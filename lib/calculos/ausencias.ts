@@ -3,6 +3,7 @@
 // ========================================
 
 import { prisma } from '@/lib/prisma';
+import { esDiaLaborable, getDiasLaborablesEmpresa } from './dias-laborables';
 
 /**
  * Verifica si una fecha es fin de semana (sábado o domingo)
@@ -46,11 +47,11 @@ export async function getFestivos(empresaId: string, fechaInicio: Date, fechaFin
 }
 
 /**
- * Calcula los días solicitados excluyendo fines de semana y festivos
+ * Calcula los días solicitados excluyendo días no laborables (según config empresa) y festivos
  * 
  * @param fechaInicio Fecha de inicio de la ausencia
  * @param fechaFin Fecha de fin de la ausencia
- * @param empresaId ID de la empresa (para obtener festivos)
+ * @param empresaId ID de la empresa (para obtener festivos y config días laborables)
  * @param medioDia Si es medio día (divide el resultado por 2)
  * @returns Número de días laborables solicitados
  */
@@ -60,21 +61,18 @@ export async function calcularDiasSolicitados(
   empresaId: string,
   medioDia: boolean = false
 ): Promise<number> {
-  // Obtener festivos de la empresa en el rango
-  const festivos = await getFestivos(empresaId, fechaInicio, fechaFin);
-  const festivosDates = festivos.map(f => f.fecha.toDateString());
+  // Obtener configuración de días laborables (una sola vez)
+  const diasLaborables = await getDiasLaborablesEmpresa(empresaId);
 
   let dias = 0;
   let fecha = new Date(fechaInicio);
   const fechaFinDate = new Date(fechaFin);
 
   while (fecha <= fechaFinDate) {
-    // Excluir fines de semana
-    if (!esFinDeSemana(fecha)) {
-      // Excluir festivos
-      if (!festivosDates.includes(fecha.toDateString())) {
-        dias++;
-      }
+    // Verificar si el día es laborable según configuración y festivos
+    const esLaborable = await esDiaLaborable(fecha, empresaId, diasLaborables);
+    if (esLaborable) {
+      dias++;
     }
     fecha.setDate(fecha.getDate() + 1);
   }
@@ -84,6 +82,7 @@ export async function calcularDiasSolicitados(
 
 /**
  * Calcula los días naturales y laborables entre dos fechas
+ * Usa la configuración de días laborables de la empresa y festivos
  */
 export async function calcularDias(
   fechaInicio: Date,
@@ -102,22 +101,43 @@ export async function calcularDias(
   const festivos = await getFestivos(empresaId, fechaInicio, fechaFin);
   const festivosDates = festivos.map(f => f.fecha.toDateString());
 
-  // Contar días laborables (excluyendo solo fines de semana, incluyendo festivos)
+  // Obtener configuración de días laborables
+  const diasLaborablesConfig = await getDiasLaborablesEmpresa(empresaId);
+
+  // Contar días laborables y solicitados según configuración de empresa
   let diasLaborables = 0;
   let diasSolicitados = 0;
   let fecha = new Date(fechaInicio);
   const fechaFinDate = new Date(fechaFin);
 
   while (fecha <= fechaFinDate) {
-    const esFinde = esFinDeSemana(fecha);
-    const esFest = festivosDates.includes(fecha.toDateString());
-
-    if (!esFinde) {
+    // Verificar si el día de la semana es laborable según configuración
+    const diaSemana = fecha.getDay();
+    const mapaDias: { [key: number]: keyof typeof diasLaborablesConfig } = {
+      0: 'domingo',
+      1: 'lunes',
+      2: 'martes',
+      3: 'miercoles',
+      4: 'jueves',
+      5: 'viernes',
+      6: 'sabado',
+    };
+    const nombreDia = mapaDias[diaSemana];
+    const esDiaSemanaLaborable = diasLaborablesConfig[nombreDia];
+    
+    // Un día es "laborable" si el día de la semana está configurado como tal
+    // (no consideramos festivos para días laborables, solo para días solicitados)
+    if (esDiaSemanaLaborable) {
       diasLaborables++;
-      if (!esFest) {
-        diasSolicitados++;
-      }
     }
+
+    // Días solicitados: solo días laborables que NO son festivos
+    // esDiaLaborable ya verifica festivos y días de semana
+    const esLaborable = await esDiaLaborable(fecha, empresaId, diasLaborablesConfig);
+    if (esLaborable) {
+      diasSolicitados++;
+    }
+
     fecha.setDate(fecha.getDate() + 1);
   }
 
@@ -133,11 +153,10 @@ export async function calcularDias(
  */
 export async function getSaldoEmpleado(empleadoId: string, año: number) {
   let saldo = await prisma.empleadoSaldoAusencias.findFirst({
-    where: {
-      empleadoId,
-      equipoId: null, // Saldo general
-      año,
-    },
+      where: {
+        empleadoId,
+        año,
+      },
   });
 
   // Si no existe, crear uno por defecto
@@ -155,7 +174,6 @@ export async function getSaldoEmpleado(empleadoId: string, año: number) {
       data: {
         empleadoId,
         empresaId: empleado.empresaId,
-        equipoId: null,
         año,
         diasTotales: empleado.diasVacaciones,
         diasUsados: 0,
@@ -170,6 +188,7 @@ export async function getSaldoEmpleado(empleadoId: string, año: number) {
 
 /**
  * Calcula el saldo disponible de un empleado
+ * Recalcula desde las ausencias reales para mantener sincronización
  */
 export async function calcularSaldoDisponible(empleadoId: string, año: number): Promise<{
   diasTotales: number;
@@ -179,13 +198,34 @@ export async function calcularSaldoDisponible(empleadoId: string, año: number):
 }> {
   const saldo = await getSaldoEmpleado(empleadoId, año);
 
-  const diasDisponibles =
-    saldo.diasTotales - Number(saldo.diasUsados) - Number(saldo.diasPendientes);
+  // Recalcular desde ausencias reales para mantener sincronización
+  const ausencias = await prisma.ausencia.findMany({
+    where: {
+      empleadoId,
+      descuentaSaldo: true, // Solo contar ausencias que descuentan saldo (vacaciones)
+      fechaInicio: {
+        gte: new Date(`${año}-01-01`),
+        lt: new Date(`${año + 1}-01-01`),
+      },
+    },
+  });
+
+  // Días usados: ausencias aprobadas y disfrutadas
+  const diasUsados = ausencias
+    .filter((a) => a.estado === 'en_curso' || a.estado === 'completada' || a.estado === 'auto_aprobada')
+    .reduce((sum, a) => sum + Number(a.diasSolicitados), 0);
+
+  // Días pendientes: ausencias esperando aprobación
+  const diasPendientes = ausencias
+    .filter((a) => a.estado === 'pendiente_aprobacion')
+    .reduce((sum, a) => sum + Number(a.diasSolicitados), 0);
+
+  const diasDisponibles = saldo.diasTotales - diasUsados - diasPendientes;
 
   return {
     diasTotales: saldo.diasTotales,
-    diasUsados: Number(saldo.diasUsados),
-    diasPendientes: Number(saldo.diasPendientes),
+    diasUsados,
+    diasPendientes,
     diasDisponibles,
   };
 }
@@ -301,7 +341,7 @@ export async function calcularSolapamientoEquipo(
     where: {
       equipoId,
       estado: {
-        in: ['pendiente_aprobacion', 'en_curso', 'auto_aprobada'],
+        in: ['pendiente_aprobacion', 'en_curso', 'completada', 'auto_aprobada'],
       },
       OR: [
         {
@@ -353,6 +393,7 @@ export async function calcularSolapamientoEquipo(
 
 /**
  * Obtiene la disponibilidad de cada día para el calendario inteligente
+ * Usa la configuración de días laborables de la empresa
  */
 export async function getDisponibilidadCalendario(
   equipoId: string,
@@ -366,6 +407,7 @@ export async function getDisponibilidadCalendario(
     porcentaje: number;
     esFestivo: boolean;
     esFinDeSemana: boolean;
+    esLaborable: boolean;
   }>
 > {
   // Obtener solapamiento
@@ -375,17 +417,28 @@ export async function getDisponibilidadCalendario(
   const festivos = await getFestivos(empresaId, fechaInicio, fechaFin);
   const festivosDates = festivos.map(f => f.fecha.toDateString());
 
-  return solapamiento.map((s) => {
-    const esFinde = esFinDeSemana(s.fecha);
+  // Obtener configuración de días laborables
+  const diasLaborablesConfig = await getDiasLaborablesEmpresa(empresaId);
+
+  // Obtener política del equipo si existe
+  const politica = await prisma.equipoPoliticaAusencias.findUnique({
+    where: { equipoId },
+  });
+  const maxSolapamientoPct = politica?.maxSolapamientoPct || 50;
+
+  return await Promise.all(solapamiento.map(async (s) => {
+    const esFinde = esFinDeSemana(s.fecha); // Mantener para compatibilidad
     const esFest = festivosDates.includes(s.fecha.toDateString());
+    const esLaborable = await esDiaLaborable(s.fecha, empresaId, diasLaborablesConfig);
 
     let estado: 'muy_disponible' | 'disponible' | 'poco_disponible' | 'no_disponible';
 
-    if (esFest || s.porcentaje > 50) {
+    // Usar el umbral de la política del equipo o 50% por defecto
+    if (esFest || !esLaborable || s.porcentaje > maxSolapamientoPct) {
       estado = 'no_disponible';
-    } else if (s.porcentaje >= 40) {
+    } else if (s.porcentaje >= maxSolapamientoPct * 0.8) {
       estado = 'poco_disponible';
-    } else if (s.porcentaje >= 25) {
+    } else if (s.porcentaje >= maxSolapamientoPct * 0.5) {
       estado = 'disponible';
     } else {
       estado = 'muy_disponible';
@@ -397,7 +450,246 @@ export async function getDisponibilidadCalendario(
       porcentaje: s.porcentaje,
       esFestivo: esFest,
       esFinDeSemana: esFinde,
+      esLaborable,
     };
+  }));
+}
+
+/**
+ * Obtiene la política de ausencias de un equipo
+ */
+export async function getPoliticaEquipo(equipoId: string | null) {
+  if (!equipoId) {
+    return null;
+  }
+
+  return await prisma.equipoPoliticaAusencias.findUnique({
+    where: { equipoId },
   });
+}
+
+/**
+ * Valida si una ausencia cumple con la política de antelación mínima del equipo
+ * Solo aplica a ausencias que requieren aprobación (vacaciones y "otro")
+ */
+export async function validarAntelacion(
+  equipoId: string | null,
+  fechaInicio: Date,
+  tipoAusencia: string // 'vacaciones', 'enfermedad', 'enfermedad_familiar', 'maternidad_paternidad', 'otro'
+): Promise<{
+  valida: boolean;
+  mensaje?: string;
+  diasAntelacion?: number;
+  requiereDias?: number;
+}> {
+  // Solo aplicar antelación a tipos que requieren aprobación
+  const tiposQueRequierenAprobacion = ['vacaciones', 'otro'];
+  if (!tiposQueRequierenAprobacion.includes(tipoAusencia)) {
+    return { valida: true };
+  }
+
+  if (!equipoId) {
+    // Sin equipo, no hay restricción de antelación
+    return { valida: true };
+  }
+
+  const politica = await getPoliticaEquipo(equipoId);
+  
+  if (!politica || !politica.requiereAntelacionDias) {
+    return { valida: true };
+  }
+
+  const hoy = new Date();
+  hoy.setHours(0, 0, 0, 0);
+  
+  const fechaInicioDate = new Date(fechaInicio);
+  fechaInicioDate.setHours(0, 0, 0, 0);
+
+  const diffTime = fechaInicioDate.getTime() - hoy.getTime();
+  const diasAntelacion = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+  if (diasAntelacion < politica.requiereAntelacionDias) {
+    return {
+      valida: false,
+      mensaje: `La solicitud debe realizarse con al menos ${politica.requiereAntelacionDias} días de antelación. Faltan ${diasAntelacion} días.`,
+      diasAntelacion,
+      requiereDias: politica.requiereAntelacionDias,
+    };
+  }
+
+  return {
+    valida: true,
+    diasAntelacion,
+    requiereDias: politica.requiereAntelacionDias,
+  };
+}
+
+/**
+ * Valida si una ausencia cumple con la política de solapamiento máximo del equipo
+ */
+export async function validarSolapamientoMaximo(
+  equipoId: string | null,
+  fechaInicio: Date,
+  fechaFin: Date,
+  excluirAusenciaId?: string // Para excluir la ausencia actual en caso de edición
+): Promise<{
+  valida: boolean;
+  mensaje?: string;
+  maxPorcentaje?: number;
+  fechaProblema?: Date;
+}> {
+  if (!equipoId) {
+    // Sin equipo, no hay restricción de solapamiento
+    return { valida: true };
+  }
+
+  const politica = await getPoliticaEquipo(equipoId);
+  
+  if (!politica) {
+    return { valida: true };
+  }
+
+  const solapamiento = await calcularSolapamientoEquipo(equipoId, fechaInicio, fechaFin);
+
+  // Si es una edición, excluir la ausencia actual del cálculo
+  if (excluirAusenciaId) {
+    // Obtener la ausencia actual para restar su solapamiento
+    const ausenciaActual = await prisma.ausencia.findUnique({
+      where: { id: excluirAusenciaId },
+      select: { fechaInicio: true, fechaFin: true },
+    });
+
+    if (ausenciaActual) {
+      // Ajustar el cálculo restando la ausencia actual
+      // Esto se puede hacer ajustando el conteo, pero por simplicidad
+      // recalculamos sin esa ausencia
+      const ausenciasEquipo = await prisma.ausencia.findMany({
+        where: {
+          equipoId,
+          estado: {
+            in: ['pendiente_aprobacion', 'en_curso', 'completada', 'auto_aprobada'],
+          },
+          id: { not: excluirAusenciaId },
+          OR: [
+            {
+              AND: [
+                { fechaInicio: { lte: fechaFin } },
+                { fechaFin: { gte: fechaInicio } },
+              ],
+            },
+          ],
+        },
+      });
+
+      const totalEquipo = await prisma.empleadoEquipo.count({
+        where: { equipoId },
+      });
+
+      if (totalEquipo > 0) {
+        // Recalcular solapamiento día por día
+        let fecha = new Date(fechaInicio);
+        const fechaFinDate = new Date(fechaFin);
+
+        while (fecha <= fechaFinDate) {
+          const ausentesEsteDia = ausenciasEquipo.filter(
+            (a) =>
+              new Date(a.fechaInicio) <= fecha && new Date(a.fechaFin) >= fecha
+          ).length;
+
+          // Agregar 1 por la ausencia que se está solicitando
+          const porcentaje = ((ausentesEsteDia + 1) / totalEquipo) * 100;
+
+          if (porcentaje > politica.maxSolapamientoPct) {
+            return {
+              valida: false,
+              mensaje: `El solapamiento máximo permitido es ${politica.maxSolapamientoPct}%. En la fecha ${fecha.toLocaleDateString('es-ES')} habría ${Math.round(porcentaje)}% del equipo ausente.`,
+              maxPorcentaje: politica.maxSolapamientoPct,
+              fechaProblema: new Date(fecha),
+            };
+          }
+
+          fecha.setDate(fecha.getDate() + 1);
+        }
+      }
+    }
+  } else {
+    // Nueva ausencia: verificar solapamiento incluyendo esta
+    const totalEquipo = await prisma.empleadoEquipo.count({
+      where: { equipoId },
+    });
+
+    if (totalEquipo === 0) {
+      return { valida: true, maxPorcentaje: politica.maxSolapamientoPct };
+    }
+
+    // Recalcular día por día incluyendo la nueva ausencia
+    let fecha = new Date(fechaInicio);
+    const fechaFinDate = new Date(fechaFin);
+
+    while (fecha <= fechaFinDate) {
+      // Contar ausentes este día (sin incluir la nueva)
+      const ausentesEsteDia = solapamiento.find(
+        (s) => s.fecha.toDateString() === fecha.toDateString()
+      )?.ausentes || 0;
+
+      // Agregar 1 por la nueva ausencia
+      const porcentajeConNueva = ((ausentesEsteDia + 1) / totalEquipo) * 100;
+
+      if (porcentajeConNueva > politica.maxSolapamientoPct) {
+        return {
+          valida: false,
+          mensaje: `El solapamiento máximo permitido es ${politica.maxSolapamientoPct}%. En la fecha ${fecha.toLocaleDateString('es-ES')} habría ${Math.round(porcentajeConNueva)}% del equipo ausente (${ausentesEsteDia + 1} de ${totalEquipo} miembros).`,
+          maxPorcentaje: politica.maxSolapamientoPct,
+          fechaProblema: new Date(fecha),
+        };
+      }
+
+      fecha.setDate(fecha.getDate() + 1);
+    }
+  }
+
+  return { valida: true, maxPorcentaje: politica.maxSolapamientoPct };
+}
+
+
+/**
+ * Valida todas las políticas de ausencia de un equipo
+ */
+export async function validarPoliticasEquipo(
+  equipoId: string | null,
+  empleadoId: string,
+  fechaInicio: Date,
+  fechaFin: Date,
+  tipoAusencia: string, // Necesario para determinar si requiere aprobación
+  excluirAusenciaId?: string
+): Promise<{
+  valida: boolean;
+  errores: string[];
+}> {
+  const errores: string[] = [];
+
+  // Validar antelación (solo para tipos que requieren aprobación)
+  const validacionAntelacion = await validarAntelacion(equipoId, fechaInicio, tipoAusencia);
+  if (!validacionAntelacion.valida) {
+    errores.push(validacionAntelacion.mensaje || 'No cumple con la antelación mínima requerida');
+  }
+
+  // Validar solapamiento máximo (solo para vacaciones)
+  if (tipoAusencia === 'vacaciones') {
+    const validacionSolapamiento = await validarSolapamientoMaximo(
+      equipoId,
+      fechaInicio,
+      fechaFin,
+      excluirAusenciaId
+    );
+    if (!validacionSolapamiento.valida) {
+      errores.push(validacionSolapamiento.mensaje || 'Excede el solapamiento máximo permitido');
+    }
+  }
+
+  return {
+    valida: errores.length === 0,
+    errores,
+  };
 }
 

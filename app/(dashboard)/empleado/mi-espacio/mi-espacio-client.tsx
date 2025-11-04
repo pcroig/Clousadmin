@@ -6,14 +6,17 @@
 
 import { useState, useEffect } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { User, Edit2 } from 'lucide-react';
+import { User, Edit2, Loader2 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { GeneralTab } from '../../hr/mi-espacio/tabs/general-tab';
 import { AusenciasTab } from './tabs/ausencias-tab';
 import { FichajesTab } from './tabs/fichajes-tab';
 import { ContratosTab } from '../../hr/mi-espacio/tabs/contratos-tab';
 import { DocumentosTab } from '../../hr/mi-espacio/tabs/documentos-tab';
+import { toast } from 'sonner';
+import { LoadingButton } from '@/components/shared/loading-button';
 
 interface MiEspacioClientProps {
   empleado: any;
@@ -26,15 +29,78 @@ export function MiEspacioClient({ empleado, usuario }: MiEspacioClientProps) {
   const tabFromUrl = searchParams.get('tab') || 'general';
   const [activeTab, setActiveTab] = useState(tabFromUrl);
   const [editingProfile, setEditingProfile] = useState(false);
+  const [showAvatarDialog, setShowAvatarDialog] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
   useEffect(() => {
-    if (searchParams.get('tab')) {
-      setActiveTab(searchParams.get('tab') || 'general');
-    }
+    const tab = searchParams.get('tab') || 'general';
+    setActiveTab(tab);
   }, [searchParams]);
 
   const getInitials = () => {
     return `${empleado.nombre.charAt(0)}${empleado.apellidos.charAt(0)}`.toUpperCase();
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validar tipo de archivo
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+    if (!allowedTypes.includes(file.type)) {
+      toast.error('Tipo de archivo no permitido. Solo JPG, PNG y WEBP');
+      return;
+    }
+
+    // Validar tamaño (2MB)
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error('El archivo es demasiado grande. Máximo 2MB');
+      return;
+    }
+
+    setSelectedFile(file);
+    
+    // Crear preview
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setPreviewUrl(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+    
+    setShowAvatarDialog(true);
+  };
+
+  const handleUploadAvatar = async () => {
+    if (!selectedFile) return;
+
+    setUploadingAvatar(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', selectedFile);
+
+      const response = await fetch(`/api/empleados/${empleado.id}/avatar`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        toast.success('Avatar actualizado correctamente');
+        setShowAvatarDialog(false);
+        setSelectedFile(null);
+        setPreviewUrl(null);
+        window.location.reload();
+      } else {
+        toast.error('Error al subir avatar');
+      }
+    } catch (error) {
+      console.error('Error uploading avatar:', error);
+      toast.error('Error al subir avatar');
+    } finally {
+      setUploadingAvatar(false);
+    }
   };
 
   const tabs = [
@@ -58,8 +124,15 @@ export function MiEspacioClient({ empleado, usuario }: MiEspacioClientProps) {
                   {getInitials()}
                 </AvatarFallback>
               </Avatar>
+              <input
+                type="file"
+                id="avatar-upload"
+                className="hidden"
+                accept="image/jpeg,image/jpg,image/png,image/webp"
+                onChange={handleFileSelect}
+              />
               <button
-                onClick={() => setEditingProfile(!editingProfile)}
+                onClick={() => document.getElementById('avatar-upload')?.click()}
                 className="absolute -bottom-1 -right-1 bg-gray-900 text-white rounded-full p-1.5 hover:bg-gray-800 transition-colors"
                 title="Editar foto de perfil"
               >
@@ -99,12 +172,50 @@ export function MiEspacioClient({ empleado, usuario }: MiEspacioClientProps) {
 
       {/* Content */}
       <div className="flex-1 min-h-0 overflow-y-auto">
-        {activeTab === 'general' && <GeneralTab empleado={empleado} usuario={usuario} />}
+        {activeTab === 'general' && <GeneralTab empleado={empleado} usuario={usuario} rol="empleado" />}
         {activeTab === 'ausencias' && <AusenciasTab empleadoId={empleado.id} />}
         {activeTab === 'fichajes' && <FichajesTab empleadoId={empleado.id} />}
         {activeTab === 'contratos' && <ContratosTab empleado={empleado} />}
         {activeTab === 'documentos' && <DocumentosTab empleado={empleado} />}
       </div>
+
+      {/* Dialog para cambiar avatar */}
+      <Dialog open={showAvatarDialog} onOpenChange={setShowAvatarDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Cambiar Foto de Perfil</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            {previewUrl && (
+              <div className="flex justify-center">
+                <Avatar className="h-32 w-32">
+                  <AvatarImage src={previewUrl} />
+                  <AvatarFallback>{getInitials()}</AvatarFallback>
+                </Avatar>
+              </div>
+            )}
+            <p className="text-sm text-gray-500 text-center">
+              Tamaño máximo: 2MB. Formatos permitidos: JPG, PNG, WEBP
+            </p>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowAvatarDialog(false);
+                setSelectedFile(null);
+                setPreviewUrl(null);
+              }}
+              disabled={uploadingAvatar}
+            >
+              Cancelar
+            </Button>
+            <LoadingButton onClick={handleUploadAvatar} loading={uploadingAvatar}>
+              Guardar Foto
+            </LoadingButton>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

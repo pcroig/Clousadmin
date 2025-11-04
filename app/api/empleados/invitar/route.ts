@@ -2,83 +2,108 @@
 // API Route: Enviar Invitación a Empleado
 // ========================================
 
-import { NextRequest, NextResponse } from 'next/server';
-import { getSession } from '@/lib/auth';
-import { crearInvitacion } from '@/lib/invitaciones';
+import { NextRequest } from 'next/server';
+import { crearOnboarding } from '@/lib/onboarding';
+import { sendOnboardingEmail } from '@/lib/email';
+import {
+  requireAuthAsHR,
+  validateRequest,
+  handleApiError,
+  successResponse,
+  notFoundResponse,
+  forbiddenResponse,
+  badRequestResponse,
+} from '@/lib/api-handler';
+import { z } from 'zod';
 
+const invitacionSchema = z.object({
+  empleadoId: z.string().uuid(),
+  email: z.string().email().optional(), // Email opcional, si no se provee usa el del empleado
+});
+
+// POST /api/empleados/invitar - Enviar invitación a empleado (solo HR Admin)
 export async function POST(req: NextRequest) {
   try {
-    const session = await getSession();
+    // Verificar autenticación y rol HR Admin
+    const authResult = await requireAuthAsHR(req);
+    if (authResult instanceof Response) return authResult;
+    const { session } = authResult;
 
-    // Solo HR Admin puede enviar invitaciones
-    if (!session || session.user.rol !== 'hr_admin') {
-      return NextResponse.json(
-        { error: 'No autorizado' },
-        { status: 403 }
-      );
-    }
+    // Validar request body
+    const validationResult = await validateRequest(req, invitacionSchema);
+    if (validationResult instanceof Response) return validationResult;
+    const { data: validatedData } = validationResult;
 
-    const { empleadoId, email } = await req.json();
-
-    if (!empleadoId || !email) {
-      return NextResponse.json(
-        { error: 'Faltan datos requeridos' },
-        { status: 400 }
-      );
-    }
+    const { empleadoId } = validatedData;
 
     // Verificar que el empleado existe y pertenece a la misma empresa
     const { prisma } = await import('@/lib/prisma');
     const empleado = await prisma.empleado.findUnique({
       where: { id: empleadoId },
+      include: {
+        empresa: true,
+      },
     });
 
     if (!empleado) {
-      return NextResponse.json(
-        { error: 'Empleado no encontrado' },
-        { status: 404 }
-      );
+      return notFoundResponse('Empleado no encontrado');
     }
 
     if (empleado.empresaId !== session.user.empresaId) {
-      return NextResponse.json(
-        { error: 'No autorizado' },
-        { status: 403 }
-      );
+      return forbiddenResponse('El empleado no pertenece a tu empresa');
     }
 
-    // Crear invitación
-    const result = await crearInvitacion(
+    // Usar email provisto o email del empleado
+    const email = validatedData.email || empleado.email;
+
+    if (!email) {
+      return badRequestResponse('El empleado no tiene email configurado');
+    }
+
+    // Crear onboarding (genera token y link)
+    const result = await crearOnboarding(
       empleadoId,
-      session.user.empresaId,
-      email
+      session.user.empresaId
     );
 
     if (!result.success) {
-      return NextResponse.json(
+      return successResponse(
         { error: result.error },
-        { status: 500 }
+        500
       );
     }
 
-    // TODO: Enviar email con la invitación
-    // await sendInvitacionEmail(email, result.url);
+    // Después del check anterior, TypeScript sabe que result.success es true
+    // Por lo tanto, result.url está disponible
+    const { url } = result;
 
-    console.log(`[Invitación] Creada para ${email}: ${result.url}`);
+    // Enviar email de onboarding
+    try {
+      await sendOnboardingEmail(
+        empleado.nombre,
+        empleado.apellidos,
+        email,
+        empleado.empresa.nombre,
+        url
+      );
+      console.log(`[Onboarding] Email enviado a ${email}: ${url}`);
+    } catch (emailError) {
+      console.error('[Onboarding] Error al enviar email:', emailError);
+      // No fallar si el email falla, el onboarding ya está creado
+    }
 
-    return NextResponse.json({
+    return successResponse({
       success: true,
-      url: result.url,
-      message: 'Invitación enviada correctamente',
+      url,
+      message: 'Invitación de onboarding enviada correctamente',
     });
   } catch (error) {
-    console.error('[POST /api/empleados/invitar] Error:', error);
-    return NextResponse.json(
-      { error: 'Error al enviar la invitación' },
-      { status: 500 }
-    );
+    return handleApiError(error, 'API POST /api/empleados/invitar');
   }
 }
+
+
+
 
 
 

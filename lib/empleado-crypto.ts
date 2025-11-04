@@ -1,0 +1,118 @@
+// ========================================
+// Empleado Encryption Helpers
+// ========================================
+// Helpers para encriptar/desencriptar campos sensibles de empleados
+
+import { encrypt, decrypt } from '@/lib/crypto';
+import type { Empleado } from '@prisma/client';
+
+// Campos sensibles que se encriptan
+const SENSITIVE_FIELDS = ['iban', 'nif', 'nss'] as const;
+
+type SensitiveField = (typeof SENSITIVE_FIELDS)[number];
+
+/**
+ * Encriptar campos sensibles antes de guardar en BD
+ * @param data - Datos del empleado (puede ser parcial para updates)
+ * @returns Datos con campos sensibles encriptados
+ */
+export function encryptEmpleadoData<T extends Partial<Empleado>>(data: T): T {
+  const encrypted = { ...data };
+
+  for (const field of SENSITIVE_FIELDS) {
+    const value = data[field as keyof T];
+    if (value !== null && value !== undefined && value !== '') {
+      try {
+        encrypted[field as keyof T] = encrypt(String(value)) as any;
+      } catch (error) {
+        console.error(`[Empleado Crypto] Error encriptando ${field}:`, error);
+        throw new Error(`Error encriptando campo ${field}`);
+      }
+    }
+  }
+
+  return encrypted;
+}
+
+/**
+ * Desencriptar campos sensibles después de leer de BD
+ * @param empleado - Empleado con campos encriptados
+ * @returns Empleado con campos desencriptados
+ */
+export function decryptEmpleadoData<T extends Partial<Empleado>>(empleado: T): T {
+  if (!empleado) return empleado;
+
+  const decrypted = { ...empleado };
+
+  for (const field of SENSITIVE_FIELDS) {
+    const value = empleado[field as keyof T];
+    if (value !== null && value !== undefined && value !== '') {
+      try {
+        decrypted[field as keyof T] = decrypt(String(value)) as any;
+      } catch (error) {
+        console.error(`[Empleado Crypto] Error desencriptando ${field}:`, error);
+        // Mantener valor encriptado si falla (no romper la app)
+        // En producción, loggear este error para investigar
+      }
+    }
+  }
+
+  return decrypted;
+}
+
+/**
+ * Desencriptar array de empleados
+ * @param empleados - Array de empleados con campos encriptados
+ * @returns Array de empleados con campos desencriptados
+ */
+export function decryptEmpleadoList<T extends Partial<Empleado>>(empleados: T[]): T[] {
+  return empleados.map((emp) => decryptEmpleadoData(emp));
+}
+
+/**
+ * Verificar si un campo está encriptado
+ * Útil para migración de datos existentes
+ */
+export function isFieldEncrypted(value: string | null | undefined): boolean {
+  if (!value || value.trim() === '') return false;
+
+  // Formato encriptado: salt:iv:authTag:ciphertext (4 partes separadas por :)
+  const parts = value.split(':');
+  return parts.length === 4;
+}
+
+/**
+ * Obtener campos sensibles que necesitan encriptación
+ * Útil para scripts de migración
+ */
+export function getSensitiveFields(): readonly SensitiveField[] {
+  return SENSITIVE_FIELDS;
+}
+
+/**
+ * Sanitizar datos de empleado para logs (ocultar campos sensibles)
+ * NUNCA loggear datos sensibles sin sanitizar
+ */
+export function sanitizeEmpleadoForLogs<T extends Partial<Empleado>>(
+  empleado: T
+): Partial<T> {
+  const sanitized = { ...empleado };
+
+  for (const field of SENSITIVE_FIELDS) {
+    if (empleado[field as keyof T]) {
+      sanitized[field as keyof T] = '[REDACTED]' as any;
+    }
+  }
+
+  // También sanitizar salarios si existen
+  if ('salarioBrutoAnual' in sanitized) {
+    sanitized.salarioBrutoAnual = '[REDACTED]' as any;
+  }
+  if ('salarioBrutoMensual' in sanitized) {
+    sanitized.salarioBrutoMensual = '[REDACTED]' as any;
+  }
+
+  return sanitized;
+}
+
+

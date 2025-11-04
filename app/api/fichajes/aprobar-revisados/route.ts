@@ -4,9 +4,15 @@
 // Endpoint para que HR apruebe fichajes en estado 'revisado'
 // Puede aprobar uno, varios o todos
 
-import { NextRequest, NextResponse } from 'next/server';
-import { getSession } from '@/lib/auth';
+import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import {
+  requireAuthAsHR,
+  validateRequest,
+  handleApiError,
+  successResponse,
+  badRequestResponse,
+} from '@/lib/api-handler';
 import { z } from 'zod';
 
 const aprobarSchema = z.object({
@@ -15,24 +21,18 @@ const aprobarSchema = z.object({
   empresaId: z.string().optional(),
 });
 
+// POST /api/fichajes/aprobar-revisados - Aprobar fichajes revisados (solo HR Admin)
 export async function POST(req: NextRequest) {
   try {
-    // 1. Verificar sesión y permisos
-    const session = await getSession();
-    if (!session) {
-      return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
-    }
+    // Verificar autenticación y rol HR Admin
+    const authResult = await requireAuthAsHR(req);
+    if (authResult instanceof Response) return authResult;
+    const { session } = authResult;
 
-    if (session.user.rol !== 'hr_admin') {
-      return NextResponse.json(
-        { error: 'No autorizado. Solo HR Admin puede aprobar fichajes.' },
-        { status: 403 }
-      );
-    }
-
-    // 2. Validar body
-    const body = await req.json();
-    const validatedData = aprobarSchema.parse(body);
+    // Validar request body
+    const validationResult = await validateRequest(req, aprobarSchema);
+    if (validationResult instanceof Response) return validationResult;
+    const { data: validatedData } = validationResult;
 
     const empresaId = validatedData.empresaId || session.user.empresaId;
     let fichajesIds = validatedData.fichajesIds || [];
@@ -53,13 +53,8 @@ export async function POST(req: NextRequest) {
     }
 
     if (fichajesIds.length === 0) {
-      return NextResponse.json(
-        { error: 'No hay fichajes para aprobar' },
-        { status: 400 }
-      );
+      return badRequestResponse('No hay fichajes para aprobar');
     }
-
-    console.log('[Aprobar Revisados] Aprobando', fichajesIds.length, 'fichajes');
 
     // 4. Actualizar fichajes a 'finalizado' (aprobado pasa a finalizado)
     const resultado = await prisma.fichaje.updateMany({
@@ -79,30 +74,13 @@ export async function POST(req: NextRequest) {
     // TODO: Update AutoCompletado records for approved fichajes
     // Note: JSON filtering with 'in' operator needs to be implemented differently
 
-    console.log('[Aprobar Revisados] Aprobados:', resultado.count);
-
-    return NextResponse.json({
+    return successResponse({
       success: true,
       aprobados: resultado.count,
       mensaje: `${resultado.count} fichaje(s) aprobado(s) correctamente`,
     });
-
   } catch (error) {
-    if (error instanceof z.ZodError) {
-      return NextResponse.json(
-        { error: 'Datos inválidos', details: error.issues },
-        { status: 400 }
-      );
-    }
-
-    console.error('[API Aprobar Revisados]', error);
-    return NextResponse.json(
-      { 
-        error: 'Error al aprobar fichajes',
-        details: error instanceof Error ? error.message : 'Error desconocido',
-      },
-      { status: 500 }
-    );
+    return handleApiError(error, 'API POST /api/fichajes/aprobar-revisados');
   }
 }
 

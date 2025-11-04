@@ -20,7 +20,7 @@ interface MiEspacioHRClientProps {
 }
 
 export function MiEspacioHRClient({ empleado, usuario }: MiEspacioHRClientProps) {
-  const [activeTab, setActiveTab] = useState('datos');
+  const [activeTab, setActiveTab] = useState('general');
   const [editingProfile, setEditingProfile] = useState(false);
 
   const getInitials = () => {
@@ -86,7 +86,7 @@ export function MiEspacioHRClient({ empleado, usuario }: MiEspacioHRClientProps)
 
       {/* Content */}
       <div className="flex-1 min-h-0 overflow-y-auto">
-        {activeTab === 'general' && <GeneralTab empleado={empleado} usuario={usuario} />}
+        {activeTab === 'general' && <GeneralTab empleado={empleado} usuario={usuario} rol="hr_admin" />}
         {activeTab === 'ausencias' && <AusenciasTab empleadoId={empleado.id} />}
         {activeTab === 'fichajes' && <FichajesTab empleadoId={empleado.id} />}
         {activeTab === 'contratos' && <ContratosTab empleado={empleado} />}

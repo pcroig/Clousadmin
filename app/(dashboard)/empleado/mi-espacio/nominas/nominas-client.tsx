@@ -9,10 +9,10 @@ interface Nomina {
 }
 
 interface MiEspacioNominasClientProps {
-  nominas: Nomina[];
+  nominas?: Nomina[];
 }
 
-export function MiEspacioNominasClient({ nominas }: MiEspacioNominasClientProps) {
+export function MiEspacioNominasClient({ nominas = [] }: MiEspacioNominasClientProps) {
   const handleDescargar = (nominaId: number) => {
     // Aquí iría la lógica de descarga
     console.log('Descargando nómina:', nominaId);

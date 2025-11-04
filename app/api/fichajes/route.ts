@@ -3,10 +3,18 @@
 // ========================================
 // NUEVO MODELO: Fichaje = día completo, POST crea eventos dentro del fichaje
 
-import { NextRequest, NextResponse } from 'next/server';
-import { getSession } from '@/lib/auth';
+import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { validarEvento, validarLimitesJornada, calcularHorasTrabajadas, calcularTiempoEnPausa } from '@/lib/calculos/fichajes';
+import {
+  requireAuth,
+  validateRequest,
+  handleApiError,
+  successResponse,
+  createdResponse,
+  badRequestResponse,
+  forbiddenResponse,
+} from '@/lib/api-handler';
 import { z } from 'zod';
 
 const fichajeEventoCreateSchema = z.object({
@@ -16,12 +24,20 @@ const fichajeEventoCreateSchema = z.object({
   ubicacion: z.string().optional(),
 });
 
+// GET /api/fichajes - Listar fichajes
 export async function GET(req: NextRequest) {
   try {
-    // 1. Verificar sesión
-    const session = await getSession();
-    if (!session) {
-      return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
+    // Verificar autenticación
+    const authResult = await requireAuth(req);
+    if (authResult instanceof Response) return authResult;
+    const { session } = authResult;
+
+    // Validar que la sesión tiene empresaId
+    if (!session.user?.empresaId) {
+      return handleApiError(
+        new Error('Sesión inválida: falta empresaId'),
+        'API GET /api/fichajes'
+      );
     }
 
     // 2. Obtener parámetros de query
@@ -42,7 +58,7 @@ export async function GET(req: NextRequest) {
     if (empleadoId) {
       // Verificar permisos
       if (session.user.rol === 'empleado' && empleadoId !== session.user.empleadoId) {
-        return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
+        return forbiddenResponse('No autorizado');
       }
       where.empleadoId = empleadoId;
     } else if (propios === '1' || propios === 'true') {
@@ -50,21 +66,43 @@ export async function GET(req: NextRequest) {
       if (session.user.empleadoId) {
         where.empleadoId = session.user.empleadoId;
       } else {
-        return NextResponse.json(
-          { error: 'No tienes un empleado asignado. Contacta con HR.' },
-          { status: 400 }
-        );
+        return badRequestResponse('No tienes un empleado asignado. Contacta con HR.');
       }
     } else if (session.user.rol === 'empleado') {
       // Empleados solo ven sus propios fichajes
       if (session.user.empleadoId) {
         where.empleadoId = session.user.empleadoId;
       } else {
-        return NextResponse.json(
-          { error: 'No tienes un empleado asignado. Contacta con HR.' },
-          { status: 400 }
-        );
+        return badRequestResponse('No tienes un empleado asignado. Contacta con HR.');
       }
+    } else if (session.user.rol === 'manager') {
+      // Managers solo ven fichajes de sus empleados a cargo
+      if (!session.user.empleadoId) {
+        return badRequestResponse('No tienes un empleado asignado. Contacta con HR.');
+      }
+
+      // Obtener IDs de empleados a cargo
+      const empleadosACargo = await prisma.empleado.findMany({
+        where: {
+          managerId: session.user.empleadoId,
+          empresaId: session.user.empresaId,
+          activo: true,
+        },
+        select: {
+          id: true,
+        },
+      });
+
+      const empleadoIds = empleadosACargo.map((e) => e.id);
+
+      if (empleadoIds.length === 0) {
+        // Si no tiene empleados a cargo, devolver array vacío
+        return successResponse([]);
+      }
+
+      where.empleadoId = {
+        in: empleadoIds,
+      };
     }
 
     // Filtrar por fecha
@@ -112,88 +150,48 @@ export async function GET(req: NextRequest) {
       take: 500, // Límite para performance
     });
 
-    return NextResponse.json(fichajes);
+    return successResponse(fichajes);
   } catch (error) {
-    console.error('[API GET Fichajes]', error);
-    
-    // Mejorar logging de errores para diagnóstico
-    if (error instanceof Error) {
-      console.error('[API GET Fichajes] Mensaje:', error.message);
-      console.error('[API GET Fichajes] Stack:', error.stack);
-      
-      // Error de Prisma
-      if (error.message.includes('Prisma') || error.message.includes('prisma')) {
-        return NextResponse.json(
-          { 
-            error: 'Error de conexión a la base de datos',
-            details: process.env.NODE_ENV === 'development' ? error.message : undefined,
-            suggestion: 'Verifica que Prisma Client esté generado y la base de datos esté accesible'
-          },
-          { status: 500 }
-        );
-      }
-    }
-    
-    return NextResponse.json(
-      { 
-        error: 'Error al obtener fichajes',
-        details: process.env.NODE_ENV === 'development' && error instanceof Error ? error.message : undefined
-      },
-      { status: 500 }
-    );
+    return handleApiError(error, 'API GET /api/fichajes');
   }
 }
 
+// POST /api/fichajes - Crear evento de fichaje
 export async function POST(req: NextRequest) {
   try {
-    // 1. Verificar sesión
-    const session = await getSession();
-    if (!session) {
-      return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
-    }
+    // Verificar autenticación
+    const authResult = await requireAuth(req);
+    if (authResult instanceof Response) return authResult;
+    const { session } = authResult;
 
-    // 2. Validar body
-    const body = await req.json();
-    const validatedData = fichajeEventoCreateSchema.parse(body);
+    // Validar request body
+    const validationResult = await validateRequest(req, fichajeEventoCreateSchema);
+    if (validationResult instanceof Response) return validationResult;
+    const { data: validatedData } = validationResult;
 
     // 3. Determinar fecha y hora
     const fechaBase = validatedData.fecha ? new Date(validatedData.fecha) : new Date();
     const fecha = new Date(fechaBase.getFullYear(), fechaBase.getMonth(), fechaBase.getDate());
     const hora = validatedData.hora ? new Date(validatedData.hora) : new Date();
-    
-    console.log('[POST Fichaje]', {
-      tipo: validatedData.tipo,
-      fecha: fecha.toISOString(),
-      hora: hora.toISOString(),
-    });
 
     // 4. Validar que el empleado puede fichar
     const empleadoId = session.user.empleadoId;
     
     if (!empleadoId) {
-      return NextResponse.json(
-        { error: 'No tienes un empleado asignado. Contacta con HR.' },
-        { status: 400 }
-      );
+      return badRequestResponse('No tienes un empleado asignado. Contacta con HR.');
     }
 
     const validacion = await validarEvento(validatedData.tipo, empleadoId);
 
     if (!validacion.valido) {
-      return NextResponse.json(
-        { error: validacion.error },
-        { status: 400 }
-      );
+      return badRequestResponse(validacion.error || 'Evento inválido');
     }
 
-    // 5. Validar límites de jornada
+    // Validar límites de jornada
     const validacionLimites = await validarLimitesJornada(empleadoId, hora);
 
     if (!validacionLimites.valido) {
-      return NextResponse.json(
-        { error: validacionLimites.error },
-        { status: 400 }
-      );
+      return badRequestResponse(validacionLimites.error || 'Límites de jornada inválidos');
     }
 
     // 6. Buscar o crear fichaje del día
@@ -212,10 +210,7 @@ export async function POST(req: NextRequest) {
     if (!fichaje) {
       // Crear fichaje del día (solo si es entrada)
       if (validatedData.tipo !== 'entrada') {
-        return NextResponse.json(
-          { error: 'Debes iniciar la jornada primero (entrada)' },
-          { status: 400 }
-        );
+        return badRequestResponse('Debes iniciar la jornada primero (entrada)');
       }
 
       fichaje = await prisma.fichaje.create({
@@ -229,8 +224,6 @@ export async function POST(req: NextRequest) {
           eventos: true,
         },
       });
-
-      console.log('[POST Fichaje] Fichaje creado:', fichaje.id);
     }
 
     // 7. Crear evento dentro del fichaje
@@ -242,8 +235,6 @@ export async function POST(req: NextRequest) {
         ubicacion: validatedData.ubicacion,
       },
     });
-
-    console.log('[POST Fichaje] Evento creado:', evento.id, evento.tipo);
 
     // 8. Actualizar cálculos del fichaje
     const todosEventos = [...fichaje.eventos, evento];
@@ -283,19 +274,8 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    return NextResponse.json(fichajeActualizado, { status: 201 });
+    return createdResponse(fichajeActualizado);
   } catch (error) {
-    if (error instanceof z.ZodError) {
-      return NextResponse.json(
-        { error: 'Datos inválidos', details: error.issues },
-        { status: 400 }
-      );
-    }
-
-    console.error('[API POST Fichajes]', error);
-    return NextResponse.json(
-      { error: 'Error al crear fichaje' },
-      { status: 500 }
-    );
+    return handleApiError(error, 'API POST /api/fichajes');
   }
 }

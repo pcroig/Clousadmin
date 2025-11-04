@@ -185,7 +185,7 @@ export function HorarioMiEspacioClient({
                           <span className="font-medium">{ausencia.tipo}</span>
                           <Badge
                             variant={
-                              ausencia.estado === 'aprobada'
+                              ausencia.estado === 'en_curso' || ausencia.estado === 'completada' || ausencia.estado === 'auto_aprobada'
                                 ? 'default'
                                 : ausencia.estado === 'rechazada'
                                   ? 'destructive'

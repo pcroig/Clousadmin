@@ -25,11 +25,6 @@ export type FichajeConEventos = Fichaje & {
 export async function obtenerEstadoFichaje(empleadoId: string): Promise<EstadoFichaje> {
   const hoy = new Date();
   const fechaHoy = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
-  
-  console.log('[obtenerEstadoFichaje]', {
-    empleadoId,
-    fechaHoy: fechaHoy.toISOString(),
-  });
 
   // Buscar el fichaje del día (único por empleado + fecha)
   const fichajeHoy = await prisma.fichaje.findUnique({
@@ -59,7 +54,6 @@ export async function obtenerEstadoFichaje(empleadoId: string): Promise<EstadoFi
 
   // Si está en curso, determinar estado actual según último evento
   const ultimoEvento = fichajeHoy.eventos[fichajeHoy.eventos.length - 1];
-  console.log('[obtenerEstadoFichaje] Último evento:', { tipo: ultimoEvento.tipo, hora: ultimoEvento.hora });
 
   switch (ultimoEvento.tipo) {
     case 'entrada':
@@ -533,12 +527,8 @@ export async function crearFichajesAutomaticos(
   const errores: string[] = [];
   let creados = 0;
 
-  console.log('[crearFichajesAutomaticos] Empresa:', empresaId, 'Fecha:', fechaSinHora.toISOString().split('T')[0]);
-
   // Obtener empleados disponibles
   const empleadosDisponibles = await obtenerEmpleadosDisponibles(empresaId, fechaSinHora);
-
-  console.log('[crearFichajesAutomaticos] Empleados disponibles:', empleadosDisponibles.length);
 
   // Para cada empleado, verificar si ya tiene fichaje
   for (const empleado of empleadosDisponibles) {
@@ -564,16 +554,17 @@ export async function crearFichajesAutomaticos(
         });
 
         creados++;
-        console.log('[crearFichajesAutomaticos] Fichaje creado para:', empleado.nombre, empleado.apellidos);
       }
     } catch (error) {
       const mensaje = error instanceof Error ? error.message : 'Error desconocido';
       errores.push(`${empleado.nombre} ${empleado.apellidos}: ${mensaje}`);
-      console.error('[crearFichajesAutomaticos] Error creando fichaje:', error);
+      console.error('[crearFichajesAutomaticos] Error creando fichaje:', {
+        empleadoId: empleado.id,
+        nombre: `${empleado.nombre} ${empleado.apellidos}`,
+        error,
+      });
     }
   }
-
-  console.log('[crearFichajesAutomaticos] Resultado:', { creados, errores: errores.length });
 
   return { creados, errores };
 }

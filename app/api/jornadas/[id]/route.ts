@@ -2,25 +2,33 @@
 // API Jornadas [ID] - GET, PATCH, DELETE
 // ========================================
 
-import { NextRequest, NextResponse } from 'next/server';
-import { getSession } from '@/lib/auth';
+import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { jornadaUpdateSchema } from '@/lib/validaciones/schemas';
-import { z } from 'zod';
+import {
+  requireAuthAsHR,
+  validateRequest,
+  verifyEmpresaAccess,
+  handleApiError,
+  successResponse,
+  notFoundResponse,
+  badRequestResponse,
+} from '@/lib/api-handler';
 
 interface Params {
   id: string;
 }
 
+// GET /api/jornadas/[id] - Obtener jornada por ID
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<Params> }
 ) {
   try {
-    const session = await getSession();
-    if (!session || session.user.rol !== 'hr_admin') {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
-    }
+    // Verificar autenticación y rol HR Admin
+    const authResult = await requireAuthAsHR(req);
+    if (authResult instanceof Response) return authResult;
+    const { session } = authResult;
 
     const { id } = await params;
 
@@ -41,29 +49,32 @@ export async function GET(
     });
 
     if (!jornada) {
-      return NextResponse.json({ error: 'Jornada no encontrada' }, { status: 404 });
+      return notFoundResponse('Jornada no encontrada');
     }
 
-    return NextResponse.json(jornada);
+    return successResponse(jornada);
   } catch (error) {
-    console.error('[API GET Jornada]', error);
-    return NextResponse.json({ error: 'Error al obtener jornada' }, { status: 500 });
+    return handleApiError(error, 'API GET /api/jornadas/[id]');
   }
 }
 
+// PATCH /api/jornadas/[id] - Actualizar jornada
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<Params> }
 ) {
   try {
-    const session = await getSession();
-    if (!session || session.user.rol !== 'hr_admin') {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
-    }
+    // Verificar autenticación y rol HR Admin
+    const authResult = await requireAuthAsHR(req);
+    if (authResult instanceof Response) return authResult;
+    const { session } = authResult;
 
     const { id } = await params;
-    const body = await req.json();
-    const validatedData = jornadaUpdateSchema.parse(body);
+
+    // Validar request body
+    const validationResult = await validateRequest(req, jornadaUpdateSchema);
+    if (validationResult instanceof Response) return validationResult;
+    const { data: validatedData } = validationResult;
 
     // Verificar que la jornada pertenece a la empresa
     const jornadaExistente = await prisma.jornada.findUnique({
@@ -71,15 +82,12 @@ export async function PATCH(
     });
 
     if (!jornadaExistente) {
-      return NextResponse.json({ error: 'Jornada no encontrada' }, { status: 404 });
+      return notFoundResponse('Jornada no encontrada');
     }
 
     // No permitir editar jornadas predefinidas
     if (jornadaExistente.esPredefinida) {
-      return NextResponse.json(
-        { error: 'No se pueden editar jornadas predefinidas' },
-        { status: 400 }
-      );
+      return badRequestResponse('No se pueden editar jornadas predefinidas');
     }
 
     // Actualizar jornada
@@ -92,29 +100,22 @@ export async function PATCH(
       },
     });
 
-    return NextResponse.json(jornadaActualizada);
+    return successResponse(jornadaActualizada);
   } catch (error) {
-    if (error instanceof z.ZodError) {
-      return NextResponse.json(
-        { error: 'Datos inválidos', details: error.issues },
-        { status: 400 }
-      );
-    }
-
-    console.error('[API PATCH Jornada]', error);
-    return NextResponse.json({ error: 'Error al actualizar jornada' }, { status: 500 });
+    return handleApiError(error, 'API PATCH /api/jornadas/[id]');
   }
 }
 
+// DELETE /api/jornadas/[id] - Eliminar jornada (marcar como inactiva)
 export async function DELETE(
   req: NextRequest,
   { params }: { params: Promise<Params> }
 ) {
   try {
-    const session = await getSession();
-    if (!session || session.user.rol !== 'hr_admin') {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
-    }
+    // Verificar autenticación y rol HR Admin
+    const authResult = await requireAuthAsHR(req);
+    if (authResult instanceof Response) return authResult;
+    const { session } = authResult;
 
     const { id } = await params;
 
@@ -127,22 +128,18 @@ export async function DELETE(
     });
 
     if (!jornada) {
-      return NextResponse.json({ error: 'Jornada no encontrada' }, { status: 404 });
+      return notFoundResponse('Jornada no encontrada');
     }
 
     // No permitir eliminar jornadas predefinidas
     if (jornada.esPredefinida) {
-      return NextResponse.json(
-        { error: 'No se pueden eliminar jornadas predefinidas' },
-        { status: 400 }
-      );
+      return badRequestResponse('No se pueden eliminar jornadas predefinidas');
     }
 
     // No permitir eliminar si hay empleados asignados
     if (jornada.empleados.length > 0) {
-      return NextResponse.json(
-        { error: `No se puede eliminar. ${jornada.empleados.length} empleados tienen esta jornada asignada` },
-        { status: 400 }
+      return badRequestResponse(
+        `No se puede eliminar. ${jornada.empleados.length} empleados tienen esta jornada asignada`
       );
     }
 
@@ -152,10 +149,9 @@ export async function DELETE(
       data: { activa: false },
     });
 
-    return NextResponse.json({ success: true });
+    return successResponse({ success: true });
   } catch (error) {
-    console.error('[API DELETE Jornada]', error);
-    return NextResponse.json({ error: 'Error al eliminar jornada' }, { status: 500 });
+    return handleApiError(error, 'API DELETE /api/jornadas/[id]');
   }
 }
 

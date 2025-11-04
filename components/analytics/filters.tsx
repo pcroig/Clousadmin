@@ -1,0 +1,92 @@
+"use client"
+
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Button } from "@/components/ui/button"
+import { Users, Building2, Calendar as CalendarIcon, Download } from "lucide-react"
+
+export interface FilterValues {
+  genero: string
+  equipo: string
+  antiguedad: string
+}
+
+interface AnalyticsFiltersProps {
+  filters: FilterValues
+  onFilterChange: (key: keyof FilterValues, value: string) => void
+  onExport?: () => Promise<void>
+  departamentos?: string[]
+}
+
+export function AnalyticsFilters({
+  filters,
+  onFilterChange,
+  onExport,
+  departamentos = [],
+}: AnalyticsFiltersProps) {
+  return (
+    <div className="flex items-center gap-3">
+      {/* Filtro de Género */}
+      <Select value={filters.genero} onValueChange={(value) => onFilterChange('genero', value)}>
+        <SelectTrigger className="w-[180px]">
+          <Users className="w-4 h-4 mr-2" />
+          <SelectValue placeholder="Género" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="todos">Todos</SelectItem>
+          <SelectItem value="hombre">Hombre</SelectItem>
+          <SelectItem value="mujer">Mujer</SelectItem>
+          <SelectItem value="otro">Otro</SelectItem>
+          <SelectItem value="no_especificado">No especificado</SelectItem>
+        </SelectContent>
+      </Select>
+
+      {/* Filtro de Equipo */}
+      <Select value={filters.equipo} onValueChange={(value) => onFilterChange('equipo', value)}>
+        <SelectTrigger className="w-[180px]">
+          <Building2 className="w-4 h-4 mr-2" />
+          <SelectValue placeholder="Equipo" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="todos">Todos los equipos</SelectItem>
+          {departamentos.length > 0 ? (
+            departamentos.map((equipo) => (
+              <SelectItem key={equipo} value={equipo}>
+                {equipo}
+              </SelectItem>
+            ))
+          ) : (
+            <SelectItem value="" disabled>Cargando equipos...</SelectItem>
+          )}
+        </SelectContent>
+      </Select>
+
+      {/* Filtro de Antigüedad */}
+      <Select value={filters.antiguedad} onValueChange={(value) => onFilterChange('antiguedad', value)}>
+        <SelectTrigger className="w-[180px]">
+          <CalendarIcon className="w-4 h-4 mr-2" />
+          <SelectValue placeholder="Antigüedad" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="todos">Todos</SelectItem>
+          <SelectItem value="menos_6_meses">&lt; 6 meses</SelectItem>
+          <SelectItem value="6_12_meses">6-12 meses</SelectItem>
+          <SelectItem value="1_3_años">1-3 años</SelectItem>
+          <SelectItem value="3_5_años">3-5 años</SelectItem>
+          <SelectItem value="mas_5_años">&gt; 5 años</SelectItem>
+        </SelectContent>
+      </Select>
+
+      {/* Botón de Exportación */}
+      {onExport && (
+        <Button
+          variant="outline"
+          onClick={onExport}
+          className="ml-auto"
+        >
+          <Download className="w-4 h-4 mr-2" />
+          Exportar
+        </Button>
+      )}
+    </div>
+  )
+}

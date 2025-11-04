@@ -1,0 +1,144 @@
+// ========================================
+// API: Documentos - Descarga y Eliminación
+// ========================================
+
+import { NextRequest, NextResponse } from 'next/server';
+import { getSession } from '@/lib/auth';
+import { prisma } from '@/lib/prisma';
+import { readFile, unlink } from 'fs/promises';
+import { join } from 'path';
+import { existsSync } from 'fs';
+import { puedeAccederACarpeta } from '@/lib/documentos';
+
+// GET /api/documentos/[id] - Descargar documento
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const session = await getSession();
+
+    if (!session) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+    }
+
+    const { id } = await params;
+
+    const documento = await prisma.documento.findUnique({
+      where: { id },
+      include: {
+        carpeta: true,
+        empleado: {
+          include: {
+            usuario: true,
+          },
+        },
+      },
+    });
+
+    if (!documento) {
+      return NextResponse.json({ error: 'Documento no encontrado' }, { status: 404 });
+    }
+
+    // Validar permisos de acceso a la carpeta
+    if (documento.carpetaId) {
+      const puedeAcceder = await puedeAccederACarpeta(
+        documento.carpetaId,
+        session.user.id,
+        session.user.rol
+      );
+
+      if (!puedeAcceder) {
+        return NextResponse.json(
+          { error: 'No tienes permisos para acceder a este documento' },
+          { status: 403 }
+        );
+      }
+    } else {
+      // Documento sin carpeta: solo HR puede acceder
+      if (session.user.rol !== 'hr_admin') {
+        return NextResponse.json(
+          { error: 'No tienes permisos para acceder a este documento' },
+          { status: 403 }
+        );
+      }
+    }
+
+    // Leer archivo del filesystem
+    const filePath = join(process.cwd(), 'uploads', documento.s3Key);
+
+    if (!existsSync(filePath)) {
+      return NextResponse.json(
+        { error: 'Archivo no encontrado en el servidor' },
+        { status: 404 }
+      );
+    }
+
+    const fileBuffer = await readFile(filePath);
+
+    // Devolver archivo con headers apropiados
+    return new NextResponse(fileBuffer, {
+      headers: {
+        'Content-Type': documento.mimeType,
+        'Content-Disposition': `attachment; filename="${encodeURIComponent(documento.nombre)}"`,
+        'Content-Length': documento.tamano.toString(),
+      },
+    });
+  } catch (error) {
+    console.error('Error descargando documento:', error);
+    return NextResponse.json(
+      { error: 'Error al descargar documento' },
+      { status: 500 }
+    );
+  }
+}
+
+// DELETE /api/documentos/[id] - Eliminar documento
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const session = await getSession();
+
+    if (!session || session.user.rol !== 'hr_admin') {
+      return NextResponse.json(
+        { error: 'Solo HR Admin puede eliminar documentos' },
+        { status: 403 }
+      );
+    }
+
+    const { id } = await params;
+
+    const documento = await prisma.documento.findUnique({
+      where: { id },
+    });
+
+    if (!documento) {
+      return NextResponse.json({ error: 'Documento no encontrado' }, { status: 404 });
+    }
+
+    // Eliminar archivo del filesystem
+    const filePath = join(process.cwd(), 'uploads', documento.s3Key);
+
+    if (existsSync(filePath)) {
+      await unlink(filePath);
+    }
+
+    // Eliminar registro de DB
+    await prisma.documento.delete({
+      where: { id },
+    });
+
+    return NextResponse.json({
+      success: true,
+      message: 'Documento eliminado correctamente',
+    });
+  } catch (error) {
+    console.error('Error eliminando documento:', error);
+    return NextResponse.json(
+      { error: 'Error al eliminar documento' },
+      { status: 500 }
+    );
+  }
+}

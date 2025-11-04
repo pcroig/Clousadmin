@@ -1,22 +1,47 @@
 // ========================================
 // API FichajeEventos - Crear evento
 // ========================================
-import { NextRequest, NextResponse } from 'next/server';
-import { getSession } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
 
+import { NextRequest } from 'next/server';
+import { prisma } from '@/lib/prisma';
+import {
+  requireAuth,
+  validateRequest,
+  handleApiError,
+  successResponse,
+  notFoundResponse,
+} from '@/lib/api-handler';
+import { z } from 'zod';
+
+const fichajeEventoSchema = z.object({
+  fichajeId: z.string().uuid(),
+  tipo: z.enum(['entrada', 'pausa_inicio', 'pausa_fin', 'salida']),
+  hora: z.string(),
+  motivoEdicion: z.string().optional(),
+});
+
+// POST /api/fichajes/eventos - Crear evento de fichaje
 export async function POST(req: NextRequest) {
   try {
-    const session = await getSession();
-    if (!session) return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
+    // Verificar autenticación
+    const authResult = await requireAuth(req);
+    if (authResult instanceof Response) return authResult;
+    const { session } = authResult;
 
-    const body = await req.json();
-    const { fichajeId, tipo, hora, motivoEdicion } = body as {
-      fichajeId: string; tipo: 'entrada'|'pausa_inicio'|'pausa_fin'|'salida'; hora: string; motivoEdicion?: string;
-    };
+    // Validar request body
+    const validationResult = await validateRequest(req, fichajeEventoSchema);
+    if (validationResult instanceof Response) return validationResult;
+    const { data: validatedData } = validationResult;
 
-    const fichaje = await prisma.fichaje.findFirst({ where: { id: fichajeId, empresaId: session.user.empresaId } });
-    if (!fichaje) return NextResponse.json({ error: 'Fichaje no encontrado' }, { status: 404 });
+    const { fichajeId, tipo, hora, motivoEdicion } = validatedData;
+
+    // Verificar que el fichaje existe y pertenece a la empresa
+    const fichaje = await prisma.fichaje.findFirst({
+      where: { id: fichajeId, empresaId: session.user.empresaId },
+    });
+    if (!fichaje) {
+      return notFoundResponse('Fichaje no encontrado');
+    }
 
     const evento = await prisma.fichajeEvento.create({
       data: {
@@ -37,10 +62,9 @@ export async function POST(req: NextRequest) {
       await prisma.fichaje.update({ where: { id: fichajeId }, data: { horasTrabajadas, horasEnPausa } });
     }
 
-    return NextResponse.json({ success: true, eventoId: evento.id });
+    return successResponse({ success: true, eventoId: evento.id });
   } catch (error) {
-    console.error('[API POST FichajeEvento]', error);
-    return NextResponse.json({ error: 'Error al crear evento' }, { status: 500 });
+    return handleApiError(error, 'API POST /api/fichajes/eventos');
   }
 }
 

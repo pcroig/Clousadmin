@@ -1,0 +1,194 @@
+// ========================================
+// Cálculo de Días Laborables
+// ========================================
+
+import { prisma } from '@/lib/prisma';
+
+interface DiasLaborables {
+  lunes: boolean;
+  martes: boolean;
+  miercoles: boolean;
+  jueves: boolean;
+  viernes: boolean;
+  sabado: boolean;
+  domingo: boolean;
+}
+
+const DIAS_LABORABLES_DEFAULT: DiasLaborables = {
+  lunes: true,
+  martes: true,
+  miercoles: true,
+  jueves: true,
+  viernes: true,
+  sabado: false,
+  domingo: false,
+};
+
+/**
+ * Obtiene la configuración de días laborables de una empresa
+ * Si no existe configuración, retorna L-V por defecto
+ */
+export async function getDiasLaborablesEmpresa(empresaId: string): Promise<DiasLaborables> {
+  try {
+    const empresa = await prisma.empresa.findUnique({
+      where: { id: empresaId },
+      select: { config: true },
+    });
+
+    if (!empresa) {
+      console.warn(`[DiasLaborables] Empresa ${empresaId} no encontrada, usando default`);
+      return DIAS_LABORABLES_DEFAULT;
+    }
+
+    const config = empresa.config as any;
+    
+    // Si existe la configuración de días laborables, usarla
+    if (config.diasLaborables && typeof config.diasLaborables === 'object') {
+      return {
+        lunes: config.diasLaborables.lunes ?? DIAS_LABORABLES_DEFAULT.lunes,
+        martes: config.diasLaborables.martes ?? DIAS_LABORABLES_DEFAULT.martes,
+        miercoles: config.diasLaborables.miercoles ?? DIAS_LABORABLES_DEFAULT.miercoles,
+        jueves: config.diasLaborables.jueves ?? DIAS_LABORABLES_DEFAULT.jueves,
+        viernes: config.diasLaborables.viernes ?? DIAS_LABORABLES_DEFAULT.viernes,
+        sabado: config.diasLaborables.sabado ?? DIAS_LABORABLES_DEFAULT.sabado,
+        domingo: config.diasLaborables.domingo ?? DIAS_LABORABLES_DEFAULT.domingo,
+      };
+    }
+
+    // Si no existe, retornar default
+    return DIAS_LABORABLES_DEFAULT;
+  } catch (error) {
+    console.error('[DiasLaborables] Error obteniendo configuración:', error);
+    return DIAS_LABORABLES_DEFAULT;
+  }
+}
+
+/**
+ * Verifica si un día de la semana es laborable según la configuración de la empresa
+ */
+function esDiaSemanaLaborable(fecha: Date, diasLaborables: DiasLaborables): boolean {
+  const diaSemana = fecha.getDay(); // 0 = domingo, 1 = lunes, ..., 6 = sábado
+  
+  const mapaDias: { [key: number]: keyof DiasLaborables } = {
+    0: 'domingo',
+    1: 'lunes',
+    2: 'martes',
+    3: 'miercoles',
+    4: 'jueves',
+    5: 'viernes',
+    6: 'sabado',
+  };
+
+  const nombreDia = mapaDias[diaSemana];
+  return diasLaborables[nombreDia];
+}
+
+/**
+ * Verifica si una fecha es festivo activo
+ */
+async function esFestivoActivo(fecha: Date, empresaId: string): Promise<boolean> {
+  try {
+    const festivo = await prisma.festivo.findFirst({
+      where: {
+        empresaId,
+        fecha: {
+          equals: fecha,
+        },
+        activo: true,
+      },
+    });
+
+    return festivo !== null;
+  } catch (error) {
+    console.error('[DiasLaborables] Error verificando festivo:', error);
+    return false;
+  }
+}
+
+/**
+ * Determina si una fecha es laborable según:
+ * 1. Configuración de días de la semana de la empresa
+ * 2. Si es festivo activo
+ * 
+ * Una fecha es laborable si:
+ * - El día de la semana está configurado como laborable
+ * - Y NO es festivo activo
+ */
+export async function esDiaLaborable(
+  fecha: Date,
+  empresaId: string,
+  diasLaborables?: DiasLaborables
+): Promise<boolean> {
+  // Obtener configuración si no se proporcionó
+  if (!diasLaborables) {
+    diasLaborables = await getDiasLaborablesEmpresa(empresaId);
+  }
+
+  // Verificar si el día de la semana es laborable
+  const esDiaSemanaLab = esDiaSemanaLaborable(fecha, diasLaborables);
+  
+  if (!esDiaSemanaLab) {
+    return false;
+  }
+
+  // Verificar si es festivo
+  const esFestivo = await esFestivoActivo(fecha, empresaId);
+  
+  return !esFestivo;
+}
+
+/**
+ * Cuenta los días laborables entre dos fechas (inclusivo)
+ */
+export async function contarDiasLaborables(
+  fechaInicio: Date,
+  fechaFin: Date,
+  empresaId: string
+): Promise<number> {
+  const diasLaborables = await getDiasLaborablesEmpresa(empresaId);
+  let count = 0;
+  
+  const fecha = new Date(fechaInicio);
+  const fechaFinDate = new Date(fechaFin);
+
+  while (fecha <= fechaFinDate) {
+    const esLaborable = await esDiaLaborable(fecha, empresaId, diasLaborables);
+    if (esLaborable) {
+      count++;
+    }
+    fecha.setDate(fecha.getDate() + 1);
+  }
+
+  return count;
+}
+
+/**
+ * Obtiene los días no laborables (fines de semana según config + festivos) en un rango
+ */
+export async function getDiasNoLaborables(
+  fechaInicio: Date,
+  fechaFin: Date,
+  empresaId: string
+): Promise<Date[]> {
+  const diasLaborables = await getDiasLaborablesEmpresa(empresaId);
+  const diasNoLaborables: Date[] = [];
+  
+  const fecha = new Date(fechaInicio);
+  const fechaFinDate = new Date(fechaFin);
+
+  while (fecha <= fechaFinDate) {
+    const esLaborable = await esDiaLaborable(fecha, empresaId, diasLaborables);
+    if (!esLaborable) {
+      diasNoLaborables.push(new Date(fecha));
+    }
+    fecha.setDate(fecha.getDate() + 1);
+  }
+
+  return diasNoLaborables;
+}
+
+
+
+
+
+

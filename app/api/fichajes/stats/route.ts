@@ -3,20 +3,21 @@
 // ========================================
 // GET: Obtener estadísticas para el widget del dashboard HR
 
-import { NextRequest, NextResponse } from 'next/server';
-import { getSession } from '@/lib/auth';
+import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import {
+  requireAuthAsHR,
+  handleApiError,
+  successResponse,
+} from '@/lib/api-handler';
 
+// GET /api/fichajes/stats - Obtener estadísticas de fichajes (solo HR Admin)
 export async function GET(request: NextRequest) {
   try {
-    const session = await getSession();
-
-    if (!session || session.user.rol !== 'hr_admin') {
-      return NextResponse.json(
-        { error: 'No autorizado' },
-        { status: 403 }
-      );
-    }
+    // Verificar autenticación y rol HR Admin
+    const authResult = await requireAuthAsHR(request);
+    if (authResult instanceof Response) return authResult;
+    const { session } = authResult;
 
     // Obtener fecha desde query params o usar hoy por defecto
     const { searchParams } = new URL(request.url);
@@ -50,18 +51,13 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    return NextResponse.json({
+    return successResponse({
       autoCompletados,
       enRevision,
       fecha: hoy.toISOString().split('T')[0],
     });
-
   } catch (error) {
-    console.error('[API Stats] Error:', error);
-    return NextResponse.json(
-      { error: 'Error al obtener estadísticas' },
-      { status: 500 }
-    );
+    return handleApiError(error, 'API GET /api/fichajes/stats');
   }
 }
 

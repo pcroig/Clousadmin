@@ -7,6 +7,10 @@
 
 import { prisma } from '@/lib/prisma';
 import { Fichaje, FichajeEvento, Empleado, Jornada } from '@prisma/client';
+import {
+  crearNotificacionFichajeAutocompletado,
+  crearNotificacionFichajeRequiereRevision,
+} from '@/lib/notificaciones';
 
 /**
  * Resultado de clasificación de un fichaje incompleto
@@ -44,7 +48,6 @@ export async function clasificarFichajesIncompletos(
   // 0. Crear fichajes automáticos para empleados disponibles sin fichaje
   const { crearFichajesAutomaticos } = await import('@/lib/calculos/fichajes');
   const resultadoCreacion = await crearFichajesAutomaticos(empresaId, fechaSinHora);
-  console.log('[Clasificador] Fichajes creados automáticamente:', resultadoCreacion.creados);
 
   // 1. Obtener todos los fichajes del día con sus eventos
   const fichajes = await prisma.fichaje.findMany({
@@ -69,8 +72,6 @@ export async function clasificarFichajesIncompletos(
     },
   });
 
-  console.log('[Clasificador] Total fichajes encontrados:', fichajes.length);
-
   const autoCompletar: FichajeClasificado[] = [];
   const revisionManual: FichajeClasificado[] = [];
 
@@ -91,11 +92,6 @@ export async function clasificarFichajesIncompletos(
       }
     }
   }
-
-  console.log('[Clasificador] Resultado:', {
-    autoCompletar: autoCompletar.length,
-    revisionManual: revisionManual.length,
-  });
 
   return { autoCompletar, revisionManual };
 }
@@ -302,7 +298,6 @@ export async function aplicarAutoCompletado(
           fichajeId: clasificado.fichaje.id,
           tipo: 'salida',
           hora: clasificado.salidaSugerida,
-          metodo: 'auto_completado',
         },
       });
 
@@ -354,9 +349,25 @@ export async function aplicarAutoCompletado(
         },
       });
 
+      // Crear notificación de fichaje autocompletado
+      await crearNotificacionFichajeAutocompletado(prisma, {
+        fichajeId: clasificado.fichaje.id,
+        empresaId,
+        empleadoId: clasificado.empleadoId,
+        empleadoNombre: clasificado.empleadoNombre,
+        fecha: clasificado.fecha,
+        salidaSugerida: clasificado.salidaSugerida,
+        razon: clasificado.razon,
+      });
+
       completados++;
     } catch (error) {
-      console.error('[Clasificador] Error aplicando auto-completado:', error);
+      console.error('[Clasificador] Error aplicando auto-completado:', {
+        empleadoId: clasificado.empleadoId,
+        empleadoNombre: clasificado.empleadoNombre,
+        fecha: clasificado.fecha,
+        error,
+      });
       errores.push(`${clasificado.empleadoNombre}: ${error instanceof Error ? error.message : 'Error desconocido'}`);
     }
   }
@@ -378,7 +389,13 @@ export async function guardarRevisionManual(
     try {
       // Validar que tenemos datos completos
       if (!clasificado.fecha || !clasificado.fichaje || !clasificado.fichaje.eventos) {
-        console.error('[Clasificador] Datos incompletos en clasificado:', clasificado);
+        console.error('[Clasificador] Datos incompletos en clasificado:', {
+          empleadoId: clasificado.empleadoId,
+          empleadoNombre: clasificado.empleadoNombre,
+          tieneFecha: !!clasificado.fecha,
+          tieneFichaje: !!clasificado.fichaje,
+          tieneEventos: !!clasificado.fichaje?.eventos,
+        });
         continue;
       }
 
@@ -415,9 +432,24 @@ export async function guardarRevisionManual(
         },
       });
 
+      // Crear notificación de fichaje que requiere revisión
+      await crearNotificacionFichajeRequiereRevision(prisma, {
+        fichajeId: clasificado.fichaje.id,
+        empresaId,
+        empleadoId: clasificado.empleadoId,
+        empleadoNombre: clasificado.empleadoNombre,
+        fecha: clasificado.fecha,
+        razon: clasificado.razon,
+      });
+
       guardados++;
     } catch (error) {
-      console.error('[Clasificador] Error guardando revisión manual:', error);
+      console.error('[Clasificador] Error guardando revisión manual:', {
+        empleadoId: clasificado.empleadoId,
+        empleadoNombre: clasificado.empleadoNombre,
+        fichajeId: clasificado.fichaje?.id,
+        error,
+      });
       errores.push(`${clasificado.empleadoNombre}: ${error instanceof Error ? error.message : 'Error desconocido'}`);
     }
   }

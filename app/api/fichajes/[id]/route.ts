@@ -2,9 +2,19 @@
 // API Fichajes [ID] - GET, PATCH, DELETE
 // ========================================
 
-import { NextRequest, NextResponse } from 'next/server';
-import { getSession } from '@/lib/auth';
+import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import {
+  requireAuth,
+  requireAuthAsHROrManager,
+  requireAuthAsHR,
+  validateRequest,
+  handleApiError,
+  successResponse,
+  notFoundResponse,
+  forbiddenResponse,
+  badRequestResponse,
+} from '@/lib/api-handler';
 import { z } from 'zod';
 
 const fichajeApprovalSchema = z.object({
@@ -22,15 +32,16 @@ interface Params {
   id: string;
 }
 
+// GET /api/fichajes/[id] - Obtener fichaje por ID
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<Params> }
 ) {
   try {
-    const session = await getSession();
-    if (!session) {
-      return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
-    }
+    // Verificar autenticación
+    const authResult = await requireAuth(req);
+    if (authResult instanceof Response) return authResult;
+    const { session } = authResult;
 
     const { id } = await params;
 
@@ -56,36 +67,35 @@ export async function GET(
     });
 
     if (!fichaje) {
-      return NextResponse.json({ error: 'Fichaje no encontrado' }, { status: 404 });
+      return notFoundResponse('Fichaje no encontrado');
     }
 
-    // Verificar permisos
+    // Verificar permisos: empleados solo pueden ver sus propios fichajes
     if (
       session.user.rol === 'empleado' &&
       fichaje.empleadoId !== session.user.empleadoId
     ) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
+      return forbiddenResponse('No tienes permiso para ver este fichaje');
     }
 
-    return NextResponse.json(fichaje);
+    return successResponse(fichaje);
   } catch (error) {
-    console.error('[API GET Fichaje]', error);
-    return NextResponse.json({ error: 'Error al obtener fichaje' }, { status: 500 });
+    return handleApiError(error, 'API GET /api/fichajes/[id]');
   }
 }
 
+// PATCH /api/fichajes/[id] - Aprobar/Rechazar o Editar fichaje
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<Params> }
 ) {
   try {
-    const session = await getSession();
-    if (!session) {
-      return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
-    }
+    // Verificar autenticación
+    const authResult = await requireAuth(req);
+    if (authResult instanceof Response) return authResult;
+    const { session } = authResult;
 
     const { id } = await params;
-    const body = await req.json();
 
     // Obtener fichaje
     const fichaje = await prisma.fichaje.findUnique({
@@ -96,16 +106,29 @@ export async function PATCH(
     });
 
     if (!fichaje) {
-      return NextResponse.json({ error: 'Fichaje no encontrado' }, { status: 404 });
+      return notFoundResponse('Fichaje no encontrado');
     }
 
     // Caso 1: Aprobar/Rechazar fichaje (solo HR/Manager)
+    // Intentar parsear el body primero para ver si tiene accion
+    let body;
+    try {
+      body = await req.json();
+    } catch {
+      return badRequestResponse('Body inválido');
+    }
+
+    // Si tiene accion, procesar aprobación/rechazo
     if (body.accion) {
+      // Verificar rol HR Admin o Manager
       if (session.user.rol !== 'hr_admin' && session.user.rol !== 'manager') {
-        return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
+        return forbiddenResponse('Solo HR Admin o Manager pueden aprobar/rechazar fichajes');
       }
 
-      const validatedData = fichajeApprovalSchema.parse(body);
+      // Validar con schema
+      const validationResult = await validateRequest(req, fichajeApprovalSchema);
+      if (validationResult instanceof Response) return validationResult;
+      const { data: validatedData } = validationResult;
 
       if (validatedData.accion === 'aprobar') {
         const actualizado = await prisma.fichaje.update({
@@ -116,7 +139,7 @@ export async function PATCH(
           },
         });
 
-        return NextResponse.json(actualizado);
+        return successResponse(actualizado);
       } else if (validatedData.accion === 'rechazar') {
         const actualizado = await prisma.fichaje.update({
           where: { id },
@@ -126,40 +149,84 @@ export async function PATCH(
           },
         });
 
-        return NextResponse.json(actualizado);
+        return successResponse(actualizado);
       }
     }
 
-    // TODO: Implement edit functionality with new FichajeEvento schema
+    // Caso 2: Editar fichaje (solo HR/Manager o el propio empleado para solicitar corrección)
+    const validationResult = await validateRequest(req, fichajeEditSchema);
+    if (validationResult instanceof Response) return validationResult;
+    const { data: validatedData } = validationResult;
 
-    return NextResponse.json({ error: 'Acción no especificada' }, { status: 400 });
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return NextResponse.json(
-        { error: 'Datos inválidos', details: error.issues },
-        { status: 400 }
-      );
+    // Verificar permisos: empleados solo pueden editar sus propios fichajes y solo para solicitar corrección
+    if (session.user.rol === 'empleado' && fichaje.empleadoId !== session.user.empleadoId) {
+      return forbiddenResponse('Solo puedes editar tus propios fichajes');
     }
 
-    console.error('[API PATCH Fichaje]', error);
-    return NextResponse.json({ error: 'Error al actualizar fichaje' }, { status: 500 });
+    // Si es empleado, debe tener motivoEdicion
+    if (session.user.rol === 'empleado' && !validatedData.motivoEdicion) {
+      return badRequestResponse('Debes proporcionar un motivo para la corrección');
+    }
+
+    // Actualizar evento del fichaje (por ahora solo actualizar la hora si se proporciona)
+    if (validatedData.hora || validatedData.tipo) {
+      // Buscar el evento a editar (por defecto el último evento del día)
+      const eventos = await prisma.fichajeEvento.findMany({
+        where: { fichajeId: id },
+        orderBy: { hora: 'desc' },
+        take: 1,
+      });
+
+      if (eventos.length > 0) {
+        await prisma.fichajeEvento.update({
+          where: { id: eventos[0].id },
+          data: {
+            ...(validatedData.hora && { hora: new Date(validatedData.hora) }),
+            ...(validatedData.tipo && { tipo: validatedData.tipo }),
+            editado: true,
+          },
+        });
+
+        // Recalcular horas trabajadas
+        // TODO: Llamar a función de recálculo
+      }
+    }
+
+    // Actualizar fecha del fichaje si se proporciona
+    if (validatedData.fecha) {
+      await prisma.fichaje.update({
+        where: { id },
+        data: {
+          fecha: new Date(validatedData.fecha),
+        },
+      });
+    }
+
+    const fichajeActualizado = await prisma.fichaje.findUnique({
+      where: { id },
+      include: {
+        eventos: {
+          orderBy: { hora: 'asc' },
+        },
+      },
+    });
+
+    return successResponse(fichajeActualizado);
+  } catch (error) {
+    return handleApiError(error, 'API PATCH /api/fichajes/[id]');
   }
 }
 
+// DELETE /api/fichajes/[id] - Eliminar fichaje (solo HR Admin)
 export async function DELETE(
   req: NextRequest,
   { params }: { params: Promise<Params> }
 ) {
   try {
-    const session = await getSession();
-    if (!session) {
-      return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
-    }
-
-    // Solo HR puede eliminar fichajes
-    if (session.user.rol !== 'hr_admin') {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
-    }
+    // Verificar autenticación y rol HR Admin
+    const authResult = await requireAuthAsHR(req);
+    if (authResult instanceof Response) return authResult;
+    const { session } = authResult;
 
     const { id } = await params;
 
@@ -170,10 +237,9 @@ export async function DELETE(
       },
     });
 
-    return NextResponse.json({ success: true });
+    return successResponse({ success: true });
   } catch (error) {
-    console.error('[API DELETE Fichaje]', error);
-    return NextResponse.json({ error: 'Error al eliminar fichaje' }, { status: 500 });
+    return handleApiError(error, 'API DELETE /api/fichajes/[id]');
   }
 }
 

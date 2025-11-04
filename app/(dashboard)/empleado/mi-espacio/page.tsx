@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import { serializeEmpleado } from '@/lib/utils';
 import { MiEspacioClient } from './mi-espacio-client';
+import { Suspense } from 'react';
 
 export default async function MiEspacioPage() {
   const session = await getSession();
@@ -37,5 +38,9 @@ export default async function MiEspacioPage() {
   // Serializar campos Decimal para Client Component
   const empleadoSerializado = serializeEmpleado(empleado);
 
-  return <MiEspacioClient empleado={empleadoSerializado} usuario={usuario} />;
+  return (
+    <Suspense fallback={<div className="p-6">Cargando...</div>}>
+      <MiEspacioClient empleado={empleadoSerializado} usuario={usuario} />
+    </Suspense>
+  );
 }

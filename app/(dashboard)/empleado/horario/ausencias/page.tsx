@@ -19,7 +19,6 @@ export default async function AusenciasEmpleadoPage() {
   const saldo = await prisma.empleadoSaldoAusencias.findFirst({
     where: {
       empleadoId: session.user.empleadoId,
-      equipoId: null, // Saldo general
       año: añoActual,
     },
   });

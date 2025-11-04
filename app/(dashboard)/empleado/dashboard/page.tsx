@@ -5,9 +5,9 @@
 import { getSession } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
-import { FichajeWidget } from '@/components/shared/fichaje-widget';
-import { NotificacionesWidget, Notificacion } from '@/components/shared/notificaciones-widget';
-import { AusenciasWidget, AusenciaItem } from '@/components/shared/ausencias-widget';
+import { Notificacion } from '@/components/shared/notificaciones-widget';
+import { AusenciaItem } from '@/components/shared/ausencias-widget';
+import { EmpleadoDashboardClient } from './dashboard-client';
 
 interface DashboardData {
   empleado: any;
@@ -15,18 +15,28 @@ interface DashboardData {
   saldoFinal: any;
   ausenciasProximas: AusenciaItem[];
   ausenciasPasadasItems: AusenciaItem[];
+  campanaPendiente: {
+    id: string;
+    titulo: string;
+    fechaInicioObjetivo: Date;
+    fechaFinObjetivo: Date;
+  } | null;
 }
 
-async function obtenerDatosDashboard(session: any): Promise<DashboardData> {
+async function obtenerDatosDashboard(session: { user: { id: string; empresaId: string } }): Promise<DashboardData> {
   // Verificar que prisma esté disponible
   if (!prisma) {
     throw new Error('Prisma client no está disponible');
   }
 
-  // Obtener empleado
+  // Obtener empleado (solo campos necesarios)
   const empleado = await prisma.empleado.findUnique({
     where: {
       usuarioId: session.user.id,
+    },
+    select: {
+      id: true,
+      empresaId: true,
     },
   });
 
@@ -34,7 +44,7 @@ async function obtenerDatosDashboard(session: any): Promise<DashboardData> {
     throw new Error('Empleado no encontrado');
   }
 
-  // Notificaciones del empleado
+  // Notificaciones del empleado (ausencias + campañas de vacaciones)
   const ausenciasNotificaciones = await prisma.ausencia.findMany({
     where: {
       empleadoId: empleado.id,
@@ -48,9 +58,43 @@ async function obtenerDatosDashboard(session: any): Promise<DashboardData> {
     take: 8,
   });
 
+  // Buscar campaña activa con preferencia pendiente del empleado
+  const preferenciaPendiente = await prisma.preferenciaVacaciones.findFirst({
+    where: {
+      empleadoId: empleado.id,
+      empresaId: session.user.empresaId,
+      completada: false,
+    },
+    include: {
+      campana: {
+        select: {
+          id: true,
+          titulo: true,
+          fechaInicioObjetivo: true,
+          fechaFinObjetivo: true,
+          estado: true,
+        },
+      },
+    },
+    orderBy: {
+      createdAt: 'desc',
+    },
+  });
+
+  // Si hay preferencia pendiente y la campaña está abierta
+  let campanaPendiente: DashboardData['campanaPendiente'] = null;
+  if (preferenciaPendiente && preferenciaPendiente.campana.estado === 'abierta') {
+    campanaPendiente = {
+      id: preferenciaPendiente.campana.id,
+      titulo: preferenciaPendiente.campana.titulo,
+      fechaInicioObjetivo: preferenciaPendiente.campana.fechaInicioObjetivo,
+      fechaFinObjetivo: preferenciaPendiente.campana.fechaFinObjetivo,
+    };
+  }
+
   const notificaciones: Notificacion[] = ausenciasNotificaciones.map((aus: any) => ({
     id: aus.id,
-    tipo: aus.estado === 'aprobada' ? 'aprobada' : aus.estado === 'rechazada' ? 'rechazada' : 'pendiente',
+    tipo: aus.estado === 'en_curso' || aus.estado === 'completada' || aus.estado === 'auto_aprobada' ? 'aprobada' : aus.estado === 'rechazada' ? 'rechazada' : 'pendiente',
     mensaje: `Tu solicitud de ${aus.tipo} está ${aus.estado}`,
     fecha: aus.createdAt,
   }));
@@ -63,12 +107,15 @@ async function obtenerDatosDashboard(session: any): Promise<DashboardData> {
     saldo = await prisma.empleadoSaldoAusencias.findFirst({
       where: {
         empleadoId: empleado.id,
-        equipoId: null, // Saldo general
         año: añoActual,
       },
     });
   } catch (error) {
-    console.error('Error obteniendo saldo:', error);
+    console.error('[EmpleadoDashboard] Error obteniendo saldo de ausencias:', {
+      empleadoId: empleado.id,
+      año: añoActual,
+      error,
+    });
     saldo = null;
   }
 
@@ -143,6 +190,7 @@ async function obtenerDatosDashboard(session: any): Promise<DashboardData> {
     saldoFinal,
     ausenciasProximas,
     ausenciasPasadasItems,
+    campanaPendiente,
   };
 }
 
@@ -166,7 +214,11 @@ export default async function EmpleadoDashboardPage() {
   try {
     dashboardData = await obtenerDatosDashboard(session);
   } catch (error) {
-    console.error('Error en EmpleadoDashboardPage:', error);
+    console.error('[EmpleadoDashboardPage] Error obteniendo datos del dashboard:', {
+      userId: session.user.id,
+      empleadoId: session.user.empleadoId,
+      error,
+    });
     return (
       <div className="p-4 text-center">
         <p className="text-red-600">Error al cargar el dashboard. Por favor, recarga la página.</p>
@@ -176,48 +228,13 @@ export default async function EmpleadoDashboardPage() {
 
   // Renderizar dashboard
   return (
-    <div className="h-full w-full flex flex-col">
-      {/* Header */}
-      <div className="flex-shrink-0 mb-5">
-        <h1 className="text-2xl font-bold text-gray-900">
-          Buenos Días, {session.user.nombre}
-        </h1>
-      </div>
-
-      {/* 3x2 Grid Layout - Notificaciones y Ausencias ocupan 2 filas */}
-      <div className="flex-1 min-h-0 pb-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 grid-rows-2 gap-5">
-          {/* Fichaje Widget - Fila 1, Columna 1 */}
-          <div className="min-h-0">
-            <FichajeWidget href="/empleado/horario/fichajes" />
-          </div>
-
-          {/* Notificaciones Widget - Fila 1-2, Columna 2 (ocupa 2 filas) */}
-          <div className="row-span-2 min-h-0">
-            <NotificacionesWidget 
-              notificaciones={dashboardData.notificaciones} 
-              maxItems={8} 
-              altura="doble" 
-            />
-          </div>
-
-          {/* Ausencias Widget - Fila 1-2, Columna 3 (ocupa 2 filas) */}
-          <div className="row-span-2 min-h-0">
-            <AusenciasWidget
-              diasAcumulados={dashboardData.saldoFinal.diasTotales}
-              diasDisponibles={dashboardData.saldoFinal.diasTotales - Number(dashboardData.saldoFinal.diasUsados)}
-              diasUtilizados={Number(dashboardData.saldoFinal.diasUsados)}
-              proximasAusencias={dashboardData.ausenciasProximas}
-              ausenciasPasadas={dashboardData.ausenciasPasadasItems}
-            />
-          </div>
-
-          {/* Widget vacío - Fila 2, Columna 1 */}
-          <div className="min-h-0">
-            {/* Por ahora vacío */}
-          </div>
-        </div>
-      </div>
-    </div>
+    <EmpleadoDashboardClient
+      userName={session.user.nombre}
+      notificaciones={dashboardData.notificaciones}
+      saldoFinal={dashboardData.saldoFinal}
+      ausenciasProximas={dashboardData.ausenciasProximas}
+      ausenciasPasadas={dashboardData.ausenciasPasadasItems}
+      campanaPendiente={dashboardData.campanaPendiente}
+    />
   );
 }

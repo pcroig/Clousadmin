@@ -30,5 +30,13 @@ export function serializeEmpleado(empleado: any) {
       salarioBrutoAnual: decimalToNumber(empleado.manager.salarioBrutoAnual),
       salarioBrutoMensual: decimalToNumber(empleado.manager.salarioBrutoMensual),
     } : null,
+    // Serializar Decimal en saldosAusencias
+    saldosAusencias: empleado.saldosAusencias
+      ? empleado.saldosAusencias.map((saldo: any) => ({
+          ...saldo,
+          diasUsados: decimalToNumber(saldo.diasUsados) ?? 0,
+          diasPendientes: decimalToNumber(saldo.diasPendientes) ?? 0,
+        }))
+      : empleado.saldosAusencias,
   };
 }

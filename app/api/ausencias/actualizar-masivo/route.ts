@@ -2,10 +2,17 @@
 // API Actualizar Ausencias Masivo
 // ========================================
 
-import { NextRequest, NextResponse } from 'next/server';
-import { getSession } from '@/lib/auth';
+import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { actualizarSaldo } from '@/lib/calculos/ausencias';
+import {
+  requireAuthAsHROrManager,
+  validateRequest,
+  handleApiError,
+  successResponse,
+  notFoundResponse,
+  badRequestResponse,
+} from '@/lib/api-handler';
 import { z } from 'zod';
 
 const actualizarMasivoSchema = z.object({
@@ -14,13 +21,13 @@ const actualizarMasivoSchema = z.object({
   motivoRechazo: z.string().optional(),
 });
 
+// POST /api/ausencias/actualizar-masivo - Procesar múltiples ausencias (HR Admin o Manager)
 export async function POST(req: NextRequest) {
   try {
-    // 1. Verificar sesión y permisos
-    const session = await getSession();
-    if (!session || (session.user.rol !== 'hr_admin' && session.user.rol !== 'manager')) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
-    }
+    // Verificar autenticación y rol HR Admin o Manager
+    const authResult = await requireAuthAsHROrManager(req);
+    if (authResult instanceof Response) return authResult;
+    const { session } = authResult;
 
     // Obtener información del empleado si es manager
     let empleadoManager = null;
@@ -31,15 +38,13 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // 2. Validar body
-    const body = await req.json();
-    const validatedData = actualizarMasivoSchema.parse(body);
+    // Validar request body
+    const validationResult = await validateRequest(req, actualizarMasivoSchema);
+    if (validationResult instanceof Response) return validationResult;
+    const { data: validatedData } = validationResult;
 
     if (validatedData.accion === 'rechazar' && !validatedData.motivoRechazo) {
-      return NextResponse.json(
-        { error: 'El motivo de rechazo es obligatorio' },
-        { status: 400 }
-      );
+      return badRequestResponse('El motivo de rechazo es obligatorio');
     }
 
     // 3. Obtener todas las ausencias
@@ -47,7 +52,7 @@ export async function POST(req: NextRequest) {
       where: {
         id: { in: validatedData.ausenciasIds },
         empresaId: session.user.empresaId,
-        estado: 'pendiente', // Solo ausencias pendientes
+        estado: 'pendiente_aprobacion', // Solo ausencias pendientes
       },
       include: {
         empleado: true,
@@ -55,10 +60,7 @@ export async function POST(req: NextRequest) {
     });
 
     if (ausencias.length === 0) {
-      return NextResponse.json(
-        { error: 'No se encontraron ausencias pendientes' },
-        { status: 404 }
-      );
+      return notFoundResponse('No se encontraron ausencias pendientes');
     }
 
     // 4. Procesar en lote
@@ -84,10 +86,17 @@ export async function POST(req: NextRequest) {
 
         // Actualizar ausencia
         if (validatedData.accion === 'aprobar') {
+          // Determinar estado: en_curso si aún no pasó, completada si ya pasó
+          const hoy = new Date();
+          hoy.setHours(0, 0, 0, 0);
+          const fechaFin = new Date(ausencia.fechaFin);
+          fechaFin.setHours(0, 0, 0, 0);
+          const estadoAprobado = fechaFin < hoy ? 'completada' : 'en_curso';
+
           await prisma.ausencia.update({
             where: { id: ausencia.id },
             data: {
-              estado: 'aprobada',
+              estado: estadoAprobado,
               aprobadaPor: session.user.id,
               aprobadaEn: new Date(),
             },
@@ -138,25 +147,14 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 5. Retornar resumen
-    return NextResponse.json({
+    // Retornar resumen
+    return successResponse({
       success: true,
       mensaje: `Procesadas ${resultados.exitosas} ausencias correctamente`,
       resultados,
     });
   } catch (error) {
-    if (error instanceof z.ZodError) {
-      return NextResponse.json(
-        { error: 'Datos inválidos', details: error.issues },
-        { status: 400 }
-      );
-    }
-
-    console.error('[API Actualizar Masivo Ausencias]', error);
-    return NextResponse.json(
-      { error: 'Error al procesar ausencias' },
-      { status: 500 }
-    );
+    return handleApiError(error, 'API POST /api/ausencias/actualizar-masivo');
   }
 }
 

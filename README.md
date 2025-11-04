@@ -1,36 +1,202 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 🏢 CLOUSADMIN
 
-## Getting Started
+Plataforma de gestión de RRHH para empresas españolas construida con Next.js 14, Prisma, AWS y procesamiento de documentos con IA.
 
-First, run the development server:
+---
+
+## 🚀 Quick Start
 
 ```bash
+# 1. Clonar e instalar
+git clone <repository-url>
+cd Clousadmin
+npm install
+
+# 2. Configurar base de datos
+createdb clousadmin
+cp .env.example .env.local  # Y completar variables
+
+# 3. Ejecutar migraciones y seed
+npx prisma migrate dev
+npm run seed
+
+# 4. Iniciar servidor
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+**Accede a:** [http://localhost:3000](http://localhost:3000)
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+**Credenciales de prueba:**
+- HR Admin: `admin@clousadmin.com` / `Admin123!`
+- Empleado: `ana.garcia@clousadmin.com` / `Empleado123!`
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+---
 
-## Learn More
+## 📚 Documentación
 
-To learn more about Next.js, take a look at the following resources:
+Toda la documentación está en `docs/`:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- **[docs/README.md](docs/README.md)** - Índice de toda la documentación
+- **[docs/SETUP.md](docs/SETUP.md)** - Guía de configuración completa
+- **[docs/ARQUITECTURA.md](docs/ARQUITECTURA.md)** - Decisiones técnicas y estructura
+- **[docs/DESIGN_SYSTEM.md](docs/DESIGN_SYSTEM.md)** - Guías de diseño UI/UX
+- **[docs/DESIGN_PATTERNS.md](docs/DESIGN_PATTERNS.md)** - Patrones de diseño unificados
+- **[docs/funcionalidades/](docs/funcionalidades/)** - Documentación de cada feature
+- **[.cursorrules](.cursorrules)** - Principios de desarrollo
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Para documentación histórica, ver [docs/historial/](docs/historial/)
 
-## Deploy on Vercel
+---
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## 🛠️ Stack Tecnológico
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- **Frontend**: Next.js 16 (App Router), TypeScript, Tailwind CSS, shadcn/ui
+- **Backend**: Node.js, Prisma, PostgreSQL
+- **Auth**: JWT (jose) + bcryptjs
+- **Cloud**: AWS S3, RDS, Cognito, SES (opcional)
+- **IA**: OpenAI GPT-4 Vision (opcional)
+
+---
+
+## 📁 Estructura del Proyecto
+
+```
+Clousadmin/
+├── app/                    # Next.js App Router
+│   ├── (auth)/             # Rutas públicas
+│   ├── (dashboard)/        # Rutas protegidas (empleado, hr, manager)
+│   └── api/                # API Routes
+├── components/             # Componentes React
+│   ├── ui/                 # shadcn/ui (auto-generados)
+│   ├── shared/             # Compartidos
+│   ├── empleado/           # Específicos empleado
+│   └── hr/                 # Específicos HR
+├── lib/                    # Utilidades y lógica de negocio
+│   ├── calculos/           # Lógica de negocio
+│   └── validaciones/       # Validaciones Zod
+├── prisma/                 # Schema y migraciones
+├── docs/                   # Documentación
+└── .cursorrules            # Principios de desarrollo
+```
+
+---
+
+## 🎯 Funcionalidades
+
+### ✅ Completadas
+- Autenticación JWT con roles (HR Admin, Manager, Empleado)
+- Dashboard multi-rol con widgets personalizados
+- Gestión de empleados, equipos y puestos
+- Gestión de ausencias (solicitud, aprobación, saldo)
+- Fichajes y control horario (entrada/salida, pausas)
+- Jornadas laborales configurables
+
+### 🚧 En Desarrollo
+- Auto-completado de fichajes con IA
+- Balance de horas acumulado
+- Módulo de nóminas
+- Módulo de documentos con firma digital
+
+### 📋 Roadmap
+- Integración AWS S3 para documentos
+- Extracción IA de contratos y nóminas
+- Calendario inteligente de vacaciones
+- Integración Google Calendar/Outlook
+- Analytics y reporting avanzado
+
+---
+
+## 🧪 Testing
+
+```bash
+# Ejecutar tests (cuando estén implementados)
+npm test
+
+# Linting
+npm run lint
+
+# Ver base de datos
+npx prisma studio
+```
+
+---
+
+## 🚀 Despliegue
+
+### Producción
+
+```bash
+# Build
+npm run build
+
+# Ejecutar producción
+npm start
+```
+
+### Variables de Entorno (Producción)
+
+Ver `.env.example` para todas las variables requeridas.
+
+**Críticas:**
+- `DATABASE_URL` - PostgreSQL connection string
+- `NEXTAUTH_SECRET` - JWT secret (generar con `openssl rand -base64 32`)
+- `NEXT_PUBLIC_APP_URL` - URL pública de la app
+
+---
+
+## 📖 Guías
+
+### Para Desarrolladores
+1. Lee [docs/ARQUITECTURA.md](docs/ARQUITECTURA.md) para entender la estructura
+2. Sigue las **máximas de desarrollo** en [.cursorrules](.cursorrules)
+3. Consulta [docs/funcionalidades/](docs/funcionalidades/) para cada feature
+
+### Para Contribuir
+1. Crea una rama: `git checkout -b feature/nueva-funcionalidad`
+2. Sigue las convenciones de código en `.cursorrules`
+3. Documenta cambios en `docs/daily/`
+4. Crea PR con descripción clara
+
+---
+
+## 🐛 Troubleshooting
+
+### Error: "Can't reach database server"
+```bash
+# Verifica que PostgreSQL esté corriendo
+pg_ctl status
+
+# Verifica tu DATABASE_URL en .env.local
+```
+
+### Error: permisos npm
+```bash
+sudo chown -R $(whoami) ~/.npm
+npm install
+```
+
+### Puerto 3000 en uso
+```bash
+killall node
+npm run dev
+```
+
+Más ayuda en [docs/SETUP.md](docs/SETUP.md#troubleshooting).
+
+---
+
+## 📝 License
+
+Proprietary - Clousadmin © 2025
+
+---
+
+## 📧 Contacto
+
+Para preguntas o soporte: [info@clousadmin.com](mailto:info@clousadmin.com)
+
+---
+
+**Versión**: 1.0.0  
+**Última actualización**: 25 de octubre 2025
+**Última limpieza**: 25 de octubre 2025

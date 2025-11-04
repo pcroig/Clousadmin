@@ -1,0 +1,389 @@
+// ========================================
+// API: Empleados - Confirmar Importación desde Excel
+// ========================================
+
+import { NextRequest, NextResponse } from 'next/server';
+import { getSession } from '@/lib/auth';
+import { prisma } from '@/lib/prisma';
+import { crearInvitacion } from '@/lib/invitaciones';
+import type { EmpleadoDetectado } from '@/lib/ia/procesar-excel-empleados';
+
+interface ConfirmarImportacionBody {
+  empleados: (EmpleadoDetectado & { valido: boolean; errores: string[] })[];
+  equiposDetectados: string[];
+  managersDetectados: string[];
+  invitarEmpleados: boolean;
+}
+
+/**
+ * POST /api/empleados/importar-excel/confirmar
+ * Crea empleados, usuarios, equipos y envía invitaciones
+ */
+export async function POST(req: NextRequest) {
+  try {
+    // Verificar autenticación
+    const session = await getSession();
+    if (!session || session.user.rol !== 'hr_admin') {
+      return NextResponse.json(
+        { success: false, error: 'No autorizado' },
+        { status: 401 }
+      );
+    }
+
+    const body: ConfirmarImportacionBody = await req.json();
+
+    const { empleados, equiposDetectados, invitarEmpleados } = body;
+
+    // Filtrar solo empleados válidos
+    const empleadosValidos = empleados.filter((e) => e.valido);
+
+    if (empleadosValidos.length === 0) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'No hay empleados válidos para importar',
+        },
+        { status: 400 }
+      );
+    }
+
+    console.log(
+      `[ConfirmarImportacion] Importando ${empleadosValidos.length} empleados...`
+    );
+
+    // Procesar en batches de 50 empleados
+    const BATCH_SIZE = 50;
+    const batches: typeof empleadosValidos[] = [];
+    
+    for (let i = 0; i < empleadosValidos.length; i += BATCH_SIZE) {
+      batches.push(empleadosValidos.slice(i, i + BATCH_SIZE));
+    }
+
+    const resultados = {
+      empleadosCreados: 0,
+      equiposCreados: 0,
+      invitacionesEnviadas: 0,
+      errores: [] as string[],
+    };
+
+    // 1. Crear equipos primero (usar upsert para evitar duplicados)
+    const equiposCreados = new Map<string, string>(); // nombre -> id
+
+    for (const nombreEquipo of equiposDetectados) {
+      try {
+        // Usar upsert para crear o actualizar equipo (ahora tenemos índice único)
+        const equipo = await prisma.equipo.upsert({
+          where: {
+            empresaId_nombre: {
+              empresaId: session.user.empresaId,
+              nombre: nombreEquipo,
+            },
+          },
+          update: {
+            // Si ya existe, asegurar que está activo
+            activo: true,
+          },
+          create: {
+            empresaId: session.user.empresaId,
+            nombre: nombreEquipo,
+            tipo: 'proyecto',
+            activo: true,
+          },
+        });
+
+        equiposCreados.set(nombreEquipo, equipo.id);
+        resultados.equiposCreados++;
+      } catch (error) {
+        console.error(`[ConfirmarImportacion] Error creando equipo ${nombreEquipo}:`, error);
+        resultados.errores.push(`Error al crear equipo: ${nombreEquipo}`);
+      }
+    }
+
+    console.log(`[ConfirmarImportacion] Equipos creados: ${resultados.equiposCreados}`);
+
+    // 2. Crear empleados en batches
+    for (const batch of batches) {
+      await Promise.all(
+        batch.map(async (empleadoData) => {
+          try {
+            await prisma.$transaction(async (tx) => {
+              // Verificar si el email ya existe
+              const usuarioExistente = await tx.usuario.findUnique({
+                where: { email: empleadoData.email!.toLowerCase() },
+              });
+
+              if (usuarioExistente) {
+                resultados.errores.push(
+                  `Email duplicado: ${empleadoData.email}`
+                );
+                return; // Saltar este empleado
+              }
+
+              // Crear usuario (sin password, se establecerá en el onboarding)
+              const usuario = await tx.usuario.create({
+                data: {
+                  email: empleadoData.email!.toLowerCase(),
+                  nombre: empleadoData.nombre!,
+                  apellidos: empleadoData.apellidos!,
+                  empresaId: session.user.empresaId,
+                  rol: 'empleado',
+                  emailVerificado: false,
+                  activo: invitarEmpleados ? false : true, // Se activará al aceptar invitación
+                },
+              });
+
+              // Verificar si el NIF ya existe (si hay NIF)
+              if (empleadoData.nif) {
+                const empleadoConNif = await tx.empleado.findUnique({
+                  where: { nif: empleadoData.nif },
+                });
+
+                if (empleadoConNif) {
+                  resultados.errores.push(
+                    `NIF duplicado: ${empleadoData.nif}`
+                  );
+                  // Eliminar el usuario creado para mantener consistencia
+                  await tx.usuario.delete({ where: { id: usuario.id } });
+                  return; // Saltar este empleado
+                }
+              }
+
+              // Crear empleado
+              const empleado = await tx.empleado.create({
+                data: {
+                  usuarioId: usuario.id,
+                  empresaId: session.user.empresaId,
+                  nombre: empleadoData.nombre!,
+                  apellidos: empleadoData.apellidos!,
+                  email: empleadoData.email!.toLowerCase(),
+                  nif: empleadoData.nif || null,
+                  telefono: empleadoData.telefono,
+                  fechaNacimiento: empleadoData.fechaNacimiento
+                    ? new Date(empleadoData.fechaNacimiento)
+                    : null,
+                  puesto: empleadoData.puesto,
+                  departamento: empleadoData.departamento,
+                  fechaAlta: empleadoData.fechaAlta
+                    ? new Date(empleadoData.fechaAlta)
+                    : new Date(),
+                  tipoContrato: empleadoData.tipoContrato || 'indefinido',
+                  salarioBrutoAnual: empleadoData.salarioBrutoAnual
+                    ? parseFloat(empleadoData.salarioBrutoAnual.toString())
+                    : null,
+                  salarioBrutoMensual: empleadoData.salarioBrutoMensual
+                    ? parseFloat(empleadoData.salarioBrutoMensual.toString())
+                    : null,
+                  direccionCalle: empleadoData.direccionCalle,
+                  direccionNumero: empleadoData.direccionNumero,
+                  direccionPiso: empleadoData.direccionPiso,
+                  ciudad: empleadoData.ciudad,
+                  codigoPostal: empleadoData.codigoPostal,
+                  direccionProvincia: empleadoData.direccionProvincia,
+                  onboardingCompletado: false,
+                  activo: invitarEmpleados ? false : true,
+                },
+              });
+
+              // Vincular empleado al usuario
+              await tx.usuario.update({
+                where: { id: usuario.id },
+                data: { empleadoId: empleado.id },
+              });
+
+              // Asignar a equipo si corresponde
+              if (empleadoData.equipo && equiposCreados.has(empleadoData.equipo)) {
+                await tx.empleadoEquipo.create({
+                  data: {
+                    empleadoId: empleado.id,
+                    equipoId: equiposCreados.get(empleadoData.equipo)!,
+                  },
+                });
+              }
+
+              resultados.empleadosCreados++;
+
+              // Crear invitación si corresponde
+              if (invitarEmpleados) {
+                try {
+                  await crearInvitacion(
+                    empleado.id,
+                    session.user.empresaId,
+                    empleadoData.email!.toLowerCase()
+                  );
+                  resultados.invitacionesEnviadas++;
+                } catch (error) {
+                  console.error(
+                    `[ConfirmarImportacion] Error creando invitación para ${empleadoData.email}:`,
+                    error
+                  );
+                }
+              }
+            });
+          } catch (error) {
+            console.error(
+              `[ConfirmarImportacion] Error creando empleado ${empleadoData.email}:`,
+              error
+            );
+            resultados.errores.push(
+              `Error al crear empleado: ${empleadoData.email}`
+            );
+          }
+        })
+      );
+    }
+
+    // 3. Asignar managers (segunda pasada)
+    // Extraer todos los managers únicos de los empleados importados
+    const managersUnicos = new Set<string>();
+    
+    // Agregar managers detectados por la IA
+    if (body.managersDetectados && body.managersDetectados.length > 0) {
+      body.managersDetectados.forEach((m) => managersUnicos.add(m.toLowerCase().trim()));
+    }
+    
+    // Agregar managers del campo manager de cada empleado
+    empleadosValidos.forEach((emp) => {
+      if (emp.manager && emp.manager.trim()) {
+        managersUnicos.add(emp.manager.toLowerCase().trim());
+      }
+    });
+
+    if (managersUnicos.size > 0) {
+      console.log(`[ConfirmarImportacion] Asignando ${managersUnicos.size} managers...`);
+      
+      // Crear mapa de managers: email/nombre -> empleadoId
+      const managersMap = new Map<string, string>();
+      
+      for (const managerInfo of Array.from(managersUnicos)) {
+        try {
+          // Buscar por email (primero intentar email)
+          let managerEmpleado = await prisma.empleado.findFirst({
+            where: {
+              empresaId: session.user.empresaId,
+              email: managerInfo,
+            },
+          });
+
+          // Si no se encuentra por email, buscar por nombre completo
+          if (!managerEmpleado) {
+            // Intentar dividir el nombre en nombre y apellidos
+            const partesNombre = managerInfo.split(' ');
+            if (partesNombre.length >= 2) {
+              const nombre = partesNombre[0];
+              const apellidos = partesNombre.slice(1).join(' ');
+              
+              managerEmpleado = await prisma.empleado.findFirst({
+                where: {
+                  empresaId: session.user.empresaId,
+                  nombre: { contains: nombre, mode: 'insensitive' },
+                  apellidos: { contains: apellidos, mode: 'insensitive' },
+                },
+              });
+            } else if (partesNombre.length === 1) {
+              // Solo nombre, buscar por nombre o apellidos
+              managerEmpleado = await prisma.empleado.findFirst({
+                where: {
+                  empresaId: session.user.empresaId,
+                  OR: [
+                    { nombre: { contains: partesNombre[0], mode: 'insensitive' } },
+                    { apellidos: { contains: partesNombre[0], mode: 'insensitive' } },
+                  ],
+                },
+              });
+            }
+          }
+
+          if (managerEmpleado) {
+            managersMap.set(managerInfo, managerEmpleado.id);
+            console.log(`[ConfirmarImportacion] Manager encontrado: ${managerInfo} -> ${managerEmpleado.id}`);
+          } else {
+            console.warn(`[ConfirmarImportacion] Manager no encontrado: ${managerInfo}`);
+          }
+        } catch (error) {
+          console.error(`[ConfirmarImportacion] Error buscando manager ${managerInfo}:`, error);
+        }
+      }
+
+      // Asignar managers a empleados y equipos
+      let managersAsignados = 0;
+      
+      for (const empleadoData of empleadosValidos) {
+        try {
+          if (empleadoData.manager && empleadoData.manager.trim()) {
+            const managerKey = empleadoData.manager.toLowerCase().trim();
+            
+            if (managersMap.has(managerKey)) {
+              const managerId = managersMap.get(managerKey)!;
+              
+              // Buscar el empleado creado
+              const empleadoCreado = await prisma.empleado.findFirst({
+                where: {
+                  empresaId: session.user.empresaId,
+                  email: empleadoData.email!.toLowerCase(),
+                },
+              });
+
+              if (empleadoCreado) {
+                // 1. Asignar managerId al empleado (relación directa manager)
+                await prisma.empleado.update({
+                  where: { id: empleadoCreado.id },
+                  data: { managerId },
+                });
+
+                // 2. Si el empleado tiene equipo, asignar el manager como manager del equipo
+                // (solo si el equipo no tiene manager)
+                if (empleadoData.equipo && equiposCreados.has(empleadoData.equipo)) {
+                  const equipoId = equiposCreados.get(empleadoData.equipo)!;
+                  
+                  // Verificar si el equipo ya tiene un manager, si no, asignarlo
+                  const equipo = await prisma.equipo.findUnique({
+                    where: { id: equipoId },
+                    select: { managerId: true },
+                  });
+
+                  if (!equipo?.managerId) {
+                    await prisma.equipo.update({
+                      where: { id: equipoId },
+                      data: { managerId },
+                    });
+                    console.log(`[ConfirmarImportacion] Manager asignado al equipo: ${empleadoData.equipo}`);
+                  }
+                }
+
+                managersAsignados++;
+              }
+            }
+          }
+        } catch (error) {
+          console.error(
+            `[ConfirmarImportacion] Error asignando manager para ${empleadoData.email}:`,
+            error
+          );
+        }
+      }
+
+      console.log(`[ConfirmarImportacion] Managers asignados: ${managersAsignados}`);
+    }
+
+    console.log('[ConfirmarImportacion] Resultados:', resultados);
+
+    return NextResponse.json({
+      success: true,
+      data: resultados,
+    });
+  } catch (error) {
+    console.error('[ConfirmarImportacion] Error:', error);
+
+    return NextResponse.json(
+      {
+        success: false,
+        error:
+          error instanceof Error
+            ? error.message
+            : 'Error al confirmar la importación',
+      },
+      { status: 500 }
+    );
+  }
+}
+

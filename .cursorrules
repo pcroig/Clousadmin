@@ -1,0 +1,327 @@
+# Clousadmin - Cursor Rules
+
+## Project Overview
+Clousadmin is an HR management platform for Spanish companies built with Next.js 14, Prisma, AWS, and AI-powered document processing.
+
+---
+
+## 🎯 DEVELOPMENT PRINCIPLES
+
+**ALWAYS follow these principles in ALL tasks:**
+
+### 1. ROOT CAUSE ANALYSIS
+- ✅ Identify and fix the **root cause** of the problem
+- ❌ DO NOT apply temporary patches or superficial solutions
+- 🔍 Investigate thoroughly before implementing
+
+### 2. CLEAN CODE
+- ✅ Clean, efficient, and organized code for **long-term** maintainability
+- ✅ Clear and consistent structure
+- ✅ Robust error handling
+- ✅ Adequate inline documentation
+- ✅ Separation of concerns (data fetching vs presentation)
+- ✅ **Code reuse** (DRY - Don't Repeat Yourself)
+  - Extract common logic to reusable functions/components
+  - Create shared utilities in `lib/` when the same logic is repeated
+  - Reusable UI components instead of duplicating JSX
+  - Custom hooks for logic shared between components
+
+### 3. LONG-TERM THINKING
+- Every solution must consider:
+  - **Maintainability**: Easy to understand in 6 months?
+  - **Scalability**: Works with 1000x data?
+  - **Performance**: Is it efficient?
+  - **Testability**: Can it be easily tested?
+  - **Reusability**: Can it be used in multiple places?
+  - **Efficiency**: Avoids duplicate calculations? Optimizes queries? Minimizes re-renders?
+
+### 4. ORGANIZATION
+- ✅ Everything must be **ordered and well-structured**
+- ✅ Reduce complexity through separation of concerns
+- ✅ Follow consistent naming conventions
+- ✅ Document important architectural decisions
+
+### 5. CODE REUSE & SCALABILITY
+- ✅ **Before duplicating code**, search if a similar solution already exists
+- ✅ **Extract to reusable functions/components** when:
+  - The same logic appears in 2+ places
+  - The logic is complex and may need maintenance
+  - It can be useful in other project contexts
+- ✅ **Create shared utilities** in `lib/`:
+  - Calculation functions (`lib/calculos/`)
+  - Common validations (`lib/validaciones/`)
+  - Format/date/text helpers
+  - Shared business logic
+- ✅ **Reusable components**:
+  - Generic UI components in `components/shared/`
+  - Avoid specific components when they can be generic
+  - Well-typed props for maximum flexibility
+- ✅ **Optimization and efficiency**:
+  - Use `React.memo()` for components that re-render frequently
+  - `useMemo()` and `useCallback()` for expensive calculations and functions passed as props
+  - Optimize Prisma queries (avoid N+1, use select/include appropriately)
+  - Lazy loading for heavy components
+  - Pagination for large lists
+  - Debounce/throttle for searches and filters
+
+### 6. SYSTEM-WIDE IMPACT ANALYSIS
+- ✅ **BEFORE making any change**, review **ALL relationships and dependencies**
+- ✅ Identify **ALL places** that use the modified code/component/schema
+- ✅ Verify that changes don't break existing functionality in other parts
+- ✅ Search for references in:
+  - Related Prisma models (foreign keys, relations)
+  - React components that import/use the modified code
+  - API Routes that consume/produce the modified format
+  - Calculation/validation functions that depend on the structure
+  - Shared TypeScript interfaces
+  - Related utilities and helpers
+- ✅ Use search tools (`grep`, `codebase_search`) to find ALL references
+- ✅ Consider cascade effects: schema changes affect migrations, types, validations, queries
+- ✅ **DO NOT assume** a change is isolated - always verify the entire system
+
+**MANDATORY PROCESS when making changes:**
+1. 🔍 **Search for all references** of the code to modify
+2. 📋 **List all affected files** (direct and indirect)
+3. ✅ **Verify compatibility** in each affected location
+4. 🔧 **Update ALL necessary places** consistently
+5. 🧪 **Consider edge cases** that might break
+
+**When integrating external code or libraries:**
+- ✅ **Verify tech stack compatibility** before integration (does it match Next.js 14, Prisma, TypeScript?)
+- ✅ **Ask about project structure** if unclear (monorepo? single app? where is the code located?)
+- ✅ **DO NOT assume** project structure - verify paths and conventions match
+- ✅ **Check all dependencies** - ensure they're compatible with existing stack
+- ✅ **Test integration** in isolation before applying system-wide
+
+**ANTI-PATTERNS TO AVOID:**
+- ❌ Quick patches without understanding the problem
+- ❌ Duplicated or inconsistent code
+- ❌ Superficial error handling (`try-catch` without a plan)
+- ❌ Solutions that only work "for now"
+- ❌ Lack of separation of concerns
+- ❌ **Making changes without reviewing relationships and dependencies** ⚠️ **CRITICAL**
+- ❌ Assuming a change is isolated without verifying impacts in other parts
+- ❌ Modifying schemas/interfaces without updating all consumers
+- ❌ Changing data formats without migrating existing code that uses them
+- ❌ **Duplicating code** instead of extracting to reusable functions/components
+- ❌ Creating specific components when they could be generic
+- ❌ Ignoring optimization opportunities (unnecessary re-renders, inefficient queries)
+- ❌ Hardcoding values that should be configurable or reusable
+
+---
+
+## Core Architecture Principles
+
+### 1. Stack & Technology
+- **Framework**: Next.js 14 (App Router)
+- **Language**: TypeScript (strict mode)
+- **Runtime**: Node.js 18+
+- **Database**: PostgreSQL with Prisma ORM
+- **UI**: Tailwind CSS + shadcn/ui
+- **Charts**: Recharts
+- **State**: React Server Components + Server Actions (no Redux/Zustand unless necessary)
+- **Validation**: Zod schemas
+- **Forms**: react-hook-form + @hookform/resolvers
+- **AWS Services**: S3, RDS, Cognito, SES
+- **AI**: OpenAI GPT-4 Vision
+
+### 2. Project Structure (Follow README.md)
+```
+app/
+├── (auth)/           # Authentication routes (login, onboarding)
+├── (dashboard)/      # Protected routes (empleado, hr)
+├── api/              # API Routes (RESTful conventions)
+└── layout.tsx
+
+components/
+├── ui/               # shadcn/ui components (auto-generated, don't edit manually)
+├── empleado/         # Employee-facing components
+├── hr/               # HR admin components
+└── shared/           # Shared components (sidebar, notifications)
+
+lib/
+├── prisma.ts         # Prisma client singleton
+├── auth.ts           # AWS Cognito authentication
+├── s3.ts             # S3 file storage utilities
+├── openai.ts         # OpenAI API client
+├── ia/               # AI processing logic (extract contracts, nominas, matching)
+├── calculos/         # Business logic (ausencias, fichajes, balance-horas)
+└── validaciones/     # Validation utilities (IBAN, NIF, festivos)
+
+prisma/
+├── schema.prisma     # Database schema
+└── migrations/       # Auto-generated migrations
+```
+
+---
+
+## Development Guidelines
+
+### 3. Naming Conventions
+
+#### Files & Folders
+- **Pages/Routes**: lowercase with hyphens (`app/empleado/mi-espacio/datos/page.tsx`)
+- **Components**: PascalCase (`components/empleado/WidgetFichar.tsx`)
+- **Utilities/Libs**: camelCase (`lib/calculos/balanceHoras.ts`)
+- **Types**: PascalCase in separate files (`types/Empleado.ts`)
+- **API Routes**: lowercase with hyphens (`app/api/empleados/route.ts`)
+
+#### Code Style
+- **Variables/Functions**: camelCase (`const empleadoActual`, `function calcularSaldo()`)
+- **Types/Interfaces**: PascalCase (`type EmpleadoData`, `interface NominaExtraccion`)
+- **Constants**: UPPER_SNAKE_CASE (`const MAX_FILE_SIZE = 5000000`)
+- **Enums**: PascalCase keys (`enum RolUsuario { HRAdmin, Manager, Empleado }`)
+
+#### Database (Prisma Schema)
+- **Tables**: singular, camelCase (`model empleado`, `model ausencia`)
+- **Fields**: camelCase (`createdAt`, `updatedAt`, `empleadoId`)
+- **Relations**: plural for one-to-many (`empleado.ausencias`, `empresa.empleados`)
+
+### 4. TypeScript Standards
+
+#### Type Safety
+- **Always use TypeScript** - no `any` types unless absolutely necessary
+- **Strict mode enabled** - enforce null checks, strict function types
+- **Define interfaces** for all data shapes (API responses, Prisma models, component props)
+- **Use Zod** for runtime validation (forms, API inputs, external data)
+
+### 5. Next.js Patterns
+
+#### Server Components vs Client Components
+- **DEFAULT**: Server Component (no 'use client')
+- **USE CLIENT**: Only when needed (interactivity, hooks, browser APIs)
+
+#### API Routes
+- **GET**: Direct Server Components
+- **POST/PATCH/DELETE**: API Routes with Zod validation
+
+#### Server Actions
+- For mutations from forms
+- Always with `revalidatePath()` after changes
+
+### 6. Prisma Best Practices
+
+#### Schema Conventions
+- Singular table names, camelCase fields
+- Timestamps: `createdAt`, `updatedAt`
+- Relations: plural for one-to-many
+- Indexes on foreign keys and frequently queried fields
+
+#### Query Patterns
+- Use Prisma client singleton
+- Avoid N+1 queries with include/select
+- Use transactions for multi-step operations
+
+### 7. Error Handling & Logging
+
+#### Error Patterns
+- Structured error handling with try/catch
+- Contextual logging: `console.error('[Context]', error)`
+- Return success/error objects: `{ success: boolean, data?: any, error?: string }`
+
+#### Logging Levels
+- **console.log**: Development debugging only (remove before commit)
+- **console.info**: Success confirmations, milestones
+- **console.warn**: Degraded functionality, missing optional data
+- **console.error**: Critical errors, exceptions, must investigate
+
+### 8. Security Guidelines
+
+#### Environment Variables
+- Validate env vars at startup with Zod
+- Never commit `.env.local`, use `.env.example` template
+
+#### Input Validation
+- Always validate user inputs with Zod
+- Validate before database operations
+
+#### Authentication Checks
+- Check auth in Server Components and API Routes
+- Role-based access control
+
+---
+
+## Common Anti-Patterns to Avoid
+
+1. **Business Logic in Components**: Keep components presentational, logic in `lib/`
+2. **Client Components Everywhere**: Default to Server Components, use 'use client' only when needed
+3. **Missing Error Handling**: Always wrap async operations in try/catch
+4. **Hardcoded Values**: Use environment variables and constants
+5. **Ignoring Type Safety**: No `any` types, use Zod for runtime validation
+6. **N+1 Queries**: Use Prisma `include` and `select` for eager loading
+7. **Missing Input Validation**: Validate all user inputs before database operations
+8. **Exposing Secrets**: Never commit `.env.local`, use `.env.example` template
+9. **Direct Database Queries in Components**: Use Server Actions or API Routes
+10. **Skipping Tests**: Write tests for business logic (`lib/calculos/`, `lib/validaciones/`)
+11. **Code Duplication**: Extract common logic to shared utilities/components instead of copying code
+12. **Over-Specific Components**: Make components generic and reusable when possible
+13. **Ignoring Performance**: Not using memoization for expensive calculations or frequent re-renders
+
+---
+
+## Performance Guidelines
+
+- **Database**: Use indexes for foreign keys and frequently queried fields
+- **Caching**: Use Next.js `unstable_cache` for expensive operations
+- **Images**: Use `next/image` with proper width/height
+- **Fonts**: Use `next/font` to optimize font loading
+- **API Routes**: Return only necessary data (avoid over-fetching)
+- **File Upload**: Limit file sizes (5MB for PDFs, 2MB for images)
+- **React Optimization**: 
+  - `React.memo()` for components that re-render frequently
+  - `useMemo()` for expensive calculations
+  - `useCallback()` for functions passed as props
+  - Lazy load heavy components with `next/dynamic`
+- **Code Reuse**: Extract reusable logic to avoid duplication and improve maintainability
+
+---
+
+## Commit Message Conventions
+
+Use conventional commits format:
+
+```
+feat(empleados): add onboarding flow with email invitation
+fix(ausencias): correct vacation days calculation for leap years
+docs(readme): update installation instructions
+refactor(prisma): normalize database schema naming
+test(calculos): add unit tests for balance-horas calculation
+```
+
+Types: `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`
+
+---
+
+## AI Assistant Instructions
+
+When helping with this project:
+
+1. **Follow this file religiously** - these are project-specific conventions
+2. **Suggest TypeScript-first** - no JavaScript unless explicitly requested
+3. **Use Server Components by default** - only suggest 'use client' when necessary
+4. **Validate with Zod** - always validate external inputs
+5. **Think multi-tenant** - consider `empresaId` filtering in queries
+6. **Spanish context** - use Spanish for user-facing text, English for code
+7. **Prisma best practices** - avoid N+1, use transactions for multi-step ops
+8. **AWS-native** - prefer AWS services over third-party alternatives
+9. **Security-first** - never expose credentials, validate all inputs
+10. **Document as you go** - update daily logs after significant changes
+11. **⚠️ MANDATORY SYSTEM-WIDE REVIEW** - BEFORE any change:
+    - Search for ALL references to the modified code/schema/component
+    - Verify Prisma relationships (foreign keys, relations)
+    - Find ALL components/APIs/utilities that use the modified code
+    - Ensure changes are consistent across the ENTIRE system
+    - DO NOT make isolated changes without verifying cascade impacts
+    - **When integrating external code**: Verify tech stack compatibility, ask about structure if unclear, never assume project layout
+12. **🔄 CODE REUSE & SCALABILITY** - Always prioritize:
+    - Search for existing code before creating new (avoid duplication)
+    - Extract common logic to shared utilities in `lib/`
+    - Create generic and reusable components
+    - Optimize with memoization when appropriate
+    - Consider performance and scalability impact
+    - Make code scalable and efficient from the start
+
+---
+
+**Version**: 1.1.0
+**Last Updated**: 2025-01-27

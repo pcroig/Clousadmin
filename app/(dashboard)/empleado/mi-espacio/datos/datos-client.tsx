@@ -1,5 +1,7 @@
 'use client';
 
+import { Button } from '@/components/ui/button';
+
 export function MiEspacioDatosClient({ empleado }: any) {
   return (
     <div className="space-y-6">
@@ -64,10 +66,56 @@ export function MiEspacioDatosClient({ empleado }: any) {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Dirección</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Calle</label>
               <input
                 type="text"
-                defaultValue={empleado.direccion || ''}
+                defaultValue={empleado.direccionCalle || ''}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Número</label>
+                <input
+                  type="text"
+                  defaultValue={empleado.direccionNumero || ''}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Piso/Puerta</label>
+                <input
+                  type="text"
+                  defaultValue={empleado.direccionPiso || ''}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                  placeholder="Opcional"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">CP</label>
+                <input
+                  type="text"
+                  defaultValue={empleado.codigoPostal || ''}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                  maxLength={5}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Ciudad</label>
+                <input
+                  type="text"
+                  defaultValue={empleado.ciudad || ''}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Provincia</label>
+              <input
+                type="text"
+                defaultValue={empleado.direccionProvincia || ''}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
               />
             </div>
@@ -76,9 +124,9 @@ export function MiEspacioDatosClient({ empleado }: any) {
       </div>
 
       <div className="flex justify-end">
-        <button className="px-4 py-2 bg-gray-900 text-white rounded-lg text-sm font-medium hover:bg-gray-800">
+        <Button variant="default">
           Guardar cambios
-        </button>
+        </Button>
       </div>
     </div>
   );

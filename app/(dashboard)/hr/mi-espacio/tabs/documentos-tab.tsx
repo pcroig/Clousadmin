@@ -44,18 +44,24 @@ export function DocumentosTab({ empleado }: any) {
         {activeDocTab === 'personales' ? (
           carpetasPersonales.length > 0 ? (
             carpetasPersonales.map((carpeta: any) => (
-              <div key={carpeta.id} className="flex flex-col items-center cursor-pointer group">
-                <div className="w-24 h-24 rounded-full bg-gray-100 flex items-center justify-center mb-2 group-hover:bg-gray-200 transition-colors">
-                  <svg className="w-12 h-12 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
-                  </svg>
+              <div key={carpeta.id} className="cursor-pointer group">
+                <div className="bg-gray-50/50 rounded-3xl p-6 group-hover:bg-gray-100/50 transition-all duration-200 border border-gray-200">
+                  <div className="flex flex-col items-center space-y-3">
+                    <div className="w-28 h-28 rounded-full bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center group-hover:from-gray-200 group-hover:to-gray-300 transition-all duration-200 shadow-sm">
+                      <svg className="w-14 h-14 text-gray-600 group-hover:text-gray-700 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                      </svg>
+                    </div>
+                    <div className="text-center w-full">
+                      <p className="text-sm font-semibold text-gray-900 mb-1">{carpeta.nombre}</p>
+                      {carpeta.documentos.length > 0 && (
+                        <p className="text-xs text-gray-500">
+                          {carpeta.documentos.length} doc{carpeta.documentos.length !== 1 ? 's' : ''}
+                        </p>
+                      )}
+                    </div>
+                  </div>
                 </div>
-                <p className="text-sm font-medium text-gray-900 text-center">{carpeta.nombre}</p>
-                {carpeta.documentos.length > 0 && (
-                  <p className="text-xs text-gray-500 mt-1">
-                    {carpeta.documentos.length} documento{carpeta.documentos.length !== 1 ? 's' : ''}
-                  </p>
-                )}
               </div>
             ))
           ) : (
@@ -68,18 +74,24 @@ export function DocumentosTab({ empleado }: any) {
           )
         ) : carpetasCompartidas.length > 0 ? (
           carpetasCompartidas.map((carpeta: any) => (
-            <div key={carpeta.id} className="flex flex-col items-center cursor-pointer group">
-              <div className="w-24 h-24 rounded-full bg-gray-100 flex items-center justify-center mb-2 group-hover:bg-gray-200 transition-colors">
-                <svg className="w-12 h-12 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
-                </svg>
+            <div key={carpeta.id} className="cursor-pointer group">
+              <div className="bg-gray-50/50 rounded-3xl p-6 group-hover:bg-gray-100/50 transition-all duration-200 border border-gray-200">
+                <div className="flex flex-col items-center space-y-3">
+                  <div className="w-28 h-28 rounded-full bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center group-hover:from-gray-200 group-hover:to-gray-300 transition-all duration-200 shadow-sm">
+                    <svg className="w-14 h-14 text-gray-600 group-hover:text-gray-700 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                    </svg>
+                  </div>
+                  <div className="text-center w-full">
+                    <p className="text-sm font-semibold text-gray-900 mb-1">{carpeta.nombre}</p>
+                    {carpeta.documentos.length > 0 && (
+                      <p className="text-xs text-gray-500">
+                        {carpeta.documentos.length} doc{carpeta.documentos.length !== 1 ? 's' : ''}
+                      </p>
+                    )}
+                  </div>
+                </div>
               </div>
-              <p className="text-sm font-medium text-gray-900 text-center">{carpeta.nombre}</p>
-              {carpeta.documentos.length > 0 && (
-                <p className="text-xs text-gray-500 mt-1">
-                  {carpeta.documentos.length} documento{carpeta.documentos.length !== 1 ? 's' : ''}
-                </p>
-              )}
             </div>
           ))
         ) : (

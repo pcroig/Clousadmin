@@ -1,46 +1,51 @@
 // ========================================
-// API Marcar Notificación como Leída
+// API Route: Marcar Notificación como Leída
 // ========================================
 
-import { NextRequest, NextResponse } from 'next/server';
-import { getSession } from '@/lib/auth';
+import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import {
+  requireAuth,
+  handleApiError,
+  successResponse,
+  notFoundResponse,
+  forbiddenResponse,
+} from '@/lib/api-handler';
 
-// PATCH: Marcar notificación como leída
+// PATCH /api/notificaciones/[id]/marcar-leida
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getSession();
-    if (!session) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
-    }
+    // Verificar autenticación
+    const authResult = await requireAuth(req);
+    if (authResult instanceof Response) return authResult;
+    const { session } = authResult;
 
-    const { id: notificacionId } = await params;
+    const { id } = await params;
 
     // Verificar que la notificación pertenece al usuario
-    const notificacion = await prisma.notificacion.findFirst({
-      where: {
-        id: notificacionId,
-        usuarioId: session.user.id,
-      },
+    const notificacion = await prisma.notificacion.findUnique({
+      where: { id },
     });
 
     if (!notificacion) {
-      return NextResponse.json({ error: 'Notificación no encontrada' }, { status: 404 });
+      return notFoundResponse('Notificación no encontrada');
+    }
+
+    if (notificacion.usuarioId !== session.user.id) {
+      return forbiddenResponse('No tienes permiso para marcar esta notificación');
     }
 
     // Marcar como leída
-    await prisma.notificacion.update({
-      where: { id: notificacionId },
+    const notificacionActualizada = await prisma.notificacion.update({
+      where: { id },
       data: { leida: true },
     });
 
-    return NextResponse.json({ success: true });
+    return successResponse(notificacionActualizada);
   } catch (error) {
-    console.error('[API PATCH Marcar Leída]', error);
-    return NextResponse.json({ error: 'Error al marcar notificación' }, { status: 500 });
+    return handleApiError(error, 'API PATCH /api/notificaciones/[id]/marcar-leida');
   }
 }
-

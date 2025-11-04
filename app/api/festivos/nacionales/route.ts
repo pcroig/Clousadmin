@@ -1,15 +1,16 @@
 // ========================================
 // API Festivos Nacionales - España
 // ========================================
-import { NextRequest, NextResponse } from 'next/server';
-import { getSession } from '@/lib/auth';
 
+import { NextRequest } from 'next/server';
+import { requireAuth, handleApiError, successResponse } from '@/lib/api-handler';
+
+// GET /api/festivos/nacionales - Obtener festivos nacionales de España
 export async function GET(req: NextRequest) {
   try {
-    const session = await getSession();
-    if (!session) {
-      return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
-    }
+    // Verificar autenticación
+    const authResult = await requireAuth(req);
+    if (authResult instanceof Response) return authResult;
 
     const { searchParams } = new URL(req.url);
     const año = parseInt(searchParams.get('año') || new Date().getFullYear().toString());
@@ -47,10 +48,9 @@ export async function GET(req: NextRequest) {
       })),
     ];
 
-    return NextResponse.json({ año, festivos });
+    return successResponse({ año, festivos });
   } catch (error) {
-    console.error('[API GET Festivos Nacionales]', error);
-    return NextResponse.json({ error: 'Error al obtener festivos' }, { status: 500 });
+    return handleApiError(error, 'API GET /api/festivos/nacionales');
   }
 }
 

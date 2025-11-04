@@ -20,7 +20,7 @@ interface MiEspacioManagerClientProps {
 }
 
 export function MiEspacioManagerClient({ empleado, usuario }: MiEspacioManagerClientProps) {
-  const [activeTab, setActiveTab] = useState('datos');
+  const [activeTab, setActiveTab] = useState('general');
   const [editingProfile, setEditingProfile] = useState(false);
 
   const getInitials = () => {
@@ -86,7 +86,7 @@ export function MiEspacioManagerClient({ empleado, usuario }: MiEspacioManagerCl
 
       {/* Content */}
       <div className="flex-1 min-h-0 overflow-y-auto">
-        {activeTab === 'general' && <GeneralTab empleado={empleado} usuario={usuario} />}
+        {activeTab === 'general' && <GeneralTab empleado={empleado} usuario={usuario} rol="manager" />}
         {activeTab === 'ausencias' && <AusenciasTab empleadoId={empleado.id} />}
         {activeTab === 'fichajes' && <FichajesTab empleadoId={empleado.id} />}
         {activeTab === 'contratos' && <ContratosTab empleado={empleado} />}

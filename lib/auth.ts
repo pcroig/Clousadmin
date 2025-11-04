@@ -4,15 +4,12 @@
 // Core authentication functions using bcrypt and JWT
 
 import { compare, hash } from 'bcryptjs';
-import { SignJWT, jwtVerify } from 'jose';
 import { cookies } from 'next/headers';
 import { prisma } from '@/lib/prisma';
 import type { SessionData, UsuarioAutenticado } from '@/types/auth';
+import { createToken, verifyToken } from '@/lib/auth-edge';
 
 // Configuración
-const JWT_SECRET = new TextEncoder().encode(
-  process.env.NEXTAUTH_SECRET || 'fallback-secret-change-in-production'
-);
 const SESSION_COOKIE_NAME = 'clousadmin-session';
 const SESSION_DURATION = 7 * 24 * 60 * 60 * 1000; // 7 días
 
@@ -33,38 +30,48 @@ export async function verifyPassword(
   return compare(password, hashedPassword);
 }
 
-/**
- * Crear token JWT
- */
-export async function createToken(payload: SessionData): Promise<string> {
-  const token = await new SignJWT({ ...payload })
-    .setProtectedHeader({ alg: 'HS256' })
-    .setIssuedAt()
-    .setExpirationTime('7d')
-    .sign(JWT_SECRET);
+// Re-exportar funciones de Edge Runtime para compatibilidad
+export { verifyToken, createToken } from '@/lib/auth-edge';
 
-  return token;
+/**
+ * Hash de token JWT con SHA-256 usando Web Crypto API
+ * Usado para almacenar tokens en BD sin exponer el JWT completo
+ * Compatible con Edge Runtime y Node.js Runtime
+ */
+async function hashToken(token: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(token);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
 /**
- * Verificar y decodificar token JWT
+ * Crear sesión (guardar cookie + registrar en BD)
  */
-export async function verifyToken(token: string): Promise<SessionData | null> {
-  try {
-    const verified = await jwtVerify(token, JWT_SECRET);
-    return verified.payload as unknown as SessionData;
-  } catch (error) {
-    console.error('Error verificando token:', error);
-    return null;
-  }
-}
-
-/**
- * Crear sesión (guardar cookie)
- */
-export async function createSession(sessionData: SessionData): Promise<void> {
+export async function createSession(
+  sessionData: SessionData,
+  metadata?: { ipAddress?: string; userAgent?: string }
+): Promise<void> {
   const token = await createToken(sessionData);
+  const tokenHash = await hashToken(token);
   const cookieStore = await cookies();
+  
+  // Guardar sesión en BD (tabla sesionesActivas)
+  try {
+    await prisma.sesionActiva.create({
+      data: {
+        usuarioId: sessionData.user.id,
+        tokenHash,
+        ipAddress: metadata?.ipAddress || null,
+        userAgent: metadata?.userAgent || null,
+        expiraEn: new Date(Date.now() + SESSION_DURATION),
+      },
+    });
+  } catch (error) {
+    console.error('[Auth] Error guardando sesión activa:', error);
+    // Continuar aunque falle el guardado en BD
+  }
   
   cookieStore.set(SESSION_COOKIE_NAME, token, {
     httpOnly: true,
@@ -76,7 +83,7 @@ export async function createSession(sessionData: SessionData): Promise<void> {
 }
 
 /**
- * Obtener sesión actual
+ * Obtener sesión actual (con verificación en BD)
  */
 export async function getSession(): Promise<SessionData | null> {
   const cookieStore = await cookies();
@@ -86,7 +93,55 @@ export async function getSession(): Promise<SessionData | null> {
     return null;
   }
 
-  return verifyToken(token.value);
+  // Verificar JWT
+  const sessionData = await verifyToken(token.value);
+  if (!sessionData) {
+    return null;
+  }
+
+  // Verificar que la sesión existe en BD y no ha sido invalidada
+  const tokenHash = await hashToken(token.value);
+  try {
+    const sesionActiva = await prisma.sesionActiva.findUnique({
+      where: { tokenHash },
+    });
+
+    if (!sesionActiva) {
+      // Sesión invalidada (no existe en BD)
+      return null;
+    }
+
+    // Verificar expiración
+    if (sesionActiva.expiraEn < new Date()) {
+      // Sesión expirada, eliminar de BD
+      await prisma.sesionActiva.delete({ where: { tokenHash } });
+      return null;
+    }
+
+    // Actualizar último uso
+    await prisma.sesionActiva.update({
+      where: { tokenHash },
+      data: { ultimoUso: new Date() },
+    });
+
+    // Verificar que usuario sigue activo (cada request)
+    const usuario = await prisma.usuario.findUnique({
+      where: { id: sessionData.user.id },
+      select: { activo: true },
+    });
+
+    if (!usuario || !usuario.activo) {
+      // Usuario desactivado, invalidar sesión
+      await prisma.sesionActiva.delete({ where: { tokenHash } });
+      return null;
+    }
+
+    return sessionData;
+  } catch (error) {
+    console.error('[Auth] Error verificando sesión activa:', error);
+    // Si falla la verificación en BD, permitir sesión (degradar graciosamente)
+    return sessionData;
+  }
 }
 
 /**
@@ -94,7 +149,66 @@ export async function getSession(): Promise<SessionData | null> {
  */
 export async function destroySession(): Promise<void> {
   const cookieStore = await cookies();
+  const token = cookieStore.get(SESSION_COOKIE_NAME);
+
+  // Eliminar sesión de BD
+  if (token) {
+    const tokenHash = await hashToken(token.value);
+    try {
+      await prisma.sesionActiva.delete({
+        where: { tokenHash },
+      });
+    } catch (error) {
+      console.error('[Auth] Error eliminando sesión activa:', error);
+    }
+  }
+
   cookieStore.delete(SESSION_COOKIE_NAME);
+}
+
+/**
+ * Invalidar todas las sesiones de un usuario
+ * Útil al cambiar contraseña o por razones de seguridad
+ */
+export async function invalidateAllUserSessions(usuarioId: string): Promise<void> {
+  try {
+    await prisma.sesionActiva.deleteMany({
+      where: { usuarioId },
+    });
+  } catch (error) {
+    console.error('[Auth] Error invalidando sesiones de usuario:', error);
+    throw error;
+  }
+}
+
+/**
+ * Listar sesiones activas de un usuario
+ */
+export async function getUserActiveSessions(usuarioId: string) {
+  return prisma.sesionActiva.findMany({
+    where: {
+      usuarioId,
+      expiraEn: { gt: new Date() },
+    },
+    orderBy: { ultimoUso: 'desc' },
+  });
+}
+
+/**
+ * Limpiar sesiones expiradas (ejecutar periódicamente)
+ */
+export async function cleanupExpiredSessions(): Promise<number> {
+  try {
+    const result = await prisma.sesionActiva.deleteMany({
+      where: {
+        expiraEn: { lt: new Date() },
+      },
+    });
+    return result.count;
+  } catch (error) {
+    console.error('[Auth] Error limpiando sesiones expiradas:', error);
+    return 0;
+  }
 }
 
 /**

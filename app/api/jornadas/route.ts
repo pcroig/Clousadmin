@@ -2,19 +2,26 @@
 // API Jornadas - GET, POST
 // ========================================
 
-import { NextRequest, NextResponse } from 'next/server';
-import { getSession } from '@/lib/auth';
+import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { jornadaCreateSchema } from '@/lib/validaciones/schemas';
-import { z } from 'zod';
+import {
+  requireAuthAsHR,
+  validateRequest,
+  verifyEmpresaAccess,
+  handleApiError,
+  successResponse,
+  createdResponse,
+  badRequestResponse,
+} from '@/lib/api-handler';
 
+// GET /api/jornadas - Listar jornadas (solo HR Admin)
 export async function GET(req: NextRequest) {
   try {
-    // Verificar sesión y permisos (solo HR)
-    const session = await getSession();
-    if (!session || session.user.rol !== 'hr_admin') {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
-    }
+    // Verificar autenticación y rol HR Admin
+    const authResult = await requireAuthAsHR(req);
+    if (authResult instanceof Response) return authResult;
+    const { session } = authResult;
 
     // Obtener jornadas de la empresa
     const jornadas = await prisma.jornada.findMany({
@@ -34,36 +41,32 @@ export async function GET(req: NextRequest) {
       },
     });
 
-    return NextResponse.json(jornadas);
+    return successResponse(jornadas);
   } catch (error) {
-    console.error('[API GET Jornadas]', error);
-    return NextResponse.json(
-      { error: 'Error al obtener jornadas' },
-      { status: 500 }
-    );
+    return handleApiError(error, 'API GET /api/jornadas');
   }
 }
 
+// POST /api/jornadas - Crear nueva jornada (solo HR Admin)
 export async function POST(req: NextRequest) {
   try {
-    // Verificar sesión y permisos (solo HR)
-    const session = await getSession();
-    if (!session || session.user.rol !== 'hr_admin') {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
-    }
+    // Verificar autenticación y rol HR Admin
+    const authResult = await requireAuthAsHR(req);
+    if (authResult instanceof Response) return authResult;
+    const { session } = authResult;
 
-    // Validar body
-    const body = await req.json();
-    const validatedData = jornadaCreateSchema.parse(body);
+    // Validar request body (sin empresaId, se usa el de la sesión)
+    const schemaSinEmpresaId = jornadaCreateSchema.omit({ empresaId: true });
+    const validationResult = await validateRequest(req, schemaSinEmpresaId);
+    if (validationResult instanceof Response) return validationResult;
+    const { data: validatedData } = validationResult;
 
-    // Validar que la empresa sea la del usuario
-    if (validatedData.empresaId !== session.user.empresaId) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
-    }
+    // Usar empresaId de la sesión (más seguro)
+    const empresaId = session.user.empresaId;
 
     // Crear configuración por defecto si no se proporciona
-    let config = validatedData.config;
-    if (!config) {
+    let config: Record<string, any> = validatedData.config || {};
+    if (!validatedData.config) {
       if (validatedData.tipo === 'fija') {
         // Configuración por defecto: L-V 9:00-18:00 con 1h pausa
         config = {
@@ -89,11 +92,27 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Añadir límites de fichaje al config si se proporcionan
+    if (validatedData.limiteInferior) {
+      config.limiteInferior = validatedData.limiteInferior;
+    }
+    if (validatedData.limiteSuperior) {
+      config.limiteSuperior = validatedData.limiteSuperior;
+    }
+
+    // Añadir tipo al config si se proporciona (para referencia)
+    if (validatedData.tipo) {
+      config.tipo = validatedData.tipo;
+    }
+
+    // Validar que no haya jornada duplicada asignada al mismo nivel
+    // (esto se validará al asignar, pero es bueno tenerlo aquí también)
+    
     // Crear jornada
     const jornada = await prisma.jornada.create({
       data: {
         nombre: validatedData.nombre,
-        empresaId: validatedData.empresaId,
+        empresaId: empresaId,
         horasSemanales: validatedData.horasSemanales,
         config: config as any,
         esPredefinida: false,
@@ -101,20 +120,9 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    return NextResponse.json(jornada, { status: 201 });
+    return createdResponse(jornada);
   } catch (error) {
-    if (error instanceof z.ZodError) {
-      return NextResponse.json(
-        { error: 'Datos inválidos', details: error.issues },
-        { status: 400 }
-      );
-    }
-
-    console.error('[API POST Jornadas]', error);
-    return NextResponse.json(
-      { error: 'Error al crear jornada' },
-      { status: 500 }
-    );
+    return handleApiError(error, 'API POST /api/jornadas');
   }
 }
 

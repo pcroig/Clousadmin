@@ -82,6 +82,81 @@ export function validarNIFoNIE(identificacion: string): boolean {
 }
 
 /**
+ * Obtiene información detallada sobre la validación de un NIF/NIE
+ * Útil para mostrar mensajes de error más descriptivos
+ */
+export function obtenerInfoValidacionNIF(identificacion: string): {
+  valido: boolean;
+  tipo: 'NIF' | 'NIE' | 'INVALIDO';
+  mensaje?: string;
+  letraCorrecta?: string;
+} {
+  if (!identificacion) {
+    return {
+      valido: false,
+      tipo: 'INVALIDO',
+      mensaje: 'El NIF/NIE es obligatorio',
+    };
+  }
+
+  const idLimpio = identificacion.trim().toUpperCase();
+  const letras = 'TRWAGMYFPDXBNJZSQVHLCKE';
+
+  // Detectar si es NIE
+  if (/^[XYZ]/.test(idLimpio)) {
+    const regexNIE = /^[XYZ]\d{7}[A-Z]$/;
+    if (!regexNIE.test(idLimpio)) {
+      return {
+        valido: false,
+        tipo: 'NIE',
+        mensaje: 'Formato de NIE inválido (debe ser X/Y/Z + 7 dígitos + letra)',
+      };
+    }
+
+    let nieModificado = idLimpio.replace('X', '0').replace('Y', '1').replace('Z', '2');
+    const numero = parseInt(nieModificado.substring(0, 8), 10);
+    const letraProporcionada = idLimpio.charAt(8);
+    const letraEsperada = letras[numero % 23];
+
+    if (letraProporcionada === letraEsperada) {
+      return { valido: true, tipo: 'NIE' };
+    }
+
+    return {
+      valido: false,
+      tipo: 'NIE',
+      mensaje: `La letra del NIE es incorrecta. La letra correcta es: ${letraEsperada}`,
+      letraCorrecta: letraEsperada,
+    };
+  }
+
+  // Validar como NIF
+  const regexDNI = /^\d{8}[A-Z]$/;
+  if (!regexDNI.test(idLimpio)) {
+    return {
+      valido: false,
+      tipo: 'NIF',
+      mensaje: 'Formato de NIF inválido (debe ser 8 dígitos + letra)',
+    };
+  }
+
+  const numero = parseInt(idLimpio.substring(0, 8), 10);
+  const letraProporcionada = idLimpio.charAt(8);
+  const letraEsperada = letras[numero % 23];
+
+  if (letraProporcionada === letraEsperada) {
+    return { valido: true, tipo: 'NIF' };
+  }
+
+  return {
+    valido: false,
+    tipo: 'NIF',
+    mensaje: `La letra del NIF es incorrecta. La letra correcta es: ${letraEsperada}`,
+    letraCorrecta: letraEsperada,
+  };
+}
+
+/**
  * Formatea un NIF/NIE añadiendo espacios para legibilidad
  * Ejemplo: 12345678Z → 12.345.678-Z
  */

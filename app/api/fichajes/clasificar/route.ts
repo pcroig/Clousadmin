@@ -3,8 +3,13 @@
 // ========================================
 // Endpoint para ejecutar el clasificador manualmente (solo HR admins)
 
-import { NextRequest, NextResponse } from 'next/server';
-import { getSession } from '@/lib/auth';
+import { NextRequest } from 'next/server';
+import {
+  requireAuthAsHR,
+  validateRequest,
+  handleApiError,
+  successResponse,
+} from '@/lib/api-handler';
 import { z } from 'zod';
 import {
   clasificarFichajesIncompletos,
@@ -16,44 +21,31 @@ const clasificarSchema = z.object({
   fecha: z.string().optional(), // YYYY-MM-DD format
 });
 
+// POST /api/fichajes/clasificar - Ejecutar clasificador de fichajes (solo HR Admin)
 export async function POST(request: NextRequest) {
   try {
-    // 1. Verificar autenticación y permisos
-    const session = await getSession();
+    // Verificar autenticación y rol HR Admin
+    const authResult = await requireAuthAsHR(request);
+    if (authResult instanceof Response) return authResult;
+    const { session } = authResult;
 
-    if (!session || session.user.rol !== 'hr_admin') {
-      return NextResponse.json(
-        { error: 'No autorizado. Solo HR admins pueden ejecutar el clasificador.' },
-        { status: 403 }
-      );
+    // Validar request body (puede estar vacío)
+    let fechaParam: string | undefined = undefined;
+    try {
+      const validationResult = await validateRequest(request, clasificarSchema);
+      if (validationResult instanceof Response) return validationResult;
+      fechaParam = validationResult.data.fecha;
+    } catch {
+      // Si el body no es JSON válido, usar valores por defecto
+      fechaParam = undefined;
     }
-
-    // 2. Validar y obtener fecha a clasificar (por defecto: día anterior)
-    const body = await request.json().catch(() => ({}));
-    const validation = clasificarSchema.safeParse(body);
-    
-    if (!validation.success) {
-      return NextResponse.json(
-        { error: 'Datos inválidos', detalles: validation.error.issues },
-        { status: 400 }
-      );
-    }
-
-    const fechaParam = validation.data.fecha;
     const fecha = fechaParam ? new Date(fechaParam) : new Date(Date.now() - 24 * 60 * 60 * 1000);
-
-    console.log('[API Clasificar] Iniciando clasificación para empresa:', session.user.empresaId, 'fecha:', fecha.toISOString().split('T')[0]);
 
     // 3. Ejecutar clasificador
     const { autoCompletar, revisionManual } = await clasificarFichajesIncompletos(
       session.user.empresaId,
       fecha
     );
-
-    console.log('[API Clasificar] Clasificación completada:', {
-      autoCompletar: autoCompletar.length,
-      revisionManual: revisionManual.length,
-    });
 
     // 4. Aplicar auto-completados
     const resultadoAutoCompletar =       await aplicarAutoCompletado(
@@ -67,8 +59,8 @@ export async function POST(request: NextRequest) {
       revisionManual
     );
 
-    // 6. Retornar resumen
-    return NextResponse.json({
+    // Retornar resumen
+    return successResponse({
       success: true,
       fecha: fecha.toISOString().split('T')[0],
       resumen: {
@@ -91,16 +83,8 @@ export async function POST(request: NextRequest) {
         })),
       },
     });
-
   } catch (error) {
-    console.error('[API Clasificar] Error:', error);
-    return NextResponse.json(
-      {
-        error: 'Error al clasificar fichajes',
-        detalle: error instanceof Error ? error.message : 'Error desconocido',
-      },
-      { status: 500 }
-    );
+    return handleApiError(error, 'API POST /api/fichajes/clasificar');
   }
 }
 

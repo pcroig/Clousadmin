@@ -4,9 +4,16 @@
 // GET: Obtener fichajes pendientes de revisión
 // POST: Aprobar/rechazar fichajes en revisión
 
-import { NextRequest, NextResponse } from 'next/server';
-import { getSession } from '@/lib/auth';
+import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import {
+  requireAuthAsHR,
+  validateRequest,
+  handleApiError,
+  successResponse,
+} from '@/lib/api-handler';
+import { crearNotificacionFichajeResuelto } from '@/lib/notificaciones';
+import { obtenerDiasSinFicharPorEmpleado } from '@/lib/calculos/dias-sin-fichar';
 import { z } from 'zod';
 
 const revisionSchema = z.object({
@@ -18,24 +25,20 @@ const revisionSchema = z.object({
   ).min(1, 'Debe proporcionar al menos una revisión'),
 });
 
+// GET /api/fichajes/revision - Obtener fichajes pendientes de revisión (solo HR Admin)
 export async function GET(request: NextRequest) {
   try {
-    console.log('[API Revisión GET] Iniciando...');
-    const session = await getSession();
-    console.log('[API Revisión GET] Session:', session ? 'existe' : 'null');
-    console.log('[API Revisión GET] Rol:', session?.user?.rol);
+    // Verificar autenticación y rol HR Admin
+    const authResult = await requireAuthAsHR(request);
+    if (authResult instanceof Response) return authResult;
+    const { session } = authResult;
 
-    if (!session || session.user.rol !== 'hr_admin') {
-      console.log('[API Revisión GET] No autorizado');
-      return NextResponse.json(
-        { error: 'No autorizado' },
-        { status: 403 }
-      );
-    }
-
-    console.log('[API Revisión GET] EmpresaId:', session.user.empresaId);
+    // Obtener la fecha de hoy (inicio del día)
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0);
 
     // Obtener registros de auto_completados con estado "pendiente" (requieren revisión)
+    // Solo fichajes de días ANTERIORES al día actual
     let autoCompletados;
     try {
       autoCompletados = await prisma.autoCompletado.findMany({
@@ -57,12 +60,20 @@ export async function GET(request: NextRequest) {
           createdAt: 'asc',
         },
       });
+
+      // Filtrar solo fichajes de días anteriores al día actual
+      autoCompletados = autoCompletados.filter((ac) => {
+        const datosOriginales = ac.datosOriginales as any;
+        const fechaFichaje = datosOriginales?.fecha ? new Date(datosOriginales.fecha) : null;
+        if (!fechaFichaje) return false;
+        
+        fechaFichaje.setHours(0, 0, 0, 0);
+        return fechaFichaje < hoy;
+      });
     } catch (prismaError) {
       console.error('[API Revisión] Error en Prisma query:', prismaError);
       throw prismaError;
     }
-
-    console.log('[API Revisión] Encontrados:', autoCompletados.length, 'fichajes');
 
     // Formatear datos para el modal
     const fichajes = await Promise.all(autoCompletados.map(async (ac) => {
@@ -113,7 +124,12 @@ export async function GET(request: NextRequest) {
           }
         }
       } catch (e) {
-        console.warn('[API Revisión] No se pudo construir vista previa por jornada:', e);
+        // Si no se puede construir vista previa por jornada, continuar sin ella
+        console.warn('[API Revisión] No se pudo construir vista previa por jornada:', {
+          autoCompletadoId: ac.id,
+          empleadoId: ac.empleadoId,
+          error: e,
+        });
       }
       
       return {
@@ -128,43 +144,31 @@ export async function GET(request: NextRequest) {
       };
     }));
 
-    console.log('[API Revisión] Fichajes formateados:', fichajes.length);
+    // Calcular días sin fichar para cada empleado
+    const empleadoIds = Array.from(new Set(autoCompletados.map(ac => ac.empleadoId)));
+    const diasSinFicharMap = await obtenerDiasSinFicharPorEmpleado(empleadoIds);
 
-    return NextResponse.json({ fichajes }, { status: 200 });
+    return successResponse({ fichajes, diasSinFicharMap });
 
   } catch (error) {
-    console.error('[API Revisión] Error en GET:', error);
-    return NextResponse.json(
-      { error: 'Error al obtener fichajes en revisión' },
-      { status: 500 }
-    );
+    return handleApiError(error, 'API GET /api/fichajes/revision');
   }
 }
 
+// POST /api/fichajes/revision - Procesar revisiones de fichajes (solo HR Admin)
 export async function POST(request: NextRequest) {
   try {
-    const session = await getSession();
+    // Verificar autenticación y rol HR Admin
+    const authResult = await requireAuthAsHR(request);
+    if (authResult instanceof Response) return authResult;
+    const { session } = authResult;
 
-    if (!session || session.user.rol !== 'hr_admin') {
-      return NextResponse.json(
-        { error: 'No autorizado' },
-        { status: 403 }
-      );
-    }
+    // Validar request body
+    const validationResult = await validateRequest(request, revisionSchema);
+    if (validationResult instanceof Response) return validationResult;
+    const { data: validatedData } = validationResult;
 
-    const body = await request.json();
-    const validation = revisionSchema.safeParse(body);
-
-    if (!validation.success) {
-      return NextResponse.json(
-        { error: 'Datos inválidos', detalles: validation.error.issues },
-        { status: 400 }
-      );
-    }
-
-    const { revisiones } = validation.data;
-
-    console.log('[API Revisión] Procesando revisiones:', revisiones.length);
+    const { revisiones } = validatedData;
 
     let actualizados = 0;
     const errores: string[] = [];
@@ -302,6 +306,15 @@ export async function POST(request: NextRequest) {
             },
           });
 
+          // Crear notificación de fichaje resuelto
+          await crearNotificacionFichajeResuelto(prisma, {
+            fichajeId,
+            empresaId: session.user.empresaId,
+            empleadoId: autoCompletado.empleadoId,
+            empleadoNombre: `${autoCompletado.empleado.nombre} ${autoCompletado.empleado.apellidos}`,
+            fecha: new Date(datos.fecha),
+          });
+
           actualizados++;
         }
       } catch (error) {
@@ -310,20 +323,13 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    console.log('[API Revisión] Resultado:', { actualizados, errores: errores.length });
-
-    return NextResponse.json({
+    return successResponse({
       success: true,
       actualizados,
       errores,
     });
-
   } catch (error) {
-    console.error('[API Revisión] Error en POST:', error);
-    return NextResponse.json(
-      { error: 'Error al procesar revisiones' },
-      { status: 500 }
-    );
+    return handleApiError(error, 'API POST /api/fichajes/revision');
   }
 }
 

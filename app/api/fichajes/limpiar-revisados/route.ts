@@ -1,16 +1,22 @@
 // ========================================
 // API Fichajes - Limpiar Revisados
 // ========================================
-import { NextRequest, NextResponse } from 'next/server';
-import { getSession } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
 
+import { NextRequest } from 'next/server';
+import { prisma } from '@/lib/prisma';
+import {
+  requireAuthAsHR,
+  handleApiError,
+  successResponse,
+} from '@/lib/api-handler';
+
+// POST /api/fichajes/limpiar-revisados - Cambiar fichajes "revisado" a "finalizado" (solo HR Admin)
 export async function POST(_req: NextRequest) {
   try {
-    const session = await getSession();
-    if (!session || session.user.rol !== 'hr_admin') {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
-    }
+    // Verificar autenticación y rol HR Admin
+    const authResult = await requireAuthAsHR(_req);
+    if (authResult instanceof Response) return authResult;
+    const { session } = authResult;
 
     // Cambiar todos los fichajes "revisado" a "finalizado" de la empresa
     const resultado = await prisma.fichaje.updateMany({
@@ -23,16 +29,12 @@ export async function POST(_req: NextRequest) {
       },
     });
 
-    return NextResponse.json({
+    return successResponse({
       success: true,
       actualizados: resultado.count,
     });
   } catch (error) {
-    console.error('[API POST Limpiar Revisados]', error);
-    return NextResponse.json(
-      { error: 'Error al limpiar fichajes revisados' },
-      { status: 500 }
-    );
+    return handleApiError(error, 'API POST /api/fichajes/limpiar-revisados');
   }
 }
 

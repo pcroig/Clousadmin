@@ -1,0 +1,301 @@
+import { NextRequest, NextResponse as Response } from 'next/server';
+import { prisma, Prisma } from '@/lib/prisma';
+import {
+  requireAuth,
+  requireAuthAsHROrManager,
+  validateRequest,
+  handleApiError,
+  successResponse,
+  notFoundResponse,
+  forbiddenResponse,
+  badRequestResponse,
+} from '@/lib/api-handler';
+import {
+  crearNotificacionCambioManager,
+  crearNotificacionAsignadoEquipo,
+} from '@/lib/notificaciones';
+import { z } from 'zod';
+import { encryptEmpleadoData, decryptEmpleadoData } from '@/lib/empleado-crypto';
+
+// Schema de validación para actualizar empleado
+const empleadoUpdateSchema = z.object({
+  // Información Personal
+  nif: z.string().optional(),
+  nss: z.string().optional(),
+  fechaNacimiento: z.string().optional(),
+  estadoCivil: z.string().optional(),
+  numeroHijos: z.number().optional(),
+  genero: z.string().optional(),
+
+  // Información de Contacto
+  telefono: z.string().optional(),
+  direccion: z.string().optional(),
+  codigoPostal: z.string().optional(),
+  ciudad: z.string().optional(),
+
+  // Información Laboral
+  puestoId: z.string().optional(),
+  equipoIds: z.array(z.string()).optional(),
+  managerId: z.string().optional(),
+  fechaAlta: z.string().optional(),
+  tipoContrato: z.string().optional(),
+  categoriaProfesional: z.string().optional(),
+  grupoCotizacion: z.number().int().optional(),
+
+  // Información Bancaria
+  iban: z.string().optional(),
+  titularCuenta: z.string().optional(),
+  salarioBrutoAnual: z.number().optional(),
+  salarioBrutoMensual: z.number().optional(),
+});
+
+// GET /api/empleados/[id] - Obtener empleado por ID
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    // Verificar autenticación
+    const authResult = await requireAuth(request);
+    if (authResult instanceof Response) return authResult;
+    const { session } = authResult;
+
+    const { id } = await params;
+
+    const empleado = await prisma.empleado.findUnique({
+      where: {
+        id,
+        empresaId: session.user.empresaId,
+      },
+      include: {
+        usuario: {
+          select: {
+            id: true,
+            email: true,
+            rol: true,
+          },
+        },
+        equipos: {
+          include: {
+            equipo: true,
+          },
+        },
+        puestoRelacion: true,
+        jornada: true,
+        manager: {
+          select: {
+            id: true,
+            nombre: true,
+            apellidos: true,
+          },
+        },
+      },
+    });
+
+    if (!empleado) {
+      return notFoundResponse('Empleado no encontrado');
+    }
+
+    // Desencriptar datos sensibles antes de retornar
+    const empleadoDesencriptado = decryptEmpleadoData(empleado);
+
+    return successResponse(empleadoDesencriptado);
+  } catch (error) {
+    return handleApiError(error, 'API GET /api/empleados/[id]');
+  }
+}
+
+// PATCH /api/empleados/[id] - Actualizar empleado (HR Admin o Manager)
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    // Verificar autenticación y rol HR Admin o Manager
+    const authResult = await requireAuthAsHROrManager(request);
+    if (authResult instanceof Response) return authResult;
+    const { session } = authResult;
+
+    const { id } = await params;
+
+    // Validar request body
+    const validationResult = await validateRequest(request, empleadoUpdateSchema);
+    if (validationResult instanceof Response) return validationResult;
+    const { data: validatedData } = validationResult;
+
+    // Extraer equipoIds para manejar relación many-to-many
+    const { equipoIds, ...empleadoData } = validatedData;
+
+    // Validar foreign keys antes de actualizar
+    // Validar managerId si se proporciona
+    if (empleadoData.managerId) {
+      const managerExiste = await prisma.empleado.findUnique({
+        where: {
+          id: empleadoData.managerId,
+          empresaId: session.user.empresaId,
+        },
+      });
+
+      if (!managerExiste) {
+        return badRequestResponse('El manager especificado no existe');
+      }
+
+      // Evitar auto-referencias circulares (un empleado no puede ser su propio manager)
+      if (empleadoData.managerId === id) {
+        return badRequestResponse('Un empleado no puede ser su propio manager');
+      }
+    }
+
+    // Validar puestoId si se proporciona
+    if (empleadoData.puestoId) {
+      const puestoExiste = await prisma.puesto.findUnique({
+        where: {
+          id: empleadoData.puestoId,
+          empresaId: session.user.empresaId,
+        },
+      });
+
+      if (!puestoExiste) {
+        return badRequestResponse('El puesto especificado no existe');
+      }
+    }
+
+    // Validar equipoIds si se proporcionan
+    if (equipoIds && equipoIds.length > 0) {
+      const equiposExistentes = await prisma.equipo.findMany({
+        where: {
+          id: { in: equipoIds },
+          empresaId: session.user.empresaId,
+        },
+      });
+
+      if (equiposExistentes.length !== equipoIds.length) {
+        return badRequestResponse('Uno o más equipos especificados no existen');
+      }
+    }
+
+    // Obtener datos actuales del empleado antes de actualizar
+    const empleadoActual = await prisma.empleado.findUnique({
+      where: { id, empresaId: session.user.empresaId },
+      include: {
+        equipos: { select: { equipoId: true } },
+        manager: { select: { id: true, nombre: true, apellidos: true } },
+      },
+    });
+
+    if (!empleadoActual) {
+      return notFoundResponse('Empleado no encontrado');
+    }
+
+    const oldManagerId = empleadoActual.managerId;
+    const oldEquipoIds = empleadoActual.equipos.map(e => e.equipoId);
+
+    // Preparar datos para actualización
+    const datosParaActualizar = {
+      ...empleadoData,
+      fechaNacimiento: empleadoData.fechaNacimiento
+        ? new Date(empleadoData.fechaNacimiento)
+        : undefined,
+      fechaAlta: empleadoData.fechaAlta
+        ? new Date(empleadoData.fechaAlta)
+        : undefined,
+      // Convertir números a Decimal para Prisma
+      salarioBrutoAnual: empleadoData.salarioBrutoAnual !== undefined
+        ? new Prisma.Decimal(empleadoData.salarioBrutoAnual)
+        : undefined,
+      salarioBrutoMensual: empleadoData.salarioBrutoMensual !== undefined
+        ? new Prisma.Decimal(empleadoData.salarioBrutoMensual)
+        : undefined,
+    };
+
+    // Encriptar campos sensibles antes de guardar
+    const datosEncriptados = encryptEmpleadoData(datosParaActualizar);
+
+    // Actualizar empleado y relaciones en una transacción
+    const empleado = await prisma.$transaction(async (tx) => {
+      // Actualizar datos del empleado con encriptación
+      const updatedEmpleado = await tx.empleado.update({
+        where: {
+          id,
+          empresaId: session.user.empresaId,
+        },
+        data: datosEncriptados,
+        include: {
+          usuario: { select: { id: true } },
+        },
+      });
+
+      // Actualizar equipos si se proporcionaron
+      if (equipoIds !== undefined) {
+        // Eliminar todas las relaciones existentes
+        await tx.empleadoEquipo.deleteMany({
+          where: { empleadoId: id },
+        });
+
+        // Crear nuevas relaciones
+        if (equipoIds.length > 0) {
+          await tx.empleadoEquipo.createMany({
+            data: equipoIds.map((equipoId) => ({
+              empleadoId: id,
+              equipoId,
+            })),
+          });
+        }
+      }
+
+      return updatedEmpleado;
+    });
+
+    // Crear notificaciones de cambios importantes
+    // 1. Cambio de manager
+    if (empleadoData.managerId && empleadoData.managerId !== oldManagerId) {
+      const nuevoManager = await prisma.empleado.findUnique({
+        where: { id: empleadoData.managerId },
+        select: { nombre: true, apellidos: true },
+      });
+
+      if (nuevoManager) {
+        await crearNotificacionCambioManager(prisma, {
+          empleadoId: id,
+          empresaId: session.user.empresaId,
+          empleadoNombre: `${empleadoActual.nombre} ${empleadoActual.apellidos}`,
+          nuevoManagerId: empleadoData.managerId,
+          nuevoManagerNombre: `${nuevoManager.nombre} ${nuevoManager.apellidos}`,
+          anteriorManagerId: oldManagerId || undefined,
+          anteriorManagerNombre: empleadoActual.manager
+            ? `${empleadoActual.manager.nombre} ${empleadoActual.manager.apellidos}`
+            : undefined,
+        });
+      }
+    }
+
+    // 2. Asignación a nuevos equipos
+    if (equipoIds !== undefined) {
+      const nuevosEquipos = equipoIds.filter(id => !oldEquipoIds.includes(id));
+
+      for (const equipoId of nuevosEquipos) {
+        const equipo = await prisma.equipo.findUnique({
+          where: { id: equipoId },
+          select: { nombre: true },
+        });
+
+        if (equipo) {
+          await crearNotificacionAsignadoEquipo(prisma, {
+            empleadoId: id,
+            empresaId: session.user.empresaId,
+            empleadoNombre: `${empleadoActual.nombre} ${empleadoActual.apellidos}`,
+            equipoId,
+            equipoNombre: equipo.nombre,
+          });
+        }
+      }
+    }
+
+    // Desencriptar antes de retornar
+    const empleadoDesencriptado = decryptEmpleadoData(empleado);
+
+    return successResponse(empleadoDesencriptado);
+  } catch (error) {
+    return handleApiError(error, 'API PATCH /api/empleados/[id]');
+  }
+}

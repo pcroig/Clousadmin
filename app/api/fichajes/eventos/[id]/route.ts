@@ -1,26 +1,48 @@
 // ========================================
 // API FichajeEventos - Editar / Eliminar evento
 // ========================================
-import { NextRequest, NextResponse } from 'next/server';
-import { getSession } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
 
+import { NextRequest } from 'next/server';
+import { prisma } from '@/lib/prisma';
+import {
+  requireAuth,
+  validateRequest,
+  handleApiError,
+  successResponse,
+  notFoundResponse,
+} from '@/lib/api-handler';
+import { z } from 'zod';
+
+const fichajeEventoUpdateSchema = z.object({
+  tipo: z.enum(['entrada', 'pausa_inicio', 'pausa_fin', 'salida']).optional(),
+  hora: z.string().optional(),
+  motivoEdicion: z.string().optional(),
+});
+
+// PATCH /api/fichajes/eventos/[id] - Editar evento de fichaje
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const session = await getSession();
-    if (!session) return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
+    // Verificar autenticación
+    const authResult = await requireAuth(req);
+    if (authResult instanceof Response) return authResult;
+    const { session } = authResult;
 
     const { id } = await params;
-    const body = await req.json();
-    const { tipo, hora, motivoEdicion } = body as { tipo?: string; hora?: string; motivoEdicion?: string };
 
-    // Verificar pertenencia
+    // Validar request body
+    const validationResult = await validateRequest(req, fichajeEventoUpdateSchema);
+    if (validationResult instanceof Response) return validationResult;
+    const { data: validatedData } = validationResult;
+
+    const { tipo, hora, motivoEdicion } = validatedData;
+
+    // Verificar que el evento existe y pertenece a la empresa
     const evento = await prisma.fichajeEvento.findUnique({
       where: { id },
       include: { fichaje: true },
     });
     if (!evento || evento.fichaje.empresaId !== session.user.empresaId) {
-      return NextResponse.json({ error: 'No encontrado' }, { status: 404 });
+      return notFoundResponse('Evento no encontrado');
     }
 
     await prisma.fichajeEvento.update({
@@ -43,23 +65,29 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       await prisma.fichaje.update({ where: { id: evento.fichajeId }, data: { horasTrabajadas, horasEnPausa } });
     }
 
-    return NextResponse.json({ success: true });
+    return successResponse({ success: true });
   } catch (error) {
-    console.error('[API PATCH FichajeEvento]', error);
-    return NextResponse.json({ error: 'Error al actualizar evento' }, { status: 500 });
+    return handleApiError(error, 'API PATCH /api/fichajes/eventos/[id]');
   }
 }
 
+// DELETE /api/fichajes/eventos/[id] - Eliminar evento de fichaje
 export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const session = await getSession();
-    if (!session) return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
+    // Verificar autenticación
+    const authResult = await requireAuth(_req);
+    if (authResult instanceof Response) return authResult;
+    const { session } = authResult;
 
     const { id } = await params;
-    // Verificar pertenencia
-    const evento = await prisma.fichajeEvento.findUnique({ where: { id }, include: { fichaje: true } });
+
+    // Verificar que el evento existe y pertenece a la empresa
+    const evento = await prisma.fichajeEvento.findUnique({
+      where: { id },
+      include: { fichaje: true },
+    });
     if (!evento || evento.fichaje.empresaId !== session.user.empresaId) {
-      return NextResponse.json({ error: 'No encontrado' }, { status: 404 });
+      return notFoundResponse('Evento no encontrado');
     }
 
     await prisma.fichajeEvento.delete({ where: { id } });
@@ -73,10 +101,9 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
       await prisma.fichaje.update({ where: { id: evento.fichajeId }, data: { horasTrabajadas, horasEnPausa } });
     }
 
-    return NextResponse.json({ success: true });
+    return successResponse({ success: true });
   } catch (error) {
-    console.error('[API DELETE FichajeEvento]', error);
-    return NextResponse.json({ error: 'Error al eliminar evento' }, { status: 500 });
+    return handleApiError(error, 'API DELETE /api/fichajes/eventos/[id]');
   }
 }
 

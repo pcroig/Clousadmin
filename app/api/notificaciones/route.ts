@@ -1,59 +1,72 @@
 // ========================================
-// API Notificaciones
+// API: Notificaciones
 // ========================================
+// GET: Obtener notificaciones del usuario autenticado
 
-import { NextRequest, NextResponse } from 'next/server';
-import { getSession } from '@/lib/auth';
+import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import {
+  requireAuth,
+  handleApiError,
+  successResponse,
+} from '@/lib/api-handler';
 
-// GET: Listar notificaciones del usuario
-export async function GET(req: NextRequest) {
+// GET /api/notificaciones - Obtener notificaciones del usuario autenticado
+export async function GET(request: NextRequest) {
   try {
-    const session = await getSession();
-    if (!session) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
-    }
+    // Verificar autenticación
+    const authResult = await requireAuth(request);
+    if (authResult instanceof Response) return authResult;
+    const { session } = authResult;
 
-    const { searchParams } = new URL(req.url);
-    const leidas = searchParams.get('leidas'); // 'true', 'false', o null (todas)
+    const { searchParams } = new URL(request.url);
+    const leida = searchParams.get('leida'); // 'true', 'false', o null (todas)
     const tipo = searchParams.get('tipo');
-    const limit = parseInt(searchParams.get('limit') || '50');
+    const limit = searchParams.get('limit');
 
+    // Construir filtros
     const where: any = {
       usuarioId: session.user.id,
+      empresaId: session.user.empresaId,
     };
 
-    if (leidas === 'true') {
+    // Filtro por estado leída
+    if (leida === 'true') {
       where.leida = true;
-    } else if (leidas === 'false') {
+    } else if (leida === 'false') {
       where.leida = false;
     }
+    // Si leida es null o 'all', no se filtra
 
+    // Filtro por tipo
     if (tipo) {
       where.tipo = tipo;
     }
 
+    // Obtener notificaciones
     const notificaciones = await prisma.notificacion.findMany({
       where,
       orderBy: {
         createdAt: 'desc',
       },
-      take: limit,
+      take: limit ? parseInt(limit) : undefined,
     });
 
-    return NextResponse.json({
+    // Contar no leídas
+    const noLeidas = await prisma.notificacion.count({
+      where: {
+        usuarioId: session.user.id,
+        empresaId: session.user.empresaId,
+        leida: false,
+      },
+    });
+
+    return successResponse({
       notificaciones,
       total: notificaciones.length,
-      noLeidas: await prisma.notificacion.count({
-        where: {
-          usuarioId: session.user.id,
-          leida: false,
-        },
-      }),
+      noLeidas,
     });
   } catch (error) {
-    console.error('[API GET Notificaciones]', error);
-    return NextResponse.json({ error: 'Error al obtener notificaciones' }, { status: 500 });
+    return handleApiError(error, 'API GET /api/notificaciones');
   }
 }
-

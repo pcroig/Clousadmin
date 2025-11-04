@@ -2,9 +2,16 @@
 // API Jornadas Asignar - POST
 // ========================================
 
-import { NextRequest, NextResponse } from 'next/server';
-import { getSession } from '@/lib/auth';
+import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import {
+  requireAuthAsHR,
+  validateRequest,
+  handleApiError,
+  successResponse,
+  notFoundResponse,
+  badRequestResponse,
+} from '@/lib/api-handler';
 import { z } from 'zod';
 
 const asignarSchema = z.object({
@@ -17,19 +24,25 @@ interface Params {
   id: string;
 }
 
+// POST /api/jornadas/[id]/asignar - Asignar jornada a empleados (solo HR Admin)
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<Params> }
 ) {
   try {
-    const session = await getSession();
-    if (!session || session.user.rol !== 'hr_admin') {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
-    }
+    // Verificar autenticación y rol HR Admin
+    const authResult = await requireAuthAsHR(req);
+    if (authResult instanceof Response) return authResult;
+    const { session } = authResult;
 
     const { id: jornadaId } = await params;
-    const body = await req.json();
-    const { empleadoIds, equipoId, aplicarATodos } = asignarSchema.parse(body);
+
+    // Validar request body
+    const validationResult = await validateRequest(req, asignarSchema);
+    if (validationResult instanceof Response) return validationResult;
+    const { data: validatedData } = validationResult;
+
+    const { empleadoIds, equipoId, aplicarATodos } = validatedData;
 
     // Verificar que la jornada existe y pertenece a la empresa
     const jornada = await prisma.jornada.findUnique({
@@ -40,7 +53,7 @@ export async function POST(
     });
 
     if (!jornada) {
-      return NextResponse.json({ error: 'Jornada no encontrada' }, { status: 404 });
+      return notFoundResponse('Jornada no encontrada');
     }
 
     let empleadosActualizados = 0;
@@ -89,27 +102,16 @@ export async function POST(
       });
       empleadosActualizados = result.count;
     } else {
-      return NextResponse.json(
-        { error: 'Debe especificar empleados, equipo o aplicar a todos' },
-        { status: 400 }
-      );
+      return badRequestResponse('Debe especificar empleados, equipo o aplicar a todos');
     }
 
-    return NextResponse.json({
+    return successResponse({
       success: true,
       empleadosActualizados,
       mensaje: `Jornada asignada a ${empleadosActualizados} empleado(s)`,
     });
   } catch (error) {
-    if (error instanceof z.ZodError) {
-      return NextResponse.json(
-        { error: 'Datos inválidos', details: error.issues },
-        { status: 400 }
-      );
-    }
-
-    console.error('[API POST Asignar Jornada]', error);
-    return NextResponse.json({ error: 'Error al asignar jornada' }, { status: 500 });
+    return handleApiError(error, 'API POST /api/jornadas/[id]/asignar');
   }
 }
 
