@@ -10,6 +10,7 @@ import {
   LogOut,
   HeadphonesIcon,
   Bell,
+  Plug,
   ArrowLeft,
   ExternalLink,
 } from 'lucide-react';
@@ -55,6 +56,16 @@ export function SettingsClient({ usuario }: SettingsClientProps) {
       icon: HeadphonesIcon,
       action: () => {
         window.open('mailto:soporte@clousadmin.com?subject=Soporte - ' + usuario.email, '_blank');
+      },
+      available: true,
+    },
+    {
+      id: 'integrations',
+      title: 'Integraciones',
+      description: 'Conecta tu calendario personal de Google',
+      icon: Plug,
+      action: () => {
+        router.push('/empleado/settings/integraciones');
       },
       available: true,
     },

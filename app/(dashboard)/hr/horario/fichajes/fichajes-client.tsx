@@ -29,6 +29,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Clock, Calendar, ChevronDown, ChevronUp, Edit2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { formatearHorasMinutos } from '@/lib/utils/formatters';
 import { JornadasModal } from './jornadas-modal';
 import { EditarFichajeModal } from './editar-fichaje-modal';
 import { RevisionModal } from './revision-modal';
@@ -592,9 +593,7 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
                         </TableCell>
                         <TableCell>
                           <span className="text-sm font-medium">
-                            {typeof jornada.horasTrabajadas === 'number' && !isNaN(jornada.horasTrabajadas)
-                              ? `${jornada.horasTrabajadas.toFixed(1)}h`
-                              : '0.0h'}
+                            {formatearHorasMinutos(jornada.horasTrabajadas)}
                           </span>
                         </TableCell>
                         <TableCell>
@@ -609,8 +608,8 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
                     <TableCell>
                           <span className={`text-sm font-medium ${jornada.balance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                             {typeof jornada.balance === 'number' && !isNaN(jornada.balance)
-                              ? `${jornada.balance >= 0 ? '+' : ''}${jornada.balance.toFixed(1)}h`
-                              : '0.0h'}
+                              ? `${jornada.balance >= 0 ? '+' : ''}${formatearHorasMinutos(Math.abs(jornada.balance))}`
+                              : '0h 0m'}
                           </span>
                     </TableCell>
                     <TableCell>

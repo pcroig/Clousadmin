@@ -187,6 +187,16 @@ export async function POST(req: NextRequest) {
       return badRequestResponse(validacion.error || 'Evento inválido');
     }
 
+    // Validar que es día laborable (solo para entrada)
+    if (validatedData.tipo === 'entrada') {
+      const { esDiaLaboral } = await import('@/lib/calculos/fichajes');
+      const esLaboral = await esDiaLaboral(empleadoId, fecha);
+      
+      if (!esLaboral) {
+        return badRequestResponse('No puedes fichar en un día no laborable (fin de semana, festivo o con ausencia)');
+      }
+    }
+
     // Validar límites de jornada
     const validacionLimites = await validarLimitesJornada(empleadoId, hora);
 

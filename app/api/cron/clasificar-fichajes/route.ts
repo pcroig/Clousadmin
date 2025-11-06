@@ -1,11 +1,11 @@
 // ========================================
 // CRON: Clasificar Fichajes Incompletos
 // ========================================
-// Se ejecuta automáticamente cada noche a las 00:30 (configurado en AWS EventBridge)
+// Se ejecuta automáticamente cada noche a las 23:30 (configurado en AWS EventBridge)
 // Procesa todas las empresas activas
 //
 // AWS EventBridge Setup:
-// 1. Crear regla en EventBridge con schedule: cron(30 0 * * ? *)
+// 1. Crear regla en EventBridge con schedule: cron(30 23 * * ? *)
 // 2. Target: API Gateway/ALB -> POST a esta URL
 // 3. Agregar header: x-cron-secret: ${CRON_SECRET}
 
@@ -64,8 +64,12 @@ export async function POST(request: NextRequest) {
       try {
         console.log(`[CRON] Procesando empresa: ${empresa.nombre} (${empresa.id})`);
 
-        // Nota: clasificarFichajesIncompletos ya ejecuta crearFichajesAutomaticos internamente
-        // Clasificar fichajes
+        // 4.1. Primero crear fichajes automáticos para empleados disponibles sin fichaje
+        const { crearFichajesAutomaticos } = await import('@/lib/calculos/fichajes');
+        const resultadoCreacion = await crearFichajesAutomaticos(empresa.id, ayer);
+        console.log(`[CRON] Fichajes creados: ${resultadoCreacion.creados}, errores: ${resultadoCreacion.errores.length}`);
+
+        // 4.2. Luego clasificar fichajes existentes
         const { autoCompletar, revisionManual } = await clasificarFichajesIncompletos(
           empresa.id,
           ayer

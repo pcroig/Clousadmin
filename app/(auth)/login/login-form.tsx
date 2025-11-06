@@ -25,14 +25,42 @@ export function LoginForm({ callbackUrl }: LoginFormProps) {
   const [rateLimited, setRateLimited] = useState(false);
   const [retryAfter, setRetryAfter] = useState(0);
 
-  // Detectar error de cuenta inactiva en la URL y borrar cookie
+  // Detectar errores en la URL (cuenta inactiva, OAuth, etc.)
   useEffect(() => {
     const errorParam = searchParams.get('error');
+    const emailParam = searchParams.get('email');
+
     if (errorParam === 'cuenta_inactiva') {
       // Borrar cookie de sesión automáticamente
       document.cookie = 'clousadmin-session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax';
       setError('Tu sesión anterior ha expirado. Por favor, inicia sesión de nuevo.');
-      // Limpiar el error de la URL
+      router.replace('/login');
+    } else if (errorParam === 'oauth_error') {
+      const messageParam = searchParams.get('message');
+      const errorMessage = messageParam
+        ? `Error en la autenticación con Google: ${messageParam}`
+        : 'Error en la autenticación con Google. Por favor, intenta de nuevo.';
+      setError(errorMessage);
+      router.replace('/login');
+    } else if (errorParam === 'missing_code') {
+      setError('No se recibió código de autorización de Google.');
+      router.replace('/login');
+    } else if (errorParam === 'invalid_state') {
+      setError('Error de seguridad en la autenticación. Por favor, intenta de nuevo.');
+      router.replace('/login');
+    } else if (errorParam === 'email_not_verified') {
+      setError('Tu email de Google no está verificado. Por favor, verifica tu email en Google.');
+      router.replace('/login');
+    } else if (errorParam === 'user_inactive') {
+      setError('Tu cuenta está inactiva. Contacta con tu administrador de RRHH.');
+      router.replace('/login');
+    } else if (errorParam === 'no_account') {
+      const emailMsg = emailParam
+        ? ` (${emailParam})`
+        : '';
+      setError(
+        `No existe una cuenta con este email${emailMsg}. Necesitas una invitación para crear una cuenta.`
+      );
       router.replace('/login');
     }
   }, [searchParams, router]);
@@ -84,9 +112,9 @@ export function LoginForm({ callbackUrl }: LoginFormProps) {
     }
   };
 
-  // Función para login de prueba con Google (placeholder)
+  // Función para login con Google OAuth
   const handleGoogleLogin = () => {
-    alert('Google OAuth se configurará próximamente. Por ahora, usa login con email.');
+    window.location.href = '/api/auth/google';
   };
 
   return (

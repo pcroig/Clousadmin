@@ -20,6 +20,7 @@ import {
   crearNotificacionAusenciaRechazada,
   crearNotificacionAusenciaCancelada,
 } from '@/lib/notificaciones';
+import { CalendarManager } from '@/lib/integrations/calendar/calendar-manager';
 import { z } from 'zod';
 
 // Schema para aprobar/rechazar
@@ -29,15 +30,16 @@ const ausenciaAccionSchema = z.object({
 });
 
 // Schema para editar ausencia
-const ausenciaEditarSchema = z.object({
-  tipo: z.enum(['vacaciones', 'enfermedad', 'enfermedad_familiar', 'maternidad_paternidad', 'otro']).optional(),
-  fechaInicio: z.string().optional(),
-  fechaFin: z.string().optional(),
-  medioDia: z.boolean().optional(),
-  motivo: z.string().nullable().optional(),
-  descripcion: z.string().nullable().optional(),
-  estado: z.enum(['pendiente_aprobacion', 'en_curso', 'completada', 'auto_aprobada', 'rechazada', 'cancelada']).optional(),
-}).refine((data) => {
+      const ausenciaEditarSchema = z.object({
+        tipo: z.enum(['vacaciones', 'enfermedad', 'enfermedad_familiar', 'maternidad_paternidad', 'otro']).optional(),
+        fechaInicio: z.string().optional(),
+        fechaFin: z.string().optional(),
+        medioDia: z.boolean().optional(),
+        motivo: z.string().nullable().optional(),
+        descripcion: z.string().nullable().optional(),
+        justificanteUrl: z.string().url().nullable().optional(),
+        estado: z.enum(['pendiente_aprobacion', 'en_curso', 'completada', 'auto_aprobada', 'rechazada', 'cancelada']).optional(),
+      }).refine((data) => {
   // Si hay fechas, validar que fechaFin >= fechaInicio
   if (data.fechaInicio && data.fechaFin) {
     return new Date(data.fechaFin) >= new Date(data.fechaInicio);
@@ -218,6 +220,20 @@ export async function PATCH(
           fechaInicio: ausencia.fechaInicio,
           fechaFin: ausencia.fechaFin,
         });
+
+        // Sincronizar con calendarios conectados (Google Calendar, etc.)
+        try {
+          await CalendarManager.syncAusenciaToCalendars({
+            ...result,
+            empleado: {
+              nombre: result.empleado.nombre,
+              apellidos: result.empleado.apellidos,
+            },
+          });
+        } catch (error) {
+          console.error('Error syncing ausencia to calendars:', error);
+          // No fallar la aprobación si falla la sincronización con calendario
+        }
       } else {
         await crearNotificacionAusenciaRechazada(prisma, {
           ausenciaId: result.id,
@@ -229,6 +245,18 @@ export async function PATCH(
           fechaFin: ausencia.fechaFin,
           motivoRechazo,
         });
+
+        // Eliminar evento de calendarios si existe
+        try {
+          await CalendarManager.deleteAusenciaFromCalendars(
+            result.id,
+            session.user.empresaId,
+            ausencia.empleadoId
+          );
+        } catch (error) {
+          console.error('Error deleting ausencia from calendars:', error);
+          // No fallar el rechazo si falla la eliminación del calendario
+        }
       }
 
       return successResponse(result);
@@ -242,6 +270,7 @@ export async function PATCH(
         medioDia: z.boolean().optional(),
         motivo: z.string().nullable().optional(),
         descripcion: z.string().nullable().optional(),
+        justificanteUrl: z.string().nullable().optional(),
         estado: z.enum(['pendiente_aprobacion', 'en_curso', 'completada', 'auto_aprobada', 'rechazada', 'cancelada']).optional(),
       }).refine((data) => {
         if (data.fechaInicio && data.fechaFin) {
@@ -386,6 +415,7 @@ export async function PATCH(
         data: {
           ...(dataEdicion.tipo && { tipo: dataEdicion.tipo }),
           ...(dataEdicion.fechaInicio && { fechaInicio: nuevaFechaInicio }),
+          ...(dataEdicion.justificanteUrl !== undefined && { justificanteUrl: dataEdicion.justificanteUrl }),
           ...(dataEdicion.fechaFin && { fechaFin: nuevaFechaFin }),
           ...(dataEdicion.medioDia !== undefined && { medioDia: nuevoMedioDia }),
           ...(dataEdicion.motivo !== undefined && { motivo: dataEdicion.motivo }),

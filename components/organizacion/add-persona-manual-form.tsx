@@ -171,7 +171,24 @@ export function AddPersonaManualForm({ onSuccess, onCancel }: AddPersonaManualFo
         toast.success('Empleado creado correctamente');
         onSuccess();
       } else {
-        toast.error(data.error || 'Error al crear empleado');
+        // Manejo específico para email duplicado
+        if (data.code === 'EMAIL_DUPLICADO' && data.empleadoExistente) {
+          const empleado = data.empleadoExistente;
+          toast.error(
+            `El email ${formData.email} ya está registrado para ${empleado.nombre} ${empleado.apellidos}`,
+            {
+              duration: 6000,
+              action: {
+                label: 'Ver empleado',
+                onClick: () => {
+                  window.location.href = `/hr/organizacion/personas/${empleado.id}`;
+                },
+              },
+            }
+          );
+        } else {
+          toast.error(data.error || 'Error al crear empleado');
+        }
       }
     } catch (error) {
       console.error('[AddPersonaManualForm] Error:', error);
@@ -427,10 +444,13 @@ export function AddPersonaManualForm({ onSuccess, onCancel }: AddPersonaManualFo
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="administrador">Administrador</SelectItem>
+                <SelectItem value="fijo_discontinuo">Fijo discontinuo</SelectItem>
                 <SelectItem value="indefinido">Indefinido</SelectItem>
                 <SelectItem value="temporal">Temporal</SelectItem>
+                <SelectItem value="becario">Becario</SelectItem>
                 <SelectItem value="practicas">Prácticas</SelectItem>
-                <SelectItem value="formacion">Formación</SelectItem>
+                <SelectItem value="obra_y_servicio">Obra y servicio</SelectItem>
               </SelectContent>
             </Select>
           </div>

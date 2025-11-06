@@ -12,7 +12,11 @@ import { EmpleadoDashboardClient } from './dashboard-client';
 interface DashboardData {
   empleado: any;
   notificaciones: Notificacion[];
-  saldoFinal: any;
+  saldoFinal: {
+    diasTotales: number;
+    diasUsados: number;
+    diasPendientes: number;
+  };
   ausenciasProximas: AusenciaItem[];
   ausenciasPasadasItems: AusenciaItem[];
   campanaPendiente: {
@@ -120,17 +124,15 @@ async function obtenerDatosDashboard(session: { user: { id: string; empresaId: s
   }
 
   // Si no existe saldo, crear uno por defecto
-  const saldoFinal = saldo || {
-    id: 'temp',
-    empleadoId: empleado.id,
-    empresaId: empleado.empresaId,
-    año: añoActual,
+  // Convertir Decimal a números para serialización (Client Components)
+  const saldoFinal = saldo ? {
+    diasTotales: saldo.diasTotales,
+    diasUsados: Number(saldo.diasUsados),
+    diasPendientes: Number(saldo.diasPendientes),
+  } : {
     diasTotales: 22, // Días por defecto en España
     diasUsados: 0,
     diasPendientes: 0,
-    origen: 'manual_hr',
-    createdAt: new Date(),
-    updatedAt: new Date(),
   };
 
   // Próximas ausencias

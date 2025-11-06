@@ -18,7 +18,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { TableHeader as PageHeader } from '@/components/shared/table-header';
 import { SolicitarAusenciaModal } from '@/components/empleado/solicitar-ausencia-modal';
-import { Calendar, Plus } from 'lucide-react';
+import { Calendar, Plus, ChevronDown, ChevronUp } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -42,14 +42,32 @@ interface SaldoData {
   diasDisponibles: number;
 }
 
-interface Props {
-  saldo: SaldoData;
+interface CampanaData {
+  id: string;
+  titulo: string;
+  fechaInicioObjetivo: string;
+  fechaFinObjetivo: string;
+  miPreferencia: {
+    id: string;
+    completada: boolean;
+    aceptada: boolean;
+    diasIdeales: any;
+    diasPrioritarios: any;
+    diasAlternativos: any;
+    propuestaIA: any;
+  } | null;
 }
 
-export function AusenciasEmpleadoClient({ saldo }: Props) {
+interface Props {
+  saldo: SaldoData;
+  campanas?: CampanaData[];
+}
+
+export function AusenciasEmpleadoClient({ saldo, campanas = [] }: Props) {
   const [ausencias, setAusencias] = useState<Ausencia[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalSolicitud, setModalSolicitud] = useState(false);
+  const [campanasExpandidas, setCampanasExpandidas] = useState(false);
 
   useEffect(() => {
     fetchAusencias();
@@ -133,6 +151,75 @@ export function AusenciasEmpleadoClient({ saldo }: Props) {
           </CardContent>
         </Card>
       </div>
+
+      {/* Panel de Campañas Activas */}
+      {campanas.length > 0 && (
+        <Card className="mb-6">
+          <div
+            className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-50 transition-colors"
+            onClick={() => setCampanasExpandidas(!campanasExpandidas)}
+          >
+            <div className="flex items-center gap-3">
+              <Calendar className="w-5 h-5 text-blue-600" />
+              <div>
+                <h3 className="font-semibold text-gray-900">
+                  {campanas.length === 1 ? 'Campaña de Vacaciones Activa' : 'Campañas de Vacaciones Activas'}
+                </h3>
+                <p className="text-sm text-gray-500">
+                  {campanas.length} campaña{campanas.length !== 1 ? 's' : ''} disponible{campanas.length !== 1 ? 's' : ''}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <Badge className="bg-blue-100 text-blue-800 border-0">
+                Activas
+              </Badge>
+              {campanasExpandidas ? (
+                <ChevronUp className="w-5 h-5 text-gray-400" />
+              ) : (
+                <ChevronDown className="w-5 h-5 text-gray-400" />
+              )}
+            </div>
+          </div>
+
+          {campanasExpandidas && (
+            <div className="border-t border-gray-200 p-4 space-y-3">
+              {campanas.map((campana) => (
+                <div
+                  key={campana.id}
+                  className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200"
+                >
+                  <div className="flex-1">
+                    <h4 className="font-medium text-gray-900 mb-1">{campana.titulo}</h4>
+                    <div className="flex items-center gap-4 text-sm text-gray-600">
+                      <span>
+                        <Calendar className="w-3.5 h-3.5 inline mr-1" />
+                        {format(new Date(campana.fechaInicioObjetivo), 'dd MMM', { locale: es })} -{' '}
+                        {format(new Date(campana.fechaFinObjetivo), 'dd MMM yyyy', { locale: es })}
+                      </span>
+                      {campana.miPreferencia && (
+                        <Badge variant={campana.miPreferencia.aceptada ? 'success' : 'warning'} className="text-xs">
+                          {campana.miPreferencia.aceptada ? 'Participando' : 'Pendiente'}
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      // Aquí se podría abrir un modal con más detalles
+                      window.location.href = `/empleado/horario/vacaciones/${campana.id}`;
+                    }}
+                  >
+                    Ver detalles
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
+      )}
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto">

@@ -23,6 +23,12 @@ export default async function MiEspacioDatosPage() {
     include: {
       usuario: true,
       manager: true,
+      puestoRelacion: {
+        select: {
+          id: true,
+          nombre: true,
+        },
+      },
     },
   });
 

@@ -47,13 +47,21 @@ export function decryptEmpleadoData<T extends Partial<Empleado>>(empleado: T): T
   for (const field of SENSITIVE_FIELDS) {
     const value = empleado[field as keyof T];
     if (value !== null && value !== undefined && value !== '') {
-      try {
-        decrypted[field as keyof T] = decrypt(String(value)) as any;
-      } catch (error) {
-        console.error(`[Empleado Crypto] Error desencriptando ${field}:`, error);
-        // Mantener valor encriptado si falla (no romper la app)
-        // En producción, loggear este error para investigar
+      const stringValue = String(value);
+      
+      // Verificar si el campo está encriptado antes de intentar desencriptarlo
+      // Esto maneja casos donde hay datos antiguos sin encriptar
+      if (isFieldEncrypted(stringValue)) {
+        try {
+          decrypted[field as keyof T] = decrypt(stringValue) as any;
+        } catch (error) {
+          // Si falla la desencriptación, mantener el valor original
+          // Esto puede pasar si la key cambió o hay datos corruptos
+          console.warn(`[Empleado Crypto] No se pudo desencriptar ${field}, manteniendo valor original. Error:`, error instanceof Error ? error.message : error);
+          // Mantener el valor original (encriptado) para no romper la app
+        }
       }
+      // Si no está encriptado, dejarlo como está (datos antiguos o ya desencriptados)
     }
   }
 
@@ -114,5 +122,9 @@ export function sanitizeEmpleadoForLogs<T extends Partial<Empleado>>(
 
   return sanitized;
 }
+
+
+
+
 
 

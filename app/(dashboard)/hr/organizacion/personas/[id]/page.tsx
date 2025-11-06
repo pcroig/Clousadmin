@@ -7,6 +7,7 @@ import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import { EmpleadoDetailClient } from './empleado-detail-client';
 import { notFound } from 'next/navigation';
+import { decryptEmpleadoData } from '@/lib/empleado-crypto';
 
 interface EmpleadoDetailPageProps {
   params: Promise<{
@@ -111,44 +112,47 @@ export default async function EmpleadoDetailPage({ params }: EmpleadoDetailPageP
     notFound();
   }
 
+  // Desencriptar campos sensibles antes de pasar al componente
+  const empleadoDesencriptado = decryptEmpleadoData(empleado);
+
   const empleadoData = {
-    id: empleado.id,
-    nombre: empleado.nombre,
-    apellidos: empleado.apellidos,
-    email: empleado.email,
-    fotoUrl: empleado.fotoUrl,
-    nif: empleado.nif,
-    nss: empleado.nss,
-    fechaNacimiento: empleado.fechaNacimiento,
-    telefono: empleado.telefono,
-    direccionCalle: empleado.direccionCalle,
-    direccionNumero: empleado.direccionNumero,
-    direccionPiso: empleado.direccionPiso,
-    codigoPostal: empleado.codigoPostal,
-    ciudad: empleado.ciudad,
-    direccionProvincia: empleado.direccionProvincia,
-    estadoCivil: empleado.estadoCivil,
-    numeroHijos: empleado.numeroHijos,
-    genero: empleado.genero,
-    iban: empleado.iban,
-    titularCuenta: empleado.titularCuenta,
-    puesto: empleado.puesto,
-    puestoId: empleado.puestoId,
+    id: empleadoDesencriptado.id,
+    nombre: empleadoDesencriptado.nombre,
+    apellidos: empleadoDesencriptado.apellidos,
+    email: empleadoDesencriptado.email,
+    fotoUrl: empleadoDesencriptado.fotoUrl,
+    nif: empleadoDesencriptado.nif,
+    nss: empleadoDesencriptado.nss,
+    fechaNacimiento: empleadoDesencriptado.fechaNacimiento,
+    telefono: empleadoDesencriptado.telefono,
+    direccionCalle: empleadoDesencriptado.direccionCalle,
+    direccionNumero: empleadoDesencriptado.direccionNumero,
+    direccionPiso: empleadoDesencriptado.direccionPiso,
+    codigoPostal: empleadoDesencriptado.codigoPostal,
+    ciudad: empleadoDesencriptado.ciudad,
+    direccionProvincia: empleadoDesencriptado.direccionProvincia,
+    estadoCivil: empleadoDesencriptado.estadoCivil,
+    numeroHijos: empleadoDesencriptado.numeroHijos,
+    genero: empleadoDesencriptado.genero,
+    iban: empleadoDesencriptado.iban,
+    titularCuenta: empleadoDesencriptado.titularCuenta,
+    puesto: empleadoDesencriptado.puesto,
+    puestoId: empleadoDesencriptado.puestoId,
     puestoRelacion: empleado.puestoRelacion ? {
       id: empleado.puestoRelacion.id,
       nombre: empleado.puestoRelacion.nombre,
     } : null,
-    managerId: empleado.managerId,
-    fechaAlta: empleado.fechaAlta,
-    fechaBaja: empleado.fechaBaja,
-    tipoContrato: empleado.tipoContrato,
-    categoriaProfesional: empleado.categoriaProfesional,
-    grupoCotizacion: empleado.grupoCotizacion,
-    estadoEmpleado: empleado.estadoEmpleado,
-    salarioBrutoAnual: empleado.salarioBrutoAnual ? Number(empleado.salarioBrutoAnual) : null,
-    salarioBrutoMensual: empleado.salarioBrutoMensual ? Number(empleado.salarioBrutoMensual) : null,
-    diasVacaciones: empleado.diasVacaciones,
-    activo: empleado.activo,
+    managerId: empleadoDesencriptado.managerId,
+    fechaAlta: empleadoDesencriptado.fechaAlta,
+    fechaBaja: empleadoDesencriptado.fechaBaja,
+    tipoContrato: empleadoDesencriptado.tipoContrato,
+    categoriaProfesional: empleadoDesencriptado.categoriaProfesional,
+    grupoCotizacion: empleadoDesencriptado.grupoCotizacion,
+    estadoEmpleado: empleadoDesencriptado.estadoEmpleado,
+    salarioBrutoAnual: empleadoDesencriptado.salarioBrutoAnual ? Number(empleadoDesencriptado.salarioBrutoAnual) : null,
+    salarioBrutoMensual: empleadoDesencriptado.salarioBrutoMensual ? Number(empleadoDesencriptado.salarioBrutoMensual) : null,
+    diasVacaciones: empleadoDesencriptado.diasVacaciones,
+    activo: empleadoDesencriptado.activo,
     manager: empleado.manager ? {
       nombre: `${empleado.manager.nombre} ${empleado.manager.apellidos}`,
     } : null,

@@ -41,7 +41,7 @@ export function AddPersonaDialog({ open, onOpenChange, onSuccess }: AddPersonaDi
             </TabsTrigger>
             <TabsTrigger value="document" className="flex items-center gap-2">
               <Upload className="h-4 w-4" />
-              <span>Subir Documento</span>
+              <span>Importar</span>
             </TabsTrigger>
             <TabsTrigger value="onboarding" className="flex items-center gap-2">
               <Mail className="h-4 w-4" />
@@ -67,6 +67,10 @@ export function AddPersonaDialog({ open, onOpenChange, onSuccess }: AddPersonaDi
     </Dialog>
   );
 }
+
+
+
+
 
 
 

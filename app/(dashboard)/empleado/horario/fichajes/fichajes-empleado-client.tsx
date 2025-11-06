@@ -29,6 +29,7 @@ import { TableHeader as PageHeader } from '@/components/shared/table-header';
 import { Clock, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { formatearHorasMinutos } from '@/lib/utils/formatters';
 
 interface Fichaje {
   id: string;
@@ -241,25 +242,25 @@ export function FichajesEmpleadoClient({ balanceInicial }: Props) {
           <div className="grid grid-cols-4 gap-4">
             <div className="text-center">
               <div className={`text-2xl font-bold ${balanceInicial.diario >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                {balanceInicial.diario >= 0 ? '+' : ''}{balanceInicial.diario.toFixed(1)}h
+                {balanceInicial.diario >= 0 ? '+' : ''}{formatearHorasMinutos(Math.abs(balanceInicial.diario))}
               </div>
               <div className="text-xs text-gray-500 mt-1">Hoy</div>
             </div>
             <div className="text-center">
               <div className={`text-2xl font-bold ${balanceInicial.semanal >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                {balanceInicial.semanal >= 0 ? '+' : ''}{balanceInicial.semanal.toFixed(1)}h
+                {balanceInicial.semanal >= 0 ? '+' : ''}{formatearHorasMinutos(Math.abs(balanceInicial.semanal))}
               </div>
               <div className="text-xs text-gray-500 mt-1">Semana</div>
             </div>
             <div className="text-center">
               <div className={`text-2xl font-bold ${balanceInicial.mensual >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                {balanceInicial.mensual >= 0 ? '+' : ''}{balanceInicial.mensual.toFixed(1)}h
+                {balanceInicial.mensual >= 0 ? '+' : ''}{formatearHorasMinutos(Math.abs(balanceInicial.mensual))}
               </div>
               <div className="text-xs text-gray-500 mt-1">Mes</div>
             </div>
             <div className="text-center">
               <div className={`text-2xl font-bold ${balanceInicial.acumulado >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                {balanceInicial.acumulado >= 0 ? '+' : ''}{balanceInicial.acumulado.toFixed(1)}h
+                {balanceInicial.acumulado >= 0 ? '+' : ''}{formatearHorasMinutos(Math.abs(balanceInicial.acumulado))}
               </div>
               <div className="text-xs text-gray-500 mt-1">Acumulado</div>
             </div>
@@ -320,7 +321,7 @@ export function FichajesEmpleadoClient({ balanceInicial }: Props) {
                         </TableCell>
                         <TableCell>
                           <span className="text-sm font-medium">
-                            {jornada.horasTrabajadas.toFixed(1)}h
+                            {formatearHorasMinutos(jornada.horasTrabajadas)}
                           </span>
                         </TableCell>
                         <TableCell>
@@ -334,7 +335,7 @@ export function FichajesEmpleadoClient({ balanceInicial }: Props) {
                         </TableCell>
                         <TableCell>
                           <span className={`text-sm font-medium ${jornada.balance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                            {jornada.balance >= 0 ? '+' : ''}{jornada.balance.toFixed(1)}h
+                            {jornada.balance >= 0 ? '+' : ''}{formatearHorasMinutos(Math.abs(jornada.balance))}
                           </span>
                         </TableCell>
                         <TableCell>

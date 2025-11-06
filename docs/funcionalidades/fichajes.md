@@ -8,14 +8,16 @@ El sistema de fichajes permite a los empleados registrar su jornada laboral comp
 
 Cada fichaje (día completo) tiene un único estado que refleja su ciclo de vida:
 
+**Solo existen 4 estados únicos:**
+
 - **`en_curso`** - Estado por defecto. Fichaje creado automáticamente o fichaje manual iniciado (sin completar)
-- **`finalizado`** - Fichaje manual completo (empleado fichó entrada y salida)
-- **`revisado`** - Auto-completado por IA con alta confianza, listo para aprobación rápida por HR
-- **`pendiente_revision`** - Requiere revisión detallada de HR (fichaje incompleto o con inconsistencias)
-- **`aprobado`** - Revisado y aprobado por HR
-- **`rechazado`** - Rechazado por HR, requiere corrección
+- **`finalizado`** - Fichaje completo y aprobado (manual o tras aprobación HR)
+- **`revisado`** - Auto-completado por clasificador, listo para aprobación rápida HR
+- **`pendiente`** - Requiere revisión manual detallada de HR (fichajes sin eventos o problemáticos)
 
 **Nota importante**: El fichaje representa el día completo, mientras que los eventos (entrada, pausa_inicio, pausa_fin, salida) son acciones individuales dentro de ese día.
+
+**Ver sección completa "Estados del Fichaje (Día Completo)" más abajo para detalles del workflow.**
 
 ---
 

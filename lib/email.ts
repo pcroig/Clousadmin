@@ -4,13 +4,29 @@
 
 import { SESClient, SendEmailCommand } from '@aws-sdk/client-ses';
 
-const sesClient = new SESClient({
-  region: process.env.SES_REGION || process.env.AWS_REGION || 'eu-west-1',
-  credentials: {
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
-  },
-});
+// Helper: Check if SES is configured
+function isSESConfigured(): boolean {
+  return !!(
+    process.env.AWS_ACCESS_KEY_ID &&
+    process.env.AWS_SECRET_ACCESS_KEY &&
+    process.env.SES_FROM_EMAIL
+  );
+}
+
+// Create SES client only if configured (lazy initialization)
+function getSESClient(): SESClient | null {
+  if (!isSESConfigured()) {
+    return null;
+  }
+  
+  return new SESClient({
+    region: process.env.SES_REGION || process.env.AWS_REGION || 'eu-west-1',
+    credentials: {
+      accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
+      secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
+    },
+  });
+}
 
 /**
  * Enviar email usando AWS SES
@@ -21,6 +37,17 @@ export async function sendEmail(
   htmlBody: string,
   textBody?: string
 ): Promise<void> {
+  // If SES is not configured (development), log and skip
+  if (!isSESConfigured()) {
+    console.warn('[Email] SES no configurado. En desarrollo, email no enviado:', { to, subject });
+    return;
+  }
+
+  const sesClient = getSESClient();
+  if (!sesClient) {
+    throw new Error('SES client no disponible');
+  }
+
   try {
     const command = new SendEmailCommand({
       Source: process.env.SES_FROM_EMAIL!,

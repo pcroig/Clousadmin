@@ -45,9 +45,12 @@ export async function clasificarFichajesIncompletos(
 
   const fechaSinHora = new Date(fecha.getFullYear(), fecha.getMonth(), fecha.getDate());
 
-  // 0. Crear fichajes automáticos para empleados disponibles sin fichaje
-  const { crearFichajesAutomaticos } = await import('@/lib/calculos/fichajes');
-  const resultadoCreacion = await crearFichajesAutomaticos(empresaId, fechaSinHora);
+  // NOTA: NO creamos fichajes automáticos aquí. Los fichajes se crean:
+  // 1. Automáticamente en el CRON nocturno (antes de ejecutar clasificador)
+  // 2. Cuando el empleado ficha por primera vez en el día
+  // El clasificador solo analiza fichajes existentes
+
+  console.log('[Clasificador] Analizando fichajes existentes para fecha:', fechaSinHora.toISOString().split('T')[0]);
 
   // 1. Obtener todos los fichajes del día con sus eventos
   const fichajes = await prisma.fichaje.findMany({

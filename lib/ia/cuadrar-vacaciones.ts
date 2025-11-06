@@ -4,7 +4,7 @@
 // Usa OpenAI para optimizar distribución de vacaciones en campañas
 
 // Importar desde punto de entrada centralizado (base común)
-import { getOpenAIClient, getModelConfig } from './index';
+import { callAIWithConfig } from './models';
 import { prisma } from '@/lib/prisma';
 import type { PreferenciaVacaciones, Empleado, Ausencia } from '@prisma/client';
 
@@ -69,15 +69,6 @@ export async function cuadrarVacacionesIA(
 
   console.info(`[Cuadrar Vacaciones] Iniciando para campaña ${campanaId} con ${preferencias.length} empleados`);
 
-  // Obtener configuración de modelo para esta funcionalidad
-  const modelConfig = getModelConfig('cuadrar-vacaciones');
-  if (!modelConfig) {
-    throw new Error('Configuración de modelo no encontrada para cuadrar-vacaciones');
-  }
-
-  // Obtener cliente OpenAI (lanzará error si no está configurado)
-  const openai = getOpenAIClient();
-
   // 1. Preparar datos para la IA
   const preferenciasFormateadas = preferencias.map(pref => ({
     empleadoId: pref.empleado.id,
@@ -106,28 +97,17 @@ export async function cuadrarVacacionesIA(
   });
 
   try {
-    // 3. Llamar a OpenAI con configuración específica de la funcionalidad
-    const completion = await openai.chat.completions.create({
-      model: modelConfig.model,
-      messages: [
-        ...(modelConfig.systemMessage
-          ? [{ role: 'system', content: modelConfig.systemMessage } as const]
-          : []),
-        {
-          role: 'user',
-          content: prompt,
-        },
-      ],
-      response_format: modelConfig.responseFormat === 'json_object' 
-        ? { type: 'json_object' } 
-        : undefined,
-      temperature: modelConfig.temperature,
-      ...(modelConfig.maxTokens ? { max_tokens: modelConfig.maxTokens } : {}),
-    });
+    // 3. Llamar a IA usando el cliente unificado (con fallback automático)
+    const completion = await callAIWithConfig('cuadrar-vacaciones', [
+      {
+        role: 'user',
+        content: prompt,
+      },
+    ]);
 
     const responseText = completion.choices[0]?.message?.content;
     if (!responseText) {
-      throw new Error('OpenAI no devolvió respuesta');
+      throw new Error('La IA no devolvió respuesta');
     }
 
     // 4. Parsear respuesta
@@ -137,18 +117,18 @@ export async function cuadrarVacacionesIA(
     const resultadoValidado = validarYNormalizarResultado(resultado, preferencias);
 
     console.info(`[Cuadrar Vacaciones] Completado - ${resultadoValidado.propuestas.length} propuestas generadas`);
-    console.info(`[Cuadrar Vacaciones] Tokens usados: ${completion.usage?.total_tokens || 0}`);
+    console.info(`[Cuadrar Vacaciones] Tokens usados: ${completion.usage?.totalTokens || 0}`);
 
     return {
       ...resultadoValidado,
       metadata: {
         timestamp: new Date().toISOString(),
         model: completion.model,
-        tokensUsed: completion.usage?.total_tokens,
+        tokensUsed: completion.usage?.totalTokens,
       },
     };
   } catch (error) {
-    console.error('[Cuadrar Vacaciones] Error llamando a OpenAI:', error);
+    console.error('[Cuadrar Vacaciones] Error llamando a IA:', error);
     
     // Si falla la IA, retornar propuestas básicas
     return generarPropuestasFallback(preferencias, solapamientoMaximoPct);

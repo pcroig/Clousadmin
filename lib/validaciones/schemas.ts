@@ -119,12 +119,22 @@ export type JornadaAsignarInput = z.infer<typeof jornadaAsignarSchema>;
 
 export const ausenciaCreateSchema = z.object({
   tipo: z.enum(['vacaciones', 'enfermedad', 'enfermedad_familiar', 'maternidad_paternidad', 'otro']),
-  fechaInicio: z.string().or(z.date()),
-  fechaFin: z.string().or(z.date()),
+  fechaInicio: z.union([
+    z.string().refine((val) => !isNaN(new Date(val).getTime()), {
+      message: 'fechaInicio debe ser una fecha válida',
+    }),
+    z.date(),
+  ]),
+  fechaFin: z.union([
+    z.string().refine((val) => !isNaN(new Date(val).getTime()), {
+      message: 'fechaFin debe ser una fecha válida',
+    }),
+    z.date(),
+  ]),
   medioDia: z.boolean().default(false),
   descripcion: z.string().optional(),
   motivo: z.string().optional(),
-  justificanteUrl: z.string().optional(),
+  justificanteUrl: z.string().url().optional(),
   diasIdeales: z.array(z.string()).optional(),
   diasPrioritarios: z.array(z.string()).optional(),
   diasAlternativos: z.array(z.string()).optional(),
@@ -133,6 +143,10 @@ export const ausenciaCreateSchema = z.object({
   (data) => {
     const inicio = new Date(data.fechaInicio);
     const fin = new Date(data.fechaFin);
+    // Validar que las fechas sean válidas
+    if (isNaN(inicio.getTime()) || isNaN(fin.getTime())) {
+      return false;
+    }
     return fin >= inicio;
   },
   {
@@ -141,7 +155,7 @@ export const ausenciaCreateSchema = z.object({
   }
 ).refine(
   (data) => {
-    if (data.tipo === 'otro' && !data.motivo) {
+    if (data.tipo === 'otro' && (!data.motivo || data.motivo.trim() === '')) {
       return false;
     }
     return true;
@@ -175,6 +189,7 @@ export const ausenciaUpdateSchema = z.object({
   medioDia: z.boolean().optional(),
   descripcion: z.string().optional().nullable(),
   motivo: z.string().optional().nullable(),
+  justificanteUrl: z.string().url().optional().nullable(),
   estado: z.enum(['pendiente_aprobacion', 'en_curso', 'completada', 'auto_aprobada', 'rechazada', 'cancelada']).optional(),
   // Para mantener compatibilidad con aprobar/rechazar
   accion: z.enum(['aprobar', 'rechazar']).optional(),

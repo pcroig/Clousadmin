@@ -108,8 +108,17 @@ export const datosBancariosSchema = z.object({
   iban: z
     .string()
     .min(1, 'El IBAN es obligatorio')
-    .refine((val) => validarIBAN(val), {
-      message: 'IBAN inválido (formato español requerido: ES + 22 dígitos)',
+    .refine((val) => {
+      const ibanLimpio = val.trim().toUpperCase().replace(/\s/g, '');
+      // Primero verificar formato básico
+      const regexIBAN = /^ES\d{22}$/;
+      if (!regexIBAN.test(ibanLimpio)) {
+        return false;
+      }
+      // Luego validar checksum
+      return validarIBAN(ibanLimpio);
+    }, {
+      message: 'IBAN inválido. Verifica el formato (ES + 22 dígitos) y que el checksum sea correcto',
     }),
   
   titularCuenta: z

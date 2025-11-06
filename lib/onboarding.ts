@@ -8,6 +8,8 @@ import { randomBytes } from 'crypto';
 import { encryptEmpleadoData } from '@/lib/empleado-crypto';
 import { validarDocumentosRequeridosCompletos } from '@/lib/documentos/onboarding';
 import { obtenerOnboardingConfig } from '@/lib/onboarding-config';
+import { hashPassword } from '@/lib/auth';
+import { uploadToS3 } from '@/lib/s3';
 
 /**
  * Helper function to safely convert values to Prisma JSON input
@@ -20,6 +22,7 @@ function toJsonValue<T extends Record<string, any>>(value: T): Prisma.InputJsonV
  * Progreso del onboarding
  */
 export interface ProgresoOnboarding {
+  credenciales_completadas: boolean;
   datos_personales: boolean;
   datos_bancarios: boolean;
   datos_documentos: boolean;
@@ -48,6 +51,10 @@ export interface DatosTemporales {
   };
   datos_documentos?: {
     documentosSubidos: string[]; // Array de IDs de documentos
+  };
+  credenciales?: {
+    password: string; // Contraseña hasheada (no se almacena en datos temporales por seguridad)
+    avatarUrl?: string; // URL del avatar si se sube
   };
 }
 
@@ -99,6 +106,7 @@ export async function crearOnboarding(
         token,
         tokenExpira,
         progreso: {
+          credenciales_completadas: false,
           datos_personales: false,
           datos_bancarios: false,
           datos_documentos: false,
@@ -159,6 +167,84 @@ export async function verificarTokenOnboarding(token: string) {
     return {
       valido: false,
       error: 'Error al verificar el token',
+    };
+  }
+}
+
+/**
+ * Guardar credenciales (Paso 0) - Avatar y contraseña
+ */
+export async function guardarCredenciales(
+  token: string,
+  password: string,
+  avatarFile?: { buffer: Buffer; mimeType: string; filename: string }
+) {
+  try {
+    // Verificar token
+    const verificacion = await verificarTokenOnboarding(token);
+    if (!verificacion.valido || !verificacion.onboarding) {
+      return {
+        success: false,
+        error: verificacion.error || 'Token inválido',
+      };
+    }
+
+    const { onboarding } = verificacion;
+
+    // Validar contraseña
+    if (password.length < 8) {
+      return {
+        success: false,
+        error: 'La contraseña debe tener al menos 8 caracteres',
+      };
+    }
+
+    // Hash de contraseña
+    const hashedPassword = await hashPassword(password);
+
+    // Subir avatar si se proporciona
+    let avatarUrl: string | undefined;
+    if (avatarFile) {
+      const timestamp = Date.now();
+      const randomString = randomBytes(8).toString('hex');
+      const fileExtension = avatarFile.filename.split('.').pop();
+      const s3Key = `avatars/${onboarding.empresaId}/${onboarding.empleadoId}/${timestamp}-${randomString}.${fileExtension}`;
+      
+      await uploadToS3(avatarFile.buffer, s3Key, avatarFile.mimeType);
+      avatarUrl = `https://${process.env.S3_BUCKET}.s3.${process.env.AWS_REGION}.amazonaws.com/${s3Key}`;
+    }
+
+    // Actualizar usuario con contraseña y avatar
+    await prisma.usuario.update({
+      where: { id: onboarding.empleado.usuarioId },
+      data: {
+        password: hashedPassword,
+        avatar: avatarUrl,
+        emailVerificado: true,
+        activo: true,
+      },
+    });
+
+    // Actualizar progreso
+    const progresoActual = onboarding.progreso as unknown as ProgresoOnboarding;
+    const progresoNuevo: ProgresoOnboarding = {
+      ...progresoActual,
+      credenciales_completadas: true,
+    };
+
+    await prisma.onboardingEmpleado.update({
+      where: { id: onboarding.id },
+      data: {
+        progreso: toJsonValue(progresoNuevo),
+      },
+    });
+
+    return { success: true };
+  } catch (error) {
+    console.error('[guardarCredenciales] Error:', error);
+    return {
+      success: false,
+      error: 'Error al guardar credenciales',
     };
   }
 }
@@ -312,6 +398,91 @@ export async function guardarProgresoDocumentos(token: string) {
 }
 
 /**
+ * Calcular si un empleado debe estar activo según sus fechas de contrato
+ * @param fechaAlta - Fecha de inicio de contrato
+ * @param fechaBaja - Fecha de finalización de contrato (opcional)
+ * @returns true si el empleado debe estar activo, false si debe estar inactivo
+ */
+export function calcularEstadoActivoSegunFechas(
+  fechaAlta: Date,
+  fechaBaja: Date | null
+): boolean {
+  const fechaActual = new Date();
+  fechaActual.setHours(0, 0, 0, 0); // Normalizar a inicio del día
+  
+  const fechaAltaNormalizada = new Date(fechaAlta);
+  fechaAltaNormalizada.setHours(0, 0, 0, 0);
+  
+  // Si tiene fecha de baja, verificar si ya pasó
+  if (fechaBaja) {
+    const fechaBajaNormalizada = new Date(fechaBaja);
+    fechaBajaNormalizada.setHours(0, 0, 0, 0);
+    
+    // Si la fecha de baja ya pasó, debe estar inactivo
+    if (fechaBajaNormalizada < fechaActual) {
+      return false;
+    }
+    
+    // Si la fecha de alta ya pasó y la de baja no, debe estar activo
+    return fechaAltaNormalizada <= fechaActual;
+  }
+  
+  // Sin fecha de baja: activo si la fecha de alta ya pasó
+  return fechaAltaNormalizada <= fechaActual;
+}
+
+/**
+ * Actualizar estado activo de empleado y usuario según fechas de contrato
+ * @param empleadoId - ID del empleado
+ * @returns true si se actualizó correctamente, false en caso de error
+ */
+export async function actualizarEstadoActivoPorFechas(empleadoId: string): Promise<boolean> {
+  try {
+    const empleado = await prisma.empleado.findUnique({
+      where: { id: empleadoId },
+      select: {
+        fechaAlta: true,
+        fechaBaja: true,
+        usuarioId: true,
+        activo: true,
+      },
+    });
+
+    if (!empleado) {
+      console.error(`[actualizarEstadoActivoPorFechas] Empleado ${empleadoId} no encontrado`);
+      return false;
+    }
+
+    const debeEstarActivo = calcularEstadoActivoSegunFechas(
+      empleado.fechaAlta,
+      empleado.fechaBaja
+    );
+
+    // Solo actualizar si el estado cambió
+    if (empleado.activo !== debeEstarActivo) {
+      await prisma.empleado.update({
+        where: { id: empleadoId },
+        data: { activo: debeEstarActivo },
+      });
+
+      await prisma.usuario.update({
+        where: { id: empleado.usuarioId },
+        data: { activo: debeEstarActivo },
+      });
+
+      console.log(
+        `[actualizarEstadoActivoPorFechas] Empleado ${empleadoId} actualizado: activo=${debeEstarActivo}`
+      );
+    }
+
+    return true;
+  } catch (error) {
+    console.error(`[actualizarEstadoActivoPorFechas] Error actualizando empleado ${empleadoId}:`, error);
+    return false;
+  }
+}
+
+/**
  * Finalizar onboarding - Traspasar datos temporales a Empleado
  */
 export async function finalizarOnboarding(token: string) {
@@ -329,10 +500,10 @@ export async function finalizarOnboarding(token: string) {
 
     // Validar que todos los pasos estén completados
     const progreso = onboarding.progreso as unknown as ProgresoOnboarding;
-    if (!progreso.datos_personales || !progreso.datos_bancarios) {
+    if (!progreso.credenciales_completadas || !progreso.datos_personales || !progreso.datos_bancarios) {
       return {
         success: false,
-        error: 'Faltan pasos por completar (datos personales o bancarios)',
+        error: 'Faltan pasos por completar (credenciales, datos personales o bancarios)',
       };
     }
 
@@ -400,13 +571,47 @@ export async function finalizarOnboarding(token: string) {
       onboardingCompletadoEn: new Date(),
     };
 
+    // Obtener empleado para verificar fechas de contrato
+    const empleado = await prisma.empleado.findUnique({
+      where: { id: onboarding.empleadoId },
+      select: {
+        fechaAlta: true,
+        fechaBaja: true,
+        usuarioId: true,
+      },
+    });
+
+    if (!empleado) {
+      return {
+        success: false,
+        error: 'Empleado no encontrado',
+      };
+    }
+
+    // Calcular estado activo según fechas de contrato
+    const debeEstarActivo = calcularEstadoActivoSegunFechas(
+      empleado.fechaAlta,
+      empleado.fechaBaja
+    );
+
     // Encriptar campos sensibles antes de guardar
     const datosEmpleadoEncriptados = encryptEmpleadoData(datosEmpleado);
 
-    // Traspasar datos encriptados a Empleado
+    // Traspasar datos encriptados a Empleado y actualizar estado activo
     await prisma.empleado.update({
       where: { id: onboarding.empleadoId },
-      data: datosEmpleadoEncriptados,
+      data: {
+        ...datosEmpleadoEncriptados,
+        activo: debeEstarActivo,
+      },
+    });
+
+    // Actualizar también el estado activo del usuario
+    await prisma.usuario.update({
+      where: { id: empleado.usuarioId },
+      data: {
+        activo: debeEstarActivo,
+      },
     });
 
     // Marcar onboarding como completado

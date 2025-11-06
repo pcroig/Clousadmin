@@ -20,11 +20,41 @@ interface SolicitarAusenciaModalProps {
 }
 
 const TIPOS_AUSENCIA = [
-  { value: 'vacaciones', label: 'Vacaciones' },
-  { value: 'enfermedad', label: 'Enfermedad' },
-  { value: 'enfermedad_familiar', label: 'Enfermedad familiar' },
-  { value: 'maternidad_paternidad', label: 'Maternidad/Paternidad' },
-  { value: 'otro', label: 'Otro' },
+  { 
+    value: 'vacaciones', 
+    label: 'Vacaciones', 
+    descripcion: 'Necesita aprobación • Descuenta saldo',
+    needsApproval: true,
+    descuentaSaldo: true
+  },
+  { 
+    value: 'enfermedad', 
+    label: 'Enfermedad', 
+    descripcion: 'No necesita aprobación • No descuenta saldo',
+    needsApproval: false,
+    descuentaSaldo: false
+  },
+  { 
+    value: 'enfermedad_familiar', 
+    label: 'Enfermedad familiar', 
+    descripcion: 'No necesita aprobación • No descuenta saldo',
+    needsApproval: false,
+    descuentaSaldo: false
+  },
+  { 
+    value: 'maternidad_paternidad', 
+    label: 'Maternidad/Paternidad', 
+    descripcion: 'No necesita aprobación • No descuenta saldo',
+    needsApproval: false,
+    descuentaSaldo: false
+  },
+  { 
+    value: 'otro', 
+    label: 'Otro', 
+    descripcion: 'Necesita aprobación • No descuenta saldo',
+    needsApproval: true,
+    descuentaSaldo: false
+  },
 ];
 
 export function SolicitarAusenciaModal({
@@ -39,6 +69,8 @@ export function SolicitarAusenciaModal({
   const [medioDia, setMedioDia] = useState(false);
   const [descripcion, setDescripcion] = useState('');
   const [motivo, setMotivo] = useState('');
+  const [justificante, setJustificante] = useState<File | null>(null);
+  const [uploadingJustificante, setUploadingJustificante] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -60,22 +92,74 @@ export function SolicitarAusenciaModal({
     }
 
     try {
+      // Subir justificante a S3 si hay archivo
+      let justificanteUrl: string | undefined;
+      if (justificante) {
+        setUploadingJustificante(true);
+        const formData = new FormData();
+        formData.append('file', justificante);
+        formData.append('tipo', 'justificante');
+
+        const uploadResponse = await fetch('/api/upload', {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (!uploadResponse.ok) {
+          throw new Error('Error al subir el justificante');
+        }
+
+        const uploadData = await uploadResponse.json();
+        justificanteUrl = uploadData.url;
+        setUploadingJustificante(false);
+      }
+
+      // Construir payload solo con campos que tienen valores
+      const payload: any = {
+        tipo,
+        fechaInicio: fechaInicio.toISOString(),
+        fechaFin: fechaFin.toISOString(),
+        medioDia,
+      };
+
+      // Solo incluir descripcion si tiene valor
+      if (descripcion.trim()) {
+        payload.descripcion = descripcion.trim();
+      }
+
+      // Solo incluir motivo si tiene valor (o si es tipo "otro" y es requerido)
+      if (tipo === 'otro') {
+        if (!motivo.trim()) {
+          setError('El motivo es obligatorio para ausencias de tipo "Otro"');
+          setLoading(false);
+          return;
+        }
+        payload.motivo = motivo.trim();
+      } else if (motivo.trim()) {
+        payload.motivo = motivo.trim();
+      }
+
+      // Incluir justificante URL si se subió
+      if (justificanteUrl) {
+        payload.justificanteUrl = justificanteUrl;
+      }
+
       const response = await fetch('/api/ausencias', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          tipo,
-          fechaInicio: fechaInicio.toISOString(),
-          fechaFin: fechaFin.toISOString(),
-          medioDia,
-          descripcion: descripcion.trim() || null,
-          motivo: motivo.trim() || null,
-        }),
+        body: JSON.stringify(payload),
       });
 
       const data = await response.json();
 
       if (!response.ok) {
+        // Mostrar detalles de validación si están disponibles
+        if (data.details && Array.isArray(data.details)) {
+          const errores = data.details.map((d: any) => 
+            `${d.path?.join('.') || 'campo'}: ${d.message}`
+          ).join(', ');
+          throw new Error(data.error + ': ' + errores);
+        }
         throw new Error(data.error || 'Error al crear solicitud');
       }
 
@@ -89,6 +173,7 @@ export function SolicitarAusenciaModal({
       setMedioDia(false);
       setDescripcion('');
       setMotivo('');
+      setJustificante(null);
     } catch (err: any) {
       setError(err.message || 'Error al crear solicitud');
     } finally {
@@ -114,11 +199,26 @@ export function SolicitarAusenciaModal({
               <SelectContent>
                 {TIPOS_AUSENCIA.map((t) => (
                   <SelectItem key={t.value} value={t.value}>
-                    {t.label}
+                    <div className="flex flex-col">
+                      <span className="font-medium">{t.label}</span>
+                      <span className="text-xs text-gray-500">{t.descripcion}</span>
+                    </div>
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
+            {/* Información adicional del tipo seleccionado */}
+            {TIPOS_AUSENCIA.find((t) => t.value === tipo) && (
+              <p className="text-xs text-gray-600 mt-1.5 flex items-center gap-1">
+                <span className={TIPOS_AUSENCIA.find((t) => t.value === tipo)?.needsApproval ? 'text-yellow-600' : 'text-green-600'}>
+                  {TIPOS_AUSENCIA.find((t) => t.value === tipo)?.needsApproval ? '⏱ Necesita aprobación' : '✓ No necesita aprobación'}
+                </span>
+                <span className="text-gray-400">•</span>
+                <span className={TIPOS_AUSENCIA.find((t) => t.value === tipo)?.descuentaSaldo ? 'text-orange-600' : 'text-gray-500'}>
+                  {TIPOS_AUSENCIA.find((t) => t.value === tipo)?.descuentaSaldo ? '📊 Descuenta saldo' : 'No descuenta saldo'}
+                </span>
+              </p>
+            )}
           </div>
 
           {/* Saldo disponible (solo vacaciones) */}
@@ -224,6 +324,29 @@ export function SolicitarAusenciaModal({
             </div>
           )}
 
+          {/* Justificante (opcional) */}
+          <div>
+            <Label htmlFor="justificante">
+              Justificante (opcional)
+              {(tipo === 'enfermedad' || tipo === 'enfermedad_familiar' || tipo === 'maternidad_paternidad') && (
+                <span className="text-xs text-gray-500 ml-2">Recomendado para estos tipos de ausencia</span>
+              )}
+            </Label>
+            <Input
+              id="justificante"
+              type="file"
+              accept=".pdf,.jpg,.jpeg,.png"
+              onChange={(e) => setJustificante(e.target.files?.[0] || null)}
+              disabled={loading || uploadingJustificante}
+              className="cursor-pointer"
+            />
+            {justificante && (
+              <p className="text-xs text-gray-500 mt-1">
+                Archivo seleccionado: {justificante.name} ({(justificante.size / 1024).toFixed(1)} KB)
+              </p>
+            )}
+          </div>
+
           {/* Error */}
           {error && (
             <div className="bg-red-50 border border-red-200 rounded-lg p-3">
@@ -241,8 +364,8 @@ export function SolicitarAusenciaModal({
             >
               Cancelar
             </Button>
-            <Button type="submit" disabled={loading}>
-              {loading ? 'Enviando...' : 'Solicitar'}
+            <Button type="submit" disabled={loading || uploadingJustificante}>
+              {uploadingJustificante ? 'Subiendo justificante...' : loading ? 'Enviando...' : 'Solicitar'}
             </Button>
           </div>
         </form>

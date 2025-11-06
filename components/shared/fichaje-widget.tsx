@@ -10,7 +10,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { WidgetCard } from './widget-card';
 import { calcularHorasTrabajadas } from '@/lib/calculos/fichajes';
-import { formatTiempoTrabajado } from '@/lib/utils/formatters';
+import { formatTiempoTrabajado, formatearHorasMinutos } from '@/lib/utils/formatters';
 import type { FichajeEvento } from '@prisma/client';
 
 interface FichajeWidgetProps {
@@ -282,7 +282,7 @@ export function FichajeWidget({
             <div>
               <h3 className="text-[24px] font-bold text-gray-900">{getTituloEstado()}</h3>
               <p className="text-[11px] text-gray-500 mt-1">
-                {estadoActual === 'trabajando' && `${horasPorHacer.toFixed(1)}h restantes`}
+                {estadoActual === 'trabajando' && `${formatearHorasMinutos(horasPorHacer)} restantes`}
                 {estadoActual === 'en_pausa' && 'En descanso'}
                 {estadoActual === 'sin_fichar' && 'Listo para comenzar'}
                 {estadoActual === 'finalizado' && 'Día completado'}

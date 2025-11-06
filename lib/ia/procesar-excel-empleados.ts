@@ -2,8 +2,8 @@
 // IA - Procesar Excel de Empleados
 // ========================================
 
-import { getOpenAIClient, isOpenAIAvailable } from './client';
-import { callOpenAIWithConfig } from './models';
+import { isAnyProviderAvailable } from './core/client';
+import { callAIWithConfig } from './models';
 
 /**
  * Estructura de un empleado detectado por la IA
@@ -58,10 +58,10 @@ export interface RespuestaProcesamientoExcel {
 export async function mapearEmpleadosConIA(
   excelData: Record<string, any>[]
 ): Promise<RespuestaProcesamientoExcel> {
-  // Verificar que OpenAI está disponible
-  if (!isOpenAIAvailable()) {
-    // Si OpenAI no está configurado, usar mapeo básico por columnas comunes
-    console.warn('[mapearEmpleadosConIA] OpenAI no está configurado, usando mapeo básico');
+  // Verificar que hay algún proveedor de IA disponible
+  if (!isAnyProviderAvailable()) {
+    // Si no hay IA configurada, usar mapeo básico por columnas comunes
+    console.warn('[mapearEmpleadosConIA] No hay proveedores de IA configurados, usando mapeo básico');
     return mapeoBasicoSinIA(excelData);
   }
 
@@ -123,8 +123,8 @@ ${JSON.stringify(muestra, null, 2)}
 Procesa TODOS los ${excelData.length} registros, no solo la muestra.
 `;
 
-    // Llamar a la IA con la configuración específica
-    const completion = await callOpenAIWithConfig('procesar-excel-empleados', [
+    // Llamar a la IA con la configuración específica (usa cliente unificado con fallback)
+    const completion = await callAIWithConfig('procesar-excel-empleados', [
       {
         role: 'user',
         content: prompt,

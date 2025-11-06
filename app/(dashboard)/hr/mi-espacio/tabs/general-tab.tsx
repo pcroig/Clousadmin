@@ -10,15 +10,18 @@ import { Plus, Loader2, ChevronDown } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { toast } from 'sonner';
 import { LoadingButton } from '@/components/shared/loading-button';
+import { Combobox, type ComboboxOption } from '@/components/shared/combobox';
 
 interface GeneralTabProps {
   empleado: any;
   usuario: any;
   rol?: 'empleado' | 'hr_admin' | 'manager';
+  onFieldUpdate?: (field: string, value: any) => Promise<void>;
 }
 
-export function GeneralTab({ empleado, usuario, rol = 'empleado' }: GeneralTabProps) {
+export function GeneralTab({ empleado, usuario, rol = 'empleado', onFieldUpdate }: GeneralTabProps) {
   const isEmpleado = rol === 'empleado';
+  const isHrAdmin = rol === 'hr_admin';
 
   // Estados para datos del formulario
   const [formData, setFormData] = useState({
@@ -60,15 +63,27 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado' }: GeneralTabPr
   const [managers, setManagers] = useState<any[]>([]);
 
   // Estados para modales de crear nuevo
-  const [showNuevoPuestoModal, setShowNuevoPuestoModal] = useState(false);
   const [showNuevoEquipoModal, setShowNuevoEquipoModal] = useState(false);
-  const [nuevoPuesto, setNuevoPuesto] = useState({ nombre: '', descripcion: '' });
   const [nuevoEquipo, setNuevoEquipo] = useState({ nombre: '', descripcion: '', tipo: 'proyecto' });
 
   // Estados de carga
   const [saving, setSaving] = useState(false);
-  const [creatingPuesto, setCreatingPuesto] = useState(false);
   const [creatingEquipo, setCreatingEquipo] = useState(false);
+  
+  // Función helper para actualizar campos individualmente (guardado automático)
+  const handleFieldUpdate = async (field: string, value: any) => {
+    if (isEmpleado || !onFieldUpdate) {
+      // Si es empleado o no hay onFieldUpdate, usar el método anterior
+      return;
+    }
+    
+    try {
+      await onFieldUpdate(field, value);
+    } catch (error) {
+      console.error(`Error updating ${field}:`, error);
+      // El error ya se maneja en onFieldUpdate
+    }
+  };
 
   // Cargar datos de opciones
   useEffect(() => {
@@ -130,35 +145,29 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado' }: GeneralTabPr
     }
   }
 
-  async function handleCrearPuesto() {
-    if (!nuevoPuesto.nombre.trim()) {
-      toast.error('El nombre del puesto es requerido');
-      return;
-    }
-
-    setCreatingPuesto(true);
+  // Función para crear un nuevo puesto (usado por Combobox)
+  async function handleCreatePuesto(nombre: string): Promise<string | null> {
     try {
       const response = await fetch('/api/organizacion/puestos', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(nuevoPuesto),
+        body: JSON.stringify({ nombre }),
       });
 
-      if (response.ok) {
-        const puesto = await response.json();
-        setPuestos([...puestos, puesto]);
-        setFormData({ ...formData, puestoId: puesto.id });
-        setShowNuevoPuestoModal(false);
-        setNuevoPuesto({ nombre: '', descripcion: '' });
-        toast.success('Puesto creado correctamente');
-      } else {
-        toast.error('Error al crear puesto');
+      if (!response.ok) {
+        const error = await response.json();
+        toast.error(error.error || 'Error al crear puesto');
+        return null;
       }
+
+      const nuevoPuesto = await response.json();
+      setPuestos([...puestos, nuevoPuesto]);
+      toast.success('Puesto creado correctamente');
+      return nuevoPuesto.id;
     } catch (error) {
-      console.error('Error creating puesto:', error);
+      console.error('[GeneralTab] Error creating puesto:', error);
       toast.error('Error al crear puesto');
-    } finally {
-      setCreatingPuesto(false);
+      return null;
     }
   }
 
@@ -238,30 +247,37 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado' }: GeneralTabPr
   };
 
   const toggleEquipo = (equipoId: string) => {
+    let newEquipoIds: string[];
     if (formData.equipoIds.includes(equipoId)) {
-      setFormData({
-        ...formData,
-        equipoIds: formData.equipoIds.filter((id: string) => id !== equipoId),
-      });
+      newEquipoIds = formData.equipoIds.filter((id: string) => id !== equipoId);
     } else {
-      setFormData({
-        ...formData,
-        equipoIds: [...formData.equipoIds, equipoId],
-      });
+      newEquipoIds = [...formData.equipoIds, equipoId];
+    }
+    
+    setFormData({
+      ...formData,
+      equipoIds: newEquipoIds,
+    });
+    
+    // Guardar automáticamente si es HR Admin
+    if (isHrAdmin && onFieldUpdate) {
+      handleFieldUpdate('equipoIds', newEquipoIds);
     }
   };
 
   return (
     <div className="space-y-6">
-      {/* Botón Guardar Cambios */}
-      <div className="flex justify-end">
-        <LoadingButton
-          onClick={handleSave}
-          loading={saving}
-        >
-          {isEmpleado ? 'Solicitar cambios' : 'Guardar cambios'}
-        </LoadingButton>
-      </div>
+      {/* Botón Guardar Cambios - Solo para empleados */}
+      {isEmpleado && (
+        <div className="flex justify-end">
+          <LoadingButton
+            onClick={handleSave}
+            loading={saving}
+          >
+            Solicitar cambios
+          </LoadingButton>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Información Personal */}
@@ -274,6 +290,14 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado' }: GeneralTabPr
                 id="nif"
                 value={formData.nif}
                 onChange={(e) => setFormData({ ...formData, nif: e.target.value })}
+                onBlur={(e) => {
+                  if (isHrAdmin && onFieldUpdate) {
+                    const newValue = e.target.value || null;
+                    if (newValue !== (empleado.nif || null)) {
+                      handleFieldUpdate('nif', newValue);
+                    }
+                  }
+                }}
                 disabled={isEmpleado}
                 placeholder="No especificado"
               />
@@ -284,6 +308,14 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado' }: GeneralTabPr
                 id="nss"
                 value={formData.nss}
                 onChange={(e) => setFormData({ ...formData, nss: e.target.value })}
+                onBlur={(e) => {
+                  if (isHrAdmin && onFieldUpdate) {
+                    const newValue = e.target.value || null;
+                    if (newValue !== (empleado.nss || null)) {
+                      handleFieldUpdate('nss', newValue);
+                    }
+                  }
+                }}
                 disabled={isEmpleado}
                 placeholder="No especificado"
               />
@@ -295,6 +327,17 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado' }: GeneralTabPr
                 type="date"
                 value={formData.fechaNacimiento}
                 onChange={(e) => setFormData({ ...formData, fechaNacimiento: e.target.value })}
+                onBlur={(e) => {
+                  if (isHrAdmin && onFieldUpdate) {
+                    const newValue = e.target.value || null;
+                    const currentValue = empleado.fechaNacimiento 
+                      ? new Date(empleado.fechaNacimiento).toISOString().split('T')[0] 
+                      : null;
+                    if (newValue !== currentValue) {
+                      handleFieldUpdate('fechaNacimiento', newValue);
+                    }
+                  }
+                }}
                 disabled={isEmpleado}
               />
             </div>
@@ -302,7 +345,15 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado' }: GeneralTabPr
               <Label htmlFor="estadoCivil">Estado Civil</Label>
               <Select
                 value={formData.estadoCivil}
-                onValueChange={(value) => setFormData({ ...formData, estadoCivil: value })}
+                onValueChange={(value) => {
+                  setFormData({ ...formData, estadoCivil: value });
+                  if (isHrAdmin && onFieldUpdate) {
+                    const newValue = value || null;
+                    if (newValue !== (empleado.estadoCivil || null)) {
+                      handleFieldUpdate('estadoCivil', newValue);
+                    }
+                  }
+                }}
                 disabled={isEmpleado}
               >
                 <SelectTrigger>
@@ -324,6 +375,14 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado' }: GeneralTabPr
                 type="number"
                 value={formData.numeroHijos}
                 onChange={(e) => setFormData({ ...formData, numeroHijos: parseInt(e.target.value) || 0 })}
+                onBlur={(e) => {
+                  if (isHrAdmin && onFieldUpdate) {
+                    const newValue = parseInt(e.target.value) || 0;
+                    if (newValue !== (empleado.numeroHijos || 0)) {
+                      handleFieldUpdate('numeroHijos', newValue);
+                    }
+                  }
+                }}
                 disabled={isEmpleado}
                 min="0"
               />
@@ -332,7 +391,15 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado' }: GeneralTabPr
               <Label htmlFor="genero">Género</Label>
               <Select
                 value={formData.genero}
-                onValueChange={(value) => setFormData({ ...formData, genero: value })}
+                onValueChange={(value) => {
+                  setFormData({ ...formData, genero: value });
+                  if (isHrAdmin && onFieldUpdate) {
+                    const newValue = value || null;
+                    if (newValue !== (empleado.genero || null)) {
+                      handleFieldUpdate('genero', newValue);
+                    }
+                  }
+                }}
                 disabled={isEmpleado}
               >
                 <SelectTrigger>
@@ -369,6 +436,14 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado' }: GeneralTabPr
                 type="tel"
                 value={formData.telefono}
                 onChange={(e) => setFormData({ ...formData, telefono: e.target.value })}
+                onBlur={(e) => {
+                  if (isHrAdmin && onFieldUpdate) {
+                    const newValue = e.target.value || null;
+                    if (newValue !== (empleado.telefono || null)) {
+                      handleFieldUpdate('telefono', newValue);
+                    }
+                  }
+                }}
                 placeholder="No especificado"
               />
             </div>
@@ -378,6 +453,14 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado' }: GeneralTabPr
                 id="direccionCalle"
                 value={formData.direccionCalle}
                 onChange={(e) => setFormData({ ...formData, direccionCalle: e.target.value })}
+                onBlur={(e) => {
+                  if (isHrAdmin && onFieldUpdate) {
+                    const newValue = e.target.value || null;
+                    if (newValue !== (empleado.direccionCalle || null)) {
+                      handleFieldUpdate('direccionCalle', newValue);
+                    }
+                  }
+                }}
                 placeholder="No especificada"
               />
             </div>
@@ -388,6 +471,14 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado' }: GeneralTabPr
                   id="direccionNumero"
                   value={formData.direccionNumero}
                   onChange={(e) => setFormData({ ...formData, direccionNumero: e.target.value })}
+                  onBlur={(e) => {
+                    if (isHrAdmin && onFieldUpdate) {
+                      const newValue = e.target.value || null;
+                      if (newValue !== (empleado.direccionNumero || null)) {
+                        handleFieldUpdate('direccionNumero', newValue);
+                      }
+                    }
+                  }}
                   placeholder="No especificado"
                 />
               </div>
@@ -397,6 +488,14 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado' }: GeneralTabPr
                   id="direccionPiso"
                   value={formData.direccionPiso}
                   onChange={(e) => setFormData({ ...formData, direccionPiso: e.target.value })}
+                  onBlur={(e) => {
+                    if (isHrAdmin && onFieldUpdate) {
+                      const newValue = e.target.value || null;
+                      if (newValue !== (empleado.direccionPiso || null)) {
+                        handleFieldUpdate('direccionPiso', newValue);
+                      }
+                    }
+                  }}
                   placeholder="Opcional"
                 />
               </div>
@@ -408,6 +507,14 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado' }: GeneralTabPr
                   id="codigoPostal"
                   value={formData.codigoPostal}
                   onChange={(e) => setFormData({ ...formData, codigoPostal: e.target.value })}
+                  onBlur={(e) => {
+                    if (isHrAdmin && onFieldUpdate) {
+                      const newValue = e.target.value || null;
+                      if (newValue !== (empleado.codigoPostal || null)) {
+                        handleFieldUpdate('codigoPostal', newValue);
+                      }
+                    }
+                  }}
                   placeholder="No especificado"
                   maxLength={5}
                 />
@@ -418,6 +525,14 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado' }: GeneralTabPr
                   id="ciudad"
                   value={formData.ciudad}
                   onChange={(e) => setFormData({ ...formData, ciudad: e.target.value })}
+                  onBlur={(e) => {
+                    if (isHrAdmin && onFieldUpdate) {
+                      const newValue = e.target.value || null;
+                      if (newValue !== (empleado.ciudad || null)) {
+                        handleFieldUpdate('ciudad', newValue);
+                      }
+                    }
+                  }}
                   placeholder="No especificada"
                 />
               </div>
@@ -428,6 +543,14 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado' }: GeneralTabPr
                 id="direccionProvincia"
                 value={formData.direccionProvincia}
                 onChange={(e) => setFormData({ ...formData, direccionProvincia: e.target.value })}
+                onBlur={(e) => {
+                  if (isHrAdmin && onFieldUpdate) {
+                    const newValue = e.target.value || null;
+                    if (newValue !== (empleado.direccionProvincia || null)) {
+                      handleFieldUpdate('direccionProvincia', newValue);
+                    }
+                  }
+                }}
                 placeholder="No especificada"
               />
             </div>
@@ -438,7 +561,7 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado' }: GeneralTabPr
         <div className="bg-white rounded-lg border border-gray-200 p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Información Laboral</h3>
           <div className="space-y-4">
-            {/* Puesto con dropdown */}
+            {/* Puesto con Combobox sincronizado */}
             <div>
               <Label htmlFor="puesto">Puesto</Label>
               {isEmpleado ? (
@@ -447,37 +570,23 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado' }: GeneralTabPr
                   disabled
                 />
               ) : (
-                <Select
-                  value={formData.puestoId || 'sin-puesto'}
+                <Combobox
+                  options={puestos.map((p: any) => ({ value: p.id, label: p.nombre }))}
+                  value={formData.puestoId || undefined}
                   onValueChange={(value) => {
-                    if (value === 'nuevo-puesto') {
-                      setShowNuevoPuestoModal(true);
-                    } else {
-                      setFormData({ ...formData, puestoId: value === 'sin-puesto' ? '' : value });
+                    setFormData({ ...formData, puestoId: value || '' });
+                    if (isHrAdmin && onFieldUpdate) {
+                      const newValue = value || null;
+                      if (newValue !== (empleado.puestoId || null)) {
+                        handleFieldUpdate('puestoId', newValue);
+                      }
                     }
                   }}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Seleccionar puesto" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="sin-puesto">Sin puesto asignado</SelectItem>
-                    {puestos && puestos.length > 0 ? (
-                      puestos.map((puesto: any) => (
-                        <SelectItem key={puesto.id} value={puesto.id}>
-                          {puesto.nombre}
-                        </SelectItem>
-                      ))
-                    ) : (
-                      <SelectItem value="no-puestos" disabled>No hay puestos disponibles</SelectItem>
-                    )}
-                    <div className="border-t border-gray-200 my-1"></div>
-                    <SelectItem value="nuevo-puesto" className="text-blue-600 focus:text-blue-700">
-                      <Plus className="w-4 h-4 inline mr-2" />
-                      Añadir nuevo puesto
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
+                  placeholder="Seleccionar o crear puesto"
+                  emptyText="No se encontraron puestos."
+                  createText="Crear nuevo puesto"
+                  onCreateNew={handleCreatePuesto}
+                />
               )}
             </div>
 
@@ -565,7 +674,16 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado' }: GeneralTabPr
               ) : (
                 <Select
                   value={formData.managerId || 'sin-manager'}
-                  onValueChange={(value) => setFormData({ ...formData, managerId: value === 'sin-manager' ? '' : value })}
+                  onValueChange={(value) => {
+                    const newValue = value === 'sin-manager' ? '' : value;
+                    setFormData({ ...formData, managerId: newValue });
+                    if (isHrAdmin && onFieldUpdate) {
+                      const finalValue = newValue || null;
+                      if (finalValue !== (empleado.managerId || null)) {
+                        handleFieldUpdate('managerId', finalValue);
+                      }
+                    }
+                  }}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Seleccionar manager" />
@@ -589,6 +707,17 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado' }: GeneralTabPr
                 type="date"
                 value={formData.fechaAlta}
                 onChange={(e) => setFormData({ ...formData, fechaAlta: e.target.value })}
+                onBlur={(e) => {
+                  if (isHrAdmin && onFieldUpdate) {
+                    const newValue = e.target.value || null;
+                    const currentValue = empleado.fechaAlta 
+                      ? new Date(empleado.fechaAlta).toISOString().split('T')[0] 
+                      : null;
+                    if (newValue !== currentValue) {
+                      handleFieldUpdate('fechaAlta', newValue);
+                    }
+                  }
+                }}
                 disabled={isEmpleado}
               />
             </div>
@@ -597,15 +726,25 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado' }: GeneralTabPr
               <Label htmlFor="tipoContrato">Tipo de Contrato</Label>
               <Select
                 value={formData.tipoContrato}
-                onValueChange={(value) => setFormData({ ...formData, tipoContrato: value })}
+                onValueChange={(value) => {
+                  setFormData({ ...formData, tipoContrato: value });
+                  if (isHrAdmin && onFieldUpdate) {
+                    if (value !== (empleado.tipoContrato || 'indefinido')) {
+                      handleFieldUpdate('tipoContrato', value);
+                    }
+                  }
+                }}
                 disabled={isEmpleado}
               >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="administrador">Administrador</SelectItem>
+                  <SelectItem value="fijo_discontinuo">Fijo discontinuo</SelectItem>
                   <SelectItem value="indefinido">Indefinido</SelectItem>
                   <SelectItem value="temporal">Temporal</SelectItem>
+                  <SelectItem value="becario">Becario</SelectItem>
                   <SelectItem value="practicas">Prácticas</SelectItem>
                   <SelectItem value="obra_y_servicio">Obra y servicio</SelectItem>
                 </SelectContent>
@@ -639,6 +778,14 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado' }: GeneralTabPr
                 id="iban"
                 value={formData.iban}
                 onChange={(e) => setFormData({ ...formData, iban: e.target.value })}
+                onBlur={(e) => {
+                  if (isHrAdmin && onFieldUpdate) {
+                    const newValue = e.target.value || null;
+                    if (newValue !== (empleado.iban || null)) {
+                      handleFieldUpdate('iban', newValue);
+                    }
+                  }
+                }}
                 disabled={isEmpleado}
                 placeholder="ES00 0000 0000 0000 0000 0000"
               />
@@ -649,6 +796,14 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado' }: GeneralTabPr
                 id="titularCuenta"
                 value={formData.titularCuenta}
                 onChange={(e) => setFormData({ ...formData, titularCuenta: e.target.value })}
+                onBlur={(e) => {
+                  if (isHrAdmin && onFieldUpdate) {
+                    const newValue = e.target.value || null;
+                    if (newValue !== (empleado.titularCuenta || null)) {
+                      handleFieldUpdate('titularCuenta', newValue);
+                    }
+                  }
+                }}
                 disabled={isEmpleado}
                 placeholder="Nombre del titular"
               />
@@ -660,6 +815,15 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado' }: GeneralTabPr
                 type="number"
                 value={formData.salarioBrutoAnual}
                 onChange={(e) => setFormData({ ...formData, salarioBrutoAnual: parseFloat(e.target.value) || 0 })}
+                onBlur={(e) => {
+                  if (isHrAdmin && onFieldUpdate) {
+                    const newValue = parseFloat(e.target.value);
+                    const currentValue = empleado.salarioBrutoAnual || 0;
+                    if (!isNaN(newValue) && newValue !== currentValue) {
+                      handleFieldUpdate('salarioBrutoAnual', newValue);
+                    }
+                  }
+                }}
                 disabled={isEmpleado}
                 placeholder="0.00"
                 step="0.01"
@@ -672,6 +836,15 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado' }: GeneralTabPr
                 type="number"
                 value={formData.salarioBrutoMensual}
                 onChange={(e) => setFormData({ ...formData, salarioBrutoMensual: parseFloat(e.target.value) || 0 })}
+                onBlur={(e) => {
+                  if (isHrAdmin && onFieldUpdate) {
+                    const newValue = parseFloat(e.target.value);
+                    const currentValue = empleado.salarioBrutoMensual || 0;
+                    if (!isNaN(newValue) && newValue !== currentValue) {
+                      handleFieldUpdate('salarioBrutoMensual', newValue);
+                    }
+                  }
+                }}
                 disabled={isEmpleado}
                 placeholder="0.00"
                 step="0.01"
@@ -680,43 +853,6 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado' }: GeneralTabPr
           </div>
         </div>
       </div>
-
-      {/* Modal Crear Nuevo Puesto */}
-      <Dialog open={showNuevoPuestoModal} onOpenChange={setShowNuevoPuestoModal}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Crear Nuevo Puesto</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="nuevoPuestoNombre">Nombre del Puesto *</Label>
-              <Input
-                id="nuevoPuestoNombre"
-                value={nuevoPuesto.nombre}
-                onChange={(e) => setNuevoPuesto({ ...nuevoPuesto, nombre: e.target.value })}
-                placeholder="ej. Software Engineer"
-              />
-            </div>
-            <div>
-              <Label htmlFor="nuevoPuestoDescripcion">Descripción</Label>
-              <Input
-                id="nuevoPuestoDescripcion"
-                value={nuevoPuesto.descripcion}
-                onChange={(e) => setNuevoPuesto({ ...nuevoPuesto, descripcion: e.target.value })}
-                placeholder="Descripción del puesto (opcional)"
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowNuevoPuestoModal(false)} disabled={creatingPuesto}>
-              Cancelar
-            </Button>
-            <LoadingButton onClick={handleCrearPuesto} loading={creatingPuesto}>
-              Crear Puesto
-            </LoadingButton>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       {/* Modal Crear Nuevo Equipo */}
       <Dialog open={showNuevoEquipoModal} onOpenChange={setShowNuevoEquipoModal}>
@@ -773,3 +909,4 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado' }: GeneralTabPr
     </div>
   );
 }
+

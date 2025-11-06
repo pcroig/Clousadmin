@@ -1,86 +1,167 @@
 // ========================================
 // IA - Punto de Entrada Centralizado
 // ========================================
-// Este archivo exporta todo lo relacionado con IA/OpenAI
-// Instalación, configuración y funcionalidades centralizadas
-//
-// Uso básico:
-//   import { getOpenAIClient, MODELS } from '@/lib/ia';
-//
-// Uso por funcionalidad:
-//   import { cuadrarVacacionesIA } from '@/lib/ia/cuadrar-vacaciones';
+// Este archivo exporta todo lo relacionado con IA
+// Nueva arquitectura unificada con soporte multi-proveedor
 
 // ========================================
-// BASE COMÚN - Instalación y Configuración
+// CORE - Cliente y Tipos
 // ========================================
 
-/**
- * Cliente de IA con fallback automático
- * - Prioridad 1: OpenAI (GPT-4.1)
- * - Prioridad 2: Replicate (Llama 3.1 70B)
- *
- * @example
- * ```typescript
- * import { getAIClient, isAIAvailable } from '@/lib/ia';
- *
- * if (isAIAvailable()) {
- *   const client = getAIClient();
- *   const completion = await client.chat.completions.create({ ... });
- * }
- * ```
- */
 export {
-  getAIClient,
+  // Cliente unificado con fallback automático
+  callAI,
+  callAISafe,
+  callAIWithRetry,
+  callAIForJSON,
+  
+  // Detección de proveedores
+  getAvailableProviders,
+  isAnyProviderAvailable,
+  getPrimaryProvider,
+  getActiveProviderName,
+  
+  // Legacy compatibility
   isAIAvailable,
-  getActiveProvider,
-  resetAIClient,
-  // Funciones legacy (mantener compatibilidad)
-  getOpenAIClient,
-  isOpenAIAvailable,
-  resetOpenAIClient,
-} from './client';
+  getAIClient,
+} from './core/client';
 
-/**
- * Configuraciones de modelos y helpers
- * 
- * @example
- * ```typescript
- * import { MODELS, getModelConfig } from '@/lib/ia';
- * const config = getModelConfig('cuadrar-vacaciones');
- * ```
- */
 export {
-  MODELS,
-  getModelConfig,
-  getModelConfigOrDefault,
-  callAIWithConfig,
-  // Funciones legacy (mantener compatibilidad)
-  callOpenAIWithConfig,
-  type ModelName,
+  // Tipos
+  AIProvider,
+  MessageRole,
+  ContentType,
+  type AIMessage,
+  type AIResponse,
   type ModelConfig,
-} from './models';
+  type AICallOptions,
+  type AIResult,
+  type AISuccess,
+  type AIError,
+  type TokenUsage,
+  
+  // Type guards
+  isAISuccess,
+  isAIError,
+  isTextContent,
+  hasImageContent,
+} from './core/types';
 
-// ========================================
-// FUNCIONALIDADES ESPECÍFICAS
-// ========================================
-// Cada funcionalidad se importa desde su archivo específico:
-//   import { cuadrarVacacionesIA } from '@/lib/ia/cuadrar-vacaciones';
-//   import { clasificarNomina } from '@/lib/ia/clasificador-nominas';
-
-/**
- * Clasificador de Nóminas
- */
 export {
+  // Configuración de modelos
+  OPENAI_MODELS,
+  ANTHROPIC_MODELS,
+  GOOGLE_MODELS,
+  AIUseCase,
+  getModelForUseCase,
+  getConfigForUseCase,
+  createConfigForUseCase,
+  getFeatureConfig,
+  FEATURE_CONFIGS,
+  
+  // Helpers de costos
+  getApproximateCost,
+  calculateCallCost,
+} from './core/config';
+
+// ========================================
+// PATTERNS - Patrones Reutilizables
+// ========================================
+
+export {
+  // Extraction Pattern
+  extractStructuredData,
+  extractStructuredDataOrThrow,
+  extractList,
+  extractPartialData,
+  type ExtractionOptions,
+  type ExtractionResult,
+} from './patterns/extraction';
+
+export {
+  // Classification Pattern
+  classify,
+  classifySimple,
+  classifyMulti,
+  matchBasic,
+  type Candidate,
+  type ClassificationMatch,
+  type ClassificationResult,
+  type ClassificationOptions,
+} from './patterns/classification';
+
+export {
+  // Vision Pattern
+  analyzeDocument,
+  analyzeDocumentOrThrow,
+  extractTextFromDocument,
+  describeDocument,
+  validateDocument,
+  compareDocuments,
+  type DocumentAnalysisOptions,
+  type DocumentAnalysisResult,
+} from './patterns/vision';
+
+export {
+  // Generation Pattern
+  generateText,
+  generateTextOrThrow,
+  summarizeText,
+  rewriteText,
+  translateText,
+  expandText,
+  generateRecommendations,
+  analyzeAndEvaluate,
+  completeText,
+  generateEmail,
+  generateFAQAnswer,
+  type GenerationOptions,
+  type GenerationResult,
+} from './patterns/generation';
+
+// ========================================
+// FEATURES - Funcionalidades Específicas
+// ========================================
+
+export {
+  // Clasificador de Nóminas
   clasificarNomina,
   type EmpleadoCandidato,
   type MatchingResult,
 } from './clasificador-nominas';
 
+// ========================================
+// LEGACY EXPORTS - Compatibilidad
+// ========================================
+
 /**
- * Tipos comunes para funcionalidades de IA
+ * ⚠️ DEPRECATED: Exports legacy para compatibilidad con código antiguo
+ * 
+ * Para nuevo código, usar:
+ * - callAI() para llamadas unificadas con fallback automático
+ * - getAvailableProviders() para verificar qué proveedores están disponibles
+ * 
+ * Si necesitas acceso directo a un proveedor específico:
+ * - import { getOpenAIClient } from '@/lib/ia/core/providers/openai'
+ * - import { getAnthropicClient } from '@/lib/ia/core/providers/anthropic'
+ * - import { getGoogleAIClient } from '@/lib/ia/core/providers/google'
  */
-export type {
-  // Exportar tipos comunes si los hay
-} from './models';
 
+// Clients específicos por proveedor (uso avanzado)
+export {
+  getOpenAIClient,
+  isOpenAIAvailable,
+  resetOpenAIClient,
+} from './core/providers/openai';
 
+export {
+  getAnthropicClient,
+  isAnthropicAvailable,
+  resetAnthropicClient,
+} from './core/providers/anthropic';
+
+export {
+  getGoogleAIClient,
+  isGoogleAIAvailable,
+  resetGoogleAIClient,
+} from './core/providers/google';

@@ -94,6 +94,23 @@ export function formatTiempoTrabajado(diffMs: number): string {
 }
 
 /**
+ * Convierte horas decimales a formato "Xh Ym" (sin segundos)
+ * Ejemplo: 8.5 → "8h 30m"
+ */
+export function formatearHorasMinutos(horas: number | string | null | undefined): string {
+  if (horas === null || horas === undefined) return '0h 0m';
+  
+  const horasNum = typeof horas === 'string' ? parseFloat(horas) : horas;
+  
+  if (isNaN(horasNum)) return '0h 0m';
+  
+  const horasEnteras = Math.floor(horasNum);
+  const minutos = Math.round((horasNum - horasEnteras) * 60);
+  
+  return `${horasEnteras}h ${minutos}m`;
+}
+
+/**
  * Obtiene la variante de badge según el estado de una solicitud
  */
 export function getSolicitudBadgeVariant(estado: string): 'warning' | 'success' | 'destructive' | 'secondary' {
@@ -124,6 +141,8 @@ export function getSolicitudEstadoLabel(estado: string): string {
       return estado;
   }
 }
+
+
 
 
 

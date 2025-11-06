@@ -90,12 +90,35 @@ export async function POST(request: NextRequest) {
     // Verificar que el email no exista
     const existingUsuario = await prisma.usuario.findUnique({
       where: { email: body.email },
+      include: {
+        empleado: {
+          select: {
+            id: true,
+            nombre: true,
+            apellidos: true,
+            email: true,
+            activo: true,
+          },
+        },
+      },
     });
 
     if (existingUsuario) {
-      return handleApiError(
-        new Error('El email ya está en uso'),
-        'API POST /api/empleados'
+      // Si el usuario ya existe, devolver información del empleado existente
+      // para que el frontend pueda manejar el caso apropiadamente
+      return Response.json(
+        {
+          error: 'El email ya está en uso',
+          code: 'EMAIL_DUPLICADO',
+          empleadoExistente: existingUsuario.empleado ? {
+            id: existingUsuario.empleado.id,
+            nombre: existingUsuario.empleado.nombre,
+            apellidos: existingUsuario.empleado.apellidos,
+            email: existingUsuario.empleado.email,
+            activo: existingUsuario.empleado.activo,
+          } : null,
+        },
+        { status: 409 } // 409 Conflict es más apropiado que 500 para duplicados
       );
     }
 

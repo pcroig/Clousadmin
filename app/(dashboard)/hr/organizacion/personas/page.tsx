@@ -6,6 +6,7 @@ import { getSession } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import { PersonasClient } from './personas-client';
+import { decryptEmpleadoList } from '@/lib/empleado-crypto';
 
 // Server Component
 export default async function PersonasPage() {
@@ -26,7 +27,8 @@ export default async function PersonasPage() {
       apellidos: true,
       email: true,
       telefono: true,
-      puesto: true,
+      puesto: true, // Mantener para retrocompatibilidad
+      puestoId: true,
       activo: true,
       fotoUrl: true,
       nif: true,
@@ -41,6 +43,12 @@ export default async function PersonasPage() {
       iban: true,
       fechaAlta: true,
       salarioBrutoMensual: true,
+      puestoRelacion: {
+        select: {
+          id: true,
+          nombre: true,
+        },
+      },
       equipos: {
         select: {
           equipo: {
@@ -57,13 +65,16 @@ export default async function PersonasPage() {
     },
   });
 
-  const empleadosData = empleados.map((emp) => ({
+  // Desencriptar campos sensibles antes de pasar al componente
+  const empleadosDesencriptados = decryptEmpleadoList(empleados);
+
+  const empleadosData = empleadosDesencriptados.map((emp) => ({
     id: emp.id,
     nombre: `${emp.nombre} ${emp.apellidos}`,
     email: emp.email,
     telefono: emp.telefono || '',
     equipo: emp.equipos[0]?.equipo.nombre || 'Sin equipo',
-    puesto: emp.puesto || 'Sin puesto',
+    puesto: emp.puestoRelacion?.nombre || emp.puesto || 'Sin puesto', // Usar puestoRelacion primero, luego fallback a puesto deprecated
     activo: emp.activo,
     avatar: emp.fotoUrl || undefined,
     // Datos completos para detalles

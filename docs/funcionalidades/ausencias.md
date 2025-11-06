@@ -1,8 +1,8 @@
 # 🏖️ DOCUMENTACIÓN: GESTIÓN DE AUSENCIAS - ESTADO ACTUAL
 
-**Versión**: 3.0  
-**Fecha**: 2 Noviembre 2025  
-**Estado**: Sistema completo y operativo con Festivos y Calendario Laboral
+**Versión**: 3.1  
+**Fecha**: 27 Enero 2025  
+**Estado**: Sistema completo y operativo con Festivos, Calendario Laboral, Justificantes y Campañas para Empleados
 
 ---
 
@@ -20,10 +20,10 @@
 8. **Sistema de Festivos**: CRUD completo, importación automática de festivos nacionales
 9. **Calendario Laboral**: Configuración de días laborables por empresa, integrado en cálculos
 10. **Campañas de Vacaciones**: Sistema de cuadrado inteligente con IA
-
-### ⚠️ PENDIENTE
-
-1. **Widget saldo en dashboard empleado**: Mostrar Total/Usados/Pendientes/Disponibles
+11. **Justificantes**: Sistema de subida de documentos para ausencias (S3)
+12. **Selector de Tipos Mejorado**: Información visual sobre aprobación y descuento de saldo
+13. **Campañas para Empleados**: Widget y panel de campañas activas en vista de empleados
+14. **Vista de Personas Mejorada**: Tabla de ausencias en lugar de cards
 
 ---
 
@@ -74,6 +74,7 @@
 | `/api/festivos/[id]` | GET, PATCH, DELETE | ✅ **NUEVO** | CRUD individual de festivos |
 | `/api/festivos/importar-nacionales` | POST | ✅ **NUEVO** | Importar festivos nacionales automáticamente |
 | `/api/empresa/calendario-laboral` | GET, PATCH | ✅ **NUEVO** | Configurar días laborables de empresa |
+| `/api/upload` | POST | ✅ **NUEVO** | Subir archivos a S3 (justificantes, documentos) |
 
 #### ✅ IMPLEMENTADOS (Organización)
 
@@ -127,12 +128,16 @@
 - ✅ Vista tabla de ausencias del empleado
 - ✅ Modal solicitar nueva ausencia
 - ✅ Saldo de vacaciones
+- ✅ Panel de campañas de vacaciones activas (expandible/colapsable)
+- ✅ Muestra estado de participación en campañas
 
 #### ✅ `/hr/organizacion/personas/[id]` (Tab Ausencias)
 
 **Implementado**:
-- ✅ Tabla simple de ausencias
-- ✅ Modal editar ausencia al hacer click
+- ✅ Tabla completa de ausencias (reemplazó cards de Próximas/Pasadas)
+- ✅ Columnas: Tipo, Fecha Inicio, Fecha Fin, Días, Estado
+- ✅ Ordenadas por fecha más reciente primero
+- ✅ Click en fila para ver detalles/editar
 - ✅ Usa `Dialog` de shadcn/ui (consistente)
 
 ---
@@ -141,8 +146,12 @@
 
 #### ✅ `SolicitarAusenciaModal`
 - ✅ Implementado y funcional
-- ✅ Usa Popover de shadcn/ui (ya instalado)
+- ✅ Usa Dialog de shadcn/ui
 - ✅ Validación de saldo
+- ✅ Selector de tipos con información detallada (aprobación y descuento de saldo)
+- ✅ Campo de upload de justificante (opcional, recomendado para tipos sin aprobación)
+- ✅ Soporte para archivos PDF, JPG, PNG (máx 5MB)
+- ✅ Subida a S3 antes de crear la ausencia
 
 #### ✅ `GestionarAusenciasModal`
 - ✅ **RECIÉN CREADO** - Tab Saldo funcional
@@ -151,6 +160,16 @@
 #### ✅ `FechaCalendar`
 - ✅ Componente reutilizable
 - ✅ Usado en ausencias empleado y widgets
+
+#### ✅ `CampanasVacacionesWidget`
+- ✅ Widget pequeño para dashboard de empleado
+- ✅ Muestra campaña activa si existe
+- ✅ Estado de participación del empleado
+- ✅ Botón para ver detalles
+
+#### ✅ `AusenciasWidget`
+- ✅ Botón actualizado: "Solicitar ausencia" (antes "Abrir ausencia")
+- ✅ Botón con bordes (variant="outline")
 
 ---
 
@@ -200,12 +219,14 @@ const diasPendientes = ausencias
 ### Flujo Empleado
 
 1. **Solicitar Ausencia**
-   - Empleado accede a `/empleado/mi-espacio` → Tab Ausencias
-   - Click "Nueva Ausencia"
-   - Completa formulario (tipo, fechas, motivo si aplica)
+   - Empleado accede a `/empleado/mi-espacio` → Tab Ausencias o widget de ausencias
+   - Click "Solicitar ausencia" (botón con bordes)
+   - Selecciona tipo de ausencia (con información visual sobre aprobación y descuento)
+   - Completa formulario (tipo, fechas, motivo si aplica, descripción)
+   - **Opcional**: Sube justificante (recomendado para enfermedad, enfermedad_familiar, maternidad_paternidad)
    - Sistema valida saldo disponible (si es vacaciones)
-   - Se crea ausencia con estado `pendiente_aprobacion`
-   - Saldo pendiente se incrementa automáticamente
+   - Se crea ausencia con estado `pendiente_aprobacion` (o directamente aprobada según tipo)
+   - Saldo pendiente se incrementa automáticamente (si descuenta saldo)
 
 2. **Ver Ausencias Propias**
    - Tab "Próximas": Ausencias con fechaFin >= hoy y estados `pendiente_aprobacion`, `en_curso`, `auto_aprobada`
@@ -242,9 +263,10 @@ const diasPendientes = ausencias
 
 5. **Editar Ausencia**
    - Desde tabla o desde perfil de empleado
-   - Permite modificar: tipo, fechas, motivo, descripción, medio día
+   - Permite modificar: tipo, fechas, motivo, descripción, medio día, **justificante**
    - Recalcula días automáticamente
    - Valida saldo si cambia número de días
+   - Permite subir/actualizar justificante después de crear la ausencia
 
 ---
 
@@ -253,6 +275,13 @@ const diasPendientes = ausencias
 ### Solicitar Ausencia (Empleado)
 
 ```typescript
+// POST /api/upload (opcional, si hay justificante)
+FormData:
+  - file: File (PDF, JPG, PNG, máx 5MB)
+  - tipo: "justificante"
+
+// Respuesta: { url: "https://bucket.s3.../justificante_xxx.pdf" }
+
 // POST /api/ausencias
 {
   "tipo": "vacaciones",
@@ -260,15 +289,30 @@ const diasPendientes = ausencias
   "fechaFin": "2025-12-05",
   "motivo": "Descanso",
   "descripcion": "Vacaciones de Navidad",
-  "medioDia": false
+  "medioDia": false,
+  "justificanteUrl": "https://bucket.s3.../justificante_xxx.pdf" // opcional
 }
 
 // Sistema automáticamente:
 // 1. Calcula días naturales y laborables
-// 2. Valida saldo disponible
-// 3. Crea ausencia con estado 'pendiente_aprobacion'
-// 4. Incrementa diasPendientes en saldo
+// 2. Valida saldo disponible (si tipo = 'vacaciones')
+// 3. Crea ausencia con estado:
+//    - 'pendiente_aprobacion' para 'vacaciones' y 'otro'
+//    - Estado directo aprobado para 'enfermedad', 'enfermedad_familiar', 'maternidad_paternidad'
+// 4. Incrementa diasPendientes en saldo (si descuenta saldo)
 ```
+
+### Tipos de Ausencia y Reglas
+
+| Tipo | Necesita Aprobación | Descuenta Saldo | Auto-aprobación IA |
+|------|---------------------|-----------------|---------------------|
+| **Vacaciones** | ✅ Sí | ✅ Sí | Solo después de 2 días sin aprobar |
+| **Enfermedad** | ❌ No | ❌ No | Directo (sin aprobación) |
+| **Enfermedad familiar** | ❌ No | ❌ No | Directo (sin aprobación) |
+| **Maternidad/Paternidad** | ❌ No | ❌ No | Directo (sin aprobación) |
+| **Otro** | ✅ Sí | ❌ No | Solo después de 2 días sin aprobar |
+
+**Nota sobre auto-aprobación**: Solo aplica a tipos que necesitan aprobación (`vacaciones`, `otro`). Después de 2 días sin aprobar/rechazar, el sistema IA clasifica y puede auto-aprobar según criterios.
 
 ### Aprobar Ausencia (HR)
 
@@ -292,16 +336,79 @@ const diasPendientes = ausencias
   "tipo": "vacaciones",
   "fechaInicio": "2025-12-01",
   "fechaFin": "2025-12-03", // Cambio: menos días
-  "medioDia": false
+  "medioDia": false,
+  "justificanteUrl": "https://bucket.s3.../nuevo_justificante.pdf" // opcional, actualizar
 }
 
 // Sistema automáticamente:
 // 1. Recalcula días solicitados
 // 2. Actualiza saldo si cambió número de días
 // 3. Valida saldo suficiente
+// 4. Actualiza justificante si se proporcionó nueva URL
 ```
 
 ---
+
+## 📄 SISTEMA DE JUSTIFICANTES
+
+### Funcionalidad
+
+El sistema permite subir justificantes (documentos) para ausencias, especialmente útil para tipos que no requieren aprobación.
+
+### Características
+
+- **Tipos de archivo permitidos**: PDF, JPG, PNG
+- **Tamaño máximo**: 5MB
+- **Almacenamiento**: AWS S3
+- **Momento de subida**: 
+  - Al crear la ausencia (recomendado para tipos sin aprobación)
+  - Al editar una ausencia existente
+
+### Flujo de Upload
+
+1. **Usuario selecciona archivo** en el formulario
+2. **Sistema valida** tipo y tamaño
+3. **Upload a S3** mediante `/api/upload`
+4. **URL almacenada** en campo `justificanteUrl` de la ausencia
+5. **Disponible para HR** para revisión
+
+### Endpoint de Upload
+
+**POST /api/upload**
+- Body: `FormData` con `file` y `tipo`
+- Validaciones: tipo de archivo, tamaño máximo
+- Retorna: URL del archivo en S3
+
+### Recomendaciones por Tipo
+
+- **Enfermedad**: Justificante recomendado (médico)
+- **Enfermedad familiar**: Justificante recomendado (médico)
+- **Maternidad/Paternidad**: Justificante recomendado (documentación oficial)
+- **Vacaciones**: Justificante opcional
+- **Otro**: Justificante opcional
+
+## 🎯 CAMPAÑAS DE VACACIONES PARA EMPLEADOS
+
+### Vista en Dashboard
+
+- **Widget pequeño**: `CampanasVacacionesWidget`
+- Muestra campaña activa si existe
+- Estado de participación del empleado
+- Botón para ver detalles
+
+### Vista en Pantalla de Ausencias
+
+- **Panel expandible**: Similar al de HR pero adaptado
+- Muestra todas las campañas activas
+- Información de fechas objetivo
+- Estado de participación (Participando/Pendiente/Sin participar)
+- Botón "Ver detalles" para cada campaña
+
+### Integración
+
+- Las campañas se obtienen automáticamente al cargar la página
+- Se filtran por empresa y estado 'activa'
+- Se incluye la preferencia del empleado si existe
 
 ## 📝 PRÓXIMAS MEJORAS
 
@@ -327,6 +434,11 @@ const diasPendientes = ausencias
    - Notificar a HR al crear nueva ausencia
    - Notificar a empleado al aprobar/rechazar
    - Integrar con sistema de notificaciones existente
+
+5. **Visualización de justificantes**
+   - Ver justificante desde la vista de ausencia
+   - Descargar justificante
+   - Preview de imágenes
 
 ---
 
@@ -510,11 +622,16 @@ Todas las funciones de cálculo de días usan la configuración:
 - API Masivo: `app/api/ausencias/actualizar-masivo/route.ts`
 - UI HR: `app/(dashboard)/hr/horario/ausencias/ausencias-client.tsx`
 - UI Empleado: `app/(dashboard)/empleado/mi-espacio/tabs/ausencias-tab.tsx`
+- UI Empleado Ausencias: `app/(dashboard)/empleado/horario/ausencias/ausencias-empleado-client.tsx`
 - Modal Solicitar: `components/empleado/solicitar-ausencia-modal.tsx`
 - Modal Gestionar: `app/(dashboard)/hr/horario/ausencias/gestionar-ausencias-modal.tsx`
+- Widget Ausencias: `components/shared/ausencias-widget.tsx`
+- Widget Campañas: `components/empleado/campanas-vacaciones-widget.tsx`
+- API Upload: `app/api/upload/route.ts`
+- Validaciones: `lib/validaciones/schemas.ts` (ausenciaCreateSchema, ausenciaUpdateSchema)
 
 ---
 
-**Última actualización**: 2 Noviembre 2025
-**Estado**: Sistema completo y operativo con Estados Unificados, Festivos y Calendario Laboral
+**Última actualización**: 27 Enero 2025
+**Estado**: Sistema completo y operativo con Estados Unificados, Festivos, Calendario Laboral, Justificantes y Campañas para Empleados
 

@@ -5,6 +5,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { ArrowLeft, User, Edit2, Calendar, ChevronRight } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -27,12 +28,14 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import Link from 'next/link';
 import { FechaCalendar } from '@/components/shared/fecha-calendar';
 import { FichajesTab as FichajesTabShared } from '../../../mi-espacio/tabs/fichajes-tab';
 import { GeneralTab as GeneralTabShared } from '../../../mi-espacio/tabs/general-tab';
 import { toast } from 'sonner';
 import { LoadingButton } from '@/components/shared/loading-button';
+import { DarDeBajaModal } from '@/components/hr/DarDeBajaModal';
 
 interface EmpleadoDetailClientProps {
   empleado: any; // TODO: Type properly
@@ -40,6 +43,7 @@ interface EmpleadoDetailClientProps {
 }
 
 export function EmpleadoDetailClient({ empleado, usuario }: EmpleadoDetailClientProps) {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState('general');
 
   // Función helper para actualizar campos del empleado
@@ -57,8 +61,8 @@ export function EmpleadoDetailClient({ empleado, usuario }: EmpleadoDetailClient
       }
 
       toast.success('Campo actualizado correctamente');
-      // Opcional: recargar la página para reflejar cambios
-      // window.location.reload();
+      // Recargar la página para reflejar cambios (especialmente importante para puesto)
+      router.refresh();
     } catch (error) {
       console.error(`Error updating ${field}:`, error);
       toast.error(error instanceof Error ? error.message : 'Error al actualizar campo');
@@ -125,7 +129,7 @@ export function EmpleadoDetailClient({ empleado, usuario }: EmpleadoDetailClient
 
       {/* Content */}
       <div className="flex-1 min-h-0 overflow-y-auto">
-        {activeTab === 'general' && <GeneralTabShared empleado={empleado} usuario={usuario} rol="hr_admin" />}
+        {activeTab === 'general' && <GeneralTabShared empleado={empleado} usuario={usuario} rol="hr_admin" onFieldUpdate={handleFieldUpdate} />}
         {activeTab === 'fichajes' && <FichajesTabShared empleadoId={empleado.id} />}
         {activeTab === 'ausencias' && <AusenciasTab empleado={empleado} />}
         {activeTab === 'contratos' && <ContratosTab empleado={empleado} onFieldUpdate={handleFieldUpdate} />}
@@ -188,24 +192,8 @@ function AusenciasTab({ empleado }: any) {
     });
   }
 
-  const proximasAusencias = ausencias
-    .filter((a) => {
-      const fechaFin = new Date(a.fechaFin);
-      const hoy = new Date();
-      hoy.setHours(0, 0, 0, 0);
-      fechaFin.setHours(0, 0, 0, 0);
-      return fechaFin >= hoy && (a.estado === 'pendiente_aprobacion' || a.estado === 'en_curso' || a.estado === 'auto_aprobada');
-    })
-    .sort((a, b) => new Date(a.fechaInicio).getTime() - new Date(b.fechaInicio).getTime());
-
-  const ausenciasPasadas = ausencias
-    .filter((a) => {
-      const fechaFin = new Date(a.fechaFin);
-      const hoy = new Date();
-      hoy.setHours(0, 0, 0, 0);
-      fechaFin.setHours(0, 0, 0, 0);
-      return fechaFin < hoy && (a.estado === 'completada' || a.estado === 'auto_aprobada');
-    })
+  // Ordenar ausencias por fecha (más recientes primero)
+  const ausenciasOrdenadas = ausencias
     .sort((a, b) => new Date(b.fechaInicio).getTime() - new Date(a.fechaInicio).getTime());
 
   function getEstadoBadge(estado: string) {
@@ -264,80 +252,53 @@ function AusenciasTab({ empleado }: any) {
         </CardContent>
       </Card>
 
-      {/* Card de Próximas/Pasadas Ausencias con Calendario */}
-      <Card className="p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Ausencias de {empleado.nombre}</h3>
-
-        <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'proximas' | 'pasadas')} className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="proximas">Próximas</TabsTrigger>
-            <TabsTrigger value="pasadas">Pasadas</TabsTrigger>
-          </TabsList>
-          <TabsContent value="proximas" className="mt-4 space-y-3">
-            {loading ? (
-              <p className="text-sm text-gray-500 text-center py-4">Cargando...</p>
-            ) : proximasAusencias.length === 0 ? (
-                <p className="text-sm text-gray-500 text-center py-4">No hay ausencias próximas</p>
-              ) : (
-              proximasAusencias.map((ausencia) => {
+      {/* Tabla de Ausencias */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base font-semibold">Ausencias de {empleado.nombre}</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {loading ? (
+            <p className="text-sm text-gray-500 text-center py-4">Cargando...</p>
+          ) : ausencias.length === 0 ? (
+            <p className="text-sm text-gray-500 text-center py-8">No hay ausencias registradas</p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Tipo</TableHead>
+                  <TableHead>Fecha Inicio</TableHead>
+                  <TableHead>Fecha Fin</TableHead>
+                  <TableHead className="text-center">Días</TableHead>
+                  <TableHead>Estado</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {ausenciasOrdenadas.map((ausencia) => {
                   const fechaInicio = new Date(ausencia.fechaInicio);
                   const fechaFin = new Date(ausencia.fechaFin);
-                  const esMismoDia = fechaInicio.toDateString() === fechaFin.toDateString();
-
+                  
                   return (
-                  <div key={ausencia.id} className="flex items-center gap-3 p-2 border rounded-md">
-                      <div className="flex items-center gap-2">
-                        <FechaCalendar date={fechaInicio} />
-                        {!esMismoDia && (
-                          <>
-                          <ChevronRight className="w-4 h-4 text-gray-400" />
-                            <FechaCalendar date={fechaFin} />
-                          </>
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-900">{getTipoLabel(ausencia.tipo)}</p>
-                      <p className="text-xs text-gray-500">{ausencia.diasSolicitados} {ausencia.diasSolicitados === 1 ? 'día' : 'días'}</p>
-                      </div>
-                    {getEstadoBadge(ausencia.estado)}
-                    </div>
+                    <TableRow 
+                      key={ausencia.id} 
+                      className="cursor-pointer hover:bg-gray-50"
+                      onClick={() => {
+                        // Aquí podrías abrir un modal para editar si lo deseas
+                        console.log('Ausencia seleccionada:', ausencia.id);
+                      }}
+                    >
+                      <TableCell className="font-medium">{getTipoLabel(ausencia.tipo)}</TableCell>
+                      <TableCell>{fechaInicio.toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' })}</TableCell>
+                      <TableCell>{fechaFin.toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' })}</TableCell>
+                      <TableCell className="text-center">{ausencia.diasSolicitados}</TableCell>
+                      <TableCell>{getEstadoBadge(ausencia.estado)}</TableCell>
+                    </TableRow>
                   );
-                })
-              )}
-          </TabsContent>
-          <TabsContent value="pasadas" className="mt-4 space-y-3">
-            {loading ? (
-              <p className="text-sm text-gray-500 text-center py-4">Cargando...</p>
-            ) : ausenciasPasadas.length === 0 ? (
-              <p className="text-sm text-gray-500 text-center py-4">No hay ausencias pasadas</p>
-            ) : (
-              ausenciasPasadas.map((ausencia) => {
-                const fechaInicio = new Date(ausencia.fechaInicio);
-                const fechaFin = new Date(ausencia.fechaFin);
-                const esMismoDia = fechaInicio.toDateString() === fechaFin.toDateString();
-
-                return (
-                  <div key={ausencia.id} className="flex items-center gap-3 p-2 border rounded-md">
-                    <div className="flex items-center gap-2">
-                      <FechaCalendar date={fechaInicio} />
-                      {!esMismoDia && (
-                        <>
-                          <ChevronRight className="w-4 h-4 text-gray-400" />
-                          <FechaCalendar date={fechaFin} />
-                        </>
-                      )}
-          </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-900">{getTipoLabel(ausencia.tipo)}</p>
-                      <p className="text-xs text-gray-500">{ausencia.diasSolicitados} {ausencia.diasSolicitados === 1 ? 'día' : 'días'}</p>
-            </div>
-                    {getEstadoBadge(ausencia.estado)}
-          </div>
-                );
-              })
-            )}
-          </TabsContent>
-        </Tabs>
+                })}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
       </Card>
     </div>
   );
@@ -366,8 +327,7 @@ function ContratosTab({ empleado, onFieldUpdate }: { empleado: any; onFieldUpdat
   const [fechaFin, setFechaFin] = useState(
     empleado.contratos?.[0]?.fechaFin ? new Date(empleado.contratos[0].fechaFin).toISOString().split('T')[0] : ''
   );
-  const [showFinalizarDialog, setShowFinalizarDialog] = useState(false);
-  const [finalizando, setFinalizando] = useState(false);
+  const [showDarDeBajaModal, setShowDarDeBajaModal] = useState(false);
 
   const contratoActual = empleado.contratos?.[0] || {};
 
@@ -437,48 +397,25 @@ function ContratosTab({ empleado, onFieldUpdate }: { empleado: any; onFieldUpdat
     }
   }
 
-  async function handleFinalizarContrato() {
-    if (!contratoActual.id) {
-      toast.error('No hay contrato activo para finalizar');
-      return;
-    }
-
-    setFinalizando(true);
-    try {
-      const response = await fetch(`/api/contratos/${contratoActual.id}/finalizar`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          fechaFin: new Date().toISOString().split('T')[0],
-        }),
-      });
-
-      if (response.ok) {
-        toast.success('Contrato finalizado correctamente. El empleado ha sido desactivado.');
-        setShowFinalizarDialog(false);
-        window.location.reload();
-      } else {
-        const error = await response.json();
-        toast.error(`Error: ${error.error || 'Error al finalizar contrato'}`);
-      }
-    } catch (error) {
-      console.error('Error finalizando contrato:', error);
-      toast.error('Error al finalizar contrato');
-    } finally {
-      setFinalizando(false);
-    }
-  }
+  // Callback cuando se complete el proceso de dar de baja
+  const handleDarDeBajaSuccess = () => {
+    toast.success('Proceso de baja completado correctamente');
+    setTimeout(() => {
+      window.location.reload();
+    }, 1000);
+  };
 
   return (
     <div className="space-y-6 max-w-6xl">
-      {/* Header con botón Finalizar Contrato */}
+      {/* Header con botón Dar de Baja */}
       <div className="flex justify-end mb-4">
         <Button
           variant="destructive"
-          onClick={() => setShowFinalizarDialog(true)}
+          onClick={() => setShowDarDeBajaModal(true)}
+          disabled={empleado.estadoEmpleado === 'baja' || !empleado.activo}
           className="bg-red-600 hover:bg-red-700"
         >
-          Finalizar Contrato
+          {empleado.estadoEmpleado === 'baja' ? 'Empleado dado de baja' : 'Dar de Baja'}
         </Button>
       </div>
 
@@ -517,8 +454,11 @@ function ContratosTab({ empleado, onFieldUpdate }: { empleado: any; onFieldUpdat
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="administrador">Administrador</SelectItem>
+                  <SelectItem value="fijo_discontinuo">Fijo discontinuo</SelectItem>
                   <SelectItem value="indefinido">Indefinido</SelectItem>
                   <SelectItem value="temporal">Temporal</SelectItem>
+                  <SelectItem value="becario">Becario</SelectItem>
                   <SelectItem value="practicas">Prácticas</SelectItem>
                   <SelectItem value="obra_y_servicio">Obra y servicio</SelectItem>
                 </SelectContent>
@@ -577,18 +517,23 @@ function ContratosTab({ empleado, onFieldUpdate }: { empleado: any; onFieldUpdat
           <div className="space-y-3">
                         <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Categoría profesional</label>                                                     
-              <input
-                type="text"
-                defaultValue={empleado.categoriaProfesional || ''}
-                placeholder="No informado"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                onBlur={(e) => {
-                  const newValue = e.target.value;
-                  if (newValue !== (empleado.categoriaProfesional || '')) {
-                    onFieldUpdate('categoriaProfesional', newValue || null);
-                  }
+              <Select
+                value={empleado.categoriaProfesional || ''}
+                onValueChange={(value) => {
+                  onFieldUpdate('categoriaProfesional', value || null);
                 }}
-              />
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Seleccionar" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="directivo">Directivo</SelectItem>
+                  <SelectItem value="mando_intermedio">Mando intermedio</SelectItem>
+                  <SelectItem value="tecnico">Técnico</SelectItem>
+                  <SelectItem value="trabajador_cualificado">Trabajador cualificado</SelectItem>
+                  <SelectItem value="trabajador_baja_cualificacion">Trabajador con baja cualificación</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Grupo de cotización</label>                                                       
@@ -607,11 +552,23 @@ function ContratosTab({ empleado, onFieldUpdate }: { empleado: any; onFieldUpdat
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Nivel de educación</label>
-              <input
-                type="text"
-                placeholder="No informado"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-              />
+              <Select
+                value={empleado.nivelEducacion || ''}
+                onValueChange={(value) => {
+                  onFieldUpdate('nivelEducacion', value || null);
+                }}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Seleccionar" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="nivel_basico">Nivel Básico</SelectItem>
+                  <SelectItem value="eso_equivalente">ESO o Equivalente</SelectItem>
+                  <SelectItem value="bachillerato_grado_medio">Bachillerato o Grado Medio</SelectItem>
+                  <SelectItem value="formacion_profesional_superior">Formación Profesional Superior</SelectItem>
+                  <SelectItem value="educacion_universitaria_postgrado">Educación Universitaria y Postgrado</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Contrato a distancia</label>
@@ -844,47 +801,19 @@ function ContratosTab({ empleado, onFieldUpdate }: { empleado: any; onFieldUpdat
         )}
       </div>
 
-      {/* Dialog Finalizar Contrato */}
-      <Dialog open={showFinalizarDialog} onOpenChange={setShowFinalizarDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Finalizar Contrato</DialogTitle>
-          </DialogHeader>
-          <div className="py-4">
-            <p className="text-sm text-gray-600 mb-4">
-              ¿Estás seguro de que deseas finalizar el contrato de{' '}
-              <strong>{empleado.nombre} {empleado.apellidos}</strong>?
-            </p>
-            <p className="text-sm text-red-600 mb-2">
-              Esta acción:
-            </p>
-            <ul className="text-sm text-gray-600 list-disc list-inside mb-4 space-y-1">
-              <li>Marcará la fecha de fin del contrato</li>
-              <li>Desactivará el empleado</li>
-              <li>Deshabilitará el acceso a la plataforma</li>
-            </ul>
-            <p className="text-sm font-semibold text-red-600">
-              Esta acción no se puede deshacer.
-            </p>
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setShowFinalizarDialog(false)}
-              disabled={finalizando}
-            >
-              Cancelar
-            </Button>
-            <LoadingButton
-              variant="destructive"
-              onClick={handleFinalizarContrato}
-              loading={finalizando}
-            >
-              Finalizar Contrato
-            </LoadingButton>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* Modal Dar de Baja */}
+      <DarDeBajaModal
+        open={showDarDeBajaModal}
+        onOpenChange={setShowDarDeBajaModal}
+        empleado={{
+          id: empleado.id,
+          nombre: empleado.nombre,
+          apellidos: empleado.apellidos,
+          fechaAlta: empleado.fechaAlta,
+        }}
+        contratoId={contratoActual.id || null}
+        onSuccess={handleDarDeBajaSuccess}
+      />
     </div>
   );
 }
@@ -962,4 +891,5 @@ function DocumentosTab({ empleado }: any) {
     </div>
   );
 }
+
 

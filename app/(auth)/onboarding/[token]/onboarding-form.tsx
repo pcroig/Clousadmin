@@ -4,7 +4,7 @@
 // Onboarding Form - Multi-Step Employee Data Collection
 // ========================================
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -15,11 +15,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Empleado } from '@prisma/client';
-import { ChevronLeft, ChevronRight, Check } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Upload, User } from 'lucide-react';
 import type { DatosTemporales, ProgresoOnboarding } from '@/lib/onboarding';
 import { DocumentUploader } from '@/components/shared/document-uploader';
 import { DocumentList } from '@/components/shared/document-list';
+import { validarIBAN } from '@/lib/validaciones/iban';
 
 interface OnboardingFormProps {
   token: string;
@@ -28,7 +30,7 @@ interface OnboardingFormProps {
   datosTemporales: DatosTemporales | null;
 }
 
-type Paso = 1 | 2 | 3;
+type Paso = 0 | 1 | 2 | 3;
 
 // Mapeo de nombres de campos a etiquetas en español
 const campoLabels: Record<string, string> = {
@@ -43,6 +45,8 @@ const campoLabels: Record<string, string> = {
   direccionProvincia: 'Provincia',
   estadoCivil: 'Estado Civil',
   numeroHijos: 'Número de Hijos',
+  iban: 'IBAN',
+  titularCuenta: 'Titular de la cuenta',
 };
 
 // Función helper para obtener el label de un campo
@@ -57,13 +61,26 @@ export function OnboardingForm({
   datosTemporales: datosInicial,
 }: OnboardingFormProps) {
   // Estado del formulario
-  const [pasoActual, setPasoActual] = useState<Paso>(
-    progresoInicial.datos_documentos ? 3 : progresoInicial.datos_bancarios ? 2 : progresoInicial.datos_personales ? 2 : 1
-  );
+  const [pasoActual, setPasoActual] = useState<Paso>(() => {
+    // Determinar paso inicial basado en progreso
+    if (!progresoInicial.credenciales_completadas) return 0;
+    if (!progresoInicial.datos_personales) return 1;
+    if (!progresoInicial.datos_bancarios) return 2;
+    if (!progresoInicial.datos_documentos) return 3;
+    return 3;
+  });
+  
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [errorDetails, setErrorDetails] = useState<Record<string, string[]>>({});
   const [success, setSuccess] = useState('');
+
+  // Paso 0: Credenciales
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
 
   // Paso 3: Documentos
   const [documentos, setDocumentos] = useState<any[]>([]);
@@ -91,15 +108,36 @@ export function OnboardingForm({
     titularCuenta: datosInicial?.datos_bancarios?.titularCuenta || '',
   });
 
-  // Validación en tiempo real para IBAN (calculado directamente, no en useEffect)
+  // Validación en tiempo real para IBAN
   const ibanValido = (() => {
     if (datosBancarios.iban.length >= 24) {
-      // Validación básica de formato español
-      const regexIBAN = /^ES\d{22}$/i;
-      return regexIBAN.test(datosBancarios.iban.replace(/\s/g, ''));
+      return validarIBAN(datosBancarios.iban);
     }
     return null;
   })();
+
+  // Manejar selección de avatar
+  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Validar tipo
+      if (!file.type.startsWith('image/')) {
+        setError('Por favor, selecciona una imagen');
+        return;
+      }
+      // Validar tamaño (2MB)
+      if (file.size > 2 * 1024 * 1024) {
+        setError('La imagen no puede superar 2MB');
+        return;
+      }
+      setAvatarFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setAvatarPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   // Cargar documentos y configuración cuando se llega al paso 3
   useEffect(() => {
@@ -111,14 +149,12 @@ export function OnboardingForm({
   const cargarDocumentosYConfiguracion = async () => {
     setLoadingDocumentos(true);
     try {
-      // Cargar configuración de documentos requeridos (usando token de onboarding)
       const configRes = await fetch(`/api/onboarding/${token}/config`);
       const configData = await configRes.json();
       if (configData.success && configData.config) {
         setDocumentosRequeridos(configData.config.documentosRequeridos || []);
       }
 
-      // Cargar documentos ya subidos
       const docsRes = await fetch(`/api/onboarding/${token}/documentos`);
       const docsData = await docsRes.json();
       if (docsData.success) {
@@ -128,6 +164,76 @@ export function OnboardingForm({
       console.error('[cargarDocumentosYConfiguracion] Error:', err);
     } finally {
       setLoadingDocumentos(false);
+    }
+  };
+
+  const handleSubmitPaso0 = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setErrorDetails({});
+    
+    // Validaciones
+    if (password.length < 8) {
+      setError('La contraseña debe tener al menos 8 caracteres');
+      return;
+    }
+    if (password !== confirmPassword) {
+      setError('Las contraseñas no coinciden');
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const formData = new FormData();
+      formData.append('password', password);
+      formData.append('confirmPassword', confirmPassword);
+      if (avatarFile) {
+        formData.append('avatar', avatarFile);
+      }
+
+      const res = await fetch(`/api/onboarding/${token}/credenciales`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      const data = await res.json();
+
+      if (res.ok && data.success) {
+        setSuccess('Credenciales guardadas correctamente');
+        setTimeout(() => {
+          setPasoActual(1);
+          setSuccess('');
+        }, 800);
+      } else {
+        // Manejar errores de validación detallados
+        if (data.details && typeof data.details === 'object' && Object.keys(data.details).length > 0) {
+          setErrorDetails(data.details as Record<string, string[]>);
+          // Construir mensaje de error más descriptivo
+          const errores: string[] = [];
+          Object.entries(data.details).forEach(([campo, mensajes]) => {
+            if (Array.isArray(mensajes) && mensajes.length > 0) {
+              mensajes.forEach((msg: string) => {
+                if (campo === 'password') {
+                  errores.push(`Contraseña: ${msg}`);
+                } else if (campo === 'confirmPassword') {
+                  errores.push(`Confirmación: ${msg}`);
+                } else {
+                  errores.push(msg);
+                }
+              });
+            }
+          });
+          setError(errores.length > 0 ? errores.join('. ') : 'Por favor, corrige los errores indicados');
+        } else {
+          setError(data.error || 'Error al guardar credenciales');
+          setErrorDetails({});
+        }
+      }
+    } catch (err) {
+      console.error('[handleSubmitPaso0] Error:', err);
+      setError('Error de conexión. Inténtalo de nuevo.');
+      setLoading(false);
     }
   };
 
@@ -144,7 +250,6 @@ export function OnboardingForm({
         body: JSON.stringify(datosPersonales),
       });
 
-      // Verificar si la respuesta es JSON
       const contentType = res.headers.get('content-type');
       if (!contentType || !contentType.includes('application/json')) {
         const text = await res.text();
@@ -163,7 +268,6 @@ export function OnboardingForm({
           setSuccess('');
         }, 800);
       } else {
-        // Manejar errores de validación detallados
         if (data.details && typeof data.details === 'object' && Object.keys(data.details).length > 0) {
           setErrorDetails(data.details as Record<string, string[]>);
           setError('Por favor, corrige los errores en los campos indicados');
@@ -171,7 +275,6 @@ export function OnboardingForm({
           setError(data.error || 'Error al guardar datos personales');
           setErrorDetails({});
         }
-        
         setLoading(false);
       }
     } catch (err) {
@@ -184,17 +287,16 @@ export function OnboardingForm({
   const handleSubmitPaso2 = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setErrorDetails({});
     setLoading(true);
 
     try {
-      // Guardar datos bancarios
       const res = await fetch(`/api/onboarding/${token}/datos-bancarios`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(datosBancarios),
       });
 
-      // Verificar si la respuesta es JSON
       const contentType = res.headers.get('content-type');
       if (!contentType || !contentType.includes('application/json')) {
         const text = await res.text();
@@ -206,27 +308,27 @@ export function OnboardingForm({
 
       const data = await res.json();
 
-      if (!res.ok || !data.success) {
+      if (res.ok && data.success) {
+        setSuccess('Datos bancarios guardados correctamente');
+        setTimeout(() => {
+          setPasoActual(3);
+          setSuccess('');
+        }, 800);
+      } else {
+        if (data.details && typeof data.details === 'object' && Object.keys(data.details).length > 0) {
+          setErrorDetails(data.details as Record<string, string[]>);
+          setError('Por favor, corrige los errores en los campos indicados');
+        } else {
         setError(data.error || 'Error al guardar datos bancarios');
-        if (data.details) {
-          console.error('Validation errors:', data.details);
+          setErrorDetails({});
         }
         setLoading(false);
-        return;
       }
-
-      // Avanzar al paso 3 (documentos)
-      setSuccess('Datos bancarios guardados correctamente');
-      setTimeout(() => {
-        setPasoActual(3);
-        setSuccess('');
-      }, 800);
-      setLoading(false);
     } catch (err) {
       console.error('[handleSubmitPaso2] Error:', err);
       setError('Error de conexión. Inténtalo de nuevo.');
       setLoading(false);
-    }
+      }
   };
 
   const handleUploadDocumento = async (file: File, tipoDocumento: string, nombreDocumento: string) => {
@@ -271,7 +373,7 @@ export function OnboardingForm({
       if (res.ok && data.success) {
         setSuccess('¡Onboarding completado! Redirigiendo...');
         setTimeout(() => {
-          window.location.href = '/login?onboarding=success';
+        window.location.href = '/login?onboarding=success';
         }, 2000);
       } else {
         setError(data.error || 'Error al finalizar onboarding');
@@ -282,6 +384,10 @@ export function OnboardingForm({
       setError('Error de conexión. Inténtalo de nuevo.');
       setLoading(false);
     }
+  };
+
+  const validarPaso0 = () => {
+    return password.length >= 8 && password === confirmPassword;
   };
 
   const validarPaso1 = () => {
@@ -301,92 +407,183 @@ export function OnboardingForm({
     return datosBancarios.iban && datosBancarios.titularCuenta && ibanValido !== false;
   };
 
+  // Stepper con líneas (4 pasos: 0, 1, 2, 3)
+  const totalPasos = 4;
+  
+  // Calcular qué pasos deben mostrarse como completados (pasos anteriores al actual)
+  const pasoActualNum = pasoActual;
+
+  // Títulos y descripciones por paso
+  const pasoConfig = {
+    0: {
+      titulo: 'Bienvenido',
+      descripcion: 'Configura tu avatar y contraseña para acceder a tu cuenta',
+    },
+    1: {
+      titulo: 'Datos Personales',
+      descripcion: 'Completa tu información personal',
+    },
+    2: {
+      titulo: 'Datos Bancarios',
+      descripcion: 'Introduce tu información bancaria',
+    },
+    3: {
+      titulo: 'Documentos',
+      descripcion: 'Sube los documentos requeridos para completar tu onboarding',
+    },
+  };
+
+  const configActual = pasoConfig[pasoActual];
+
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="space-y-2 text-center">
-        <h1 className="text-3xl font-bold">
-          Bienvenido/a, {empleado.nombre}!
-        </h1>
-        <p className="text-gray-500">
-          Completa tus datos para finalizar tu alta
-        </p>
+      {/* Título y descripción */}
+      <div className="space-y-2">
+        <h1 className="text-2xl font-bold">{configActual.titulo}</h1>
+        <p className="text-gray-500">{configActual.descripcion}</p>
       </div>
 
-      {/* Progress Indicator */}
-      <div className="flex items-center justify-center gap-2">
-        {/* Paso 1 */}
-        <div
-          className={`flex h-10 w-10 items-center justify-center rounded-full ${
-            pasoActual === 1
-              ? 'bg-primary text-white'
-              : progresoInicial.datos_personales
-              ? 'bg-green-500 text-white'
-              : 'bg-gray-200 text-gray-600'
-          }`}
-        >
-          {progresoInicial.datos_personales ? (
-            <Check className="h-5 w-5" />
-          ) : (
-            '1'
-          )}
-        </div>
-        <div className="h-1 w-12 bg-gray-200">
-          <div
-            className={`h-full transition-all ${
-              pasoActual >= 2 || progresoInicial.datos_bancarios
-                ? 'w-full bg-primary'
-                : 'w-0'
-            }`}
-          />
-        </div>
-        {/* Paso 2 */}
-        <div
-          className={`flex h-10 w-10 items-center justify-center rounded-full ${
-            pasoActual === 2
-              ? 'bg-primary text-white'
-              : progresoInicial.datos_bancarios
-              ? 'bg-green-500 text-white'
-              : 'bg-gray-200 text-gray-600'
-          }`}
-        >
-          {progresoInicial.datos_bancarios ? (
-            <Check className="h-5 w-5" />
-          ) : (
-            '2'
-          )}
-        </div>
-        <div className="h-1 w-12 bg-gray-200">
-          <div
-            className={`h-full transition-all ${
-              pasoActual === 3 || progresoInicial.datos_documentos
-                ? 'w-full bg-primary'
-                : 'w-0'
-            }`}
-          />
-        </div>
-        {/* Paso 3 */}
-        <div
-          className={`flex h-10 w-10 items-center justify-center rounded-full ${
-            pasoActual === 3
-              ? 'bg-primary text-white'
-              : progresoInicial.datos_documentos
-              ? 'bg-green-500 text-white'
-              : 'bg-gray-200 text-gray-600'
-          }`}
-        >
-          {progresoInicial.datos_documentos ? (
-            <Check className="h-5 w-5" />
-          ) : (
-            '3'
-          )}
-        </div>
+      {/* Stepper con líneas - debajo del título */}
+      <div className="flex items-center gap-1">
+        {[...Array(totalPasos)].map((_, index) => {
+          // Un paso está completado si ya pasamos por él (index < pasoActual)
+          const estaCompletado = index < pasoActualNum;
+          // Gris oscuro si está completado o es el paso actual, gris claro si no
+          const esActivoOCompletado = estaCompletado || index === pasoActualNum;
+          
+          return (
+            <div key={index} className="flex-1">
+              <div
+                className={`h-1 transition-colors ${
+                  esActivoOCompletado
+                    ? 'bg-gray-600'
+                    : 'bg-gray-200'
+                }`}
+              />
+            </div>
+          );
+        })}
       </div>
 
-      {/* Forms */}
+      {/* Paso 0: Credenciales */}
+      {pasoActual === 0 && (
+        <form onSubmit={handleSubmitPaso0} className="space-y-4">
+
+          {/* Avatar */}
+          <div className="space-y-4">
+            <Label>Avatar (opcional)</Label>
+            <div className="flex items-center gap-4">
+              <Avatar className="h-20 w-20">
+                {avatarPreview ? (
+                  <AvatarImage src={avatarPreview} alt="Avatar" />
+                ) : (
+                  <AvatarFallback className="bg-gray-100">
+                    <User className="h-10 w-10 text-gray-400" />
+                  </AvatarFallback>
+                )}
+              </Avatar>
+              <div className="space-y-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => avatarInputRef.current?.click()}
+                  className="flex items-center gap-2"
+                >
+                  <Upload className="h-4 w-4" />
+                  {avatarFile ? 'Cambiar avatar' : 'Subir avatar'}
+                </Button>
+                <input
+                  ref={avatarInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleAvatarChange}
+                  className="hidden"
+                />
+                {avatarFile && (
+                  <p className="text-xs text-gray-500">{avatarFile.name}</p>
+          )}
+        </div>
+            </div>
+          </div>
+
+          {/* Contraseña */}
+          <div className="space-y-2">
+            <Label htmlFor="password">
+              Contraseña <span className="text-red-500">*</span>
+            </Label>
+            <Input
+              id="password"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              minLength={8}
+              placeholder="Mínimo 8 caracteres"
+          />
+        </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="confirmPassword">
+              Confirmar contraseña <span className="text-red-500">*</span>
+            </Label>
+            <Input
+              id="confirmPassword"
+              type="password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              required
+              minLength={8}
+              placeholder="Repite tu contraseña"
+            />
+            {password && confirmPassword && password !== confirmPassword && (
+              <p className="text-xs text-red-600">Las contraseñas no coinciden</p>
+          )}
+        </div>
+
+          {error && (
+            <div className="rounded-md bg-red-50 p-3">
+              <p className="text-sm text-red-600">{error}</p>
+              {Object.keys(errorDetails).length > 0 && (
+                <ul className="list-disc list-inside space-y-1 mt-2">
+                  {Object.entries(errorDetails).map(([campo, errores]) => {
+                    if (Array.isArray(errores) && errores.length > 0) {
+                      return errores.map((mensaje, index) => (
+                        <li key={`${campo}-${index}`} className="text-sm text-red-700">
+                          {campo === 'password' ? 'Contraseña: ' : campo === 'confirmPassword' ? 'Confirmación: ' : ''}
+                          {mensaje}
+                        </li>
+                      ));
+                    }
+                    return null;
+                  })}
+                </ul>
+              )}
+      </div>
+          )}
+
+          {success && (
+            <div className="rounded-md bg-green-50 p-3">
+              <p className="text-sm text-green-600">{success}</p>
+        </div>
+          )}
+
+          <Button
+            type="submit"
+            className="w-full"
+            disabled={loading || !validarPaso0()}
+          >
+            {loading ? 'Guardando...' : (
+              <>
+                Siguiente <ChevronRight className="ml-2 h-4 w-4" />
+              </>
+            )}
+          </Button>
+        </form>
+      )}
+
+      {/* Paso 1: Datos Personales */}
       {pasoActual === 1 && (
         <form onSubmit={handleSubmitPaso1} className="space-y-4">
-          <h2 className="text-xl font-semibold">Paso 1: Datos Personales</h2>
 
           {/* Identificación */}
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -424,7 +621,6 @@ export function OnboardingForm({
           </div>
 
           {/* Contacto */}
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="telefono">
                 Teléfono <span className="text-red-500">*</span>
@@ -442,8 +638,6 @@ export function OnboardingForm({
                 }
                 required
           />
-        </div>
-
           </div>
 
           {/* Dirección */}
@@ -628,25 +822,33 @@ export function OnboardingForm({
             </div>
           )}
 
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setPasoActual(0)}
+              disabled={loading}
+            >
+              <ChevronLeft className="mr-2 h-4 w-4" /> Anterior
+            </Button>
           <Button
             type="submit"
-            className="w-full"
+              className="flex-1"
             disabled={loading || !validarPaso1()}
           >
-            {loading ? (
-              'Guardando...'
-            ) : (
+              {loading ? 'Guardando...' : (
               <>
                 Siguiente <ChevronRight className="ml-2 h-4 w-4" />
               </>
             )}
           </Button>
+          </div>
         </form>
       )}
 
+      {/* Paso 2: Datos Bancarios */}
       {pasoActual === 2 && (
         <form onSubmit={handleSubmitPaso2} className="space-y-4">
-          <h2 className="text-xl font-semibold">Paso 2: Datos Bancarios</h2>
 
           <div className="space-y-2">
             <Label htmlFor="iban">
@@ -674,7 +876,7 @@ export function OnboardingForm({
             />
             {ibanValido === false && (
               <p className="text-xs text-red-600">
-                IBAN inválido (formato español: ES + 22 dígitos)
+                IBAN inválido. Verifica el formato (ES + 22 dígitos) y el checksum
               </p>
             )}
             {ibanValido === true && (
@@ -702,7 +904,21 @@ export function OnboardingForm({
 
         {error && (
           <div className="rounded-md bg-red-50 p-3">
-            <p className="text-sm text-red-600">{error}</p>
+              <p className="text-sm font-medium text-red-800 mb-2">{error}</p>
+              {Object.keys(errorDetails).length > 0 && (
+                <ul className="list-disc list-inside space-y-1">
+                  {Object.entries(errorDetails).map(([campo, errores]) => {
+                    if (Array.isArray(errores) && errores.length > 0) {
+                      return errores.map((mensaje, index) => (
+                        <li key={`${campo}-${index}`} className="text-sm text-red-700">
+                          <span className="font-medium">{getCampoLabel(campo)}:</span> {mensaje}
+                        </li>
+                      ));
+                    }
+                    return null;
+                  })}
+                </ul>
+              )}
           </div>
         )}
 
@@ -731,18 +947,14 @@ export function OnboardingForm({
                   Siguiente <ChevronRight className="ml-2 h-4 w-4" />
                 </>
               )}
-            </Button>
+        </Button>
           </div>
-        </form>
+      </form>
       )}
 
+      {/* Paso 3: Documentos */}
       {pasoActual === 3 && (
         <div className="space-y-6">
-          <h2 className="text-xl font-semibold">Paso 3: Documentos</h2>
-          
-          <p className="text-sm text-gray-600">
-            Sube los documentos requeridos para completar tu onboarding
-          </p>
 
           {loadingDocumentos ? (
             <div className="flex items-center justify-center py-12">
@@ -849,10 +1061,6 @@ export function OnboardingForm({
           )}
         </div>
       )}
-
-      <p className="text-center text-xs text-gray-500">
-        * Campos obligatorios
-      </p>
     </div>
   );
 }

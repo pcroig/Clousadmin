@@ -27,14 +27,14 @@ export default async function OnboardingPage({
             Clousadmin
           </Link>
         </div>
-        <div className="flex flex-1 items-center justify-center">
-          <div className="w-full max-w-2xl">
+        <div className="flex flex-1 items-start justify-start pt-8">
+          <div className="w-full max-w-xl">
             {!valido ? (
-              <div className="space-y-4 text-center">
+              <div className="space-y-4">
                 <h1 className="text-2xl font-bold text-red-600">
                   Token de onboarding inválido
                 </h1>
-                <p className="text-gray-600">{error}</p>
+                <p className="text-gray-500">{error}</p>
                 <Link
                   href="/login"
                   className="inline-block text-sm text-primary hover:underline"

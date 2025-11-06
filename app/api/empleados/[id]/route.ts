@@ -40,6 +40,7 @@ const empleadoUpdateSchema = z.object({
   fechaAlta: z.string().optional(),
   tipoContrato: z.string().optional(),
   categoriaProfesional: z.string().optional(),
+  nivelEducacion: z.string().optional(),
   grupoCotizacion: z.number().int().optional(),
 
   // Información Bancaria
@@ -191,22 +192,56 @@ export async function PATCH(
     const oldEquipoIds = empleadoActual.equipos.map(e => e.equipoId);
 
     // Preparar datos para actualización
-    const datosParaActualizar = {
-      ...empleadoData,
-      fechaNacimiento: empleadoData.fechaNacimiento
-        ? new Date(empleadoData.fechaNacimiento)
-        : undefined,
-      fechaAlta: empleadoData.fechaAlta
-        ? new Date(empleadoData.fechaAlta)
-        : undefined,
-      // Convertir números a Decimal para Prisma
-      salarioBrutoAnual: empleadoData.salarioBrutoAnual !== undefined
-        ? new Prisma.Decimal(empleadoData.salarioBrutoAnual)
-        : undefined,
-      salarioBrutoMensual: empleadoData.salarioBrutoMensual !== undefined
-        ? new Prisma.Decimal(empleadoData.salarioBrutoMensual)
-        : undefined,
-    };
+    // Limpiar campos undefined para evitar errores de Prisma
+    const datosParaActualizar: any = {};
+    
+    // Solo incluir campos que tienen valores definidos y válidos
+    if (empleadoData.fechaNacimiento !== undefined) {
+      // Validar que la fecha no esté vacía y sea válida
+      if (empleadoData.fechaNacimiento && empleadoData.fechaNacimiento.trim() !== '') {
+        const fecha = new Date(empleadoData.fechaNacimiento);
+        if (!isNaN(fecha.getTime())) {
+          datosParaActualizar.fechaNacimiento = fecha;
+        } else {
+          return badRequestResponse('La fecha de nacimiento proporcionada no es válida');
+        }
+      } else {
+        // Si está vacío, establecer como null
+        datosParaActualizar.fechaNacimiento = null;
+      }
+    }
+    if (empleadoData.fechaAlta !== undefined) {
+      // Validar que la fecha no esté vacía y sea válida
+      if (empleadoData.fechaAlta && empleadoData.fechaAlta.trim() !== '') {
+        const fecha = new Date(empleadoData.fechaAlta);
+        if (!isNaN(fecha.getTime())) {
+          datosParaActualizar.fechaAlta = fecha;
+        } else {
+          return badRequestResponse('La fecha de alta proporcionada no es válida');
+        }
+      } else {
+        return badRequestResponse('La fecha de alta es requerida');
+      }
+    }
+    if (empleadoData.salarioBrutoAnual !== undefined) {
+      datosParaActualizar.salarioBrutoAnual = new Prisma.Decimal(empleadoData.salarioBrutoAnual);
+    }
+    if (empleadoData.salarioBrutoMensual !== undefined) {
+      datosParaActualizar.salarioBrutoMensual = new Prisma.Decimal(empleadoData.salarioBrutoMensual);
+    }
+    
+    // Incluir otros campos que no sean undefined
+    Object.keys(empleadoData).forEach((key) => {
+      if (
+        key !== 'fechaNacimiento' &&
+        key !== 'fechaAlta' &&
+        key !== 'salarioBrutoAnual' &&
+        key !== 'salarioBrutoMensual' &&
+        empleadoData[key as keyof typeof empleadoData] !== undefined
+      ) {
+        datosParaActualizar[key] = empleadoData[key as keyof typeof empleadoData];
+      }
+    });
 
     // Encriptar campos sensibles antes de guardar
     const datosEncriptados = encryptEmpleadoData(datosParaActualizar);
@@ -214,12 +249,25 @@ export async function PATCH(
     // Actualizar empleado y relaciones en una transacción
     const empleado = await prisma.$transaction(async (tx) => {
       // Actualizar datos del empleado con encriptación
+      // Filtrar campos undefined/nulos que no deben actualizarse
+      const datosLimpios = Object.fromEntries(
+        Object.entries(datosEncriptados).filter(([_, value]) => value !== undefined)
+      );
+      
+      // Si no hay datos para actualizar, retornar el empleado actual
+      if (Object.keys(datosLimpios).length === 0) {
+        return await tx.empleado.findUnique({
+          where: { id, empresaId: session.user.empresaId },
+          include: { usuario: { select: { id: true } } },
+        });
+      }
+      
       const updatedEmpleado = await tx.empleado.update({
         where: {
           id,
           empresaId: session.user.empresaId,
         },
-        data: datosEncriptados,
+        data: datosLimpios,
         include: {
           usuario: { select: { id: true } },
         },
@@ -292,6 +340,10 @@ export async function PATCH(
     }
 
     // Desencriptar antes de retornar
+    if (!empleado) {
+      return notFoundResponse('Empleado no encontrado');
+    }
+
     const empleadoDesencriptado = decryptEmpleadoData(empleado);
 
     return successResponse(empleadoDesencriptado);

@@ -16,6 +16,12 @@ export default async function MiEspacioManagerPage() {
       usuarioId: session.user.id,
     },
     include: {
+      puestoRelacion: {
+        select: {
+          id: true,
+          nombre: true,
+        },
+      },
       carpetas: {
         include: {
           documentos: true,

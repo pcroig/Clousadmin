@@ -140,23 +140,30 @@ export async function configurarIntegracionAction(
       empresaId: session.user.empresaId,
     });
 
-    // Usar upsert para actualizar si ya existe
-    const integracion = await prisma.integracion.upsert({
+    // Buscar si ya existe una integración con estos parámetros
+    const existingIntegration = await prisma.integracion.findFirst({
       where: {
-        empresaId_tipo_proveedor: {
-          empresaId: validatedData.empresaId,
-          tipo: validatedData.tipo,
-          proveedor: validatedData.proveedor,
-        },
-      },
-      update: {
-        config: toJsonValue(validatedData.config || {}),
-        activa: true,
-      },
-      create: {
         empresaId: validatedData.empresaId,
         tipo: validatedData.tipo,
         proveedor: validatedData.proveedor,
+        usuarioId: null, // Solo integraciones de empresa
+      },
+    });
+
+    // Crear o actualizar la integración
+    const integracion = existingIntegration
+      ? await prisma.integracion.update({
+          where: { id: existingIntegration.id },
+          data: {
+            config: toJsonValue(validatedData.config || {}),
+            activa: true,
+          },
+        })
+      : await prisma.integracion.create({
+          data: {
+            empresaId: validatedData.empresaId,
+            tipo: validatedData.tipo,
+            proveedor: validatedData.proveedor,
         config: toJsonValue(validatedData.config || {}),
         activa: true,
       },

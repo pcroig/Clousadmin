@@ -249,8 +249,8 @@ export function RevisionModal({ open, onClose, onReviewed, onEditFichaje }: Revi
               <div className="flex flex-wrap items-center justify-between gap-4 py-3 px-4 bg-gray-50 rounded-lg">
                 <div className="flex items-center gap-3">
                   <div className="flex items-center gap-2">
-                    <span className="text-sm text-gray-600">Total pendientes:</span>
-                    <Badge variant="outline">{fichajesRevision.length}</Badge>
+                    <span className="text-sm text-gray-600">Pendientes:</span>
+                    <Badge variant="outline">{gruposFiltrados.reduce((acc, g) => acc + g.fichajes.length, 0)}</Badge>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="text-sm text-gray-600">Seleccionados:</span>
@@ -273,7 +273,7 @@ export function RevisionModal({ open, onClose, onReviewed, onEditFichaje }: Revi
                     disabled={totalSeleccionados === 0}
                     loading={processing}
                   >
-                    Actualizar ({totalSeleccionados})
+                    Cuadrar ({totalSeleccionados})
                   </LoadingButton>
                 </div>
               </div>
@@ -294,7 +294,7 @@ export function RevisionModal({ open, onClose, onReviewed, onEditFichaje }: Revi
                   ) : (
                     <>
                       <Filter className="w-3 h-3 mr-1" />
-                      Ocultar días sin fichajes
+                      Omitir días sin fichajes
                     </>
                   )}
                 </Button>
@@ -302,7 +302,7 @@ export function RevisionModal({ open, onClose, onReviewed, onEditFichaje }: Revi
 
               {ocultarDiasSinFichajes && (
                 <div className="text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded px-3 py-2">
-                  <strong>Filtro activo:</strong> Se ocultan los días donde no hay ningún fichaje registrado (probablemente no laborables).
+                  <strong>Filtro activo:</strong> Los días sin ningún fichaje registrado se omiten del cuadraje masivo (días no laborables).
                 </div>
               )}
             </div>

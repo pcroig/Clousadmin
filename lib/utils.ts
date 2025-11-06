@@ -40,3 +40,5 @@ export function serializeEmpleado(empleado: any) {
       : empleado.saldosAusencias,
   };
 }
+
+

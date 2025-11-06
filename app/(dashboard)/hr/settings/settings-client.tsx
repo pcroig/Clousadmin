@@ -74,13 +74,12 @@ export function SettingsClient({ usuario }: SettingsClientProps) {
     {
       id: 'integrations',
       title: 'Integraciones',
-      description: 'Conecta Clousadmin con otras herramientas',
+      description: 'Conecta Clousadmin con Google Calendar y más',
       icon: Plug,
       action: () => {
-        toast.info('Integraciones próximamente disponibles');
+        router.push('/hr/settings/integraciones');
       },
-      available: false,
-      badge: 'Próximamente',
+      available: true,
     },
     {
       id: 'notifications',

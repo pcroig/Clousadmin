@@ -61,10 +61,10 @@ export const AusenciasWidget = memo(function AusenciasWidget({
           <Button
             onClick={onOpenModal}
             size="sm"
-            variant="ghost"
-            className="text-[11px] h-7 px-2 hover:bg-gray-100"
+            variant="outline"
+            className="text-[11px] h-7 px-3 border-gray-300"
           >
-            Abrir ausencia
+            Solicitar ausencia
           </Button>
         )
       }

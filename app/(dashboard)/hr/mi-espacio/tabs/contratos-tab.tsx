@@ -76,15 +76,21 @@ export function ContratosTab({ empleado }: any) {
               <Input
                 type="text"
                 value={
-                  tipoContrato === 'indefinido'
-                    ? 'Indefinido'
-                    : tipoContrato === 'temporal'
-                      ? 'Temporal'
-                      : tipoContrato === 'practicas'
-                        ? 'Prácticas'
-                        : tipoContrato === 'obra_y_servicio'
-                          ? 'Obra y servicio'
-                          : tipoContrato
+                  tipoContrato === 'administrador'
+                    ? 'Administrador'
+                    : tipoContrato === 'fijo_discontinuo'
+                      ? 'Fijo discontinuo'
+                      : tipoContrato === 'indefinido'
+                        ? 'Indefinido'
+                        : tipoContrato === 'temporal'
+                          ? 'Temporal'
+                          : tipoContrato === 'becario'
+                            ? 'Becario'
+                            : tipoContrato === 'practicas'
+                              ? 'Prácticas'
+                              : tipoContrato === 'obra_y_servicio'
+                                ? 'Obra y servicio'
+                                : tipoContrato
                 }
                 readOnly
                 className="bg-gray-50"
@@ -128,7 +134,19 @@ export function ContratosTab({ empleado }: any) {
               <label className="block text-sm font-medium text-gray-700 mb-1">Categoría profesional</label>
               <Input
                 type="text"
-                value={empleado.categoriaProfesional || 'No informado'}
+                value={
+                  empleado.categoriaProfesional === 'directivo'
+                    ? 'Directivo'
+                    : empleado.categoriaProfesional === 'mando_intermedio'
+                      ? 'Mando intermedio'
+                      : empleado.categoriaProfesional === 'tecnico'
+                        ? 'Técnico'
+                        : empleado.categoriaProfesional === 'trabajador_cualificado'
+                          ? 'Trabajador cualificado'
+                          : empleado.categoriaProfesional === 'trabajador_baja_cualificacion'
+                            ? 'Trabajador con baja cualificación'
+                            : empleado.categoriaProfesional || 'No informado'
+                }
                 readOnly
                 className="bg-gray-50"
               />
@@ -144,7 +162,24 @@ export function ContratosTab({ empleado }: any) {
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Nivel de educación</label>
-              <Input type="text" value="No informado" readOnly className="bg-gray-50" />
+              <Input
+                type="text"
+                value={
+                  empleado.nivelEducacion === 'nivel_basico'
+                    ? 'Nivel Básico'
+                    : empleado.nivelEducacion === 'eso_equivalente'
+                      ? 'ESO o Equivalente'
+                      : empleado.nivelEducacion === 'bachillerato_grado_medio'
+                        ? 'Bachillerato o Grado Medio'
+                        : empleado.nivelEducacion === 'formacion_profesional_superior'
+                          ? 'Formación Profesional Superior'
+                          : empleado.nivelEducacion === 'educacion_universitaria_postgrado'
+                            ? 'Educación Universitaria y Postgrado'
+                            : empleado.nivelEducacion || 'No informado'
+                }
+                readOnly
+                className="bg-gray-50"
+              />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Contrato a distancia</label>

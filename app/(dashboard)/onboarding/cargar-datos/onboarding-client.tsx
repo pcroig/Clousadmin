@@ -93,53 +93,63 @@ export function OnboardingClient({
     }
   };
 
+  // Títulos y descripciones por paso
+  const pasoConfig = {
+    sedes: {
+      titulo: 'Sedes',
+      descripcion: 'Configura las sedes de tu empresa',
+    },
+    empleados: {
+      titulo: 'Empleados',
+      descripcion: 'Importa los empleados de tu empresa',
+    },
+    integraciones: {
+      titulo: 'Integraciones',
+      descripcion: 'Configura las integraciones de tu empresa',
+    },
+    admins: {
+      titulo: 'HR Admins',
+      descripcion: 'Invita a otros administradores de RRHH',
+    },
+  };
+
+  const configActual = pasoConfig[currentTab as keyof typeof pasoConfig];
+
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white border-b">
-        <div className="max-w-5xl mx-auto px-6 py-8">
-          <div className="text-center space-y-2">
-            <h1 className="text-3xl font-bold">Bienvenido a Clousadmin</h1>
-            <p className="text-gray-600">
-              Configura {nombreEmpresa} en solo unos pasos
-            </p>
-          </div>
-
-          {/* Progress bar */}
-          <div className="mt-8">
-            <div className="flex items-center justify-between text-xs text-gray-500 mb-2">
-              <span>Paso {currentTabIndex + 1} de {tabs.length}</span>
-              <span>{Math.round(((currentTabIndex + 1) / tabs.length) * 100)}%</span>
-            </div>
-            <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-primary transition-all duration-300"
-                style={{
-                  width: `${((currentTabIndex + 1) / tabs.length) * 100}%`,
-                }}
-              />
-            </div>
-          </div>
-        </div>
-      </div>
-
       {/* Main content */}
-      <div className="max-w-5xl mx-auto px-6 py-8">
-        <Tabs value={currentTab} onValueChange={setCurrentTab} className="space-y-6">
-          {/* Tabs list */}
-          <TabsList className="grid w-full grid-cols-4">
-            {tabs.map((tab) => {
-              const Icon = tab.icon;
+      <div className="max-w-3xl px-6 py-8">
+        {/* Header con título, descripción y stepper */}
+        <div className="space-y-6 mb-8">
+          {/* Título y descripción */}
+          <div className="space-y-2">
+            <h1 className="text-2xl font-bold">{configActual.titulo}</h1>
+            <p className="text-gray-500">{configActual.descripcion}</p>
+          </div>
+
+          {/* Stepper con líneas - debajo del título */}
+          <div className="flex items-center gap-1">
+            {tabs.map((_, index) => {
+              const estaCompletado = index < currentTabIndex;
+              const esActivoOCompletado = estaCompletado || index === currentTabIndex;
+              
               return (
-                <TabsTrigger key={tab.value} value={tab.value} className="flex items-center gap-2">
-                  <Icon className="h-4 w-4" />
-                  <span className="hidden sm:inline">{tab.label}</span>
-                </TabsTrigger>
+                <div key={index} className="flex-1">
+                  <div
+                    className={`h-1 transition-colors ${
+                      esActivoOCompletado
+                        ? 'bg-gray-600'
+                        : 'bg-gray-200'
+                    }`}
+                  />
+                </div>
               );
             })}
-          </TabsList>
-
-          {/* Tabs content */}
+          </div>
+        </div>
+        
+        <Tabs value={currentTab} onValueChange={setCurrentTab} className="space-y-6">
+          {/* Tabs content - sin tabs list visible, solo el contenido */}
           <div className="bg-white rounded-lg border p-6 min-h-[500px]">
             {tabs.map((tab) => (
               <TabsContent key={tab.value} value={tab.value}>
@@ -191,6 +201,8 @@ export function OnboardingClient({
     </div>
   );
 }
+
+
 
 
 

@@ -12,25 +12,24 @@
 //   const config = getModelConfig('cuadrar-vacaciones');
 
 /**
- * Modelos disponibles
+ * Modelos disponibles (DEPRECATED)
+ * 
+ * ⚠️ IMPORTANTE: Este archivo es legacy y se mantiene solo para compatibilidad.
+ * Para nuevas implementaciones, usar:
+ *   - import { OPENAI_MODELS, ANTHROPIC_MODELS } from '@/lib/ia/core/config'
+ *   - import { callAI } from '@/lib/ia'
  *
- * POLÍTICA ACTUAL:
- * - Todos los modelos usan GPT-4.1 como modelo principal
- * - Fallback a modelo open source si OpenAI no está disponible
- *
- * Referencia: https://platform.openai.com/docs/models
+ * Referencia: https://platform.openai.com/docs/agents/models
  */
 export const MODELS = {
-  // Modelo principal - GPT-4.1
-  GPT_4_1: 'gpt-4.1',
-
-  // Fallback - Modelo open source (Llama 3.1 70B via Replicate)
-  LLAMA_3_1_70B: 'meta/meta-llama-3.1-70b-instruct',
-
-  // Modelos legacy (deprecated - no usar en nuevas implementaciones)
+  // Modelos OpenAI Agents SDK
+  GPT_4_1: 'gpt-4.1', // Default del SDK - balance óptimo
+  GPT_4_1_MINI: 'gpt-4.1-mini', // Rápido y económico
+  GPT_5: 'gpt-5', // Razonamiento avanzado
+  
+  // Modelos legacy (mantener para compatibilidad)
   GPT_4O_MINI: 'gpt-4o-mini',
   GPT_4O: 'gpt-4o',
-  GPT_5: 'gpt-5',
 } as const;
 
 /**
@@ -55,43 +54,24 @@ export interface ModelConfig {
 }
 
 /**
- * Configuraciones predefinidas por funcionalidad
- *
- * POLÍTICA ACTUAL: Todos usan GPT-4.1 como modelo principal
- * - Temperatura ajustada según necesidad de creatividad/consistencia
- * - Formato de respuesta según el caso de uso
- * - Fallback automático a Llama 3.1 70B si OpenAI no disponible
+ * Configuraciones predefinidas por funcionalidad (DEPRECATED)
+ * 
+ * ⚠️ IMPORTANTE: Para nuevas implementaciones, usar getFeatureConfig() de @/lib/ia/core/config
+ * Este objeto se mantiene solo para compatibilidad con código legacy.
  */
 export const FUNCTION_CONFIGS: Record<string, ModelConfig> = {
-  /**
-   * Cuadrar Vacaciones
-   * - Usa: GPT-4.1 (mejor razonamiento para optimización compleja)
-   * - Temperatura baja: resultados determinísticos y reproducibles
-   */
   'cuadrar-vacaciones': {
     model: MODELS.GPT_4_1,
     temperature: 0.3,
     responseFormat: 'json_object',
     systemMessage: 'Eres un asistente experto en optimización de recursos humanos, especializado en planificación de vacaciones.',
   },
-
-  /**
-   * Clasificador de Fichajes
-   * - Usa: GPT-4.1 (mejor análisis de patrones complejos)
-   * - Temperatura media: permite cierta variabilidad en clasificaciones
-   */
   'clasificador-fichajes': {
     model: MODELS.GPT_4_1,
     temperature: 0.5,
     responseFormat: 'json_object',
     systemMessage: 'Eres un asistente experto en análisis de fichajes laborales y detección de anomalías en registros de tiempo.',
   },
-
-  /**
-   * Procesar Excel de Empleados
-   * - Usa: GPT-4.1 (mejor comprensión de estructuras complejas)
-   * - Temperatura baja: mapeos consistentes y precisos
-   */
   'procesar-excel-empleados': {
     model: MODELS.GPT_4_1,
     temperature: 0.2,
@@ -99,36 +79,18 @@ export const FUNCTION_CONFIGS: Record<string, ModelConfig> = {
     maxTokens: 4000,
     systemMessage: 'Eres un asistente experto en análisis de datos de recursos humanos y mapeo de información de empleados desde hojas de cálculo.',
   },
-
-  /**
-   * Clasificador de Nóminas
-   * - Usa: GPT-4.1 (mejor matching inteligente)
-   * - Temperatura baja: clasificaciones precisas
-   */
   'clasificador-nominas': {
     model: MODELS.GPT_4_1,
     temperature: 0.2,
     responseFormat: 'json_object',
     systemMessage: 'Eres un asistente experto en análisis de nóminas y matching de documentos con empleados.',
   },
-
-  /**
-   * Extracción de Documentos
-   * - Usa: GPT-4.1 (mejor comprensión de contexto visual)
-   * - Temperatura baja: extracciones precisas y consistentes
-   */
   'extraer-documentos': {
     model: MODELS.GPT_4_1,
     temperature: 0.2,
     responseFormat: 'json_object',
     systemMessage: 'Eres un asistente experto en extracción de información de documentos legales y administrativos.',
   },
-
-  /**
-   * Análisis de Sentimientos
-   * - Usa: GPT-4.1 (mejor comprensión del lenguaje y contexto)
-   * - Temperatura media: permite matices en análisis
-   */
   'analisis-sentimientos': {
     model: MODELS.GPT_4_1,
     temperature: 0.4,
@@ -168,12 +130,20 @@ export function getModelConfigOrDefault(
 }
 
 /**
- * Crea una llamada estándar al cliente de IA con la configuración de una funcionalidad
- * Usa fallback automático si OpenAI no está disponible
+ * Crea una llamada al cliente unificado de IA con la configuración de una funcionalidad
+ * Usa fallback automático entre proveedores disponibles (OpenAI, Anthropic, Google)
  *
  * @param functionName Nombre de la funcionalidad
- * @param messages Mensajes para enviar al modelo
+ * @param messages Mensajes para enviar al modelo (formato OpenAI - se convierte automáticamente)
  * @returns Promise con la respuesta del modelo
+ * 
+ * @example
+ * ```typescript
+ * const response = await callAIWithConfig('clasificador-nominas', [
+ *   { role: 'user', content: 'Clasifica esta nómina...' }
+ * ]);
+ * console.log(response.choices[0].message.content);
+ * ```
  */
 export async function callAIWithConfig(
   functionName: string,
@@ -184,30 +154,45 @@ export async function callAIWithConfig(
     throw new Error(`No existe configuración de modelo para la funcionalidad: ${functionName}`);
   }
 
-  // Import dinámico desde punto de entrada centralizado para evitar circular deps
-  const { getAIClient } = await import('./index');
-  const client = getAIClient();
-
-  const completionConfig: OpenAI.Chat.ChatCompletionCreateParams = {
+  // Import del cliente unificado
+  const { callAI, AIProvider, MessageRole } = await import('./core/client');
+  const { MessageRole: MsgRole, type AIMessage } = await import('./core/types');
+  
+  // Convertir mensajes de formato OpenAI a formato unificado
+  const aiMessages: any[] = [];
+  
+  // Agregar system message si existe
+  if (config.systemMessage) {
+    aiMessages.push({
+      role: MsgRole.SYSTEM,
+      content: config.systemMessage,
+    });
+  }
+  
+  // Convertir resto de mensajes
+  for (const msg of messages) {
+    aiMessages.push({
+      role: msg.role === 'system' ? MsgRole.SYSTEM : 
+            msg.role === 'assistant' ? MsgRole.ASSISTANT : 
+            MsgRole.USER,
+      content: msg.content,
+    });
+  }
+  
+  // Configuración unificada
+  const modelConfig = {
+    provider: AIProvider.OPENAI, // Prioridad a OpenAI, con fallback automático
     model: config.model,
-    messages: config.systemMessage
-      ? [
-          { role: 'system', content: config.systemMessage },
-          ...messages,
-        ]
-      : messages,
     temperature: config.temperature,
+    maxTokens: config.maxTokens,
+    responseFormat: config.responseFormat,
   };
-
-  if (config.responseFormat) {
-    completionConfig.response_format = { type: config.responseFormat };
-  }
-
-  if (config.maxTokens) {
-    completionConfig.max_tokens = config.maxTokens;
-  }
-
-  return client.chat.completions.create(completionConfig as any);
+  
+  // Llamar al cliente unificado (con fallback automático)
+  return callAI(aiMessages, modelConfig as any, {
+    responseFormat: config.responseFormat,
+    maxTokens: config.maxTokens,
+  });
 }
 
 /**

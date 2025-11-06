@@ -11,6 +11,7 @@ import { z } from 'zod';
 const puestoCreateSchema = z.object({
   nombre: z.string().min(1, 'El nombre es requerido').max(100),
   descripcion: z.string().optional(),
+  empleadoIds: z.array(z.string().uuid()).optional(),
 });
 
 // GET /api/puestos - Listar todos los puestos activos
@@ -84,13 +85,47 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Crear puesto
-    const puesto = await prisma.puesto.create({
-      data: {
-        empresaId: session.user.empresaId,
-        nombre: validatedData.nombre,
-        descripcion: validatedData.descripcion || null,
-      },
+    // Extraer empleadoIds para asignar después
+    const { empleadoIds, ...puestoData } = validatedData;
+
+    // Crear puesto en una transacción
+    const puesto = await prisma.$transaction(async (tx) => {
+      // Crear el puesto
+      const nuevoPuesto = await tx.puesto.create({
+        data: {
+          empresaId: session.user.empresaId,
+          nombre: puestoData.nombre,
+          descripcion: puestoData.descripcion || null,
+        },
+      });
+
+      // Asignar empleados si se proporcionaron
+      if (empleadoIds && empleadoIds.length > 0) {
+        // Validar que los empleados existen y pertenecen a la empresa
+        const empleadosExistentes = await tx.empleado.findMany({
+          where: {
+            id: { in: empleadoIds },
+            empresaId: session.user.empresaId,
+          },
+        });
+
+        if (empleadosExistentes.length !== empleadoIds.length) {
+          throw new Error('Uno o más empleados especificados no existen');
+        }
+
+        // Actualizar empleados para asignarles el puesto
+        await tx.empleado.updateMany({
+          where: {
+            id: { in: empleadoIds },
+            empresaId: session.user.empresaId,
+          },
+          data: {
+            puestoId: nuevoPuesto.id,
+          },
+        });
+      }
+
+      return nuevoPuesto;
     });
 
     return NextResponse.json(puesto, { status: 201 });

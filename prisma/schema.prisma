@@ -83,6 +83,7 @@ model Usuario {
   email     String  @unique @db.VarChar(255)
   password  String? @db.VarChar(255) // Bcrypt hash (local auth)
   cognitoId String? @unique @db.VarChar(255) // AWS Cognito sub (cloud auth)
+  googleId  String? @unique @db.VarChar(255) // Google OAuth sub
 
   // Role-based access control
   rol String @default("empleado") @db.VarChar(50) // 'platform_admin', 'hr_admin', 'manager', 'empleado'
@@ -112,6 +113,7 @@ model Usuario {
 
   @@index([email])
   @@index([cognitoId])
+  @@index([googleId])
   @@index([empresaId])
   @@map("usuarios")
 }
@@ -135,8 +137,9 @@ model Empleado {
   fotoUrl   String? @db.Text // S3 URL
 
   // Identification
-  nif             String?   @unique @db.VarChar(20)
-  nss             String?   @db.VarChar(20) // Número Seguridad Social
+  // NOTA: nif y nss son TEXT porque se encriptan (encrypt genera ~100+ caracteres)
+  nif             String?   @unique @db.Text
+  nss             String?   @db.Text // Número Seguridad Social (encriptado)
   fechaNacimiento DateTime?
 
   // Contact
@@ -152,11 +155,12 @@ model Empleado {
 
   // Family info
   estadoCivil String? @db.VarChar(50) // 'soltero', 'casado', 'divorciado', 'viudo', 'pareja_hecho'
-  numeroHijos Int     @default(0)
+  numeroHijos Int     @default(0) @db.SmallInt // 0-5 típicamente
   genero      String? @db.VarChar(50) // 'hombre', 'mujer', 'otro', 'no_especificado'
 
   // Banking (for payroll)
-  iban          String? @db.VarChar(34)
+  // NOTA: iban es TEXT porque se encripta (encrypt genera ~100+ caracteres)
+  iban          String? @db.Text
   titularCuenta String? @db.VarChar(200)
 
   // Employment info
@@ -165,9 +169,10 @@ model Empleado {
   puestoId             String? // Foreign key to Puesto
   fechaAlta            DateTime
   fechaBaja            DateTime?
-  tipoContrato         String    @default("indefinido") @db.VarChar(50) // 'indefinido', 'temporal', 'administrador', 'practicas', 'obra_y_servicio'
+  tipoContrato         String    @default("indefinido") @db.VarChar(50) // 'indefinido', 'temporal', 'administrador', 'fijo_discontinuo', 'becario', 'practicas', 'obra_y_servicio'
   categoriaProfesional String?   @db.VarChar(50) // 'directivo', 'mando_intermedio', 'tecnico', 'trabajador_cualificado', 'trabajador_baja_cualificacion'
-  grupoCotizacion      Int? // 1-11 (Spanish social security groups)
+  nivelEducacion       String?   @db.VarChar(50) // 'nivel_basico', 'eso_equivalente', 'bachillerato_grado_medio', 'formacion_profesional_superior', 'educacion_universitaria_postgrado'
+  grupoCotizacion      Int?      @db.SmallInt // 1-11 (Spanish social security groups)
   estadoEmpleado       String    @default("activo") @db.VarChar(50) // 'activo', 'baja', 'suspendido'
 
   // Manager relationship (self-referencing)
@@ -235,7 +240,7 @@ model Empleado {
   @@index([nif])
   @@index([email])
   @@index([estadoEmpleado])
-  @@index([departamento])
+  // @@index([departamento]) // REMOVED: deprecated field, not used in queries
   @@map("empleados")
 }
 
@@ -328,14 +333,19 @@ model Sede {
 /// Integracion - External integrations configuration
 /// Stores integration settings for calendar, communication, and payroll systems
 model Integracion {
-  id        String @id @default(uuid())
+  id        String  @id @default(uuid())
   empresaId String
+  usuarioId String? // NULL = integración a nivel de empresa, NOT NULL = integración personal
 
   tipo      String @db.VarChar(50) // 'calendario', 'comunicacion', 'nominas'
   proveedor String @db.VarChar(100) // 'google_calendar', 'outlook', 'slack', 'teams', etc.
 
   // Configuration (JSONB for flexibility - credentials, API keys, etc.)
+  // For calendar: { "accessToken": "...", "refreshToken": "...", "expiresAt": 123456, "scope": "...", "channelId": "...", "resourceId": "..." }
   config Json? // e.g., { "apiKey": "...", "webhookUrl": "...", "enabled_features": [...] }
+
+  // Calendar-specific fields
+  calendarId String? @db.VarChar(255) // ID del calendario en Google/Outlook
 
   activa Boolean @default(true)
 
@@ -345,8 +355,9 @@ model Integracion {
   // Relations
   empresa Empresa @relation(fields: [empresaId], references: [id], onDelete: Cascade)
 
-  @@unique([empresaId, tipo, proveedor]) // Only one integration per type and provider
+  @@unique([empresaId, tipo, proveedor, usuarioId]) // Only one integration per type, provider, and user
   @@index([empresaId])
+  @@index([usuarioId])
   @@index([tipo])
   @@map("integraciones")
 }
@@ -420,6 +431,9 @@ model Fichaje {
   @@index([empleadoId])
   @@index([fecha])
   @@index([estado])
+  @@index([empresaId, estado]) // Composite index for filtering by company and status
+  @@index([empresaId, fecha]) // Composite index for date range queries
+  @@index([empresaId, empleadoId, fecha]) // Composite index for employee-specific queries
   @@map("fichajes")
 }
 
@@ -511,6 +525,9 @@ model Ausencia {
   @@index([tipo])
   @@index([estado])
   @@index([fechaInicio, fechaFin])
+  @@index([empresaId, estado]) // Composite index for filtering by company and status
+  @@index([empresaId, tipo, estado]) // Composite index for combined filters
+  @@index([empresaId, empleadoId, estado]) // Composite index for employee absence queries
   @@map("ausencias")
 }
 
@@ -545,7 +562,7 @@ model EmpleadoSaldoAusencias {
   id         String @id @default(uuid())
   empleadoId String
   empresaId  String
-  año       Int // Año fiscal
+  año       Int    @db.SmallInt // Año fiscal (2024-2099)
 
   diasTotales    Int     @default(0) // Días asignados (desde contrato o manual)
   diasUsados     Decimal @default(0) @db.Decimal(4, 1) // Días ya usados (ausencias aprobadas)
@@ -705,8 +722,8 @@ model Nomina {
   empleadoId String
 
   // Period
-  mes  Int // 1-12
-  anio Int // 2024, 2025, etc.
+  mes  Int @db.SmallInt // 1-12
+  anio Int @db.SmallInt // 2024-2099
 
   // Amounts
   salarioBruto Decimal @db.Decimal(10, 2)
@@ -745,6 +762,8 @@ model Nomina {
   @@index([documentoId])
   @@index([mes, anio])
   @@index([estado])
+  @@index([empleadoId, estado]) // Composite index for employee-specific status filtering
+  @@index([empleadoId, mes, anio]) // Composite index already covered by unique constraint
   @@map("nominas")
 }
 
@@ -794,8 +813,8 @@ model ResumenMensualNomina {
   empleadoId String
 
   // Period
-  mes  Int // 1-12
-  anio Int // 2024, 2025, etc.
+  mes  Int @db.SmallInt // 1-12
+  anio Int @db.SmallInt // 2024-2099
 
   // Working days
   diasLaborables            Int @default(0) // Business days in month
@@ -831,8 +850,8 @@ model ExportGestoria {
   empresaId String
 
   // Period
-  mes  Int // 1-12
-  anio Int // 2024, 2025, etc.
+  mes  Int @db.SmallInt // 1-12
+  anio Int @db.SmallInt // 2024-2099
 
   // File reference
   archivoUrl    String @db.Text // Local path or S3 URL
@@ -887,6 +906,7 @@ model SolicitudCambio {
   @@index([empleadoId])
   @@index([aprobadorId])
   @@index([estado])
+  @@index([empresaId, estado]) // Composite index for filtering by company and status
   @@map("solicitudes_cambio")
 }
 
@@ -928,6 +948,8 @@ model AutoCompletado {
   @@index([tipo])
   @@index([estado])
   @@index([expiraEn])
+  @@index([empresaId, tipo, estado]) // Composite index for combined filters
+  @@index([empresaId, estado, expiraEn]) // Composite index for auto-approval queries
   @@map("auto_completados")
 }
 
@@ -1040,8 +1062,8 @@ model OnboardingEmpleado {
   fechaCompletado DateTime?
 
   // Progress tracking (JSONB)
-  // { "datos_personales": boolean, "datos_bancarios": boolean, "datos_documentos": boolean }
-  progreso Json @default("{\"datos_personales\": false, \"datos_bancarios\": false, \"datos_documentos\": false}")
+  // { "credenciales_completadas": boolean, "datos_personales": boolean, "datos_bancarios": boolean, "datos_documentos": boolean }
+  progreso Json @default("{\"credenciales_completadas\": false, \"datos_personales\": false, \"datos_bancarios\": false, \"datos_documentos\": false}")
 
   // Temporary data storage (JSONB) until onboarding is completed
   // Stores form data from each step before final commit to Empleado
