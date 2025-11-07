@@ -12,7 +12,7 @@ export interface BalanceDia {
   horasEsperadas: number;
   balance: number; // + o -
   esFestivo: boolean;
-  esFinDeSemana: boolean;
+  esNoLaborable: boolean; // Calculado del calendario laboral de la empresa (no hardcoded)
 }
 
 export interface BalancePeriodo {
@@ -138,6 +138,19 @@ export async function calcularBalancePeriodo(
     festivos.map(f => f.fecha.toISOString().split('T')[0])
   );
 
+  // ✅ OPTIMIZACIÓN: Pre-cargar calendario laboral de la empresa (evita N+1)
+  const { esDiaLaborable } = await import('@/lib/calculos/dias-laborables');
+  const calendarioLaboralMap = new Map<string, boolean>();
+  
+  // Pre-calcular todos los días del rango
+  let fechaTemp = new Date(fechaInicio);
+  while (fechaTemp <= fechaFin) {
+    const fechaKey = fechaTemp.toISOString().split('T')[0];
+    const esLaborable = await esDiaLaborable(fechaTemp, empleado.empresaId);
+    calendarioLaboralMap.set(fechaKey, esLaborable);
+    fechaTemp.setDate(fechaTemp.getDate() + 1);
+  }
+
   // Calcular balance por día
   const dias: BalanceDia[] = [];
   let totalHorasTrabajadas = 0;
@@ -154,7 +167,7 @@ export async function calcularBalancePeriodo(
     const balance = horasTrabajadas - horasEsperadas;
 
     const esFestivo = fechasFestivas.has(fechaKey);
-    const esFinDeSemana = fechaActual.getDay() === 0 || fechaActual.getDay() === 6;
+    const esLaborable = calendarioLaboralMap.get(fechaKey) ?? true;
 
     dias.push({
       fecha: new Date(fechaActual),
@@ -162,7 +175,7 @@ export async function calcularBalancePeriodo(
       horasEsperadas,
       balance,
       esFestivo,
-      esFinDeSemana,
+      esNoLaborable: !esLaborable, // ✅ Calculado del calendario laboral (no hardcoded)
     });
 
     totalHorasTrabajadas += horasTrabajadas;

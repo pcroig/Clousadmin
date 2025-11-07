@@ -28,6 +28,8 @@ import {
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useApi } from '@/lib/hooks';
+import { getAvatarPlaceholderClasses } from '@/lib/design-system';
+import { cn } from '@/lib/utils';
 
 interface Preferencia {
   id: string;
@@ -246,7 +248,14 @@ export function PopoverMonitoreoCampana({
                           >
                           <Avatar className="w-8 h-8">
                             <AvatarImage src={pref.empleado.fotoUrl || undefined} />
-                            <AvatarFallback className="text-xs">
+                            <AvatarFallback
+                              className={cn(
+                                getAvatarPlaceholderClasses(
+                                  `${pref.empleado.nombre} ${pref.empleado.apellidos}`
+                                ),
+                                'text-xs font-medium'
+                              )}
+                            >
                               {getIniciales(pref.empleado.nombre, pref.empleado.apellidos)}
                             </AvatarFallback>
                           </Avatar>
@@ -305,7 +314,14 @@ export function PopoverMonitoreoCampana({
                           >
                           <Avatar className="w-8 h-8">
                             <AvatarImage src={pref.empleado.fotoUrl || undefined} />
-                            <AvatarFallback className="text-xs">
+                            <AvatarFallback
+                              className={cn(
+                                getAvatarPlaceholderClasses(
+                                  `${pref.empleado.nombre} ${pref.empleado.apellidos}`
+                                ),
+                                'text-xs font-medium'
+                              )}
+                            >
                               {getIniciales(pref.empleado.nombre, pref.empleado.apellidos)}
                             </AvatarFallback>
                           </Avatar>

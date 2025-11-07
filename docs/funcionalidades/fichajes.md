@@ -2,20 +2,28 @@
 
 ## Visión General
 
-El sistema de fichajes permite a los empleados registrar su jornada laboral completa (entrada, pausas y salida), vinculado a jornadas laborales configurables (fijas o flexibles). Incluye auto-completado inteligente con IA para fichajes incompletos.
+El sistema de fichajes permite a los empleados registrar su jornada laboral completa (entrada, pausas y salida), vinculado a jornadas laborales configurables (fijas o flexibles). Incluye validación automática de fichajes completos y cuadre masivo por HR para fichajes incompletos.
 
 ## Estados del Fichaje
 
 Cada fichaje (día completo) tiene un único estado que refleja su ciclo de vida:
 
-**Solo existen 4 estados únicos:**
+**Solo existen 3 estados únicos:**
 
 - **`en_curso`** - Estado por defecto. Fichaje creado automáticamente o fichaje manual iniciado (sin completar)
+- **`pendiente`** - Requiere revisión manual de HR (fichaje incompleto al cierre del día)
 - **`finalizado`** - Fichaje completo y aprobado (manual o tras aprobación HR)
-- **`revisado`** - Auto-completado por clasificador, listo para aprobación rápida HR
-- **`pendiente`** - Requiere revisión manual detallada de HR (fichajes sin eventos o problemáticos)
 
 **Nota importante**: El fichaje representa el día completo, mientras que los eventos (entrada, pausa_inicio, pausa_fin, salida) son acciones individuales dentro de ese día.
+
+### Workflow de Estados
+
+1. **Inicio del día**: El empleado ficha entrada → `en_curso`
+2. **Durante el día**: El empleado registra eventos → permanece `en_curso`
+3. **Fin del día (CRON 23:30)**:
+   - Si el fichaje tiene todos los eventos requeridos según jornada → `finalizado`
+   - Si le faltan eventos o no hay fichaje para ese día laboral → `pendiente`
+4. **Cuadre HR**: HR revisa fichajes `pendiente`, crea eventos faltantes → `finalizado`
 
 **Ver sección completa "Estados del Fichaje (Día Completo)" más abajo para detalles del workflow.**
 
@@ -147,111 +155,92 @@ Se calcula para:
 
 ---
 
-## 4. Auto-completado de Marcajes (Fase 3)
+## 4. Validación de Fichajes Completos
 
-### Detección de Incompletos
+### Sistema de Validación
 
-Para cada día laborable del mes:
-- ¿Tiene entrada? → Si no, marcar como incompleto
-- ¿Tiene salida? → Si no, marcar como incompleto
-- ¿Pausas coherentes? → Si inicio sin fin o viceversa, marcar como incompleto
+El sistema valida automáticamente si un fichaje está completo basándose en la jornada laboral del empleado. No utiliza IA, sino reglas determinísticas según el tipo de jornada.
 
-### Reglas de Auto-completado
+### Jornadas Fijas
 
-```javascript
-// Falta salida
-if (tiene_entrada && !tiene_salida) {
-  salida_autocompletada = jornada.hora_fin
-}
+**Eventos requeridos:**
+- `entrada` (hora de entrada configurada)
+- `salida` (hora de salida configurada)
+- `pausa_inicio` y `pausa_fin` (SOLO si están configuradas en la jornada)
 
-// Falta entrada
-if (!tiene_entrada && tiene_salida) {
-  entrada_autocompletada = jornada.hora_inicio
-}
-
-// Falta pausa obligatoria
-if (jornada.pausa_obligatoria && !tiene_pausa_completa) {
-  pausa_inicio = jornada.pausa_inicio
-  pausa_fin = jornada.pausa_fin
-}
-
-// Sin fichajes en todo el día
-if (no_tiene_fichajes) {
-  // Crear jornada completa teórica
-  entrada = jornada.hora_inicio
-  pausa_inicio = jornada.pausa_inicio
-  pausa_fin = jornada.pausa_fin
-  salida = jornada.hora_fin
-}
-```
-
-### Clasificación con IA
-
-Sistema evalúa cada fichaje auto-completado con OpenAI:
-
-**Factores evaluados:**
-- Sin fichajes en día laborable sin ausencia
-- Desviación de horas vs jornada teórica
-- Patrón inusual vs histórico (últimos 30 días)
-- Días consecutivos con problemas
-- Conflictos con ausencias/festivos
-
-**Resultado:**
+**Ejemplo de configuración:**
 ```json
 {
-  "alerta": true/false,
-  "motivo": "Sin fichajes en día laborable",
-  "score": 0-100
+  "tipo": "fija",
+  "lunes": {
+    "activo": true,
+    "entrada": "09:00",
+    "salida": "18:00",
+    "pausa_inicio": "14:00",
+    "pausa_fin": "15:00"
+  }
 }
 ```
 
-- **score < 70**: Auto-completado normal
-- **score ≥ 70**: Requiere revisión manual (alerta)
+### Jornadas Flexibles
 
-### Proceso de Aprobación
+**Eventos requeridos:**
+- `entrada` (el empleado decide cuándo)
+- `salida` (según horas semanales / días activos)
+- `pausa_inicio` y `pausa_fin` (SOLO si `descansoMinimo` está configurado)
 
-#### Workflow Automático (CRON Nocturno)
-1. **23:30 cada noche**: CRON ejecuta clasificador
-2. Sistema crea fichajes automáticos para empleados disponibles sin fichaje (estado `en_curso`)
-3. Clasificador analiza fichajes incompletos y decide:
-   - **Auto-completar** → estado `revisado` (confianza alta, listo para aprobación rápida)
-   - **Revisión manual** → estado `pendiente` (patrones irregulares, sin eventos, pausas sin cerrar)
+**Ejemplo de configuración:**
+```json
+{
+  "tipo": "flexible",
+  "descansoMinimo": "00:30",
+  "lunes": { "activo": true },
+  "martes": { "activo": true }
+}
+```
 
-#### Workflow HR (Manual)
-1. **Widget HR (Auto-completed)**: Muestra contadores de auto-completados por tipo.
-   - Botón "Check" en Fichajes: cambia masivamente `revisado` → `finalizado` y archiva las entradas auto-completadas (contador vuelve a 0).
-   - Ausencias y Solicitudes siguen el mismo patrón (cuando se implementen sus auto-completados).
+### Ausencias de Medio Día
 
-2. **HR ejecuta "Cuadrar fichajes"** (antes "Actualizar marcajes"): 
-   - Clasificador analiza fichajes del rango seleccionado (manual).
-   - La tabla muestra la vista previa del fichaje propuesto basada en la jornada del empleado (entrada, pausa opcional, salida).
-   - Acciones: "Seleccionar todos" y "Actualizar". Se pueden abrir ediciones puntuales por fila.
-   - Al actualizar, se crean los eventos faltantes según jornada, se recalculan horas y el fichaje pasa a `finalizado` (balance diario 0 si aplica jornada fija con descanso).
+Si un empleado tiene ausencia de medio día:
+- **Ausencia de mañana**: No se requiere `entrada` ni pausas de la mañana
+- **Ausencia de tarde**: No se requiere `salida` ni pausas de la tarde
 
-### Estados del Fichaje (Día Completo)
+Los eventos requeridos se reducen proporcionalmente.
 
-Los fichajes tienen UN SOLO estado que representa el ciclo completo del día. **Solo existen 4 estados:**
+### CRON Nocturno (Cierre de Jornadas)
 
-1. **`en_curso`**: Inicio del día o fichaje incompleto (sin eventos o sin cerrar). Estado por defecto cuando se crea el fichaje automáticamente para un día laboral.
+**Ejecución**: Todas las noches a las 23:30
 
-2. **`finalizado`**: Fichaje completo y aprobado. Puede ser:
-   - Fichaje manual completo (empleado fichó entrada y salida correctamente)
-   - Fichaje auto-completado y aprobado por HR (desde estado `revisado` o `pendiente`)
+**Proceso:**
+1. Para cada empresa activa, procesa el día anterior
+2. Para cada empleado con día laboral:
+   - Si **NO tiene fichaje**: Crea fichaje con estado `pendiente`
+   - Si **tiene fichaje `en_curso`**:
+     - Valida si está completo según su jornada
+     - Si completo → estado `finalizado`
+     - Si incompleto → estado `pendiente`
 
-3. **`revisado`**: Auto-completado por el clasificador nocturno, listo para aprobación rápida por HR. Al hacer check en el widget o aprobar, pasa a `finalizado`.
+### Cuadrar Fichajes (HR)
 
-4. **`pendiente`**: Requiere revisión manual detallada de HR. Se usa para:
-   - Fichajes incompletos o sin eventos (creados automáticamente)
-   - Fichajes con patrones irregulares
-   - Fichajes rechazados por HR (quedan en `pendiente` con `motivoRechazo`)
+**Acceso**: Solo HR Admin y Managers (para su equipo)
 
-**Workflow de estados:**
-- `en_curso` → Si empleado completa manualmente → `finalizado`
-- `en_curso` → Si clasificador auto-completa (confianza alta) → `revisado`
-- `en_curso` → Si clasificador requiere revisión → `pendiente`
-- `revisado` → Si HR aprueba (check del widget o "Cuadrar fichajes") → `finalizado`
-- `pendiente` → Si HR aprueba en "Actualizar marcajes" → `finalizado`
-- `pendiente` → Si HR rechaza → `pendiente` (con `motivoRechazo`)
+**Funcionalidad:**
+1. **Listado**: Muestra todos los fichajes con estado `pendiente` de días anteriores
+2. **Vista previa**: Para cada fichaje muestra:
+   - Eventos registrados (verde)
+   - Eventos propuestos basados en jornada (azul)
+   - Razón de la pendencia
+3. **Cuadre masivo**: 
+   - Seleccionar múltiples fichajes
+   - Botón "Cuadrar" crea eventos faltantes según jornada
+   - Considera ausencias de medio día (no crea eventos para períodos ausentes)
+   - Marca como `finalizado` y registra auditoría
+4. **Edición individual**: Abrir modal para editar eventos manualmente
+
+**Auditoría de cuadre:**
+- `cuadradoMasivamente`: Boolean (true si fue cuadrado desde esta funcionalidad)
+- `cuadradoPor`: ID del usuario que cuadró
+- `cuadradoEn`: Timestamp del cuadre
 
 **Nota importante**: Los EVENTOS de fichaje (`FichajeEvento`) NO tienen estado. Solo el fichaje completo (`Fichaje`) tiene estado. `aprobado` y `rechazado` NO son estados, son resultados del workflow que se registran en campos de aprobación (`aprobadoPor`, `fechaAprobacion`, `motivoRechazo`).
 
@@ -278,19 +267,20 @@ Los fichajes tienen UN SOLO estado que representa el ciclo completo del día. **
 ✅ No puede reanudar si no está en pausa
 ✅ No puede finalizar si no tiene entrada o está en pausa
 
-### Al Auto-completar
+### Al Validar (CRON o Cuadrar)
 
 ✅ Solo días laborables (excluir festivos y fines de semana)
-✅ Solo días sin ausencia aprobada
-✅ Respetar jornada teórica del empleado en ese día
-✅ Si jornada cambió mid-mes, usar jornada vigente en ese día
+✅ Solo días sin ausencia de día completo (ausencias de medio día SÍ requieren fichaje)
+✅ Validar eventos según tipo de jornada (fija/flexible)
+✅ Considerar ausencias de medio día al validar eventos requeridos
+✅ Pausas obligatorias solo si están configuradas (`pausa_inicio`/`pausa_fin` o `descansoMinimo`)
 
-### Al Aprobar
+### Al Aprobar/Cuadrar
 
-✅ Manager solo aprueba su equipo
-✅ HR aprueba cualquier empleado
-✅ No se pueden aprobar marcajes con alerta sin revisar
-✅ Marcajes rechazados requieren corrección de empleado
+✅ Manager solo puede cuadrar fichajes de su equipo
+✅ HR Admin puede cuadrar fichajes de cualquier empleado
+✅ Solo se pueden cuadrar fichajes con estado `pendiente` o `en_curso`
+✅ Al cuadrar, registrar auditoría completa (quién, cuándo, masivo/individual)
 
 ---
 
@@ -304,7 +294,7 @@ Los fichajes tienen UN SOLO estado que representa el ciclo completo del día. **
 | Ver todos los fichajes | ❌ | ❌ | ✅ |
 | Solicitar corrección de fichaje | ✅ | ✅ | ❌ |
 | Aprobar fichajes | ❌ | ✅ (su equipo) | ✅ (todos) |
-| Ejecutar auto-completado | ❌ | ❌ | ✅ |
+| Cuadrar fichajes masivamente | ❌ | ✅ (su equipo) | ✅ (todos) |
 | Configurar jornadas | ❌ | ❌ | ✅ |
 | Asignar jornadas | ❌ | ❌ | ✅ |
 
@@ -390,15 +380,21 @@ model Fichaje {
   
   // Estado del fichaje completo (UN SOLO ESTADO para todo el día)
   estado          String   @default("en_curso") @db.VarChar(50)
-  // Valores (4 estados únicos): 'en_curso', 'finalizado', 'revisado', 'pendiente'
+  // Valores (3 estados únicos): 'en_curso', 'pendiente', 'finalizado'
   
   // Cálculos agregados
   horasTrabajadas Decimal?  @db.Decimal(5, 2)
   horasEnPausa    Decimal?  @db.Decimal(5, 2)
   
-  // Auto-completion
+  // Auditoría de cuadre masivo
+  cuadradoMasivamente Boolean   @default(false)
+  cuadradoPor         String?
+  cuadradoEn          DateTime?
+  
+  // Legacy (mantener por compatibilidad aunque deprecated)
   autoCompletado  Boolean   @default(false)
-  fechaAprobacion DateTime? // Fecha en que fue aprobado/finalizado por HR
+  fechaAprobacion DateTime? // Compatibilidad histórica; no se usa en nuevos flujos
+
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
   
@@ -433,7 +429,7 @@ model Jornada {
   empresaId       String
   nombre          String   // 'Jornada Completa 40h'
   horasSemanales  Decimal  // 40.00
-  config          Json     // { lunes: { activo, entrada, pausa_inicio?, pausa_fin?, salida }, ... }
+  config          Json     // Ejemplos: fija { lunes: { activo, entrada, pausa_inicio?, pausa_fin?, salida }, ... } | flexible { tipo: "flexible", descansoMinimo?: "HH:mm", lunes: { activo: true }, ... }
   esPredefinida   Boolean  @default(false)
   activa          Boolean  @default(true)
   createdAt       DateTime @default(now())
@@ -460,14 +456,12 @@ model Jornada {
 | `/api/fichajes/eventos/[id]` | PATCH | Edita evento (tipo, hora, motivoEdicion) | ✅ |
 | `/api/fichajes/eventos/[id]` | DELETE | Elimina evento del fichaje | ✅ |
 
-### Auto-completado y Revisión
+### Cuadrar Fichajes
 
 | Endpoint | Método | Descripción | Auth |
 |----------|--------|-------------|------|
-| `/api/fichajes/clasificar` | POST | Ejecuta clasificador IA manualmente. Analiza fichajes incompletos | HR |
-| `/api/fichajes/revision` | POST | Cuadrar fichajes manualmente. Crea eventos según jornada, finaliza fichajes | HR |
-| `/api/fichajes/aprobar-revisados` | POST | Aprueba masivamente fichajes en estado `revisado` → `finalizado` | HR |
-| `/api/fichajes/limpiar-revisados` | POST | Limpia auto-completados de fichajes. Similar a "check" del widget | HR |
+| `/api/fichajes/revision` | GET | Obtener fichajes pendientes de revisión (estado `pendiente`, días anteriores) | HR |
+| `/api/fichajes/cuadrar` | POST | Cuadrar fichajes masivamente. Crea eventos faltantes según jornada y marca como `finalizado` | HR |
 
 ### Estadísticas
 
@@ -479,9 +473,9 @@ model Jornada {
 
 | Endpoint | Método | Descripción | Auth |
 |----------|--------|-------------|------|
-| `/api/cron/clasificar-fichajes` | POST | CRON job nocturno (23:30). Crea fichajes automáticos y clasifica | CRON_SECRET |
+| `/api/cron/clasificar-fichajes` | POST | CRON job nocturno (23:30). Crea fichajes pendientes y valida fichajes en curso | CRON_SECRET |
 
-**Nota**: Los endpoints de auto-completado requieren `CRON_SECRET` en headers para protección.
+**Nota**: Los endpoints CRON requieren `CRON_SECRET` en headers para protección.
 
 ### ProcesamientoMarcajes
 
@@ -526,38 +520,67 @@ model ProcesamientoMarcajes {
 // 5. Actualiza horasTrabajadas del fichaje
 ```
 
-### Auto-completar Fichajes (HR)
+### Obtener Fichajes Pendientes (HR)
 
 ```typescript
-// POST /api/fichajes/revision
+// GET /api/fichajes/revision
+
+// Sistema retorna:
 {
-  "fechaInicio": "2025-10-01",
-  "fechaFin": "2025-10-31",
-  "empleadoId": "uuid" // Opcional, si no se proporciona procesa todos
+  "fichajes": [
+    {
+      "id": "fichaje-uuid",
+      "fichajeId": "fichaje-uuid",
+      "empleadoId": "empleado-uuid",
+      "empleadoNombre": "Juan Pérez",
+      "fecha": "2025-11-06T00:00:00.000Z",
+      "eventos": [
+        // Vista previa con eventos propuestos (azul) y registrados (verde)
+        { "tipo": "entrada", "hora": "2025-11-06T09:00:00.000Z", "origen": "propuesto" },
+        { "tipo": "pausa_inicio", "hora": "2025-11-06T14:00:00.000Z", "origen": "propuesto" },
+        { "tipo": "pausa_fin", "hora": "2025-11-06T15:00:00.000Z", "origen": "propuesto" },
+        { "tipo": "salida", "hora": "2025-11-06T18:00:00.000Z", "origen": "propuesto" }
+      ],
+      "eventosRegistrados": [
+        // Eventos que el empleado ya fichó
+      ],
+      "razon": "Faltan eventos: entrada, salida",
+      "eventosFaltantes": ["entrada", "salida"]
+    }
+  ]
+}
+```
+
+### Cuadrar Fichajes Masivamente (HR)
+
+```typescript
+// POST /api/fichajes/cuadrar
+{
+  "fichajeIds": ["fichaje-uuid-1", "fichaje-uuid-2", "fichaje-uuid-3"]
 }
 
 // Sistema automáticamente:
-// 1. Encuentra fichajes incompletos en el rango
-// 2. Para cada uno, crea eventos según jornada del empleado
-// 3. Recalcula horasTrabajadas y horasEnPausa
-// 4. Cambia estado a 'finalizado'
-```
+// 1. Verifica ausencias de medio día del empleado
+// 2. Para cada fichaje, valida qué eventos faltan (considerando ausencias)
+// 3. Crea eventos faltantes según jornada del empleado (fija o flexible)
+//    - Jornada fija: usa horarios configurados
+//    - Jornada flexible: calcula horarios basándose en horas semanales
+//    - NO crea eventos para períodos con ausencia de medio día
+// 4. Recalcula horasTrabajadas y horasEnPausa
+// 5. Cambia estado a 'finalizado'
+// 6. Registra auditoría: cuadradoMasivamente=true, cuadradoPor, cuadradoEn
 
-### Aprobar Fichajes Revisados (HR)
-
-```typescript
-// POST /api/fichajes/aprobar-revisados
-// Sin body, aprueba todos los fichajes con estado 'revisado'
-
-// Sistema automáticamente:
-// 1. Busca todos los fichajes con estado 'revisado'
-// 2. Cambia estado a 'finalizado'
-// 3. Archiva auto-completados relacionados
-// 4. Retorna count de fichajes aprobados
+// Respuesta:
+{
+  "success": true,
+  "cuadrados": 3,
+  "errores": [],
+  "mensaje": "3 fichajes cuadrados correctamente"
+}
 ```
 
 ---
 
-**Versión**: 2.1
-**Última actualización**: 25 octubre 2025
-**Estado**: Fase 1 y 2 implementadas, Fase 3 (auto-completado IA) en desarrollo
+**Versión**: 3.0
+**Última actualización**: 6 noviembre 2025
+**Estado**: Sistema de validación basado en eventos completos implementado. Auto-completado IA eliminado en favor de validación determinística.

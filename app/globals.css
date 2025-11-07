@@ -16,8 +16,8 @@
   --color-text-secondary: #6B6A64;
   --color-text-disabled: #B0AFA9;
 
-  --color-accent: #F26C21;
-  --color-accent-hover: #D45A1B;
+  --color-accent: #d97757;
+  --color-accent-hover: #c6613f;
   --color-accent-active: #B84915;
   --color-accent-light: #FFF4ED;
 
@@ -56,8 +56,8 @@
   --color-ring: var(--color-accent);
 
   /* Chart colors (using accent variations) */
-  --color-chart-1: #F26C21;
-  --color-chart-2: #D45A1B;
+  --color-chart-1: #d97757;
+  --color-chart-2: #c6613f;
   --color-chart-3: #16A34A;
   --color-chart-4: #0284C7;
   --color-chart-5: #EA580C;
@@ -96,8 +96,8 @@
   --text-secondary: #6B6A64;
   --text-disabled: #B0AFA9;
 
-  --accent: #F26C21;
-  --accent-hover: #D45A1B;
+  --accent: #d97757;
+  --accent-hover: #c6613f;
   --accent-active: #B84915;
   --accent-light: #FFF4ED;
 
@@ -151,8 +151,8 @@
   --input: var(--border-input);
   --ring: var(--accent);
 
-  --chart-1: #F26C21;
-  --chart-2: #D45A1B;
+  --chart-1: #d97757;
+  --chart-2: #c6613f;
   --chart-3: #16A34A;
   --chart-4: #0284C7;
   --chart-5: #EA580C;

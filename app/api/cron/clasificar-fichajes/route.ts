@@ -1,139 +1,180 @@
 // ========================================
-// CRON: Clasificar Fichajes Incompletos
+// CRON: Cerrar Jornadas del Día Anterior
 // ========================================
-// Se ejecuta automáticamente cada noche a las 23:30 (configurado en AWS EventBridge)
-// Procesa todas las empresas activas
 //
-// AWS EventBridge Setup:
-// 1. Crear regla en EventBridge con schedule: cron(30 23 * * ? *)
-// 2. Target: API Gateway/ALB -> POST a esta URL
-// 3. Agregar header: x-cron-secret: ${CRON_SECRET}
+// Funcionalidad:
+// 1. Para cada empresa activa, procesar empleados del día anterior
+// 2. Si un empleado no tiene fichaje del día anterior:
+//    - Verificar si es día laboral (jornada + festivos + ausencias)
+//    - Si es laboral, crear fichaje en estado 'pendiente' (para cuadrar)
+// 3. Si un empleado tiene fichaje en estado 'en_curso':
+//    - Validar si el fichaje está completo según su jornada
+//    - Si está completo: marcar como 'finalizado'
+//    - Si está incompleto: marcar como 'pendiente' (para cuadrar)
+//
+// Se ejecuta todas las noches a las 23:30
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import {
-  clasificarFichajesIncompletos,
-  aplicarAutoCompletado,
-  guardarRevisionManual,
-} from '@/lib/ia/clasificador-fichajes';
+  validarFichajeCompleto,
+  actualizarCalculosFichaje,
+  obtenerEmpleadosDisponibles,
+} from '@/lib/calculos/fichajes';
 
 export async function POST(request: NextRequest) {
   try {
-    // 1. Verificar header de seguridad (AWS EventBridge)
-    const cronSecret = request.headers.get('x-cron-secret');
-    const expectedSecret = process.env.CRON_SECRET;
-
-    if (!expectedSecret) {
-      console.error('[CRON] CRON_SECRET no configurado en variables de entorno');
-      return NextResponse.json(
-        { error: 'Configuración inválida' },
-        { status: 500 }
-      );
+    // Verificar CRON_SECRET
+    const cronSecret = request.headers.get('authorization');
+    if (cronSecret !== `Bearer ${process.env.CRON_SECRET}`) {
+      return new Response('Unauthorized', { status: 401 });
     }
 
-    if (cronSecret !== expectedSecret) {
-      console.error('[CRON] Intento de acceso no autorizado');
-      return NextResponse.json(
-        { error: 'No autorizado' },
-        { status: 401 }
-      );
-    }
+    console.log('[CRON Cerrar Jornadas] Iniciando proceso...');
 
-    console.log('[CRON] Iniciando clasificación nocturna de fichajes');
-    const inicio = Date.now();
-
-    // 2. Obtener todas las empresas activas
-    const empresas = await prisma.empresa.findMany({
-      select: {
-        id: true,
-        nombre: true,
-      },
-    });
-
-    console.log('[CRON] Empresas a procesar:', empresas.length);
-
-    // 3. Fecha a clasificar: día anterior
+    // Fecha de ayer (el día que queremos cerrar)
     const ayer = new Date();
     ayer.setDate(ayer.getDate() - 1);
     ayer.setHours(0, 0, 0, 0);
 
-    const resultados = [];
+    console.log(`[CRON Cerrar Jornadas] Procesando día: ${ayer.toISOString().split('T')[0]}`);
 
-    // 4. Procesar cada empresa
+    // Obtener todas las empresas activas
+    const empresas = await prisma.empresa.findMany({
+      where: {
+        activa: true,
+      },
+    });
+
+    let fichajesCreados = 0;
+    let fichajesPendientes = 0;
+    let fichajesFinalizados = 0;
+    const errores: string[] = [];
+
     for (const empresa of empresas) {
       try {
-        console.log(`[CRON] Procesando empresa: ${empresa.nombre} (${empresa.id})`);
+        console.log(`[CRON Cerrar Jornadas] Procesando empresa: ${empresa.nombre}`);
 
-        // 4.1. Primero crear fichajes automáticos para empleados disponibles sin fichaje
-        const { crearFichajesAutomaticos } = await import('@/lib/calculos/fichajes');
-        const resultadoCreacion = await crearFichajesAutomaticos(empresa.id, ayer);
-        console.log(`[CRON] Fichajes creados: ${resultadoCreacion.creados}, errores: ${resultadoCreacion.errores.length}`);
+        // Obtener empleados que deberían trabajar ese día
+        const empleadosDisponibles = await obtenerEmpleadosDisponibles(empresa.id, ayer);
 
-        // 4.2. Luego clasificar fichajes existentes
-        const { autoCompletar, revisionManual } = await clasificarFichajesIncompletos(
-          empresa.id,
-          ayer
-        );
+        console.log(`[CRON Cerrar Jornadas] ${empleadosDisponibles.length} empleados disponibles en ${empresa.nombre}`);
 
-        // Aplicar auto-completados
-        const resultadoAutoCompletar = await aplicarAutoCompletado(
-          autoCompletar,
-          empresa.id
-        );
+        for (const empleado of empleadosDisponibles) {
+          try {
+            // Buscar fichaje del día anterior
+            let fichaje = await prisma.fichaje.findUnique({
+              where: {
+                empleadoId_fecha: {
+                  empleadoId: empleado.id,
+                  fecha: ayer,
+                },
+              },
+              include: {
+                eventos: true,
+              },
+            });
 
-        // Guardar revisiones manuales
-        const resultadoRevision = await guardarRevisionManual(
-          empresa.id,
-          revisionManual
-        );
+            // Si no existe fichaje, crear uno en estado pendiente
+            if (!fichaje) {
+              fichaje = await prisma.fichaje.create({
+                data: {
+                  empresaId: empresa.id,
+                  empleadoId: empleado.id,
+                  fecha: ayer,
+                  estado: 'pendiente',
+                },
+                include: {
+                  eventos: true,
+                },
+              });
 
-        resultados.push({
-          empresaId: empresa.id,
-          empresaNombre: empresa.nombre,
-          autoCompletados: resultadoAutoCompletar.completados,
-          enRevision: resultadoRevision.guardados,
-          errores: [
-            ...resultadoAutoCompletar.errores,
-            ...resultadoRevision.errores,
-          ],
-        });
+              console.log(`[CRON Cerrar Jornadas] Fichaje creado para ${empleado.nombre} ${empleado.apellidos}`);
+              fichajesCreados++;
+              fichajesPendientes++;
+              continue;
+            }
 
+            // Si el fichaje está en curso, validarlo
+            if (fichaje.estado === 'en_curso') {
+              // Validar si está completo
+              const validacion = await validarFichajeCompleto(fichaje.id);
+
+              // Actualizar cálculos
+              await actualizarCalculosFichaje(fichaje.id);
+
+              if (validacion.completo) {
+                // Fichaje completo: finalizar
+                await prisma.fichaje.update({
+                  where: { id: fichaje.id },
+                  data: {
+                    estado: 'finalizado',
+                  },
+                });
+
+                console.log(`[CRON Cerrar Jornadas] Fichaje finalizado: ${empleado.nombre} ${empleado.apellidos}`);
+                fichajesFinalizados++;
+              } else {
+                // Fichaje incompleto: pendiente de cuadrar
+                await prisma.fichaje.update({
+                  where: { id: fichaje.id },
+                  data: {
+                    estado: 'pendiente',
+                  },
+                });
+
+                console.log(`[CRON Cerrar Jornadas] Fichaje pendiente: ${empleado.nombre} ${empleado.apellidos} - ${validacion.razon}`);
+                fichajesPendientes++;
+              }
+            }
+          } catch (error) {
+            const mensaje = `Error procesando empleado ${empleado.nombre} ${empleado.apellidos}: ${
+              error instanceof Error ? error.message : 'Error desconocido'
+            }`;
+            errores.push(mensaje);
+            console.error(`[CRON Cerrar Jornadas] ${mensaje}`);
+          }
+        }
       } catch (error) {
-        console.error(`[CRON] Error procesando empresa ${empresa.nombre}:`, error);
-        resultados.push({
-          empresaId: empresa.id,
-          empresaNombre: empresa.nombre,
-          error: error instanceof Error ? error.message : 'Error desconocido',
-        });
+        const mensaje = `Error procesando empresa ${empresa.nombre}: ${
+          error instanceof Error ? error.message : 'Error desconocido'
+        }`;
+        errores.push(mensaje);
+        console.error(`[CRON Cerrar Jornadas] ${mensaje}`);
       }
     }
 
-    const duracion = Date.now() - inicio;
-
-    console.log('[CRON] Clasificación completada:', {
-      empresas: empresas.length,
-      duracion: `${duracion}ms`,
-      totalAutoCompletados: resultados.reduce((acc, r) => acc + (r.autoCompletados || 0), 0),
-      totalEnRevision: resultados.reduce((acc, r) => acc + (r.enRevision || 0), 0),
-    });
-
-    return NextResponse.json({
+    const resultado = {
       success: true,
       fecha: ayer.toISOString().split('T')[0],
-      empresasProcesadas: empresas.length,
-      duracion: `${duracion}ms`,
-      resultados,
-    });
+      empresas: empresas.length,
+      fichajesCreados,
+      fichajesPendientes,
+      fichajesFinalizados,
+      errores,
+    };
 
-  } catch (error) {
-    console.error('[CRON] Error fatal:', error);
-    return NextResponse.json(
-      {
-        error: 'Error en clasificación nocturna',
-        detalle: error instanceof Error ? error.message : 'Error desconocido',
+    console.log('[CRON Cerrar Jornadas] Proceso completado:', resultado);
+
+    return new Response(JSON.stringify(resultado), {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/json',
       },
-      { status: 500 }
+    });
+  } catch (error) {
+    console.error('[CRON Cerrar Jornadas] Error fatal:', error);
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error: error instanceof Error ? error.message : 'Error desconocido',
+      }),
+      {
+        status: 500,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      }
     );
   }
 }
-

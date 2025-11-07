@@ -59,7 +59,7 @@ export const SolicitudesWidget = memo(function SolicitudesWidget({
           solicitudesMostradas.map((solicitud) => (
             <div
               key={solicitud.id}
-              className="py-3 border-b border-gray-200 last:border-0 hover:bg-gray-50 transition-colors px-2 -mx-2"
+              className="py-2.5 border-b border-gray-200 last:border-0 hover:bg-gray-50 transition-colors px-2 -mx-2"
             >
               <div className="flex items-start gap-3">
                 <div className="w-10 h-10 rounded-full bg-stone-200 flex items-center justify-center text-[13px] font-semibold text-stone-700 flex-shrink-0">

@@ -30,7 +30,7 @@ export default async function PayrollPage() {
       id: true,
       mes: true,
       anio: true,
-      salarioBruto: true,
+      totalBruto: true,
       tieneAnomalias: true,
       verificado: true,
     },
@@ -42,8 +42,8 @@ export default async function PayrollPage() {
   );
 
   // Calcular total bruto del mes actual
-  const totalBruto = nominasMesActual.reduce((sum, n) => {
-    return sum + Number(n.salarioBruto);
+  const totalBrutoMes = nominasMesActual.reduce((sum, n) => {
+    return sum + Number(n.totalBruto);
   }, 0);
 
   // Contar nóminas pendientes de revisión (con anomalías o sin verificar)
@@ -57,7 +57,7 @@ export default async function PayrollPage() {
   return (
     <PayrollClient
       nominasMesActual={nominasMesActual.length}
-      totalBruto={totalBruto}
+      totalBruto={totalBrutoMes}
       pendientesRevision={pendientesRevision}
       hayNominas={hayNominas}
       mesActual={mesActual}

@@ -174,6 +174,12 @@ export async function POST(request: NextRequest) {
         },
       });
 
+      // Garantizar vínculo bidireccional usuario <-> empleado
+      await tx.usuario.update({
+        where: { id: usuario.id },
+        data: { empleadoId: empleado.id },
+      });
+
       // Asignar equipos si se proporcionaron
       if (body.equipoIds && Array.isArray(body.equipoIds) && body.equipoIds.length > 0) {
         await tx.empleadoEquipo.createMany({
@@ -183,6 +189,24 @@ export async function POST(request: NextRequest) {
           })),
         });
       }
+
+      // Crear carpetas del sistema automáticamente
+      const carpetasSistema = [
+        { nombre: 'Nóminas', esSistema: true },
+        { nombre: 'Contratos', esSistema: true },
+        { nombre: 'Justificantes', esSistema: true },
+        { nombre: 'Médicos', esSistema: true },
+        { nombre: 'Otros documentos', esSistema: true },
+      ];
+
+      await tx.carpeta.createMany({
+        data: carpetasSistema.map((carpeta) => ({
+          empresaId: session.user.empresaId,
+          empleadoId: empleado.id,
+          nombre: carpeta.nombre,
+          esSistema: carpeta.esSistema,
+        })),
+      });
 
       return { usuario, empleado };
     });

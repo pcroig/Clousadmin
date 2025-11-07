@@ -1,0 +1,74 @@
+// ========================================
+// Onboarding Simplificado Page - Existing Employee Setup
+// ========================================
+// Página de onboarding simplificado para empleados existentes
+// 3 pasos: Credenciales (avatar + contraseña) + Integraciones + PWA
+
+import { GalleryVerticalEnd } from 'lucide-react';
+import Link from 'next/link';
+import { verificarTokenOnboarding, type ProgresoOnboardingSimplificado, type DatosTemporales } from '@/lib/onboarding';
+import { OnboardingSimplificadoForm } from './onboarding-simplificado-form';
+import { redirect } from 'next/navigation';
+
+export default async function OnboardingSimplificadoPage({
+  params,
+}: {
+  params: { token: string };
+}) {
+  const { token } = params;
+  const { valido, onboarding, error } = await verificarTokenOnboarding(token);
+
+  // Verificar que sea onboarding simplificado
+  if (valido && onboarding && onboarding.tipoOnboarding !== 'simplificado') {
+    // Si es onboarding completo, redirigir a la página correcta
+    redirect(`/onboarding/${token}`);
+  }
+
+  return (
+    <div className="grid min-h-svh lg:grid-cols-2">
+      <div className="flex flex-col gap-4 p-6 md:p-10">
+        <div className="flex justify-center gap-2 md:justify-start">
+          <Link href="/" className="flex items-center gap-2 font-medium">
+            <div className="bg-primary text-primary-foreground flex size-6 items-center justify-center rounded-md">
+              <GalleryVerticalEnd className="size-4" />
+            </div>
+            Clousadmin
+          </Link>
+        </div>
+        <div className="flex flex-1 items-start justify-start pt-8">
+          <div className="w-full max-w-xl">
+            {!valido ? (
+              <div className="space-y-4">
+                <h1 className="text-2xl font-bold text-red-600">
+                  Token de onboarding inválido
+                </h1>
+                <p className="text-gray-500">{error}</p>
+                <Link
+                  href="/login"
+                  className="inline-block text-sm text-primary hover:underline"
+                >
+                  Volver a login
+                </Link>
+              </div>
+            ) : (
+              <OnboardingSimplificadoForm
+                token={token}
+                empleado={onboarding!.empleado}
+                progreso={onboarding!.progreso as unknown as ProgresoOnboardingSimplificado}
+                datosTemporales={onboarding!.datosTemporales as unknown as DatosTemporales | null}
+              />
+            )}
+          </div>
+        </div>
+      </div>
+      <div className="bg-muted relative hidden lg:block">
+        <img
+          src="/login-hero.jpg"
+          alt="HR Management"
+          className="absolute inset-0 h-full w-full object-cover dark:brightness-[0.2] dark:grayscale"
+        />
+      </div>
+    </div>
+  );
+}
+

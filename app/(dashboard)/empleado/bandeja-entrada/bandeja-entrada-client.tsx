@@ -94,16 +94,17 @@ export function BandejaEntradaEmpleadoClient({
       ? notificaciones
       : notificaciones.filter((n) => n.tipo === filtro);
 
+  // Iconos sin fondo - siempre gris oscuro según sistema de diseño
   const getIcono = (tipo: string) => {
     switch (tipo) {
       case 'aprobada':
-        return <CheckCircle2 className="w-5 h-5 text-green-600" />;
+        return <CheckCircle2 className="w-5 h-5 text-gray-600" />;
       case 'rechazada':
-        return <XCircle className="w-5 h-5 text-red-600" />;
+        return <XCircle className="w-5 h-5 text-gray-600" />;
       case 'pendiente':
-        return <Clock className="w-5 h-5 text-yellow-600" />;
+        return <Clock className="w-5 h-5 text-gray-600" />;
       default:
-        return <Info className="w-5 h-5 text-blue-600" />;
+        return <Info className="w-5 h-5 text-gray-600" />;
     }
   };
 
@@ -190,54 +191,43 @@ export function BandejaEntradaEmpleadoClient({
             <p className="text-gray-500">No hay notificaciones</p>
           </div>
         ) : (
-          <div className="bg-white rounded-lg border border-gray-200 h-full overflow-y-auto">
-            {notificacionesFiltradas.map((notif, index) => (
-              <div key={notif.id}>
-                <div
-                  className={`p-4 cursor-pointer transition-all hover:bg-gray-50 ${
-                    !notif.leida ? 'border-l-4 border-l-blue-500' : 'pl-[20px]'
-                  }`}
-                  onClick={() => handleMarcarLeida(notif.id)}
-                >
-                  <div className="flex items-start gap-4">
-                    <div className={`p-2 rounded-lg ${
-                      notif.tipo === 'aprobada' ? 'bg-green-50 border border-green-200' :
-                      notif.tipo === 'rechazada' ? 'bg-red-50 border border-red-200' :
-                      notif.tipo === 'pendiente' ? 'bg-yellow-50 border border-yellow-200' :
-                      'bg-blue-50 border border-blue-200'
-                    }`}>
-                      {getIcono(notif.tipo)}
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <p className="text-sm font-semibold text-gray-900">
-                            {notif.titulo}
-                          </p>
-                          <p className="text-sm text-gray-600 mt-1">
-                            {notif.mensaje}
-                          </p>
-                        </div>
-                        {!notif.leida && (
-                          <div className="w-2 h-2 bg-blue-600 rounded-full ml-2 mt-2" />
-                        )}
+          <div className="space-y-3">
+            {notificacionesFiltradas.map((notif) => (
+              <div
+                key={notif.id}
+                className="bg-white rounded-lg border border-gray-200 p-6 hover:shadow-sm transition-shadow cursor-pointer"
+                onClick={() => handleMarcarLeida(notif.id)}
+              >
+                <div className="flex items-start gap-4">
+                  {/* Icono sin fondo - solo gris oscuro según sistema de diseño */}
+                  <div className="flex-shrink-0 pt-0.5">
+                    {getIcono(notif.tipo)}
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <p className="text-sm font-semibold text-gray-900">
+                          {notif.titulo}
+                        </p>
+                        <p className="text-sm text-gray-600 mt-1">
+                          {notif.mensaje}
+                        </p>
                       </div>
-                      <p className="text-xs text-gray-500 mt-2">
-                        {notif.fecha.toLocaleDateString('es-ES', {
-                          day: 'numeric',
-                          month: 'long',
-                          year: 'numeric',
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}
-                      </p>
+                      {!notif.leida && (
+                        <div className="w-2 h-2 bg-[#d97757] rounded-full ml-2 mt-2 flex-shrink-0" />
+                      )}
                     </div>
+                    <p className="text-xs text-gray-500 mt-2">
+                      {notif.fecha.toLocaleDateString('es-ES', {
+                        day: 'numeric',
+                        month: 'long',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
+                    </p>
                   </div>
                 </div>
-                {/* Separador entre notificaciones */}
-                {index < notificacionesFiltradas.length - 1 && (
-                  <div className="border-b border-gray-200" />
-                )}
               </div>
             ))}
           </div>

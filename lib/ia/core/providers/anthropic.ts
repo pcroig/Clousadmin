@@ -247,7 +247,8 @@ export function mapToAnthropicModel(genericModel: string): string {
   const modelMap: Record<string, string> = {
     // Modelos OpenAI recientes
     'gpt-4.1': 'claude-sonnet-4-5',
-    'gpt-4.1-mini': 'claude-haiku-4-5',
+    'gpt-4.1-mini-2025-04-14': 'claude-haiku-4-5',
+    'gpt-4.1-mini': 'claude-haiku-4-5', // Legacy - mantener para compatibilidad
     'gpt-5': 'claude-opus-4-1', // Razonamiento -> Opus
     'gpt-5-mini': 'claude-sonnet-4-5',
     'gpt-5-nano': 'claude-haiku-4-5',

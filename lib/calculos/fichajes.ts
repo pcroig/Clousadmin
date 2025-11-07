@@ -4,7 +4,8 @@
 // NUEVO MODELO: Fichaje = día completo, FichajeEvento = eventos individuales
 
 import { prisma } from '@/lib/prisma';
-import { Fichaje, FichajeEvento, Empleado } from '@prisma/client';
+import { Fichaje, FichajeEvento, Empleado, Ausencia } from '@prisma/client';
+import type { JornadaConfig, DiaConfig } from './fichajes-helpers';
 
 /**
  * Estados posibles del fichaje (del día completo)
@@ -228,22 +229,24 @@ export async function validarLimitesJornada(
     return { valido: true }; // Si no tiene jornada, no validar límites
   }
 
-  const config = empleado.jornada.config as any;
+  const config = empleado.jornada.config as JornadaConfig;
+  const limiteInferior = typeof config.limiteInferior === 'string' ? config.limiteInferior : undefined;
+  const limiteSuperior = typeof config.limiteSuperior === 'string' ? config.limiteSuperior : undefined;
 
-  if (config.limiteInferior || config.limiteSuperior) {
+  if (limiteInferior || limiteSuperior) {
     const horaFichaje = `${hora.getHours().toString().padStart(2, '0')}:${hora.getMinutes().toString().padStart(2, '0')}`;
 
-    if (config.limiteInferior && horaFichaje < config.limiteInferior) {
+    if (limiteInferior && horaFichaje < limiteInferior) {
       return {
         valido: false,
-        error: `No puedes fichar antes de ${config.limiteInferior}`,
+        error: `No puedes fichar antes de ${limiteInferior}`,
       };
     }
 
-    if (config.limiteSuperior && horaFichaje > config.limiteSuperior) {
+    if (limiteSuperior && horaFichaje > limiteSuperior) {
       return {
         valido: false,
-        error: `No puedes fichar después de ${config.limiteSuperior}`,
+        error: `No puedes fichar después de ${limiteSuperior}`,
       };
     }
   }
@@ -338,18 +341,20 @@ export async function obtenerHorasEsperadas(
   }
 
   const jornada = empleado.jornada;
-  const config = jornada.config as any;
+  const config = jornada.config as JornadaConfig;
 
   // Obtener día de la semana (0 = domingo, 1 = lunes, ...)
   const diaSemana = fecha.getDay();
   const nombresDias = ['domingo', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado'];
   const nombreDia = nombresDias[diaSemana];
+  const diaConfig = config[nombreDia] as DiaConfig | undefined;
 
-  if (config[nombreDia] && config[nombreDia].activo) {
+  if (diaConfig?.activo) {
     // Si tiene configuración específica para el día
-    const entrada = config[nombreDia].entrada; // e.g., "09:00"
-    const salida = config[nombreDia].salida; // e.g., "18:00"
-    const pausa = config[nombreDia].pausa || 0; // e.g., 1 hora
+    const entrada = diaConfig.entrada; // e.g., "09:00"
+    const salida = diaConfig.salida; // e.g., "18:00"
+    const pausaInicio = diaConfig.pausa_inicio; // e.g., "14:00"
+    const pausaFin = diaConfig.pausa_fin; // e.g., "15:00"
 
     if (entrada && salida) {
       const [horaE, minE] = entrada.split(':').map(Number);
@@ -359,14 +364,39 @@ export async function obtenerHorasEsperadas(
       const minutosSalida = horaS * 60 + minS;
 
       const minutosTrabajoTotal = minutosSalida - minutosEntrada;
-      const minutosTrabajoNeto = minutosTrabajoTotal - (pausa * 60);
+      
+      // Calcular pausa si está configurada
+      let minutosPausa = 0;
+      if (pausaInicio && pausaFin) {
+        const [horaPI, minPI] = pausaInicio.split(':').map(Number);
+        const [horaPF, minPF] = pausaFin.split(':').map(Number);
+        const minutosPausaInicio = horaPI * 60 + minPI;
+        const minutosPausaFin = horaPF * 60 + minPF;
+        minutosPausa = minutosPausaFin - minutosPausaInicio;
+      }
+      
+      const minutosTrabajoNeto = minutosTrabajoTotal - minutosPausa;
 
       return minutosTrabajoNeto / 60; // Convertir a horas
     }
   }
 
   // Jornada flexible: dividir horas semanales entre días activos
-  const diasActivos = Object.keys(config).filter(dia => config[dia]?.activo).length;
+  const diasActivos = Object.entries(config).reduce((count, [clave, valor]) => {
+    if (['tipo', 'descansoMinimo', 'limiteInferior', 'limiteSuperior'].includes(clave)) {
+      return count;
+    }
+
+    if (valor && typeof valor === 'object' && !Array.isArray(valor)) {
+      const configDia = valor as DiaConfig;
+      if (configDia.activo) {
+        return count + 1;
+      }
+    }
+
+    return count;
+  }, 0);
+
   if (diasActivos > 0) {
     return Number(jornada.horasSemanales) / diasActivos;
   }
@@ -408,7 +438,11 @@ export async function actualizarCalculosFichaje(fichajeId: string): Promise<void
 
 /**
  * Verifica si una fecha es día laboral para un empleado
- * Considera: jornada, festivos, ausencias, fines de semana
+ * Considera:
+ * - Calendario laboral de la empresa (diasLaborables config)
+ * - Festivos activos de la empresa
+ * - Jornada del empleado (días activos)
+ * - Ausencias de día completo del empleado
  */
 export async function esDiaLaboral(empleadoId: string, fecha: Date): Promise<boolean> {
   // Normalizar fecha (sin hora)
@@ -436,34 +470,35 @@ export async function esDiaLaboral(empleadoId: string, fecha: Date): Promise<boo
     return false;
   }
 
-  // 4. Verificar si es fin de semana
-  const { esFinDeSemana } = await import('@/lib/calculos/ausencias');
-  if (esFinDeSemana(fechaSinHora)) {
+  // 4. Verificar calendario laboral de la EMPRESA (días laborables + festivos)
+  const { esDiaLaborable } = await import('@/lib/calculos/dias-laborables');
+  const esLaborableEmpresa = await esDiaLaborable(fechaSinHora, empleado.empresaId);
+  
+  if (!esLaborableEmpresa) {
+    // El día no es laborable para la empresa (fin de semana según config o festivo)
     return false;
   }
 
-  // 5. Verificar configuración de jornada para ese día
+  // 5. Verificar configuración de JORNADA del empleado para ese día específico
+  // (El empleado puede tener días específicos no activos aunque la empresa trabaje)
   const diasSemana = ['domingo', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado'];
   const nombreDia = diasSemana[fechaSinHora.getDay()];
-  const config = empleado.jornada.config as any;
+  const config = empleado.jornada.config as JornadaConfig;
+  const diaConfig = config[nombreDia] as DiaConfig | undefined;
 
-  if (config[nombreDia] && config[nombreDia].activo === false) {
+  if (diaConfig && diaConfig.activo === false) {
     return false;
   }
 
-  // 6. Verificar festivos
-  const { esFestivo } = await import('@/lib/calculos/ausencias');
-  const esFestivoHoy = await esFestivo(fechaSinHora, empleado.empresaId);
-  if (esFestivoHoy) {
-    return false;
-  }
-
-  // 7. Verificar ausencias (aprobadas o pendientes)
+  // 6. Verificar ausencias (aprobadas o pendientes)
+  // IMPORTANTE: Solo excluir ausencias de día completo (no medio día)
+  // Si tiene ausencia de medio día, aún puede trabajar y debe fichar
   const ausencia = await prisma.ausencia.findFirst({
     where: {
       empleadoId,
+      medioDia: false, // Solo ausencias de día completo
       estado: {
-        in: ['aprobada', 'pendiente', 'auto_aprobada'],
+        in: ['aprobada', 'en_curso', 'auto_aprobada'],
       },
       fechaInicio: {
         lte: fechaSinHora,
@@ -567,4 +602,201 @@ export async function crearFichajesAutomaticos(
   }
 
   return { creados, errores };
+}
+
+/**
+ * Información sobre ausencia de medio día
+ */
+export interface AusenciaMedioDia {
+  tieneAusencia: boolean;
+  medioDia: 'mañana' | 'tarde' | null;
+  ausencia: Ausencia | null;
+}
+
+/**
+ * Obtiene información sobre ausencia de medio día para un empleado en una fecha
+ */
+export async function obtenerAusenciaMedioDia(
+  empleadoId: string,
+  fecha: Date
+): Promise<AusenciaMedioDia> {
+  const fechaSinHora = new Date(fecha.getFullYear(), fecha.getMonth(), fecha.getDate());
+  
+  const ausencia = await prisma.ausencia.findFirst({
+    where: {
+      empleadoId,
+      medioDia: true,
+      estado: {
+        in: ['aprobada', 'en_curso', 'auto_aprobada'],
+      },
+      fechaInicio: {
+        lte: fechaSinHora,
+      },
+      fechaFin: {
+        gte: fechaSinHora,
+      },
+    },
+  });
+
+  if (!ausencia) {
+    return {
+      tieneAusencia: false,
+      medioDia: null,
+      ausencia: null,
+    };
+  }
+
+  return {
+    tieneAusencia: true,
+    medioDia: 'mañana', // Por defecto mañana, TODO: Añadir campo 'turno' a Ausencia
+    ausencia,
+  };
+}
+
+/**
+ * Resultado de validación de fichaje completo
+ */
+export interface ValidacionFichajeCompleto {
+  completo: boolean;
+  eventosRequeridos: string[];
+  eventosFaltantes: string[];
+  razon?: string;
+}
+
+/**
+ * Valida si un fichaje está completo según la jornada del empleado
+ * Tiene en cuenta:
+ * - Jornada fija: entrada + salida + pausa (si configurada)
+ * - Jornada flexible: entrada + salida + pausa (si descansoMinimo > 0)
+ * - Ausencias de medio día: reduce eventos requeridos proporcionalmente
+ */
+export async function validarFichajeCompleto(
+  fichajeId: string
+): Promise<ValidacionFichajeCompleto> {
+  const fichaje = await prisma.fichaje.findUnique({
+    where: { id: fichajeId },
+    include: {
+      empleado: {
+        include: {
+          jornada: true,
+        },
+      },
+      eventos: {
+        orderBy: {
+          hora: 'asc',
+        },
+      },
+    },
+  });
+
+  if (!fichaje) {
+    throw new Error(`Fichaje ${fichajeId} no encontrado`);
+  }
+
+  if (!fichaje.empleado.jornada) {
+    return {
+      completo: false,
+      eventosRequeridos: [],
+      eventosFaltantes: [],
+      razon: 'Empleado sin jornada asignada',
+    };
+  }
+
+  const jornada = fichaje.empleado.jornada;
+  const config = jornada.config as JornadaConfig;
+  const fechaFichaje = fichaje.fecha;
+  
+  const diasSemana = ['domingo', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado'];
+  const nombreDia = diasSemana[fechaFichaje.getDay()];
+  const configDia = config[nombreDia] as DiaConfig | undefined;
+
+  // Obtener información de ausencia de medio día
+  const ausenciaMedioDia = await obtenerAusenciaMedioDia(fichaje.empleadoId, fichaje.fecha);
+
+  let eventosRequeridos: string[] = [];
+
+  // JORNADA FIJA
+  // Detectar jornada fija: tiene tipo 'fija' O tiene configDia con entrada/salida
+  if (config.tipo === 'fija' || (configDia && configDia.entrada && configDia.salida)) {
+    // Si el día no está activo o no está configurado, el fichaje está completo (día no laborable)
+    if (!configDia || configDia.activo === false) {
+      return {
+        completo: true,
+        eventosRequeridos: [],
+        eventosFaltantes: [],
+        razon: 'Día no laborable según jornada',
+      };
+    }
+
+    // Eventos básicos requeridos
+    if (!ausenciaMedioDia.tieneAusencia || ausenciaMedioDia.medioDia === 'tarde') {
+      eventosRequeridos.push('entrada');
+    }
+    
+    if (!ausenciaMedioDia.tieneAusencia || ausenciaMedioDia.medioDia === 'mañana') {
+      eventosRequeridos.push('salida');
+    }
+
+    // Pausa es opcional según configuración
+    if (configDia.pausa_inicio && configDia.pausa_fin && !ausenciaMedioDia.tieneAusencia) {
+      eventosRequeridos.push('pausa_inicio');
+      eventosRequeridos.push('pausa_fin');
+    }
+  }
+  // JORNADA FLEXIBLE
+  else if (config.tipo === 'flexible') {
+    // Verificar si el día está activo
+    if (!configDia || configDia.activo === false) {
+      return {
+        completo: true,
+        eventosRequeridos: [],
+        eventosFaltantes: [],
+        razon: 'Día no laborable según jornada flexible',
+      };
+    }
+
+    // Siempre entrada y salida
+    if (!ausenciaMedioDia.tieneAusencia || ausenciaMedioDia.medioDia === 'tarde') {
+      eventosRequeridos.push('entrada');
+    }
+    
+    if (!ausenciaMedioDia.tieneAusencia || ausenciaMedioDia.medioDia === 'mañana') {
+      eventosRequeridos.push('salida');
+    }
+
+    // Pausa obligatoria solo si hay descansoMinimo configurado
+    if (config.descansoMinimo && !ausenciaMedioDia.tieneAusencia) {
+      eventosRequeridos.push('pausa_inicio');
+      eventosRequeridos.push('pausa_fin');
+    }
+  }
+  // Fallback: jornada sin tipo o config incompleto
+  else {
+    eventosRequeridos = ['entrada', 'salida'];
+  }
+
+  // Calcular eventos faltantes
+  const tiposEventosExistentes = fichaje.eventos.map((e) => e.tipo);
+  const eventosFaltantes = eventosRequeridos.filter(
+    (requerido) => !tiposEventosExistentes.includes(requerido)
+  );
+
+  // Validar coherencia de pausas: si tiene pausa_inicio, debe tener pausa_fin
+  const tienePausaInicio = tiposEventosExistentes.includes('pausa_inicio');
+  const tienePausaFin = tiposEventosExistentes.includes('pausa_fin');
+  
+  if (tienePausaInicio && !tienePausaFin) {
+    eventosFaltantes.push('pausa_fin');
+  } else if (!tienePausaInicio && tienePausaFin) {
+    eventosFaltantes.push('pausa_inicio');
+  }
+
+  const completo = eventosFaltantes.length === 0;
+
+  return {
+    completo,
+    eventosRequeridos,
+    eventosFaltantes,
+    razon: completo ? undefined : `Faltan eventos: ${eventosFaltantes.join(', ')}`,
+  };
 }

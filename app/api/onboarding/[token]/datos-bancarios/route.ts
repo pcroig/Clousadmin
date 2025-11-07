@@ -20,6 +20,8 @@ export async function POST(
     // Validar datos con Zod
     const validacion = datosBancariosSchema.safeParse(body);
     if (!validacion.success) {
+      console.error('[POST /api/onboarding/[token]/datos-bancarios] Errores de validación:', validacion.error.flatten().fieldErrors);
+      console.error('[POST /api/onboarding/[token]/datos-bancarios] IBAN recibido:', body.iban);
       return NextResponse.json(
         {
           success: false,

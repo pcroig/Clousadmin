@@ -406,7 +406,7 @@ export async function getDisponibilidadCalendario(
     estado: 'muy_disponible' | 'disponible' | 'poco_disponible' | 'no_disponible';
     porcentaje: number;
     esFestivo: boolean;
-    esFinDeSemana: boolean;
+    esNoLaborable: boolean; // Calculado del calendario laboral (inverso de esLaborable)
     esLaborable: boolean;
   }>
 > {
@@ -427,7 +427,6 @@ export async function getDisponibilidadCalendario(
   const maxSolapamientoPct = politica?.maxSolapamientoPct || 50;
 
   return await Promise.all(solapamiento.map(async (s) => {
-    const esFinde = esFinDeSemana(s.fecha); // Mantener para compatibilidad
     const esFest = festivosDates.includes(s.fecha.toDateString());
     const esLaborable = await esDiaLaborable(s.fecha, empresaId, diasLaborablesConfig);
 
@@ -449,7 +448,7 @@ export async function getDisponibilidadCalendario(
       estado,
       porcentaje: s.porcentaje,
       esFestivo: esFest,
-      esFinDeSemana: esFinde,
+      esNoLaborable: !esLaborable, // ✅ Calculado del calendario laboral (no hardcoded)
       esLaborable,
     };
   }));

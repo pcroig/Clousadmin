@@ -361,7 +361,7 @@ export function FichajeWidget({
                   cx="64"
                   cy="64"
                   r="58"
-                  stroke="#F26C21"
+                  stroke="#d97757"
                   strokeWidth="8"
                   fill="none"
                   strokeDasharray={`${((circumference * 3) / 4) * (porcentajeProgreso / 100)} ${circumference}`}

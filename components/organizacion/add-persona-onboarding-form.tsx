@@ -28,9 +28,10 @@ interface DocumentoSubido {
 interface AddPersonaOnboardingFormProps {
   onSuccess: () => void;
   onCancel: () => void;
+  tipoOnboarding?: 'completo' | 'simplificado';
 }
 
-export function AddPersonaOnboardingForm({ onSuccess, onCancel }: AddPersonaOnboardingFormProps) {
+export function AddPersonaOnboardingForm({ onSuccess, onCancel, tipoOnboarding = 'completo' }: AddPersonaOnboardingFormProps) {
   const [loading, setLoading] = useState(false);
   const [uploadingDocs, setUploadingDocs] = useState(false);
   const [puestos, setPuestos] = useState<Array<{ id: string; nombre: string }>>([]);
@@ -211,6 +212,7 @@ export function AddPersonaOnboardingForm({ onSuccess, onCancel }: AddPersonaOnbo
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           empleadoId: dataEmpleado.id,
+          tipoOnboarding: tipoOnboarding,
         }),
       });
 

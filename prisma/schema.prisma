@@ -17,6 +17,43 @@ datasource db {
 }
 
 // ========================================
+// ENUMS
+// ========================================
+
+/// Roles de usuario en el sistema
+enum UsuarioRol {
+  platform_admin // Admin de la plataforma (super admin)
+  hr_admin       // Admin de RR.HH. de la empresa
+  manager        // Manager de equipo
+  empleado       // Empleado regular
+}
+
+/// Estados posibles de un empleado
+enum EstadoEmpleado {
+  activo     // Empleado activo
+  baja       // Empleado dado de baja
+  suspendido // Empleado suspendido temporalmente
+}
+
+/// Tipos de contrato laboral (España)
+enum TipoContrato {
+  indefinido        // Contrato indefinido
+  temporal          // Contrato temporal
+  administrador     // Administrador societario
+  fijo_discontinuo  // Fijo discontinuo
+  becario           // Becario
+  practicas         // Prácticas
+  obra_y_servicio   // Obra y servicio
+}
+
+/// Tipos de equipo
+enum TipoEquipo {
+  proyecto  // Equipo de proyecto
+  squad     // Squad ágil
+  temporal  // Equipo temporal
+}
+
+// ========================================
 // 1. CORE ENTITIES (Empresa, Usuario, Empleado)
 // ========================================
 
@@ -64,6 +101,8 @@ model Empresa {
   sedes                  Sede[]
   integraciones          Integracion[]
   resumenesNomina        ResumenMensualNomina[]
+  eventosNomina          EventoNomina[]
+  tiposComplemento       TipoComplemento[]
   exportsGestoria        ExportGestoria[]
   auditoriaAccesos       AuditoriaAcceso[]
   consentimientos        Consentimiento[]
@@ -86,7 +125,7 @@ model Usuario {
   googleId  String? @unique @db.VarChar(255) // Google OAuth sub
 
   // Role-based access control
-  rol String @default("empleado") @db.VarChar(50) // 'platform_admin', 'hr_admin', 'manager', 'empleado'
+  rol UsuarioRol @default(empleado)
 
   // Profile
   nombre    String  @db.VarChar(100)
@@ -164,16 +203,15 @@ model Empleado {
   titularCuenta String? @db.VarChar(200)
 
   // Employment info
-  departamento         String?   @db.VarChar(100) // DEPRECATED - use equipos relation instead
   puesto               String?   @db.VarChar(100) // DEPRECATED - use puestoId instead
   puestoId             String? // Foreign key to Puesto
   fechaAlta            DateTime
   fechaBaja            DateTime?
-  tipoContrato         String    @default("indefinido") @db.VarChar(50) // 'indefinido', 'temporal', 'administrador', 'fijo_discontinuo', 'becario', 'practicas', 'obra_y_servicio'
+  tipoContrato         TipoContrato    @default(indefinido)
   categoriaProfesional String?   @db.VarChar(50) // 'directivo', 'mando_intermedio', 'tecnico', 'trabajador_cualificado', 'trabajador_baja_cualificacion'
   nivelEducacion       String?   @db.VarChar(50) // 'nivel_basico', 'eso_equivalente', 'bachillerato_grado_medio', 'formacion_profesional_superior', 'educacion_universitaria_postgrado'
   grupoCotizacion      Int?      @db.SmallInt // 1-11 (Spanish social security groups)
-  estadoEmpleado       String    @default("activo") @db.VarChar(50) // 'activo', 'baja', 'suspendido'
+  estadoEmpleado       EstadoEmpleado @default(activo)
 
   // Manager relationship (self-referencing)
   managerId       String?
@@ -229,6 +267,7 @@ model Empleado {
   preferenciasVacaciones     PreferenciaVacaciones[]
   alertasNomina              AlertaNomina[]
   resumenesNomina            ResumenMensualNomina[]
+  complementos               EmpleadoComplemento[]
   consentimientos            Consentimiento[]
   solicitudesEliminacion     SolicitudEliminacionDatos[]
 
@@ -240,12 +279,10 @@ model Empleado {
   @@index([nif])
   @@index([email])
   @@index([estadoEmpleado])
-  // @@index([departamento]) // REMOVED: deprecated field, not used in queries
   @@map("empleados")
 }
 
 /// Equipo - Flexible team groupings (projects, squads)
-/// Different from departamento (which is just a TEXT field)
 model Equipo {
   id          String  @id @default(uuid())
   empresaId   String
@@ -253,7 +290,7 @@ model Equipo {
   managerId   String?
   sedeId      String? // Sede donde opera el equipo
   descripcion String? @db.Text
-  tipo        String  @default("proyecto") @db.VarChar(50) // 'proyecto', 'squad', 'temporal'
+  tipo        TipoEquipo @default(proyecto)
   activo      Boolean @default(true)
 
   createdAt DateTime @default(now())
@@ -375,7 +412,8 @@ model Jornada {
   horasSemanales Decimal @db.Decimal(5, 2) // e.g., 40.00 hours
 
   // Schedule config (JSONB for flexibility)
-  // Example: { "lunes": { "activo": true, "entrada": "09:00", "salida": "18:00" }, ... }
+  // Example fija: { "tipo": "fija", "lunes": { "activo": true, "entrada": "09:00", "salida": "18:00", "pausa_inicio": "14:00", "pausa_fin": "15:00" }, ... }
+  // Example flexible: { "tipo": "flexible", "descansoMinimo": "00:30", "lunes": { "activo": true }, ... }
   config Json
 
   // Predefined by system (cannot be deleted)
@@ -404,17 +442,21 @@ model Fichaje {
 
   // Estado del fichaje completo (UN SOLO ESTADO para todo el día)
   estado String @default("en_curso") @db.VarChar(50)
-  // Posibles valores (4 estados únicos):
+  // Posibles valores (3 estados únicos):
   // - 'en_curso': Inicio del día o fichaje incompleto (sin eventos o sin cerrar)
+  // - 'pendiente': Requiere revisión manual de HR (fichaje incompleto al cierre del día)
   // - 'finalizado': Fichaje completo y aprobado (manual o tras aprobación HR)
-  // - 'revisado': Auto-completado por clasificador, listo para aprobación rápida HR
-  // - 'pendiente': Requiere revisión manual detallada de HR o rechazado
 
   // Cálculos agregados (se actualizan al crear eventos)
   horasTrabajadas Decimal? @db.Decimal(5, 2) // Horas netas trabajadas (sin pausas)
   horasEnPausa    Decimal? @db.Decimal(5, 2) // Tiempo total en pausas
 
-  // Auto-completion
+  // Auditoría de cuadre masivo
+  cuadradoMasivamente Boolean   @default(false) // Marcado si fue cuadrado desde "Cuadrar fichajes"
+  cuadradoPor         String? // Usuario ID que cuadró masivamente
+  cuadradoEn          DateTime? // Fecha del cuadre masivo
+  
+  // Legacy field (deprecated - no longer used)
   autoCompletado  Boolean   @default(false)
   fechaAprobacion DateTime? // Fecha en que fue aprobado/finalizado por HR
 
@@ -692,7 +734,7 @@ model Contrato {
   empleadoId String
 
   // Contract details
-  tipoContrato      String    @db.VarChar(50) // 'indefinido', 'temporal', 'practicas'
+  tipoContrato      TipoContrato
   fechaInicio       DateTime  @db.Date
   fechaFin          DateTime? @db.Date
   salarioBrutoAnual Decimal   @db.Decimal(10, 2)
@@ -708,7 +750,9 @@ model Contrato {
   updatedAt DateTime @updatedAt
 
   // Relations
-  empleado Empleado @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+  empleado     Empleado              @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+  complementos EmpleadoComplemento[]
+  nominas      Nomina[]
 
   @@index([empleadoId])
   @@index([tipoContrato])
@@ -718,17 +762,28 @@ model Contrato {
 /// Nomina - Payslips
 /// Monthly payroll records
 model Nomina {
-  id         String @id @default(uuid())
-  empleadoId String
+  id              String  @id @default(uuid())
+  empleadoId      String
+  contratoId      String? // Contrato vigente en el momento de generación
+  eventoNominaId  String? // Vinculado al ciclo mensual
 
   // Period
   mes  Int @db.SmallInt // 1-12
   anio Int @db.SmallInt // 2024-2099
 
-  // Amounts
-  salarioBruto Decimal @db.Decimal(10, 2)
-  deducciones  Decimal @db.Decimal(10, 2)
-  salarioNeto  Decimal @db.Decimal(10, 2)
+  // Amounts (base)
+  salarioBase      Decimal @db.Decimal(10, 2) // Salario base del periodo
+  totalComplementos Decimal @default(0) @db.Decimal(10, 2) // Suma de complementos asignados
+  totalDeducciones  Decimal @default(0) @db.Decimal(10, 2) // Total deducciones (IRPF, SS)
+  totalBruto       Decimal @db.Decimal(10, 2) // Salario base + complementos
+  totalNeto        Decimal @db.Decimal(10, 2) // Total bruto - deducciones
+
+  // Días trabajados
+  diasTrabajados Int @default(0) @db.SmallInt // Días efectivamente trabajados
+  diasAusencias  Int @default(0) @db.SmallInt // Días de ausencias en el periodo
+
+  // Complementos
+  complementosPendientes Boolean @default(false) // true si faltan complementos por asignar
 
   // Document reference
   documentoId String? @unique // Link to Documento table (PDF)
@@ -739,9 +794,13 @@ model Nomina {
   tieneAnomalias   Boolean @default(false)
 
   // Upload & publishing workflow
-  estado           String    @default("borrador") @db.VarChar(50) // 'borrador', 'publicada', 'anulada'
+  // Estados: pre_nomina → complementos_pendientes → lista_exportar → exportada → definitiva → publicada → anulada
+  estado           String    @default("pre_nomina") @db.VarChar(50)
   fechaPublicacion DateTime?
   subidoPor        String? // Usuario ID que subió la nómina
+
+  // Exportación
+  exportadaEn DateTime? // Cuando se incluyó en export para gestoría
 
   // Employee notification tracking
   empleadoNotificado Boolean   @default(false)
@@ -753,17 +812,22 @@ model Nomina {
   updatedAt DateTime @updatedAt
 
   // Relations
-  empleado  Empleado       @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
-  documento Documento?     @relation(fields: [documentoId], references: [id], onDelete: SetNull)
-  alertas   AlertaNomina[]
+  empleado              Empleado                   @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+  contrato              Contrato?                  @relation(fields: [contratoId], references: [id], onDelete: SetNull)
+  eventoNomina          EventoNomina?              @relation(fields: [eventoNominaId], references: [id], onDelete: SetNull)
+  documento             Documento?                 @relation(fields: [documentoId], references: [id], onDelete: SetNull)
+  alertas               AlertaNomina[]
+  complementosAsignados AsignacionComplemento[]
 
   @@unique([empleadoId, mes, anio]) // One payslip per employee per month
   @@index([empleadoId])
+  @@index([contratoId])
+  @@index([eventoNominaId])
   @@index([documentoId])
   @@index([mes, anio])
   @@index([estado])
-  @@index([empleadoId, estado]) // Composite index for employee-specific status filtering
-  @@index([empleadoId, mes, anio]) // Composite index already covered by unique constraint
+  @@index([empleadoId, estado])
+  @@index([eventoNominaId, estado])
   @@map("nominas")
 }
 
@@ -841,6 +905,126 @@ model ResumenMensualNomina {
   @@index([empresaId, anio, mes])
   @@index([empleadoId])
   @@map("resumenes_mensuales_nomina")
+}
+
+/// EventoNomina - Ciclo mensual de nóminas a nivel empresa
+/// Gestiona todo el workflow: generación → complementos → export → import → publicación
+model EventoNomina {
+  id        String @id @default(uuid())
+  empresaId String
+
+  // Periodo
+  mes  Int @db.SmallInt // 1-12
+  anio Int @db.SmallInt // 2024-2099
+
+  // Estados: generando → pre_nomina → pendiente_exportar → exportada → pendiente_importar → completada → cerrada
+  estado String @default("generando") @db.VarChar(50)
+
+  // Fechas del ciclo
+  fechaGeneracion         DateTime? // Cuando se generaron las pre-nóminas
+  fechaLimiteComplementos DateTime? // Fecha límite para asignar complementos
+  fechaExportacion        DateTime? // Cuando se exportó para gestoría
+  fechaImportacion        DateTime? // Cuando se importaron las definitivas
+  fechaPublicacion        DateTime? // Cuando se notificó a empleados
+  fechaCierre             DateTime? // Cuando se cerró el periodo
+
+  // Tracking
+  totalEmpleados           Int @default(0)
+  empleadosConComplementos Int @default(0)
+  complementosAsignados    Int @default(0)
+  nominasImportadas        Int @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  empresa                Empresa        @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  nominas                Nomina[]
+  notificacionesEnviadas Notificacion[]
+
+  @@unique([empresaId, mes, anio])
+  @@index([empresaId, estado])
+  @@index([empresaId, mes, anio])
+  @@map("eventos_nomina")
+}
+
+/// TipoComplemento - Catálogo de tipos de complementos (definidos por HR)
+model TipoComplemento {
+  id        String @id @default(uuid())
+  empresaId String
+
+  nombre      String @db.VarChar(200) // "Plus transporte", "Bonus objetivos"
+  descripcion String? @db.Text
+
+  // Tipo de importe
+  esImporteFijo Boolean @default(true) // true = fijo, false = variable
+  importeFijo   Decimal? @db.Decimal(10, 2) // Si es fijo, el importe por defecto
+
+  activo Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  empresa              Empresa                @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  empleadoComplementos EmpleadoComplemento[]
+
+  @@index([empresaId, activo])
+  @@map("tipos_complemento")
+}
+
+/// EmpleadoComplemento - Complementos asignados a un empleado (parte del contrato)
+model EmpleadoComplemento {
+  id                String  @id @default(uuid())
+  empleadoId        String
+  tipoComplementoId String
+  contratoId        String? // Vinculado a un contrato específico
+
+  // Si es importe fijo, se puede override aquí
+  importePersonalizado Decimal? @db.Decimal(10, 2)
+
+  activo Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  empleado        Empleado                   @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+  tipoComplemento TipoComplemento            @relation(fields: [tipoComplementoId], references: [id], onDelete: Cascade)
+  contrato        Contrato?                  @relation(fields: [contratoId], references: [id], onDelete: SetNull)
+  asignaciones    AsignacionComplemento[]
+
+  @@index([empleadoId, activo])
+  @@index([tipoComplementoId])
+  @@index([contratoId])
+  @@map("empleado_complementos")
+}
+
+/// AsignacionComplemento - Complemento asignado en una nómina específica
+model AsignacionComplemento {
+  id                    String @id @default(uuid())
+  nominaId              String
+  empleadoComplementoId String
+
+  // Importe asignado (puede ser el fijo o el variable introducido)
+  importe Decimal @db.Decimal(10, 2)
+
+  // Tracking
+  asignadoPor      String? // Usuario ID que asignó
+  fechaAsignacion DateTime @default(now()) // Fecha de asignación
+  notas           String? @db.Text // Notas adicionales sobre la asignación
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  nomina              Nomina              @relation(fields: [nominaId], references: [id], onDelete: Cascade)
+  empleadoComplemento EmpleadoComplemento @relation(fields: [empleadoComplementoId], references: [id], onDelete: Cascade)
+
+  @@unique([nominaId, empleadoComplementoId]) // Un complemento solo se asigna una vez por nómina
+  @@index([nominaId])
+  @@index([empleadoComplementoId])
+  @@map("asignaciones_complemento")
 }
 
 /// ExportGestoria - Payroll exports tracking
@@ -1053,6 +1237,9 @@ model OnboardingEmpleado {
   empresaId  String
   empleadoId String @unique
 
+  // Onboarding type: 'completo' (new employees with full onboarding) or 'simplificado' (existing employees with credentials + integrations only)
+  tipoOnboarding String @default("completo") @db.VarChar(20) // 'completo' | 'simplificado'
+
   // Token management
   token       String   @unique @db.Text
   tokenExpira DateTime
@@ -1062,7 +1249,8 @@ model OnboardingEmpleado {
   fechaCompletado DateTime?
 
   // Progress tracking (JSONB)
-  // { "credenciales_completadas": boolean, "datos_personales": boolean, "datos_bancarios": boolean, "datos_documentos": boolean }
+  // For 'completo': { "credenciales_completadas": boolean, "datos_personales": boolean, "datos_bancarios": boolean, "datos_documentos": boolean, "pwa_explicacion": boolean }
+  // For 'simplificado': { "credenciales_completadas": boolean, "integraciones": boolean, "pwa_explicacion": boolean }
   progreso Json @default("{\"credenciales_completadas\": false, \"datos_personales\": false, \"datos_bancarios\": false, \"datos_documentos\": false}")
 
   // Temporary data storage (JSONB) until onboarding is completed
@@ -1116,11 +1304,12 @@ model OnboardingConfig {
 
 /// Notificacion - Sistema de notificaciones para usuarios
 model Notificacion {
-  id        String @id @default(uuid())
-  empresaId String
-  usuarioId String
+  id              String  @id @default(uuid())
+  empresaId       String
+  usuarioId       String
+  eventoNominaId  String? // Vinculado a evento de nómina (opcional)
 
-  tipo    String @db.VarChar(50) // 'info', 'success', 'warning', 'error', 'ausencia_aprobada', 'ausencia_rechazada', etc.
+  tipo    String @db.VarChar(50) // 'info', 'success', 'warning', 'error', 'ausencia_aprobada', 'ausencia_rechazada', 'nomina_complementos', etc.
   titulo  String @db.VarChar(255)
   mensaje String @db.Text
 
@@ -1134,11 +1323,13 @@ model Notificacion {
   createdAt DateTime @default(now())
 
   // Relations
-  empresa Empresa @relation(fields: [empresaId], references: [id], onDelete: Cascade)
-  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  empresa      Empresa       @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  usuario      Usuario       @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  eventoNomina EventoNomina? @relation(fields: [eventoNominaId], references: [id], onDelete: SetNull)
 
   @@index([usuarioId, leida])
   @@index([empresaId])
+  @@index([eventoNominaId])
   @@index([createdAt])
   @@map("notificaciones")
 }

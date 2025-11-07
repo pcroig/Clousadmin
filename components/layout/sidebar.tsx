@@ -5,7 +5,7 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import {
   Home,
   Inbox,
@@ -19,9 +19,21 @@ import {
   User,
   ChevronLeft,
   ChevronRight,
+  LogOut,
+  HeadphonesIcon,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { toast } from 'sonner';
+import { getAvatarPlaceholderClasses } from '@/lib/design-system';
+import { cn } from '@/lib/utils';
 
 interface NavigationChild {
   name: string;
@@ -46,8 +58,19 @@ interface SidebarProps {
 
 export function Sidebar({ rol, usuario }: SidebarProps) {
   const pathname = usePathname();
+  const router = useRouter();
   const [openMenus, setOpenMenus] = useState<string[]>(['Horario', 'Organización']);
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
+  const [hasMounted, setHasMounted] = useState(false);
+
+  useEffect(() => {
+    setHasMounted(true);
+  }, []);
+
+  if (!hasMounted) {
+    return null;
+  }
 
   const toggleMenu = (menu: string) => {
     setOpenMenus((prev) =>
@@ -59,6 +82,31 @@ export function Sidebar({ rol, usuario }: SidebarProps) {
 
   const getInitials = () => {
     return `${usuario.nombre.charAt(0)}${usuario.apellidos.charAt(0)}`.toUpperCase();
+  };
+
+  const handleLogout = async () => {
+    setLoggingOut(true);
+    try {
+      const { logoutAction } = await import('@/app/(auth)/login/actions');
+      await logoutAction();
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      window.location.href = '/login';
+    } catch (error) {
+      console.error('Error al cerrar sesión:', error);
+      toast.error('Error al cerrar sesión');
+      window.location.href = '/login';
+    } finally {
+      setLoggingOut(false);
+    }
+  };
+
+  const handleSettings = () => {
+    const settingsPath = `/${rol === 'hr_admin' ? 'hr' : rol === 'manager' ? 'manager' : 'empleado'}/settings`;
+    router.push(settingsPath);
+  };
+
+  const handleSupport = () => {
+    window.open('mailto:soporte@clousadmin.com?subject=Soporte', '_blank');
   };
 
   // Navegación para HR
@@ -262,40 +310,68 @@ export function Sidebar({ rol, usuario }: SidebarProps) {
         })}
       </nav>
 
-      {/* User Info - Click to Settings */}
-      <Link
-        href={`/${rol === 'hr_admin' ? 'hr' : rol === 'manager' ? 'manager' : 'empleado'}/settings`}
-        className="border-t border-gray-200 p-4 hover:bg-gray-50 transition-colors"
-      >
-        {!isCollapsed ? (
-          <div className="flex items-center gap-3">
-            <Avatar className="h-10 w-10">
-              {usuario.avatar && <AvatarImage src={usuario.avatar} />}
-              <AvatarFallback className="bg-gray-200 text-gray-700 text-sm">
-                {getInitials()}
-              </AvatarFallback>
-            </Avatar>
-            <div className="flex-1 overflow-hidden">
-              <p className="text-sm font-medium text-gray-900 truncate">
-                {usuario.nombre} {usuario.apellidos}
-              </p>
-              <p className="text-xs text-gray-500">
-                {rol === 'hr_admin' ? 'HR Admin' : rol === 'manager' ? 'Manager' : 'Empleado'}
-              </p>
-            </div>
-            <Settings className="h-4 w-4 text-gray-400" />
-          </div>
-        ) : (
-          <div className="flex w-full items-center justify-center">
-            <Avatar className="h-9 w-9">
-              {usuario.avatar && <AvatarImage src={usuario.avatar} />}
-              <AvatarFallback className="bg-gray-200 text-gray-700 text-xs">
-                {getInitials()}
-              </AvatarFallback>
-            </Avatar>
-          </div>
-        )}
-      </Link>
+      {/* User Menu Dropdown */}
+      <div className="border-t border-gray-200">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button className="w-full p-4 hover:bg-gray-50 transition-colors focus:outline-none">
+              {!isCollapsed ? (
+                <div className="flex items-center gap-3">
+                  <Avatar className="h-10 w-10">
+                    {usuario.avatar && <AvatarImage src={usuario.avatar} />}
+                    <AvatarFallback
+                      className={cn(
+                        getAvatarPlaceholderClasses(`${usuario.nombre} ${usuario.apellidos}`),
+                        'text-sm font-medium'
+                      )}
+                    >
+                      {getInitials()}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1 overflow-hidden text-left">
+                    <p className="text-sm font-medium text-gray-900 truncate">
+                      {usuario.nombre} {usuario.apellidos}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      {rol === 'hr_admin' ? 'HR Admin' : rol === 'manager' ? 'Manager' : 'Empleado'}
+                    </p>
+                  </div>
+                  <ChevronDown className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                </div>
+              ) : (
+                <div className="flex w-full items-center justify-center">
+                  <Avatar className="h-9 w-9">
+                    {usuario.avatar && <AvatarImage src={usuario.avatar} />}
+                    <AvatarFallback
+                      className={cn(
+                        getAvatarPlaceholderClasses(`${usuario.nombre} ${usuario.apellidos}`),
+                        'text-xs font-medium'
+                      )}
+                    >
+                      {getInitials()}
+                    </AvatarFallback>
+                  </Avatar>
+                </div>
+              )}
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="center" className="w-56">
+            <DropdownMenuItem onClick={handleSettings} disabled={loggingOut}>
+              <Settings className="mr-2 h-4 w-4" />
+              <span>Ajustes</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={handleSupport} disabled={loggingOut}>
+              <HeadphonesIcon className="mr-2 h-4 w-4" />
+              <span>Contactar soporte</span>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={handleLogout} disabled={loggingOut}>
+              <LogOut className="mr-2 h-4 w-4" />
+              <span>{loggingOut ? 'Cerrando sesión...' : 'Cerrar sesión'}</span>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
     </div>
   );
 }

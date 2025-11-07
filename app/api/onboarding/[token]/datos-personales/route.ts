@@ -20,6 +20,8 @@ export async function POST(
     // Validar datos con Zod
     const validacion = datosPersonalesSchema.safeParse(body);
     if (!validacion.success) {
+      console.error('[POST /api/onboarding/[token]/datos-personales] Errores de validación:', validacion.error.flatten().fieldErrors);
+      console.error('[POST /api/onboarding/[token]/datos-personales] Payload recibido:', body);
       const fieldErrors = validacion.error.flatten().fieldErrors;
       
       return NextResponse.json(

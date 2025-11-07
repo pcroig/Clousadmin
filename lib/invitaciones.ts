@@ -5,7 +5,7 @@
 
 import { prisma } from '@/lib/prisma';
 import { hashPassword } from '@/lib/auth';
-import { randomBytes } from 'crypto';
+import { crearOnboarding, type TipoOnboarding } from '@/lib/onboarding';
 
 /**
  * Crear invitación para un empleado
@@ -13,7 +13,8 @@ import { randomBytes } from 'crypto';
 export async function crearInvitacion(
   empleadoId: string,
   empresaId: string,
-  email: string
+  email: string,
+  tipoOnboarding: TipoOnboarding = 'completo'
 ) {
   try {
     // Verificar si ya existe una invitación activa
@@ -28,27 +29,29 @@ export async function crearInvitacion(
       });
     }
 
-    // Generar token único
-    const token = randomBytes(32).toString('hex');
-    const expiraEn = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 días
+    const onboarding = await crearOnboarding(empleadoId, empresaId, tipoOnboarding);
+
+    if (!onboarding.success) {
+      return {
+        success: false,
+        error: onboarding.error || 'Error al crear onboarding',
+      };
+    }
 
     const invitacion = await prisma.invitacionEmpleado.create({
       data: {
         empresaId,
         empleadoId,
         email,
-        token,
-        expiraEn,
+        token: onboarding.token,
+        expiraEn: onboarding.onboarding.tokenExpira,
       },
     });
 
-    const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000';
-    const url = `${baseUrl}/onboarding/${token}`;
-
     return {
       success: true,
-      token,
-      url,
+      token: onboarding.token,
+      url: onboarding.url,
       invitacion,
     };
   } catch (error) {

@@ -1,0 +1,171 @@
+// ========================================
+// API: Evento de Nómina Individual
+// ========================================
+// Gestionar un evento específico (actualizar estado, exportar, etc.)
+
+import { NextRequest, NextResponse } from 'next/server';
+import { getSession } from '@/lib/auth';
+import { prisma } from '@/lib/prisma';
+import { z } from 'zod';
+
+const UpdateEventoSchema = z.object({
+  estado: z.enum([
+    'generando',
+    'complementos_pendientes',
+    'lista_exportar',
+    'exportada',
+    'definitiva',
+    'publicada',
+  ]).optional(),
+  fechaExportacion: z.string().datetime().optional(),
+  fechaLimiteComplementos: z.string().datetime().optional(),
+});
+
+// ========================================
+// GET /api/nominas/eventos/[id]
+// ========================================
+// Obtiene detalles de un evento específico
+export async function GET(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const session = await getSession();
+    if (!session) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+    }
+
+    const { id } = await params;
+
+    if (!['hr_admin', 'platform_admin', 'manager'].includes(session.user.rol)) {
+      return NextResponse.json({ error: 'Acceso denegado' }, { status: 403 });
+    }
+
+    const evento = await prisma.eventoNomina.findFirst({
+      where: {
+        id,
+        empresaId: session.user.empresaId,
+      },
+      include: {
+        nominas: {
+          include: {
+            empleado: {
+              select: {
+                id: true,
+                nombre: true,
+                apellidos: true,
+                email: true,
+              },
+            },
+            complementosAsignados: {
+              include: {
+                empleadoComplemento: {
+                  include: {
+                    tipoComplemento: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+        _count: {
+          select: { notificacionesEnviadas: true },
+        },
+      },
+    });
+
+    if (!evento) {
+      return NextResponse.json({ error: 'Evento no encontrado' }, { status: 404 });
+    }
+
+    return NextResponse.json({ evento });
+  } catch (error) {
+    console.error('[GET /api/nominas/eventos/[id]] Error:', error);
+    return NextResponse.json(
+      { error: 'Error al obtener evento' },
+      { status: 500 }
+    );
+  }
+}
+
+// ========================================
+// PATCH /api/nominas/eventos/[id]
+// ========================================
+// Actualiza el estado de un evento
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const session = await getSession();
+    if (!session || !['hr_admin', 'platform_admin'].includes(session.user.rol)) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+    }
+
+    const { id } = await params;
+
+    const body = await req.json();
+    const data = UpdateEventoSchema.parse(body);
+
+    // Verificar que el evento pertenece a la empresa
+    const evento = await prisma.eventoNomina.findFirst({
+      where: {
+        id,
+        empresaId: session.user.empresaId,
+      },
+    });
+
+    if (!evento) {
+      return NextResponse.json({ error: 'Evento no encontrado' }, { status: 404 });
+    }
+
+    // Validaciones de transiciones de estado
+    if (data.estado) {
+      const estadosValidos: Record<string, string[]> = {
+        generando: ['complementos_pendientes'],
+        complementos_pendientes: ['lista_exportar'],
+        lista_exportar: ['exportada'],
+        exportada: ['definitiva'],
+        definitiva: ['publicada'],
+        publicada: [],
+      };
+
+      const siguientesEstados = estadosValidos[evento.estado];
+      if (!siguientesEstados.includes(data.estado)) {
+        return NextResponse.json(
+          {
+            error: `No se puede cambiar de estado '${evento.estado}' a '${data.estado}'`,
+            estadosValidos: siguientesEstados,
+          },
+          { status: 400 }
+        );
+      }
+    }
+
+    const updated = await prisma.eventoNomina.update({
+      where: { id },
+      data: {
+        ...(data.estado && { estado: data.estado }),
+        ...(data.fechaExportacion && { fechaExportacion: new Date(data.fechaExportacion) }),
+        ...(data.fechaLimiteComplementos && {
+          fechaLimiteComplementos: new Date(data.fechaLimiteComplementos)
+        }),
+      },
+    });
+
+    return NextResponse.json({ evento: updated });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(
+        { error: 'Datos inválidos', details: error.errors },
+        { status: 400 }
+      );
+    }
+
+    console.error('[PATCH /api/nominas/eventos/[id]] Error:', error);
+    return NextResponse.json(
+      { error: 'Error al actualizar evento' },
+      { status: 500 }
+    );
+  }
+}

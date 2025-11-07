@@ -18,6 +18,8 @@ import { LoadingButton } from '@/components/shared/loading-button';
 import { toast } from 'sonner';
 import { Search, UserPlus, X } from 'lucide-react';
 import { getInitials } from '@/components/shared/utils';
+import { getAvatarPlaceholderClasses } from '@/lib/design-system';
+import { cn } from '@/lib/utils';
 
 interface Employee {
   id: string;
@@ -172,7 +174,12 @@ export function ManageMembersModal({
                   >
                     <Avatar className="h-8 w-8">
                       {member.avatar && <AvatarImage src={member.avatar} />}
-                      <AvatarFallback className="bg-gray-900 text-white text-xs">
+                      <AvatarFallback
+                        className={cn(
+                          getAvatarPlaceholderClasses(member.nombre),
+                          'text-xs font-medium'
+                        )}
+                      >
                         {getInitials(member.nombre)}
                       </AvatarFallback>
                     </Avatar>
@@ -218,7 +225,12 @@ export function ManageMembersModal({
                   >
                     <Avatar className="h-8 w-8">
                       {emp.fotoUrl && <AvatarImage src={emp.fotoUrl} />}
-                      <AvatarFallback className="bg-gray-900 text-white text-xs">
+                      <AvatarFallback
+                        className={cn(
+                          getAvatarPlaceholderClasses(`${emp.nombre} ${emp.apellidos}`),
+                          'text-xs font-medium'
+                        )}
+                      >
                         {getInitials(`${emp.nombre} ${emp.apellidos}`)}
                       </AvatarFallback>
                     </Avatar>

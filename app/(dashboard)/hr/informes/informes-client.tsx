@@ -37,7 +37,7 @@ const asistenciaData = [
 ];
 
 const ausenciasTipoData = [
-  { tipo: 'Vacaciones', value: 45, color: '#F26C21' },
+  { tipo: 'Vacaciones', value: 45, color: '#d97757' },
   { tipo: 'Enfermedad', value: 30, color: '#6B6A64' },
   { tipo: 'Permisos', value: 15, color: '#3D3D3A' },
   { tipo: 'Otros', value: 10, color: '#EFEFED' },
@@ -136,7 +136,7 @@ export function InformesClient() {
                   <Line
                     type="monotone"
                     dataKey="asistencia"
-                    stroke="#F26C21"
+                    stroke="#d97757"
                     strokeWidth={2}
                     name="Asistencia"
                   />
@@ -196,7 +196,7 @@ export function InformesClient() {
                   <XAxis dataKey="departamento" stroke="#6B6A64" />
                   <YAxis stroke="#6B6A64" />
                   <Tooltip />
-                  <Bar dataKey="empleados" fill="#F26C21" />
+                  <Bar dataKey="empleados" fill="#d97757" />
                 </BarChart>
               </ResponsiveContainer>
             </Card>
@@ -215,7 +215,7 @@ export function InformesClient() {
                   <Line
                     type="monotone"
                     dataKey="horas"
-                    stroke="#F26C21"
+                    stroke="#d97757"
                     strokeWidth={2}
                   />
                 </LineChart>

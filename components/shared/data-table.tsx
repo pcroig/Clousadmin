@@ -5,6 +5,8 @@
 'use client';
 
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { getAvatarPlaceholderClasses } from '@/lib/design-system';
+import { cn } from '@/lib/utils';
 import { getInitials } from './utils';
 
 export interface Column<T> {
@@ -95,7 +97,12 @@ export function AvatarCell({ nombre, avatar }: { nombre: string; avatar?: string
     <div className="flex items-center gap-3">
       <Avatar className="h-9 w-9">
         {avatar && <AvatarImage src={avatar} />}
-        <AvatarFallback className="bg-gray-900 text-white text-xs font-medium">
+        <AvatarFallback
+          className={cn(
+            getAvatarPlaceholderClasses(nombre),
+            'text-xs font-medium'
+          )}
+        >
           {getInitials(nombre)}
         </AvatarFallback>
       </Avatar>

@@ -81,6 +81,32 @@ export async function loginAction(email: string, password: string) {
       };
     }
 
+    // Garantizar que el usuario tiene su empleadoId sincronizado (autocorrección)
+    let empleadoId = usuario.empleadoId;
+
+    if (!empleadoId) {
+      try {
+        const empleadoRelacionado =
+          usuario.empleado ||
+          (await prisma.empleado.findUnique({
+            where: { usuarioId: usuario.id },
+            select: { id: true },
+          }));
+
+        if (empleadoRelacionado?.id) {
+          const usuarioConEmpleado = await prisma.usuario.update({
+            where: { id: usuario.id },
+            data: { empleadoId: empleadoRelacionado.id },
+            select: { empleadoId: true },
+          });
+
+          empleadoId = usuarioConEmpleado.empleadoId;
+        }
+      } catch (linkError) {
+        console.error('[Login] Error sincronizando empleadoId del usuario:', linkError);
+      }
+    }
+
     // Crear sesión con valor actualizado de activo y metadata
     await createSession(
       {
@@ -91,7 +117,7 @@ export async function loginAction(email: string, password: string) {
           apellidos: usuario.apellidos,
           rol: usuario.rol,
           empresaId: usuario.empresaId,
-          empleadoId: usuario.empleadoId,
+          empleadoId,
           avatar: usuario.avatar,
           activo: usuarioActualizado.activo, // Usar valor actualizado de BD
         },

@@ -19,9 +19,21 @@ import {
 
 interface IntegracionesFormProps {
   integracionesIniciales?: any[];
+  token?: string;
+  empresaId?: string;
+  onComplete?: () => void;
+  onSkip?: () => void;
+  simplified?: boolean;
 }
 
-export function IntegracionesForm({ integracionesIniciales = [] }: IntegracionesFormProps) {
+export function IntegracionesForm({ 
+  integracionesIniciales = [],
+  token,
+  empresaId,
+  onComplete,
+  onSkip,
+  simplified = false 
+}: IntegracionesFormProps) {
   const [calendarioSeleccionado, setCalendarioSeleccionado] = useState<string>('');
   const [comunicacionSeleccionada, setComunicacionSeleccionada] = useState<string>('');
   const [loading, setLoading] = useState<{
@@ -105,6 +117,40 @@ export function IntegracionesForm({ integracionesIniciales = [] }: Integraciones
       console.error('Error:', err);
     } finally {
       setLoading({ ...loading, comunicacion: false });
+    }
+  };
+
+  // Manejar omitir integraciones (marcar como completado)
+  const handleSkipIntegrations = async () => {
+    if (!token) return;
+    
+    try {
+      const response = await fetch(`/api/onboarding-simplificado/${token}/integraciones-completado`, {
+        method: 'POST',
+      });
+
+      if (response.ok && onSkip) {
+        onSkip();
+      }
+    } catch (error) {
+      console.error('[IntegracionesForm] Error skipping integrations:', error);
+    }
+  };
+
+  // Manejar completar integraciones
+  const handleCompleteIntegrations = async () => {
+    if (!token) return;
+
+    try {
+      const response = await fetch(`/api/onboarding-simplificado/${token}/integraciones-completado`, {
+        method: 'POST',
+      });
+
+      if (response.ok && onComplete) {
+        onComplete();
+      }
+    } catch (error) {
+      console.error('[IntegracionesForm] Error completing integrations:', error);
     }
   };
 
@@ -246,6 +292,22 @@ export function IntegracionesForm({ integracionesIniciales = [] }: Integraciones
           💡 <strong>Tip:</strong> Puedes configurar integraciones más adelante desde el panel de administración.
         </p>
       </div>
+
+      {/* Botones de navegación para onboarding simplificado */}
+      {simplified && (onComplete || onSkip) && (
+        <div className="flex justify-end gap-3 pt-4 border-t">
+          {onSkip && (
+            <Button type="button" variant="outline" onClick={handleSkipIntegrations}>
+              Omitir por ahora
+            </Button>
+          )}
+          {onComplete && (
+            <Button type="button" onClick={handleCompleteIntegrations}>
+              Continuar
+            </Button>
+          )}
+        </div>
+      )}
     </div>
   );
 }

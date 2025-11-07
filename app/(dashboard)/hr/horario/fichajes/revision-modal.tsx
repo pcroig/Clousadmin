@@ -34,18 +34,19 @@ import { EditarFichajeModal } from './editar-fichaje-modal';
 interface EventoPropuesto {
   tipo: string;
   hora: string;
-  origen: 'registrado' | 'sugerido';
+  origen: 'registrado' | 'propuesto';
 }
 
 interface FichajeRevision {
   id: string;
-  fichajeId: string | null;
+  fichajeId: string;
   empleadoId: string;
   empleadoNombre: string;
   fecha: string;
   eventos: EventoPropuesto[];
+  eventosRegistrados: EventoPropuesto[];
   razon: string;
-  confianza: number;
+  eventosFaltantes: string[];
 }
 
 interface RevisionModalProps {
@@ -79,7 +80,6 @@ export function RevisionModal({ open, onClose, onReviewed, onEditFichaje }: Revi
   const [seleccionados, setSeleccionados] = useState<Record<string, boolean>>({});
   const [empleadosExpandidos, setEmpleadosExpandidos] = useState<Record<string, boolean>>({});
   const [ocultarDiasSinFichajes, setOcultarDiasSinFichajes] = useState(false);
-  const [diasSinFicharMap, setDiasSinFicharMap] = useState<Record<string, number>>({});
   const [editarFichajeModal, setEditarFichajeModal] = useState<EditarFichajeModalState>({
     open: false,
     fichajeId: null,
@@ -103,10 +103,8 @@ export function RevisionModal({ open, onClose, onReviewed, onEditFichaje }: Revi
       if (response.ok) {
         const data = await response.json();
         const fichajes: FichajeRevision[] = data.fichajes || [];
-        const diasSinFichar: Record<string, number> = data.diasSinFicharMap || {};
         
         setFichajesRevision(fichajes);
-        setDiasSinFicharMap(diasSinFichar);
         
         const estadoInicial: Record<string, boolean> = {};
         fichajes.forEach((f) => {
@@ -158,18 +156,21 @@ export function RevisionModal({ open, onClose, onReviewed, onEditFichaje }: Revi
         return;
       }
 
-      const response = await fetch('/api/fichajes/revision', {
+      console.log('[Modal Revisión] Cuadrando fichajes:', seleccion);
+
+      // Llamar al nuevo endpoint de cuadrar fichajes
+      const response = await fetch('/api/fichajes/cuadrar', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          revisiones: seleccion.map((id) => ({ id, accion: 'actualizar' as const })),
+          fichajeIds: seleccion,
         }),
       });
 
       if (response.ok) {
         const resultado = await response.json();
         toast.success(
-          `Fichajes actualizados: ${resultado.actualizados}` +
+          `Fichajes cuadrados: ${resultado.cuadrados}` +
             (resultado.errores?.length ? `. Con incidencias: ${resultado.errores.length}` : '')
         );
         onReviewed();
@@ -338,12 +339,6 @@ export function RevisionModal({ open, onClose, onReviewed, onEditFichaje }: Revi
                               {seleccionadosEnGrupo} seleccionado{seleccionadosEnGrupo > 1 ? 's' : ''}
                             </Badge>
                           )}
-                          {diasSinFicharMap[grupo.empleadoId] >= 5 && (
-                            <Badge className="bg-red-100 text-red-800 border-red-300 text-xs flex items-center gap-1">
-                              <AlertTriangle className="w-3 h-3" />
-                              {diasSinFicharMap[grupo.empleadoId]} días laborables sin fichar
-                            </Badge>
-                          )}
                         </div>
                       </div>
 
@@ -383,18 +378,23 @@ export function RevisionModal({ open, onClose, onReviewed, onEditFichaje }: Revi
                                       fichaje.eventos.map((evento, idx) => {
                                         const fechaEvento = toDate(evento.hora);
                                         const etiqueta = EVENT_LABELS[evento.tipo] || evento.tipo;
+                                        const esPropuesto = evento.origen === 'propuesto';
+                                        
                                         return (
                                           <div key={`${fichaje.id}-${idx}`} className="flex items-center gap-2 text-xs">
-                                            <Clock className="w-3 h-3 text-gray-400" />
-                                            <span className="font-mono">
+                                            <Clock className={`w-3 h-3 ${esPropuesto ? 'text-blue-400' : 'text-gray-400'}`} />
+                                            <span className={`font-mono ${esPropuesto ? 'text-blue-700' : 'text-gray-700'}`}>
                                               {format(fechaEvento, 'HH:mm')}
                                             </span>
                                             <Badge
-                                              variant="outline"
-                                              className="text-xs"
+                                              variant={esPropuesto ? "default" : "outline"}
+                                              className={`text-xs ${esPropuesto ? 'bg-blue-100 text-blue-800 border-blue-300' : ''}`}
                                             >
                                               {etiqueta}
                                             </Badge>
+                                            {esPropuesto && (
+                                              <span className="text-xs text-blue-600 italic">(propuesto)</span>
+                                            )}
                                           </div>
                                         );
                                       })

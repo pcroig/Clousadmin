@@ -13,6 +13,8 @@ import { AusenciasTab } from '../../hr/mi-espacio/tabs/ausencias-tab';
 import { FichajesTab } from '../../hr/mi-espacio/tabs/fichajes-tab';
 import { ContratosTab } from '../../hr/mi-espacio/tabs/contratos-tab';
 import { DocumentosTab } from '../../hr/mi-espacio/tabs/documentos-tab';
+import { getAvatarPlaceholderClasses } from '@/lib/design-system';
+import { cn } from '@/lib/utils';
 
 interface MiEspacioManagerClientProps {
   empleado: any;
@@ -44,7 +46,12 @@ export function MiEspacioManagerClient({ empleado, usuario }: MiEspacioManagerCl
             <div className="relative">
               <Avatar className="h-16 w-16">
                 {empleado.fotoUrl && <AvatarImage src={empleado.fotoUrl} />}
-                <AvatarFallback className="bg-gray-900 text-white text-lg">
+                <AvatarFallback
+                  className={cn(
+                    getAvatarPlaceholderClasses(`${empleado.nombre} ${empleado.apellidos}`),
+                    'text-lg font-semibold'
+                  )}
+                >
                   {getInitials()}
                 </AvatarFallback>
               </Avatar>

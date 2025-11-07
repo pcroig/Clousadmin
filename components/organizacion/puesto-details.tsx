@@ -22,6 +22,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { getAvatarPlaceholderClasses } from '@/lib/design-system';
+import { cn } from '@/lib/utils';
 
 interface PuestoDetailsProps {
   puesto: {
@@ -191,7 +193,12 @@ export function PuestoDetails({ puesto, onUpdate, onDelete }: PuestoDetailsProps
                 >
                   <Avatar className="h-9 w-9">
                     {empleado.avatar && <AvatarImage src={empleado.avatar} />}
-                    <AvatarFallback className="bg-gray-900 text-white text-xs font-medium">
+                    <AvatarFallback
+                      className={cn(
+                        getAvatarPlaceholderClasses(empleado.nombre),
+                        'text-xs font-medium'
+                      )}
+                    >
                       {getInitials(empleado.nombre)}
                     </AvatarFallback>
                   </Avatar>

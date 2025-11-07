@@ -24,7 +24,7 @@
 export const MODELS = {
   // Modelos OpenAI Agents SDK
   GPT_4_1: 'gpt-4.1', // Default del SDK - balance óptimo
-  GPT_4_1_MINI: 'gpt-4.1-mini', // Rápido y económico
+  GPT_4_1_MINI: 'gpt-4.1-mini-2025-04-14', // Rápido y económico
   GPT_5: 'gpt-5', // Razonamiento avanzado
   
   // Modelos legacy (mantener para compatibilidad)
@@ -65,12 +65,6 @@ export const FUNCTION_CONFIGS: Record<string, ModelConfig> = {
     temperature: 0.3,
     responseFormat: 'json_object',
     systemMessage: 'Eres un asistente experto en optimización de recursos humanos, especializado en planificación de vacaciones.',
-  },
-  'clasificador-fichajes': {
-    model: MODELS.GPT_4_1,
-    temperature: 0.5,
-    responseFormat: 'json_object',
-    systemMessage: 'Eres un asistente experto en análisis de fichajes laborales y detección de anomalías en registros de tiempo.',
   },
   'procesar-excel-empleados': {
     model: MODELS.GPT_4_1,
@@ -156,7 +150,7 @@ export async function callAIWithConfig(
 
   // Import del cliente unificado
   const { callAI, AIProvider, MessageRole } = await import('./core/client');
-  const { MessageRole: MsgRole, type AIMessage } = await import('./core/types');
+  const { MessageRole: MsgRole } = await import('./core/types');
   
   // Convertir mensajes de formato OpenAI a formato unificado
   const aiMessages: any[] = [];

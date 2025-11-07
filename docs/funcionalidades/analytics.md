@@ -262,7 +262,7 @@ model EmpleadoEquipo {
 }
 ```
 
-**Nota:** El campo `Empleado.departamento` está deprecated y no se usa en Analytics.
+**Nota:** El campo `Empleado.departamento` ha sido eliminado. Analytics ahora usa la relación `Equipo` para agrupar empleados.
 
 ### 4.2 Cálculo de Antigüedad
 
@@ -409,7 +409,7 @@ Content (scroll)
 
 ### Versión 1.0 (Nov 2024)
 - ✅ Implementación inicial con dashboard único
-- ✅ Filtros globales (género, departamento, antigüedad)
+- ✅ Filtros globales (género, equipo, antigüedad)
 - ✅ Exportación a Excel
 - ✅ 3 endpoints principales (plantilla, compensación, fichajes)
 
@@ -419,7 +419,7 @@ Content (scroll)
 
 ### 🎯 Datos Reales
 - Usa relación N:N correcta (Empleado ↔ Equipo)
-- No usa el campo `departamento` deprecado
+- Usa la relación `Equipo` en lugar del campo `departamento` eliminado
 - Cálculo dinámico de antigüedad
 - Solo fichajes finalizados/revisados
 

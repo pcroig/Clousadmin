@@ -22,6 +22,7 @@ import type { DatosTemporales, ProgresoOnboarding } from '@/lib/onboarding';
 import { DocumentUploader } from '@/components/shared/document-uploader';
 import { DocumentList } from '@/components/shared/document-list';
 import { validarIBAN } from '@/lib/validaciones/iban';
+import { PWAExplicacion } from '@/components/onboarding/pwa-explicacion';
 
 interface OnboardingFormProps {
   token: string;
@@ -30,7 +31,7 @@ interface OnboardingFormProps {
   datosTemporales: DatosTemporales | null;
 }
 
-type Paso = 0 | 1 | 2 | 3;
+type Paso = 0 | 1 | 2 | 3 | 4;
 
 // Mapeo de nombres de campos a etiquetas en español
 const campoLabels: Record<string, string> = {
@@ -64,10 +65,11 @@ export function OnboardingForm({
   const [pasoActual, setPasoActual] = useState<Paso>(() => {
     // Determinar paso inicial basado en progreso
     if (!progresoInicial.credenciales_completadas) return 0;
-    if (!progresoInicial.datos_personales) return 1;
-    if (!progresoInicial.datos_bancarios) return 2;
-    if (!progresoInicial.datos_documentos) return 3;
-    return 3;
+    if ('datos_personales' in progresoInicial && !progresoInicial.datos_personales) return 1;
+    if ('datos_bancarios' in progresoInicial && !progresoInicial.datos_bancarios) return 2;
+    if ('datos_documentos' in progresoInicial && !progresoInicial.datos_documentos) return 3;
+    if (!progresoInicial.pwa_explicacion) return 4;
+    return 4;
   });
   
   const [loading, setLoading] = useState(false);
@@ -110,7 +112,10 @@ export function OnboardingForm({
 
   // Validación en tiempo real para IBAN
   const ibanValido = (() => {
-    if (datosBancarios.iban.length >= 24) {
+    if (!datosBancarios.iban) return null;
+    // Limpiar espacios para contar caracteres reales
+    const ibanLimpio = datosBancarios.iban.trim().toUpperCase().replace(/\s/g, '');
+    if (ibanLimpio.length >= 24) {
       return validarIBAN(datosBancarios.iban);
     }
     return null;
@@ -201,6 +206,7 @@ export function OnboardingForm({
 
       if (res.ok && data.success) {
         setSuccess('Credenciales guardadas correctamente');
+        setLoading(false);
         setTimeout(() => {
           setPasoActual(1);
           setSuccess('');
@@ -263,6 +269,7 @@ export function OnboardingForm({
 
       if (res.ok && data.success) {
         setSuccess('Datos personales guardados correctamente');
+        setLoading(false);
         setTimeout(() => {
           setPasoActual(2);
           setSuccess('');
@@ -310,6 +317,7 @@ export function OnboardingForm({
 
       if (res.ok && data.success) {
         setSuccess('Datos bancarios guardados correctamente');
+        setLoading(false);
         setTimeout(() => {
           setPasoActual(3);
           setSuccess('');
@@ -364,6 +372,17 @@ export function OnboardingForm({
     setError('');
 
     try {
+      // Primero marcar PWA como completado
+      const pwaRes = await fetch(`/api/onboarding/${token}/pwa-completado`, {
+        method: 'POST',
+      });
+
+      if (!pwaRes.ok) {
+        const pwaData = await pwaRes.json();
+        throw new Error(pwaData.error || 'Error al marcar PWA como completado');
+      }
+
+      // Luego finalizar onboarding
       const res = await fetch(`/api/onboarding/${token}/finalizar`, {
         method: 'POST',
       });
@@ -372,8 +391,9 @@ export function OnboardingForm({
 
       if (res.ok && data.success) {
         setSuccess('¡Onboarding completado! Redirigiendo...');
+        setLoading(false);
         setTimeout(() => {
-        window.location.href = '/login?onboarding=success';
+          window.location.href = '/login?onboarding=success';
         }, 2000);
       } else {
         setError(data.error || 'Error al finalizar onboarding');
@@ -381,7 +401,7 @@ export function OnboardingForm({
       }
     } catch (err) {
       console.error('[handleFinalizarOnboarding] Error:', err);
-      setError('Error de conexión. Inténtalo de nuevo.');
+      setError(err instanceof Error ? err.message : 'Error de conexión. Inténtalo de nuevo.');
       setLoading(false);
     }
   };
@@ -408,7 +428,7 @@ export function OnboardingForm({
   };
 
   // Stepper con líneas (4 pasos: 0, 1, 2, 3)
-  const totalPasos = 4;
+  const totalPasos = 5;
   
   // Calcular qué pasos deben mostrarse como completados (pasos anteriores al actual)
   const pasoActualNum = pasoActual;
@@ -430,6 +450,10 @@ export function OnboardingForm({
     3: {
       titulo: 'Documentos',
       descripcion: 'Sube los documentos requeridos para completar tu onboarding',
+    },
+    4: {
+      titulo: 'App Móvil',
+      descripcion: 'Instala Clousadmin en tu móvil para acceder fácilmente',
     },
   };
 
@@ -596,7 +620,10 @@ export function OnboardingForm({
                 placeholder="12345678A"
                 value={datosPersonales.nif}
                 onChange={(e) =>
-                  setDatosPersonales({ ...datosPersonales, nif: e.target.value })
+                  setDatosPersonales({
+                    ...datosPersonales,
+                    nif: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''),
+                  })
                 }
                 required
                 maxLength={20}
@@ -856,7 +883,7 @@ export function OnboardingForm({
             </Label>
             <Input
               id="iban"
-              placeholder="ES9121000418450200051332"
+              placeholder="ES91 2100 0418 4502 0005 1332"
               value={datosBancarios.iban}
               onChange={(e) =>
                 setDatosBancarios({
@@ -865,7 +892,7 @@ export function OnboardingForm({
                 })
               }
               required
-              maxLength={24}
+              maxLength={34}
               className={
                 ibanValido === false
                   ? 'border-red-500'
@@ -1050,15 +1077,50 @@ export function OnboardingForm({
                   <ChevronLeft className="mr-2 h-4 w-4" /> Anterior
                 </Button>
                 <Button
-                  onClick={handleFinalizarOnboarding}
+                  onClick={() => setPasoActual(4)}
                   className="flex-1"
                   disabled={loading}
                 >
-                  {loading ? 'Finalizando...' : 'Finalizar Onboarding'}
+                  Siguiente <ChevronRight className="ml-2 h-4 w-4" />
                 </Button>
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Paso 4: PWA Explicación */}
+      {pasoActual === 4 && (
+        <div className="space-y-6">
+          <PWAExplicacion
+            onComplete={handleFinalizarOnboarding}
+            showCompleteButton={true}
+            loading={loading}
+          />
+
+          {error && (
+            <div className="rounded-md bg-red-50 p-3">
+              <p className="text-sm text-red-600">{error}</p>
+            </div>
+          )}
+
+          {success && (
+            <div className="rounded-md bg-green-50 p-3">
+              <p className="text-sm text-green-600">{success}</p>
+            </div>
+          )}
+
+          {/* Botón de volver (opcional) */}
+          <div className="flex justify-start pt-4">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setPasoActual(3)}
+              disabled={loading}
+            >
+              <ChevronLeft className="mr-2 h-4 w-4" /> Anterior
+            </Button>
+          </div>
         </div>
       )}
     </div>
