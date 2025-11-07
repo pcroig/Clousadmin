@@ -4,15 +4,21 @@
 // Validates Spanish NIF (DNI) and NIE format and checksum
 
 /**
+ * Normaliza un NIF/NIE eliminando espacios, puntos y guiones y convirtiendo a mayúsculas
+ */
+export function normalizarIdentificacion(identificacion: string): string {
+  return identificacion.trim().toUpperCase().replace(/[.\-\s]/g, '');
+}
+
+/**
  * Valida un NIF español (DNI)
  * Formato: 8 dígitos + letra de control
- * Ejemplo: 12345678Z
+ * Ejemplo: 12345678Z, 12345678-Z, 12.345.678-Z
  */
 export function validarNIF(nif: string): boolean {
   if (!nif) return false;
 
-  // Limpiar espacios y convertir a mayúsculas
-  const nifLimpio = nif.trim().toUpperCase();
+  const nifLimpio = normalizarIdentificacion(nif);
 
   // Regex para DNI: 8 dígitos + letra
   const regexDNI = /^\d{8}[A-Z]$/;
@@ -35,13 +41,12 @@ export function validarNIF(nif: string): boolean {
 /**
  * Valida un NIE español (extranjeros)
  * Formato: X/Y/Z + 7 dígitos + letra de control
- * Ejemplo: X1234567L
+ * Ejemplo: X1234567L, X-1234567-L, X.123.456.7-L
  */
 export function validarNIE(nie: string): boolean {
   if (!nie) return false;
 
-  // Limpiar espacios y convertir a mayúsculas
-  const nieLimpio = nie.trim().toUpperCase();
+  const nieLimpio = normalizarIdentificacion(nie);
 
   // Regex para NIE: (X|Y|Z) + 7 dígitos + letra
   const regexNIE = /^[XYZ]\d{7}[A-Z]$/;
@@ -66,11 +71,12 @@ export function validarNIE(nie: string): boolean {
 
 /**
  * Valida NIF o NIE (ambos formatos)
+ * Acepta formatos con guiones, puntos y espacios
  */
 export function validarNIFoNIE(identificacion: string): boolean {
   if (!identificacion) return false;
 
-  const idLimpio = identificacion.trim().toUpperCase();
+  const idLimpio = normalizarIdentificacion(identificacion);
 
   // Detectar si es NIE (empieza por X, Y, Z)
   if (/^[XYZ]/.test(idLimpio)) {
@@ -99,7 +105,7 @@ export function obtenerInfoValidacionNIF(identificacion: string): {
     };
   }
 
-  const idLimpio = identificacion.trim().toUpperCase();
+  const idLimpio = normalizarIdentificacion(identificacion);
   const letras = 'TRWAGMYFPDXBNJZSQVHLCKE';
 
   // Detectar si es NIE
@@ -109,7 +115,7 @@ export function obtenerInfoValidacionNIF(identificacion: string): {
       return {
         valido: false,
         tipo: 'NIE',
-        mensaje: 'Formato de NIE inválido (debe ser X/Y/Z + 7 dígitos + letra)',
+        mensaje: 'Formato de NIE inválido (debe ser X/Y/Z + 7 dígitos + letra, ej: X1234567L)',
       };
     }
 
@@ -136,7 +142,7 @@ export function obtenerInfoValidacionNIF(identificacion: string): {
     return {
       valido: false,
       tipo: 'NIF',
-      mensaje: 'Formato de NIF inválido (debe ser 8 dígitos + letra)',
+      mensaje: 'Formato de NIF inválido (debe ser 8 dígitos + letra, ej: 12345678Z)',
     };
   }
 

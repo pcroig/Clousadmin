@@ -16,7 +16,7 @@ import { AIProvider, ModelConfig } from './types';
  */
 export const OPENAI_MODELS = {
   GPT_4_1: 'gpt-4.1', // Default del Agents SDK - balance entre predictibilidad y baja latencia
-  GPT_4_1_MINI: 'gpt-4.1-mini', // Versión mini más rápida
+  GPT_4_1_MINI: 'gpt-4.1-mini-2025-04-14', // Versión mini más rápida
   GPT_5: 'gpt-5', // Modelo de razonamiento
   GPT_5_MINI: 'gpt-5-mini', // Razonamiento rápido
   GPT_5_NANO: 'gpt-5-nano', // Razonamiento ultra-rápido
@@ -260,21 +260,12 @@ export const FEATURE_CONFIGS = {
   },
   
   /**
-   * Clasificación de fichajes
-   */
-  'clasificador-fichajes': {
-    useCase: AIUseCase.CLASSIFICATION,
-    systemMessage: 'Eres un asistente experto en análisis de fichajes laborales y detección de anomalías en registros de tiempo.',
-    temperature: 0.3,
-  },
-  
-  /**
-   * Cuadrar vacaciones (optimización)
+   * Cuadrar vacaciones
    */
   'cuadrar-vacaciones': {
-    useCase: AIUseCase.REASONING,
-    systemMessage: 'Eres un asistente experto en optimización de recursos humanos, especializado en planificación de vacaciones.',
-    temperature: 0.3,
+    useCase: AIUseCase.PLANNING,
+    systemMessage: 'Eres un asistente experto en gestión de vacaciones y planificación de recursos humanos.',
+    temperature: 0.2,
   },
   
   /**

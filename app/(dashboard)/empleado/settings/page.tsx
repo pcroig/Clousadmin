@@ -18,10 +18,14 @@ export default async function SettingsPage() {
   const usuario = await prisma.usuario.findUnique({
     where: { id: session.user.id },
     select: {
-      nombre: true,
-      apellidos: true,
       email: true,
       rol: true,
+      ultimoAcceso: true,
+      empresa: {
+        select: {
+          nombre: true,
+        },
+      },
     },
   });
 

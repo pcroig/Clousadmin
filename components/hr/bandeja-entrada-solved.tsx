@@ -28,15 +28,16 @@ interface BandejaEntradaSolvedProps {
 }
 
 export function BandejaEntradaSolved({ stats, items }: BandejaEntradaSolvedProps) {
+  // Iconos sin fondo - siempre gris oscuro según sistema de diseño
   const getIconForType = (tipo: string) => {
     switch (tipo) {
       case 'fichaje':
-        return <Clock className="w-5 h-5 text-blue-600" />;
+        return <Clock className="w-5 h-5 text-gray-600" />;
       case 'ausencia':
         return <Calendar className="w-5 h-5 text-gray-600" />;
       case 'nomina':
       case 'contrato':
-        return <FileCheck className="w-5 h-5 text-green-600" />;
+        return <FileCheck className="w-5 h-5 text-gray-600" />;
       default:
         return <CheckCircle2 className="w-5 h-5 text-gray-600" />;
     }

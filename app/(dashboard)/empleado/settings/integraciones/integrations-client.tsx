@@ -7,7 +7,6 @@
 import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
-  ArrowLeft,
   Calendar,
   Check,
   Loader2,
@@ -27,7 +26,7 @@ import {
 } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import Link from 'next/link';
+import { SettingsLayout } from '@/components/settings/settings-layout';
 import type { Integracion } from '@prisma/client';
 
 interface IntegrationsClientProps {
@@ -124,60 +123,45 @@ export function IntegrationsClient({
 
   if (!googleConfigured) {
     return (
-      <div className="h-full w-full flex flex-col">
-        <div className="mb-6">
-          <Link
-            href="/empleado/settings"
-            className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-4"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            <span className="text-sm">Volver a Configuración</span>
-          </Link>
-          <h1 className="text-2xl font-bold text-gray-900">Integraciones</h1>
-          <p className="text-sm text-gray-600 mt-1">
-            Conecta Clousadmin con tus herramientas favoritas
-          </p>
-        </div>
+      <SettingsLayout rol="empleado">
+        <div className="space-y-6">
+          <div>
+            <h2 className="text-2xl font-semibold text-gray-900">Integraciones</h2>
+            <p className="text-sm text-gray-500 mt-1">
+              Conecta Clousadmin con tus herramientas favoritas
+            </p>
+          </div>
 
-        <Card className="border-yellow-200 bg-yellow-50/30">
-          <CardHeader>
-            <div className="flex items-start gap-4">
-              <AlertCircle className="w-5 h-5 text-yellow-600 mt-0.5" />
-              <div>
-                <CardTitle className="text-base text-yellow-900">
-                  Integraciones no disponibles
-                </CardTitle>
-                <CardDescription className="mt-2 text-yellow-800">
-                  Las integraciones de calendario no están configuradas actualmente.
-                  Por favor, contacta con tu administrador de RRHH.
-                </CardDescription>
+          <Card className="border-yellow-200 bg-yellow-50/30">
+            <CardHeader>
+              <div className="flex items-start gap-4">
+                <AlertCircle className="w-5 h-5 text-yellow-600 mt-0.5" />
+                <div>
+                  <CardTitle className="text-base text-yellow-900">
+                    Integraciones no disponibles
+                  </CardTitle>
+                  <CardDescription className="mt-2 text-yellow-800">
+                    Las integraciones de calendario no están configuradas actualmente.
+                    Por favor, contacta con tu administrador de RRHH.
+                  </CardDescription>
+                </div>
               </div>
-            </div>
-          </CardHeader>
-        </Card>
-      </div>
+            </CardHeader>
+          </Card>
+        </div>
+      </SettingsLayout>
     );
   }
 
   return (
-    <div className="h-full w-full flex flex-col">
-      {/* Header */}
-      <div className="mb-6">
-        <Link
-          href="/empleado/settings"
-          className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-4"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          <span className="text-sm">Volver a Configuración</span>
-        </Link>
-        <h1 className="text-2xl font-bold text-gray-900">Integraciones</h1>
-        <p className="text-sm text-gray-600 mt-1">
-          Conecta tu calendario personal para sincronizar tus ausencias automáticamente
-        </p>
-      </div>
-
-      {/* Integrations List */}
-      <div className="flex-1 overflow-y-auto space-y-6">
+    <SettingsLayout rol="empleado">
+      <div className="space-y-6">
+        <div>
+          <h2 className="text-2xl font-semibold text-gray-900">Integraciones</h2>
+          <p className="text-sm text-gray-500 mt-1">
+            Conecta tu calendario personal para sincronizar tus ausencias automáticamente
+          </p>
+        </div>
         {/* Google Calendar Section */}
         <div>
           <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
@@ -315,6 +299,6 @@ export function IntegrationsClient({
           </CardHeader>
         </Card>
       </div>
-    </div>
+    </SettingsLayout>
   );
 }

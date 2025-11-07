@@ -246,7 +246,7 @@ export function AusenciasTab({ empleadoId }: { empleadoId: string }) {
           <Card>
             <CardHeader>
               <CardTitle className="text-base font-semibold flex items-center gap-2">
-                <CalendarIcon className="w-5 h-5 text-[#F26C21]" />
+                <CalendarIcon className="w-5 h-5 text-[#d97757]" />
                 Saldo de Ausencias {new Date().getFullYear()}
               </CardTitle>
             </CardHeader>

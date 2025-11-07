@@ -32,7 +32,10 @@ export async function POST(req: NextRequest) {
 
     const body: ConfirmarImportacionBody = await req.json();
 
-    const { empleados, equiposDetectados, invitarEmpleados } = body;
+    const { empleados, equiposDetectados } = body;
+
+    // Requisito actual: siempre invitar y activar empleados importados
+    const debeInvitar = true;
 
     // Filtrar solo empleados válidos
     const empleadosValidos = empleados.filter((e) => e.valido);
@@ -101,12 +104,21 @@ export async function POST(req: NextRequest) {
 
     console.log(`[ConfirmarImportacion] Equipos creados: ${resultados.equiposCreados}`);
 
-    // 2. Crear empleados en batches
+    // 2. Crear empleados en batches con paralelismo controlado
+    const CONCURRENCY = 8; // Procesamos 8 empleados en paralelo (balance entre velocidad y carga DB)
+    
     for (const batch of batches) {
-      await Promise.all(
-        batch.map(async (empleadoData) => {
+      // Dividir batch en chunks de CONCURRENCY para paralelismo controlado
+      const chunks: typeof batch[] = [];
+      for (let i = 0; i < batch.length; i += CONCURRENCY) {
+        chunks.push(batch.slice(i, i + CONCURRENCY));
+      }
+
+      for (const chunk of chunks) {
+        // Procesar chunk en paralelo con allSettled (errores no bloquean otros)
+        const creationPromises = chunk.map(async (empleadoData) => {
           try {
-            await prisma.$transaction(async (tx) => {
+            const creationResult = await prisma.$transaction(async (tx) => {
               // Verificar si el email ya existe
               const usuarioExistente = await tx.usuario.findUnique({
                 where: { email: empleadoData.email!.toLowerCase() },
@@ -116,7 +128,7 @@ export async function POST(req: NextRequest) {
                 resultados.errores.push(
                   `Email duplicado: ${empleadoData.email}`
                 );
-                return; // Saltar este empleado
+                return null; // Saltar este empleado
               }
 
               // Crear usuario (sin password, se establecerá en el onboarding)
@@ -128,7 +140,7 @@ export async function POST(req: NextRequest) {
                   empresaId: session.user.empresaId,
                   rol: 'empleado',
                   emailVerificado: false,
-                  activo: invitarEmpleados ? false : true, // Se activará al aceptar invitación
+                  activo: true,
                 },
               });
 
@@ -144,7 +156,7 @@ export async function POST(req: NextRequest) {
                   );
                   // Eliminar el usuario creado para mantener consistencia
                   await tx.usuario.delete({ where: { id: usuario.id } });
-                  return; // Saltar este empleado
+                  return null; // Saltar este empleado
                 }
               }
 
@@ -162,11 +174,9 @@ export async function POST(req: NextRequest) {
                     ? new Date(empleadoData.fechaNacimiento)
                     : null,
                   puesto: empleadoData.puesto,
-                  departamento: empleadoData.departamento,
                   fechaAlta: empleadoData.fechaAlta
                     ? new Date(empleadoData.fechaAlta)
                     : new Date(),
-                  tipoContrato: empleadoData.tipoContrato || 'indefinido',
                   salarioBrutoAnual: empleadoData.salarioBrutoAnual
                     ? parseFloat(empleadoData.salarioBrutoAnual.toString())
                     : null,
@@ -180,7 +190,7 @@ export async function POST(req: NextRequest) {
                   codigoPostal: empleadoData.codigoPostal,
                   direccionProvincia: empleadoData.direccionProvincia,
                   onboardingCompletado: false,
-                  activo: invitarEmpleados ? false : true,
+                  activo: true,
                 },
               });
 
@@ -200,25 +210,47 @@ export async function POST(req: NextRequest) {
                 });
               }
 
-              resultados.empleadosCreados++;
+              return {
+                empleadoId: empleado.id,
+                email: empleado.email,
+              };
+            }, { timeout: 10000 });
 
-              // Crear invitación si corresponde
-              if (invitarEmpleados) {
-                try {
-                  await crearInvitacion(
-                    empleado.id,
-                    session.user.empresaId,
-                    empleadoData.email!.toLowerCase()
+            if (!creationResult) {
+              return null; // Ya se registró el error correspondiente
+            }
+
+            // Empleado creado con éxito, crear invitación
+            if (debeInvitar) {
+              try {
+                const invitacion = await crearInvitacion(
+                  creationResult.empleadoId,
+                  session.user.empresaId,
+                  creationResult.email,
+                  'simplificado'
+                );
+
+                if (invitacion.success) {
+                  return { success: true, empleado: creationResult };
+                } else {
+                  resultados.errores.push(
+                    `Error al crear invitación: ${creationResult.email}`
                   );
-                  resultados.invitacionesEnviadas++;
-                } catch (error) {
-                  console.error(
-                    `[ConfirmarImportacion] Error creando invitación para ${empleadoData.email}:`,
-                    error
-                  );
+                  return { success: false, empleado: creationResult };
                 }
+              } catch (error) {
+                console.error(
+                  `[ConfirmarImportacion] Error creando invitación para ${creationResult.email}:`,
+                  error
+                );
+                resultados.errores.push(
+                  `Error al crear invitación: ${creationResult.email}`
+                );
+                return { success: false, empleado: creationResult };
               }
-            });
+            }
+
+            return { success: true, empleado: creationResult };
           } catch (error) {
             console.error(
               `[ConfirmarImportacion] Error creando empleado ${empleadoData.email}:`,
@@ -227,9 +259,23 @@ export async function POST(req: NextRequest) {
             resultados.errores.push(
               `Error al crear empleado: ${empleadoData.email}`
             );
+            return null;
           }
-        })
-      );
+        });
+
+        // Esperar a que todos los empleados del chunk se procesen
+        const results = await Promise.allSettled(creationPromises);
+
+        // Contabilizar resultados
+        results.forEach((result) => {
+          if (result.status === 'fulfilled' && result.value) {
+            resultados.empleadosCreados++;
+            if (result.value.success) {
+              resultados.invitacionesEnviadas++;
+            }
+          }
+        });
+      }
     }
 
     // 3. Asignar managers (segunda pasada)

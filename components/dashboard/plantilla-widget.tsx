@@ -8,6 +8,8 @@ import Link from 'next/link';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { getInitials } from '@/components/shared/utils';
 import { WidgetCard } from '@/components/shared/widget-card';
+import { getAvatarPlaceholderClasses } from '@/lib/design-system';
+import { cn } from '@/lib/utils';
 
 interface EmpleadoResumen {
   nombre: string;
@@ -52,7 +54,12 @@ export function PlantillaWidget({ trabajando, ausencias, vacaciones }: Plantilla
                     className="h-8 w-8 border-2 border-white rounded-lg"
                   >
                     {emp.avatar && <AvatarImage src={emp.avatar} />}
-                    <AvatarFallback className="bg-accent text-white text-[11px] font-medium rounded-lg">
+                    <AvatarFallback
+                      className={cn(
+                        getAvatarPlaceholderClasses(emp.nombre),
+                        'text-[11px] font-medium rounded-lg'
+                      )}
+                    >
                       {getInitials(emp.nombre)}
                     </AvatarFallback>
                   </Avatar>
@@ -80,7 +87,12 @@ export function PlantillaWidget({ trabajando, ausencias, vacaciones }: Plantilla
                     className="h-8 w-8 border-2 border-white rounded-lg"
                   >
                     {emp.avatar && <AvatarImage src={emp.avatar} />}
-                    <AvatarFallback className="bg-warning text-white text-[11px] font-medium rounded-lg">
+                    <AvatarFallback
+                      className={cn(
+                        getAvatarPlaceholderClasses(emp.nombre),
+                        'text-[11px] font-medium rounded-lg'
+                      )}
+                    >
                       {getInitials(emp.nombre)}
                     </AvatarFallback>
                   </Avatar>
@@ -108,7 +120,12 @@ export function PlantillaWidget({ trabajando, ausencias, vacaciones }: Plantilla
                     className="h-8 w-8 border-2 border-white rounded-lg"
                   >
                     {emp.avatar && <AvatarImage src={emp.avatar} />}
-                    <AvatarFallback className="bg-info text-white text-[11px] font-medium rounded-lg">
+                    <AvatarFallback
+                      className={cn(
+                        getAvatarPlaceholderClasses(emp.nombre),
+                        'text-[11px] font-medium rounded-lg'
+                      )}
+                    >
                       {getInitials(emp.nombre)}
                     </AvatarFallback>
                   </Avatar>

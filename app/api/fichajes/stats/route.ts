@@ -1,5 +1,5 @@
 // ========================================
-// API: Estadísticas de Fichajes Auto-completados
+// API: Estadísticas de Fichajes
 // ========================================
 // GET: Obtener estadísticas para el widget del dashboard HR
 
@@ -29,30 +29,31 @@ export async function GET(request: NextRequest) {
     const manana = new Date(hoy);
     manana.setDate(manana.getDate() + 1);
 
-    // Contar auto-completados del día (estado: aprobado, tipo: fichaje_completado)
-    const autoCompletados = await prisma.autoCompletado.count({
+    // Contar fichajes cuadrados masivamente del día
+    const cuadradosMasivamente = await prisma.fichaje.count({
       where: {
         empresaId: session.user.empresaId,
-        tipo: 'fichaje_completado',
-        estado: 'aprobado',
-        createdAt: {
+        cuadradoMasivamente: true,
+        cuadradoEn: {
           gte: hoy,
           lt: manana,
         },
       },
     });
 
-    // Contar fichajes en revisión (estado: pendiente, tipo: fichaje_revision)
-    const enRevision = await prisma.autoCompletado.count({
+    // Contar fichajes pendientes (requieren revisión)
+    const enRevision = await prisma.fichaje.count({
       where: {
         empresaId: session.user.empresaId,
-        tipo: 'fichaje_revision',
         estado: 'pendiente',
+        fecha: {
+          lt: hoy, // Solo días anteriores
+        },
       },
     });
 
     return successResponse({
-      autoCompletados,
+      cuadradosMasivamente,
       enRevision,
       fecha: hoy.toISOString().split('T')[0],
     });

@@ -1,6 +1,6 @@
 # Sistema de Diseño - Clousadmin
 
-## 🎨 Sistema de Colores
+## 🎨 Sistema de Colores Unificado
 
 ### Colores Principales
 
@@ -30,6 +30,8 @@ className="text-[#e1af9e]"
 className="hover:text-[#c6613f]"
 ```
 
+**⚠️ IMPORTANTE**: NO usar `#f26c21` (color antiguo, deprecado)
+
 #### Colores de Estado
 
 Los colores de estado se mantienen con la paleta estándar de Tailwind:
@@ -39,6 +41,22 @@ Los colores de estado se mantienen con la paleta estándar de Tailwind:
 - **Rechazado/Error**: `bg-red-100 text-red-800`
 - **Cancelado/Neutral**: `bg-gray-100 text-gray-800`
 - **Editado/Info**: `bg-blue-100 text-blue-800`
+
+#### Botones de Acción Crítica (Excepciones)
+
+Los botones de aprobar y rechazar usan colores específicos:
+
+```tsx
+// Botón Aprobar
+<button className="bg-green-600 hover:bg-green-700 text-white">
+  Aprobar
+</button>
+
+// Botón Rechazar
+<button className="bg-red-600 hover:bg-red-700 text-white">
+  Rechazar
+</button>
+```
 
 ### Escala de Grises
 
@@ -61,6 +79,36 @@ bg-gray-50, bg-gray-100
 /* Bordes */
 border-gray-200, border-gray-300
 ```
+
+### Colores Pastel/Crema (Uso Ocasional)
+
+Estos colores son para uso **ocasional** en elementos como avatares, gráficos y visualizaciones de datos. **NO son para uso corriente** en la interfaz.
+
+```tsx
+// Colores pastel definidos en globals.css para gráficos
+const chartColors = {
+  chart1: '#d97757',  // Color principal
+  chart2: '#c6613f',  // Variante oscura
+  chart3: '#16A34A',  // Verde
+  chart4: '#0284C7',  // Azul
+  chart5: '#EA580C',  // Naranja advertencia
+};
+
+// Ejemplo de uso en gráficos
+<Recharts.Pie dataKey="value" fill={chartColors.chart1} />
+```
+
+**Casos de uso permitidos**:
+- Gráficos de barras, líneas, pie charts
+- Avatares con colores de fondo variados
+- Indicadores visuales en dashboards
+- Elementos de data visualization
+
+**NO usar para**:
+- Botones principales
+- Iconos de navegación
+- Textos de UI estándar
+- Fondos de cards o containers
 
 ---
 

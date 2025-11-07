@@ -272,11 +272,8 @@ export default async function HRBandejaEntradaPage() {
 
   return (
     <div className="p-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Bandeja de entrada</h1>
-        <p className="text-gray-600 mt-2">
-          Gestiona solicitudes, revisa elementos completados y recibe notificaciones
-        </p>
+      <div className="mb-6">
+        <h1 className="text-2xl font-semibold text-gray-900">Bandeja de entrada</h1>
       </div>
 
       <BandejaEntradaTabs

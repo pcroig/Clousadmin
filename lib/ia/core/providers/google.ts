@@ -216,7 +216,8 @@ export function mapToGoogleModel(genericModel: string): string {
   const modelMap: Record<string, string> = {
     // Modelos OpenAI recientes
     'gpt-4.1': 'gemini-1.5-pro-latest',
-    'gpt-4.1-mini': 'gemini-1.5-flash-latest',
+    'gpt-4.1-mini-2025-04-14': 'gemini-1.5-flash-latest',
+    'gpt-4.1-mini': 'gemini-1.5-flash-latest', // Legacy - mantener para compatibilidad
     'gpt-5': 'gemini-1.5-pro-latest',
     'gpt-5-mini': 'gemini-1.5-flash-latest',
     'gpt-5-nano': 'gemini-1.5-flash-latest',

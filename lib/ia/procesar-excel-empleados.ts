@@ -4,6 +4,8 @@
 
 import { isAnyProviderAvailable } from './core/client';
 import { callAIWithConfig } from './models';
+import * as XLSX from 'xlsx';
+import { z } from 'zod';
 
 /**
  * Estructura de un empleado detectado por la IA
@@ -19,7 +21,6 @@ export interface EmpleadoDetectado {
 
   // Datos laborales
   puesto: string | null;
-  departamento: string | null;
   equipo: string | null;
   manager: string | null; // Nombre o email del manager
   fechaAlta: string | null; // ISO date string
@@ -49,8 +50,338 @@ export interface RespuestaProcesamientoExcel {
   columnasDetectadas: Record<string, string>; // Mapeo de columnas originales a campos
 }
 
+// ========================================
+// SCHEMAS ZOD PARA VALIDACIÓN
+// ========================================
+
+/**
+ * Schema Zod para EmpleadoDetectado - validación estructurada
+ */
+export const EmpleadoDetectadoSchema = z.object({
+  nombre: z.string().nullable(),
+  apellidos: z.string().nullable(),
+  email: z.string().nullable(),
+  nif: z.string().nullable(),
+  telefono: z.string().nullable(),
+  fechaNacimiento: z.string().nullable(),
+  puesto: z.string().nullable(),
+  equipo: z.string().nullable(),
+  manager: z.string().nullable(),
+  fechaAlta: z.string().nullable(),
+  tipoContrato: z.string().nullable(),
+  salarioBrutoAnual: z.number().nullable(),
+  salarioBrutoMensual: z.number().nullable(),
+  direccion: z.string().nullable(),
+  direccionCalle: z.string().nullable(),
+  direccionNumero: z.string().nullable(),
+  direccionPiso: z.string().nullable(),
+  direccionProvincia: z.string().nullable(),
+  ciudad: z.string().nullable(),
+  codigoPostal: z.string().nullable(),
+});
+
+/**
+ * Schema Zod para RespuestaProcesamientoExcel - validación estructurada
+ */
+export const RespuestaProcesamientoExcelSchema = z.object({
+  empleados: z.array(EmpleadoDetectadoSchema),
+  equiposDetectados: z.array(z.string()).default([]),
+  managersDetectados: z.array(z.string()).default([]),
+  columnasDetectadas: z.record(z.string(), z.string().nullable()).default({}),
+});
+
+/**
+ * Convertir fecha de Excel (número serial o string) a formato ISO (YYYY-MM-DD)
+ */
+function convertirFechaExcelAISO(valor: any): string | null {
+  if (!valor) return null;
+
+  // Si es un número, es una fecha serial de Excel
+  if (typeof valor === 'number') {
+    try {
+      // Excel cuenta desde el 1 de enero de 1900
+      // Pero hay un bug: Excel trata 1900 como año bisiesto, así que hay que ajustar
+      const fecha = XLSX.SSF.parse_date_code(valor);
+      if (fecha) {
+        return `${fecha.y}-${String(fecha.m).padStart(2, '0')}-${String(fecha.d).padStart(2, '0')}`;
+      }
+    } catch (error) {
+      // Si falla el parseo, intentar como timestamp
+      try {
+        const fecha = new Date((valor - 25569) * 86400 * 1000);
+        if (!isNaN(fecha.getTime())) {
+          return fecha.toISOString().split('T')[0];
+        }
+      } catch {
+        // Ignorar error
+      }
+    }
+  }
+
+  // Si es un string, intentar parsear formatos comunes
+  if (typeof valor === 'string') {
+    const valorTrim = valor.trim();
+    
+    // Formato DD/MM/YYYY o DD-MM-YYYY
+    const formatoFecha = /^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/;
+    const match = valorTrim.match(formatoFecha);
+    if (match) {
+      const [, dia, mes, anio] = match;
+      return `${anio}-${mes.padStart(2, '0')}-${dia.padStart(2, '0')}`;
+    }
+
+    // Formato YYYY-MM-DD (ya está en formato ISO)
+    const formatoISO = /^\d{4}-\d{2}-\d{2}$/;
+    if (formatoISO.test(valorTrim)) {
+      return valorTrim;
+    }
+
+    // Intentar parsear como fecha estándar
+    const fecha = new Date(valorTrim);
+    if (!isNaN(fecha.getTime())) {
+      return fecha.toISOString().split('T')[0];
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Dividir nombre completo en nombre y apellidos
+ */
+function dividirNombreCompleto(nombreCompleto: string): { nombre: string; apellidos: string } {
+  const partes = nombreCompleto.trim().split(/\s+/).filter(p => p.length > 0);
+  
+  if (partes.length === 0) {
+    return { nombre: '', apellidos: '' };
+  }
+  
+  if (partes.length === 1) {
+    return { nombre: partes[0], apellidos: '' };
+  }
+  
+  // El primer elemento es el nombre, el resto son apellidos
+  return {
+    nombre: partes[0],
+    apellidos: partes.slice(1).join(' '),
+  };
+}
+
+/**
+ * Convertir valor a número (maneja strings con símbolos de moneda, comas, etc.)
+ */
+function convertirANumero(valor: any): number | null {
+  if (valor === null || valor === undefined || valor === '') {
+    return null;
+  }
+
+  if (typeof valor === 'number') {
+    return isNaN(valor) ? null : valor;
+  }
+
+  if (typeof valor === 'string') {
+    // Remover símbolos de moneda, espacios, y convertir comas a puntos
+    const limpio = valor.replace(/[^\d.,-]/g, '').replace(',', '.');
+    const num = parseFloat(limpio);
+    return isNaN(num) ? null : num;
+  }
+
+  return null;
+}
+
+// ========================================
+// PROCESAMIENTO DE DATOS (UNIFICADO)
+// ========================================
+
+/**
+ * Obtener mapeo básico de columnas comunes (reutilizable)
+ */
+function obtenerMapeoBasicoColumnas(): Record<string, keyof EmpleadoDetectado> {
+  return {
+    // Nombre completo
+    'nombre completo': 'nombre',
+    'nombrecompleto': 'nombre',
+    // Nombre y apellidos
+    'nombre': 'nombre',
+    'name': 'nombre',
+    'apellidos': 'apellidos',
+    'apellido': 'apellidos',
+    // Email
+    'correo electrónico': 'email',
+    'correoelectronico': 'email',
+    'email': 'email',
+    'correo': 'email',
+    // NIF
+    'nif': 'nif',
+    'dni': 'nif',
+    // Teléfono
+    'teléfono móvil': 'telefono',
+    'telefonomovil': 'telefono',
+    'teléfono': 'telefono',
+    'telefono': 'telefono',
+    // Puesto
+    'puesto': 'puesto',
+    'cargo': 'puesto',
+    // Departamento y equipo (departamento se mapea a equipo ahora)
+    'departamento': 'equipo',
+    'equipo': 'equipo',
+    'manager': 'manager',
+    'jefe': 'manager',
+    // Fechas
+    'fecha de nacimiento': 'fechaNacimiento',
+    'fechanacimiento': 'fechaNacimiento',
+    'fecha de alta': 'fechaAlta',
+    'fechaalta': 'fechaAlta',
+    'tipo de contrato': 'tipoContrato',
+    'tipocontrato': 'tipoContrato',
+    // Salario
+    'salario bruto anual': 'salarioBrutoAnual',
+    'salariobrutoanual': 'salarioBrutoAnual',
+    'salario bruto anual (€)': 'salarioBrutoAnual',
+    // Ubicación
+    'ubicación de oficina': 'ciudad',
+    'ubicaciondeoficina': 'ciudad',
+    'ciudad': 'ciudad',
+    'direccion': 'direccion',
+  };
+}
+
+/**
+ * Procesa empleados desde datos de Excel usando un mapeo de columnas
+ * Función unificada que elimina duplicación entre diferentes flujos
+ * 
+ * @param excelData - Datos del Excel
+ * @param mapeoColumnas - Mapeo de columnas (de IA o básico)
+ * @returns Array de empleados procesados con equipos y managers detectados
+ */
+function procesarEmpleadosConMapeo(
+  excelData: Record<string, any>[],
+  mapeoColumnas: Record<string, string>
+): {
+  empleados: EmpleadoDetectado[];
+  equiposDetectados: string[];
+  managersDetectados: string[];
+} {
+  if (excelData.length === 0) {
+    return { empleados: [], equiposDetectados: [], managersDetectados: [] };
+  }
+
+  // Crear índice de columnas (case-insensitive) para búsqueda O(1)
+  const primeraFila = excelData[0];
+  const indiceColumnas = new Map<string, string>();
+  Object.keys(primeraFila).forEach((columna) => {
+    const columnaLower = columna.toLowerCase().trim();
+    indiceColumnas.set(columnaLower, columna);
+  });
+
+  const equiposSet = new Set<string>();
+  const managersSet = new Set<string>();
+
+  const empleados: EmpleadoDetectado[] = excelData.map((fila) => {
+    const empleado: EmpleadoDetectado = {
+      nombre: null,
+      apellidos: null,
+      email: null,
+      nif: null,
+      telefono: null,
+      fechaNacimiento: null,
+      puesto: null,
+      equipo: null,
+      manager: null,
+      fechaAlta: null,
+      tipoContrato: null,
+      salarioBrutoAnual: null,
+      salarioBrutoMensual: null,
+      direccion: null,
+      direccionCalle: null,
+      direccionNumero: null,
+      direccionPiso: null,
+      direccionProvincia: null,
+      ciudad: null,
+      codigoPostal: null,
+    };
+
+    // Buscar y procesar "Nombre Completo" primero
+    let nombreCompletoEncontrado = false;
+    const columnasNombreCompleto = ['nombre completo', 'nombrecompleto'];
+    for (const columnaNombre of columnasNombreCompleto) {
+      const columnaReal = indiceColumnas.get(columnaNombre);
+      if (columnaReal && fila[columnaReal] && typeof fila[columnaReal] === 'string') {
+        const { nombre, apellidos } = dividirNombreCompleto(fila[columnaReal]);
+        empleado.nombre = nombre || null;
+        empleado.apellidos = apellidos || null;
+        nombreCompletoEncontrado = true;
+        break;
+      }
+    }
+
+    // Mapear campos usando el diccionario de columnas
+    Object.entries(mapeoColumnas).forEach(([columnaOriginal, campoMapeado]) => {
+      // Si ya procesamos nombre completo, saltar columnas individuales de nombre
+      if (nombreCompletoEncontrado && (campoMapeado === 'nombre' || campoMapeado === 'apellidos')) {
+        return;
+      }
+
+      // Buscar columna usando índice (case-insensitive)
+      const columnaLower = columnaOriginal.toLowerCase().trim();
+      const columnaEncontrada = indiceColumnas.get(columnaLower);
+      if (!columnaEncontrada) return;
+
+      const valor = fila[columnaEncontrada];
+      if (valor === undefined || valor === null || valor === '') return;
+
+      // Procesar según tipo de campo
+      if (campoMapeado === 'fechaNacimiento' || campoMapeado === 'fechaAlta') {
+        const fechaISO = convertirFechaExcelAISO(valor);
+        // @ts-ignore - Asignación dinámica
+        empleado[campoMapeado] = fechaISO;
+      } else if (campoMapeado === 'salarioBrutoAnual' || campoMapeado === 'salarioBrutoMensual') {
+        const num = convertirANumero(valor);
+        // @ts-ignore - Asignación dinámica
+        empleado[campoMapeado] = num;
+      } else if (campoMapeado === 'nombre' && typeof valor === 'string' && valor.includes(' ')) {
+        // Dividir nombre completo si tiene espacios
+        const { nombre, apellidos } = dividirNombreCompleto(valor);
+        empleado.nombre = nombre || null;
+        empleado.apellidos = apellidos || null;
+      } else {
+        // Campos de texto normales
+        // @ts-ignore - Asignación dinámica
+        empleado[campoMapeado] = String(valor).trim() || null;
+      }
+    });
+
+    // Post-procesamiento: calcular salario mensual
+    if (empleado.salarioBrutoAnual && !empleado.salarioBrutoMensual) {
+      empleado.salarioBrutoMensual = empleado.salarioBrutoAnual / 12;
+    }
+
+    // Detectar equipos y managers únicos
+    if (empleado.equipo) equiposSet.add(empleado.equipo);
+    if (empleado.manager) managersSet.add(empleado.manager);
+
+    return empleado;
+  });
+
+  return {
+    empleados,
+    equiposDetectados: Array.from(equiposSet),
+    managersDetectados: Array.from(managersSet),
+  };
+}
+
+// ========================================
+// FUNCIÓN PRINCIPAL
+// ========================================
+
 /**
  * Analizar estructura del Excel y mapear columnas a campos de empleado
+ * 
+ * Estrategia escalable:
+ * - Si hay pocos registros (<50): enviar todos a la IA
+ * - Si hay muchos registros (>=50): enviar muestra más grande (30) para que la IA aprenda el mapeo,
+ *   luego procesar todos manualmente usando el mapeo detectado
+ * - Fallback automático a mapeo básico si la IA falla
  * 
  * @param excelData - Datos crudos del Excel (array de objetos)
  * @returns Respuesta con empleados mapeados y metadatos
@@ -58,16 +389,32 @@ export interface RespuestaProcesamientoExcel {
 export async function mapearEmpleadosConIA(
   excelData: Record<string, any>[]
 ): Promise<RespuestaProcesamientoExcel> {
-  // Verificar que hay algún proveedor de IA disponible
+  // Si no hay IA disponible, usar mapeo básico directamente
   if (!isAnyProviderAvailable()) {
-    // Si no hay IA configurada, usar mapeo básico por columnas comunes
     console.warn('[mapearEmpleadosConIA] No hay proveedores de IA configurados, usando mapeo básico');
-    return mapeoBasicoSinIA(excelData);
+    const mapeoBasico = obtenerMapeoBasicoColumnas();
+    const resultado = procesarEmpleadosConMapeo(excelData, mapeoBasico);
+    return {
+      ...resultado,
+      columnasDetectadas: {},
+    };
   }
 
+  // Estrategia escalable según cantidad de datos
+  const totalRegistros = excelData.length;
+  const UMBRAL_REGISTROS_PARA_MUESTRA = 50;
+  const TAMAÑO_MUESTRA = 30;
+
+  const usarMuestra = totalRegistros >= UMBRAL_REGISTROS_PARA_MUESTRA;
+  const registrosParaIA = usarMuestra
+    ? excelData.slice(0, TAMAÑO_MUESTRA)
+    : excelData;
+
   try {
-    // Tomar una muestra de los primeros 5 registros para análisis
-    const muestra = excelData.slice(0, Math.min(5, excelData.length));
+    console.log(
+      `[mapearEmpleadosConIA] Procesando ${totalRegistros} registros ` +
+      `(${usarMuestra ? `muestra de ${registrosParaIA.length} para IA` : 'todos a la IA'})`
+    );
     
     // Construir el prompt para la IA
     const prompt = `
@@ -80,11 +427,10 @@ Analiza los siguientes datos de empleados desde un archivo Excel y mapea cada co
 - Identifica managers (pueden estar en columna "Manager", "Jefe", "Responsable", etc.)
 - Normaliza fechas al formato ISO (YYYY-MM-DD)
 - Los salarios deben ser números sin símbolos
+- Si hay una columna "Nombre Completo", divídela en "nombre" y "apellidos"
 
-**Datos de muestra del Excel:**
-${JSON.stringify(muestra, null, 2)}
-
-**Total de registros:** ${excelData.length}
+**Datos del Excel (${registrosParaIA.length} de ${totalRegistros} registros):**
+${JSON.stringify(registrosParaIA, null, 2)}
 
 **Responde con un JSON con esta estructura:**
 {
@@ -120,7 +466,10 @@ ${JSON.stringify(muestra, null, 2)}
   }
 }
 
-Procesa TODOS los ${excelData.length} registros, no solo la muestra.
+${usarMuestra 
+  ? `Procesa SOLO los ${registrosParaIA.length} registros proporcionados. El sistema procesará el resto automáticamente usando el mapeo de columnas que detectes.`
+  : `Procesa TODOS los ${totalRegistros} registros proporcionados.`
+}
 `;
 
     // Llamar a la IA con la configuración específica (usa cliente unificado con fallback)
@@ -136,209 +485,93 @@ Procesa TODOS los ${excelData.length} registros, no solo la muestra.
       throw new Error('La IA no devolvió respuesta');
     }
 
-    // Parsear la respuesta JSON
-    const respuesta: RespuestaProcesamientoExcel = JSON.parse(content);
+    // Parsear y validar con Zod (validación estructurada robusta)
+    const parsed = JSON.parse(content);
+    const validado = RespuestaProcesamientoExcelSchema.parse(parsed);
 
-    // Validar que la respuesta tiene la estructura esperada
-    if (!respuesta.empleados || !Array.isArray(respuesta.empleados)) {
-      throw new Error('Respuesta de la IA inválida: falta el array de empleados');
-    }
+    // Limpiar mapeo de columnas: remover valores null y normalizar campos con "/"
+    const mapeoLimpio: Record<string, string> = {};
+    const camposValidos = new Set([
+      'nombre', 'apellidos', 'email', 'nif', 'telefono', 'fechaNacimiento',
+      'puesto', 'equipo', 'manager', 'fechaAlta', 'tipoContrato',
+      'salarioBrutoAnual', 'salarioBrutoMensual', 'direccion', 'direccionCalle',
+      'direccionNumero', 'direccionPiso', 'direccionProvincia', 'ciudad', 'codigoPostal'
+    ]);
 
-    // Si la IA procesó solo la muestra, procesar todos los datos manualmente
-    // usando el mapeo de columnas detectado
-    if (respuesta.empleados.length < excelData.length) {
-      respuesta.empleados = await mapearTodosLosEmpleados(
-        excelData,
-        respuesta.columnasDetectadas
+    Object.entries(validado.columnasDetectadas).forEach(([columna, campo]) => {
+      if (!campo || typeof campo !== 'string') return;
+      
+      // Si contiene "/", tomar el primero (ej: "nombre/apellidos" -> "nombre")
+      const campoNormalizado = campo.includes('/') ? campo.split('/')[0].trim() : campo.trim();
+      if (campoNormalizado && camposValidos.has(campoNormalizado)) {
+        mapeoLimpio[columna] = campoNormalizado;
+      }
+    });
+
+    // Si usamos muestra O no hay mapeo útil, procesar todos con el mapeo detectado
+    const necesitaProcesamientoManual =
+      usarMuestra ||
+      validado.empleados.length < totalRegistros ||
+      Object.keys(mapeoLimpio).length === 0;
+
+    if (necesitaProcesamientoManual) {
+      console.log(
+        `[mapearEmpleadosConIA] Procesando todos los ${totalRegistros} registros ` +
+        `usando mapeo detectado (${Object.keys(mapeoLimpio).length} columnas)`
       );
+
+      // Si no hay mapeo de la IA, usar mapeo básico
+      const mapeoFinal = Object.keys(mapeoLimpio).length > 0 
+        ? mapeoLimpio 
+        : obtenerMapeoBasicoColumnas();
+
+      // Procesar todos los registros con función unificada
+      const resultado = procesarEmpleadosConMapeo(excelData, mapeoFinal);
+
+      return {
+        empleados: resultado.empleados,
+        equiposDetectados: resultado.equiposDetectados,
+        managersDetectados: resultado.managersDetectados,
+        columnasDetectadas: mapeoLimpio,
+      };
     }
 
-    return respuesta;
+    // Si la IA procesó todos exitosamente, retornar su respuesta
+    console.log(
+      `[mapearEmpleadosConIA] ✅ IA procesó ${validado.empleados.length} empleados ` +
+      `(${validado.empleados.filter(e => e.nombre && e.email).length} con datos completos)`
+    );
+
+    return {
+      empleados: validado.empleados,
+      equiposDetectados: validado.equiposDetectados,
+      managersDetectados: validado.managersDetectados,
+      columnasDetectadas: mapeoLimpio,
+    };
   } catch (error) {
     console.error('[mapearEmpleadosConIA] Error procesando Excel con IA:', {
       totalRegistros: excelData.length,
-      muestra: excelData.slice(0, 5).length,
       error,
     });
-    throw new Error('Error al procesar el Excel con IA: ' + (error as Error).message);
+    
+    // Fallback robusto: si la IA falla, usar mapeo básico
+    console.warn(
+      '[mapearEmpleadosConIA] Usando fallback a mapeo básico debido a error en IA'
+    );
+    
+    const mapeoBasico = obtenerMapeoBasicoColumnas();
+    const resultado = procesarEmpleadosConMapeo(excelData, mapeoBasico);
+    
+    return {
+      ...resultado,
+      columnasDetectadas: {},
+    };
   }
 }
 
-/**
- * Mapeo básico sin IA - usa nombres de columnas comunes
- */
-function mapeoBasicoSinIA(
-  excelData: Record<string, any>[]
-): RespuestaProcesamientoExcel {
-  // Mapeo común de nombres de columnas
-  const mapeoColumnas: Record<string, keyof EmpleadoDetectado> = {
-    // Nombres comunes en español e inglés
-    nombre: 'nombre',
-    name: 'nombre',
-    nombres: 'nombre',
-    apellidos: 'apellidos',
-    apellido: 'apellidos',
-    surname: 'apellidos',
-    lastname: 'apellidos',
-    email: 'email',
-    correo: 'email',
-    'e-mail': 'email',
-    nif: 'nif',
-    dni: 'nif',
-    telefono: 'telefono',
-    teléfono: 'telefono',
-    phone: 'telefono',
-    puesto: 'puesto',
-    cargo: 'puesto',
-    position: 'puesto',
-    departamento: 'departamento',
-    department: 'departamento',
-    equipo: 'equipo',
-    team: 'equipo',
-    manager: 'manager',
-    jefe: 'manager',
-    responsable: 'manager',
-    direccion: 'direccion',
-    address: 'direccion',
-    calle: 'direccionCalle',
-    street: 'direccionCalle',
-    direccionCalle: 'direccionCalle',
-    'dirección calle': 'direccionCalle',
-    numero: 'direccionNumero',
-    number: 'direccionNumero',
-    direccionNumero: 'direccionNumero',
-    'dirección número': 'direccionNumero',
-    piso: 'direccionPiso',
-    floor: 'direccionPiso',
-    direccionPiso: 'direccionPiso',
-    'dirección piso': 'direccionPiso',
-    provincia: 'direccionProvincia',
-    province: 'direccionProvincia',
-    direccionProvincia: 'direccionProvincia',
-    'dirección provincia': 'direccionProvincia',
-    ciudad: 'ciudad',
-    city: 'ciudad',
-    codigoPostal: 'codigoPostal',
-    'código postal': 'codigoPostal',
-    'codigo postal': 'codigoPostal',
-    'código_postal': 'codigoPostal',
-    codigo_postal: 'codigoPostal',
-    'códigoPostal': 'codigoPostal',
-    postal: 'codigoPostal',
-    zip: 'codigoPostal',
-  };
-
-  // Detectar equipos y managers únicos
-  const equiposSet = new Set<string>();
-  const managersSet = new Set<string>();
-
-  const empleados: EmpleadoDetectado[] = excelData.map((fila) => {
-    const empleado: EmpleadoDetectado = {
-      nombre: null,
-      apellidos: null,
-      email: null,
-      nif: null,
-      telefono: null,
-      fechaNacimiento: null,
-      puesto: null,
-      departamento: null,
-      equipo: null,
-      manager: null,
-      fechaAlta: null,
-      tipoContrato: null,
-      salarioBrutoAnual: null,
-      salarioBrutoMensual: null,
-      direccion: null,
-      direccionCalle: null,
-      direccionNumero: null,
-      direccionPiso: null,
-      direccionProvincia: null,
-      ciudad: null,
-      codigoPostal: null,
-    };
-
-    // Mapear columnas buscando coincidencias (case-insensitive)
-    Object.keys(fila).forEach((columna) => {
-      const columnaLower = columna.toLowerCase().trim();
-      const campo = mapeoColumnas[columnaLower];
-      
-      if (campo && fila[columna] !== undefined && fila[columna] !== null && fila[columna] !== '') {
-        const valor = fila[columna];
-        
-        // Convertir a string si es necesario (excepto números)
-        if (campo === 'salarioBrutoAnual' || campo === 'salarioBrutoMensual') {
-          const num = typeof valor === 'string' ? parseFloat(valor.replace(/[^\d.,]/g, '').replace(',', '.')) : Number(valor);
-          empleado[campo] = isNaN(num) ? null : num;
-        } else {
-          empleado[campo] = String(valor).trim() || null;
-        }
-
-        // Detectar equipos y managers
-        if (campo === 'equipo' && empleado.equipo) {
-          equiposSet.add(empleado.equipo);
-        }
-        if (campo === 'manager' && empleado.manager) {
-          managersSet.add(empleado.manager);
-        }
-      }
-    });
-
-    return empleado;
-  });
-
-  return {
-    empleados,
-    equiposDetectados: Array.from(equiposSet),
-    managersDetectados: Array.from(managersSet),
-    columnasDetectadas: {},
-  };
-}
-
-/**
- * Mapear todos los empleados usando el mapeo de columnas detectado
- * (fallback si la IA no procesó todos los registros)
- */
-async function mapearTodosLosEmpleados(
-  excelData: Record<string, any>[],
-  columnasDetectadas: Record<string, string>
-): Promise<EmpleadoDetectado[]> {
-  return excelData.map((fila) => {
-    const empleado: EmpleadoDetectado = {
-      nombre: null,
-      apellidos: null,
-      email: null,
-      nif: null,
-      telefono: null,
-      fechaNacimiento: null,
-      puesto: null,
-      departamento: null,
-      equipo: null,
-      manager: null,
-      fechaAlta: null,
-      tipoContrato: null,
-      salarioBrutoAnual: null,
-      salarioBrutoMensual: null,
-      direccion: null,
-      direccionCalle: null,
-      direccionNumero: null,
-      direccionPiso: null,
-      direccionProvincia: null,
-      ciudad: null,
-      codigoPostal: null,
-    };
-
-    // Mapear cada campo usando el diccionario de columnas
-    Object.entries(columnasDetectadas).forEach(([columnaOriginal, campoMapeado]) => {
-      const valor = fila[columnaOriginal];
-      if (valor !== undefined && valor !== null && valor !== '') {
-        // @ts-ignore - Asignación dinámica
-        empleado[campoMapeado] = valor;
-      }
-    });
-
-    return empleado;
-  });
-}
+// ========================================
+// VALIDACIÓN
+// ========================================
 
 /**
  * Validar que un empleado tiene los campos mínimos requeridos
@@ -372,4 +605,3 @@ export function validarEmpleado(empleado: EmpleadoDetectado): {
     errores,
   };
 }
-

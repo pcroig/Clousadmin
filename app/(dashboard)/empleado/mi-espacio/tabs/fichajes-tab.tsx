@@ -129,7 +129,7 @@ export function FichajesTab({ empleadoId }: { empleadoId: string }) {
       <Card>
         <CardHeader>
           <div className="flex items-center gap-2">
-            <Clock className="w-5 h-5 text-[#F26C21]" />
+            <Clock className="w-5 h-5 text-[#d97757]" />
             <CardTitle className="text-base font-semibold">Resumen de Fichajes</CardTitle>
           </div>
         </CardHeader>

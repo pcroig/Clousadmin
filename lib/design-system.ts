@@ -189,3 +189,48 @@ export const themeColors = {
 export type IconSize = 'small' | 'default' | 'large' | 'xlarge';
 export type BadgeVariant = keyof typeof badgeVariants;
 export type AccentColor = keyof typeof accentColors;
+
+// ========================================
+// AVATAR PLACEHOLDER UTILITIES
+// ========================================
+
+/**
+ * Paleta de colores pastel/crema para placeholders de avatar.
+ * Los colores están alineados con la guía de diseño (fondos neutros y crema).
+ */
+export const avatarPlaceholderPalette = [
+  'bg-stone-100 text-gray-700 border border-gray-200',
+  'bg-stone-200 text-gray-700 border border-gray-200',
+  'bg-gray-100 text-gray-700 border border-gray-200',
+  'bg-gray-200 text-gray-800 border border-gray-300',
+  'bg-white text-gray-700 border border-gray-200',
+] as const;
+
+/**
+ * Devuelve las clases Tailwind para un placeholder de avatar basadas en un identificador.
+ * El identificador suele ser el nombre del empleado para garantizar consistencia entre vistas.
+ *
+ * @param identifier - Texto con el que se calculará la variante (ej. nombre completo)
+ * @returns Clases Tailwind combinadas (background + texto + borde)
+ */
+export function getAvatarPlaceholderClasses(identifier?: string | null): string {
+  const palette = avatarPlaceholderPalette;
+  if (palette.length === 0) return '';
+
+  if (!identifier) {
+    return palette[0];
+  }
+
+  const normalized = identifier.trim().toLowerCase();
+  if (!normalized) {
+    return palette[0];
+  }
+
+  const hash = Array.from(normalized).reduce(
+    (accumulator, currentChar) => accumulator + currentChar.charCodeAt(0),
+    0
+  );
+
+  const index = hash % palette.length;
+  return palette[index];
+}

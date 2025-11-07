@@ -6,6 +6,7 @@
 
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { Settings } from 'lucide-react';
 import { BandejaEntradaSolicitudes } from './bandeja-entrada-solicitudes';
 import { BandejaEntradaSolved } from './bandeja-entrada-solved';
 import { BandejaEntradaNotificaciones } from './bandeja-entrada-notificaciones';
@@ -207,69 +208,92 @@ export function BandejaEntradaTabs({
     }
   };
 
+  const notificacionesNoLeidas = notificaciones.filter((n) => !n.leida).length;
+
   return (
     <div className="space-y-6">
-      {/* Header with Tabs and Autoaprobar button */}
-      <div className="flex items-center justify-between">
-        {/* Tabs */}
-        <div className="flex items-center gap-4 border-b border-gray-200">
-          <button
-            onClick={() => setActiveTab('solicitudes')}
-            className={`pb-3 px-2 text-sm font-medium transition-colors relative ${
-              activeTab === 'solicitudes'
-                ? 'text-gray-900'
-                : 'text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            Solicitudes
-            {activeTab === 'solicitudes' && (
-              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gray-900" />
-            )}
-          </button>
+      {/* Header with Tabs and Actions */}
+      <div className="border-b border-gray-200 pb-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-6">
+            <button
+              onClick={() => setActiveTab('solicitudes')}
+              className={`relative pb-3 px-2 text-sm font-medium transition-colors ${
+                activeTab === 'solicitudes'
+                  ? 'text-gray-900'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              Solicitudes
+              {activeTab === 'solicitudes' && (
+                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gray-900" />
+              )}
+            </button>
 
-          <button
-            onClick={() => setActiveTab('auto-completed')}
-            className={`pb-3 px-2 text-sm font-medium transition-colors relative ${
-              activeTab === 'auto-completed'
-                ? 'text-gray-900'
-                : 'text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            Auto-completed
-            {activeTab === 'auto-completed' && (
-              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gray-900" />
-            )}
-          </button>
+            <button
+              onClick={() => setActiveTab('auto-completed')}
+              className={`relative pb-3 px-2 text-sm font-medium transition-colors ${
+                activeTab === 'auto-completed'
+                  ? 'text-gray-900'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              Auto-completed
+              {activeTab === 'auto-completed' && (
+                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gray-900" />
+              )}
+            </button>
 
-          <button
-            onClick={() => setActiveTab('notificaciones')}
-            className={`pb-3 px-2 text-sm font-medium transition-colors relative ${
-              activeTab === 'notificaciones'
-                ? 'text-gray-900'
-                : 'text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            Notificaciones
-            {activeTab === 'notificaciones' && (
-              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gray-900" />
+            <button
+              onClick={() => setActiveTab('notificaciones')}
+              className={`relative pb-3 px-2 text-sm font-medium transition-colors ${
+                activeTab === 'notificaciones'
+                  ? 'text-gray-900'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              Notificaciones
+              {activeTab === 'notificaciones' && (
+                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gray-900" />
+              )}
+            </button>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {activeTab === 'solicitudes' && solicitudesPendientes.length > 0 && (
+              <Button
+                variant="outline"
+                onClick={handleAutoaprobar}
+                className="border-gray-300"
+              >
+                Autoaprobar
+              </Button>
             )}
-          </button>
+
+            {activeTab === 'notificaciones' && notificacionesNoLeidas > 0 && (
+              <Button
+                variant="outline"
+                onClick={handleMarcarTodasLeidas}
+                className="border-gray-300"
+              >
+                Marcar leídas ({notificacionesNoLeidas})
+              </Button>
+            )}
+
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="Abrir ajustes de la bandeja"
+              className="text-gray-500 hover:text-gray-700"
+            >
+              <Settings className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
-
-        {/* Autoaprobar button - only show on Solicitudes tab */}
-        {activeTab === 'solicitudes' && solicitudesPendientes.length > 0 && (
-          <Button
-            variant="outline"
-            onClick={handleAutoaprobar}
-            className="border-gray-300"
-          >
-            Autoaprobar
-          </Button>
-        )}
       </div>
 
       {/* Tab Content */}
-      <div className="mt-6">
+      <div className="pt-6">
         {activeTab === 'solicitudes' && (
           <BandejaEntradaSolicitudes
             solicitudesPendientes={solicitudesPendientes}
@@ -287,7 +311,6 @@ export function BandejaEntradaTabs({
           <BandejaEntradaNotificaciones
             notificaciones={notificaciones}
             onMarcarLeida={handleMarcarLeida}
-            onMarcarTodasLeidas={handleMarcarTodasLeidas}
           />
         )}
       </div>

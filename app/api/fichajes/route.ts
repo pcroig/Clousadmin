@@ -193,7 +193,7 @@ export async function POST(req: NextRequest) {
       const esLaboral = await esDiaLaboral(empleadoId, fecha);
       
       if (!esLaboral) {
-        return badRequestResponse('No puedes fichar en un día no laborable (fin de semana, festivo o con ausencia)');
+        return badRequestResponse('No puedes fichar en este día. Puede ser un día no laborable según el calendario de la empresa, un festivo, o tienes una ausencia de día completo.');
       }
     }
 
@@ -247,16 +247,24 @@ export async function POST(req: NextRequest) {
     });
 
     // 8. Actualizar cálculos del fichaje
-    const todosEventos = [...fichaje.eventos, evento];
+    // Obtener todos los eventos incluyendo el recién creado
+    const todosEventos = await prisma.fichajeEvento.findMany({
+      where: { fichajeId: fichaje.id },
+      orderBy: { hora: 'asc' },
+    });
+    
     const horasTrabajadas = calcularHorasTrabajadas(todosEventos);
     const horasEnPausa = calcularTiempoEnPausa(todosEventos);
 
-    // 9. Si es salida manual, cambiar estado a finalizado solo si es fichaje completo manual
+    // 9. Validar si el fichaje está completo después de agregar el evento
+    // Si es salida, validar si el fichaje está completo según la jornada
     let nuevoEstado = fichaje.estado;
-    if (validatedData.tipo === 'salida' && !fichaje.autoCompletado) {
-      // Verificar que tiene entrada
-      const tieneEntrada = todosEventos.some(e => e.tipo === 'entrada');
-      if (tieneEntrada) {
+    if (validatedData.tipo === 'salida') {
+      // Validar si el fichaje está completo según la jornada
+      const { validarFichajeCompleto } = await import('@/lib/calculos/fichajes');
+      const validacion = await validarFichajeCompleto(fichaje.id);
+      
+      if (validacion.completo) {
         nuevoEstado = 'finalizado';
       }
     }

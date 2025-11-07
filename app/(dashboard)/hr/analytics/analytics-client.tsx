@@ -205,7 +205,7 @@ export function AnalyticsClient() {
                 chartConfig={{
                   empleados: {
                     label: 'Empleados',
-                    color: '#F26C21',
+                    color: '#d97757',
                   },
                 }}
               />
@@ -219,7 +219,7 @@ export function AnalyticsClient() {
                 chartConfig={{
                   empleados: {
                     label: 'Empleados',
-                    color: '#F26C21',
+                    color: '#d97757',
                   },
                 }}
               />
@@ -231,7 +231,7 @@ export function AnalyticsClient() {
                 dataKey="empleados"
                 nameKey="genero"
                 chartConfig={{
-                  hombre: { label: 'Hombre', color: '#F26C21' },
+                  hombre: { label: 'Hombre', color: '#d97757' },
                   mujer: { label: 'Mujer', color: '#6B6A64' },
                   otro: { label: 'Otro', color: '#3D3D3A' },
                   'No especificado': { label: 'No especificado', color: '#EFEFED' },
@@ -275,7 +275,7 @@ export function AnalyticsClient() {
                 chartConfig={{
                   promedio: {
                     label: 'Salario Promedio',
-                    color: '#F26C21',
+                    color: '#d97757',
                   },
                 }}
               />
@@ -289,7 +289,7 @@ export function AnalyticsClient() {
                 chartConfig={{
                   coste: {
                     label: 'Coste Total',
-                    color: '#F26C21',
+                    color: '#d97757',
                   },
                 }}
               />
@@ -326,7 +326,7 @@ export function AnalyticsClient() {
                 chartConfig={{
                   horas: {
                     label: 'Horas',
-                    color: '#F26C21',
+                    color: '#d97757',
                   },
                 }}
                 className="lg:col-span-2"
@@ -341,7 +341,7 @@ export function AnalyticsClient() {
                 chartConfig={{
                   promedio: {
                     label: 'Horas Promedio',
-                    color: '#F26C21',
+                    color: '#d97757',
                   },
                 }}
               />

@@ -138,10 +138,8 @@ async function main() {
       codigoPostal: '28001',
       ciudad: 'Madrid',
       direccionProvincia: 'Madrid',
-      departamento: 'Administración',
       puesto: 'HR Administrator',
       fechaAlta: new Date('2024-01-01'),
-      tipoContrato: 'indefinido',
       jornadaId: jornadaCompleta.id,
       salarioBrutoAnual: 45000,
       salarioBrutoMensual: 3750,
@@ -171,54 +169,55 @@ async function main() {
       apellidos: 'García López',
       email: 'ana.garcia@clousadmin.com',
       nif: '11111111A',
-      departamento: 'Tech',
+      equipo: 'Tech',
       puesto: 'Software Engineer',
       salarioBrutoAnual: 42000,
-      rol: 'empleado',
+      rol: 'empleado' as const,
     },
     {
       nombre: 'Carlos',
       apellidos: 'Martínez Ruiz',
       email: 'carlos.martinez@clousadmin.com',
       nif: '22222222B',
-      departamento: 'Producto',
+      equipo: 'Producto',
       puesto: 'Product Manager',
       salarioBrutoAnual: 48000,
-      rol: 'manager', // Carlos es manager de equipos
+      rol: 'manager' as const, // Carlos es manager de equipos
     },
     {
       nombre: 'Laura',
       apellidos: 'Sánchez Pérez',
       email: 'laura.sanchez@clousadmin.com',
       nif: '33333333C',
-      departamento: 'Diseño',
+      equipo: 'Diseño',
       puesto: 'UX Designer',
       salarioBrutoAnual: 38000,
-      rol: 'empleado',
+      rol: 'empleado' as const,
     },
     {
       nombre: 'Miguel',
       apellidos: 'López Fernández',
       email: 'miguel.lopez@clousadmin.com',
       nif: '44444444D',
-      departamento: 'Tech',
+      equipo: 'Tech',
       puesto: 'DevOps Engineer',
       salarioBrutoAnual: 45000,
-      rol: 'empleado',
+      rol: 'empleado' as const,
     },
     {
       nombre: 'Sara',
       apellidos: 'Fernández González',
       email: 'sara.fernandez@clousadmin.com',
       nif: '55555555E',
-      departamento: 'Tech',
+      equipo: 'Tech',
       puesto: 'QA Engineer',
       salarioBrutoAnual: 38000,
-      rol: 'empleado',
+      rol: 'empleado' as const,
     },
   ];
 
-  const empleados: any[] = [];
+  type EmpleadoRecord = Awaited<ReturnType<typeof prisma.empleado.upsert>>;
+  const empleados: EmpleadoRecord[] = [];
 
   for (const empData of empleadosData) {
     const usuarioPassword = await hash('Empleado123!', 12);
@@ -250,7 +249,6 @@ async function main() {
         // Actualizar datos si el empleado ya existe
         nombre: empData.nombre,
         apellidos: empData.apellidos,
-        departamento: empData.departamento,
         puesto: empData.puesto,
         salarioBrutoAnual: empData.salarioBrutoAnual,
         salarioBrutoMensual: Math.round(empData.salarioBrutoAnual / 12),
@@ -268,10 +266,8 @@ async function main() {
         direccionNumero: `${Math.floor(Math.random() * 100)}`,
         codigoPostal: `280${Math.floor(Math.random() * 50)}`,
         ciudad: 'Madrid',
-        departamento: empData.departamento,
         puesto: empData.puesto,
         fechaAlta: new Date('2024-03-01'),
-        tipoContrato: 'indefinido',
         managerId: empleadoAdmin.id,
         jornadaId: jornadaCompleta.id,
         salarioBrutoAnual: empData.salarioBrutoAnual,
@@ -298,12 +294,18 @@ async function main() {
   // ========================================
   console.log('👨‍👩‍👧‍👦 Creando equipos...');
 
-  const equipoDesarrollo = await prisma.equipo.create({
-    data: {
+  const equipoDesarrollo = await prisma.equipo.upsert({
+    where: {
+      empresaId_nombre: {
+        empresaId: empresa.id,
+        nombre: 'Equipo de Desarrollo',
+      },
+    },
+    update: {},
+    create: {
       empresaId: empresa.id,
       nombre: 'Equipo de Desarrollo',
       descripcion: 'Equipo encargado del desarrollo de producto',
-      tipo: 'proyecto',
       managerId: empleados[1].id, // Carlos (Product Manager)
     },
   });
@@ -320,12 +322,18 @@ async function main() {
 
   console.log(`  ✅ ${equipoDesarrollo.nombre} (3 miembros)`);
 
-  const equipoProducto = await prisma.equipo.create({
-    data: {
+  const equipoProducto = await prisma.equipo.upsert({
+    where: {
+      empresaId_nombre: {
+        empresaId: empresa.id,
+        nombre: 'Equipo de Producto',
+      },
+    },
+    update: {},
+    create: {
       empresaId: empresa.id,
       nombre: 'Equipo de Producto',
       descripcion: 'Equipo de diseño y producto',
-      tipo: 'squad',
       managerId: empleados[1].id, // Carlos (Product Manager)
     },
   });
@@ -634,7 +642,7 @@ async function main() {
     const fechaFichajeSinHora = new Date(fechaFichaje.getFullYear(), fechaFichaje.getMonth(), fechaFichaje.getDate());
 
     switch (index) {
-      case 0: // Empleado 1: SIN SALIDA (>8h transcurridas) - Se auto-completará
+      case 0: // Empleado 1: SIN SALIDA (>8h transcurridas) - Quedará pendiente para cuadre
         {
           const eventos = [
             {
@@ -648,8 +656,7 @@ async function main() {
               empresaId: empresa.id,
               empleadoId: empleado.id,
               fecha: fechaFichajeSinHora,
-              estado: 'en_curso', // En curso porque no tiene salida
-              autoCompletado: false,
+              estado: 'pendiente', // Pendiente porque falta salida
               eventos: {
                 createMany: {
                   data: eventos,
@@ -670,7 +677,7 @@ async function main() {
             data: { horasTrabajadas, horasEnPausa },
           });
         }
-        // Nota: No hay salida, se auto-completará porque pasaron >8h
+        // Nota: No hay salida, quedará pendiente hasta que HR lo cuadre
         break;
 
       case 1: // Empleado 2: PAUSA SIN CERRAR - Requiere revisión manual
@@ -691,7 +698,7 @@ async function main() {
               empresaId: empresa.id,
               empleadoId: empleado.id,
               fecha: fechaFichajeSinHora,
-              estado: 'en_curso', // En curso porque está en pausa sin cerrar
+              estado: 'pendiente', // Pendiente porque la pausa quedó sin cerrar
               eventos: {
                 createMany: {
                   data: eventos,
@@ -703,7 +710,7 @@ async function main() {
             },
           });
 
-          // Actualizar cálculos
+          // Actualizar cálculos parciales
           const horasTrabajadas = calcularHorasTrabajadas(fichaje.eventos);
           const horasEnPausa = calcularTiempoEnPausa(fichaje.eventos);
           
@@ -712,7 +719,7 @@ async function main() {
             data: { horasTrabajadas, horasEnPausa },
           });
         }
-        // Nota: No hay pausa_fin ni salida, requiere revisión manual
+        // Nota: Pausa sin cerrar, quedará pendiente para cuadre manual
         break;
 
       case 2: // Empleado 3: JORNADA COMPLETA - No se procesará
@@ -766,7 +773,6 @@ async function main() {
         break;
 
       case 3: // Empleado 4: SIN ENTRADA - Requiere revisión manual
-        // No hay fichaje de entrada, solo se creará uno de salida manual
         {
           const eventos = [
             {
@@ -780,7 +786,7 @@ async function main() {
               empresaId: empresa.id,
               empleadoId: empleado.id,
               fecha: fechaFichajeSinHora,
-              estado: 'finalizado', // Marcado como finalizado aunque falte entrada (caso anómalo para testing)
+              estado: 'pendiente', // Falta entrada, queda pendiente para cuadre
               eventos: {
                 createMany: {
                   data: eventos,
@@ -801,59 +807,19 @@ async function main() {
             data: { horasTrabajadas, horasEnPausa },
           });
         }
-        // Nota: Falta entrada, requerirá revisión manual
+        // Nota: Falta entrada, quedará pendiente hasta que HR lo solucione
         break;
     }
   }
 
   console.log(`✅ Fichajes de prueba creados para ${empleadosParaFichajes.length} empleados\n`);
   console.log('📋 Casos de prueba creados:');
-  console.log('  • Empleado 1: Sin salida (>8h) → Auto-completar');
-  console.log('  • Empleado 2: Pausa sin cerrar → Revisión manual');
-  console.log('  • Empleado 3: Jornada completa → No procesar');
-  console.log('  • Empleado 4: Sin entrada → Revisión manual\n');
+  console.log('  • Empleado 1: Sin salida (>8h) → Estado "pendiente"');
+  console.log('  • Empleado 2: Pausa sin cerrar → Estado "pendiente"');
+  console.log('  • Empleado 3: Jornada completa → Estado "finalizado"');
+  console.log('  • Empleado 4: Sin entrada → Estado "pendiente"\n');
 
-  // ========================================
-  // Ejecutar clasificador para los fichajes de prueba
-  // ========================================
-  console.log('🤖 Ejecutando clasificador para procesar fichajes de prueba...');
-
-  const { clasificarFichajesIncompletos, aplicarAutoCompletado, guardarRevisionManual } = 
-    await import('../lib/ia/clasificador-fichajes');
-
-  let totalAutoCompletados = 0;
-  let totalEnRevision = 0;
-
-  // Clasificar cada día de fichajes (usar haceDias que es hace 3 días)
-  for (let i = 0; i < 4; i++) {
-    const fechaClasificar = new Date(haceDias);
-    fechaClasificar.setDate(haceDias.getDate() - i);
-    
-    const { autoCompletar, revisionManual } = await clasificarFichajesIncompletos(
-      empresa.id,
-      fechaClasificar
-    );
-
-    // Aplicar auto-completados
-    if (autoCompletar.length > 0) {
-      const resultado = await aplicarAutoCompletado(autoCompletar, empresa.id);
-      totalAutoCompletados += resultado.completados;
-      if (resultado.errores.length > 0) {
-        console.warn('  ⚠️  Errores en auto-completado:', resultado.errores);
-      }
-    }
-
-    // Guardar revisiones manuales
-    if (revisionManual.length > 0) {
-      const resultado = await guardarRevisionManual(empresa.id, revisionManual);
-      totalEnRevision += resultado.guardados;
-      if (resultado.errores.length > 0) {
-        console.warn('  ⚠️  Errores en revisión manual:', resultado.errores);
-      }
-    }
-  }
-
-  console.log(`✅ Clasificador ejecutado: ${totalAutoCompletados} auto-completados, ${totalEnRevision} en revisión\n`);
+  console.log('ℹ️  Usa la funcionalidad "Cuadrar fichajes" para resolver los pendientes.\n');
 
   // ========================================
   // 8. CREAR CARPETAS DE DOCUMENTOS PREDEFINIDAS
@@ -868,13 +834,13 @@ async function main() {
     for (const nombreCarpeta of carpetasPredefinidas) {
       await prisma.carpeta.create({
         data: {
-        empresaId: empresa.id,
+          empresaId: empresa.id,
           empleadoId: empleado.id,
           nombre: nombreCarpeta,
-        esSistema: true,
-        compartida: false,
-      },
-  });
+          esSistema: true,
+          compartida: false,
+        },
+      });
       carpetasCreadas++;
     }
   }
@@ -915,7 +881,7 @@ async function main() {
   console.log(`  • 2 equipos de trabajo`);
   console.log(`  • 10 ausencias (3 pendientes, 6 aprobadas, 1 rechazada)`);
   console.log(`  • ${festivos2025.length} festivos de España 2025`);
-  console.log(`  • Fichajes de prueba para 4 empleados (auto-completado Ecución)`);
+  console.log('  • Fichajes de prueba con distintos estados (pendiente/finalizado) listos para cuadre');
   console.log(`  • ${carpetasCreadas} carpetas de documentos\n`);
 
   console.log('🔑 Credenciales de acceso:');

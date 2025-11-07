@@ -17,6 +17,8 @@ import { LoadingButton } from '@/components/shared/loading-button';
 import { toast } from 'sonner';
 import { Check } from 'lucide-react';
 import { getInitials } from '@/components/shared/utils';
+import { getAvatarPlaceholderClasses } from '@/lib/design-system';
+import { cn } from '@/lib/utils';
 
 interface TeamMember {
   id: string;
@@ -121,7 +123,12 @@ export function ChangeManagerModal({
                 >
                   <Avatar className="h-8 w-8">
                     {member.avatar && <AvatarImage src={member.avatar} />}
-                    <AvatarFallback className="bg-gray-900 text-white text-xs">
+                    <AvatarFallback
+                      className={cn(
+                        getAvatarPlaceholderClasses(member.nombre),
+                        'text-xs font-medium'
+                      )}
+                    >
                       {getInitials(member.nombre)}
                     </AvatarFallback>
                   </Avatar>

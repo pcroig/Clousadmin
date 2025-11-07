@@ -9,6 +9,8 @@ import { Button } from '@/components/ui/button';
 import { Mail, Phone, Calendar, MapPin, CreditCard, DollarSign } from 'lucide-react';
 import { getInitials } from '@/components/shared/utils';
 import { construirDireccionCompleta } from '@/lib/utils/direccion';
+import { getAvatarPlaceholderClasses } from '@/lib/design-system';
+import { cn } from '@/lib/utils';
 
 interface PersonaDetailsProps {
   empleado: {
@@ -60,7 +62,12 @@ export function PersonaDetails({ empleado }: PersonaDetailsProps) {
       <div className="flex flex-col items-center text-center pb-6 border-b border-gray-200">
         <Avatar className="h-20 w-20 mb-3">
           {empleado.avatar && <AvatarImage src={empleado.avatar} />}
-          <AvatarFallback className="bg-gray-900 text-white text-lg">
+          <AvatarFallback
+            className={cn(
+              getAvatarPlaceholderClasses(empleado.nombre),
+              'text-lg font-semibold'
+            )}
+          >
             {getInitials(empleado.nombre)}
           </AvatarFallback>
         </Avatar>

@@ -135,7 +135,6 @@ export async function PATCH(
           where: { id },
           data: {
             estado: 'finalizado',
-            fechaAprobacion: new Date(),
           },
         });
 
@@ -145,7 +144,6 @@ export async function PATCH(
           where: { id },
           data: {
             estado: 'pendiente', // Rechazado pasa a pendiente
-            fechaAprobacion: new Date(),
           },
         });
 
@@ -178,17 +176,25 @@ export async function PATCH(
       });
 
       if (eventos.length > 0) {
+        const evento = eventos[0];
+        
         await prisma.fichajeEvento.update({
-          where: { id: eventos[0].id },
+          where: { id: evento.id },
           data: {
-            ...(validatedData.hora && { hora: new Date(validatedData.hora) }),
+            ...(validatedData.hora && { 
+              hora: new Date(validatedData.hora),
+              horaOriginal: evento.hora, // Audit: save original time
+            }),
             ...(validatedData.tipo && { tipo: validatedData.tipo }),
             editado: true,
+            editadoPor: session.user.id,
+            motivoEdicion: validatedData.motivoEdicion || null,
           },
         });
 
         // Recalcular horas trabajadas
-        // TODO: Llamar a función de recálculo
+        const { actualizarCalculosFichaje } = await import('@/lib/calculos/fichajes');
+        await actualizarCalculosFichaje(id);
       }
     }
 
@@ -199,6 +205,19 @@ export async function PATCH(
         data: {
           fecha: new Date(validatedData.fecha),
         },
+      });
+    }
+
+    // Validar si el fichaje está completo después de la edición
+    const { validarFichajeCompleto } = await import('@/lib/calculos/fichajes');
+    const validacion = await validarFichajeCompleto(id);
+    
+    // Si el fichaje estaba pendiente y ahora está completo, marcarlo como finalizado
+    // Solo si quien edita es HR o Manager
+    if (validacion.completo && fichaje.estado === 'pendiente' && (session.user.rol === 'hr_admin' || session.user.rol === 'manager')) {
+      await prisma.fichaje.update({
+        where: { id },
+        data: { estado: 'finalizado' },
       });
     }
 
@@ -242,4 +261,5 @@ export async function DELETE(
     return handleApiError(error, 'API DELETE /api/fichajes/[id]');
   }
 }
+
 

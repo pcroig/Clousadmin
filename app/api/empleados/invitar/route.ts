@@ -19,6 +19,7 @@ import { z } from 'zod';
 const invitacionSchema = z.object({
   empleadoId: z.string().uuid(),
   email: z.string().email().optional(), // Email opcional, si no se provee usa el del empleado
+  tipoOnboarding: z.enum(['completo', 'simplificado']).optional(), // Tipo de onboarding, por defecto 'completo'
 });
 
 // POST /api/empleados/invitar - Enviar invitación a empleado (solo HR Admin)
@@ -34,7 +35,7 @@ export async function POST(req: NextRequest) {
     if (validationResult instanceof Response) return validationResult;
     const { data: validatedData } = validationResult;
 
-    const { empleadoId } = validatedData;
+    const { empleadoId, tipoOnboarding = 'completo' } = validatedData;
 
     // Verificar que el empleado existe y pertenece a la misma empresa
     const { prisma } = await import('@/lib/prisma');
@@ -63,7 +64,8 @@ export async function POST(req: NextRequest) {
     // Crear onboarding (genera token y link)
     const result = await crearOnboarding(
       empleadoId,
-      session.user.empresaId
+      session.user.empresaId,
+      tipoOnboarding
     );
 
     if (!result.success) {

@@ -179,7 +179,7 @@ export function AnalyticsClient() {
               chartConfig={{
                 empleados: {
                   label: 'Empleados',
-                  color: '#F26C21',
+                  color: '#d97757',
                 },
               }}
               footer={
@@ -198,7 +198,7 @@ export function AnalyticsClient() {
               chartConfig={{
                 empleados: {
                   label: 'Empleados',
-                  color: '#F26C21',
+                  color: '#d97757',
                 },
               }}
               footer={
@@ -255,7 +255,7 @@ export function AnalyticsClient() {
               chartConfig={{
                 promedio: {
                   label: 'Salario Promedio',
-                  color: '#F26C21',
+                  color: '#d97757',
                 },
               }}
             />
@@ -269,7 +269,7 @@ export function AnalyticsClient() {
               chartConfig={{
                 coste: {
                   label: 'Coste Total',
-                  color: '#F26C21',
+                  color: '#d97757',
                 },
               }}
             />
@@ -335,7 +335,7 @@ export function AnalyticsClient() {
               chartConfig={{
                 horas: {
                   label: 'Horas',
-                  color: '#F26C21',
+                  color: '#d97757',
                 },
               }}
               footer={

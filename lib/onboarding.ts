@@ -19,14 +19,34 @@ function toJsonValue<T extends Record<string, any>>(value: T): Prisma.InputJsonV
 }
 
 /**
- * Progreso del onboarding
+ * Tipo de onboarding
  */
-export interface ProgresoOnboarding {
+export type TipoOnboarding = 'completo' | 'simplificado';
+
+/**
+ * Progreso del onboarding completo (nuevos empleados)
+ */
+export interface ProgresoOnboardingCompleto {
   credenciales_completadas: boolean;
   datos_personales: boolean;
   datos_bancarios: boolean;
   datos_documentos: boolean;
+  pwa_explicacion: boolean;
 }
+
+/**
+ * Progreso del onboarding simplificado (empleados existentes)
+ */
+export interface ProgresoOnboardingSimplificado {
+  credenciales_completadas: boolean;
+  integraciones: boolean;
+  pwa_explicacion: boolean;
+}
+
+/**
+ * Union type para progreso de onboarding (soporta ambos tipos)
+ */
+export type ProgresoOnboarding = ProgresoOnboardingCompleto | ProgresoOnboardingSimplificado;
 
 /**
  * Datos temporales almacenados durante el onboarding
@@ -80,7 +100,8 @@ export type CrearOnboardingResult = CrearOnboardingSuccess | CrearOnboardingErro
  */
 export async function crearOnboarding(
   empleadoId: string,
-  empresaId: string
+  empresaId: string,
+  tipoOnboarding: TipoOnboarding = 'completo'
 ): Promise<CrearOnboardingResult> {
   try {
     // Verificar si ya existe un onboarding activo
@@ -99,23 +120,35 @@ export async function crearOnboarding(
     const token = randomBytes(32).toString('hex');
     const tokenExpira = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 días
 
+    // Definir progreso inicial según tipo de onboarding
+    const progresoInicial = tipoOnboarding === 'completo'
+      ? {
+          credenciales_completadas: false,
+          datos_personales: false,
+          datos_bancarios: false,
+          datos_documentos: false,
+          pwa_explicacion: false,
+        }
+      : {
+          credenciales_completadas: false,
+          integraciones: false,
+          pwa_explicacion: false,
+        };
+
     const onboarding = await prisma.onboardingEmpleado.create({
       data: {
         empresaId,
         empleadoId,
         token,
         tokenExpira,
-        progreso: {
-          credenciales_completadas: false,
-          datos_personales: false,
-          datos_bancarios: false,
-          datos_documentos: false,
-        },
+        tipoOnboarding,
+        progreso: toJsonValue(progresoInicial),
       },
     });
 
     const baseUrl = process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-    const url = `${baseUrl}/onboarding/${token}`;
+    const path = tipoOnboarding === 'completo' ? 'onboarding' : 'onboarding-simplificado';
+    const url = `${baseUrl}/${path}/${token}`;
 
     return {
       success: true,
@@ -497,122 +530,185 @@ export async function finalizarOnboarding(token: string) {
     }
 
     const { onboarding } = verificacion;
+    const tipoOnboarding = onboarding.tipoOnboarding as TipoOnboarding;
 
-    // Validar que todos los pasos estén completados
+    // Validar que todos los pasos estén completados según tipo de onboarding
     const progreso = onboarding.progreso as unknown as ProgresoOnboarding;
-    if (!progreso.credenciales_completadas || !progreso.datos_personales || !progreso.datos_bancarios) {
-      return {
-        success: false,
-        error: 'Faltan pasos por completar (credenciales, datos personales o bancarios)',
-      };
-    }
 
-    // Obtener datos temporales
-    const datosTemporales = onboarding.datosTemporales as unknown as DatosTemporales;
-    if (!datosTemporales.datos_personales || !datosTemporales.datos_bancarios) {
-      return {
-        success: false,
-        error: 'Datos incompletos',
-      };
-    }
+    if (tipoOnboarding === 'completo') {
+      const progresoCompleto = progreso as ProgresoOnboardingCompleto;
+      if (!progresoCompleto.credenciales_completadas || 
+          !progresoCompleto.datos_personales || 
+          !progresoCompleto.datos_bancarios ||
+          !progresoCompleto.pwa_explicacion) {
+        return {
+          success: false,
+          error: 'Faltan pasos por completar (credenciales, datos personales, bancarios o PWA)',
+        };
+      }
 
-    // Validar documentos requeridos (solo si hay documentos requeridos configurados)
-    const configResult = await obtenerOnboardingConfig(onboarding.empresaId);
-    if (configResult.success && configResult.config) {
-      const documentosRequeridos = configResult.config.documentosRequeridos;
-      
-      // Si hay documentos requeridos, validar que todos estén completos
-      if (documentosRequeridos && Array.isArray(documentosRequeridos) && documentosRequeridos.length > 0) {
-        // Solo validar documentos que son requeridos (requerido: true)
-        const docsRequeridos = documentosRequeridos.filter((d: any) => d.requerido === true);
+      // Obtener datos temporales
+      const datosTemporales = onboarding.datosTemporales as unknown as DatosTemporales;
+      if (!datosTemporales?.datos_personales || !datosTemporales?.datos_bancarios) {
+        return {
+          success: false,
+          error: 'Datos incompletos',
+        };
+      }
+
+      // Validar documentos requeridos (solo para onboarding completo)
+      const configResult = await obtenerOnboardingConfig(onboarding.empresaId);
+      if (configResult.success && configResult.config) {
+        const documentosRequeridos = configResult.config.documentosRequeridos;
         
-        if (docsRequeridos.length > 0) {
-          const validacionDocs = await validarDocumentosRequeridosCompletos(
-            onboarding.empresaId,
-            onboarding.empleadoId,
-            docsRequeridos
-          );
+        // Si hay documentos requeridos, validar que todos estén completos
+        if (documentosRequeridos && Array.isArray(documentosRequeridos) && documentosRequeridos.length > 0) {
+          // Solo validar documentos que son requeridos (requerido: true)
+          const docsRequeridos = documentosRequeridos.filter((d: any) => d.requerido === true);
+          
+          if (docsRequeridos.length > 0) {
+            const validacionDocs = await validarDocumentosRequeridosCompletos(
+              onboarding.empresaId,
+              onboarding.empleadoId,
+              docsRequeridos
+            );
 
-          if (validacionDocs.success && !validacionDocs.completo) {
-            const docsFaltantes = validacionDocs.documentosFaltantes || [];
-            const nombresDocsFaltantes = docsFaltantes.map((d) => d.nombre).join(', ');
-            return {
-              success: false,
-              error: `Faltan documentos requeridos: ${nombresDocsFaltantes}`,
-            };
+            if (validacionDocs.success && !validacionDocs.completo) {
+              const docsFaltantes = validacionDocs.documentosFaltantes || [];
+              const nombresDocsFaltantes = docsFaltantes.map((d) => d.nombre).join(', ');
+              return {
+                success: false,
+                error: `Faltan documentos requeridos: ${nombresDocsFaltantes}`,
+              };
+            }
           }
         }
       }
-    }
 
-    const { datos_personales, datos_bancarios } = datosTemporales;
+      const { datos_personales, datos_bancarios } = datosTemporales;
 
-    // Preparar datos del empleado
-    const datosEmpleado = {
-      // Datos personales
-      nif: datos_personales.nif,
-      nss: datos_personales.nss,
-      telefono: datos_personales.telefono,
-      direccionCalle: datos_personales.direccionCalle,
-      direccionNumero: datos_personales.direccionNumero,
-      direccionPiso: datos_personales.direccionPiso,
-      codigoPostal: datos_personales.codigoPostal,
-      ciudad: datos_personales.ciudad,
-      direccionProvincia: datos_personales.direccionProvincia,
-      estadoCivil: datos_personales.estadoCivil,
-      numeroHijos: datos_personales.numeroHijos || 0,
+      // Preparar datos del empleado (solo para onboarding completo)
+      const datosEmpleado = {
+        // Datos personales
+        nif: datos_personales.nif,
+        nss: datos_personales.nss,
+        telefono: datos_personales.telefono,
+        direccionCalle: datos_personales.direccionCalle,
+        direccionNumero: datos_personales.direccionNumero,
+        direccionPiso: datos_personales.direccionPiso,
+        codigoPostal: datos_personales.codigoPostal,
+        ciudad: datos_personales.ciudad,
+        direccionProvincia: datos_personales.direccionProvincia,
+        estadoCivil: datos_personales.estadoCivil,
+        numeroHijos: datos_personales.numeroHijos || 0,
 
-      // Datos bancarios
-      iban: datos_bancarios.iban,
-      titularCuenta: datos_bancarios.titularCuenta,
+        // Datos bancarios
+        iban: datos_bancarios.iban,
+        titularCuenta: datos_bancarios.titularCuenta,
 
-      // Marcar onboarding completo
-      onboardingCompletado: true,
-      onboardingCompletadoEn: new Date(),
-    };
-
-    // Obtener empleado para verificar fechas de contrato
-    const empleado = await prisma.empleado.findUnique({
-      where: { id: onboarding.empleadoId },
-      select: {
-        fechaAlta: true,
-        fechaBaja: true,
-        usuarioId: true,
-      },
-    });
-
-    if (!empleado) {
-      return {
-        success: false,
-        error: 'Empleado no encontrado',
+        // Marcar onboarding completo
+        onboardingCompletado: true,
+        onboardingCompletadoEn: new Date(),
       };
+
+      // Obtener empleado para verificar fechas de contrato
+      const empleado = await prisma.empleado.findUnique({
+        where: { id: onboarding.empleadoId },
+        select: {
+          fechaAlta: true,
+          fechaBaja: true,
+          usuarioId: true,
+        },
+      });
+
+      if (!empleado) {
+        return {
+          success: false,
+          error: 'Empleado no encontrado',
+        };
+      }
+
+      // Calcular estado activo según fechas de contrato
+      const debeEstarActivo = calcularEstadoActivoSegunFechas(
+        empleado.fechaAlta,
+        empleado.fechaBaja
+      );
+
+      // Encriptar campos sensibles antes de guardar
+      const datosEmpleadoEncriptados = encryptEmpleadoData(datosEmpleado);
+
+      // Traspasar datos encriptados a Empleado y actualizar estado activo
+      await prisma.empleado.update({
+        where: { id: onboarding.empleadoId },
+        data: {
+          ...datosEmpleadoEncriptados,
+          activo: debeEstarActivo,
+        },
+      });
+
+      // Actualizar también el estado activo del usuario
+      await prisma.usuario.update({
+        where: { id: empleado.usuarioId },
+        data: {
+          empleadoId: onboarding.empleadoId,
+          activo: debeEstarActivo,
+        },
+      });
+    } else {
+      // Onboarding simplificado - solo validar pasos básicos
+      const progresoSimplificado = progreso as ProgresoOnboardingSimplificado;
+      if (!progresoSimplificado.credenciales_completadas || 
+          !progresoSimplificado.integraciones ||
+          !progresoSimplificado.pwa_explicacion) {
+        return {
+          success: false,
+          error: 'Faltan pasos por completar (credenciales, integraciones o PWA)',
+        };
+      }
+
+      // Para onboarding simplificado, solo marcar como completado
+      // Los datos ya están en el empleado, solo falta activar
+      const empleado = await prisma.empleado.findUnique({
+        where: { id: onboarding.empleadoId },
+        select: {
+          fechaAlta: true,
+          fechaBaja: true,
+          usuarioId: true,
+        },
+      });
+
+      if (!empleado) {
+        return {
+          success: false,
+          error: 'Empleado no encontrado',
+        };
+      }
+
+      // Calcular estado activo según fechas de contrato
+      const debeEstarActivo = calcularEstadoActivoSegunFechas(
+        empleado.fechaAlta,
+        empleado.fechaBaja
+      );
+
+      // Actualizar empleado con onboarding completado
+      await prisma.empleado.update({
+        where: { id: onboarding.empleadoId },
+        data: {
+          onboardingCompletado: true,
+          onboardingCompletadoEn: new Date(),
+          activo: debeEstarActivo,
+        },
+      });
+
+      // Actualizar también el estado activo del usuario
+      await prisma.usuario.update({
+        where: { id: empleado.usuarioId },
+        data: {
+          empleadoId: onboarding.empleadoId,
+          activo: debeEstarActivo,
+        },
+      });
     }
-
-    // Calcular estado activo según fechas de contrato
-    const debeEstarActivo = calcularEstadoActivoSegunFechas(
-      empleado.fechaAlta,
-      empleado.fechaBaja
-    );
-
-    // Encriptar campos sensibles antes de guardar
-    const datosEmpleadoEncriptados = encryptEmpleadoData(datosEmpleado);
-
-    // Traspasar datos encriptados a Empleado y actualizar estado activo
-    await prisma.empleado.update({
-      where: { id: onboarding.empleadoId },
-      data: {
-        ...datosEmpleadoEncriptados,
-        activo: debeEstarActivo,
-      },
-    });
-
-    // Actualizar también el estado activo del usuario
-    await prisma.usuario.update({
-      where: { id: empleado.usuarioId },
-      data: {
-        activo: debeEstarActivo,
-      },
-    });
 
     // Marcar onboarding como completado
     await prisma.onboardingEmpleado.update({
@@ -723,6 +819,78 @@ export async function obtenerOnboardingPorEmpleado(empleadoId: string) {
   } catch (error) {
     console.error('[obtenerOnboardingPorEmpleado] Error:', error);
     return null;
+  }
+}
+
+/**
+ * Guardar progreso del paso de integraciones (onboarding simplificado)
+ */
+export async function guardarProgresoIntegraciones(token: string) {
+  try {
+    const verificacion = await verificarTokenOnboarding(token);
+    if (!verificacion.valido || !verificacion.onboarding) {
+      return {
+        success: false,
+        error: verificacion.error || 'Token inválido',
+      };
+    }
+
+    const { onboarding } = verificacion;
+    const progreso = onboarding.progreso as unknown as ProgresoOnboardingSimplificado;
+
+    await prisma.onboardingEmpleado.update({
+      where: { id: onboarding.id },
+      data: {
+        progreso: toJsonValue({
+          ...progreso,
+          integraciones: true,
+        }),
+      },
+    });
+
+    return { success: true };
+  } catch (error) {
+    console.error('[guardarProgresoIntegraciones] Error:', error);
+    return {
+      success: false,
+      error: 'Error al guardar progreso de integraciones',
+    };
+  }
+}
+
+/**
+ * Guardar progreso del paso de PWA (ambos tipos de onboarding)
+ */
+export async function guardarProgresoPWA(token: string) {
+  try {
+    const verificacion = await verificarTokenOnboarding(token);
+    if (!verificacion.valido || !verificacion.onboarding) {
+      return {
+        success: false,
+        error: verificacion.error || 'Token inválido',
+      };
+    }
+
+    const { onboarding } = verificacion;
+    const progreso = onboarding.progreso as unknown as ProgresoOnboarding;
+
+    await prisma.onboardingEmpleado.update({
+      where: { id: onboarding.id },
+      data: {
+        progreso: toJsonValue({
+          ...progreso,
+          pwa_explicacion: true,
+        }),
+      },
+    });
+
+    return { success: true };
+  } catch (error) {
+    console.error('[guardarProgresoPWA] Error:', error);
+    return {
+      success: false,
+      error: 'Error al guardar progreso de PWA',
+    };
   }
 }
 

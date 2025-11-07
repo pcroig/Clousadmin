@@ -8,6 +8,8 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Calendar, MoreVertical, Check, X } from 'lucide-react';
+import { getAvatarPlaceholderClasses } from '@/lib/design-system';
+import { cn } from '@/lib/utils';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -92,14 +94,21 @@ export function BandejaEntradaSolicitudes({
           </p>
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-4">
           {solicitudesActuales.map((solicitud) => (
             <div key={solicitud.id} className="bg-white rounded-lg border border-gray-200 p-6 hover:shadow-sm transition-shadow">
               <div className="flex items-start gap-4">
                 {/* Avatar */}
                 <Avatar className="h-12 w-12 rounded-lg">
                   <AvatarImage src={solicitud.empleado.avatar} />
-                  <AvatarFallback className="bg-stone-200 text-stone-700 rounded-lg">
+                  <AvatarFallback
+                    className={cn(
+                      getAvatarPlaceholderClasses(
+                        `${solicitud.empleado.nombre} ${solicitud.empleado.apellidos}`
+                      ),
+                      'rounded-lg text-sm font-medium'
+                    )}
+                  >
                     {getInitials(
                       solicitud.empleado.nombre,
                       solicitud.empleado.apellidos

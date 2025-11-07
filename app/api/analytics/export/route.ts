@@ -49,10 +49,6 @@ export async function GET(request: NextRequest) {
       where.genero = genero;
     }
 
-    if (equipo && equipo !== 'todos') {
-      where.departamento = equipo;
-    }
-
     // Obtener empleados con todos los datos necesarios
     let empleados = await prisma.empleado.findMany({
       where,
@@ -61,13 +57,28 @@ export async function GET(request: NextRequest) {
         nombre: true,
         apellidos: true,
         email: true,
-        departamento: true,
         genero: true,
         fechaAlta: true,
         salarioBrutoMensual: true,
         salarioBrutoAnual: true,
+        equipos: {
+          select: {
+            equipo: {
+              select: {
+                nombre: true,
+              },
+            },
+          },
+        },
       },
     });
+
+    // Filtrar por equipo si aplica
+    if (equipo && equipo !== 'todos') {
+      empleados = empleados.filter((e) =>
+        e.equipos.some((eq) => eq.equipo.nombre === equipo)
+      );
+    }
 
     // Filtrar por antigüedad si aplica
     if (antiguedad && antiguedad !== 'todos') {
@@ -88,7 +99,7 @@ export async function GET(request: NextRequest) {
       [''],
       ['Filtros aplicados:'],
       ['Género:', genero || 'Todos'],
-      ['Equipo/Departamento:', equipo || 'Todos'],
+      ['Equipo:', equipo || 'Todos'],
       ['Antigüedad:', antiguedad || 'Todos'],
       [''],
       ['Total empleados:', empleados.length],
@@ -104,7 +115,7 @@ export async function GET(request: NextRequest) {
       Nombre: e.nombre,
       Apellidos: e.apellidos,
       Email: e.email,
-      Departamento: e.departamento || 'Sin departamento',
+      Equipos: e.equipos.map((eq) => eq.equipo.nombre).join(', ') || 'Sin equipo',
       Género: e.genero || 'No especificado',
       'Fecha Alta': e.fechaAlta.toLocaleDateString('es-ES'),
       Antigüedad: calcularAntiguedad(e.fechaAlta),
@@ -131,7 +142,7 @@ export async function GET(request: NextRequest) {
     const compensacionData = empleados.map((e) => ({
       Nombre: e.nombre,
       Apellidos: e.apellidos,
-      Departamento: e.departamento || 'Sin departamento',
+      Equipos: e.equipos.map((eq) => eq.equipo.nombre).join(', ') || 'Sin equipo',
       'Salario Bruto Mensual': e.salarioBrutoMensual
         ? `${Number(e.salarioBrutoMensual).toFixed(2)}€`
         : 'N/A',

@@ -248,35 +248,14 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
     setCuadrandoFichajes(true);
     
     try {
-      // 1. Primero ejecutar el clasificador (últimos 7 días por si acaso)
-      const hoy = new Date();
-      hoy.setHours(0, 0, 0, 0);
+      console.log('[Cuadrar fichajes] Abriendo modal de revisión...');
       
-      console.log('[Cuadrar fichajes] Ejecutando clasificador...');
-      
-      const response = await fetch('/api/fichajes/clasificar', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fecha: hoy.toISOString().split('T')[0] }),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        console.error('[Cuadrar fichajes] Error en clasificador:', error);
-      } else {
-        const resultado = await response.json();
-        console.log('[Cuadrar fichajes] Resultado:', resultado);
-      }
-
-      // 2. Recargar fichajes para mostrar los cambios
-      await fetchFichajes();
-      
-      // 3. Abrir modal de revisión
+      // Abrir modal de revisión directamente
       setRevisionModal(true);
       
     } catch (error) {
       console.error('[Cuadrar fichajes] Error:', error);
-      alert('Error al cuadrar fichajes. Revisa la consola para más detalles.');
+      alert('Error al abrir cuadre de fichajes. Revisa la consola para más detalles.');
     } finally {
       setCuadrandoFichajes(false);
     }

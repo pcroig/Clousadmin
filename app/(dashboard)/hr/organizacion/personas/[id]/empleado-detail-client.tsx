@@ -36,6 +36,8 @@ import { GeneralTab as GeneralTabShared } from '../../../mi-espacio/tabs/general
 import { toast } from 'sonner';
 import { LoadingButton } from '@/components/shared/loading-button';
 import { DarDeBajaModal } from '@/components/hr/DarDeBajaModal';
+import { getAvatarPlaceholderClasses } from '@/lib/design-system';
+import { cn } from '@/lib/utils';
 
 interface EmpleadoDetailClientProps {
   empleado: any; // TODO: Type properly
@@ -96,7 +98,12 @@ export function EmpleadoDetailClient({ empleado, usuario }: EmpleadoDetailClient
         <div className="flex items-center gap-4">
           <Avatar className="h-16 w-16">
             {empleado.fotoUrl && <AvatarImage src={empleado.fotoUrl} />}
-            <AvatarFallback className="bg-gray-900 text-white text-lg">
+            <AvatarFallback
+              className={cn(
+                getAvatarPlaceholderClasses(`${empleado.nombre} ${empleado.apellidos}`),
+                'text-lg font-semibold'
+              )}
+            >
               {getInitials()}
             </AvatarFallback>
           </Avatar>

@@ -2,6 +2,7 @@
 // Add Persona Manual Form
 // ========================================
 // Formulario manual para añadir persona con todos los campos
+// Incluye opción de importar empleados al inicio
 
 'use client';
 
@@ -13,6 +14,8 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { LoadingButton } from '@/components/shared/loading-button';
 import { Combobox, type ComboboxOption } from '@/components/shared/combobox';
+import { AddPersonaDocumentForm } from './add-persona-document-form';
+import { ChevronDown, ChevronUp, Upload } from 'lucide-react';
 
 interface AddPersonaManualFormProps {
   onSuccess: () => void;
@@ -23,6 +26,7 @@ export function AddPersonaManualForm({ onSuccess, onCancel }: AddPersonaManualFo
   const [loading, setLoading] = useState(false);
   const [equipos, setEquipos] = useState<Array<{ id: string; nombre: string }>>([]);
   const [puestos, setPuestos] = useState<Array<{ id: string; nombre: string }>>([]);
+  const [showImportSection, setShowImportSection] = useState(false);
 
   useEffect(() => {
     async function fetchData() {
@@ -200,6 +204,38 @@ export function AddPersonaManualForm({ onSuccess, onCancel }: AddPersonaManualFo
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
+      {/* Sección de Importar */}
+      <div className="border border-blue-200 rounded-lg bg-blue-50/50">
+        <button
+          type="button"
+          onClick={() => setShowImportSection(!showImportSection)}
+          className="w-full flex items-center justify-between p-4 hover:bg-blue-100/50 transition-colors rounded-lg"
+        >
+          <div className="flex items-center gap-2">
+            <Upload className="h-5 w-5 text-blue-600" />
+            <span className="font-medium text-blue-900">¿Prefieres importar empleado(s)?</span>
+          </div>
+          {showImportSection ? (
+            <ChevronUp className="h-5 w-5 text-blue-600" />
+          ) : (
+            <ChevronDown className="h-5 w-5 text-blue-600" />
+          )}
+        </button>
+        
+        {showImportSection && (
+          <div className="px-4 pb-4">
+            <AddPersonaDocumentForm onSuccess={onSuccess} onCancel={onCancel} />
+          </div>
+        )}
+      </div>
+
+      {/* Separador */}
+      <div className="flex items-center gap-3">
+        <div className="flex-1 border-t border-gray-300"></div>
+        <span className="text-sm text-gray-500 font-medium">O introduce los datos manualmente</span>
+        <div className="flex-1 border-t border-gray-300"></div>
+      </div>
+
       {/* Datos Básicos */}
       <div className="space-y-4">
         <h3 className="text-sm font-semibold text-gray-900 border-b pb-2">Datos Básicos</h3>
