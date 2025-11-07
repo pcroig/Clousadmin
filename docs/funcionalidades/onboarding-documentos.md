@@ -337,3 +337,4 @@ El progreso se almacena en `OnboardingEmpleado.progreso`:
 **Última actualización:** 2025-11-05  
 **Versión:** 1.0.0
 
+
