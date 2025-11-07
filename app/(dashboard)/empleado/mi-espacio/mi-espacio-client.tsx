@@ -60,10 +60,10 @@ export function MiEspacioClient({ empleado, usuario }: MiEspacioClientProps) {
               </Avatar>
               <button
                 onClick={() => setEditingProfile(!editingProfile)}
-                className="absolute -bottom-1 -right-1 bg-gray-900 text-white rounded-full p-1.5 hover:bg-gray-800 transition-colors"
+                className="absolute -bottom-1 -right-1 text-gray-600 hover:text-[#c6613f] transition-colors p-1"
                 title="Editar foto de perfil"
               >
-                <Edit2 className="w-3 h-3" />
+                <Edit2 className="w-4 h-4" />
               </button>
             </div>
 

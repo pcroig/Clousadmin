@@ -45,11 +45,9 @@ export function DocumentosTab({ empleado }: any) {
           carpetasPersonales.length > 0 ? (
             carpetasPersonales.map((carpeta: any) => (
               <div key={carpeta.id} className="flex flex-col items-center cursor-pointer group">
-                <div className="w-24 h-24 rounded-full bg-gray-100 flex items-center justify-center mb-2 group-hover:bg-gray-200 transition-colors">
-                  <svg className="w-12 h-12 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
-                  </svg>
-                </div>
+                <svg className="w-16 h-16 text-gray-600 mb-3 group-hover:text-[#c6613f] transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                </svg>
                 <p className="text-sm font-medium text-gray-900 text-center">{carpeta.nombre}</p>
                 {carpeta.documentos.length > 0 && (
                   <p className="text-xs text-gray-500 mt-1">
@@ -69,11 +67,9 @@ export function DocumentosTab({ empleado }: any) {
         ) : carpetasCompartidas.length > 0 ? (
           carpetasCompartidas.map((carpeta: any) => (
             <div key={carpeta.id} className="flex flex-col items-center cursor-pointer group">
-              <div className="w-24 h-24 rounded-full bg-gray-100 flex items-center justify-center mb-2 group-hover:bg-gray-200 transition-colors">
-                <svg className="w-12 h-12 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
-                </svg>
-              </div>
+              <svg className="w-16 h-16 text-gray-600 mb-3 group-hover:text-[#c6613f] transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+              </svg>
               <p className="text-sm font-medium text-gray-900 text-center">{carpeta.nombre}</p>
               {carpeta.documentos.length > 0 && (
                 <p className="text-xs text-gray-500 mt-1">
