@@ -1,9 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { useApi } from '@/lib/hooks';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Table,
@@ -13,8 +10,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Clock, Edit2, ChevronDown, ChevronUp } from 'lucide-react';
-import { EditarFichajeModal } from '../../horario/fichajes/editar-fichaje-modal';
+import { Badge } from '@/components/ui/badge';
+import { Clock, ChevronDown, ChevronUp } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -23,6 +20,7 @@ interface FichajeEvento {
   tipo: string;
   hora: string;
   editado: boolean;
+  motivoEdicion?: string | null;
 }
 
 interface Fichaje {
@@ -33,181 +31,161 @@ interface Fichaje {
   eventos: FichajeEvento[];
 }
 
+interface BalanceResumen {
+  diario: number;
+  semanal: number;
+  mensual: number;
+  acumulado: number;
+}
+
 interface JornadaDia {
   fecha: Date;
-  fichaje: Fichaje;
+  fichajeId: string;
+  eventos: FichajeEvento[];
   horasTrabajadas: number;
   horarioEntrada: string | null;
   horarioSalida: string | null;
   balance: number;
-  estado: string;
+  estado: 'completa' | 'incompleta' | 'pendiente';
 }
 
 export function FichajesTab({ empleadoId }: { empleadoId: string }) {
+  const [fichajes, setFichajes] = useState<Fichaje[]>([]);
   const [jornadas, setJornadas] = useState<JornadaDia[]>([]);
+  const [loading, setLoading] = useState(true);
   const [jornadaExpandida, setJornadaExpandida] = useState<string | null>(null);
-  const [fichajeEditando, setFichajeEditando] = useState<Fichaje | null>(null);
-
-  // Memoizar función de callback para evitar recreación en cada render
-  const handleFichajesSuccess = useCallback((data: Fichaje[]) => {
-    // Agrupar fichajes en jornadas cuando se cargan
-    const jornadasAgrupadas = agruparPorJornada(data);
-    setJornadas(jornadasAgrupadas);
-  }, []);
-
-  // Memoizar opciones para evitar que refetchFichajes cambie en cada render
-  const fichajesApiOptions = useMemo(() => ({
-    onSuccess: handleFichajesSuccess,
-  }), [handleFichajesSuccess]);
-
-  // Hook para cargar fichajes
-  const { data: fichajes = [], loading, execute: refetchFichajes } = useApi<Fichaje[]>(fichajesApiOptions);
+  const [balance, setBalance] = useState<BalanceResumen>({
+    diario: 0,
+    semanal: 0,
+    mensual: 0,
+    acumulado: 0,
+  });
 
   useEffect(() => {
-    if (empleadoId) {
-      refetchFichajes(`/api/fichajes?empleadoId=${empleadoId}&propios=1`);
-    }
-  }, [empleadoId, refetchFichajes]);
+    fetchFichajes();
+  }, [empleadoId]);
 
-  // Función auxiliar para extraer solo la hora (HH:mm) de un DateTime ISO
-  function extraerHora(datetime: string | Date): string | null {
+  async function fetchFichajes() {
+    setLoading(true);
     try {
-      const fecha = typeof datetime === 'string' ? new Date(datetime) : datetime;
-      if (isNaN(fecha.getTime())) {
-        return null;
+      const response = await fetch('/api/fichajes');
+      if (!response.ok) {
+        throw new Error('Error al obtener fichajes');
       }
-      // Extraer solo HH:mm del DateTime
-      const horas = fecha.getHours().toString().padStart(2, '0');
-      const minutos = fecha.getMinutes().toString().padStart(2, '0');
-      return `${horas}:${minutos}`;
-    } catch {
-      return null;
+      const data = await response.json();
+
+      // Procesar fichajes con su nueva estructura (eventos separados)
+      const fichajesConEventos = data.map((f: any) => ({
+        id: f.id,
+        fecha: f.fecha,
+        estado: f.estado,
+        horasTrabajadas: f.horasTrabajadas ? Number(f.horasTrabajadas) : 0,
+        eventos: f.eventos || [],
+      }));
+
+      setFichajes(fichajesConEventos);
+
+      // Agrupar fichajes en jornadas
+      const jornadasAgrupadas = agruparPorJornada(fichajesConEventos);
+      setJornadas(jornadasAgrupadas);
+    } catch (error) {
+      console.error('Error fetching fichajes:', error);
+      setFichajes([]);
+      setJornadas([]);
+    } finally {
+      setLoading(false);
     }
   }
 
   function agruparPorJornada(fichajes: Fichaje[]): JornadaDia[] {
-    // Agrupar por fecha
-    const grupos: Record<string, Fichaje[]> = {};
-    
-    fichajes.forEach(f => {
-      const fechaKey = new Date(f.fecha).toISOString().split('T')[0];
-      if (!grupos[fechaKey]) {
-        grupos[fechaKey] = [];
-      }
-      grupos[fechaKey].push(f);
-    });
+    // Cada fichaje ya representa un día completo con sus eventos
+    return fichajes.map(fichaje => {
+      const eventos = fichaje.eventos || [];
 
-    // Convertir a jornadas
-    return Object.entries(grupos).map(([fechaKey, fichajesDelDia]) => {
-      // Obtener el fichaje principal del día (el que tiene eventos)
-      const fichajePrincipal = fichajesDelDia.find(f => f.eventos && f.eventos.length > 0) || fichajesDelDia[0];
-      
-      const eventos = fichajePrincipal.eventos || [];
-      const entrada = eventos.find((e) => e.tipo === 'entrada');
-      const salida = eventos.find((e) => e.tipo === 'salida');
-      
-      // Extraer solo la hora del DateTime completo
-      const horarioEntrada = entrada && entrada.hora ? extraerHora(entrada.hora) : null;
-      const horarioSalida = salida && salida.hora ? extraerHora(salida.hora) : null;
+      // Obtener horario de entrada/salida desde los eventos
+      const entrada = eventos.find(e => e.tipo === 'entrada');
+      const salida = eventos.find(e => e.tipo === 'salida');
 
-      // Calcular horas trabajadas
-      let horasTrabajadas = 0;
-      if (fichajePrincipal.horasTrabajadas) {
-        horasTrabajadas = Number(fichajePrincipal.horasTrabajadas);
-      } else if (entrada && salida && entrada.hora && salida.hora) {
-        const entradaHora = new Date(entrada.hora);
-        const salidaHora = new Date(salida.hora);
-        if (!isNaN(entradaHora.getTime()) && !isNaN(salidaHora.getTime())) {
-          const diff = (salidaHora.getTime() - entradaHora.getTime()) / (1000 * 60 * 60);
-          horasTrabajadas = diff;
-        }
+      const horarioEntrada = entrada ? format(new Date(entrada.hora), 'HH:mm') : null;
+      const horarioSalida = salida ? format(new Date(salida.hora), 'HH:mm') : null;
+
+      // Determinar estado de la jornada
+      let estado: 'completa' | 'incompleta' | 'pendiente' = 'completa';
+      if (fichaje.estado === 'en_curso') {
+        estado = 'incompleta';
+      } else if (fichaje.estado === 'pendiente' || fichaje.estado === 'revisado') {
+        estado = 'pendiente';
       }
 
-      // Balance (asumiendo 8h como jornada estándar)
-      const balance = horasTrabajadas - 8;
+      // Balance (asumiendo 8h como jornada estándar por ahora)
+      const balance = fichaje.horasTrabajadas - 8;
 
       return {
-        fecha: new Date(fechaKey),
-        fichaje: fichajePrincipal,
-        horasTrabajadas,
+        fecha: new Date(fichaje.fecha),
+        fichajeId: fichaje.id,
+        eventos: eventos,
+        horasTrabajadas: fichaje.horasTrabajadas,
         horarioEntrada,
         horarioSalida,
         balance,
-        estado: fichajePrincipal.estado || 'finalizado',
+        estado,
       };
     }).sort((a, b) => b.fecha.getTime() - a.fecha.getTime());
   }
 
-  function getEstadoBadge(estado: string) {
-    const variants: Record<string, { label: string; className: string }> = {
-      en_curso: { label: 'En Curso', className: 'bg-blue-100 text-blue-800' },
-      finalizado: { label: 'Finalizado', className: 'bg-green-100 text-green-800' },
-      revisado: { label: 'Revisado', className: 'bg-gray-100 text-gray-800' },
-      pendiente: { label: 'Pendiente', className: 'bg-yellow-100 text-yellow-800' },
+  function getEstadoBadge(estado: 'completa' | 'incompleta' | 'pendiente') {
+    const variants: Record<typeof estado, { label: string; className: string }> = {
+      completa: { label: 'Completa', className: 'bg-green-100 text-green-800' },
+      incompleta: { label: 'Incompleta', className: 'bg-yellow-100 text-yellow-800' },
+      pendiente: { label: 'Pendiente', className: 'bg-orange-100 text-orange-800' },
     };
-    const variant = variants[estado] || variants.finalizado;
+
+    const variant = variants[estado];
     return <Badge className={variant.className}>{variant.label}</Badge>;
   }
 
   return (
     <div className="space-y-6">
       {/* Widget Resumen */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <Clock className="w-5 h-5 text-[#F26C21]" />
-            <CardTitle className="text-base font-semibold">Resumen de Fichajes</CardTitle>
+      <Card className="p-6">
+        <div className="flex items-center gap-2 mb-4">
+          <Clock className="w-5 h-5 text-[#d97757]" />
+          <h3 className="text-base font-semibold">Balance de Horas</h3>
+        </div>
+        <div className="grid grid-cols-4 gap-4">
+          <div className="text-center">
+            <div className={`text-2xl font-bold ${balance.diario >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+              {balance.diario >= 0 ? '+' : ''}{balance.diario.toFixed(1)}h
+            </div>
+            <div className="text-xs text-gray-500 mt-1">Hoy</div>
           </div>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-4 gap-4">
-            <div className="text-center">
-              <div className="text-2xl font-bold text-gray-900">
-                {jornadas.length > 0
-                  ? jornadas.reduce((sum, j) => sum + j.horasTrabajadas, 0).toFixed(1)
-                  : '0.0'}
-                h
-              </div>
-              <div className="text-xs text-gray-500 mt-1">Total trabajado</div>
+          <div className="text-center">
+            <div className={`text-2xl font-bold ${balance.semanal >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+              {balance.semanal >= 0 ? '+' : ''}{balance.semanal.toFixed(1)}h
             </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-gray-900">
-                {jornadas.length > 0
-                  ? jornadas.filter(j => j.horarioEntrada).length
-                  : 0}
-              </div>
-              <div className="text-xs text-gray-500 mt-1">Días con fichaje</div>
-            </div>
-            <div className="text-center">
-              <div className={`text-2xl font-bold ${
-                jornadas.length > 0 && jornadas.reduce((sum, j) => sum + j.balance, 0) >= 0
-                  ? 'text-green-600'
-                  : 'text-red-600'
-              }`}>
-                {jornadas.length > 0
-                  ? (jornadas.reduce((sum, j) => sum + j.balance, 0) >= 0 ? '+' : '') +
-                    jornadas.reduce((sum, j) => sum + j.balance, 0).toFixed(1)
-                  : '0.0'}
-                h
-              </div>
-              <div className="text-xs text-gray-500 mt-1">Balance</div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-gray-900">
-                {jornadas.filter(j => j.estado === 'en_curso').length}
-              </div>
-              <div className="text-xs text-gray-500 mt-1">En curso</div>
-            </div>
+            <div className="text-xs text-gray-500 mt-1">Semana</div>
           </div>
-        </CardContent>
+          <div className="text-center">
+            <div className={`text-2xl font-bold ${balance.mensual >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+              {balance.mensual >= 0 ? '+' : ''}{balance.mensual.toFixed(1)}h
+            </div>
+            <div className="text-xs text-gray-500 mt-1">Mes</div>
+          </div>
+          <div className="text-center">
+            <div className={`text-2xl font-bold ${balance.acumulado >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+              {balance.acumulado >= 0 ? '+' : ''}{balance.acumulado.toFixed(1)}h
+            </div>
+            <div className="text-xs text-gray-500 mt-1">Acumulado</div>
+          </div>
+        </div>
       </Card>
 
-      {/* Tabla de fichajes */}
+      {/* Historial por Jornadas */}
       <Card className="p-0">
         <div className="p-6 border-b border-gray-200">
           <h3 className="text-sm font-semibold text-gray-900">Historial por Jornadas</h3>
         </div>
-        
+
         <Table>
           <TableHeader>
             <TableRow>
@@ -217,19 +195,18 @@ export function FichajesTab({ empleadoId }: { empleadoId: string }) {
               <TableHead>Horario</TableHead>
               <TableHead>Balance</TableHead>
               <TableHead>Estado</TableHead>
-              <TableHead className="w-[60px]"></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-8 text-gray-500">
+                <TableCell colSpan={6} className="text-center py-8 text-gray-500">
                   Cargando...
                 </TableCell>
               </TableRow>
             ) : jornadas.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-8 text-gray-500">
+                <TableCell colSpan={6} className="text-center py-8 text-gray-500">
                   No tienes fichajes registrados
                 </TableCell>
               </TableRow>
@@ -237,10 +214,10 @@ export function FichajesTab({ empleadoId }: { empleadoId: string }) {
               jornadas.slice(0, 30).map((jornada) => {
                 const key = jornada.fecha.toISOString();
                 const isExpanded = jornadaExpandida === key;
-                
+
                 return (
                   <React.Fragment key={key}>
-                    <TableRow 
+                    <TableRow
                       className="cursor-pointer hover:bg-gray-50"
                       onClick={() => setJornadaExpandida(isExpanded ? null : key)}
                     >
@@ -274,43 +251,29 @@ export function FichajesTab({ empleadoId }: { empleadoId: string }) {
                       <TableCell>
                         {getEstadoBadge(jornada.estado)}
                       </TableCell>
-                      <TableCell>
-                        <button
-                          className="p-1 hover:bg-gray-100 rounded"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setFichajeEditando(jornada.fichaje);
-                          }}
-                        >
-                          <Edit2 className="w-4 h-4 text-gray-400" />
-                        </button>
-                      </TableCell>
                     </TableRow>
-                    
+
                     {/* Detalles expandidos */}
                     {isExpanded && (
-                      <TableRow>
-                        <TableCell colSpan={7} className="bg-gray-50 p-4">
+                      <TableRow key={`${key}-expanded`}>
+                        <TableCell colSpan={6} className="bg-gray-50 p-4">
                           <div className="space-y-2">
-                            <div className="text-sm font-semibold text-gray-700 mb-3">Fichajes del día:</div>
-                            {jornada.fichaje.eventos?.map((evento: FichajeEvento) => {
-                              const horaEvento = evento.hora ? extraerHora(evento.hora) : null;
-                              return (
-                                <div key={evento.id} className="flex items-center justify-between text-sm py-2 px-3 bg-white rounded border border-gray-200">
-                                  <div className="flex items-center gap-4">
-                                    <span className="font-medium text-gray-900 w-16">
-                                      {horaEvento || 'N/A'}
-                                    </span>
-                                    <Badge variant="outline" className="text-xs">
-                                      {evento.tipo.replace('_', ' ')}
-                                    </Badge>
-                                    {evento.editado && (
-                                      <Badge className="bg-blue-100 text-blue-800 text-xs">Editado</Badge>
-                                    )}
-                                  </div>
+                            <div className="text-sm font-semibold text-gray-700 mb-3">Eventos del día:</div>
+                            {jornada.eventos.map(e => (
+                              <div key={e.id} className="flex items-center justify-between text-sm py-2 px-3 bg-white rounded border border-gray-200">
+                                <div className="flex items-center gap-4">
+                                  <span className="font-medium text-gray-900 w-16">
+                                    {format(new Date(e.hora), 'HH:mm')}
+                                  </span>
+                                  <Badge variant="outline" className="text-xs">
+                                    {e.tipo.replace('_', ' ')}
+                                  </Badge>
+                                  {e.editado && (
+                                    <Badge className="bg-blue-100 text-blue-800 text-xs">Editado</Badge>
+                                  )}
                                 </div>
-                              );
-                            }) || <p className="text-sm text-gray-500">No hay eventos registrados</p>}
+                              </div>
+                            ))}
                           </div>
                         </TableCell>
                       </TableRow>
@@ -322,20 +285,6 @@ export function FichajesTab({ empleadoId }: { empleadoId: string }) {
           </TableBody>
         </Table>
       </Card>
-
-      {/* Modal Editar Fichaje */}
-      {fichajeEditando && (
-        <EditarFichajeModal
-          open={!!fichajeEditando}
-          fichaje={fichajeEditando.eventos?.[0] || null}
-          fichajeDiaId={fichajeEditando.id}
-          onClose={() => setFichajeEditando(null)}
-          onSave={() => {
-            setFichajeEditando(null);
-            refetchFichajes(`/api/fichajes?empleadoId=${empleadoId}&propios=1`);
-          }}
-        />
-      )}
     </div>
   );
 }
