@@ -48,3 +48,7 @@ next-env.d.ts
 
 # local uploads (development only)
 /uploads
+
+# Environment variables
+.env
+.env.backup

@@ -114,7 +114,7 @@ export async function PATCH(
         data: {
           empresaId: compensacion.empresaId,
           empleadoId: compensacion.empleadoId,
-          tipo: 'compensacion_horas', // Asumiendo que existe este tipo
+          tipo: 'otro', // Usar 'otro' ya que 'compensacion_horas' no existe en el enum
           fechaInicio,
           fechaFin,
           medioDia: false,
@@ -124,6 +124,7 @@ export async function PATCH(
           descuentaSaldo: false, // No descuenta, suma al saldo
           estado: EstadoAusencia.auto_aprobada,
           descripcion: `Compensación de ${compensacion.horasBalance} horas extra`,
+          motivo: 'Compensación de horas extra trabajadas', // Requerido para tipo 'otro'
           aprobadaPor: session.user.id,
           aprobadaEn: new Date(),
         },

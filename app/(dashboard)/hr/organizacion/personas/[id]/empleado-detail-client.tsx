@@ -368,6 +368,10 @@ function FichajesTab({ empleado }: FichajesTabProps) {
         if (balanceRes.ok) {
           const balance = await balanceRes.json();
           setBalanceData(balance);
+        } else {
+          const error = await balanceRes.json().catch(() => ({ error: 'Error desconocido' }));
+          console.error('[FichajesTab] Error cargando balance:', error);
+          toast.error(`Error al cargar balance: ${error.error || 'Error desconocido'}`);
         }
 
         // Cargar promedios
@@ -375,6 +379,10 @@ function FichajesTab({ empleado }: FichajesTabProps) {
         if (promediosRes.ok) {
           const promedios = await promediosRes.json();
           setPromediosData(promedios);
+        } else {
+          const error = await promediosRes.json().catch(() => ({ error: 'Error desconocido' }));
+          console.error('[FichajesTab] Error cargando promedios:', error);
+          toast.error(`Error al cargar promedios: ${error.error || 'Error desconocido'}`);
         }
 
         // Cargar compensaciones pendientes
@@ -382,9 +390,13 @@ function FichajesTab({ empleado }: FichajesTabProps) {
         if (compRes.ok) {
           const comps = await compRes.json();
           setCompensaciones(comps);
+        } else {
+          const error = await compRes.json().catch(() => ({ error: 'Error desconocido' }));
+          console.error('[FichajesTab] Error cargando compensaciones:', error);
+          // No mostrar toast para compensaciones ya que no es crítico
         }
       } catch (error) {
-        console.error('[FichajesTab] Error cargando datos:', error);
+        console.error('[FichajesTab] Error general cargando datos:', error);
         toast.error('Error al cargar datos de fichajes');
       } finally {
         setCargando(false);
