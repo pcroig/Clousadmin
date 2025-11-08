@@ -4,10 +4,12 @@ import { prisma } from '@/lib/prisma';
 import { serializeEmpleado } from '@/lib/utils';
 import { MiEspacioHRClient } from './mi-espacio-hr-client';
 
+import { UsuarioRol } from '@/lib/constants/enums';
+
 export default async function MiEspacioHRPage() {
   const session = await getSession();
 
-  if (!session || session.user.rol !== 'hr_admin') {
+  if (!session || session.user.rol !== UsuarioRol.hr_admin) {
     redirect('/login');
   }
 

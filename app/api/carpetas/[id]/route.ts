@@ -7,6 +7,8 @@ import { getSession } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { puedeAccederACarpeta } from '@/lib/documentos';
 
+import { UsuarioRol } from '@/lib/constants/enums';
+
 // GET /api/carpetas/[id] - Ver contenido de carpeta
 export async function GET(
   request: NextRequest,
@@ -88,7 +90,7 @@ export async function DELETE(
   try {
     const session = await getSession();
 
-    if (!session || session.user.rol !== 'hr_admin') {
+    if (!session || session.user.rol !== UsuarioRol.hr_admin) {
       return NextResponse.json(
         { error: 'Solo HR Admin puede eliminar carpetas' },
         { status: 403 }
@@ -150,7 +152,7 @@ export async function PATCH(
   try {
     const session = await getSession();
 
-    if (!session || session.user.rol !== 'hr_admin') {
+    if (!session || session.user.rol !== UsuarioRol.hr_admin) {
       return NextResponse.json(
         { error: 'Solo HR Admin puede editar carpetas' },
         { status: 403 }

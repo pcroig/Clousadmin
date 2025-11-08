@@ -8,6 +8,8 @@ import { prisma } from '@/lib/prisma';
 import { crearInvitacion } from '@/lib/invitaciones';
 import type { EmpleadoDetectado } from '@/lib/ia/procesar-excel-empleados';
 
+import { UsuarioRol } from '@/lib/constants/enums';
+
 interface ConfirmarImportacionBody {
   empleados: (EmpleadoDetectado & { valido: boolean; errores: string[] })[];
   equiposDetectados: string[];
@@ -23,7 +25,7 @@ export async function POST(req: NextRequest) {
   try {
     // Verificar autenticación
     const session = await getSession();
-    if (!session || session.user.rol !== 'hr_admin') {
+    if (!session || session.user.rol !== UsuarioRol.hr_admin) {
       return NextResponse.json(
         { success: false, error: 'No autorizado' },
         { status: 401 }
@@ -138,7 +140,7 @@ export async function POST(req: NextRequest) {
                   nombre: empleadoData.nombre!,
                   apellidos: empleadoData.apellidos!,
                   empresaId: session.user.empresaId,
-                  rol: 'empleado',
+                  rol: UsuarioRol.empleado,
                   emailVerificado: false,
                   activo: true,
                 },

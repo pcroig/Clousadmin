@@ -23,6 +23,7 @@ import { DocumentUploader } from '@/components/shared/document-uploader';
 import { DocumentList } from '@/components/shared/document-list';
 import { validarIBAN } from '@/lib/validaciones/iban';
 import { PWAExplicacion } from '@/components/onboarding/pwa-explicacion';
+import { getAvatarStyle } from '@/lib/design-system';
 
 interface OnboardingFormProps {
   token: string;
@@ -83,6 +84,7 @@ export function OnboardingForm({
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const avatarInputRef = useRef<HTMLInputElement>(null);
+  const avatarStyle = getAvatarStyle(`${empleado.nombre} ${empleado.apellidos || ''}`);
 
   // Paso 3: Documentos
   const [documentos, setDocumentos] = useState<any[]>([]);
@@ -501,8 +503,11 @@ export function OnboardingForm({
                 {avatarPreview ? (
                   <AvatarImage src={avatarPreview} alt="Avatar" />
                 ) : (
-                  <AvatarFallback className="bg-gray-100">
-                    <User className="h-10 w-10 text-gray-400" />
+                  <AvatarFallback
+                    className="flex items-center justify-center"
+                    style={avatarStyle}
+                  >
+                    <User className="h-10 w-10 opacity-70" />
                   </AvatarFallback>
                 )}
               </Avatar>

@@ -1,0 +1,172 @@
+// ========================================
+// API: Procesar Solicitudes de Fichaje Manual
+// ========================================
+// Procesa solicitudes de fichaje manual pendientes y crea los eventos correspondientes
+
+import { NextRequest } from 'next/server';
+import { prisma } from '@/lib/prisma';
+import {
+  requireAuth,
+  handleApiError,
+  successResponse,
+} from '@/lib/api-handler';
+import { actualizarCalculosFichaje } from '@/lib/calculos/fichajes';
+import { crearNotificacionSolicitudAprobada } from '@/lib/notificaciones';
+import { EstadoAusencia, EstadoSolicitud } from '@/lib/constants/enums';
+
+// POST /api/solicitudes/procesar-fichajes - Procesar solicitudes de fichaje manual
+export async function POST(request: NextRequest) {
+  try {
+    // Verificar autenticación (puede ser ejecutado por cron o por HR admin)
+    const authResult = await requireAuth(request);
+    if (authResult instanceof Response) return authResult;
+    const { session } = authResult;
+
+    console.info('[Procesar Fichajes] Iniciando procesamiento de solicitudes pendientes');
+
+    // Buscar solicitudes de fichaje manual pendientes
+    const solicitudesPendientes = await prisma.solicitudCambio.findMany({
+      where: {
+        tipo: 'fichaje_manual',
+        estado: EstadoSolicitud.pendiente,
+      },
+      include: {
+        empleado: {
+          select: {
+            id: true,
+            nombre: true,
+            apellidos: true,
+            empresaId: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: 'asc',
+      },
+    });
+
+    console.info(`[Procesar Fichajes] Encontradas ${solicitudesPendientes.length} solicitudes pendientes`);
+
+    let procesadas = 0;
+    let errores: string[] = [];
+
+    for (const solicitud of solicitudesPendientes) {
+      try {
+        const camposCambiados = solicitud.camposCambiados as any;
+        const { fecha: fechaStr, tipo, hora: horaStr, motivo } = camposCambiados;
+
+        if (!fechaStr || !tipo || !horaStr) {
+          errores.push(`Solicitud ${solicitud.id}: Datos incompletos`);
+          continue;
+        }
+
+        // Parsear fecha (YYYY-MM-DD)
+        const fechaParts = fechaStr.split('-');
+        const fecha = new Date(
+          parseInt(fechaParts[0]),
+          parseInt(fechaParts[1]) - 1,
+          parseInt(fechaParts[2])
+        );
+        fecha.setHours(0, 0, 0, 0);
+
+        // Parsear hora completa (YYYY-MM-DDTHH:mm:ss o solo HH:mm)
+        let horaCompleta: Date;
+        if (horaStr.includes('T')) {
+          horaCompleta = new Date(horaStr);
+        } else {
+          // Si solo viene HH:mm, construir fecha completa
+          const [hours, minutes] = horaStr.split(':');
+          horaCompleta = new Date(fecha);
+          horaCompleta.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+        }
+
+        console.info(`[Procesar Fichajes] Procesando solicitud ${solicitud.id}: ${tipo} a las ${horaCompleta.toISOString()}`);
+
+        // 1. Buscar o crear fichaje del día
+        let fichaje = await prisma.fichaje.findUnique({
+          where: {
+            empleadoId_fecha: {
+              empleadoId: solicitud.empleadoId,
+              fecha,
+            },
+          },
+          include: {
+            eventos: {
+              orderBy: {
+                hora: 'asc',
+              },
+            },
+          },
+        });
+
+        if (!fichaje) {
+          console.info(`[Procesar Fichajes] Creando nuevo fichaje para ${solicitud.empleado.nombre} ${solicitud.empleado.apellidos}`);
+          fichaje = await prisma.fichaje.create({
+            data: {
+              empresaId: solicitud.empleado.empresaId,
+              empleadoId: solicitud.empleadoId,
+              fecha,
+              estado: EstadoAusencia.en_curso,
+            },
+            include: {
+              eventos: true,
+            },
+          });
+        }
+
+        // 2. Crear evento
+        await prisma.fichajeEvento.create({
+          data: {
+            fichajeId: fichaje.id,
+            tipo: tipo as 'entrada' | 'pausa_inicio' | 'pausa_fin' | 'salida',
+            hora: horaCompleta,
+            editado: true,
+            motivoEdicion: motivo || 'Fichaje manual',
+          },
+        });
+
+        console.info(`[Procesar Fichajes] Evento ${tipo} creado para fichaje ${fichaje.id}`);
+
+        // 3. Actualizar cálculos del fichaje
+        await actualizarCalculosFichaje(fichaje.id);
+
+        // 4. Actualizar solicitud a auto_aprobada
+        await prisma.solicitudCambio.update({
+          where: { id: solicitud.id },
+          data: {
+            estado: EstadoSolicitud.auto_aprobada,
+            fechaRespuesta: new Date(),
+          },
+        });
+
+        // 5. Crear notificación al empleado
+        await crearNotificacionSolicitudAprobada({
+          solicitudId: solicitud.id,
+          empleadoId: solicitud.empleadoId,
+          empresaId: solicitud.empleado.empresaId,
+          aprobadoPor: 'ia', // Auto-aprobada por el sistema
+        });
+
+        procesadas++;
+        console.info(`[Procesar Fichajes] Solicitud ${solicitud.id} procesada exitosamente`);
+      } catch (error) {
+        const mensaje = error instanceof Error ? error.message : 'Error desconocido';
+        errores.push(`Solicitud ${solicitud.id}: ${mensaje}`);
+        console.error(`[Procesar Fichajes] Error procesando solicitud ${solicitud.id}:`, error);
+      }
+    }
+
+    console.info(`[Procesar Fichajes] Finalizado: ${procesadas} procesadas, ${errores.length} errores`);
+
+    return successResponse({
+      success: true,
+      procesadas,
+      errores,
+      mensaje: `${procesadas} solicitudes de fichaje manual procesadas correctamente${errores.length > 0 ? `, ${errores.length} errores` : ''}`,
+    });
+  } catch (error) {
+    console.error('[Procesar Fichajes] Error general:', error);
+    return handleApiError(error, 'API POST /api/solicitudes/procesar-fichajes');
+  }
+}
+

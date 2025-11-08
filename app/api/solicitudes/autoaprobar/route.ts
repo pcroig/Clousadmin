@@ -7,17 +7,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireAuthAsHROrManager, handleApiError } from '@/lib/api-handler';
 
-// Whitelist de campos permitidos para cambios de datos personales
-const ALLOWED_EMPLOYEE_FIELDS = [
-  'nombre',
-  'apellidos',
-  'telefono',
-  'direccion',
-  'email',
-  'fechaNacimiento',
-  'numeroSeguridadSocial',
-  'cuentaBancaria',
-] as const;
+import { EstadoAusencia, EstadoSolicitud } from '@/lib/constants/enums';
+import { esCampoPermitido } from '@/lib/constants/whitelist-campos';
+import { crearNotificacionSolicitudAprobada } from '@/lib/notificaciones';
 
 export async function POST(req: NextRequest) {
   try {
@@ -32,7 +24,7 @@ export async function POST(req: NextRequest) {
     const ausenciasPendientes = await prisma.ausencia.findMany({
       where: {
         empresaId: session.user.empresaId,
-        estado: 'pendiente',
+        estado: EstadoAusencia.pendiente_aprobacion,
       },
       include: {
         empleado: {
@@ -54,7 +46,9 @@ export async function POST(req: NextRequest) {
     const solicitudesPendientes = await prisma.solicitudCambio.findMany({
       where: {
         empresaId: session.user.empresaId,
-        estado: 'pendiente',
+        estado: {
+          in: [EstadoSolicitud.pendiente, EstadoSolicitud.requiere_revision],
+        },
       },
       include: {
         empleado: {
@@ -184,7 +178,7 @@ export async function POST(req: NextRequest) {
           await tx.solicitudCambio.update({
             where: { id: solicitud.id },
             data: {
-              estado: 'aprobada',
+              estado: EstadoSolicitud.auto_aprobada,
               aprobadorId: session.user.id,
               fechaRespuesta: ahora,
             },
@@ -199,7 +193,7 @@ export async function POST(req: NextRequest) {
             const camposRechazados: string[] = [];
 
             for (const [campo, valor] of Object.entries(cambios)) {
-              if (ALLOWED_EMPLOYEE_FIELDS.includes(campo as any)) {
+              if (esCampoPermitido(campo)) {
                 cambiosValidados[campo] = valor;
               } else {
                 camposRechazados.push(campo);
@@ -220,26 +214,15 @@ export async function POST(req: NextRequest) {
             }
           }
 
-          // Crear notificación
-          if (solicitud.empleado.usuario?.id) {
-            await tx.notificacion.create({
-              data: {
-                empresaId: session.user.empresaId,
-                usuarioId: solicitud.empleado.usuario.id,
-                tipo: 'success',
-                titulo: 'Solicitud auto-aprobada',
-                mensaje: `Tu solicitud de ${solicitud.tipo} ha sido aprobada automáticamente`,
-                metadata: {
-                  solicitudId: solicitud.id,
-                  tipo: solicitud.tipo,
-                  autoAprobado: true,
-                },
-                leida: false,
-              },
-            });
-          } else {
-            console.warn(`[AUTOAPROBAR] No se pudo crear notificación para solicitud ${solicitud.id}: empleado sin usuario asociado`);
-          }
+        });
+
+        // Crear notificación fuera de la transacción
+        await crearNotificacionSolicitudAprobada(prisma, {
+          solicitudId: solicitud.id,
+          empresaId: session.user.empresaId,
+          empleadoId: solicitud.empleadoId,
+          tipo: solicitud.tipo,
+          aprobadoPor: 'ia',
         });
 
         solicitudesAprobadas++;

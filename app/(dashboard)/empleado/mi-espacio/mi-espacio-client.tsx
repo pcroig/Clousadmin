@@ -14,6 +14,7 @@ import { AusenciasTab } from './tabs/ausencias-tab';
 import { FichajesTab } from './tabs/fichajes-tab';
 import { ContratosTab } from '../../hr/mi-espacio/tabs/contratos-tab';
 import { DocumentosTab } from '../../hr/mi-espacio/tabs/documentos-tab';
+import { getAvatarStyle } from '@/lib/design-system';
 
 interface MiEspacioClientProps {
   empleado: any;
@@ -37,6 +38,8 @@ export function MiEspacioClient({ empleado, usuario }: MiEspacioClientProps) {
     return `${empleado.nombre.charAt(0)}${empleado.apellidos.charAt(0)}`.toUpperCase();
   };
 
+  const avatarStyle = getAvatarStyle(`${empleado.nombre} ${empleado.apellidos}`);
+
   const tabs = [
     { id: 'general', label: 'General' },
     { id: 'ausencias', label: 'Ausencias' },
@@ -54,7 +57,10 @@ export function MiEspacioClient({ empleado, usuario }: MiEspacioClientProps) {
             <div className="relative">
               <Avatar className="h-16 w-16">
                 {empleado.fotoUrl && <AvatarImage src={empleado.fotoUrl} />}
-                <AvatarFallback className="bg-gray-900 text-white text-lg">
+                <AvatarFallback
+                  className="text-lg font-semibold uppercase"
+                  style={avatarStyle}
+                >
                   {getInitials()}
                 </AvatarFallback>
               </Avatar>

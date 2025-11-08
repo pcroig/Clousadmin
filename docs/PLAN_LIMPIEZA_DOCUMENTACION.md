@@ -24,13 +24,13 @@
 
 **Archivos de diseño (posible duplicación):**
 - `DESIGN_SYSTEM.md` - Sistema de diseño (colores, tipografía, tokens)
-- `DESIGN_PATTERNS.md` - Patrones de diseño unificados (widgets, componentes)
-- `UI_COMPONENTS.md` - Referencia de componentes UI
+- `DESIGN_PATTERNS.md` - Patrones de diseño unificados (widgets, componentes) *(consolidado en nov 2025)*
+- `UI_COMPONENTS.md` - Referencia de componentes UI *(obsoleto)*
 
 **Análisis**: 
-- `DESIGN_SYSTEM.md` y `DESIGN_PATTERNS.md` tienen contenido complementario pero solapado
-- `UI_COMPONENTS.md` parece ser una referencia técnica más antigua
-- **Decisión**: Consolidar en `DESIGN_SYSTEM.md` con secciones claras
+- `DESIGN_SYSTEM.md` y `DESIGN_PATTERNS.md` tenían contenido complementario pero solapado
+- `UI_COMPONENTS.md` era una referencia técnica más antigua
+- **Decisión**: Consolidar en `DESIGN_SYSTEM.md` con secciones claras *(COMPLETADO 2025-11-07)*
 
 ---
 
@@ -59,7 +59,7 @@
 ---
 
 **Archivos de limpieza/optimización:**
-- `LIMPIEZA_PLAN.md` - Plan de limpieza y optimización (2025-01-27)
+- `LIMPIEZA_PLAN.md` - Plan de limpieza y optimización (2025-01-27) *(movido a historial/ 2025-11-07)*
 - `EXPLICACION_LIMPIEZA.md` - Explicación educativa de limpieza
 - `OPTIMIZACION_PENDIENTE.md` - Lista de optimizaciones pendientes
 
@@ -67,7 +67,7 @@
 - `LIMPIEZA_PLAN.md` y `EXPLICACION_LIMPIEZA.md` son complementarios pero pueden consolidarse
 - `OPTIMIZACION_PENDIENTE.md` es útil mantener como roadmap
 - **Decisión**: 
-  - Consolidar `LIMPIEZA_PLAN.md` y `EXPLICACION_LIMPIEZA.md` en uno solo
+  - `LIMPIEZA_PLAN.md` movido a `historial/` (plan completado)
   - Mantener `OPTIMIZACION_PENDIENTE.md` como roadmap activo
 
 ---
@@ -80,11 +80,11 @@
 
 ---
 
-**Archivos AWS:**
-- `AWS_PATTERNS.md` - Patrones de integración AWS
-- `AWS_EVENTBRIDGE_SETUP.md` - Configuración específica de EventBridge
+**Archivos AWS (obsoletos, sin implementación planificada):**
+- `AWS_DEPLOYMENT_GUIDE.md`
 
-**Decisión**: Mantener separados (especialización)
+**Decisión**: Eliminar; la plataforma no integrará AWS en este roadmap  
+**Estado**: ✅ Eliminados 2025-11-07
 
 ---
 
@@ -178,27 +178,21 @@
 
 ---
 
-### 📋 FASE 2: Unificar Documentación de Diseño
+### 📋 FASE 2: Unificar Documentación de Diseño *(COMPLETADA 2025-11-07)*
 
 **Objetivo**: Consolidar `DESIGN_SYSTEM.md`, `DESIGN_PATTERNS.md` y `UI_COMPONENTS.md`
 
-**Acciones**:
-1. Leer los tres archivos completos
-2. Consolidar en `DESIGN_SYSTEM.md` con estructura:
-   - Sistema de diseño (colores, tipografía, tokens) - de DESIGN_SYSTEM.md
-   - Patrones de componentes (widgets, badges, etc.) - de DESIGN_PATTERNS.md
-   - Referencia de componentes UI - de UI_COMPONENTS.md (si es relevante)
-3. Eliminar `DESIGN_PATTERNS.md` y `UI_COMPONENTS.md`
-4. Actualizar referencias en `README.md`, `docs/README.md` y `.cursorrules`
+**Acciones ejecutadas**:
+1. Contenido de `DESIGN_PATTERNS.md` y `UI_COMPONENTS.md` integrado en `DESIGN_SYSTEM.md`.
+2. Eliminados los archivos duplicados y actualizadas las referencias en `README.md` y `docs/README.md`.
 
 **Archivos afectados**:
-- `DESIGN_SYSTEM.md` → Expandir/actualizar
-- `DESIGN_PATTERNS.md` → Eliminar (contenido fusionado)
-- `UI_COMPONENTS.md` → Eliminar o mover contenido útil a DESIGN_SYSTEM.md
-- `README.md` → Actualizar referencias
-- `docs/README.md` → Actualizar referencias
+- `DESIGN_SYSTEM.md` → Expandido con tokens, guías de uso y patrones.
+- `DESIGN_PATTERNS.md` → Eliminado.
+- `UI_COMPONENTS.md` → Eliminado.
+- `README.md`, `docs/README.md`, `docs/ESTRUCTURA.md` → Referencias actualizadas.
 
-**Riesgo**: Medio - Necesita revisión cuidadosa para no perder información
+**Riesgo**: Bajo (validado tras consolidación)
 
 ---
 
@@ -225,20 +219,19 @@
 
 ### 📋 FASE 4: Consolidar Planes de Limpieza
 
-**Objetivo**: Unificar `LIMPIEZA_PLAN.md` y `EXPLICACION_LIMPIEZA.md`
+**Objetivo**: Unificar `LIMPIEZA_PLAN.md` (ya en historial) y `EXPLICACION_LIMPIEZA.md`
+
+**Estado**: ✅ `LIMPIEZA_PLAN.md` movido a `historial/` (2025-11-07)
 
 **Acciones**:
-1. Leer ambos archivos
-2. Consolidar en `LIMPIEZA_PLAN.md` con:
-   - Plan técnico (de LIMPIEZA_PLAN.md)
-   - Sección educativa/explicativa (de EXPLICACION_LIMPIEZA.md)
-3. Eliminar `EXPLICACION_LIMPIEZA.md`
-4. Mantener `OPTIMIZACION_PENDIENTE.md` como roadmap separado
+1. ~~Leer ambos archivos~~ → `LIMPIEZA_PLAN.md` ya está en historial
+2. Si existe `EXPLICACION_LIMPIEZA.md`, revisar si debe consolidarse o moverse a historial
+3. Mantener `OPTIMIZACION_PENDIENTE.md` como roadmap separado
 
 **Archivos afectados**:
-- `LIMPIEZA_PLAN.md` → Expandir
-- `EXPLICACION_LIMPIEZA.md` → Eliminar
-- Referencias en `docs/README.md`
+- `LIMPIEZA_PLAN.md` → Ya en `historial/` (2025-11-07)
+- `EXPLICACION_LIMPIEZA.md` → Revisar si existe y decidir acción
+- Referencias en `docs/README.md` → Actualizadas
 
 **Riesgo**: Bajo - Solo reorganización
 
@@ -328,7 +321,6 @@
 ### Archivos a Actualizar/Expandir
 - `docs/funcionalidades/documentos.md` → Crear/consolidar
 - `DESIGN_SYSTEM.md` → Expandir con contenido de otros
-- `LIMPIEZA_PLAN.md` → Expandir con contenido educativo
 - `ARQUITECTURA.md` → Revisar y posiblemente fusionar con ESTRUCTURA.md
 - `README.md` → Actualizar referencias
 - `docs/README.md` → Actualizar estructura y referencias
@@ -338,8 +330,6 @@
 - `SETUP_AUTENTICACION.md`
 - `HOOKS_REUTILIZABLES.md`
 - `API_REFACTORING.md`
-- `AWS_PATTERNS.md`
-- `AWS_EVENTBRIDGE_SETUP.md`
 - `TROUBLESHOOTING.md`
 - `OPTIMIZACION_PENDIENTE.md`
 - `PATRONES_CODIGO.md`

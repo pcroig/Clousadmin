@@ -1,10 +1,11 @@
 // ========================================
-// Dashboard Layout - No Header, Only Sidebar
+// Dashboard Layout - Sidebar + Header
 // ========================================
 
 import { getSession } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { Sidebar } from '@/components/layout/sidebar';
+import { Header } from '@/components/layout/header';
 
 export default async function DashboardLayout({
   children,
@@ -29,8 +30,12 @@ export default async function DashboardLayout({
         }}
       />
 
-      {/* Main Content Area - Full height, no header */}
+      {/* Main Content Area - Header + Content */}
       <div className="flex-1 overflow-hidden flex flex-col">
+        {/* Header */}
+        <Header rol={session.user.rol as 'hr_admin' | 'manager' | 'empleado'} />
+
+        {/* Main Content */}
         <main className="flex-1 overflow-y-auto">
           <div className="h-full max-w-[1800px] mx-auto px-8 py-6">
             {children}

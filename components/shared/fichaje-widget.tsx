@@ -9,6 +9,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { WidgetCard } from './widget-card';
+import { FichajeManualModal } from './fichaje-manual-modal';
 import { calcularHorasTrabajadas } from '@/lib/calculos/fichajes';
 import { formatTiempoTrabajado, formatearHorasMinutos } from '@/lib/utils/formatters';
 import type { FichajeEvento } from '@prisma/client';
@@ -43,6 +44,7 @@ export function FichajeWidget({
   const [cargando, setCargando] = useState(false);
   const [inicializando, setInicializando] = useState(true);
   const [horaEntrada, setHoraEntrada] = useState<Date | null>(null);
+  const [modalFichajeManual, setModalFichajeManual] = useState(false);
 
   // Actualizar tiempo trabajado cada segundo SOLO cuando está trabajando
   useEffect(() => {
@@ -327,14 +329,23 @@ export function FichajeWidget({
                 </Button>
               </div>
             ) : (
-              <Button
-                variant="default"
-                className="w-full font-semibold text-[13px]"
-                onClick={() => handleFichar()}
-                disabled={cargando}
-              >
-                {getTextoBoton()}
-              </Button>
+              <div className="space-y-2">
+                <Button
+                  variant="default"
+                  className="w-full font-semibold text-[13px]"
+                  onClick={() => handleFichar()}
+                  disabled={cargando}
+                >
+                  {getTextoBoton()}
+                </Button>
+                <Button
+                  variant="outline"
+                  className="w-full font-semibold text-[13px]"
+                  onClick={() => setModalFichajeManual(true)}
+                >
+                  + Añadir Manual
+                </Button>
+              </div>
             )}
           </div>
 
@@ -390,6 +401,16 @@ export function FichajeWidget({
             </div>
           </div>
         </div>
+
+        {/* Modal de fichaje manual */}
+        <FichajeManualModal
+          open={modalFichajeManual}
+          onClose={() => setModalFichajeManual(false)}
+          onSuccess={() => {
+            setModalFichajeManual(false);
+            obtenerEstadoActual(); // Refrescar estado después de crear solicitud
+          }}
+        />
     </WidgetCard>
   );
 }

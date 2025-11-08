@@ -1,0 +1,45 @@
+name: Cron - Revisar Solicitudes con IA
+
+# Ejecutar diariamente a las 2:00 AM UTC (3:00 AM CET en invierno, 4:00 AM CEST en verano)
+on:
+  schedule:
+    - cron: '0 2 * * *'  # Diario a las 2 AM UTC
+  workflow_dispatch:  # Permite ejecución manual desde GitHub Actions UI
+
+jobs:
+  revisar-solicitudes:
+    name: Revisar solicitudes pendientes
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Ejecutar revisión de solicitudes
+        run: |
+          echo "🔄 Ejecutando revisión de solicitudes con IA..."
+          
+          response=$(curl -s -w "\n%{http_code}" -X POST ${{ secrets.APP_URL }}/api/cron/revisar-solicitudes \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            -H "Content-Type: application/json")
+          
+          http_code=$(echo "$response" | tail -n1)
+          body=$(echo "$response" | sed '$d')
+          
+          echo "📊 Status Code: $http_code"
+          echo "📝 Response:"
+          echo "$body" | jq '.' || echo "$body"
+          
+          if [ "$http_code" != "200" ]; then
+            echo "❌ Error: El cron job falló con código $http_code"
+            exit 1
+          fi
+          
+          echo "✅ Cron job ejecutado exitosamente"
+
+      - name: Notificar resultado
+        if: always()
+        run: |
+          if [ "${{ job.status }}" == "success" ]; then
+            echo "✅ Revisión completada exitosamente"
+          else
+            echo "❌ Revisión falló - revisa los logs"
+          fi
+

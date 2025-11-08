@@ -130,6 +130,14 @@ export {
   type MatchingResult,
 } from './clasificador-nominas';
 
+export {
+  // Clasificador de Solicitudes
+  clasificarSolicitud,
+  clasificarSolicitudAusencia,
+  type SolicitudClasificacion,
+  type SolicitudInput,
+} from './clasificador-solicitudes';
+
 // ========================================
 // LEGACY EXPORTS - Compatibilidad
 // ========================================

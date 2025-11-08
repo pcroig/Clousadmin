@@ -7,10 +7,12 @@ import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import { EquiposClient } from './equipos-client';
 
+import { UsuarioRol } from '@/lib/constants/enums';
+
 export default async function EquiposPage() {
   const session = await getSession();
 
-  if (!session || session.user.rol !== 'hr_admin') {
+  if (!session || session.user.rol !== UsuarioRol.hr_admin) {
     redirect('/login');
   }
 

@@ -5,6 +5,8 @@
 
 import { prisma } from './prisma';
 
+import { UsuarioRol } from '@/lib/constants/enums';
+
 /**
  * Carpetas del sistema que se crean automáticamente para cada empleado
  */
@@ -139,7 +141,7 @@ export async function puedeAccederACarpeta(
   rol: string
 ): Promise<boolean> {
   // HR Admin puede ver todo
-  if (rol === 'hr_admin') {
+  if (rol === UsuarioRol.hr_admin) {
     return true;
   }
 
@@ -194,7 +196,7 @@ export async function puedeSubirACarpeta(
   rol: string
 ): Promise<boolean> {
   // HR Admin puede subir a cualquier carpeta
-  if (rol === 'hr_admin') {
+  if (rol === UsuarioRol.hr_admin) {
     return true;
   }
 

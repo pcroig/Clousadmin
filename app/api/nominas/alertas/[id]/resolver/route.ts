@@ -6,6 +6,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { resolverAlerta } from '@/lib/validaciones/nominas';
 
+import { UsuarioRol } from '@/lib/constants/enums';
+
 interface Params {
   id: string;
 }
@@ -19,7 +21,7 @@ export async function POST(
     const session = await getSession();
 
     // Verificar autenticación y rol
-    if (!session || session.user.rol !== 'hr_admin') {
+    if (!session || session.user.rol !== UsuarioRol.hr_admin) {
       return NextResponse.json(
         { error: 'No autorizado' },
         { status: 403 }
@@ -48,6 +50,7 @@ export async function POST(
     );
   }
 }
+
 
 
 

@@ -8,9 +8,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Mail, Phone, Calendar, MapPin, CreditCard, DollarSign } from 'lucide-react';
 import { getInitials } from '@/components/shared/utils';
-import { construirDireccionCompleta } from '@/lib/utils/direccion';
-import { getAvatarPlaceholderClasses } from '@/lib/design-system';
-import { cn } from '@/lib/utils';
+import { getAvatarStyle } from '@/lib/design-system';
 
 interface PersonaDetailsProps {
   empleado: {
@@ -39,6 +37,8 @@ interface PersonaDetailsProps {
 
 export function PersonaDetails({ empleado }: PersonaDetailsProps) {
 
+  const avatarStyle = getAvatarStyle(empleado.nombre);
+
   const formatDate = (date: Date | null) => {
     if (!date) return 'No especificado';
     return new Date(date).toLocaleDateString('es-ES', {
@@ -63,10 +63,8 @@ export function PersonaDetails({ empleado }: PersonaDetailsProps) {
         <Avatar className="h-20 w-20 mb-3">
           {empleado.avatar && <AvatarImage src={empleado.avatar} />}
           <AvatarFallback
-            className={cn(
-              getAvatarPlaceholderClasses(empleado.nombre),
-              'text-lg font-semibold'
-            )}
+            className="text-lg font-semibold uppercase"
+            style={avatarStyle}
           >
             {getInitials(empleado.nombre)}
           </AvatarFallback>
@@ -112,8 +110,13 @@ export function PersonaDetails({ empleado }: PersonaDetailsProps) {
             <div className="flex-1 min-w-0">
               <p className="text-xs text-gray-500">Dirección</p>
               <p className="text-sm text-gray-900">
-                {construirDireccionCompleta(empleado.detalles)}
+                {empleado.detalles.direccion || 'No especificado'}
               </p>
+              {empleado.detalles.ciudad && (
+                <p className="text-sm text-gray-600">
+                  {empleado.detalles.codigoPostal} {empleado.detalles.ciudad}, {empleado.detalles.pais}
+                </p>
+              )}
             </div>
           </div>
         </div>

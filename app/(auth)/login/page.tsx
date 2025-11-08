@@ -9,6 +9,8 @@ import { getSession } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { Suspense } from 'react';
 
+import { UsuarioRol } from '@/lib/constants/enums';
+
 export default async function LoginPage({
   searchParams,
 }: {
@@ -19,7 +21,7 @@ export default async function LoginPage({
   const params = await searchParams;
   
   if (session) {
-    if (session.user.rol === 'hr_admin') {
+    if (session.user.rol === UsuarioRol.hr_admin) {
       redirect('/hr/dashboard');
     } else {
       redirect('/empleado/dashboard');

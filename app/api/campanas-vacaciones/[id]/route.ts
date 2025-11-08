@@ -6,6 +6,8 @@ import { NextRequest } from 'next/server';
 
 export const dynamic = 'force-dynamic';
 import { prisma } from '@/lib/prisma';
+import { UsuarioRol } from '@/lib/constants/enums';
+
 import {
   requireAuth,
   handleApiError,
@@ -90,7 +92,7 @@ export async function PATCH(
     const { session } = authResult;
 
     // Solo HR Admin o Manager
-    if (session.user.rol !== 'hr_admin' && session.user.rol !== 'manager') {
+    if (session.user.rol !== UsuarioRol.hr_admin && session.user.rol !== UsuarioRol.manager) {
       return badRequestResponse('No tienes permisos para actualizar campañas');
     }
 

@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import * as XLSX from 'xlsx';
+import { actualizarEstadosNominasLote } from '@/lib/calculos/sync-estados-nominas';
 
 // ========================================
 // GET /api/nominas/eventos/[id]/exportar
@@ -195,19 +196,15 @@ export async function GET(
     // Generar buffer del archivo Excel
     const excelBuffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
 
-    // Actualizar estado del evento a "exportada"
+    // Actualizar estados usando función centralizadora (garantiza sincronización)
+    await actualizarEstadosNominasLote(id, 'exportada');
+
+    // Actualizar fecha de exportación del evento
     await prisma.eventoNomina.update({
       where: { id },
       data: {
-        estado: 'exportada',
         fechaExportacion: new Date(),
       },
-    });
-
-    // Actualizar estado de las nóminas
-    await prisma.nomina.updateMany({
-      where: { eventoNominaId: id },
-      data: { estado: 'exportada' },
     });
 
     // Configurar headers para descarga de archivo

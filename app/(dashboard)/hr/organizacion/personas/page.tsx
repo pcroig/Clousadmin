@@ -8,11 +8,13 @@ import { prisma } from '@/lib/prisma';
 import { PersonasClient } from './personas-client';
 import { decryptEmpleadoList } from '@/lib/empleado-crypto';
 
+import { UsuarioRol } from '@/lib/constants/enums';
+
 // Server Component
 export default async function PersonasPage() {
   const session = await getSession();
 
-  if (!session || session.user.rol !== 'hr_admin') {
+  if (!session || session.user.rol !== UsuarioRol.hr_admin) {
     redirect('/login');
   }
 

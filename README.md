@@ -39,8 +39,7 @@ Toda la documentación está en `docs/`:
 - **[docs/README.md](docs/README.md)** - Índice de toda la documentación
 - **[docs/SETUP.md](docs/SETUP.md)** - Guía de configuración completa
 - **[docs/ARQUITECTURA.md](docs/ARQUITECTURA.md)** - Decisiones técnicas y estructura
-- **[docs/DESIGN_SYSTEM.md](docs/DESIGN_SYSTEM.md)** - Guías de diseño UI/UX
-- **[docs/DESIGN_PATTERNS.md](docs/DESIGN_PATTERNS.md)** - Patrones de diseño unificados
+- **[docs/DESIGN_SYSTEM.md](docs/DESIGN_SYSTEM.md)** - Guías de diseño UI/UX y patrones de componentes
 - **[docs/funcionalidades/](docs/funcionalidades/)** - Documentación de cada feature
 - **[.cursorrules](.cursorrules)** - Principios de desarrollo
 
@@ -50,7 +49,7 @@ Para documentación histórica, ver [docs/historial/](docs/historial/)
 
 ## 🛠️ Stack Tecnológico
 
-- **Frontend**: Next.js 16 (App Router), TypeScript, Tailwind CSS, shadcn/ui
+- **Frontend**: Next.js 16 (App Router) con React 19, TypeScript, Tailwind CSS 4, shadcn/ui
 - **Backend**: Node.js, Prisma, PostgreSQL
 - **Auth**: JWT (jose) + bcryptjs
 - **Cloud**: AWS S3, RDS, Cognito, SES (opcional)
@@ -108,16 +107,10 @@ Clousadmin/
 
 ## 🧪 Testing
 
-```bash
-# Ejecutar tests (cuando estén implementados)
-npm test
-
-# Linting
-npm run lint
-
-# Ver base de datos
-npx prisma studio
-```
+- Actualmente no hay una batería de tests automatizados publicada. Revísalo en `docs/OPTIMIZACION_PENDIENTE.md`.
+- Ejecuta el linting con `npm run lint`.
+- Para diagnósticos rápidos de la base de datos utiliza `npm run diagnostico`.
+- Accede al visor de Prisma con `npx prisma studio` o `npm run db:studio`.
 
 ---
 
@@ -197,6 +190,6 @@ Para preguntas o soporte: [info@clousadmin.com](mailto:info@clousadmin.com)
 
 ---
 
-**Versión**: 1.0.0  
-**Última actualización**: 25 de octubre 2025
-**Última limpieza**: 25 de octubre 2025
+**Versión**: 1.1.0  
+**Última actualización**: 7 de noviembre de 2025
+**Última limpieza**: 7 de noviembre de 2025

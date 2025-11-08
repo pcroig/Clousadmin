@@ -13,6 +13,8 @@ import {
 import { importarFestivosNacionales } from '@/lib/festivos/importar-nacionales';
 import { importarFestivosSchema } from '@/lib/validaciones/schemas';
 
+import { UsuarioRol } from '@/lib/constants/enums';
+
 // Force dynamic rendering
 export const dynamic = 'force-dynamic';
 
@@ -24,7 +26,7 @@ export async function POST(req: NextRequest) {
     const { session } = authResult;
 
     // Solo HR Admin puede importar festivos
-    if (session.user.rol !== 'hr_admin') {
+    if (session.user.rol !== UsuarioRol.hr_admin) {
       return badRequestResponse('No tienes permisos para importar festivos');
     }
 

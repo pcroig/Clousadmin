@@ -9,6 +9,8 @@ import { getSession } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { verificarInvitacionSignup } from '@/lib/invitaciones-signup';
 
+import { UsuarioRol } from '@/lib/constants/enums';
+
 export default async function SignupPage({
   searchParams,
 }: {
@@ -28,7 +30,7 @@ export default async function SignupPage({
   const session = await getSession();
   
   if (session) {
-    if (session.user.rol === 'hr_admin' || session.user.rol === 'platform_admin') {
+    if (session.user.rol === UsuarioRol.hr_admin || session.user.rol === UsuarioRol.platform_admin) {
       redirect('/hr/dashboard');
     } else {
       redirect('/empleado/dashboard');

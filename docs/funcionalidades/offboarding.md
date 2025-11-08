@@ -560,3 +560,4 @@ WHERE c.nombre = 'Offboarding' AND c.empleadoId = 'empleado-id';
 **Versión**: 1.0.0
 
 
+

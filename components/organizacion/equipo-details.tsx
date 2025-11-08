@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { LoadingButton } from '@/components/shared/loading-button';
 import { Users, User, Pencil, Trash2, MapPin } from 'lucide-react';
 import { getInitials } from '@/components/shared/utils';
+import { getAvatarStyle } from '@/lib/design-system';
 import { EquipoFormModal } from './equipo-form-modal';
 import { ManageMembersModal } from './manage-members-modal';
 import { ChangeManagerModal } from './change-manager-modal';
@@ -24,8 +25,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { getAvatarPlaceholderClasses } from '@/lib/design-system';
-import { cn } from '@/lib/utils';
 
 interface EquipoDetailsProps {
   equipo: {
@@ -169,32 +168,34 @@ export function EquipoDetails({ equipo, onUpdate, onDelete }: EquipoDetailsProps
                 No hay miembros en este equipo
               </p>
             ) : (
-              equipo.empleados.map((empleado) => (
-                <div
-                  key={empleado.id}
-                  className="flex items-center gap-3 p-3 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
-                >
-                  <Avatar className="h-9 w-9">
-                    {empleado.avatar && <AvatarImage src={empleado.avatar} />}
-                    <AvatarFallback
-                      className={cn(
-                        getAvatarPlaceholderClasses(empleado.nombre),
-                        'text-xs font-medium'
-                      )}
-                    >
-                      {getInitials(empleado.nombre)}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm text-gray-900 font-medium">{empleado.nombre}</p>
+              equipo.empleados.map((empleado) => {
+                const avatarStyle = getAvatarStyle(empleado.nombre);
+
+                return (
+                  <div
+                    key={empleado.id}
+                    className="flex items-center gap-3 p-3 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
+                  >
+                    <Avatar className="h-9 w-9">
+                      {empleado.avatar && <AvatarImage src={empleado.avatar} />}
+                      <AvatarFallback
+                        className="text-xs font-semibold uppercase"
+                        style={avatarStyle}
+                      >
+                        {getInitials(empleado.nombre)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-gray-900 font-medium">{empleado.nombre}</p>
+                    </div>
+                    {empleado.id === equipo.responsableId && (
+                      <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded font-medium">
+                        Responsable
+                      </span>
+                    )}
                   </div>
-                  {empleado.id === equipo.responsableId && (
-                    <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded font-medium">
-                      Responsable
-                    </span>
-                  )}
-                </div>
-              ))
+                );
+              })
             )}
           </div>
         </div>

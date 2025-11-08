@@ -8,6 +8,8 @@ import { prisma } from '@/lib/prisma';
 import { writeFile, mkdir } from 'fs/promises';
 import { join } from 'path';
 import { existsSync } from 'fs';
+import { UsuarioRol } from '@/lib/constants/enums';
+
 import {
   validarMimeType,
   validarTamanoArchivo,
@@ -37,7 +39,7 @@ export async function GET(request: NextRequest) {
     };
 
     // Si no es HR admin, solo puede ver sus propios documentos
-    if (session.user.rol !== 'hr_admin') {
+    if (session.user.rol !== UsuarioRol.hr_admin) {
       const empleado = await prisma.empleado.findUnique({
         where: { usuarioId: session.user.id },
       });
@@ -131,7 +133,7 @@ export async function POST(request: NextRequest) {
 
     // Determinar empleadoId
     let empleadoId: string | null = null;
-    if (session.user.rol === 'hr_admin' && empleadoIdParam) {
+    if (session.user.rol === UsuarioRol.hr_admin && empleadoIdParam) {
       empleadoId = empleadoIdParam;
     } else if (carpeta.empleadoId) {
       empleadoId = carpeta.empleadoId;

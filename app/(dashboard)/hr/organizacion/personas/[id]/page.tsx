@@ -9,6 +9,8 @@ import { EmpleadoDetailClient } from './empleado-detail-client';
 import { notFound } from 'next/navigation';
 import { decryptEmpleadoData } from '@/lib/empleado-crypto';
 
+import { UsuarioRol } from '@/lib/constants/enums';
+
 interface EmpleadoDetailPageProps {
   params: Promise<{
     id: string;
@@ -18,7 +20,7 @@ interface EmpleadoDetailPageProps {
 export default async function EmpleadoDetailPage({ params }: EmpleadoDetailPageProps) {
   const session = await getSession();
 
-  if (!session || session.user.rol !== 'hr_admin') {
+  if (!session || session.user.rol !== UsuarioRol.hr_admin) {
     redirect('/login');
   }
 

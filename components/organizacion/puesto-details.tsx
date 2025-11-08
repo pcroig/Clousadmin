@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { LoadingButton } from '@/components/shared/loading-button';
 import { Briefcase, Pencil, Trash2, Upload, FileText, Download } from 'lucide-react';
 import { getInitials } from '@/components/shared/utils';
+import { getAvatarStyle } from '@/lib/design-system';
 import { PuestoFormModal } from './puesto-form-modal';
 import { toast } from 'sonner';
 import {
@@ -22,8 +23,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { getAvatarPlaceholderClasses } from '@/lib/design-system';
-import { cn } from '@/lib/utils';
 
 interface PuestoDetailsProps {
   puesto: {
@@ -149,8 +148,8 @@ export function PuestoDetails({ puesto, onUpdate, onDelete }: PuestoDetailsProps
         {/* Header */}
         <div className="pb-6 border-b border-gray-200">
           <div className="flex items-start gap-3 mb-3">
-            <div className="w-12 h-12 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
-              <Briefcase className="w-6 h-6 text-gray-600" />
+            <div className="w-12 h-12 rounded-lg bg-purple-100 flex items-center justify-center flex-shrink-0">
+              <Briefcase className="w-6 h-6 text-purple-600" />
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-start justify-between gap-2">
@@ -186,27 +185,29 @@ export function PuestoDetails({ puesto, onUpdate, onDelete }: PuestoDetailsProps
                 No hay empleados con este puesto
               </p>
             ) : (
-              puesto.empleados.map((empleado) => (
-                <div
-                  key={empleado.id}
-                  className="flex items-center gap-3 p-3 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
-                >
-                  <Avatar className="h-9 w-9">
-                    {empleado.avatar && <AvatarImage src={empleado.avatar} />}
-                    <AvatarFallback
-                      className={cn(
-                        getAvatarPlaceholderClasses(empleado.nombre),
-                        'text-xs font-medium'
-                      )}
-                    >
-                      {getInitials(empleado.nombre)}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm text-gray-900 font-medium">{empleado.nombre}</p>
+              puesto.empleados.map((empleado) => {
+                const avatarStyle = getAvatarStyle(empleado.nombre);
+
+                return (
+                  <div
+                    key={empleado.id}
+                    className="flex items-center gap-3 p-3 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
+                  >
+                    <Avatar className="h-9 w-9">
+                      {empleado.avatar && <AvatarImage src={empleado.avatar} />}
+                      <AvatarFallback
+                        className="text-xs font-semibold uppercase"
+                        style={avatarStyle}
+                      >
+                        {getInitials(empleado.nombre)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-gray-900 font-medium">{empleado.nombre}</p>
+                    </div>
                   </div>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
         </div>

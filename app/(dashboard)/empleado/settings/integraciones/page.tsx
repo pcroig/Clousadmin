@@ -8,6 +8,8 @@ import { prisma } from '@/lib/prisma';
 import { IntegrationsClient } from './integrations-client';
 import { isGoogleOAuthConfigured } from '@/lib/oauth/config';
 
+import { UsuarioRol } from '@/lib/constants/enums';
+
 export default async function IntegrationsPage() {
   const session = await getSession();
 
@@ -15,7 +17,7 @@ export default async function IntegrationsPage() {
     redirect('/login');
   }
 
-  if (session.user.rol !== 'empleado') {
+  if (session.user.rol !== UsuarioRol.empleado) {
     redirect('/login');
   }
 

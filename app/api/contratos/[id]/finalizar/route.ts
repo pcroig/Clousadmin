@@ -79,7 +79,7 @@ export async function POST(
     if (contrato.empleado.empresaId !== session.user.empresaId) {
       return successResponse(
         { error: 'No tienes permisos para finalizar este contrato' },
-        { status: 403 }
+        403
       );
     }
 
@@ -90,7 +90,7 @@ export async function POST(
     if (fechaFin < fechaInicio) {
       return successResponse(
         { error: 'La fecha de finalización no puede ser anterior a la fecha de inicio del contrato' },
-        { status: 400 }
+        400
       );
     }
 

@@ -5,7 +5,7 @@
 
 import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { validarEvento, validarLimitesJornada, calcularHorasTrabajadas, calcularTiempoEnPausa } from '@/lib/calculos/fichajes';
+import { validarEvento, validarLimitesJornada, calcularHorasTrabajadas, calcularTiempoEnPausa, obtenerHorasEsperadasBatch } from '@/lib/calculos/fichajes';
 import {
   requireAuth,
   validateRequest,
@@ -16,6 +16,8 @@ import {
   forbiddenResponse,
 } from '@/lib/api-handler';
 import { z } from 'zod';
+
+import { EstadoAusencia, UsuarioRol } from '@/lib/constants/enums';
 
 const fichajeEventoCreateSchema = z.object({
   tipo: z.enum(['entrada', 'pausa_inicio', 'pausa_fin', 'salida']),
@@ -57,7 +59,7 @@ export async function GET(req: NextRequest) {
     // Filtrar por empleado
     if (empleadoId) {
       // Verificar permisos
-      if (session.user.rol === 'empleado' && empleadoId !== session.user.empleadoId) {
+      if (session.user.rol === UsuarioRol.empleado && empleadoId !== session.user.empleadoId) {
         return forbiddenResponse('No autorizado');
       }
       where.empleadoId = empleadoId;
@@ -68,14 +70,14 @@ export async function GET(req: NextRequest) {
       } else {
         return badRequestResponse('No tienes un empleado asignado. Contacta con HR.');
       }
-    } else if (session.user.rol === 'empleado') {
+    } else if (session.user.rol === UsuarioRol.empleado) {
       // Empleados solo ven sus propios fichajes
       if (session.user.empleadoId) {
         where.empleadoId = session.user.empleadoId;
       } else {
         return badRequestResponse('No tienes un empleado asignado. Contacta con HR.');
       }
-    } else if (session.user.rol === 'manager') {
+    } else if (session.user.rol === UsuarioRol.manager) {
       // Managers solo ven fichajes de sus empleados a cargo
       if (!session.user.empleadoId) {
         return badRequestResponse('No tienes un empleado asignado. Contacta con HR.');
@@ -150,7 +152,45 @@ export async function GET(req: NextRequest) {
       take: 500, // Límite para performance
     });
 
-    return successResponse(fichajes);
+    if (fichajes.length === 0) {
+      return successResponse(fichajes);
+    }
+
+    const horasEsperadasMap = await obtenerHorasEsperadasBatch(
+      fichajes.map((fichaje) => ({
+        empleadoId: fichaje.empleadoId,
+        fecha: fichaje.fecha,
+      }))
+    );
+
+    const fichajesConBalance = fichajes.map((fichaje) => {
+      const fechaBase = new Date(fichaje.fecha.getFullYear(), fichaje.fecha.getMonth(), fichaje.fecha.getDate());
+      const key = `${fichaje.empleadoId}_${fechaBase.toISOString().split('T')[0]}`;
+
+      const horasEsperadas = horasEsperadasMap[key] ?? 0;
+
+      const horasTrabajadas =
+        fichaje.horasTrabajadas !== null && fichaje.horasTrabajadas !== undefined
+          ? Number(fichaje.horasTrabajadas)
+          : calcularHorasTrabajadas(fichaje.eventos as any);
+
+      const horasEnPausa =
+        fichaje.horasEnPausa !== null && fichaje.horasEnPausa !== undefined
+          ? Number(fichaje.horasEnPausa)
+          : calcularTiempoEnPausa(fichaje.eventos as any);
+
+      const balance = Math.round((horasTrabajadas - horasEsperadas) * 100) / 100;
+
+      return {
+        ...fichaje,
+        horasTrabajadas,
+        horasEnPausa,
+        horasEsperadas,
+        balance,
+      };
+    });
+
+    return successResponse(fichajesConBalance);
   } catch (error) {
     return handleApiError(error, 'API GET /api/fichajes');
   }
@@ -228,7 +268,7 @@ export async function POST(req: NextRequest) {
           empresaId: session.user.empresaId,
           empleadoId,
           fecha,
-          estado: 'en_curso',
+          estado: EstadoAusencia.en_curso,
         },
         include: {
           eventos: true,

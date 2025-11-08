@@ -14,6 +14,8 @@ import {
 } from "@/lib/oauth/config";
 import { randomBytes } from "crypto";
 
+import { UsuarioRol } from '@/lib/constants/enums';
+
 export async function GET(req: NextRequest) {
   try {
     // Verificar sesión
@@ -27,7 +29,7 @@ export async function GET(req: NextRequest) {
     const type = searchParams.get("type") || "personal"; // 'personal' o 'empresa'
 
     // Verificar permisos
-    if (type === "empresa" && session.user.rol !== "hr_admin") {
+    if (type === "empresa" && session.user.rol !== UsuarioRol.hr_admin) {
       return NextResponse.json(
         { error: "Only HR admins can connect company calendar" },
         { status: 403 }

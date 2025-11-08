@@ -11,10 +11,12 @@ import { NotificacionesWidget, Notificacion } from '@/components/shared/notifica
 import { AutoCompletadoWidget } from '@/components/shared/auto-completado-widget';
 import { AusenciasWidget, AusenciaItem } from '@/components/shared/ausencias-widget';
 
+import { EstadoAusencia, UsuarioRol } from '@/lib/constants/enums';
+
 export default async function ManagerDashboardPage() {
   const session = await getSession();
 
-  if (!session || session.user.rol !== 'manager') {
+  if (!session || session.user.rol !== UsuarioRol.manager) {
     redirect('/login');
   }
 
@@ -36,7 +38,7 @@ export default async function ManagerDashboardPage() {
   const ausenciasPendientes = await prisma.ausencia.findMany({
     where: {
       empresaId: session.user.empresaId,
-      estado: 'pendiente',
+      estado: EstadoAusencia.pendiente_aprobacion,
       empleado: {
         managerId: manager.id,
       },
@@ -117,9 +119,14 @@ export default async function ManagerDashboardPage() {
   const aprobados = await prisma.autoCompletado.count({
     where: {
       empresaId: session.user.empresaId,
-      estado: {
-        in: ['aprobado', 'auto_aprobado'],
-      },
+      estado: 'aprobado',
+    },
+  });
+
+  const rechazados = await prisma.autoCompletado.count({
+    where: {
+      empresaId: session.user.empresaId,
+      estado: 'rechazado',
     },
   });
 
@@ -150,7 +157,7 @@ export default async function ManagerDashboardPage() {
       fechaInicio: {
         gte: hoy,
       },
-      estado: 'aprobada',
+      estado: EstadoAusencia.en_curso,
     },
     select: {
       id: true,

@@ -83,6 +83,7 @@ export function EditarJornadaModal({ open, modo, jornada, onClose }: EditarJorna
     domingo: { activo: false, entrada: '', salida: '' },
   });
   const [usarDescanso, setUsarDescanso] = useState(false);
+  const [descansoFlexible, setDescansoFlexible] = useState<string>('');
 
   // Estados de asignación
   const [empleados, setEmpleados] = useState<Empleado[]>([]);
@@ -113,20 +114,48 @@ export function EditarJornadaModal({ open, modo, jornada, onClose }: EditarJorna
         const config = jornada.config || {};
         const esFija = Object.values(config).some((dia: any) => dia.entrada && dia.salida);
         setTipoJornada(esFija ? 'fija' : 'flexible');
-        
-        if (esFija) {
-          setHorariosFijos(prevState => {
-            const newState = { ...prevState };
-            Object.keys(newState).forEach(dia => {
-              if (config[dia]) {
-                newState[dia as keyof typeof prevState] = config[dia];
+
+        setHorariosFijos(prevState => {
+          const newState = { ...prevState };
+
+          Object.keys(newState).forEach((dia) => {
+            const diaConfig = config[dia];
+            const diaKey = dia as keyof typeof prevState;
+
+            if (diaConfig && typeof diaConfig === 'object') {
+              if (esFija) {
+                newState[diaKey] = {
+                  ...newState[diaKey],
+                  activo: (diaConfig as any).activo ?? true,
+                  entrada: (diaConfig as any).entrada ?? newState[diaKey].entrada,
+                  salida: (diaConfig as any).salida ?? newState[diaKey].salida,
+                  pausa_inicio: (diaConfig as any).pausa_inicio,
+                  pausa_fin: (diaConfig as any).pausa_fin,
+                };
+              } else {
+                newState[diaKey] = {
+                  ...newState[diaKey],
+                  activo: Boolean((diaConfig as any).activo),
+                };
               }
-            });
-            return newState;
+            } else {
+              newState[diaKey] = {
+                ...newState[diaKey],
+                activo: dia !== 'sabado' && dia !== 'domingo',
+              };
+            }
           });
-          // Habilitar descanso si el primer día tiene pausa
+
+          return newState;
+        });
+
+        if (esFija) {
           const algunDiaConPausa = Object.values(config).some((d: any) => d?.pausa_inicio && d?.pausa_fin);
           setUsarDescanso(Boolean(algunDiaConPausa));
+          setDescansoFlexible('');
+        } else {
+          setUsarDescanso(false);
+          setDescansoFlexible(typeof config.descansoMinimo === 'string' ? config.descansoMinimo : '');
         }
         
         setLimiteInferior(config.limiteInferior || '');
@@ -173,6 +202,8 @@ export function EditarJornadaModal({ open, modo, jornada, onClose }: EditarJorna
     setHorasSemanales('40');
     setLimiteInferior('');
     setLimiteSuperior('');
+    setUsarDescanso(false);
+    setDescansoFlexible('');
     setNivelAsignacion('empresa');
     setEmpleadosSeleccionados([]);
     setErrors({});
@@ -273,8 +304,13 @@ export function EditarJornadaModal({ open, modo, jornada, onClose }: EditarJorna
         // Jornada flexible: todos los días activos sin horario específico
         const dias = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo'];                                                                
         dias.forEach(dia => {
-          config[dia] = { activo: dia !== 'sabado' && dia !== 'domingo' };
+          const estadoDia = horariosFijos[dia as keyof typeof horariosFijos];
+          config[dia] = { activo: estadoDia?.activo ?? false };
         });
+
+        if (descansoFlexible) {
+          config.descansoMinimo = descansoFlexible;
+        }
       }
 
       if (limiteInferior) config.limiteInferior = limiteInferior;
@@ -432,9 +468,14 @@ export function EditarJornadaModal({ open, modo, jornada, onClose }: EditarJorna
           <div className="grid grid-cols-2 gap-4">
             <Field>
               <FieldLabel htmlFor="tipo">Tipo de jornada</FieldLabel>
-              <Select 
-                value={tipoJornada} 
-                onValueChange={(v) => setTipoJornada(v as 'fija' | 'flexible')}
+              <Select
+                value={tipoJornada}
+                onValueChange={(v) => {
+                  setTipoJornada(v as 'fija' | 'flexible');
+                  if (v === 'fija') {
+                    setDescansoFlexible('');
+                  }
+                }}
                 disabled={esPredefinida}
               >
                 <SelectTrigger id="tipo">
@@ -515,6 +556,23 @@ export function EditarJornadaModal({ open, modo, jornada, onClose }: EditarJorna
               </FieldDescription>
             )}
           </div>
+
+          {tipoJornada === 'flexible' && !esPredefinida && (
+            <Field className="mt-4">
+              <FieldLabel htmlFor="descansoFlexible">Pausa mínima diaria</FieldLabel>
+              <Input
+                id="descansoFlexible"
+                type="time"
+                step={60}
+                value={descansoFlexible}
+                onChange={(e) => setDescansoFlexible(e.target.value)}
+                placeholder="00:30"
+              />
+              <FieldDescription>
+                Establece el descanso mínimo obligatorio que se tendrá en cuenta al cuadrar fichajes y calcular balances.
+              </FieldDescription>
+            </Field>
+          )}
 
           {/* Horarios específicos (solo si es tipo fija) */}
           {tipoJornada === 'fija' && !esPredefinida && (

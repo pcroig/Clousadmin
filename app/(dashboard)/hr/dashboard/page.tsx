@@ -5,16 +5,18 @@
 import { getSession } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
+import { EstadoAusencia, TipoFichajeEvento, UsuarioRol } from '@/lib/constants/enums';
 import { FichajeWidget } from '@/components/shared/fichaje-widget';
 import { SolicitudesWidget } from '@/components/shared/solicitudes-widget';
 import { NotificacionesWidget, Notificacion } from '@/components/shared/notificaciones-widget';
 import { PlantillaWidget } from '@/components/dashboard/plantilla-widget';
 import { AutoCompletadoWidget } from '@/components/shared/auto-completado-widget';
+import { obtenerResumenPlantilla } from '@/lib/calculos/plantilla';
 
 export default async function HRDashboardPage() {
   const session = await getSession();
 
-  if (!session || session.user.rol !== 'hr_admin') {
+  if (!session || session.user.rol !== UsuarioRol.hr_admin) {
     redirect('/login');
   }
 
@@ -22,7 +24,7 @@ export default async function HRDashboardPage() {
   const ausenciasPendientes = await prisma.ausencia.findMany({
     where: {
       empresaId: session.user.empresaId,
-      estado: 'pendiente',
+      estado: EstadoAusencia.pendiente_aprobacion,
     },
     include: {
       empleado: {
@@ -93,60 +95,8 @@ export default async function HRDashboardPage() {
     fecha: aus.createdAt,
   }));
 
-  // Obtener empleados para plantilla
-  const totalEmpleados = await prisma.empleado.count({
-    where: {
-      empresaId: session.user.empresaId,
-      activo: true,
-    },
-  });
-
-  const empleadosData = await prisma.empleado.findMany({
-    where: {
-      empresaId: session.user.empresaId,
-      activo: true,
-    },
-    select: {
-      id: true,
-      nombre: true,
-      apellidos: true,
-      fotoUrl: true,
-    },
-    take: 10,
-  });
-
-  // Ausencias hoy
-  const hoy = new Date();
-  hoy.setHours(0, 0, 0, 0);
-  const ausenciasHoy = await prisma.ausencia.count({
-    where: {
-      empresaId: session.user.empresaId,
-      estado: 'aprobada',
-      fechaInicio: {
-        lte: hoy,
-      },
-      fechaFin: {
-        gte: hoy,
-      },
-      tipo: {
-        in: ['enfermedad', 'enfermedad_familiar', 'otro'],
-      },
-    },
-  });
-
-  const vacacionesHoy = await prisma.ausencia.count({
-    where: {
-      empresaId: session.user.empresaId,
-      estado: 'aprobada',
-      fechaInicio: {
-        lte: hoy,
-      },
-      fechaFin: {
-        gte: hoy,
-      },
-      tipo: 'vacaciones',
-    },
-  });
+  // Resumen actual de la plantilla
+  const plantillaResumen = await obtenerResumenPlantilla(session.user.empresaId);
 
   // Estadísticas de fichaje
   const hoyDate = new Date();
@@ -163,7 +113,7 @@ export default async function HRDashboardPage() {
       fecha: hoyDate,
       eventos: {
         some: {
-          tipo: 'entrada',
+          tipo: TipoFichajeEvento.entrada,
         },
       },
     },
@@ -186,9 +136,6 @@ export default async function HRDashboardPage() {
       fecha: ayerDate,
     },
   });
-
-  // Empleados trabajando = Los que ficharon Y NO están ausentes
-  const trabajandoHoy = fichadosHoy.length;
 
   // Auto-completed stats - Widget muestra lo auto-completado automáticamente (sin intervención HR)
   // Fichajes auto-completados (tipo: fichaje_completado, estado: aprobado)
@@ -259,21 +206,9 @@ export default async function HRDashboardPage() {
           {/* Plantilla Widget - Fila 2, Columna 3 */}
           <div className="min-h-0">
             <PlantillaWidget
-              trabajando={{
-                count: trabajandoHoy,
-                empleados: empleadosData.slice(0, 4).map((e) => ({
-                  nombre: `${e.nombre} ${e.apellidos}`,
-                  avatar: e.fotoUrl || undefined,
-                })),
-              }}
-              ausencias={{
-                count: ausenciasHoy,
-                empleados: [],
-              }}
-              vacaciones={{
-                count: vacacionesHoy,
-                empleados: [],
-              }}
+              trabajando={plantillaResumen.trabajando}
+              ausentes={plantillaResumen.ausentes}
+              sinFichar={plantillaResumen.sinFichar}
             />
           </div>
         </div>

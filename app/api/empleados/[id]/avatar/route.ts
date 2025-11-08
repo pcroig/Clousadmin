@@ -4,6 +4,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { UsuarioRol } from '@/lib/constants/enums';
+
 import {
   requireAuth,
   handleApiError,
@@ -35,7 +37,7 @@ export async function POST(
     // Verificar permisos: solo el propio empleado o HR Admin
     if (
       session.user.empleadoId !== id &&
-      session.user.rol !== 'hr_admin'
+      session.user.rol !== UsuarioRol.hr_admin
     ) {
       return forbiddenResponse('No tienes permisos para actualizar este avatar');
     }

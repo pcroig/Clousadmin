@@ -35,6 +35,8 @@ import { GestionarAusenciasModal } from './gestionar-ausencias-modal';
 import { CrearCampanaModal } from './crear-campana-modal';
 import { PopoverMonitoreoCampana } from '@/components/hr/popover-monitoreo-campana';
 
+import { EstadoAusencia } from '@/lib/constants/enums';
+
 interface Ausencia {
   id: string;
   tipo: string;
@@ -193,7 +195,7 @@ export function AusenciasClient() {
     return tipos[tipo] || tipo;
   }
 
-  const ausenciasPendientes = ausencias.filter(a => a.estado === 'pendiente_aprobacion').length;
+  const ausenciasPendientes = ausencias.filter(a => a.estado === EstadoAusencia.pendiente_aprobacion).length;
 
   // Filtros en cliente
   const ausenciasFiltradas = ausencias.filter((ausencia) => {

@@ -6,12 +6,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 
+import { UsuarioRol } from '@/lib/constants/enums';
+
 // GET /api/equipos - List teams
 export async function GET() {
   try {
     const session = await getSession();
 
-    if (!session || session.user.rol !== 'hr_admin') {
+    if (!session || session.user.rol !== UsuarioRol.hr_admin) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
 
@@ -63,7 +65,7 @@ export async function POST(request: NextRequest) {
   try {
     const session = await getSession();
 
-    if (!session || session.user.rol !== 'hr_admin') {
+    if (!session || session.user.rol !== UsuarioRol.hr_admin) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
 

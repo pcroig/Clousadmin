@@ -5,6 +5,8 @@
 
 import { PrismaClient } from '@prisma/client';
 
+import { UsuarioRol } from '@/lib/constants/enums';
+
 // ========================================
 // TIPOS
 // ========================================
@@ -33,7 +35,10 @@ export type TipoNotificacion =
   // Documentos
   | 'documento_solicitado'
   | 'documento_subido'
-  | 'documento_rechazado';
+  | 'documento_rechazado'
+  // Denuncias
+  | 'denuncia_recibida'
+  | 'denuncia_actualizada';
 
 export type PrioridadNotificacion = 'baja' | 'normal' | 'alta' | 'critica';
 
@@ -65,7 +70,7 @@ async function obtenerUsuariosANotificar(
   // HR Admins
   if (roles.hrAdmin) {
     const hrAdmins = await prisma.usuario.findMany({
-      where: { empresaId, rol: 'hr_admin', activo: true },
+      where: { empresaId, rol: UsuarioRol.hr_admin, activo: true },
       select: { id: true },
     });
     usuarioIds.push(...hrAdmins.map(u => u.id));
@@ -289,6 +294,42 @@ export async function crearNotificacionAusenciaCancelada(
       empleadoId,
       empleadoNombre,
       prioridad: 'normal',
+    },
+  });
+}
+
+export async function crearNotificacionAusenciaAutoAprobada(
+  prisma: PrismaClient,
+  params: {
+    ausenciaId: string;
+    empresaId: string;
+    empleadoId: string;
+    tipo: string;
+    fechaInicio: Date;
+    fechaFin: Date;
+  }
+) {
+  const { ausenciaId, empresaId, empleadoId, tipo, fechaInicio, fechaFin } = params;
+
+  const usuarioIds = await obtenerUsuariosANotificar(prisma, empresaId, {
+    empleado: empleadoId,
+  });
+
+  await crearNotificaciones(prisma, {
+    empresaId,
+    usuarioIds,
+    tipo: 'ausencia_aprobada',
+    titulo: 'Ausencia aprobada automáticamente',
+    mensaje: `Tu ausencia por ${tipo} del ${fechaInicio.toLocaleDateString('es-ES')} al ${fechaFin.toLocaleDateString('es-ES')} ha sido aprobada automáticamente.`,
+    metadata: {
+      ausenciaId,
+      tipo,
+      fechaInicio: fechaInicio.toISOString(),
+      fechaFin: fechaFin.toISOString(),
+      autoAprobada: true,
+      prioridad: 'normal',
+      accionUrl: '/empleado/horario/ausencias',
+      accionTexto: 'Ver ausencia',
     },
   });
 }
@@ -584,6 +625,128 @@ export async function crearNotificacionSolicitudCreada(
   });
 }
 
+export async function crearNotificacionSolicitudAprobada(
+  prisma: PrismaClient,
+  params: {
+    solicitudId: string;
+    empresaId: string;
+    empleadoId: string;
+    tipo: string;
+    aprobadoPor: 'ia' | 'manual';
+  }
+) {
+  const { solicitudId, empresaId, empleadoId, tipo, aprobadoPor } = params;
+
+  const usuarioIds = await obtenerUsuariosANotificar(prisma, empresaId, {
+    empleado: empleadoId,
+  });
+
+  const tipoDescripcion = {
+    cambio_datos: 'cambio de datos personales',
+    fichaje_correccion: 'corrección de fichaje',
+    ausencia_modificacion: 'modificación de ausencia',
+    documento: 'documento',
+  }[tipo] || tipo;
+
+  const mensajeExtra = aprobadoPor === 'ia' ? ' automáticamente' : '';
+
+  await crearNotificaciones(prisma, {
+    empresaId,
+    usuarioIds,
+    tipo: 'solicitud_aprobada',
+    titulo: 'Solicitud aprobada',
+    mensaje: `Tu solicitud de ${tipoDescripcion} ha sido aprobada${mensajeExtra}.`,
+    metadata: {
+      solicitudId,
+      tipo,
+      aprobadoPor,
+      prioridad: 'normal',
+      accionUrl: '/empleado/bandeja-entrada',
+      accionTexto: 'Ver detalles',
+    },
+  });
+}
+
+export async function crearNotificacionSolicitudRechazada(
+  prisma: PrismaClient,
+  params: {
+    solicitudId: string;
+    empresaId: string;
+    empleadoId: string;
+    tipo: string;
+    motivoRechazo?: string;
+  }
+) {
+  const { solicitudId, empresaId, empleadoId, tipo, motivoRechazo } = params;
+
+  const usuarioIds = await obtenerUsuariosANotificar(prisma, empresaId, {
+    empleado: empleadoId,
+  });
+
+  const tipoDescripcion = {
+    cambio_datos: 'cambio de datos personales',
+    fichaje_correccion: 'corrección de fichaje',
+    ausencia_modificacion: 'modificación de ausencia',
+    documento: 'documento',
+  }[tipo] || tipo;
+
+  await crearNotificaciones(prisma, {
+    empresaId,
+    usuarioIds,
+    tipo: 'solicitud_rechazada',
+    titulo: 'Solicitud rechazada',
+    mensaje: `Tu solicitud de ${tipoDescripcion} ha sido rechazada${motivoRechazo ? `: ${motivoRechazo}` : '.'}`,
+    metadata: {
+      solicitudId,
+      tipo,
+      ...(motivoRechazo && { motivoRechazo }),
+      prioridad: 'normal',
+      accionUrl: '/empleado/bandeja-entrada',
+      accionTexto: 'Ver detalles',
+    },
+  });
+}
+
+export async function crearNotificacionSolicitudRequiereRevision(
+  prisma: PrismaClient,
+  params: {
+    solicitudId: string;
+    empresaId: string;
+    empleadoId: string;
+    empleadoNombre: string;
+    tipo: string;
+  }
+) {
+  const { solicitudId, empresaId, empleadoNombre, tipo } = params;
+
+  const usuarioIds = await obtenerUsuariosANotificar(prisma, empresaId, {
+    hrAdmin: true,
+  });
+
+  const tipoDescripcion = {
+    cambio_datos: 'cambio de datos personales',
+    fichaje_correccion: 'corrección de fichaje',
+    ausencia_modificacion: 'modificación de ausencia',
+    documento: 'documento',
+  }[tipo] || tipo;
+
+  await crearNotificaciones(prisma, {
+    empresaId,
+    usuarioIds,
+    tipo: 'solicitud_creada', // Reutilizamos el tipo pero con prioridad crítica
+    titulo: 'Solicitud requiere revisión manual',
+    mensaje: `La solicitud de ${tipoDescripcion} de ${empleadoNombre} requiere tu revisión manual.`,
+    metadata: {
+      solicitudId,
+      tipo,
+      requiereRevision: true,
+      prioridad: 'critica',
+      accionUrl: '/hr/bandeja-entrada',
+      accionTexto: 'Revisar ahora',
+    },
+  });
+}
+
 // ========================================
 // PAYROLL / NÓMINAS
 // ========================================
@@ -757,6 +920,239 @@ export async function crearNotificacionDocumentoRechazado(
       prioridad: 'alta',
       accionUrl: '/empleado/documentos',
       accionTexto: 'Volver a subir',
+    },
+  });
+}
+
+// ========================================
+// CAMPAÑAS DE VACACIONES
+// ========================================
+
+export async function crearNotificacionCampanaCreada(
+  prisma: PrismaClient,
+  params: {
+    campanaId: string;
+    empresaId: string;
+    empleadosIds: string[];
+    fechaInicio: Date;
+    fechaFin: Date;
+    titulo: string;
+  }
+) {
+  const { campanaId, empresaId, empleadosIds, fechaInicio, fechaFin, titulo } = params;
+
+  // Notificar a cada empleado individualmente
+  for (const empleadoId of empleadosIds) {
+    const usuarioIds = await obtenerUsuariosANotificar(prisma, empresaId, {
+      empleado: empleadoId,
+    });
+
+    if (usuarioIds.length > 0) {
+      await crearNotificaciones(prisma, {
+        empresaId,
+        usuarioIds,
+        tipo: 'solicitud_creada', // Reutilizamos tipo genérico
+        titulo: 'Nueva campaña de vacaciones',
+        mensaje: `Se ha iniciado la campaña "${titulo}" para planificar tus vacaciones del ${fechaInicio.toLocaleDateString('es-ES')} al ${fechaFin.toLocaleDateString('es-ES')}. Por favor, indica tus preferencias.`,
+        metadata: {
+          campanaId,
+          fechaInicio: fechaInicio.toISOString(),
+          fechaFin: fechaFin.toISOString(),
+          prioridad: 'alta',
+          accionUrl: `/empleado/vacaciones/campanas/${campanaId}`,
+          accionTexto: 'Ver campaña',
+        },
+      });
+    }
+  }
+}
+
+export async function crearNotificacionCampanaCompletada(
+  prisma: PrismaClient,
+  params: {
+    campanaId: string;
+    empresaId: string;
+    titulo: string;
+    totalEmpleados: number;
+  }
+) {
+  const { campanaId, empresaId, titulo, totalEmpleados } = params;
+
+  // Notificar a HR Admin
+  const usuarioIds = await obtenerUsuariosANotificar(prisma, empresaId, {
+    hrAdmin: true,
+  });
+
+  await crearNotificaciones(prisma, {
+    empresaId,
+    usuarioIds,
+    tipo: 'solicitud_creada',
+    titulo: 'Campaña de vacaciones completada',
+    mensaje: `Todos los empleados (${totalEmpleados}) han completado sus preferencias para la campaña "${titulo}". Ya puedes cuadrar las vacaciones.`,
+    metadata: {
+      campanaId,
+      totalEmpleados,
+      prioridad: 'alta',
+      accionUrl: `/hr/vacaciones/campanas/${campanaId}`,
+      accionTexto: 'Cuadrar vacaciones',
+    },
+  });
+}
+
+// ========================================
+// ONBOARDING
+// ========================================
+
+export async function crearNotificacionOnboardingCompletado(
+  prisma: PrismaClient,
+  params: {
+    empleadoId: string;
+    empresaId: string;
+    empleadoNombre: string;
+  }
+) {
+  const { empleadoId, empresaId, empleadoNombre } = params;
+
+  // Obtener manager del empleado
+  const empleado = await prisma.empleado.findUnique({
+    where: { id: empleadoId },
+    select: { managerId: true },
+  });
+
+  // Notificar a HR Admin y Manager
+  const usuarioIds = await obtenerUsuariosANotificar(prisma, empresaId, {
+    hrAdmin: true,
+    manager: empleado?.managerId,
+  });
+
+  await crearNotificaciones(prisma, {
+    empresaId,
+    usuarioIds,
+    tipo: 'solicitud_creada',
+    titulo: 'Onboarding completado',
+    mensaje: `${empleadoNombre} ha completado su proceso de onboarding y está listo para comenzar.`,
+    metadata: {
+      empleadoId,
+      empleadoNombre,
+      prioridad: 'normal',
+      accionUrl: `/hr/empleados/${empleadoId}`,
+      accionTexto: 'Ver empleado',
+    },
+  });
+}
+
+// ========================================
+// NÓMINAS - COMPLEMENTOS
+// ========================================
+
+export async function crearNotificacionComplementosPendientes(
+  prisma: PrismaClient,
+  params: {
+    nominaId: string;
+    empresaId: string;
+    managerId: string;
+    empleadosCount: number;
+    mes: number;
+    año: number;
+  }
+) {
+  const { nominaId, empresaId, managerId, empleadosCount, mes, año } = params;
+
+  const usuarioIds = await obtenerUsuariosANotificar(prisma, empresaId, {
+    manager: managerId,
+  });
+
+  const meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+
+  await crearNotificaciones(prisma, {
+    empresaId,
+    usuarioIds,
+    tipo: 'solicitud_creada',
+    titulo: 'Complementos de nómina pendientes',
+    mensaje: `Tienes ${empleadosCount} empleado(s) en tu equipo que requieren complementos de nómina para ${meses[mes - 1]} ${año}. Por favor, completa la información.`,
+    metadata: {
+      nominaId,
+      mes,
+      año,
+      empleadosCount,
+      prioridad: 'alta',
+      accionUrl: '/manager/bandeja-entrada',
+      accionTexto: 'Completar complementos',
+      requiresModal: true, // Flag especial para abrir modal
+    },
+  });
+}
+
+// ========================================
+// DENUNCIAS
+// ========================================
+
+/**
+ * Notifica a HR Admins cuando se recibe una nueva denuncia
+ */
+export async function crearNotificacionDenunciaRecibida(
+  prisma: PrismaClient,
+  params: {
+    denunciaId: string;
+    empresaId: string;
+    esAnonima: boolean;
+    descripcionBreve: string;
+  }
+) {
+  const { denunciaId, empresaId, esAnonima, descripcionBreve } = params;
+
+  // Notificar a todos los HR Admins
+  const usuarioIds = await obtenerUsuariosANotificar(prisma, empresaId, {
+    hrAdmin: true,
+  });
+
+  await crearNotificaciones(prisma, {
+    empresaId,
+    usuarioIds,
+    tipo: 'denuncia_recibida',
+    titulo: 'Nueva denuncia recibida',
+    mensaje: `Se ha recibido una denuncia ${esAnonima ? 'anónima' : ''} en el canal de denuncias. ${descripcionBreve.substring(0, 100)}${descripcionBreve.length > 100 ? '...' : ''}`,
+    metadata: {
+      denunciaId,
+      esAnonima,
+      prioridad: 'critica',
+      accionUrl: `/hr/denuncias/${denunciaId}`,
+      accionTexto: 'Revisar denuncia',
+    },
+  });
+}
+
+/**
+ * Notifica al denunciante cuando su denuncia ha sido actualizada (solo si NO es anónima)
+ */
+export async function crearNotificacionDenunciaActualizada(
+  prisma: PrismaClient,
+  params: {
+    denunciaId: string;
+    empresaId: string;
+    empleadoId: string; // Denunciante
+    nuevoEstado: string;
+    mensaje: string;
+  }
+) {
+  const { denunciaId, empresaId, empleadoId, nuevoEstado, mensaje } = params;
+
+  const usuarioIds = await obtenerUsuariosANotificar(prisma, empresaId, {
+    empleado: empleadoId,
+  });
+
+  await crearNotificaciones(prisma, {
+    empresaId,
+    usuarioIds,
+    tipo: 'denuncia_actualizada',
+    titulo: 'Actualización en tu denuncia',
+    mensaje,
+    metadata: {
+      denunciaId,
+      nuevoEstado,
+      prioridad: 'alta',
+      accionUrl: `/empleado/denuncias/${denunciaId}`,
+      accionTexto: 'Ver denuncia',
     },
   });
 }

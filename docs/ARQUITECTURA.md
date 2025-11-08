@@ -20,7 +20,8 @@ Documentación de la arquitectura del proyecto, decisiones técnicas y estructur
 ### Frontend
 - **Framework**: Next.js 16 (App Router)
 - **Lenguaje**: TypeScript (strict mode)
-- **UI**: Tailwind CSS + shadcn/ui
+- **React**: React 19
+- **UI**: Tailwind CSS 4 + shadcn/ui
 - **Formularios**: react-hook-form + Zod
 - **Gráficos**: Recharts
 - **Estado**: React Server Components (sin Redux/Zustand)
@@ -426,5 +427,5 @@ model Ausencia {
 
 ---
 
-**Versión**: 1.0  
-**Última actualización**: 25 de octubre 2025
+**Versión**: 1.1  
+**Última actualización**: 7 de noviembre 2025

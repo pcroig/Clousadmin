@@ -7,6 +7,8 @@ import * as XLSX from 'xlsx';
 import { prisma } from '@/lib/prisma';
 import { obtenerResumenesMensuales } from '../calculos/nominas';
 
+import { EstadoAusencia } from '@/lib/constants/enums';
+
 /**
  * Genera Excel para gestoría con datos del mes
  */
@@ -355,7 +357,7 @@ async function agregarHojaCambios(
   const cambiosSalario = await prisma.solicitudCambio.findMany({
     where: {
       empresaId,
-      estado: 'aprobada',
+      estado: EstadoAusencia.en_curso,
       fechaRespuesta: {
         gte: fechaInicio,
         lte: fechaFin,
@@ -477,6 +479,7 @@ export async function guardarExportGestoria(
     `[guardarExportGestoria] Export guardado: ${numEmpleados} empleados, ${numAlertasCriticas} alertas críticas`
   );
 }
+
 
 
 

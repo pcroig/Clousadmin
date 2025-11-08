@@ -14,6 +14,8 @@ import { Clock, Calendar, TrendingUp } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
+import { EstadoAusencia } from '@/lib/constants/enums';
+
 interface BalanceResumen {
   diario: number;
   semanal: number;
@@ -185,9 +187,9 @@ export function HorarioMiEspacioClient({
                           <span className="font-medium">{ausencia.tipo}</span>
                           <Badge
                             variant={
-                              ausencia.estado === 'en_curso' || ausencia.estado === 'completada' || ausencia.estado === 'auto_aprobada'
+                              ausencia.estado === EstadoAusencia.en_curso || ausencia.estado === EstadoAusencia.completada || ausencia.estado === EstadoAusencia.auto_aprobada
                                 ? 'default'
-                                : ausencia.estado === 'rechazada'
+                                : ausencia.estado === EstadoAusencia.rechazada
                                   ? 'destructive'
                                   : 'secondary'
                             }

@@ -15,6 +15,8 @@ import {
 import { crearNotificacionSolicitudCreada } from '@/lib/notificaciones';
 import { z } from 'zod';
 
+import { EstadoSolicitud, UsuarioRol } from '@/lib/constants/enums';
+
 // Schema de validación
 const solicitudCreateSchema = z.object({
   tipo: z.enum(['cambio_datos', 'fichaje_correccion', 'ausencia_modificacion', 'documento']),
@@ -40,7 +42,7 @@ export async function GET(request: NextRequest) {
       estado,
     };
 
-    if (session.user.rol === 'empleado' && session.user.empleadoId) {
+    if (session.user.rol === UsuarioRol.empleado && session.user.empleadoId) {
       where.empleadoId = session.user.empleadoId;
     }
 
@@ -100,7 +102,7 @@ export async function POST(request: NextRequest) {
         tipo: validatedData.tipo,
         camposCambiados: validatedData.camposCambiados,
         motivo: validatedData.motivo,
-        estado: 'pendiente',
+        estado: EstadoSolicitud.pendiente,
       },
       include: {
         empleado: {

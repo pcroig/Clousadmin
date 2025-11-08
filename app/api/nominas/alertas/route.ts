@@ -4,6 +4,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
+import { UsuarioRol } from '@/lib/constants/enums';
+
 import {
   obtenerAlertas,
   detectarAlertas,
@@ -16,7 +18,7 @@ export async function GET(req: NextRequest) {
     const session = await getSession();
 
     // Verificar autenticación y rol
-    if (!session || session.user.rol !== 'hr_admin') {
+    if (!session || session.user.rol !== UsuarioRol.hr_admin) {
       return NextResponse.json(
         { error: 'No autorizado' },
         { status: 403 }
@@ -81,6 +83,7 @@ export async function GET(req: NextRequest) {
     );
   }
 }
+
 
 
 

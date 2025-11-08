@@ -9,6 +9,8 @@ import { prisma } from '@/lib/prisma';
 import { z } from 'zod';
 import { Decimal } from '@prisma/client/runtime/library';
 
+import { UsuarioRol } from '@/lib/constants/enums';
+
 const GenerarEventoSchema = z.object({
   mes: z.number().int().min(1).max(12),
   anio: z.number().int().min(2020).max(2100),
@@ -44,10 +46,44 @@ export async function GET(req: NextRequest) {
         _count: {
           select: { nominas: true },
         },
+        nominas: {
+          select: {
+            id: true,
+            alertas: {
+              where: {
+                resuelta: false, // Solo alertas no resueltas
+              },
+              select: {
+                id: true,
+                tipo: true, // 'critico', 'advertencia', 'info'
+              },
+            },
+          },
+        },
       },
     });
 
-    return NextResponse.json({ eventos });
+    // Calcular conteo de alertas por evento
+    const eventosConAlertas = eventos.map((evento) => {
+      const alertas = evento.nominas.flatMap((n) => n.alertas);
+
+      const conteoAlertas = {
+        criticas: alertas.filter((a) => a.tipo === 'critico').length,
+        advertencias: alertas.filter((a) => a.tipo === 'advertencia').length,
+        informativas: alertas.filter((a) => a.tipo === 'info').length,
+        total: alertas.length,
+      };
+
+      // Eliminar el array de nóminas del response (solo queremos el conteo)
+      const { nominas, ...eventoSinNominas } = evento;
+
+      return {
+        ...eventoSinNominas,
+        alertas: conteoAlertas,
+      };
+    });
+
+    return NextResponse.json({ eventos: eventosConAlertas });
   } catch (error) {
     console.error('[GET /api/nominas/eventos] Error:', error);
     return NextResponse.json(
@@ -258,7 +294,7 @@ export async function POST(req: NextRequest) {
     const managers = await prisma.usuario.findMany({
       where: {
         empresaId: session.user.empresaId,
-        rol: 'manager',
+        rol: UsuarioRol.manager,
         activo: true,
       },
     });

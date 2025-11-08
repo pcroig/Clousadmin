@@ -93,6 +93,10 @@ Botón de exportación que genera un archivo Excel con 4 hojas:
 - Salario promedio por equipo
 - Evolución de coste (6 meses)
 - Distribución salarial por rangos (6 rangos)
+- Percentiles salariales (p10, p25, p50, p75, p90) y min/max
+- Distribución por rangos dinámicos de 10k
+- Desglose por puesto (total, promedio, mediana, min, max)
+- Top complementos asignados (veces, importe total y promedio)
 
 ### Pestaña: Fichajes
 
@@ -314,7 +318,7 @@ function calcularAntiguedad(fechaAlta: Date): string {
 - ✅ Consistente con el resto de la aplicación
 - ✅ Tabs personalizadas (matching mi-espacio, no Shadcn Tabs component)
 - ✅ Layout responsive (desktop/tablet/móvil)
-- ✅ Colores corporativos (#F26C21, #6B6A64, etc.)
+- ✅ Colores corporativos (#d97757, #6B6A64, etc.)
 - ✅ Botón Exportar alineado con tabs (misma altura)
 - ✅ Filtros posicionados debajo de tabs
 
@@ -397,6 +401,12 @@ Content (scroll)
 ---
 
 ## 11. Changelog
+
+### Versión 2.1 (Nov 2025)
+- ✅ Añadida API extendida de nóminas (`/api/nominas/analytics`) con percentiles salariales y rangos dinámicos.
+- ✅ Incorporado desglose por puesto (total, promedio, min, max, mediana).
+- ✅ Top 10 complementos más asignados con importe total y promedio.
+- ✅ Comparativa de departamentos con mediana y complementos promedio.
 
 ### Versión 2.0 (Nov 2024)
 - ✅ Implementado sistema de pestañas

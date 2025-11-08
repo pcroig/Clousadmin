@@ -62,6 +62,18 @@ const envSchema = z.object({
     .optional()
     .or(z.undefined()),
   PLATFORM_ADMIN_EMAIL: z.string().email().optional().or(z.undefined()), // Email del creador de la plataforma
+
+  // Cron Jobs
+  CRON_SECRET: z
+    .string()
+    .min(32, 'CRON_SECRET debe tener al menos 32 caracteres para seguridad')
+    .optional(),
+  SOLICITUDES_PERIODO_REVISION_HORAS: z
+    .string()
+    .transform((val) => parseInt(val || '48', 10))
+    .pipe(z.number().min(1).max(168))
+    .optional()
+    .default('48' as any),
 });
 
 // Validate and export

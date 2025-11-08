@@ -15,6 +15,8 @@ import {
 } from '@/lib/onboarding-config';
 import { z } from 'zod';
 
+import { UsuarioRol } from '@/lib/constants/enums';
+
 // Schema de validación para campos requeridos
 const camposRequeridosSchema = z.object({
   datos_personales: z.object({
@@ -59,7 +61,7 @@ export async function GET(req: NextRequest) {
   try {
     const session = await getSession();
 
-    if (!session || session.user.rol !== 'hr_admin') {
+    if (!session || session.user.rol !== UsuarioRol.hr_admin) {
       return NextResponse.json(
         { success: false, error: 'No autorizado' },
         { status: 401 }
@@ -93,7 +95,7 @@ export async function PATCH(req: NextRequest) {
   try {
     const session = await getSession();
 
-    if (!session || session.user.rol !== 'hr_admin') {
+    if (!session || session.user.rol !== UsuarioRol.hr_admin) {
       return NextResponse.json(
         { success: false, error: 'No autorizado' },
         { status: 401 }
@@ -220,6 +222,7 @@ export async function PATCH(req: NextRequest) {
     );
   }
 }
+
 
 
 

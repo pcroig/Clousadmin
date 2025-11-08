@@ -15,6 +15,8 @@ import { Clock, ChevronDown, ChevronUp } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
+import { EstadoAusencia } from '@/lib/constants/enums';
+
 interface FichajeEvento {
   id: string;
   tipo: string;
@@ -111,9 +113,9 @@ export function FichajesTab({ empleadoId }: { empleadoId: string }) {
 
       // Determinar estado de la jornada
       let estado: 'completa' | 'incompleta' | 'pendiente' = 'completa';
-      if (fichaje.estado === 'en_curso') {
+      if (fichaje.estado === EstadoAusencia.en_curso) {
         estado = 'incompleta';
-      } else if (fichaje.estado === 'pendiente' || fichaje.estado === 'revisado') {
+      } else if (fichaje.estado === EstadoAusencia.pendiente_aprobacion || fichaje.estado === 'revisado') {
         estado = 'pendiente';
       }
 

@@ -7,6 +7,8 @@ import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import { OnboardingClient } from './onboarding-client';
 
+import { UsuarioRol } from '@/lib/constants/enums';
+
 export default async function CargarDatosPage() {
   const session = await getSession();
 
@@ -16,7 +18,7 @@ export default async function CargarDatosPage() {
   }
 
   // Solo HR admins pueden acceder al onboarding
-  if (session.user.rol !== 'hr_admin') {
+  if (session.user.rol !== UsuarioRol.hr_admin) {
     redirect('/empleado/dashboard');
   }
 
@@ -56,6 +58,7 @@ export default async function CargarDatosPage() {
     />
   );
 }
+
 
 
 

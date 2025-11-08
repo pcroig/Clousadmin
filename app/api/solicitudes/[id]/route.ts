@@ -14,6 +14,13 @@ import {
 } from '@/lib/api-handler';
 import { z } from 'zod';
 
+import { EstadoSolicitud } from '@/lib/constants/enums';
+import { esCampoPermitido } from '@/lib/constants/whitelist-campos';
+import {
+  crearNotificacionSolicitudAprobada,
+  crearNotificacionSolicitudRechazada,
+} from '@/lib/notificaciones';
+
 const solicitudAccionSchema = z.object({
   accion: z.enum(['aprobar', 'rechazar']),
   motivoRechazo: z.string().optional(),
@@ -79,8 +86,8 @@ export async function PATCH(
       return notFoundResponse('Solicitud no encontrada');
     }
 
-    // Verificar que la solicitud está pendiente
-    if (solicitud.estado !== 'pendiente') {
+    // Verificar que la solicitud está pendiente o requiere revisión
+    if (solicitud.estado !== EstadoSolicitud.pendiente && solicitud.estado !== EstadoSolicitud.requiere_revision) {
       return NextResponse.json(
         { error: `La solicitud ya está ${solicitud.estado}` },
         { status: 400 }
@@ -96,7 +103,7 @@ export async function PATCH(
         const solicitudActualizada = await tx.solicitudCambio.update({
           where: { id },
           data: {
-            estado: 'aprobada',
+            estado: EstadoSolicitud.aprobada_manual,
             aprobadorId: session.user.id,
             fechaRespuesta: ahora,
           },
@@ -120,7 +127,7 @@ export async function PATCH(
           const camposRechazados: string[] = [];
 
           for (const [campo, valor] of Object.entries(cambios)) {
-            if (ALLOWED_EMPLOYEE_FIELDS.includes(campo as any)) {
+            if (esCampoPermitido(campo)) {
               cambiosValidados[campo] = valor;
             } else {
               camposRechazados.push(campo);
@@ -141,26 +148,6 @@ export async function PATCH(
           }
         }
 
-        // Crear notificación para el empleado
-        if (solicitud.empleado.usuario?.id) {
-          await tx.notificacion.create({
-            data: {
-              empresaId: session.user.empresaId,
-              usuarioId: solicitud.empleado.usuario.id,
-              tipo: 'success',
-              titulo: 'Solicitud aprobada',
-              mensaje: `Tu solicitud de ${solicitud.tipo} ha sido aprobada`,
-              metadata: {
-                solicitudId: solicitud.id,
-                tipo: solicitud.tipo,
-              },
-              leida: false,
-            },
-          });
-        } else {
-          console.warn(`[SOLICITUDES] No se pudo crear notificación para solicitud ${id}: empleado sin usuario asociado`);
-        }
-
         return {
           solicitud: solicitudActualizada,
           message: 'Solicitud aprobada correctamente',
@@ -170,7 +157,7 @@ export async function PATCH(
         const solicitudActualizada = await tx.solicitudCambio.update({
           where: { id },
           data: {
-            estado: 'rechazada',
+            estado: EstadoSolicitud.rechazada,
             aprobadorId: session.user.id,
             fechaRespuesta: ahora,
             motivoRechazo: motivoRechazo,
@@ -186,35 +173,31 @@ export async function PATCH(
           },
         });
 
-        // Crear notificación para el empleado
-        if (solicitud.empleado.usuario?.id) {
-          await tx.notificacion.create({
-            data: {
-              empresaId: session.user.empresaId,
-              usuarioId: solicitud.empleado.usuario.id,
-              tipo: 'error',
-              titulo: 'Solicitud rechazada',
-              mensaje: `Tu solicitud de ${solicitud.tipo} ha sido rechazada${
-                motivoRechazo ? `: ${motivoRechazo}` : ''
-              }`,
-              metadata: {
-                solicitudId: solicitud.id,
-                tipo: solicitud.tipo,
-                motivoRechazo,
-              },
-              leida: false,
-            },
-          });
-        } else {
-          console.warn(`[SOLICITUDES] No se pudo crear notificación para solicitud ${id}: empleado sin usuario asociado`);
-        }
-
         return {
           solicitud: solicitudActualizada,
           message: 'Solicitud rechazada correctamente',
         };
       }
     });
+
+    // Crear notificación fuera de la transacción
+    if (accion === 'aprobar') {
+      await crearNotificacionSolicitudAprobada(prisma, {
+        solicitudId: solicitud.id,
+        empresaId: session.user.empresaId,
+        empleadoId: solicitud.empleadoId,
+        tipo: solicitud.tipo,
+        aprobadoPor: 'manual',
+      });
+    } else {
+      await crearNotificacionSolicitudRechazada(prisma, {
+        solicitudId: solicitud.id,
+        empresaId: session.user.empresaId,
+        empleadoId: solicitud.empleadoId,
+        tipo: solicitud.tipo,
+        motivoRechazo,
+      });
+    }
 
     return successResponse(result);
   } catch (error) {

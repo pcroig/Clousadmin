@@ -10,6 +10,8 @@ import { TableFilters } from '@/components/shared/table-filters';
 import { DataTable, Column, AvatarCell } from '@/components/shared/data-table';
 import { DetailsPanel } from '@/components/shared/details-panel';
 
+import { EstadoAusencia } from '@/lib/constants/enums';
+
 // Tipos de datos
 interface Fichaje {
   id: string;
@@ -30,7 +32,7 @@ interface Ausencia {
     avatar?: string;
   };
   dias: number;
-  estado: 'pendiente' | 'aprobada' | 'rechazada' | 'en_curso' | 'completada' | 'auto_aprobada';
+  estado: EstadoAusencia.pendiente_aprobacion | 'aprobada' | 'rechazada' | 'en_curso' | 'completada' | 'auto_aprobada';
   tipo: string;
   justificante: boolean;
 }
@@ -90,7 +92,7 @@ export default function HorarioPage() {
       id: '1',
       empleado: { nombre: 'Ada Lovelace' },
       dias: 5,
-      estado: 'pendiente',
+      estado: EstadoAusencia.pendiente_aprobacion,
       tipo: 'Vacaciones',
       justificante: false,
     },
@@ -144,9 +146,9 @@ export default function HorarioPage() {
       cell: (row) => (
         <span
           className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-            row.estado === 'en_curso' || row.estado === 'completada' || row.estado === 'auto_aprobada'
+            row.estado === EstadoAusencia.en_curso || row.estado === EstadoAusencia.completada || row.estado === EstadoAusencia.auto_aprobada
               ? 'bg-green-100 text-green-800'
-              : row.estado === 'rechazada'
+              : row.estado === EstadoAusencia.rechazada
               ? 'bg-red-100 text-red-800'
               : 'bg-yellow-100 text-yellow-800'
           }`}

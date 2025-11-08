@@ -2,6 +2,8 @@
 
 ## 🎨 Paleta de Colores
 
+> Las variables canónicas viven en `app/globals.css` dentro del bloque `@theme inline` (Tailwind CSS 4). Usa siempre los tokens, nunca colores hardcodeados.
+
 ### Colores Base
 
 ```css
@@ -20,10 +22,10 @@
 --text-disabled: #B0AFA9;        /* Texto deshabilitado */
 
 /* Brand - Accent */
---accent: #F26C21;               /* Color principal (botones, links, badges) */
---accent-hover: #D45A1B;         /* Hover en elementos accent */
---accent-active: #B84915;        /* Active/pressed en elementos accent */
---accent-light: #FFF4ED;         /* Background suave para badges/tags */
+--accent: #d97757;               /* Botones principales, iconos destacados */
+--accent-hover: #c6613f;
+--accent-active: #B84915;
+--accent-light: #FFF4ED;
 ```
 
 ### Estados de Feedback
@@ -56,7 +58,90 @@
 |-------|--------------|------------------|--------|
 | `#3D3D3A` (text-primary) | 11.2:1 | 10.8:1 | ✅ AAA |
 | `#6B6A64` (text-secondary) | 4.6:1 | 4.4:1 | ✅ AA |
-| `#F26C21` (accent) | 3.6:1 | 3.5:1 | ⚠️ Solo para UI |
+| `#d97757` (accent) | 4.1:1 | 3.9:1 | ⚠️ Solo para UI |
+
+### Reglas de uso
+
+- Iconos por defecto en gris (`text-gray-600` / `text-gray-700`), **sin fondo de color**.
+- Iconos destacados usan `text-[#d97757]`; el hover utiliza `hover:text-[#c6613f]`.
+- No usar el color naranja antiguo `#f26c21`.
+- Fondos y superficies se limitan a `bg-white`, `bg-gray-50`, `bg-gray-100`, `bg-stone-100`.
+- Los únicos botones verdes/rojos permitidos son las acciones de aprobar/rechazar; el resto usa el acento.
+- Badges y estados usan la paleta definida (`bg-green-100 text-green-700`, etc.).
+
+---
+
+## 🧾 Guías de color aplicadas
+
+### Iconos
+
+```tsx
+// ✅ Icono sin fondo
+<CheckCircle2 className="w-5 h-5 text-gray-600" />
+
+// ✅ Icono destacado
+<Calendar className="w-5 h-5 text-[#d97757]" />
+
+// ✅ Hover interactivo
+<Edit className="w-5 h-5 text-gray-600 hover:text-[#c6613f] transition-colors" />
+
+// ❌ Prohibido: icono con fondo
+<div className="bg-green-50 border-green-200 p-2 rounded-lg">
+  <CheckCircle2 className="w-5 h-5 text-green-600" />
+</div>
+```
+
+### Notificaciones
+
+```tsx
+// ✅ Correcto
+<div className="flex items-start gap-4">
+  <CheckCircle2 className="w-5 h-5 text-gray-600 flex-shrink-0" />
+  <div className="flex-1">
+    <p className="text-sm font-semibold text-gray-900">Título</p>
+    <p className="text-sm text-gray-600">Mensaje</p>
+  </div>
+</div>
+
+// ❌ Incorrecto: icono con fondo
+<div className="flex items-start gap-4">
+  <div className="bg-green-50 border-green-200 p-2 rounded-lg">
+    <CheckCircle2 className="w-5 h-5 text-green-600" />
+  </div>
+  ...
+</div>
+```
+
+### Badges de estado
+
+```tsx
+<span className="px-2 py-0.5 text-xs font-medium rounded-full bg-green-100 text-green-700">
+  Aprobada
+</span>
+
+<span className="px-2 py-0.5 text-xs font-medium rounded-full bg-red-100 text-red-700">
+  Rechazada
+</span>
+```
+
+### Botones de acción
+
+```tsx
+// Botón principal
+<button className="bg-[#d97757] hover:bg-[#c6613f] text-white px-4 py-2 rounded">
+  Guardar
+</button>
+
+// Botón aprobar (excepción verde permitida)
+<button className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded">
+  Aprobar
+</button>
+
+// Botón rechazar (excepción roja permitida)
+<button className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded">
+  Rechazar
+</button>
+```
 
 ---
 
@@ -386,7 +471,7 @@ font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 .input:focus {
   outline: none;
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(242, 108, 33, 0.1);
+  box-shadow: 0 0 0 3px rgba(217, 119, 87, 0.1);
 }
 
 .input:disabled {
@@ -521,7 +606,7 @@ font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 
 /* Focus sutil para inputs */
 .input:focus {
-  box-shadow: 0 0 0 3px rgba(242, 108, 33, 0.15);
+  box-shadow: 0 0 0 3px rgba(217, 119, 87, 0.15);
 }
 ```
 
@@ -558,146 +643,123 @@ font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 
 ---
 
-## 🚀 Uso con Tailwind CSS
+## 🚀 Uso con Tailwind CSS 4
 
-### Configuración en `tailwind.config.js`
+### Configuración en `app/globals.css`
 
-```javascript
-module.exports = {
-  theme: {
-    extend: {
-      colors: {
-        background: '#FAF9F5',
-        surface: '#FFFFFF',
-        'surface-secondary': '#F6F3F2',
-        border: '#EFEFED',
-        'border-input': '#E0DFD9',
-        'text-primary': '#3D3D3A',
-        'text-secondary': '#6B6A64',
-        'text-disabled': '#B0AFA9',
-        accent: {
-          DEFAULT: '#F26C21',
-          hover: '#D45A1B',
-          active: '#B84915',
-          light: '#FFF4ED',
-        },
-        success: {
-          DEFAULT: '#16A34A',
-          light: '#DCFCE7',
-          border: '#86EFAC',
-        },
-        error: {
-          DEFAULT: '#DC2626',
-          light: '#FEE2E2',
-          border: '#FCA5A5',
-        },
-        warning: {
-          DEFAULT: '#EA580C',
-          light: '#FFEDD5',
-          border: '#FDBA74',
-        },
-        info: {
-          DEFAULT: '#0284C7',
-          light: '#E0F2FE',
-          border: '#7DD3FC',
-        },
-      },
-      fontFamily: {
-        sans: ['Inter', 'sans-serif'],
-      },
-      fontSize: {
-        'page-title': ['30px', { lineHeight: '1.2', fontWeight: '700' }],
-        'section-title': ['20px', { lineHeight: '1.3', fontWeight: '600' }],
-      },
-      borderRadius: {
-        'sm': '10px',
-        'md': '14px',
-        'lg': '18px',
-      },
-      boxShadow: {
-        'card': '0 1px 2px rgba(0, 0, 0, 0.05)',
-        'card-hover': '0 4px 6px rgba(0, 0, 0, 0.1)',
-        'modal': '0 10px 15px rgba(0, 0, 0, 0.1)',
-      },
-      transitionDuration: {
-        DEFAULT: '150ms',
-      },
-      transitionTimingFunction: {
-        DEFAULT: 'ease-in-out',
-      },
-    },
-  },
-};
+Tailwind CSS 4 usa la nueva sintaxis `@theme inline` en lugar de `tailwind.config.js`:
+
+```css
+@import "tailwindcss";
+
+@theme inline {
+  /* Colores del Design System */
+  --color-background: #FAF9F5;
+  --color-surface: #FFFFFF;
+  --color-surface-secondary: #F6F3F2;
+  --color-border: #EFEFED;
+  --color-border-input: #E0DFD9;
+  --color-text-primary: #3D3D3A;
+  --color-text-secondary: #6B6A64;
+  --color-text-disabled: #B0AFA9;
+  --color-accent: #d97757;
+  --color-accent-hover: #c6613f;
+  --color-accent-active: #B84915;
+  --color-accent-light: #FFF4ED;
+  /* ... más colores ... */
+}
 ```
+
+**Nota**: La configuración completa está en `app/globals.css`. No se usa `tailwind.config.js` en Tailwind CSS 4.
 
 ---
 
-## 📚 Referencia de Componentes UI
+## 📦 Patrones de Componentes (React)
 
-Para patrones de uso y ejemplos prácticos de componentes, ver **[DESIGN_PATTERNS.md](./DESIGN_PATTERNS.md)**.
+### Widgets del dashboard
+- Usa `WidgetCard` (`components/shared/widget-card.tsx`) como contenedor estándar.
+- Variantes de altura: `h-[280px]` (una fila) y `h-[580px]` (dos filas).
+- Mantén `contentClassName` para personalizar scroll sin romper padding.
 
-### Componente CalendarioLaboral
-
-Componente estándar para selección de fechas y visualización de días especiales (ausencias, festivos, no laborables).
-
-**Ubicación**: `components/shared/calendario-laboral.tsx`  
-**Base**: shadcn/ui Calendar
-
-#### Props
-```typescript
-interface CalendarioLaboralProps {
-  mode?: 'single' | 'range' | 'multiple';
-  selected?: Date | DateRange | Date[];
-  onSelect?: (date: Date | DateRange | Date[] | undefined) => void;
-  marcadores?: CalendarioMarcador[];
-  numberOfMonths?: number;
-  className?: string;
-  disabled?: (date: Date) => boolean;
-}
-
-interface CalendarioMarcador {
-  fecha: Date;
-  tipo: 'ausencia' | 'festivo' | 'no_laborable' | 'custom';
-  label?: string;
-}
-```
-
-#### Ejemplo de uso
 ```tsx
-import { CalendarioLaboral } from '@/components/shared/calendario-laboral';
-
-// Modo range para filtros
-<CalendarioLaboral
-  mode="range"
-  selected={rangoFechas}
-  onSelect={setRangoFechas}
-  numberOfMonths={2}
-/>
-
-// Con marcadores de días especiales
-<CalendarioLaboral
-  mode="single"
-  marcadores={[
-    { fecha: new Date(2025, 11, 25), tipo: 'festivo', label: 'Navidad' },
-    { fecha: new Date(2025, 11, 26), tipo: 'no_laborable' },
-  ]}
-  numberOfMonths={1}
-/>
+<WidgetCard
+  title="Solicitudes"
+  href="/hr/solicitudes"
+  height="h-[280px]"
+  badge={pendingCount}
+>
+  <SolicitudesWidget />
+</WidgetCard>
 ```
 
-#### Estilos de marcadores
-- **Festivos**: `bg-red-100 text-red-900` (días festivos nacionales/autonómicos)
-- **Ausencias**: `bg-blue-100 text-blue-900` (ausencias de empleados)
-- **No laborables**: `bg-gray-100 text-gray-500` (días personalizados por empresa)
+### Tablas de datos
+- Usa `DataTable` (`components/shared/data-table.tsx`) con columnas tipadas.
+- Encabeza con `TableHeader` y filtros con `TableFilters`.
+
+```tsx
+<TableHeader title="Personas" actionButton={{ label: '+ Añadir', onClick: openModal }} />
+<TableFilters showDateNavigation onFilterClick={handleFilter} />
+<DataTable columns={columns} data={data} getRowId={(row) => row.id} />
+```
+
+### Botones
+- Usa `Button` de `components/ui/button.tsx`.
+- Variantes válidas: `default` (gris oscuro), `outline`, `secondary`, `ghost`, `link`, `destructive`.
+- Acciones de aprobar/rechazar usan verdes/rojos; el resto emplea el acento.
+
+```tsx
+<Button>Guardar</Button>
+<Button variant="outline">Cancelar</Button>
+<Button variant="destructive">Eliminar</Button>
+```
+
+### Badges y estados
+- Usa `Badge` (`components/ui/badge.tsx`) y aplica variantes `success`, `warning`, `info`, `destructive`.
+- Los colores deben corresponder a la tabla de estados (verde/rojo/amarillo/azul).
+
+### Cards y contenedores
+- Usa `Card` (`components/ui/card.tsx`) con el spacing por defecto (`px-6` / `pt-6`).
+- Para widgets reutiliza `WidgetCard`; para KPIs usa `KpiCard`.
+
+### Modales y paneles
+- Formularios/confirmaciones: `Dialog` (`components/ui/dialog.tsx`).
+- Paneles de detalle: `DetailsPanel` (`components/shared/details-panel.tsx`).
+
+### Layouts recurrentes
+- Dashboards: `grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6`.
+- Páginas con tabla: header + filtros + tabla + panel de detalles.
 
 ---
 
-## 🔗 Documentación Relacionada
+## ✅ Checklist final
 
-- **[DESIGN_PATTERNS.md](./DESIGN_PATTERNS.md)** - Patrones de diseño y uso de componentes
-- **[PATRONES_CODIGO.md](./PATRONES_CODIGO.md)** - Patrones específicos de código TypeScript/Next.js
+**Tokens y estilos**
+- [ ] Se usan únicamente tokens (`text-primary`, `bg-surface`, `accent`, etc.).
+- [ ] Iconos sin fondo; hovers utilizan `hover:text-[#c6613f]`.
+- [ ] Espaciado alineado al sistema de 8px.
+- [ ] Estados (focus/hover/disabled) implementan las reglas anteriores.
+
+**Componentes React**
+- [ ] Componentes base (`WidgetCard`, `DataTable`, `Button`, `Badge`, etc.) reutilizados.
+- [ ] Sin duplicar estilos de shadcn/ui; usar props/variants existentes.
+- [ ] Accesibilidad: `aria-*`, foco gestionado, teclado funcional.
+- [ ] Responsive probado en `sm`, `md`, `lg`.
 
 ---
 
-**Versión**: 1.1.0
-**Última actualización**: 2025-01-27
+## 🔗 Referencias
+
+- `app/globals.css` — Tokens Tailwind CSS 4 (`@theme inline`).
+- `lib/design-system.ts` — Helpers (`iconClasses`, `accentColors`).
+- `.cursorrules` — Principios y anti-patrones generales.
+- Componentes clave:  
+  - `components/shared/widget-card.tsx`  
+  - `components/shared/data-table.tsx`  
+  - `components/ui/button.tsx`  
+  - `components/ui/badge.tsx`  
+  - `components/shared/details-panel.tsx`
+
+---
+
+**Versión**: 1.3.0  
+**Última actualización**: 7 de noviembre 2025

@@ -7,6 +7,8 @@ import { prisma } from '@/lib/prisma';
 import { getSession } from '@/lib/auth';
 import { z } from 'zod';
 
+import { UsuarioRol } from '@/lib/constants/enums';
+
 interface RouteParams {
   params: Promise<{
     id: string;
@@ -85,7 +87,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 export async function PATCH(request: NextRequest, { params }: RouteParams) {
   try {
     const session = await getSession();
-    if (!session || session.user.rol !== 'hr_admin') {
+    if (!session || session.user.rol !== UsuarioRol.hr_admin) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
     }
 
@@ -156,7 +158,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 export async function DELETE(request: NextRequest, { params }: RouteParams) {
   try {
     const session = await getSession();
-    if (!session || session.user.rol !== 'hr_admin') {
+    if (!session || session.user.rol !== UsuarioRol.hr_admin) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
     }
 

@@ -7,59 +7,21 @@ import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import { PayrollClient } from './payroll-client';
 
+import { UsuarioRol } from '@/lib/constants/enums';
+
 export default async function PayrollPage() {
   const session = await getSession();
 
-  if (!session || session.user.rol !== 'hr_admin') {
+  if (!session || session.user.rol !== UsuarioRol.hr_admin) {
     redirect('/login');
   }
 
-  // Obtener datos reales de nóminas
   const ahora = new Date();
   const mesActual = ahora.getMonth() + 1; // 1-12
   const anioActual = ahora.getFullYear();
 
-  // Obtener todas las nóminas de la empresa (filtrado por empresaId del empleado)
-  const nominas = await prisma.nomina.findMany({
-    where: {
-      empleado: {
-        empresaId: session.user.empresaId,
-      },
-    },
-    select: {
-      id: true,
-      mes: true,
-      anio: true,
-      totalBruto: true,
-      tieneAnomalias: true,
-      verificado: true,
-    },
-  });
-
-  // Filtrar nóminas del mes actual
-  const nominasMesActual = nominas.filter(
-    (n) => n.mes === mesActual && n.anio === anioActual
-  );
-
-  // Calcular total bruto del mes actual
-  const totalBrutoMes = nominasMesActual.reduce((sum, n) => {
-    return sum + Number(n.totalBruto);
-  }, 0);
-
-  // Contar nóminas pendientes de revisión (con anomalías o sin verificar)
-  const pendientesRevision = nominasMesActual.filter(
-    (n) => n.tieneAnomalias || !n.verificado
-  ).length;
-
-  // Verificar si hay nóminas
-  const hayNominas = nominas.length > 0;
-
   return (
     <PayrollClient
-      nominasMesActual={nominasMesActual.length}
-      totalBruto={totalBrutoMes}
-      pendientesRevision={pendientesRevision}
-      hayNominas={hayNominas}
       mesActual={mesActual}
       anioActual={anioActual}
     />

@@ -13,6 +13,7 @@ import { AusenciasTab } from './tabs/ausencias-tab';
 import { FichajesTab } from './tabs/fichajes-tab';
 import { ContratosTab } from './tabs/contratos-tab';
 import { DocumentosTab } from './tabs/documentos-tab';
+import { getAvatarStyle } from '@/lib/design-system';
 
 interface MiEspacioHRClientProps {
   empleado: any;
@@ -26,6 +27,8 @@ export function MiEspacioHRClient({ empleado, usuario }: MiEspacioHRClientProps)
   const getInitials = () => {
     return `${empleado.nombre.charAt(0)}${empleado.apellidos.charAt(0)}`.toUpperCase();
   };
+
+  const avatarStyle = getAvatarStyle(`${empleado.nombre} ${empleado.apellidos}`);
 
   const tabs = [
     { id: 'general', label: 'General' },
@@ -44,7 +47,10 @@ export function MiEspacioHRClient({ empleado, usuario }: MiEspacioHRClientProps)
             <div className="relative">
               <Avatar className="h-16 w-16">
                 {empleado.fotoUrl && <AvatarImage src={empleado.fotoUrl} />}
-                <AvatarFallback className="bg-gray-900 text-white text-lg">
+                <AvatarFallback
+                  className="text-lg font-semibold uppercase"
+                  style={avatarStyle}
+                >
                   {getInitials()}
                 </AvatarFallback>
               </Avatar>

@@ -6,6 +6,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 
+import { UsuarioRol } from '@/lib/constants/enums';
+
 // GET /api/carpetas - Listar carpetas del usuario
 export async function GET(request: NextRequest) {
   try {
@@ -24,7 +26,7 @@ export async function GET(request: NextRequest) {
       empresaId: session.user.empresaId,
     };
 
-    if (session.user.rol === 'hr_admin') {
+    if (session.user.rol === UsuarioRol.hr_admin) {
       // HR Admin: puede ver todas las carpetas o filtrar por empleado
       if (empleadoId) {
         whereClause.OR = [
@@ -129,7 +131,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Solo HR Admin puede crear carpetas compartidas
-    if (compartida && session.user.rol !== 'hr_admin') {
+    if (compartida && session.user.rol !== UsuarioRol.hr_admin) {
       return NextResponse.json(
         { error: 'Solo HR Admin puede crear carpetas compartidas' },
         { status: 403 }

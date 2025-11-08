@@ -204,12 +204,17 @@ import { Edit } from 'lucide-react';
 
 ### Excepciones Permitidas
 
-**Avatares de Usuario**: Los avatares pueden mantener fondos ya que representan personas:
+**Avatares de Usuario**: Usa la paleta pastel centralizada para placeholders:
 
 ```tsx
-<AvatarFallback className="bg-gray-900 text-white text-lg">
-  {getInitials()}
-</AvatarFallback>
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { getAvatarStyle } from '@/lib/design-system';
+
+<Avatar>
+  <AvatarFallback style={getAvatarStyle(nombre)} className="font-semibold uppercase">
+    {getInitials(nombre)}
+  </AvatarFallback>
+</Avatar>
 ```
 
 **Botones de Acción Críticos**: Botones pequeños de acción pueden tener fondo:

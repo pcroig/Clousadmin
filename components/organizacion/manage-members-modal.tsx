@@ -18,8 +18,7 @@ import { LoadingButton } from '@/components/shared/loading-button';
 import { toast } from 'sonner';
 import { Search, UserPlus, X } from 'lucide-react';
 import { getInitials } from '@/components/shared/utils';
-import { getAvatarPlaceholderClasses } from '@/lib/design-system';
-import { cn } from '@/lib/utils';
+import { getAvatarStyle } from '@/lib/design-system';
 
 interface Employee {
   id: string;
@@ -167,38 +166,40 @@ export function ManageMembersModal({
                   {searchTerm ? 'No se encontraron miembros' : 'No hay miembros en el equipo'}
                 </p>
               ) : (
-                filteredMembers.map((member) => (
-                  <div
-                    key={member.id}
-                    className="flex items-center gap-2 p-2 rounded-lg hover:bg-gray-50"
-                  >
-                    <Avatar className="h-8 w-8">
-                      {member.avatar && <AvatarImage src={member.avatar} />}
-                      <AvatarFallback
-                        className={cn(
-                          getAvatarPlaceholderClasses(member.nombre),
-                          'text-xs font-medium'
-                        )}
-                      >
-                        {getInitials(member.nombre)}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-900 truncate">
-                        {member.nombre}
-                      </p>
-                    </div>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => handleRemoveMember(member.id)}
-                      disabled={removingMemberId === member.id}
-                      className="h-8 w-8 p-0"
+                filteredMembers.map((member) => {
+                  const avatarStyle = getAvatarStyle(member.nombre);
+
+                  return (
+                    <div
+                      key={member.id}
+                      className="flex items-center gap-2 p-2 rounded-lg hover:bg-gray-50"
                     >
-                      <X className="h-4 w-4 text-red-600" />
-                    </Button>
-                  </div>
-                ))
+                      <Avatar className="h-8 w-8">
+                        {member.avatar && <AvatarImage src={member.avatar} />}
+                        <AvatarFallback
+                          className="text-xs font-semibold uppercase"
+                          style={avatarStyle}
+                        >
+                          {getInitials(member.nombre)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-900 truncate">
+                          {member.nombre}
+                        </p>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => handleRemoveMember(member.id)}
+                        disabled={removingMemberId === member.id}
+                        className="h-8 w-8 p-0"
+                      >
+                        <X className="h-4 w-4 text-red-600" />
+                      </Button>
+                    </div>
+                  );
+                })
               )}
             </div>
           </div>
@@ -218,41 +219,43 @@ export function ManageMembersModal({
                     : 'No hay empleados disponibles'}
                 </p>
               ) : (
-                filteredEmployees.map((emp) => (
-                  <div
-                    key={emp.id}
-                    className="flex items-center gap-2 p-2 rounded-lg hover:bg-gray-50"
-                  >
-                    <Avatar className="h-8 w-8">
-                      {emp.fotoUrl && <AvatarImage src={emp.fotoUrl} />}
-                      <AvatarFallback
-                        className={cn(
-                          getAvatarPlaceholderClasses(`${emp.nombre} ${emp.apellidos}`),
-                          'text-xs font-medium'
-                        )}
-                      >
-                        {getInitials(`${emp.nombre} ${emp.apellidos}`)}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-900 truncate">
-                        {emp.nombre} {emp.apellidos}
-                      </p>
-                      {emp.puesto && (
-                        <p className="text-xs text-gray-500 truncate">{emp.puesto}</p>
-                      )}
-                    </div>
-                    <LoadingButton
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => handleAddMember(emp.id)}
-                      loading={loadingEmployeeId === emp.id}
-                      className="h-8 w-8 p-0"
+                filteredEmployees.map((emp) => {
+                  const avatarStyle = getAvatarStyle(`${emp.nombre} ${emp.apellidos}`);
+
+                  return (
+                    <div
+                      key={emp.id}
+                      className="flex items-center gap-2 p-2 rounded-lg hover:bg-gray-50"
                     >
-                      <UserPlus className="h-4 w-4 text-green-600" />
-                    </LoadingButton>
-                  </div>
-                ))
+                      <Avatar className="h-8 w-8">
+                        {emp.fotoUrl && <AvatarImage src={emp.fotoUrl} />}
+                        <AvatarFallback
+                          className="text-xs font-semibold uppercase"
+                          style={avatarStyle}
+                        >
+                          {getInitials(`${emp.nombre} ${emp.apellidos}`)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-900 truncate">
+                          {emp.nombre} {emp.apellidos}
+                        </p>
+                        {emp.puesto && (
+                          <p className="text-xs text-gray-500 truncate">{emp.puesto}</p>
+                        )}
+                      </div>
+                      <LoadingButton
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => handleAddMember(emp.id)}
+                        loading={loadingEmployeeId === emp.id}
+                        className="h-8 w-8 p-0"
+                      >
+                        <UserPlus className="h-4 w-4 text-green-600" />
+                      </LoadingButton>
+                    </div>
+                  );
+                })
               )}
             </div>
           </div>

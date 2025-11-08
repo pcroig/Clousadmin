@@ -9,6 +9,8 @@ import { z } from 'zod';
 import type { SessionData } from '@/types/auth';
 import { rateLimitApi, rateLimitApiWrite, getClientIP } from '@/lib/rate-limit';
 
+import { UsuarioRol } from '@/lib/constants/enums';
+
 // ========================================
 // Types
 // ========================================
@@ -108,7 +110,7 @@ export function verifyEmpleadoAccess(
   targetEmpleadoId: string
 ): NextResponse | null {
   // HR Admin puede acceder a todo
-  if (session.user.rol === 'hr_admin') {
+  if (session.user.rol === UsuarioRol.hr_admin) {
     return null;
   }
   

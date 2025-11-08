@@ -23,6 +23,8 @@ import {
 import { CalendarManager } from '@/lib/integrations/calendar/calendar-manager';
 import { z } from 'zod';
 
+import { EstadoAusencia, UsuarioRol } from '@/lib/constants/enums';
+
 // Schema para aprobar/rechazar
 const ausenciaAccionSchema = z.object({
   accion: z.enum(['aprobar', 'rechazar']),
@@ -76,7 +78,7 @@ export async function PATCH(
     }
 
     // Si es manager, verificar que la ausencia es de un empleado a su cargo
-    if (session.user.rol === 'manager') {
+    if (session.user.rol === UsuarioRol.manager) {
       if (!session.user.empleadoId) {
         return forbiddenResponse('No tienes un empleado asignado. Contacta con HR.');
       }
@@ -330,9 +332,9 @@ export async function PATCH(
         
         if (ausencia.descuentaSaldo && !nuevoDescuentaSaldo) {
           // Cambió de vacaciones a otro tipo: devolver días al saldo
-          if (ausencia.estado === 'pendiente_aprobacion') {
+          if (ausencia.estado === EstadoAusencia.pendiente_aprobacion) {
             await actualizarSaldo(ausencia.empleadoId, año, 'cancelar', diasAnteriores);
-          } else if (ausencia.estado === 'en_curso' || ausencia.estado === 'completada' || ausencia.estado === 'auto_aprobada') {
+          } else if (ausencia.estado === EstadoAusencia.en_curso || ausencia.estado === EstadoAusencia.completada || ausencia.estado === EstadoAusencia.auto_aprobada) {
             // Devolver días usados
             await prisma.empleadoSaldoAusencias.updateMany({
               where: { empleadoId: ausencia.empleadoId, año },
@@ -346,9 +348,9 @@ export async function PATCH(
             return badRequestResponse(validacion.mensaje || 'Saldo insuficiente');
           }
           
-          if (ausencia.estado === 'pendiente_aprobacion') {
+          if (ausencia.estado === EstadoAusencia.pendiente_aprobacion) {
             await actualizarSaldo(ausencia.empleadoId, año, 'solicitar', nuevosDiasSolicitados);
-          } else if (ausencia.estado === 'en_curso' || ausencia.estado === 'completada' || ausencia.estado === 'auto_aprobada') {
+          } else if (ausencia.estado === EstadoAusencia.en_curso || ausencia.estado === EstadoAusencia.completada || ausencia.estado === EstadoAusencia.auto_aprobada) {
             // Marcar como usados
             await prisma.empleadoSaldoAusencias.updateMany({
               where: { empleadoId: ausencia.empleadoId, año },
@@ -394,13 +396,13 @@ export async function PATCH(
 
       // Actualizar saldo si cambió el número de días (sin cambio de tipo)
       if (!cambioTipo && nuevoDescuentaSaldo && diferenciaDias !== 0) {
-        if (ausencia.estado === 'pendiente_aprobacion') {
+        if (ausencia.estado === EstadoAusencia.pendiente_aprobacion) {
           // Ajustar días pendientes
           await prisma.empleadoSaldoAusencias.updateMany({
             where: { empleadoId: ausencia.empleadoId, año },
             data: { diasPendientes: { increment: diferenciaDias } },
           });
-        } else if (ausencia.estado === 'en_curso' || ausencia.estado === 'completada' || ausencia.estado === 'auto_aprobada') {
+        } else if (ausencia.estado === EstadoAusencia.en_curso || ausencia.estado === EstadoAusencia.completada || ausencia.estado === EstadoAusencia.auto_aprobada) {
           // Ajustar días usados
           await prisma.empleadoSaldoAusencias.updateMany({
             where: { empleadoId: ausencia.empleadoId, año },
@@ -469,7 +471,7 @@ export async function DELETE(
       where: {
         id,
         empleadoId: session.user.empleadoId,
-        estado: 'pendiente_aprobacion',
+        estado: EstadoAusencia.pendiente_aprobacion,
       }
     });
 
