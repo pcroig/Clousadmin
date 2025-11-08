@@ -52,6 +52,7 @@ Clousadmin/
 │   │   └── manager/              # Dashboard Manager
 │   ├── api/                      # API Routes
 │   │   ├── ausencias/
+│   │   ├── denuncias/            # ✨ Canal de denuncias
 │   │   ├── fichajes/
 │   │   └── jornadas/
 │   └── layout.tsx                # Layout principal
@@ -427,5 +428,6 @@ model Ausencia {
 
 ---
 
-**Versión**: 1.1  
-**Última actualización**: 7 de noviembre 2025
+**Versión**: 1.2
+**Última actualización**: 8 de noviembre 2025
+**Cambios**: Agregado Canal de Denuncias, Header global, sistema de notificaciones

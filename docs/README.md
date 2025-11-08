@@ -37,6 +37,7 @@ docs/
 │   ├── ausencias.md
 │   ├── autenticacion.md
 │   ├── bandeja-entrada.md
+│   ├── canal-denuncias.md            # ✨ NUEVO: Sistema de denuncias internas
 │   ├── documentos.md
 │   ├── festivos.md
 │   ├── fichajes.md
