@@ -19,7 +19,12 @@ import {
   createdResponse,
   badRequestResponse,
 } from '@/lib/api-handler';
-import { crearNotificacionAusenciaSolicitada } from '@/lib/notificaciones';
+import { 
+  crearNotificacionAusenciaSolicitada,
+  crearNotificacionAusenciaAutoAprobada,
+} from '@/lib/notificaciones';
+
+import { EstadoAusencia, UsuarioRol, TipoAusencia } from '@/lib/constants/enums';
 
 // GET /api/ausencias - Listar ausencias
 export async function GET(req: NextRequest) {
@@ -49,12 +54,12 @@ export async function GET(req: NextRequest) {
     }
 
     // Si es empleado, solo ver sus propias ausencias
-    if (session.user.rol === 'empleado' && session.user.empleadoId) {
+    if (session.user.rol === UsuarioRol.empleado && session.user.empleadoId) {
       where.empleadoId = session.user.empleadoId;
     }
 
     // Si es manager, solo ver ausencias de sus empleados a cargo
-    if (session.user.rol === 'manager') {
+    if (session.user.rol === UsuarioRol.manager) {
       if (!session.user.empleadoId) {
         return badRequestResponse('No tienes un empleado asignado. Contacta con HR.');
       }
@@ -201,6 +206,18 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Determinar si la ausencia es auto-aprobable
+    // Tipos auto-aprobables: enfermedad, enfermedad_familiar, maternidad_paternidad
+    const tiposAutoAprobables = [
+      TipoAusencia.enfermedad,
+      TipoAusencia.enfermedad_familiar,
+      TipoAusencia.maternidad_paternidad,
+    ];
+    const esAutoAprobable = tiposAutoAprobables.includes(validatedData.tipo as TipoAusencia);
+    const estadoInicial = esAutoAprobable 
+      ? EstadoAusencia.auto_aprobada 
+      : EstadoAusencia.pendiente_aprobacion;
+
     // Crear ausencia
     const ausencia = await prisma.ausencia.create({
       data: {
@@ -221,7 +238,7 @@ export async function POST(req: NextRequest) {
         diasIdeales: validatedData.diasIdeales ? JSON.parse(JSON.stringify(validatedData.diasIdeales)) : null,
         diasPrioritarios: validatedData.diasPrioritarios ? JSON.parse(JSON.stringify(validatedData.diasPrioritarios)) : null,
         diasAlternativos: validatedData.diasAlternativos ? JSON.parse(JSON.stringify(validatedData.diasAlternativos)) : null,
-        estado: 'pendiente_aprobacion',
+        estado: estadoInicial,
       },
       include: {
         empleado: {
@@ -246,17 +263,30 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Crear notificación para HR/Manager
-    await crearNotificacionAusenciaSolicitada(prisma, {
-      ausenciaId: ausencia.id,
-      empresaId: session.user.empresaId,
-      empleadoId: session.user.empleadoId,
-      empleadoNombre: `${ausencia.empleado.nombre} ${ausencia.empleado.apellidos}`,
-      tipo: ausencia.tipo,
-      fechaInicio: ausencia.fechaInicio,
-      fechaFin: ausencia.fechaFin,
-      diasSolicitados: diasSolicitadosFinal,
-    });
+    // Crear notificación apropiada según si fue auto-aprobada o requiere aprobación
+    if (esAutoAprobable) {
+      // Notificar al empleado que su ausencia fue auto-aprobada
+      await crearNotificacionAusenciaAutoAprobada(prisma, {
+        ausenciaId: ausencia.id,
+        empresaId: session.user.empresaId,
+        empleadoId: session.user.empleadoId,
+        tipo: ausencia.tipo,
+        fechaInicio: ausencia.fechaInicio,
+        fechaFin: ausencia.fechaFin,
+      });
+    } else {
+      // Notificar a HR/Manager que hay una ausencia pendiente de aprobación
+      await crearNotificacionAusenciaSolicitada(prisma, {
+        ausenciaId: ausencia.id,
+        empresaId: session.user.empresaId,
+        empleadoId: session.user.empleadoId,
+        empleadoNombre: `${ausencia.empleado.nombre} ${ausencia.empleado.apellidos}`,
+        tipo: ausencia.tipo,
+        fechaInicio: ausencia.fechaInicio,
+        fechaFin: ausencia.fechaFin,
+        diasSolicitados: diasSolicitadosFinal,
+      });
+    }
 
     return createdResponse(ausencia);
   } catch (error) {

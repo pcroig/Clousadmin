@@ -8,8 +8,7 @@ import Link from 'next/link';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { getInitials } from '@/components/shared/utils';
 import { WidgetCard } from '@/components/shared/widget-card';
-import { getAvatarPlaceholderClasses } from '@/lib/design-system';
-import { cn } from '@/lib/utils';
+import { getAvatarStyle } from '@/lib/design-system';
 
 interface EmpleadoResumen {
   nombre: string;
@@ -21,17 +20,17 @@ interface PlantillaWidgetProps {
     count: number;
     empleados: EmpleadoResumen[];
   };
-  ausencias: {
+  ausentes: {
     count: number;
     empleados: EmpleadoResumen[];
   };
-  vacaciones: {
+  sinFichar: {
     count: number;
     empleados: EmpleadoResumen[];
   };
 }
 
-export function PlantillaWidget({ trabajando, ausencias, vacaciones }: PlantillaWidgetProps) {
+export function PlantillaWidget({ trabajando, ausentes, sinFichar }: PlantillaWidgetProps) {
 
   return (
     <WidgetCard
@@ -48,24 +47,26 @@ export function PlantillaWidget({ trabajando, ausencias, vacaciones }: Plantilla
                 <p className="text-[11px] text-gray-500">{trabajando.count} personas</p>
               </div>
               <div className="flex -space-x-2 flex-shrink-0 ml-3">
-                {trabajando.empleados.slice(0, 4).map((emp, idx) => (
-                  <Avatar
-                    key={idx}
-                    className="h-8 w-8 border-2 border-white rounded-lg"
-                  >
-                    {emp.avatar && <AvatarImage src={emp.avatar} />}
-                    <AvatarFallback
-                      className={cn(
-                        getAvatarPlaceholderClasses(emp.nombre),
-                        'text-[11px] font-medium rounded-lg'
-                      )}
+                {trabajando.empleados.slice(0, 4).map((emp, idx) => {
+                  const avatarStyle = getAvatarStyle(emp.nombre);
+
+                  return (
+                    <Avatar
+                      key={idx}
+                      className="h-8 w-8 border-2 border-white"
                     >
-                      {getInitials(emp.nombre)}
-                    </AvatarFallback>
-                  </Avatar>
-                ))}
+                      {emp.avatar && <AvatarImage src={emp.avatar} />}
+                      <AvatarFallback
+                        className="text-[11px] font-semibold uppercase"
+                        style={avatarStyle}
+                      >
+                        {getInitials(emp.nombre)}
+                      </AvatarFallback>
+                    </Avatar>
+                  );
+                })}
                 {trabajando.count > 4 && (
-                  <div className="flex h-8 w-8 items-center justify-center rounded-lg border-2 border-white bg-accent-light text-[11px] font-semibold text-accent">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-white bg-accent-light text-[11px] font-semibold text-accent">
                     +{trabajando.count - 4}
                   </div>
                 )}
@@ -73,66 +74,70 @@ export function PlantillaWidget({ trabajando, ausencias, vacaciones }: Plantilla
             </div>
           </Link>
 
-          {/* Ausencias */}
+          {/* Ausentes */}
           <Link href="/hr/horario/ausencias?estado=en_curso" className="block">
             <div className="flex items-center justify-between p-2 rounded-lg border border-gray-200 bg-white transition-all hover:border-gray-300 hover:shadow-sm cursor-pointer group">
               <div className="flex-1 min-w-0">
-                <p className="text-[13px] font-semibold text-gray-900 group-hover:text-gray-700">Ausencias</p>
-                <p className="text-[11px] text-gray-500">{ausencias.count} personas</p>
+                <p className="text-[13px] font-semibold text-gray-900 group-hover:text-gray-700">Ausentes</p>
+                <p className="text-[11px] text-gray-500">{ausentes.count} personas</p>
               </div>
               <div className="flex -space-x-2 flex-shrink-0 ml-3">
-                {ausencias.empleados.slice(0, 4).map((emp, idx) => (
-                  <Avatar
-                    key={idx}
-                    className="h-8 w-8 border-2 border-white rounded-lg"
-                  >
-                    {emp.avatar && <AvatarImage src={emp.avatar} />}
-                    <AvatarFallback
-                      className={cn(
-                        getAvatarPlaceholderClasses(emp.nombre),
-                        'text-[11px] font-medium rounded-lg'
-                      )}
+                {ausentes.empleados.slice(0, 4).map((emp, idx) => {
+                  const avatarStyle = getAvatarStyle(emp.nombre);
+
+                  return (
+                    <Avatar
+                      key={idx}
+                      className="h-8 w-8 border-2 border-white"
                     >
-                      {getInitials(emp.nombre)}
-                    </AvatarFallback>
-                  </Avatar>
-                ))}
-                {ausencias.count > 4 && (
-                  <div className="flex h-8 w-8 items-center justify-center rounded-lg border-2 border-white bg-warning-light text-[11px] font-semibold text-warning">
-                    +{ausencias.count - 4}
+                      {emp.avatar && <AvatarImage src={emp.avatar} />}
+                      <AvatarFallback
+                        className="text-[11px] font-semibold uppercase"
+                        style={avatarStyle}
+                      >
+                        {getInitials(emp.nombre)}
+                      </AvatarFallback>
+                    </Avatar>
+                  );
+                })}
+                {ausentes.count > 4 && (
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-white bg-warning-light text-[11px] font-semibold text-warning">
+                    +{ausentes.count - 4}
                   </div>
                 )}
               </div>
             </div>
           </Link>
 
-          {/* Vacaciones */}
-          <Link href="/hr/horario/ausencias?tipo=vacaciones" className="block">
+          {/* Sin fichar */}
+          <Link href="/hr/horario/fichajes" className="block">
             <div className="flex items-center justify-between p-2 rounded-lg border border-gray-200 bg-white transition-all hover:border-gray-300 hover:shadow-sm cursor-pointer group">
               <div className="flex-1 min-w-0">
-                <p className="text-[13px] font-semibold text-gray-900 group-hover:text-gray-700">Vacaciones</p>
-                <p className="text-[11px] text-gray-500">{vacaciones.count} personas</p>
+                <p className="text-[13px] font-semibold text-gray-900 group-hover:text-gray-700">Sin fichar</p>
+                <p className="text-[11px] text-gray-500">{sinFichar.count} personas</p>
               </div>
               <div className="flex -space-x-2 flex-shrink-0 ml-3">
-                {vacaciones.empleados.slice(0, 4).map((emp, idx) => (
-                  <Avatar
-                    key={idx}
-                    className="h-8 w-8 border-2 border-white rounded-lg"
-                  >
-                    {emp.avatar && <AvatarImage src={emp.avatar} />}
-                    <AvatarFallback
-                      className={cn(
-                        getAvatarPlaceholderClasses(emp.nombre),
-                        'text-[11px] font-medium rounded-lg'
-                      )}
+                {sinFichar.empleados.slice(0, 4).map((emp, idx) => {
+                  const avatarStyle = getAvatarStyle(emp.nombre);
+
+                  return (
+                    <Avatar
+                      key={idx}
+                      className="h-8 w-8 border-2 border-white"
                     >
-                      {getInitials(emp.nombre)}
-                    </AvatarFallback>
-                  </Avatar>
-                ))}
-                {vacaciones.count > 4 && (
-                  <div className="flex h-8 w-8 items-center justify-center rounded-lg border-2 border-white bg-info-light text-[11px] font-semibold text-info">
-                    +{vacaciones.count - 4}
+                      {emp.avatar && <AvatarImage src={emp.avatar} />}
+                      <AvatarFallback
+                        className="text-[11px] font-semibold uppercase"
+                        style={avatarStyle}
+                      >
+                        {getInitials(emp.nombre)}
+                      </AvatarFallback>
+                    </Avatar>
+                  );
+                })}
+                {sinFichar.count > 4 && (
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-white bg-error-light text-[11px] font-semibold text-error">
+                    +{sinFichar.count - 4}
                   </div>
                 )}
               </div>

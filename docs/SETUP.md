@@ -182,9 +182,11 @@ npm start                # Ejecutar producción
 
 # Base de datos
 npm run seed             # Poblar con datos de prueba
-npx prisma studio        # Interfaz visual de BD
-npx prisma migrate dev   # Crear nueva migración
-npx prisma generate      # Regenerar cliente Prisma
+npm run db:studio        # Interfaz visual de BD (Prisma Studio)
+npm run db:migrate       # Crear nueva migración
+npm run db:deploy        # Aplicar migraciones (producción)
+npm run db:generate      # Regenerar cliente Prisma
+npm run diagnostico      # Diagnóstico rápido de Prisma
 
 # Linting
 npm run lint             # Ejecutar ESLint
@@ -224,5 +226,5 @@ Lee `docs/ARQUITECTURA.md` para entender la estructura del proyecto.
 
 ---
 
-**Versión**: 1.0  
-**Última actualización**: 25 de octubre 2025
+**Versión**: 1.1  
+**Última actualización**: 7 de noviembre 2025

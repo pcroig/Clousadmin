@@ -15,6 +15,15 @@ Esta carpeta contiene documentación histórica de migraciones y cambios arquite
 - `../funcionalidades/ausencias.md` - Estados y lógica de transición de ausencias
 - `../funcionalidades/fichajes.md` - Estados y workflow de fichajes
 
+### Planes y Optimizaciones Completadas (Referencia)
+- `LIMPIEZA_PLAN.md` - Plan de limpieza y optimización completado (2025-01-27)
+- `FASE1_OPTIMIZACIONES_APLICADAS.md` - Optimizaciones aplicadas al schema Prisma (2025-01-27)
+- `EVALUACION_OPTIMIZACION_MODELOS.md` - Evaluación holística de optimización de modelos (v1.0)
+- `EVALUACION_OPTIMIZACION_MODELOS_V2.md` - Evaluación ejecutable de optimización de modelos (v2.0 y v3.0)
+- `REVISION_RELACIONES_CAMBIOS.md` - Revisión completa de relaciones y cambios en schema (2025-01-27)
+
+**Nota**: Las optimizaciones documentadas en estos archivos ya están aplicadas o integradas en la documentación activa.
+
 ### Especificaciones Técnicas (Referencia)
 - `AUTO_COMPLETADO_FICHAJES.md` - **Consolidado**: Especificación y guía de testing del sistema de auto-completado de fichajes
 

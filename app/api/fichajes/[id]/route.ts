@@ -17,6 +17,8 @@ import {
 } from '@/lib/api-handler';
 import { z } from 'zod';
 
+import { EstadoAusencia, UsuarioRol } from '@/lib/constants/enums';
+
 const fichajeApprovalSchema = z.object({
   accion: z.enum(['aprobar', 'rechazar']),
 });
@@ -72,7 +74,7 @@ export async function GET(
 
     // Verificar permisos: empleados solo pueden ver sus propios fichajes
     if (
-      session.user.rol === 'empleado' &&
+      session.user.rol === UsuarioRol.empleado &&
       fichaje.empleadoId !== session.user.empleadoId
     ) {
       return forbiddenResponse('No tienes permiso para ver este fichaje');
@@ -121,7 +123,7 @@ export async function PATCH(
     // Si tiene accion, procesar aprobación/rechazo
     if (body.accion) {
       // Verificar rol HR Admin o Manager
-      if (session.user.rol !== 'hr_admin' && session.user.rol !== 'manager') {
+      if (session.user.rol !== UsuarioRol.hr_admin && session.user.rol !== UsuarioRol.manager) {
         return forbiddenResponse('Solo HR Admin o Manager pueden aprobar/rechazar fichajes');
       }
 
@@ -143,7 +145,7 @@ export async function PATCH(
         const actualizado = await prisma.fichaje.update({
           where: { id },
           data: {
-            estado: 'pendiente', // Rechazado pasa a pendiente
+            estado: EstadoAusencia.pendiente_aprobacion, // Rechazado pasa a pendiente
           },
         });
 
@@ -157,12 +159,12 @@ export async function PATCH(
     const { data: validatedData } = validationResult;
 
     // Verificar permisos: empleados solo pueden editar sus propios fichajes y solo para solicitar corrección
-    if (session.user.rol === 'empleado' && fichaje.empleadoId !== session.user.empleadoId) {
+    if (session.user.rol === UsuarioRol.empleado && fichaje.empleadoId !== session.user.empleadoId) {
       return forbiddenResponse('Solo puedes editar tus propios fichajes');
     }
 
     // Si es empleado, debe tener motivoEdicion
-    if (session.user.rol === 'empleado' && !validatedData.motivoEdicion) {
+    if (session.user.rol === UsuarioRol.empleado && !validatedData.motivoEdicion) {
       return badRequestResponse('Debes proporcionar un motivo para la corrección');
     }
 
@@ -214,7 +216,7 @@ export async function PATCH(
     
     // Si el fichaje estaba pendiente y ahora está completo, marcarlo como finalizado
     // Solo si quien edita es HR o Manager
-    if (validacion.completo && fichaje.estado === 'pendiente' && (session.user.rol === 'hr_admin' || session.user.rol === 'manager')) {
+    if (validacion.completo && fichaje.estado === EstadoAusencia.pendiente_aprobacion && (session.user.rol === UsuarioRol.hr_admin || session.user.rol === UsuarioRol.manager)) {
       await prisma.fichaje.update({
         where: { id },
         data: { estado: 'finalizado' },
@@ -261,5 +263,6 @@ export async function DELETE(
     return handleApiError(error, 'API DELETE /api/fichajes/[id]');
   }
 }
+
 
 

@@ -9,13 +9,15 @@ import { tieneAlertasCriticas } from '@/lib/validaciones/nominas';
 import { join } from 'path';
 import { writeFile } from 'fs/promises';
 
+import { UsuarioRol } from '@/lib/constants/enums';
+
 // GET /api/nominas/export-gestoria?mes=X&anio=Y
 export async function GET(req: NextRequest) {
   try {
     const session = await getSession();
 
     // Verificar autenticación y rol
-    if (!session || session.user.rol !== 'hr_admin') {
+    if (!session || session.user.rol !== UsuarioRol.hr_admin) {
       return NextResponse.json(
         { error: 'No autorizado' },
         { status: 403 }
@@ -112,6 +114,7 @@ export async function GET(req: NextRequest) {
     );
   }
 }
+
 
 
 

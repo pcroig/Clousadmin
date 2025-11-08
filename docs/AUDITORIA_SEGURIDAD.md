@@ -9,48 +9,48 @@
 
 ### 1. Vulnerabilidades de Login
 
+**Estado**: ✅ Resuelto (nov 2025)  
 **Archivo**: `app/(auth)/login/actions.ts`
 
-#### Problemas Identificados:
-- **No hay rate limiting**: Vulnerable a ataques de fuerza bruta
-- **Timing attack posible**: Línea 14-25 revela si el email existe (respuesta más rápida si no existe)
-- **No hay logging de intentos fallidos**: No se registran intentos de login para detectar ataques
-- **Error revela existencia de email**: El código especial 'email_no_existe' revela información
+#### Problemas Identificados (enero 2025):
+- ~~No hay rate limiting~~ → `rateLimitLogin` con ventana corta + horaria (L14-L29)
+- ~~Timing attack posible~~ → Retardo mínimo constante de 200 ms (L32-L52)
+- ~~No hay logging de intentos fallidos~~ → Logging controlado sin datos sensibles (L148-L151)
+- ~~Error revela existencia de email~~ → Respuestas genéricas (`Credenciales incorrectas`)
 
-#### Impacto:
-- Alto: Fuerza bruta puede comprometer cuentas
-- Medio: Timing attacks pueden enumerar emails válidos
+#### Impacto residual:
+- Bajo: mantener monitoreo de logs y alertas de rate limiting
 
 ---
 
 ### 2. Gestión de Sesiones
 
+**Estado**: ✅ Resuelto (nov 2025)  
 **Archivo**: `lib/auth.ts`
 
-#### Problemas Identificados:
-- **No hay invalidación al cambiar contraseña**: Sesiones antiguas siguen siendo válidas
-- **Sesiones de 7 días sin renovación**: Línea 17, muy largo para datos sensibles  
-- **No hay registro de sesiones activas**: No se puede listar/invalidar sesiones del usuario
-- **Sesión no se invalida si usuario se desactiva**: Solo se verifica en login, no en requests posteriores
+#### Problemas Identificados (enero 2025):
+- ~~No hay invalidación al cambiar contraseña~~ → `loginAction` elimina sesiones previas
+- ~~Sesiones de 7 días sin renovación~~ → `sesionActiva` controla expiración y `ultimoUso`
+- ~~No hay registro de sesiones activas~~ → `getUserActiveSessions` disponible
+- ~~Sesión no se invalida si usuario se desactiva~~ → `getSession()` consulta BD y elimina sesión
 
-#### Impacto:
-- Alto: Token robado puede usarse indefinidamente (7 días)
-- Alto: Usuario desactivado puede seguir usando la app hasta que expire el token
+#### Impacto residual:
+- Evaluar reducir duración de sesión a 72 h en producción
 
 ---
 
 ### 3. Middleware de Seguridad
 
+**Estado**: ✅ Resuelto (nov 2025)  
 **Archivo**: `middleware.ts`
 
-#### Problemas Identificados:
-- **Solo verifica usuario activo del token**: Línea 58, no consulta BD en cada request
-- **No actualiza "último uso"**: No hay registro de actividad de sesión
-- **No verifica que sesión existe en BD**: Si se agrega tabla de sesiones activas, no se consulta
+#### Problemas Identificados (enero 2025):
+- ~~Solo verifica usuario activo del token~~ → `getSession()` revalida contra BD
+- ~~No actualiza "último uso"~~ → Actualización en `sesionActiva.update`
+- ~~No verifica que sesión existe en BD~~ → Hash del token buscado en `sesionActiva`
 
-#### Impacto:
-- Medio: Usuario desactivado puede seguir accediendo hasta expiración del token
-- Bajo: No hay trazabilidad de actividad de sesiones
+#### Impacto residual:
+- Añadir métricas de expiración vs. uso real para detectar sesiones huérfanas
 
 ---
 
@@ -61,43 +61,45 @@
 - `app/(dashboard)/hr/organizacion/personas/page.tsx`
 - `app/api/empleados/route.ts`
 
-#### Problemas Identificados:
-- **Datos sin encriptar en BD**: IBAN, NIF, NSS, salarios en texto plano
-- **Datos sensibles en respuestas API**: Se retornan sin filtrar según rol
-- **Potencial exposición en logs**: console.error puede loggear datos sensibles
+**Estado**: 🚧 Pendiente  
+#### Problemas vigentes:
+- **Datos sin encriptar en BD**: IBAN, NIF, NSS siguen almacenados sin cifrar en altas/updates
+- **Datos sensibles en respuestas API**: Endpoints HR devuelven todos los campos → crear proyecciones `select`
+- **Potencial exposición en logs**: Revisar `handleApiError` para sanitizar stacktraces
 
 #### Impacto:
 - Crítico: Breach de BD expone datos sensibles directamente
-- Alto: Logs pueden contener datos sensibles
+- Alto: Logs pueden contener datos sensibles si no se sanitiza
 
 ---
 
 ### 5. Autorización y Control de Acceso
 
+**Estado**: ⚠️ En seguimiento  
 **Archivo**: `lib/api-handler.ts`
 
 #### Problemas Identificados:
-- **No hay auditoría de accesos**: No se registra quién accede a qué datos
-- **Verificación empresaId puede olvidarse**: No es automática en todas las queries
+- **No hay auditoría de accesos**: Pendiente definir almacenamiento + dashboards
+- **Verificación `empresaId` puede olvidarse**: Helpers existen (`verifyEmpresaAccess`) pero falta revisión 100 %
 
 #### Impacto:
 - Alto: Sin auditoría, difícil detectar accesos no autorizados
-- Medio: Riesgo de olvidar filtro empresaId en nuevas queries
+- Medio: Riesgo de olvidar filtro `empresaId` en nuevas queries
 
 ---
 
 ## Recomendaciones por Prioridad
 
 ### Críticas (Implementar YA)
-1. ✅ **Rate Limiting**: Proteger login contra fuerza bruta
-2. ✅ **Sesiones Mejoradas**: Tabla de sesiones activas con invalidación
-3. ✅ **Encriptación de Datos**: IBAN, NIF, NSS, salarios
-4. ✅ **Verificación Usuario Activo**: En middleware, consultar BD en cada request
+1. ✅ **Rate Limiting** (completado nov 2025)
+2. ✅ **Sesiones Mejoradas** (completado nov 2025)
+3. 🚧 **Encriptación de Datos** (IBAN/NIF/NSS en altas todavía sin cifrar)
+4. ✅ **Verificación Usuario Activo** (middleware consulta BD)
 
 ### Altas (Esta semana)
-5. ✅ **Auditoría de Accesos**: Registrar accesos a datos sensibles
-6. ✅ **Estandarizar tiempos de respuesta**: Prevenir timing attacks en login
-7. ✅ **Headers de Seguridad**: CSP, HSTS, etc.
+5. 🚧 **Auditoría de Accesos**: Diseñar tabla + reporting
+6. ✅ **Estandarizar tiempos de respuesta** (login)
+7. ⚠️ **Headers de Seguridad**: Documentar CSP/HSTS mínimos
 
 ### Medias (Este mes)
 8. ⏳ **Logging estructurado**: Evitar datos sensibles en logs
@@ -109,8 +111,8 @@
 ## Estado de Implementación
 
 - [x] Fase 1: Auditoría completada
-- [ ] Fase 2: Rate limiting
-- [ ] Fase 3: Sesiones mejoradas  
+- [x] Fase 2: Rate limiting
+- [x] Fase 3: Sesiones mejoradas  
 - [ ] Fase 4: Encriptación
 - [ ] Fase 5: Auditoría GDPR
 - [ ] Fase 6: Funcionalidades GDPR
@@ -120,7 +122,14 @@
 
 ---
 
-**Próximos pasos**: Implementar Fase 2 (Rate Limiting con fallback a memoria)
+**Próximos pasos**:
+- Priorizar Fase 4 (cifrado y proyección de datos sensibles)
+- Planificar implementación de auditoría de accesos (Fase 5) y cabeceras CSP/HSTS
+
+---
+
+**Última actualización**: 7 de noviembre 2025
+
 
 
 

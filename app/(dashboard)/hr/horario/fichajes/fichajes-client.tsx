@@ -34,6 +34,8 @@ import { JornadasModal } from './jornadas-modal';
 import { EditarFichajeModal } from './editar-fichaje-modal';
 import { RevisionModal } from './revision-modal';
 
+import { EstadoAusencia } from '@/lib/constants/enums';
+
 // NUEVO MODELO: Fichaje tiene eventos dentro
 interface FichajeEvento {
   id: string;
@@ -49,6 +51,8 @@ interface Fichaje {
   estado: string;
   horasTrabajadas: number | string | null; // Prisma Decimal se serializa como string
   horasEnPausa: number | string | null; // Prisma Decimal se serializa como string
+  horasEsperadas?: number | string | null;
+  balance?: number | string | null;
   autoCompletado: boolean;
   eventos: FichajeEvento[];
   empleado: {
@@ -65,6 +69,7 @@ interface JornadaDia {
   fecha: Date;
   fichaje: Fichaje;
   horasTrabajadas: number;
+  horasEsperadas: number;
   horarioEntrada: string | null;
   horarioSalida: string | null;
   balance: number;
@@ -191,8 +196,26 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
       const horarioEntrada = entrada ? format(new Date(entrada.hora), 'HH:mm') : null;
       const horarioSalida = salida ? format(new Date(salida.hora), 'HH:mm') : null;
 
-      // Balance (asumiendo 8h como jornada estándar por ahora)
-      const balance = horasTrabajadas - 8;
+      const horasEsperadas = (() => {
+        const valor = (fichaje as any).horasEsperadas;
+        if (valor === null || valor === undefined) {
+          return 0;
+        }
+        const numero = typeof valor === 'string' ? parseFloat(valor) : valor;
+        return Number.isFinite(numero) ? numero : 0;
+      })();
+
+      const balance = (() => {
+        const valor = (fichaje as any).balance;
+        if (valor === null || valor === undefined) {
+          return Math.round((horasTrabajadas - horasEsperadas) * 100) / 100;
+        }
+        const numero = typeof valor === 'string' ? parseFloat(valor) : valor;
+        if (Number.isFinite(numero)) {
+          return numero;
+        }
+        return Math.round((horasTrabajadas - horasEsperadas) * 100) / 100;
+      })();
 
       return {
         empleadoId: fichaje.empleado.id,
@@ -200,6 +223,7 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
         fecha: new Date(fichaje.fecha),
         fichaje,
         horasTrabajadas,
+        horasEsperadas,
         horarioEntrada,
         horarioSalida,
         balance,
@@ -367,9 +391,9 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
   // Fichajes que requieren atención (no completados ni aprobados)
   const fichajesRevisados = jornadasFiltradas.filter(j => j.fichaje.estado === 'revisado').length;
   const fichajesPendientesRevision = jornadasFiltradas.filter(j => 
-    j.fichaje.estado === 'pendiente' || 
+    j.fichaje.estado === EstadoAusencia.pendiente_aprobacion || 
     j.fichaje.estado === 'pendiente_revision' || // Legacy
-    j.fichaje.estado === 'en_curso' ||
+    j.fichaje.estado === EstadoAusencia.en_curso ||
     j.fichaje.estado === 'rechazado' // Legacy - tratar como pendiente
   ).length;
 
@@ -512,6 +536,7 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
                 <TableHead>Empleado</TableHead>
                 <TableHead>Fecha</TableHead>
                 <TableHead>Horas Trabajadas</TableHead>
+                <TableHead>Horas Esperadas</TableHead>
                 <TableHead>Horario</TableHead>
                 <TableHead>Balance</TableHead>
                 <TableHead>Estado</TableHead>
@@ -577,6 +602,11 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
                         </TableCell>
                         <TableCell>
                           <span className="text-sm text-gray-600">
+                            {formatearHorasMinutos(jornada.horasEsperadas)}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-sm text-gray-600">
                             {jornada.horarioEntrada && jornada.horarioSalida
                               ? `${jornada.horarioEntrada} - ${jornada.horarioSalida}`
                               : jornada.horarioEntrada
@@ -585,9 +615,15 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
                           </span>
                     </TableCell>
                     <TableCell>
-                          <span className={`text-sm font-medium ${jornada.balance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                            {typeof jornada.balance === 'number' && !isNaN(jornada.balance)
-                              ? `${jornada.balance >= 0 ? '+' : ''}${formatearHorasMinutos(Math.abs(jornada.balance))}`
+                          <span
+                            className={`text-sm font-medium ${
+                              jornada.balance >= 0 ? 'text-green-600' : 'text-red-600'
+                            }`}
+                          >
+                            {Number.isFinite(jornada.balance) && jornada.balance !== 0
+                              ? `${jornada.balance > 0 ? '+' : '-'}${formatearHorasMinutos(
+                                  Math.abs(jornada.balance)
+                                )}`
                               : '0h 0m'}
                           </span>
                     </TableCell>

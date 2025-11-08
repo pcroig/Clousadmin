@@ -5,6 +5,8 @@
 
 import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { EstadoAusencia } from '@/lib/constants/enums';
+
 import {
   requireAuthAsHR,
   handleApiError,
@@ -45,7 +47,7 @@ export async function GET(request: NextRequest) {
     const enRevision = await prisma.fichaje.count({
       where: {
         empresaId: session.user.empresaId,
-        estado: 'pendiente',
+        estado: EstadoAusencia.pendiente_aprobacion,
         fecha: {
           lt: hoy, // Solo días anteriores
         },

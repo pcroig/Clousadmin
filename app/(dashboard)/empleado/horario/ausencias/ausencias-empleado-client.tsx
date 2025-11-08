@@ -22,6 +22,8 @@ import { Calendar, Plus, ChevronDown, ChevronUp } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
+import { EstadoAusencia } from '@/lib/constants/enums';
+
 interface Ausencia {
   id: string;
   tipo: string;
@@ -270,7 +272,7 @@ export function AusenciasEmpleadoClient({ saldo, campanas = [] }: Props) {
                       {format(new Date(ausencia.createdAt), 'dd MMM yyyy', { locale: es })}
                     </TableCell>
                     <TableCell className="max-w-xs truncate">
-                      {ausencia.estado === 'rechazada' && ausencia.motivoRechazo ? (
+                      {ausencia.estado === EstadoAusencia.rechazada && ausencia.motivoRechazo ? (
                         <span className="text-red-600 text-sm">{ausencia.motivoRechazo}</span>
                       ) : (
                         <span className="text-gray-500 text-sm">{ausencia.motivo || '-'}</span>

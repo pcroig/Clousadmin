@@ -13,11 +13,14 @@ import { Mail, Phone, Calendar, MapPin, Briefcase, Users } from 'lucide-react';
 import Link from 'next/link';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { getAvatarStyle } from '@/lib/design-system';
+
+import { UsuarioRol } from '@/lib/constants/enums';
 
 export default async function ManagerEquipoPage() {
   const session = await getSession();
 
-  if (!session || session.user.rol !== 'manager') {
+  if (!session || session.user.rol !== UsuarioRol.manager) {
     redirect('/login');
   }
 
@@ -126,41 +129,47 @@ export default async function ManagerEquipoPage() {
         </Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {empleadosACargo.map((empleado) => (
-            <Card key={empleado.id} className="p-6 hover:shadow-lg transition-shadow">
-              <div className="flex items-start gap-4">
-                <Avatar className="h-16 w-16">
-                  {empleado.fotoUrl && <AvatarImage src={empleado.fotoUrl} />}
-                  <AvatarFallback className="bg-gray-200 text-gray-700">
-                    {getInitials(empleado.nombre, empleado.apellidos)}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="flex-1 min-w-0">
-                  <h3 className="text-lg font-semibold text-gray-900 truncate">
-                    {empleado.nombre} {empleado.apellidos}
-                  </h3>
-                  {empleado.puestoRelacion && (
-                    <p className="text-sm text-gray-600 flex items-center gap-1 mt-1">
-                      <Briefcase className="h-3 w-3" />
-                      {empleado.puestoRelacion.nombre}
-                    </p>
-                  )}
-                  {empleado.estadoEmpleado && (
-                    <Badge
-                      variant={
-                        empleado.estadoEmpleado === 'activo'
-                          ? 'default'
-                          : empleado.estadoEmpleado === 'baja'
-                          ? 'destructive'
-                          : 'secondary'
-                      }
-                      className="mt-2"
+          {empleadosACargo.map((empleado) => {
+            const avatarStyle = getAvatarStyle(`${empleado.nombre} ${empleado.apellidos}`);
+
+            return (
+              <Card key={empleado.id} className="p-6 hover:shadow-lg transition-shadow">
+                <div className="flex items-start gap-4">
+                  <Avatar className="h-16 w-16">
+                    {empleado.fotoUrl && <AvatarImage src={empleado.fotoUrl} />}
+                    <AvatarFallback
+                      className="text-lg font-semibold uppercase"
+                      style={avatarStyle}
                     >
-                      {empleado.estadoEmpleado.charAt(0).toUpperCase() + empleado.estadoEmpleado.slice(1)}
-                    </Badge>
-                  )}
+                      {getInitials(empleado.nombre, empleado.apellidos)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-lg font-semibold text-gray-900 truncate">
+                      {empleado.nombre} {empleado.apellidos}
+                    </h3>
+                    {empleado.puestoRelacion && (
+                      <p className="text-sm text-gray-600 flex items-center gap-1 mt-1">
+                        <Briefcase className="h-3 w-3" />
+                        {empleado.puestoRelacion.nombre}
+                      </p>
+                    )}
+                    {empleado.estadoEmpleado && (
+                      <Badge
+                        variant={
+                          empleado.estadoEmpleado === 'activo'
+                            ? 'default'
+                            : empleado.estadoEmpleado === 'baja'
+                            ? 'destructive'
+                            : 'secondary'
+                        }
+                        className="mt-2"
+                      >
+                        {empleado.estadoEmpleado.charAt(0).toUpperCase() + empleado.estadoEmpleado.slice(1)}
+                      </Badge>
+                    )}
+                  </div>
                 </div>
-              </div>
 
               <div className="mt-6 space-y-3">
                 {empleado.usuario?.email && (
@@ -214,8 +223,9 @@ export default async function ManagerEquipoPage() {
                   </Link>
                 </Button>
               </div>
-            </Card>
-          ))}
+              </Card>
+            );
+          })}
         </div>
       )}
 

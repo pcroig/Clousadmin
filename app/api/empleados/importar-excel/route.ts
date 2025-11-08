@@ -7,6 +7,8 @@ import { getSession } from '@/lib/auth';
 import { parseExcelToJSON, isValidExcelFile } from '@/lib/excel/parser';
 import { mapearEmpleadosConIA, validarEmpleado } from '@/lib/ia/procesar-excel-empleados';
 
+import { UsuarioRol } from '@/lib/constants/enums';
+
 /**
  * POST /api/empleados/importar-excel
  * Analiza un archivo Excel y retorna preview de empleados detectados
@@ -15,7 +17,7 @@ export async function POST(req: NextRequest) {
   try {
     // Verificar autenticación
     const session = await getSession();
-    if (!session || session.user.rol !== 'hr_admin') {
+    if (!session || session.user.rol !== UsuarioRol.hr_admin) {
       return NextResponse.json(
         { success: false, error: 'No autorizado' },
         { status: 401 }
@@ -127,6 +129,7 @@ export async function POST(req: NextRequest) {
     );
   }
 }
+
 
 
 

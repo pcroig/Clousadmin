@@ -7,6 +7,8 @@ import { prisma } from '@/lib/prisma';
 import { redirect } from 'next/navigation';
 import { CarpetaDetailClient } from './carpeta-detail-client';
 
+import { UsuarioRol } from '@/lib/constants/enums';
+
 export default async function HRCarpetaDetailPage({
   params,
 }: {
@@ -14,7 +16,7 @@ export default async function HRCarpetaDetailPage({
 }) {
   const session = await getSession();
 
-  if (!session || session.user.rol !== 'hr_admin') {
+  if (!session || session.user.rol !== UsuarioRol.hr_admin) {
     redirect('/login');
   }
 

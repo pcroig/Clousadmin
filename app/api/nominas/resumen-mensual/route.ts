@@ -10,13 +10,15 @@ import {
 } from '@/lib/calculos/nominas';
 import { prisma } from '@/lib/prisma';
 
+import { UsuarioRol } from '@/lib/constants/enums';
+
 // GET /api/nominas/resumen-mensual?mes=X&anio=Y&recalcular=true
 export async function GET(req: NextRequest) {
   try {
     const session = await getSession();
 
     // Verificar autenticación y rol
-    if (!session || session.user.rol !== 'hr_admin') {
+    if (!session || session.user.rol !== UsuarioRol.hr_admin) {
       return NextResponse.json(
         { error: 'No autorizado' },
         { status: 403 }
@@ -115,6 +117,7 @@ export async function GET(req: NextRequest) {
     );
   }
 }
+
 
 
 

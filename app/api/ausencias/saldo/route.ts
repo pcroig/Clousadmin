@@ -14,6 +14,8 @@ import {
 } from '@/lib/api-handler';
 import { z } from 'zod';
 
+import { EstadoAusencia, UsuarioRol } from '@/lib/constants/enums';
+
 const saldoSchema = z.object({
   nivel: z.enum(['empresa', 'equipo']),
   diasTotales: z.number().int().min(0).max(365),
@@ -36,7 +38,7 @@ export async function GET(req: NextRequest) {
     }
 
     // Validar permisos: empleados solo pueden ver su propio saldo
-    if (session.user.rol === 'empleado' && session.user.empleadoId !== empleadoId) {
+    if (session.user.rol === UsuarioRol.empleado && session.user.empleadoId !== empleadoId) {
       return badRequestResponse('No puedes ver el saldo de otros empleados');
     }
 
@@ -79,11 +81,11 @@ export async function GET(req: NextRequest) {
     });
 
     const diasUsados = ausencias
-      .filter((a: any) => a.estado === 'en_curso' || a.estado === 'completada' || a.estado === 'auto_aprobada')
+      .filter((a: any) => a.estado === EstadoAusencia.en_curso || a.estado === EstadoAusencia.completada || a.estado === EstadoAusencia.auto_aprobada)
       .reduce((sum: number, a: any) => sum + Number(a.diasSolicitados), 0);
 
     const diasPendientes = ausencias
-      .filter((a: any) => a.estado === 'pendiente_aprobacion')
+      .filter((a: any) => a.estado === EstadoAusencia.pendiente_aprobacion)
       .reduce((sum: number, a: any) => sum + Number(a.diasSolicitados), 0);
 
     const diasTotales = saldoAsignado?.diasTotales || 0;

@@ -8,10 +8,12 @@ import { prisma } from '@/lib/prisma';
 import { serializeEmpleado } from '@/lib/utils';
 import { MiEspacioDatosClient } from './datos-client';
 
+import { UsuarioRol } from '@/lib/constants/enums';
+
 export default async function MiEspacioDatosPage() {
   const session = await getSession();
 
-  if (!session || session.user.rol === 'hr_admin') {
+  if (!session || session.user.rol === UsuarioRol.hr_admin) {
     redirect('/login');
   }
 

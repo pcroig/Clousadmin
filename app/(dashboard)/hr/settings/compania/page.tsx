@@ -9,10 +9,12 @@ import { prisma } from '@/lib/prisma';
 
 import { CompanyClient } from './company-client';
 
+import { UsuarioRol } from '@/lib/constants/enums';
+
 export default async function CompanySettingsPage() {
   const session = await getSession();
 
-  if (!session || session.user.rol !== 'hr_admin') {
+  if (!session || session.user.rol !== UsuarioRol.hr_admin) {
     redirect('/login');
   }
 
@@ -30,7 +32,7 @@ export default async function CompanySettingsPage() {
       telefono: true,
       createdAt: true,
       usuarios: {
-        where: { rol: 'hr_admin' },
+        where: { rol: UsuarioRol.hr_admin },
         select: {
           id: true,
           nombre: true,

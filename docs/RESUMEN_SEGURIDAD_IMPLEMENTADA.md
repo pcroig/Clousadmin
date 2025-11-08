@@ -1,7 +1,8 @@
 # Resumen Ejecutivo - Implementación de Seguridad
 
-**Fecha**: 2025-01-27  
-**Estado**: Fases 1-7 completadas ✅ (Funcionalidad core lista para dev local)
+**Fecha**: 2025-11-07  
+**Estado**: Fases 1-3 completadas ✅ · Fases 4-5 en progreso ⚠️  
+**Versión**: 1.1
 
 ---
 
@@ -11,7 +12,7 @@ Implementar un sistema de seguridad robusto para Clousadmin, cumpliendo con est�
 
 ---
 
-## ✅ Fases Completadas (1-7)
+## ✅ Fases Completadas / ⚠️ En progreso
 
 ### **Fase 1: Auditoría de Seguridad ✅**
 
@@ -22,11 +23,11 @@ Implementar un sistema de seguridad robusto para Clousadmin, cumpliendo con est�
 - Evaluación de exposición de datos sensibles
 - Planificación de mejoras
 
-**Hallazgos clave**:
-- ❌ Sin rate limiting → **Solucionado**
-- ❌ Sin gestión de sesiones activas → **Solucionado**
-- ❌ Datos sensibles sin encriptar → **Solucionado**
-- ❌ Sin auditoría de accesos → **Solucionado**
+**Hallazgos clave (estado nov 2025)**:
+- ❌ Sin rate limiting → ✅ **Solucionado**
+- ❌ Sin gestión de sesiones activas → ✅ **Solucionado**
+- ❌ Datos sensibles sin encriptar → ⚠️ **En progreso** (helpers listos, falta integrar en APIs)
+- ❌ Sin auditoría de accesos → ⚠️ **En progreso** (utilidades sin wiring)
 
 ---
 
@@ -77,78 +78,58 @@ Implementar un sistema de seguridad robusto para Clousadmin, cumpliendo con est�
 
 ---
 
-### **Fase 4: Encriptación de Datos Sensibles ✅**
+### **Fase 4: Encriptación de Datos Sensibles** ⚠️ *(en progreso)*
 
-**Archivos**: `lib/crypto.ts`, `lib/empleado-crypto.ts`, `lib/onboarding.ts`, `app/api/empleados/[id]/route.ts`
+**Archivos**: `lib/crypto.ts`, `lib/empleado-crypto.ts`
 
 **Implementado**:
-- ✅ Encriptación AES-256-GCM para campos sensibles
-- ✅ Campos encriptados automáticamente:
-  - `empleado.iban`
-  - `empleado.nif`
-  - `empleado.nss`
-- ✅ Derivación de key con PBKDF2 + salt aleatorio
-- ✅ Helpers reutilizables:
-  - `encrypt()` / `decrypt()`
-  - `encryptEmpleadoData()` / `decryptEmpleadoData()`
-  - `sanitizeEmpleadoForLogs()` (evitar logging de datos sensibles)
-- ✅ Integración en:
-  - Onboarding de empleados
-  - API de actualización de empleados
-  - (Otras queries según necesidad)
+- ✅ Librería AES-256-GCM con PBKDF2 + salt aleatorio
+- ✅ Helpers reutilizables (`encrypt`, `decrypt`, `encryptEmpleadoData`, `sanitizeEmpleadoForLogs`)
+- ✅ Validación de `ENCRYPTION_KEY` en `lib/env.ts`
+
+**Pendiente**:
+- ❌ Aplicar helpers en onboarding y APIs de empleados (`app/api/empleados`, `lib/onboarding`)
+- ❌ Cifrar salarios cuando se implementen ordenamientos seguros
+- ❌ Migrar datos históricos (Fase 9)
 
 **Configuración**:
 ```env
 ENCRYPTION_KEY=3f70cf35f9f2efeff971a06fb8b3f2440d9b30b0271fd6936c9b72bd183216df
 ```
-⚠️ **CRÍTICO**: Guardar de forma segura, sin key no se pueden desencriptar datos
-
-**Beneficios**:
-- 🔐 Protección en caso de breach de BD
-- 🔐 Cumplimiento con estándares de seguridad empresariales
-- 🔐 Base para certificaciones (ISO 27001, etc.)
+⚠️ **CRÍTICO**: Guardar la clave en Secrets Manager en producción
 
 ---
 
-### **Fase 5: Auditoría de Accesos ✅**
+### **Fase 5: Auditoría de Accesos** ⚠️ *(en progreso)*
 
 **Archivos**: `lib/auditoria.ts`, `prisma/schema.prisma` (modelos `AuditoriaAcceso`, `Consentimiento`, `SolicitudEliminacionDatos`)
 
 **Implementado**:
-- ✅ Tabla `auditoria_accesos` para registrar accesos a datos sensibles
-- ✅ Registro automático de:
-  - Quién accedió
-  - Qué datos
-  - Cuándo
-  - Desde dónde (IP, User Agent)
-  - Qué acción (lectura, modificación, exportación, eliminación)
-- ✅ Funciones de auditoría:
-  - `registrarAcceso()` - Registrar evento
-  - `obtenerLogAuditoria()` - Consultar logs de un empleado
-  - `obtenerEstadisticasAccesos()` - Estadísticas agregadas
-  - `detectarAccesosSospechosos()` - Alertas de seguridad
-  - `limpiarLogsAntiguos()` - Retención de datos
-- ✅ Modelos GDPR:
-  - `Consentimiento` - Gestión de consentimientos
-  - `SolicitudEliminacionDatos` - Derecho al olvido
+- ✅ Utilidades para registrar, consultar y limpiar accesos
+- ✅ Modelos GDPR preparados (consentimientos, solicitudes de eliminación)
 
-**Cumplimiento GDPR/LOPD**:
-- 📋 Artículo 30: Registro de actividades de tratamiento
-- 📋 Artículo 15: Derecho de acceso (logs de auditoría)
-- 📋 Artículo 5: Limitación del plazo de conservación
+**Pendiente**:
+- ❌ Invocar `registrarAcceso` en APIs y servicios críticos
+- ❌ UI/reportes para revisar logs y responder solicitudes GDPR
+- ❌ Alertas automáticas (accesos sospechosos, exportaciones masivas)
+
+**Cumplimiento GDPR/LOPD (parcial)**:
+- 📋 Artículo 30: estructura lista, falta captura real de eventos
+- 📋 Artículo 15: APIs internas disponibles, falta exposición a usuarios
+- 📋 Artículo 5: helper de retención (`limpiarLogsAntiguos`) listo
 
 ---
 
 ## 📊 Métricas de Seguridad
 
-| Aspecto | Antes | Después | Mejora |
-|---------|-------|---------|--------|
-| Rate Limiting | ❌ Ninguno | ✅ Multi-nivel | ∞ |
-| Datos Encriptados | 0% | 100% (sensibles) | +100% |
-| Sesiones Rastreables | ❌ No | ✅ Sí | ✅ |
-| Auditoría de Accesos | ❌ No | ✅ Sí | ✅ |
-| Protección Fuerza Bruta | ❌ No | ✅ Sí | ✅ |
-| GDPR Compliance | 20% | 70% | +50% |
+| Aspecto | Antes | Estado nov 2025 | Nota |
+|---------|-------|------------------|------|
+| Rate Limiting | ❌ Ninguno | ✅ Multi-nivel | Falta backend Redis prod |
+| Datos Encriptados | 0% | ⚠️ Helpers listos | Aplicar en APIs + migración |
+| Sesiones Rastreables | ❌ No | ✅ Sí | Tabla `sesionActiva` operativa |
+| Auditoría de Accesos | ❌ No | ⚠️ Utilidades listas | Falta integrar y exponer |
+| Protección Fuerza Bruta | ❌ No | ✅ Sí | Incluye mitigación timing |
+| GDPR Compliance | 20% | ~50% | Requiere fases 6-10 |
 
 ---
 
@@ -234,12 +215,12 @@ ENCRYPTION_KEY=3f70cf35f9f2efeff971a06fb8b3f2440d9b30b0271fd6936c9b72bd183216df
    ```
 
 ### Antes de Producción (CRÍTICO)
-1. 🔴 **Migrar ENCRYPTION_KEY a AWS Secrets Manager**
-2. 🔴 **Implementar Fase 8 (Testing exhaustivo)**
-3. 🔴 **Implementar Fase 9 (Migración de datos existentes)**
-4. 🟡 **Completar Fase 6 (GDPR completo)**
-5. 🟡 **Completar Fase 7 (Headers de seguridad)**
-6. 🟡 **Migrar rate limiting a Redis/Upstash**
+1. 🔴 Aplicar cifrado en CRUD de empleados y ejecutar migración de datos históricos
+2. 🔴 Integrar auditoría de accesos en APIs y exponer reporting
+3. 🔴 Migrar `ENCRYPTION_KEY` y secrets a AWS Secrets Manager
+4. 🟡 Completar Fase 6 (GDPR completo)
+5. 🟡 Migrar rate limiting a Redis/Upstash
+6. 🟡 Ejecutar Fase 8 (testing exhaustivo)
 
 ### Post-Producción
 - 📊 Configurar monitoreo (CloudWatch, DataDog, etc.)
@@ -262,25 +243,20 @@ ENCRYPTION_KEY=3f70cf35f9f2efeff971a06fb8b3f2440d9b30b0271fd6936c9b72bd183216df
 
 ## ✨ Conclusión
 
-Se han completado **7 de 10 fases** del plan de seguridad, incluyendo **todas las fases críticas** para desarrollo local:
-- ✅ Análisis y planificación
-- ✅ Protección contra ataques
-- ✅ Gestión segura de sesiones
-- ✅ Encriptación de datos sensibles
-- ✅ Auditoría y trazabilidad
-- ✅ Headers de seguridad HTTP
+Se han completado **4 de 10 fases** del plan de seguridad (auditoría inicial, rate limiting, sesiones mejoradas y headers). Las fases de encriptación y auditoría de accesos cuentan con utilidades listas pero requieren integración en los flujos reales.
 
-La plataforma ahora cuenta con:
-- 🛡️ **Seguridad robusta** contra ataques comunes
-- 🔐 **Encriptación** de datos sensibles
-- 📋 **Auditoría** completa de accesos
-- 🔒 **Gestión de sesiones** con invalidación en tiempo real
-- 🛡️ **Headers HTTP** con protección multi-capa
+La plataforma dispone actualmente de:
+- 🛡️ **Protecciones anti-ataques** (rate limiting + mitigación de timing)
+- 🔒 **Gestión segura de sesiones** con invalidación y seguimiento
+- 🛡️ **Headers HTTP** con políticas defensivas
 
-**Estado actual**: ✅ **Seguro para desarrollo local y staging**  
-**Próximo paso**: Completar Fases 6, 8-10 antes de producción (UI GDPR, testing, migración de datos)
+Próximos pasos clave:
+- Aplicar cifrado completo en APIs y migrar datos existentes
+- Registrar accesos sensibles en tiempo real y exponer reporting
+- Completar backlog GDPR (consentimientos, derecho al olvido)
+- Ejecutar testing y monitoreo previo al despliegue productivo
 
 ---
 
-**Última actualización**: 2025-01-27
+**Última actualización**: 7 de noviembre 2025
 

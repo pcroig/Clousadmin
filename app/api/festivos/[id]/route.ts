@@ -16,6 +16,8 @@ import {
 } from '@/lib/api-handler';
 import { festivoUpdateSchema } from '@/lib/validaciones/schemas';
 
+import { UsuarioRol } from '@/lib/constants/enums';
+
 // Force dynamic rendering
 export const dynamic = 'force-dynamic';
 
@@ -68,7 +70,7 @@ export async function PATCH(
     const { session } = authResult;
 
     // Solo HR Admin puede editar festivos
-    if (session.user.rol !== 'hr_admin') {
+    if (session.user.rol !== UsuarioRol.hr_admin) {
       return badRequestResponse('No tienes permisos para editar festivos');
     }
 
@@ -175,7 +177,7 @@ export async function DELETE(
     const { session } = authResult;
 
     // Solo HR Admin puede eliminar festivos
-    if (session.user.rol !== 'hr_admin') {
+    if (session.user.rol !== UsuarioRol.hr_admin) {
       return badRequestResponse('No tienes permisos para eliminar festivos');
     }
 

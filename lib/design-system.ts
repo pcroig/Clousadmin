@@ -154,6 +154,64 @@ export function getAccentColorStyle(
 }
 
 // ========================================
+// AVATARES
+// ========================================
+
+/**
+ * Paleta de colores pastel/crema para avatares sin imagen.
+ * Documentada en el sistema de diseño y reutilizada en toda la plataforma.
+ */
+export const avatarPalette = [
+  { background: '#e5dacc', text: '#1f2937' },
+  { background: '#bcd1cc', text: '#1f2937' },
+  { background: '#cbcadd', text: '#1f2937' },
+] as const;
+
+/**
+ * Calcula un índice determinista a partir de un identificador (nombre, email, etc.)
+ * para seleccionar un color de la paleta de avatares. Garantiza consistencia visual
+ * entre renderizados y evita saltos de color.
+ */
+function getAvatarPaletteIndex(identifier?: string): number {
+  if (!identifier) {
+    return 0;
+  }
+
+  let hash = 0;
+  for (let i = 0; i < identifier.length; i++) {
+    hash = (hash << 5) - hash + identifier.charCodeAt(i);
+    hash |= 0; // Convert to 32bit integer
+  }
+
+  return Math.abs(hash) % avatarPalette.length;
+}
+
+/**
+ * Devuelve el color (background y texto) para un avatar sin imagen.
+ *
+ * @param identifier - Cadena única (nombre completo, email, id...) para obtener un color consistente
+ */
+export function getAvatarColors(identifier?: string) {
+  return avatarPalette[getAvatarPaletteIndex(identifier)];
+}
+
+/**
+ * Devuelve estilos inline para aplicar el color de la paleta en avatares.
+ *
+ * @param identifier - Cadena única (nombre completo, email, id...) para obtener un color consistente
+ */
+export function getAvatarStyle(identifier?: string): {
+  backgroundColor: string;
+  color: string;
+} {
+  const { background, text } = getAvatarColors(identifier);
+  return {
+    backgroundColor: background,
+    color: text,
+  };
+}
+
+// ========================================
 // UTILIDADES DE TEMA
 // ========================================
 
@@ -189,48 +247,3 @@ export const themeColors = {
 export type IconSize = 'small' | 'default' | 'large' | 'xlarge';
 export type BadgeVariant = keyof typeof badgeVariants;
 export type AccentColor = keyof typeof accentColors;
-
-// ========================================
-// AVATAR PLACEHOLDER UTILITIES
-// ========================================
-
-/**
- * Paleta de colores pastel/crema para placeholders de avatar.
- * Los colores están alineados con la guía de diseño (fondos neutros y crema).
- */
-export const avatarPlaceholderPalette = [
-  'bg-stone-100 text-gray-700 border border-gray-200',
-  'bg-stone-200 text-gray-700 border border-gray-200',
-  'bg-gray-100 text-gray-700 border border-gray-200',
-  'bg-gray-200 text-gray-800 border border-gray-300',
-  'bg-white text-gray-700 border border-gray-200',
-] as const;
-
-/**
- * Devuelve las clases Tailwind para un placeholder de avatar basadas en un identificador.
- * El identificador suele ser el nombre del empleado para garantizar consistencia entre vistas.
- *
- * @param identifier - Texto con el que se calculará la variante (ej. nombre completo)
- * @returns Clases Tailwind combinadas (background + texto + borde)
- */
-export function getAvatarPlaceholderClasses(identifier?: string | null): string {
-  const palette = avatarPlaceholderPalette;
-  if (palette.length === 0) return '';
-
-  if (!identifier) {
-    return palette[0];
-  }
-
-  const normalized = identifier.trim().toLowerCase();
-  if (!normalized) {
-    return palette[0];
-  }
-
-  const hash = Array.from(normalized).reduce(
-    (accumulator, currentChar) => accumulator + currentChar.charCodeAt(0),
-    0
-  );
-
-  const index = hash % palette.length;
-  return palette[index];
-}

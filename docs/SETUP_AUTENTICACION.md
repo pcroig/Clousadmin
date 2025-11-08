@@ -6,7 +6,7 @@ Ya está completado si ejecutaste el setup inicial. Si no:
 
 ```bash
 # Ejecutar migraciones
-npx prisma migrate dev
+npm run db:migrate
 
 # Seed con datos de prueba
 npm run seed
@@ -77,7 +77,7 @@ npm run seed
 ### Ver datos en Prisma Studio
 
 ```bash
-npx prisma studio
+npm run db:studio
 ```
 
 Abre en `http://localhost:5555`
@@ -92,6 +92,7 @@ Abre en `http://localhost:5555`
 ---
 
 Para documentación completa, ver `docs/funcionalidades/autenticacion.md`
+
 
 
 

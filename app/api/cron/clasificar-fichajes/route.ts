@@ -16,6 +16,8 @@
 
 import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { EstadoAusencia } from '@/lib/constants/enums';
+
 import {
   validarFichajeCompleto,
   actualizarCalculosFichaje,
@@ -82,7 +84,7 @@ export async function POST(request: NextRequest) {
                   empresaId: empresa.id,
                   empleadoId: empleado.id,
                   fecha: ayer,
-                  estado: 'pendiente',
+                  estado: EstadoAusencia.pendiente_aprobacion,
                 },
                 include: {
                   eventos: true,
@@ -96,7 +98,7 @@ export async function POST(request: NextRequest) {
             }
 
             // Si el fichaje está en curso, validarlo
-            if (fichaje.estado === 'en_curso') {
+            if (fichaje.estado === EstadoAusencia.en_curso) {
               // Validar si está completo
               const validacion = await validarFichajeCompleto(fichaje.id);
 
@@ -119,7 +121,7 @@ export async function POST(request: NextRequest) {
                 await prisma.fichaje.update({
                   where: { id: fichaje.id },
                   data: {
-                    estado: 'pendiente',
+                    estado: EstadoAusencia.pendiente_aprobacion,
                   },
                 });
 

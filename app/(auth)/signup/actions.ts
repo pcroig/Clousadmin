@@ -11,6 +11,8 @@ import { signupSchema } from '@/lib/validaciones/schemas';
 import { verificarInvitacionSignup, usarInvitacionSignup } from '@/lib/invitaciones-signup';
 import { z } from 'zod';
 
+import { UsuarioRol } from '@/lib/constants/enums';
+
 /**
  * Registrar nueva empresa + primer usuario HR Admin
  * Crea automáticamente: Empresa → Usuario → Empleado → Sesión
@@ -106,7 +108,7 @@ export async function signupEmpresaAction(
           nombre: validatedData.nombre,
           apellidos: validatedData.apellidos,
           empresaId: empresa.id,
-          rol: 'hr_admin',
+          rol: UsuarioRol.hr_admin,
           emailVerificado: true, // Auto-verificado en signup
           activo: true,
         },

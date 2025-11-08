@@ -13,6 +13,8 @@ import {
 import { validarFichajeCompleto } from '@/lib/calculos/fichajes';
 import { generarEventosPropuestos } from '@/lib/calculos/fichajes-helpers';
 
+import { EstadoAusencia } from '@/lib/constants/enums';
+
 // GET /api/fichajes/revision - Obtener fichajes pendientes de revisión (solo HR Admin)
 export async function GET(request: NextRequest) {
   try {
@@ -29,7 +31,7 @@ export async function GET(request: NextRequest) {
     const fichajesPendientes = await prisma.fichaje.findMany({
       where: {
         empresaId: session.user.empresaId,
-        estado: 'pendiente',
+        estado: EstadoAusencia.pendiente_aprobacion,
         fecha: {
           lt: hoy, // Solo días anteriores al día actual
         },

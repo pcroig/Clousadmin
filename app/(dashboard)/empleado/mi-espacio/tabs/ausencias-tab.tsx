@@ -30,6 +30,8 @@ import { es } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { LoadingButton } from '@/components/shared/loading-button';
 
+import { EstadoAusencia } from '@/lib/constants/enums';
+
 interface Ausencia {
   id: string;
   tipo: string;
@@ -131,11 +133,11 @@ export function AusenciasTab({ empleadoId }: { empleadoId: string }) {
     const totalDias = saldo.diasTotales || 22;
     
     const diasUsados = ausencias
-      .filter((a) => a.estado === 'en_curso' || a.estado === 'completada' || a.estado === 'auto_aprobada')
+      .filter((a) => a.estado === EstadoAusencia.en_curso || a.estado === EstadoAusencia.completada || a.estado === EstadoAusencia.auto_aprobada)
       .reduce((sum, a) => sum + Number(a.diasSolicitados), 0);
 
     const diasPendientes = ausencias
-      .filter((a) => a.estado === 'pendiente_aprobacion')
+      .filter((a) => a.estado === EstadoAusencia.pendiente_aprobacion)
       .reduce((sum, a) => sum + Number(a.diasSolicitados), 0);
 
     setSaldo({
@@ -152,7 +154,7 @@ export function AusenciasTab({ empleadoId }: { empleadoId: string }) {
       const hoy = new Date();
       hoy.setHours(0, 0, 0, 0);
       fechaFin.setHours(0, 0, 0, 0);
-      return fechaFin >= hoy && (a.estado === 'pendiente_aprobacion' || a.estado === 'en_curso' || a.estado === 'auto_aprobada');
+      return fechaFin >= hoy && (a.estado === EstadoAusencia.pendiente_aprobacion || a.estado === EstadoAusencia.en_curso || a.estado === EstadoAusencia.auto_aprobada);
     })
     .sort((a, b) => new Date(a.fechaInicio).getTime() - new Date(b.fechaInicio).getTime());
 
@@ -162,7 +164,7 @@ export function AusenciasTab({ empleadoId }: { empleadoId: string }) {
       const hoy = new Date();
       hoy.setHours(0, 0, 0, 0);
       fechaFin.setHours(0, 0, 0, 0);
-      return fechaFin < hoy && (a.estado === 'completada' || a.estado === 'auto_aprobada');
+      return fechaFin < hoy && (a.estado === EstadoAusencia.completada || a.estado === EstadoAusencia.auto_aprobada);
     })
     .sort((a, b) => new Date(b.fechaInicio).getTime() - new Date(a.fechaInicio).getTime());
 
@@ -225,7 +227,7 @@ export function AusenciasTab({ empleadoId }: { empleadoId: string }) {
     pendiente: (date: Date) => getDiaEstado(date) === 'pendiente_aprobacion',
     aprobada: (date: Date) => {
       const estado = getDiaEstado(date);
-      return estado === 'en_curso' || estado === 'auto_aprobada' || estado === 'completada';
+      return estado === EstadoAusencia.en_curso || estado === EstadoAusencia.auto_aprobada || estado === EstadoAusencia.completada;
     },
     rechazada: (date: Date) => getDiaEstado(date) === 'rechazada',
   };
@@ -307,7 +309,7 @@ export function AusenciasTab({ empleadoId }: { empleadoId: string }) {
                           <p className="text-[13px] font-medium text-gray-900">{getTipoLabel(ausencia.tipo)}</p>
                           <p className="text-[11px] text-gray-500">{ausencia.diasSolicitados} {ausencia.diasSolicitados === 1 ? 'día' : 'días'}</p>
                         </div>
-                        {ausencia.estado === 'pendiente_aprobacion' && (
+                        {ausencia.estado === EstadoAusencia.pendiente_aprobacion && (
                           <span className="px-2 py-1 rounded text-[11px] font-medium bg-yellow-100 text-yellow-800">
                             Pendiente
                           </span>

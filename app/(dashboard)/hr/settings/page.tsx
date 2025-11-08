@@ -7,6 +7,8 @@ import { getSession } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { SettingsClient } from './settings-client';
 
+import { UsuarioRol } from '@/lib/constants/enums';
+
 export default async function SettingsPage() {
   const session = await getSession();
 
@@ -29,7 +31,7 @@ export default async function SettingsPage() {
     },
   });
 
-  if (!usuario || usuario.rol !== 'hr_admin') {
+  if (!usuario || usuario.rol !== UsuarioRol.hr_admin) {
     redirect('/login');
   }
 

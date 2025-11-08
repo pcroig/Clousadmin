@@ -13,8 +13,7 @@ import { AusenciasTab } from '../../hr/mi-espacio/tabs/ausencias-tab';
 import { FichajesTab } from '../../hr/mi-espacio/tabs/fichajes-tab';
 import { ContratosTab } from '../../hr/mi-espacio/tabs/contratos-tab';
 import { DocumentosTab } from '../../hr/mi-espacio/tabs/documentos-tab';
-import { getAvatarPlaceholderClasses } from '@/lib/design-system';
-import { cn } from '@/lib/utils';
+import { getAvatarStyle } from '@/lib/design-system';
 
 interface MiEspacioManagerClientProps {
   empleado: any;
@@ -22,12 +21,14 @@ interface MiEspacioManagerClientProps {
 }
 
 export function MiEspacioManagerClient({ empleado, usuario }: MiEspacioManagerClientProps) {
-  const [activeTab, setActiveTab] = useState('general');
+  const [activeTab, setActiveTab] = useState('datos');
   const [editingProfile, setEditingProfile] = useState(false);
 
   const getInitials = () => {
     return `${empleado.nombre.charAt(0)}${empleado.apellidos.charAt(0)}`.toUpperCase();
   };
+
+  const avatarStyle = getAvatarStyle(`${empleado.nombre} ${empleado.apellidos}`);
 
   const tabs = [
     { id: 'general', label: 'General' },
@@ -47,20 +48,18 @@ export function MiEspacioManagerClient({ empleado, usuario }: MiEspacioManagerCl
               <Avatar className="h-16 w-16">
                 {empleado.fotoUrl && <AvatarImage src={empleado.fotoUrl} />}
                 <AvatarFallback
-                  className={cn(
-                    getAvatarPlaceholderClasses(`${empleado.nombre} ${empleado.apellidos}`),
-                    'text-lg font-semibold'
-                  )}
+                  className="text-lg font-semibold uppercase"
+                  style={avatarStyle}
                 >
                   {getInitials()}
                 </AvatarFallback>
               </Avatar>
               <button
                 onClick={() => setEditingProfile(!editingProfile)}
-                className="absolute -bottom-1 -right-1 text-gray-600 hover:text-[#c6613f] transition-colors p-1"
+                className="absolute -bottom-1 -right-1 bg-gray-900 text-white rounded-full p-1.5 hover:bg-gray-800 transition-colors"
                 title="Editar foto de perfil"
               >
-                <Edit2 className="w-4 h-4" />
+                <Edit2 className="w-3 h-3" />
               </button>
             </div>
 
@@ -93,7 +92,7 @@ export function MiEspacioManagerClient({ empleado, usuario }: MiEspacioManagerCl
 
       {/* Content */}
       <div className="flex-1 min-h-0 overflow-y-auto">
-        {activeTab === 'general' && <GeneralTab empleado={empleado} usuario={usuario} rol="manager" />}
+        {activeTab === 'general' && <GeneralTab empleado={empleado} usuario={usuario} />}
         {activeTab === 'ausencias' && <AusenciasTab empleadoId={empleado.id} />}
         {activeTab === 'fichajes' && <FichajesTab empleadoId={empleado.id} />}
         {activeTab === 'contratos' && <ContratosTab empleado={empleado} />}

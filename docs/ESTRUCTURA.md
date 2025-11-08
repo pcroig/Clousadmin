@@ -151,45 +151,54 @@ prisma/
 
 **Comandos importantes**:
 ```bash
-npx prisma generate      # Generar cliente TypeScript
-npx prisma migrate dev   # Crear nueva migración
-npm run seed             # Poblar con datos de prueba
-npx prisma studio        # Ver BD en navegador
+npm run db:generate        # Regenerar Prisma Client
+npm run db:migrate -- --name add_feature   # Crear nueva migración
+npm run db:deploy          # Aplicar migraciones pendientes
+npm run db:studio          # Ver BD en navegador
+npm run diagnostico        # Diagnóstico rápido de integridad Prisma
+npm run seed               # Poblar con datos de prueba
 ```
 
 ---
 
 ### 6. `docs/` - Documentación 📚
 
-**Estructura final (LIMPIA)**:
+**Estructura actual**:
 ```
 docs/
-├── README.md                   # Índice de documentación
-├── ARQUITECTURA.md             # Decisiones técnicas
-├── SETUP.md                    # Guía de instalación
-├── DESIGN_SYSTEM.md            # Guías UI/UX
+├── README.md                    # Índice general
+├── ARQUITECTURA.md              # Decisiones técnicas
+├── SETUP.md                     # Guía de instalación
+├── DESIGN_SYSTEM.md             # Guía UI/UX y patrones de componentes
+├── API_REFACTORING.md           # Patrones API centralizados
 │
-├── funcionalidades/            # Docs de cada feature
+├── daily/                       # Changelog y consolidado mensual
+│   ├── 2025-01-27-integracion-componentes.md
+│   ├── 2025-01-27-unificacion-diseno.md
+│   ├── 2025-10-consolidado.md
+│   └── 2025-11-05-fix-email-duplicado.md
+├── funcionalidades/             # Documentación por feature
 │   ├── ausencias.md
 │   ├── fichajes.md
-│   └── jornadas.md
-│
-├── sesiones/                   # Resúmenes de sesiones importantes
-│   ├── 2025-10-25-resumen.md
-│   └── 2025-10-25-manijas.md
-│
-└── daily/                      # Changelog diario
-    ├── 2025-10-23.md
-    ├── 2025-10-24.md
-    └── 2025-10-25.md
+│   ├── documentos.md
+│   └── ...
+├── ia/                          # Arquitectura IA y variables
+├── notificaciones/              # Comunicación interna (ideas y estado)
+├── incidencias/                 # RCA de incidencias detectadas
+└── historial/                   # Documentación legacy / referencia
 ```
 
-**Qué hay en cada archivo**:
+**Qué hay en cada carpeta**:
 - **SETUP.md**: Cómo instalar y configurar desde cero
-- **ARQUITECTURA.md**: Por qué tomamos ciertas decisiones técnicas
-- **DESIGN_SYSTEM.md**: Colores, tipografía, componentes UI
-- **funcionalidades/**: Cómo funciona cada módulo (ausencias, fichajes, etc.)
-- **daily/**: Qué se hizo cada día (changelog)
+- **ARQUITECTURA.md**: Decisiones y stack
+- **DESIGN_SYSTEM.md**: Guía de UI, tokens de color y patrones de componentes
+- **API_REFACTORING.md**: Patrón de API handler unificado
+- **funcionalidades/**: Manual por módulo (ausencias, fichajes, etc.)
+- **daily/**: Registro cronológico y consolidado mensual
+- **ia/**: Procesos de IA, variables y arquitectura
+- **notificaciones/**: Estrategia de notificaciones y backlog
+- **incidencias/**: Post-mortems y acciones correctivas
+- **historial/**: Versiones antiguas (solo lectura)
 
 ---
 
@@ -199,7 +208,7 @@ docs/
 
 1. **Planificar** → Lee `.cursorrules` y `docs/ARQUITECTURA.md`
 2. **Schema** → Actualiza `prisma/schema.prisma` si necesitas nuevas tablas
-3. **Migración** → `npx prisma migrate dev --name add_feature`
+3. **Migración** → `npm run db:migrate -- --name add_feature`
 4. **Lógica** → Crea funciones en `lib/calculos/` o `lib/validaciones/`
 5. **API** → Crea endpoints en `app/api/`
 6. **UI** → Crea componentes en `components/`
@@ -268,6 +277,6 @@ docs/
 
 ---
 
-**Versión**: 1.1  
-**Creado**: 25 de octubre 2025
-**Última actualización**: 25 de octubre 2025
+**Versión**: 1.2  
+**Creado**: 25 de octubre 2025  
+**Última actualización**: 7 de noviembre 2025

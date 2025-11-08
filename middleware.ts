@@ -7,6 +7,8 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { verifyToken } from '@/lib/auth-edge';
 
+import { UsuarioRol } from '@/lib/constants/enums';
+
 // Rutas públicas (no requieren autenticación)
 const publicPaths = ['/login', '/signup', '/waitlist', '/onboarding'];
 
@@ -66,10 +68,10 @@ export async function middleware(request: NextRequest) {
 
   // Verificar acceso a rutas de HR Admin
   if (hrAdminPaths.some((path) => pathname.startsWith(path))) {
-    if (session.user.rol !== 'hr_admin') {
+    if (session.user.rol !== UsuarioRol.hr_admin) {
       // Redirigir al dashboard apropiado según el rol
       const dashboardUrl =
-        session.user.rol === 'manager'
+        session.user.rol === UsuarioRol.manager
           ? '/manager/dashboard'
           : '/empleado/dashboard';
       return NextResponse.redirect(new URL(dashboardUrl, request.url));
@@ -78,10 +80,10 @@ export async function middleware(request: NextRequest) {
 
   // Verificar acceso a rutas de Manager
   if (managerPaths.some((path) => pathname.startsWith(path))) {
-    if (session.user.rol !== 'manager') {
+    if (session.user.rol !== UsuarioRol.manager) {
       // Redirigir al dashboard apropiado según el rol
       const dashboardUrl =
-        session.user.rol === 'hr_admin'
+        session.user.rol === UsuarioRol.hr_admin
           ? '/hr/dashboard'
           : '/empleado/dashboard';
       return NextResponse.redirect(new URL(dashboardUrl, request.url));
@@ -90,10 +92,10 @@ export async function middleware(request: NextRequest) {
 
   // Verificar acceso a rutas de Empleado
   if (empleadoPaths.some((path) => pathname.startsWith(path))) {
-    if (session.user.rol !== 'empleado') {
+    if (session.user.rol !== UsuarioRol.empleado) {
       // Redirigir al dashboard apropiado según el rol
       const dashboardUrl =
-        session.user.rol === 'hr_admin'
+        session.user.rol === UsuarioRol.hr_admin
           ? '/hr/dashboard'
           : '/manager/dashboard';
       return NextResponse.redirect(new URL(dashboardUrl, request.url));
@@ -101,17 +103,17 @@ export async function middleware(request: NextRequest) {
   }
 
   // Si el usuario es HR Admin y está en la raíz, redirigir a su dashboard
-  if (pathname === '/' && session.user.rol === 'hr_admin') {
+  if (pathname === '/' && session.user.rol === UsuarioRol.hr_admin) {
     return NextResponse.redirect(new URL('/hr/dashboard', request.url));
   }
 
   // Si el usuario es manager y está en la raíz, redirigir a su dashboard
-  if (pathname === '/' && session.user.rol === 'manager') {
+  if (pathname === '/' && session.user.rol === UsuarioRol.manager) {
     return NextResponse.redirect(new URL('/manager/dashboard', request.url));
   }
 
   // Si el usuario es empleado y está en la raíz, redirigir a su dashboard
-  if (pathname === '/' && session.user.rol === 'empleado') {
+  if (pathname === '/' && session.user.rol === UsuarioRol.empleado) {
     return NextResponse.redirect(new URL('/empleado/dashboard', request.url));
   }
 

@@ -11,6 +11,8 @@ import { crearInvitacion } from '@/lib/invitaciones';
 import { z } from 'zod';
 import { revalidatePath } from 'next/cache';
 
+import { UsuarioRol } from '@/lib/constants/enums';
+
 /**
  * Helper function to safely convert values to Prisma JSON input
  */
@@ -198,7 +200,7 @@ export async function configurarIntegracionAction(
 export async function invitarHRAdminAction(email: string, nombre: string, apellidos: string) {
   try {
     const session = await getSession();
-    if (!session || session.user.rol !== 'hr_admin') {
+    if (!session || session.user.rol !== UsuarioRol.hr_admin) {
       return {
         success: false,
         error: 'No tienes permisos para invitar HR admins',
@@ -226,7 +228,7 @@ export async function invitarHRAdminAction(email: string, nombre: string, apelli
           nombre,
           apellidos,
           empresaId: session.user.empresaId,
-          rol: 'hr_admin',
+          rol: UsuarioRol.hr_admin,
           emailVerificado: false,
           activo: false, // Se activará cuando acepte la invitación
         },

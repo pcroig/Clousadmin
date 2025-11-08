@@ -5,6 +5,8 @@
 import { prisma } from '@/lib/prisma';
 import { esDiaLaborable, getDiasLaborablesEmpresa } from './dias-laborables';
 
+import { EstadoAusencia } from '@/lib/constants/enums';
+
 /**
  * Verifica si una fecha es fin de semana (sábado o domingo)
  */
@@ -212,12 +214,12 @@ export async function calcularSaldoDisponible(empleadoId: string, año: number):
 
   // Días usados: ausencias aprobadas y disfrutadas
   const diasUsados = ausencias
-    .filter((a) => a.estado === 'en_curso' || a.estado === 'completada' || a.estado === 'auto_aprobada')
+    .filter((a) => a.estado === EstadoAusencia.en_curso || a.estado === EstadoAusencia.completada || a.estado === EstadoAusencia.auto_aprobada)
     .reduce((sum, a) => sum + Number(a.diasSolicitados), 0);
 
   // Días pendientes: ausencias esperando aprobación
   const diasPendientes = ausencias
-    .filter((a) => a.estado === 'pendiente_aprobacion')
+    .filter((a) => a.estado === EstadoAusencia.pendiente_aprobacion)
     .reduce((sum, a) => sum + Number(a.diasSolicitados), 0);
 
   const diasDisponibles = saldo.diasTotales - diasUsados - diasPendientes;

@@ -9,6 +9,8 @@ import { Notificacion } from '@/components/shared/notificaciones-widget';
 import { AusenciaItem } from '@/components/shared/ausencias-widget';
 import { EmpleadoDashboardClient } from './dashboard-client';
 
+import { EstadoAusencia, UsuarioRol } from '@/lib/constants/enums';
+
 interface DashboardData {
   empleado: any;
   notificaciones: Notificacion[];
@@ -98,7 +100,7 @@ async function obtenerDatosDashboard(session: { user: { id: string; empresaId: s
 
   const notificaciones: Notificacion[] = ausenciasNotificaciones.map((aus: any) => ({
     id: aus.id,
-    tipo: aus.estado === 'en_curso' || aus.estado === 'completada' || aus.estado === 'auto_aprobada' ? 'aprobada' : aus.estado === 'rechazada' ? 'rechazada' : 'pendiente',
+    tipo: aus.estado === EstadoAusencia.en_curso || aus.estado === EstadoAusencia.completada || aus.estado === EstadoAusencia.auto_aprobada ? 'aprobada' : aus.estado === EstadoAusencia.rechazada ? 'rechazada' : 'pendiente',
     mensaje: `Tu solicitud de ${aus.tipo} está ${aus.estado}`,
     fecha: aus.createdAt,
   }));
@@ -169,7 +171,7 @@ async function obtenerDatosDashboard(session: { user: { id: string; empresaId: s
       fechaFin: {
         lt: hoy,
       },
-      estado: 'aprobada',
+      estado: EstadoAusencia.en_curso,
     },
     orderBy: {
       fechaFin: 'desc',
@@ -183,7 +185,7 @@ async function obtenerDatosDashboard(session: { user: { id: string; empresaId: s
     fechaFin: aus.fechaFin,
     tipo: aus.tipo,
     dias: Number(aus.diasSolicitados),
-    estado: 'aprobada',
+    estado: EstadoAusencia.en_curso,
   }));
 
   return {
@@ -207,7 +209,7 @@ export default async function EmpleadoDashboardPage() {
 
   // Verificar que el rol es correcto (el middleware ya protege rutas de HR)
   // Solo verificamos el rol específico de esta página
-  if (session.user.rol !== 'empleado' && session.user.rol !== 'manager') {
+  if (session.user.rol !== UsuarioRol.empleado && session.user.rol !== UsuarioRol.manager) {
     return null;
   }
 

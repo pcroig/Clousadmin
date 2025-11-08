@@ -4,6 +4,8 @@
 
 import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { UsuarioRol } from '@/lib/constants/enums';
+
 import {
   requireAuth,
   handleApiError,
@@ -23,7 +25,7 @@ export async function POST(
     const { session } = authResult;
 
     // Solo HR Admin o Manager
-    if (session.user.rol !== 'hr_admin' && session.user.rol !== 'manager') {
+    if (session.user.rol !== UsuarioRol.hr_admin && session.user.rol !== UsuarioRol.manager) {
       return badRequestResponse('No tienes permisos para cerrar campañas');
     }
 

@@ -19,12 +19,12 @@ Guía para solucionar problemas comunes en Clousadmin.
 
 **2. Regenerar Prisma Client**
 ```bash
-npx prisma generate
+npm run db:generate
 ```
 
 **3. Reiniciar Prisma Studio**
 ```bash
-npx prisma studio
+npm run db:studio
 ```
 
 **Si el problema persiste:**
@@ -41,10 +41,10 @@ tsx scripts/diagnostico-prisma.ts
 
 **6. Limpiar y regenerar todo**
 ```bash
-# Limpiar node_modules y regenerar
+# Limpiar artefactos de Prisma y regenerar
 rm -rf node_modules/.prisma
-npx prisma generate
-npx prisma studio
+npm run db:generate
+npm run db:studio
 ```
 
 ---
@@ -146,9 +146,9 @@ CREATE DATABASE clousadmin;
 
 **5. Aplicar migraciones**
 ```bash
-npx prisma migrate deploy
+npm run db:deploy
 # O si estás en desarrollo:
-npx prisma migrate dev
+npm run db:migrate
 ```
 
 ---
@@ -163,14 +163,14 @@ npx prisma migrate dev
 
 **1. Generar Prisma Client**
 ```bash
-npx prisma generate
+npm run db:generate
 ```
 
 **2. Verificar que node_modules existe**
 ```bash
 # Si no existe, reinstalar dependencias
 npm install
-npx prisma generate
+npm run db:generate
 ```
 
 **3. Reiniciar servidor de desarrollo**
@@ -192,12 +192,12 @@ npm run dev
 
 **1. Crear y aplicar migración**
 ```bash
-npx prisma migrate dev --name descripcion_cambio
+npm run db:migrate -- --name descripcion_cambio
 ```
 
 **2. Regenerar Prisma Client**
 ```bash
-npx prisma generate
+npm run db:generate
 ```
 
 **3. Reiniciar servidor**

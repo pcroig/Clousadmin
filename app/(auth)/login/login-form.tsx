@@ -11,6 +11,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { loginAction } from './actions';
 
+import { UsuarioRol } from '@/lib/constants/enums';
+
 interface LoginFormProps {
   callbackUrl?: string;
 }
@@ -85,7 +87,7 @@ export function LoginForm({ callbackUrl }: LoginFormProps) {
         // Redirigir según el callback URL o el rol del usuario
         if (callbackUrl) {
           router.push(callbackUrl);
-        } else if (result.rol === 'hr_admin') {
+        } else if (result.rol === UsuarioRol.hr_admin) {
           router.push('/hr/dashboard');
         } else {
           router.push('/empleado/dashboard');

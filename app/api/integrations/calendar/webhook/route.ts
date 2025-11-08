@@ -11,6 +11,8 @@ import { getGoogleOAuthConfig } from "@/lib/oauth/config";
 import { createCalendarProvider } from "@/lib/integrations/calendar/providers";
 import type { CalendarIntegrationConfig } from "@/lib/integrations/types";
 
+import { EstadoAusencia, UsuarioRol } from '@/lib/constants/enums';
+
 export async function POST(req: NextRequest) {
   try {
     // Obtener headers de Google
@@ -137,7 +139,7 @@ async function processCalendarChanges(integracionId: string) {
           await prisma.ausencia.update({
             where: { id: ausenciaId },
             data: {
-              estado: "cancelada",
+              estado: EstadoAusencia.cancelada,
               // Podríamos añadir un campo "canceladaPor" con valor "calendar_sync"
             },
           });
@@ -172,7 +174,7 @@ async function getFirstAdminUsuarioId(empresaId: string): Promise<string | null>
   const admin = await prisma.usuario.findFirst({
     where: {
       empresaId,
-      rol: "hr_admin",
+      rol: UsuarioRol.hr_admin,
       activo: true,
     },
     select: { id: true },

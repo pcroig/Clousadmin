@@ -10,6 +10,9 @@ import { validarDocumentosRequeridosCompletos } from '@/lib/documentos/onboardin
 import { obtenerOnboardingConfig } from '@/lib/onboarding-config';
 import { hashPassword } from '@/lib/auth';
 import { uploadToS3 } from '@/lib/s3';
+import { crearNotificacionOnboardingCompletado } from '@/lib/notificaciones';
+
+import { UsuarioRol } from '@/lib/constants/enums';
 
 /**
  * Helper function to safely convert values to Prisma JSON input
@@ -719,11 +722,23 @@ export async function finalizarOnboarding(token: string) {
       },
     });
 
-    // Crear notificación para HR
-    await crearNotificacionOnboarding(
-      onboarding.empleadoId,
-      onboarding.empresaId
-    );
+    // Obtener datos del empleado para la notificación
+    const empleadoData = await prisma.empleado.findUnique({
+      where: { id: onboarding.empleadoId },
+      select: {
+        nombre: true,
+        apellidos: true,
+      },
+    });
+
+    // Crear notificación para HR y Manager
+    if (empleadoData) {
+      await crearNotificacionOnboardingCompletado(prisma, {
+        empleadoId: onboarding.empleadoId,
+        empresaId: onboarding.empresaId,
+        empleadoNombre: `${empleadoData.nombre} ${empleadoData.apellidos}`,
+      });
+    }
 
     console.log(
       `[finalizarOnboarding] Onboarding completado para empleado ${onboarding.empleadoId}`
@@ -768,7 +783,7 @@ export async function crearNotificacionOnboarding(
     const usuariosHR = await prisma.usuario.findMany({
       where: {
         empresaId,
-        rol: 'hr_admin',
+        rol: UsuarioRol.hr_admin,
         activo: true,
       },
       select: {

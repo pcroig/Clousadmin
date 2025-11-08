@@ -7,10 +7,12 @@ import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import { BandejaEntradaTabs } from '@/components/hr/bandeja-entrada-tabs';
 
+import { EstadoAusencia, EstadoSolicitud, UsuarioRol } from '@/lib/constants/enums';
+
 export default async function HRBandejaEntradaPage() {
   const session = await getSession();
 
-  if (!session || session.user.rol !== 'hr_admin') {
+  if (!session || session.user.rol !== UsuarioRol.hr_admin) {
     redirect('/login');
   }
 
@@ -18,7 +20,7 @@ export default async function HRBandejaEntradaPage() {
   const ausenciasPendientes = await prisma.ausencia.findMany({
     where: {
       empresaId: session.user.empresaId,
-      estado: 'pendiente',
+      estado: EstadoAusencia.pendiente_aprobacion,
     },
     include: {
       empleado: {
@@ -39,7 +41,7 @@ export default async function HRBandejaEntradaPage() {
     where: {
       empresaId: session.user.empresaId,
       estado: {
-        in: ['aprobada', 'rechazada'],
+        in: [EstadoAusencia.en_curso, EstadoAusencia.completada, EstadoAusencia.rechazada],
       },
     },
     include: {
@@ -61,7 +63,9 @@ export default async function HRBandejaEntradaPage() {
   const solicitudesCambioPendientes = await prisma.solicitudCambio.findMany({
     where: {
       empresaId: session.user.empresaId,
-      estado: 'pendiente',
+      estado: {
+        in: [EstadoSolicitud.pendiente, EstadoSolicitud.requiere_revision],
+      },
     },
     include: {
       empleado: {
@@ -82,7 +86,7 @@ export default async function HRBandejaEntradaPage() {
     where: {
       empresaId: session.user.empresaId,
       estado: {
-        in: ['aprobada', 'rechazada'],
+        in: [EstadoSolicitud.aprobada_manual, EstadoSolicitud.auto_aprobada, EstadoSolicitud.rechazada],
       },
     },
     include: {
@@ -113,7 +117,7 @@ export default async function HRBandejaEntradaPage() {
       detalles: `Solicitud de ${aus.tipo}`,
       fechaLimite: new Date(aus.fechaFin),
       fechaCreacion: aus.createdAt,
-      estado: 'pendiente' as const,
+      estado: EstadoAusencia.pendiente_aprobacion as const,
       metadata: {
         tipoAusencia: aus.tipo,
         fechaInicio: aus.fechaInicio,
@@ -131,7 +135,7 @@ export default async function HRBandejaEntradaPage() {
       detalles: `Solicitud de cambio de ${sol.tipo}`,
       fechaLimite: new Date(sol.createdAt.getTime() + 7 * 24 * 60 * 60 * 1000),
       fechaCreacion: sol.createdAt,
-      estado: 'pendiente' as const,
+      estado: EstadoAusencia.pendiente_aprobacion as const,
     })),
   ].sort((a, b) => b.fechaCreacion.getTime() - a.fechaCreacion.getTime());
 
@@ -148,7 +152,7 @@ export default async function HRBandejaEntradaPage() {
       detalles: `Solicitud de ${aus.tipo}`,
       fechaLimite: new Date(aus.fechaFin),
       fechaCreacion: aus.createdAt,
-      estado: aus.estado as 'aprobada' | 'rechazada',
+      estado: aus.estado,
       fechaResolucion: aus.aprobadaEn || undefined,
       metadata: {
         tipoAusencia: aus.tipo,
@@ -167,7 +171,12 @@ export default async function HRBandejaEntradaPage() {
       detalles: `Solicitud de cambio de ${sol.tipo}`,
       fechaLimite: new Date(sol.createdAt.getTime() + 7 * 24 * 60 * 60 * 1000),
       fechaCreacion: sol.createdAt,
-      estado: sol.estado as 'aprobada' | 'rechazada',
+      estado:
+        sol.estado === EstadoSolicitud.aprobada_manual || sol.estado === EstadoSolicitud.auto_aprobada
+          ? EstadoAusencia.en_curso
+          : sol.estado === EstadoSolicitud.rechazada
+            ? EstadoAusencia.rechazada
+            : EstadoAusencia.cancelada,
       fechaResolucion: sol.fechaRespuesta || undefined,
     })),
   ].sort((a, b) => (b.fechaResolucion?.getTime() || 0) - (a.fechaResolucion?.getTime() || 0));

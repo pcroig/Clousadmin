@@ -13,6 +13,8 @@ import {
 } from '@/lib/api-handler';
 import { calendarioLaboralUpdateSchema } from '@/lib/validaciones/schemas';
 
+import { UsuarioRol } from '@/lib/constants/enums';
+
 // Force dynamic rendering
 export const dynamic = 'force-dynamic';
 
@@ -24,7 +26,7 @@ export async function PATCH(req: NextRequest) {
     const { session } = authResult;
 
     // Solo HR Admin puede actualizar el calendario laboral
-    if (session.user.rol !== 'hr_admin') {
+    if (session.user.rol !== UsuarioRol.hr_admin) {
       return badRequestResponse('No tienes permisos para modificar el calendario laboral');
     }
 

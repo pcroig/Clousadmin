@@ -9,6 +9,8 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 
+import { UsuarioRol } from '@/lib/constants/enums';
+
 interface SettingsSection {
   id: string;
   label: string;
@@ -16,7 +18,7 @@ interface SettingsSection {
 }
 
 interface SettingsLayoutProps {
-  rol: 'hr_admin' | 'manager' | 'empleado';
+  rol: UsuarioRol.hr_admin | 'manager' | 'empleado';
   children: React.ReactNode;
 }
 
@@ -24,8 +26,8 @@ export const SettingsLayout = ({ rol, children }: SettingsLayoutProps) => {
   const pathname = usePathname();
 
   const basePath = useMemo(() => {
-    if (rol === 'hr_admin') return '/hr';
-    if (rol === 'manager') return '/manager';
+    if (rol === UsuarioRol.hr_admin) return '/hr';
+    if (rol === UsuarioRol.manager) return '/manager';
     return '/empleado';
   }, [rol]);
 
@@ -43,7 +45,7 @@ export const SettingsLayout = ({ rol, children }: SettingsLayoutProps) => {
       },
     ];
 
-    if (rol === 'hr_admin') {
+    if (rol === UsuarioRol.hr_admin) {
       items.splice(1, 0, {
         id: 'company',
         label: 'Compañía',
@@ -54,7 +56,7 @@ export const SettingsLayout = ({ rol, children }: SettingsLayoutProps) => {
         label: 'Integraciones',
         href: `${basePath}/settings/integraciones`,
       });
-    } else if (rol === 'empleado') {
+    } else if (rol === UsuarioRol.empleado) {
       items.push({
         id: 'integrations',
         label: 'Integraciones',

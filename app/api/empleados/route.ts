@@ -11,6 +11,8 @@ import {
 } from '@/lib/api-handler';
 import { hash } from 'bcryptjs';
 
+import { UsuarioRol } from '@/lib/constants/enums';
+
 // GET /api/empleados - Listar todos los empleados (solo HR Admin)
 export async function GET(request: NextRequest) {
   try {
@@ -129,7 +131,7 @@ export async function POST(request: NextRequest) {
         data: {
           email: body.email,
           password: await hash(Math.random().toString(36).slice(-8), 10), // Password temporal                                                              
-          rol: 'empleado',
+          rol: UsuarioRol.empleado,
           nombre: body.nombre,
           apellidos: body.apellidos,
           empresaId: session.user.empresaId,

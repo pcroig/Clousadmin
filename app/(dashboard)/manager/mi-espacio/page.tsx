@@ -4,10 +4,12 @@ import { prisma } from '@/lib/prisma';
 import { serializeEmpleado } from '@/lib/utils';
 import { MiEspacioManagerClient } from './mi-espacio-manager-client';
 
+import { UsuarioRol } from '@/lib/constants/enums';
+
 export default async function MiEspacioManagerPage() {
   const session = await getSession();
 
-  if (!session || session.user.rol !== 'manager') {
+  if (!session || session.user.rol !== UsuarioRol.manager) {
     redirect('/login');
   }
 

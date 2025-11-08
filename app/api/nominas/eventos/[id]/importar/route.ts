@@ -9,6 +9,10 @@ import { getSession } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { uploadToS3 } from '@/lib/s3';
 import { clasificarNomina } from '@/lib/ia/clasificador-nominas';
+import {
+  actualizarEstadoNomina,
+  sincronizarEstadoEvento,
+} from '@/lib/calculos/sync-estados-nominas';
 
 // ========================================
 // POST /api/nominas/eventos/[id]/importar
@@ -199,15 +203,17 @@ export async function POST(
           },
         });
 
-        // Vincular documento a nómina y actualizar estado
+        // Vincular documento a nómina
         await prisma.nomina.update({
           where: { id: nomina.id },
           data: {
             documentoId: documento.id,
-            estado: 'definitiva',
             subidoPor: session.user.id,
           },
         });
+
+        // Actualizar estado usando función de sincronización
+        await actualizarEstadoNomina(nomina.id, 'definitiva');
 
         resultados.push({
           empleado: `${nomina.empleado.nombre} ${nomina.empleado.apellidos}`,
@@ -223,6 +229,9 @@ export async function POST(
       }
     }
 
+    // Sincronizar estado del evento (automático basado en estados de nóminas individuales)
+    await sincronizarEstadoEvento(id);
+
     // Verificar si todas las nóminas tienen documentos
     const nominasSinDocumento = await prisma.nomina.count({
       where: {
@@ -230,14 +239,6 @@ export async function POST(
         documentoId: null,
       },
     });
-
-    // Si todas las nóminas tienen documento, actualizar estado del evento
-    if (nominasSinDocumento === 0) {
-      await prisma.eventoNomina.update({
-        where: { id },
-        data: { estado: 'definitiva' },
-      });
-    }
 
     return NextResponse.json({
       importadas: resultados.length,

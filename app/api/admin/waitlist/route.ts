@@ -7,12 +7,14 @@ import { getSession } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { convertirWaitlistEnInvitacion } from '@/lib/invitaciones-signup';
 
+import { UsuarioRol } from '@/lib/constants/enums';
+
 // GET /api/admin/waitlist - Obtener lista de espera
 export async function GET(req: NextRequest) {
   try {
     // Verificar autenticación y rol platform_admin
     const session = await getSession();
-    if (!session || session.user.rol !== 'platform_admin') {
+    if (!session || session.user.rol !== UsuarioRol.platform_admin) {
       return NextResponse.json(
         { success: false, error: 'No autorizado' },
         { status: 403 }
@@ -41,7 +43,7 @@ export async function POST(req: NextRequest) {
   try {
     // Verificar autenticación y rol platform_admin
     const session = await getSession();
-    if (!session || session.user.rol !== 'platform_admin') {
+    if (!session || session.user.rol !== UsuarioRol.platform_admin) {
       return NextResponse.json(
         { success: false, error: 'No autorizado' },
         { status: 403 }
@@ -84,6 +86,7 @@ export async function POST(req: NextRequest) {
     );
   }
 }
+
 
 
 

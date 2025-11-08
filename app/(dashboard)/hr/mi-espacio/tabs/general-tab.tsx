@@ -12,6 +12,8 @@ import { toast } from 'sonner';
 import { LoadingButton } from '@/components/shared/loading-button';
 import { Combobox, type ComboboxOption } from '@/components/shared/combobox';
 
+import { UsuarioRol } from '@/lib/constants/enums';
+
 interface GeneralTabProps {
   empleado: any;
   usuario: any;
@@ -20,8 +22,8 @@ interface GeneralTabProps {
 }
 
 export function GeneralTab({ empleado, usuario, rol = 'empleado', onFieldUpdate }: GeneralTabProps) {
-  const isEmpleado = rol === 'empleado';
-  const isHrAdmin = rol === 'hr_admin';
+  const isEmpleado = rol === UsuarioRol.empleado;
+  const isHrAdmin = rol === UsuarioRol.hr_admin;
 
   // Estados para datos del formulario
   const [formData, setFormData] = useState({
@@ -136,7 +138,7 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado', onFieldUpdate 
         const data = await response.json();
         // Filtrar solo HR Admin y Managers
         const managersData = data.filter((emp: any) => 
-          emp.usuario?.rol === 'hr_admin' || emp.usuario?.rol === 'manager'
+          emp.usuario?.rol === UsuarioRol.hr_admin || emp.usuario?.rol === UsuarioRol.manager
         );
         setManagers(managersData);
       }

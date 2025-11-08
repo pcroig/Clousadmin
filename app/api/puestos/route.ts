@@ -7,6 +7,8 @@ import { prisma } from '@/lib/prisma';
 import { getSession } from '@/lib/auth';
 import { z } from 'zod';
 
+import { UsuarioRol } from '@/lib/constants/enums';
+
 // Schema de validación
 const puestoCreateSchema = z.object({
   nombre: z.string().min(1, 'El nombre es requerido').max(100),
@@ -62,7 +64,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const session = await getSession();
-    if (!session || session.user.rol !== 'hr_admin') {
+    if (!session || session.user.rol !== UsuarioRol.hr_admin) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
     }
 

@@ -18,6 +18,8 @@ import { EditarFichajeModal } from '../../../hr/horario/fichajes/editar-fichaje-
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
+import { EstadoAusencia } from '@/lib/constants/enums';
+
 interface FichajeEvento {
   id: string;
   tipo: string;
@@ -168,7 +170,7 @@ export function FichajesTab({ empleadoId }: { empleadoId: string }) {
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold text-gray-900">
-                {jornadas.filter(j => j.estado === 'en_curso').length}
+                {jornadas.filter(j => j.estado === EstadoAusencia.en_curso).length}
               </div>
               <div className="text-xs text-gray-500 mt-1">En curso</div>
             </div>

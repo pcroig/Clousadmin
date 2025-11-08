@@ -7,10 +7,12 @@ import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import { BandejaEntradaEmpleadoClient } from './bandeja-entrada-client';
 
+import { UsuarioRol } from '@/lib/constants/enums';
+
 export default async function EmpleadoBandejaEntradaPage() {
   const session = await getSession();
 
-  if (!session || session.user.rol === 'hr_admin') {
+  if (!session || session.user.rol === UsuarioRol.hr_admin) {
     redirect('/login');
   }
 
@@ -25,57 +27,41 @@ export default async function EmpleadoBandejaEntradaPage() {
     );
   }
 
-  // Obtener ausencias del empleado
-  const ausencias = await prisma.ausencia.findMany({
+  // Obtener notificaciones reales del empleado
+  const notificaciones = await prisma.notificacion.findMany({
     where: {
-      empleadoId: session.user.empleadoId,
+      usuarioId: session.user.id,
+      empresaId: session.user.empresaId,
     },
     orderBy: {
       createdAt: 'desc',
     },
-    take: 20,
+    take: 50, // Últimas 50 notificaciones
   });
 
-  // Crear notificaciones basadas en las ausencias
-  const notificaciones = ausencias.map((ausencia) => {
-    let tipo: 'aprobada' | 'rechazada' | 'pendiente' | 'info' = 'info';
-    let titulo = '';
-    let mensaje = '';
-
-    switch (ausencia.estado) {
-      case 'aprobada':
-        tipo = 'aprobada';
-        titulo = `Solicitud de ${ausencia.tipo} aprobada`;
-        mensaje = `Tu solicitud de ${ausencia.tipo} del ${ausencia.fechaInicio.toLocaleDateString('es-ES')} al ${ausencia.fechaFin.toLocaleDateString('es-ES')} ha sido aprobada`;
-        break;
-      case 'rechazada':
-        tipo = 'rechazada';
-        titulo = `Solicitud de ${ausencia.tipo} rechazada`;
-        mensaje = `Tu solicitud de ${ausencia.tipo} del ${ausencia.fechaInicio.toLocaleDateString('es-ES')} al ${ausencia.fechaFin.toLocaleDateString('es-ES')} ha sido rechazada`;
-        break;
-      case 'pendiente':
-        tipo = 'pendiente';
-        titulo = `Solicitud de ${ausencia.tipo} pendiente`;
-        mensaje = `Tu solicitud de ${ausencia.tipo} del ${ausencia.fechaInicio.toLocaleDateString('es-ES')} al ${ausencia.fechaFin.toLocaleDateString('es-ES')} está pendiente de revisión`;
-        break;
+  // Mapear a formato esperado por el componente cliente
+  const notificacionesFormateadas = notificaciones.map((notif) => {
+    // Determinar tipo para UI basado en el tipo de notificación
+    let tipoUI: 'aprobada' | 'rechazada' | 'pendiente' | 'info' = 'info';
+    
+    if (notif.tipo.includes('aprobada')) {
+      tipoUI = 'aprobada';
+    } else if (notif.tipo.includes('rechazada')) {
+      tipoUI = 'rechazada';
+    } else if (notif.tipo.includes('pendiente') || notif.tipo === 'solicitud_creada') {
+      tipoUI = 'pendiente';
     }
 
     return {
-      id: ausencia.id,
-      tipo,
-      titulo,
-      mensaje,
-      fecha: ausencia.createdAt,
-      leida: false,
-      metadata: {
-        ausenciaId: ausencia.id,
-        tipoAusencia: ausencia.tipo,
-        fechaInicio: ausencia.fechaInicio,
-        fechaFin: ausencia.fechaFin,
-        estado: ausencia.estado,
-      },
+      id: notif.id,
+      tipo: tipoUI,
+      titulo: notif.titulo,
+      mensaje: notif.mensaje,
+      fecha: notif.createdAt,
+      leida: notif.leida,
+      metadata: notif.metadata as any,
     };
   });
 
-  return <BandejaEntradaEmpleadoClient notificaciones={notificaciones} />;
+  return <BandejaEntradaEmpleadoClient notificaciones={notificacionesFormateadas} />;
 }

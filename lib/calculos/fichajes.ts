@@ -7,6 +7,8 @@ import { prisma } from '@/lib/prisma';
 import { Fichaje, FichajeEvento, Empleado, Ausencia } from '@prisma/client';
 import type { JornadaConfig, DiaConfig } from './fichajes-helpers';
 
+import { EstadoAusencia } from '@/lib/constants/enums';
+
 /**
  * Estados posibles del fichaje (del día completo)
  */
@@ -325,6 +327,94 @@ export function agruparFichajesPorDia(
 /**
  * Calcula las horas esperadas de un empleado para una fecha
  */
+function parseHorasValor(valor: number | string | null | undefined): number {
+  if (valor === null || valor === undefined) {
+    return 0;
+  }
+
+  if (typeof valor === 'number') {
+    return valor;
+  }
+
+  const parsed = Number(valor);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function redondearHoras(horas: number): number {
+  return Math.round(horas * 100) / 100;
+}
+
+export function calcularHorasEsperadasDesdeConfig(
+  config: JornadaConfig,
+  fecha: Date,
+  horasSemanales?: number | string | null
+): number {
+  const fechaBase = new Date(fecha.getFullYear(), fecha.getMonth(), fecha.getDate());
+  const diasSemana = ['domingo', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado'];
+  const nombreDia = diasSemana[fechaBase.getDay()];
+  const diaConfig = config[nombreDia] as DiaConfig | undefined;
+
+  const tipoJornada = config.tipo ?? (diaConfig?.entrada && diaConfig?.salida ? 'fija' : 'flexible');
+
+  // Jornadas fijas o días con horarios definidos
+  if (tipoJornada === 'fija' || (diaConfig?.entrada && diaConfig?.salida)) {
+    if (!diaConfig || diaConfig.activo === false || !diaConfig.entrada || !diaConfig.salida) {
+      return 0;
+    }
+
+    const [horaE, minE] = diaConfig.entrada.split(':').map(Number);
+    const [horaS, minS] = diaConfig.salida.split(':').map(Number);
+
+    const minutosEntrada = (horaE ?? 0) * 60 + (minE ?? 0);
+    const minutosSalida = (horaS ?? 0) * 60 + (minS ?? 0);
+
+    let minutosTrabajo = minutosSalida - minutosEntrada;
+
+    if (diaConfig.pausa_inicio && diaConfig.pausa_fin) {
+      const [horaPI, minPI] = diaConfig.pausa_inicio.split(':').map(Number);
+      const [horaPF, minPF] = diaConfig.pausa_fin.split(':').map(Number);
+      const minutosPausaInicio = (horaPI ?? 0) * 60 + (minPI ?? 0);
+      const minutosPausaFin = (horaPF ?? 0) * 60 + (minPF ?? 0);
+      minutosTrabajo -= minutosPausaFin - minutosPausaInicio;
+    }
+
+    minutosTrabajo = Math.max(minutosTrabajo, 0);
+    return redondearHoras(minutosTrabajo / 60);
+  }
+
+  // Jornadas flexibles
+  if (tipoJornada === 'flexible') {
+    if (!diaConfig || diaConfig.activo === false) {
+      return 0;
+    }
+
+    const horasSemanalesNum = parseHorasValor(horasSemanales);
+    if (horasSemanalesNum <= 0) {
+      return 0;
+    }
+
+    const diasActivos = Object.entries(config).reduce((count, [clave, valor]) => {
+      if (['tipo', 'descansoMinimo', 'limiteInferior', 'limiteSuperior'].includes(clave)) {
+        return count;
+      }
+
+      if (valor && typeof valor === 'object' && !Array.isArray(valor)) {
+        const dia = valor as DiaConfig;
+        if (dia.activo) {
+          return count + 1;
+        }
+      }
+
+      return count;
+    }, 0);
+
+    const divisor = diasActivos > 0 ? diasActivos : 5;
+    return redondearHoras(horasSemanalesNum / divisor);
+  }
+
+  return 0;
+}
+
 export async function obtenerHorasEsperadas(
   empleadoId: string,
   fecha: Date
@@ -343,65 +433,55 @@ export async function obtenerHorasEsperadas(
   const jornada = empleado.jornada;
   const config = jornada.config as JornadaConfig;
 
-  // Obtener día de la semana (0 = domingo, 1 = lunes, ...)
-  const diaSemana = fecha.getDay();
-  const nombresDias = ['domingo', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado'];
-  const nombreDia = nombresDias[diaSemana];
-  const diaConfig = config[nombreDia] as DiaConfig | undefined;
+  return calcularHorasEsperadasDesdeConfig(config, fecha, jornada.horasSemanales);
+}
 
-  if (diaConfig?.activo) {
-    // Si tiene configuración específica para el día
-    const entrada = diaConfig.entrada; // e.g., "09:00"
-    const salida = diaConfig.salida; // e.g., "18:00"
-    const pausaInicio = diaConfig.pausa_inicio; // e.g., "14:00"
-    const pausaFin = diaConfig.pausa_fin; // e.g., "15:00"
-
-    if (entrada && salida) {
-      const [horaE, minE] = entrada.split(':').map(Number);
-      const [horaS, minS] = salida.split(':').map(Number);
-
-      const minutosEntrada = horaE * 60 + minE;
-      const minutosSalida = horaS * 60 + minS;
-
-      const minutosTrabajoTotal = minutosSalida - minutosEntrada;
-      
-      // Calcular pausa si está configurada
-      let minutosPausa = 0;
-      if (pausaInicio && pausaFin) {
-        const [horaPI, minPI] = pausaInicio.split(':').map(Number);
-        const [horaPF, minPF] = pausaFin.split(':').map(Number);
-        const minutosPausaInicio = horaPI * 60 + minPI;
-        const minutosPausaFin = horaPF * 60 + minPF;
-        minutosPausa = minutosPausaFin - minutosPausaInicio;
-      }
-      
-      const minutosTrabajoNeto = minutosTrabajoTotal - minutosPausa;
-
-      return minutosTrabajoNeto / 60; // Convertir a horas
-    }
+export async function obtenerHorasEsperadasBatch(
+  entradas: Array<{ empleadoId: string; fecha: Date }>
+): Promise<Record<string, number>> {
+  if (entradas.length === 0) {
+    return {};
   }
 
-  // Jornada flexible: dividir horas semanales entre días activos
-  const diasActivos = Object.entries(config).reduce((count, [clave, valor]) => {
-    if (['tipo', 'descansoMinimo', 'limiteInferior', 'limiteSuperior'].includes(clave)) {
-      return count;
+  const uniqueEmpleadoIds = Array.from(new Set(entradas.map((entrada) => entrada.empleadoId)));
+
+  const empleados = await prisma.empleado.findMany({
+    where: {
+      id: {
+        in: uniqueEmpleadoIds,
+      },
+    },
+    include: {
+      jornada: true,
+    },
+  });
+
+  const empleadoMap = new Map(empleados.map((empleado) => [empleado.id, empleado]));
+  const resultado: Record<string, number> = {};
+
+  for (const entrada of entradas) {
+    const fechaBase = new Date(entrada.fecha.getFullYear(), entrada.fecha.getMonth(), entrada.fecha.getDate());
+    const key = `${entrada.empleadoId}_${fechaBase.toISOString().split('T')[0]}`;
+
+    if (resultado[key] !== undefined) {
+      continue;
     }
 
-    if (valor && typeof valor === 'object' && !Array.isArray(valor)) {
-      const configDia = valor as DiaConfig;
-      if (configDia.activo) {
-        return count + 1;
-      }
-    }
+    const empleado = empleadoMap.get(entrada.empleadoId);
 
-    return count;
-  }, 0);
+    const horasEsperadas =
+      empleado && empleado.jornada
+        ? calcularHorasEsperadasDesdeConfig(
+            empleado.jornada.config as JornadaConfig,
+            fechaBase,
+            Number(empleado.jornada.horasSemanales)
+          )
+        : 0;
 
-  if (diasActivos > 0) {
-    return Number(jornada.horasSemanales) / diasActivos;
+    resultado[key] = horasEsperadas;
   }
 
-  return 0;
+  return resultado;
 }
 
 /**
@@ -584,7 +664,7 @@ export async function crearFichajesAutomaticos(
             empresaId,
             empleadoId: empleado.id,
             fecha: fechaSinHora,
-            estado: 'en_curso',
+            estado: EstadoAusencia.en_curso,
           },
         });
 

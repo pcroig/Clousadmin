@@ -8,6 +8,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Upload, User, ChevronRight } from 'lucide-react';
 import { LoadingButton } from '@/components/shared/loading-button';
 import { toast } from 'sonner';
+import { getAvatarStyle } from '@/lib/design-system';
 
 interface CredencialesFormProps {
   token: string;
@@ -25,6 +26,7 @@ export function CredencialesForm({ token, empleado, onComplete, initialProgress 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const avatarStyle = getAvatarStyle(`${empleado.nombre ?? ''} ${empleado.apellidos ?? ''}`);
 
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -109,8 +111,11 @@ export function CredencialesForm({ token, empleado, onComplete, initialProgress 
             {avatarPreview ? (
               <AvatarImage src={avatarPreview} alt="Avatar" />
             ) : (
-              <AvatarFallback className="bg-gray-100">
-                <User className="h-10 w-10 text-gray-400" />
+              <AvatarFallback
+                className="flex items-center justify-center"
+                style={avatarStyle}
+              >
+                <User className="h-10 w-10 opacity-70" />
               </AvatarFallback>
             )}
           </Avatar>
@@ -195,4 +200,5 @@ export function CredencialesForm({ token, empleado, onComplete, initialProgress 
     </form>
   );
 }
+
 

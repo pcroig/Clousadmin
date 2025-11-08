@@ -5,6 +5,8 @@
 import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { calcularDias } from '@/lib/calculos/ausencias';
+import { EstadoAusencia } from '@/lib/constants/enums';
+
 import {
   requireAuth,
   handleApiError,
@@ -105,7 +107,7 @@ export async function POST(
         diasSolicitados,
         descripcion: `Vacaciones de campaña: ${preferencia.campana.titulo}`,
         descuentaSaldo: true,
-        estado: 'pendiente_aprobacion',
+        estado: EstadoAusencia.pendiente_aprobacion,
         diasIdeales: preferencia.diasIdeales as any,
         diasPrioritarios: preferencia.diasPrioritarios as any,
         diasAlternativos: preferencia.diasAlternativos as any,

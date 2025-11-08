@@ -15,6 +15,8 @@ import {
 } from '@/lib/api-handler';
 import { z } from 'zod';
 
+import { EstadoAusencia, UsuarioRol } from '@/lib/constants/enums';
+
 const actualizarMasivoSchema = z.object({
   ausenciasIds: z.array(z.string().uuid()),
   accion: z.enum(['aprobar', 'rechazar']),
@@ -31,7 +33,7 @@ export async function POST(req: NextRequest) {
 
     // Obtener información del empleado si es manager
     let empleadoManager = null;
-    if (session.user.rol === 'manager' && session.user.empleadoId) {
+    if (session.user.rol === UsuarioRol.manager && session.user.empleadoId) {
       empleadoManager = await prisma.empleado.findUnique({
         where: { id: session.user.empleadoId },
         include: { equipos: { include: { equipo: true } } }
@@ -52,7 +54,7 @@ export async function POST(req: NextRequest) {
       where: {
         id: { in: validatedData.ausenciasIds },
         empresaId: session.user.empresaId,
-        estado: 'pendiente_aprobacion', // Solo ausencias pendientes
+        estado: EstadoAusencia.pendiente_aprobacion, // Solo ausencias pendientes
       },
       include: {
         empleado: true,
@@ -73,7 +75,7 @@ export async function POST(req: NextRequest) {
     for (const ausencia of ausencias) {
       try {
         // Verificar permisos si es manager (solo su equipo)
-        if (session.user.rol === 'manager' && empleadoManager) {
+        if (session.user.rol === UsuarioRol.manager && empleadoManager) {
           const equiposManager = empleadoManager.equipos.map(e => e.equipo.id);
           if (ausencia.equipoId && !equiposManager.includes(ausencia.equipoId)) {
             resultados.errores.push(
@@ -118,7 +120,7 @@ export async function POST(req: NextRequest) {
           await prisma.ausencia.update({
             where: { id: ausencia.id },
             data: {
-              estado: 'rechazada',
+              estado: EstadoAusencia.rechazada,
               aprobadaPor: session.user.id,
               aprobadaEn: new Date(),
               motivoRechazo: validatedData.motivoRechazo,

@@ -7,6 +7,9 @@ export const dynamic = 'force-dynamic';
 import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { campanaVacacionesCreateSchema } from '@/lib/validaciones/schemas';
+import { UsuarioRol } from '@/lib/constants/enums';
+import { crearNotificacionCampanaCreada } from '@/lib/notificaciones';
+
 import {
   requireAuth,
   handleApiError,
@@ -76,7 +79,7 @@ export async function POST(req: NextRequest) {
     const { session } = authResult;
 
     // Solo HR Admin o Manager pueden crear campañas
-    if (session.user.rol !== 'hr_admin' && session.user.rol !== 'manager') {
+    if (session.user.rol !== UsuarioRol.hr_admin && session.user.rol !== UsuarioRol.manager) {
       return badRequestResponse('No tienes permisos para crear campañas de vacaciones');
     }
 
@@ -233,29 +236,18 @@ export async function POST(req: NextRequest) {
       // No fallar si hay problema con preferencias, pero loguearlo
     }
 
-    // Crear notificaciones para cada empleado (solo para los que tienen usuarioId)
+    // Crear notificaciones para cada empleado usando la función tipada
     try {
-      const notificaciones = empleadosAsignados
-        .filter(emp => emp.usuarioId) // Solo empleados con usuario
-        .map(emp => ({
-          empresaId: session.user.empresaId,
-          usuarioId: emp.usuarioId!,
-          tipo: 'info',
-          titulo: 'Nueva campaña de vacaciones',
-          mensaje: `Se ha creado la campaña "${data.titulo}". Por favor, indica tus preferencias de vacaciones.`,
-          metadata: {
-            campanaId: campana.id,
-            tipo: 'campana_vacaciones_nueva',
-          },
-          leida: false,
-        }));
-
-      if (notificaciones.length > 0) {
-        await prisma.notificacion.createMany({
-          data: notificaciones
-        });
-        console.info(`[Campaña] ${notificaciones.length} notificaciones creadas`);
-      }
+      const empleadosIds = empleadosAsignados.map(emp => emp.id);
+      await crearNotificacionCampanaCreada(prisma, {
+        campanaId: campana.id,
+        empresaId: session.user.empresaId,
+        empleadosIds,
+        fechaInicio: fechaInicioObjetivo,
+        fechaFin: fechaFinObjetivo,
+        titulo: data.titulo,
+      });
+      console.info(`[Campaña] Notificaciones enviadas a ${empleadosIds.length} empleados`);
     } catch (error) {
       console.error('[Campaña] Error creando notificaciones:', error);
       // No fallar si hay problema con notificaciones, pero loguearlo

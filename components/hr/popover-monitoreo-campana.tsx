@@ -28,8 +28,7 @@ import {
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useApi } from '@/lib/hooks';
-import { getAvatarPlaceholderClasses } from '@/lib/design-system';
-import { cn } from '@/lib/utils';
+import { getAvatarStyle } from '@/lib/design-system';
 
 interface Preferencia {
   id: string;
@@ -241,24 +240,25 @@ export function PopoverMonitoreoCampana({
                         </h4>
                       </div>
                       <div className="space-y-2.5">
-                        {preferenciasCompletadas.map((pref) => (
-                          <div
-                            key={pref.id}
-                            className="flex items-start gap-3 p-3 rounded-lg bg-green-50 border border-green-200 hover:bg-green-100 transition-colors"
-                          >
-                          <Avatar className="w-8 h-8">
-                            <AvatarImage src={pref.empleado.fotoUrl || undefined} />
-                            <AvatarFallback
-                              className={cn(
-                                getAvatarPlaceholderClasses(
-                                  `${pref.empleado.nombre} ${pref.empleado.apellidos}`
-                                ),
-                                'text-xs font-medium'
-                              )}
+                        {preferenciasCompletadas.map((pref) => {
+                          const avatarStyle = getAvatarStyle(
+                            `${pref.empleado.nombre} ${pref.empleado.apellidos}`
+                          );
+
+                          return (
+                            <div
+                              key={pref.id}
+                              className="flex items-start gap-3 p-3 rounded-lg bg-green-50 border border-green-200 hover:bg-green-100 transition-colors"
                             >
-                              {getIniciales(pref.empleado.nombre, pref.empleado.apellidos)}
-                            </AvatarFallback>
-                          </Avatar>
+                              <Avatar className="w-8 h-8">
+                                <AvatarImage src={pref.empleado.fotoUrl || undefined} />
+                                <AvatarFallback
+                                  className="text-xs font-semibold uppercase"
+                                  style={avatarStyle}
+                                >
+                                  {getIniciales(pref.empleado.nombre, pref.empleado.apellidos)}
+                                </AvatarFallback>
+                              </Avatar>
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium text-gray-900 truncate">
                               {pref.empleado.nombre} {pref.empleado.apellidos}
@@ -290,8 +290,9 @@ export function PopoverMonitoreoCampana({
                               )}
                             </div>
                           </div>
-                        </div>
-                      ))}
+                            </div>
+                          );
+                        })}
                     </div>
                   </div>
                 )}
@@ -307,24 +308,25 @@ export function PopoverMonitoreoCampana({
                         </h4>
                       </div>
                       <div className="space-y-2.5">
-                        {preferenciasPendientes.map((pref) => (
-                          <div
-                            key={pref.id}
-                            className="flex items-center gap-3 p-3 rounded-lg bg-yellow-50 border border-yellow-200 hover:bg-yellow-100 transition-colors"
-                          >
-                          <Avatar className="w-8 h-8">
-                            <AvatarImage src={pref.empleado.fotoUrl || undefined} />
-                            <AvatarFallback
-                              className={cn(
-                                getAvatarPlaceholderClasses(
-                                  `${pref.empleado.nombre} ${pref.empleado.apellidos}`
-                                ),
-                                'text-xs font-medium'
-                              )}
+                        {preferenciasPendientes.map((pref) => {
+                          const avatarStyle = getAvatarStyle(
+                            `${pref.empleado.nombre} ${pref.empleado.apellidos}`
+                          );
+
+                          return (
+                            <div
+                              key={pref.id}
+                              className="flex items-center gap-3 p-3 rounded-lg bg-yellow-50 border border-yellow-200 hover:bg-yellow-100 transition-colors"
                             >
-                              {getIniciales(pref.empleado.nombre, pref.empleado.apellidos)}
-                            </AvatarFallback>
-                          </Avatar>
+                              <Avatar className="w-8 h-8">
+                                <AvatarImage src={pref.empleado.fotoUrl || undefined} />
+                                <AvatarFallback
+                                  className="text-xs font-semibold uppercase"
+                                  style={avatarStyle}
+                                >
+                                  {getIniciales(pref.empleado.nombre, pref.empleado.apellidos)}
+                                </AvatarFallback>
+                              </Avatar>
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium text-gray-900 truncate">
                               {pref.empleado.nombre} {pref.empleado.apellidos}
@@ -333,8 +335,9 @@ export function PopoverMonitoreoCampana({
                               Esperando respuesta...
                             </p>
                           </div>
-                        </div>
-                      ))}
+                            </div>
+                          );
+                        })}
                     </div>
                   </div>
                 )}

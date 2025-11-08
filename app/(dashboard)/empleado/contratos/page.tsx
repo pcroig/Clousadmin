@@ -5,10 +5,12 @@
 import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/auth';
 
+import { UsuarioRol } from '@/lib/constants/enums';
+
 export default async function EmpleadoContratosPage() {
   const session = await getSession();
   
-  if (!session || session.user.rol !== 'empleado') {
+  if (!session || session.user.rol !== UsuarioRol.empleado) {
     redirect('/login');
   }
 

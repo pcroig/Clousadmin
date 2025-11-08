@@ -5,9 +5,8 @@
 'use client';
 
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { getAvatarPlaceholderClasses } from '@/lib/design-system';
-import { cn } from '@/lib/utils';
 import { getInitials } from './utils';
+import { getAvatarStyle } from '@/lib/design-system';
 
 export interface Column<T> {
   id: string;
@@ -23,7 +22,6 @@ interface DataTableProps<T> {
   onRowClick?: (row: T) => void;
   getRowId?: (row: T) => string;
   emptyMessage?: string;
-  emptyComponent?: React.ReactNode;
 }
 
 export function DataTable<T extends Record<string, any>>({
@@ -32,7 +30,6 @@ export function DataTable<T extends Record<string, any>>({
   onRowClick,
   getRowId,
   emptyMessage = 'No hay datos disponibles',
-  emptyComponent,
 }: DataTableProps<T>) {
 
   return (
@@ -57,9 +54,9 @@ export function DataTable<T extends Record<string, any>>({
               <tr>
                 <td
                   colSpan={columns.length}
-                  className="px-6 py-12 text-center"
+                  className="px-6 py-12 text-center text-sm text-gray-500"
                 >
-                  {emptyComponent || <p className="text-sm text-gray-500">{emptyMessage}</p>}
+                  {emptyMessage}
                 </td>
               </tr>
             ) : (
@@ -93,15 +90,15 @@ export function DataTable<T extends Record<string, any>>({
 // Helper component for avatar cells
 export function AvatarCell({ nombre, avatar }: { nombre: string; avatar?: string }) {
 
+  const avatarStyle = getAvatarStyle(nombre);
+
   return (
     <div className="flex items-center gap-3">
       <Avatar className="h-9 w-9">
         {avatar && <AvatarImage src={avatar} />}
         <AvatarFallback
-          className={cn(
-            getAvatarPlaceholderClasses(nombre),
-            'text-xs font-medium'
-          )}
+          className="text-xs font-semibold uppercase"
+          style={avatarStyle}
         >
           {getInitials(nombre)}
         </AvatarFallback>

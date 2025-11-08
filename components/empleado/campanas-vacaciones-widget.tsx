@@ -12,6 +12,8 @@ import { WidgetCard } from '@/components/shared/widget-card';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
+import { EstadoAusencia } from '@/lib/constants/enums';
+
 interface CampanaInfo {
   id: string;
   titulo: string;
@@ -39,13 +41,13 @@ export const CampanasVacacionesWidget = memo(function CampanasVacacionesWidget({
 
   const estadoBadgeVariant = campanaActiva.miPreferencia?.estado === 'aceptada' 
     ? 'success' 
-    : campanaActiva.miPreferencia?.estado === 'pendiente'
+    : campanaActiva.miPreferencia?.estado === EstadoAusencia.pendiente_aprobacion
     ? 'warning'
     : 'default';
 
   const estadoLabel = campanaActiva.miPreferencia?.estado === 'aceptada'
     ? 'Participando'
-    : campanaActiva.miPreferencia?.estado === 'pendiente'
+    : campanaActiva.miPreferencia?.estado === EstadoAusencia.pendiente_aprobacion
     ? 'Pendiente'
     : 'Sin participar';
 
@@ -113,6 +115,7 @@ export const CampanasVacacionesWidget = memo(function CampanasVacacionesWidget({
     </WidgetCard>
   );
 });
+
 
 
 

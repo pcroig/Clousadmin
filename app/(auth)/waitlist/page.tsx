@@ -8,12 +8,14 @@ import { WaitlistForm } from './waitlist-form';
 import { getSession } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 
+import { UsuarioRol } from '@/lib/constants/enums';
+
 export default async function WaitlistPage() {
   // Si el usuario ya está autenticado, redirigir
   const session = await getSession();
   
   if (session) {
-    if (session.user.rol === 'hr_admin') {
+    if (session.user.rol === UsuarioRol.hr_admin) {
       redirect('/hr/dashboard');
     } else {
       redirect('/empleado/dashboard');

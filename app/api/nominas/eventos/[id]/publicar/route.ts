@@ -6,6 +6,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import {
+  actualizarEstadosNominasLote,
+  recalcularEstadisticasEvento,
+} from '@/lib/calculos/sync-estados-nominas';
 
 // ========================================
 // POST /api/nominas/eventos/[id]/publicar
@@ -100,19 +104,17 @@ export async function POST(
       },
     });
 
-    // Actualizar estado de las nóminas
-    await prisma.nomina.updateMany({
-      where: {
-        eventoNominaId: id,
-        estado: 'definitiva',
-      },
-      data: {
-        estado: 'publicada',
+    // Actualizar en transacción para garantizar atomicidad
+    // Usar la función centralizadora para mantener sincronización
+    const cantidadActualizada = await actualizarEstadosNominasLote(
+      id,
+      'publicada',
+      {
         fechaPublicacion: new Date(),
         empleadoNotificado: true,
         fechaNotificacion: new Date(),
-      },
-    });
+      }
+    );
 
     // Crear notificaciones para los empleados
     const notificaciones = await Promise.all(
@@ -129,16 +131,11 @@ export async function POST(
       )
     );
 
-    // Actualizar estado del evento
-    await prisma.eventoNomina.update({
-      where: { id },
-      data: {
-        estado: 'publicada',
-      },
-    });
+    // Recalcular estadísticas del evento
+    await recalcularEstadisticasEvento(id);
 
     return NextResponse.json({
-      nominasPublicadas: evento.nominas.length,
+      nominasPublicadas: cantidadActualizada,
       empleadosNotificados: notificaciones.length,
       mes: evento.mes,
       anio: evento.anio,

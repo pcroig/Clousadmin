@@ -17,8 +17,7 @@ import { LoadingButton } from '@/components/shared/loading-button';
 import { toast } from 'sonner';
 import { Check } from 'lucide-react';
 import { getInitials } from '@/components/shared/utils';
-import { getAvatarPlaceholderClasses } from '@/lib/design-system';
-import { cn } from '@/lib/utils';
+import { getAvatarStyle } from '@/lib/design-system';
 
 interface TeamMember {
   id: string;
@@ -111,35 +110,37 @@ export function ChangeManagerModal({
               </button>
 
               {/* Team Members */}
-              {members.map((member) => (
-                <button
-                  key={member.id}
-                  onClick={() => setSelectedManagerId(member.id)}
-                  className={`w-full flex items-center gap-3 p-3 rounded-lg border transition-colors ${
-                    selectedManagerId === member.id
-                      ? 'border-blue-600 bg-blue-50'
-                      : 'border-gray-200 hover:bg-gray-50'
-                  }`}
-                >
-                  <Avatar className="h-8 w-8">
-                    {member.avatar && <AvatarImage src={member.avatar} />}
-                    <AvatarFallback
-                      className={cn(
-                        getAvatarPlaceholderClasses(member.nombre),
-                        'text-xs font-medium'
-                      )}
-                    >
-                      {getInitials(member.nombre)}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1 text-left">
-                    <p className="text-sm font-medium text-gray-900">{member.nombre}</p>
-                  </div>
-                  {selectedManagerId === member.id && (
-                    <Check className="h-5 w-5 text-blue-600" />
-                  )}
-                </button>
-              ))}
+              {members.map((member) => {
+                const avatarStyle = getAvatarStyle(member.nombre);
+
+                return (
+                  <button
+                    key={member.id}
+                    onClick={() => setSelectedManagerId(member.id)}
+                    className={`w-full flex items-center gap-3 p-3 rounded-lg border transition-colors ${
+                      selectedManagerId === member.id
+                        ? 'border-blue-600 bg-blue-50'
+                        : 'border-gray-200 hover:bg-gray-50'
+                    }`}
+                  >
+                    <Avatar className="h-8 w-8">
+                      {member.avatar && <AvatarImage src={member.avatar} />}
+                      <AvatarFallback
+                        className="text-xs font-semibold uppercase"
+                        style={avatarStyle}
+                      >
+                        {getInitials(member.nombre)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 text-left">
+                      <p className="text-sm font-medium text-gray-900">{member.nombre}</p>
+                    </div>
+                    {selectedManagerId === member.id && (
+                      <Check className="h-5 w-5 text-blue-600" />
+                    )}
+                  </button>
+                );
+              })}
             </>
           )}
         </div>

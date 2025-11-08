@@ -53,6 +53,49 @@ enum TipoEquipo {
   temporal  // Equipo temporal
 }
 
+/// Estados del fichaje (día completo)
+enum EstadoFichaje {
+  en_curso   // Fichaje iniciado, aún no completado
+  pendiente  // Requiere revisión manual de HR
+  finalizado // Fichaje completo y aprobado
+}
+
+/// Tipos de evento de fichaje
+enum TipoFichajeEvento {
+  entrada       // Inicio de jornada
+  pausa_inicio  // Inicio de pausa/descanso
+  pausa_fin     // Fin de pausa/reanudación
+  salida        // Fin de jornada
+}
+
+/// Tipos de ausencia (fijos, no configurables)
+enum TipoAusencia {
+  vacaciones             // Vacaciones anuales
+  enfermedad             // Baja por enfermedad propia
+  enfermedad_familiar    // Cuidado familiar
+  maternidad_paternidad  // Permisos parentales
+  otro                   // Otros permisos
+}
+
+/// Estados de ausencia
+enum EstadoAusencia {
+  pendiente_aprobacion // Esperando aprobación
+  en_curso             // Aprobada, aún no disfrutada
+  completada           // Aprobada y ya disfrutada
+  auto_aprobada        // Auto-aprobada por IA
+  rechazada            // Rechazada por manager/HR
+  cancelada            // Cancelada por el empleado
+}
+
+/// Estados de solicitud de cambio
+enum EstadoSolicitud {
+  pendiente              // Recién creada
+  requiere_revision      // IA determina que necesita revisión manual
+  auto_aprobada          // IA la aprobó tras 48h
+  aprobada_manual        // HR/Manager la aprobó
+  rechazada              // Rechazada por HR/Manager
+}
+
 // ========================================
 // 1. CORE ENTITIES (Empresa, Usuario, Empleado)
 // ========================================
@@ -107,6 +150,8 @@ model Empresa {
   auditoriaAccesos       AuditoriaAcceso[]
   consentimientos        Consentimiento[]
   solicitudesEliminacion SolicitudEliminacionDatos[]
+  compensacionesHorasExtra CompensacionHoraExtra[]
+  denuncias              Denuncia[]
 
   @@index([cif])
   @@map("empresas")
@@ -270,6 +315,8 @@ model Empleado {
   complementos               EmpleadoComplemento[]
   consentimientos            Consentimiento[]
   solicitudesEliminacion     SolicitudEliminacionDatos[]
+  compensacionesHorasExtra   CompensacionHoraExtra[]
+  denuncias                  Denuncia[]
 
   @@index([empresaId])
   @@index([usuarioId])
@@ -441,11 +488,7 @@ model Fichaje {
   fecha      DateTime @db.Date
 
   // Estado del fichaje completo (UN SOLO ESTADO para todo el día)
-  estado String @default("en_curso") @db.VarChar(50)
-  // Posibles valores (3 estados únicos):
-  // - 'en_curso': Inicio del día o fichaje incompleto (sin eventos o sin cerrar)
-  // - 'pendiente': Requiere revisión manual de HR (fichaje incompleto al cierre del día)
-  // - 'finalizado': Fichaje completo y aprobado (manual o tras aprobación HR)
+  estado EstadoFichaje @default(en_curso)
 
   // Cálculos agregados (se actualizan al crear eventos)
   horasTrabajadas Decimal? @db.Decimal(5, 2) // Horas netas trabajadas (sin pausas)
@@ -485,8 +528,8 @@ model FichajeEvento {
   id        String @id @default(uuid())
   fichajeId String
 
-  tipo String   @db.VarChar(50) // 'entrada', 'pausa_inicio', 'pausa_fin', 'salida'
-  hora DateTime @db.Timestamptz(6)
+  tipo TipoFichajeEvento
+  hora DateTime       @db.Timestamptz(6)
 
   // Metadata del evento
   ubicacion String? @db.Text // GPS coords o nombre oficina
@@ -517,10 +560,10 @@ model Ausencia {
   equipoId   String? // Equipo del empleado (para cálculo solapamiento)
 
   // Absence details (FIXED TYPES)
-  tipo        String   @db.VarChar(50) // 'vacaciones', 'enfermedad', 'enfermedad_familiar', 'maternidad_paternidad', 'otro'
-  fechaInicio DateTime @db.Date
-  fechaFin    DateTime @db.Date
-  medioDia    Boolean  @default(false)
+  tipo        TipoAusencia
+  fechaInicio DateTime     @db.Date
+  fechaFin    DateTime     @db.Date
+  medioDia    Boolean      @default(false)
 
   diasNaturales   Int // Total days (including weekends)
   diasLaborables  Int // Working days only
@@ -540,10 +583,10 @@ model Ausencia {
   diasAlternativos Json? // Array de fechas alternativas
 
   // Approval workflow
-  estado        String    @default("pendiente_aprobacion") @db.VarChar(50) // 'pendiente_aprobacion', 'en_curso', 'completada', 'auto_aprobada', 'rechazada', 'cancelada'
+  estado        EstadoAusencia @default(pendiente_aprobacion)
   aprobadaPor   String? // Usuario ID
   aprobadaEn    DateTime?
-  motivoRechazo String?   @db.Text
+  motivoRechazo String?        @db.Text
 
   // Supporting documents (e.g., medical certificate)
   documentoId String? // Link to Documento
@@ -557,9 +600,10 @@ model Ausencia {
   updatedAt DateTime @updatedAt
 
   // Relations
-  empresa  Empresa  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
-  empleado Empleado @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
-  equipo   Equipo?  @relation(fields: [equipoId], references: [id], onDelete: SetNull)
+  empresa                 Empresa                 @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  empleado                Empleado                @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+  equipo                  Equipo?                 @relation(fields: [equipoId], references: [id], onDelete: SetNull)
+  compensacionHoraExtra   CompensacionHoraExtra?
 
   @@index([empresaId])
   @@index([empleadoId])
@@ -623,6 +667,46 @@ model EmpleadoSaldoAusencias {
   @@index([empleadoId, año])
   @@index([empresaId])
   @@map("empleado_saldo_ausencias")
+}
+
+/// CompensacionHoraExtra - Gestión de compensación de horas extra
+/// Permite a empleados solicitar compensación de balance positivo vía nómina o ausencia
+model CompensacionHoraExtra {
+  id         String @id @default(uuid())
+  empresaId  String
+  empleadoId String
+
+  // Horas a compensar
+  horasBalance Decimal @db.Decimal(5, 2) // Horas positivas del balance
+
+  // Decisión de compensación
+  tipoCompensacion String @db.VarChar(50) // 'nomina' | 'ausencia'
+  estado           String @default("pendiente") @db.VarChar(50) // 'pendiente', 'aprobada', 'rechazada'
+
+  // Si es ausencia
+  diasAusencia Decimal? @db.Decimal(4, 1) // Días convertidos (8h = 1 día)
+  ausenciaId   String?  @unique // Ausencia creada al aprobar
+
+  // Si es nómina
+  nominaId String? // ID de pre-nómina donde se incluye
+
+  // Auditoría
+  aprobadoPor   String? // HR admin que aprobó
+  aprobadoEn    DateTime?
+  motivoRechazo String?  @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  empresa  Empresa   @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  empleado Empleado  @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+  ausencia Ausencia? @relation(fields: [ausenciaId], references: [id])
+
+  @@index([empresaId])
+  @@index([empleadoId])
+  @@index([estado])
+  @@map("compensaciones_horas_extra")
 }
 
 /// EquipoPoliticaAusencias - Configuración de políticas de ausencias por equipo
@@ -1074,9 +1158,14 @@ model SolicitudCambio {
   motivo String? @db.Text
 
   // Approval workflow
-  estado         String    @default("pendiente") @db.VarChar(50) // 'pendiente', 'aprobada', 'rechazada'
-  motivoRechazo  String?   @db.Text
+  estado         EstadoSolicitud @default(pendiente)
+  motivoRechazo  String?         @db.Text
   fechaRespuesta DateTime?
+
+  // AI classification
+  revisionIA                Json?    // Análisis del clasificador IA
+  revisadaPorIA             Boolean  @default(false)
+  requiereAprobacionManual  Boolean  @default(false)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1332,6 +1421,52 @@ model Notificacion {
   @@index([eventoNominaId])
   @@index([createdAt])
   @@map("notificaciones")
+}
+
+/// Denuncia - Canal de denuncias internas
+/// Permite a empleados reportar situaciones irregulares de forma anónima o identificada
+model Denuncia {
+  id              String  @id @default(uuid())
+  empresaId       String
+  denuncianteId   String? // NULL si es anónima
+
+  // Contenido de la denuncia
+  descripcion     String  @db.Text
+  fechaIncidente  DateTime? @db.Date // Fecha aproximada del incidente (opcional)
+  ubicacion       String? @db.Text // Contexto/ubicación del incidente (opcional)
+
+  // Estado y seguimiento
+  estado          String  @default("pendiente") @db.VarChar(50) // 'pendiente', 'en_revision', 'resuelta', 'archivada'
+  prioridad       String  @default("media") @db.VarChar(50) // 'baja', 'media', 'alta', 'critica'
+
+  // Anonimato
+  esAnonima       Boolean @default(false)
+
+  // Asignación (HR)
+  asignadaA       String? // Usuario ID (HR admin)
+  asignadaEn      DateTime?
+
+  // Resolución
+  resueltaEn      DateTime?
+  resolucion      String? @db.Text
+  notasInternas   String? @db.Text // Notas privadas de HR
+
+  // Documentos adjuntos (S3 keys en JSON)
+  documentos      Json? // Array de { id, nombre, s3Key, mimeType, tamano, uploadedAt }
+
+  // Timestamps
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  empresa         Empresa  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  denunciante     Empleado? @relation(fields: [denuncianteId], references: [id], onDelete: SetNull)
+
+  @@index([empresaId, estado])
+  @@index([denuncianteId])
+  @@index([asignadaA])
+  @@index([createdAt])
+  @@map("denuncias")
 }
 
 // ========================================

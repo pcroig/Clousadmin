@@ -1,7 +1,7 @@
 # Configuración de Seguridad - Clousadmin
 
-**Fecha**: 2025-01-27  
-**Estado**: En implementación
+**Fecha**: 2025-11-07  
+**Estado**: En implementación (actualizado)
 
 ---
 
@@ -42,13 +42,13 @@ node -e "console.log('ENCRYPTION_KEY=' + require('crypto').randomBytes(32).toStr
 Los siguientes campos se encriptan automáticamente en la aplicación:
 
 ### Empleado
-- `iban` - Cuenta bancaria
-- `nif` - Identificación fiscal
-- `nss` - Número de Seguridad Social
-- `salarioBrutoAnual` - Salario anual (futuro)
-- `salarioBrutoMensual` - Salario mensual (futuro)
+- `iban` - Cuenta bancaria *(pendiente de aplicar en altas/updates)*
+- `nif` - Identificación fiscal *(pendiente de aplicar en altas/updates)*
+- `nss` - Número de Seguridad Social *(pendiente de aplicar en altas/updates)*
+- `salarioBrutoAnual` - Salario anual *(futuro, requiere revisar ordenamientos)*
+- `salarioBrutoMensual` - Salario mensual *(futuro)*
 
-**Nota**: Los salarios se encriptarán en fase posterior para no romper queries de ordenamiento.
+> **Estado actual**: Las utilidades `encryptEmpleadoData` / `decryptEmpleadoData` ya existen (`lib/empleado-crypto.ts`), pero los endpoints de creación/actualización aún no aplican el cifrado (nov 2025). Priorizar la adopción en `app/api/empleados`.
 
 ---
 
@@ -66,8 +66,8 @@ Los siguientes campos se encriptan automáticamente en la aplicación:
 
 ### Storage
 
-- **Desarrollo**: En memoria (Map)
-- **Producción** (futuro): Redis/Upstash para sincronización multi-instancia
+- **Desarrollo**: In-memory Map (implementado)
+- **Producción**: pendiente migrar a Redis/Upstash para sincronización multi-instancia
 
 ---
 
@@ -75,10 +75,10 @@ Los siguientes campos se encriptan automáticamente en la aplicación:
 
 ### Tabla: `sesiones_activas`
 
-- **Duración**: 7 días
+- **Duración**: 7 días (evaluar reducción a 72 h)
 - **Tracking**: IP, User Agent, último uso
-- **Invalidación**: Automática al cambiar contraseña o desactivar usuario
-- **Limpieza**: Sesiones expiradas se eliminan automáticamente
+- **Invalidación**: Automática al cambiar contraseña, desactivar usuario o iniciar sesión de nuevo
+- **Limpieza**: Sesiones expiradas se eliminan automáticamente (`cleanupExpiredSessions`)
 
 ### Funciones Disponibles
 
@@ -117,7 +117,7 @@ Se registrarán todos los accesos a datos sensibles:
 - [x] Timing attack mitigation en login
 
 ### En Progreso
-- [ ] Encriptación de campos sensibles en BD
+- [ ] Encriptación de campos sensibles en BD (APIs pendientes)
 - [ ] Auditoría de accesos
 - [ ] GDPR compliance (consentimientos, derecho al olvido, exportación)
 
@@ -149,6 +149,7 @@ Se registrarán todos los accesos a datos sensibles:
    - [ ] Configurar renovación automática de sesión
 
 4. **Encriptación**:
+   - [ ] Aplicar cifrado en endpoints críticos (`/api/empleados`, onboarding)
    - [ ] Backup de `ENCRYPTION_KEY` en lugar seguro
    - [ ] Documentar procedimiento de recuperación
 
@@ -160,7 +161,8 @@ Se registrarán todos los accesos a datos sensibles:
 
 ---
 
-**Última actualización**: 2025-01-27
+**Última actualización**: 7 de noviembre 2025
+
 
 
 

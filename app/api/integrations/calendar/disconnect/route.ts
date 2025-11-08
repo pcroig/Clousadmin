@@ -10,6 +10,8 @@ import { prisma } from "@/lib/prisma";
 import { OAuthManager } from "@/lib/oauth/oauth-manager";
 import { getGoogleOAuthConfig } from "@/lib/oauth/config";
 
+import { UsuarioRol } from '@/lib/constants/enums';
+
 export async function DELETE(req: NextRequest) {
   try {
     const authResult = await requireAuth(req);
@@ -45,7 +47,7 @@ export async function DELETE(req: NextRequest) {
 
     // Solo el dueño de la integración o un HR admin puede desconectar
     const isOwner = integracion.usuarioId === session.user.id;
-    const isHRAdmin = session.user.rol === "hr_admin";
+    const isHRAdmin = session.user.rol === UsuarioRol.hr_admin;
 
     if (!isOwner && !isHRAdmin) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });

@@ -6,6 +6,8 @@
 import { PrismaClient } from '@prisma/client';
 import { hash } from 'bcryptjs';
 
+import { EstadoAusencia, UsuarioRol } from '@/lib/constants/enums';
+
 const prisma = new PrismaClient();
 
 async function main() {
@@ -113,7 +115,7 @@ async function main() {
       password: passwordHash,
       nombre: 'Admin',
       apellidos: 'Clousadmin',
-      rol: 'hr_admin',
+      rol: UsuarioRol.hr_admin,
       activo: true,
       emailVerificado: true,
       empresaId: empresa.id,
@@ -172,7 +174,7 @@ async function main() {
       equipo: 'Tech',
       puesto: 'Software Engineer',
       salarioBrutoAnual: 42000,
-      rol: 'empleado' as const,
+      rol: UsuarioRol.empleado as const,
     },
     {
       nombre: 'Carlos',
@@ -182,7 +184,7 @@ async function main() {
       equipo: 'Producto',
       puesto: 'Product Manager',
       salarioBrutoAnual: 48000,
-      rol: 'manager' as const, // Carlos es manager de equipos
+      rol: UsuarioRol.manager as const, // Carlos es manager de equipos
     },
     {
       nombre: 'Laura',
@@ -192,7 +194,7 @@ async function main() {
       equipo: 'Diseño',
       puesto: 'UX Designer',
       salarioBrutoAnual: 38000,
-      rol: 'empleado' as const,
+      rol: UsuarioRol.empleado as const,
     },
     {
       nombre: 'Miguel',
@@ -202,7 +204,7 @@ async function main() {
       equipo: 'Tech',
       puesto: 'DevOps Engineer',
       salarioBrutoAnual: 45000,
-      rol: 'empleado' as const,
+      rol: UsuarioRol.empleado as const,
     },
     {
       nombre: 'Sara',
@@ -212,7 +214,7 @@ async function main() {
       equipo: 'Tech',
       puesto: 'QA Engineer',
       salarioBrutoAnual: 38000,
-      rol: 'empleado' as const,
+      rol: UsuarioRol.empleado as const,
     },
   ];
 
@@ -371,7 +373,7 @@ async function main() {
       diasSolicitados: 6, // Excluyendo festivos 25 y 26 dic
       motivo: 'Vacaciones de Navidad',
       descuentaSaldo: true,
-        estado: 'pendiente',
+        estado: EstadoAusencia.pendiente_aprobacion,
       },
       {
       empleadoId: empleados[1].id, // Carlos
@@ -385,7 +387,7 @@ async function main() {
       diasSolicitados: 4, // Excluyendo festivo 1 nov
       motivo: 'Puente de noviembre',
       descuentaSaldo: true,
-        estado: 'pendiente',
+        estado: EstadoAusencia.pendiente_aprobacion,
       },
       {
       empleadoId: empleados[3].id, // Miguel
@@ -399,7 +401,7 @@ async function main() {
       diasSolicitados: 1,
       motivo: 'Asuntos personales',
       descuentaSaldo: false,
-        estado: 'pendiente',
+        estado: EstadoAusencia.pendiente_aprobacion,
       },
 
     // Ausencias aprobadas (futuras)
@@ -415,7 +417,7 @@ async function main() {
       diasSolicitados: 5, // Excluyendo festivo 1 nov
       motivo: 'Vacaciones de otoño',
       descuentaSaldo: true,
-      estado: 'aprobada',
+      estado: EstadoAusencia.en_curso,
       aprobadaPor: usuarioAdmin.id,
       aprobadaEn: new Date(),
     },
@@ -431,7 +433,7 @@ async function main() {
       diasSolicitados: 5, // Excluyendo festivo 25 dic
       motivo: 'Vacaciones de Navidad',
       descuentaSaldo: true,
-      estado: 'aprobada',
+      estado: EstadoAusencia.en_curso,
       aprobadaPor: usuarioAdmin.id,
       aprobadaEn: new Date(),
     },
@@ -449,7 +451,7 @@ async function main() {
       diasSolicitados: 3,
       motivo: 'Gripe',
       descuentaSaldo: false,
-      estado: 'aprobada',
+      estado: EstadoAusencia.completada,
       aprobadaPor: usuarioAdmin.id,
       aprobadaEn: new Date('2025-10-15'),
     },
@@ -465,7 +467,7 @@ async function main() {
       diasSolicitados: 10, // Excluyendo festivo 15 ago
       motivo: 'Vacaciones de verano',
       descuentaSaldo: true,
-      estado: 'aprobada',
+      estado: EstadoAusencia.completada,
       aprobadaPor: usuarioAdmin.id,
       aprobadaEn: new Date('2025-07-20'),
     },
@@ -481,7 +483,7 @@ async function main() {
       diasSolicitados: 4,
       motivo: 'Puente',
       descuentaSaldo: true,
-      estado: 'aprobada',
+      estado: EstadoAusencia.completada,
       aprobadaPor: usuarioAdmin.id,
       aprobadaEn: new Date('2025-09-01'),
     },
@@ -497,7 +499,7 @@ async function main() {
       diasSolicitados: 1,
       motivo: 'Mudanza',
       descuentaSaldo: false,
-      estado: 'aprobada',
+      estado: EstadoAusencia.completada,
       aprobadaPor: usuarioAdmin.id,
       aprobadaEn: new Date('2025-10-05'),
     },
@@ -515,7 +517,7 @@ async function main() {
       diasSolicitados: 7, // Excluyendo festivo 6 dic
       motivo: 'Vacaciones diciembre',
       descuentaSaldo: false, // No descuenta porque fue rechazada
-      estado: 'rechazada',
+      estado: EstadoAusencia.rechazada,
       aprobadaPor: usuarioAdmin.id,
       aprobadaEn: new Date(),
       motivoRechazo: 'Ya hay 3 personas de vacaciones en esas fechas. Por favor elige otras fechas.',
@@ -656,7 +658,7 @@ async function main() {
               empresaId: empresa.id,
               empleadoId: empleado.id,
               fecha: fechaFichajeSinHora,
-              estado: 'pendiente', // Pendiente porque falta salida
+              estado: EstadoAusencia.pendiente_aprobacion, // Pendiente porque falta salida
               eventos: {
                 createMany: {
                   data: eventos,
@@ -698,7 +700,7 @@ async function main() {
               empresaId: empresa.id,
               empleadoId: empleado.id,
               fecha: fechaFichajeSinHora,
-              estado: 'pendiente', // Pendiente porque la pausa quedó sin cerrar
+              estado: EstadoAusencia.pendiente_aprobacion, // Pendiente porque la pausa quedó sin cerrar
               eventos: {
                 createMany: {
                   data: eventos,
@@ -786,7 +788,7 @@ async function main() {
               empresaId: empresa.id,
               empleadoId: empleado.id,
               fecha: fechaFichajeSinHora,
-              estado: 'pendiente', // Falta entrada, queda pendiente para cuadre
+              estado: EstadoAusencia.pendiente_aprobacion, // Falta entrada, queda pendiente para cuadre
               eventos: {
                 createMany: {
                   data: eventos,

@@ -5,10 +5,12 @@ import { serializeEmpleado } from '@/lib/utils';
 import { MiEspacioClient } from './mi-espacio-client';
 import { Suspense } from 'react';
 
+import { UsuarioRol } from '@/lib/constants/enums';
+
 export default async function MiEspacioPage() {
   const session = await getSession();
 
-  if (!session || session.user.rol === 'hr_admin') {
+  if (!session || session.user.rol === UsuarioRol.hr_admin) {
     redirect('/login');
   }
 

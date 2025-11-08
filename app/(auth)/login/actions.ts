@@ -107,6 +107,23 @@ export async function loginAction(email: string, password: string) {
       }
     }
 
+    // CRÍTICO: Invalidar todas las sesiones antiguas del usuario antes de crear una nueva
+    // Esto previene problemas con cookies antiguas que puedan tener datos desactualizados (ej. rol incorrecto)
+    try {
+      const sesionesEliminadas = await prisma.sesionActiva.deleteMany({
+        where: { usuarioId: usuario.id },
+      });
+      
+      if (sesionesEliminadas.count > 0) {
+        console.info(
+          `[Login] Invalidadas ${sesionesEliminadas.count} sesión(es) antigua(s) para usuario ${usuario.email}`
+        );
+      }
+    } catch (sessionError) {
+      console.error('[Login] Error al invalidar sesiones antiguas:', sessionError);
+      // Continuar aunque falle la invalidación (no bloquear el login)
+    }
+
     // Crear sesión con valor actualizado de activo y metadata
     await createSession(
       {
@@ -126,6 +143,11 @@ export async function loginAction(email: string, password: string) {
         ipAddress: clientIP,
         userAgent: headersList.get('user-agent') || undefined,
       }
+    );
+
+    // Logging para auditoría y debugging (sin información sensible)
+    console.info(
+      `[Login] Login exitoso - Email: ${usuario.email}, Rol: ${usuario.rol}, EmpresaId: ${usuario.empresaId}`
     );
 
     return {

@@ -290,3 +290,4 @@ npx prisma db seed
 **Revisado por**: [Pendiente]  
 **Aprobado por**: [Pendiente]
 
+

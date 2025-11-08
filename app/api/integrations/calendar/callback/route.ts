@@ -13,6 +13,8 @@ import { prisma } from "@/lib/prisma";
 import { createCalendarProvider } from "@/lib/integrations/calendar/providers";
 import type { CalendarIntegrationConfig } from "@/lib/integrations/types";
 
+import { UsuarioRol } from '@/lib/constants/enums';
+
 export async function GET(req: NextRequest) {
   try {
     // Verificar sesión
@@ -64,7 +66,7 @@ export async function GET(req: NextRequest) {
     // Verificar permisos para integración de empresa
     if (
       integrationType === "empresa" &&
-      session.user.rol !== "hr_admin"
+      session.user.rol !== UsuarioRol.hr_admin
     ) {
       return NextResponse.redirect(
         new URL(

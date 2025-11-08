@@ -10,6 +10,8 @@ import { join } from 'path';
 import { existsSync } from 'fs';
 import { puedeAccederACarpeta } from '@/lib/documentos';
 
+import { UsuarioRol } from '@/lib/constants/enums';
+
 // GET /api/documentos/[id] - Descargar documento
 export async function GET(
   request: NextRequest,
@@ -56,7 +58,7 @@ export async function GET(
       }
     } else {
       // Documento sin carpeta: solo HR puede acceder
-      if (session.user.rol !== 'hr_admin') {
+      if (session.user.rol !== UsuarioRol.hr_admin) {
         return NextResponse.json(
           { error: 'No tienes permisos para acceder a este documento' },
           { status: 403 }
@@ -101,7 +103,7 @@ export async function DELETE(
   try {
     const session = await getSession();
 
-    if (!session || session.user.rol !== 'hr_admin') {
+    if (!session || session.user.rol !== UsuarioRol.hr_admin) {
       return NextResponse.json(
         { error: 'Solo HR Admin puede eliminar documentos' },
         { status: 403 }

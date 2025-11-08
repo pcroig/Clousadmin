@@ -6,10 +6,12 @@ import { getSession } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { AusenciasClient } from '@/app/(dashboard)/hr/horario/ausencias/ausencias-client';
 
+import { UsuarioRol } from '@/lib/constants/enums';
+
 export default async function ManagerAusenciasPage() {
   const session = await getSession();
 
-  if (!session || session.user.rol !== 'manager') {
+  if (!session || session.user.rol !== UsuarioRol.manager) {
     redirect('/login');
   }
 

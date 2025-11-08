@@ -11,6 +11,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { FechaCalendar } from '@/components/shared/fecha-calendar';
 import { WidgetCard } from './widget-card';
+import { EstadoAusencia } from '@/lib/constants/enums';
+
 import {
   getAusenciaBadgeVariant,
   getAusenciaEstadoLabel,
@@ -24,7 +26,7 @@ export interface AusenciaItem {
   fechaFin?: Date;
   tipo: string;
   dias: number;
-  estado: 'pendiente_aprobacion' | 'en_curso' | 'completada' | 'auto_aprobada' | 'rechazada' | 'cancelada' | 'pendiente' | 'aprobada';
+  estado: EstadoAusencia.pendiente_aprobacion | 'en_curso' | 'completada' | 'auto_aprobada' | 'rechazada' | 'cancelada' | 'pendiente' | 'aprobada';
 }
 
 interface AusenciasWidgetProps {
