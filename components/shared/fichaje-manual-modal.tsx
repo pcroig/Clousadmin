@@ -83,21 +83,6 @@ export function FichajeManualModal({ open, onClose, onSuccess }: FichajeManualMo
     }
   };
 
-  const getTipoLabel = (tipoEvento: string) => {
-    switch (tipoEvento) {
-      case 'entrada':
-        return 'Entrada';
-      case 'pausa_inicio':
-        return 'Inicio de Pausa';
-      case 'pausa_fin':
-        return 'Fin de Pausa';
-      case 'salida':
-        return 'Salida';
-      default:
-        return tipoEvento;
-    }
-  };
-
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[425px]">

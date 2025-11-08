@@ -63,7 +63,7 @@ export async function GET(request: NextRequest) {
     console.info(`[Balance Fichajes] ${empleadoId}: ${balance.balanceTotal}h desde ${fechaDesde.toISOString().split('T')[0]}`);
 
     return successResponse({
-      horasTrabajadas: balance.dias.reduce((sum, d) => sum + d.horasTrabajadas, 0),
+      horasTrabajadas: balance.totalHorasTrabajadas, // Ya calculado en calcularBalancePeriodo
       horasEsperadas: balance.totalHorasEsperadas,
       balance: balance.balanceTotal,
       fechaDesde: fechaDesde.toISOString().split('T')[0],

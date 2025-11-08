@@ -60,13 +60,27 @@ export async function POST(request: NextRequest) {
           continue;
         }
 
-        // Parsear fecha (YYYY-MM-DD)
+        // Validar y parsear fecha (YYYY-MM-DD)
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(fechaStr)) {
+          errores.push(`Solicitud ${solicitud.id}: Formato de fecha inválido (esperado YYYY-MM-DD)`);
+          continue;
+        }
+
         const fechaParts = fechaStr.split('-');
-        const fecha = new Date(
-          parseInt(fechaParts[0]),
-          parseInt(fechaParts[1]) - 1,
-          parseInt(fechaParts[2])
-        );
+        const año = parseInt(fechaParts[0]);
+        const mes = parseInt(fechaParts[1]) - 1;
+        const dia = parseInt(fechaParts[2]);
+
+        if (isNaN(año) || isNaN(mes) || isNaN(dia)) {
+          errores.push(`Solicitud ${solicitud.id}: Componentes de fecha inválidos`);
+          continue;
+        }
+
+        const fecha = new Date(año, mes, dia);
+        if (isNaN(fecha.getTime())) {
+          errores.push(`Solicitud ${solicitud.id}: Fecha inválida`);
+          continue;
+        }
         fecha.setHours(0, 0, 0, 0);
 
         // Parsear hora completa (YYYY-MM-DDTHH:mm:ss o solo HH:mm)
