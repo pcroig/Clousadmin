@@ -7,7 +7,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { createOAuthProvider } from "@/lib/oauth/providers";
-import { getGoogleOAuthConfig } from "@/lib/oauth/config";
+import { getGoogleCalendarOAuthConfig } from "@/lib/oauth/config";
 import { OAuthManager } from "@/lib/oauth/oauth-manager";
 import { prisma } from "@/lib/prisma";
 import { createCalendarProvider } from "@/lib/integrations/calendar/providers";
@@ -30,11 +30,19 @@ export async function GET(req: NextRequest) {
     const state = searchParams.get("state");
     const error = searchParams.get("error");
 
+    // Determinar URL de integraciones según rol
+    let integracionesUrl = "/empleado/settings/integraciones";
+    if (session.user.rol === UsuarioRol.hr_admin || session.user.rol === UsuarioRol.platform_admin) {
+      integracionesUrl = "/hr/settings/integraciones";
+    } else if (session.user.rol === UsuarioRol.manager) {
+      integracionesUrl = "/manager/settings";
+    }
+
     // Verificar si hubo error
     if (error) {
       return NextResponse.redirect(
         new URL(
-          `/configuracion/integraciones?error=calendar_oauth_error`,
+          `${integracionesUrl}?error=calendar_oauth_error`,
           req.url
         )
       );
@@ -44,7 +52,7 @@ export async function GET(req: NextRequest) {
     if (!code) {
       return NextResponse.redirect(
         new URL(
-          `/configuracion/integraciones?error=missing_code`,
+          `${integracionesUrl}?error=missing_code`,
           req.url
         )
       );
@@ -57,7 +65,7 @@ export async function GET(req: NextRequest) {
     if (!savedState || savedState !== state) {
       return NextResponse.redirect(
         new URL(
-          `/configuracion/integraciones?error=invalid_state`,
+          `${integracionesUrl}?error=invalid_state`,
           req.url
         )
       );
@@ -70,14 +78,14 @@ export async function GET(req: NextRequest) {
     ) {
       return NextResponse.redirect(
         new URL(
-          `/configuracion/integraciones?error=forbidden`,
+          `${integracionesUrl}?error=forbidden`,
           req.url
         )
       );
     }
 
-    // Intercambiar código por tokens
-    const config = getGoogleOAuthConfig();
+    // Intercambiar código por tokens (usar config específica para calendario)
+    const config = getGoogleCalendarOAuthConfig();
     const googleProvider = createOAuthProvider("google", config);
     const tokens = await googleProvider.exchangeCodeForTokens(code);
 
@@ -92,12 +100,9 @@ export async function GET(req: NextRequest) {
       tokens
     );
 
-    // Crear calendario dedicado "Clousadmin - Ausencias"
-    const calendarProvider = createCalendarProvider("google_calendar");
-    const calendar = await calendarProvider.createCalendar(
-      tokens.access_token,
-      "Clousadmin - Ausencias"
-    );
+    // Usar el calendario primario del usuario en lugar de crear uno nuevo
+    // Esto evita problemas con permisos y es más simple para el usuario
+    const calendarId = "primary";
 
     // Crear integración en BD
     const integrationConfig: CalendarIntegrationConfig = {
@@ -123,7 +128,7 @@ export async function GET(req: NextRequest) {
         where: { id: existingIntegration.id },
         data: {
           config: integrationConfig as any,
-          calendarId: calendar.id,
+          calendarId: calendarId,
           activa: true,
         },
       });
@@ -136,7 +141,7 @@ export async function GET(req: NextRequest) {
           tipo: "calendario",
           proveedor: "google_calendar",
           config: integrationConfig as any,
-          calendarId: calendar.id,
+          calendarId: calendarId,
           activa: true,
         },
       });
@@ -144,7 +149,7 @@ export async function GET(req: NextRequest) {
 
     // Limpiar cookies
     const response = NextResponse.redirect(
-      new URL("/configuracion/integraciones?success=calendar_connected", req.url)
+      new URL(`${integracionesUrl}?success=true`, req.url)
     );
     response.cookies.delete("calendar_oauth_state");
     response.cookies.delete("calendar_integration_type");
@@ -153,8 +158,9 @@ export async function GET(req: NextRequest) {
   } catch (error) {
     console.error("Error en callback de calendario:", error);
 
+    // En caso de error, redirigir a login ya que no tenemos sesión aquí
     const response = NextResponse.redirect(
-      new URL("/configuracion/integraciones?error=calendar_failed", req.url)
+      new URL("/login?error=calendar_failed", req.url)
     );
     response.cookies.delete("calendar_oauth_state");
     response.cookies.delete("calendar_integration_type");

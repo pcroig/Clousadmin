@@ -67,7 +67,7 @@ export async function calcularDiasSolicitados(
   const diasLaborables = await getDiasLaborablesEmpresa(empresaId);
 
   let dias = 0;
-  let fecha = new Date(fechaInicio);
+  const fecha = new Date(fechaInicio);
   const fechaFinDate = new Date(fechaFin);
 
   while (fecha <= fechaFinDate) {
@@ -109,7 +109,7 @@ export async function calcularDias(
   // Contar días laborables y solicitados según configuración de empresa
   let diasLaborables = 0;
   let diasSolicitados = 0;
-  let fecha = new Date(fechaInicio);
+  const fecha = new Date(fechaInicio);
   const fechaFinDate = new Date(fechaFin);
 
   while (fecha <= fechaFinDate) {
@@ -343,7 +343,7 @@ export async function calcularSolapamientoEquipo(
     where: {
       equipoId,
       estado: {
-        in: ['pendiente_aprobacion', 'en_curso', 'completada', 'auto_aprobada'],
+        in: [EstadoAusencia.pendiente_aprobacion, EstadoAusencia.en_curso, EstadoAusencia.completada, EstadoAusencia.auto_aprobada],
       },
       OR: [
         {
@@ -368,7 +368,7 @@ export async function calcularSolapamientoEquipo(
     porcentaje: number;
   }> = [];
 
-  let fecha = new Date(fechaInicio);
+  const fecha = new Date(fechaInicio);
   const fechaFinDate = new Date(fechaFin);
 
   while (fecha <= fechaFinDate) {
@@ -568,7 +568,7 @@ export async function validarSolapamientoMaximo(
         where: {
           equipoId,
           estado: {
-            in: ['pendiente_aprobacion', 'en_curso', 'completada', 'auto_aprobada'],
+            in: [EstadoAusencia.pendiente_aprobacion, EstadoAusencia.en_curso, EstadoAusencia.completada, EstadoAusencia.auto_aprobada],
           },
           id: { not: excluirAusenciaId },
           OR: [
@@ -588,7 +588,7 @@ export async function validarSolapamientoMaximo(
 
       if (totalEquipo > 0) {
         // Recalcular solapamiento día por día
-        let fecha = new Date(fechaInicio);
+        const fecha = new Date(fechaInicio);
         const fechaFinDate = new Date(fechaFin);
 
         while (fecha <= fechaFinDate) {
@@ -624,7 +624,7 @@ export async function validarSolapamientoMaximo(
     }
 
     // Recalcular día por día incluyendo la nueva ausencia
-    let fecha = new Date(fechaInicio);
+    const fecha = new Date(fechaInicio);
     const fechaFinDate = new Date(fechaFin);
 
     while (fecha <= fechaFinDate) {

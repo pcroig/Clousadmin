@@ -19,7 +19,7 @@ export interface Notificacion {
   tipo: string;
   titulo: string;
   mensaje: string;
-  metadata?: any;
+  metadata?: Record<string, unknown>;
   leida: boolean;
   createdAt: string;
 }

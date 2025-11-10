@@ -80,13 +80,18 @@ export async function GET(req: NextRequest) {
       },
     });
 
-    const diasUsados = ausencias
-      .filter((a: any) => a.estado === EstadoAusencia.en_curso || a.estado === EstadoAusencia.completada || a.estado === EstadoAusencia.auto_aprobada)
-      .reduce((sum: number, a: any) => sum + Number(a.diasSolicitados), 0);
+    interface Ausencia {
+      estado: string;
+      diasSolicitados: number | { toNumber(): number } | string;
+    }
+    
+    const diasUsados = (ausencias as Ausencia[])
+      .filter((a) => a.estado === EstadoAusencia.en_curso || a.estado === EstadoAusencia.completada || a.estado === EstadoAusencia.auto_aprobada)
+      .reduce((sum: number, a) => sum + Number(a.diasSolicitados), 0);
 
-    const diasPendientes = ausencias
-      .filter((a: any) => a.estado === EstadoAusencia.pendiente_aprobacion)
-      .reduce((sum: number, a: any) => sum + Number(a.diasSolicitados), 0);
+    const diasPendientes = (ausencias as Ausencia[])
+      .filter((a) => a.estado === EstadoAusencia.pendiente_aprobacion)
+      .reduce((sum: number, a) => sum + Number(a.diasSolicitados), 0);
 
     const diasTotales = saldoAsignado?.diasTotales || 0;
 

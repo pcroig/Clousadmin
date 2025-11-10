@@ -5,6 +5,8 @@
 import { NextRequest } from 'next/server';
 import { requireAuth, handleApiError, successResponse, badRequestResponse } from '@/lib/api-handler';
 import { uploadToS3 } from '@/lib/s3';
+import { prisma } from '@/lib/prisma';
+import { obtenerOCrearCarpetaSistema, TIPOS_DOCUMENTO } from '@/lib/documentos';
 
 // Configuración de Next.js para manejar uploads
 export const runtime = 'nodejs';
@@ -21,6 +23,8 @@ export async function POST(req: NextRequest) {
     const formData = await req.formData();
     const file = formData.get('file') as File;
     const tipo = formData.get('tipo') as string; // 'justificante', 'documento', etc.
+    const empleadoId = formData.get('empleadoId') as string | null; // Opcional: para crear documento asociado
+    const crearDocumento = formData.get('crearDocumento') === 'true'; // Si debe crear registro en BD
 
     if (!file) {
       return badRequestResponse('No se proporcionó ningún archivo');
@@ -52,11 +56,49 @@ export async function POST(req: NextRequest) {
     const s3Key = `uploads/${session.user.empresaId}/${tipo || 'general'}/${fileName}`;
     const url = await uploadToS3(buffer, s3Key, file.type);
 
+    let documento = null;
+
+    // Si se solicita crear documento en BD (para justificantes, etc.)
+    if (crearDocumento && empleadoId) {
+      // Determinar la carpeta según el tipo
+      let carpetaNombre: 'Justificantes' | 'Médicos' = 'Justificantes';
+      if (tipo === TIPOS_DOCUMENTO.MEDICO || tipo === 'medico') {
+        carpetaNombre = 'Médicos';
+      }
+
+      // Obtener o crear carpeta correspondiente
+      const carpeta = await obtenerOCrearCarpetaSistema(
+        empleadoId,
+        session.user.empresaId,
+        carpetaNombre
+      );
+
+      // Crear documento en BD
+      documento = await prisma.documento.create({
+        data: {
+          empresaId: session.user.empresaId,
+          empleadoId,
+          carpetaId: carpeta.id,
+          nombre: file.name,
+          tipoDocumento: tipo || 'otro',
+          mimeType: file.type,
+          tamano: file.size,
+          s3Key,
+          s3Bucket: process.env.S3_BUCKET || 'local',
+        },
+      });
+    }
+
     return successResponse({
       url,
       fileName,
       size: file.size,
       type: file.type,
+      documento: documento ? {
+        id: documento.id,
+        nombre: documento.nombre,
+        carpetaId: documento.carpetaId,
+      } : null,
     });
   } catch (error) {
     return handleApiError(error, 'API POST /api/upload');

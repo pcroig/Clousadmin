@@ -5,13 +5,13 @@
 // ========================================
 
 import { prisma } from '@/lib/prisma';
-import { hashPassword } from '@/lib/auth';
-import { createSession } from '@/lib/auth';
+import { hashPassword, createSession } from '@/lib/auth';
 import { signupSchema } from '@/lib/validaciones/schemas';
 import { verificarInvitacionSignup, usarInvitacionSignup } from '@/lib/invitaciones-signup';
 import { z } from 'zod';
 
 import { UsuarioRol } from '@/lib/constants/enums';
+import { getOrCreateDefaultJornada } from '@/lib/jornadas/get-or-create-default';
 
 /**
  * Registrar nueva empresa + primer usuario HR Admin
@@ -78,27 +78,7 @@ export async function signupEmpresaAction(
       });
 
       // 2. Crear jornada por defecto (40 horas, flexible, límites 7:00-21:00)
-      const jornadaPorDefecto = await tx.jornada.create({
-        data: {
-          empresaId: empresa.id,
-          nombre: 'Jornada por Defecto',
-          horasSemanales: 40,
-          config: {
-            tipo: 'flexible',
-            limiteInferior: '07:00',
-            limiteSuperior: '21:00',
-            lunes: { activo: true },
-            martes: { activo: true },
-            miercoles: { activo: true },
-            jueves: { activo: true },
-            viernes: { activo: true },
-            sabado: { activo: false },
-            domingo: { activo: false },
-          },
-          esPredefinida: true, // Marcar como predefinida para que no se pueda eliminar
-          activa: true,
-        },
-      });
+      const jornadaPorDefecto = await getOrCreateDefaultJornada(tx, empresa.id);
 
       // 3. Crear usuario HR Admin
       const usuario = await tx.usuario.create({

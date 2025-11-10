@@ -158,7 +158,17 @@ export function AddPersonaOnboardingForm({ onSuccess, onCancel, tipoOnboarding =
 
     try {
       // Crear empleado
-      const empleadoData: any = {
+      interface EmpleadoCreateData {
+        nombre: string;
+        apellidos: string;
+        email: string;
+        fechaAlta: string;
+        activo: boolean;
+        onboardingCompletado: boolean;
+        puestoId?: string;
+      }
+      
+      const empleadoData: EmpleadoCreateData = {
         nombre: formData.nombre,
         apellidos: formData.apellidos,
         email: formData.email,
@@ -373,13 +383,12 @@ export function AddPersonaOnboardingForm({ onSuccess, onCancel, tipoOnboarding =
               <div>
                 <Label htmlFor="tipoDocumento">Tipo de Documento</Label>
                 <Select
-                  id="tipoDocumento"
                   value={tipoDocumentoActual}
                   onValueChange={(value) => {
                     setTipoDocumentoActual(value);
                   }}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger id="tipoDocumento">
                     <SelectValue placeholder="Seleccionar tipo" />
                   </SelectTrigger>
                   <SelectContent>
@@ -439,13 +448,12 @@ export function AddPersonaOnboardingForm({ onSuccess, onCancel, tipoOnboarding =
               <div>
                 <Label htmlFor="tipoDocumentoAdicional">Tipo de Documento</Label>
                 <Select
-                  id="tipoDocumentoAdicional"
                   value={tipoDocumentoActual}
                   onValueChange={(value) => {
                     setTipoDocumentoActual(value);
                   }}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger id="tipoDocumentoAdicional">
                     <SelectValue placeholder="Seleccionar tipo" />
                   </SelectTrigger>
                   <SelectContent>

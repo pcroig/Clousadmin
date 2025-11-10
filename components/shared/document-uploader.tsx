@@ -6,7 +6,8 @@
 
 import { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
-import { Upload, X, FileText, Loader2 } from 'lucide-react';
+import { LoadingButton } from '@/components/shared/loading-button';
+import { Upload, X, FileText } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 
 interface DocumentUploaderProps {
@@ -65,8 +66,9 @@ export function DocumentUploader({
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
-    } catch (err: any) {
-      setError(err.message || 'Error al subir el archivo');
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Error al subir el archivo';
+      setError(message);
     } finally {
       setUploading(false);
     }
@@ -139,23 +141,15 @@ export function DocumentUploader({
             )}
           </div>
 
-          <Button
+          <LoadingButton
             onClick={handleUpload}
+            loading={uploading}
             disabled={disabled || uploading}
             className="w-full mt-4"
           >
-            {uploading ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Subiendo...
-              </>
-            ) : (
-              <>
-                <Upload className="mr-2 h-4 w-4" />
-                Subir archivo
-              </>
-            )}
-          </Button>
+            <Upload className="mr-2 h-4 w-4" />
+            {uploading ? 'Subiendo...' : 'Subir archivo'}
+          </LoadingButton>
         </div>
       )}
 
@@ -167,6 +161,7 @@ export function DocumentUploader({
     </div>
   );
 }
+
 
 
 

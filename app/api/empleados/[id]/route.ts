@@ -11,8 +11,10 @@ import {
   badRequestResponse,
 } from '@/lib/api-handler';
 import {
-  crearNotificacionCambioManager,
   crearNotificacionAsignadoEquipo,
+  crearNotificacionCambioManager,
+  crearNotificacionCambioPuesto,
+  crearNotificacionJornadaAsignada,
 } from '@/lib/notificaciones';
 import { z } from 'zod';
 import { encryptEmpleadoData, decryptEmpleadoData } from '@/lib/empleado-crypto';
@@ -161,6 +163,25 @@ export async function PATCH(
       }
     }
 
+    // Validar jornadaId si se proporciona
+    if (empleadoData.jornadaId) {
+      const jornadaExiste = await prisma.jornada.findUnique({
+        where: {
+          id: empleadoData.jornadaId,
+          empresaId: session.user.empresaId,
+        },
+      });
+
+      if (!jornadaExiste) {
+        return badRequestResponse('La jornada especificada no existe');
+      }
+
+      // Validar que la jornada esté activa
+      if (!jornadaExiste.activa) {
+        return badRequestResponse('La jornada especificada está inactiva. Solo se pueden asignar jornadas activas a empleados.');
+      }
+    }
+
     // Validar equipoIds si se proporcionan
     if (equipoIds && equipoIds.length > 0) {
       const equiposExistentes = await prisma.equipo.findMany({
@@ -295,26 +316,74 @@ export async function PATCH(
     });
 
     // Crear notificaciones de cambios importantes
-    // 1. Cambio de manager
-    if (empleadoData.managerId && empleadoData.managerId !== oldManagerId) {
-      const nuevoManager = await prisma.empleado.findUnique({
-        where: { id: empleadoData.managerId },
-        select: { nombre: true, apellidos: true },
-      });
-
-      if (nuevoManager) {
-        await crearNotificacionCambioManager(prisma, {
-          empleadoId: id,
-          empresaId: session.user.empresaId,
-          empleadoNombre: `${empleadoActual.nombre} ${empleadoActual.apellidos}`,
-          nuevoManagerId: empleadoData.managerId,
-          nuevoManagerNombre: `${nuevoManager.nombre} ${nuevoManager.apellidos}`,
-          anteriorManagerId: oldManagerId || undefined,
-          anteriorManagerNombre: empleadoActual.manager
-            ? `${empleadoActual.manager.nombre} ${empleadoActual.manager.apellidos}`
-            : undefined,
+    try {
+      // 1. Cambio de manager
+      if (empleadoData.managerId && empleadoData.managerId !== oldManagerId) {
+        const nuevoManager = await prisma.empleado.findUnique({
+          where: { id: empleadoData.managerId },
+          select: { nombre: true, apellidos: true },
         });
+
+        if (nuevoManager) {
+          await crearNotificacionCambioManager(prisma, {
+            empleadoId: id,
+            empresaId: session.user.empresaId,
+            empleadoNombre: `${empleadoActual.nombre} ${empleadoActual.apellidos}`,
+            nuevoManagerId: empleadoData.managerId,
+            nuevoManagerNombre: `${nuevoManager.nombre} ${nuevoManager.apellidos}`,
+            anteriorManagerId: oldManagerId || undefined,
+            anteriorManagerNombre: empleadoActual.manager
+              ? `${empleadoActual.manager.nombre} ${empleadoActual.manager.apellidos}`
+              : undefined,
+          });
+        }
       }
+
+      // 2. Cambio de jornada
+      if (
+        empleadoData.jornadaId &&
+        empleadoData.jornadaId !== empleadoActual.jornadaId
+      ) {
+        const nuevaJornada = await prisma.jornada.findUnique({
+          where: { id: empleadoData.jornadaId },
+          select: { nombre: true },
+        });
+
+        if (nuevaJornada) {
+          await crearNotificacionJornadaAsignada(prisma, {
+            empleadoId: id,
+            empresaId: session.user.empresaId,
+            jornadaNombre: nuevaJornada.nombre,
+          });
+        }
+      }
+
+      // 3. Cambio de puesto
+      if (empleadoData.puestoId && empleadoData.puestoId !== empleadoActual.puestoId) {
+        const puestoAnterior = empleadoActual.puestoId
+          ? await prisma.puesto.findUnique({
+              where: { id: empleadoActual.puestoId },
+              select: { nombre: true },
+            })
+          : null;
+
+        const puestoNuevo = await prisma.puesto.findUnique({
+          where: { id: empleadoData.puestoId },
+          select: { nombre: true },
+        });
+
+        if (puestoNuevo) {
+          await crearNotificacionCambioPuesto(prisma, {
+            empleadoId: id,
+            empresaId: session.user.empresaId,
+            puestoAnterior: puestoAnterior?.nombre || null,
+            puestoNuevo: puestoNuevo.nombre,
+          });
+        }
+      }
+    } catch (error) {
+      console.error('[API PATCH /api/empleados/[id]] Error creando notificaciones:', error);
+      // No fallar la actualización si falla la notificación
     }
 
     // 2. Asignación a nuevos equipos

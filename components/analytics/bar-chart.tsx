@@ -19,7 +19,7 @@ import {
 interface BarChartComponentProps {
   title: string
   description?: string
-  data: Array<Record<string, any>>
+  data: Array<Record<string, unknown>>
   dataKey: string | string[] // Puede ser una key o múltiples para barras múltiples
   xAxisKey: string
   chartConfig: ChartConfig

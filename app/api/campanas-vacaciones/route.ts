@@ -5,7 +5,7 @@
 export const dynamic = 'force-dynamic';
 
 import { NextRequest } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { prisma, Prisma } from '@/lib/prisma';
 import { campanaVacacionesCreateSchema } from '@/lib/validaciones/schemas';
 import { UsuarioRol } from '@/lib/constants/enums';
 import { crearNotificacionCampanaCreada } from '@/lib/notificaciones';
@@ -30,7 +30,12 @@ export async function GET(req: NextRequest) {
     const estado = searchParams.get('estado');
 
     // Filtros base
-    const where: any = {
+    interface CampanaWhereClause {
+      empresaId: string;
+      estado?: string;
+    }
+    
+    const where: CampanaWhereClause = {
       empresaId: session.user.empresaId,
     };
 
@@ -93,7 +98,16 @@ export async function POST(req: NextRequest) {
     const data = validationResult.data;
 
     // Determinar empleados asignados
-    let empleadosAsignados: any[] = [];
+    interface EmpleadoAsignado {
+      id: string;
+      usuarioId: string;
+      nombre: string;
+      apellidos: string;
+      email: string;
+      estadoEmpleado?: string;
+    }
+    
+    let empleadosAsignados: EmpleadoAsignado[] = [];
 
     if (data.alcance === 'todos') {
       // Todos los empleados activos de la empresa
@@ -209,7 +223,7 @@ export async function POST(req: NextRequest) {
         empresaId: session.user.empresaId,
         titulo: data.titulo,
         alcance: data.alcance,
-        equipoIds: (data.equipoIds || null) as any,
+        equipoIds: (data.equipoIds || null) as unknown as Prisma.InputJsonValue,
         solapamientoMaximoPct: data.solapamientoMaximoPct,
         fechaInicioObjetivo,
         fechaFinObjetivo,

@@ -4,11 +4,13 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
+import { encryptEmpleadoData } from '@/lib/empleado-crypto';
 import { prisma } from '@/lib/prisma';
-import { crearInvitacion } from '@/lib/invitaciones';
+import { invitarEmpleado } from '@/lib/invitaciones';
 import type { EmpleadoDetectado } from '@/lib/ia/procesar-excel-empleados';
 
 import { UsuarioRol } from '@/lib/constants/enums';
+import { getOrCreateDefaultJornada } from '@/lib/jornadas/get-or-create-default';
 
 interface ConfirmarImportacionBody {
   empleados: (EmpleadoDetectado & { valido: boolean; errores: string[] })[];
@@ -33,6 +35,23 @@ export async function POST(req: NextRequest) {
     }
 
     const body: ConfirmarImportacionBody = await req.json();
+
+    const sanitizeOptionalString = (value: unknown): string | null => {
+      if (typeof value !== 'string') return null;
+      const trimmed = value.trim();
+      return trimmed.length > 0 ? trimmed : null;
+    };
+
+    const sanitizeNif = (nif: unknown): string | null => {
+      const sanitized = sanitizeOptionalString(nif);
+      return sanitized ? sanitized.toUpperCase() : null;
+    };
+
+    const empresa = await prisma.empresa.findUnique({
+      where: { id: session.user.empresaId },
+      select: { nombre: true },
+    });
+    const empresaNombre = empresa?.nombre || 'Tu empresa';
 
     const { empleados, equiposDetectados } = body;
 
@@ -67,8 +86,20 @@ export async function POST(req: NextRequest) {
     const resultados = {
       empleadosCreados: 0,
       equiposCreados: 0,
+      puestosCreados: 0,
       invitacionesEnviadas: 0,
       errores: [] as string[],
+      empleadosImportados: [] as Array<{
+        id: string;
+        nombre: string;
+        apellidos: string;
+        email: string;
+        puesto: string | null;
+        equipo: string | null;
+        fechaAlta: string | null;
+        salarioBrutoAnual: number | null;
+        invitacionEnviada: boolean;
+      }>,
     };
 
     // 1. Crear equipos primero (usar upsert para evitar duplicados)
@@ -105,6 +136,50 @@ export async function POST(req: NextRequest) {
     }
 
     console.log(`[ConfirmarImportacion] Equipos creados: ${resultados.equiposCreados}`);
+
+    // 1.5. Crear puestos de trabajo (similar a equipos)
+    const puestosUnicos = new Set<string>();
+    empleadosValidos.forEach((emp) => {
+      if (emp.puesto && emp.puesto.trim()) {
+        puestosUnicos.add(emp.puesto.trim());
+      }
+    });
+
+    const puestosCreados = new Map<string, string>(); // nombre -> id
+
+    for (const nombrePuesto of Array.from(puestosUnicos)) {
+      try {
+        const puesto = await prisma.puesto.upsert({
+          where: {
+            empresaId_nombre: {
+              empresaId: session.user.empresaId,
+              nombre: nombrePuesto,
+            },
+          },
+          update: {
+            activo: true,
+          },
+          create: {
+            empresaId: session.user.empresaId,
+            nombre: nombrePuesto,
+            activo: true,
+          },
+        });
+
+        puestosCreados.set(nombrePuesto, puesto.id);
+        resultados.puestosCreados++;
+      } catch (error) {
+        console.error(`[ConfirmarImportacion] Error creando puesto ${nombrePuesto}:`, error);
+        resultados.errores.push(`Error al crear puesto: ${nombrePuesto}`);
+      }
+    }
+
+    console.log(`[ConfirmarImportacion] Puestos creados: ${resultados.puestosCreados}`);
+
+    const jornadaPorDefecto = await getOrCreateDefaultJornada(
+      prisma,
+      session.user.empresaId
+    );
 
     // 2. Crear empleados en batches con paralelismo controlado
     const CONCURRENCY = 8; // Procesamos 8 empleados en paralelo (balance entre velocidad y carga DB)
@@ -162,38 +237,48 @@ export async function POST(req: NextRequest) {
                 }
               }
 
-              // Crear empleado
+              // Preparar datos del empleado
+              const datosEmpleado = {
+                usuarioId: usuario.id,
+                empresaId: session.user.empresaId,
+                nombre: empleadoData.nombre!,
+                apellidos: empleadoData.apellidos!,
+                email: empleadoData.email!.toLowerCase(),
+                nif: sanitizeNif(empleadoData.nif),
+                telefono: sanitizeOptionalString(empleadoData.telefono),
+                fechaNacimiento: empleadoData.fechaNacimiento
+                  ? new Date(empleadoData.fechaNacimiento)
+                  : null,
+                puesto: empleadoData.puesto, // Mantener por compatibilidad (deprecated)
+                puestoId: empleadoData.puesto && puestosCreados.has(empleadoData.puesto.trim())
+                  ? puestosCreados.get(empleadoData.puesto.trim())
+                  : null,
+                jornadaId: jornadaPorDefecto.id, // Asignar jornada por defecto
+                fechaAlta: empleadoData.fechaAlta
+                  ? new Date(empleadoData.fechaAlta)
+                  : new Date(),
+                salarioBrutoAnual: empleadoData.salarioBrutoAnual
+                  ? parseFloat(empleadoData.salarioBrutoAnual.toString())
+                  : null,
+                salarioBrutoMensual: empleadoData.salarioBrutoMensual
+                  ? parseFloat(empleadoData.salarioBrutoMensual.toString())
+                  : null,
+                direccionCalle: sanitizeOptionalString(empleadoData.direccionCalle),
+                direccionNumero: sanitizeOptionalString(empleadoData.direccionNumero),
+                direccionPiso: sanitizeOptionalString(empleadoData.direccionPiso),
+                ciudad: sanitizeOptionalString(empleadoData.ciudad),
+                codigoPostal: sanitizeOptionalString(empleadoData.codigoPostal),
+                direccionProvincia: sanitizeOptionalString(empleadoData.direccionProvincia),
+                onboardingCompletado: false,
+                activo: true,
+              };
+
+              // Encriptar datos sensibles antes de crear
+              const datosEncriptados = encryptEmpleadoData(datosEmpleado);
+
+              // Crear empleado con datos encriptados
               const empleado = await tx.empleado.create({
-                data: {
-                  usuarioId: usuario.id,
-                  empresaId: session.user.empresaId,
-                  nombre: empleadoData.nombre!,
-                  apellidos: empleadoData.apellidos!,
-                  email: empleadoData.email!.toLowerCase(),
-                  nif: empleadoData.nif || null,
-                  telefono: empleadoData.telefono,
-                  fechaNacimiento: empleadoData.fechaNacimiento
-                    ? new Date(empleadoData.fechaNacimiento)
-                    : null,
-                  puesto: empleadoData.puesto,
-                  fechaAlta: empleadoData.fechaAlta
-                    ? new Date(empleadoData.fechaAlta)
-                    : new Date(),
-                  salarioBrutoAnual: empleadoData.salarioBrutoAnual
-                    ? parseFloat(empleadoData.salarioBrutoAnual.toString())
-                    : null,
-                  salarioBrutoMensual: empleadoData.salarioBrutoMensual
-                    ? parseFloat(empleadoData.salarioBrutoMensual.toString())
-                    : null,
-                  direccionCalle: empleadoData.direccionCalle,
-                  direccionNumero: empleadoData.direccionNumero,
-                  direccionPiso: empleadoData.direccionPiso,
-                  ciudad: empleadoData.ciudad,
-                  codigoPostal: empleadoData.codigoPostal,
-                  direccionProvincia: empleadoData.direccionProvincia,
-                  onboardingCompletado: false,
-                  activo: true,
-                },
+                data: datosEncriptados,
               });
 
               // Vincular empleado al usuario
@@ -215,6 +300,12 @@ export async function POST(req: NextRequest) {
               return {
                 empleadoId: empleado.id,
                 email: empleado.email,
+                nombre: empleado.nombre,
+                apellidos: empleado.apellidos,
+                puesto: empleado.puesto,
+                equipo: empleadoData.equipo || null,
+                fechaAlta: empleado.fechaAlta ? empleado.fechaAlta.toISOString() : null,
+                salarioBrutoAnual: empleado.salarioBrutoAnual ? parseFloat(empleado.salarioBrutoAnual.toString()) : null,
               };
             }, { timeout: 10000 });
 
@@ -225,21 +316,43 @@ export async function POST(req: NextRequest) {
             // Empleado creado con éxito, crear invitación
             if (debeInvitar) {
               try {
-                const invitacion = await crearInvitacion(
-                  creationResult.empleadoId,
-                  session.user.empresaId,
-                  creationResult.email,
-                  'simplificado'
-                );
+                const invitacion = await invitarEmpleado({
+                  empleadoId: creationResult.empleadoId,
+                  empresaId: session.user.empresaId,
+                  email: creationResult.email,
+                  nombre: creationResult.nombre,
+                  apellidos: creationResult.apellidos,
+                  tipoOnboarding: 'simplificado',
+                  empresaNombre,
+                });
 
-                if (invitacion.success) {
-                  return { success: true, empleado: creationResult };
-                } else {
+                if (!invitacion.success) {
                   resultados.errores.push(
                     `Error al crear invitación: ${creationResult.email}`
                   );
-                  return { success: false, empleado: creationResult };
+                  return {
+                    success: false,
+                    empleado: creationResult,
+                    invitacionEnviada: false,
+                  };
                 }
+
+                if (!invitacion.emailEnviado) {
+                  resultados.errores.push(
+                    `No se pudo enviar el email de invitación: ${creationResult.email}`
+                  );
+                  return {
+                    success: false,
+                    empleado: creationResult,
+                    invitacionEnviada: false,
+                  };
+                }
+
+                return {
+                  success: true,
+                  empleado: creationResult,
+                  invitacionEnviada: true,
+                };
               } catch (error) {
                 console.error(
                   `[ConfirmarImportacion] Error creando invitación para ${creationResult.email}:`,
@@ -248,11 +361,11 @@ export async function POST(req: NextRequest) {
                 resultados.errores.push(
                   `Error al crear invitación: ${creationResult.email}`
                 );
-                return { success: false, empleado: creationResult };
+                return { success: false, empleado: creationResult, invitacionEnviada: false };
               }
             }
 
-            return { success: true, empleado: creationResult };
+            return { success: true, empleado: creationResult, invitacionEnviada: true };
           } catch (error) {
             console.error(
               `[ConfirmarImportacion] Error creando empleado ${empleadoData.email}:`,
@@ -274,6 +387,20 @@ export async function POST(req: NextRequest) {
             resultados.empleadosCreados++;
             if (result.value.success) {
               resultados.invitacionesEnviadas++;
+            }
+            // Agregar empleado a la lista de importados
+            if (result.value.empleado) {
+              resultados.empleadosImportados.push({
+                id: result.value.empleado.empleadoId,
+                nombre: result.value.empleado.nombre,
+                apellidos: result.value.empleado.apellidos,
+                email: result.value.empleado.email,
+                puesto: result.value.empleado.puesto,
+                equipo: result.value.empleado.equipo,
+                fechaAlta: result.value.empleado.fechaAlta,
+                salarioBrutoAnual: result.value.empleado.salarioBrutoAnual,
+                invitacionEnviada: result.value.invitacionEnviada || false,
+              });
             }
           }
         });

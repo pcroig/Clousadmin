@@ -4,7 +4,7 @@
 // Analytics - Client Component con Datos Reales
 // ========================================
 
-import { useState, useEffect } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { AnalyticsFilters, FilterValues } from '@/components/analytics/filters';
 import { BarChartComponent } from '@/components/analytics/bar-chart';
 import { AreaChartComponent } from '@/components/analytics/area-chart';
@@ -52,11 +52,7 @@ export function AnalyticsClient() {
   const [fichajesData, setFichajesData] = useState<FichajesData | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    fetchData();
-  }, [filters]);
-
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true);
     try {
       const queryParams = new URLSearchParams({
@@ -85,7 +81,11 @@ export function AnalyticsClient() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [filters]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   const handleFilterChange = (key: keyof FilterValues, value: string) => {
     setFilters((prev) => ({ ...prev, [key]: value }));

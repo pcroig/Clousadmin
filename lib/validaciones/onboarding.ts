@@ -5,6 +5,7 @@
 
 import { z } from 'zod';
 import { normalizarIdentificacion, obtenerInfoValidacionNIF } from './nif';
+import { validarIBAN } from './iban';
 
 /**
  * Validar NSS (Número de Seguridad Social) español
@@ -118,14 +119,13 @@ export const datosBancariosSchema = z.object({
         });
         return;
       }
-      // The validarIBAN function was removed, so this check is no longer possible.
-      // Keeping the original message as it was not explicitly removed by the user.
-      // If the intent was to remove this check, a new edit would be needed.
-      // For now, we'll keep the original message.
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'IBAN inválido. El checksum no es correcto. Verifica que todos los dígitos sean correctos',
-      });
+
+      if (!validarIBAN(val)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'IBAN inválido. El checksum no es correcto. Verifica que todos los dígitos sean correctos',
+        });
+      }
     }),
   
   titularCuenta: z

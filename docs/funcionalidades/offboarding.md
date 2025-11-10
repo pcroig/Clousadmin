@@ -561,3 +561,4 @@ WHERE c.nombre = 'Offboarding' AND c.empleadoId = 'empleado-id';
 
 
 
+

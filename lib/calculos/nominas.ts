@@ -5,6 +5,7 @@
 
 import { prisma } from '@/lib/prisma';
 import { esDiaLaborable, getDiasLaborablesEmpresa } from './dias-laborables';
+import { EstadoAusencia, EstadoFichaje } from '@/lib/constants/enums';
 
 /**
  * Tipo de retorno para el resumen mensual
@@ -44,7 +45,7 @@ export async function calcularDiasLaborablesMes(
   // Último día del mes
   const fechaFin = new Date(anio, mes, 0);
 
-  let fecha = new Date(fechaInicio);
+  const fecha = new Date(fechaInicio);
   
   while (fecha <= fechaFin) {
     // Verificar si el día es laborable
@@ -84,7 +85,7 @@ export async function calcularDiasTrabajados(
         gte: fechaInicio,
         lte: fechaFin,
       },
-      estado: 'finalizado',
+      estado: EstadoFichaje.finalizado,
     },
   });
 
@@ -117,7 +118,7 @@ export async function calcularAusenciasPorTipo(
     where: {
       empleadoId,
       estado: {
-        in: ['completada', 'en_curso', 'auto_aprobada'],
+        in: [EstadoAusencia.completada, EstadoAusencia.en_curso, EstadoAusencia.auto_aprobada],
       },
       OR: [
         // Ausencias que empiezan en el mes
@@ -154,7 +155,7 @@ export async function calcularAusenciasPorTipo(
   let diasVacaciones = 0;
   let diasBajaIT = 0;
   let diasPermisosRetribuidos = 0;
-  let diasPermisosNoRetribuidos = 0;
+  const diasPermisosNoRetribuidos = 0;
 
   for (const ausencia of ausencias) {
     // Calcular cuántos días de esta ausencia caen en el mes actual
@@ -222,7 +223,7 @@ export async function calcularHorasMensuales(
         gte: fechaInicio,
         lte: fechaFin,
       },
-      estado: 'finalizado',
+      estado: EstadoFichaje.finalizado,
     },
     select: {
       horasTrabajadas: true,

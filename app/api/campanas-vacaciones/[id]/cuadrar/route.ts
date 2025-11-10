@@ -5,7 +5,7 @@
 import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { cuadrarVacacionesIA } from '@/lib/ia/cuadrar-vacaciones';
-import { UsuarioRol } from '@/lib/constants/enums';
+import { UsuarioRol, EstadoAusencia } from '@/lib/constants/enums';
 
 import {
   requireAuth,
@@ -78,7 +78,7 @@ export async function POST(
     const ausenciasAprobadas = await prisma.ausencia.findMany({
       where: {
         empleadoId: { in: empleadoIds },
-        estado: { in: ['en_curso', 'completada', 'auto_aprobada'] },
+        estado: { in: [EstadoAusencia.en_curso, EstadoAusencia.completada, EstadoAusencia.auto_aprobada] },
         tipo: 'vacaciones',
       },
     });

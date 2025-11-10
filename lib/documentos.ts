@@ -13,11 +13,14 @@ import { UsuarioRol } from '@/lib/constants/enums';
 export const CARPETAS_SISTEMA = [
   'Contratos',
   'Nóminas',
+  'Justificantes',
   'Personales',
   'Médicos',
 ] as const;
 
 export type CarpetaSistema = typeof CARPETAS_SISTEMA[number];
+
+const CARPETAS_GLOBALES: CarpetaSistema[] = ['Contratos', 'Nóminas', 'Justificantes'];
 
 /**
  * Tipos de documentos permitidos
@@ -25,8 +28,12 @@ export type CarpetaSistema = typeof CARPETAS_SISTEMA[number];
 export const TIPOS_DOCUMENTO = {
   CONTRATO: 'contrato',
   NOMINA: 'nomina',
+  JUSTIFICANTE: 'justificante',
   MEDICO: 'medico',
   PERSONAL: 'personal',
+  DNI: 'dni',
+  ONBOARDING: 'onboarding',
+  OFFBOARDING: 'offboarding',
   OTRO: 'otro',
 } as const;
 
@@ -36,8 +43,12 @@ export const TIPOS_DOCUMENTO = {
 export const LIMITES_TAMANO = {
   [TIPOS_DOCUMENTO.CONTRATO]: 10 * 1024 * 1024, // 10MB
   [TIPOS_DOCUMENTO.NOMINA]: 2 * 1024 * 1024, // 2MB
+  [TIPOS_DOCUMENTO.JUSTIFICANTE]: 5 * 1024 * 1024, // 5MB
   [TIPOS_DOCUMENTO.MEDICO]: 5 * 1024 * 1024, // 5MB
   [TIPOS_DOCUMENTO.PERSONAL]: 5 * 1024 * 1024, // 5MB
+  [TIPOS_DOCUMENTO.DNI]: 5 * 1024 * 1024, // 5MB
+  [TIPOS_DOCUMENTO.ONBOARDING]: 5 * 1024 * 1024, // 5MB
+  [TIPOS_DOCUMENTO.OFFBOARDING]: 5 * 1024 * 1024, // 5MB
   [TIPOS_DOCUMENTO.OTRO]: 10 * 1024 * 1024, // 10MB
 };
 
@@ -86,11 +97,15 @@ export async function crearCarpetasSistemaParaEmpleado(
 /**
  * Obtiene las carpetas de un empleado
  */
+interface CarpetaWhereClause {
+  OR: Array<Record<string, unknown>>;
+}
+
 export async function obtenerCarpetasEmpleado(
   empleadoId: string,
   incluirCompartidas = true
 ) {
-  const whereClause: any = {
+  const whereClause: CarpetaWhereClause = {
     OR: [
       // Carpetas personales del empleado
       { empleadoId },
@@ -318,4 +333,96 @@ export function validarNombreArchivo(nombre: string): {
   }
 
   return { valido: true };
+}
+
+/**
+ * Obtiene o crea una carpeta del sistema para un empleado
+ * @param empleadoId ID del empleado
+ * @param empresaId ID de la empresa
+ * @param nombreCarpeta Nombre de la carpeta (debe ser una de CARPETAS_SISTEMA)
+ * @returns La carpeta existente o recién creada
+ */
+export async function obtenerOCrearCarpetaSistema(
+  empleadoId: string,
+  empresaId: string,
+  nombreCarpeta: CarpetaSistema
+) {
+  // Buscar carpeta existente
+  let carpeta = await prisma.carpeta.findFirst({
+    where: {
+      empresaId,
+      empleadoId,
+      nombre: nombreCarpeta,
+      esSistema: true,
+    },
+  });
+
+  // Si no existe, crearla
+  if (!carpeta) {
+    carpeta = await prisma.carpeta.create({
+      data: {
+        empresaId,
+        empleadoId,
+        nombre: nombreCarpeta,
+        esSistema: true,
+        compartida: false,
+      },
+    });
+  }
+
+  return carpeta;
+}
+
+/**
+ * Obtiene o crea una carpeta global (sin empleadoId) para HR
+ * Usada para agregaciones de documentos de todos los empleados
+ * @param empresaId ID de la empresa
+ * @param nombreCarpeta Nombre de la carpeta (Nóminas, Contratos, Justificantes)
+ * @returns La carpeta global existente o recién creada
+ */
+export async function obtenerOCrearCarpetaGlobal(
+  empresaId: string,
+  nombreCarpeta: string
+) {
+  // Buscar carpeta global existente
+  let carpeta = await prisma.carpeta.findFirst({
+    where: {
+      empresaId,
+      empleadoId: null,
+      nombre: nombreCarpeta,
+      esSistema: true,
+      compartida: true,
+    },
+  });
+
+  // Si no existe, crearla
+  if (!carpeta) {
+    carpeta = await prisma.carpeta.create({
+      data: {
+        empresaId,
+        empleadoId: null,
+        nombre: nombreCarpeta,
+        esSistema: true,
+        compartida: true,
+        asignadoA: 'todos',
+      },
+    });
+  }
+
+  return carpeta;
+}
+
+/**
+ * Asegura que las carpetas globales por defecto (Contratos, Nóminas, Justificantes)
+ * existan para la empresa indicada. Devuelve las carpetas creadas o encontradas.
+ */
+export async function asegurarCarpetasGlobales(empresaId: string) {
+  const carpetas = [];
+
+  for (const nombre of CARPETAS_GLOBALES) {
+    const carpeta = await obtenerOCrearCarpetaGlobal(empresaId, nombre);
+    carpetas.push(carpeta);
+  }
+
+  return carpetas;
 }

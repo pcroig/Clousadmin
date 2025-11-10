@@ -52,28 +52,39 @@ Documento {
 
 ### Carpetas del Sistema (Automáticas)
 
-Cada empleado tiene 4 carpetas creadas automáticamente:
+Cada empleado tiene 5 carpetas creadas automáticamente:
 
 1. **📄 Contratos** (`esSistema: true`)
    - Contratos laborales
    - Modificaciones
    - Anexos
    - Finiquitos
+   - Se suben durante onboarding (opcional)
 
 2. **💰 Nóminas** (`esSistema: true`)
    - PDFs de nóminas mensuales
-   - Por ahora solo storage (validaciones en Fase 2)
+   - Importados masivamente o manualmente desde módulo de nóminas
+   - Se reasignan automáticamente a cada empleado
+   - **Vista HR**: Carpeta global agregada con filtros por empleado
 
-3. **👤 Personales** (`esSistema: true`)
+3. **📋 Justificantes** (`esSistema: true`)
+   - Justificantes de ausencias
+   - Se crean automáticamente desde el módulo de ausencias
+   - Vinculados a registros de ausencia (campo `documentoId`)
+   - **Vista HR**: Carpeta global agregada con filtros por empleado
+
+4. **👤 Personales** (`esSistema: true`)
    - DNI/NIE/Pasaporte
    - Certificado bancario
    - Certificado SS
    - Títulos académicos
+   - Empleados pueden subir archivos
 
-4. **🏥 Médicos** (`esSistema: true`)
+5. **🏥 Médicos** (`esSistema: true`)
    - Partes de baja
    - Justificantes médicos
    - Se vinculan a ausencias
+   - Empleados pueden subir archivos
 
 ---
 
@@ -96,6 +107,31 @@ Cada empleado tiene 4 carpetas creadas automáticamente:
 
 ### Documentos
 
+#### `POST /api/upload`
+Upload de archivos con opción de crear documento en BD (usado para justificantes)
+
+**Body (FormData):**
+```
+file: File
+tipo: string (justificante|medico|contrato|etc)
+empleadoId: string (opcional)
+crearDocumento: boolean (opcional, si debe crear registro en BD)
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "url": "s3://...",
+  "fileName": "archivo.pdf",
+  "documento": {
+    "id": "uuid",
+    "nombre": "archivo.pdf",
+    "carpetaId": "uuid"
+  }
+}
+```
+
 #### `POST /api/documentos`
 Upload de documentos (multipart/form-data)
 
@@ -105,7 +141,7 @@ Upload de documentos (multipart/form-data)
   "file": File,
   "carpetaId": "uuid",
   "empleadoId": "uuid",
-  "tipoDocumento": "contrato|nomina|medico|personal|otro"
+  "tipoDocumento": "contrato|nomina|justificante|medico|personal|otro"
 }
 ```
 
@@ -150,12 +186,20 @@ Ver contenido de carpeta
   "carpeta": {
     "id": "uuid",
     "nombre": "Contratos",
-    "esSistema": true
+    "esSistema": true,
+    "esGlobal": false,
+    "empleado": {...}
   },
   "documentos": [...],
   "subcarpetas": [...]
 }
 ```
+
+**Carpetas Globales:**
+- Si `empleadoId` es `null` y `esSistema: true`, es una carpeta global
+- Agrega documentos de todos los empleados del mismo tipo
+- Vista HR incluye filtros por empleado y búsqueda
+- Tipos globales: Nóminas, Contratos, Justificantes
 
 #### `POST /api/carpetas`
 Crear carpeta (solo HR para carpetas compartidas)
@@ -186,12 +230,25 @@ Eliminar carpeta vacía (solo HR)
 ```
 Navegar a: /hr/documentos
 - Verás todas las carpetas de la empresa
+- Carpetas con ícono 🌍 son globales (agregan documentos de todos los empleados)
 - Click en una carpeta para ver su contenido
 - Dentro de la carpeta podrás:
   • Ver todos los documentos en formato tabla
+  • En carpetas globales: filtrar por empleado y buscar
   • Descargar documentos
   • Eliminar documentos
   • Subir nuevos documentos
+```
+
+#### Carpetas Globales (Nóminas, Contratos, Justificantes)
+```
+1. Navegar a carpeta global (ej: "Nóminas")
+2. Ver banner azul indicando que es carpeta global
+3. Usar filtros:
+   • Selector "Filtrar por empleado": Ver documentos de un empleado específico
+   • Campo "Buscar": Buscar por nombre de documento o empleado
+4. Tabla muestra columna adicional "Empleado" con asignación
+5. Contador muestra: "X documentos (de Y total)"
 ```
 
 #### Crear Carpeta Compartida
@@ -215,9 +272,10 @@ Navegar a: /hr/documentos
 #### Ver Mis Documentos
 ```
 Navegar a: /empleado/mi-espacio/documentos
-- Tab "Personales": Tus 4 carpetas del sistema
-  • Contratos (solo lectura)
-  • Nóminas (solo lectura)
+- Tab "Personales": Tus 5 carpetas del sistema
+  • Contratos (solo lectura) - subidos durante onboarding
+  • Nóminas (solo lectura) - reasignadas desde módulo de nóminas
+  • Justificantes (solo lectura) - creadas automáticamente desde ausencias
   • Personales (puedes subir archivos)
   • Médicos (puedes subir archivos)
 - Tab "Compartidos": Carpetas compartidas por la empresa
@@ -226,6 +284,19 @@ Navegar a: /empleado/mi-espacio/documentos
   • Ver todos los documentos en formato tabla
   • Descargar documentos
   • Subir documentos (solo en Personales y Médicos)
+```
+
+#### Subir Justificante desde Ausencias
+```
+1. Navegar a: /empleado/mi-espacio/ausencias
+2. Click en "Solicitar Ausencia"
+3. Completar formulario de ausencia
+4. Opcional: Subir justificante (PDF, JPG, PNG)
+5. Al crear la ausencia:
+   • Archivo se sube a S3
+   • Se crea documento en carpeta "Justificantes"
+   • Se vincula a la ausencia (campo documentoId)
+   • Visible en "Mis Documentos > Justificantes"
 ```
 
 #### Subir Documentos Personales
@@ -333,9 +404,11 @@ app/(dashboard)/
 
 ---
 
-## 🔄 Integración con Creación de Empleados
+## 🔄 Integraciones del Sistema
 
-### Opción 1: Automática (Recomendada)
+### 1. Integración con Creación de Empleados
+
+#### Automática (Recomendada)
 ```typescript
 import { crearEmpleadoConCarpetas } from '@/lib/hooks/use-crear-empleado';
 
@@ -346,15 +419,77 @@ const empleado = await crearEmpleadoConCarpetas({
   empresaId: 'uuid',
   // ... otros campos
 });
-// Las carpetas se crean automáticamente en la transacción
+// Las 5 carpetas del sistema se crean automáticamente en la transacción
 ```
 
-### Opción 2: Post-hook
-```typescript
-import { postCrearEmpleado } from '@/lib/hooks/use-crear-empleado';
+### 2. Integración con Módulo de Ausencias
 
-// Después de crear un empleado
-await postCrearEmpleado(nuevoEmpleado.id, empresaId);
+#### Subida de Justificantes
+```typescript
+// En solicitar-ausencia-modal.tsx
+const formData = new FormData();
+formData.append('file', justificante);
+formData.append('tipo', 'justificante');
+formData.append('crearDocumento', 'true');
+formData.append('empleadoId', empleadoId);
+
+const uploadResponse = await fetch('/api/upload', {
+  method: 'POST',
+  body: formData,
+});
+
+const { url, documento } = await uploadResponse.json();
+
+// Al crear ausencia, vincular documento
+await fetch('/api/ausencias', {
+  method: 'POST',
+  body: JSON.stringify({
+    tipo: 'enfermedad',
+    fechaInicio: '2025-01-15',
+    fechaFin: '2025-01-17',
+    justificanteUrl: url,
+    documentoId: documento.id, // ← Vincula documento a ausencia
+  }),
+});
+```
+
+**Flujo completo:**
+1. Usuario sube justificante en modal de ausencia
+2. API `/api/upload` sube archivo a S3
+3. API crea documento en carpeta "Justificantes" del empleado
+4. API retorna `documentoId`
+5. Al crear ausencia, se vincula con `documentoId`
+6. Documento visible en "Mis Documentos > Justificantes"
+
+### 3. Integración con Nóminas (Futuro - Fase 2)
+
+```typescript
+// Importación masiva de nóminas
+// 1. Subir PDF de nómina
+// 2. IA extrae datos (empleado, período, conceptos)
+// 3. Matching automático de empleado
+// 4. Asigna documento a carpeta "Nóminas" del empleado
+// 5. Visible en carpeta global "Nóminas" (HR) y personal (Empleado)
+```
+
+### 4. Integración con Onboarding
+
+```typescript
+// Durante proceso de onboarding
+// Documentos subidos se guardan en carpetas correspondientes:
+// - Contrato → Carpeta "Contratos"
+// - DNI → Carpeta "Personales"
+// - Certificado bancario → Carpeta "Personales"
+// Lógica en: lib/documentos/onboarding.ts
+```
+
+### 5. Integración con Offboarding
+
+```typescript
+// Durante proceso de offboarding
+// Documentos (finiquito, carta de baja) se guardan en carpeta especial
+// Visible solo para HR Admin
+// Lógica en: components/hr/DarDeBajaModal.tsx
 ```
 
 ---
@@ -415,11 +550,39 @@ curl http://localhost:3000/api/documentos
 ## 📝 Notas Técnicas
 
 ### Estructura de Carpetas del Sistema
-Cada empleado tiene automáticamente 4 carpetas:
-1. **Contratos** - Contratos laborales, modificaciones, anexos
-2. **Nóminas** - PDFs de nóminas mensuales
-3. **Personales** - DNI, certificados bancarios, títulos
-4. **Médicos** - Justificantes médicos, bajas IT
+Cada empleado tiene automáticamente 5 carpetas:
+1. **Contratos** - Contratos laborales, modificaciones, anexos (subidos en onboarding)
+2. **Nóminas** - PDFs de nóminas mensuales (importados desde módulo nóminas)
+3. **Justificantes** - Justificantes de ausencias (creados automáticamente)
+4. **Personales** - DNI, certificados bancarios, títulos
+5. **Médicos** - Justificantes médicos, bajas IT
+
+### Carpetas Globales vs Individuales
+
+**Carpetas Individuales:**
+- Tienen `empleadoId` asignado
+- Contienen documentos específicos de un empleado
+- Visibles en "Mi Espacio" para el empleado
+- Visibles en vista HR filtrando por empleado
+
+**Carpetas Globales:**
+- `empleadoId` es `null`
+- `compartida: true` y `esSistema: true`
+- Agregan documentos de todos los empleados del mismo tipo
+- Solo visibles para HR Admin
+- Incluyen filtros por empleado y búsqueda
+- Tipos: Nóminas, Contratos, Justificantes
+
+**Creación de carpetas globales:**
+```typescript
+import { obtenerOCrearCarpetaGlobal } from '@/lib/documentos';
+
+const carpetaGlobal = await obtenerOCrearCarpetaGlobal(
+  empresaId,
+  'Nóminas'
+);
+// Resultado: carpeta sin empleadoId, compartida, sistema
+```
 
 ### Permisos de Upload
 - **Empleados** pueden subir SOLO a: Personales y Médicos
@@ -437,6 +600,28 @@ Cada empleado tiene automáticamente 4 carpetas:
 - Los campos `procesadoIA` y `datosExtraidos` ya existen en el modelo pero no se usan en MVP
 - El campo `s3Key` se usa para el path local en MVP, será la key de S3 en Fase 2
 - Validación en cada API usando `getSession()` y verificando rol
+- Endpoint `/api/documentos/extraer` preparado para extracción de datos con OpenAI
+- Lógica de IA en: `lib/ia/extraccion-contratos.ts`, `lib/ia/extraccion-nominas.ts`
+
+### Vinculación de Documentos con Otras Entidades
+
+**Ausencias:**
+```prisma
+model ausencia {
+  documentoId String?    @db.Uuid
+  documento   documento? @relation(fields: [documentoId], references: [id])
+}
+```
+- Campo `documentoId` vincula ausencia con justificante
+- Se asigna automáticamente al subir justificante desde modal de ausencia
+
+**Contratos (Futuro):**
+```prisma
+model contrato {
+  documentoId String?    @db.Uuid
+  documento   documento? @relation(fields: [documentoId], references: [id])
+}
+```
 
 ---
 
@@ -494,29 +679,88 @@ Para dudas o mejoras:
 
 ## ✅ Checklist de Implementación
 
+### Core del Sistema
 - [x] Schema Prisma actualizado
 - [x] Migraciones ejecutadas
+- [x] 5 carpetas del sistema (Contratos, Nóminas, Justificantes, Personales, Médicos)
 - [x] APIs de documentos (upload, download, delete)
 - [x] APIs de carpetas (create, list, view, delete)
-- [x] Vista HR de carpetas
-- [x] Vista HR de detalle de carpeta
-- [x] Vista Empleado de carpetas
-- [x] Vista Empleado de detalle de carpeta
 - [x] Sistema de permisos implementado
 - [x] Validaciones de archivos
-- [x] Carpetas automáticas para empleados
 - [x] Script de migración ejecutado
-- [x] Hooks de integración
-- [x] Documentación completa
 - [x] TypeScript sin errores
 - [x] Compatible con Next.js 15
-- [x] Preparado para Fase 2
+
+### Vistas y UI
+- [x] Vista HR de carpetas
+- [x] Vista HR de detalle de carpeta
+- [x] Vista HR con carpetas globales agregadas
+- [x] Filtros por empleado en carpetas globales
+- [x] Búsqueda en carpetas globales
+- [x] Columna "Empleado" en carpetas globales
+- [x] Vista Empleado de carpetas
+- [x] Vista Empleado de detalle de carpeta
+
+### Integraciones
+- [x] Integración con creación de empleados (carpetas automáticas)
+- [x] Integración con módulo de ausencias (justificantes)
+- [x] Vinculación documento-ausencia (campo documentoId)
+- [x] API `/api/upload` con creación de documento en BD
+- [x] API `/api/empleados/me` para obtener empleado actual
+- [x] Selector de carpetas reutilizable (CarpetaSelector)
+- [x] Integración con onboarding (documentos en carpetas correspondientes)
+- [x] Integración con offboarding (documentos de baja)
+
+### Utilidades y Helpers
+- [x] `obtenerOCrearCarpetaSistema()` - Crear/obtener carpeta de empleado
+- [x] `obtenerOCrearCarpetaGlobal()` - Crear/obtener carpeta global
+- [x] Constantes unificadas (CARPETAS_SISTEMA, TIPOS_DOCUMENTO)
+- [x] Validaciones de archivos y carpetas
+- [x] Hooks de integración
+
+### Documentación
+- [x] Documentación completa actualizada
+- [x] Flujos de integración documentados
+- [x] Ejemplos de uso de APIs
+- [x] Guía de carpetas globales vs individuales
+- [x] Preparación para Fase 2 (IA)
 
 ---
 
-**Última actualización**: 2025-01-27  
-**Versión**: 1.0.0 MVP  
+**Última actualización**: 2025-11-08  
+**Versión**: 1.1.0 MVP  
 **Status**: ✅ COMPLETADO Y FUNCIONAL
+
+---
+
+## 🆕 Changelog v1.1.0 (2025-11-08)
+
+### ✨ Nuevas Funcionalidades
+- ➕ Añadida carpeta "Justificantes" a carpetas del sistema (ahora son 5)
+- 🌍 Carpetas globales con agregación de documentos de todos los empleados
+- 🔍 Filtros por empleado y búsqueda en carpetas globales
+- 🔗 Vinculación documento-ausencia con campo `documentoId`
+- 📤 API `/api/upload` mejorada para crear documentos en BD
+- 👤 Endpoint `/api/empleados/me` para obtener empleado actual
+- 🗂️ Componente `CarpetaSelector` reutilizable
+
+### 🔧 Mejoras
+- 📋 Constantes unificadas en `lib/documentos.ts` (CARPETAS_SISTEMA, TIPOS_DOCUMENTO)
+- 🔄 Integración completa con módulo de ausencias
+- 📊 Vista HR mejorada con tabla adaptativa (columna "Empleado" en globales)
+- 🎨 UI mejorada con banners explicativos en carpetas globales
+- 🛠️ Funciones helper: `obtenerOCrearCarpetaSistema()`, `obtenerOCrearCarpetaGlobal()`
+
+### 📚 Documentación
+- 📖 Documentación actualizada con todos los nuevos flujos
+- 🔗 Ejemplos de integración con ausencias, onboarding, offboarding
+- 📝 Sección "Integraciones del Sistema" ampliada
+- 🗺️ Diferencias entre carpetas globales vs individuales explicadas
+
+### 🔮 Preparado para Fase 2
+- 🤖 Estructura lista para IA (campos `procesadoIA`, `datosExtraidos`)
+- 🔗 Vinculaciones preparadas para contratos y nóminas
+- 📡 Endpoints de extracción documentados
 
 
 

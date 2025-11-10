@@ -4,6 +4,7 @@
 // GET: Obtener métricas de compensación (costes, salarios, distribución)
 
 import { NextRequest } from 'next/server';
+import type { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import {
   requireAuthAsHR,
@@ -25,6 +26,31 @@ function calcularAntiguedad(fechaAlta: Date): string {
   return 'mas_5_años';
 }
 
+const MESES = [
+  'Enero',
+  'Febrero',
+  'Marzo',
+  'Abril',
+  'Mayo',
+  'Junio',
+  'Julio',
+  'Agosto',
+  'Septiembre',
+  'Octubre',
+  'Noviembre',
+  'Diciembre',
+];
+
+const toNumber = (value: Prisma.Decimal | number | null | undefined) =>
+  Number(value ?? 0);
+
+const calcularVariacion = (actual: number, anterior: number) => {
+  if (anterior <= 0) {
+    return 0;
+  }
+  return Number((((actual - anterior) / anterior) * 100).toFixed(1));
+};
+
 // GET /api/analytics/compensacion - Obtener métricas de compensación (solo HR Admin)
 export async function GET(request: NextRequest) {
   try {
@@ -39,7 +65,7 @@ export async function GET(request: NextRequest) {
     const antiguedad = searchParams.get('antiguedad');
 
     // Construir filtros base
-    const where: any = {
+    const where: Prisma.EmpleadoWhereInput = {
       empresaId: session.user.empresaId,
       estadoEmpleado: 'activo',
     };
@@ -213,6 +239,281 @@ export async function GET(request: NextRequest) {
       })
     );
 
+    const currentYear = new Date().getFullYear();
+    const previousYear = currentYear - 1;
+
+    const [
+      resumenPorAnio,
+      tendenciaMensualRaw,
+      nominasDepartamento,
+      complementosAsignados,
+    ] = await Promise.all([
+      prisma.nomina.groupBy({
+        by: ['anio'],
+        where: {
+          anio: { in: [previousYear, currentYear] },
+          empleado: {
+            empresaId: session.user.empresaId,
+          },
+        },
+        _sum: {
+          totalNeto: true,
+          totalBruto: true,
+          totalComplementos: true,
+        },
+        _count: {
+          _all: true,
+        },
+      }),
+      prisma.nomina.groupBy({
+        by: ['anio', 'mes'],
+        where: {
+          anio: currentYear,
+          empleado: {
+            empresaId: session.user.empresaId,
+          },
+        },
+        _sum: {
+          totalNeto: true,
+          totalBruto: true,
+          totalComplementos: true,
+        },
+        _count: {
+          _all: true,
+        },
+        orderBy: {
+          mes: 'asc',
+        },
+      }),
+      prisma.nomina.findMany({
+        where: {
+          anio: currentYear,
+          empleado: {
+            empresaId: session.user.empresaId,
+          },
+        },
+        select: {
+          totalNeto: true,
+          totalComplementos: true,
+          empleado: {
+            select: {
+              departamento: {
+                select: {
+                  nombre: true,
+                },
+              },
+            },
+          },
+        },
+      }),
+      prisma.asignacionComplemento.findMany({
+        where: {
+          nomina: {
+            anio: currentYear,
+            empleado: {
+              empresaId: session.user.empresaId,
+            },
+          },
+        },
+        select: {
+          importe: true,
+          empleadoComplemento: {
+            select: {
+              tipoComplemento: {
+                select: {
+                  nombre: true,
+                },
+              },
+            },
+          },
+        },
+      }),
+    ]);
+
+    const resumenNominasPorAnio = resumenPorAnio.reduce<
+      Record<
+        number,
+        {
+          totalNeto: number;
+          totalBruto: number;
+          totalComplementos: number;
+          totalNominas: number;
+        }
+      >
+    >((acc, item) => {
+      acc[item.anio] = {
+        totalNeto: toNumber(item._sum.totalNeto),
+        totalBruto: toNumber(item._sum.totalBruto),
+        totalComplementos: toNumber(item._sum.totalComplementos),
+        totalNominas: item._count._all ?? 0,
+      };
+      return acc;
+    }, {});
+
+    const resumenActual =
+      resumenNominasPorAnio[currentYear] ?? {
+        totalNeto: 0,
+        totalBruto: 0,
+        totalComplementos: 0,
+        totalNominas: 0,
+      };
+
+    const resumenAnterior =
+      resumenNominasPorAnio[previousYear] ?? {
+        totalNeto: 0,
+        totalBruto: 0,
+        totalComplementos: 0,
+        totalNominas: 0,
+      };
+
+    const variaciones = {
+      totalNeto: calcularVariacion(resumenActual.totalNeto, resumenAnterior.totalNeto),
+      totalBruto: calcularVariacion(resumenActual.totalBruto, resumenAnterior.totalBruto),
+      totalComplementos: calcularVariacion(
+        resumenActual.totalComplementos,
+        resumenAnterior.totalComplementos
+      ),
+    };
+
+    const tendenciaPorMes = tendenciaMensualRaw.reduce<
+      Record<
+        number,
+        {
+          totalNeto: number;
+          totalBruto: number;
+          totalComplementos: number;
+          totalNominas: number;
+        }
+      >
+    >((acc, item) => {
+      acc[item.mes] = {
+        totalNeto: toNumber(item._sum.totalNeto),
+        totalBruto: toNumber(item._sum.totalBruto),
+        totalComplementos: toNumber(item._sum.totalComplementos),
+        totalNominas: item._count._all ?? 0,
+      };
+      return acc;
+    }, {});
+
+    const tendenciaMensual = Array.from({ length: 12 }, (_, index) => {
+      const mesNumero = index + 1;
+      const data = tendenciaPorMes[mesNumero] ?? {
+        totalNeto: 0,
+        totalBruto: 0,
+        totalComplementos: 0,
+        totalNominas: 0,
+      };
+
+      return {
+        mes: MESES[mesNumero - 1],
+        mesNumero,
+        totalNeto: data.totalNeto,
+        totalBruto: data.totalBruto,
+        totalComplementos: data.totalComplementos,
+        totalNominas: data.totalNominas,
+      };
+    }).filter(
+      (entry) =>
+        entry.totalNeto > 0 ||
+        entry.totalBruto > 0 ||
+        entry.totalComplementos > 0 ||
+        entry.totalNominas > 0
+    );
+
+    const departamentosMap = new Map<
+      string,
+      {
+        totalNeto: number;
+        totalComplementos: number;
+        nominas: number;
+      }
+    >();
+
+    nominasDepartamento.forEach((nomina) => {
+      const departamento =
+        nomina.empleado?.departamento?.nombre ?? 'Sin departamento';
+
+      if (!departamentosMap.has(departamento)) {
+        departamentosMap.set(departamento, {
+          totalNeto: 0,
+          totalComplementos: 0,
+          nominas: 0,
+        });
+      }
+
+      const data = departamentosMap.get(departamento)!;
+      data.totalNeto += toNumber(nomina.totalNeto);
+      data.totalComplementos += toNumber(nomina.totalComplementos);
+      data.nominas += 1;
+    });
+
+    const porDepartamento = Array.from(departamentosMap.entries())
+      .map(([departamento, data]) => ({
+        departamento,
+        totalNeto: Number(data.totalNeto.toFixed(2)),
+        totalComplementos: Number(data.totalComplementos.toFixed(2)),
+        promedioNeto:
+          data.nominas > 0
+            ? Number((data.totalNeto / data.nominas).toFixed(2))
+            : 0,
+        nominas: data.nominas,
+      }))
+      .sort((a, b) => b.totalNeto - a.totalNeto);
+
+    const complementosMap = new Map<
+      string,
+      { totalImporte: number; count: number }
+    >();
+
+    complementosAsignados.forEach((asignacion) => {
+      const nombre =
+        asignacion.empleadoComplemento?.tipoComplemento?.nombre ??
+        'Sin tipo';
+
+      if (!complementosMap.has(nombre)) {
+        complementosMap.set(nombre, { totalImporte: 0, count: 0 });
+      }
+
+      const data = complementosMap.get(nombre)!;
+      data.totalImporte += toNumber(asignacion.importe);
+      data.count += 1;
+    });
+
+    const complementosTop = Array.from(complementosMap.entries())
+      .map(([nombre, data]) => ({
+        nombre,
+        totalImporte: Number(data.totalImporte.toFixed(2)),
+        promedioImporte:
+          data.count > 0
+            ? Number((data.totalImporte / data.count).toFixed(2))
+            : 0,
+        vecesAsignado: data.count,
+      }))
+      .sort((a, b) => b.totalImporte - a.totalImporte)
+      .slice(0, 5);
+
+    const tieneNominas =
+      resumenActual.totalNominas > 0 ||
+      resumenAnterior.totalNominas > 0 ||
+      tendenciaMensual.length > 0 ||
+      porDepartamento.length > 0 ||
+      complementosTop.length > 0;
+
+    const nominasAnalytics = tieneNominas
+      ? {
+          currentYear,
+          previousYear,
+          resumen: {
+            actual: resumenActual,
+            anterior: resumenAnterior,
+            variaciones,
+          },
+          tendenciaMensual,
+          porDepartamento,
+          complementosTop,
+        }
+      : null;
+
     return successResponse({
       costeTotalNomina: Math.round(costeTotalNomina),
       cambioCoste: Math.round(cambioCoste),
@@ -220,6 +521,7 @@ export async function GET(request: NextRequest) {
       salarioPromedioEquipo,
       evolucionCoste,
       distribucionSalarial,
+      nominas: nominasAnalytics,
     });
   } catch (error) {
     return handleApiError(error, 'API GET /api/analytics/compensacion');

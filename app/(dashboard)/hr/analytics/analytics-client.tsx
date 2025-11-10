@@ -4,13 +4,14 @@
 // Analytics - Client Component con Diseño Consistente
 // ========================================
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Download } from 'lucide-react';
 import { AnalyticsFilters, FilterValues } from '@/components/analytics/filters';
 import { BarChartComponent } from '@/components/analytics/bar-chart';
 import { AreaChartComponent } from '@/components/analytics/area-chart';
 import { PieChartComponent } from '@/components/analytics/pie-chart';
+import { KpiCard } from '@/components/analytics/kpi-card';
 import { toast } from 'sonner';
 
 interface PlantillaData {
@@ -24,6 +25,48 @@ interface PlantillaData {
   evolucionAltasBajas: Array<{ mes: string; altas: number; bajas: number }>;
 }
 
+interface NominaResumen {
+  totalNeto: number;
+  totalBruto: number;
+  totalComplementos: number;
+  totalNominas: number;
+}
+
+interface NominasAnalytics {
+  currentYear: number;
+  previousYear: number;
+  resumen: {
+    actual: NominaResumen;
+    anterior: NominaResumen;
+    variaciones: {
+      totalNeto: number;
+      totalBruto: number;
+      totalComplementos: number;
+    };
+  };
+  tendenciaMensual: Array<{
+    mes: string;
+    mesNumero: number;
+    totalNeto: number;
+    totalBruto: number;
+    totalComplementos: number;
+    totalNominas: number;
+  }>;
+  porDepartamento: Array<{
+    departamento: string;
+    totalNeto: number;
+    totalComplementos: number;
+    promedioNeto: number;
+    nominas: number;
+  }>;
+  complementosTop: Array<{
+    nombre: string;
+    totalImporte: number;
+    promedioImporte: number;
+    vecesAsignado: number;
+  }>;
+}
+
 interface CompensacionData {
   costeTotalNomina: number;
   cambioCoste: number;
@@ -31,6 +74,7 @@ interface CompensacionData {
   salarioPromedioEquipo: Array<{ equipo: string; promedio: number }>;
   evolucionCoste: Array<{ mes: string; coste: number }>;
   distribucionSalarial: Array<{ rango: string; empleados: number }>;
+  nominas: NominasAnalytics | null;
 }
 
 interface FichajesData {
@@ -43,6 +87,16 @@ interface FichajesData {
   promedioHorasPorEquipo: Array<{ equipo: string; promedio: number }>;
   tasaAbsentismoPorEquipo: Array<{ equipo: string; tasa: number }>;
 }
+
+const currencyFormatter = new Intl.NumberFormat('es-ES', {
+  style: 'currency',
+  currency: 'EUR',
+  maximumFractionDigits: 0,
+});
+
+const formatCurrency = (value: number) => currencyFormatter.format(Math.round(value ?? 0));
+
+const formatPercent = (value: number) => `${value > 0 ? '+' : ''}${value.toFixed(1)}%`;
 
 export function AnalyticsClient() {
   const [activeTab, setActiveTab] = useState('plantilla');
@@ -64,17 +118,9 @@ export function AnalyticsClient() {
     { id: 'fichajes', label: 'Fichajes' },
   ];
 
-  // Cargar equipos al montar el componente
-  useEffect(() => {
-    fetchEquipos();
-  }, []);
+  const nominasAnalytics = compensacionData?.nominas;
 
-  // Cargar datos cuando cambian los filtros
-  useEffect(() => {
-    fetchData();
-  }, [filters]);
-
-  const fetchEquipos = async () => {
+  const fetchEquipos = useCallback(async () => {
     try {
       const response = await fetch('/api/analytics/equipos');
       const data = await response.json();
@@ -82,9 +128,9 @@ export function AnalyticsClient() {
     } catch (error) {
       console.error('Error fetching equipos:', error);
     }
-  };
+  }, []);
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true);
     try {
       const queryParams = new URLSearchParams({
@@ -113,7 +159,17 @@ export function AnalyticsClient() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [filters]);
+
+  // Cargar equipos al montar el componente
+  useEffect(() => {
+    fetchEquipos();
+  }, [fetchEquipos]);
+
+  // Cargar datos cuando cambian los filtros
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   const handleFilterChange = (key: keyof FilterValues, value: string) => {
     setFilters((prev) => ({ ...prev, [key]: value }));
@@ -263,8 +319,92 @@ export function AnalyticsClient() {
         )}
 
         {/* Tab: Compensación */}
-        {activeTab === 'compensacion' && (
+        {activeTab === 'compensacion' && compensacionData && (
           <div className="space-y-6">
+            {nominasAnalytics && (
+              <div className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <KpiCard
+                    title={`Total neto ${nominasAnalytics.currentYear}`}
+                    value={formatCurrency(nominasAnalytics.resumen.actual.totalNeto)}
+                    subtitle={`Variación vs ${nominasAnalytics.previousYear}: ${formatPercent(
+                      nominasAnalytics.resumen.variaciones.totalNeto
+                    )}`}
+                  />
+                  <KpiCard
+                    title="Complementos abonados"
+                    value={formatCurrency(nominasAnalytics.resumen.actual.totalComplementos)}
+                    subtitle={`Variación vs ${nominasAnalytics.previousYear}: ${formatPercent(
+                      nominasAnalytics.resumen.variaciones.totalComplementos
+                    )}`}
+                  />
+                  <KpiCard
+                    title="Nóminas procesadas"
+                    value={nominasAnalytics.resumen.actual.totalNominas}
+                    subtitle={`Diferencia vs ${nominasAnalytics.previousYear}: ${
+                      nominasAnalytics.resumen.actual.totalNominas -
+                      nominasAnalytics.resumen.anterior.totalNominas >= 0
+                        ? '+'
+                        : ''
+                    }${
+                      nominasAnalytics.resumen.actual.totalNominas -
+                      nominasAnalytics.resumen.anterior.totalNominas
+                    }`}
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {nominasAnalytics.tendenciaMensual.length > 0 && (
+                    <AreaChartComponent
+                      title="Total neto abonado"
+                      description={`Evolución mensual ${nominasAnalytics.currentYear}`}
+                      data={nominasAnalytics.tendenciaMensual}
+                      dataKey="totalNeto"
+                      xAxisKey="mes"
+                      chartConfig={{
+                        totalNeto: {
+                          label: 'Total neto',
+                          color: '#0ea5e9',
+                        },
+                      }}
+                    />
+                  )}
+
+                  {nominasAnalytics.porDepartamento.length > 0 && (
+                    <BarChartComponent
+                      title="Coste neto por departamento"
+                      description={`Top departamentos ${nominasAnalytics.currentYear}`}
+                      data={nominasAnalytics.porDepartamento}
+                      dataKey="totalNeto"
+                      xAxisKey="departamento"
+                      chartConfig={{
+                        totalNeto: {
+                          label: 'Total neto',
+                          color: '#6366f1',
+                        },
+                      }}
+                    />
+                  )}
+                </div>
+
+                {nominasAnalytics.complementosTop.length > 0 && (
+                  <BarChartComponent
+                    title="Top complementos abonados"
+                    description={`Importe total ${nominasAnalytics.currentYear}`}
+                    data={nominasAnalytics.complementosTop}
+                    dataKey="totalImporte"
+                    xAxisKey="nombre"
+                    chartConfig={{
+                      totalImporte: {
+                        label: 'Importe total',
+                        color: '#ec4899',
+                      },
+                    }}
+                  />
+                )}
+              </div>
+            )}
+
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <BarChartComponent
                 title="Salario Promedio por Equipo"

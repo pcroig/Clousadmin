@@ -11,7 +11,7 @@ import {
   successResponse,
   badRequestResponse,
 } from '@/lib/api-handler';
-import { UsuarioRol } from '@/lib/constants/enums';
+import { UsuarioRol, EstadoFichaje } from '@/lib/constants/enums';
 
 // GET /api/fichajes/promedios - Obtener promedios de fichajes
 export async function GET(request: NextRequest) {
@@ -45,9 +45,7 @@ export async function GET(request: NextRequest) {
         fecha: {
           gte: fechaDesde,
         },
-        estado: {
-          in: ['finalizado', 'aprobado'],
-        },
+        estado: EstadoFichaje.finalizado,
       },
       include: {
         eventos: {
@@ -125,4 +123,5 @@ export async function GET(request: NextRequest) {
     return handleApiError(error, 'API GET /api/fichajes/promedios');
   }
 }
+
 

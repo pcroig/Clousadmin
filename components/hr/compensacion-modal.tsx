@@ -13,8 +13,13 @@ import { Textarea } from '@/components/ui/textarea';
 import { LoadingButton } from '@/components/shared/loading-button';
 import { toast } from 'sonner';
 
+interface Compensacion {
+  id: string;
+  [key: string]: unknown;
+}
+
 interface CompensacionModalProps {
-  compensacion: any;
+  compensacion: Compensacion;
   open: boolean;
   onClose: () => void;
   onSuccess?: () => void;
@@ -220,4 +225,5 @@ export function CompensacionModal({ compensacion, open, onClose, onSuccess }: Co
     </Dialog>
   );
 }
+
 

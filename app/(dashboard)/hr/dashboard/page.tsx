@@ -168,31 +168,31 @@ export default async function HRDashboardPage() {
   return (
     <div className="h-full w-full flex flex-col">
       {/* Header */}
-      <div className="flex-shrink-0 mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">
+      <div className="flex-shrink-0 mb-3 sm:mb-6">
+        <h1 className="text-xl sm:text-2xl font-bold text-gray-900">
           Buenos Días, {session.user.nombre}
         </h1>
       </div>
 
-      {/* 3x2 Grid Layout - Solicitudes ocupa 2 filas */}
-      <div className="flex-1 min-h-0 pb-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 grid-rows-2 gap-6">
-          {/* Fichaje Widget - Fila 1, Columna 1 */}
+      {/* Responsive Grid Layout */}
+      <div className="flex-1 min-h-0 pb-4 sm:pb-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 lg:grid-rows-2 gap-4 sm:gap-6">
+          {/* Fichaje Widget */}
           <div className="min-h-0">
             <FichajeWidget href="/hr/horario/fichajes" />
           </div>
 
-          {/* Solicitudes Widget - Fila 1-2, Columna 2 (ocupa 2 filas) */}
-          <div className="row-span-2 min-h-0">
+          {/* Solicitudes Widget - Ocupa 2 filas en desktop */}
+          <div className="row-span-1 lg:row-span-2 min-h-0">
             <SolicitudesWidget solicitudes={solicitudes} maxItems={8} />
           </div>
 
-          {/* Notificaciones Widget - Fila 1, Columna 3 */}
+          {/* Notificaciones Widget */}
           <div className="min-h-0">
             <NotificacionesWidget notificaciones={notificaciones} maxItems={3} href="/hr/bandeja-entrada" />
           </div>
 
-          {/* Auto-completed Widget - Fila 2, Columna 1 */}
+          {/* Auto-completed Widget */}
           <div className="min-h-0">
             <AutoCompletadoWidget
               stats={{
@@ -203,7 +203,7 @@ export default async function HRDashboardPage() {
             />
           </div>
 
-          {/* Plantilla Widget - Fila 2, Columna 3 */}
+          {/* Plantilla Widget */}
           <div className="min-h-0">
             <PlantillaWidget
               trabajando={plantillaResumen.trabajando}

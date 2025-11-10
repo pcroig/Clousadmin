@@ -14,7 +14,7 @@ export async function calcularDiasSinFichar(empleadoId: string): Promise<number>
   hoy.setHours(0, 0, 0, 0);
   
   let diasSinFichar = 0;
-  let fechaActual = new Date(hoy);
+  const fechaActual = new Date(hoy);
   fechaActual.setDate(fechaActual.getDate() - 1); // Empezar desde ayer
   
   // Retroceder máximo 30 días para evitar bucles infinitos
@@ -82,6 +82,7 @@ export async function obtenerDiasSinFicharPorEmpleado(
   
   return resultados;
 }
+
 
 
 

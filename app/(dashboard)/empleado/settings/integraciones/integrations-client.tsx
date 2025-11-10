@@ -6,17 +6,9 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import {
-  Calendar,
-  Check,
-  Loader2,
-  Plug,
-  X,
-  AlertCircle,
-  ExternalLink,
-  User,
-} from 'lucide-react';
+import { Calendar, Check, Plug, X, AlertCircle, ExternalLink, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { LoadingButton } from '@/components/shared/loading-button';
 import {
   Card,
   CardContent,
@@ -202,33 +194,25 @@ export function IntegrationsClient({
                       <div className="flex items-center gap-2">
                         <Check className="w-4 h-4 text-green-600" />
                         <span className="text-sm font-medium">
-                          Calendario "Clousadmin - Ausencias"
+                          Calendario Principal
                         </span>
                       </div>
                       {personalIntegrations.map((integration) => (
-                        <Button
+                        <LoadingButton
                           key={integration.id}
                           variant="outline"
                           size="sm"
                           onClick={() => handleDisconnect(integration.id)}
+                          loading={disconnecting === integration.id}
                           disabled={disconnecting === integration.id}
                         >
-                          {disconnecting === integration.id ? (
-                            <>
-                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                              Desconectando...
-                            </>
-                          ) : (
-                            <>
-                              <X className="w-4 h-4 mr-2" />
-                              Desconectar
-                            </>
-                          )}
-                        </Button>
+                          <X className="w-4 h-4 mr-2" />
+                          {disconnecting === integration.id ? 'Desconectando...' : 'Desconectar'}
+                        </LoadingButton>
                       ))}
                     </div>
                     <p className="text-xs text-gray-500">
-                      Tus ausencias se sincronizan automáticamente en tu calendario personal
+                      Tus ausencias aprobadas se sincronizan automáticamente en tu calendario principal de Google
                     </p>
                   </div>
                 ) : (
@@ -237,23 +221,15 @@ export function IntegrationsClient({
                       Conecta tu calendario personal de Google para ver tus ausencias sincronizadas
                       automáticamente.
                     </p>
-                    <Button
+                    <LoadingButton
                       onClick={handleConnectCalendar}
+                      loading={connecting}
                       disabled={connecting}
                       className="w-full sm:w-auto"
                     >
-                      {connecting ? (
-                        <>
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          Conectando...
-                        </>
-                      ) : (
-                        <>
-                          <Plug className="w-4 h-4 mr-2" />
-                          Conectar Mi Calendario
-                        </>
-                      )}
-                    </Button>
+                      <Plug className="w-4 h-4 mr-2" />
+                      {connecting ? 'Conectando...' : 'Conectar Mi Calendario'}
+                    </LoadingButton>
                   </div>
                 )}
               </CardContent>

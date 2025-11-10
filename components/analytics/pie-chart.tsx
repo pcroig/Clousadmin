@@ -20,7 +20,7 @@ import {
 interface PieChartComponentProps {
   title: string
   description?: string
-  data: Array<Record<string, any>>
+  data: Array<Record<string, unknown>>
   dataKey: string
   nameKey: string
   chartConfig: ChartConfig

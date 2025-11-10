@@ -4,12 +4,26 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Settings } from 'lucide-react';
 import { BandejaEntradaSolicitudes } from './bandeja-entrada-solicitudes';
 import { BandejaEntradaSolved } from './bandeja-entrada-solved';
 import { BandejaEntradaNotificaciones } from './bandeja-entrada-notificaciones';
+import { ejecutarAccionSolicitud } from '@/lib/services/solicitudes-actions';
+import { toast } from 'sonner';
+import { useRouter } from 'next/navigation';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 
 // Reutilizar tipos de componentes hijos
 type SolicitudItem = Parameters<typeof BandejaEntradaSolicitudes>[0]['solicitudesPendientes'][0];
@@ -38,6 +52,17 @@ export function BandejaEntradaTabs({
   notificaciones,
 }: BandejaEntradaTabsProps) {
   const [activeTab, setActiveTab] = useState<TabType>('solicitudes');
+  const router = useRouter();
+  const [autoApproveLoading, setAutoApproveLoading] = useState(false);
+
+  const ausenciasPendientes = useMemo(
+    () => solicitudesPendientes.filter((s) => s.tipo === 'ausencia'),
+    [solicitudesPendientes],
+  );
+  const solicitudesCambioPendientes = useMemo(
+    () => solicitudesPendientes.filter((s) => s.tipo !== 'ausencia'),
+    [solicitudesPendientes],
+  );
 
   const handleAprobar = async (id: string) => {
     // Determinar el tipo de solicitud (ausencia o cambio_datos)
@@ -47,44 +72,26 @@ export function BandejaEntradaTabs({
       return;
     }
 
-    const endpoint =
-      solicitudPendiente.tipo === 'ausencia'
-        ? `/api/ausencias/${id}`
-        : `/api/solicitudes/${id}`;
+    const resultado = await ejecutarAccionSolicitud({
+      solicitudId: id,
+      tipo: solicitudPendiente.tipo,
+      accion: 'aprobar',
+    });
 
-    try {
-      const response = await fetch(endpoint, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          accion: 'aprobar',
-        }),
-      });
-
-      if (response.ok) {
-        // Recargar la página para actualizar los datos
-        window.location.reload();
-      } else {
-        const error = await response.json();
-        console.error('[BandejaEntradaTabs] Error al aprobar solicitud:', {
-          solicitudId: id,
-          tipo: solicitudPendiente.tipo,
-          endpoint,
-          error,
-        });
-        alert('Error al aprobar la solicitud');
-      }
-    } catch (error) {
-      console.error('[BandejaEntradaTabs] Error al aprobar solicitud:', {
-        solicitudId: id,
-        tipo: solicitudPendiente.tipo,
-        endpoint,
-        error,
-      });
-      alert('Error al aprobar la solicitud');
+    if (resultado.ok) {
+      toast.success('Solicitud aprobada correctamente');
+      router.refresh();
+      return;
     }
+
+    console.error('[BandejaEntradaTabs] Error al aprobar solicitud:', {
+      solicitudId: id,
+      tipo: solicitudPendiente.tipo,
+      endpoint: resultado.endpoint,
+      error: resultado.error,
+      data: resultado.data,
+    });
+    toast.error('Error al aprobar la solicitud');
   };
 
   const handleRechazar = async (id: string) => {
@@ -97,47 +104,28 @@ export function BandejaEntradaTabs({
 
     const motivo = prompt('Motivo del rechazo (opcional):');
 
-    const endpoint =
-      solicitudPendiente.tipo === 'ausencia'
-        ? `/api/ausencias/${id}`
-        : `/api/solicitudes/${id}`;
+    const resultado = await ejecutarAccionSolicitud({
+      solicitudId: id,
+      tipo: solicitudPendiente.tipo,
+      accion: 'rechazar',
+      motivoRechazo: motivo || undefined,
+    });
 
-    try {
-      const response = await fetch(endpoint, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          accion: 'rechazar',
-          motivoRechazo: motivo || undefined,
-        }),
-      });
-
-      if (response.ok) {
-        // Recargar la página para actualizar los datos
-        window.location.reload();
-      } else {
-        const error = await response.json();
-        console.error('[BandejaEntradaTabs] Error al rechazar solicitud:', {
-          solicitudId: id,
-          tipo: solicitudPendiente.tipo,
-          endpoint,
-          motivo,
-          error,
-        });
-        alert('Error al rechazar la solicitud');
-      }
-    } catch (error) {
-      console.error('[BandejaEntradaTabs] Error al rechazar solicitud:', {
-        solicitudId: id,
-        tipo: solicitudPendiente.tipo,
-        endpoint,
-        motivo,
-        error,
-      });
-      alert('Error al rechazar la solicitud');
+    if (resultado.ok) {
+      toast.success('Solicitud rechazada correctamente');
+      router.refresh();
+      return;
     }
+
+    console.error('[BandejaEntradaTabs] Error al rechazar solicitud:', {
+      solicitudId: id,
+      tipo: solicitudPendiente.tipo,
+      endpoint: resultado.endpoint,
+      motivo,
+      error: resultado.error,
+      data: resultado.data,
+    });
+    toast.error('Error al rechazar la solicitud');
   };
 
   const handleMarcarLeida = async (id: string) => {
@@ -147,19 +135,21 @@ export function BandejaEntradaTabs({
       });
 
       if (response.ok) {
-        // Recargar la página para actualizar las notificaciones
-        window.location.reload();
+        toast.success('Notificación marcada como leída');
+        router.refresh();
       } else {
         console.error('[BandejaEntradaTabs] Error al marcar notificación como leída:', {
           notificacionId: id,
           status: response.status,
         });
+        toast.error('No se pudo marcar la notificación como leída');
       }
     } catch (error) {
       console.error('[BandejaEntradaTabs] Error al marcar notificación como leída:', {
         notificacionId: id,
         error,
       });
+      toast.error('Error de red al actualizar la notificación');
     }
   };
 
@@ -170,23 +160,22 @@ export function BandejaEntradaTabs({
       });
 
       if (response.ok) {
-        // Recargar la página para actualizar las notificaciones
-        window.location.reload();
+        toast.success('Todas las notificaciones han sido marcadas como leídas');
+        router.refresh();
       } else {
         console.error('Error al marcar todas las notificaciones como leídas');
+        toast.error('No se pudieron marcar todas las notificaciones como leídas');
       }
     } catch (error) {
       console.error('Error al marcar todas las notificaciones como leídas:', error);
+      toast.error('Error de red al actualizar las notificaciones');
     }
   };
 
   const handleAutoaprobar = async () => {
-    const confirmar = window.confirm(
-      `¿Estás seguro de que quieres auto-aprobar ${solicitudesPendientes.length} solicitudes pendientes?\n\nEsta acción no se puede deshacer.`
-    );
+    if (autoApproveLoading) return;
 
-    if (!confirmar) return;
-
+    setAutoApproveLoading(true);
     try {
       const response = await fetch('/api/solicitudes/autoaprobar', {
         method: 'POST',
@@ -194,17 +183,18 @@ export function BandejaEntradaTabs({
 
       if (response.ok) {
         const result = await response.json();
-        alert(result.message);
-        // Recargar la página para actualizar los datos
-        window.location.reload();
+        toast.success(result.message || 'Solicitudes auto-aprobadas correctamente');
+        router.refresh();
       } else {
         const error = await response.json();
         console.error('Error al auto-aprobar:', error);
-        alert('Error al auto-aprobar las solicitudes');
+        toast.error(error.error || 'Error al auto-aprobar las solicitudes');
       }
     } catch (error) {
       console.error('Error al auto-aprobar:', error);
-      alert('Error al auto-aprobar las solicitudes');
+      toast.error('Error de red al auto-aprobar las solicitudes');
+    } finally {
+      setAutoApproveLoading(false);
     }
   };
 
@@ -261,13 +251,43 @@ export function BandejaEntradaTabs({
 
           <div className="flex items-center gap-2">
             {activeTab === 'solicitudes' && solicitudesPendientes.length > 0 && (
-              <Button
-                variant="outline"
-                onClick={handleAutoaprobar}
-                className="border-gray-300"
-              >
-                Autoaprobar
-              </Button>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="border-gray-300"
+                    disabled={autoApproveLoading}
+                  >
+                    Autoaprobar
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Auto-aprobar solicitudes pendientes</AlertDialogTitle>
+                    <AlertDialogDescription asChild>
+                      <div className="space-y-3 text-sm text-muted-foreground">
+                        <p>Se aprobarán automáticamente todas las solicitudes pendientes:</p>
+                        <ul className="list-disc list-inside space-y-1">
+                          <li>{ausenciasPendientes.length} ausencias</li>
+                          <li>{solicitudesCambioPendientes.length} solicitudes de cambio</li>
+                        </ul>
+                        <p className="font-medium text-amber-600">Esta acción no se puede deshacer.</p>
+                      </div>
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel disabled={autoApproveLoading}>Cancelar</AlertDialogCancel>
+                    <AlertDialogAction asChild>
+                      <Button
+                        onClick={handleAutoaprobar}
+                        disabled={autoApproveLoading}
+                      >
+                        {autoApproveLoading ? 'Auto-aprobando...' : 'Confirmar auto-aprobación'}
+                      </Button>
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             )}
 
             {activeTab === 'notificaciones' && notificacionesNoLeidas > 0 && (

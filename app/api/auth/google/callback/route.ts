@@ -143,8 +143,18 @@ export async function GET(req: NextRequest) {
 
     await createSession(sessionData, { ipAddress, userAgent });
 
+    // Redirigir según rol del usuario
+    let dashboardUrl = "/empleado/dashboard"; // Default
+    if (usuario.rol === "hr_admin") {
+      dashboardUrl = "/hr/dashboard";
+    } else if (usuario.rol === "manager") {
+      dashboardUrl = "/manager/dashboard";
+    } else if (usuario.rol === "platform_admin") {
+      dashboardUrl = "/hr/dashboard"; // Platform admin usa el dashboard de HR
+    }
+
     // Limpiar cookie de state
-    const response = NextResponse.redirect(new URL("/dashboard", req.url));
+    const response = NextResponse.redirect(new URL(dashboardUrl, req.url));
     response.cookies.delete("oauth_state");
 
     return response;

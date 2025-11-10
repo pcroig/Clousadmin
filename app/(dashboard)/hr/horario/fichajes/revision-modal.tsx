@@ -30,6 +30,7 @@ import { es } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { LoadingButton } from '@/components/shared/loading-button';
 import { EditarFichajeModal } from './editar-fichaje-modal';
+import { InfoTooltip } from '@/components/shared/info-tooltip';
 
 interface EventoPropuesto {
   tipo: string;
@@ -280,7 +281,12 @@ export function RevisionModal({ open, onClose, onReviewed, onEditFichaje }: Revi
               </div>
 
               {/* Barra de filtros */}
-              <div className="flex items-center justify-end gap-3 py-2 px-4 bg-blue-50 rounded-lg border border-blue-200">
+              <div className="flex items-center justify-end gap-2 py-2">
+                <InfoTooltip
+                  content="Oculta temporalmente los días sin fichajes para centrar el cuadrado en jornadas con actividad."
+                  variant="subtle"
+                  side="left"
+                />
                 <Button
                   variant={ocultarDiasSinFichajes ? "default" : "outline"}
                   size="sm"
@@ -302,9 +308,9 @@ export function RevisionModal({ open, onClose, onReviewed, onEditFichaje }: Revi
               </div>
 
               {ocultarDiasSinFichajes && (
-                <div className="text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded px-3 py-2">
-                  <strong>Filtro activo:</strong> Los días sin ningún fichaje registrado se omiten del cuadraje masivo (días no laborables).
-                </div>
+                <p className="text-xs text-gray-600 text-right">
+                  <strong>Filtro activo:</strong> Los días sin fichajes se omiten del cuadraje masivo.
+                </p>
               )}
             </div>
 

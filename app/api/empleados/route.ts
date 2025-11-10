@@ -3,15 +3,20 @@
 // ========================================
 
 import { NextRequest } from 'next/server';
-import { prisma } from '@/lib/prisma';
-import {
-  requireAuthAsHR,
-  handleApiError,
-  successResponse,
-} from '@/lib/api-handler';
 import { hash } from 'bcryptjs';
 
+import {
+  handleApiError,
+  requireAuthAsHR,
+  successResponse,
+} from '@/lib/api-handler';
 import { UsuarioRol } from '@/lib/constants/enums';
+import { encryptEmpleadoData } from '@/lib/empleado-crypto';
+import { prisma } from '@/lib/prisma';
+import { crearNotificacionEmpleadoCreado } from '@/lib/notificaciones';
+import { getOrCreateDefaultJornada } from '@/lib/jornadas/get-or-create-default';
+import { CARPETAS_SISTEMA } from '@/lib/documentos';
+import { invitarEmpleado } from '@/lib/invitaciones';
 
 // GET /api/empleados - Listar todos los empleados (solo HR Admin)
 export async function GET(request: NextRequest) {
@@ -81,8 +86,29 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
 
+    const sanitizeOptionalString = (value: unknown): string | null => {
+      if (typeof value !== 'string') return null;
+      const trimmed = value.trim();
+      return trimmed.length > 0 ? trimmed : null;
+    };
+
+    const sanitizeEmail = (email: unknown): string | null => {
+      if (typeof email !== 'string') return null;
+      const trimmed = email.trim().toLowerCase();
+      return trimmed.length > 0 ? trimmed : null;
+    };
+
+    const sanitizeNif = (nif: unknown): string | null => {
+      const sanitized = sanitizeOptionalString(nif);
+      return sanitized ? sanitized.toUpperCase() : null;
+    };
+
+    const email = sanitizeEmail(body.email);
+    const nombre = sanitizeOptionalString(body.nombre);
+    const apellidos = sanitizeOptionalString(body.apellidos);
+
     // Validaciones básicas
-    if (!body.nombre || !body.apellidos || !body.email) {
+    if (!nombre || !apellidos || !email) {
       return handleApiError(
         new Error('Nombre, apellidos y email son requeridos'),
         'API POST /api/empleados'
@@ -91,7 +117,7 @@ export async function POST(request: NextRequest) {
 
     // Verificar que el email no exista
     const existingUsuario = await prisma.usuario.findUnique({
-      where: { email: body.email },
+      where: { email },
       include: {
         empleado: {
           select: {
@@ -124,56 +150,69 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Obtener o crear jornada por defecto para la empresa
+    const jornadaPorDefecto = await getOrCreateDefaultJornada(
+      prisma,
+      session.user.empresaId
+    );
+
     // Crear usuario y empleado en transacción
     const result = await prisma.$transaction(async (tx) => {
       // Crear usuario
-            const usuario = await tx.usuario.create({
+      const usuario = await tx.usuario.create({
         data: {
-          email: body.email,
-          password: await hash(Math.random().toString(36).slice(-8), 10), // Password temporal                                                              
+          email,
+          password: await hash(Math.random().toString(36).slice(-8), 10), // Password temporal
           rol: UsuarioRol.empleado,
-          nombre: body.nombre,
-          apellidos: body.apellidos,
+          nombre,
+          apellidos,
           empresaId: session.user.empresaId,
           activo: body.activo !== undefined ? body.activo : true,
         },
       });
 
-      // Crear empleado
+      // Preparar datos del empleado
+      const empleadoData = {
+        usuarioId: usuario.id,
+        empresaId: session.user.empresaId,
+        nombre,
+        apellidos,
+        email,
+        nif: sanitizeNif(body.nif),
+        nss: sanitizeOptionalString(body.nss),
+        fechaNacimiento: body.fechaNacimiento ? new Date(body.fechaNacimiento) : null,
+        telefono: sanitizeOptionalString(body.telefono),
+        direccionCalle: sanitizeOptionalString(body.direccionCalle),
+        direccionNumero: sanitizeOptionalString(body.direccionNumero),
+        direccionPiso: sanitizeOptionalString(body.direccionPiso),
+        codigoPostal: sanitizeOptionalString(body.codigoPostal),
+        ciudad: sanitizeOptionalString(body.ciudad),
+        direccionProvincia: sanitizeOptionalString(body.direccionProvincia),
+        estadoCivil: sanitizeOptionalString(body.estadoCivil),
+        numeroHijos: body.numeroHijos || 0,
+        genero: sanitizeOptionalString(body.genero),
+        iban: sanitizeOptionalString(body.iban),
+        titularCuenta: sanitizeOptionalString(body.titularCuenta),
+        puestoId: body.puestoId || null,
+        jornadaId: jornadaPorDefecto.id, // Asignar jornada por defecto
+        fechaAlta: body.fechaAlta ? new Date(body.fechaAlta) : new Date(),
+        tipoContrato: body.tipoContrato || 'indefinido',
+        salarioBrutoAnual: body.salarioBrutoAnual
+          ? parseFloat(body.salarioBrutoAnual)
+          : null,
+        salarioBrutoMensual: body.salarioBrutoMensual
+          ? parseFloat(body.salarioBrutoMensual)
+          : null,
+        activo: body.activo !== undefined ? body.activo : true,
+        onboardingCompletado: body.onboardingCompletado || false,
+      };
+
+      // Encriptar datos sensibles antes de crear
+      const datosEncriptados = encryptEmpleadoData(empleadoData);
+
+      // Crear empleado con datos encriptados
       const empleado = await tx.empleado.create({
-        data: {
-          usuarioId: usuario.id,
-          empresaId: session.user.empresaId,
-          nombre: body.nombre,
-          apellidos: body.apellidos,
-          email: body.email,
-          nif: body.nif,
-          nss: body.nss,
-          fechaNacimiento: body.fechaNacimiento ? new Date(body.fechaNacimiento) : null,
-          telefono: body.telefono,
-          direccionCalle: body.direccionCalle,
-          direccionNumero: body.direccionNumero,
-          direccionPiso: body.direccionPiso,
-          codigoPostal: body.codigoPostal,
-          ciudad: body.ciudad,
-          direccionProvincia: body.direccionProvincia,
-          estadoCivil: body.estadoCivil,
-          numeroHijos: body.numeroHijos || 0,
-          genero: body.genero,
-          iban: body.iban,
-          titularCuenta: body.titularCuenta,
-          puestoId: body.puestoId || null,
-          fechaAlta: body.fechaAlta ? new Date(body.fechaAlta) : new Date(),
-          tipoContrato: body.tipoContrato || 'indefinido',
-          salarioBrutoAnual: body.salarioBrutoAnual
-            ? parseFloat(body.salarioBrutoAnual)
-            : null,
-          salarioBrutoMensual: body.salarioBrutoMensual
-            ? parseFloat(body.salarioBrutoMensual)
-            : null,
-          activo: body.activo !== undefined ? body.activo : true,
-          onboardingCompletado: body.onboardingCompletado || false,
-        },
+        data: datosEncriptados,
       });
 
       // Garantizar vínculo bidireccional usuario <-> empleado
@@ -192,21 +231,13 @@ export async function POST(request: NextRequest) {
         });
       }
 
-      // Crear carpetas del sistema automáticamente
-      const carpetasSistema = [
-        { nombre: 'Nóminas', esSistema: true },
-        { nombre: 'Contratos', esSistema: true },
-        { nombre: 'Justificantes', esSistema: true },
-        { nombre: 'Médicos', esSistema: true },
-        { nombre: 'Otros documentos', esSistema: true },
-      ];
-
+      // Crear carpetas del sistema automáticamente usando constante
       await tx.carpeta.createMany({
-        data: carpetasSistema.map((carpeta) => ({
+        data: CARPETAS_SISTEMA.map((nombreCarpeta) => ({
           empresaId: session.user.empresaId,
           empleadoId: empleado.id,
-          nombre: carpeta.nombre,
-          esSistema: carpeta.esSistema,
+          nombre: nombreCarpeta,
+          esSistema: true,
         })),
       });
 
@@ -214,6 +245,47 @@ export async function POST(request: NextRequest) {
     });
 
     console.log(`[API POST /api/empleados] Empleado creado: ${result.empleado.id}`);
+
+    // Crear invitación automática y enviar email
+    try {
+      const invitacionResult = await invitarEmpleado({
+        empleadoId: result.empleado.id,
+        empresaId: session.user.empresaId,
+        email: result.empleado.email,
+        nombre: result.empleado.nombre,
+        apellidos: result.empleado.apellidos,
+        tipoOnboarding: 'completo',
+      });
+
+      if (!invitacionResult.success) {
+        console.error(
+          '[API POST /api/empleados] Error creando invitación automática:',
+          invitacionResult.error
+        );
+      } else if (!invitacionResult.emailEnviado) {
+        console.warn(
+          '[API POST /api/empleados] Invitación creada pero el email no se envió automáticamente'
+        );
+      } else {
+        console.log(
+          `[API POST /api/empleados] Invitación enviada a ${result.empleado.email}`
+        );
+      }
+    } catch (error) {
+      console.error('[API POST /api/empleados] Error procesando invitación automática:', error);
+    }
+
+    // Notificar a HR sobre la creación del empleado
+    try {
+      await crearNotificacionEmpleadoCreado(prisma, {
+        empleadoId: result.empleado.id,
+        empresaId: session.user.empresaId,
+        empleadoNombre: `${result.empleado.nombre} ${result.empleado.apellidos}`,
+      });
+    } catch (error) {
+      console.error('[API POST /api/empleados] Error creando notificación:', error);
+      // No fallar la creación del empleado si falla la notificación
+    }
 
     return successResponse(result.empleado, 201);
   } catch (error) {

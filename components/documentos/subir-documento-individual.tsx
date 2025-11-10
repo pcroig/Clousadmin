@@ -6,7 +6,7 @@
 
 import { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { Upload, FileText, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
+import { Upload, FileText, CheckCircle, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { LoadingButton } from '@/components/shared/loading-button';
 import { Label } from '@/components/ui/label';
@@ -208,14 +208,7 @@ export function SubirDocumentoIndividual({ onSuccess, onCancel }: SubirDocumento
                 </div>
               </div>
               <LoadingButton onClick={handleExtraerDatos} loading={procesando}>
-                {procesando ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Extrayendo datos...
-                  </>
-                ) : (
-                  'Extraer con IA'
-                )}
+                {procesando ? 'Extrayendo datos...' : 'Extraer con IA'}
               </LoadingButton>
             </div>
           )}

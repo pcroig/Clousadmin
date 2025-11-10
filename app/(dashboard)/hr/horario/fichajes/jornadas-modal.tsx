@@ -6,11 +6,11 @@
 
 import { useState, useEffect } from 'react';
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+  DialogLarge as Dialog,
+  DialogLargeContent as DialogContent,
+  DialogLargeHeader as DialogHeader,
+  DialogLargeTitle as DialogTitle,
+} from '@/components/ui/dialog-large';
 import { Button } from '@/components/ui/button';
 import {
   Table,
@@ -124,18 +124,12 @@ export function JornadasModal({ open, onClose }: JornadasModalProps) {
   return (
     <>
       <Dialog open={open} onOpenChange={onClose}>
-        <DialogContent className="max-w-[1200px] w-[1200px] max-h-[90vh] overflow-hidden flex flex-col">
+        <DialogContent className="max-h-[90vh] overflow-hidden flex flex-col">
           <DialogHeader>
-            <div className="flex items-center justify-between">
-              <DialogTitle className="flex items-center gap-2">
-                <Clock className="h-5 w-5" />
-                Gestión de Jornadas
-              </DialogTitle>
-              <Button onClick={handleCrear} className="gap-2">
-                <Plus className="h-4 w-4" />
-                Nueva Jornada
-              </Button>
-            </div>
+            <DialogTitle className="flex items-center gap-2">
+              <Clock className="h-5 w-5" />
+              Gestión de Jornadas
+            </DialogTitle>
           </DialogHeader>
 
           <div className="flex-1 overflow-y-auto -mx-6 px-6">
@@ -195,6 +189,14 @@ export function JornadasModal({ open, onClose }: JornadasModalProps) {
                 )}
               </TableBody>
             </Table>
+          </div>
+
+          {/* Botón Nueva Jornada abajo */}
+          <div className="mt-4 flex justify-end border-t pt-4">
+            <Button onClick={handleCrear} className="gap-2">
+              <Plus className="h-4 w-4" />
+              Nueva Jornada
+            </Button>
           </div>
         </DialogContent>
       </Dialog>

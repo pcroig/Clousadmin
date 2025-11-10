@@ -57,7 +57,14 @@ export async function obtenerLogAuditoria(
     limite?: number;
   }
 ) {
-  const where: any = {
+  type WhereClause = {
+    empresaId: string;
+    empleadoAccedidoId: string;
+    createdAt?: { gte?: Date; lte?: Date };
+    accion?: string;
+  };
+  
+  const where: WhereClause = {
     empresaId,
     empleadoAccedidoId: empleadoId,
   };
@@ -104,7 +111,12 @@ export async function obtenerEstadisticasAccesos(
     hasta?: Date;
   }
 ) {
-  const where: any = { empresaId };
+  type WhereClauseStats = {
+    empresaId: string;
+    createdAt?: { gte?: Date; lte?: Date };
+  };
+  
+  const where: WhereClauseStats = { empresaId };
 
   if (opciones?.desde || opciones?.hasta) {
     where.createdAt = {};
@@ -211,6 +223,7 @@ export async function detectarAccesosSospechosos(
     count: a._count.id,
   }));
 }
+
 
 
 

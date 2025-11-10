@@ -4,7 +4,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -20,6 +20,17 @@ import { toast } from 'sonner';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Check, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
+
+interface Empleado {
+  id: string;
+  nombre: string;
+  apellidos: string;
+}
+
+interface PuestoData {
+  empleados: Empleado[];
+  [key: string]: unknown;
+}
 
 interface PuestoFormModalProps {
   isOpen: boolean;
@@ -48,18 +59,7 @@ export function PuestoFormModal({
 
   const isEditing = !!puesto;
 
-  // Cargar empleados disponibles al abrir el modal (solo si es creación)
-  useEffect(() => {
-    if (isOpen && !isEditing) {
-      fetchEmpleados();
-    } else if (isOpen && isEditing && puesto) {
-      // Si es edición, cargar empleados ya asignados al puesto
-      fetchEmpleados();
-      fetchEmpleadosAsignados();
-    }
-  }, [isOpen, isEditing, puesto]);
-
-  async function fetchEmpleados() {
+  const fetchEmpleados = useCallback(async () => {
     try {
       const response = await fetch('/api/empleados');
       if (response.ok) {
@@ -69,22 +69,33 @@ export function PuestoFormModal({
     } catch (error) {
       console.error('Error fetching empleados:', error);
     }
-  }
+  }, []);
 
-  async function fetchEmpleadosAsignados() {
+  const fetchEmpleadosAsignados = useCallback(async () => {
     if (!puesto) return;
     try {
       const response = await fetch(`/api/puestos/${puesto.id}`);
       if (response.ok) {
-        const data = await response.json();
+        const data = await response.json() as PuestoData;
         if (data.empleados) {
-          setEmpleadosSeleccionados(data.empleados.map((emp: any) => emp.id));
+          setEmpleadosSeleccionados(data.empleados.map((emp) => emp.id));
         }
       }
     } catch (error) {
       console.error('Error fetching empleados asignados:', error);
     }
-  }
+  }, [puesto]);
+
+  // Cargar empleados disponibles al abrir el modal (solo si es creación)
+  useEffect(() => {
+    if (isOpen && !isEditing) {
+      fetchEmpleados();
+    } else if (isOpen && isEditing && puesto) {
+      // Si es edición, cargar empleados ya asignados al puesto
+      fetchEmpleados();
+      fetchEmpleadosAsignados();
+    }
+  }, [isOpen, isEditing, puesto, fetchEmpleados, fetchEmpleadosAsignados]);
 
   useEffect(() => {
     if (isOpen) {
@@ -119,7 +130,13 @@ export function PuestoFormModal({
       const url = isEditing ? `/api/puestos/${puesto.id}` : '/api/puestos';
       const method = isEditing ? 'PATCH' : 'POST';
 
-      const body: any = {
+      interface PuestoSubmitBody {
+        nombre: string;
+        descripcion: string | null;
+        empleadoIds?: string[];
+      }
+      
+      const body: PuestoSubmitBody = {
         nombre: formData.nombre.trim(),
         descripcion: formData.descripcion.trim() || null,
       };
@@ -167,8 +184,8 @@ export function PuestoFormModal({
       const response = await fetch(`/api/puestos/${puestoId}`);
       if (!response.ok) return;
       
-      const data = await response.json();
-      const empleadosActuales = (data.empleados || []).map((emp: any) => emp.id);
+      const data = await response.json() as PuestoData;
+      const empleadosActuales = (data.empleados || []).map((emp) => emp.id);
       
       // Encontrar empleados a añadir y a quitar
       const empleadosAAnadir = empleadosSeleccionados.filter(id => !empleadosActuales.includes(id));

@@ -1,8 +1,21 @@
 # Gestión de Nóminas
 
+**Estado**: ✅ Completado y Funcional  
+**Versión**: 1.1.0  
+**Fecha última actualización**: 10 Noviembre 2025
+
 ## Descripción General
 
 Sistema completo de gestión de nóminas que permite a HR gestionar el ciclo completo de generación, complementación, exportación e importación de nóminas mensuales para todos los empleados.
+
+### ✅ Funcionalidades Implementadas
+
+1. **Workflow Completo de Estados**: 6 estados sincronizados (generando → complementos_pendientes → lista_exportar → exportada → definitiva → publicada)
+2. **Notificaciones Inteligentes**: Solo se notifica a managers con empleados que tienen complementos pendientes
+3. **Integración con Documentos**: PDFs de nóminas se vinculan automáticamente a carpeta "Nóminas" del empleado
+4. **Sistema de Alertas**: Detección automática de datos faltantes y anomalías
+5. **Analytics Integrados**: KPIs de nóminas disponibles en la pestaña `Compensación` de Analytics (totales netos, complementos, distribución por departamento)
+6. **Asignación Individual de Complementos**: Complementos variables gestionados desde cada nómina/pre-nómina
 
 ## Flujo de Trabajo (Workflow)
 
@@ -174,7 +187,63 @@ Publica nóminas para que los empleados puedan verlas.
 - Muestra datos completos de empleado, período, compensación, incidencias y estado del documento PDF.
 - Cada alerta incluye categoría, código y detalles estructurados cuando están disponibles.
 
-### 6. Asignación de Complementos a Nóminas
+### 6. Métricas de Nómina en Analytics ⭐ NUEVO
+
+**Ubicación**: `/hr/analytics` → pestaña `Compensación`
+
+**Visualizaciones disponibles**:
+- KPIs anuales: total neto abonado, complementos y número de nóminas (comparativa con año anterior)
+- Tendencia mensual del total neto abonado
+- Coste neto por departamento (ranking descendente)
+- Top complementos salariales abonados en el año
+
+**Origen de datos**:
+- Prisma `nomina` (agrupaciones por año, mes y departamento)
+- Prisma `asignaciones_complemento` (conteo e importes por tipo de complemento)
+
+**Actualización**:
+- Fetch en vivo desde `/api/analytics/compensacion`
+- El endpoint agrega al payload existente el bloque `nominas` con toda la información necesaria para las gráficas
+
+### 7. Notificaciones a Managers ⭐ OPTIMIZADO
+
+**Comportamiento**:
+- Se notifica SOLO a managers que tienen empleados con complementos salariales
+- El sistema filtra managers sin empleados con complementos (no reciben notificación innecesaria)
+- Mensaje personalizado con número exacto de empleados con complementos pendientes
+
+**Lógica**:
+```typescript
+// Obtener managers con equipos que tienen empleados con complementos
+managers.filter(manager => 
+  manager.equiposGestionados.some(equipo =>
+    equipo.miembros.some(empleado => 
+      empleado.complementos.length > 0
+    )
+  )
+)
+```
+
+**Mensaje**:
+```
+Título: Nóminas {mes}/{año} - Complementos pendientes
+Mensaje: Tienes {N} empleado(s) con complementos salariales que 
+         requieren validación antes del {fecha_límite}
+```
+
+### 8. Integración con Documentos ✅ VERIFICADO
+
+**Comportamiento**:
+- Al importar PDFs de nóminas definitivas, se crean automáticamente en carpeta "Nóminas" del empleado
+- Si la carpeta no existe, se auto-crea como carpeta del sistema
+- Los empleados ven sus nóminas en `/empleado/mi-espacio/documentos/{carpeta_nominas}`
+- Permisos: empleados solo lectura, HR puede subir/descargar
+
+**Vinculación**:
+- Campo `documentoId` en tabla `Nomina` apunta a `Documento`
+- Al publicar, los empleados reciben notificación con acceso a su carpeta de documentos
+
+### 9. Asignación de Complementos a Nóminas
 
 Permite asignar complementos específicos a nóminas individuales.
 
@@ -374,10 +443,24 @@ POST /api/nominas/eventos/[eventoId]/publicar
 
 ## Permisos
 
-- **hr_admin**: Acceso completo
-- **platform_admin**: Acceso completo
-- **manager**: Puede ver y asignar complementos
-- **empleado**: Solo puede ver sus propias nóminas publicadas
+| Acción | HR Admin | Platform Admin | Manager | Empleado |
+|--------|----------|----------------|---------|----------|
+| Generar evento | ✅ | ✅ | ❌ | ❌ |
+| Ver todos los eventos | ✅ | ✅ | ❌ | ❌ |
+| Cancelar evento | ❌ | ❌ | ❌ | ❌ |
+| Asignar complementos | ✅ | ✅ | ✅ (su equipo) | ❌ |
+| Exportar a Excel | ✅ | ✅ | ❌ | ❌ |
+| Importar PDFs | ✅ | ✅ | ❌ | ❌ |
+| Publicar nóminas | ✅ | ✅ | ❌ | ❌ |
+| Ver reportes | ✅ | ✅ | ❌ | ❌ |
+| Gestionar tipos complemento | ✅ | ✅ | ❌ | ❌ |
+| Ver nóminas propias | ✅ | ✅ | ✅ | ✅ |
+| Descargar PDF propio | ✅ | ✅ | ✅ | ✅ |
+
+**Nota sobre Managers**: 
+- Reciben notificaciones solo si tienen empleados con complementos
+- Pueden validar complementos de su equipo
+- No tienen acceso a vista general de payroll
 
 ## Notas Técnicas
 
@@ -404,8 +487,44 @@ export async function POST(
 - Transacciones para operaciones complejas
 - Índices en campos frecuentes (empleadoId, eventoNominaId)
 
+## Navegación en Sidebar
+
+```
+Nóminas (DollarSign) → /hr/payroll
+Analytics (BarChart3) → /hr/analytics (pestaña Compensación)
+```
+
+## Estado de Funcionalidades Pendientes
+
+### ❌ No Implementado (Futuro)
+
+1. **Cálculo de deducciones fiscales**: IRPF, Seguridad Social, otras deducciones
+2. **Edición manual de pre-nóminas**: Ajustar salario base, días trabajados
+3. **Historial y auditoría**: Registro de cambios, quién modificó qué
+4. **Validaciones avanzadas**: Formato IBAN/NSS, rangos salariales
+5. **Integración con gestoría**: API automática con sistemas externos
+6. **Pagas extras**: Gestión de 14 pagas, prorrata
+7. **Envío de emails reales**: AWS SES para notificaciones por correo
+8. **Cancelación de eventos**: Eliminación de eventos y nóminas asociadas
+9. **Gestión centralizada de tipos de complemento**: Catálogo desde UI dedicada
+
+### ✅ Completamente Funcional
+
+- ✅ Workflow de estados completo
+- ✅ Generación automática de pre-nóminas
+- ✅ Gestión de complementos variables desde cada nómina
+- ✅ Exportación a Excel
+- ✅ Importación con IA
+- ✅ Publicación y notificaciones
+- ✅ Sistema de alertas
+- ✅ Analytics y KPIs (pestaña Compensación)
+- ✅ Integración con documentos
+
 ## Referencias
 
 - Arquitectura IA: `docs/ia/ARQUITECTURA_IA.md`
 - Classification Pattern: `lib/ia/patterns/classification.ts`
 - Clasificador Nóminas: `lib/ia/clasificador-nominas.ts`
+- Sync Estados: `lib/calculos/sync-estados-nominas.ts`
+- Validaciones: `lib/validaciones/nominas.ts`
+- Cálculos: `lib/calculos/nominas.ts`

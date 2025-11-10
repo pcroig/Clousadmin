@@ -4,7 +4,7 @@
 
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   ArrowLeft,
@@ -38,6 +38,7 @@ import { EmptyState } from '@/components/shared/empty-state';
 import { LoadingButton } from '@/components/shared/loading-button';
 import { SearchableSelect } from '@/components/shared/searchable-select';
 import { SearchableMultiSelect } from '@/components/shared/searchable-multi-select';
+import { InfoTooltip } from '@/components/shared/info-tooltip';
 
 interface Documento {
   id: string;
@@ -46,6 +47,11 @@ interface Documento {
   mimeType: string;
   tamano: number;
   createdAt: string;
+  empleado?: {
+    id: string;
+    nombre: string;
+    apellidos: string;
+  } | null;
 }
 
 interface Carpeta {
@@ -54,6 +60,7 @@ interface Carpeta {
   esSistema: boolean;
   compartida: boolean;
   asignadoA?: string | null;
+  esGlobal?: boolean;
   empleado?: {
     id: string;
     nombre: string;
@@ -75,9 +82,10 @@ interface Empleado {
 
 interface CarpetaDetailClientProps {
   carpeta: Carpeta;
+  empleados?: Empleado[];
 }
 
-export function CarpetaDetailClient({ carpeta }: CarpetaDetailClientProps) {
+export function CarpetaDetailClient({ carpeta, empleados = [] }: CarpetaDetailClientProps) {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
@@ -87,26 +95,21 @@ export function CarpetaDetailClient({ carpeta }: CarpetaDetailClientProps) {
     null
   );
 
+  // Estados para filtros (solo para carpetas globales)
+  const [filtroEmpleado, setFiltroEmpleado] = useState<string>('todos');
+  const [busqueda, setBusqueda] = useState<string>('');
+
   // Estados para modal de editar asignación
   const [modalEditarAsignacion, setModalEditarAsignacion] = useState(false);
   const [tipoAsignacion, setTipoAsignacion] = useState<'todos' | 'equipo' | 'individual'>('todos');
   const [equipoSeleccionado, setEquipoSeleccionado] = useState('');
   const [empleadosSeleccionados, setEmpleadosSeleccionados] = useState<string[]>([]);
   const [equipos, setEquipos] = useState<Equipo[]>([]);
-  const [empleados, setEmpleados] = useState<Empleado[]>([]);
+  const [empleadosList, setEmpleadosList] = useState<Empleado[]>([]);
   const [cargandoDatos, setCargandoDatos] = useState(false);
   const [actualizandoAsignacion, setActualizandoAsignacion] = useState(false);
 
-  // Cargar equipos y empleados cuando se abre el modal
-  useEffect(() => {
-    if (modalEditarAsignacion) {
-      cargarDatos();
-      // Parsear asignadoA actual para pre-seleccionar valores
-      parsearAsignadoA();
-    }
-  }, [modalEditarAsignacion]);
-
-  const parsearAsignadoA = () => {
+  const parsearAsignadoA = useCallback(() => {
     if (!carpeta.asignadoA) {
       setTipoAsignacion('todos');
       return;
@@ -128,9 +131,9 @@ export function CarpetaDetailClient({ carpeta }: CarpetaDetailClientProps) {
     } else {
       setTipoAsignacion('todos');
     }
-  };
+  }, [carpeta]);
 
-  const cargarDatos = async () => {
+  const cargarDatos = useCallback(async () => {
     setCargandoDatos(true);
     try {
       const [equiposRes, empleadosRes] = await Promise.all([
@@ -145,14 +148,23 @@ export function CarpetaDetailClient({ carpeta }: CarpetaDetailClientProps) {
 
       if (empleadosRes.ok) {
         const { empleados } = await empleadosRes.json();
-        setEmpleados(empleados || []);
+        setEmpleadosList(empleados || []);
       }
     } catch (error) {
       console.error('Error cargando datos:', error);
     } finally {
       setCargandoDatos(false);
     }
-  };
+  }, []);
+
+  // Cargar equipos y empleados cuando se abre el modal
+  useEffect(() => {
+    if (modalEditarAsignacion) {
+      cargarDatos();
+      // Parsear asignadoA actual para pre-seleccionar valores
+      parsearAsignadoA();
+    }
+  }, [modalEditarAsignacion, cargarDatos, parsearAsignadoA]);
 
   const handleActualizarAsignacion = async () => {
     // Validar según tipo de asignación
@@ -307,6 +319,26 @@ export function CarpetaDetailClient({ carpeta }: CarpetaDetailClientProps) {
     });
   };
 
+  // Filtrar documentos (solo para carpetas globales)
+  const documentosFiltrados = carpeta.esGlobal 
+    ? carpeta.documentos.filter((doc) => {
+        // Filtro por empleado
+        if (filtroEmpleado !== 'todos' && doc.empleado?.id !== filtroEmpleado) {
+          return false;
+        }
+        // Filtro por búsqueda (nombre del documento o empleado)
+        if (busqueda.trim()) {
+          const terminoBusqueda = busqueda.toLowerCase();
+          const coincideNombre = doc.nombre.toLowerCase().includes(terminoBusqueda);
+          const coincideEmpleado = doc.empleado 
+            ? `${doc.empleado.nombre} ${doc.empleado.apellidos}`.toLowerCase().includes(terminoBusqueda)
+            : false;
+          return coincideNombre || coincideEmpleado;
+        }
+        return true;
+      })
+    : carpeta.documentos;
+
   return (
     <>
       <div className="h-full w-full flex flex-col">
@@ -346,6 +378,17 @@ export function CarpetaDetailClient({ carpeta }: CarpetaDetailClientProps) {
                   {carpeta.empleado.apellidos}
                 </p>
               )}
+              {carpeta.esGlobal && (
+                <div className="mt-2 flex items-center gap-2 text-sm text-gray-600">
+                  <InfoTooltip
+                    content={`Carpeta global que reúne todos los documentos tipo "${carpeta.nombre}" de la empresa.`}
+                    variant="subtle"
+                  />
+                  <span>
+                    Carpeta global con documentos de todos los empleados.
+                  </span>
+                </div>
+              )}
             </div>
 
             <div className="flex gap-2">
@@ -378,17 +421,53 @@ export function CarpetaDetailClient({ carpeta }: CarpetaDetailClientProps) {
           </div>
         </div>
 
+        {/* Filtros (solo para carpetas globales) */}
+        {carpeta.esGlobal && empleados.length > 0 && (
+          <div className="mb-4 flex-shrink-0 space-y-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div>
+                <Label htmlFor="filtro-empleado" className="text-xs text-gray-600">Filtrar por empleado</Label>
+                <Select value={filtroEmpleado} onValueChange={setFiltroEmpleado}>
+                  <SelectTrigger id="filtro-empleado">
+                    <SelectValue placeholder="Todos los empleados" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todos">Todos los empleados</SelectItem>
+                    {empleados.map((emp) => (
+                      <SelectItem key={emp.id} value={emp.id}>
+                        {emp.nombre} {emp.apellidos}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="busqueda" className="text-xs text-gray-600">Buscar documento</Label>
+                <Input
+                  id="busqueda"
+                  placeholder="Buscar por nombre o empleado..."
+                  value={busqueda}
+                  onChange={(e) => setBusqueda(e.target.value)}
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Contador de documentos */}
         <div className="mb-4 flex-shrink-0">
           <p className="text-sm text-gray-600 font-medium">
-            {carpeta.documentos.length}{' '}
-            {carpeta.documentos.length === 1 ? 'documento' : 'documentos'}
+            {documentosFiltrados.length}{' '}
+            {documentosFiltrados.length === 1 ? 'documento' : 'documentos'}
+            {carpeta.esGlobal && documentosFiltrados.length !== carpeta.documentos.length && (
+              <span className="text-gray-500"> (de {carpeta.documentos.length} total)</span>
+            )}
           </p>
         </div>
 
         {/* Lista de documentos */}
         <div className="flex-1 min-h-0 overflow-y-auto">
-          {carpeta.documentos.length === 0 ? (
+          {documentosFiltrados.length === 0 ? (
             <div className="bg-white rounded-lg border border-gray-200 p-6">
               <EmptyState
                 variant="secondary"
@@ -414,6 +493,11 @@ export function CarpetaDetailClient({ carpeta }: CarpetaDetailClientProps) {
                     <th className="text-left py-3 px-4 text-xs font-medium text-gray-600 uppercase">
                       Nombre
                     </th>
+                    {carpeta.esGlobal && (
+                      <th className="text-left py-3 px-4 text-xs font-medium text-gray-600 uppercase">
+                        Empleado
+                      </th>
+                    )}
                     <th className="text-left py-3 px-4 text-xs font-medium text-gray-600 uppercase">
                       Tipo
                     </th>
@@ -429,24 +513,35 @@ export function CarpetaDetailClient({ carpeta }: CarpetaDetailClientProps) {
                   </tr>
                 </thead>
                 <tbody>
-                  {carpeta.documentos.map((documento) => (
+                  {documentosFiltrados.map((documento) => (
                     <tr
                       key={documento.id}
                       className="border-b border-gray-100 last:border-0 hover:bg-gray-50 transition-colors"
                     >
-                      <td className="py-3 px-4">
-                        <div className="flex items-center gap-3">
-                          <FileText className="w-5 h-5 text-gray-400" />
-                          <span className="text-sm font-medium text-gray-900">
-                            {documento.nombre}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="py-3 px-4">
-                        <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">
-                          {documento.tipoDocumento}
+                    <td className="py-3 px-4">
+                      <div className="flex items-center gap-3">
+                        <FileText className="w-5 h-5 text-gray-400" />
+                        <span className="text-sm font-medium text-gray-900">
+                          {documento.nombre}
                         </span>
+                      </div>
+                    </td>
+                    {carpeta.esGlobal && (
+                      <td className="py-3 px-4">
+                        {documento.empleado ? (
+                          <span className="text-sm text-gray-700">
+                            {documento.empleado.nombre} {documento.empleado.apellidos}
+                          </span>
+                        ) : (
+                          <span className="text-sm text-gray-400 italic">Sin asignar</span>
+                        )}
                       </td>
+                    )}
+                    <td className="py-3 px-4">
+                      <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">
+                        {documento.tipoDocumento}
+                      </span>
+                    </td>
                       <td className="py-3 px-4 text-sm text-gray-600">
                         {formatearTamano(documento.tamano)}
                       </td>
@@ -542,7 +637,7 @@ export function CarpetaDetailClient({ carpeta }: CarpetaDetailClientProps) {
                 ) : (
                   <>
                     <SearchableMultiSelect
-                      items={empleados.map((e) => ({
+                      items={empleadosList.map((e) => ({
                         value: e.id,
                         label: `${e.nombre} ${e.apellidos}`,
                       }))}

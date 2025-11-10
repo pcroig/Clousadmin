@@ -16,7 +16,7 @@ export interface Column<T> {
   width?: string;
 }
 
-interface DataTableProps<T> {
+interface DataTableProps<T extends object> {
   columns: Column<T>[];
   data: T[];
   onRowClick?: (row: T) => void;
@@ -24,7 +24,7 @@ interface DataTableProps<T> {
   emptyMessage?: string;
 }
 
-export function DataTable<T extends Record<string, any>>({
+export function DataTable<T extends object>({
   columns,
   data,
   onRowClick,
@@ -68,15 +68,19 @@ export function DataTable<T extends Record<string, any>>({
                     onRowClick ? 'cursor-pointer hover:bg-gray-50' : ''
                   } transition-colors`}
                 >
-                  {columns.map((column) => (
-                    <td key={column.id} className="px-6 py-4 text-sm text-gray-900">
-                      {column.cell
-                        ? column.cell(row)
-                        : column.accessorKey
-                        ? String(row[column.accessorKey] || '')
-                        : ''}
-                    </td>
-                  ))}
+                  {columns.map((column) => {
+                    const renderedCell = column.cell
+                      ? column.cell(row)
+                      : column.accessorKey
+                      ? String((row as Record<string, unknown>)[column.accessorKey as string] ?? '')
+                      : '';
+
+                    return (
+                      <td key={column.id} className="px-6 py-4 text-sm text-gray-900">
+                        {renderedCell}
+                      </td>
+                    );
+                  })}
                 </tr>
               ))
             )}

@@ -7,11 +7,13 @@
 import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { LoadingButton } from '@/components/shared/loading-button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Settings, FileText, FolderOpen, Plus, Trash2, Loader2 } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
+import { Settings, FileText, FolderOpen, Plus, Trash2 } from 'lucide-react';
 import type {
   CamposRequeridos,
   DocumentoRequerido,
@@ -162,7 +164,7 @@ export function GestionarOnboardingModal({
   const actualizarDocumentoRequerido = (
     id: string,
     campo: keyof DocumentoRequerido,
-    valor: any
+    valor: unknown
   ) => {
     setDocumentosRequeridos(
       documentosRequeridos.map((doc) =>
@@ -189,7 +191,7 @@ export function GestionarOnboardingModal({
         <div className="flex-1 overflow-y-auto p-6">
             {loading ? (
               <div className="flex items-center justify-center py-12">
-                <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+                <Spinner className="size-8 text-gray-400" />
               </div>
             ) : (
               <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -264,16 +266,14 @@ export function GestionarOnboardingModal({
                     </div>
                   </div>
 
-                  <Button onClick={guardarCamposRequeridos} disabled={saving} className="w-full">
-                    {saving ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Guardando...
-                      </>
-                    ) : (
-                      'Guardar Campos'
-                    )}
-                  </Button>
+                  <LoadingButton
+                    onClick={guardarCamposRequeridos}
+                    loading={saving}
+                    disabled={saving}
+                    className="w-full"
+                  >
+                    {saving ? 'Guardando...' : 'Guardar Campos'}
+                  </LoadingButton>
                 </TabsContent>
 
                 {/* Tab: Documentos Requeridos */}
@@ -367,20 +367,14 @@ export function GestionarOnboardingModal({
                     )}
                   </div>
 
-                  <Button
+                  <LoadingButton
                     onClick={guardarDocumentosRequeridos}
+                    loading={saving}
                     disabled={saving}
                     className="w-full"
                   >
-                    {saving ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Guardando...
-                      </>
-                    ) : (
-                      'Guardar Documentos'
-                    )}
-                  </Button>
+                    {saving ? 'Guardando...' : 'Guardar Documentos'}
+                  </LoadingButton>
                 </TabsContent>
 
                 {/* Tab: Plantillas */}

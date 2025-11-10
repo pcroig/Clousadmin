@@ -6,6 +6,7 @@ import { getSession } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import { DocumentosClient } from './documentos-client';
+import { asegurarCarpetasGlobales } from '@/lib/documentos';
 
 import { UsuarioRol } from '@/lib/constants/enums';
 
@@ -15,6 +16,9 @@ export default async function DocumentosPage() {
   if (!session || session.user.rol !== UsuarioRol.hr_admin) {
     redirect('/login');
   }
+
+  // Asegurar carpetas globales por defecto para HR
+  await asegurarCarpetasGlobales(session.user.empresaId);
 
   // Obtener todas las carpetas de nivel superior (sin parent)
   const carpetas = await prisma.carpeta.findMany({

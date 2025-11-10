@@ -51,6 +51,23 @@ interface SaldoAusencias {
   diasDisponibles: number;
 }
 
+interface DiasLaborables {
+  lunes: boolean;
+  martes: boolean;
+  miercoles: boolean;
+  jueves: boolean;
+  viernes: boolean;
+  sabado: boolean;
+  domingo: boolean;
+}
+
+interface Festivo {
+  id: string;
+  fecha: string;
+  nombre: string;
+  activo: boolean;
+}
+
 export function AusenciasTab({ empleadoId }: { empleadoId: string }) {
   const [saldo, setSaldo] = useState<SaldoAusencias>({
     diasTotales: 0,
@@ -68,6 +85,18 @@ export function AusenciasTab({ empleadoId }: { empleadoId: string }) {
     descripcion: '',
     medioDia: false,
   });
+
+  // Estados para calendario laboral
+  const [diasLaborables, setDiasLaborables] = useState<DiasLaborables>({
+    lunes: true,
+    martes: true,
+    miercoles: true,
+    jueves: true,
+    viernes: true,
+    sabado: false,
+    domingo: false,
+  });
+  const [festivos, setFestivos] = useState<Festivo[]>([]);
 
   // Hook para cargar ausencias
   const { data: ausencias = [], loading, execute: refetchAusencias } = useApi<Ausencia[]>();
@@ -112,6 +141,49 @@ export function AusenciasTab({ empleadoId }: { empleadoId: string }) {
       refetchSaldo(`/api/ausencias/saldo?empleadoId=${empleadoId}`);
     }
   }, [empleadoId, refetchAusencias, refetchSaldo]);
+
+  // Cargar días laborables y festivos
+  useEffect(() => {
+    let isMounted = true;
+    const controller = new AbortController();
+
+    async function cargarCalendarioLaboral() {
+      try {
+        // Cargar días laborables
+        const diasResponse = await fetch('/api/empresa/calendario-laboral', {
+          signal: controller.signal,
+        });
+        if (diasResponse.ok) {
+          const { diasLaborables: dias } = await diasResponse.json();
+          if (isMounted && dias) {
+            setDiasLaborables(dias);
+          }
+        }
+
+        // Cargar festivos activos
+        const festivosResponse = await fetch('/api/festivos?activo=true', {
+          signal: controller.signal,
+        });
+        if (festivosResponse.ok) {
+          const festivosData = await festivosResponse.json();
+          if (isMounted) {
+            setFestivos(festivosData);
+          }
+        }
+      } catch (error) {
+        if (!controller.signal.aborted) {
+          console.error('Error cargando calendario laboral:', error);
+        }
+      }
+    }
+
+    cargarCalendarioLaboral();
+
+    return () => {
+      isMounted = false;
+      controller.abort();
+    };
+  }, []);
 
   async function handleCrearAusencia() {
     if (!nuevaAusencia.fechaInicio || !nuevaAusencia.fechaFin) {
@@ -223,6 +295,24 @@ export function AusenciasTab({ empleadoId }: { empleadoId: string }) {
   };
 
   // Modificadores para react-day-picker
+  // Helper para determinar si un día es festivo
+  const esFestivo = (date: Date) => {
+    return festivos.some(f => {
+      const festivoDate = new Date(f.fecha);
+      festivoDate.setHours(0, 0, 0, 0);
+      const checkDate = new Date(date);
+      checkDate.setHours(0, 0, 0, 0);
+      return festivoDate.getTime() === checkDate.getTime();
+    });
+  };
+
+  // Helper para determinar si un día es laborable según config empresa
+  const esLaborable = (date: Date) => {
+    const diasSemana = ['domingo', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado'];
+    const diaKey = diasSemana[date.getDay()] as keyof DiasLaborables;
+    return diasLaborables[diaKey];
+  };
+
   const modifiers = {
     pendiente: (date: Date) => getDiaEstado(date) === 'pendiente_aprobacion',
     aprobada: (date: Date) => {
@@ -230,12 +320,16 @@ export function AusenciasTab({ empleadoId }: { empleadoId: string }) {
       return estado === EstadoAusencia.en_curso || estado === EstadoAusencia.auto_aprobada || estado === EstadoAusencia.completada;
     },
     rechazada: (date: Date) => getDiaEstado(date) === 'rechazada',
+    festivo: (date: Date) => esFestivo(date),
+    noLaborable: (date: Date) => !esLaborable(date),
   };
 
   const modifiersClassNames = {
     pendiente: 'relative after:absolute after:top-0 after:left-0 after:w-full after:h-full after:bg-yellow-300 after:opacity-40 after:rounded-md',
     aprobada: 'relative after:absolute after:top-0 after:left-0 after:w-full after:h-full after:bg-green-300 after:opacity-40 after:rounded-md',
     rechazada: 'relative after:absolute after:top-0 after:left-0 after:w-full after:h-full after:bg-red-300 after:opacity-40 after:rounded-md',
+    festivo: 'relative after:absolute after:top-0 after:left-0 after:w-full after:h-full after:bg-red-100 after:border after:border-red-300 after:opacity-60 after:rounded-md',
+    noLaborable: 'bg-gray-100 text-gray-400',
   };
 
   return (
@@ -363,7 +457,7 @@ export function AusenciasTab({ empleadoId }: { empleadoId: string }) {
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
-                <CardTitle className="text-base font-semibold">Calendario de Ausencias</CardTitle>
+                <CardTitle className="text-base font-semibold">Calendario</CardTitle>
                 <Button
                   onClick={() => setShowNuevaAusenciaModal(true)}
                   size="sm"
@@ -371,40 +465,70 @@ export function AusenciasTab({ empleadoId }: { empleadoId: string }) {
                   Solicitar Ausencia
                 </Button>
               </div>
-            </CardHeader>
-          <CardContent>
-              <Calendar
-                mode="single"
-                month={calendarMonth}
-                onMonthChange={setCalendarMonth}
-                modifiers={modifiers}
-                modifiersClassNames={modifiersClassNames}
-                className="rounded-md border"
-                locale={es}
-              />
               
-              {/* Leyenda */}
-              <div className="mt-4 pt-4 border-t border-gray-200">
-                <p className="text-xs font-semibold text-gray-700 mb-2">Leyenda:</p>
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                  <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 bg-yellow-300 rounded"></div>
-                    <span>Pendiente</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 bg-green-300 rounded"></div>
-                    <span>Aprobada</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 bg-red-300 rounded"></div>
-                    <span>Rechazada</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 bg-gray-200 rounded"></div>
-                    <span>Día laborable</span>
-                  </div>
+              {/* Leyenda - debajo del título, encima del calendario */}
+              <div className="flex flex-wrap items-center gap-4 pt-3 text-xs">
+                <div className="flex items-center gap-1.5">
+                  <div className="w-3 h-3 bg-white border-2 border-gray-900 rounded"></div>
+                  <span className="text-gray-700">Laborable</span>
                 </div>
-            </div>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-3 h-3 bg-gray-100 rounded"></div>
+                  <span className="text-gray-700">No laborable</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-3 h-3 bg-red-100 border border-red-300 rounded"></div>
+                  <span className="text-gray-700">Festivo</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-3 h-3 bg-yellow-300 rounded"></div>
+                  <span className="text-gray-700">Pendiente</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-3 h-3 bg-green-300 rounded"></div>
+                  <span className="text-gray-700">Aprobada</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-3 h-3 bg-red-300 rounded"></div>
+                  <span className="text-gray-700">Rechazada</span>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {/* Dos calendarios lado a lado */}
+              <div className="grid grid-cols-2 gap-4">
+                {/* Mes actual */}
+                <div>
+                  <Calendar
+                    mode="single"
+                    month={calendarMonth}
+                    onMonthChange={(month) => {
+                      setCalendarMonth(month);
+                    }}
+                    modifiers={modifiers}
+                    modifiersClassNames={modifiersClassNames}
+                    className="rounded-md border"
+                    locale={es}
+                  />
+                </div>
+                
+                {/* Mes siguiente */}
+                <div>
+                  <Calendar
+                    mode="single"
+                    month={new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 1)}
+                    onMonthChange={(month) => {
+                      // Al cambiar el segundo calendario, también mueve el primero
+                      const mesAnterior = new Date(month.getFullYear(), month.getMonth() - 1, 1);
+                      setCalendarMonth(mesAnterior);
+                    }}
+                    modifiers={modifiers}
+                    modifiersClassNames={modifiersClassNames}
+                    className="rounded-md border"
+                    locale={es}
+                  />
+                </div>
+              </div>
           </CardContent>
         </Card>
         </div>

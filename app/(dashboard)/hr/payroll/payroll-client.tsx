@@ -5,24 +5,24 @@
 // ========================================
 // Vista consolidada: Eventos expandibles con sus nóminas
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { EmptyState } from '@/components/shared/empty-state';
+import { CardSkeleton, ListSkeleton } from '@/components/shared/loading-skeletons';
+import { LoadingButton } from '@/components/shared/loading-button';
+import { Spinner } from '@/components/ui/spinner';
 import {
   FileText,
   Upload,
   Download,
   Plus,
   CheckCircle,
-  Clock,
   ChevronDown,
   ChevronUp,
   Send,
   Eye,
   User,
-  TrendingUp,
-  Users,
-  DollarSign,
   AlertCircle,
   AlertTriangle,
   Info,
@@ -146,14 +146,7 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
   } | null>(null);
   const [loadingAnalytics, setLoadingAnalytics] = useState(false);
 
-  const nombreMes = meses[mesActual - 1];
-
-  useEffect(() => {
-    fetchEventos();
-    fetchAnalytics();
-  }, [anioActual]);
-
-  const fetchEventos = async () => {
+  const fetchEventos = useCallback(async () => {
     try {
       const response = await fetch('/api/nominas/eventos');
       const data = await response.json();
@@ -164,9 +157,9 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const fetchAnalytics = async () => {
+  const fetchAnalytics = useCallback(async () => {
     try {
       setLoadingAnalytics(true);
       const response = await fetch(`/api/nominas/analytics?anio=${anioActual}`);
@@ -178,7 +171,12 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
     } finally {
       setLoadingAnalytics(false);
     }
-  };
+  }, [anioActual]);
+
+  useEffect(() => {
+    fetchEventos();
+    fetchAnalytics();
+  }, [fetchEventos, fetchAnalytics]);
 
   const fetchEventoDetails = async (eventoId: string) => {
     try {
@@ -365,12 +363,45 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
     }
   };
 
+
   if (loading) {
     return (
-      <div className="h-full flex items-center justify-center">
-        <div className="text-center">
-          <Clock className="w-12 h-12 text-gray-400 mx-auto mb-4 animate-spin" />
-          <p className="text-gray-600">Cargando nóminas...</p>
+      <div className="h-full w-full flex flex-col">
+        {/* Header */}
+        <div className="flex-shrink-0 mb-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">Nóminas</h1>
+              <p className="text-sm text-gray-600 mt-1">
+                Gestiona el ciclo completo de nóminas mensuales
+              </p>
+            </div>
+
+            <div className="flex gap-3">
+              <LoadingButton className="btn-primary" loading>
+                Generando...
+              </LoadingButton>
+              <Button variant="outline" disabled>
+                <Upload className="w-4 h-4 mr-2" />
+                Subir Nóminas
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        {/* Analytics skeleton */}
+        <div className="flex-shrink-0 mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            {Array.from({ length: 4 }).map((_, index) => (
+              <CardSkeleton key={index} className="h-32" />
+            ))}
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-y-auto pb-6">
+          <Card className="p-6">
+            <ListSkeleton items={4} />
+          </Card>
         </div>
       </div>
     );
@@ -389,92 +420,92 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
           </div>
 
           <div className="flex gap-3">
-            <Button
+            <LoadingButton
               className="btn-primary"
               onClick={handleGenerarEvento}
+              loading={isGenerating}
               disabled={isGenerating}
             >
               <Plus className="w-4 h-4 mr-2" />
               {isGenerating ? 'Generando...' : 'Generar Evento Mensual'}
-            </Button>
+            </LoadingButton>
           </div>
         </div>
       </div>
 
       {/* Analytics KPIs */}
-      {analytics && eventos.length > 0 && (
+      {eventos.length > 0 && (
         <div className="flex-shrink-0 mb-6">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <KpiCard
-              title="Coste Total Año"
-              value={`€${analytics.totalNeto.toLocaleString('es-ES', {
-                minimumFractionDigits: 0,
-                maximumFractionDigits: 0
-              })}`}
-              subtitle={`${anioActual}`}
-              trend={
-                analytics.variacionAnioAnterior !== 0
-                  ? {
-                      value: Math.abs(analytics.variacionAnioAnterior),
-                      isPositive: analytics.variacionAnioAnterior < 0, // Menos coste es positivo
-                    }
-                  : undefined
-              }
-            />
+          {loadingAnalytics || !analytics ? (
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              {Array.from({ length: 4 }).map((_, index) => (
+                <CardSkeleton key={index} className="h-32" />
+              ))}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <KpiCard
+                title="Coste Total Año"
+                value={`€${analytics.totalNeto.toLocaleString('es-ES', {
+                  minimumFractionDigits: 0,
+                  maximumFractionDigits: 0
+                })}`}
+                subtitle={`${anioActual}`}
+                trend={
+                  analytics.variacionAnioAnterior !== 0
+                    ? {
+                        value: Math.abs(analytics.variacionAnioAnterior),
+                        isPositive: analytics.variacionAnioAnterior < 0, // Menos coste es positivo
+                      }
+                    : undefined
+                }
+              />
 
-            <KpiCard
-              title="Empleados"
-              value={analytics.empleadosUnicos}
-              subtitle="Empleados activos"
-            />
+              <KpiCard
+                title="Empleados"
+                value={analytics.empleadosUnicos}
+                subtitle="Empleados activos"
+              />
 
-            <KpiCard
-              title="Coste Promedio"
-              value={`€${analytics.promedioNeto.toLocaleString('es-ES', {
-                minimumFractionDigits: 0,
-                maximumFractionDigits: 0
-              })}`}
-              subtitle="Por empleado/año"
-            />
+              <KpiCard
+                title="Coste Promedio"
+                value={`€${analytics.promedioNeto.toLocaleString('es-ES', {
+                  minimumFractionDigits: 0,
+                  maximumFractionDigits: 0
+                })}`}
+                subtitle="Por empleado/año"
+              />
 
-            <KpiCard
-              title="Eventos Procesados"
-              value={eventos.length}
-              subtitle={`${anioActual}`}
-            />
-          </div>
+              <KpiCard
+                title="Eventos Procesados"
+                value={eventos.length}
+                subtitle={`${anioActual}`}
+              />
+            </div>
+          )}
         </div>
       )}
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto pb-6">
         {eventos.length === 0 ? (
-          /* Empty State */
-          <Card className="p-12">
-            <div className="flex flex-col items-center justify-center text-center">
-              <div className="w-20 h-20 bg-orange-50 rounded-full flex items-center justify-center mb-6">
-                <FileText className="w-10 h-10 text-[#d97757]" />
-              </div>
-
-              <h3 className="text-xl font-semibold text-gray-900 mb-2">
-                No hay nóminas registradas
-              </h3>
-
-              <p className="text-gray-600 max-w-md mb-8">
-                Genera un evento mensual para crear automáticamente las pre-nóminas
-                de todos los empleados activos, o sube nóminas directamente.
-              </p>
-
-              <div className="flex gap-4">
-                <Button
+          <div className="py-16">
+            <EmptyState
+              variant="primary"
+              icon={FileText}
+              title="No hay nóminas registradas"
+              description="Genera un evento mensual para crear automáticamente las pre-nóminas de todo el equipo o sube las nóminas manualmente."
+              action={
+                <div className="flex flex-wrap items-center justify-center gap-4">
+                  <LoadingButton
                   className="btn-primary"
                   onClick={handleGenerarEvento}
+                    loading={isGenerating}
                   disabled={isGenerating}
                 >
                   <Plus className="w-4 h-4 mr-2" />
                   {isGenerating ? 'Generando...' : 'Generar Evento'}
-                </Button>
-
+                  </LoadingButton>
                 <Button
                   variant="outline"
                   onClick={() => {
@@ -495,8 +526,9 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
                   Subir Nóminas
                 </Button>
               </div>
+              }
+            />
             </div>
-          </Card>
         ) : (
           /* Lista de Eventos */
           <div className="space-y-4">
@@ -632,15 +664,16 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
                         {/* Exportar */}
                         {['lista_exportar', 'exportada', 'definitiva', 'publicada'].includes(evento.estado) && (
                           <div className="group relative">
-                            <Button
+                            <LoadingButton
                               size="sm"
                               variant="outline"
                               onClick={() => handleExportar(evento.id)}
+                              loading={isProcessing}
                               disabled={isProcessing}
                             >
                               <Download className="w-4 h-4 mr-2" />
                               {evento.estado === 'lista_exportar' ? 'Exportar Excel' : 'Re-exportar'}
-                            </Button>
+                            </LoadingButton>
                             {evento.estado === 'lista_exportar' && (
                               <div className="absolute right-0 top-full mt-2 w-56 p-2 bg-gray-900 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10">
                                 Descarga Excel con todas las nóminas para enviar a gestoría
@@ -652,15 +685,16 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
                         {/* Importar */}
                         {['exportada', 'definitiva'].includes(evento.estado) && (
                           <div className="group relative">
-                            <Button
+                            <LoadingButton
                               size="sm"
                               variant="outline"
                               onClick={() => handleImportar(evento.id)}
+                              loading={isProcessing}
                               disabled={isProcessing}
                             >
                               <Upload className="w-4 h-4 mr-2" />
                               Importar PDFs
-                            </Button>
+                            </LoadingButton>
                             <div className="absolute right-0 top-full mt-2 w-56 p-2 bg-gray-900 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10">
                               Sube los PDFs de nóminas definitivas recibidas de gestoría
                             </div>
@@ -670,15 +704,16 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
                         {/* Publicar */}
                         {evento.estado === 'definitiva' && (
                           <div className="group relative">
-                            <Button
+                            <LoadingButton
                               size="sm"
                               className="btn-primary"
                               onClick={() => handlePublicar(evento.id)}
+                              loading={isProcessing}
                               disabled={isProcessing}
                             >
                               <Send className="w-4 h-4 mr-2" />
                               Publicar y Notificar
-                            </Button>
+                            </LoadingButton>
                             <div className="absolute right-0 top-full mt-2 w-56 p-2 bg-gray-900 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10">
                               Publica las nóminas y envía notificaciones a todos los empleados
                             </div>
@@ -702,9 +737,9 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
                   {isExpanded && (
                     <div className="border-t bg-gray-50">
                       {isLoadingDetails ? (
-                        <div className="p-8 text-center">
-                          <Clock className="w-8 h-8 text-gray-400 mx-auto mb-2 animate-spin" />
-                          <p className="text-sm text-gray-600">Cargando nóminas...</p>
+                        <div className="p-8 text-center flex flex-col items-center gap-2 text-sm text-gray-600">
+                          <Spinner className="size-6 text-gray-500" />
+                          Cargando nóminas...
                         </div>
                       ) : evento.nominas && evento.nominas.length > 0 ? (
                         <div className="p-6 space-y-3">

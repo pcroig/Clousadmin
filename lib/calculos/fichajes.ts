@@ -4,7 +4,13 @@
 // NUEVO MODELO: Fichaje = día completo, FichajeEvento = eventos individuales
 
 import { prisma } from '@/lib/prisma';
-import { Fichaje, FichajeEvento, Empleado, Ausencia } from '@prisma/client';
+import {
+  Fichaje,
+  FichajeEvento,
+  Empleado,
+  Ausencia,
+  EstadoFichaje as PrismaEstadoFichaje,
+} from '@prisma/client';
 import type { JornadaConfig, DiaConfig } from './fichajes-helpers';
 
 import { EstadoAusencia } from '@/lib/constants/enums';
@@ -51,7 +57,7 @@ export async function obtenerEstadoFichaje(empleadoId: string): Promise<EstadoFi
   }
 
   // Estado del fichaje completo
-  if (fichajeHoy.estado === 'finalizado' || fichajeHoy.estado === 'aprobado') {
+  if (fichajeHoy.estado === PrismaEstadoFichaje.finalizado) {
     return 'finalizado';
   }
 
@@ -578,7 +584,7 @@ export async function esDiaLaboral(empleadoId: string, fecha: Date): Promise<boo
       empleadoId,
       medioDia: false, // Solo ausencias de día completo
       estado: {
-        in: ['aprobada', 'en_curso', 'auto_aprobada'],
+        in: [EstadoAusencia.en_curso, EstadoAusencia.completada, EstadoAusencia.auto_aprobada],
       },
       fechaInicio: {
         lte: fechaSinHora,
@@ -664,7 +670,7 @@ export async function crearFichajesAutomaticos(
             empresaId,
             empleadoId: empleado.id,
             fecha: fechaSinHora,
-            estado: EstadoAusencia.en_curso,
+            estado: PrismaEstadoFichaje.en_curso,
           },
         });
 
@@ -707,7 +713,7 @@ export async function obtenerAusenciaMedioDia(
       empleadoId,
       medioDia: true,
       estado: {
-        in: ['aprobada', 'en_curso', 'auto_aprobada'],
+        in: [EstadoAusencia.en_curso, EstadoAusencia.completada, EstadoAusencia.auto_aprobada],
       },
       fechaInicio: {
         lte: fechaSinHora,

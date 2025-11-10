@@ -133,6 +133,66 @@ export async function POST(req: NextRequest) {
       return badRequestResponse('La fecha de fin debe ser posterior a la fecha de inicio');
     }
 
+    // Validar que no hay solapamiento con ausencias existentes del mismo empleado
+    const fechaInicioCheck = validatedData.fechaInicio instanceof Date 
+      ? validatedData.fechaInicio 
+      : new Date(validatedData.fechaInicio);
+    const fechaFinCheck = validatedData.fechaFin instanceof Date 
+      ? validatedData.fechaFin 
+      : new Date(validatedData.fechaFin);
+
+    const ausenciasSolapadas = await prisma.ausencia.findMany({
+      where: {
+        empleadoId: session.user.empleadoId,
+        estado: {
+          in: [
+            EstadoAusencia.pendiente_aprobacion,
+            EstadoAusencia.en_curso,
+            EstadoAusencia.auto_aprobada,
+          ],
+        },
+        OR: [
+          // Caso 1: La nueva ausencia comienza durante una ausencia existente
+          {
+            AND: [
+              { fechaInicio: { lte: fechaInicioCheck } },
+              { fechaFin: { gte: fechaInicioCheck } },
+            ],
+          },
+          // Caso 2: La nueva ausencia termina durante una ausencia existente
+          {
+            AND: [
+              { fechaInicio: { lte: fechaFinCheck } },
+              { fechaFin: { gte: fechaFinCheck } },
+            ],
+          },
+          // Caso 3: La nueva ausencia contiene completamente una ausencia existente
+          {
+            AND: [
+              { fechaInicio: { gte: fechaInicioCheck } },
+              { fechaFin: { lte: fechaFinCheck } },
+            ],
+          },
+        ],
+      },
+      select: {
+        id: true,
+        tipo: true,
+        fechaInicio: true,
+        fechaFin: true,
+        estado: true,
+      },
+    });
+
+    if (ausenciasSolapadas.length > 0) {
+      const ausencia = ausenciasSolapadas[0];
+      const formatFecha = (date: Date) => date.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
+      return badRequestResponse(
+        `Ya tienes una ausencia de tipo "${ausencia.tipo}" en este período (${formatFecha(ausencia.fechaInicio)} - ${formatFecha(ausencia.fechaFin)}). No puedes solicitar ausencias que se solapen en fechas.`,
+        { ausenciaSolapada: ausencia }
+      );
+    }
+
     // Calcular días (naturales, laborables, solicitados)
     const { diasNaturales, diasLaborables, diasSolicitados } = await calcularDias(
       new Date(validatedData.fechaInicio),
@@ -234,6 +294,7 @@ export async function POST(req: NextRequest) {
         descripcion: validatedData.descripcion,
         motivo: validatedData.motivo,
         justificanteUrl: validatedData.justificanteUrl,
+        documentoId: validatedData.documentoId, // Vincular documento justificante
         descuentaSaldo,
         diasIdeales: validatedData.diasIdeales ? JSON.parse(JSON.stringify(validatedData.diasIdeales)) : null,
         diasPrioritarios: validatedData.diasPrioritarios ? JSON.parse(JSON.stringify(validatedData.diasPrioritarios)) : null,

@@ -135,6 +135,7 @@ export const ausenciaCreateSchema = z.object({
   descripcion: z.string().optional(),
   motivo: z.string().optional(),
   justificanteUrl: z.string().url().optional(),
+  documentoId: z.string().uuid().optional(), // ID del documento justificante
   diasIdeales: z.array(z.string()).optional(),
   diasPrioritarios: z.array(z.string()).optional(),
   diasAlternativos: z.array(z.string()).optional(),
@@ -190,6 +191,7 @@ export const ausenciaUpdateSchema = z.object({
   descripcion: z.string().optional().nullable(),
   motivo: z.string().optional().nullable(),
   justificanteUrl: z.string().url().optional().nullable(),
+  documentoId: z.string().uuid().optional().nullable(), // ID del documento justificante
   estado: z.enum(['pendiente_aprobacion', 'en_curso', 'completada', 'auto_aprobada', 'rechazada', 'cancelada']).optional(),
   // Para mantener compatibilidad con aprobar/rechazar
   accion: z.enum(['aprobar', 'rechazar']).optional(),

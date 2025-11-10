@@ -828,7 +828,9 @@ async function main() {
   // ========================================
   console.log('📁 Creando carpetas de documentos...');
 
-  const carpetasPredefinidas = ['Contratos', 'Nóminas', 'Médicos', 'Certificados', 'Otros'];
+  // Usar la constante CARPETAS_SISTEMA del módulo documentos
+  const { CARPETAS_SISTEMA } = await import('../lib/documentos');
+  const carpetasPredefinidas = [...CARPETAS_SISTEMA];
 
   // Crear carpetas individuales para cada empleado
   let carpetasCreadas = 0;
@@ -849,7 +851,8 @@ async function main() {
 
   console.log(`✅ ${carpetasCreadas} carpetas individuales creadas`);
 
-  // Crear carpetas centralizadas para HR Admin
+  // Crear carpetas centralizadas para HR Admin (globales)
+  // Estas carpetas agregadas permiten a HR ver documentos de todos los empleados
   const carpetasCentralizadas = ['Nóminas', 'Contratos', 'Justificantes'];
   let carpetasCentralizadasCreadas = 0;
 
@@ -857,7 +860,7 @@ async function main() {
     await prisma.carpeta.create({
       data: {
         empresaId: empresa.id,
-        empleadoId: null, // No pertenece a ningún empleado específico
+        empleadoId: null, // No pertenece a ningún empleado específico (carpeta global)
         nombre: nombreCarpeta,
         esSistema: true,
         compartida: true,
@@ -867,7 +870,7 @@ async function main() {
     carpetasCentralizadasCreadas++;
   }
 
-  console.log(`✅ ${carpetasCentralizadasCreadas} carpetas centralizadas para HR creadas\n`);
+  console.log(`✅ ${carpetasCentralizadasCreadas} carpetas centralizadas (globales) para HR creadas\n`);
 
   // ========================================
   // RESUMEN FINAL

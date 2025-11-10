@@ -5,6 +5,10 @@
 import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import {
+  actualizarCalculosFichaje,
+  validarFichajeCompleto,
+} from '@/lib/calculos/fichajes';
+import {
   requireAuth,
   requireAuthAsHROrManager,
   requireAuthAsHR,
@@ -17,7 +21,7 @@ import {
 } from '@/lib/api-handler';
 import { z } from 'zod';
 
-import { EstadoAusencia, UsuarioRol } from '@/lib/constants/enums';
+import { EstadoFichaje, UsuarioRol } from '@/lib/constants/enums';
 
 const fichajeApprovalSchema = z.object({
   accion: z.enum(['aprobar', 'rechazar']),
@@ -133,10 +137,30 @@ export async function PATCH(
       const { data: validatedData } = validationResult;
 
       if (validatedData.accion === 'aprobar') {
+        // Validar que el fichaje tiene los eventos mínimos requeridos (entrada y salida)
+        const eventos = await prisma.fichajeEvento.findMany({
+          where: { fichajeId: fichaje.id },
+          orderBy: { hora: 'asc' },
+        });
+
+        const tieneEntrada = eventos.some((evento) => evento.tipo === 'entrada');
+        const tieneSalida = eventos.some((evento) => evento.tipo === 'salida');
+
+        if (!tieneEntrada || !tieneSalida) {
+          return badRequestResponse(
+            'No se puede aprobar un fichaje sin eventos de entrada y salida. El fichaje debe tener al menos una entrada y una salida registradas.',
+            {
+              tieneEntrada,
+              tieneSalida,
+              eventosRegistrados: eventos.length,
+            }
+          );
+        }
+
         const actualizado = await prisma.fichaje.update({
           where: { id },
           data: {
-            estado: 'finalizado',
+            estado: EstadoFichaje.finalizado,
           },
         });
 
@@ -145,7 +169,7 @@ export async function PATCH(
         const actualizado = await prisma.fichaje.update({
           where: { id },
           data: {
-            estado: EstadoAusencia.pendiente_aprobacion, // Rechazado pasa a pendiente
+            estado: EstadoFichaje.pendiente, // Rechazado pasa a pendiente
           },
         });
 
@@ -195,7 +219,6 @@ export async function PATCH(
         });
 
         // Recalcular horas trabajadas
-        const { actualizarCalculosFichaje } = await import('@/lib/calculos/fichajes');
         await actualizarCalculosFichaje(id);
       }
     }
@@ -211,15 +234,18 @@ export async function PATCH(
     }
 
     // Validar si el fichaje está completo después de la edición
-    const { validarFichajeCompleto } = await import('@/lib/calculos/fichajes');
     const validacion = await validarFichajeCompleto(id);
     
     // Si el fichaje estaba pendiente y ahora está completo, marcarlo como finalizado
     // Solo si quien edita es HR o Manager
-    if (validacion.completo && fichaje.estado === EstadoAusencia.pendiente_aprobacion && (session.user.rol === UsuarioRol.hr_admin || session.user.rol === UsuarioRol.manager)) {
+    if (
+      validacion.completo &&
+      fichaje.estado === EstadoFichaje.pendiente &&
+      (session.user.rol === UsuarioRol.hr_admin || session.user.rol === UsuarioRol.manager)
+    ) {
       await prisma.fichaje.update({
         where: { id },
-        data: { estado: 'finalizado' },
+        data: { estado: EstadoFichaje.finalizado },
       });
     }
 
@@ -263,6 +289,7 @@ export async function DELETE(
     return handleApiError(error, 'API DELETE /api/fichajes/[id]');
   }
 }
+
 
 
 

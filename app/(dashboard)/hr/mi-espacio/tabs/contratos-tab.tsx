@@ -1,13 +1,31 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Button } from '@/components/ui/button';
+import { DarDeBajaModal } from '@/components/hr/DarDeBajaModal';
+import { toast } from 'sonner';
 
-export function ContratosTab({ empleado }: any) {
+interface ContratosTabProps {
+  empleado: any;
+  rol?: 'empleado' | 'manager' | 'hr_admin';
+  onFieldUpdate?: (field: string, value: any) => Promise<void>;
+}
+
+export function ContratosTab({ empleado, rol = 'empleado', onFieldUpdate }: ContratosTabProps) {
+  const router = useRouter();
   const [jornadas, setJornadas] = useState<any[]>([]);
   const [puestos, setPuestos] = useState<any[]>([]);
+  const [equipos, setEquipos] = useState<any[]>([]);
+  const [managers, setManagers] = useState<any[]>([]);
+  const [darDeBajaModalOpen, setDarDeBajaModalOpen] = useState(false);
+  const [editingHistorial, setEditingHistorial] = useState(false);
+  const [nuevoSalario, setNuevoSalario] = useState('');
+  const [fechaCambio, setFechaCambio] = useState('');
+  const [historialSalarios, setHistorialSalarios] = useState<any[]>([]);
 
   const contratoActual = empleado.contratos?.[0] || {};
   const tipoContrato = empleado.tipoContrato || 'indefinido';
@@ -15,12 +33,7 @@ export function ContratosTab({ empleado }: any) {
     ? new Date(contratoActual.fechaFin).toISOString().split('T')[0]
     : '';
 
-  useEffect(() => {
-    fetchJornadas();
-    fetchPuestos();
-  }, []);
-
-  async function fetchJornadas() {
+  const fetchJornadas = useCallback(async () => {
     try {
       const response = await fetch('/api/jornadas');
       if (response.ok) {
@@ -30,9 +43,9 @@ export function ContratosTab({ empleado }: any) {
     } catch (error) {
       console.error('Error fetching jornadas:', error);
     }
-  }
+  }, []);
 
-  async function fetchPuestos() {
+  const fetchPuestos = useCallback(async () => {
     try {
       const response = await fetch('/api/organizacion/puestos');
       if (response.ok) {
@@ -42,10 +55,58 @@ export function ContratosTab({ empleado }: any) {
     } catch (error) {
       console.error('Error fetching puestos:', error);
     }
-  }
+  }, []);
+
+  const fetchEquipos = useCallback(async () => {
+    try {
+      const response = await fetch('/api/organizacion/equipos');
+      if (response.ok) {
+        const data = await response.json();
+        setEquipos(data);
+      }
+    } catch (error) {
+      console.error('Error fetching equipos:', error);
+    }
+  }, []);
+
+  const fetchManagers = useCallback(async () => {
+    try {
+      const response = await fetch('/api/empleados');
+      if (response.ok) {
+        const data = await response.json();
+        const managersData = data.filter((emp: any) => 
+          emp.usuario?.rol === 'hr_admin' || emp.usuario?.rol === 'manager'
+        );
+        setManagers(managersData);
+      }
+    } catch (error) {
+      console.error('Error fetching managers:', error);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchJornadas();
+    fetchPuestos();
+    fetchEquipos();
+    fetchManagers();
+  }, [fetchJornadas, fetchPuestos, fetchEquipos, fetchManagers]);
+
+  // Escuchar evento de "Dar de Baja" desde el header
+  useEffect(() => {
+    const handleDarDeBajaEvent = () => {
+      if (rol === 'hr_admin') {
+        setDarDeBajaModalOpen(true);
+      }
+    };
+
+    window.addEventListener('darDeBajaContrato', handleDarDeBajaEvent);
+    return () => window.removeEventListener('darDeBajaContrato', handleDarDeBajaEvent);
+  }, [rol]);
 
   const jornadaActual = jornadas.find((j) => j.id === empleado.jornadaId);
   const puestoActual = puestos.find((p) => p.id === empleado.puestoId);
+  const equiposEmpleado = empleado.equipos?.map((eq: any) => eq.equipo?.nombre || eq.nombre).join(', ') || 'Sin equipo';
+  const managerEmpleado = empleado.manager ? `${empleado.manager.nombre} ${empleado.manager.apellidos}` : 'Sin manager';
 
   return (
     <div className="space-y-6 max-w-6xl">
@@ -113,6 +174,24 @@ export function ContratosTab({ empleado }: any) {
               <Input
                 type="text"
                 value={puestoActual?.nombre || empleado.puesto || 'No asignado'}
+                readOnly
+                className="bg-gray-50"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Equipos</label>
+              <Input
+                type="text"
+                value={equiposEmpleado}
+                readOnly
+                className="bg-gray-50"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Manager</label>
+              <Input
+                type="text"
+                value={managerEmpleado}
                 readOnly
                 className="bg-gray-50"
               />
@@ -193,30 +272,54 @@ export function ContratosTab({ empleado }: any) {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Salario */}
         <div className="bg-white rounded-lg border border-gray-200 p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Salario</h3>
+          <h3 className="text-lg font-semibold text-gray-900 mb-6">Salario</h3>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Salario bruto anual</label>
-              <Input
-                type="text"
-                value={`${empleado.salarioBrutoAnual?.toLocaleString('es-ES') || 0} €`}
-                readOnly
-                className="bg-gray-50"
-              />
+          <div className="space-y-6">
+            {/* Salario Base */}
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Salario bruto anual</label>
+                <Input
+                  type="text"
+                  value={`${empleado.salarioBrutoAnual?.toLocaleString('es-ES') || 0} €`}
+                  readOnly
+                  className="bg-gray-50"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de pagas</label>
+                <Input 
+                  type="text" 
+                  value={empleado.numPagas || "14 pagas (12 + 2 extras)"} 
+                  readOnly 
+                  className="bg-gray-50" 
+                />
+              </div>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Salario bruto mensual</label>
-              <Input
-                type="text"
-                value={`${empleado.salarioBrutoMensual?.toLocaleString('es-ES') || 0} €`}
-                readOnly
-                className="bg-gray-50"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Tipo</label>
-              <Input type="text" value="Anual" readOnly className="bg-gray-50" />
+
+            {/* Complementos Salariales */}
+            <div className="border-t pt-4">
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="text-sm font-semibold text-gray-900">Complementos</h4>
+                {rol === 'hr_admin' && empleado.complementos && empleado.complementos.length === 0 && (
+                  <Button variant="outline" size="sm" disabled>
+                    Añadir
+                  </Button>
+                )}
+              </div>
+              
+              {empleado.complementos && empleado.complementos.length > 0 ? (
+                <div className="space-y-2">
+                  {empleado.complementos.map((comp: any, index: number) => (
+                    <div key={index} className="flex justify-between items-center text-sm p-2 bg-gray-50 rounded">
+                      <span className="text-gray-700">{comp.tipo || comp.tipoComplemento?.nombre}</span>
+                      <span className="font-medium">{comp.importe?.toLocaleString('es-ES')} €</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-gray-500">No hay complementos salariales</p>
+              )}
             </div>
           </div>
         </div>
@@ -335,20 +438,143 @@ export function ContratosTab({ empleado }: any) {
         </div>
       </div>
 
+      {/* Historial de Cambios de Salario */}
+      <div className="bg-white rounded-lg border border-gray-200 p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold text-gray-900">Historial de Salarios</h3>
+          {rol === 'hr_admin' && !editingHistorial && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setEditingHistorial(true)}
+            >
+              Añadir cambio
+            </Button>
+          )}
+        </div>
+        
+        {editingHistorial && rol === 'hr_admin' && (
+          <div className="mb-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+            <div className="grid grid-cols-2 gap-4 mb-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Nuevo salario (€/año)</label>
+                <Input
+                  type="number"
+                  value={nuevoSalario}
+                  onChange={(e) => setNuevoSalario(e.target.value)}
+                  placeholder="Ej: 35000"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Fecha de cambio</label>
+                <Input
+                  type="date"
+                  value={fechaCambio}
+                  onChange={(e) => setFechaCambio(e.target.value)}
+                />
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                onClick={() => {
+                  if (nuevoSalario && fechaCambio) {
+                    setHistorialSalarios([
+                      ...historialSalarios,
+                      {
+                        salario: parseFloat(nuevoSalario),
+                        fechaCambio: fechaCambio,
+                        fechaRegistro: new Date().toISOString(),
+                      }
+                    ]);
+                    setNuevoSalario('');
+                    setFechaCambio('');
+                    setEditingHistorial(false);
+                    toast.success('Cambio de salario añadido');
+                  }
+                }}
+                disabled={!nuevoSalario || !fechaCambio}
+              >
+                Guardar
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  setNuevoSalario('');
+                  setFechaCambio('');
+                  setEditingHistorial(false);
+                }}
+              >
+                Cancelar
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {historialSalarios.length > 0 ? (
+          <div className="space-y-2">
+            {historialSalarios.map((cambio, index) => (
+              <div key={index} className="flex justify-between items-center text-sm p-3 bg-gray-50 rounded-lg border border-gray-200">
+                <div>
+                  <p className="font-medium text-gray-900">{cambio.salario.toLocaleString('es-ES')} €/año</p>
+                  <p className="text-xs text-gray-500">Cambio efectivo desde {new Date(cambio.fechaCambio).toLocaleDateString('es-ES')}</p>
+                </div>
+                {rol === 'hr_admin' && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setHistorialSalarios(historialSalarios.filter((_, i) => i !== index));
+                      toast.success('Cambio eliminado');
+                    }}
+                  >
+                    Eliminar
+                  </Button>
+                )}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-6 text-gray-500">
+            <p className="text-sm">No hay cambios de salario registrados</p>
+            {rol !== 'hr_admin' && (
+              <p className="text-xs mt-1">Contacta con HR para más información</p>
+            )}
+          </div>
+        )}
+      </div>
+
       {/* Nota informativa */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-        <div className="flex items-start gap-2">
-          <svg className="w-5 h-5 text-blue-600 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-          <div>
-            <p className="text-sm font-medium text-blue-900">Modo de solo lectura</p>
-            <p className="text-sm text-blue-700 mt-1">
-              Esta información es de solo consulta. Para realizar cambios, contacta con el departamento de RR.HH.
-            </p>
+      {rol !== 'hr_admin' && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <div className="flex items-start gap-2">
+            <svg className="w-5 h-5 text-blue-600 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <div>
+              <p className="text-sm font-medium text-blue-900">Modo de solo lectura</p>
+              <p className="text-sm text-blue-700 mt-1">
+                Esta información es de solo consulta. Para realizar cambios, contacta con el departamento de RR.HH.
+              </p>
+            </div>
           </div>
         </div>
-      </div>
+      )}
+
+      {/* Modal Dar de Baja */}
+      {rol === 'hr_admin' && contratoActual.id && (
+        <DarDeBajaModal
+          isOpen={darDeBajaModalOpen}
+          onClose={() => setDarDeBajaModalOpen(false)}
+          contratoId={contratoActual.id}
+          empleadoNombre={`${empleado.nombre} ${empleado.apellidos}`}
+          onSuccess={() => {
+            // Recargar la página para mostrar los cambios
+            router.refresh();
+          }}
+        />
+      )}
     </div>
   );
 }

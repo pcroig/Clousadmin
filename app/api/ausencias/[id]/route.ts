@@ -116,6 +116,28 @@ export async function PATCH(
       fechaFin.setHours(0, 0, 0, 0);
       
       nuevoEstado = fechaFin < hoy ? 'completada' : 'en_curso';
+
+      // Validar saldo suficiente antes de aprobar si la ausencia descuenta saldo
+      if (ausencia.descuentaSaldo) {
+        const año = ausencia.fechaInicio.getFullYear();
+        const diasSolicitados = Number(ausencia.diasSolicitados);
+        
+        const validacion = await validarSaldoSuficiente(
+          ausencia.empleadoId,
+          año,
+          diasSolicitados
+        );
+
+        if (!validacion.suficiente) {
+          return badRequestResponse(
+            validacion.mensaje || 'El empleado no tiene saldo suficiente para aprobar esta ausencia',
+            {
+              saldoDisponible: validacion.saldoActual,
+              diasSolicitados: diasSolicitados,
+            }
+          );
+        }
+      }
     }
 
       // Usar transacción para asegurar consistencia de datos

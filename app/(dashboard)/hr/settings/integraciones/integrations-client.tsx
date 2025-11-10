@@ -6,18 +6,9 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import {
-  Calendar,
-  Check,
-  Loader2,
-  Plug,
-  X,
-  AlertCircle,
-  ExternalLink,
-  Building2,
-  User,
-} from 'lucide-react';
+import { Calendar, Check, Plug, X, AlertCircle, ExternalLink, Building2, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { LoadingButton } from '@/components/shared/loading-button';
 import {
   Card,
   CardContent,
@@ -225,25 +216,17 @@ export function IntegrationsClient({
                         </span>
                       </div>
                       {empresaIntegrations.map((integration) => (
-                        <Button
+                        <LoadingButton
                           key={integration.id}
                           variant="outline"
                           size="sm"
                           onClick={() => handleDisconnect(integration.id, 'de empresa')}
+                          loading={disconnecting === integration.id}
                           disabled={disconnecting === integration.id}
                         >
-                          {disconnecting === integration.id ? (
-                            <>
-                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                              Desconectando...
-                            </>
-                          ) : (
-                            <>
-                              <X className="w-4 h-4 mr-2" />
-                              Desconectar
-                            </>
-                          )}
-                        </Button>
+                          <X className="w-4 h-4 mr-2" />
+                          {disconnecting === integration.id ? 'Desconectando...' : 'Desconectar'}
+                        </LoadingButton>
                       ))}
                     </div>
                     <p className="text-xs text-gray-500">
@@ -256,23 +239,15 @@ export function IntegrationsClient({
                       Conecta un calendario de empresa para que todas las ausencias aprobadas se
                       sincronicen automáticamente en un calendario compartido.
                     </p>
-                    <Button
+                    <LoadingButton
                       onClick={() => handleConnectCalendar('empresa')}
+                      loading={connectingEmpresa}
                       disabled={connectingEmpresa}
                       className="w-full sm:w-auto"
                     >
-                      {connectingEmpresa ? (
-                        <>
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          Conectando...
-                        </>
-                      ) : (
-                        <>
-                          <Plug className="w-4 h-4 mr-2" />
-                          Conectar Calendario de Empresa
-                        </>
-                      )}
-                    </Button>
+                      <Plug className="w-4 h-4 mr-2" />
+                      {connectingEmpresa ? 'Conectando...' : 'Conectar Calendario de Empresa'}
+                    </LoadingButton>
                   </div>
                 )}
               </CardContent>
@@ -314,25 +289,17 @@ export function IntegrationsClient({
                         </span>
                       </div>
                       {personalIntegrations.map((integration) => (
-                        <Button
+                        <LoadingButton
                           key={integration.id}
                           variant="outline"
                           size="sm"
                           onClick={() => handleDisconnect(integration.id, 'personal')}
+                          loading={disconnecting === integration.id}
                           disabled={disconnecting === integration.id}
                         >
-                          {disconnecting === integration.id ? (
-                            <>
-                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                              Desconectando...
-                            </>
-                          ) : (
-                            <>
-                              <X className="w-4 h-4 mr-2" />
-                              Desconectar
-                            </>
-                          )}
-                        </Button>
+                          <X className="w-4 h-4 mr-2" />
+                          {disconnecting === integration.id ? 'Desconectando...' : 'Desconectar'}
+                        </LoadingButton>
                       ))}
                     </div>
                     <p className="text-xs text-gray-500">
@@ -345,24 +312,16 @@ export function IntegrationsClient({
                       Conecta tu calendario personal de Google para ver todas las ausencias
                       sincronizadas automáticamente.
                     </p>
-                    <Button
+                    <LoadingButton
                       onClick={() => handleConnectCalendar('personal')}
+                      loading={connectingPersonal}
                       disabled={connectingPersonal}
                       variant="outline"
                       className="w-full sm:w-auto"
                     >
-                      {connectingPersonal ? (
-                        <>
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          Conectando...
-                        </>
-                      ) : (
-                        <>
-                          <Plug className="w-4 h-4 mr-2" />
-                          Conectar Mi Calendario Personal
-                        </>
-                      )}
-                    </Button>
+                      <Plug className="w-4 h-4 mr-2" />
+                      {connectingPersonal ? 'Conectando...' : 'Conectar Mi Calendario Personal'}
+                    </LoadingButton>
                   </div>
                 )}
               </CardContent>

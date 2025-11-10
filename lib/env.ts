@@ -73,7 +73,7 @@ const envSchema = z.object({
     .transform((val) => parseInt(val || '48', 10))
     .pipe(z.number().min(1).max(168))
     .optional()
-    .default('48' as any),
+    .default('48' as unknown as string),
 });
 
 // Validate and export

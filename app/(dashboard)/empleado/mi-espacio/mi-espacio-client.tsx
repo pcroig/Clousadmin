@@ -6,7 +6,7 @@
 
 import { useState, useEffect } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { User, Edit2 } from 'lucide-react';
+import { User, Edit2, Flag } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { GeneralTab } from '../../hr/mi-espacio/tabs/general-tab';
@@ -15,6 +15,7 @@ import { FichajesTab } from './tabs/fichajes-tab';
 import { ContratosTab } from '../../hr/mi-espacio/tabs/contratos-tab';
 import { DocumentosTab } from '../../hr/mi-espacio/tabs/documentos-tab';
 import { getAvatarStyle } from '@/lib/design-system';
+import { DenunciaDialog } from '@/components/empleado/denuncia-dialog';
 
 interface MiEspacioClientProps {
   empleado: any;
@@ -27,6 +28,7 @@ export function MiEspacioClient({ empleado, usuario }: MiEspacioClientProps) {
   const tabFromUrl = searchParams.get('tab') || 'general';
   const [activeTab, setActiveTab] = useState(tabFromUrl);
   const [editingProfile, setEditingProfile] = useState(false);
+  const [denunciaDialogOpen, setDenunciaDialogOpen] = useState(false);
 
   useEffect(() => {
     if (searchParams.get('tab')) {
@@ -80,6 +82,31 @@ export function MiEspacioClient({ empleado, usuario }: MiEspacioClientProps) {
               <p className="text-sm text-gray-500">{usuario.email}</p>
             </div>
           </div>
+
+          <div className="flex items-center gap-2">
+            {/* Botón Guardar - visible en General */}
+            {activeTab === 'general' && (
+              <Button
+                onClick={() => {
+                  const event = new CustomEvent('saveGeneral');
+                  window.dispatchEvent(event);
+                }}
+              >
+                Guardar cambios
+              </Button>
+            )}
+
+            {/* Botón Canal de Denuncias */}
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => setDenunciaDialogOpen(true)}
+              className="rounded-lg"
+              title="Canal de denuncias"
+            >
+              <Flag className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -105,12 +132,18 @@ export function MiEspacioClient({ empleado, usuario }: MiEspacioClientProps) {
 
       {/* Content */}
       <div className="flex-1 min-h-0 overflow-y-auto">
-        {activeTab === 'general' && <GeneralTab empleado={empleado} usuario={usuario} />}
+        {activeTab === 'general' && <GeneralTab empleado={empleado} usuario={usuario} rol="empleado" />}
         {activeTab === 'ausencias' && <AusenciasTab empleadoId={empleado.id} />}
         {activeTab === 'fichajes' && <FichajesTab empleadoId={empleado.id} />}
-        {activeTab === 'contratos' && <ContratosTab empleado={empleado} />}
+        {activeTab === 'contratos' && <ContratosTab empleado={empleado} rol="empleado" />}
         {activeTab === 'documentos' && <DocumentosTab empleado={empleado} />}
       </div>
+
+      {/* Dialog de Denuncias */}
+      <DenunciaDialog
+        isOpen={denunciaDialogOpen}
+        onClose={() => setDenunciaDialogOpen(false)}
+      />
     </div>
   );
 }

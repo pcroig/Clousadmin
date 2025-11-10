@@ -30,6 +30,15 @@ export default async function HRCarpetaDetailPage({
     },
     include: {
       documentos: {
+        include: {
+          empleado: {
+            select: {
+              id: true,
+              nombre: true,
+              apellidos: true,
+            },
+          },
+        },
         orderBy: {
           createdAt: 'desc',
         },
@@ -48,6 +57,59 @@ export default async function HRCarpetaDetailPage({
     redirect('/hr/documentos');
   }
 
+  // Si es carpeta global (sin empleadoId), obtener documentos agregados de todos los empleados
+  let documentosAgregados = carpeta.documentos;
+  let esGlobal = false;
+
+  if (!carpeta.empleadoId && carpeta.compartida && carpeta.esSistema) {
+    esGlobal = true;
+    // Buscar todos los documentos del mismo tipo en carpetas de empleados
+    const tipoDocumento = carpeta.nombre === 'Nóminas' ? 'nomina' : 
+                         carpeta.nombre === 'Contratos' ? 'contrato' :
+                         carpeta.nombre === 'Justificantes' ? 'justificante' : null;
+
+    if (tipoDocumento) {
+      documentosAgregados = await prisma.documento.findMany({
+        where: {
+          empresaId: session.user.empresaId,
+          tipoDocumento: tipoDocumento,
+          empleadoId: { not: null },
+        },
+        include: {
+          empleado: {
+            select: {
+              id: true,
+              nombre: true,
+              apellidos: true,
+            },
+          },
+        },
+        orderBy: {
+          createdAt: 'desc',
+        },
+      });
+    }
+  }
+
+  // Obtener lista de empleados para el filtro (si es carpeta global)
+  let empleados: Array<{ id: string; nombre: string; apellidos: string }> = [];
+  if (esGlobal) {
+    empleados = await prisma.empleado.findMany({
+      where: {
+        empresaId: session.user.empresaId,
+        activo: true,
+      },
+      select: {
+        id: true,
+        nombre: true,
+        apellidos: true,
+      },
+      orderBy: {
+        nombre: 'asc',
+      },
+    });
+  }
+
   // Serializar datos para evitar problemas con Date
   const carpetaData = {
     id: carpeta.id,
@@ -56,15 +118,21 @@ export default async function HRCarpetaDetailPage({
     compartida: carpeta.compartida,
     asignadoA: carpeta.asignadoA,
     empleado: carpeta.empleado,
-    documentos: carpeta.documentos.map((doc) => ({
+    esGlobal,
+    documentos: documentosAgregados.map((doc) => ({
       id: doc.id,
       nombre: doc.nombre,
       tipoDocumento: doc.tipoDocumento,
       mimeType: doc.mimeType,
       tamano: doc.tamano,
       createdAt: doc.createdAt.toISOString(),
+      empleado: doc.empleado ? {
+        id: doc.empleado.id,
+        nombre: doc.empleado.nombre,
+        apellidos: doc.empleado.apellidos,
+      } : null,
     })),
   };
 
-  return <CarpetaDetailClient carpeta={carpetaData} />;
+  return <CarpetaDetailClient carpeta={carpetaData} empleados={empleados} />;
 }

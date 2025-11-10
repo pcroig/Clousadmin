@@ -8,10 +8,10 @@
 import { useState } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { LoadingButton } from '@/components/shared/loading-button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { Loader2 } from 'lucide-react';
 
 interface ComplementoEmpleado {
   empleadoId: string;
@@ -242,13 +242,13 @@ export function ModalComplementosNomina({
               >
                 Cancelar
               </Button>
-              <Button 
+              <LoadingButton 
                 onClick={handleGuardar}
+                loading={guardando}
                 disabled={guardando}
               >
-                {guardando && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Guardar complementos
-              </Button>
+                {guardando ? 'Guardando...' : 'Guardar complementos'}
+              </LoadingButton>
             </div>
           </div>
         </DialogFooter>

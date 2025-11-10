@@ -86,49 +86,75 @@ export default async function ManagerDashboardPage() {
   const ayerDate = new Date(hoyDate);
   ayerDate.setDate(ayerDate.getDate() - 1);
 
-  const fichajesHoy = await prisma.fichaje.count({
-    where: {
-      empresaId: session.user.empresaId,
-      fecha: hoyDate,
-    },
-  });
-
-  const fichajesAyer = await prisma.fichaje.count({
-    where: {
-      empresaId: session.user.empresaId,
-      fecha: ayerDate,
-    },
-  });
-
-  // Empleados del manager
-  const empleadosEquipo = await prisma.empleado.count({
+  // Empleados del manager (activos) para filtrar métricas
+  const empleadosEquipo = await prisma.empleado.findMany({
     where: {
       managerId: manager.id,
       activo: true,
     },
+    select: {
+      id: true,
+    },
   });
+  const empleadoIds = empleadosEquipo.map((empleado) => empleado.id);
+
+  const fichajesHoy = empleadoIds.length
+    ? await prisma.fichaje.count({
+        where: {
+          empresaId: session.user.empresaId,
+          empleadoId: {
+            in: empleadoIds,
+          },
+          fecha: hoyDate,
+        },
+      })
+    : 0;
+
+  const fichajesAyer = empleadoIds.length
+    ? await prisma.fichaje.count({
+        where: {
+          empresaId: session.user.empresaId,
+          empleadoId: {
+            in: empleadoIds,
+          },
+          fecha: ayerDate,
+        },
+      })
+    : 0;
+
+  const resumenFichajes =
+    empleadoIds.length === 0
+      ? 'Todavía no tienes empleados a cargo.'
+      : fichajesHoy === fichajesAyer
+        ? `Tu equipo ha registrado ${fichajesHoy} fichajes hoy (sin cambios respecto a ayer).`
+        : `Tu equipo ha registrado ${fichajesHoy} fichajes hoy (${fichajesHoy - fichajesAyer >= 0 ? '+' : ''}${
+            fichajesHoy - fichajesAyer
+          } frente a ayer).`;
 
   // Auto-completed stats
-  const pendientes = await prisma.autoCompletado.count({
-    where: {
-      empresaId: session.user.empresaId,
-      estado: 'pendiente',
-    },
-  });
+  const pendientes = empleadoIds.length
+    ? await prisma.autoCompletado.count({
+        where: {
+          empresaId: session.user.empresaId,
+          estado: 'pendiente',
+          empleadoId: {
+            in: empleadoIds,
+          },
+        },
+      })
+    : 0;
 
-  const aprobados = await prisma.autoCompletado.count({
-    where: {
-      empresaId: session.user.empresaId,
-      estado: 'aprobado',
-    },
-  });
-
-  const rechazados = await prisma.autoCompletado.count({
-    where: {
-      empresaId: session.user.empresaId,
-      estado: 'rechazado',
-    },
-  });
+  const aprobados = empleadoIds.length
+    ? await prisma.autoCompletado.count({
+        where: {
+          empresaId: session.user.empresaId,
+          estado: 'aprobado',
+          empleadoId: {
+            in: empleadoIds,
+          },
+        },
+      })
+    : 0;
 
   // Ausencias del equipo
   const añoActual = new Date().getFullYear();
@@ -190,17 +216,18 @@ export default async function ManagerDashboardPage() {
   return (
     <div className="h-full w-full flex flex-col">
       {/* Header */}
-      <div className="flex-shrink-0 mb-5">
-        <h1 className="text-2xl font-bold text-gray-900">
+      <div className="flex-shrink-0 mb-3 sm:mb-5">
+        <h1 className="text-xl sm:text-2xl font-bold text-gray-900">
           Buenos Días, {session.user.nombre}
         </h1>
+        <p className="text-xs sm:text-sm text-gray-600 mt-1">{resumenFichajes}</p>
       </div>
 
-      {/* 3 Column Layout */}
+      {/* Responsive Layout: Stack on mobile, 3 columns on desktop */}
       <div className="flex-1 min-h-0 pb-4">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
           {/* Column 1 */}
-          <div className="space-y-6">
+          <div className="space-y-4 sm:space-y-6">
             <FichajeWidget />
             <AutoCompletadoWidget
               stats={{
@@ -212,12 +239,16 @@ export default async function ManagerDashboardPage() {
           </div>
 
           {/* Column 2 */}
-          <div className="space-y-6">
-            <SolicitudesWidget solicitudes={solicitudes} maxItems={8} />
+          <div className="space-y-4 sm:space-y-6">
+            <SolicitudesWidget
+              solicitudes={solicitudes}
+              maxItems={8}
+              dashboardHref="/manager/bandeja-entrada"
+            />
           </div>
 
           {/* Column 3 */}
-          <div className="space-y-6">
+          <div className="space-y-4 sm:space-y-6">
             <NotificacionesWidget notificaciones={notificaciones} maxItems={3} />
             <AusenciasWidget
               diasAcumulados={diasTotalesEquipo}

@@ -8,7 +8,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { createOAuthProvider } from "@/lib/oauth/providers";
 import {
-  getGoogleOAuthConfig,
+  getGoogleCalendarOAuthConfig,
   GOOGLE_CALENDAR_SCOPES,
   GOOGLE_LOGIN_SCOPES,
 } from "@/lib/oauth/config";
@@ -39,8 +39,8 @@ export async function GET(req: NextRequest) {
     // Generar state para CSRF protection
     const state = randomBytes(32).toString("hex");
 
-    // Crear proveedor OAuth
-    const config = getGoogleOAuthConfig();
+    // Crear proveedor OAuth (usar config específica para calendario)
+    const config = getGoogleCalendarOAuthConfig();
     const googleProvider = createOAuthProvider("google", config);
 
     // Scopes necesarios: login + calendar

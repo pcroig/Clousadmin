@@ -218,7 +218,7 @@ export default async function HRBandejaEntradaPage() {
     where: {
       empresaId: session.user.empresaId,
       estado: {
-        in: ['aprobada', 'rechazada'],
+        in: [EstadoAusencia.en_curso, EstadoAusencia.completada, EstadoAusencia.auto_aprobada, EstadoAusencia.rechazada],
       },
       aprobadaEn: {
         gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), // Último mes
