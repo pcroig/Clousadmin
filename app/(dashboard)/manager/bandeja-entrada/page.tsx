@@ -264,7 +264,7 @@ export default async function ManagerBandejaEntradaPage() {
     where: {
       empresaId: session.user.empresaId,
       estado: {
-        in: ['aprobada', 'rechazada'],
+        in: [EstadoAusencia.en_curso, EstadoAusencia.completada, EstadoAusencia.auto_aprobada, EstadoAusencia.rechazada],
       },
       empleadoId: {
         in: empleadoIds,

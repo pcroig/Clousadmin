@@ -5,7 +5,15 @@
 
 import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { validarEvento, validarLimitesJornada, calcularHorasTrabajadas, calcularTiempoEnPausa, obtenerHorasEsperadasBatch } from '@/lib/calculos/fichajes';
+import {
+  calcularHorasTrabajadas,
+  calcularTiempoEnPausa,
+  esDiaLaboral,
+  obtenerHorasEsperadasBatch,
+  validarEvento,
+  validarFichajeCompleto,
+  validarLimitesJornada,
+} from '@/lib/calculos/fichajes';
 import {
   requireAuth,
   validateRequest,
@@ -17,7 +25,7 @@ import {
 } from '@/lib/api-handler';
 import { z } from 'zod';
 
-import { EstadoAusencia, UsuarioRol } from '@/lib/constants/enums';
+import { EstadoFichaje, UsuarioRol } from '@/lib/constants/enums';
 
 const fichajeEventoCreateSchema = z.object({
   tipo: z.enum(['entrada', 'pausa_inicio', 'pausa_fin', 'salida']),
@@ -52,7 +60,14 @@ export async function GET(req: NextRequest) {
     const propios = searchParams.get('propios');
 
     // 3. Construir filtros
-    const where: any = {
+    interface FichajeWhereClause {
+      empresaId: string;
+      empleadoId?: string;
+      fecha?: { gte?: Date; lte?: Date };
+      estado?: EstadoFichaje;
+    }
+    
+    const where: FichajeWhereClause = {
       empresaId: session.user.empresaId,
     };
 
@@ -125,7 +140,11 @@ export async function GET(req: NextRequest) {
 
     // Filtrar por estado
     if (estado && estado !== 'todos') {
-      where.estado = estado;
+      if ((Object.values(EstadoFichaje) as string[]).includes(estado)) {
+        where.estado = estado as EstadoFichaje;
+      } else {
+        return badRequestResponse('Estado de fichaje inválido');
+      }
     }
 
     // 4. Obtener fichajes con sus eventos
@@ -172,12 +191,12 @@ export async function GET(req: NextRequest) {
       const horasTrabajadas =
         fichaje.horasTrabajadas !== null && fichaje.horasTrabajadas !== undefined
           ? Number(fichaje.horasTrabajadas)
-          : calcularHorasTrabajadas(fichaje.eventos as any);
+          : calcularHorasTrabajadas(fichaje.eventos as unknown as Array<{ tipo: string; hora: Date }>);
 
       const horasEnPausa =
         fichaje.horasEnPausa !== null && fichaje.horasEnPausa !== undefined
           ? Number(fichaje.horasEnPausa)
-          : calcularTiempoEnPausa(fichaje.eventos as any);
+          : calcularTiempoEnPausa(fichaje.eventos as unknown as Array<{ tipo: string; hora: Date }>);
 
       const balance = Math.round((horasTrabajadas - horasEsperadas) * 100) / 100;
 
@@ -221,6 +240,21 @@ export async function POST(req: NextRequest) {
       return badRequestResponse('No tienes un empleado asignado. Contacta con HR.');
     }
 
+    // Validar que el empleado tiene jornada asignada
+    const empleado = await prisma.empleado.findUnique({
+      where: { id: empleadoId },
+      select: { jornadaId: true, jornada: { select: { activa: true } } },
+    });
+
+    if (!empleado || !empleado.jornadaId) {
+      return badRequestResponse('No tienes una jornada laboral asignada. Contacta con HR para que te asignen una jornada antes de fichar.');
+    }
+
+    // Validar que la jornada esté activa
+    if (!empleado.jornada || !empleado.jornada.activa) {
+      return badRequestResponse('Tu jornada laboral está inactiva. Contacta con HR para que te asignen una jornada activa.');
+    }
+
     const validacion = await validarEvento(validatedData.tipo, empleadoId);
 
     if (!validacion.valido) {
@@ -229,7 +263,6 @@ export async function POST(req: NextRequest) {
 
     // Validar que es día laborable (solo para entrada)
     if (validatedData.tipo === 'entrada') {
-      const { esDiaLaboral } = await import('@/lib/calculos/fichajes');
       const esLaboral = await esDiaLaboral(empleadoId, fecha);
       
       if (!esLaboral) {
@@ -268,7 +301,7 @@ export async function POST(req: NextRequest) {
           empresaId: session.user.empresaId,
           empleadoId,
           fecha,
-          estado: EstadoAusencia.en_curso,
+          estado: EstadoFichaje.en_curso,
         },
         include: {
           eventos: true,
@@ -301,11 +334,10 @@ export async function POST(req: NextRequest) {
     let nuevoEstado = fichaje.estado;
     if (validatedData.tipo === 'salida') {
       // Validar si el fichaje está completo según la jornada
-      const { validarFichajeCompleto } = await import('@/lib/calculos/fichajes');
       const validacion = await validarFichajeCompleto(fichaje.id);
       
       if (validacion.completo) {
-        nuevoEstado = 'finalizado';
+        nuevoEstado = EstadoFichaje.finalizado;
       }
     }
 

@@ -11,8 +11,10 @@ import { TableFilters } from '@/components/shared/table-filters';
 import { DataTable, Column, AvatarCell } from '@/components/shared/data-table';
 import { AddPersonaDialog } from '@/components/organizacion/add-persona-dialog';
 import { GestionarOnboardingModal } from '@/components/hr/gestionar-onboarding-modal';
+import { DetailsPanel } from '@/components/shared/details-panel';
+import { DenunciasDetails } from '@/components/hr/denuncias-details';
 import { Button } from '@/components/ui/button';
-import { Settings } from 'lucide-react';
+import { Settings, Flag } from 'lucide-react';
 
 interface Empleado {
   id: string;
@@ -49,6 +51,7 @@ export function PersonasClient({ empleados }: PersonasClientProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [addPersonaDialogOpen, setAddPersonaDialogOpen] = useState(false);
   const [gestionarOnboardingOpen, setGestionarOnboardingOpen] = useState(false);
+  const [denunciasDetailsOpen, setDenunciasDetailsOpen] = useState(false);
 
   // Filtrar empleados por búsqueda
   const empleadosFiltrados = empleados.filter((emp) =>
@@ -113,9 +116,17 @@ export function PersonasClient({ empleados }: PersonasClientProps) {
         <div className="flex items-center gap-3">
           <Button
             variant="outline"
+            size="icon"
+            onClick={() => setDenunciasDetailsOpen(true)}
+            className="rounded-lg"
+            title="Canal de denuncias"
+          >
+            <Flag className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="outline"
             onClick={() => setGestionarOnboardingOpen(true)}
           >
-            <Settings className="mr-2 h-4 w-4" />
             Gestionar on/offboarding
           </Button>
           <Button onClick={() => setAddPersonaDialogOpen(true)}>
@@ -156,6 +167,15 @@ export function PersonasClient({ empleados }: PersonasClientProps) {
         open={gestionarOnboardingOpen}
         onOpenChange={setGestionarOnboardingOpen}
       />
+
+      {/* Panel de Denuncias */}
+      <DetailsPanel
+        isOpen={denunciasDetailsOpen}
+        onClose={() => setDenunciasDetailsOpen(false)}
+        title="Canal de Denuncias"
+      >
+        <DenunciasDetails onClose={() => setDenunciasDetailsOpen(false)} />
+      </DetailsPanel>
     </div>
   );
 }

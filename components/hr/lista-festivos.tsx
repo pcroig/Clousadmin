@@ -4,7 +4,7 @@
 // Lista de Festivos
 // ========================================
 
-import { useState, useEffect } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import {
   Table,
   TableBody,
@@ -44,11 +44,7 @@ export function ListaFestivos({ año, onUpdate }: ListaFestivosProps) {
     modo: 'crear',
   });
 
-  useEffect(() => {
-    cargarFestivos();
-  }, [año]);
-
-  async function cargarFestivos() {
+  const cargarFestivos = useCallback(async () => {
     setCargando(true);
     try {
       const url = año ? `/api/festivos?año=${año}` : '/api/festivos';
@@ -62,7 +58,11 @@ export function ListaFestivos({ año, onUpdate }: ListaFestivosProps) {
     } finally {
       setCargando(false);
     }
-  }
+  }, [año]);
+
+  useEffect(() => {
+    cargarFestivos();
+  }, [cargarFestivos]);
 
   async function handleEliminar(festivo: Festivo) {
     if (!confirm(`¿Eliminar el festivo "${festivo.nombre}"?`)) {

@@ -4,7 +4,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -54,14 +54,7 @@ export function ManageMembersModal({
   const [loadingEmployeeId, setLoadingEmployeeId] = useState<string | null>(null);
   const [removingMemberId, setRemovingMemberId] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (isOpen) {
-      loadAvailableEmployees();
-      setSearchTerm('');
-    }
-  }, [isOpen, teamId]);
-
-  const loadAvailableEmployees = async () => {
+  const loadAvailableEmployees = useCallback(async () => {
     try {
       const response = await fetch(`/api/equipos/${teamId}/available-members`);
       if (!response.ok) {
@@ -73,7 +66,14 @@ export function ManageMembersModal({
       console.error('Error loading employees:', error);
       toast.error('Error al cargar empleados disponibles');
     }
-  };
+  }, [teamId]);
+
+  useEffect(() => {
+    if (isOpen) {
+      loadAvailableEmployees();
+      setSearchTerm('');
+    }
+  }, [isOpen, loadAvailableEmployees]);
 
   const handleAddMember = async (empleadoId: string) => {
     setLoadingEmployeeId(empleadoId);

@@ -4,7 +4,7 @@
 // Onboarding Form - Multi-Step Employee Data Collection
 // ========================================
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -30,6 +30,8 @@ interface OnboardingFormProps {
   empleado: Empleado;
   progreso: ProgresoOnboarding;
   datosTemporales: DatosTemporales | null;
+  nombreEmpresa: string;
+  tipoOnboarding: string;
 }
 
 type Paso = 0 | 1 | 2 | 3 | 4;
@@ -61,10 +63,21 @@ export function OnboardingForm({
   empleado,
   progreso: progresoInicial,
   datosTemporales: datosInicial,
+  nombreEmpresa,
+  tipoOnboarding,
 }: OnboardingFormProps) {
+  // Determinar si es onboarding simplificado (empleado importado)
+  const esSimplificado = tipoOnboarding === 'simplificado';
+
   // Estado del formulario
   const [pasoActual, setPasoActual] = useState<Paso>(() => {
-    // Determinar paso inicial basado en progreso
+    // Para onboarding simplificado, solo paso 0 (credenciales) y 4 (PWA)
+    if (esSimplificado) {
+      if (!progresoInicial.credenciales_completadas) return 0;
+      return 4;
+    }
+    
+    // Para onboarding completo, todos los pasos
     if (!progresoInicial.credenciales_completadas) return 0;
     if ('datos_personales' in progresoInicial && !progresoInicial.datos_personales) return 1;
     if ('datos_bancarios' in progresoInicial && !progresoInicial.datos_bancarios) return 2;
@@ -146,14 +159,7 @@ export function OnboardingForm({
     }
   };
 
-  // Cargar documentos y configuración cuando se llega al paso 3
-  useEffect(() => {
-    if (pasoActual === 3) {
-      cargarDocumentosYConfiguracion();
-    }
-  }, [pasoActual]);
-
-  const cargarDocumentosYConfiguracion = async () => {
+  const cargarDocumentosYConfiguracion = useCallback(async () => {
     setLoadingDocumentos(true);
     try {
       const configRes = await fetch(`/api/onboarding/${token}/config`);
@@ -172,7 +178,14 @@ export function OnboardingForm({
     } finally {
       setLoadingDocumentos(false);
     }
-  };
+  }, [token]);
+
+  // Cargar documentos y configuración cuando se llega al paso 3
+  useEffect(() => {
+    if (pasoActual === 3) {
+      cargarDocumentosYConfiguracion();
+    }
+  }, [pasoActual, cargarDocumentosYConfiguracion]);
 
   const handleSubmitPaso0 = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -210,7 +223,8 @@ export function OnboardingForm({
         setSuccess('Credenciales guardadas correctamente');
         setLoading(false);
         setTimeout(() => {
-          setPasoActual(1);
+          // Para onboarding simplificado, ir directamente al paso 4 (PWA)
+          setPasoActual(esSimplificado ? 4 : 1);
           setSuccess('');
         }, 800);
       } else {
@@ -429,16 +443,19 @@ export function OnboardingForm({
     return datosBancarios.iban && datosBancarios.titularCuenta && ibanValido !== false;
   };
 
-  // Stepper con líneas (4 pasos: 0, 1, 2, 3)
-  const totalPasos = 5;
+  // Stepper con líneas
+  // Para onboarding simplificado: 2 pasos (credenciales + PWA)
+  // Para onboarding completo: 5 pasos (credenciales, datos personales, bancarios, documentos, PWA)
+  const totalPasos = esSimplificado ? 2 : 5;
   
   // Calcular qué pasos deben mostrarse como completados (pasos anteriores al actual)
-  const pasoActualNum = pasoActual;
+  // Para onboarding simplificado, ajustar la representación visual
+  const pasoActualNum = esSimplificado ? (pasoActual === 4 ? 1 : 0) : pasoActual;
 
   // Títulos y descripciones por paso
   const pasoConfig = {
     0: {
-      titulo: 'Bienvenido',
+      titulo: `Bienvenido/a ${empleado.nombre} a ${nombreEmpresa}`,
       descripcion: 'Configura tu avatar y contraseña para acceder a tu cuenta',
     },
     1: {
@@ -1114,18 +1131,6 @@ export function OnboardingForm({
               <p className="text-sm text-green-600">{success}</p>
             </div>
           )}
-
-          {/* Botón de volver (opcional) */}
-          <div className="flex justify-start pt-4">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setPasoActual(3)}
-              disabled={loading}
-            >
-              <ChevronLeft className="mr-2 h-4 w-4" /> Anterior
-            </Button>
-          </div>
         </div>
       )}
     </div>

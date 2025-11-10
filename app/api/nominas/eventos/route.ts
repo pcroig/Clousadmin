@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { z } from 'zod';
+import type { Notificacion } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 
 import { UsuarioRol } from '@/lib/constants/enums';
@@ -75,7 +76,8 @@ export async function GET(req: NextRequest) {
       };
 
       // Eliminar el array de nóminas del response (solo queremos el conteo)
-      const { nominas, ...eventoSinNominas } = evento;
+      const eventoSinNominas = { ...evento };
+      delete eventoSinNominas.nominas;
 
       return {
         ...eventoSinNominas,
@@ -135,7 +137,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Calcular fecha límite por defecto (último día del mes)
-    let fechaLimite = data.fechaLimiteComplementos
+    const fechaLimite = data.fechaLimiteComplementos
       ? new Date(data.fechaLimiteComplementos)
       : new Date(data.anio, data.mes, 0, 23, 59, 59); // Último día del mes
 
@@ -290,34 +292,106 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // Enviar notificaciones a TODOS los managers
+    // Enviar notificaciones SOLO a managers con empleados que tienen complementos pendientes
     const managers = await prisma.usuario.findMany({
       where: {
         empresaId: session.user.empresaId,
         rol: UsuarioRol.manager,
         activo: true,
+        empleado: {
+          equiposGestionados: {
+            some: {
+              miembros: {
+                some: {
+                  empleado: {
+                    complementos: {
+                      some: {
+                        activo: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+      include: {
+        empleado: {
+          include: {
+            equiposGestionados: {
+              include: {
+                miembros: {
+                  include: {
+                    empleado: {
+                      select: {
+                        id: true,
+                        complementos: {
+                          where: {
+                            activo: true,
+                          },
+                          select: {
+                            id: true,
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
       },
     });
 
-    const notificaciones = await Promise.all(
-      managers.map((manager) =>
-        prisma.notificacion.create({
-          data: {
-            usuarioId: manager.id,
-            tipo: 'nomina_generada',
-            titulo: `Nóminas ${data.mes}/${data.anio} generadas`,
-            mensaje: `Se han generado ${nominasCreadas.length} pre-nóminas. Por favor, revisa y asigna complementos antes del ${fechaLimite.toLocaleDateString()}.`,
-            eventoNominaId: evento.id,
-          },
+    let totalNotificaciones = 0;
+    if (managers.length > 0) {
+      const notificaciones = await Promise.all(
+        managers.map((manager) => {
+          const equipos = manager.empleado?.equiposGestionados ?? [];
+          const empleadosConComplementos = equipos.reduce((count, equipo) => {
+            const miembrosConComplementos =
+              equipo.miembros.filter((miembro) => miembro.empleado.complementos.length > 0).length;
+            return count + miembrosConComplementos;
+          }, 0);
+
+          if (empleadosConComplementos === 0) {
+            return null;
+          }
+
+          return prisma.notificacion.create({
+            data: {
+              usuarioId: manager.id,
+              tipo: 'nomina_generada',
+              titulo: `Nóminas ${data.mes}/${data.anio} - Complementos pendientes`,
+              mensaje: `Se han generado las pre-nóminas. Tienes ${empleadosConComplementos} empleado(s) con complementos salariales que requieren validación antes del ${fechaLimite.toLocaleDateString()}.`,
+              eventoNominaId: evento.id,
+            },
+          });
         })
-      )
-    );
+      );
+
+      totalNotificaciones = notificaciones.filter(
+        (notificacion): notificacion is Notificacion => Boolean(notificacion)
+      ).length;
+
+      if (totalNotificaciones > 0) {
+        console.log(
+          `[Generar Evento] Notificaciones enviadas a ${totalNotificaciones} manager(s) con complementos pendientes`
+        );
+      } else {
+        console.log('[Generar Evento] Managers sin complementos pendientes - sin notificaciones');
+      }
+    } else {
+      console.log('[Generar Evento] No hay managers con empleados con complementos activos - sin notificaciones');
+    }
 
     return NextResponse.json(
       {
         evento,
         nominasGeneradas: nominasCreadas.length,
-        notificacionesEnviadas: notificaciones.length,
+        notificacionesEnviadas: totalNotificaciones,
       },
       { status: 201 }
     );

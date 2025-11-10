@@ -641,6 +641,20 @@ font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 ```
 
+#### Componentes disponibles
+
+- **Spinner** (`components/ui/spinner.tsx`): icono accesible (usa `aria-label="Loading"`) pensado para acciones breves o feedback inline. Ajusta tamaño con utilidades `size-*` y color con `text-*`.
+- **LoadingButton** (`components/shared/loading-button.tsx`): botón reutilizable que integra `Spinner`, gestiona estados `disabled` y oculta iconos mientras está cargando.
+- **Skeletons** (`components/shared/loading-skeletons.tsx`): patrones (`GridSkeleton`, `TableSkeleton`, `CardSkeleton`, `ListSkeleton`) para listas y vistas con carga perceptible.
+- **EmptyState** (`components/shared/empty-state.tsx`): wrapper de shadcn para estados sin datos con variantes `primary` (CTA) y `secondary` (compacto).
+
+#### Reglas rápidas
+
+- Usa `Spinner` para feedback puntual (mutaciones, envíos de formularios o acciones dentro de tarjetas). Evita dejar iconos girando indefinidamente cuando hay alternativas de skeleton.
+- Prefiere `Skeletons` cuando el usuario espera contenido estructurado (tablas, grids, tarjetas) y la carga puede tardar más de ~300 ms.
+- `LoadingButton` debe ser el default para CTAs con estado de envío; no dupliques lógica de spinner manualmente.
+- Los estados vacíos deben utilizar `EmptyState` para garantizar consistencia visual y copy en español. Añade `variant="secondary"` en celdas o paneles compactos.
+
 ---
 
 ## 🚀 Uso con Tailwind CSS 4

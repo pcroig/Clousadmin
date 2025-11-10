@@ -1,7 +1,7 @@
 'use client';
 
 // ========================================
-// Signup Form Component
+// Signup Form Component - Multi-Step with Onboarding
 // ========================================
 
 import { useState } from 'react';
@@ -10,6 +10,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { signupEmpresaAction } from './actions';
+import { SedesForm } from '@/components/onboarding/sedes-form';
+import { ImportarEmpleados } from '@/components/onboarding/importar-empleados';
+import { IntegracionesForm } from '@/components/onboarding/integraciones-form';
+import { InvitarHRAdmins } from '@/components/onboarding/invitar-hr-admins';
 
 interface SignupFormProps {
   token: string;
@@ -19,7 +23,10 @@ interface SignupFormProps {
 export function SignupForm({ token, emailInvitacion }: SignupFormProps) {
   const router = useRouter();
   
-  // Estado del formulario
+  // Estado del paso actual (0-4)
+  const [pasoActual, setPasoActual] = useState(0);
+  
+  // Estado del formulario inicial (paso 0)
   const [formData, setFormData] = useState({
     nombreEmpresa: '',
     webEmpresa: '',
@@ -31,6 +38,9 @@ export function SignupForm({ token, emailInvitacion }: SignupFormProps) {
   
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  
+  // Total de pasos
+  const totalPasos = 5;
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({
@@ -39,7 +49,7 @@ export function SignupForm({ token, emailInvitacion }: SignupFormProps) {
     });
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmitPaso0 = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setLoading(true);
@@ -51,9 +61,8 @@ export function SignupForm({ token, emailInvitacion }: SignupFormProps) {
       });
 
       if (result.success) {
-        // Usuario autenticado automáticamente, redirigir a onboarding
-        router.push('/onboarding/cargar-datos');
-        router.refresh();
+        // Usuario autenticado, pasar al siguiente paso
+        setPasoActual(1);
       } else {
         if (result.requiereInvitacion) {
           // Si requiere invitación, redirigir a waitlist
@@ -73,21 +82,80 @@ export function SignupForm({ token, emailInvitacion }: SignupFormProps) {
     }
   };
 
+  const handleFinalizarOnboarding = () => {
+    router.push('/hr/dashboard');
+    router.refresh();
+  };
+
+  const handleSiguiente = () => {
+    if (pasoActual < totalPasos - 1) {
+      setPasoActual(pasoActual + 1);
+    }
+  };
+
+  const handleAnterior = () => {
+    if (pasoActual > 0) {
+      setPasoActual(pasoActual - 1);
+    }
+  };
+
+  // Títulos y descripciones por paso
+  const pasoConfig = [
+    {
+      titulo: 'Crea la cuenta de tu empresa',
+      descripcion: 'Configura tu empresa en Clousadmin y empieza a gestionar tu equipo. Tu email ya ha sido verificado.',
+    },
+    {
+      titulo: 'Configura las sedes',
+      descripcion: 'Añade las oficinas o centros de trabajo de tu empresa',
+    },
+    {
+      titulo: 'Importa empleados',
+      descripcion: 'Sube un archivo Excel con los datos de tus empleados',
+    },
+    {
+      titulo: 'Integraciones (opcional)',
+      descripcion: 'Conecta con tus herramientas favoritas',
+    },
+    {
+      titulo: 'Invita a otros administradores (opcional)',
+      descripcion: 'Añade más personas al equipo de RRHH',
+    },
+  ];
+
+  const configActual = pasoConfig[pasoActual];
+
   return (
     <div className="space-y-6">
-      <div className="space-y-2 text-center">
-        <h1 className="text-2xl font-bold">Crear cuenta</h1>
-        <p className="text-gray-500">
-          Configura tu empresa y comienza a gestionar tu equipo
-        </p>
-        <div className="mt-2 rounded-md bg-green-50 border border-green-200 p-2">
-          <p className="text-xs text-green-700">
-            ✓ Has sido invitado - Tu email está verificado
-          </p>
-        </div>
+      {/* Título y descripción */}
+      <div className="space-y-2">
+        <h1 className="text-2xl font-bold">{configActual.titulo}</h1>
+        <p className="text-sm text-gray-600">{configActual.descripcion}</p>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-4">
+      {/* Stepper con líneas */}
+      <div className="flex items-center gap-1">
+        {[...Array(totalPasos)].map((_, index) => {
+          const estaCompletado = index < pasoActual;
+          const esActivoOCompletado = estaCompletado || index === pasoActual;
+          
+          return (
+            <div key={index} className="flex-1">
+              <div
+                className={`h-1 transition-colors ${
+                  esActivoOCompletado
+                    ? 'bg-gray-600'
+                    : 'bg-gray-200'
+                }`}
+              />
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Paso 0: Datos de empresa y usuario */}
+      {pasoActual === 0 && (
+        <form onSubmit={handleSubmitPaso0} className="space-y-4">
         <div className="space-y-2">
           <Label htmlFor="nombreEmpresa">Nombre de la empresa *</Label>
           <Input
@@ -182,16 +250,89 @@ export function SignupForm({ token, emailInvitacion }: SignupFormProps) {
         )}
 
         <Button type="submit" className="w-full" disabled={loading}>
-          {loading ? 'Creando cuenta...' : 'Crear cuenta'}
+          {loading ? 'Creando cuenta...' : 'Crear cuenta y continuar'}
         </Button>
-      </form>
 
-      <div className="text-center">
-        <span className="text-sm text-gray-500">¿Ya tienes cuenta? </span>
-        <a href="/login" className="text-sm text-primary hover:underline">
-          Inicia sesión
-        </a>
-      </div>
+        <div className="text-center pt-4">
+          <span className="text-sm text-gray-500">¿Ya tienes cuenta? </span>
+          <a href="/login" className="text-sm text-primary hover:underline">
+            Inicia sesión
+          </a>
+        </div>
+      </form>
+      )}
+
+      {/* Paso 1: Sedes */}
+      {pasoActual === 1 && (
+        <div className="space-y-6">
+          <SedesForm sedesIniciales={[]} />
+          <div className="flex justify-between pt-4 border-t">
+            <Button variant="outline" onClick={handleAnterior}>
+              Anterior
+            </Button>
+            <Button onClick={handleSiguiente}>
+              Siguiente
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Paso 2: Empleados */}
+      {pasoActual === 2 && (
+        <div className="space-y-6">
+          <ImportarEmpleados />
+          <div className="flex justify-between pt-4 border-t">
+            <Button variant="outline" onClick={handleAnterior}>
+              Anterior
+            </Button>
+            <Button onClick={handleSiguiente}>
+              Siguiente
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Paso 3: Integraciones */}
+      {pasoActual === 3 && (
+        <div className="space-y-6">
+          <IntegracionesForm integracionesIniciales={[]} />
+          <div className="flex justify-between pt-4 border-t">
+            <Button variant="outline" onClick={handleAnterior}>
+              Anterior
+            </Button>
+            <Button onClick={handleSiguiente}>
+              Siguiente
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Paso 4: Invitar HR Admins */}
+      {pasoActual === 4 && (
+        <div className="space-y-6">
+          <InvitarHRAdmins />
+          <div className="flex justify-between pt-4 border-t">
+            <Button variant="outline" onClick={handleAnterior}>
+              Anterior
+            </Button>
+            <Button onClick={handleFinalizarOnboarding}>
+              Finalizar y empezar
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Opción de saltar */}
+      {pasoActual > 0 && (
+        <div className="text-center pt-2">
+          <button
+            onClick={handleFinalizarOnboarding}
+            className="text-sm text-gray-500 hover:text-gray-700 underline"
+          >
+            Saltar y empezar ahora
+          </button>
+        </div>
+      )}
     </div>
   );
 }

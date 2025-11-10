@@ -7,6 +7,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
+  DialogDescription,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Field, FieldLabel, FieldDescription } from '@/components/ui/field';
@@ -14,6 +15,7 @@ import { Badge } from '@/components/ui/badge';
 import { Calendar, Check, Edit } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { InfoTooltip } from '@/components/shared/info-tooltip';
 
 interface PropuestaVacacion {
   fechaInicio: string;
@@ -82,20 +84,21 @@ export function ResultadoVacacionesModal({
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Resultado del cuadrado de vacaciones</DialogTitle>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="space-y-1">
+              <DialogTitle>Resultado del cuadrado de vacaciones</DialogTitle>
+              <DialogDescription className="text-sm text-gray-600">
+                <span className="font-medium text-gray-700">Campaña:</span> {campanaTitulo}
+              </DialogDescription>
+            </div>
+            <InfoTooltip
+              content="El sistema ajusta automáticamente las vacaciones para evitar solapamientos y respetar las preferencias indicadas."
+              variant="subtle"
+            />
+          </div>
         </DialogHeader>
 
         <div className="space-y-4">
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <p className="text-sm text-blue-800">
-              <strong>Campaña:</strong> {campanaTitulo}
-            </p>
-            <p className="text-sm text-blue-700 mt-2">
-              El sistema ha cuadrado las vacaciones de todos los empleados respetando las preferencias
-              y el solapamiento máximo permitido. A continuación encontrarás tu propuesta.
-            </p>
-          </div>
-
           {/* Propuesta */}
           <div className="border border-gray-200 rounded-lg p-6 space-y-4">
             <div className="flex items-center justify-between">

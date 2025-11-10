@@ -8,19 +8,15 @@
 import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { LoadingButton } from '@/components/shared/loading-button';
 import { Calendar } from '@/components/ui/calendar';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
-import { Info, Calendar as CalendarIcon, X, Loader2 } from 'lucide-react';
+import { Calendar as CalendarIcon, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useMutation } from '@/lib/hooks';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
+import { InfoTooltip } from '@/components/shared/info-tooltip';
 
 interface PreferenciasVacacionesModalProps {
   open: boolean;
@@ -46,7 +42,13 @@ export function PreferenciasVacacionesModal({
   const [diasAlternativos, setDiasAlternativos] = useState<Date[]>([]);
   const [modoSeleccion, setModoSeleccion] = useState<'ideales' | 'prioritarios' | 'alternativos'>('ideales');
 
-  const { mutate: guardarPreferencias, loading: guardando } = useMutation<any, any>({
+  interface MutationVariables {
+    diasIdeales: Date[];
+    diasPrioritarios: Date[];
+    diasAlternativos: Date[];
+  }
+  
+  const { mutate: guardarPreferencias, loading: guardando } = useMutation<Record<string, unknown>, MutationVariables>({
     onSuccess: () => {
       onSuccess();
       onClose();
@@ -136,35 +138,42 @@ export function PreferenciasVacacionesModal({
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-xl font-semibold text-gray-900">
-            {campanaTitulo}
-          </DialogTitle>
-          <div className="flex items-center gap-2 mt-2">
-            <CalendarIcon className="w-4 h-4 text-gray-500" />
-            <span className="text-sm text-gray-600">
-              {format(fechaInicio, 'PPP', { locale: es })} - {format(fechaFin, 'PPP', { locale: es })}
-            </span>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <DialogTitle className="text-xl font-semibold text-gray-900">
+                {campanaTitulo}
+              </DialogTitle>
+              <div className="mt-2 flex items-center gap-2 text-sm text-gray-600">
+                <CalendarIcon className="w-4 h-4 text-gray-500" />
+                <span>
+                  {format(fechaInicio, 'PPP', { locale: es })} - {format(fechaFin, 'PPP', { locale: es })}
+                </span>
+              </div>
+            </div>
+            <InfoTooltip
+              content={(
+                <div className="space-y-2 text-sm">
+                  <p className="font-medium">¿Cómo funciona?</p>
+                  <ul className="space-y-1 text-xs">
+                    <li>
+                      <strong>Fechas ideales:</strong> Tus días preferidos de vacaciones
+                    </li>
+                    <li>
+                      <strong>Fechas prioritarias:</strong> Días muy importantes para ti
+                    </li>
+                    <li>
+                      <strong>Fechas alternativas:</strong> Opciones si no están disponibles las anteriores
+                    </li>
+                  </ul>
+                </div>
+              )}
+              variant="subtle"
+              side="left"
+            />
           </div>
         </DialogHeader>
 
         <div className="space-y-6 py-4">
-          {/* Info Tooltip */}
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <div className="flex items-start gap-3">
-              <Info className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
-              <div className="flex-1">
-                <p className="text-sm font-medium text-blue-900 mb-1">
-                  ¿Cómo funciona?
-                </p>
-                <ul className="text-xs text-blue-800 space-y-1">
-                  <li>• <strong>Fechas ideales:</strong> Tus días preferidos de vacaciones</li>
-                  <li>• <strong>Fechas prioritarias:</strong> Días muy importantes para ti</li>
-                  <li>• <strong>Fechas alternativas:</strong> Opciones si no están disponibles las anteriores</li>
-                </ul>
-              </div>
-            </div>
-          </div>
-
           {/* Selector de modo */}
           <div className="flex gap-2">
             <Button
@@ -297,20 +306,14 @@ export function PreferenciasVacacionesModal({
           <Button variant="outline" onClick={onClose} disabled={guardando}>
             Cancelar
           </Button>
-          <Button 
+          <LoadingButton 
             onClick={handleGuardar} 
+            loading={guardando}
             disabled={!puedeGuardar || guardando}
             className="min-w-[120px]"
           >
-            {guardando ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Guardando...
-              </>
-            ) : (
-              'Guardar Preferencias'
-            )}
-          </Button>
+            {guardando ? 'Guardando...' : 'Guardar Preferencias'}
+          </LoadingButton>
         </div>
       </DialogContent>
     </Dialog>

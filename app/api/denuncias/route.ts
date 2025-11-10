@@ -18,9 +18,7 @@ import { UsuarioRol } from '@/lib/constants/enums';
 
 // Schema de validación para crear denuncia
 const denunciaCreateSchema = z.object({
-  descripcion: z.string().min(10, 'La descripción debe tener al menos 10 caracteres'),
-  fechaIncidente: z.string().optional(),
-  ubicacion: z.string().optional(),
+  descripcion: z.string().min(1, 'La descripción es obligatoria'),
   esAnonima: z.boolean().default(false),
   documentos: z.array(z.object({
     id: z.string(),
@@ -44,17 +42,10 @@ export async function GET(req: NextRequest) {
       return forbiddenResponse('No tienes permiso para ver denuncias');
     }
 
-    const { searchParams } = new URL(req.url);
-    const estado = searchParams.get('estado');
-
     // Filtros
     const where: any = {
       empresaId: session.user.empresaId,
     };
-
-    if (estado && estado !== 'todas') {
-      where.estado = estado;
-    }
 
     // Obtener denuncias
     const denuncias = await prisma.denuncia.findMany({
@@ -104,12 +95,8 @@ export async function POST(req: NextRequest) {
         empresaId: session.user.empresaId,
         denuncianteId: data.esAnonima ? null : session.user.empleadoId,
         descripcion: data.descripcion,
-        fechaIncidente: data.fechaIncidente ? new Date(data.fechaIncidente) : null,
-        ubicacion: data.ubicacion,
         esAnonima: data.esAnonima,
         documentos: data.documentos || [],
-        estado: 'pendiente',
-        prioridad: 'media',
       },
     });
 

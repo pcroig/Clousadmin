@@ -55,7 +55,13 @@ async function obtenerDatosDashboard(session: { user: { id: string; empresaId: s
     where: {
       empleadoId: empleado.id,
       estado: {
-        in: ['aprobada', 'rechazada', 'pendiente'],
+        in: [
+          EstadoAusencia.en_curso,
+          EstadoAusencia.completada,
+          EstadoAusencia.auto_aprobada,
+          EstadoAusencia.rechazada,
+          EstadoAusencia.pendiente_aprobacion,
+        ],
       },
     },
     orderBy: {
@@ -146,7 +152,11 @@ async function obtenerDatosDashboard(session: { user: { id: string; empresaId: s
         gte: hoy,
       },
       estado: {
-        in: ['pendiente', 'aprobada'],
+        in: [
+          EstadoAusencia.pendiente_aprobacion,
+          EstadoAusencia.en_curso,
+          EstadoAusencia.auto_aprobada,
+        ],
       },
     },
     orderBy: {

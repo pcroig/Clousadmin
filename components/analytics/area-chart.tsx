@@ -19,7 +19,7 @@ import {
 interface AreaChartComponentProps {
   title: string
   description?: string
-  data: Array<Record<string, any>>
+  data: Array<Record<string, unknown>>
   dataKey: string
   xAxisKey: string
   chartConfig: ChartConfig

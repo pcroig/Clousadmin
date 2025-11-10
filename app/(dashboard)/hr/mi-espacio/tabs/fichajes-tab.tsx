@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { Card } from '@/components/ui/card';
 import {
   Table,
   TableBody,
@@ -11,11 +11,13 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Clock, ChevronDown, ChevronUp } from 'lucide-react';
-import { format } from 'date-fns';
+import { Button } from '@/components/ui/button';
+import { Clock, ChevronDown, ChevronUp, Gift } from 'lucide-react';
+import { format, isSameDay, isSameWeek, isSameMonth } from 'date-fns';
 import { es } from 'date-fns/locale';
 
-import { EstadoAusencia } from '@/lib/constants/enums';
+import { EstadoFichaje } from '@/lib/constants/enums';
+import { CompensarHorasModal } from '@/components/hr/compensar-horas-modal';
 
 interface FichajeEvento {
   id: string;
@@ -32,6 +34,14 @@ interface Fichaje {
   horasTrabajadas: number;
   eventos: FichajeEvento[];
 }
+
+type ApiFichaje = {
+  id: string;
+  fecha: string;
+  estado: string;
+  horasTrabajadas?: number | string | null;
+  eventos?: FichajeEvento[];
+};
 
 interface BalanceResumen {
   diario: number;
@@ -51,89 +61,116 @@ interface JornadaDia {
   estado: 'completa' | 'incompleta' | 'pendiente';
 }
 
-export function FichajesTab({ empleadoId }: { empleadoId: string }) {
-  const [fichajes, setFichajes] = useState<Fichaje[]>([]);
+interface FichajesTabProps {
+  empleadoId: string;
+  empleadoNombre?: string;
+}
+
+export function FichajesTab({ empleadoId, empleadoNombre = 'Empleado' }: FichajesTabProps) {
   const [jornadas, setJornadas] = useState<JornadaDia[]>([]);
   const [loading, setLoading] = useState(true);
   const [jornadaExpandida, setJornadaExpandida] = useState<string | null>(null);
-  const [balance, setBalance] = useState<BalanceResumen>({
-    diario: 0,
-    semanal: 0,
-    mensual: 0,
-    acumulado: 0,
-  });
+  const [compensarModal, setCompensarModal] = useState(false);
 
-  useEffect(() => {
-    fetchFichajes();
-  }, [empleadoId]);
-
-  async function fetchFichajes() {
-    setLoading(true);
-    try {
-      const response = await fetch('/api/fichajes');
-      if (!response.ok) {
-        throw new Error('Error al obtener fichajes');
-      }
-      const data = await response.json();
-
-      // Procesar fichajes con su nueva estructura (eventos separados)
-      const fichajesConEventos = data.map((f: any) => ({
-        id: f.id,
-        fecha: f.fecha,
-        estado: f.estado,
-        horasTrabajadas: f.horasTrabajadas ? Number(f.horasTrabajadas) : 0,
-        eventos: f.eventos || [],
-      }));
-
-      setFichajes(fichajesConEventos);
-
-      // Agrupar fichajes en jornadas
-      const jornadasAgrupadas = agruparPorJornada(fichajesConEventos);
-      setJornadas(jornadasAgrupadas);
-    } catch (error) {
-      console.error('Error fetching fichajes:', error);
-      setFichajes([]);
-      setJornadas([]);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  function agruparPorJornada(fichajes: Fichaje[]): JornadaDia[] {
-    // Cada fichaje ya representa un día completo con sus eventos
-    return fichajes.map(fichaje => {
+  const agruparPorJornada = useCallback((lista: Fichaje[]): JornadaDia[] => {
+    return lista.map(fichaje => {
       const eventos = fichaje.eventos || [];
 
-      // Obtener horario de entrada/salida desde los eventos
       const entrada = eventos.find(e => e.tipo === 'entrada');
       const salida = eventos.find(e => e.tipo === 'salida');
 
       const horarioEntrada = entrada ? format(new Date(entrada.hora), 'HH:mm') : null;
       const horarioSalida = salida ? format(new Date(salida.hora), 'HH:mm') : null;
 
-      // Determinar estado de la jornada
       let estado: 'completa' | 'incompleta' | 'pendiente' = 'completa';
-      if (fichaje.estado === EstadoAusencia.en_curso) {
+      if (fichaje.estado === EstadoFichaje.en_curso) {
         estado = 'incompleta';
-      } else if (fichaje.estado === EstadoAusencia.pendiente_aprobacion || fichaje.estado === 'revisado') {
+      } else if (
+        fichaje.estado === EstadoFichaje.pendiente ||
+        fichaje.estado === 'revisado'
+      ) {
         estado = 'pendiente';
       }
 
-      // Balance (asumiendo 8h como jornada estándar por ahora)
       const balance = fichaje.horasTrabajadas - 8;
 
       return {
         fecha: new Date(fichaje.fecha),
         fichajeId: fichaje.id,
-        eventos: eventos,
+        eventos,
         horasTrabajadas: fichaje.horasTrabajadas,
-        horarioEntrada,
-        horarioSalida,
         balance,
         estado,
+        horarioEntrada,
+        horarioSalida,
       };
     }).sort((a, b) => b.fecha.getTime() - a.fecha.getTime());
-  }
+  }, []);
+
+  const fetchFichajes = useCallback(async () => {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams();
+      params.set('empleadoId', empleadoId);
+      const response = await fetch(`/api/fichajes?${params.toString()}`);
+      if (!response.ok) {
+        throw new Error('Error al obtener fichajes');
+      }
+      const data = await response.json();
+      const rawFichajes: ApiFichaje[] = Array.isArray(data) ? data : [];
+
+      // Procesar fichajes con su nueva estructura (eventos separados)
+      const fichajesConEventos: Fichaje[] = rawFichajes.map((f) => ({
+        id: f.id,
+        fecha: f.fecha,
+        estado: f.estado,
+        horasTrabajadas: f.horasTrabajadas ? Number(f.horasTrabajadas) : 0,
+        eventos: f.eventos ?? [],
+      }));
+
+      // Agrupar fichajes en jornadas
+      const jornadasAgrupadas = agruparPorJornada(fichajesConEventos);
+      setJornadas(jornadasAgrupadas);
+    } catch (error) {
+      console.error('Error fetching fichajes:', error);
+      setJornadas([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [empleadoId, agruparPorJornada]);
+
+  useEffect(() => {
+    fetchFichajes();
+  }, [fetchFichajes]);
+
+  const balance = useMemo<BalanceResumen>(() => {
+    const hoy = new Date();
+    const resumen: BalanceResumen = {
+      diario: 0,
+      semanal: 0,
+      mensual: 0,
+      acumulado: 0,
+    };
+
+    jornadas.forEach((jornada) => {
+      const balanceDia = jornada.balance ?? 0;
+      resumen.acumulado += balanceDia;
+
+      if (isSameDay(jornada.fecha, hoy)) {
+        resumen.diario += balanceDia;
+      }
+
+      if (isSameWeek(jornada.fecha, hoy, { weekStartsOn: 1 })) {
+        resumen.semanal += balanceDia;
+      }
+
+      if (isSameMonth(jornada.fecha, hoy)) {
+        resumen.mensual += balanceDia;
+      }
+    });
+
+    return resumen;
+  }, [jornadas]);
 
   function getEstadoBadge(estado: 'completa' | 'incompleta' | 'pendiente') {
     const variants: Record<typeof estado, { label: string; className: string }> = {
@@ -150,9 +187,22 @@ export function FichajesTab({ empleadoId }: { empleadoId: string }) {
     <div className="space-y-6">
       {/* Widget Resumen */}
       <Card className="p-6">
-        <div className="flex items-center gap-2 mb-4">
-          <Clock className="w-5 h-5 text-[#d97757]" />
-          <h3 className="text-base font-semibold">Balance de Horas</h3>
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <Clock className="w-5 h-5 text-[#d97757]" />
+            <h3 className="text-base font-semibold">Balance de Horas</h3>
+          </div>
+          {/* Botón Compensar - solo visible si balance acumulado > 0 */}
+          {balance.acumulado > 0 && (
+            <Button
+              onClick={() => setCompensarModal(true)}
+              size="sm"
+              className="bg-green-600 hover:bg-green-700"
+            >
+              <Gift className="w-4 h-4 mr-2" />
+              Compensar Horas
+            </Button>
+          )}
         </div>
         <div className="grid grid-cols-4 gap-4">
           <div className="text-center">
@@ -287,6 +337,19 @@ export function FichajesTab({ empleadoId }: { empleadoId: string }) {
           </TableBody>
         </Table>
       </Card>
+
+      {/* Modal Compensar Horas */}
+      <CompensarHorasModal
+        empleadoId={empleadoId}
+        empleadoNombre={empleadoNombre}
+        balanceAcumulado={balance.acumulado}
+        open={compensarModal}
+        onClose={() => setCompensarModal(false)}
+        onSuccess={() => {
+          setCompensarModal(false);
+          fetchFichajes(); // Recargar fichajes para actualizar balance
+        }}
+      />
     </div>
   );
 }

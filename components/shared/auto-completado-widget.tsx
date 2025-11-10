@@ -25,11 +25,11 @@ export function AutoCompletadoWidget({ stats }: AutoCompletadoWidgetProps) {
   const [localStats, setLocalStats] = useState(stats);
 
   const handleLimpiar = async (tipo: 'fichajes' | 'ausencias' | 'solicitudes') => {
-    const mensajes: Record<typeof tipo, string> = {
+    const mensajes: Record<string, string> = {
       fichajes: '¿Marcar todos los fichajes revisados como finalizados y archivar auto-completados?',
       ausencias: '¿Archivar auto-completados de ausencias?',
       solicitudes: '¿Archivar auto-completados de solicitudes?',
-    } as any;
+    };
 
     if (!confirm(mensajes[tipo])) return;
     try {

@@ -17,12 +17,12 @@ export interface SolicitudCambio {
   empleadoId: string;
   aprobadorId?: string | null;
   tipo: string;
-  camposCambiados: any;
+  camposCambiados: Record<string, unknown>;
   motivo?: string | null;
   estado: string;
   motivoRechazo?: string | null;
   fechaRespuesta?: string | null;
-  revisionIA?: any;
+  revisionIA?: Record<string, unknown>;
   revisadaPorIA: boolean;
   requiereAprobacionManual: boolean;
   createdAt: string;
@@ -37,7 +37,7 @@ export interface SolicitudCambio {
 
 export interface SolicitudCreateInput {
   tipo: 'cambio_datos' | 'fichaje_correccion' | 'ausencia_modificacion' | 'documento';
-  camposCambiados: Record<string, any>;
+  camposCambiados: Record<string, unknown>;
   motivo?: string;
 }
 

@@ -4,7 +4,7 @@
 // Calendario Visual de Festivos
 // ========================================
 
-import { useState, useEffect } from 'react';
+import { useEffect, useMemo, useState, useCallback } from 'react';
 import { Calendar } from '@/components/ui/calendar';
 import { Button } from '@/components/ui/button';
 import { ChevronLeft, ChevronRight, Plus } from 'lucide-react';
@@ -39,11 +39,7 @@ export function CalendarioFestivos({ onUpdate }: CalendarioFestivosProps) {
     modo: 'crear',
   });
 
-  useEffect(() => {
-    cargarFestivos();
-  }, [mesActual]);
-
-  async function cargarFestivos() {
+  const cargarFestivos = useCallback(async () => {
     setCargando(true);
     try {
       const año = mesActual.getFullYear();
@@ -64,7 +60,11 @@ export function CalendarioFestivos({ onUpdate }: CalendarioFestivosProps) {
     } finally {
       setCargando(false);
     }
-  }
+  }, [mesActual]);
+
+  useEffect(() => {
+    cargarFestivos();
+  }, [cargarFestivos]);
 
   function handleDiaClick(date: Date | undefined) {
     if (!date) return;

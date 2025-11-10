@@ -165,8 +165,8 @@ export default async function SignupPage({
             <span className="text-lg font-semibold">Clousadmin</span>
           </Link>
         </div>
-        <div className="flex flex-1 items-center justify-center py-8">
-          <div className="w-full max-w-md">
+        <div className="flex flex-1 items-start justify-start pt-8">
+          <div className="w-full max-w-xl">
             <SignupForm token={token} emailInvitacion={verificacion.invitacion?.email || ''} />
           </div>
         </div>

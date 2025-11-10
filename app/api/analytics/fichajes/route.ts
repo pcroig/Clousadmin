@@ -10,6 +10,7 @@ import {
   handleApiError,
   successResponse,
 } from '@/lib/api-handler';
+import { EstadoAusencia } from '@/lib/constants/enums';
 
 // Función auxiliar para calcular antigüedad
 function calcularAntiguedad(fechaAlta: Date): string {
@@ -199,7 +200,7 @@ export async function GET(request: NextRequest) {
         fechaFin: {
           gte: inicioMesActual,
         },
-        estado: { in: ['en_curso', 'completada', 'auto_aprobada'] },
+        estado: { in: [EstadoAusencia.en_curso, EstadoAusencia.completada, EstadoAusencia.auto_aprobada] },
       },
     });
 
@@ -258,7 +259,7 @@ export async function GET(request: NextRequest) {
           empleadoId: emp.id,
           fechaInicio: { lte: finMesActual },
           fechaFin: { gte: inicioMesActual },
-          estado: { in: ['en_curso', 'completada', 'auto_aprobada'] },
+          estado: { in: [EstadoAusencia.en_curso, EstadoAusencia.completada, EstadoAusencia.auto_aprobada] },
         },
       });
 

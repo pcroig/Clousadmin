@@ -3,7 +3,7 @@
 // ========================================
 
 import { NextRequest } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { prisma, Prisma } from '@/lib/prisma';
 import { calcularDias } from '@/lib/calculos/ausencias';
 import { EstadoAusencia } from '@/lib/constants/enums';
 
@@ -72,7 +72,13 @@ export async function POST(
       return badRequestResponse('No hay propuesta disponible para ti');
     }
 
-    const propuesta = preferencia.propuestaIA as any;
+    interface VacacionesPropuesta {
+      fechaInicio: string | Date;
+      fechaFin: string | Date;
+      [key: string]: unknown;
+    }
+    
+    const propuesta = preferencia.propuestaIA as VacacionesPropuesta;
 
     // Validar fechas
     const fechaInicio = new Date(propuesta.fechaInicio);
@@ -108,9 +114,9 @@ export async function POST(
         descripcion: `Vacaciones de campaña: ${preferencia.campana.titulo}`,
         descuentaSaldo: true,
         estado: EstadoAusencia.pendiente_aprobacion,
-        diasIdeales: preferencia.diasIdeales as any,
-        diasPrioritarios: preferencia.diasPrioritarios as any,
-        diasAlternativos: preferencia.diasAlternativos as any,
+        diasIdeales: preferencia.diasIdeales as unknown as Prisma.InputJsonValue,
+        diasPrioritarios: preferencia.diasPrioritarios as unknown as Prisma.InputJsonValue,
+        diasAlternativos: preferencia.diasAlternativos as unknown as Prisma.InputJsonValue,
       },
     });
 

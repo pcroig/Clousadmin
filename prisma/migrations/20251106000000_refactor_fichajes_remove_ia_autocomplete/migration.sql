@@ -15,3 +15,4 @@ UPDATE "fichajes" SET estado = 'pendiente' WHERE estado = 'revisado';
 -- pero están marcados como deprecated en el schema
 
 
+

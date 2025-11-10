@@ -5,6 +5,7 @@
 
 import { prisma } from '@/lib/prisma';
 import { obtenerHorasEsperadas } from '../calculos/fichajes';
+import { EstadoAusencia } from '@/lib/constants/enums';
 
 /**
  * Tipos de alertas
@@ -332,7 +333,7 @@ async function detectarAlertasAdvertencia(
     where: {
       empleadoId,
       estado: {
-        in: ['completada', 'en_curso', 'auto_aprobada'],
+        in: [EstadoAusencia.completada, EstadoAusencia.en_curso, EstadoAusencia.auto_aprobada],
       },
       OR: [
         {
@@ -364,7 +365,7 @@ async function detectarAlertasAdvertencia(
   // Crear set de fechas con ausencias
   const diasConAusencia = new Set<string>();
   for (const ausencia of ausencias) {
-    let fecha = new Date(ausencia.fechaInicio);
+    const fecha = new Date(ausencia.fechaInicio);
     const fin = new Date(ausencia.fechaFin);
     while (fecha <= fin) {
       diasConAusencia.add(fecha.toISOString().split('T')[0]);
@@ -379,7 +380,7 @@ async function detectarAlertasAdvertencia(
 
   // Contar días laborables sin registro
   let diasSinRegistro = 0;
-  let fecha = new Date(fechaInicio);
+  const fecha = new Date(fechaInicio);
   const hoy = new Date();
   hoy.setHours(0, 0, 0, 0);
 

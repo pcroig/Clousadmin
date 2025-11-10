@@ -5,7 +5,9 @@
 'use client';
 
 import { useState } from 'react';
-import { Edit2 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { Edit2, Flag } from 'lucide-react';
+import { toast } from 'sonner';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { GeneralTab } from './tabs/general-tab';
@@ -14,6 +16,7 @@ import { FichajesTab } from './tabs/fichajes-tab';
 import { ContratosTab } from './tabs/contratos-tab';
 import { DocumentosTab } from './tabs/documentos-tab';
 import { getAvatarStyle } from '@/lib/design-system';
+import { DenunciaDialog } from '@/components/empleado/denuncia-dialog';
 
 interface MiEspacioHRClientProps {
   empleado: any;
@@ -21,14 +24,37 @@ interface MiEspacioHRClientProps {
 }
 
 export function MiEspacioHRClient({ empleado, usuario }: MiEspacioHRClientProps) {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState('general');
   const [editingProfile, setEditingProfile] = useState(false);
+  const [denunciaDialogOpen, setDenunciaDialogOpen] = useState(false);
 
   const getInitials = () => {
     return `${empleado.nombre.charAt(0)}${empleado.apellidos.charAt(0)}`.toUpperCase();
   };
 
   const avatarStyle = getAvatarStyle(`${empleado.nombre} ${empleado.apellidos}`);
+
+  const handleFieldUpdate = async (field: string, value: any) => {
+    try {
+      const response = await fetch(`/api/empleados/${empleado.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ [field]: value }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Error al actualizar campo');
+      }
+
+      toast.success('Campo actualizado correctamente');
+      router.refresh();
+    } catch (error) {
+      console.error(`Error updating ${field}:`, error);
+      toast.error(error instanceof Error ? error.message : 'Error al actualizar campo');
+    }
+  };
 
   const tabs = [
     { id: 'general', label: 'General' },
@@ -70,6 +96,32 @@ export function MiEspacioHRClient({ empleado, usuario }: MiEspacioHRClientProps)
               <p className="text-sm text-gray-500">{usuario.email}</p>
             </div>
           </div>
+
+          <div className="flex items-center gap-2">
+            {/* Botón Dar de Baja - visible en Contratos */}
+            {activeTab === 'contratos' && (
+              <Button
+                variant="destructive"
+                onClick={() => {
+                  const event = new CustomEvent('darDeBajaContrato');
+                  window.dispatchEvent(event);
+                }}
+              >
+                Dar de Baja
+              </Button>
+            )}
+
+            {/* Botón Canal de Denuncias */}
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => setDenunciaDialogOpen(true)}
+              className="rounded-lg"
+              title="Canal de denuncias"
+            >
+              <Flag className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -92,12 +144,18 @@ export function MiEspacioHRClient({ empleado, usuario }: MiEspacioHRClientProps)
 
       {/* Content */}
       <div className="flex-1 min-h-0 overflow-y-auto">
-        {activeTab === 'general' && <GeneralTab empleado={empleado} usuario={usuario} rol="hr_admin" />}
+        {activeTab === 'general' && <GeneralTab empleado={empleado} usuario={usuario} rol="hr_admin" onFieldUpdate={handleFieldUpdate} />}
         {activeTab === 'ausencias' && <AusenciasTab empleadoId={empleado.id} />}
         {activeTab === 'fichajes' && <FichajesTab empleadoId={empleado.id} />}
-        {activeTab === 'contratos' && <ContratosTab empleado={empleado} />}
+        {activeTab === 'contratos' && <ContratosTab empleado={empleado} rol="hr_admin" onFieldUpdate={handleFieldUpdate} />}
         {activeTab === 'documentos' && <DocumentosTab empleado={empleado} />}
       </div>
+
+      {/* Dialog de Denuncias */}
+      <DenunciaDialog
+        isOpen={denunciaDialogOpen}
+        onClose={() => setDenunciaDialogOpen(false)}
+      />
     </div>
   );
 }

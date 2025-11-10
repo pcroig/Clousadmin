@@ -15,16 +15,16 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 // ScrollArea no disponible, usando div con overflow
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { 
-  Eye, 
-  CheckCircle2, 
-  Clock, 
-  Calendar, 
+import {
+  Eye,
+  CheckCircle2,
+  Clock,
+  Calendar,
   Sparkles,
   Settings,
-  Loader2,
   AlertCircle,
 } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useApi } from '@/lib/hooks';
@@ -158,7 +158,7 @@ export function PopoverMonitoreoCampana({
       <PopoverContent className="w-[520px] p-0 shadow-lg border border-gray-200" align="end">
         {loading ? (
           <div className="flex items-center justify-center p-8">
-            <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
+            <Spinner className="w-6 h-6 text-gray-400" />
             <span className="ml-2 text-sm text-gray-600">Cargando...</span>
           </div>
         ) : !campana ? (

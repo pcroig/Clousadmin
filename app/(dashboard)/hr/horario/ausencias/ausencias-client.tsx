@@ -4,7 +4,7 @@
 // Ausencias Client Component
 // ========================================
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import {
@@ -86,12 +86,7 @@ export function AusenciasClient() {
   });
   const [motivoRechazo, setMotivoRechazo] = useState('');
 
-  useEffect(() => {
-    fetchAusencias();
-    fetchCampanas();
-  }, [filtroEstado]);
-
-  async function fetchAusencias() {
+  const fetchAusencias = useCallback(async () => {
     setLoading(true);
     try {
       const params = new URLSearchParams();
@@ -107,9 +102,9 @@ export function AusenciasClient() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [filtroEstado]);
 
-  async function fetchCampanas() {
+  const fetchCampanas = useCallback(async () => {
     try {
       const response = await fetch('/api/campanas-vacaciones?estado=abierta');
       if (response.ok) {
@@ -119,7 +114,12 @@ export function AusenciasClient() {
     } catch (error) {
       console.error('Error fetching campañas:', error);
     }
-  }
+  }, []);
+
+  useEffect(() => {
+    fetchAusencias();
+    fetchCampanas();
+  }, [fetchAusencias, fetchCampanas]);
 
   async function handleAprobar(id: string) {
     try {

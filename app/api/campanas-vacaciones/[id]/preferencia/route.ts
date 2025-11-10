@@ -3,7 +3,7 @@
 // ========================================
 
 import { NextRequest } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { prisma, Prisma } from '@/lib/prisma';
 import {
   requireAuth,
   handleApiError,
@@ -103,9 +103,9 @@ export async function PATCH(
     const preferenciaActualizada = await prisma.preferenciaVacaciones.update({
       where: { id: preferenciaExistente.id },
       data: {
-        diasIdeales: (body.diasIdeales || []) as any,
-        diasPrioritarios: (body.diasPrioritarios || []) as any,
-        diasAlternativos: (body.diasAlternativos || []) as any,
+        diasIdeales: (body.diasIdeales || []) as unknown as Prisma.InputJsonValue,
+        diasPrioritarios: (body.diasPrioritarios || []) as unknown as Prisma.InputJsonValue,
+        diasAlternativos: (body.diasAlternativos || []) as unknown as Prisma.InputJsonValue,
         completada: body.completada !== undefined ? body.completada : preferenciaExistente.completada,
       },
     });

@@ -56,7 +56,7 @@ export function validarNIE(nie: string): boolean {
   }
 
   // Reemplazar letra inicial por número
-  let nieModificado = nieLimpio.replace('X', '0').replace('Y', '1').replace('Z', '2');
+  const nieModificado = nieLimpio.replace('X', '0').replace('Y', '1').replace('Z', '2');
 
   // Extraer número y letra
   const numero = parseInt(nieModificado.substring(0, 8), 10);
@@ -119,7 +119,7 @@ export function obtenerInfoValidacionNIF(identificacion: string): {
       };
     }
 
-    let nieModificado = idLimpio.replace('X', '0').replace('Y', '1').replace('Z', '2');
+    const nieModificado = idLimpio.replace('X', '0').replace('Y', '1').replace('Z', '2');
     const numero = parseInt(nieModificado.substring(0, 8), 10);
     const letraProporcionada = idLimpio.charAt(8);
     const letraEsperada = letras[numero % 23];

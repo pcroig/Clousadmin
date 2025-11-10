@@ -17,8 +17,12 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 
+interface Integracion {
+  [key: string]: unknown;
+}
+
 interface IntegracionesFormProps {
-  integracionesIniciales?: any[];
+  integracionesIniciales?: Integracion[];
   token?: string;
   empresaId?: string;
   onComplete?: () => void;
@@ -285,12 +289,6 @@ export function IntegracionesForm({
             </p>
           </div>
         </div>
-      </div>
-
-      <div className="rounded-lg bg-blue-50 p-4">
-        <p className="text-sm text-blue-700">
-          💡 <strong>Tip:</strong> Puedes configurar integraciones más adelante desde el panel de administración.
-        </p>
       </div>
 
       {/* Botones de navegación para onboarding simplificado */}

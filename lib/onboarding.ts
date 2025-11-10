@@ -17,7 +17,7 @@ import { UsuarioRol } from '@/lib/constants/enums';
 /**
  * Helper function to safely convert values to Prisma JSON input
  */
-function toJsonValue<T extends Record<string, any>>(value: T): Prisma.InputJsonValue {
+function toJsonValue<T extends Record<string, unknown>>(value: T): Prisma.InputJsonValue {
   return value as unknown as Prisma.InputJsonValue;
 }
 
@@ -88,7 +88,7 @@ type CrearOnboardingSuccess = {
   success: true;
   token: string;
   url: string;
-  onboarding: any;
+  onboarding: Record<string, unknown>;
 };
 
 type CrearOnboardingError = {
@@ -567,7 +567,8 @@ export async function finalizarOnboarding(token: string) {
         // Si hay documentos requeridos, validar que todos estén completos
         if (documentosRequeridos && Array.isArray(documentosRequeridos) && documentosRequeridos.length > 0) {
           // Solo validar documentos que son requeridos (requerido: true)
-          const docsRequeridos = documentosRequeridos.filter((d: any) => d.requerido === true);
+          interface DocRequerido { requerido: boolean; }
+          const docsRequeridos = documentosRequeridos.filter((d: DocRequerido) => d.requerido === true);
           
           if (docsRequeridos.length > 0) {
             const validacionDocs = await validarDocumentosRequeridosCompletos(

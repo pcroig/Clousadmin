@@ -8,7 +8,6 @@ import crypto from 'crypto';
 // Configuración de encriptación
 const ALGORITHM = 'aes-256-gcm';
 const IV_LENGTH = 16; // 128 bits para GCM
-const AUTH_TAG_LENGTH = 16; // 128 bits auth tag
 const SALT_LENGTH = 32; // 256 bits salt para derivación de key
 
 /**
@@ -161,8 +160,12 @@ export function validateEncryptionSetup(): { valid: boolean; error?: string } {
     }
 
     return { valid: true };
-  } catch (error) {
-    return { valid: false, error: 'Error validando configuración de encriptación' };
+  } catch (_error) {
+    console.error('[Crypto] Error validando configuración:', _error);
+    return {
+      valid: false,
+      error: 'Error validando configuración de encriptación'
+    };
   }
 }
 
@@ -178,7 +181,7 @@ export function generateEncryptionKey(): string {
  * Encriptar múltiples campos de un objeto
  * Útil para encriptar datos de empleado en batch
  */
-export function encryptFields<T extends Record<string, any>>(
+export function encryptFields<T extends Record<string, unknown>>(
   obj: T,
   fieldsToEncrypt: (keyof T)[]
 ): T {
@@ -187,7 +190,7 @@ export function encryptFields<T extends Record<string, any>>(
   for (const field of fieldsToEncrypt) {
     const value = obj[field];
     if (value !== null && value !== undefined && value !== '') {
-      encrypted[field] = encrypt(String(value)) as any;
+      encrypted[field] = encrypt(String(value)) as unknown as T[keyof T];
     }
   }
 
@@ -197,7 +200,7 @@ export function encryptFields<T extends Record<string, any>>(
 /**
  * Desencriptar múltiples campos de un objeto
  */
-export function decryptFields<T extends Record<string, any>>(
+export function decryptFields<T extends Record<string, unknown>>(
   obj: T,
   fieldsToDecrypt: (keyof T)[]
 ): T {
@@ -207,9 +210,9 @@ export function decryptFields<T extends Record<string, any>>(
     const value = obj[field];
     if (value !== null && value !== undefined && value !== '') {
       try {
-        decrypted[field] = decrypt(String(value)) as any;
-      } catch (error) {
-        console.error(`[Crypto] Error desencriptando campo ${String(field)}:`, error);
+        decrypted[field] = decrypt(String(value)) as unknown as T[keyof T];
+      } catch (_error) {
+        console.error(`[Crypto] Error desencriptando campo ${String(field)}:`, _error);
         // Mantener valor encriptado si falla desencriptación
       }
     }
@@ -217,6 +220,7 @@ export function decryptFields<T extends Record<string, any>>(
 
   return decrypted;
 }
+
 
 
 

@@ -10,9 +10,16 @@ import { LoadingButton } from '@/components/shared/loading-button';
 import { toast } from 'sonner';
 import { getAvatarStyle } from '@/lib/design-system';
 
+interface OnboardingEmpleado {
+  nombre?: string;
+  apellidos?: string;
+  usuario?: { image?: string | null };
+  [key: string]: unknown;
+}
+
 interface CredencialesFormProps {
   token: string;
-  empleado: any;
+  empleado: OnboardingEmpleado;
   onComplete: () => void;
   initialProgress?: boolean;
 }

@@ -78,24 +78,28 @@ function getPrismaInstance(): PrismaClient {
 // Export Prisma with lazy initialization
 // The client is created only when first accessed, ensuring env vars are loaded
 export const prisma = new Proxy({} as PrismaClient, {
-  get(_target, prop) {
+  get(_: unknown, prop: string | symbol) {
+    void _;
     const instance = getPrismaInstance();
-    const value = (instance as any)[prop];
+    const value = (instance as Record<string | symbol, unknown>)[prop];
     
     // If it's a function, bind it to maintain 'this' context
     if (typeof value === 'function') {
-      return value.bind(instance);
+      return (value as unknown as { bind: (ctx: PrismaClient) => unknown }).bind(instance);
     }
     
     return value;
   },
-  has(_target, prop) {
+  has(_: unknown, prop: string | symbol) {
+    void _;
     return prop in getPrismaInstance();
   },
-  ownKeys(_target) {
+  ownKeys(_: unknown) {
+    void _;
     return Reflect.ownKeys(getPrismaInstance());
   },
-  getOwnPropertyDescriptor(_target, prop) {
+  getOwnPropertyDescriptor(_: unknown, prop: string | symbol) {
+    void _;
     return Reflect.getOwnPropertyDescriptor(getPrismaInstance(), prop);
   },
 });

@@ -67,12 +67,33 @@ export function FichajeWidget({
     return () => clearInterval(intervalo);
   }, [estadoActual, horaEntrada]);
 
-  // Obtener estado actual y datos al cargar
-  useEffect(() => {
-    obtenerEstadoActual();
+  // Función memoizada para actualizar horas trabajadas usando cálculo de lib/calculos
+  const actualizarHorasTrabajadas = useCallback((eventos: FichajeEvento[]) => {
+    if (eventos.length === 0) {
+      setHorasHechas(0);
+      setHorasPorHacer(8);
+      setTiempoTrabajado('00:00');
+      return;
+    }
+
+    // Usar función de lib/calculos/fichajes.ts
+    const horasTotales = calcularHorasTrabajadas(eventos);
+    const horasRedondeadas = Math.round(horasTotales * 10) / 10;
+    
+    setHorasHechas(horasRedondeadas);
+    setHorasPorHacer(Math.max(0, 8 - horasRedondeadas));
+    
+    // Actualizar cronómetro si hay tiempo trabajado
+    if (horasTotales > 0) {
+      const horas = Math.floor(horasTotales);
+      const minutos = Math.floor((horasTotales - horas) * 60);
+      setTiempoTrabajado(`${horas.toString().padStart(2, '0')}:${minutos.toString().padStart(2, '0')}`);
+    } else {
+      setTiempoTrabajado('00:00');
+    }
   }, []);
 
-  async function obtenerEstadoActual() {
+  const obtenerEstadoActual = useCallback(async () => {
     try {
       // Usar formato de fecha local (YYYY-MM-DD)
       const hoy = new Date();
@@ -157,33 +178,12 @@ export function FichajeWidget({
     } finally {
       setInicializando(false);
     }
-  }
+  }, [actualizarHorasTrabajadas]);
 
-  // Función memoizada para actualizar horas trabajadas usando cálculo de lib/calculos
-  const actualizarHorasTrabajadas = useCallback((eventos: FichajeEvento[]) => {
-    if (eventos.length === 0) {
-      setHorasHechas(0);
-      setHorasPorHacer(8);
-      setTiempoTrabajado('00:00');
-      return;
-    }
-
-    // Usar función de lib/calculos/fichajes.ts
-    const horasTotales = calcularHorasTrabajadas(eventos);
-    const horasRedondeadas = Math.round(horasTotales * 10) / 10;
-    
-    setHorasHechas(horasRedondeadas);
-    setHorasPorHacer(Math.max(0, 8 - horasRedondeadas));
-    
-    // Actualizar cronómetro si hay tiempo trabajado
-    if (horasTotales > 0) {
-      const horas = Math.floor(horasTotales);
-      const minutos = Math.floor((horasTotales - horas) * 60);
-      setTiempoTrabajado(`${horas.toString().padStart(2, '0')}:${minutos.toString().padStart(2, '0')}`);
-    } else {
-      setTiempoTrabajado('00:00');
-    }
-  }, []);
+  // Obtener estado actual y datos al cargar
+  useEffect(() => {
+    obtenerEstadoActual();
+  }, [obtenerEstadoActual]);
 
   async function handleFichar(tipoOverride?: string) {
     if (cargando) return;
@@ -263,7 +263,6 @@ export function FichajeWidget({
 
   const porcentajeProgreso = (horasHechas / (horasHechas + horasPorHacer)) * 100;
   const circumference = 2 * Math.PI * 58;
-  const offset = circumference - (porcentajeProgreso / 100) * circumference;
 
   if (inicializando) {
     return (
@@ -276,14 +275,14 @@ export function FichajeWidget({
   }
 
   return (
-    <WidgetCard title="Fichaje" href={href} contentClassName="px-6 pb-20">
-        {/* Dos mitades horizontales */}
-        <div className="grid grid-cols-2 gap-4 h-full">
-          {/* Mitad izquierda: Estado y botón */}
-          <div className="flex flex-col justify-between">
+    <WidgetCard title="Fichaje" href={href} contentClassName="px-4 sm:px-6 pb-4 sm:pb-20">
+        {/* Responsive layout: stack vertical en mobile, grid en desktop */}
+        <div className="flex flex-col sm:grid sm:grid-cols-2 gap-4 h-full">
+          {/* Estado y botones */}
+          <div className="flex flex-col justify-between order-2 sm:order-1">
             <div>
-              <h3 className="text-[24px] font-bold text-gray-900">{getTituloEstado()}</h3>
-              <p className="text-[11px] text-gray-500 mt-1">
+              <h3 className="text-lg sm:text-[24px] font-bold text-gray-900">{getTituloEstado()}</h3>
+              <p className="text-[10px] sm:text-[11px] text-gray-500 mt-1">
                 {estadoActual === 'trabajando' && `${formatearHorasMinutos(horasPorHacer)} restantes`}
                 {estadoActual === 'en_pausa' && 'En descanso'}
                 {estadoActual === 'sin_fichar' && 'Listo para comenzar'}
@@ -291,10 +290,10 @@ export function FichajeWidget({
               </p>
             </div>
             {estadoActual === 'trabajando' ? (
-              <div className="space-y-2">
+              <div className="space-y-2 mt-3 sm:mt-0">
                 <Button
                   variant="default"
-                  className="w-full font-semibold text-[13px]"
+                  className="w-full font-semibold text-xs sm:text-[13px] min-h-[44px] sm:min-h-0"
                   onClick={() => handleFichar('pausa_inicio')}
                   disabled={cargando}
                 >
@@ -302,7 +301,7 @@ export function FichajeWidget({
                 </Button>
                 <Button
                   variant="outline"
-                  className="w-full font-semibold text-[13px]"
+                  className="w-full font-semibold text-xs sm:text-[13px] min-h-[44px] sm:min-h-0"
                   onClick={() => handleFichar('salida')}
                   disabled={cargando}
                 >
@@ -310,10 +309,10 @@ export function FichajeWidget({
                 </Button>
               </div>
             ) : estadoActual === 'en_pausa' ? (
-              <div className="space-y-2">
+              <div className="space-y-2 mt-3 sm:mt-0">
                 <Button
                   variant="default"
-                  className="w-full font-semibold text-[13px]"
+                  className="w-full font-semibold text-xs sm:text-[13px] min-h-[44px] sm:min-h-0"
                   onClick={() => handleFichar('pausa_fin')}
                   disabled={cargando}
                 >
@@ -321,7 +320,7 @@ export function FichajeWidget({
                 </Button>
                 <Button
                   variant="outline"
-                  className="w-full font-semibold text-[13px]"
+                  className="w-full font-semibold text-xs sm:text-[13px] min-h-[44px] sm:min-h-0"
                   onClick={() => handleFichar('salida')}
                   disabled={cargando}
                 >
@@ -329,10 +328,10 @@ export function FichajeWidget({
                 </Button>
               </div>
             ) : (
-              <div className="space-y-2">
+              <div className="space-y-2 mt-3 sm:mt-0">
                 <Button
                   variant="default"
-                  className="w-full font-semibold text-[13px]"
+                  className="w-full font-semibold text-xs sm:text-[13px] min-h-[44px] sm:min-h-0"
                   onClick={() => handleFichar()}
                   disabled={cargando}
                 >
@@ -340,7 +339,7 @@ export function FichajeWidget({
                 </Button>
                 <Button
                   variant="outline"
-                  className="w-full font-semibold text-[13px]"
+                  className="w-full font-semibold text-xs sm:text-[13px] min-h-[44px] sm:min-h-0"
                   onClick={() => setModalFichajeManual(true)}
                 >
                   + Añadir Manual
@@ -349,9 +348,9 @@ export function FichajeWidget({
             )}
           </div>
 
-          {/* Mitad derecha: Anillo de progreso */}
-          <div className="flex flex-col items-center justify-center">
-            <div className="relative w-32 h-32">
+          {/* Anillo de progreso */}
+          <div className="flex flex-col items-center justify-center order-1 sm:order-2">
+            <div className="relative w-28 h-28 sm:w-32 sm:h-32">
               {/* SVG Anillo de progreso abierto por la parte de abajo */}
               <svg className="w-full h-full" viewBox="0 0 128 128">
                 {/* Arco de fondo (3/4 del círculo, abierto en la parte de abajo) */}
@@ -384,19 +383,19 @@ export function FichajeWidget({
               </svg>
               {/* Tiempo en el centro */}
               <div className="absolute inset-0 flex items-center justify-center">
-                <span className="text-2xl font-bold text-gray-900">{tiempoTrabajado}</span>
+                <span className="text-xl sm:text-2xl font-bold text-gray-900">{tiempoTrabajado}</span>
               </div>
             </div>
 
             {/* Marcadores de horas */}
             <div className="flex items-center justify-between w-full mt-2 px-2">
               <div className="text-center">
-                <div className="text-[11px] text-gray-900 font-semibold">{horasHechas}h</div>
-                <div className="text-[9px] text-gray-500">Hechas</div>
+                <div className="text-[10px] sm:text-[11px] text-gray-900 font-semibold">{horasHechas}h</div>
+                <div className="text-[8px] sm:text-[9px] text-gray-500">Hechas</div>
               </div>
               <div className="text-center">
-                <div className="text-[11px] text-gray-900 font-semibold">{horasPorHacer}h</div>
-                <div className="text-[9px] text-gray-500">Por hacer</div>
+                <div className="text-[10px] sm:text-[11px] text-gray-900 font-semibold">{horasPorHacer}h</div>
+                <div className="text-[8px] sm:text-[9px] text-gray-500">Por hacer</div>
               </div>
             </div>
           </div>

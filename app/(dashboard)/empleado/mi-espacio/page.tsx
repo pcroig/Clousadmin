@@ -7,11 +7,23 @@ import { Suspense } from 'react';
 
 import { UsuarioRol } from '@/lib/constants/enums';
 
-export default async function MiEspacioPage() {
+interface MiEspacioPageProps {
+  searchParams?: Promise<{
+    tab?: string;
+  }>;
+}
+
+export default async function MiEspacioPage({ searchParams }: MiEspacioPageProps) {
   const session = await getSession();
 
   if (!session || session.user.rol === UsuarioRol.hr_admin) {
     redirect('/login');
+  }
+
+  const resolvedSearchParams = searchParams ? await searchParams : undefined;
+
+  if (!resolvedSearchParams?.tab) {
+    redirect('/empleado/mi-espacio?tab=general');
   }
 
   const empleado = await prisma.empleado.findUnique({

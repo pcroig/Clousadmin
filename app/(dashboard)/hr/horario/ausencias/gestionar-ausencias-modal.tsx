@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -9,6 +9,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { LoadingButton } from '@/components/shared/loading-button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -20,12 +21,15 @@ import {
 } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Field, FieldLabel } from '@/components/ui/field';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Info, Download } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Calendar } from '@/components/ui/calendar';
+import { Equipo, PoliticaAusencia, TipoAusenciaEnum } from './types';
+import { editarCalendarioEmpresa, getAusenciasSettings } from '@/app/(dashboard)/hr/horario/ausencias/actions';
+import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
+import { InfoTooltip } from '@/components/shared/info-tooltip';
 import { CalendarioFestivos } from '@/components/hr/calendario-festivos';
 import { ListaFestivos } from '@/components/hr/lista-festivos';
-import { toast } from 'sonner';
-import { LoadingButton } from '@/components/shared/loading-button';
 
 interface GestionarAusenciasModalProps {
   open: boolean;
@@ -72,19 +76,24 @@ export function GestionarAusenciasModal({ open, onClose, onSaved }: GestionarAus
   });
   const [verCalendario, setVerCalendario] = useState(false);
 
-  useEffect(() => {
-    if (open) {
-      cargarDatos();
-    } else {
-      // Resetear al cerrar
-      setEquipoSeleccionado('');
-      setPoliticas({});
-      setSolapamientoPct('50');
-      setAntelacionDias('5');
+  const cargarPoliticaEquipo = useCallback(async (equipoId: string) => {
+    try {
+      const res = await fetch(`/api/organizacion/equipos/${equipoId}/politica`);
+      if (res.ok) {
+        const data = await res.json();
+        setPoliticas((prev) => ({
+          ...prev,
+          [equipoId]: data,
+        }));
+        setSolapamientoPct(data.maxSolapamientoPct.toString());
+        setAntelacionDias(data.requiereAntelacionDias.toString());
+      }
+    } catch (e) {
+      console.error('Error cargando política de equipo:', e);
     }
-  }, [open]);
+  }, []);
 
-  async function cargarDatos() {
+  const cargarDatos = useCallback(async () => {
     try {
       // Cargar equipos
       const resEquipos = await fetch('/api/organizacion/equipos');
@@ -111,24 +120,19 @@ export function GestionarAusenciasModal({ open, onClose, onSaved }: GestionarAus
     } catch (e) {
       console.error('Error cargando datos:', e);
     }
-  }
+  }, [cargarPoliticaEquipo]);
 
-  async function cargarPoliticaEquipo(equipoId: string) {
-    try {
-      const res = await fetch(`/api/organizacion/equipos/${equipoId}/politica`);
-      if (res.ok) {
-        const data = await res.json();
-        setPoliticas({
-          ...politicas,
-          [equipoId]: data,
-        });
-        setSolapamientoPct(data.maxSolapamientoPct.toString());
-        setAntelacionDias(data.requiereAntelacionDias.toString());
-      }
-    } catch (e) {
-      console.error('Error cargando política:', e);
+  useEffect(() => {
+    if (open) {
+      cargarDatos();
+    } else {
+      // Resetear al cerrar
+      setEquipoSeleccionado('');
+      setPoliticas({});
+      setSolapamientoPct('50');
+      setAntelacionDias('5');
     }
-  }
+  }, [open, cargarDatos]);
 
   async function handleCambiarEquipo(equipoId: string) {
     setEquipoSeleccionado(equipoId);
@@ -350,9 +354,9 @@ export function GestionarAusenciasModal({ open, onClose, onSaved }: GestionarAus
               <Button variant="outline" onClick={onClose}>
                 Cancelar
               </Button>
-              <Button onClick={handleGuardarSaldo} disabled={cargando}>
+              <LoadingButton onClick={handleGuardarSaldo} loading={cargando} disabled={cargando}>
                 {cargando ? 'Guardando...' : 'Guardar Saldo'}
-              </Button>
+              </LoadingButton>
             </DialogFooter>
           </TabsContent>
 
@@ -360,15 +364,15 @@ export function GestionarAusenciasModal({ open, onClose, onSaved }: GestionarAus
           <TabsContent value="calendario" className="space-y-4">
             <div className="flex justify-between items-center">
               <h3 className="font-semibold">Configuración del Calendario Laboral</h3>
-              <Button
+              <LoadingButton
                 size="sm"
                 variant="outline"
                 onClick={handleImportarFestivos}
+                loading={cargando}
                 disabled={cargando}
               >
-                <Download className="w-4 h-4 mr-2" />
-                Importar Calendario Nacional
-              </Button>
+                {cargando ? 'Importando...' : 'Importar Calendario Nacional'}
+              </LoadingButton>
             </div>
 
             <Field>
@@ -405,49 +409,41 @@ export function GestionarAusenciasModal({ open, onClose, onSaved }: GestionarAus
               </div>
             </Field>
 
-            <div className="border-t pt-4 mt-4">
-              <div className="flex justify-between items-center mb-4">
+            <div className="flex flex-col gap-2 mb-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-center gap-2">
                 <h4 className="font-medium">Festivos y Días No Laborables</h4>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setVerCalendario(!verCalendario)}
-                >
-                  {verCalendario ? 'Ver Lista' : 'Ver Calendario'}
-                </Button>
+                <InfoTooltip
+                  content="Esta configuración se usa para calcular los días de ausencia. Los cambios se aplican a todas las solicitudes futuras."
+                  variant="subtle"
+                />
               </div>
-
-              {verCalendario ? (
-                <CalendarioFestivos onUpdate={cargarDatos} />
-              ) : (
-                <ListaFestivos onUpdate={cargarDatos} />
-              )}
-            </div>
-
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <p className="text-sm text-blue-800">
-                <strong>Nota:</strong> La configuración de días laborables y festivos se usa para calcular 
-                los días de ausencia. Los cambios afectarán a todas las solicitudes futuras.
-              </p>
-            </div>
-
-            <DialogFooter>
-              <Button variant="outline" onClick={onClose}>
-                Cerrar
-              </Button>
-              <Button 
-                onClick={handleGuardarCalendario}
-                disabled={cargando}
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setVerCalendario(!verCalendario)}
               >
-                {cargando ? 'Guardando...' : 'Guardar Configuración'}
+                {verCalendario ? 'Ver Lista' : 'Ver Calendario'}
               </Button>
-            </DialogFooter>
+            </div>
+
+            {verCalendario ? (
+              <CalendarioFestivos onUpdate={cargarDatos} />
+            ) : (
+              <ListaFestivos onUpdate={cargarDatos} />
+            )}
           </TabsContent>
 
           {/* Tab: Políticas de Ausencia */}
           <TabsContent value="politicas" className="space-y-4">
             <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-gray-900">Configuración de Políticas de Ausencia por Equipo</h3>
+              <div className="flex items-start gap-2">
+                <h3 className="text-lg font-semibold text-gray-900 flex-1">Configuración de Políticas de Ausencia por Equipo</h3>
+                <InfoTooltip
+                  content="Estas políticas se aplican automáticamente al validar solicitudes. La antelación sólo afecta a vacaciones y ausencias 'otro', y el solapamiento se aplica únicamente a vacaciones."
+                  variant="subtle"
+                  side="left"
+                />
+              </div>
               
               <Field>
                 <FieldLabel>Seleccionar Equipo</FieldLabel>
@@ -478,27 +474,21 @@ export function GestionarAusenciasModal({ open, onClose, onSaved }: GestionarAus
                     <Field>
                       <div className="flex items-center gap-2">
                         <FieldLabel>Días de antelación mínima</FieldLabel>
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <button type="button" className="text-gray-400 hover:text-gray-600">
-                                <Info className="w-4 h-4" />
-                              </button>
-                            </TooltipTrigger>
-                            <TooltipContent className="max-w-xs">
-                              <div className="space-y-2 text-sm">
-                                <p className="font-medium">¿Qué es la antelación mínima?</p>
-                                <p className="text-xs">
-                                  Número mínimo de días que deben pasar entre la solicitud de ausencia y la fecha de inicio.
-                                  Solo aplica a ausencias que requieren aprobación (vacaciones y "otro").
-                                </p>
-                                <p className="text-xs mt-2">
-                                  Ejemplo: Con 5 días de antelación, una ausencia que empieza el 15 de enero debe solicitarse antes del 10 de enero.
-                                </p>
-                              </div>
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
+                        <InfoTooltip
+                          content={(
+                            <div className="space-y-2 text-sm">
+                              <p className="font-medium">¿Qué es la antelación mínima?</p>
+                              <p className="text-xs">
+                                Número mínimo de días que deben pasar entre la solicitud de ausencia y la fecha de inicio.
+                                Solo aplica a ausencias que requieren aprobación (vacaciones y "otro").
+                              </p>
+                              <p className="text-xs mt-2">
+                                Ejemplo: Con 5 días de antelación, una ausencia que empieza el 15 de enero debe solicitarse antes del 10 de enero.
+                              </p>
+                            </div>
+                          )}
+                          variant="subtle"
+                        />
                       </div>
                       
                       <div className="flex items-center gap-4 mt-4">
@@ -516,39 +506,23 @@ export function GestionarAusenciasModal({ open, onClose, onSaved }: GestionarAus
 
                     <Field>
                       <div className="flex items-center gap-2">
-                        <FieldLabel>Porcentaje máximo de solapamiento</FieldLabel>
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <button type="button" className="text-gray-400 hover:text-gray-600">
-                                <Info className="w-4 h-4" />
-                              </button>
-                            </TooltipTrigger>
-                            <TooltipContent className="max-w-xs">
-                              <div className="space-y-2 text-sm">
-                                <p className="font-medium">¿Qué significa el solapamiento?</p>
-                                <p className="text-xs">
-                                  El porcentaje de solapamiento determina cuántos empleados del equipo pueden estar de vacaciones al mismo tiempo.
-                                  Por ejemplo, con un 50% y 10 empleados, máximo 5 pueden estar de vacaciones simultáneamente.
-                                </p>
-                                <p className="text-xs">
-                                  Esta validación se aplica automáticamente al crear solicitudes de vacaciones.
-                                </p>
-                                <div className="mt-2 pt-2 border-t">
-                                  <p className="font-medium text-xs">Configuración actual:</p>
-                                  <p className="text-xs mt-1">
-                                    Con un {solapamientoPct}% de solapamiento máximo:
-                                  </p>
-                                  <ul className="text-xs mt-2 space-y-1 list-disc list-inside">
-                                    <li>Equipo de 10 personas: máximo {Math.ceil(((parseInt(solapamientoPct) || 50) / 100) * 10)} simultáneos</li>
-                                    <li>Equipo de 20 personas: máximo {Math.ceil(((parseInt(solapamientoPct) || 50) / 100) * 20)} simultáneos</li>
-                                    <li>Equipo de 50 personas: máximo {Math.ceil(((parseInt(solapamientoPct) || 50) / 100) * 50)} simultáneos</li>
-                                  </ul>
-                                </div>
-                              </div>
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
+                        <FieldLabel>Solapamiento máximo permitido</FieldLabel>
+                        <InfoTooltip
+                          content={(
+                            <div className="space-y-2 text-sm">
+                              <p className="font-medium">¿Qué significa el solapamiento?</p>
+                              <p className="text-xs">
+                                Número máximo de personas del equipo que pueden coincidir de vacaciones al mismo tiempo.
+                                Controla la capacidad del equipo durante los periodos con más ausencias.
+                              </p>
+                              <p className="text-xs mt-2">
+                                Ejemplo: Con un solapamiento máximo de 2 personas, si ya hay 2 miembros en vacaciones
+                                durante una semana, una tercera solicitud para esa misma semana se rechazará automáticamente.
+                              </p>
+                            </div>
+                          )}
+                          variant="subtle"
+                        />
                       </div>
                       
                       <div className="flex items-center gap-4 mt-4">
@@ -563,13 +537,6 @@ export function GestionarAusenciasModal({ open, onClose, onSaved }: GestionarAus
                         <span className="text-sm text-gray-600">%</span>
                       </div>
                     </Field>
-                  </div>
-
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                    <p className="text-sm text-blue-800">
-                      <strong>Nota:</strong> Las políticas se aplican automáticamente al validar solicitudes de ausencia.
-                      La antelación solo aplica a vacaciones y "otro", mientras que el solapamiento solo aplica a vacaciones.
-                    </p>
                   </div>
                 </>
               )}

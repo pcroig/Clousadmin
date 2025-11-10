@@ -50,22 +50,23 @@ export function EmpleadoDashboardClient({
     <>
       <div className="h-full w-full flex flex-col">
         {/* Header */}
-        <div className="flex-shrink-0 mb-5">
-          <h1 className="text-2xl font-bold text-gray-900">
+        <div className="flex-shrink-0 mb-3 sm:mb-5">
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">
             Buenos Días, {userName}
           </h1>
         </div>
 
-        {/* 3x2 Grid Layout - Notificaciones y Ausencias ocupan 2 filas */}
+        {/* Responsive Grid Layout */}
         <div className="flex-1 min-h-0 pb-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 grid-rows-2 gap-5">
-            {/* Fichaje Widget - Fila 1, Columna 1 */}
+          {/* Mobile: Stack vertical con solo Fichaje y Ausencias */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 lg:grid-rows-2 gap-4 sm:gap-5">
+            {/* Fichaje Widget */}
             <div className="min-h-0">
               <FichajeWidget href="/empleado/horario/fichajes" />
             </div>
 
-            {/* Notificaciones Widget - Fila 1-2, Columna 2 (ocupa 2 filas) */}
-            <div className="row-span-2 min-h-0">
+            {/* Notificaciones Widget - Hidden on mobile */}
+            <div className="row-span-2 min-h-0 hidden md:block">
               <NotificacionesWidget
                 notificaciones={notificaciones}
                 maxItems={8}
@@ -73,7 +74,7 @@ export function EmpleadoDashboardClient({
               />
             </div>
 
-            {/* Ausencias Widget - Fila 1-2, Columna 3 (ocupa 2 filas) */}
+            {/* Ausencias Widget */}
             <div className="row-span-2 min-h-0">
               <AusenciasWidget
                 diasAcumulados={saldoFinal.diasTotales}
@@ -86,8 +87,8 @@ export function EmpleadoDashboardClient({
               />
             </div>
 
-            {/* Widget vacío - Fila 2, Columna 1 */}
-            <div className="min-h-0">
+            {/* Widget vacío - Hidden on mobile */}
+            <div className="min-h-0 hidden lg:block">
               {/* Por ahora vacío */}
             </div>
           </div>

@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { LoadingButton } from '@/components/shared/loading-button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -11,6 +12,20 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { CalendarIcon } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { InfoTooltip } from '@/components/shared/info-tooltip';
+import { Spinner } from '@/components/ui/spinner';
+
+interface ErrorDetail {
+  field?: string;
+  message: string;
+  [key: string]: unknown;
+}
+
+interface ApiErrorResponse {
+  error: string;
+  details: ErrorDetail[];
+  [key: string]: unknown;
+}
 
 interface SolicitarAusenciaModalProps {
   open: boolean;
@@ -92,13 +107,25 @@ export function SolicitarAusenciaModal({
     }
 
     try {
-      // Subir justificante a S3 si hay archivo
+      // Subir justificante a S3 si hay archivo y crear documento en BD
       let justificanteUrl: string | undefined;
+      let documentoId: string | undefined;
+      
       if (justificante) {
         setUploadingJustificante(true);
+        
+        // Obtener empleadoId del usuario actual
+        const empleadoResponse = await fetch('/api/empleados/me');
+        const empleadoData = await empleadoResponse.json();
+        const empleadoId = empleadoData?.id;
+
         const formData = new FormData();
         formData.append('file', justificante);
         formData.append('tipo', 'justificante');
+        formData.append('crearDocumento', 'true');
+        if (empleadoId) {
+          formData.append('empleadoId', empleadoId);
+        }
 
         const uploadResponse = await fetch('/api/upload', {
           method: 'POST',
@@ -111,11 +138,23 @@ export function SolicitarAusenciaModal({
 
         const uploadData = await uploadResponse.json();
         justificanteUrl = uploadData.url;
+        documentoId = uploadData.documento?.id;
         setUploadingJustificante(false);
       }
 
       // Construir payload solo con campos que tienen valores
-      const payload: any = {
+      interface AusenciaPayload {
+        tipo: string;
+        fechaInicio: string;
+        fechaFin: string;
+        medioDia: boolean;
+        descripcion?: string;
+        motivo?: string;
+        justificanteUrl?: string;
+        documentoId?: string;
+      }
+      
+      const payload: AusenciaPayload = {
         tipo,
         fechaInicio: fechaInicio.toISOString(),
         fechaFin: fechaFin.toISOString(),
@@ -139,9 +178,12 @@ export function SolicitarAusenciaModal({
         payload.motivo = motivo.trim();
       }
 
-      // Incluir justificante URL si se subió
+      // Incluir justificante URL y documentoId si se subió
       if (justificanteUrl) {
         payload.justificanteUrl = justificanteUrl;
+      }
+      if (documentoId) {
+        payload.documentoId = documentoId;
       }
 
       const response = await fetch('/api/ausencias', {
@@ -154,13 +196,14 @@ export function SolicitarAusenciaModal({
 
       if (!response.ok) {
         // Mostrar detalles de validación si están disponibles
-        if (data.details && Array.isArray(data.details)) {
-          const errores = data.details.map((d: any) => 
-            `${d.path?.join('.') || 'campo'}: ${d.message}`
+        const apiError = data as ApiErrorResponse;
+        if (apiError.details && Array.isArray(apiError.details)) {
+          const errores = apiError.details.map((d) => 
+            `${(d as Record<string, unknown>).path ? String((d as Record<string, unknown>).path).replace(/,/g, '.') : 'campo'}: ${d.message}`
           ).join(', ');
-          throw new Error(data.error + ': ' + errores);
+          throw new Error(apiError.error + ': ' + errores);
         }
-        throw new Error(data.error || 'Error al crear solicitud');
+        throw new Error(apiError.error || 'Error al crear solicitud');
       }
 
       onSuccess();
@@ -174,8 +217,9 @@ export function SolicitarAusenciaModal({
       setDescripcion('');
       setMotivo('');
       setJustificante(null);
-    } catch (err: any) {
-      setError(err.message || 'Error al crear solicitud');
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error('Error desconocido');
+      setError(error.message || 'Error al crear solicitud');
     } finally {
       setLoading(false);
     }
@@ -223,10 +267,15 @@ export function SolicitarAusenciaModal({
 
           {/* Saldo disponible (solo vacaciones) */}
           {tipo === 'vacaciones' && (
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-              <p className="text-sm text-blue-900">
-                <span className="font-medium">Días disponibles:</span> {saldoDisponible} días
-              </p>
+            <div className="flex items-center gap-2 text-sm text-gray-600">
+              <InfoTooltip
+                content="Incluye los días de vacaciones disponibles teniendo en cuenta solicitudes aprobadas y pendientes."
+                variant="subtle"
+                side="right"
+              />
+              <span>
+                <span className="font-medium text-gray-900">Días disponibles:</span> {saldoDisponible} días
+              </span>
             </div>
           )}
 
@@ -345,6 +394,12 @@ export function SolicitarAusenciaModal({
                 Archivo seleccionado: {justificante.name} ({(justificante.size / 1024).toFixed(1)} KB)
               </p>
             )}
+            {uploadingJustificante && (
+              <p className="text-xs text-gray-500 mt-2 flex items-center gap-2">
+                <Spinner className="size-3 text-gray-400" />
+                Subiendo justificante...
+              </p>
+            )}
           </div>
 
           {/* Error */}
@@ -364,9 +419,13 @@ export function SolicitarAusenciaModal({
             >
               Cancelar
             </Button>
-            <Button type="submit" disabled={loading || uploadingJustificante}>
+            <LoadingButton
+              type="submit"
+              loading={loading || uploadingJustificante}
+              disabled={loading || uploadingJustificante}
+            >
               {uploadingJustificante ? 'Subiendo justificante...' : loading ? 'Enviando...' : 'Solicitar'}
-            </Button>
+            </LoadingButton>
           </div>
         </form>
       </DialogContent>

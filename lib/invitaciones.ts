@@ -6,6 +6,7 @@
 import { prisma } from '@/lib/prisma';
 import { hashPassword } from '@/lib/auth';
 import { crearOnboarding, type TipoOnboarding } from '@/lib/onboarding';
+import { sendOnboardingEmail } from '@/lib/email';
 
 /**
  * Crear invitación para un empleado
@@ -61,6 +62,98 @@ export async function crearInvitacion(
       error: 'Error al crear la invitación',
     };
   }
+}
+
+type CrearInvitacionReturn = Awaited<ReturnType<typeof crearInvitacion>>;
+
+type InvitacionEntidad =
+  CrearInvitacionReturn extends { invitacion: infer T } ? T : undefined;
+
+export interface InvitarEmpleadoParams {
+  empleadoId: string;
+  empresaId: string;
+  email: string;
+  nombre: string;
+  apellidos: string;
+  tipoOnboarding?: TipoOnboarding;
+  empresaNombre?: string;
+}
+
+export interface InvitarEmpleadoResult {
+  success: boolean;
+  url?: string;
+  invitacion?: InvitacionEntidad;
+  emailEnviado: boolean;
+  error?: string;
+}
+
+/**
+ * Crear invitación y enviar email automáticamente
+ */
+export async function invitarEmpleado({
+  empleadoId,
+  empresaId,
+  email,
+  nombre,
+  apellidos,
+  tipoOnboarding = 'completo',
+  empresaNombre,
+}: InvitarEmpleadoParams): Promise<InvitarEmpleadoResult> {
+  const invitacion = await crearInvitacion(
+    empleadoId,
+    empresaId,
+    email,
+    tipoOnboarding
+  );
+
+  if (!invitacion.success || !invitacion.url) {
+    return {
+      success: false,
+      emailEnviado: false,
+      error: invitacion.error || 'No se pudo crear la invitación',
+    };
+  }
+
+  let nombreEmpresa = empresaNombre;
+  try {
+    if (!nombreEmpresa) {
+      const empresa = await prisma.empresa.findUnique({
+        where: { id: empresaId },
+        select: { nombre: true },
+      });
+      nombreEmpresa = empresa?.nombre || 'Tu empresa';
+    }
+  } catch (error) {
+    console.warn(
+      '[invitarEmpleado] No se pudo obtener nombre de empresa, usando valor por defecto:',
+      error
+    );
+    nombreEmpresa = 'Tu empresa';
+  }
+
+  const nombreEmpresaFinal = nombreEmpresa || 'Tu empresa';
+
+  let emailEnviado = false;
+  try {
+    await sendOnboardingEmail(
+      nombre,
+      apellidos,
+      email,
+      nombreEmpresaFinal,
+      invitacion.url
+    );
+    emailEnviado = true;
+  } catch (error) {
+    console.error('[invitarEmpleado] Error enviando email de onboarding:', error);
+  }
+
+  return {
+    success: invitacion.success,
+    url: invitacion.url,
+    invitacion: invitacion.invitacion,
+    emailEnviado,
+    error: emailEnviado ? undefined : 'No se pudo enviar el email de invitación',
+  };
 }
 
 /**

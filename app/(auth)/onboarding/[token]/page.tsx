@@ -48,6 +48,8 @@ export default async function OnboardingPage({
                 empleado={onboarding!.empleado}
                 progreso={onboarding!.progreso as unknown as ProgresoOnboarding}
                 datosTemporales={onboarding!.datosTemporales as unknown as DatosTemporales | null}
+                nombreEmpresa={onboarding!.empresa.nombre}
+                tipoOnboarding={onboarding!.tipo}
               />
             )}
           </div>

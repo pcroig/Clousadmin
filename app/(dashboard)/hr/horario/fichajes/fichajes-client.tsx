@@ -4,7 +4,7 @@
 // Fichajes Client Component - Vista por Jornadas
 // ========================================
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import {
@@ -16,17 +16,9 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Clock, Calendar, ChevronDown, ChevronUp, Edit2 } from 'lucide-react';
+import { Clock, Calendar } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { formatearHorasMinutos } from '@/lib/utils/formatters';
@@ -34,7 +26,7 @@ import { JornadasModal } from './jornadas-modal';
 import { EditarFichajeModal } from './editar-fichaje-modal';
 import { RevisionModal } from './revision-modal';
 
-import { EstadoAusencia } from '@/lib/constants/enums';
+import { EstadoFichaje } from '@/lib/constants/enums';
 
 // NUEVO MODELO: Fichaje tiene eventos dentro
 interface FichajeEvento {
@@ -84,14 +76,12 @@ interface FichajeEventoParaEditar {
 }
 
 export function FichajesClient({ initialState }: { initialState?: string }) {
-  const [fichajes, setFichajes] = useState<Fichaje[]>([]);
   const [jornadas, setJornadas] = useState<JornadaDia[]>([]);
   const [loading, setLoading] = useState(true);
   const [filtroEstadoFichaje, setFiltroEstadoFichaje] = useState(initialState || 'todos'); // fichaje individual: confirmado/auto/rechazado
   const [rangoFechas, setRangoFechas] = useState<'dia' | 'semana' | 'mes'>('semana');
   const [fechaBase, setFechaBase] = useState(new Date());
   const [busquedaEmpleado, setBusquedaEmpleado] = useState('');
-  const [jornadaExpandida, setJornadaExpandida] = useState<string | null>(null);
   const [jornadasModal, setJornadasModal] = useState(false);
   const [revisionModal, setRevisionModal] = useState(false);
   const [cuadrandoFichajes, setCuadrandoFichajes] = useState(false);
@@ -103,11 +93,111 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
     fichaje: null,
   });
 
-  useEffect(() => {
-    fetchFichajes();
-  }, [filtroEstadoFichaje, rangoFechas, fechaBase]);
+  const calcularHorasTrabajadas = useCallback((eventos: FichajeEvento[]): number => {
+    let horasTotales = 0;
+    let inicioTrabajo: Date | null = null;
 
-  async function fetchFichajes() {
+    for (const evento of eventos) {
+      const hora = new Date(evento.hora);
+
+      switch (evento.tipo) {
+        case 'entrada':
+          inicioTrabajo = hora;
+          break;
+
+        case 'pausa_inicio':
+          if (inicioTrabajo) {
+            const tiempoTrabajado = (hora.getTime() - inicioTrabajo.getTime()) / (1000 * 60 * 60);
+            horasTotales += tiempoTrabajado;
+            inicioTrabajo = null;
+          }
+          break;
+
+        case 'pausa_fin':
+          inicioTrabajo = hora;
+          break;
+
+        case 'salida':
+          if (inicioTrabajo) {
+            const tiempoTrabajado = (hora.getTime() - inicioTrabajo.getTime()) / (1000 * 60 * 60);
+            horasTotales += tiempoTrabajado;
+            inicioTrabajo = null;
+          }
+          break;
+      }
+    }
+
+    return Math.round(horasTotales * 100) / 100;
+  }, []);
+
+  const agruparPorJornada = useCallback((fichajes: Fichaje[]): JornadaDia[] => {
+    const grupos: Record<string, Fichaje[]> = {};
+
+    fichajes.forEach(f => {
+      if (!grupos[f.fecha]) {
+        grupos[f.fecha] = [];
+      }
+      grupos[f.fecha].push(f);
+    });
+
+    return Object.entries(grupos).map(([fecha, fichajesDelDia]) => {
+      const ordenados = [...fichajesDelDia].sort((a, b) =>
+        new Date(a.hora).getTime() - new Date(b.hora).getTime()
+      );
+
+      let horasTrabajadas = 0;
+      const fichaje = fichajesDelDia[0];
+      if (fichaje.horasTrabajadas !== null && fichaje.horasTrabajadas !== undefined) {
+        const valor = fichaje.horasTrabajadas;
+        horasTrabajadas = typeof valor === 'string' ? parseFloat(valor) : valor;
+        if (Number.isNaN(horasTrabajadas)) {
+          horasTrabajadas = calcularHorasTrabajadas(ordenados);
+        }
+      } else {
+        horasTrabajadas = calcularHorasTrabajadas(ordenados);
+      }
+
+      const entrada = ordenados.find(e => e.tipo === 'entrada');
+      const salida = ordenados.find(e => e.tipo === 'salida');
+
+      const horarioEntrada = entrada ? format(new Date(entrada.hora), 'HH:mm') : null;
+      const horarioSalida = salida ? format(new Date(salida.hora), 'HH:mm') : null;
+
+      const horasEsperadas = (() => {
+        const valor = (fichaje as { horasEsperadas?: number | string | null }).horasEsperadas;
+        if (valor === null || valor === undefined) {
+          return 0;
+        }
+        const numero = typeof valor === 'string' ? parseFloat(valor) : valor;
+        return Number.isFinite(numero) ? numero : 0;
+      })();
+
+      const balance = (() => {
+        const valor = (fichaje as { balance?: number | string | null }).balance;
+        if (valor === null || valor === undefined) {
+          return Math.round((horasTrabajadas - horasEsperadas) * 100) / 100;
+        }
+        const numero = typeof valor === 'string' ? parseFloat(valor) : valor;
+        return Number.isFinite(numero)
+          ? numero
+          : Math.round((horasTrabajadas - horasEsperadas) * 100) / 100;
+      })();
+
+      return {
+        empleadoId: fichaje.empleado.id,
+        empleadoNombre: `${fichaje.empleado.nombre} ${fichaje.empleado.apellidos}`,
+        fecha: new Date(fecha),
+        fichaje,
+        horasTrabajadas,
+        horasEsperadas,
+        horarioEntrada,
+        horarioSalida,
+        balance,
+      };
+    }).sort((a, b) => b.fecha.getTime() - a.fecha.getTime());
+  }, [calcularHorasTrabajadas]);
+
+  const fetchFichajes = useCallback(async () => {
     setLoading(true);
     try {
       const params = new URLSearchParams();
@@ -117,9 +207,12 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
       params.append('fechaInicio', inicio.toISOString().split('T')[0]);
       params.append('fechaFin', fin.toISOString().split('T')[0]);
 
+      if (filtroEstadoFichaje !== 'todos') {
+        params.append('estado', filtroEstadoFichaje);
+      }
+
       const response = await fetch(`/api/fichajes?${params}`);
       const data = await response.json();
-      setFichajes(data);
       
       // Agrupar fichajes en jornadas
       const jornadasAgrupadas = agruparPorJornada(data);
@@ -129,7 +222,11 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
     } finally {
       setLoading(false);
     }
-  }
+  }, [agruparPorJornada, fechaBase, rangoFechas, filtroEstadoFichaje]);
+
+  useEffect(() => {
+    fetchFichajes();
+  }, [fetchFichajes]);
 
   function calcularRangoFechas(fecha: Date, rango: 'dia' | 'semana' | 'mes') {
     const inicio = new Date(fecha);
@@ -165,108 +262,13 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
   }
 
   // NUEVO MODELO: Los fichajes ya vienen agrupados (un fichaje por día con eventos)
-  function agruparPorJornada(fichajes: Fichaje[]): JornadaDia[] {
-    return fichajes.map(fichaje => {
-      // Ordenar eventos por hora
-      const eventosOrdenados = [...fichaje.eventos].sort((a, b) => 
-        new Date(a.hora).getTime() - new Date(b.hora).getTime()
-      );
+  // useEffect(() => {
+  //   fetchFichajes();
+  // }, [filtroEstadoFichaje, rangoFechas, fechaBase]);
 
-      // Convertir horasTrabajadas a número siempre (Prisma Decimal se serializa como string)
-      let horasTrabajadas: number;
-      if (fichaje.horasTrabajadas !== null && fichaje.horasTrabajadas !== undefined) {
-        // Convertir string o number a number
-        horasTrabajadas = typeof fichaje.horasTrabajadas === 'string' 
-          ? parseFloat(fichaje.horasTrabajadas) 
-          : fichaje.horasTrabajadas;
-        
-        // Si la conversión falla o es NaN, calcular desde eventos
-        if (isNaN(horasTrabajadas)) {
-          horasTrabajadas = calcularHorasTrabajadas(eventosOrdenados);
-        }
-      } else {
-        // Si es null/undefined, calcular desde eventos
-        horasTrabajadas = calcularHorasTrabajadas(eventosOrdenados);
-      }
-      
-      // Obtener horario de entrada/salida
-      const entrada = eventosOrdenados.find(e => e.tipo === 'entrada');
-      const salida = eventosOrdenados.find(e => e.tipo === 'salida');
-      
-      const horarioEntrada = entrada ? format(new Date(entrada.hora), 'HH:mm') : null;
-      const horarioSalida = salida ? format(new Date(salida.hora), 'HH:mm') : null;
-
-      const horasEsperadas = (() => {
-        const valor = (fichaje as any).horasEsperadas;
-        if (valor === null || valor === undefined) {
-          return 0;
-        }
-        const numero = typeof valor === 'string' ? parseFloat(valor) : valor;
-        return Number.isFinite(numero) ? numero : 0;
-      })();
-
-      const balance = (() => {
-        const valor = (fichaje as any).balance;
-        if (valor === null || valor === undefined) {
-          return Math.round((horasTrabajadas - horasEsperadas) * 100) / 100;
-        }
-        const numero = typeof valor === 'string' ? parseFloat(valor) : valor;
-        if (Number.isFinite(numero)) {
-          return numero;
-        }
-        return Math.round((horasTrabajadas - horasEsperadas) * 100) / 100;
-      })();
-
-      return {
-        empleadoId: fichaje.empleado.id,
-        empleadoNombre: `${fichaje.empleado.nombre} ${fichaje.empleado.apellidos}`,
-        fecha: new Date(fichaje.fecha),
-        fichaje,
-        horasTrabajadas,
-        horasEsperadas,
-        horarioEntrada,
-        horarioSalida,
-        balance,
-      };
-    }).sort((a, b) => b.fecha.getTime() - a.fecha.getTime());
-  }
-
-  function calcularHorasTrabajadas(eventos: FichajeEvento[]): number {
-    let horasTotales = 0;
-    let inicioTrabajo: Date | null = null;
-
-    for (const evento of eventos) {
-      const hora = new Date(evento.hora);
-
-      switch (evento.tipo) {
-        case 'entrada':
-          inicioTrabajo = hora;
-          break;
-
-        case 'pausa_inicio':
-          if (inicioTrabajo) {
-            const tiempoTrabajado = (hora.getTime() - inicioTrabajo.getTime()) / (1000 * 60 * 60);
-            horasTotales += tiempoTrabajado;
-            inicioTrabajo = null;
-          }
-          break;
-
-        case 'pausa_fin':
-          inicioTrabajo = hora;
-          break;
-
-        case 'salida':
-          if (inicioTrabajo) {
-            const tiempoTrabajado = (hora.getTime() - inicioTrabajo.getTime()) / (1000 * 60 * 60);
-            horasTotales += tiempoTrabajado;
-            inicioTrabajo = null;
-          }
-          break;
-      }
-    }
-
-    return Math.round(horasTotales * 10) / 10;
-  }
+  // useEffect(() => {
+  //   fetchFichajes();
+  // }, [filtroEstadoFichaje, rangoFechas, fechaBase]);
 
   async function handleCuadrarFichajes() {
     setCuadrandoFichajes(true);
@@ -290,7 +292,6 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
 
     const fechaIso = new Date(fecha).toISOString();
     const rowKey = `${empleadoId}_${fechaIso}`;
-    setJornadaExpandida(rowKey);
 
     setTimeout(() => {
       const rowElement = document.getElementById(rowKey);
@@ -309,7 +310,7 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
         return;
       }
 
-      const eventoSalida = eventos.find((evento: any) => evento.tipo === 'salida');
+      const eventoSalida = eventos.find((evento: FichajeEvento) => evento.tipo === 'salida');
       const eventoObjetivo = eventoSalida || eventos[eventos.length - 1];
 
       if (eventoObjetivo) {
@@ -391,9 +392,9 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
   // Fichajes que requieren atención (no completados ni aprobados)
   const fichajesRevisados = jornadasFiltradas.filter(j => j.fichaje.estado === 'revisado').length;
   const fichajesPendientesRevision = jornadasFiltradas.filter(j => 
-    j.fichaje.estado === EstadoAusencia.pendiente_aprobacion || 
+    j.fichaje.estado === EstadoFichaje.pendiente || 
     j.fichaje.estado === 'pendiente_revision' || // Legacy
-    j.fichaje.estado === EstadoAusencia.en_curso ||
+    j.fichaje.estado === EstadoFichaje.en_curso ||
     j.fichaje.estado === 'rechazado' // Legacy - tratar como pendiente
   ).length;
 
@@ -558,7 +559,6 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
               ) : (
                 jornadasFiltradas.map((jornada) => {
                   const key = `${jornada.empleadoId}_${jornada.fecha.toISOString()}`;
-                  const isExpanded = jornadaExpandida === key;
                   
                   return (
                     <React.Fragment key={key}>
@@ -568,22 +568,22 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
                         onClick={() => {
                           const eventos = jornada.fichaje.eventos;
                           if (eventos && eventos.length > 0) {
-                            const eventoSalida = eventos.find((e: any) => e.tipo === 'salida');
-                            const target = eventoSalida || eventos[eventos.length - 1];
+                            const eventoSalida = eventos.find((e: FichajeEvento) => e.tipo === 'salida');
+                            const target = (eventoSalida || eventos[eventos.length - 1]) as FichajeEvento;
                             setEditarFichajeModal({
                               open: true,
                               fichaje: {
                                 id: target.id,
                                 tipo: target.tipo,
                                 hora: target.hora,
-                                editado: Boolean((target as any).editado),
+                                editado: Boolean(target.editado),
                               },
                             });
                           }
                         }}
                       >
                         <TableCell>
-                          {/* Detalle por fila: sin dropdown */}
+                          {/* Reservado para icono futuro */}
                         </TableCell>
                     <TableCell>
                       <div className="font-medium text-gray-900">

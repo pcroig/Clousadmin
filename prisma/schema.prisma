@@ -232,7 +232,7 @@ model Empleado {
   // Address (STRUCTURED)
   direccionCalle     String? @db.VarChar(200)
   direccionNumero    String? @db.VarChar(10)
-  direccionPiso      String? @db.VarChar(10)
+  direccionPiso      String? @db.VarChar(100) // Increased from 10 to 100 to handle full addresses
   codigoPostal       String? @db.VarChar(5)
   ciudad             String? @db.VarChar(100)
   direccionProvincia String? @db.VarChar(100)
@@ -390,6 +390,7 @@ model Puesto {
   empleados  Empleado[]
   documentos Documento[]
 
+  @@unique([empresaId, nombre]) // Un puesto con el mismo nombre no puede repetirse en una empresa
   @@index([empresaId])
   @@map("puestos")
 }
@@ -1432,24 +1433,7 @@ model Denuncia {
 
   // Contenido de la denuncia
   descripcion     String  @db.Text
-  fechaIncidente  DateTime? @db.Date // Fecha aproximada del incidente (opcional)
-  ubicacion       String? @db.Text // Contexto/ubicación del incidente (opcional)
-
-  // Estado y seguimiento
-  estado          String  @default("pendiente") @db.VarChar(50) // 'pendiente', 'en_revision', 'resuelta', 'archivada'
-  prioridad       String  @default("media") @db.VarChar(50) // 'baja', 'media', 'alta', 'critica'
-
-  // Anonimato
   esAnonima       Boolean @default(false)
-
-  // Asignación (HR)
-  asignadaA       String? // Usuario ID (HR admin)
-  asignadaEn      DateTime?
-
-  // Resolución
-  resueltaEn      DateTime?
-  resolucion      String? @db.Text
-  notasInternas   String? @db.Text // Notas privadas de HR
 
   // Documentos adjuntos (S3 keys en JSON)
   documentos      Json? // Array de { id, nombre, s3Key, mimeType, tamano, uploadedAt }
@@ -1462,9 +1446,8 @@ model Denuncia {
   empresa         Empresa  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
   denunciante     Empleado? @relation(fields: [denuncianteId], references: [id], onDelete: SetNull)
 
-  @@index([empresaId, estado])
+  @@index([empresaId])
   @@index([denuncianteId])
-  @@index([asignadaA])
   @@index([createdAt])
   @@map("denuncias")
 }

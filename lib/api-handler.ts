@@ -15,10 +15,10 @@ import { UsuarioRol } from '@/lib/constants/enums';
 // Types
 // ========================================
 
-export interface ApiResponse<T = any> {
+export interface ApiResponse<T = unknown> {
   data?: T;
   error?: string;
-  details?: any;
+  details?: unknown;
 }
 
 export interface AuthenticatedContext {
@@ -35,8 +35,9 @@ export interface AuthenticatedContext {
  * Retorna 401 si no hay sesión
  */
 export async function requireAuth(
-  req: NextRequest
+  _req: NextRequest
 ): Promise<{ session: SessionData } | NextResponse> {
+  void _req;
   const session = await getSession();
   
   if (!session || !session.user) {
@@ -234,7 +235,7 @@ export function notFoundResponse(message: string = 'Recurso no encontrado'): Nex
 /**
  * Respuesta de bad request
  */
-export function badRequestResponse(message: string, details?: any): NextResponse {
+export function badRequestResponse(message: string, details?: unknown): NextResponse {
   return NextResponse.json(
     { error: message, ...(details && { details }) },
     { status: 400 }

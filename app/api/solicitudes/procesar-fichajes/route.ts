@@ -12,7 +12,7 @@ import {
 } from '@/lib/api-handler';
 import { actualizarCalculosFichaje } from '@/lib/calculos/fichajes';
 import { crearNotificacionSolicitudAprobada } from '@/lib/notificaciones';
-import { EstadoAusencia, EstadoSolicitud } from '@/lib/constants/enums';
+import { EstadoFichaje, EstadoSolicitud } from '@/lib/constants/enums';
 
 // POST /api/solicitudes/procesar-fichajes - Procesar solicitudes de fichaje manual
 export async function POST(request: NextRequest) {
@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
     console.info(`[Procesar Fichajes] Encontradas ${solicitudesPendientes.length} solicitudes pendientes`);
 
     let procesadas = 0;
-    let errores: string[] = [];
+    const errores: string[] = [];
 
     for (const solicitud of solicitudesPendientes) {
       try {
@@ -120,7 +120,7 @@ export async function POST(request: NextRequest) {
               empresaId: solicitud.empleado.empresaId,
               empleadoId: solicitud.empleadoId,
               fecha,
-              estado: EstadoAusencia.en_curso,
+              estado: EstadoFichaje.en_curso,
             },
             include: {
               eventos: true,

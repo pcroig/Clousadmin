@@ -170,7 +170,7 @@ async function agregarHojaAusencias(
     where: {
       empresaId,
       estado: {
-        in: ['completada', 'en_curso', 'auto_aprobada'],
+        in: [EstadoAusencia.completada, EstadoAusencia.en_curso, EstadoAusencia.auto_aprobada],
       },
       OR: [
         {
@@ -479,6 +479,7 @@ export async function guardarExportGestoria(
     `[guardarExportGestoria] Export guardado: ${numEmpleados} empleados, ${numAlertasCriticas} alertas críticas`
   );
 }
+
 
 
 

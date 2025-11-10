@@ -185,15 +185,10 @@ export function InvitarHRAdmins() {
           </p>
         </div>
       )}
-
-      <div className="rounded-lg bg-yellow-50 p-4">
-        <p className="text-sm text-yellow-700">
-          ⚠️ <strong>Nota:</strong> Los administradores de RRHH tendrán acceso completo a todos los datos de la empresa y empleados.
-        </p>
-      </div>
     </div>
   );
 }
+
 
 
 

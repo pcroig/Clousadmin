@@ -143,7 +143,7 @@ export async function calcularBalancePeriodo(
   const calendarioLaboralMap = new Map<string, boolean>();
   
   // Pre-calcular todos los días del rango
-  let fechaTemp = new Date(fechaInicio);
+  const fechaTemp = new Date(fechaInicio);
   while (fechaTemp <= fechaFin) {
     const fechaKey = fechaTemp.toISOString().split('T')[0];
     const esLaborable = await esDiaLaborable(fechaTemp, empleado.empresaId);
@@ -156,7 +156,7 @@ export async function calcularBalancePeriodo(
   let totalHorasTrabajadas = 0;
   let totalHorasEsperadas = 0;
 
-  let fechaActual = new Date(fechaInicio);
+  const fechaActual = new Date(fechaInicio);
   while (fechaActual <= fechaFin) {
     const fechaKey = fechaActual.toISOString().split('T')[0];
     const fichajeDia = fichajesPorDia[fechaKey];

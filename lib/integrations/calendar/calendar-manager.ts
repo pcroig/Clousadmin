@@ -5,7 +5,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { OAuthManager } from "@/lib/oauth/oauth-manager";
-import { getGoogleOAuthConfig } from "@/lib/oauth/config";
+import { getGoogleCalendarOAuthConfig } from "@/lib/oauth/config";
 import { createCalendarProvider } from "./providers";
 import type {
   CalendarProviderName} from "./providers";
@@ -27,7 +27,13 @@ export class CalendarManager {
     const results: SyncResult[] = [];
 
     try {
-      // 1. Buscar integraciones de calendario activas
+      // 1. Obtener el usuarioId del empleado
+      const empleado = await prisma.empleado.findUnique({
+        where: { id: ausencia.empleadoId },
+        select: { usuarioId: true },
+      });
+
+      // 2. Buscar integraciones de calendario activas
       const integraciones = await prisma.integracion.findMany({
         where: {
           empresaId: ausencia.empresaId,
@@ -35,7 +41,7 @@ export class CalendarManager {
           activa: true,
           OR: [
             { usuarioId: null }, // Calendario de empresa
-            { usuarioId: ausencia.empleadoId }, // Calendario personal del empleado
+            ...(empleado?.usuarioId ? [{ usuarioId: empleado.usuarioId }] : []), // Calendario personal del empleado
           ],
         },
       });
@@ -111,7 +117,7 @@ export class CalendarManager {
         throw new Error("Cannot determine user ID for token refresh");
       }
 
-      const oauthConfig = getGoogleOAuthConfig();
+      const oauthConfig = getGoogleCalendarOAuthConfig();
       const validToken = await OAuthManager.getValidAccessToken(
         usuarioId,
         "google",
@@ -190,13 +196,22 @@ export class CalendarManager {
     empleadoId: string
   ): Promise<void> {
     try {
+      // Obtener el usuarioId del empleado
+      const empleado = await prisma.empleado.findUnique({
+        where: { id: empleadoId },
+        select: { usuarioId: true },
+      });
+
       // Buscar integraciones que puedan tener el evento
       const integraciones = await prisma.integracion.findMany({
         where: {
           empresaId,
           tipo: "calendario",
           activa: true,
-          OR: [{ usuarioId: null }, { usuarioId: empleadoId }],
+          OR: [
+            { usuarioId: null },
+            ...(empleado?.usuarioId ? [{ usuarioId: empleado.usuarioId }] : []),
+          ],
         },
       });
 
@@ -211,7 +226,7 @@ export class CalendarManager {
 
           // Obtener access token válido
           const usuarioId = integracion.usuarioId || empleadoId;
-          const oauthConfig = getGoogleOAuthConfig();
+          const oauthConfig = getGoogleCalendarOAuthConfig();
           const validToken = await OAuthManager.getValidAccessToken(
             usuarioId,
             "google",

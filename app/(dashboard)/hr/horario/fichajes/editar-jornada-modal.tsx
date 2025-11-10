@@ -28,7 +28,6 @@ import {
   FieldError,
   FieldGroup,
   FieldLabel,
-  FieldSeparator,
 } from '@/components/ui/field';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -59,6 +58,14 @@ interface Empleado {
   apellidos: string;
 }
 
+interface HorarioDia {
+  activo: boolean;
+  entrada: string;
+  salida: string;
+  pausa_inicio?: string;
+  pausa_fin?: string;
+}
+
 interface EditarJornadaModalProps {
   open: boolean;
   modo: 'crear' | 'editar';
@@ -73,14 +80,14 @@ export function EditarJornadaModal({ open, modo, jornada, onClose }: EditarJorna
   const [horasSemanales, setHorasSemanales] = useState('40');
   const [limiteInferior, setLimiteInferior] = useState('');
   const [limiteSuperior, setLimiteSuperior] = useState('');
-  const [horariosFijos, setHorariosFijos] = useState({
-    lunes: { activo: true, entrada: '09:00', salida: '18:00' },
-    martes: { activo: true, entrada: '09:00', salida: '18:00' },
-    miercoles: { activo: true, entrada: '09:00', salida: '18:00' },
-    jueves: { activo: true, entrada: '09:00', salida: '18:00' },
-    viernes: { activo: true, entrada: '09:00', salida: '18:00' },
-    sabado: { activo: false, entrada: '', salida: '' },
-    domingo: { activo: false, entrada: '', salida: '' },
+  const [horariosFijos, setHorariosFijos] = useState<Record<string, HorarioDia>>({
+    lunes: { activo: true, entrada: '09:00', salida: '18:00', pausa_inicio: '', pausa_fin: '' },
+    martes: { activo: true, entrada: '09:00', salida: '18:00', pausa_inicio: '', pausa_fin: '' },
+    miercoles: { activo: true, entrada: '09:00', salida: '18:00', pausa_inicio: '', pausa_fin: '' },
+    jueves: { activo: true, entrada: '09:00', salida: '18:00', pausa_inicio: '', pausa_fin: '' },
+    viernes: { activo: true, entrada: '09:00', salida: '18:00', pausa_inicio: '', pausa_fin: '' },
+    sabado: { activo: false, entrada: '', salida: '', pausa_inicio: '', pausa_fin: '' },
+    domingo: { activo: false, entrada: '', salida: '', pausa_inicio: '', pausa_fin: '' },
   });
   const [usarDescanso, setUsarDescanso] = useState(false);
   const [descansoFlexible, setDescansoFlexible] = useState<string>('');
@@ -449,7 +456,7 @@ export function EditarJornadaModal({ open, modo, jornada, onClose }: EditarJorna
           </DialogTitle>
         </DialogHeader>
 
-        <FieldGroup className="space-y-4">
+        <FieldGroup className="space-y-3">
           {/* Información de la jornada */}
           <Field>
             <FieldLabel htmlFor="nombre">Nombre de la jornada *</FieldLabel>
@@ -506,9 +513,75 @@ export function EditarJornadaModal({ open, modo, jornada, onClose }: EditarJorna
             </Field>
           </div>
 
+          {/* Asignación */}
+          <div className="mt-6 pt-6 border-t">
+            <h3 className="text-base font-semibold text-gray-900 mb-3">¿A quién aplicar esta jornada?</h3>
+            
+            <Field>
+              <Select 
+                value={nivelAsignacion} 
+                onValueChange={(v) => setNivelAsignacion(v as 'empresa' | 'equipo' | 'individual')}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="empresa">Toda la empresa</SelectItem>
+                  <SelectItem value="equipo">Un equipo concreto</SelectItem>
+                  <SelectItem value="individual">Empleados específicos</SelectItem>
+                </SelectContent>
+              </Select>
+              <FieldDescription>
+                {nivelAsignacion === 'empresa' 
+                  ? 'Se asignará a todos los empleados de la empresa' 
+                  : nivelAsignacion === 'equipo'
+                  ? 'Selecciona un equipo para asignar su jornada a todos sus miembros'
+                  : 'Selecciona empleados específicos'}
+              </FieldDescription>
+            </Field>
+
+            {nivelAsignacion === 'equipo' && (
+              <Field className="mt-3">
+                <FieldLabel>Seleccionar equipo</FieldLabel>
+                <Select value={equipoSeleccionado} onValueChange={setEquipoSeleccionado}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Elige un equipo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {equipos.map(eq => (
+                      <SelectItem key={eq.id} value={eq.id}>
+                        {eq.nombre} ({eq.miembros})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+            )}
+
+            {nivelAsignacion === 'individual' && (
+              <Field className="mt-3">
+                <FieldLabel>Seleccionar empleados</FieldLabel>
+                <div className="border rounded-md p-4 space-y-2 max-h-64 overflow-y-auto mt-2">
+                  {empleados.map(empleado => (
+                    <div key={empleado.id} className="flex items-center gap-2">
+                      <Checkbox
+                        checked={empleadosSeleccionados.includes(empleado.id)}
+                        onCheckedChange={() => toggleEmpleado(empleado.id)}
+                      />
+                      <span className="text-sm">{empleado.nombre} {empleado.apellidos}</span>
+                    </div>
+                  ))}
+                </div>
+                <FieldDescription>
+                  {empleadosSeleccionados.length} empleado{empleadosSeleccionados.length !== 1 ? 's' : ''} seleccionado{empleadosSeleccionados.length !== 1 ? 's' : ''}
+                </FieldDescription>
+              </Field>
+            )}
+          </div>
+
           {/* Días de la semana - SIEMPRE VISIBLE */}
-          <FieldSeparator>Días laborables</FieldSeparator>
-          <div>
+          <div className="mt-6 pt-6 border-t">
+            <h3 className="text-base font-semibold text-gray-900 mb-3">Días laborables</h3>
             <FieldLabel>Días de la semana</FieldLabel>
             <div className="flex gap-2 mt-3">
               {[
@@ -557,33 +630,55 @@ export function EditarJornadaModal({ open, modo, jornada, onClose }: EditarJorna
             )}
           </div>
 
-          {tipoJornada === 'flexible' && !esPredefinida && (
-            <Field className="mt-4">
-              <FieldLabel htmlFor="descansoFlexible">Pausa mínima diaria</FieldLabel>
+          {/* Pausa mínima - UNIFICADO para ambos tipos */}
+          {!esPredefinida && (
+            <Field className="mt-3">
+              <FieldLabel htmlFor="descanso">Tiempo de descanso (opcional)</FieldLabel>
               <Input
-                id="descansoFlexible"
+                id="descanso"
                 type="time"
                 step={60}
-                value={descansoFlexible}
-                onChange={(e) => setDescansoFlexible(e.target.value)}
+                value={tipoJornada === 'flexible' ? descansoFlexible : (usarDescanso && horariosFijos.lunes?.pausa_inicio) || ''}
+                onChange={(e) => {
+                  if (tipoJornada === 'flexible') {
+                    setDescansoFlexible(e.target.value);
+                  } else {
+                    // Para jornadas fijas, aplicar el mismo descanso a todos los días
+                    setUsarDescanso(!!e.target.value);
+                    if (e.target.value) {
+                      const [h, m] = e.target.value.split(':');
+                      const pausaInicio = '14:00'; // Hora por defecto para inicio de pausa
+                      const pausaFin = `${(parseInt(h) + 14).toString().padStart(2, '0')}:${m}`;
+                      
+                      Object.keys(horariosFijos).forEach(dia => {
+                        if (horariosFijos[dia as keyof typeof horariosFijos]?.activo) {
+                          setHorariosFijos(prev => ({
+                            ...prev,
+                            [dia]: {
+                              ...prev[dia as keyof typeof prev],
+                              pausa_inicio: pausaInicio,
+                              pausa_fin: pausaFin,
+                            },
+                          }));
+                        }
+                      });
+                    }
+                  }
+                }}
                 placeholder="00:30"
               />
               <FieldDescription>
-                Establece el descanso mínimo obligatorio que se tendrá en cuenta al cuadrar fichajes y calcular balances.
+                {tipoJornada === 'flexible' 
+                  ? 'Descanso mínimo obligatorio que se tendrá en cuenta al cuadrar fichajes y calcular balances.'
+                  : 'Tiempo de descanso que se aplicará a todos los días laborables (de 14:00 a la hora correspondiente).'}
               </FieldDescription>
             </Field>
           )}
 
           {/* Horarios específicos (solo si es tipo fija) */}
           {tipoJornada === 'fija' && !esPredefinida && (
-            <>
-              <FieldSeparator />
-              <div className="flex items-center gap-3">
-                <Checkbox checked={usarDescanso} onCheckedChange={(c) => setUsarDescanso(Boolean(c))} />
-                <span className="text-sm text-gray-700">Añadir tiempo de descanso</span>
-              </div>
-              <div>
-                <FieldLabel>Horarios por día</FieldLabel>
+            <div className="mt-3">
+              <FieldLabel>Horarios por día</FieldLabel>
                 <div className="space-y-3 mt-3">
                   {Object.entries(horariosFijos)
                     .filter(([_, horario]) => horario.activo)
@@ -613,45 +708,15 @@ export function EditarJornadaModal({ open, modo, jornada, onClose }: EditarJorna
                         }}
                         className="w-32"
                       />
-                      {usarDescanso && (
-                        <div className="flex items-center gap-2 ml-6">
-                          <span className="text-xs text-gray-500">Descanso</span>
-                          <Input
-                            type="time"
-                            value={(horario as any).pausa_inicio || ''}
-                            onChange={(e) => {
-                              setHorariosFijos(prev => ({
-                                ...prev,
-                                [dia]: { ...prev[dia as keyof typeof prev], pausa_inicio: e.target.value },
-                              }));
-                            }}
-                            className="w-28"
-                          />
-                          <span className="text-gray-400">-</span>
-                          <Input
-                            type="time"
-                            value={(horario as any).pausa_fin || ''}
-                            onChange={(e) => {
-                              setHorariosFijos(prev => ({
-                                ...prev,
-                                [dia]: { ...prev[dia as keyof typeof prev], pausa_fin: e.target.value },
-                              }));
-                            }}
-                            className="w-28"
-                          />
-                        </div>
-                      )}
                     </div>
                   ))}
                 </div>
-              </div>
-            </>
+            </div>
           )}
 
           {/* Límites de fichaje */}
           {!esPredefinida && (
-            <>
-              <FieldSeparator />
+            <div className="mt-6 pt-6 border-t">
               <div className="grid grid-cols-2 gap-4">
                 <Field>
                   <FieldLabel htmlFor="limiteInferior">Límite inferior</FieldLabel>
@@ -677,75 +742,7 @@ export function EditarJornadaModal({ open, modo, jornada, onClose }: EditarJorna
                   <FieldDescription>Hora máxima de fichaje</FieldDescription>
                 </Field>
               </div>
-            </>
-          )}
-
-          {/* Asignación de empleados */}
-          <FieldSeparator>Asignación</FieldSeparator>
-
-          <Field>
-            <FieldLabel htmlFor="nivelAsignacion">Nivel de asignación</FieldLabel>
-            <Select 
-              value={nivelAsignacion} 
-              onValueChange={(v) => setNivelAsignacion(v as 'empresa' | 'equipo' | 'individual')}
-            >
-              <SelectTrigger id="nivelAsignacion">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="empresa">Toda la empresa</SelectItem>
-                <SelectItem value="equipo">Un equipo concreto</SelectItem>
-                <SelectItem value="individual">Empleados específicos</SelectItem>
-              </SelectContent>
-            </Select>
-            <FieldDescription>
-              {nivelAsignacion === 'empresa' 
-                ? 'Se asignará a todos los empleados de la empresa' 
-                : nivelAsignacion === 'equipo'
-                ? 'Selecciona un equipo para asignar su jornada a todos sus miembros'
-                : 'Selecciona empleados específicos'}
-            </FieldDescription>
-          </Field>
-
-          {nivelAsignacion === 'equipo' && (
-            <Field>
-              <FieldLabel>Seleccionar equipo</FieldLabel>
-              <Select value={equipoSeleccionado} onValueChange={setEquipoSeleccionado}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Elige un equipo" />
-                </SelectTrigger>
-                <SelectContent>
-                  {equipos.map(eq => (
-                    <SelectItem key={eq.id} value={eq.id}>
-                      {eq.nombre} ({eq.miembros})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <FieldDescription>
-                Aplica la jornada a todos los miembros del equipo seleccionado
-              </FieldDescription>
-            </Field>
-          )}
-
-          {nivelAsignacion === 'individual' && (
-            <Field>
-              <FieldLabel>Seleccionar empleados</FieldLabel>
-              <div className="border rounded-md p-4 space-y-2 max-h-64 overflow-y-auto mt-2">
-                {empleados.map(empleado => (
-                  <div key={empleado.id} className="flex items-center gap-2">
-                    <Checkbox
-                      checked={empleadosSeleccionados.includes(empleado.id)}
-                      onCheckedChange={() => toggleEmpleado(empleado.id)}
-                    />
-                    <span className="text-sm">{empleado.nombre} {empleado.apellidos}</span>
-                  </div>
-                ))}
-              </div>
-              <FieldDescription>
-                {empleadosSeleccionados.length} empleado{empleadosSeleccionados.length !== 1 ? 's' : ''} seleccionado{empleadosSeleccionados.length !== 1 ? 's' : ''}
-              </FieldDescription>
-            </Field>
+            </div>
           )}
         </FieldGroup>
 

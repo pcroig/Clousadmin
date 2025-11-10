@@ -4,9 +4,9 @@
 // Fichajes Empleado Client Component - Vista por Jornadas
 // ========================================
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import {
   Table,
   TableBody,
@@ -31,7 +31,7 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { formatearHorasMinutos } from '@/lib/utils/formatters';
 
-import { EstadoAusencia } from '@/lib/constants/enums';
+import { EstadoFichaje } from '@/lib/constants/enums';
 
 interface Fichaje {
   id: string;
@@ -65,7 +65,6 @@ interface Props {
 }
 
 export function FichajesEmpleadoClient({ balanceInicial }: Props) {
-  const [fichajes, setFichajes] = useState<Fichaje[]>([]);
   const [jornadas, setJornadas] = useState<JornadaDia[]>([]);
   const [loading, setLoading] = useState(true);
   const [jornadaExpandida, setJornadaExpandida] = useState<string | null>(null);
@@ -77,79 +76,7 @@ export function FichajesEmpleadoClient({ balanceInicial }: Props) {
   const [nuevaFecha, setNuevaFecha] = useState('');
   const [nuevaHora, setNuevaHora] = useState('');
 
-  useEffect(() => {
-    fetchFichajes();
-  }, []);
-
-  async function fetchFichajes() {
-    setLoading(true);
-    try {
-      const response = await fetch('/api/fichajes');
-      const data = await response.json();
-      setFichajes(data);
-      
-      // Agrupar fichajes en jornadas
-      const jornadasAgrupadas = agruparPorJornada(data);
-      setJornadas(jornadasAgrupadas);
-    } catch (error) {
-      console.error('Error fetching fichajes:', error);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  function agruparPorJornada(fichajes: Fichaje[]): JornadaDia[] {
-    // Agrupar por fecha
-    const grupos: Record<string, Fichaje[]> = {};
-    
-    fichajes.forEach(f => {
-      if (!grupos[f.fecha]) {
-        grupos[f.fecha] = [];
-      }
-      grupos[f.fecha].push(f);
-    });
-
-    // Convertir a jornadas
-    return Object.entries(grupos).map(([fecha, fichajesDelDia]) => {
-      const ordenados = [...fichajesDelDia].sort((a, b) => 
-        new Date(a.hora).getTime() - new Date(b.hora).getTime()
-      );
-
-      // Calcular horas trabajadas
-      const horasTrabajadas = calcularHorasTrabajadas(ordenados);
-      
-      // Obtener horario de entrada/salida
-      const entrada = ordenados.find(f => f.tipo === 'entrada');
-      const salida = ordenados.find(f => f.tipo === 'salida');
-      
-      const horarioEntrada = entrada ? format(new Date(entrada.hora), 'HH:mm') : null;
-      const horarioSalida = salida ? format(new Date(salida.hora), 'HH:mm') : null;
-
-      // Estado de la jornada
-      let estado: 'completa' | 'incompleta' | 'pendiente' = 'completa';
-      if (!entrada || !salida) {
-        estado = 'incompleta';
-      }
-      if (fichajesDelDia.some(f => f.estado === EstadoAusencia.pendiente_aprobacion)) {
-        estado = 'pendiente';
-      }
-
-      // Balance (asumiendo 8h como jornada estándar por ahora)
-      const balance = horasTrabajadas - 8;
-
-      return {
-        fecha: new Date(fecha),
-        fichajes: ordenados,
-        horasTrabajadas,
-        horarioEntrada,
-        horarioSalida,
-        balance,
-        estado,
-      };
-    }).sort((a, b) => b.fecha.getTime() - a.fecha.getTime());
-  }
-
-  function calcularHorasTrabajadas(fichajes: Fichaje[]): number {
+  const calcularHorasTrabajadas = useCallback((fichajes: Fichaje[]): number => {
     let horasTotales = 0;
     let inicioTrabajo: Date | null = null;
 
@@ -184,7 +111,72 @@ export function FichajesEmpleadoClient({ balanceInicial }: Props) {
     }
 
     return Math.round(horasTotales * 10) / 10;
-  }
+  }, []);
+
+  const agruparPorJornada = useCallback((fichajes: Fichaje[]): JornadaDia[] => {
+    const grupos: Record<string, Fichaje[]> = {};
+
+    fichajes.forEach(f => {
+      if (!grupos[f.fecha]) {
+        grupos[f.fecha] = [];
+      }
+      grupos[f.fecha].push(f);
+    });
+
+    return Object.entries(grupos).map(([fecha, fichajesDelDia]) => {
+      const ordenados = [...fichajesDelDia].sort((a, b) =>
+        new Date(a.hora).getTime() - new Date(b.hora).getTime()
+      );
+
+      const horasTrabajadas = calcularHorasTrabajadas(ordenados);
+
+      const entrada = ordenados.find(f => f.tipo === 'entrada');
+      const salida = ordenados.find(f => f.tipo === 'salida');
+
+      const horarioEntrada = entrada ? format(new Date(entrada.hora), 'HH:mm') : null;
+      const horarioSalida = salida ? format(new Date(salida.hora), 'HH:mm') : null;
+
+      let estado: 'completa' | 'incompleta' | 'pendiente' = 'completa';
+      if (!entrada || !salida) {
+        estado = 'incompleta';
+      }
+      if (fichajesDelDia.some((f) => f.estado === EstadoFichaje.pendiente)) {
+        estado = 'pendiente';
+      }
+
+      const balance = horasTrabajadas - 8;
+
+      return {
+        fecha: new Date(fecha),
+        fichajes: ordenados,
+        horasTrabajadas,
+        horarioEntrada,
+        horarioSalida,
+        balance,
+        estado,
+      };
+    }).sort((a, b) => b.fecha.getTime() - a.fecha.getTime());
+  }, [calcularHorasTrabajadas]);
+
+  const fetchFichajes = useCallback(async () => {
+    setLoading(true);
+    try {
+      const response = await fetch('/api/fichajes');
+      const data = await response.json();
+      
+      // Agrupar fichajes en jornadas
+      const jornadasAgrupadas = agruparPorJornada(data);
+      setJornadas(jornadasAgrupadas);
+    } catch (error) {
+      console.error('Error fetching fichajes:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, [agruparPorJornada]);
+
+  useEffect(() => {
+    fetchFichajes();
+  }, [fetchFichajes]);
 
   async function handleSolicitarCorreccion() {
     if (!correccionModal.fichaje || !motivoCorreccion.trim()) return;

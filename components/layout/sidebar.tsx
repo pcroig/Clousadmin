@@ -75,6 +75,13 @@ export function Sidebar({ rol, usuario }: SidebarProps) {
 
   const avatarStyle = getAvatarStyle(`${usuario.nombre} ${usuario.apellidos}`);
 
+  const containerPadding = isCollapsed ? 'px-2 py-6' : 'px-4 py-6';
+  const itemHorizontalPadding = isCollapsed ? 'px-0' : 'px-3';
+  const itemGap = isCollapsed ? 'gap-0' : 'gap-3';
+  const footerPadding = isCollapsed ? 'p-3' : 'p-4';
+  const collapsibleTriggerClasses = isCollapsed ? 'justify-center px-0' : `justify-between ${itemHorizontalPadding}`;
+  const linkAlignmentClasses = isCollapsed ? `justify-center ${itemHorizontalPadding}` : itemHorizontalPadding;
+
   const handleLogout = async () => {
     setLoggingOut(true);
     try {
@@ -144,7 +151,7 @@ export function Sidebar({ rol, usuario }: SidebarProps) {
       icon: FolderOpen,
     },
     {
-      name: 'Payroll',
+      name: 'Nóminas',
       href: '/hr/payroll',
       icon: DollarSign,
     },
@@ -166,17 +173,17 @@ export function Sidebar({ rol, usuario }: SidebarProps) {
       name: 'Bandeja de entrada',
       icon: Inbox,
       children: [
-        { name: 'Solicitudes', href: '/hr/bandeja-entrada?tab=solicitudes' },
-        { name: 'Resueltas', href: '/hr/bandeja-entrada?tab=solved' },
-        { name: 'Notificaciones', href: '/hr/bandeja-entrada?tab=notificaciones' },
+        { name: 'Solicitudes', href: '/manager/bandeja-entrada?tab=solicitudes' },
+        { name: 'Resueltas', href: '/manager/bandeja-entrada?tab=solved' },
+        { name: 'Notificaciones', href: '/manager/bandeja-entrada?tab=notificaciones' },
       ],
     },
     {
       name: 'Horario',
       icon: Clock,
       children: [
-        { name: 'Fichajes', href: '/hr/horario/fichajes' },
-        { name: 'Ausencias', href: '/hr/horario/ausencias' },
+        { name: 'Fichajes', href: '/manager/horario/fichajes' },
+        { name: 'Ausencias', href: '/manager/horario/ausencias' },
       ],
     },
     {
@@ -216,30 +223,25 @@ export function Sidebar({ rol, usuario }: SidebarProps) {
     rol === UsuarioRol.hr_admin ? hrNavigation : rol === UsuarioRol.manager ? managerNavigation : empleadoNavigation;
 
   return (
-    <div
-      className={`flex h-screen flex-col bg-white border-r border-gray-200 transition-all duration-300 ${
+    <aside
+      className={`relative flex h-screen flex-col bg-white border-r border-gray-200 transition-[width] duration-300 ${
         isCollapsed ? 'w-16' : 'w-64'
       }`}
     >
-      {/* Logo y Toggle */}
-      <div className="flex h-16 items-center justify-between px-4 border-b border-gray-200">
-        {!isCollapsed && (
-          <h1 className="text-lg font-bold text-gray-900">Clousadmin</h1>
+      <button
+        onClick={() => setIsCollapsed(!isCollapsed)}
+        className="absolute top-6 -right-2.5 z-10 flex h-6 w-6 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-500 shadow-sm transition-colors hover:bg-gray-50"
+        aria-label={isCollapsed ? 'Expandir menú lateral' : 'Colapsar menú lateral'}
+      >
+        {isCollapsed ? (
+          <ChevronRight className="h-3 w-3" />
+        ) : (
+          <ChevronLeft className="h-3 w-3" />
         )}
-        <button
-          onClick={() => setIsCollapsed(!isCollapsed)}
-          className="rounded-lg p-1.5 hover:bg-gray-100"
-        >
-          {isCollapsed ? (
-            <ChevronRight className="h-5 w-5 text-gray-600" />
-          ) : (
-            <ChevronLeft className="h-5 w-5 text-gray-600" />
-          )}
-        </button>
-      </div>
+      </button>
 
       {/* Navigation */}
-      <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
+      <nav className={`flex-1 space-y-1 overflow-y-auto ${containerPadding}`}>
         {navigation.map((item) => {
           if (item.children) {
             const isOpen = openMenus.includes(item.name);
@@ -247,10 +249,10 @@ export function Sidebar({ rol, usuario }: SidebarProps) {
               <div key={item.name}>
                 <button
                   onClick={() => !isCollapsed && toggleMenu(item.name)}
-                  className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 hover:text-gray-900"
+                  className={`flex w-full items-center rounded-lg py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 hover:text-gray-900 ${collapsibleTriggerClasses}`}
                   title={isCollapsed ? item.name : ''}
                 >
-                  <div className="flex items-center gap-3">
+                  <div className={`flex items-center ${itemGap}`}>
                     {item.icon && <item.icon className="h-5 w-5 flex-shrink-0" />}
                     {!isCollapsed && <span>{item.name}</span>}
                   </div>
@@ -287,7 +289,7 @@ export function Sidebar({ rol, usuario }: SidebarProps) {
             <Link
               key={item.name}
               href={item.href || '#'}
-              className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium ${
+              className={`flex items-center ${itemGap} rounded-lg py-2 text-sm font-medium ${linkAlignmentClasses} ${
                 isActive(item.href || '')
                   ? 'bg-gray-100 text-gray-900'
                   : 'text-gray-700 hover:bg-gray-100 hover:text-gray-900'
@@ -302,10 +304,10 @@ export function Sidebar({ rol, usuario }: SidebarProps) {
       </nav>
 
       {/* User Menu Dropdown */}
-      <div className="border-t border-gray-200">
+      <div className="border-t border-gray-200 mt-auto">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <button className="w-full p-4 hover:bg-gray-50 transition-colors focus:outline-none">
+            <button className={`w-full ${footerPadding} hover:bg-gray-50 transition-colors focus:outline-none`}>
               {!isCollapsed ? (
                 <div className="flex items-center gap-3">
                   <Avatar className="h-10 w-10">
@@ -359,6 +361,6 @@ export function Sidebar({ rol, usuario }: SidebarProps) {
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
-    </div>
+    </aside>
   );
 }
