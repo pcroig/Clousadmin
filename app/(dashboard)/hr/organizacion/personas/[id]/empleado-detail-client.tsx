@@ -22,7 +22,7 @@ import type { Empleado, Usuario } from '@/types/empleado';
 import { GeneralTab as GeneralTabShared } from '@/components/shared/mi-espacio/general-tab';
 import { FichajesTab as FichajesTabShared } from '@/components/shared/mi-espacio/fichajes-tab';
 import { ContratosTab as ContratosTabShared } from '@/components/shared/mi-espacio/contratos-tab';
-import { DocumentosTab as DocumentosTabShared } from '@/app/(dashboard)/hr/mi-espacio/tabs/documentos-tab';
+import { DocumentosTab as DocumentosTabShared } from '@/components/shared/mi-espacio/documentos-tab';
 import { getAusenciaEstadoLabel } from '@/lib/utils/formatters';
 import { EstadoAusencia } from '@/lib/constants/enums';
 
