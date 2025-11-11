@@ -27,7 +27,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 
-import { EditarFichajeModal } from '../../../hr/horario/fichajes/editar-fichaje-modal';
+import { EditarFichajeModal } from '@/app/(dashboard)/hr/horario/fichajes/editar-fichaje-modal';
 
 const MAX_FILAS = 30;
 

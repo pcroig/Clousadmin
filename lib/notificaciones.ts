@@ -27,6 +27,8 @@ export type TipoNotificacion =
   | 'cambio_manager'
   | 'asignado_equipo'
   | 'nuevo_empleado_equipo'
+  | 'cambio_puesto'
+  | 'jornada_asignada'
   // Solicitudes
   | 'solicitud_creada'
   | 'solicitud_aprobada'
@@ -521,6 +523,183 @@ export async function crearNotificacionCambioManager(
         accionTexto: 'Ver equipo',
       },
     });
+  }
+}
+
+export async function crearNotificacionCambioPuesto(
+  prisma: PrismaClient,
+  params: {
+    empresaId: string;
+    empleadoId: string;
+    empleadoNombre?: string;
+    puestoAnterior: string | null;
+    puestoNuevo: string;
+  }
+) {
+  const { empresaId, empleadoId, empleadoNombre, puestoAnterior, puestoNuevo } = params;
+
+  const empleado = await prisma.empleado.findUnique({
+    where: { id: empleadoId },
+    select: {
+      usuarioId: true,
+      managerId: true,
+      nombre: true,
+      apellidos: true,
+    },
+  });
+
+  const nombreCompleto = empleadoNombre ?? `${empleado?.nombre ?? ''} ${empleado?.apellidos ?? ''}`.trim();
+
+  // Notificar al empleado
+  const empleadoUsuarioIds = await obtenerUsuariosANotificar(prisma, empresaId, {
+    empleado: empleadoId,
+  });
+
+  if (empleadoUsuarioIds.length > 0) {
+    await crearNotificaciones(prisma, {
+      empresaId,
+      usuarioIds: empleadoUsuarioIds,
+      tipo: 'cambio_puesto',
+      titulo: 'Actualización de puesto',
+      mensaje: `Tu puesto ha cambiado a ${puestoNuevo}.${puestoAnterior ? ` Antes: ${puestoAnterior}.` : ''}`,
+      metadata: {
+        puestoAnterior,
+        puestoNuevo,
+        prioridad: 'normal',
+      },
+    });
+  }
+
+  // Notificar a HR
+  const hrUsuarioIds = await obtenerUsuariosANotificar(prisma, empresaId, {
+    hrAdmin: true,
+  });
+
+  if (hrUsuarioIds.length > 0) {
+    await crearNotificaciones(prisma, {
+      empresaId,
+      usuarioIds: hrUsuarioIds,
+      tipo: 'cambio_puesto',
+      titulo: 'Cambio de puesto registrado',
+      mensaje: `${nombreCompleto || 'El empleado'} ahora ocupa el puesto ${puestoNuevo}.`,
+      metadata: {
+        empleadoId,
+        empleadoNombre: nombreCompleto || undefined,
+        puestoAnterior,
+        puestoNuevo,
+        prioridad: 'baja',
+      },
+    });
+  }
+
+  // Notificar al manager actual si existe
+  if (empleado?.managerId) {
+    const managerUsuarioIds = await obtenerUsuariosANotificar(prisma, empresaId, {
+      manager: empleado.managerId,
+    });
+
+    if (managerUsuarioIds.length > 0) {
+      await crearNotificaciones(prisma, {
+        empresaId,
+        usuarioIds: managerUsuarioIds,
+        tipo: 'cambio_puesto',
+        titulo: 'Cambio de puesto en tu equipo',
+        mensaje: `${nombreCompleto || 'Un miembro de tu equipo'} ahora ocupa el puesto ${puestoNuevo}.`,
+        metadata: {
+          empleadoId,
+          empleadoNombre: nombreCompleto || undefined,
+          puestoAnterior,
+          puestoNuevo,
+          prioridad: 'normal',
+        },
+      });
+    }
+  }
+}
+
+export async function crearNotificacionJornadaAsignada(
+  prisma: PrismaClient,
+  params: {
+    empresaId: string;
+    empleadoId: string;
+    jornadaNombre: string;
+  }
+) {
+  const { empresaId, empleadoId, jornadaNombre } = params;
+
+  const empleado = await prisma.empleado.findUnique({
+    where: { id: empleadoId },
+    select: {
+      usuarioId: true,
+      managerId: true,
+      nombre: true,
+      apellidos: true,
+    },
+  });
+
+  const nombreCompleto = `${empleado?.nombre ?? ''} ${empleado?.apellidos ?? ''}`.trim();
+
+  // Notificar al empleado
+  const empleadoUsuarioIds = await obtenerUsuariosANotificar(prisma, empresaId, {
+    empleado: empleadoId,
+  });
+
+  if (empleadoUsuarioIds.length > 0) {
+    await crearNotificaciones(prisma, {
+      empresaId,
+      usuarioIds: empleadoUsuarioIds,
+      tipo: 'jornada_asignada',
+      titulo: 'Nueva jornada asignada',
+      mensaje: `Se te ha asignado la jornada: ${jornadaNombre}.`,
+      metadata: {
+        jornadaNombre,
+        prioridad: 'normal',
+      },
+    });
+  }
+
+  // Notificar a HR
+  const hrUsuarioIds = await obtenerUsuariosANotificar(prisma, empresaId, {
+    hrAdmin: true,
+  });
+
+  if (hrUsuarioIds.length > 0) {
+    await crearNotificaciones(prisma, {
+      empresaId,
+      usuarioIds: hrUsuarioIds,
+      tipo: 'jornada_asignada',
+      titulo: 'Jornada actualizada',
+      mensaje: `${nombreCompleto || 'El empleado'} ahora tiene asignada la jornada ${jornadaNombre}.`,
+      metadata: {
+        empleadoId,
+        empleadoNombre: nombreCompleto || undefined,
+        jornadaNombre,
+        prioridad: 'baja',
+      },
+    });
+  }
+
+  // Notificar al manager actual si existe
+  if (empleado?.managerId) {
+    const managerUsuarioIds = await obtenerUsuariosANotificar(prisma, empresaId, {
+      manager: empleado.managerId,
+    });
+
+    if (managerUsuarioIds.length > 0) {
+      await crearNotificaciones(prisma, {
+        empresaId,
+        usuarioIds: managerUsuarioIds,
+        tipo: 'jornada_asignada',
+        titulo: 'Actualización de jornada en tu equipo',
+        mensaje: `${nombreCompleto || 'Un miembro de tu equipo'} ahora tiene la jornada ${jornadaNombre}.`,
+        metadata: {
+          empleadoId,
+          empleadoNombre: nombreCompleto || undefined,
+          jornadaNombre,
+          prioridad: 'baja',
+        },
+      });
+    }
   }
 }
 
