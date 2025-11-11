@@ -10,7 +10,7 @@ import { Edit2, Flag } from 'lucide-react';
 import { toast } from 'sonner';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { GeneralTab } from './tabs/general-tab';
+import { GeneralTab } from '@/components/shared/mi-espacio/general-tab';
 import { FichajesTab } from './tabs/fichajes-tab';
 import { ContratosTab } from './tabs/contratos-tab';
 import { DocumentosTab } from './tabs/documentos-tab';
