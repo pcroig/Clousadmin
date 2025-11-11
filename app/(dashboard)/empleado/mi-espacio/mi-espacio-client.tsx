@@ -9,7 +9,7 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { User, Edit2, Flag } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { GeneralTab } from '../../hr/mi-espacio/tabs/general-tab';
+import { GeneralTab } from '@/components/shared/mi-espacio/general-tab';
 import { AusenciasTab } from '@/components/shared/mi-espacio/ausencias-tab';
 import { FichajesTab } from './tabs/fichajes-tab';
 import { ContratosTab } from '../../hr/mi-espacio/tabs/contratos-tab';

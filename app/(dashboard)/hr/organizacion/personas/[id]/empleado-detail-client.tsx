@@ -19,7 +19,7 @@ import { LoadingButton } from '@/components/shared/loading-button';
 import { CompensacionModal } from '@/components/hr/compensacion-modal';
 import { getAvatarStyle } from '@/lib/design-system';
 import type { Empleado, Usuario } from '@/types/empleado';
-import { GeneralTab as GeneralTabShared } from '@/app/(dashboard)/hr/mi-espacio/tabs/general-tab';
+import { GeneralTab as GeneralTabShared } from '@/components/shared/mi-espacio/general-tab';
 import { FichajesTab as FichajesTabShared } from '@/app/(dashboard)/hr/mi-espacio/tabs/fichajes-tab';
 import { ContratosTab as ContratosTabShared } from '@/app/(dashboard)/hr/mi-espacio/tabs/contratos-tab';
 import { DocumentosTab as DocumentosTabShared } from '@/app/(dashboard)/hr/mi-espacio/tabs/documentos-tab';
