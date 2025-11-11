@@ -4,6 +4,7 @@
 // GET: Obtener métricas de fichajes (horas trabajadas, tendencias, absentismo)
 
 import { NextRequest } from 'next/server';
+import type { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import {
   requireAuthAsHR,
@@ -11,20 +12,7 @@ import {
   successResponse,
 } from '@/lib/api-handler';
 import { EstadoAusencia } from '@/lib/constants/enums';
-
-// Función auxiliar para calcular antigüedad
-function calcularAntiguedad(fechaAlta: Date): string {
-  const hoy = new Date();
-  const mesesAntiguedad =
-    (hoy.getFullYear() - fechaAlta.getFullYear()) * 12 +
-    (hoy.getMonth() - fechaAlta.getMonth());
-
-  if (mesesAntiguedad < 6) return 'menos_6_meses';
-  if (mesesAntiguedad < 12) return '6_12_meses';
-  if (mesesAntiguedad < 36) return '1_3_años';
-  if (mesesAntiguedad < 60) return '3_5_años';
-  return 'mas_5_años';
-}
+import { obtenerRangoFechaAntiguedad } from '@/lib/calculos/antiguedad';
 
 // Función para calcular días laborables en un mes
 function calcularDiasLaborables(year: number, month: number): number {
@@ -53,7 +41,7 @@ export async function GET(request: NextRequest) {
     const antiguedad = searchParams.get('antiguedad');
 
     // Construir filtros base
-    const where: any = {
+    const where: Prisma.EmpleadoWhereInput = {
       empresaId: session.user.empresaId,
       estadoEmpleado: 'activo',
     };
@@ -66,8 +54,16 @@ export async function GET(request: NextRequest) {
       };
     }
 
+    // Aplicar filtro de antigüedad en BD (no en memoria)
+    if (antiguedad && antiguedad !== 'todos') {
+      const rangoFecha = obtenerRangoFechaAntiguedad(antiguedad);
+      if (rangoFecha) {
+        where.fechaAlta = rangoFecha;
+      }
+    }
+
     // Obtener empleados con equipos
-    let empleados = await prisma.empleado.findMany({
+    const empleados = await prisma.empleado.findMany({
       where,
       select: {
         id: true,
@@ -84,13 +80,6 @@ export async function GET(request: NextRequest) {
         },
       },
     });
-
-    // Filtrar por antigüedad si aplica
-    if (antiguedad && antiguedad !== 'todos') {
-      empleados = empleados.filter(
-        (e) => calcularAntiguedad(e.fechaAlta) === antiguedad
-      );
-    }
 
     const empleadoIds = empleados.map((e) => e.id);
 
@@ -200,7 +189,7 @@ export async function GET(request: NextRequest) {
         fechaFin: {
           gte: inicioMesActual,
         },
-        estado: { in: [EstadoAusencia.en_curso, EstadoAusencia.completada, EstadoAusencia.auto_aprobada] },
+        estado: { in: [EstadoAusencia.confirmada, EstadoAusencia.completada] },
       },
     });
 
@@ -259,7 +248,7 @@ export async function GET(request: NextRequest) {
           empleadoId: emp.id,
           fechaInicio: { lte: finMesActual },
           fechaFin: { gte: inicioMesActual },
-          estado: { in: [EstadoAusencia.en_curso, EstadoAusencia.completada, EstadoAusencia.auto_aprobada] },
+          estado: { in: [EstadoAusencia.confirmada, EstadoAusencia.completada] },
         },
       });
 

@@ -1,15 +1,111 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { LoadingButton } from '@/components/shared/loading-button';
 
 import { UsuarioRol } from '@/lib/constants/enums';
+
+type GeneralFormData = {
+  nif: string;
+  nss: string;
+  fechaNacimiento: string;
+  estadoCivil: string;
+  numeroHijos: string;
+  genero: string;
+  email: string;
+  telefono: string;
+  direccionCalle: string;
+  direccionNumero: string;
+  direccionPiso: string;
+  codigoPostal: string;
+  ciudad: string;
+  direccionProvincia: string;
+  iban: string;
+  titularCuenta: string;
+};
+
+const FORM_FIELDS: Array<keyof GeneralFormData> = [
+  'nif',
+  'nss',
+  'fechaNacimiento',
+  'estadoCivil',
+  'numeroHijos',
+  'genero',
+  'email',
+  'telefono',
+  'direccionCalle',
+  'direccionNumero',
+  'direccionPiso',
+  'codigoPostal',
+  'ciudad',
+  'direccionProvincia',
+  'iban',
+  'titularCuenta',
+];
+
+const buildInitialFormData = (empleado: any, usuario: any): GeneralFormData => ({
+  nif: empleado.nif ?? '',
+  nss: empleado.nss ?? '',
+  fechaNacimiento: empleado.fechaNacimiento ? new Date(empleado.fechaNacimiento).toISOString().split('T')[0] : '',
+  estadoCivil: empleado.estadoCivil ?? '',
+  numeroHijos: typeof empleado.numeroHijos === 'number' ? String(empleado.numeroHijos) : '',
+  genero: empleado.genero ?? '',
+  email: usuario.email ?? '',
+  telefono: empleado.telefono ?? '',
+  direccionCalle: empleado.direccionCalle ?? '',
+  direccionNumero: empleado.direccionNumero ?? '',
+  direccionPiso: empleado.direccionPiso ?? '',
+  codigoPostal: empleado.codigoPostal ?? '',
+  ciudad: empleado.ciudad ?? '',
+  direccionProvincia: empleado.direccionProvincia ?? '',
+  iban: empleado.iban ?? '',
+  titularCuenta: empleado.titularCuenta ?? '',
+});
+
+const normalizeValue = (value: string) => value.trim();
+
+const formsAreEqual = (current: GeneralFormData, initial: GeneralFormData) =>
+  FORM_FIELDS.every((field) => normalizeValue(current[field]) === normalizeValue(initial[field]));
+
+const prepareValueForPayload = (field: keyof GeneralFormData, value: string) => {
+  const trimmed = value.trim();
+
+  if (trimmed === '') {
+    return null;
+  }
+
+  if (field === 'numeroHijos') {
+    const parsed = Number(trimmed);
+    return Number.isNaN(parsed) ? null : parsed;
+  }
+
+  if (field === 'iban') {
+    return trimmed.replace(/\s+/g, '').toUpperCase();
+  }
+
+  if (field === 'fechaNacimiento') {
+    const date = new Date(trimmed);
+    return Number.isNaN(date.getTime()) ? null : date.toISOString();
+  }
+
+  return trimmed;
+};
+
+const diffFormData = (current: GeneralFormData, initial: GeneralFormData) => {
+  const diff: Record<string, any> = {};
+
+  FORM_FIELDS.forEach((field) => {
+    if (normalizeValue(current[field]) !== normalizeValue(initial[field])) {
+      diff[field] = prepareValueForPayload(field, current[field]);
+    }
+  });
+
+  return diff;
+};
 
 interface GeneralTabProps {
   empleado: any;
@@ -27,52 +123,39 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado', onFieldUpdate,
   const requiresSolicitud = isEmpleado || isManager; // Empleados y managers crean solicitudes
 
   // Estados para datos del formulario (solo info personal, contacto, bancaria)
-  const [formData, setFormData] = useState({
-    // Información Personal
-    nif: empleado.nif || '',
-    nss: empleado.nss || '',
-    fechaNacimiento: empleado.fechaNacimiento ? new Date(empleado.fechaNacimiento).toISOString().split('T')[0] : '',
-    estadoCivil: empleado.estadoCivil || '',
-    numeroHijos: empleado.numeroHijos || 0,
-    genero: empleado.genero || '',
-
-    // Información de Contacto
-    email: usuario.email || '',
-    telefono: empleado.telefono || '',
-    direccionCalle: empleado.direccionCalle || '',
-    direccionNumero: empleado.direccionNumero || '',
-    direccionPiso: empleado.direccionPiso || '',
-    codigoPostal: empleado.codigoPostal || '',
-    ciudad: empleado.ciudad || '',
-    direccionProvincia: empleado.direccionProvincia || '',
-
-    // Información Bancaria
-    iban: empleado.iban || '',
-    titularCuenta: empleado.titularCuenta || '',
-  });
+  const [formData, setFormData] = useState<GeneralFormData>(() => buildInitialFormData(empleado, usuario));
+  const initialFormDataRef = useRef<GeneralFormData>(formData);
 
   // Estados de carga
   const [saving, setSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
-  
-  // Notificar al padre sobre la función de guardado
+
+  // Sincronizar estado inicial cuando cambian los datos externos
   useEffect(() => {
-    if (onSaveReady && requiresSolicitud) {
-      onSaveReady(handleSave, hasChanges);
+    const nextInitial = buildInitialFormData(empleado, usuario);
+    setFormData(nextInitial);
+    initialFormDataRef.current = nextInitial;
+    if (requiresSolicitud) {
+      setHasChanges(false);
     }
-  }, [hasChanges, requiresSolicitud]);
+  }, [empleado, usuario, requiresSolicitud]);
 
-  // Escuchar evento de guardado desde el header
+  // Calcular si hay cambios pendientes (empleados y managers)
   useEffect(() => {
-    const handleSaveEvent = () => {
-      if (requiresSolicitud) {
-        handleSave();
-      }
-    };
-
-    window.addEventListener('saveGeneral', handleSaveEvent);
-    return () => window.removeEventListener('saveGeneral', handleSaveEvent);
-  }, [requiresSolicitud]);
+    if (requiresSolicitud) {
+      setHasChanges(!formsAreEqual(formData, initialFormDataRef.current));
+    }
+  }, [formData, requiresSolicitud]);
+  
+  const setFieldValue = useCallback(
+    (field: keyof GeneralFormData, value: string) => {
+      setFormData((prev) => ({
+        ...prev,
+        [field]: value,
+      }));
+    },
+    []
+  );
   
   // Función helper para actualizar campos individualmente (guardado automático para HR)
   const handleFieldUpdate = async (field: string, value: any) => {
@@ -87,17 +170,28 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado', onFieldUpdate,
     }
   }
 
-  const handleSave = async () => {
+  const handleSave = useCallback(async () => {
+    if (saving) {
+      return;
+    }
+
     setSaving(true);
     try {
       if (requiresSolicitud) {
+        const cambios = diffFormData(formData, initialFormDataRef.current);
+
+        if (Object.keys(cambios).length === 0) {
+          toast.info('No hay cambios pendientes por enviar');
+          return;
+        }
+
         // Empleados y managers: crear solicitud de cambio
         const response = await fetch('/api/solicitudes', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             tipo: 'cambio_datos',
-            camposCambiados: formData,
+            camposCambiados: cambios,
             motivo: 'Actualización de datos personales',
           }),
         });
@@ -124,6 +218,10 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado', onFieldUpdate,
           console.error('Error al auto-aprobar:', error);
           toast.success('Solicitud enviada. Pendiente de revisión por Recursos Humanos');
         }
+
+        // Revertir formulario a su estado original mientras se procesa la solicitud
+        setFormData(initialFormDataRef.current);
+        setHasChanges(false);
       } else {
         // HR Admin: guardar directamente
         const response = await fetch(`/api/empleados/${empleado.id}`, {
@@ -147,13 +245,26 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado', onFieldUpdate,
     } finally {
       setSaving(false);
     }
-  };
+  }, [saving, requiresSolicitud, formData, empleado.id, router]);
 
-  // Helper para actualizar form data y marcar cambios
-  const updateFormData = (updates: Partial<typeof formData>) => {
-    setFormData(prev => ({ ...prev, ...updates }));
-    setHasChanges(true);
-  };
+  // Escuchar evento de guardado desde el header
+  useEffect(() => {
+    const handleSaveEvent = () => {
+      if (requiresSolicitud) {
+        handleSave();
+      }
+    };
+
+    window.addEventListener('saveGeneral', handleSaveEvent);
+    return () => window.removeEventListener('saveGeneral', handleSaveEvent);
+  }, [requiresSolicitud, handleSave]);
+
+  // Notificar al padre sobre la función de guardado
+  useEffect(() => {
+    if (onSaveReady && requiresSolicitud) {
+      onSaveReady(handleSave, hasChanges);
+    }
+  }, [hasChanges, requiresSolicitud, onSaveReady, handleSave]);
 
   return (
     <div className="space-y-6">
@@ -167,7 +278,7 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado', onFieldUpdate,
               <Input
                 id="nif"
                 value={formData.nif}
-                onChange={(e) => setFormData({ ...formData, nif: e.target.value })}
+                onChange={(e) => setFieldValue('nif', e.target.value)}
                 onBlur={(e) => {
                   if (isHrAdmin && onFieldUpdate) {
                     const newValue = e.target.value || null;
@@ -176,7 +287,6 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado', onFieldUpdate,
                     }
                   }
                 }}
-                disabled={requiresSolicitud}
                 placeholder="No especificado"
               />
             </div>
@@ -185,7 +295,7 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado', onFieldUpdate,
               <Input
                 id="nss"
                 value={formData.nss}
-                onChange={(e) => setFormData({ ...formData, nss: e.target.value })}
+                onChange={(e) => setFieldValue('nss', e.target.value)}
                 onBlur={(e) => {
                   if (isHrAdmin && onFieldUpdate) {
                     const newValue = e.target.value || null;
@@ -194,7 +304,6 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado', onFieldUpdate,
                     }
                   }
                 }}
-                disabled={requiresSolicitud}
                 placeholder="No especificado"
               />
             </div>
@@ -204,7 +313,7 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado', onFieldUpdate,
                 id="fechaNacimiento"
                 type="date"
                 value={formData.fechaNacimiento}
-                onChange={(e) => setFormData({ ...formData, fechaNacimiento: e.target.value })}
+                onChange={(e) => setFieldValue('fechaNacimiento', e.target.value)}
                 onBlur={(e) => {
                   if (isHrAdmin && onFieldUpdate) {
                     const newValue = e.target.value || null;
@@ -216,7 +325,6 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado', onFieldUpdate,
                     }
                   }
                 }}
-                disabled={requiresSolicitud}
               />
             </div>
             <div>
@@ -224,7 +332,7 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado', onFieldUpdate,
               <Select
                 value={formData.estadoCivil}
                 onValueChange={(value) => {
-                  setFormData({ ...formData, estadoCivil: value });
+                  setFieldValue('estadoCivil', value);
                   if (isHrAdmin && onFieldUpdate) {
                     const newValue = value || null;
                     if (newValue !== (empleado.estadoCivil || null)) {
@@ -232,7 +340,6 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado', onFieldUpdate,
                     }
                   }
                 }}
-                disabled={requiresSolicitud}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Seleccionar" />
@@ -252,16 +359,16 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado', onFieldUpdate,
                 id="numeroHijos"
                 type="number"
                 value={formData.numeroHijos}
-                onChange={(e) => setFormData({ ...formData, numeroHijos: parseInt(e.target.value) || 0 })}
+                onChange={(e) => setFieldValue('numeroHijos', e.target.value)}
                 onBlur={(e) => {
                   if (isHrAdmin && onFieldUpdate) {
-                    const newValue = parseInt(e.target.value) || 0;
+                    const parsed = parseInt(e.target.value, 10);
+                    const newValue = Number.isNaN(parsed) ? 0 : parsed;
                     if (newValue !== (empleado.numeroHijos || 0)) {
                       handleFieldUpdate('numeroHijos', newValue);
                     }
                   }
                 }}
-                disabled={requiresSolicitud}
                 min="0"
               />
             </div>
@@ -270,7 +377,7 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado', onFieldUpdate,
               <Select
                 value={formData.genero}
                 onValueChange={(value) => {
-                  setFormData({ ...formData, genero: value });
+                  setFieldValue('genero', value);
                   if (isHrAdmin && onFieldUpdate) {
                     const newValue = value || null;
                     if (newValue !== (empleado.genero || null)) {
@@ -278,7 +385,6 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado', onFieldUpdate,
                     }
                   }
                 }}
-                disabled={requiresSolicitud}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Seleccionar" />
@@ -304,7 +410,7 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado', onFieldUpdate,
                 id="email"
                 type="email"
                 value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                onChange={(e) => setFieldValue('email', e.target.value)}
               />
             </div>
             <div>
@@ -313,7 +419,7 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado', onFieldUpdate,
                 id="telefono"
                 type="tel"
                 value={formData.telefono}
-                onChange={(e) => setFormData({ ...formData, telefono: e.target.value })}
+                onChange={(e) => setFieldValue('telefono', e.target.value)}
                 onBlur={(e) => {
                   if (isHrAdmin && onFieldUpdate) {
                     const newValue = e.target.value || null;
@@ -330,7 +436,7 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado', onFieldUpdate,
               <Input
                 id="direccionCalle"
                 value={formData.direccionCalle}
-                onChange={(e) => setFormData({ ...formData, direccionCalle: e.target.value })}
+                onChange={(e) => setFieldValue('direccionCalle', e.target.value)}
                 onBlur={(e) => {
                   if (isHrAdmin && onFieldUpdate) {
                     const newValue = e.target.value || null;
@@ -348,7 +454,7 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado', onFieldUpdate,
                 <Input
                   id="direccionNumero"
                   value={formData.direccionNumero}
-                  onChange={(e) => setFormData({ ...formData, direccionNumero: e.target.value })}
+                  onChange={(e) => setFieldValue('direccionNumero', e.target.value)}
                   onBlur={(e) => {
                     if (isHrAdmin && onFieldUpdate) {
                       const newValue = e.target.value || null;
@@ -365,7 +471,7 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado', onFieldUpdate,
                 <Input
                   id="direccionPiso"
                   value={formData.direccionPiso}
-                  onChange={(e) => setFormData({ ...formData, direccionPiso: e.target.value })}
+                  onChange={(e) => setFieldValue('direccionPiso', e.target.value)}
                   onBlur={(e) => {
                     if (isHrAdmin && onFieldUpdate) {
                       const newValue = e.target.value || null;
@@ -384,7 +490,7 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado', onFieldUpdate,
                 <Input
                   id="codigoPostal"
                   value={formData.codigoPostal}
-                  onChange={(e) => setFormData({ ...formData, codigoPostal: e.target.value })}
+                  onChange={(e) => setFieldValue('codigoPostal', e.target.value)}
                   onBlur={(e) => {
                     if (isHrAdmin && onFieldUpdate) {
                       const newValue = e.target.value || null;
@@ -402,7 +508,7 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado', onFieldUpdate,
                 <Input
                   id="ciudad"
                   value={formData.ciudad}
-                  onChange={(e) => setFormData({ ...formData, ciudad: e.target.value })}
+                  onChange={(e) => setFieldValue('ciudad', e.target.value)}
                   onBlur={(e) => {
                     if (isHrAdmin && onFieldUpdate) {
                       const newValue = e.target.value || null;
@@ -420,7 +526,7 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado', onFieldUpdate,
               <Input
                 id="direccionProvincia"
                 value={formData.direccionProvincia}
-                onChange={(e) => setFormData({ ...formData, direccionProvincia: e.target.value })}
+                onChange={(e) => setFieldValue('direccionProvincia', e.target.value)}
                 onBlur={(e) => {
                   if (isHrAdmin && onFieldUpdate) {
                     const newValue = e.target.value || null;
@@ -444,7 +550,7 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado', onFieldUpdate,
               <Input
                 id="iban"
                 value={formData.iban}
-                onChange={(e) => setFormData({ ...formData, iban: e.target.value })}
+                onChange={(e) => setFieldValue('iban', e.target.value)}
                 onBlur={(e) => {
                   if (isHrAdmin && onFieldUpdate) {
                     const newValue = e.target.value || null;
@@ -453,7 +559,6 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado', onFieldUpdate,
                     }
                   }
                 }}
-                disabled={requiresSolicitud}
                 placeholder="ES00 0000 0000 0000 0000 0000"
               />
             </div>
@@ -462,7 +567,7 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado', onFieldUpdate,
               <Input
                 id="titularCuenta"
                 value={formData.titularCuenta}
-                onChange={(e) => setFormData({ ...formData, titularCuenta: e.target.value })}
+                onChange={(e) => setFieldValue('titularCuenta', e.target.value)}
                 onBlur={(e) => {
                   if (isHrAdmin && onFieldUpdate) {
                     const newValue = e.target.value || null;
@@ -471,7 +576,6 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado', onFieldUpdate,
                     }
                   }
                 }}
-                disabled={requiresSolicitud}
                 placeholder="Nombre del titular"
               />
             </div>

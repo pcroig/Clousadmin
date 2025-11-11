@@ -118,7 +118,7 @@ export async function calcularAusenciasPorTipo(
     where: {
       empleadoId,
       estado: {
-        in: [EstadoAusencia.completada, EstadoAusencia.en_curso, EstadoAusencia.auto_aprobada],
+        in: [EstadoAusencia.completada, EstadoAusencia.confirmada],
       },
       OR: [
         // Ausencias que empiezan en el mes

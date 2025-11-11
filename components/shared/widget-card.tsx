@@ -21,6 +21,7 @@ interface WidgetCardProps {
   titleIcon?: React.ReactNode;
   badge?: string | number;
   headerAction?: React.ReactNode;
+  showHeader?: boolean;
 }
 
 export const WidgetCard = memo(function WidgetCard({
@@ -28,44 +29,47 @@ export const WidgetCard = memo(function WidgetCard({
   href,
   children,
   className = '',
-  height = 'h-[280px]',
+  height = 'h-full min-h-[240px]',
   headerClassName = '',
   contentClassName = '',
   titleIcon,
   badge,
   headerAction,
+  showHeader = true,
 }: WidgetCardProps) {
   return (
     <Card className={`${height} flex flex-col overflow-hidden font-inter ${className}`}>
-      <CardHeader className={`flex-shrink-0 ${headerClassName}`}>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <CardTitle className="text-[13px] sm:text-[14px] font-normal text-gray-900 flex items-center gap-2">
-              {titleIcon}
-              {title}
-            </CardTitle>
-            {badge && (
-              <span className="flex items-center justify-center min-w-[20px] h-5 px-1.5 bg-warning text-white text-[10px] sm:text-[11px] font-bold rounded-lg">
-                {badge}
-              </span>
-            )}
+      {showHeader && (
+        <CardHeader className={`flex-shrink-0 py-3 sm:py-4 ${headerClassName}`}>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <CardTitle className="text-[13px] sm:text-[14px] font-normal text-gray-900 flex items-center gap-2">
+                {titleIcon}
+                {title}
+              </CardTitle>
+              {badge && (
+                <span className="flex items-center justify-center min-w-[20px] h-5 px-1.5 bg-warning text-white text-[10px] sm:text-[11px] font-bold rounded-lg">
+                  {badge}
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-1 sm:gap-2">
+              {headerAction}
+              {href && (
+                <Link href={href}>
+                  <button
+                    className="flex items-center justify-center min-w-[44px] min-h-[44px] sm:w-6 sm:h-6 sm:min-w-0 sm:min-h-0 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+                    aria-label={`Ir a ${title}`}
+                  >
+                    <ChevronRight className="w-3.5 h-3.5 text-gray-600" />
+                  </button>
+                </Link>
+              )}
+            </div>
           </div>
-          <div className="flex items-center gap-1 sm:gap-2">
-            {headerAction}
-            {href && (
-              <Link href={href}>
-                <button
-                  className="flex items-center justify-center w-8 h-8 sm:w-6 sm:h-6 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
-                  aria-label={`Ir a ${title}`}
-                >
-                  <ChevronRight className="w-3.5 h-3.5 text-gray-600" />
-                </button>
-              </Link>
-            )}
-          </div>
-        </div>
-      </CardHeader>
-      <CardContent className={`flex-1 pb-4 sm:pb-20 ${contentClassName}`}>
+        </CardHeader>
+      )}
+      <CardContent className={`flex-1 min-h-0 pb-4 sm:pb-6 ${contentClassName}`}>
         {children}
       </CardContent>
     </Card>

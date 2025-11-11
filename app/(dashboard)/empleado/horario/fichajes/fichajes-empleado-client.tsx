@@ -30,7 +30,7 @@ import { Clock, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { formatearHorasMinutos } from '@/lib/utils/formatters';
-
+import { toast } from 'sonner';
 import { EstadoFichaje } from '@/lib/constants/enums';
 
 interface Fichaje {
@@ -198,13 +198,13 @@ export function FichajesEmpleadoClient({ balanceInicial }: Props) {
         setNuevaFecha('');
         setNuevaHora('');
         fetchFichajes();
-        alert('Solicitud de corrección enviada correctamente');
+        toast.success('Solicitud de corrección enviada correctamente');
       } else {
-        alert('Error al solicitar corrección');
+        toast.error('Error al solicitar corrección');
       }
     } catch (error) {
       console.error('Error solicitando corrección:', error);
-      alert('Error al solicitar corrección');
+      toast.error('Error al solicitar corrección');
     }
   }
 

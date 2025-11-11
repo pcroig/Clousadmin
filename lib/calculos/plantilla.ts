@@ -77,11 +77,7 @@ export async function obtenerResumenPlantilla(
       where: {
         empresaId,
         estado: {
-          in: [
-            EstadoAusencia.en_curso,
-            EstadoAusencia.auto_aprobada,
-            EstadoAusencia.pendiente_aprobacion,
-          ],
+          in: [EstadoAusencia.confirmada, EstadoAusencia.pendiente],
         },
         fechaInicio: {
           lte: fecha,

@@ -170,7 +170,7 @@ async function agregarHojaAusencias(
     where: {
       empresaId,
       estado: {
-        in: [EstadoAusencia.completada, EstadoAusencia.en_curso, EstadoAusencia.auto_aprobada],
+        in: [EstadoAusencia.completada, EstadoAusencia.confirmada],
       },
       OR: [
         {
@@ -357,7 +357,7 @@ async function agregarHojaCambios(
   const cambiosSalario = await prisma.solicitudCambio.findMany({
     where: {
       empresaId,
-      estado: EstadoAusencia.en_curso,
+      estado: EstadoAusencia.confirmada,
       fechaRespuesta: {
         gte: fechaInicio,
         lte: fechaFin,

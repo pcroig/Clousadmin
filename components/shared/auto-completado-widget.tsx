@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Check } from 'lucide-react';
 import Link from 'next/link';
 import { WidgetCard } from './widget-card';
+import { toast } from 'sonner';
 
 export interface AutoCompletadStats {
   fichajesCompletados: number;
@@ -48,10 +49,10 @@ export function AutoCompletadoWidget({ stats }: AutoCompletadoWidgetProps) {
           solicitudesCompletadas: tipo === 'solicitudes' ? 0 : prev.solicitudesCompletadas,
         }));
       } else {
-        alert('Error al limpiar');
+        toast.error('Error al limpiar');
       }
     } catch (e) {
-      alert('Error al limpiar');
+      toast.error('Error al limpiar');
     }
   };
 

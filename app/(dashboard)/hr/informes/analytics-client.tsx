@@ -16,7 +16,7 @@ import { toast } from 'sonner';
 interface PlantillaData {
   totalEmpleados: number;
   cambioMes: number;
-  porDepartamento: Array<{ departamento: string; empleados: number }>;
+  porEquipo: Array<{ equipo: string; empleados: number }>;
   evolucionPlantilla: Array<{ mes: string; empleados: number }>;
   altasMes: number;
   bajasMes: number;
@@ -26,7 +26,7 @@ interface CompensacionData {
   costeTotalNomina: number;
   cambioCoste: number;
   salarioPromedio: number;
-  salarioPromedioDpto: Array<{ departamento: string; promedio: number }>;
+  salarioPromedioEquipo: Array<{ equipo: string; promedio: number }>;
   evolucionCoste: Array<{ mes: string; coste: number }>;
   distribucionSalarial: Array<{ rango: string; empleados: number }>;
 }
@@ -171,11 +171,11 @@ export function AnalyticsClient() {
           {/* Gráficos de Plantilla */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <BarChartComponent
-              title="Empleados por Departamento"
+              title="Empleados por equipo"
               description="Distribución actual de la plantilla"
-              data={plantillaData.porDepartamento}
+              data={plantillaData.porEquipo}
               dataKey="empleados"
-              xAxisKey="departamento"
+              xAxisKey="equipo"
               chartConfig={{
                 empleados: {
                   label: 'Empleados',
@@ -247,14 +247,14 @@ export function AnalyticsClient() {
           {/* Gráficos de Compensación */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <BarChartComponent
-              title="Salario Promedio por Departamento"
+              title="Salario promedio por equipo"
               description="En euros mensuales"
-              data={compensacionData.salarioPromedioDpto}
+              data={compensacionData.salarioPromedioEquipo}
               dataKey="promedio"
-              xAxisKey="departamento"
+              xAxisKey="equipo"
               chartConfig={{
                 promedio: {
-                  label: 'Salario Promedio',
+                  label: 'Salario promedio',
                   color: '#d97757',
                 },
               }}

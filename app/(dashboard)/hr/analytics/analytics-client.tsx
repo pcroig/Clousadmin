@@ -52,8 +52,8 @@ interface NominasAnalytics {
     totalComplementos: number;
     totalNominas: number;
   }>;
-  porDepartamento: Array<{
-    departamento: string;
+  porEquipo: Array<{
+    equipo: string;
     totalNeto: number;
     totalComplementos: number;
     promedioNeto: number;
@@ -370,13 +370,13 @@ export function AnalyticsClient() {
                     />
                   )}
 
-                  {nominasAnalytics.porDepartamento.length > 0 && (
+                  {nominasAnalytics.porEquipo.length > 0 && (
                     <BarChartComponent
-                      title="Coste neto por departamento"
-                      description={`Top departamentos ${nominasAnalytics.currentYear}`}
-                      data={nominasAnalytics.porDepartamento}
+                      title="Coste neto por equipo"
+                      description={`Top equipos ${nominasAnalytics.currentYear}`}
+                      data={nominasAnalytics.porEquipo}
                       dataKey="totalNeto"
-                      xAxisKey="departamento"
+                      xAxisKey="equipo"
                       chartConfig={{
                         totalNeto: {
                           label: 'Total neto',

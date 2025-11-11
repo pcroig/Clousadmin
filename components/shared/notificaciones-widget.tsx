@@ -30,7 +30,7 @@ export const NotificacionesWidget = memo(function NotificacionesWidget({
   altura = 'normal',
   href = '/empleado/bandeja-entrada',
 }: NotificacionesWidgetProps) {
-  const alturaClass = altura === 'doble' ? 'h-[580px]' : 'h-[280px]';
+  const alturaClass = altura === 'doble' ? 'h-full min-h-[480px]' : 'h-full min-h-[240px]';
   const notificacionesMostradas = notificaciones.slice(0, maxItems);
 
   return (
@@ -39,7 +39,7 @@ export const NotificacionesWidget = memo(function NotificacionesWidget({
       href={href}
       height={alturaClass}
       titleIcon={<Bell className="w-4 h-4" />}
-      contentClassName="pb-4 overflow-y-auto"
+      contentClassName="overflow-y-auto"
     >
       <div className="space-y-0">
         {notificacionesMostradas.length === 0 ? (

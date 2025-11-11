@@ -86,11 +86,11 @@ export async function GET(req: NextRequest) {
     }
     
     const diasUsados = (ausencias as Ausencia[])
-      .filter((a) => a.estado === EstadoAusencia.en_curso || a.estado === EstadoAusencia.completada || a.estado === EstadoAusencia.auto_aprobada)
+      .filter((a) => a.estado === EstadoAusencia.confirmada || a.estado === EstadoAusencia.completada)
       .reduce((sum: number, a) => sum + Number(a.diasSolicitados), 0);
 
     const diasPendientes = (ausencias as Ausencia[])
-      .filter((a) => a.estado === EstadoAusencia.pendiente_aprobacion)
+      .filter((a) => a.estado === EstadoAusencia.pendiente)
       .reduce((sum: number, a) => sum + Number(a.diasSolicitados), 0);
 
     const diasTotales = saldoAsignado?.diasTotales || 0;

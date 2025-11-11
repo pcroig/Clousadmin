@@ -4,6 +4,7 @@
  */
 
 import type { Ausencia } from "@prisma/client";
+import { getAusenciaEstadoLabel } from "@/lib/utils/formatters";
 
 /**
  * Evento de calendario
@@ -146,9 +147,11 @@ export function ausenciaToCalendarEvent(
   const fechaFin = new Date(ausencia.fechaFin);
   fechaFin.setDate(fechaFin.getDate() + 1); // +1 día porque el end es exclusivo
 
+  const estadoFormatted = getAusenciaEstadoLabel(ausencia.estado);
+
   return {
     summary: `${tipoFormatted} - ${empleadoNombre}`,
-    description: `Tipo: ${tipoFormatted}\nDías: ${ausencia.diasSolicitados}\nID Ausencia: ${ausencia.id}\nEstado: ${ausencia.estado}${ausencia.descripcion ? `\n\nDescripción: ${ausencia.descripcion}` : ""}`,
+    description: `Tipo: ${tipoFormatted}\nDías: ${ausencia.diasSolicitados}\nID Ausencia: ${ausencia.id}\nEstado: ${estadoFormatted}${ausencia.descripcion ? `\n\nDescripción: ${ausencia.descripcion}` : ""}`,
     start: {
       date: ausencia.fechaInicio.toISOString().split("T")[0],
     },

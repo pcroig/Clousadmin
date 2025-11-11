@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { loginAction } from './actions';
-
+import { toast } from 'sonner';
 import { UsuarioRol } from '@/lib/constants/enums';
 
 interface LoginFormProps {
@@ -207,7 +207,7 @@ export function LoginForm({ callbackUrl }: LoginFormProps) {
           className="text-sm text-primary hover:underline block"
           onClick={(e) => {
             e.preventDefault();
-            alert(
+            toast.info(
               'Contacta con tu administrador de RRHH para recuperar tu contraseña'
             );
           }}

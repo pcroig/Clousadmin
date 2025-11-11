@@ -38,7 +38,7 @@ export default async function ManagerDashboardPage() {
   const ausenciasPendientes = await prisma.ausencia.findMany({
     where: {
       empresaId: session.user.empresaId,
-      estado: EstadoAusencia.pendiente_aprobacion,
+      estado: EstadoAusencia.pendiente,
       empleado: {
         managerId: manager.id,
       },
@@ -183,7 +183,7 @@ export default async function ManagerDashboardPage() {
       fechaInicio: {
         gte: hoy,
       },
-      estado: EstadoAusencia.en_curso,
+      estado: EstadoAusencia.confirmada,
     },
     select: {
       id: true,
@@ -214,9 +214,9 @@ export default async function ManagerDashboardPage() {
   }));
 
   return (
-    <div className="h-full w-full flex flex-col">
+    <div className="h-full w-full flex flex-col overflow-hidden">
       {/* Header */}
-      <div className="flex-shrink-0 mb-3 sm:mb-5">
+      <div className="flex-shrink-0 mb-3 sm:mb-4">
         <h1 className="text-xl sm:text-2xl font-bold text-gray-900">
           Buenos Días, {session.user.nombre}
         </h1>
@@ -224,39 +224,49 @@ export default async function ManagerDashboardPage() {
       </div>
 
       {/* Responsive Layout: Stack on mobile, 3 columns on desktop */}
-      <div className="flex-1 min-h-0 pb-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+      <div className="flex-1 min-h-0 pb-4 sm:pb-6 overflow-auto">
+        <div className="h-full grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
           {/* Column 1 */}
-          <div className="space-y-4 sm:space-y-6">
-            <FichajeWidget />
-            <AutoCompletadoWidget
-              stats={{
-                fichajesCompletados: aprobados,
-                ausenciasCompletadas: pendientes,
-                solicitudesCompletadas: 0,
-              }}
-            />
+          <div className="flex flex-col gap-3 sm:gap-4 min-h-0">
+            <div className="min-h-[240px]">
+              <FichajeWidget />
+            </div>
+            <div className="min-h-[240px]">
+              <AutoCompletadoWidget
+                stats={{
+                  fichajesCompletados: aprobados,
+                  ausenciasCompletadas: pendientes,
+                  solicitudesCompletadas: 0,
+                }}
+              />
+            </div>
           </div>
 
           {/* Column 2 */}
-          <div className="space-y-4 sm:space-y-6">
-            <SolicitudesWidget
-              solicitudes={solicitudes}
-              maxItems={8}
-              dashboardHref="/manager/bandeja-entrada"
-            />
+          <div className="flex flex-col gap-3 sm:gap-4 min-h-0">
+            <div className="min-h-[480px] h-full">
+              <SolicitudesWidget
+                solicitudes={solicitudes}
+                maxItems={8}
+                dashboardHref="/manager/bandeja-entrada"
+              />
+            </div>
           </div>
 
           {/* Column 3 */}
-          <div className="space-y-4 sm:space-y-6">
-            <NotificacionesWidget notificaciones={notificaciones} maxItems={3} />
-            <AusenciasWidget
-              diasAcumulados={diasTotalesEquipo}
-              diasDisponibles={diasTotalesEquipo - diasUsadosEquipo}
-              diasUtilizados={diasUsadosEquipo}
-              proximasAusencias={ausenciasEquipo}
-              ausenciasPasadas={[]}
-            />
+          <div className="flex flex-col gap-3 sm:gap-4 min-h-0">
+            <div className="min-h-[240px]">
+              <NotificacionesWidget notificaciones={notificaciones} maxItems={3} />
+            </div>
+            <div className="min-h-[240px] flex-1">
+              <AusenciasWidget
+                diasAcumulados={diasTotalesEquipo}
+                diasDisponibles={diasTotalesEquipo - diasUsadosEquipo}
+                diasUtilizados={diasUsadosEquipo}
+                proximasAusencias={ausenciasEquipo}
+                ausenciasPasadas={[]}
+              />
+            </div>
           </div>
         </div>
       </div>

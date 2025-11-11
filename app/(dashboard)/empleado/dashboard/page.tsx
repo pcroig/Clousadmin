@@ -11,6 +11,20 @@ import { EmpleadoDashboardClient } from './dashboard-client';
 
 import { EstadoAusencia, UsuarioRol } from '@/lib/constants/enums';
 
+const ESTADOS_NOTIFICACIONES: EstadoAusencia[] = [
+  EstadoAusencia.confirmada,
+  EstadoAusencia.completada,
+  EstadoAusencia.rechazada,
+  EstadoAusencia.pendiente,
+];
+
+const ESTADOS_AUSENCIAS_ABIERTAS: EstadoAusencia[] = [
+  EstadoAusencia.pendiente,
+  EstadoAusencia.confirmada,
+];
+
+const ESTADO_AUSENCIA_COMPLETADA = EstadoAusencia.completada;
+
 interface DashboardData {
   empleado: any;
   notificaciones: Notificacion[];
@@ -55,13 +69,7 @@ async function obtenerDatosDashboard(session: { user: { id: string; empresaId: s
     where: {
       empleadoId: empleado.id,
       estado: {
-        in: [
-          EstadoAusencia.en_curso,
-          EstadoAusencia.completada,
-          EstadoAusencia.auto_aprobada,
-          EstadoAusencia.rechazada,
-          EstadoAusencia.pendiente_aprobacion,
-        ],
+        in: ESTADOS_NOTIFICACIONES,
       },
     },
     orderBy: {
@@ -95,21 +103,39 @@ async function obtenerDatosDashboard(session: { user: { id: string; empresaId: s
 
   // Si hay preferencia pendiente y la campaña está abierta
   let campanaPendiente: DashboardData['campanaPendiente'] = null;
-  if (preferenciaPendiente && preferenciaPendiente.campana.estado === 'abierta') {
-    campanaPendiente = {
-      id: preferenciaPendiente.campana.id,
-      titulo: preferenciaPendiente.campana.titulo,
-      fechaInicioObjetivo: preferenciaPendiente.campana.fechaInicioObjetivo,
-      fechaFinObjetivo: preferenciaPendiente.campana.fechaFinObjetivo,
-    };
+  if (preferenciaPendiente) {
+    const campana = preferenciaPendiente.campana;
+
+    if (!campana) {
+      console.warn('[EmpleadoDashboard] Preferencia de vacaciones sin campaña asociada:', {
+        preferenciaId: preferenciaPendiente.id,
+        empleadoId: empleado.id,
+      });
+    } else if (campana.estado === 'abierta') {
+      campanaPendiente = {
+        id: campana.id,
+        titulo: campana.titulo,
+        fechaInicioObjetivo: campana.fechaInicioObjetivo,
+        fechaFinObjetivo: campana.fechaFinObjetivo,
+      };
+    }
   }
 
-  const notificaciones: Notificacion[] = ausenciasNotificaciones.map((aus: any) => ({
-    id: aus.id,
-    tipo: aus.estado === EstadoAusencia.en_curso || aus.estado === EstadoAusencia.completada || aus.estado === EstadoAusencia.auto_aprobada ? 'aprobada' : aus.estado === EstadoAusencia.rechazada ? 'rechazada' : 'pendiente',
-    mensaje: `Tu solicitud de ${aus.tipo} está ${aus.estado}`,
-    fecha: aus.createdAt,
-  }));
+  const notificaciones: Notificacion[] = ausenciasNotificaciones.map((aus: any) => {
+    const tipo =
+      aus.estado === EstadoAusencia.confirmada || aus.estado === EstadoAusencia.completada
+        ? 'aprobada'
+        : aus.estado === EstadoAusencia.rechazada
+        ? 'rechazada'
+        : 'pendiente';
+
+    return {
+      id: aus.id,
+      tipo,
+      mensaje: `Tu solicitud de ${aus.tipo} está ${aus.estado}`,
+      fecha: aus.createdAt,
+    };
+  });
 
   // Ausencias del empleado - con manejo de errores
   const añoActual = new Date().getFullYear();
@@ -152,11 +178,7 @@ async function obtenerDatosDashboard(session: { user: { id: string; empresaId: s
         gte: hoy,
       },
       estado: {
-        in: [
-          EstadoAusencia.pendiente_aprobacion,
-          EstadoAusencia.en_curso,
-          EstadoAusencia.auto_aprobada,
-        ],
+        in: ESTADOS_AUSENCIAS_ABIERTAS,
       },
     },
     orderBy: {
@@ -171,7 +193,7 @@ async function obtenerDatosDashboard(session: { user: { id: string; empresaId: s
     fechaFin: aus.fechaFin,
     tipo: aus.tipo,
     dias: Number(aus.diasSolicitados),
-    estado: aus.estado as 'pendiente' | 'aprobada' | 'rechazada',
+    estado: aus.estado as 'pendiente' | 'confirmada' | 'rechazada',
   }));
 
   // Ausencias pasadas
@@ -181,7 +203,7 @@ async function obtenerDatosDashboard(session: { user: { id: string; empresaId: s
       fechaFin: {
         lt: hoy,
       },
-      estado: EstadoAusencia.en_curso,
+      estado: ESTADO_AUSENCIA_COMPLETADA,
     },
     orderBy: {
       fechaFin: 'desc',
@@ -195,7 +217,7 @@ async function obtenerDatosDashboard(session: { user: { id: string; empresaId: s
     fechaFin: aus.fechaFin,
     tipo: aus.tipo,
     dias: Number(aus.diasSolicitados),
-    estado: EstadoAusencia.en_curso,
+    estado: EstadoAusencia.completada,
   }));
 
   return {
@@ -231,7 +253,10 @@ export default async function EmpleadoDashboardPage() {
     console.error('[EmpleadoDashboardPage] Error obteniendo datos del dashboard:', {
       userId: session.user.id,
       empleadoId: session.user.empleadoId,
-      error,
+      error:
+        error instanceof Error
+          ? { message: error.message, stack: error.stack }
+          : error,
     });
     return (
       <div className="p-4 text-center">

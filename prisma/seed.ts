@@ -373,8 +373,8 @@ async function main() {
       diasSolicitados: 6, // Excluyendo festivos 25 y 26 dic
       motivo: 'Vacaciones de Navidad',
       descuentaSaldo: true,
-        estado: EstadoAusencia.pendiente_aprobacion,
-      },
+      estado: EstadoAusencia.pendiente,
+    },
       {
       empleadoId: empleados[1].id, // Carlos
         empresaId: empresa.id,
@@ -387,8 +387,8 @@ async function main() {
       diasSolicitados: 4, // Excluyendo festivo 1 nov
       motivo: 'Puente de noviembre',
       descuentaSaldo: true,
-        estado: EstadoAusencia.pendiente_aprobacion,
-      },
+      estado: EstadoAusencia.pendiente,
+    },
       {
       empleadoId: empleados[3].id, // Miguel
         empresaId: empresa.id,
@@ -401,8 +401,8 @@ async function main() {
       diasSolicitados: 1,
       motivo: 'Asuntos personales',
       descuentaSaldo: false,
-        estado: EstadoAusencia.pendiente_aprobacion,
-      },
+      estado: EstadoAusencia.pendiente,
+    },
 
     // Ausencias aprobadas (futuras)
       {
@@ -417,7 +417,7 @@ async function main() {
       diasSolicitados: 5, // Excluyendo festivo 1 nov
       motivo: 'Vacaciones de otoño',
       descuentaSaldo: true,
-      estado: EstadoAusencia.en_curso,
+      estado: EstadoAusencia.confirmada,
       aprobadaPor: usuarioAdmin.id,
       aprobadaEn: new Date(),
     },
@@ -433,7 +433,7 @@ async function main() {
       diasSolicitados: 5, // Excluyendo festivo 25 dic
       motivo: 'Vacaciones de Navidad',
       descuentaSaldo: true,
-      estado: EstadoAusencia.en_curso,
+      estado: EstadoAusencia.confirmada,
       aprobadaPor: usuarioAdmin.id,
       aprobadaEn: new Date(),
     },
@@ -658,7 +658,7 @@ async function main() {
               empresaId: empresa.id,
               empleadoId: empleado.id,
               fecha: fechaFichajeSinHora,
-              estado: EstadoAusencia.pendiente_aprobacion, // Pendiente porque falta salida
+              estado: EstadoAusencia.pendiente, // Pendiente porque falta salida
               eventos: {
                 createMany: {
                   data: eventos,
@@ -700,7 +700,7 @@ async function main() {
               empresaId: empresa.id,
               empleadoId: empleado.id,
               fecha: fechaFichajeSinHora,
-              estado: EstadoAusencia.pendiente_aprobacion, // Pendiente porque la pausa quedó sin cerrar
+              estado: EstadoAusencia.pendiente, // Pendiente porque la pausa quedó sin cerrar
               eventos: {
                 createMany: {
                   data: eventos,
@@ -788,7 +788,7 @@ async function main() {
               empresaId: empresa.id,
               empleadoId: empleado.id,
               fecha: fechaFichajeSinHora,
-              estado: EstadoAusencia.pendiente_aprobacion, // Falta entrada, queda pendiente para cuadre
+              estado: EstadoAusencia.pendiente, // Falta entrada, queda pendiente para cuadre
               eventos: {
                 createMany: {
                   data: eventos,

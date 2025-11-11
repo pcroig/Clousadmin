@@ -17,6 +17,8 @@ export type TipoNotificacion =
   | 'ausencia_aprobada'
   | 'ausencia_rechazada'
   | 'ausencia_cancelada'
+  // Empleados
+  | 'empleado_creado'
   // Fichajes
   | 'fichaje_autocompletado'
   | 'fichaje_requiere_revision'
@@ -25,10 +27,6 @@ export type TipoNotificacion =
   | 'cambio_manager'
   | 'asignado_equipo'
   | 'nuevo_empleado_equipo'
-  // Empleados
-  | 'empleado_creado'
-  | 'jornada_asignada'
-  | 'cambio_puesto'
   // Solicitudes
   | 'solicitud_creada'
   | 'solicitud_aprobada'
@@ -50,7 +48,7 @@ export interface NotificacionMetadata {
   prioridad?: PrioridadNotificacion;
   accionUrl?: string;
   accionTexto?: string;
-  [key: string]: unknown;
+  [key: string]: any;
 }
 
 // ========================================
@@ -524,6 +522,57 @@ export async function crearNotificacionCambioManager(
       },
     });
   }
+}
+
+// ========================================
+// EMPLEADOS
+// ========================================
+
+export async function crearNotificacionEmpleadoCreado(
+  prisma: PrismaClient,
+  params: {
+    empleadoId: string;
+    empresaId: string;
+    empleadoNombre: string;
+  }
+) {
+  const { empleadoId, empresaId, empleadoNombre } = params;
+
+  const empleado = await prisma.empleado.findUnique({
+    where: { id: empleadoId },
+    select: {
+      managerId: true,
+    },
+  });
+
+  const hrUsuarioIds = await obtenerUsuariosANotificar(prisma, empresaId, {
+    hrAdmin: true,
+  });
+
+  const managerUsuarioIds =
+    empleado?.managerId
+      ? await obtenerUsuariosANotificar(prisma, empresaId, {
+          manager: empleado.managerId,
+        })
+      : [];
+
+  const usuarioIds = Array.from(new Set([...hrUsuarioIds, ...managerUsuarioIds]));
+
+  await crearNotificaciones(prisma, {
+    empresaId,
+    usuarioIds,
+    tipo: 'empleado_creado',
+    titulo: 'Nuevo empleado registrado',
+    mensaje: `${empleadoNombre} se ha incorporado a la empresa.`,
+    metadata: {
+      empleadoId,
+      empleadoNombre,
+      managerId: empleado?.managerId,
+      prioridad: 'normal',
+      accionUrl: `/hr/organizacion/personas/${empleadoId}`,
+      accionTexto: 'Revisar ficha',
+    },
+  });
 }
 
 export async function crearNotificacionAsignadoEquipo(
@@ -1157,114 +1206,6 @@ export async function crearNotificacionDenunciaActualizada(
       prioridad: 'alta',
       accionUrl: `/empleado/denuncias/${denunciaId}`,
       accionTexto: 'Ver denuncia',
-    },
-  });
-}
-
-// ========================================
-// EMPLEADOS
-// ========================================
-
-/**
- * Notifica a HR cuando se crea un nuevo empleado
- */
-export async function crearNotificacionEmpleadoCreado(
-  prisma: PrismaClient,
-  params: {
-    empleadoId: string;
-    empresaId: string;
-    empleadoNombre: string;
-  }
-) {
-  const { empleadoId, empresaId, empleadoNombre } = params;
-
-  // Notificar a todos los HR Admins
-  const usuarioIds = await obtenerUsuariosANotificar(prisma, empresaId, {
-    hrAdmin: true,
-  });
-
-  await crearNotificaciones(prisma, {
-    empresaId,
-    usuarioIds,
-    tipo: 'empleado_creado',
-    titulo: 'Nuevo empleado creado',
-    mensaje: `Se ha creado un nuevo empleado: ${empleadoNombre}. Recuerda completar su configuración y enviarle la invitación de onboarding.`,
-    metadata: {
-      empleadoId,
-      empleadoNombre,
-      prioridad: 'normal',
-      accionUrl: `/hr/empleados/${empleadoId}`,
-      accionTexto: 'Ver empleado',
-    },
-  });
-}
-
-/**
- * Notifica al empleado cuando se le asigna una jornada
- */
-export async function crearNotificacionJornadaAsignada(
-  prisma: PrismaClient,
-  params: {
-    empleadoId: string;
-    empresaId: string;
-    jornadaNombre: string;
-  }
-) {
-  const { empleadoId, empresaId, jornadaNombre } = params;
-
-  const usuarioIds = await obtenerUsuariosANotificar(prisma, empresaId, {
-    empleado: empleadoId,
-  });
-
-  await crearNotificaciones(prisma, {
-    empresaId,
-    usuarioIds,
-    tipo: 'jornada_asignada',
-    titulo: 'Jornada laboral asignada',
-    mensaje: `Se te ha asignado la jornada laboral: ${jornadaNombre}. Ahora puedes comenzar a fichar tus horas de trabajo.`,
-    metadata: {
-      jornadaNombre,
-      prioridad: 'normal',
-      accionUrl: '/empleado/mi-espacio/fichajes',
-      accionTexto: 'Ir a fichajes',
-    },
-  });
-}
-
-/**
- * Notifica al empleado cuando cambia su puesto
- */
-export async function crearNotificacionCambioPuesto(
-  prisma: PrismaClient,
-  params: {
-    empleadoId: string;
-    empresaId: string;
-    puestoAnterior: string | null;
-    puestoNuevo: string;
-  }
-) {
-  const { empleadoId, empresaId, puestoAnterior, puestoNuevo } = params;
-
-  const usuarioIds = await obtenerUsuariosANotificar(prisma, empresaId, {
-    empleado: empleadoId,
-  });
-
-  const mensaje = puestoAnterior
-    ? `Tu puesto ha cambiado de "${puestoAnterior}" a "${puestoNuevo}".`
-    : `Se te ha asignado el puesto: ${puestoNuevo}.`;
-
-  await crearNotificaciones(prisma, {
-    empresaId,
-    usuarioIds,
-    tipo: 'cambio_puesto',
-    titulo: 'Cambio de puesto',
-    mensaje,
-    metadata: {
-      puestoAnterior,
-      puestoNuevo,
-      prioridad: 'alta',
-      accionUrl: '/empleado/mi-espacio/datos',
-      accionTexto: 'Ver mis datos',
     },
   });
 }

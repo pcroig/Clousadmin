@@ -87,18 +87,16 @@ export const TIPO_AUSENCIA_LABELS: Record<TipoAusencia, string> = {
 };
 
 export const ESTADO_AUSENCIA_LABELS: Record<EstadoAusencia, string> = {
-  pendiente_aprobacion: 'Pendiente Aprobación',
-  en_curso: 'Aprobada',
+  pendiente: 'Pendiente',
+  confirmada: 'Confirmada',
   completada: 'Completada',
-  auto_aprobada: 'Auto-aprobada',
   rechazada: 'Rechazada',
-  cancelada: 'Cancelada',
 };
 
 export const ESTADO_SOLICITUD_LABELS: Record<EstadoSolicitud, string> = {
   pendiente: 'Pendiente',
   requiere_revision: 'Requiere Revisión',
-  auto_aprobada: 'Auto-aprobada',
+  auto_aprobada: 'Aprobada automáticamente',
   aprobada_manual: 'Aprobada',
   rechazada: 'Rechazada',
 };
@@ -140,12 +138,10 @@ export const TIPOS_AUSENCIA_OPTIONS = [
 ];
 
 export const ESTADOS_AUSENCIA_OPTIONS = [
-  { value: EstadoAusencia.pendiente_aprobacion, label: ESTADO_AUSENCIA_LABELS.pendiente_aprobacion },
-  { value: EstadoAusencia.en_curso, label: ESTADO_AUSENCIA_LABELS.en_curso },
+  { value: EstadoAusencia.pendiente, label: ESTADO_AUSENCIA_LABELS.pendiente },
+  { value: EstadoAusencia.confirmada, label: ESTADO_AUSENCIA_LABELS.confirmada },
   { value: EstadoAusencia.completada, label: ESTADO_AUSENCIA_LABELS.completada },
-  { value: EstadoAusencia.auto_aprobada, label: ESTADO_AUSENCIA_LABELS.auto_aprobada },
   { value: EstadoAusencia.rechazada, label: ESTADO_AUSENCIA_LABELS.rechazada },
-  { value: EstadoAusencia.cancelada, label: ESTADO_AUSENCIA_LABELS.cancelada },
 ];
 
 export const ESTADOS_FICHAJE_OPTIONS = [

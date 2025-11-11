@@ -250,3 +250,5 @@ La mayor parte de la deuda (89%) viene de uso de `any` explícito. El trabajo pr
 
 Estimación total: **~100-150 archivos a modificar** en 3-4 semanas de trabajo dedicado.
 
+
+

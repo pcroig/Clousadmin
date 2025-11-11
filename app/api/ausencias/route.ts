@@ -19,12 +19,13 @@ import {
   createdResponse,
   badRequestResponse,
 } from '@/lib/api-handler';
-import { 
+import {
   crearNotificacionAusenciaSolicitada,
   crearNotificacionAusenciaAutoAprobada,
 } from '@/lib/notificaciones';
 
 import { EstadoAusencia, UsuarioRol, TipoAusencia } from '@/lib/constants/enums';
+import { determinarEstadoTrasAprobacion } from '@/lib/calculos/ausencias';
 
 // GET /api/ausencias - Listar ausencias
 export async function GET(req: NextRequest) {
@@ -145,11 +146,7 @@ export async function POST(req: NextRequest) {
       where: {
         empleadoId: session.user.empleadoId,
         estado: {
-          in: [
-            EstadoAusencia.pendiente_aprobacion,
-            EstadoAusencia.en_curso,
-            EstadoAusencia.auto_aprobada,
-          ],
+          in: [EstadoAusencia.pendiente, EstadoAusencia.confirmada],
         },
         OR: [
           // Caso 1: La nueva ausencia comienza durante una ausencia existente
@@ -274,9 +271,9 @@ export async function POST(req: NextRequest) {
       TipoAusencia.maternidad_paternidad,
     ];
     const esAutoAprobable = tiposAutoAprobables.includes(validatedData.tipo as TipoAusencia);
-    const estadoInicial = esAutoAprobable 
-      ? EstadoAusencia.auto_aprobada 
-      : EstadoAusencia.pendiente_aprobacion;
+    const estadoInicial = esAutoAprobable
+      ? determinarEstadoTrasAprobacion(fechaFin)
+      : EstadoAusencia.pendiente;
 
     // Crear ausencia
     const ausencia = await prisma.ausencia.create({

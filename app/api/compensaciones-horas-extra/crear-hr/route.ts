@@ -15,6 +15,7 @@ import {
 } from '@/lib/api-handler';
 import { z } from 'zod';
 import { EstadoAusencia } from '@/lib/constants/enums';
+import { determinarEstadoTrasAprobacion } from '@/lib/calculos/ausencias';
 
 const crearCompensacionHRSchema = z.object({
   empleadoId: z.string(),
@@ -86,7 +87,7 @@ export async function POST(request: NextRequest) {
           diasLaborables: 0,
           diasSolicitados: diasAusencia,
           descuentaSaldo: false, // No descuenta, suma al saldo
-          estado: EstadoAusencia.auto_aprobada,
+          estado: determinarEstadoTrasAprobacion(fechaFin),
           descripcion: `Compensación de ${horasBalance} horas extra`,
           motivo: 'Compensación de horas extra trabajadas', // Requerido para tipo 'otro'
           aprobadaPor: session.user.id,
@@ -188,4 +189,5 @@ export async function POST(request: NextRequest) {
     return handleApiError(error, 'API POST /api/compensaciones-horas-extra/crear-hr');
   }
 }
+
 

@@ -8,11 +8,14 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
 import { WidgetCard } from './widget-card';
 import { FichajeManualModal } from './fichaje-manual-modal';
 import { calcularHorasTrabajadas } from '@/lib/calculos/fichajes';
 import { formatTiempoTrabajado, formatearHorasMinutos } from '@/lib/utils/formatters';
+import { MOBILE_DESIGN } from '@/lib/constants/mobile-design';
 import type { FichajeEvento } from '@prisma/client';
+import { toast } from 'sonner';
 
 interface FichajeWidgetProps {
   href?: string;
@@ -216,7 +219,7 @@ export function FichajeWidget({
 
       if (!response.ok) {
         const error = await response.json();
-        alert(error.error || 'Error al fichar');
+        toast.error(error.error || 'Error al fichar');
         return;
       }
 
@@ -224,7 +227,7 @@ export function FichajeWidget({
       await obtenerEstadoActual();
     } catch (error) {
       console.error('[FichajeWidget] Error al fichar:', error);
-      alert('Error al fichar. Intenta de nuevo.');
+      toast.error('Error al fichar. Intenta de nuevo.');
     } finally {
       setCargando(false);
     }
@@ -275,141 +278,207 @@ export function FichajeWidget({
   }
 
   return (
-    <WidgetCard title="Fichaje" href={href} contentClassName="px-4 sm:px-6 pb-4 sm:pb-20">
-        {/* Responsive layout: stack vertical en mobile, grid en desktop */}
-        <div className="flex flex-col sm:grid sm:grid-cols-2 gap-4 h-full">
-          {/* Estado y botones */}
-          <div className="flex flex-col justify-between order-2 sm:order-1">
-            <div>
-              <h3 className="text-lg sm:text-[24px] font-bold text-gray-900">{getTituloEstado()}</h3>
-              <p className="text-[10px] sm:text-[11px] text-gray-500 mt-1">
-                {estadoActual === 'trabajando' && `${formatearHorasMinutos(horasPorHacer)} restantes`}
-                {estadoActual === 'en_pausa' && 'En descanso'}
-                {estadoActual === 'sin_fichar' && 'Listo para comenzar'}
-                {estadoActual === 'finalizado' && 'Día completado'}
-              </p>
+    <>
+      {/* Mobile: Sin header, solo contenido */}
+      <div className="sm:hidden">
+        <Card className={`${MOBILE_DESIGN.widget.height.standard} flex flex-col overflow-hidden ${MOBILE_DESIGN.card.default}`}>
+          <CardContent className={`flex-1 ${MOBILE_DESIGN.spacing.widget} flex flex-col`}>
+            {/* Estado y Cronómetro juntos */}
+            <div className={`${MOBILE_DESIGN.card.highlight} text-center mb-3`}>
+              <div className={`${MOBILE_DESIGN.text.caption} mb-1`}>{getTituloEstado()}</div>
+              <div className={`${MOBILE_DESIGN.text.display} text-gray-900`}>{tiempoTrabajado}</div>
+              <div className={`${MOBILE_DESIGN.text.caption} mt-0.5`}>Horas trabajadas</div>
             </div>
-            {estadoActual === 'trabajando' ? (
-              <div className="space-y-2 mt-3 sm:mt-0">
+
+            {/* Botones de acción */}
+            <div className={`${MOBILE_DESIGN.spacing.items} mt-auto`}>
+              {estadoActual === 'trabajando' ? (
+                <>
+                  <Button
+                    variant="default"
+                    className={`w-full ${MOBILE_DESIGN.button.primary}`}
+                    onClick={() => handleFichar('pausa_inicio')}
+                    disabled={cargando}
+                  >
+                    Pausar
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className={`w-full ${MOBILE_DESIGN.button.primary}`}
+                    onClick={() => handleFichar('salida')}
+                    disabled={cargando}
+                  >
+                    Finalizar Jornada
+                  </Button>
+                </>
+              ) : estadoActual === 'en_pausa' ? (
+                <>
+                  <Button
+                    variant="default"
+                    className={`w-full ${MOBILE_DESIGN.button.primary}`}
+                    onClick={() => handleFichar('pausa_fin')}
+                    disabled={cargando}
+                  >
+                    Reanudar
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className={`w-full ${MOBILE_DESIGN.button.primary}`}
+                    onClick={() => handleFichar('salida')}
+                    disabled={cargando}
+                  >
+                    Finalizar Jornada
+                  </Button>
+                </>
+              ) : (
                 <Button
                   variant="default"
-                  className="w-full font-semibold text-xs sm:text-[13px] min-h-[44px] sm:min-h-0"
-                  onClick={() => handleFichar('pausa_inicio')}
-                  disabled={cargando}
-                >
-                  ⏸ Pausar
-                </Button>
-                <Button
-                  variant="outline"
-                  className="w-full font-semibold text-xs sm:text-[13px] min-h-[44px] sm:min-h-0"
-                  onClick={() => handleFichar('salida')}
-                  disabled={cargando}
-                >
-                  ⏹ Finalizar Jornada
-                </Button>
-              </div>
-            ) : estadoActual === 'en_pausa' ? (
-              <div className="space-y-2 mt-3 sm:mt-0">
-                <Button
-                  variant="default"
-                  className="w-full font-semibold text-xs sm:text-[13px] min-h-[44px] sm:min-h-0"
-                  onClick={() => handleFichar('pausa_fin')}
-                  disabled={cargando}
-                >
-                  ▶ Reanudar
-                </Button>
-                <Button
-                  variant="outline"
-                  className="w-full font-semibold text-xs sm:text-[13px] min-h-[44px] sm:min-h-0"
-                  onClick={() => handleFichar('salida')}
-                  disabled={cargando}
-                >
-                  ⏹ Finalizar Jornada
-                </Button>
-              </div>
-            ) : (
-              <div className="space-y-2 mt-3 sm:mt-0">
-                <Button
-                  variant="default"
-                  className="w-full font-semibold text-xs sm:text-[13px] min-h-[44px] sm:min-h-0"
+                  className={`w-full ${MOBILE_DESIGN.button.primary}`}
                   onClick={() => handleFichar()}
                   disabled={cargando}
                 >
                   {getTextoBoton()}
                 </Button>
-                <Button
-                  variant="outline"
-                  className="w-full font-semibold text-xs sm:text-[13px] min-h-[44px] sm:min-h-0"
-                  onClick={() => setModalFichajeManual(true)}
-                >
-                  + Añadir Manual
-                </Button>
-              </div>
-            )}
-          </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
-          {/* Anillo de progreso */}
-          <div className="flex flex-col items-center justify-center order-1 sm:order-2">
-            <div className="relative w-28 h-28 sm:w-32 sm:h-32">
-              {/* SVG Anillo de progreso abierto por la parte de abajo */}
-              <svg className="w-full h-full" viewBox="0 0 128 128">
-                {/* Arco de fondo (3/4 del círculo, abierto en la parte de abajo) */}
-                <circle
-                  cx="64"
-                  cy="64"
-                  r="58"
-                  stroke="#EFEFED"
-                  strokeWidth="8"
-                  fill="none"
-                  strokeDasharray={`${(circumference * 3) / 4} ${circumference}`}
-                  strokeDashoffset={-circumference / 8}
-                  strokeLinecap="round"
-                  transform="rotate(90 64 64)"
-                />
-                {/* Arco de progreso */}
-                <circle
-                  cx="64"
-                  cy="64"
-                  r="58"
-                  stroke="#d97757"
-                  strokeWidth="8"
-                  fill="none"
-                  strokeDasharray={`${((circumference * 3) / 4) * (porcentajeProgreso / 100)} ${circumference}`}
-                  strokeDashoffset={-circumference / 8}
-                  strokeLinecap="round"
-                  className="transition-all duration-300"
-                  transform="rotate(90 64 64)"
-                />
-              </svg>
-              {/* Tiempo en el centro */}
-              <div className="absolute inset-0 flex items-center justify-center">
-                <span className="text-xl sm:text-2xl font-bold text-gray-900">{tiempoTrabajado}</span>
+      {/* Desktop: Con header y anillo */}
+      <div className="hidden sm:block">
+        <WidgetCard title="Fichaje" href={href} contentClassName="px-6 pb-6">
+          <div className="grid grid-cols-2 gap-4 h-full">
+            {/* Estado y botones */}
+            <div className="flex flex-col justify-between">
+              <div>
+                <h3 className="text-[24px] font-bold text-gray-900">{getTituloEstado()}</h3>
+                <p className="text-[11px] text-gray-500 mt-1">
+                  {estadoActual === 'trabajando' && `${formatearHorasMinutos(horasPorHacer)} restantes`}
+                  {estadoActual === 'en_pausa' && 'En descanso'}
+                  {estadoActual === 'sin_fichar' && 'Listo para comenzar'}
+                  {estadoActual === 'finalizado' && 'Día completado'}
+                </p>
+              </div>
+              <div className="space-y-2">
+                {estadoActual === 'trabajando' ? (
+                  <>
+                    <Button
+                      variant="default"
+                      className="w-full font-semibold text-[13px]"
+                      onClick={() => handleFichar('pausa_inicio')}
+                      disabled={cargando}
+                    >
+                      ⏸ Pausar
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="w-full font-semibold text-[13px]"
+                      onClick={() => handleFichar('salida')}
+                      disabled={cargando}
+                    >
+                      ⏹ Finalizar Jornada
+                    </Button>
+                  </>
+                ) : estadoActual === 'en_pausa' ? (
+                  <>
+                    <Button
+                      variant="default"
+                      className="w-full font-semibold text-[13px]"
+                      onClick={() => handleFichar('pausa_fin')}
+                      disabled={cargando}
+                    >
+                      ▶ Reanudar
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="w-full font-semibold text-[13px]"
+                      onClick={() => handleFichar('salida')}
+                      disabled={cargando}
+                    >
+                      ⏹ Finalizar Jornada
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Button
+                      variant="default"
+                      className="w-full font-semibold text-[13px]"
+                      onClick={() => handleFichar()}
+                      disabled={cargando}
+                    >
+                      {getTextoBoton()}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="w-full font-semibold text-[13px]"
+                      onClick={() => setModalFichajeManual(true)}
+                    >
+                      + Añadir Manual
+                    </Button>
+                  </>
+                )}
               </div>
             </div>
 
-            {/* Marcadores de horas */}
-            <div className="flex items-center justify-between w-full mt-2 px-2">
-              <div className="text-center">
-                <div className="text-[10px] sm:text-[11px] text-gray-900 font-semibold">{horasHechas}h</div>
-                <div className="text-[8px] sm:text-[9px] text-gray-500">Hechas</div>
+            {/* Anillo de progreso */}
+            <div className="flex flex-col items-center justify-center">
+              <div className="relative w-32 h-32">
+                <svg className="w-full h-full" viewBox="0 0 128 128">
+                  <circle
+                    cx="64"
+                    cy="64"
+                    r="58"
+                    stroke="#EFEFED"
+                    strokeWidth="8"
+                    fill="none"
+                    strokeDasharray={`${(circumference * 3) / 4} ${circumference}`}
+                    strokeDashoffset={-circumference / 8}
+                    strokeLinecap="round"
+                    transform="rotate(90 64 64)"
+                  />
+                  <circle
+                    cx="64"
+                    cy="64"
+                    r="58"
+                    stroke="#d97757"
+                    strokeWidth="8"
+                    fill="none"
+                    strokeDasharray={`${((circumference * 3) / 4) * (porcentajeProgreso / 100)} ${circumference}`}
+                    strokeDashoffset={-circumference / 8}
+                    strokeLinecap="round"
+                    className="transition-all duration-300"
+                    transform="rotate(90 64 64)"
+                  />
+                </svg>
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <span className="text-2xl font-bold text-gray-900">{tiempoTrabajado}</span>
+                </div>
               </div>
-              <div className="text-center">
-                <div className="text-[10px] sm:text-[11px] text-gray-900 font-semibold">{horasPorHacer}h</div>
-                <div className="text-[8px] sm:text-[9px] text-gray-500">Por hacer</div>
+              <div className="flex items-center justify-between w-full mt-2 px-2">
+                <div className="text-center">
+                  <div className="text-[11px] text-gray-900 font-semibold">{horasHechas}h</div>
+                  <div className="text-[9px] text-gray-500">Hechas</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-[11px] text-gray-900 font-semibold">{horasPorHacer}h</div>
+                  <div className="text-[9px] text-gray-500">Por hacer</div>
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        </WidgetCard>
+      </div>
 
-        {/* Modal de fichaje manual */}
-        <FichajeManualModal
-          open={modalFichajeManual}
-          onClose={() => setModalFichajeManual(false)}
-          onSuccess={() => {
-            setModalFichajeManual(false);
-            obtenerEstadoActual(); // Refrescar estado después de crear solicitud
-          }}
-        />
-    </WidgetCard>
+      {/* Modal de fichaje manual */}
+      <FichajeManualModal
+        open={modalFichajeManual}
+        onClose={() => setModalFichajeManual(false)}
+        onSuccess={() => {
+          setModalFichajeManual(false);
+          obtenerEstadoActual();
+        }}
+      />
+    </>
   );
 }

@@ -24,7 +24,7 @@ export default async function HRDashboardPage() {
   const ausenciasPendientes = await prisma.ausencia.findMany({
     where: {
       empresaId: session.user.empresaId,
-      estado: EstadoAusencia.pendiente_aprobacion,
+      estado: EstadoAusencia.pendiente,
     },
     include: {
       empleado: {
@@ -166,34 +166,34 @@ export default async function HRDashboardPage() {
   });
 
   return (
-    <div className="h-full w-full flex flex-col">
+    <div className="h-full w-full flex flex-col overflow-hidden">
       {/* Header */}
-      <div className="flex-shrink-0 mb-3 sm:mb-6">
+      <div className="flex-shrink-0 mb-3 sm:mb-4">
         <h1 className="text-xl sm:text-2xl font-bold text-gray-900">
           Buenos Días, {session.user.nombre}
         </h1>
       </div>
 
       {/* Responsive Grid Layout */}
-      <div className="flex-1 min-h-0 pb-4 sm:pb-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 lg:grid-rows-2 gap-4 sm:gap-6">
+      <div className="flex-1 min-h-0 pb-4 sm:pb-6 overflow-auto">
+        <div className="h-full grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 auto-rows-fr gap-3 sm:gap-4">
           {/* Fichaje Widget */}
-          <div className="min-h-0">
+          <div className="min-h-[240px] h-full">
             <FichajeWidget href="/hr/horario/fichajes" />
           </div>
 
           {/* Solicitudes Widget - Ocupa 2 filas en desktop */}
-          <div className="row-span-1 lg:row-span-2 min-h-0">
+          <div className="row-span-1 lg:row-span-2 min-h-[480px] h-full">
             <SolicitudesWidget solicitudes={solicitudes} maxItems={8} />
           </div>
 
           {/* Notificaciones Widget */}
-          <div className="min-h-0">
+          <div className="min-h-[240px] h-full">
             <NotificacionesWidget notificaciones={notificaciones} maxItems={3} href="/hr/bandeja-entrada" />
           </div>
 
           {/* Auto-completed Widget */}
-          <div className="min-h-0">
+          <div className="min-h-[240px] h-full">
             <AutoCompletadoWidget
               stats={{
                 fichajesCompletados: fichajesAutoCompletados,
@@ -204,7 +204,7 @@ export default async function HRDashboardPage() {
           </div>
 
           {/* Plantilla Widget */}
-          <div className="min-h-0">
+          <div className="min-h-[240px] h-full">
             <PlantillaWidget
               trabajando={plantillaResumen.trabajando}
               ausentes={plantillaResumen.ausentes}

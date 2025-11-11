@@ -75,7 +75,7 @@ export function PlantillaWidget({ trabajando, ausentes, sinFichar }: PlantillaWi
           </Link>
 
           {/* Ausentes */}
-          <Link href="/hr/horario/ausencias?estado=en_curso" className="block">
+          <Link href="/hr/horario/ausencias?estado=confirmada" className="block">
             <div className="flex items-center justify-between p-2 rounded-lg border border-gray-200 bg-white transition-all hover:border-gray-300 hover:shadow-sm cursor-pointer group">
               <div className="flex-1 min-w-0">
                 <p className="text-[13px] font-semibold text-gray-900 group-hover:text-gray-700">Ausentes</p>

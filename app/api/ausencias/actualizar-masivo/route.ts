@@ -54,7 +54,7 @@ export async function POST(req: NextRequest) {
       where: {
         id: { in: validatedData.ausenciasIds },
         empresaId: session.user.empresaId,
-        estado: EstadoAusencia.pendiente_aprobacion, // Solo ausencias pendientes
+        estado: EstadoAusencia.pendiente, // Solo ausencias pendientes
       },
       include: {
         empleado: true,
@@ -88,12 +88,12 @@ export async function POST(req: NextRequest) {
 
         // Actualizar ausencia
         if (validatedData.accion === 'aprobar') {
-          // Determinar estado: en_curso si aún no pasó, completada si ya pasó
+          // Determinar estado: confirmada si aún no pasó, completada si ya pasó
           const hoy = new Date();
           hoy.setHours(0, 0, 0, 0);
           const fechaFin = new Date(ausencia.fechaFin);
           fechaFin.setHours(0, 0, 0, 0);
-          const estadoAprobado = fechaFin < hoy ? 'completada' : 'en_curso';
+          const estadoAprobado = fechaFin < hoy ? EstadoAusencia.completada : EstadoAusencia.confirmada;
 
           await prisma.ausencia.update({
             where: { id: ausencia.id },

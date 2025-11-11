@@ -9,6 +9,7 @@ import { getSession } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { uploadToS3 } from '@/lib/s3';
 import { clasificarNomina } from '@/lib/ia/clasificador-nominas';
+import { obtenerOCrearCarpetaSistema } from '@/lib/documentos';
 import {
   actualizarEstadoNomina,
   sincronizarEstadoEvento,
@@ -157,26 +158,12 @@ export async function POST(
           );
         }
 
-        // Obtener o crear carpeta "Nóminas" del empleado
-        let carpetaNominas = await prisma.carpeta.findFirst({
-          where: {
-            empleadoId: nomina.empleadoId,
-            nombre: 'Nóminas',
-            esSistema: true,
-          },
-        });
-
-        if (!carpetaNominas) {
-          // Auto-crear carpeta de nóminas
-          carpetaNominas = await prisma.carpeta.create({
-            data: {
-              empresaId: session.user.empresaId,
-              empleadoId: nomina.empleadoId,
-              nombre: 'Nóminas',
-              esSistema: true,
-            },
-          });
-        }
+        // Obtener o crear carpeta "Nóminas" del empleado usando función centralizada
+        const carpetaNominas = await obtenerOCrearCarpetaSistema(
+          nomina.empleadoId,
+          session.user.empresaId,
+          'Nóminas'
+        );
 
         // Leer archivo como Buffer
         const arrayBuffer = await file.arrayBuffer();

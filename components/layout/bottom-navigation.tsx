@@ -6,7 +6,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, Inbox, Clock, User, Settings } from 'lucide-react';
+import { Home, Inbox, Clock, User, Settings, MoreHorizontal } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface BottomNavigationProps {
@@ -32,22 +32,25 @@ export function BottomNavigation({ rol }: BottomNavigationProps) {
       isActive: (path) => path === '/empleado/dashboard',
     },
     {
-      name: 'Horario',
-      href: '/empleado/mi-espacio?tab=fichajes',
-      icon: Clock,
-      isActive: (path) => path.includes('/empleado/mi-espacio'),
-    },
-    {
       name: 'Bandeja',
       href: '/empleado/bandeja-entrada',
       icon: Inbox,
       isActive: (path) => path.includes('/empleado/bandeja-entrada'),
     },
     {
-      name: 'Perfil',
+      name: 'Fichajes',
+      href: '/empleado/horario/fichajes',
+      icon: Clock,
+      isActive: (path) => path.includes('/empleado/horario/fichajes'),
+    },
+    {
+      name: 'Otros',
       href: '/empleado/settings',
-      icon: User,
-      isActive: (path) => path.includes('/empleado/settings'),
+      icon: MoreHorizontal,
+      isActive: (path) =>
+        path.includes('/empleado/settings') ||
+        path.includes('/empleado/mi-espacio') ||
+        path.includes('/empleado/horario/ausencias'),
     },
   ];
 

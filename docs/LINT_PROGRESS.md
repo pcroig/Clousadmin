@@ -173,3 +173,5 @@ Endpoints con errores any que necesitan tipado:
 - Los cambios son seguros (solo tipado, sin lógica)
 - El código resultante será más mantenible y robusto
 
+
+

@@ -36,8 +36,8 @@ Creado un archivo centralizado que:
 Ejecutados scripts automáticos que migraron **138 archivos** en todo el sistema:
 
 #### Script 1: Estados y Tipos (36 archivos)
-- `estado: 'pendiente'` → `estado: EstadoAusencia.pendiente_aprobacion`
-- `estado: 'aprobada'` → `estado: EstadoAusencia.en_curso`
+- `estado: 'pendiente'` → `estado: EstadoAusencia.pendiente`
+- `estado: 'aprobada'` → `estado: EstadoAusencia.confirmada`
 - `estado === 'completada'` → `estado === EstadoAusencia.completada`
 
 #### Script 2: Roles (102 archivos)
@@ -137,7 +137,7 @@ import { EstadoAusencia, TipoAusencia, UsuarioRol } from '@/lib/constants/enums'
 // Queries de Prisma
 const ausencias = await prisma.ausencia.findMany({
   where: {
-    estado: EstadoAusencia.pendiente_aprobacion, // ✅ Type safe
+    estado: EstadoAusencia.pendiente, // ✅ Type safe
     tipo: TipoAusencia.vacaciones,
   },
 });
@@ -151,7 +151,7 @@ if (user.rol === UsuarioRol.hr_admin) {
 await prisma.ausencia.create({
   data: {
     tipo: TipoAusencia.enfermedad,
-    estado: EstadoAusencia.pendiente_aprobacion,
+    estado: EstadoAusencia.pendiente,
     // ...
   },
 });
@@ -253,5 +253,6 @@ npm test
 **Archivos afectados**: 138  
 **Enums migrados**: 8  
 **Estado**: ✅ Completado y verificado
+
 
 

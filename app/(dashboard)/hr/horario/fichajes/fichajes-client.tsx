@@ -25,7 +25,7 @@ import { formatearHorasMinutos } from '@/lib/utils/formatters';
 import { JornadasModal } from './jornadas-modal';
 import { EditarFichajeModal } from './editar-fichaje-modal';
 import { RevisionModal } from './revision-modal';
-
+import { toast } from 'sonner';
 import { EstadoFichaje } from '@/lib/constants/enums';
 
 // NUEVO MODELO: Fichaje tiene eventos dentro
@@ -281,7 +281,7 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
       
     } catch (error) {
       console.error('[Cuadrar fichajes] Error:', error);
-      alert('Error al abrir cuadre de fichajes. Revisa la consola para más detalles.');
+      toast.error('Error al abrir cuadre de fichajes. Revisa la consola para más detalles.');
     } finally {
       setCuadrandoFichajes(false);
     }
@@ -341,15 +341,15 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
       });
 
       if (response.ok) {
-        alert('Fichaje actualizado correctamente');
+        toast.success('Fichaje actualizado correctamente');
         fetchFichajes(); // Recargar fichajes
       } else {
         const error = await response.json();
-        alert(error.error || 'Error al actualizar fichaje');
+        toast.error(error.error || 'Error al actualizar fichaje');
       }
     } catch (error) {
       console.error('Error:', error);
-      alert('Error al actualizar fichaje');
+      toast.error('Error al actualizar fichaje');
     }
   }
 

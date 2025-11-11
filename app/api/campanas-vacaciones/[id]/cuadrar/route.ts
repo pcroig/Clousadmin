@@ -78,7 +78,7 @@ export async function POST(
     const ausenciasAprobadas = await prisma.ausencia.findMany({
       where: {
         empleadoId: { in: empleadoIds },
-        estado: { in: [EstadoAusencia.en_curso, EstadoAusencia.completada, EstadoAusencia.auto_aprobada] },
+        estado: { in: [EstadoAusencia.confirmada, EstadoAusencia.completada] },
         tipo: 'vacaciones',
       },
     });

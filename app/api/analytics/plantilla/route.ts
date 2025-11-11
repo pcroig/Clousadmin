@@ -4,26 +4,14 @@
 // GET: Obtener métricas de plantilla (headcount, evolución, distribución)
 
 import { NextRequest } from 'next/server';
+import type { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import {
   requireAuthAsHR,
   handleApiError,
   successResponse,
 } from '@/lib/api-handler';
-
-// Función auxiliar para calcular antigüedad
-function calcularAntiguedad(fechaAlta: Date): string {
-  const hoy = new Date();
-  const mesesAntiguedad =
-    (hoy.getFullYear() - fechaAlta.getFullYear()) * 12 +
-    (hoy.getMonth() - fechaAlta.getMonth());
-
-  if (mesesAntiguedad < 6) return 'menos_6_meses';
-  if (mesesAntiguedad < 12) return '6_12_meses';
-  if (mesesAntiguedad < 36) return '1_3_años';
-  if (mesesAntiguedad < 60) return '3_5_años';
-  return 'mas_5_años';
-}
+import { obtenerRangoFechaAntiguedad } from '@/lib/calculos/antiguedad';
 
 // GET /api/analytics/plantilla - Obtener métricas de plantilla (solo HR Admin)
 export async function GET(request: NextRequest) {
@@ -39,7 +27,7 @@ export async function GET(request: NextRequest) {
     const antiguedad = searchParams.get('antiguedad');
 
     // Construir filtros base
-    const where: any = {
+    const where: Prisma.EmpleadoWhereInput = {
       empresaId: session.user.empresaId,
       estadoEmpleado: 'activo',
     };
@@ -57,8 +45,16 @@ export async function GET(request: NextRequest) {
       };
     }
 
+    // Aplicar filtro de antigüedad en BD (no en memoria)
+    if (antiguedad && antiguedad !== 'todos') {
+      const rangoFecha = obtenerRangoFechaAntiguedad(antiguedad);
+      if (rangoFecha) {
+        where.fechaAlta = rangoFecha;
+      }
+    }
+
     // Obtener empleados con equipos
-    let empleados = await prisma.empleado.findMany({
+    const empleados = await prisma.empleado.findMany({
       where,
       select: {
         id: true,
@@ -76,13 +72,6 @@ export async function GET(request: NextRequest) {
         },
       },
     });
-
-    // Filtrar por antigüedad si aplica
-    if (antiguedad && antiguedad !== 'todos') {
-      empleados = empleados.filter(
-        (e) => calcularAntiguedad(e.fechaAlta) === antiguedad
-      );
-    }
 
     // 1. Total empleados
     const totalEmpleados = empleados.length;

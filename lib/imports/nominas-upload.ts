@@ -6,6 +6,7 @@
 import AdmZip from 'adm-zip';
 import { prisma } from '@/lib/prisma';
 import { clasificarNomina, type EmpleadoCandidato } from '@/lib/ia/clasificador-nominas';
+import { obtenerOCrearCarpetaSistema } from '@/lib/documentos';
 
 /**
  * Resultado del matching de una nómina
@@ -277,26 +278,12 @@ export async function confirmarUpload(
         continue;
       }
 
-      // Obtener carpeta "Nóminas" del empleado
-      let carpetaNominas = await prisma.carpeta.findFirst({
-        where: {
-          empleadoId,
-          nombre: 'Nóminas',
-          esSistema: true,
-        },
-      });
-
-      // Si no existe, crearla
-      if (!carpetaNominas) {
-        carpetaNominas = await prisma.carpeta.create({
-          data: {
-            empresaId: session.empresaId,
-            empleadoId,
-            nombre: 'Nóminas',
-            esSistema: true,
-          },
-        });
-      }
+      // Obtener o crear carpeta "Nóminas" del empleado usando función centralizada
+      const carpetaNominas = await obtenerOCrearCarpetaSistema(
+        empleadoId,
+        session.empresaId,
+        'Nóminas'
+      );
 
       // Generar ruta de archivo
       const timestamp = Date.now();

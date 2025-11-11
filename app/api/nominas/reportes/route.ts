@@ -17,7 +17,7 @@ type NominaMetric = {
   totalNeto: number;
   totalComplementos: number;
   totalDeducciones: number;
-  departamento: string | null;
+  equipos: string[];
   mes: number;
 };
 
@@ -41,8 +41,8 @@ type VariacionesComparativa = {
   empleados: number;
 };
 
-type DepartamentoComparativa = {
-  departamento: string;
+type EquipoComparativa = {
+  equipo: string;
   actual: { total: number; promedio: number; empleados: number };
   anterior: { total: number; promedio: number; empleados: number };
   variacion: number;
@@ -56,11 +56,11 @@ type ComparativaResultado = {
     anterior: ComparativaMetrics;
     variaciones: VariacionesComparativa;
   };
-  porDepartamento: DepartamentoComparativa[];
+  porEquipo: EquipoComparativa[];
 };
 
-type ResumenDepartamental = {
-  departamento: string;
+type ResumenPorEquipo = {
+  equipo: string;
   totalNeto: number;
   totalBruto: number;
   totalComplementos: number;
@@ -85,12 +85,12 @@ type ResumenResultado = {
     totalDeducciones: number;
     promedioNeto: number;
   };
-  departamentos: ResumenDepartamental[];
+  equipos: ResumenPorEquipo[];
   complementos: ComplementoResumen[];
 };
 
-type DepartamentoReporte = {
-  departamento: string;
+type EquipoReporte = {
+  equipo: string;
   empleados: number;
   totalNominas: number;
   totalBruto: number;
@@ -102,10 +102,10 @@ type DepartamentoReporte = {
   maxNeto: number;
 };
 
-type DepartamentosResultado = {
+type EquiposResultado = {
   anio: number;
-  totalDepartamentos: number;
-  departamentos: DepartamentoReporte[];
+  totalEquipos: number;
+  equipos: EquipoReporte[];
 };
 
 type TendenciaMensual = {
@@ -130,21 +130,23 @@ type TendenciaResultado = {
   };
 };
 
-type NominaWithDepartamento = {
+type NominaWithEquipos = {
   empleadoId: string;
   totalBruto: Prisma.Decimal | number;
   totalNeto: Prisma.Decimal | number;
   totalComplementos: Prisma.Decimal | number;
   totalDeducciones: Prisma.Decimal | number;
   empleado: {
-    departamento: {
-      nombre: string;
-    } | null;
+    equipos: Array<{
+      equipo: {
+        nombre: string;
+      } | null;
+    }>;
   };
   mes: number;
 };
 
-type NominaWithComplementos = NominaWithDepartamento & {
+type NominaWithComplementos = NominaWithEquipos & {
   complementosAsignados: Array<{
     importe: Prisma.Decimal | number;
     empleadoComplemento: {
@@ -155,14 +157,23 @@ type NominaWithComplementos = NominaWithDepartamento & {
   }>;
 };
 
-function toNominaMetric(nomina: NominaWithDepartamento): NominaMetric {
+function obtenerEquipos(empleado: NominaWithEquipos['empleado']): string[] {
+  const relaciones = empleado.equipos ?? [];
+  const nombres = relaciones
+    .map((rel) => rel.equipo?.nombre)
+    .filter((nombre): nombre is string => Boolean(nombre));
+
+  return nombres.length > 0 ? nombres : ['Sin equipo'];
+}
+
+function toNominaMetric(nomina: NominaWithEquipos): NominaMetric {
   return {
     empleadoId: nomina.empleadoId,
     totalBruto: Number(nomina.totalBruto),
     totalNeto: Number(nomina.totalNeto),
     totalComplementos: Number(nomina.totalComplementos),
     totalDeducciones: Number(nomina.totalDeducciones),
-    departamento: nomina.empleado.departamento?.nombre ?? null,
+    equipos: obtenerEquipos(nomina.empleado),
     mes: nomina.mes,
   };
 }
@@ -179,7 +190,7 @@ function toNominaDetalle(nomina: NominaWithComplementos): NominaDetalle {
 
 // GET /api/nominas/reportes?tipo=comparativa&anio=2025
 // GET /api/nominas/reportes?tipo=resumen&anio=2025&mes=3
-// GET /api/nominas/reportes?tipo=departamento&anio=2025
+// GET /api/nominas/reportes?tipo=equipos&anio=2025
 export async function GET(req: NextRequest) {
   try {
     const session = await getSession();
@@ -201,7 +212,8 @@ export async function GET(req: NextRequest) {
         return await generarResumen(session.user.empresaId, anio, mes, formato);
       
       case 'departamento':
-        return await generarPorDepartamento(session.user.empresaId, anio, formato);
+      case 'equipos':
+        return await generarPorEquipos(session.user.empresaId, anio, formato);
       
       case 'tendencia':
         return await generarTendencia(session.user.empresaId, anio, formato);
@@ -226,32 +238,36 @@ async function generarComparativa(empresaId: string, anioActual: number, formato
   const anioAnterior = anioActual - 1;
 
   // Obtener nóminas de ambos años
+  const includeEmpleado = {
+    empleado: {
+      include: {
+        equipos: {
+          select: {
+            equipo: {
+              select: {
+                nombre: true,
+              },
+            },
+          },
+        },
+      },
+    },
+  } satisfies Prisma.NominaInclude;
+
   const [nominasActualRaw, nominasAnteriorRaw] = await Promise.all([
     prisma.nomina.findMany({
       where: {
         empleado: { empresaId },
         anio: anioActual,
       },
-      include: {
-        empleado: {
-          include: {
-            departamento: true,
-          },
-        },
-      },
+      include: includeEmpleado,
     }),
     prisma.nomina.findMany({
       where: {
         empleado: { empresaId },
         anio: anioAnterior,
       },
-      include: {
-        empleado: {
-          include: {
-            departamento: true,
-          },
-        },
-      },
+      include: includeEmpleado,
     }),
   ]);
 
@@ -293,8 +309,8 @@ async function generarComparativa(empresaId: string, anioActual: number, formato
       : 0,
   };
 
-  // Comparativa por departamento
-  const acumuladoDepartamento: Record<
+  // Comparativa por equipo
+  const acumuladoEquipos: Record<
     string,
     {
       actual: { total: number; count: number };
@@ -302,47 +318,46 @@ async function generarComparativa(empresaId: string, anioActual: number, formato
     }
   > = {};
 
-  const acumularDepartamento = (nominas: NominaMetric[], tipo: 'actual' | 'anterior') => {
+  const acumularEquipos = (nominas: NominaMetric[], tipo: 'actual' | 'anterior') => {
     nominas.forEach((nomina) => {
-      const dept = nomina.departamento ?? 'Sin departamento';
-      if (!acumuladoDepartamento[dept]) {
-        acumuladoDepartamento[dept] = {
-          actual: { total: 0, count: 0 },
-          anterior: { total: 0, count: 0 },
-        };
-      }
+      nomina.equipos.forEach((equipo) => {
+        if (!acumuladoEquipos[equipo]) {
+          acumuladoEquipos[equipo] = {
+            actual: { total: 0, count: 0 },
+            anterior: { total: 0, count: 0 },
+          };
+        }
 
-      acumuladoDepartamento[dept][tipo].total += nomina.totalNeto;
-      acumuladoDepartamento[dept][tipo].count += 1;
+        acumuladoEquipos[equipo][tipo].total += nomina.totalNeto;
+        acumuladoEquipos[equipo][tipo].count += 1;
+      });
     });
   };
 
-  acumularDepartamento(nominasActual, 'actual');
-  acumularDepartamento(nominasAnterior, 'anterior');
+  acumularEquipos(nominasActual, 'actual');
+  acumularEquipos(nominasAnterior, 'anterior');
 
-  const comparativaDepartamentos: DepartamentoComparativa[] = Object.entries(acumuladoDepartamento).map(
-    ([departamento, data]) => {
-      const actualPromedio = data.actual.count > 0 ? data.actual.total / data.actual.count : 0;
-      const anteriorPromedio = data.anterior.count > 0 ? data.anterior.total / data.anterior.count : 0;
-      const variacion =
-        data.anterior.total > 0 ? ((data.actual.total - data.anterior.total) / data.anterior.total) * 100 : 0;
+  const comparativaEquipos: EquipoComparativa[] = Object.entries(acumuladoEquipos).map(([equipo, data]) => {
+    const actualPromedio = data.actual.count > 0 ? data.actual.total / data.actual.count : 0;
+    const anteriorPromedio = data.anterior.count > 0 ? data.anterior.total / data.anterior.count : 0;
+    const variacion =
+      data.anterior.total > 0 ? ((data.actual.total - data.anterior.total) / data.anterior.total) * 100 : 0;
 
-      return {
-        departamento,
-        actual: {
-          total: data.actual.total,
-          promedio: actualPromedio,
-          empleados: data.actual.count,
-        },
-        anterior: {
-          total: data.anterior.total,
-          promedio: anteriorPromedio,
-          empleados: data.anterior.count,
-        },
-        variacion,
-      };
-    }
-  );
+    return {
+      equipo,
+      actual: {
+        total: data.actual.total,
+        promedio: actualPromedio,
+        empleados: data.actual.count,
+      },
+      anterior: {
+        total: data.anterior.total,
+        promedio: anteriorPromedio,
+        empleados: data.anterior.count,
+      },
+      variacion,
+    };
+  });
 
   const resultado: ComparativaResultado = {
     anioActual,
@@ -352,7 +367,7 @@ async function generarComparativa(empresaId: string, anioActual: number, formato
       anterior: metricsAnterior,
       variaciones,
     },
-    porDepartamento: comparativaDepartamentos,
+    porEquipo: comparativaEquipos,
   };
 
   if (formato === 'excel') {
@@ -374,7 +389,15 @@ async function generarResumen(empresaId: string, anio: number, mes: number | nul
     include: {
       empleado: {
         include: {
-          departamento: true,
+          equipos: {
+            select: {
+              equipo: {
+                select: {
+                  nombre: true,
+                },
+              },
+            },
+          },
         },
       },
       complementosAsignados: {
@@ -397,31 +420,29 @@ async function generarResumen(empresaId: string, anio: number, mes: number | nul
   const totalComplementos = nominasDetalladas.reduce((sum, n) => sum + n.totalComplementos, 0);
   const totalDeducciones = nominasDetalladas.reduce((sum, n) => sum + n.totalDeducciones, 0);
 
-  const acumuladoDepartamentos: Record<string, { total: number; bruto: number; complementos: number; count: number }> =
-    {};
+  const acumuladoEquipos: Record<string, { total: number; bruto: number; complementos: number; count: number }> = {};
 
   nominasDetalladas.forEach((nomina) => {
-    const dept = nomina.departamento ?? 'Sin departamento';
-    if (!acumuladoDepartamentos[dept]) {
-      acumuladoDepartamentos[dept] = { total: 0, bruto: 0, complementos: 0, count: 0 };
-    }
+    nomina.equipos.forEach((equipo) => {
+      if (!acumuladoEquipos[equipo]) {
+        acumuladoEquipos[equipo] = { total: 0, bruto: 0, complementos: 0, count: 0 };
+      }
 
-    acumuladoDepartamentos[dept].total += nomina.totalNeto;
-    acumuladoDepartamentos[dept].bruto += nomina.totalBruto;
-    acumuladoDepartamentos[dept].complementos += nomina.totalComplementos;
-    acumuladoDepartamentos[dept].count += 1;
+      acumuladoEquipos[equipo].total += nomina.totalNeto;
+      acumuladoEquipos[equipo].bruto += nomina.totalBruto;
+      acumuladoEquipos[equipo].complementos += nomina.totalComplementos;
+      acumuladoEquipos[equipo].count += 1;
+    });
   });
 
-  const departamentos: ResumenDepartamental[] = Object.entries(acumuladoDepartamentos).map(
-    ([departamento, data]) => ({
-      departamento,
-      totalNeto: data.total,
-      totalBruto: data.bruto,
-      totalComplementos: data.complementos,
-      empleados: data.count,
-      promedioNeto: data.count > 0 ? data.total / data.count : 0,
-    })
-  );
+  const equipos: ResumenPorEquipo[] = Object.entries(acumuladoEquipos).map(([equipo, data]) => ({
+    equipo,
+    totalNeto: data.total,
+    totalBruto: data.bruto,
+    totalComplementos: data.complementos,
+    empleados: data.count,
+    promedioNeto: data.count > 0 ? data.total / data.count : 0,
+  }));
 
   const complementosAcumulados: Record<string, { count: number; total: number }> = {};
   nominasDetalladas.forEach((nomina) => {
@@ -454,7 +475,7 @@ async function generarResumen(empresaId: string, anio: number, mes: number | nul
       totalDeducciones,
       promedioNeto: totalNominas > 0 ? totalNeto / totalNominas : 0,
     },
-    departamentos,
+    equipos,
     complementos,
   };
 
@@ -465,7 +486,7 @@ async function generarResumen(empresaId: string, anio: number, mes: number | nul
   return NextResponse.json(resultado);
 }
 
-async function generarPorDepartamento(empresaId: string, anio: number, formato: FormatoReporte) {
+async function generarPorEquipos(empresaId: string, anio: number, formato: FormatoReporte) {
   const nominasRaw = await prisma.nomina.findMany({
     where: {
       empleado: { empresaId },
@@ -474,7 +495,15 @@ async function generarPorDepartamento(empresaId: string, anio: number, formato: 
     include: {
       empleado: {
         include: {
-          departamento: true,
+          equipos: {
+            select: {
+              equipo: {
+                select: {
+                  nombre: true,
+                },
+              },
+            },
+          },
         },
       },
     },
@@ -482,30 +511,31 @@ async function generarPorDepartamento(empresaId: string, anio: number, formato: 
 
   const nominas = nominasRaw.map(toNominaMetric);
 
-  const acumuladoDepartamentos: Record<
+  const acumuladoEquipos: Record<
     string,
     { nominas: NominaMetric[]; totalBruto: number; totalNeto: number; totalComplementos: number }
   > = {};
 
   nominas.forEach((nomina) => {
-    const dept = nomina.departamento ?? 'Sin departamento';
-    if (!acumuladoDepartamentos[dept]) {
-      acumuladoDepartamentos[dept] = {
-        nominas: [],
-        totalBruto: 0,
-        totalNeto: 0,
-        totalComplementos: 0,
-      };
-    }
+    nomina.equipos.forEach((equipo) => {
+      if (!acumuladoEquipos[equipo]) {
+        acumuladoEquipos[equipo] = {
+          nominas: [],
+          totalBruto: 0,
+          totalNeto: 0,
+          totalComplementos: 0,
+        };
+      }
 
-    acumuladoDepartamentos[dept].nominas.push(nomina);
-    acumuladoDepartamentos[dept].totalBruto += nomina.totalBruto;
-    acumuladoDepartamentos[dept].totalNeto += nomina.totalNeto;
-    acumuladoDepartamentos[dept].totalComplementos += nomina.totalComplementos;
+      acumuladoEquipos[equipo].nominas.push(nomina);
+      acumuladoEquipos[equipo].totalBruto += nomina.totalBruto;
+      acumuladoEquipos[equipo].totalNeto += nomina.totalNeto;
+      acumuladoEquipos[equipo].totalComplementos += nomina.totalComplementos;
+    });
   });
 
-  const departamentos: DepartamentoReporte[] = Object.entries(acumuladoDepartamentos)
-    .map(([departamento, data]) => {
+  const equiposReporte: EquipoReporte[] = Object.entries(acumuladoEquipos)
+    .map(([equipo, data]) => {
       const salariosOrdenados = data.nominas.map((n) => n.totalNeto).sort((a, b) => a - b);
       const mediana =
         salariosOrdenados.length === 0
@@ -515,7 +545,7 @@ async function generarPorDepartamento(empresaId: string, anio: number, formato: 
       const max = salariosOrdenados[salariosOrdenados.length - 1] ?? 0;
 
       return {
-        departamento,
+        equipo,
         empleados: new Set(data.nominas.map((n) => n.empleadoId)).size,
         totalNominas: data.nominas.length,
         totalBruto: data.totalBruto,
@@ -529,14 +559,14 @@ async function generarPorDepartamento(empresaId: string, anio: number, formato: 
     })
     .sort((a, b) => b.totalNeto - a.totalNeto);
 
-  const resultado: DepartamentosResultado = {
+  const resultado: EquiposResultado = {
     anio,
-    totalDepartamentos: departamentos.length,
-    departamentos,
+    totalEquipos: equiposReporte.length,
+    equipos: equiposReporte,
   };
 
   if (formato === 'excel') {
-    return generarExcelDepartamentos(resultado);
+    return generarExcelEquipos(resultado);
   }
 
   return NextResponse.json(resultado);
@@ -639,20 +669,20 @@ function generarExcelComparativa(data: ComparativaResultado) {
   const wsResumen = XLSX.utils.aoa_to_sheet(resumenData);
   XLSX.utils.book_append_sheet(workbook, wsResumen, 'Resumen');
 
-  // Hoja 2: Por Departamento
-  const deptData = data.porDepartamento.map((dept) => ({
-    Departamento: dept.departamento,
-    [`Total ${data.anioAnterior}`]: dept.anterior.total,
-    [`Promedio ${data.anioAnterior}`]: dept.anterior.promedio,
-    [`Empleados ${data.anioAnterior}`]: dept.anterior.empleados,
-    [`Total ${data.anioActual}`]: dept.actual.total,
-    [`Promedio ${data.anioActual}`]: dept.actual.promedio,
-    [`Empleados ${data.anioActual}`]: dept.actual.empleados,
-    'Variación %': dept.variacion,
+  // Hoja 2: Por Equipo
+  const equipoData = data.porEquipo.map((equipo) => ({
+    Equipo: equipo.equipo,
+    [`Total ${data.anioAnterior}`]: equipo.anterior.total,
+    [`Promedio ${data.anioAnterior}`]: equipo.anterior.promedio,
+    [`Empleados ${data.anioAnterior}`]: equipo.anterior.empleados,
+    [`Total ${data.anioActual}`]: equipo.actual.total,
+    [`Promedio ${data.anioActual}`]: equipo.actual.promedio,
+    [`Empleados ${data.anioActual}`]: equipo.actual.empleados,
+    'Variación %': equipo.variacion,
   }));
 
-  const wsDept = XLSX.utils.json_to_sheet(deptData);
-  XLSX.utils.book_append_sheet(workbook, wsDept, 'Por Departamento');
+  const wsEquipos = XLSX.utils.json_to_sheet(equipoData);
+  XLSX.utils.book_append_sheet(workbook, wsEquipos, 'Por equipo');
 
   const excelBuffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
 
@@ -680,9 +710,9 @@ function generarExcelResumen(data: ResumenResultado) {
   const wsResumen = XLSX.utils.json_to_sheet(resumenData);
   XLSX.utils.book_append_sheet(workbook, wsResumen, 'Resumen');
 
-  // Hoja 2: Por Departamento
-  const wsDept = XLSX.utils.json_to_sheet(data.departamentos);
-  XLSX.utils.book_append_sheet(workbook, wsDept, 'Departamentos');
+  // Hoja 2: Por Equipo
+  const wsEquipos = XLSX.utils.json_to_sheet(data.equipos);
+  XLSX.utils.book_append_sheet(workbook, wsEquipos, 'Equipos');
 
   // Hoja 3: Complementos
   const wsComp = XLSX.utils.json_to_sheet(data.complementos);
@@ -697,17 +727,17 @@ function generarExcelResumen(data: ResumenResultado) {
   return new NextResponse(excelBuffer, { headers });
 }
 
-function generarExcelDepartamentos(data: DepartamentosResultado) {
+function generarExcelEquipos(data: EquiposResultado) {
   const workbook = XLSX.utils.book_new();
 
-  const ws = XLSX.utils.json_to_sheet(data.departamentos);
-  XLSX.utils.book_append_sheet(workbook, ws, 'Por Departamento');
+  const ws = XLSX.utils.json_to_sheet(data.equipos);
+  XLSX.utils.book_append_sheet(workbook, ws, 'Por equipo');
 
   const excelBuffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
 
   const headers = new Headers();
   headers.set('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-  headers.set('Content-Disposition', `attachment; filename="departamentos_${data.anio}.xlsx"`);
+  headers.set('Content-Disposition', `attachment; filename="equipos_${data.anio}.xlsx"`);
 
   return new NextResponse(excelBuffer, { headers });
 }
