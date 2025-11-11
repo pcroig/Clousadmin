@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { format, isSameDay, isWithinInterval } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Calendar as CalendarIcon, ChevronRight } from 'lucide-react';
+import { Calendar as CalendarIcon, ChevronRight, Info } from 'lucide-react';
 
 import { useApi } from '@/lib/hooks';
 import { EstadoAusencia } from '@/lib/constants/enums';
@@ -14,6 +14,11 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Calendar } from '@/components/ui/calendar';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
 
 import { FechaCalendar } from '@/components/shared/fecha-calendar';
 import { SolicitarAusenciaModal } from '@/components/empleado/solicitar-ausencia-modal';
@@ -82,6 +87,10 @@ export function AusenciasTab({ empleadoId }: MiEspacioAusenciasTabProps) {
   });
   const [activeTab, setActiveTab] = useState<'proximas' | 'pasadas'>('proximas');
   const [mostrarModalSolicitud, setMostrarModalSolicitud] = useState(false);
+  
+  // Estado para popover de selección de fecha
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [popoverOpen, setPopoverOpen] = useState(false);
 
   // Estados para calendario laboral
   const [diasLaborables, setDiasLaborables] = useState<DiasLaborables>({
@@ -184,7 +193,7 @@ export function AusenciasTab({ empleadoId }: MiEspacioAusenciasTabProps) {
           fechaFin.setHours(0, 0, 0, 0);
           return (
             fechaFin >= hoy &&
-            (a.estado === EstadoAusencia.pendiente || a.estado === EstadoAusencia.confirmada)
+            (a.estado === 'pendiente' || a.estado === 'confirmada')
           );
         })
         .sort((a, b) => new Date(a.fechaInicio).getTime() - new Date(b.fechaInicio).getTime()),
@@ -199,7 +208,7 @@ export function AusenciasTab({ empleadoId }: MiEspacioAusenciasTabProps) {
           const hoy = new Date();
           hoy.setHours(0, 0, 0, 0);
           fechaFin.setHours(0, 0, 0, 0);
-          return fechaFin < hoy && a.estado === EstadoAusencia.completada;
+          return fechaFin < hoy && a.estado === 'completada';
         })
         .sort((a, b) => new Date(b.fechaInicio).getTime() - new Date(a.fechaInicio).getTime()),
     [ausencias]
@@ -208,19 +217,19 @@ export function AusenciasTab({ empleadoId }: MiEspacioAusenciasTabProps) {
   function getEstadoBadge(estado: string) {
     const variants: Record<string, { label: string; className: string }> = {
       pendiente: {
-        label: getAusenciaEstadoLabel(EstadoAusencia.pendiente),
+        label: 'Pendiente',
         className: 'bg-yellow-100 text-yellow-800',
       },
       confirmada: {
-        label: getAusenciaEstadoLabel(EstadoAusencia.confirmada),
+        label: 'Confirmada',
         className: 'bg-blue-100 text-blue-800',
       },
       completada: {
-        label: getAusenciaEstadoLabel(EstadoAusencia.completada),
+        label: 'Completada',
         className: 'bg-gray-100 text-gray-800',
       },
       rechazada: {
-        label: getAusenciaEstadoLabel(EstadoAusencia.rechazada),
+        label: 'Rechazada',
         className: 'bg-red-100 text-red-800',
       },
     };
@@ -242,32 +251,29 @@ export function AusenciasTab({ empleadoId }: MiEspacioAusenciasTabProps) {
   const modifiers = useMemo(
     () => ({
       festivo: festivos.map((festivo) => new Date(festivo.fecha)),
-      noLaborable: [
-        diasLaborables.lunes ? undefined : 1,
-        diasLaborables.martes ? undefined : 2,
-        diasLaborables.miercoles ? undefined : 3,
-        diasLaborables.jueves ? undefined : 4,
-        diasLaborables.viernes ? undefined : 5,
-        diasLaborables.sabado ? undefined : 6,
-        diasLaborables.domingo ? undefined : 0,
-      ].filter((value): value is number => typeof value === 'number'),
-      pendiente: proximasAusencias
-        .filter((a) => a.estado === EstadoAusencia.pendiente)
+      noLaborable: (date: Date) => {
+        const diasSemana = ['domingo', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado'];
+        const diaKey = diasSemana[date.getDay()] as keyof DiasLaborables;
+        return !diasLaborables[diaKey];
+      },
+      pendiente: (ausencias || [])
+        .filter((a) => a.estado === 'pendiente')
         .map((a) => ({ from: new Date(a.fechaInicio), to: new Date(a.fechaFin) })),
-      confirmada: proximasAusencias
-        .filter((a) => a.estado === EstadoAusencia.confirmada)
+      confirmada: (ausencias || [])
+        .filter((a) => a.estado === 'confirmada')
         .map((a) => ({ from: new Date(a.fechaInicio), to: new Date(a.fechaFin) })),
-      completada: ausenciasPasadas.map((a) => ({
-        from: new Date(a.fechaInicio),
-        to: new Date(a.fechaFin),
-      })),
-      rechazada: ausencias
-        .filter((a) => a.estado === EstadoAusencia.rechazada)
+      completada: (ausencias || [])
+        .filter((a) => a.estado === 'completada')
+        .map((a) => ({
+          from: new Date(a.fechaInicio),
+          to: new Date(a.fechaFin),
+        })),
+      rechazada: (ausencias || [])
+        .filter((a) => a.estado === 'rechazada')
         .map((a) => ({ from: new Date(a.fechaInicio), to: new Date(a.fechaFin) })),
     }),
     [
       ausencias,
-      ausenciasPasadas,
       diasLaborables.domingo,
       diasLaborables.jueves,
       diasLaborables.lunes,
@@ -276,7 +282,6 @@ export function AusenciasTab({ empleadoId }: MiEspacioAusenciasTabProps) {
       diasLaborables.sabado,
       diasLaborables.viernes,
       festivos,
-      proximasAusencias,
     ]
   );
 
@@ -335,6 +340,70 @@ export function AusenciasTab({ empleadoId }: MiEspacioAusenciasTabProps) {
     setMostrarModalSolicitud(false);
     refetchAusencias(`/api/ausencias?empleadoId=${empleadoId}&propios=1`);
     refetchSaldo(`/api/ausencias/saldo?empleadoId=${empleadoId}`);
+  };
+
+  // Helper: determinar si un día es festivo
+  const esFestivoFecha = (date: Date): boolean => {
+    return festivos.some((f) => {
+      const festivoDate = new Date(f.fecha);
+      festivoDate.setHours(0, 0, 0, 0);
+      const checkDate = new Date(date);
+      checkDate.setHours(0, 0, 0, 0);
+      return festivoDate.getTime() === checkDate.getTime();
+    });
+  };
+
+  // Helper: determinar si un día es laborable según jornada empresa
+  const esLaborableFecha = (date: Date): boolean => {
+    const diasSemana = ['domingo', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado'];
+    const diaKey = diasSemana[date.getDay()] as keyof DiasLaborables;
+    return diasLaborables[diaKey];
+  };
+
+  // Helper: obtener ausencia en fecha específica
+  const getAusenciaEnFecha = (date: Date): Ausencia | null => {
+    if (!ausencias) return null;
+    
+    const checkDate = new Date(date);
+    checkDate.setHours(0, 0, 0, 0);
+
+    return (
+      ausencias.find((ausencia) => {
+        const inicio = new Date(ausencia.fechaInicio);
+        const fin = new Date(ausencia.fechaFin);
+        inicio.setHours(0, 0, 0, 0);
+        fin.setHours(0, 0, 0, 0);
+
+        return isWithinInterval(checkDate, { start: inicio, end: fin });
+      }) || null
+    );
+  };
+
+  // Helper: obtener info completa de un día para el popover
+  const getDayInfo = (date: Date) => {
+    const ausencia = getAusenciaEnFecha(date);
+    const esFestivo = esFestivoFecha(date);
+    const esLaborable = esLaborableFecha(date);
+
+    return {
+      date,
+      esLaborable,
+      esFestivo,
+      ausencia,
+      festivoInfo: esFestivo ? festivos.find((f) => {
+        const fDate = new Date(f.fecha);
+        fDate.setHours(0, 0, 0, 0);
+        const checkDate = new Date(date);
+        checkDate.setHours(0, 0, 0, 0);
+        return fDate.getTime() === checkDate.getTime();
+      }) : null,
+    };
+  };
+
+  // Handler: click en día del calendario
+  const handleDayClick = (date: Date) => {
+    setSelectedDate(date);
+    setPopoverOpen(true);
   };
 
   const renderListaAusencias = (lista: Ausencia[], isPast = false) => (
@@ -534,13 +603,27 @@ export function AusenciasTab({ empleadoId }: MiEspacioAusenciasTabProps) {
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
-              <Calendar
-                mode="multiple"
-                selected={[]}
-                modifiers={modifiers}
-                modifiersClassNames={modifiersClassNames}
-                numberOfMonths={1}
-              />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <Calendar
+                  mode="single"
+                  selected={selectedDate || undefined}
+                  onDayClick={handleDayClick}
+                  modifiers={modifiers}
+                  modifiersClassNames={modifiersClassNames}
+                  className="rounded-md border"
+                  locale={es}
+                />
+                <Calendar
+                  mode="single"
+                  selected={selectedDate || undefined}
+                  onDayClick={handleDayClick}
+                  modifiers={modifiers}
+                  modifiersClassNames={modifiersClassNames}
+                  month={new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1)}
+                  className="rounded-md border"
+                  locale={es}
+                />
+              </div>
 
               <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 space-y-3">
                 <h4 className="text-sm font-semibold text-gray-900">Próximas ausencias</h4>
@@ -610,6 +693,122 @@ export function AusenciasTab({ empleadoId }: MiEspacioAusenciasTabProps) {
         onSuccess={onSolicitudSuccess}
         saldoDisponible={saldo.diasDisponibles}
       />
+
+      {/* Popover de información de día */}
+      {selectedDate && (
+        <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
+          <PopoverTrigger asChild>
+            <div className="hidden" />
+          </PopoverTrigger>
+          <PopoverContent className="w-80" align="center">
+            {(() => {
+              const dayInfo = getDayInfo(selectedDate);
+              return (
+                <div className="space-y-4">
+                  {/* Header con fecha */}
+                  <div className="flex items-center gap-2 pb-3 border-b border-gray-200">
+                    <CalendarIcon className="h-5 w-5 text-[#d97757]" />
+                    <div>
+                      <p className="font-semibold text-gray-900">
+                        {format(selectedDate, "EEEE, d 'de' MMMM", { locale: es })}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        {format(selectedDate, 'yyyy', { locale: es })}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Información del día */}
+                  <div className="space-y-3">
+                    {/* Estado laborable/festivo/no laborable */}
+                    <div className="flex items-center gap-2">
+                      <Info className="h-4 w-4 text-gray-400" />
+                      <span className="text-sm text-gray-700">
+                        {dayInfo.esFestivo ? (
+                          <Badge className="bg-red-50 border border-red-200 text-red-700">
+                            Festivo: {dayInfo.festivoInfo?.nombre}
+                          </Badge>
+                        ) : dayInfo.esLaborable ? (
+                          <Badge className="bg-green-50 border border-green-200 text-green-700">
+                            Día laborable
+                          </Badge>
+                        ) : (
+                          <Badge className="bg-gray-100 border border-gray-300 text-gray-700">
+                            No laborable
+                          </Badge>
+                        )}
+                      </span>
+                    </div>
+
+                    {/* Si hay ausencia en este día */}
+                    {dayInfo.ausencia && (
+                      <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 space-y-2">
+                        <p className="text-sm font-semibold text-gray-900">Ausencia registrada</p>
+                        <div className="space-y-1">
+                          <p className="text-xs text-gray-600">
+                            <span className="font-medium">Tipo:</span>{' '}
+                            {getTipoLabel(dayInfo.ausencia.tipo)}
+                          </p>
+                          <p className="text-xs text-gray-600">
+                            <span className="font-medium">Estado:</span>{' '}
+                            {(() => {
+                              const estadoMap: Record<string, string> = {
+                                pendiente: 'Pendiente',
+                                confirmada: 'Confirmada',
+                                completada: 'Completada',
+                                rechazada: 'Rechazada',
+                              };
+                              return estadoMap[dayInfo.ausencia.estado] || dayInfo.ausencia.estado;
+                            })()}
+                          </p>
+                          <p className="text-xs text-gray-600">
+                            <span className="font-medium">Período:</span>{' '}
+                            {format(new Date(dayInfo.ausencia.fechaInicio), 'dd MMM', {
+                              locale: es,
+                            })}{' '}
+                            -{' '}
+                            {format(new Date(dayInfo.ausencia.fechaFin), 'dd MMM yyyy', {
+                              locale: es,
+                            })}
+                          </p>
+                          <p className="text-xs text-gray-600">
+                            <span className="font-medium">Días:</span> {dayInfo.ausencia.diasSolicitados}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Botón solicitar ausencia solo si es día laborable y no festivo */}
+                    {dayInfo.esLaborable && !dayInfo.esFestivo && !dayInfo.ausencia && (
+                      <Button
+                        onClick={() => {
+                          setPopoverOpen(false);
+                          handleNuevaAusenciaClick();
+                        }}
+                        className="w-full bg-gray-900 hover:bg-gray-800 text-white"
+                        size="sm"
+                      >
+                        Solicitar ausencia desde esta fecha
+                      </Button>
+                    )}
+
+                    {/* Mensaje si no se puede solicitar */}
+                    {(!dayInfo.esLaborable || dayInfo.esFestivo || dayInfo.ausencia) && (
+                      <p className="text-xs text-gray-500 text-center">
+                        {dayInfo.ausencia
+                          ? 'Ya tienes una ausencia en este día'
+                          : dayInfo.esFestivo
+                          ? 'No puedes solicitar ausencia en un festivo'
+                          : 'No puedes solicitar ausencia en un día no laborable'}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
+          </PopoverContent>
+        </Popover>
+      )}
     </div>
   );
 }
