@@ -20,7 +20,7 @@ export default async function HRBandejaEntradaPage() {
   const ausenciasPendientes = await prisma.ausencia.findMany({
     where: {
       empresaId: session.user.empresaId,
-      estado: EstadoAusencia.pendiente_aprobacion,
+      estado: EstadoAusencia.pendiente,
     },
     include: {
       empleado: {
@@ -41,7 +41,7 @@ export default async function HRBandejaEntradaPage() {
     where: {
       empresaId: session.user.empresaId,
       estado: {
-        in: [EstadoAusencia.en_curso, EstadoAusencia.completada, EstadoAusencia.rechazada],
+        in: [EstadoAusencia.confirmada, EstadoAusencia.completada, EstadoAusencia.rechazada],
       },
     },
     include: {
@@ -117,7 +117,7 @@ export default async function HRBandejaEntradaPage() {
       detalles: `Solicitud de ${aus.tipo}`,
       fechaLimite: new Date(aus.fechaFin),
       fechaCreacion: aus.createdAt,
-      estado: EstadoAusencia.pendiente_aprobacion as const,
+      estado: EstadoAusencia.pendiente as const,
       metadata: {
         tipoAusencia: aus.tipo,
         fechaInicio: aus.fechaInicio,
@@ -135,7 +135,7 @@ export default async function HRBandejaEntradaPage() {
       detalles: `Solicitud de cambio de ${sol.tipo}`,
       fechaLimite: new Date(sol.createdAt.getTime() + 7 * 24 * 60 * 60 * 1000),
       fechaCreacion: sol.createdAt,
-      estado: EstadoAusencia.pendiente_aprobacion as const,
+      estado: EstadoAusencia.pendiente as const,
     })),
   ].sort((a, b) => b.fechaCreacion.getTime() - a.fechaCreacion.getTime());
 
@@ -173,10 +173,10 @@ export default async function HRBandejaEntradaPage() {
       fechaCreacion: sol.createdAt,
       estado:
         sol.estado === EstadoSolicitud.aprobada_manual || sol.estado === EstadoSolicitud.auto_aprobada
-          ? EstadoAusencia.en_curso
+          ? EstadoAusencia.confirmada
           : sol.estado === EstadoSolicitud.rechazada
             ? EstadoAusencia.rechazada
-            : EstadoAusencia.cancelada,
+            : EstadoAusencia.pendiente,
       fechaResolucion: sol.fechaRespuesta || undefined,
     })),
   ].sort((a, b) => (b.fechaResolucion?.getTime() || 0) - (a.fechaResolucion?.getTime() || 0));
@@ -218,7 +218,7 @@ export default async function HRBandejaEntradaPage() {
     where: {
       empresaId: session.user.empresaId,
       estado: {
-        in: [EstadoAusencia.en_curso, EstadoAusencia.completada, EstadoAusencia.auto_aprobada, EstadoAusencia.rechazada],
+        in: [EstadoAusencia.confirmada, EstadoAusencia.completada, EstadoAusencia.rechazada],
       },
       aprobadaEn: {
         gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), // Último mes

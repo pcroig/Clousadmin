@@ -29,6 +29,7 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useApi } from '@/lib/hooks';
 import { getAvatarStyle } from '@/lib/design-system';
+import { toast } from 'sonner';
 
 interface Preferencia {
   id: string;
@@ -102,16 +103,16 @@ export function PopoverMonitoreoCampana({
       
       // Cerrar popover y notificar al padre
       setOpen(false);
-      
+
       // Mostrar mensaje de éxito
-      alert(`✅ Vacaciones cuadradas exitosamente!\n\n${resultado.propuestas?.length || 0} propuestas creadas y notificaciones enviadas a los empleados.`);
-      
+      toast.success(`Vacaciones cuadradas exitosamente! ${resultado.propuestas?.length || 0} propuestas creadas y notificaciones enviadas a los empleados.`);
+
       if (onCuadrarIA) {
         onCuadrarIA(campanaId);
       }
     } catch (error) {
       console.error('[Monitoreo] Error al cuadrar con IA:', error);
-      alert('❌ Error al cuadrar vacaciones: ' + (error instanceof Error ? error.message : 'Error desconocido'));
+      toast.error('Error al cuadrar vacaciones: ' + (error instanceof Error ? error.message : 'Error desconocido'));
     }
   };
 

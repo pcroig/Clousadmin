@@ -154,17 +154,6 @@ export const ausenciaCreateSchema = z.object({
     message: 'La fecha de fin debe ser posterior o igual a la fecha de inicio',
     path: ['fechaFin'],
   }
-).refine(
-  (data) => {
-    if (data.tipo === 'otro' && (!data.motivo || data.motivo.trim() === '')) {
-      return false;
-    }
-    return true;
-  },
-  {
-    message: 'El motivo es obligatorio para ausencias de tipo "Otro"',
-    path: ['motivo'],
-  }
 );
 
 export const ausenciaApprovalSchema = z.object({
@@ -192,7 +181,7 @@ export const ausenciaUpdateSchema = z.object({
   motivo: z.string().optional().nullable(),
   justificanteUrl: z.string().url().optional().nullable(),
   documentoId: z.string().uuid().optional().nullable(), // ID del documento justificante
-  estado: z.enum(['pendiente_aprobacion', 'en_curso', 'completada', 'auto_aprobada', 'rechazada', 'cancelada']).optional(),
+  estado: z.enum(['pendiente', 'confirmada', 'completada', 'rechazada']).optional(),
   // Para mantener compatibilidad con aprobar/rechazar
   accion: z.enum(['aprobar', 'rechazar']).optional(),
   motivoRechazo: z.string().optional(),
@@ -209,18 +198,6 @@ export const ausenciaUpdateSchema = z.object({
   {
     message: 'La fecha de fin debe ser posterior o igual a la fecha de inicio',
     path: ['fechaFin'],
-  }
-).refine(
-  (data) => {
-    // Si tipo es 'otro' y se está cambiando, validar motivo
-    if (data.tipo === 'otro' && !data.motivo) {
-      return false;
-    }
-    return true;
-  },
-  {
-    message: 'El motivo es obligatorio para ausencias de tipo "Otro"',
-    path: ['motivo'],
   }
 );
 

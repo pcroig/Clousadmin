@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
+import { toast } from 'sonner';
 
 interface Festivo {
   id: string;
@@ -67,7 +68,7 @@ export function EditarFestivoModal({
 
   async function handleGuardar() {
     if (!nombre.trim() || !fecha) {
-      alert('Por favor completa todos los campos');
+      toast.error('Por favor completa todos los campos');
       return;
     }
 
@@ -82,11 +83,11 @@ export function EditarFestivoModal({
 
         if (!response.ok) {
           const error = await response.json();
-          alert(error.error || 'Error al crear festivo');
+          toast.error(error.error || 'Error al crear festivo');
           return;
         }
 
-        alert('Festivo creado exitosamente');
+        toast.success('Festivo creado exitosamente');
       } else {
         const response = await fetch(`/api/festivos/${festivo?.id}`, {
           method: 'PATCH',
@@ -96,18 +97,18 @@ export function EditarFestivoModal({
 
         if (!response.ok) {
           const error = await response.json();
-          alert(error.error || 'Error al actualizar festivo');
+          toast.error(error.error || 'Error al actualizar festivo');
           return;
         }
 
-        alert('Festivo actualizado exitosamente');
+        toast.success('Festivo actualizado exitosamente');
       }
 
       onSuccess();
       onClose();
     } catch (error) {
       console.error('Error:', error);
-      alert('Error al guardar festivo');
+      toast.error('Error al guardar festivo');
     } finally {
       setCargando(false);
     }

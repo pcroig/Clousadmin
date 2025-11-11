@@ -8,6 +8,7 @@ import { prisma } from '@/lib/prisma';
 import { EmpleadoDetailClient } from './empleado-detail-client';
 import { notFound } from 'next/navigation';
 import { decryptEmpleadoData } from '@/lib/empleado-crypto';
+import { asegurarCarpetasSistemaParaEmpleado } from '@/lib/documentos';
 
 import { UsuarioRol } from '@/lib/constants/enums';
 
@@ -114,8 +115,99 @@ export default async function EmpleadoDetailPage({ params }: EmpleadoDetailPageP
     notFound();
   }
 
+  // Asegurar que todas las carpetas del sistema existan para el empleado
+  // Esta función es idempotente y no duplica carpetas
+  await asegurarCarpetasSistemaParaEmpleado(empleado.id, session.user.empresaId);
+
+  // Re-obtener empleado para incluir posibles nuevas carpetas
+  const empleadoActualizado = await prisma.empleado.findUnique({
+    where: {
+      id: empleado.id,
+      empresaId: session.user.empresaId,
+    },
+    include: {
+      usuario: true,
+      manager: true,
+      jornada: true,
+      puestoRelacion: true,
+      equipos: {
+        include: {
+          equipo: true,
+        },
+      },
+      fichajes: {
+        orderBy: {
+          fecha: 'desc',
+        },
+        take: 30,
+        include: {
+          eventos: {
+            select: {
+              id: true,
+              tipo: true,
+              hora: true,
+              ubicacion: true,
+              editado: true,
+            },
+            orderBy: {
+              hora: 'asc',
+            },
+          },
+        },
+      },
+      ausencias: {
+        select: {
+          id: true,
+          tipo: true,
+          fechaInicio: true,
+          fechaFin: true,
+          diasLaborables: true,
+          estado: true,
+          motivo: true,
+        },
+        orderBy: {
+          createdAt: 'desc',
+        },
+        take: 10,
+      },
+      contratos: {
+        select: {
+          id: true,
+          fechaInicio: true,
+          fechaFin: true,
+          tipoContrato: true,
+          salarioBrutoAnual: true,
+        },
+        orderBy: {
+          fechaInicio: 'desc',
+        },
+        take: 10,
+      },
+      carpetas: {
+        include: {
+          documentos: {
+            select: {
+              id: true,
+              nombre: true,
+              tipoDocumento: true,
+              tamano: true,
+              s3Key: true,
+              createdAt: true,
+            },
+            take: 50,
+          },
+        },
+        take: 20,
+      },
+    },
+  });
+
+  if (!empleadoActualizado) {
+    notFound();
+  }
+
   // Desencriptar campos sensibles antes de pasar al componente
-  const empleadoDesencriptado = decryptEmpleadoData(empleado);
+  const empleadoDesencriptado = decryptEmpleadoData(empleadoActualizado);
 
   const empleadoData = {
     id: empleadoDesencriptado.id,
@@ -155,21 +247,21 @@ export default async function EmpleadoDetailPage({ params }: EmpleadoDetailPageP
     salarioBrutoMensual: empleadoDesencriptado.salarioBrutoMensual ? Number(empleadoDesencriptado.salarioBrutoMensual) : null,
     diasVacaciones: empleadoDesencriptado.diasVacaciones,
     activo: empleadoDesencriptado.activo,
-    manager: empleado.manager ? {
-      nombre: `${empleado.manager.nombre} ${empleado.manager.apellidos}`,
+    manager: empleadoActualizado.manager ? {
+      nombre: `${empleadoActualizado.manager.nombre} ${empleadoActualizado.manager.apellidos}`,
     } : null,
-    jornada: empleado.jornada ? {
-      nombre: empleado.jornada.nombre,
-      horasSemanales: Number(empleado.jornada.horasSemanales),
+    jornada: empleadoActualizado.jornada ? {
+      nombre: empleadoActualizado.jornada.nombre,
+      horasSemanales: Number(empleadoActualizado.jornada.horasSemanales),
     } : null,
-    equipos: empleado.equipos.map((eq) => ({
+    equipos: empleadoActualizado.equipos.map((eq) => ({
       equipoId: eq.equipo.id,
       equipo: {
         id: eq.equipo.id,
         nombre: eq.equipo.nombre,
       },
     })),
-    fichajes: empleado.fichajes.map((f) => ({
+    fichajes: empleadoActualizado.fichajes.map((f) => ({
       id: f.id,
       fecha: f.fecha,
       estado: f.estado,
@@ -181,7 +273,7 @@ export default async function EmpleadoDetailPage({ params }: EmpleadoDetailPageP
         editado: e.editado,
       })),
     })),
-    ausencias: empleado.ausencias.map((a) => ({
+    ausencias: empleadoActualizado.ausencias.map((a) => ({
       id: a.id,
       tipo: a.tipo,
       fechaInicio: a.fechaInicio,
@@ -190,14 +282,14 @@ export default async function EmpleadoDetailPage({ params }: EmpleadoDetailPageP
       estado: a.estado,
       motivo: a.motivo,
     })),
-    contratos: empleado.contratos.map((c) => ({
+    contratos: empleadoActualizado.contratos.map((c) => ({
       id: c.id,
       fechaInicio: c.fechaInicio,
       fechaFin: c.fechaFin,
       tipo: c.tipoContrato,
       salarioBruto: Number(c.salarioBrutoAnual),
     })),
-    carpetas: empleado.carpetas.map((c) => ({
+    carpetas: empleadoActualizado.carpetas.map((c) => ({
       id: c.id,
       nombre: c.nombre,
       esSistema: c.esSistema,

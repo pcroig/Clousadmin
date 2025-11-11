@@ -7,16 +7,23 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Calendar, MoreVertical, Check, X } from 'lucide-react';
+import { MoreVertical, Check, X } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { getAvatarStyle } from '@/lib/design-system';
 
-import { EstadoAusencia } from '@/lib/constants/enums';
+type SolicitudEstado =
+  | 'pendiente'
+  | 'confirmada'
+  | 'completada'
+  | 'rechazada'
+  | 'pendiente_aprobacion'
+  | 'en_curso'
+  | 'auto_aprobada'
+  | 'cancelada';
 
 interface SolicitudItem {
   id: string;
@@ -29,7 +36,7 @@ interface SolicitudItem {
   detalles: string;
   fechaLimite: Date;
   fechaCreacion: Date;
-  estado: EstadoAusencia;
+  estado: SolicitudEstado;
   fechaResolucion?: Date;
   metadata?: {
     tipoAusencia?: string;
@@ -46,6 +53,107 @@ interface BandejaEntradaSolicitudesProps {
 }
 
 type VistaType = 'pendientes' | 'resueltas';
+
+const DATE_FORMATTER = new Intl.DateTimeFormat('es-ES', {
+  day: 'numeric',
+  month: 'long',
+  year: 'numeric',
+});
+
+const capitalize = (value: string) => {
+  if (!value) return value;
+  return value.charAt(0).toLocaleUpperCase('es-ES') + value.slice(1);
+};
+
+const humanize = (value: string) =>
+  value
+    .split('_')
+    .map((segment) => capitalize(segment))
+    .join(' ');
+
+const formatDate = (date: Date) => DATE_FORMATTER.format(date);
+
+const getSolicitudTitulo = (solicitud: SolicitudItem) => {
+  if (solicitud.tipo === 'ausencia') {
+    const detalle = solicitud.metadata?.tipoAusencia
+      ? humanize(solicitud.metadata.tipoAusencia)
+      : 'Ausencia';
+    return `${detalle} · ${solicitud.empleado.nombre} ${solicitud.empleado.apellidos}`;
+  }
+
+  const mapaTitulo: Record<SolicitudItem['tipo'], string> = {
+    ausencia: 'Ausencia',
+    cambio_datos: 'Cambio de datos personales',
+  };
+
+  return `${mapaTitulo[solicitud.tipo] || humanize(solicitud.tipo)} · ${solicitud.empleado.nombre} ${solicitud.empleado.apellidos}`;
+};
+
+const getSolicitudDescripcion = (solicitud: SolicitudItem) => {
+  const partes: string[] = [];
+
+  partes.push(`Solicitada el ${formatDate(solicitud.fechaCreacion)}`);
+
+  if (solicitud.estado === 'pendiente' || solicitud.estado === 'pendiente_aprobacion') {
+    partes.push(`Revisar antes del ${formatDate(solicitud.fechaLimite)}`);
+  } else if (solicitud.estado === 'en_curso') {
+    if (solicitud.metadata?.fechaFin) {
+      partes.push(`En curso · Termina el ${formatDate(solicitud.metadata.fechaFin)}`);
+    } else {
+      partes.push('En curso');
+    }
+  } else {
+    const fechaCierre = solicitud.fechaResolucion || solicitud.fechaCreacion;
+    const estadoLabel =
+      solicitud.estado === 'rechazada'
+        ? 'Rechazada'
+        : solicitud.estado === 'completada'
+          ? 'Completada'
+          : solicitud.estado === 'cancelada'
+            ? 'Cancelada'
+            : 'Aprobada';
+    partes.push(`${estadoLabel} el ${formatDate(fechaCierre)}`);
+  }
+
+  if (solicitud.metadata?.fechaInicio && solicitud.metadata?.fechaFin) {
+    partes.push(
+      `Del ${formatDate(solicitud.metadata.fechaInicio)} al ${formatDate(solicitud.metadata.fechaFin)}`,
+    );
+  }
+
+  return partes.join(' · ');
+};
+
+const getEstadoPillClasses = (estado: SolicitudItem['estado']) => {
+  switch (estado) {
+    case 'pendiente':
+    case 'pendiente_aprobacion':
+    case 'en_curso':
+      return 'bg-amber-100 text-amber-700';
+    case 'confirmada':
+    case 'completada':
+    case 'auto_aprobada':
+      return 'bg-emerald-100 text-emerald-700';
+    case 'rechazada':
+    case 'cancelada':
+      return 'bg-red-100 text-red-700';
+    default:
+      return 'bg-gray-100 text-gray-700';
+  }
+};
+
+const estadoLabels: Record<SolicitudEstado, string> = {
+  pendiente: 'Pendiente',
+  pendiente_aprobacion: 'Pendiente',
+  en_curso: 'En curso',
+  confirmada: 'Confirmada',
+  completada: 'Completada',
+  auto_aprobada: 'Auto-aprobada',
+  rechazada: 'Rechazada',
+  cancelada: 'Cancelada',
+};
+
+const getEstadoLabel = (estado: SolicitudItem['estado']) => estadoLabels[estado];
 
 export function BandejaEntradaSolicitudes({
   solicitudesPendientes,
@@ -97,153 +205,70 @@ export function BandejaEntradaSolicitudes({
       ) : (
         <div className="space-y-3">
           {solicitudesActuales.map((solicitud) => {
-            const avatarStyle = getAvatarStyle(
-              `${solicitud.empleado.nombre} ${solicitud.empleado.apellidos}`
-            );
+            const titulo = getSolicitudTitulo(solicitud);
+            const descripcion = getSolicitudDescripcion(solicitud);
 
             return (
-              <div key={solicitud.id} className="bg-white rounded-lg border border-gray-200 p-6 hover:shadow-sm transition-shadow">
+              <div key={solicitud.id} className="bg-white rounded-lg border border-gray-200 p-5 hover:shadow-sm transition-shadow">
                 <div className="flex items-start gap-4">
-                  {/* Avatar */}
                   <Avatar className="h-12 w-12">
                     <AvatarImage src={solicitud.empleado.avatar} />
-                    <AvatarFallback
-                      className="text-sm font-semibold uppercase"
-                      style={avatarStyle}
-                    >
-                      {getInitials(
-                        solicitud.empleado.nombre,
-                        solicitud.empleado.apellidos
-                      )}
+                    <AvatarFallback className="bg-stone-200 text-stone-700">
+                      {getInitials(solicitud.empleado.nombre, solicitud.empleado.apellidos)}
                     </AvatarFallback>
                   </Avatar>
 
-                {/* Content */}
-                <div className="flex-1 space-y-3">
-                  {/* Header */}
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <p className="text-sm font-medium text-gray-900">
-                        La solicitud de {solicitud.tipo === 'ausencia' ? 'ausencia' : 'cambio'} de{' '}
-                        <span className="font-semibold">
-                          {solicitud.empleado.nombre} {solicitud.empleado.apellidos}
-                        </span>{' '}
-                        {solicitud.estado === EstadoAusencia.pendiente_aprobacion && 'está pendiente'}
-                        {[EstadoAusencia.en_curso, EstadoAusencia.completada, EstadoAusencia.auto_aprobada].includes(
-                          solicitud.estado
-                        ) && 'fue aprobada'}
-                        {solicitud.estado === EstadoAusencia.rechazada && 'fue rechazada'}
-                        {solicitud.estado === EstadoAusencia.cancelada && 'fue cancelada'}
-                      </p>
-                      {/* Estado badge */}
-                      {solicitud.estado !== EstadoAusencia.pendiente_aprobacion && (
-                        <span
-                          className={`px-2 py-0.5 text-xs font-medium rounded-full ${
-                            [EstadoAusencia.en_curso, EstadoAusencia.completada, EstadoAusencia.auto_aprobada].includes(
-                              solicitud.estado
-                            )
-                              ? 'bg-green-100 text-green-700'
-                              : solicitud.estado === EstadoAusencia.rechazada
-                                ? 'bg-red-100 text-red-700'
-                                : 'bg-gray-100 text-gray-700'
-                          }`}
-                        >
-                          {[EstadoAusencia.en_curso, EstadoAusencia.completada, EstadoAusencia.auto_aprobada].includes(
-                            solicitud.estado
-                          )
-                            ? 'Aprobada'
-                            : solicitud.estado === EstadoAusencia.rechazada
-                              ? 'Rechazada'
-                              : 'Cancelada'}
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2 mt-1 text-xs text-gray-500">
-                      <Calendar className="w-3 h-3" />
-                      <span>
-                        {solicitud.estado === EstadoAusencia.pendiente_aprobacion ? 'Fecha límite: ' : 'Resuelta: '}
-                        {(solicitud.estado === EstadoAusencia.pendiente_aprobacion
-                          ? solicitud.fechaLimite
-                          : solicitud.fechaResolucion || solicitud.fechaCreacion
-                        ).toLocaleDateString('es-ES', {
-                          day: 'numeric',
-                          month: 'short',
-                          year: 'numeric',
-                        })}
+                  <div className="flex-1 space-y-2">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="space-y-1">
+                        <p className="text-sm font-semibold text-gray-900">{titulo}</p>
+                        <p className="text-sm text-gray-600">{descripcion}</p>
+                      </div>
+                      <span
+                        className={`px-2 py-0.5 text-xs font-medium rounded-full whitespace-nowrap ${getEstadoPillClasses(solicitud.estado)}`}
+                      >
+                        {getEstadoLabel(solicitud.estado)}
                       </span>
                     </div>
                   </div>
 
-                  {/* Details */}
-                  <div className="text-sm text-gray-600">
-                    <p>
-                      {solicitud.fechaCreacion.toLocaleDateString('es-ES', {
-                        day: 'numeric',
-                        month: 'short',
-                        year: 'numeric',
-                      })}{' '}
-                      - {solicitud.metadata?.tipoAusencia || solicitud.tipo}
-                    </p>
-                    {solicitud.metadata?.fechaInicio && solicitud.metadata?.fechaFin && (
-                      <p className="text-gray-500">
-                        {solicitud.metadata.tipoAusencia} de{' '}
-                        {solicitud.metadata.fechaInicio.toLocaleDateString('es-ES', {
-                          day: 'numeric',
-                          month: 'long',
-                          year: 'numeric',
-                        })}{' '}
-                        a{' '}
-                        {solicitud.metadata.fechaFin.toLocaleDateString('es-ES', {
-                          day: 'numeric',
-                          month: 'long',
-                          year: 'numeric',
-                        })}
-                      </p>
+                  <div className="flex items-center gap-2">
+                    {(solicitud.estado === 'pendiente' || solicitud.estado === 'pendiente_aprobacion') && (
+                      <>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-red-600 hover:bg-red-50 hover:text-red-700"
+                          onClick={() => onRechazar(solicitud.id)}
+                        >
+                          <X className="h-5 w-5" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-green-600 hover:bg-green-50 hover:text-green-700"
+                          onClick={() => onAprobar(solicitud.id)}
+                        >
+                          <Check className="h-5 w-5" />
+                        </Button>
+                      </>
                     )}
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <MoreVertical className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem>Ver detalles</DropdownMenuItem>
+                        <DropdownMenuItem>Ver empleado</DropdownMenuItem>
+                        {(solicitud.estado === 'pendiente' || solicitud.estado === 'pendiente_aprobacion') && (
+                          <DropdownMenuItem className="text-red-600">Archivar</DropdownMenuItem>
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
                 </div>
-
-                {/* Actions */}
-                <div className="flex items-center gap-2">
-                  {/* Solo mostrar botones de acción para solicitudes pendientes */}
-                  {solicitud.estado === EstadoAusencia.pendiente_aprobacion && (
-                    <>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-9 w-9 text-red-600 hover:bg-red-50 hover:text-red-700"
-                        onClick={() => onRechazar(solicitud.id)}
-                      >
-                        <X className="h-5 w-5" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-9 w-9 text-green-600 hover:bg-green-50 hover:text-green-700"
-                        onClick={() => onAprobar(solicitud.id)}
-                      >
-                        <Check className="h-5 w-5" />
-                      </Button>
-                    </>
-                  )}
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-8 w-8">
-                        <MoreVertical className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem>Ver detalles</DropdownMenuItem>
-                      <DropdownMenuItem>Ver empleado</DropdownMenuItem>
-                      {solicitud.estado === EstadoAusencia.pendiente_aprobacion && (
-                        <DropdownMenuItem className="text-red-600">
-                          Archivar
-                        </DropdownMenuItem>
-                      )}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-              </div>
               </div>
             );
           })}

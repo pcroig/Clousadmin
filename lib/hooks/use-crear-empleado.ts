@@ -4,7 +4,7 @@
 // Para usar cuando se implemente la funcionalidad de crear empleados
 
 import { prisma } from '../prisma';
-import { crearCarpetasSistemaParaEmpleado } from '../documentos';
+import { asegurarCarpetasSistemaParaEmpleado } from '../documentos';
 
 /**
  * Crea un empleado y sus carpetas del sistema automáticamente
@@ -35,16 +35,17 @@ export async function crearEmpleadoConCarpetas(
       data: data as any,
     });
 
-    // 2. Crear carpetas del sistema automáticamente
-    const carpetas = await crearCarpetasSistemaParaEmpleado(
-      nuevoEmpleado.id,
-      data.empresaId
-    );
-
-    console.log(`✅ Empleado ${nuevoEmpleado.nombre} ${nuevoEmpleado.apellidos} creado con ${carpetas.length} carpetas`);
-
     return nuevoEmpleado;
   });
+
+  // 2. Asegurar carpetas del sistema (fuera de la transacción para evitar deadlocks)
+  // La función es idempotente y no duplica carpetas
+  const carpetas = await asegurarCarpetasSistemaParaEmpleado(
+    empleado.id,
+    data.empresaId
+  );
+
+  console.log(`✅ Empleado ${empleado.nombre} ${empleado.apellidos} creado con ${carpetas.length} carpetas`);
 
   return empleado;
 }
@@ -52,31 +53,19 @@ export async function crearEmpleadoConCarpetas(
 /**
  * Hook de post-creación para integrarse con sistemas existentes
  * Llamar después de crear un empleado para añadir las carpetas
+ * Esta función es idempotente y puede llamarse múltiples veces sin duplicar
  */
 export async function postCrearEmpleado(empleadoId: string, empresaId: string) {
   try {
-    // Verificar si ya tiene carpetas
-    const carpetasExistentes = await prisma.carpeta.findMany({
-      where: {
-        empleadoId,
-        esSistema: true,
-      },
-    });
+    // Asegurar que todas las carpetas del sistema existan
+    // La función es idempotente y no duplica carpetas
+    const carpetas = await asegurarCarpetasSistemaParaEmpleado(empleadoId, empresaId);
 
-    // Si ya tiene carpetas, no hacer nada
-    if (carpetasExistentes.length > 0) {
-      console.log('Empleado ya tiene carpetas del sistema');
-      return carpetasExistentes;
-    }
-
-    // Crear carpetas del sistema
-    const carpetas = await crearCarpetasSistemaParaEmpleado(empleadoId, empresaId);
-
-    console.log(`✅ Carpetas del sistema creadas para empleado ${empleadoId}`);
+    console.log(`✅ Carpetas del sistema aseguradas para empleado ${empleadoId}: ${carpetas.length} carpetas`);
 
     return carpetas;
   } catch (error) {
-    console.error('Error creando carpetas para empleado:', error);
+    console.error('Error asegurando carpetas para empleado:', error);
     throw error;
   }
 }

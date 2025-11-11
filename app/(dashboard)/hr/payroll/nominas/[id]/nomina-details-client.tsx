@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
+import { getAusenciaEstadoLabel } from '@/lib/utils/formatters';
 
 interface NominaDetailsClientProps {
   nomina: {
@@ -494,7 +495,7 @@ export function NominaDetailsClient({ nomina, ausencias }: NominaDetailsClientPr
                       {new Date(ausencia.fechaFin).toLocaleDateString('es-ES')}
                     </div>
                   </div>
-                  <div className="text-sm text-gray-600 capitalize">{ausencia.estado}</div>
+                  <div className="text-sm text-gray-600">{getAusenciaEstadoLabel(ausencia.estado)}</div>
                 </div>
               ))}
             </div>

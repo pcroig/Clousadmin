@@ -11,10 +11,10 @@ import { toast } from 'sonner';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { GeneralTab } from './tabs/general-tab';
-import { AusenciasTab } from './tabs/ausencias-tab';
 import { FichajesTab } from './tabs/fichajes-tab';
 import { ContratosTab } from './tabs/contratos-tab';
 import { DocumentosTab } from './tabs/documentos-tab';
+import { AusenciasTab } from '@/components/shared/mi-espacio/ausencias-tab';
 import { getAvatarStyle } from '@/lib/design-system';
 import { DenunciaDialog } from '@/components/empleado/denuncia-dialog';
 

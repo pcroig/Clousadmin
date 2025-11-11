@@ -40,7 +40,7 @@ const ausenciaAccionSchema = z.object({
         motivo: z.string().nullable().optional(),
         descripcion: z.string().nullable().optional(),
         justificanteUrl: z.string().url().nullable().optional(),
-        estado: z.enum(['pendiente_aprobacion', 'en_curso', 'completada', 'auto_aprobada', 'rechazada', 'cancelada']).optional(),
+        estado: z.enum(['pendiente', 'confirmada', 'completada', 'rechazada']).optional(),
       }).refine((data) => {
   // Si hay fechas, validar que fechaFin >= fechaInicio
   if (data.fechaInicio && data.fechaFin) {
@@ -107,15 +107,15 @@ export async function PATCH(
       
       const { accion, motivoRechazo } = validatedData;
 
-    // Determinar estado si se aprueba: en_curso si aún no pasó, completada si ya pasó
-    let nuevoEstado = 'rechazada';
+    // Determinar estado resultante
+    let nuevoEstado: EstadoAusencia = EstadoAusencia.rechazada;
     if (accion === 'aprobar') {
       const hoy = new Date();
       hoy.setHours(0, 0, 0, 0);
       const fechaFin = new Date(ausencia.fechaFin);
       fechaFin.setHours(0, 0, 0, 0);
       
-      nuevoEstado = fechaFin < hoy ? 'completada' : 'en_curso';
+      nuevoEstado = fechaFin < hoy ? EstadoAusencia.completada : EstadoAusencia.confirmada;
 
       // Validar saldo suficiente antes de aprobar si la ausencia descuenta saldo
       if (ausencia.descuentaSaldo) {
@@ -295,7 +295,7 @@ export async function PATCH(
         motivo: z.string().nullable().optional(),
         descripcion: z.string().nullable().optional(),
         justificanteUrl: z.string().nullable().optional(),
-        estado: z.enum(['pendiente_aprobacion', 'en_curso', 'completada', 'auto_aprobada', 'rechazada', 'cancelada']).optional(),
+        estado: z.enum(['pendiente', 'confirmada', 'completada', 'rechazada']).optional(),
       }).refine((data) => {
         if (data.fechaInicio && data.fechaFin) {
           return new Date(data.fechaFin) >= new Date(data.fechaInicio);
@@ -354,9 +354,9 @@ export async function PATCH(
         
         if (ausencia.descuentaSaldo && !nuevoDescuentaSaldo) {
           // Cambió de vacaciones a otro tipo: devolver días al saldo
-          if (ausencia.estado === EstadoAusencia.pendiente_aprobacion) {
+          if (ausencia.estado === EstadoAusencia.pendiente) {
             await actualizarSaldo(ausencia.empleadoId, año, 'cancelar', diasAnteriores);
-          } else if (ausencia.estado === EstadoAusencia.en_curso || ausencia.estado === EstadoAusencia.completada || ausencia.estado === EstadoAusencia.auto_aprobada) {
+          } else if (ausencia.estado === EstadoAusencia.confirmada || ausencia.estado === EstadoAusencia.completada) {
             // Devolver días usados
             await prisma.empleadoSaldoAusencias.updateMany({
               where: { empleadoId: ausencia.empleadoId, año },
@@ -370,9 +370,9 @@ export async function PATCH(
             return badRequestResponse(validacion.mensaje || 'Saldo insuficiente');
           }
           
-          if (ausencia.estado === EstadoAusencia.pendiente_aprobacion) {
+          if (ausencia.estado === EstadoAusencia.pendiente) {
             await actualizarSaldo(ausencia.empleadoId, año, 'solicitar', nuevosDiasSolicitados);
-          } else if (ausencia.estado === EstadoAusencia.en_curso || ausencia.estado === EstadoAusencia.completada || ausencia.estado === EstadoAusencia.auto_aprobada) {
+          } else if (ausencia.estado === EstadoAusencia.confirmada || ausencia.estado === EstadoAusencia.completada) {
             // Marcar como usados
             await prisma.empleadoSaldoAusencias.updateMany({
               where: { empleadoId: ausencia.empleadoId, año },
@@ -418,13 +418,13 @@ export async function PATCH(
 
       // Actualizar saldo si cambió el número de días (sin cambio de tipo)
       if (!cambioTipo && nuevoDescuentaSaldo && diferenciaDias !== 0) {
-        if (ausencia.estado === EstadoAusencia.pendiente_aprobacion) {
+        if (ausencia.estado === EstadoAusencia.pendiente) {
           // Ajustar días pendientes
           await prisma.empleadoSaldoAusencias.updateMany({
             where: { empleadoId: ausencia.empleadoId, año },
             data: { diasPendientes: { increment: diferenciaDias } },
           });
-        } else if (ausencia.estado === EstadoAusencia.en_curso || ausencia.estado === EstadoAusencia.completada || ausencia.estado === EstadoAusencia.auto_aprobada) {
+        } else if (ausencia.estado === EstadoAusencia.confirmada || ausencia.estado === EstadoAusencia.completada) {
           // Ajustar días usados
           await prisma.empleadoSaldoAusencias.updateMany({
             where: { empleadoId: ausencia.empleadoId, año },
@@ -493,7 +493,7 @@ export async function DELETE(
       where: {
         id,
         empleadoId: session.user.empleadoId,
-        estado: EstadoAusencia.pendiente_aprobacion,
+        estado: EstadoAusencia.pendiente,
       }
     });
 

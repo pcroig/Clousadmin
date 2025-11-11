@@ -16,6 +16,7 @@ import { Calendar, Check, Edit } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { InfoTooltip } from '@/components/shared/info-tooltip';
+import { toast } from 'sonner';
 
 interface PropuestaVacacion {
   fechaInicio: string;
@@ -54,23 +55,23 @@ export function ResultadoVacacionesModal({
       });
 
       if (res.ok) {
-        alert('Propuesta aceptada. Se ha creado una solicitud de ausencia que debe ser aprobada por RRHH.');
+        toast.success('Propuesta aceptada. Se ha creado una solicitud de ausencia que debe ser aprobada por RRHH.');
         onAceptar();
         onClose();
       } else {
         const error = await res.json();
-        alert(error.error || 'Error al aceptar propuesta');
+        toast.error(error.error || 'Error al aceptar propuesta');
       }
     } catch (e) {
       console.error('Error aceptando propuesta:', e);
-      alert('Error al aceptar propuesta');
+      toast.error('Error al aceptar propuesta');
     } finally {
       setCargando(false);
     }
   }
 
   function handleSolicitarCambio() {
-    alert('Para solicitar un cambio, ve a la sección de Ausencias y crea una nueva solicitud con tus fechas preferidas.');
+    toast.info('Para solicitar un cambio, ve a la sección de Ausencias y crea una nueva solicitud con tus fechas preferidas.');
     onClose();
   }
 

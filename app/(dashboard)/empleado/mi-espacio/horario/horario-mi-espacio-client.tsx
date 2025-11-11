@@ -187,14 +187,15 @@ export function HorarioMiEspacioClient({
                           <span className="font-medium">{ausencia.tipo}</span>
                           <Badge
                             variant={
-                              ausencia.estado === EstadoAusencia.en_curso || ausencia.estado === EstadoAusencia.completada || ausencia.estado === EstadoAusencia.auto_aprobada
+                              ausencia.estado === EstadoAusencia.confirmada ||
+                              ausencia.estado === EstadoAusencia.completada
                                 ? 'default'
                                 : ausencia.estado === EstadoAusencia.rechazada
-                                  ? 'destructive'
-                                  : 'secondary'
+                                ? 'destructive'
+                                : 'secondary'
                             }
                           >
-                            {ausencia.estado}
+                            {getAusenciaEstadoLabel(ausencia.estado)}
                           </Badge>
                         </div>
                         <p className="text-sm text-muted-foreground">

@@ -27,9 +27,13 @@ export async function GET(req: NextRequest) {
       include: {
         empleado: {
           include: {
-            departamento: {
+            equipos: {
               select: {
-                nombre: true,
+                equipo: {
+                  select: {
+                    nombre: true,
+                  },
+                },
               },
             },
           },
@@ -45,20 +49,30 @@ export async function GET(req: NextRequest) {
     const empleadosUnicos = new Set(nominas.map(n => n.empleadoId)).size;
     const promedioNeto = empleadosUnicos > 0 ? totalNeto / empleadosUnicos : 0;
 
-    // Distribución por departamento
-    const porDepartamento: Record<string, { total: number; count: number }> = {};
+    // Distribución por equipo
+    const porEquipo: Record<string, { total: number; count: number }> = {};
 
-    nominas.forEach(nomina => {
-      const deptNombre = nomina.empleado.departamento?.nombre || 'Sin departamento';
-      if (!porDepartamento[deptNombre]) {
-        porDepartamento[deptNombre] = { total: 0, count: 0 };
-      }
-      porDepartamento[deptNombre].total += Number(nomina.totalNeto);
-      porDepartamento[deptNombre].count += 1;
+    const getEquipos = (empleado: typeof nominas[number]['empleado']) => {
+      const relaciones = empleado.equipos ?? [];
+      const nombres = relaciones
+        .map((rel) => rel.equipo?.nombre)
+        .filter((nombre): nombre is string => Boolean(nombre));
+      return nombres.length > 0 ? nombres : ['Sin equipo'];
+    };
+
+    nominas.forEach((nomina) => {
+      const equipos = getEquipos(nomina.empleado);
+      equipos.forEach((equipo) => {
+        if (!porEquipo[equipo]) {
+          porEquipo[equipo] = { total: 0, count: 0 };
+        }
+        porEquipo[equipo].total += Number(nomina.totalNeto);
+        porEquipo[equipo].count += 1;
+      });
     });
 
-    const distribucionDepartamentos = Object.entries(porDepartamento).map(([nombre, data]) => ({
-      departamento: nombre,
+    const distribucionEquipos = Object.entries(porEquipo).map(([nombre, data]) => ({
+      equipo: nombre,
       total: data.total,
       promedio: data.count > 0 ? data.total / data.count : 0,
       empleados: data.count,
@@ -231,23 +245,26 @@ export async function GET(req: NextRequest) {
       .sort((a, b) => b.vecesAsignado - a.vecesAsignado)
       .slice(0, 10); // Top 10 complementos
 
-    // 4. Comparativa detallada entre departamentos
-    const departamentosDetallados = distribucionDepartamentos.map((dept) => {
-      const nominasDept = nominas.filter(
-        (n) => n.empleado.departamento?.nombre === dept.departamento ||
-               (!n.empleado.departamento && dept.departamento === 'Sin departamento')
-      );
+    // 4. Comparativa detallada entre equipos
+    const equiposDetallados = distribucionEquipos.map((infoEquipo) => {
+      const nominasEquipo = nominas.filter((nomina) => {
+        const equipos = getEquipos(nomina.empleado);
+        return equipos.includes(infoEquipo.equipo);
+      });
 
-      const salariosNeto = nominasDept.map((n) => Number(n.totalNeto)).sort((a, b) => a - b);
+      const salariosNeto = nominasEquipo.map((n) => Number(n.totalNeto)).sort((a, b) => a - b);
 
       return {
-        ...dept,
+        equipo: infoEquipo.equipo,
+        total: infoEquipo.total,
+        promedio: infoEquipo.promedio,
+        empleados: infoEquipo.empleados,
         min: salariosNeto[0] || 0,
         max: salariosNeto[salariosNeto.length - 1] || 0,
         mediana: calcularPercentil(salariosNeto, 50),
         complementosPromedio:
-          nominasDept.reduce((sum, n) => sum + Number(n.totalComplementos), 0) /
-          (nominasDept.length || 1),
+          nominasEquipo.reduce((sum, n) => sum + Number(n.totalComplementos), 0) /
+          (nominasEquipo.length || 1),
       };
     });
 
@@ -261,7 +278,8 @@ export async function GET(req: NextRequest) {
         promedioNeto,
         variacionAnioAnterior: Math.round(variacionAnioAnterior * 100) / 100,
       },
-      distribucionDepartamentos: departamentosDetallados,
+      distribucionEquipos,
+      equiposDetallados,
       tendenciaMensual,
       // NUEVOS REPORTES
       distribucionSalarial,

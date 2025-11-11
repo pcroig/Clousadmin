@@ -268,3 +268,5 @@ npx eslint lib/ app/api/ --fix-eslint-no-explicit-any
 
 *Sesión realizada con cuidado sistemático. No hay breaking changes. Todo es seguro de tipado.*
 
+
+

@@ -64,20 +64,26 @@ export async function GET(req: NextRequest) {
       },
     });
 
+    type EventoConNominas = (typeof eventos)[number];
+    type NominaConAlertas = EventoConNominas['nominas'][number];
+    type Alerta = NominaConAlertas['alertas'][number];
+
     // Calcular conteo de alertas por evento
-    const eventosConAlertas = eventos.map((evento) => {
-      const alertas = evento.nominas.flatMap((n) => n.alertas);
+    const eventosConAlertas = eventos.map((evento: EventoConNominas) => {
+      const alertas = evento.nominas.flatMap(
+        (nomina: NominaConAlertas) => nomina.alertas
+      );
 
       const conteoAlertas = {
-        criticas: alertas.filter((a) => a.tipo === 'critico').length,
-        advertencias: alertas.filter((a) => a.tipo === 'advertencia').length,
-        informativas: alertas.filter((a) => a.tipo === 'info').length,
+        criticas: alertas.filter((alerta: Alerta) => alerta.tipo === 'critico').length,
+        advertencias: alertas.filter((alerta: Alerta) => alerta.tipo === 'advertencia').length,
+        informativas: alertas.filter((alerta: Alerta) => alerta.tipo === 'info').length,
         total: alertas.length,
       };
 
-      // Eliminar el array de nóminas del response (solo queremos el conteo)
-      const eventoSinNominas = { ...evento };
-      delete eventoSinNominas.nominas;
+      // Extraer solo las propiedades necesarias sin 'nominas'
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { nominas, ...eventoSinNominas } = evento;
 
       return {
         ...eventoSinNominas,
@@ -192,6 +198,10 @@ export async function POST(req: NextRequest) {
       },
     });
 
+    type EmpleadoConRelaciones = (typeof empleados)[number];
+    type Ausencia = EmpleadoConRelaciones['ausencias'][number];
+    type ComplementoEmpleado = EmpleadoConRelaciones['complementos'][number];
+
     // Crear el evento de nómina
     const evento = await prisma.eventoNomina.create({
       data: {
@@ -209,7 +219,7 @@ export async function POST(req: NextRequest) {
     let empleadosConComplementos = 0;
     let totalComplementosAsignados = 0;
 
-    for (const empleado of empleados) {
+    for (const empleado of empleados as EmpleadoConRelaciones[]) {
       const contratoVigente = empleado.contratos[0];
 
       if (!contratoVigente) {
@@ -223,7 +233,8 @@ export async function POST(req: NextRequest) {
 
       // Restar días de ausencias
       let totalDiasAusencias = 0;
-      for (const ausencia of empleado.ausencias) {
+      const ausenciasEmpleado: Ausencia[] = empleado.ausencias;
+      for (const ausencia of ausenciasEmpleado) {
         // Cálculo simplificado de días de ausencia en el mes
         const inicioAusencia = new Date(Math.max(
           ausencia.fechaInicio.getTime(),
@@ -250,7 +261,8 @@ export async function POST(req: NextRequest) {
         .div(totalDiasMes);
 
       // Verificar si tiene complementos con importe variable (sin importePersonalizado ni importeFijo)
-      const tieneComplementosVariables = empleado.complementos.some(
+      const complementosEmpleado: ComplementoEmpleado[] = empleado.complementos;
+      const tieneComplementosVariables = complementosEmpleado.some(
         (comp) => !comp.importePersonalizado && !comp.tipoComplemento.importeFijo
       );
 
@@ -275,9 +287,9 @@ export async function POST(req: NextRequest) {
 
       nominasCreadas.push(nomina);
 
-      if (empleado.complementos.length > 0) {
+      if (complementosEmpleado.length > 0) {
         empleadosConComplementos++;
-        totalComplementosAsignados += empleado.complementos.length;
+        totalComplementosAsignados += complementosEmpleado.length;
       }
     }
 
@@ -345,16 +357,25 @@ export async function POST(req: NextRequest) {
       },
     });
 
+    type ManagerConEquipos = (typeof managers)[number];
+    type EquipoGestionado =
+      NonNullable<ManagerConEquipos['empleado']>['equiposGestionados'][number];
+    type MiembroEquipo = EquipoGestionado['miembros'][number];
+
     let totalNotificaciones = 0;
     if (managers.length > 0) {
       const notificaciones = await Promise.all(
-        managers.map((manager) => {
+        managers.map((manager: ManagerConEquipos) => {
           const equipos = manager.empleado?.equiposGestionados ?? [];
-          const empleadosConComplementos = equipos.reduce((count, equipo) => {
-            const miembrosConComplementos =
-              equipo.miembros.filter((miembro) => miembro.empleado.complementos.length > 0).length;
-            return count + miembrosConComplementos;
-          }, 0);
+          const empleadosConComplementos = equipos.reduce(
+            (count: number, equipo: EquipoGestionado) => {
+              const miembrosConComplementos = equipo.miembros.filter(
+                (miembro: MiembroEquipo) => miembro.empleado.complementos.length > 0
+              ).length;
+              return count + miembrosConComplementos;
+            },
+            0
+          );
 
           if (empleadosConComplementos === 0) {
             return null;
@@ -373,7 +394,7 @@ export async function POST(req: NextRequest) {
       );
 
       totalNotificaciones = notificaciones.filter(
-        (notificacion): notificacion is Notificacion => Boolean(notificacion)
+        (notificacion): notificacion is Notificacion => notificacion !== null
       ).length;
 
       if (totalNotificaciones > 0) {
@@ -398,7 +419,7 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
-        { error: 'Datos inválidos', details: error.errors },
+        { error: 'Datos inválidos', details: error.issues },
         { status: 400 }
       );
     }

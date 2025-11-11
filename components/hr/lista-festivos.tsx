@@ -17,6 +17,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Edit2, Trash2, Power, PowerOff } from 'lucide-react';
 import { EditarFestivoModal } from './editar-festivo-modal';
+import { toast } from 'sonner';
 
 interface Festivo {
   id: string;
@@ -75,16 +76,16 @@ export function ListaFestivos({ año, onUpdate }: ListaFestivosProps) {
       });
 
       if (response.ok) {
-        alert('Festivo eliminado exitosamente');
+        toast.success('Festivo eliminado exitosamente');
         cargarFestivos();
         if (onUpdate) onUpdate();
       } else {
         const error = await response.json();
-        alert(error.error || 'Error al eliminar festivo');
+        toast.error(error.error || 'Error al eliminar festivo');
       }
     } catch (error) {
       console.error('Error:', error);
-      alert('Error al eliminar festivo');
+      toast.error('Error al eliminar festivo');
     }
   }
 
@@ -97,16 +98,16 @@ export function ListaFestivos({ año, onUpdate }: ListaFestivosProps) {
       });
 
       if (response.ok) {
-        alert(`Festivo ${!festivo.activo ? 'activado' : 'desactivado'} exitosamente`);
+        toast.success(`Festivo ${!festivo.activo ? 'activado' : 'desactivado'} exitosamente`);
         cargarFestivos();
         if (onUpdate) onUpdate();
       } else {
         const error = await response.json();
-        alert(error.error || 'Error al actualizar festivo');
+        toast.error(error.error || 'Error al actualizar festivo');
       }
     } catch (error) {
       console.error('Error:', error);
-      alert('Error al actualizar festivo');
+      toast.error('Error al actualizar festivo');
     }
   }
 

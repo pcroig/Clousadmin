@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
     const ausenciasPendientes = await prisma.ausencia.findMany({
       where: {
         empresaId: session.user.empresaId,
-        estado: EstadoAusencia.pendiente_aprobacion,
+        estado: EstadoAusencia.pendiente,
       },
       include: {
         empleado: {
@@ -80,7 +80,8 @@ export async function POST(req: NextRequest) {
           const fechaFin = new Date(ausencia.fechaFin);
           fechaFin.setHours(0, 0, 0, 0);
 
-          const nuevoEstado = fechaFin < hoy ? 'completada' : 'en_curso';
+          const nuevoEstado =
+            fechaFin < hoy ? EstadoAusencia.completada : EstadoAusencia.confirmada;
 
           // Actualizar ausencia
           await tx.ausencia.update({

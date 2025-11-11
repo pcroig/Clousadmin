@@ -8,6 +8,21 @@ import { esDiaLaborable, getDiasLaborablesEmpresa } from './dias-laborables';
 import { EstadoAusencia } from '@/lib/constants/enums';
 
 /**
+ * Determina el estado aprobado para una ausencia en función de la fecha fin.
+ * - Si la fecha fin ya pasó, se considera completada
+ * - Si la fecha fin es futura o hoy, se considera aprobada/en curso
+ */
+export function determinarEstadoTrasAprobacion(fechaFin: Date): EstadoAusencia {
+  const hoy = new Date();
+  hoy.setHours(0, 0, 0, 0);
+
+  const finNormalizado = new Date(fechaFin);
+  finNormalizado.setHours(0, 0, 0, 0);
+
+  return finNormalizado < hoy ? EstadoAusencia.completada : EstadoAusencia.confirmada;
+}
+
+/**
  * Verifica si una fecha es fin de semana (sábado o domingo)
  */
 export function esFinDeSemana(fecha: Date): boolean {
@@ -214,12 +229,12 @@ export async function calcularSaldoDisponible(empleadoId: string, año: number):
 
   // Días usados: ausencias aprobadas y disfrutadas
   const diasUsados = ausencias
-    .filter((a) => a.estado === EstadoAusencia.en_curso || a.estado === EstadoAusencia.completada || a.estado === EstadoAusencia.auto_aprobada)
+    .filter((a) => a.estado === EstadoAusencia.confirmada || a.estado === EstadoAusencia.completada)
     .reduce((sum, a) => sum + Number(a.diasSolicitados), 0);
 
   // Días pendientes: ausencias esperando aprobación
   const diasPendientes = ausencias
-    .filter((a) => a.estado === EstadoAusencia.pendiente_aprobacion)
+    .filter((a) => a.estado === EstadoAusencia.pendiente)
     .reduce((sum, a) => sum + Number(a.diasSolicitados), 0);
 
   const diasDisponibles = saldo.diasTotales - diasUsados - diasPendientes;
@@ -343,7 +358,7 @@ export async function calcularSolapamientoEquipo(
     where: {
       equipoId,
       estado: {
-        in: [EstadoAusencia.pendiente_aprobacion, EstadoAusencia.en_curso, EstadoAusencia.completada, EstadoAusencia.auto_aprobada],
+        in: [EstadoAusencia.pendiente, EstadoAusencia.confirmada, EstadoAusencia.completada],
       },
       OR: [
         {
@@ -568,7 +583,7 @@ export async function validarSolapamientoMaximo(
         where: {
           equipoId,
           estado: {
-            in: [EstadoAusencia.pendiente_aprobacion, EstadoAusencia.en_curso, EstadoAusencia.completada, EstadoAusencia.auto_aprobada],
+            in: [EstadoAusencia.pendiente, EstadoAusencia.confirmada, EstadoAusencia.completada],
           },
           id: { not: excluirAusenciaId },
           OR: [

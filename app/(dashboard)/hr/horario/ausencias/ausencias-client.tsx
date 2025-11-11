@@ -34,8 +34,9 @@ import { es } from 'date-fns/locale';
 import { GestionarAusenciasModal } from './gestionar-ausencias-modal';
 import { CrearCampanaModal } from './crear-campana-modal';
 import { PopoverMonitoreoCampana } from '@/components/hr/popover-monitoreo-campana';
-
+import { toast } from 'sonner';
 import { EstadoAusencia } from '@/lib/constants/enums';
+import { getAusenciaEstadoLabel } from '@/lib/utils/formatters';
 
 interface Ausencia {
   id: string;
@@ -167,20 +168,18 @@ export function AusenciasClient() {
 
   function handleCuadrarManual(campanaId: string) {
     // TODO: Implementar modal de cuadrado manual
-    alert('Funcionalidad de cuadrado manual próximamente');
+    toast.info('Funcionalidad de cuadrado manual próximamente');
   }
 
   function getEstadoBadge(estado: string) {
     const variants: Record<string, { label: string; className: string }> = {
-      pendiente_aprobacion: { label: 'Pendiente', className: 'bg-yellow-100 text-yellow-800' },
-      en_curso: { label: 'En Curso', className: 'bg-blue-100 text-blue-800' },
-      completada: { label: 'Completada', className: 'bg-gray-100 text-gray-800' },
-      auto_aprobada: { label: 'Auto-aprobada', className: 'bg-green-100 text-green-800' },
-      rechazada: { label: 'Rechazada', className: 'bg-red-100 text-red-800' },
-      cancelada: { label: 'Cancelada', className: 'bg-gray-100 text-gray-800' },
+      pendiente: { label: getAusenciaEstadoLabel(EstadoAusencia.pendiente), className: 'bg-yellow-100 text-yellow-800' },
+      confirmada: { label: getAusenciaEstadoLabel(EstadoAusencia.confirmada), className: 'bg-blue-100 text-blue-800' },
+      completada: { label: getAusenciaEstadoLabel(EstadoAusencia.completada), className: 'bg-gray-100 text-gray-800' },
+      rechazada: { label: getAusenciaEstadoLabel(EstadoAusencia.rechazada), className: 'bg-red-100 text-red-800' },
     };
 
-    const variant = variants[estado] || variants.pendiente_aprobacion;
+    const variant = variants[estado] || variants.pendiente;
     return <Badge className={variant.className}>{variant.label}</Badge>;
   }
 
@@ -195,7 +194,7 @@ export function AusenciasClient() {
     return tipos[tipo] || tipo;
   }
 
-  const ausenciasPendientes = ausencias.filter(a => a.estado === EstadoAusencia.pendiente_aprobacion).length;
+  const ausenciasPendientes = ausencias.filter(a => a.estado === EstadoAusencia.pendiente).length;
 
   // Filtros en cliente
   const ausenciasFiltradas = ausencias.filter((ausencia) => {
@@ -308,8 +307,8 @@ export function AusenciasClient() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="todas">Todas</SelectItem>
-              <SelectItem value="pendiente_aprobacion">Pendientes</SelectItem>
-              <SelectItem value="en_curso">En Curso</SelectItem>
+              <SelectItem value="pendiente">Pendientes</SelectItem>
+              <SelectItem value="confirmada">Confirmadas</SelectItem>
               <SelectItem value="completada">Completadas</SelectItem>
               <SelectItem value="rechazada">Rechazadas</SelectItem>
             </SelectContent>
@@ -443,7 +442,7 @@ export function AusenciasClient() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="pendiente">Pendiente</SelectItem>
-                      <SelectItem value="aprobada">Aprobada</SelectItem>
+                      <SelectItem value="confirmada">Confirmada</SelectItem>
                       <SelectItem value="rechazada">Rechazada</SelectItem>
                     </SelectContent>
                   </Select>

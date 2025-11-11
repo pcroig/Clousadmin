@@ -3,22 +3,20 @@
 // ========================================
 // Funciones para formatear estados, fechas, badges, etc.
 
+import { ESTADO_AUSENCIA_LABELS, EstadoAusencia } from '@/lib/constants/enums';
+
 /**
  * Obtiene la variante de badge según el estado de una ausencia
  */
 export function getAusenciaBadgeVariant(estado: string): 'warning' | 'success' | 'destructive' | 'secondary' {
   switch (estado) {
-    case 'pendiente':
-    case 'pendiente_aprobacion':
+    case EstadoAusencia.pendiente:
       return 'warning';
-    case 'aprobada':
-    case 'en_curso':
-    case 'auto_aprobada':
+    case EstadoAusencia.confirmada:
       return 'success';
-    case 'rechazada':
-    case 'cancelada':
+    case EstadoAusencia.rechazada:
       return 'destructive';
-    case 'completada':
+    case EstadoAusencia.completada:
       return 'secondary';
     default:
       return 'secondary';
@@ -29,25 +27,13 @@ export function getAusenciaBadgeVariant(estado: string): 'warning' | 'success' |
  * Obtiene la etiqueta legible para un estado de ausencia
  */
 export function getAusenciaEstadoLabel(estado: string): string {
-  switch (estado) {
-    case 'pendiente':
-    case 'pendiente_aprobacion':
-      return 'Pendiente';
-    case 'aprobada':
-      return 'Aprobada';
-    case 'en_curso':
-      return 'En curso';
-    case 'completada':
-      return 'Completada';
-    case 'auto_aprobada':
-      return 'Auto-aprobada';
-    case 'rechazada':
-      return 'Rechazada';
-    case 'cancelada':
-      return 'Cancelada';
-    default:
-      return estado;
+  // Verificar si el estado existe directamente en el enum
+  if (Object.prototype.hasOwnProperty.call(ESTADO_AUSENCIA_LABELS, estado)) {
+    return ESTADO_AUSENCIA_LABELS[estado as EstadoAusencia];
   }
+
+  // Fallback: capitalizar el texto
+  return estado.replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
 /**

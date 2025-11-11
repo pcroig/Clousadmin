@@ -1,7 +1,14 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Card } from '@/components/ui/card';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { format, isSameDay, isSameMonth, isSameWeek } from 'date-fns';
+import { es } from 'date-fns/locale';
+import { Clock, Gift } from 'lucide-react';
+
+import { CompensarHorasModal } from '@/components/hr/compensar-horas-modal';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Table,
   TableBody,
@@ -10,38 +17,16 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Clock, ChevronDown, ChevronUp, Gift } from 'lucide-react';
-import { format, isSameDay, isSameWeek, isSameMonth } from 'date-fns';
-import { es } from 'date-fns/locale';
+import {
+  agruparFichajesEnJornadas,
+  calcularResumenJornadas,
+  getEstadoBadgeConfig,
+  type FichajeDTO,
+  type FichajeNormalizado,
+  type JornadaUI,
+} from '@/lib/utils/fichajesHistorial';
 
-import { EstadoFichaje } from '@/lib/constants/enums';
-import { CompensarHorasModal } from '@/components/hr/compensar-horas-modal';
-
-interface FichajeEvento {
-  id: string;
-  tipo: string;
-  hora: string;
-  editado: boolean;
-  motivoEdicion?: string | null;
-}
-
-interface Fichaje {
-  id: string;
-  fecha: string;
-  estado: string;
-  horasTrabajadas: number;
-  eventos: FichajeEvento[];
-}
-
-type ApiFichaje = {
-  id: string;
-  fecha: string;
-  estado: string;
-  horasTrabajadas?: number | string | null;
-  eventos?: FichajeEvento[];
-};
+import { EditarFichajeModal } from '../../horario/fichajes/editar-fichaje-modal';
 
 interface BalanceResumen {
   diario: number;
@@ -50,306 +35,232 @@ interface BalanceResumen {
   acumulado: number;
 }
 
-interface JornadaDia {
-  fecha: Date;
-  fichajeId: string;
-  eventos: FichajeEvento[];
-  horasTrabajadas: number;
-  horarioEntrada: string | null;
-  horarioSalida: string | null;
-  balance: number;
-  estado: 'completa' | 'incompleta' | 'pendiente';
-}
-
 interface FichajesTabProps {
   empleadoId: string;
   empleadoNombre?: string;
 }
 
+const MAX_FILAS = 30;
+
 export function FichajesTab({ empleadoId, empleadoNombre = 'Empleado' }: FichajesTabProps) {
-  const [jornadas, setJornadas] = useState<JornadaDia[]>([]);
+  const [jornadas, setJornadas] = useState<JornadaUI[]>([]);
   const [loading, setLoading] = useState(true);
-  const [jornadaExpandida, setJornadaExpandida] = useState<string | null>(null);
   const [compensarModal, setCompensarModal] = useState(false);
-
-  const agruparPorJornada = useCallback((lista: Fichaje[]): JornadaDia[] => {
-    return lista.map(fichaje => {
-      const eventos = fichaje.eventos || [];
-
-      const entrada = eventos.find(e => e.tipo === 'entrada');
-      const salida = eventos.find(e => e.tipo === 'salida');
-
-      const horarioEntrada = entrada ? format(new Date(entrada.hora), 'HH:mm') : null;
-      const horarioSalida = salida ? format(new Date(salida.hora), 'HH:mm') : null;
-
-      let estado: 'completa' | 'incompleta' | 'pendiente' = 'completa';
-      if (fichaje.estado === EstadoFichaje.en_curso) {
-        estado = 'incompleta';
-      } else if (
-        fichaje.estado === EstadoFichaje.pendiente ||
-        fichaje.estado === 'revisado'
-      ) {
-        estado = 'pendiente';
-      }
-
-      const balance = fichaje.horasTrabajadas - 8;
-
-      return {
-        fecha: new Date(fichaje.fecha),
-        fichajeId: fichaje.id,
-        eventos,
-        horasTrabajadas: fichaje.horasTrabajadas,
-        balance,
-        estado,
-        horarioEntrada,
-        horarioSalida,
-      };
-    }).sort((a, b) => b.fecha.getTime() - a.fecha.getTime());
-  }, []);
+  const [fichajeEditando, setFichajeEditando] = useState<FichajeNormalizado | null>(null);
 
   const fetchFichajes = useCallback(async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams();
-      params.set('empleadoId', empleadoId);
+      const params = new URLSearchParams({ empleadoId });
       const response = await fetch(`/api/fichajes?${params.toString()}`);
       if (!response.ok) {
         throw new Error('Error al obtener fichajes');
       }
-      const data = await response.json();
-      const rawFichajes: ApiFichaje[] = Array.isArray(data) ? data : [];
 
-      // Procesar fichajes con su nueva estructura (eventos separados)
-      const fichajesConEventos: Fichaje[] = rawFichajes.map((f) => ({
-        id: f.id,
-        fecha: f.fecha,
-        estado: f.estado,
-        horasTrabajadas: f.horasTrabajadas ? Number(f.horasTrabajadas) : 0,
-        eventos: f.eventos ?? [],
+      const data = await response.json();
+      const rawFichajes: FichajeDTO[] = Array.isArray(data) ? data : [];
+      const fichajesNormalizados = rawFichajes.map((fichaje) => ({
+        ...fichaje,
+        eventos: fichaje.eventos ?? [],
       }));
 
-      // Agrupar fichajes en jornadas
-      const jornadasAgrupadas = agruparPorJornada(fichajesConEventos);
-      setJornadas(jornadasAgrupadas);
+      setJornadas(agruparFichajesEnJornadas(fichajesNormalizados));
     } catch (error) {
-      console.error('Error fetching fichajes:', error);
+      console.error('[FichajesTab HR] Error fetching fichajes:', error);
       setJornadas([]);
     } finally {
       setLoading(false);
     }
-  }, [empleadoId, agruparPorJornada]);
+  }, [empleadoId]);
 
   useEffect(() => {
     fetchFichajes();
   }, [fetchFichajes]);
 
+  const resumen = useMemo(() => calcularResumenJornadas(jornadas), [jornadas]);
+
   const balance = useMemo<BalanceResumen>(() => {
     const hoy = new Date();
-    const resumen: BalanceResumen = {
+    const resultado: BalanceResumen = {
       diario: 0,
       semanal: 0,
       mensual: 0,
-      acumulado: 0,
+      acumulado: resumen.balanceAcumulado,
     };
 
     jornadas.forEach((jornada) => {
       const balanceDia = jornada.balance ?? 0;
-      resumen.acumulado += balanceDia;
 
       if (isSameDay(jornada.fecha, hoy)) {
-        resumen.diario += balanceDia;
+        resultado.diario += balanceDia;
       }
-
       if (isSameWeek(jornada.fecha, hoy, { weekStartsOn: 1 })) {
-        resumen.semanal += balanceDia;
+        resultado.semanal += balanceDia;
       }
-
       if (isSameMonth(jornada.fecha, hoy)) {
-        resumen.mensual += balanceDia;
+        resultado.mensual += balanceDia;
       }
     });
 
-    return resumen;
-  }, [jornadas]);
+    return resultado;
+  }, [jornadas, resumen.balanceAcumulado]);
 
-  function getEstadoBadge(estado: 'completa' | 'incompleta' | 'pendiente') {
-    const variants: Record<typeof estado, { label: string; className: string }> = {
-      completa: { label: 'Completa', className: 'bg-green-100 text-green-800' },
-      incompleta: { label: 'Incompleta', className: 'bg-yellow-100 text-yellow-800' },
-      pendiente: { label: 'Pendiente', className: 'bg-orange-100 text-orange-800' },
-    };
-
-    const variant = variants[estado];
-    return <Badge className={variant.className}>{variant.label}</Badge>;
-  }
+  const renderEstadoBadge = (estado: string) => {
+    const config = getEstadoBadgeConfig(estado);
+    return <Badge className={config.className}>{config.label}</Badge>;
+  };
 
   return (
     <div className="space-y-6">
-      {/* Widget Resumen */}
-      <Card className="p-6">
-        <div className="flex items-center justify-between mb-4">
+      <Card>
+        <CardHeader className="flex flex-col gap-4 pb-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-2">
-            <Clock className="w-5 h-5 text-[#d97757]" />
-            <h3 className="text-base font-semibold">Balance de Horas</h3>
+            <Clock className="h-5 w-5 text-[#d97757]" />
+            <CardTitle className="text-base font-semibold">Balance de horas</CardTitle>
           </div>
-          {/* Botón Compensar - solo visible si balance acumulado > 0 */}
-          {balance.acumulado > 0 && (
+          {resumen.balanceAcumulado > 0 && (
             <Button
               onClick={() => setCompensarModal(true)}
               size="sm"
               className="bg-green-600 hover:bg-green-700"
             >
-              <Gift className="w-4 h-4 mr-2" />
-              Compensar Horas
+              <Gift className="mr-2 h-4 w-4" />
+              Compensar horas
             </Button>
           )}
-        </div>
-        <div className="grid grid-cols-4 gap-4">
+        </CardHeader>
+        <CardContent className="grid grid-cols-4 gap-4">
           <div className="text-center">
             <div className={`text-2xl font-bold ${balance.diario >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-              {balance.diario >= 0 ? '+' : ''}{balance.diario.toFixed(1)}h
+              {balance.diario >= 0 ? '+' : ''}
+              {balance.diario.toFixed(1)}h
             </div>
-            <div className="text-xs text-gray-500 mt-1">Hoy</div>
+            <div className="mt-1 text-xs text-gray-500">Hoy</div>
           </div>
           <div className="text-center">
             <div className={`text-2xl font-bold ${balance.semanal >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-              {balance.semanal >= 0 ? '+' : ''}{balance.semanal.toFixed(1)}h
+              {balance.semanal >= 0 ? '+' : ''}
+              {balance.semanal.toFixed(1)}h
             </div>
-            <div className="text-xs text-gray-500 mt-1">Semana</div>
+            <div className="mt-1 text-xs text-gray-500">Semana</div>
           </div>
           <div className="text-center">
             <div className={`text-2xl font-bold ${balance.mensual >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-              {balance.mensual >= 0 ? '+' : ''}{balance.mensual.toFixed(1)}h
+              {balance.mensual >= 0 ? '+' : ''}
+              {balance.mensual.toFixed(1)}h
             </div>
-            <div className="text-xs text-gray-500 mt-1">Mes</div>
+            <div className="mt-1 text-xs text-gray-500">Mes</div>
           </div>
           <div className="text-center">
             <div className={`text-2xl font-bold ${balance.acumulado >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-              {balance.acumulado >= 0 ? '+' : ''}{balance.acumulado.toFixed(1)}h
+              {balance.acumulado >= 0 ? '+' : ''}
+              {balance.acumulado.toFixed(1)}h
             </div>
-            <div className="text-xs text-gray-500 mt-1">Acumulado</div>
+            <div className="mt-1 text-xs text-gray-500">Acumulado</div>
           </div>
-        </div>
+        </CardContent>
       </Card>
 
-      {/* Historial por Jornadas */}
-      <Card className="p-0">
-        <div className="p-6 border-b border-gray-200">
-          <h3 className="text-sm font-semibold text-gray-900">Historial por Jornadas</h3>
-        </div>
-
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-[40px]"></TableHead>
-              <TableHead>Fecha</TableHead>
-              <TableHead>Horas Trabajadas</TableHead>
-              <TableHead>Horario</TableHead>
-              <TableHead>Balance</TableHead>
-              <TableHead>Estado</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {loading ? (
+      <Card>
+        <CardHeader className="border-b border-gray-200 px-6 py-4">
+          <CardTitle className="text-sm font-semibold text-gray-900">Historial por jornadas</CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          <Table>
+            <TableHeader>
               <TableRow>
-                <TableCell colSpan={6} className="text-center py-8 text-gray-500">
-                  Cargando...
-                </TableCell>
+                <TableHead>Fecha</TableHead>
+                <TableHead>Horas trabajadas</TableHead>
+                <TableHead>Horario</TableHead>
+                <TableHead>Balance</TableHead>
+                <TableHead>Estado</TableHead>
               </TableRow>
-            ) : jornadas.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={6} className="text-center py-8 text-gray-500">
-                  No tienes fichajes registrados
-                </TableCell>
-              </TableRow>
-            ) : (
-              jornadas.slice(0, 30).map((jornada) => {
-                const key = jornada.fecha.toISOString();
-                const isExpanded = jornadaExpandida === key;
+            </TableHeader>
+            <TableBody>
+              {loading ? (
+                <TableRow>
+                  <TableCell colSpan={5} className="py-8 text-center text-gray-500">
+                    Cargando...
+                  </TableCell>
+                </TableRow>
+              ) : jornadas.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={5} className="py-8 text-center text-gray-500">
+                    No hay fichajes registrados
+                  </TableCell>
+                </TableRow>
+              ) : (
+                jornadas.slice(0, MAX_FILAS).map((jornada) => {
+                  const key = `${jornada.fichaje.id}-${jornada.fecha.toISOString()}`;
+                  const balancePositivo = jornada.balance >= 0;
 
-                return (
-                  <React.Fragment key={key}>
+                  return (
                     <TableRow
+                      key={key}
                       className="cursor-pointer hover:bg-gray-50"
-                      onClick={() => setJornadaExpandida(isExpanded ? null : key)}
+                      onClick={() => setFichajeEditando(jornada.fichaje)}
                     >
-                      <TableCell>
-                        {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                      </TableCell>
                       <TableCell>
                         <span className="text-sm font-medium">
                           {format(jornada.fecha, 'EEEE, dd MMM yyyy', { locale: es })}
                         </span>
                       </TableCell>
                       <TableCell>
-                        <span className="text-sm font-medium">
-                          {jornada.horasTrabajadas.toFixed(1)}h
-                        </span>
+                        <span className="text-sm font-medium">{jornada.horasTrabajadas.toFixed(1)}h</span>
                       </TableCell>
                       <TableCell>
                         <span className="text-sm text-gray-600">
-                          {jornada.horarioEntrada && jornada.horarioSalida
-                            ? `${jornada.horarioEntrada} - ${jornada.horarioSalida}`
-                            : jornada.horarioEntrada
-                            ? `${jornada.horarioEntrada} - ...`
+                          {jornada.entrada && jornada.salida
+                            ? `${format(jornada.entrada, 'HH:mm')} - ${format(jornada.salida, 'HH:mm')}`
+                            : jornada.entrada
+                            ? `${format(jornada.entrada, 'HH:mm')} - ...`
                             : 'Sin datos'}
                         </span>
                       </TableCell>
                       <TableCell>
-                        <span className={`text-sm font-medium ${jornada.balance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                          {jornada.balance >= 0 ? '+' : ''}{jornada.balance.toFixed(1)}h
+                        <span
+                          className={`text-sm font-medium ${
+                            balancePositivo ? 'text-green-600' : 'text-red-600'
+                          }`}
+                        >
+                          {balancePositivo ? '+' : ''}
+                          {jornada.balance.toFixed(1)}h
                         </span>
                       </TableCell>
-                      <TableCell>
-                        {getEstadoBadge(jornada.estado)}
-                      </TableCell>
+                      <TableCell>{renderEstadoBadge(jornada.estado)}</TableCell>
                     </TableRow>
-
-                    {/* Detalles expandidos */}
-                    {isExpanded && (
-                      <TableRow key={`${key}-expanded`}>
-                        <TableCell colSpan={6} className="bg-gray-50 p-4">
-                          <div className="space-y-2">
-                            <div className="text-sm font-semibold text-gray-700 mb-3">Eventos del día:</div>
-                            {jornada.eventos.map(e => (
-                              <div key={e.id} className="flex items-center justify-between text-sm py-2 px-3 bg-white rounded border border-gray-200">
-                                <div className="flex items-center gap-4">
-                                  <span className="font-medium text-gray-900 w-16">
-                                    {format(new Date(e.hora), 'HH:mm')}
-                                  </span>
-                                  <Badge variant="outline" className="text-xs">
-                                    {e.tipo.replace('_', ' ')}
-                                  </Badge>
-                                  {e.editado && (
-                                    <Badge className="bg-blue-100 text-blue-800 text-xs">Editado</Badge>
-                                  )}
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </React.Fragment>
-                );
-              })
-            )}
-          </TableBody>
-        </Table>
+                  );
+                })
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
       </Card>
 
-      {/* Modal Compensar Horas */}
       <CompensarHorasModal
         empleadoId={empleadoId}
         empleadoNombre={empleadoNombre}
-        balanceAcumulado={balance.acumulado}
+        balanceAcumulado={resumen.balanceAcumulado}
         open={compensarModal}
         onClose={() => setCompensarModal(false)}
         onSuccess={() => {
           setCompensarModal(false);
-          fetchFichajes(); // Recargar fichajes para actualizar balance
+          fetchFichajes();
         }}
       />
+
+      {fichajeEditando && (
+        <EditarFichajeModal
+          open
+          fichaje={null}
+          fichajeDiaId={typeof fichajeEditando.id === 'string' ? fichajeEditando.id : undefined}
+          onClose={() => setFichajeEditando(null)}
+          onSave={() => {
+            setFichajeEditando(null);
+            fetchFichajes();
+          }}
+        />
+      )}
     </div>
   );
 }

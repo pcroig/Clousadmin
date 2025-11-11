@@ -14,6 +14,7 @@ import { IntegracionesForm } from '@/components/onboarding/integraciones-form';
 import { InvitarHRAdmins } from '@/components/onboarding/invitar-hr-admins';
 import { completarOnboardingAction } from './actions';
 import { Building2, Users, Plug, UserPlus, CheckCircle } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface OnboardingClientProps {
   sedes: any[];
@@ -83,11 +84,11 @@ export function OnboardingClient({
         router.push('/hr/dashboard');
         router.refresh();
       } else {
-        alert('Error al completar el onboarding: ' + result.error);
+        toast.error('Error al completar el onboarding: ' + result.error);
       }
     } catch (error) {
       console.error('Error:', error);
-      alert('Error al completar el onboarding');
+      toast.error('Error al completar el onboarding');
     } finally {
       setLoading(false);
     }

@@ -333,7 +333,7 @@ async function detectarAlertasAdvertencia(
     where: {
       empleadoId,
       estado: {
-        in: [EstadoAusencia.completada, EstadoAusencia.en_curso, EstadoAusencia.auto_aprobada],
+        in: [EstadoAusencia.completada, EstadoAusencia.confirmada],
       },
       OR: [
         {

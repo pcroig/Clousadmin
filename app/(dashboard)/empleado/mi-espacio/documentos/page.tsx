@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import { serializeEmpleado } from '@/lib/utils';
 import { MiEspacioDocumentosClient } from './documentos-client';
+import { asegurarCarpetasSistemaParaEmpleado } from '@/lib/documentos';
 
 import { UsuarioRol } from '@/lib/constants/enums';
 
@@ -30,8 +31,30 @@ export default async function MiEspacioDocumentosPage() {
     redirect('/empleado/dashboard');
   }
 
+  // Asegurar que todas las carpetas del sistema existan para el empleado
+  // Esta función es idempotente y no duplica carpetas
+  await asegurarCarpetasSistemaParaEmpleado(empleado.id, session.user.empresaId);
+
+  // Re-obtener empleado con carpetas actualizadas
+  const empleadoActualizado = await prisma.empleado.findUnique({
+    where: {
+      usuarioId: session.user.id,
+    },
+    include: {
+      carpetas: {
+        include: {
+          documentos: true,
+        },
+      },
+    },
+  });
+
+  if (!empleadoActualizado) {
+    redirect('/empleado/dashboard');
+  }
+
   // Serializar campos Decimal para Client Component
-  const empleadoSerializado = serializeEmpleado(empleado);
+  const empleadoSerializado = serializeEmpleado(empleadoActualizado);
 
   return <MiEspacioDocumentosClient empleado={empleadoSerializado} />;
 }

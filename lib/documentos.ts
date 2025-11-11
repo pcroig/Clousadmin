@@ -70,7 +70,14 @@ export const MIME_TYPES_PERMITIDOS = [
 
 /**
  * Crea las carpetas del sistema para un empleado
- * Se ejecuta automáticamente al crear un nuevo empleado
+ * 
+ * @deprecated Usa `asegurarCarpetasSistemaParaEmpleado()` en su lugar.
+ * Esta función crea carpetas sin verificar si ya existen, lo que puede causar duplicados.
+ * La nueva función es idempotente y más segura.
+ * 
+ * @param empleadoId ID del empleado
+ * @param empresaId ID de la empresa
+ * @returns Array de carpetas creadas
  */
 export async function crearCarpetasSistemaParaEmpleado(
   empleadoId: string,
@@ -371,6 +378,32 @@ export async function obtenerOCrearCarpetaSistema(
   }
 
   return carpeta;
+}
+
+/**
+ * Asegura que todas las carpetas del sistema existan para un empleado
+ * Esta función es idempotente: puede llamarse múltiples veces sin duplicar carpetas
+ * 
+ * @param empleadoId ID del empleado
+ * @param empresaId ID de la empresa
+ * @returns Array con todas las carpetas del sistema del empleado
+ */
+export async function asegurarCarpetasSistemaParaEmpleado(
+  empleadoId: string,
+  empresaId: string
+) {
+  const carpetas = [];
+
+  for (const nombreCarpeta of CARPETAS_SISTEMA) {
+    const carpeta = await obtenerOCrearCarpetaSistema(
+      empleadoId,
+      empresaId,
+      nombreCarpeta
+    );
+    carpetas.push(carpeta);
+  }
+
+  return carpetas;
 }
 
 /**

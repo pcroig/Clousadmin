@@ -79,12 +79,10 @@ enum TipoAusencia {
 
 /// Estados de ausencia
 enum EstadoAusencia {
-  pendiente_aprobacion // Esperando aprobación
-  en_curso             // Aprobada, aún no disfrutada
-  completada           // Aprobada y ya disfrutada
-  auto_aprobada        // Auto-aprobada por IA
-  rechazada            // Rechazada por manager/HR
-  cancelada            // Cancelada por el empleado
+  pendiente   // Solicitud registrada y pendiente de revisión
+  confirmada  // Aprobada y todavía vigente
+  completada  // Finalizada (fechas pasadas)
+  rechazada   // Rechazada por manager/HR
 }
 
 /// Estados de solicitud de cambio
@@ -584,7 +582,7 @@ model Ausencia {
   diasAlternativos Json? // Array de fechas alternativas
 
   // Approval workflow
-  estado        EstadoAusencia @default(pendiente_aprobacion)
+  estado        EstadoAusencia @default(pendiente)
   aprobadaPor   String? // Usuario ID
   aprobadaEn    DateTime?
   motivoRechazo String?        @db.Text

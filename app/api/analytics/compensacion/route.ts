@@ -4,51 +4,113 @@
 // GET: Obtener métricas de compensación (costes, salarios, distribución)
 
 import { NextRequest } from 'next/server';
-import type { Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import {
   requireAuthAsHR,
   handleApiError,
   successResponse,
 } from '@/lib/api-handler';
+import { obtenerRangoFechaAntiguedad } from '@/lib/calculos/antiguedad';
+import {
+  toNumber,
+  calcularVariacion,
+  MESES,
+} from '@/lib/utils/analytics-helpers';
 
-// Función auxiliar para calcular antigüedad
-function calcularAntiguedad(fechaAlta: Date): string {
-  const hoy = new Date();
-  const mesesAntiguedad =
-    (hoy.getFullYear() - fechaAlta.getFullYear()) * 12 +
-    (hoy.getMonth() - fechaAlta.getMonth());
+const empleadoConEquiposSelect = Prisma.validator<Prisma.EmpleadoSelect>()({
+  id: true,
+  salarioBrutoMensual: true,
+  salarioBrutoAnual: true,
+  fechaAlta: true,
+  equipos: {
+    select: {
+      equipo: {
+        select: {
+          id: true,
+          nombre: true,
+        },
+      },
+    },
+  },
+});
 
-  if (mesesAntiguedad < 6) return 'menos_6_meses';
-  if (mesesAntiguedad < 12) return '6_12_meses';
-  if (mesesAntiguedad < 36) return '1_3_años';
-  if (mesesAntiguedad < 60) return '3_5_años';
-  return 'mas_5_años';
-}
+type EmpleadoConEquipos = Prisma.EmpleadoGetPayload<{
+  select: typeof empleadoConEquiposSelect;
+}>;
 
-const MESES = [
-  'Enero',
-  'Febrero',
-  'Marzo',
-  'Abril',
-  'Mayo',
-  'Junio',
-  'Julio',
-  'Agosto',
-  'Septiembre',
-  'Octubre',
-  'Noviembre',
-  'Diciembre',
-];
+const nominaConEquiposSelect = Prisma.validator<Prisma.NominaSelect>()({
+  id: true,
+  totalNeto: true,
+  totalComplementos: true,
+  empleado: {
+    select: {
+      equipos: {
+        select: {
+          equipo: {
+            select: {
+              nombre: true,
+            },
+          },
+        },
+      },
+    },
+  },
+});
 
-const toNumber = (value: Prisma.Decimal | number | null | undefined) =>
-  Number(value ?? 0);
+type NominaConEquipos = Prisma.NominaGetPayload<{
+  select: typeof nominaConEquiposSelect;
+}>;
 
-const calcularVariacion = (actual: number, anterior: number) => {
-  if (anterior <= 0) {
-    return 0;
-  }
-  return Number((((actual - anterior) / anterior) * 100).toFixed(1));
+const asignacionComplementoSelect =
+  Prisma.validator<Prisma.AsignacionComplementoSelect>()({
+    importe: true,
+    empleadoComplemento: {
+      select: {
+        tipoComplemento: {
+          select: {
+            nombre: true,
+          },
+        },
+      },
+    },
+  });
+
+type AsignacionComplementoDetalle = Prisma.AsignacionComplementoGetPayload<{
+  select: typeof asignacionComplementoSelect;
+}>;
+
+type NominaHistorico = {
+  anio: number;
+  mes: number;
+  _sum: {
+    totalBruto: Prisma.Decimal | null;
+  };
+};
+
+type NominaGroupResumen = {
+  anio: number;
+  _sum: {
+    totalNeto: Prisma.Decimal | null;
+    totalBruto: Prisma.Decimal | null;
+    totalComplementos: Prisma.Decimal | null;
+  };
+  _count: {
+    _all: number | null;
+  };
+};
+
+type NominaGroupMensual = {
+  anio: number;
+  mes: number;
+  _sum: {
+    totalNeto: Prisma.Decimal | null;
+    totalBruto: Prisma.Decimal | null;
+    totalComplementos: Prisma.Decimal | null;
+  };
+  _count: {
+    _all: number | null;
+  };
 };
 
 // GET /api/analytics/compensacion - Obtener métricas de compensación (solo HR Admin)
@@ -83,37 +145,27 @@ export async function GET(request: NextRequest) {
       };
     }
 
-    // Obtener empleados con salarios y equipos
-    let empleados = await prisma.empleado.findMany({
-      where,
-      select: {
-        id: true,
-        salarioBrutoMensual: true,
-        salarioBrutoAnual: true,
-        fechaAlta: true,
-        equipos: {
-          select: {
-            equipo: {
-              select: {
-                id: true,
-                nombre: true,
-              },
-            },
-          },
-        },
-      },
-    });
-
-    // Filtrar por antigüedad si aplica
+    // Aplicar filtro de antigüedad en BD (no en memoria)
     if (antiguedad && antiguedad !== 'todos') {
-      empleados = empleados.filter(
-        (e) => calcularAntiguedad(e.fechaAlta) === antiguedad
-      );
+      const rangoFecha = obtenerRangoFechaAntiguedad(antiguedad);
+      if (rangoFecha) {
+        where.fechaAlta = rangoFecha;
+      }
     }
+
+    // Obtener empleados con salarios y equipos
+    const empleadosArgs: Prisma.EmpleadoFindManyArgs = {
+      where,
+      select: empleadoConEquiposSelect,
+    };
+    const empleados: EmpleadoConEquipos[] = await prisma.empleado.findMany(empleadosArgs);
+
+    const empleadosIds = empleados.map((empleado: EmpleadoConEquipos) => empleado.id);
 
     // 1. Coste total nómina mensual
     const costeTotalNomina = empleados.reduce(
-      (sum, e) => sum + Number(e.salarioBrutoMensual || 0),
+      (sum: number, empleado: EmpleadoConEquipos) =>
+        sum + Number(empleado.salarioBrutoMensual || 0),
       0
     );
 
@@ -133,8 +185,11 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    const costeMesAnterior = empleadosMesAnterior.reduce(
-      (sum, e) => sum + Number(e.salarioBrutoMensual || 0),
+    const costeMesAnterior = empleadosMesAnterior.reduce<number>(
+      (
+        sum: number,
+        empleado: { salarioBrutoMensual: Prisma.Decimal | number | null }
+      ) => sum + Number(empleado.salarioBrutoMensual || 0),
       0
     );
 
@@ -145,37 +200,58 @@ export async function GET(request: NextRequest) {
       empleados.length > 0 ? costeTotalNomina / empleados.length : 0;
 
     // 4. Salario promedio por equipo
-    const porEquipo: Record<string, { total: number; count: number }> = {};
+    const salariosPorEquipo: Record<string, { total: number; count: number }> = {};
 
-    empleados.forEach((e) => {
-      const salario = Number(e.salarioBrutoMensual || 0);
+    empleados.forEach((empleado: EmpleadoConEquipos) => {
+      const salario = Number(empleado.salarioBrutoMensual || 0);
 
-      if (e.equipos.length === 0) {
-        if (!porEquipo['Sin equipo']) {
-          porEquipo['Sin equipo'] = { total: 0, count: 0 };
+      if (empleado.equipos.length === 0) {
+        if (!salariosPorEquipo['Sin equipo']) {
+          salariosPorEquipo['Sin equipo'] = { total: 0, count: 0 };
         }
-        porEquipo['Sin equipo'].total += salario;
-        porEquipo['Sin equipo'].count += 1;
+        salariosPorEquipo['Sin equipo'].total += salario;
+        salariosPorEquipo['Sin equipo'].count += 1;
       } else {
-        e.equipos.forEach((eq) => {
-          const nombreEquipo = eq.equipo.nombre;
-          if (!porEquipo[nombreEquipo]) {
-            porEquipo[nombreEquipo] = { total: 0, count: 0 };
+        empleado.equipos.forEach((eq) => {
+          const nombreEquipo = eq.equipo?.nombre ?? 'Sin equipo';
+          if (!salariosPorEquipo[nombreEquipo]) {
+            salariosPorEquipo[nombreEquipo] = { total: 0, count: 0 };
           }
-          porEquipo[nombreEquipo].total += salario;
-          porEquipo[nombreEquipo].count += 1;
+          salariosPorEquipo[nombreEquipo].total += salario;
+          salariosPorEquipo[nombreEquipo].count += 1;
         });
       }
     });
 
-    const salarioPromedioEquipo = Object.entries(porEquipo).map(
+    const salarioPromedioEquipo = Object.entries(salariosPorEquipo).map(
       ([equipo, data]) => ({
         equipo,
         promedio: Math.round(data.count > 0 ? data.total / data.count : 0),
       })
     );
 
-    // 5. Evolución coste nómina (últimos 6 meses)
+    // 5. Evolución coste nómina (últimos 6 meses) - OPTIMIZADO
+    // Usar agregación por nóminas en lugar de queries repetidas
+    const hace6Meses = new Date();
+    hace6Meses.setMonth(hace6Meses.getMonth() - 6);
+    hace6Meses.setDate(1);
+    hace6Meses.setHours(0, 0, 0, 0);
+
+    const nominaHistoricoWhere: Prisma.NominaWhereInput = {
+      empleadoId: { in: empleadosIds },
+      anio: { gte: hace6Meses.getFullYear() },
+    };
+
+    const nominasHistorico = (await prisma.nomina.groupBy({
+      by: ['anio', 'mes'],
+      where: nominaHistoricoWhere,
+      _sum: {
+        totalBruto: true,
+      },
+      orderBy: [{ anio: 'asc' }, { mes: 'asc' }],
+    })) as NominaHistorico[];
+
+    // Construir evolución de costes desde datos históricos
     const evolucionCoste = [];
     for (let i = 5; i >= 0; i--) {
       const fecha = new Date();
@@ -183,23 +259,15 @@ export async function GET(request: NextRequest) {
       fecha.setDate(1);
       fecha.setHours(0, 0, 0, 0);
 
-      const finMes = new Date(fecha.getFullYear(), fecha.getMonth() + 1, 0);
+      const mesNumero = fecha.getMonth() + 1;
+      const anio = fecha.getFullYear();
 
-      const empleadosMes = await prisma.empleado.findMany({
-        where: {
-          empresaId: session.user.empresaId,
-          fechaAlta: { lte: finMes },
-          OR: [{ fechaBaja: null }, { fechaBaja: { gt: finMes } }],
-        },
-        select: {
-          salarioBrutoMensual: true,
-        },
-      });
-
-      const coste = empleadosMes.reduce(
-        (sum, e) => sum + Number(e.salarioBrutoMensual || 0),
-        0
+      // Buscar en datos agregados
+      const dataMes = nominasHistorico.find(
+        (n) => n.anio === anio && n.mes === mesNumero
       );
+
+      const coste = dataMes ? toNumber(dataMes._sum.totalBruto) : 0;
 
       evolucionCoste.push({
         mes: fecha.toLocaleDateString('es-ES', {
@@ -220,9 +288,12 @@ export async function GET(request: NextRequest) {
       'Más de 70k': 0,
     };
 
-    empleados.forEach((e) => {
+    empleados.forEach((empleado: EmpleadoConEquipos) => {
       const salarioAnual = Number(
-        e.salarioBrutoAnual || (e.salarioBrutoMensual ? Number(e.salarioBrutoMensual) * 12 : 0)
+        empleado.salarioBrutoAnual ||
+          (empleado.salarioBrutoMensual
+            ? Number(empleado.salarioBrutoMensual) * 12
+            : 0)
       );
       if (salarioAnual < 20000) rangos['Menos de 20k']++;
       else if (salarioAnual < 30000) rangos['20k - 30k']++;
@@ -242,133 +313,140 @@ export async function GET(request: NextRequest) {
     const currentYear = new Date().getFullYear();
     const previousYear = currentYear - 1;
 
-    const [
-      resumenPorAnio,
-      tendenciaMensualRaw,
-      nominasDepartamento,
-      complementosAsignados,
-    ] = await Promise.all([
-      prisma.nomina.groupBy({
-        by: ['anio'],
-        where: {
-          anio: { in: [previousYear, currentYear] },
-          empleado: {
-            empresaId: session.user.empresaId,
-          },
-        },
-        _sum: {
-          totalNeto: true,
-          totalBruto: true,
-          totalComplementos: true,
-        },
-        _count: {
-          _all: true,
-        },
-      }),
-      prisma.nomina.groupBy({
-        by: ['anio', 'mes'],
-        where: {
-          anio: currentYear,
-          empleado: {
-            empresaId: session.user.empresaId,
-          },
-        },
-        _sum: {
-          totalNeto: true,
-          totalBruto: true,
-          totalComplementos: true,
-        },
-        _count: {
-          _all: true,
-        },
-        orderBy: {
-          mes: 'asc',
-        },
-      }),
-      prisma.nomina.findMany({
-        where: {
-          anio: currentYear,
-          empleado: {
-            empresaId: session.user.empresaId,
-          },
-        },
-        select: {
-          totalNeto: true,
-          totalComplementos: true,
-          empleado: {
-            select: {
-              departamento: {
-                select: {
-                  nombre: true,
-                },
-              },
-            },
-          },
-        },
-      }),
-      prisma.asignacionComplemento.findMany({
-        where: {
-          nomina: {
+    // Si no hay empleados, no hacer las queries de nóminas
+    if (empleadosIds.length === 0) {
+      return successResponse({
+        costeTotalNomina: 0,
+        cambioCoste: 0,
+        salarioPromedio: 0,
+        salarioPromedioEquipo: [],
+        evolucionCoste,
+        distribucionSalarial: [],
+        nominas: null,
+      });
+    }
+
+    const resumenPorAnioPromise = prisma.nomina.groupBy({
+      by: ['anio'],
+      where: {
+        anio: { in: [previousYear, currentYear] },
+        empleadoId: { in: empleadosIds },
+      },
+      _sum: {
+        totalNeto: true,
+        totalBruto: true,
+        totalComplementos: true,
+      },
+      _count: {
+        _all: true,
+      },
+    }) as Promise<NominaGroupResumen[]>;
+
+    const tendenciaMensualPromise = prisma.nomina.groupBy({
+      by: ['anio', 'mes'],
+      where: {
+        anio: currentYear,
+        empleadoId: { in: empleadosIds },
+      },
+      _sum: {
+        totalNeto: true,
+        totalBruto: true,
+        totalComplementos: true,
+      },
+      _count: {
+        _all: true,
+      },
+      orderBy: {
+        mes: 'asc',
+      },
+    }) as Promise<NominaGroupMensual[]>;
+
+    const nominasEquiposArgs: Prisma.NominaFindManyArgs = {
+      where: {
+        anio: currentYear,
+        empleadoId: { in: empleadosIds },
+      },
+      select: nominaConEquiposSelect,
+    };
+    const nominasEquiposPromise = prisma.nomina.findMany(nominasEquiposArgs) as Promise<NominaConEquipos[]>;
+
+    const complementosAsignadosArgs: Prisma.AsignacionComplementoFindManyArgs = {
+      where: {
+        nomina: {
+          is: {
             anio: currentYear,
-            empleado: {
-              empresaId: session.user.empresaId,
-            },
+            empleadoId: { in: empleadosIds },
           },
         },
-        select: {
-          importe: true,
-          empleadoComplemento: {
-            select: {
-              tipoComplemento: {
-                select: {
-                  nombre: true,
-                },
-              },
-            },
-          },
-        },
-      }),
+      },
+      select: asignacionComplementoSelect,
+    };
+    const [resumenPorAnioRaw, tendenciaMensualRaw, nominasEquiposRaw] = await Promise.all([
+      resumenPorAnioPromise,
+      tendenciaMensualPromise,
+      nominasEquiposPromise,
     ]);
 
-    const resumenNominasPorAnio = resumenPorAnio.reduce<
-      Record<
-        number,
-        {
-          totalNeto: number;
-          totalBruto: number;
-          totalComplementos: number;
-          totalNominas: number;
-        }
-      >
-    >((acc, item) => {
-      acc[item.anio] = {
-        totalNeto: toNumber(item._sum.totalNeto),
-        totalBruto: toNumber(item._sum.totalBruto),
-        totalComplementos: toNumber(item._sum.totalComplementos),
-        totalNominas: item._count._all ?? 0,
-      };
-      return acc;
-    }, {});
+    const resumenPorAnio = resumenPorAnioRaw as NominaGroupResumen[];
+    const nominasEquipos = nominasEquiposRaw as NominaConEquipos[];
 
-    const resumenActual =
-      resumenNominasPorAnio[currentYear] ?? {
-        totalNeto: 0,
-        totalBruto: 0,
-        totalComplementos: 0,
-        totalNominas: 0,
-      };
+    const nominaIds = nominasEquipos.map((nomina) => nomina.id);
 
-    const resumenAnterior =
-      resumenNominasPorAnio[previousYear] ?? {
-        totalNeto: 0,
-        totalBruto: 0,
-        totalComplementos: 0,
-        totalNominas: 0,
-      };
+    const complementosAsignados =
+      nominaIds.length === 0
+        ? []
+        : await prisma.asignacionComplemento.findMany({
+            where: {
+              nominaId: { in: nominaIds },
+            },
+            select: asignacionComplementoSelect,
+          }).then(
+            (result) => result as AsignacionComplementoDetalle[]
+          );
+
+    type ResumenAnio = {
+      totalNeto: number;
+      totalBruto: number;
+      totalComplementos: number;
+      totalNominas: number;
+    };
+
+    const resumenNominasPorAnio = resumenPorAnio.reduce<Record<number, ResumenAnio>>(
+      (acc: Record<number, ResumenAnio>, item: NominaGroupResumen) => {
+        acc[item.anio] = {
+          totalNeto: toNumber(item._sum.totalNeto),
+          totalBruto: toNumber(item._sum.totalBruto),
+          totalComplementos: toNumber(item._sum.totalComplementos),
+          totalNominas: item._count._all ?? 0,
+        };
+        return acc;
+      },
+      {}
+    );
+
+    const resumenActual: ResumenAnio = resumenNominasPorAnio[currentYear] ?? {
+      totalNeto: 0,
+      totalBruto: 0,
+      totalComplementos: 0,
+      totalNominas: 0,
+    };
+
+    const resumenAnterior: ResumenAnio = resumenNominasPorAnio[previousYear] ?? {
+      totalNeto: 0,
+      totalBruto: 0,
+      totalComplementos: 0,
+      totalNominas: 0,
+    };
 
     const variaciones = {
-      totalNeto: calcularVariacion(resumenActual.totalNeto, resumenAnterior.totalNeto),
-      totalBruto: calcularVariacion(resumenActual.totalBruto, resumenAnterior.totalBruto),
+      totalNeto: calcularVariacion(
+        resumenActual.totalNeto,
+        resumenAnterior.totalNeto
+      ),
+      totalBruto: calcularVariacion(
+        resumenActual.totalBruto,
+        resumenAnterior.totalBruto
+      ),
       totalComplementos: calcularVariacion(
         resumenActual.totalComplementos,
         resumenAnterior.totalComplementos
@@ -376,16 +454,9 @@ export async function GET(request: NextRequest) {
     };
 
     const tendenciaPorMes = tendenciaMensualRaw.reduce<
-      Record<
-        number,
-        {
-          totalNeto: number;
-          totalBruto: number;
-          totalComplementos: number;
-          totalNominas: number;
-        }
-      >
-    >((acc, item) => {
+      Record<number, ResumenAnio>
+    >(
+      (acc: Record<number, ResumenAnio>, item: NominaGroupMensual) => {
       acc[item.mes] = {
         totalNeto: toNumber(item._sum.totalNeto),
         totalBruto: toNumber(item._sum.totalBruto),
@@ -393,7 +464,9 @@ export async function GET(request: NextRequest) {
         totalNominas: item._count._all ?? 0,
       };
       return acc;
-    }, {});
+      },
+      {}
+    );
 
     const tendenciaMensual = Array.from({ length: 12 }, (_, index) => {
       const mesNumero = index + 1;
@@ -420,36 +493,54 @@ export async function GET(request: NextRequest) {
         entry.totalNominas > 0
     );
 
-    const departamentosMap = new Map<
-      string,
-      {
-        totalNeto: number;
-        totalComplementos: number;
-        nominas: number;
+    type EquipoAcumulado = {
+      totalNeto: number;
+      totalComplementos: number;
+      nominas: number;
+    };
+
+    const equiposMap = new Map<string, EquipoAcumulado>();
+
+    nominasEquipos.forEach((nomina: NominaConEquipos) => {
+      const equipos = nomina.empleado?.equipos ?? [];
+
+      if (equipos.length === 0) {
+        if (!equiposMap.has('Sin equipo')) {
+          equiposMap.set('Sin equipo', {
+            totalNeto: 0,
+            totalComplementos: 0,
+            nominas: 0,
+          });
+        }
+
+        const data = equiposMap.get('Sin equipo')!;
+        data.totalNeto += toNumber(nomina.totalNeto);
+        data.totalComplementos += toNumber(nomina.totalComplementos);
+        data.nominas += 1;
+        return;
       }
-    >();
 
-    nominasDepartamento.forEach((nomina) => {
-      const departamento =
-        nomina.empleado?.departamento?.nombre ?? 'Sin departamento';
+      equipos.forEach((eq) => {
+        const nombreEquipo = eq.equipo?.nombre ?? 'Sin equipo';
 
-      if (!departamentosMap.has(departamento)) {
-        departamentosMap.set(departamento, {
-          totalNeto: 0,
-          totalComplementos: 0,
-          nominas: 0,
-        });
-      }
+        if (!equiposMap.has(nombreEquipo)) {
+          equiposMap.set(nombreEquipo, {
+            totalNeto: 0,
+            totalComplementos: 0,
+            nominas: 0,
+          });
+        }
 
-      const data = departamentosMap.get(departamento)!;
-      data.totalNeto += toNumber(nomina.totalNeto);
-      data.totalComplementos += toNumber(nomina.totalComplementos);
-      data.nominas += 1;
+        const data = equiposMap.get(nombreEquipo)!;
+        data.totalNeto += toNumber(nomina.totalNeto);
+        data.totalComplementos += toNumber(nomina.totalComplementos);
+        data.nominas += 1;
+      });
     });
 
-    const porDepartamento = Array.from(departamentosMap.entries())
-      .map(([departamento, data]) => ({
-        departamento,
+    const nominasPorEquipo = Array.from(equiposMap.entries())
+      .map(([equipo, data]) => ({
+        equipo,
         totalNeto: Number(data.totalNeto.toFixed(2)),
         totalComplementos: Number(data.totalComplementos.toFixed(2)),
         promedioNeto:
@@ -460,24 +551,27 @@ export async function GET(request: NextRequest) {
       }))
       .sort((a, b) => b.totalNeto - a.totalNeto);
 
-    const complementosMap = new Map<
-      string,
-      { totalImporte: number; count: number }
-    >();
+    type ComplementoAcumulado = {
+      totalImporte: number;
+      count: number;
+    };
 
-    complementosAsignados.forEach((asignacion) => {
-      const nombre =
-        asignacion.empleadoComplemento?.tipoComplemento?.nombre ??
-        'Sin tipo';
+    const complementosMap = new Map<string, ComplementoAcumulado>();
 
-      if (!complementosMap.has(nombre)) {
-        complementosMap.set(nombre, { totalImporte: 0, count: 0 });
+    complementosAsignados.forEach(
+      (asignacion: AsignacionComplementoDetalle) => {
+        const nombre =
+          asignacion.empleadoComplemento?.tipoComplemento?.nombre ?? 'Sin tipo';
+
+        if (!complementosMap.has(nombre)) {
+          complementosMap.set(nombre, { totalImporte: 0, count: 0 });
+        }
+
+        const data = complementosMap.get(nombre)!;
+        data.totalImporte += toNumber(asignacion.importe);
+        data.count += 1;
       }
-
-      const data = complementosMap.get(nombre)!;
-      data.totalImporte += toNumber(asignacion.importe);
-      data.count += 1;
-    });
+    );
 
     const complementosTop = Array.from(complementosMap.entries())
       .map(([nombre, data]) => ({
@@ -496,7 +590,7 @@ export async function GET(request: NextRequest) {
       resumenActual.totalNominas > 0 ||
       resumenAnterior.totalNominas > 0 ||
       tendenciaMensual.length > 0 ||
-      porDepartamento.length > 0 ||
+      nominasPorEquipo.length > 0 ||
       complementosTop.length > 0;
 
     const nominasAnalytics = tieneNominas
@@ -509,7 +603,7 @@ export async function GET(request: NextRequest) {
             variaciones,
           },
           tendenciaMensual,
-          porDepartamento,
+          porEquipo: nominasPorEquipo,
           complementosTop,
         }
       : null;

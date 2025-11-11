@@ -18,3 +18,5 @@
 - Monitorizar en QA la creación de eventos para verificar que la sincronización automática se comporta como esperado con datos reales.
 - Valorar pruebas unitarias específicas para `sync-estados-nominas` (no incluidas en esta iteración).
 
+
+

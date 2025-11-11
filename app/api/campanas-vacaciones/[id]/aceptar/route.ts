@@ -98,7 +98,7 @@ export async function POST(
     // Obtener equipoId del empleado (si tiene)
     const equipoId = preferencia.empleado.equipos[0]?.equipoId || null;
 
-    // Crear ausencia automáticamente en estado pendiente_aprobacion
+    // Crear ausencia automáticamente en estado pendiente
     const ausencia = await prisma.ausencia.create({
       data: {
         empresaId: session.user.empresaId,
@@ -113,7 +113,7 @@ export async function POST(
         diasSolicitados,
         descripcion: `Vacaciones de campaña: ${preferencia.campana.titulo}`,
         descuentaSaldo: true,
-        estado: EstadoAusencia.pendiente_aprobacion,
+        estado: EstadoAusencia.pendiente,
         diasIdeales: preferencia.diasIdeales as unknown as Prisma.InputJsonValue,
         diasPrioritarios: preferencia.diasPrioritarios as unknown as Prisma.InputJsonValue,
         diasAlternativos: preferencia.diasAlternativos as unknown as Prisma.InputJsonValue,

@@ -23,6 +23,8 @@ import { GeneralTab as GeneralTabShared } from '@/app/(dashboard)/hr/mi-espacio/
 import { FichajesTab as FichajesTabShared } from '@/app/(dashboard)/hr/mi-espacio/tabs/fichajes-tab';
 import { ContratosTab as ContratosTabShared } from '@/app/(dashboard)/hr/mi-espacio/tabs/contratos-tab';
 import { DocumentosTab as DocumentosTabShared } from '@/app/(dashboard)/hr/mi-espacio/tabs/documentos-tab';
+import { getAusenciaEstadoLabel } from '@/lib/utils/formatters';
+import { EstadoAusencia } from '@/lib/constants/enums';
 
 interface EmpleadoDetailClientProps {
   empleado: Empleado;
@@ -188,22 +190,19 @@ function AusenciasTab({ empleado }: AusenciasTabProps) {
   );
 
   const getEstadoBadge = (estado: string) => {
+    const label = getAusenciaEstadoLabel(estado);
+
     switch (estado) {
-      case 'approved':
-      case 'auto_aprobada':
-      case 'en_curso':
-        return <Badge className="bg-green-100 text-green-800">Aprobado</Badge>;
-      case 'rejected':
-        return <Badge className="bg-red-100 text-red-800">Rechazado</Badge>;
-      case 'pending':
-      case 'pendiente_aprobacion':
-        return <Badge className="bg-yellow-100 text-yellow-800">Pendiente</Badge>;
-      case 'completada':
-        return <Badge className="bg-gray-100 text-gray-800">Completada</Badge>;
-      case 'cancelada':
-        return <Badge className="bg-gray-100 text-gray-800">Cancelada</Badge>;
+      case EstadoAusencia.confirmada:
+        return <Badge className="bg-green-100 text-green-800">{label}</Badge>;
+      case EstadoAusencia.rechazada:
+        return <Badge className="bg-red-100 text-red-800">{label}</Badge>;
+      case EstadoAusencia.pendiente:
+        return <Badge className="bg-yellow-100 text-yellow-800">{label}</Badge>;
+      case EstadoAusencia.completada:
+        return <Badge className="bg-gray-100 text-gray-800">{label}</Badge>;
       default:
-        return <Badge variant="secondary">{estado}</Badge>;
+        return <Badge variant="secondary">{label}</Badge>;
     }
   };
 

@@ -15,6 +15,7 @@ import {
 } from '@/lib/api-handler';
 import { z } from 'zod';
 import { EstadoAusencia } from '@/lib/constants/enums';
+import { determinarEstadoTrasAprobacion } from '@/lib/calculos/ausencias';
 
 const aprobarRechazarSchema = z.object({
   accion: z.enum(['aprobar', 'rechazar']),
@@ -122,7 +123,7 @@ export async function PATCH(
           diasLaborables: 0,
           diasSolicitados: diasAusencia,
           descuentaSaldo: false, // No descuenta, suma al saldo
-          estado: EstadoAusencia.auto_aprobada,
+          estado: determinarEstadoTrasAprobacion(fechaFin),
           descripcion: `Compensación de ${compensacion.horasBalance} horas extra`,
           motivo: 'Compensación de horas extra trabajadas', // Requerido para tipo 'otro'
           aprobadaPor: session.user.id,

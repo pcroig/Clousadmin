@@ -41,13 +41,13 @@ export const CampanasVacacionesWidget = memo(function CampanasVacacionesWidget({
 
   const estadoBadgeVariant = campanaActiva.miPreferencia?.estado === 'aceptada' 
     ? 'success' 
-    : campanaActiva.miPreferencia?.estado === EstadoAusencia.pendiente_aprobacion
+    : campanaActiva.miPreferencia?.estado === EstadoAusencia.pendiente
     ? 'warning'
     : 'default';
 
   const estadoLabel = campanaActiva.miPreferencia?.estado === 'aceptada'
     ? 'Participando'
-    : campanaActiva.miPreferencia?.estado === EstadoAusencia.pendiente_aprobacion
+    : campanaActiva.miPreferencia?.estado === EstadoAusencia.pendiente
     ? 'Pendiente'
     : 'Sin participar';
 
@@ -115,6 +115,7 @@ export const CampanasVacacionesWidget = memo(function CampanasVacacionesWidget({
     </WidgetCard>
   );
 });
+
 
 
 

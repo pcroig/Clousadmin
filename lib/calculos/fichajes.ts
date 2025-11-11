@@ -584,7 +584,7 @@ export async function esDiaLaboral(empleadoId: string, fecha: Date): Promise<boo
       empleadoId,
       medioDia: false, // Solo ausencias de día completo
       estado: {
-        in: [EstadoAusencia.en_curso, EstadoAusencia.completada, EstadoAusencia.auto_aprobada],
+        in: [EstadoAusencia.confirmada, EstadoAusencia.completada],
       },
       fechaInicio: {
         lte: fechaSinHora,
@@ -713,7 +713,7 @@ export async function obtenerAusenciaMedioDia(
       empleadoId,
       medioDia: true,
       estado: {
-        in: [EstadoAusencia.en_curso, EstadoAusencia.completada, EstadoAusencia.auto_aprobada],
+        in: [EstadoAusencia.confirmada, EstadoAusencia.completada],
       },
       fechaInicio: {
         lte: fechaSinHora,

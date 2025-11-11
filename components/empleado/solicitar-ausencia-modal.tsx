@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { LoadingButton } from '@/components/shared/loading-button';
@@ -34,7 +34,15 @@ interface SolicitarAusenciaModalProps {
   saldoDisponible?: number;
 }
 
-const TIPOS_AUSENCIA = [
+type TipoAusenciaOption = {
+  value: string;
+  label: string;
+  descripcion: string;
+  needsApproval: boolean;
+  descuentaSaldo: boolean;
+};
+
+const TIPOS_AUSENCIA: TipoAusenciaOption[] = [
   { 
     value: 'vacaciones', 
     label: 'Vacaciones', 
@@ -72,6 +80,31 @@ const TIPOS_AUSENCIA = [
   },
 ];
 
+const getApprovalCopy = (needsApproval: boolean) =>
+  needsApproval ? '⏱ Necesita aprobación' : '✓ No necesita aprobación';
+
+const getBalanceCopy = (descuentaSaldo: boolean) =>
+  descuentaSaldo ? '📊 Descuenta saldo' : 'No descuenta saldo';
+
+const TipoOptionContent = ({
+  label,
+  needsApproval,
+  descuentaSaldo,
+}: Pick<TipoAusenciaOption, 'label' | 'needsApproval' | 'descuentaSaldo'>) => (
+  <span className="flex min-w-0 flex-wrap items-center gap-2">
+    <span className="font-medium">{label}</span>
+    <span className="flex min-w-0 items-center gap-1 text-xs text-gray-500">
+      <span className={needsApproval ? 'text-yellow-600' : 'text-green-600'}>
+        {getApprovalCopy(needsApproval)}
+      </span>
+      <span className="text-gray-400">•</span>
+      <span className={descuentaSaldo ? 'text-orange-600' : 'text-gray-500'}>
+        {getBalanceCopy(descuentaSaldo)}
+      </span>
+    </span>
+  </span>
+);
+
 export function SolicitarAusenciaModal({
   open,
   onClose,
@@ -83,11 +116,15 @@ export function SolicitarAusenciaModal({
   const [fechaFin, setFechaFin] = useState<Date>();
   const [medioDia, setMedioDia] = useState(false);
   const [descripcion, setDescripcion] = useState('');
-  const [motivo, setMotivo] = useState('');
   const [justificante, setJustificante] = useState<File | null>(null);
   const [uploadingJustificante, setUploadingJustificante] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  const selectedTipo = useMemo(
+    () => TIPOS_AUSENCIA.find((t) => t.value === tipo),
+    [tipo],
+  );
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -96,12 +133,6 @@ export function SolicitarAusenciaModal({
 
     if (!fechaInicio || !fechaFin) {
       setError('Por favor selecciona las fechas');
-      setLoading(false);
-      return;
-    }
-
-    if (tipo === 'otro' && !motivo.trim()) {
-      setError('El motivo es obligatorio para ausencias de tipo "Otro"');
       setLoading(false);
       return;
     }
@@ -149,7 +180,6 @@ export function SolicitarAusenciaModal({
         fechaFin: string;
         medioDia: boolean;
         descripcion?: string;
-        motivo?: string;
         justificanteUrl?: string;
         documentoId?: string;
       }
@@ -164,18 +194,6 @@ export function SolicitarAusenciaModal({
       // Solo incluir descripcion si tiene valor
       if (descripcion.trim()) {
         payload.descripcion = descripcion.trim();
-      }
-
-      // Solo incluir motivo si tiene valor (o si es tipo "otro" y es requerido)
-      if (tipo === 'otro') {
-        if (!motivo.trim()) {
-          setError('El motivo es obligatorio para ausencias de tipo "Otro"');
-          setLoading(false);
-          return;
-        }
-        payload.motivo = motivo.trim();
-      } else if (motivo.trim()) {
-        payload.motivo = motivo.trim();
       }
 
       // Incluir justificante URL y documentoId si se subió
@@ -215,7 +233,6 @@ export function SolicitarAusenciaModal({
       setFechaFin(undefined);
       setMedioDia(false);
       setDescripcion('');
-      setMotivo('');
       setJustificante(null);
     } catch (err) {
       const error = err instanceof Error ? err : new Error('Error desconocido');
@@ -237,32 +254,29 @@ export function SolicitarAusenciaModal({
           <div>
             <Label htmlFor="tipo">Tipo de ausencia *</Label>
             <Select value={tipo} onValueChange={setTipo}>
-              <SelectTrigger id="tipo">
-                <SelectValue />
+              <SelectTrigger id="tipo" className="w-full">
+                <SelectValue placeholder="Selecciona un tipo">
+                  {selectedTipo && (
+                    <TipoOptionContent
+                      label={selectedTipo.label}
+                      needsApproval={selectedTipo.needsApproval}
+                      descuentaSaldo={selectedTipo.descuentaSaldo}
+                    />
+                  )}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 {TIPOS_AUSENCIA.map((t) => (
                   <SelectItem key={t.value} value={t.value}>
-                    <div className="flex flex-col">
-                      <span className="font-medium">{t.label}</span>
-                      <span className="text-xs text-gray-500">{t.descripcion}</span>
-                    </div>
+                    <TipoOptionContent
+                      label={t.label}
+                      needsApproval={t.needsApproval}
+                      descuentaSaldo={t.descuentaSaldo}
+                    />
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
-            {/* Información adicional del tipo seleccionado */}
-            {TIPOS_AUSENCIA.find((t) => t.value === tipo) && (
-              <p className="text-xs text-gray-600 mt-1.5 flex items-center gap-1">
-                <span className={TIPOS_AUSENCIA.find((t) => t.value === tipo)?.needsApproval ? 'text-yellow-600' : 'text-green-600'}>
-                  {TIPOS_AUSENCIA.find((t) => t.value === tipo)?.needsApproval ? '⏱ Necesita aprobación' : '✓ No necesita aprobación'}
-                </span>
-                <span className="text-gray-400">•</span>
-                <span className={TIPOS_AUSENCIA.find((t) => t.value === tipo)?.descuentaSaldo ? 'text-orange-600' : 'text-gray-500'}>
-                  {TIPOS_AUSENCIA.find((t) => t.value === tipo)?.descuentaSaldo ? '📊 Descuenta saldo' : 'No descuenta saldo'}
-                </span>
-              </p>
-            )}
           </div>
 
           {/* Saldo disponible (solo vacaciones) */}
@@ -279,55 +293,56 @@ export function SolicitarAusenciaModal({
             </div>
           )}
 
-          {/* Fecha Inicio */}
-          <div>
-            <Label>Fecha de inicio *</Label>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  className="w-full justify-start text-left font-normal"
-                >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {fechaInicio ? format(fechaInicio, 'PPP', { locale: es }) : 'Seleccionar fecha'}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar
-                  mode="single"
-                  selected={fechaInicio}
-                  onSelect={setFechaInicio}
-                  disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
-                />
-              </PopoverContent>
-            </Popover>
-          </div>
+          {/* Fechas */}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div>
+              <Label>Fecha de inicio *</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start text-left font-normal"
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {fechaInicio ? format(fechaInicio, 'PPP', { locale: es }) : 'Seleccionar fecha'}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={fechaInicio}
+                    onSelect={setFechaInicio}
+                    disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
 
-          {/* Fecha Fin */}
-          <div>
-            <Label>Fecha de fin *</Label>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  className="w-full justify-start text-left font-normal"
-                >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {fechaFin ? format(fechaFin, 'PPP', { locale: es }) : 'Seleccionar fecha'}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-full p-0" align="start">
-                <Calendar
-                  mode="single"
-                  selected={fechaFin}
-                  onSelect={setFechaFin}
-                  disabled={(date) => {
-                    const today = new Date(new Date().setHours(0, 0, 0, 0));
-                    return date < today || (fechaInicio ? date < fechaInicio : false);
-                  }}
-                />
-              </PopoverContent>
-            </Popover>
+            <div>
+              <Label>Fecha de fin *</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start text-left font-normal"
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {fechaFin ? format(fechaFin, 'PPP', { locale: es }) : 'Seleccionar fecha'}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={fechaFin}
+                    onSelect={setFechaFin}
+                    disabled={(date) => {
+                      const today = new Date(new Date().setHours(0, 0, 0, 0));
+                      return date < today || (fechaInicio ? date < fechaInicio : false);
+                    }}
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
           </div>
 
           {/* Medio Día */}
@@ -358,20 +373,6 @@ export function SolicitarAusenciaModal({
             />
           </div>
 
-          {/* Motivo (obligatorio para "Otro") */}
-          {tipo === 'otro' && (
-            <div>
-              <Label htmlFor="motivo">Motivo *</Label>
-              <Input
-                id="motivo"
-                value={motivo}
-                onChange={(e) => setMotivo(e.target.value)}
-                maxLength={500}
-                placeholder="Ej: Mudanza, trámites legales, etc."
-                required
-              />
-            </div>
-          )}
 
           {/* Justificante (opcional) */}
           <div>

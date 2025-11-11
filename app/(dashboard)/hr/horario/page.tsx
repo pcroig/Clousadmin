@@ -32,7 +32,7 @@ interface Ausencia {
     avatar?: string;
   };
   dias: number;
-  estado: EstadoAusencia.pendiente_aprobacion | 'aprobada' | 'rechazada' | 'en_curso' | 'completada' | 'auto_aprobada';
+  estado: EstadoAusencia;
   tipo: string;
   justificante: boolean;
 }
@@ -92,7 +92,7 @@ export default function HorarioPage() {
       id: '1',
       empleado: { nombre: 'Ada Lovelace' },
       dias: 5,
-      estado: EstadoAusencia.pendiente_aprobacion,
+      estado: EstadoAusencia.pendiente,
       tipo: 'Vacaciones',
       justificante: false,
     },
@@ -146,7 +146,7 @@ export default function HorarioPage() {
       cell: (row) => (
         <span
           className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-            row.estado === EstadoAusencia.en_curso || row.estado === EstadoAusencia.completada || row.estado === EstadoAusencia.auto_aprobada
+            row.estado === EstadoAusencia.confirmada || row.estado === EstadoAusencia.completada
               ? 'bg-green-100 text-green-800'
               : row.estado === EstadoAusencia.rechazada
               ? 'bg-red-100 text-red-800'
