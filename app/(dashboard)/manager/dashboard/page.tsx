@@ -225,48 +225,46 @@ export default async function ManagerDashboardPage() {
 
       {/* Responsive Layout: Stack on mobile, 3 columns on desktop */}
       <div className="flex-1 min-h-0 pb-4 sm:pb-6 overflow-auto">
-        <div className="h-full grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-          {/* Column 1 */}
-          <div className="flex flex-col gap-3 sm:gap-4 min-h-0">
-            <div className="min-h-[240px]">
-              <FichajeWidget />
-            </div>
-            <div className="min-h-[240px]">
-              <AutoCompletadoWidget
-                stats={{
-                  fichajesCompletados: aprobados,
-                  ausenciasCompletadas: pendientes,
-                  solicitudesCompletadas: 0,
-                }}
-              />
-            </div>
+        <div className="h-full grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 lg:grid-rows-[1fr_1fr] gap-3 sm:gap-4">
+          {/* Fichaje Widget - Fila 1 */}
+          <div className="h-full min-h-[220px]">
+            <FichajeWidget />
           </div>
 
-          {/* Column 2 */}
-          <div className="flex flex-col gap-3 sm:gap-4 min-h-0">
-            <div className="min-h-[480px] h-full">
-              <SolicitudesWidget
-                solicitudes={solicitudes}
-                maxItems={8}
-                dashboardHref="/manager/bandeja-entrada"
-              />
-            </div>
+          {/* Solicitudes Widget - Ocupa 2 filas */}
+          <div className="row-span-1 lg:row-span-2 h-full min-h-[440px]">
+            <SolicitudesWidget
+              solicitudes={solicitudes}
+              maxItems={8}
+              dashboardHref="/manager/bandeja-entrada"
+            />
           </div>
 
-          {/* Column 3 */}
-          <div className="flex flex-col gap-3 sm:gap-4 min-h-0">
-            <div className="min-h-[240px]">
-              <NotificacionesWidget notificaciones={notificaciones} maxItems={3} />
-            </div>
-            <div className="min-h-[240px] flex-1">
-              <AusenciasWidget
-                diasAcumulados={diasTotalesEquipo}
-                diasDisponibles={diasTotalesEquipo - diasUsadosEquipo}
-                diasUtilizados={diasUsadosEquipo}
-                proximasAusencias={ausenciasEquipo}
-                ausenciasPasadas={[]}
-              />
-            </div>
+          {/* Notificaciones Widget - Fila 1 */}
+          <div className="h-full min-h-[220px]">
+            <NotificacionesWidget notificaciones={notificaciones} maxItems={3} />
+          </div>
+
+          {/* Auto-completed Widget - Fila 2 */}
+          <div className="h-full min-h-[220px]">
+            <AutoCompletadoWidget
+              stats={{
+                fichajesCompletados: aprobados,
+                ausenciasCompletadas: pendientes,
+                solicitudesCompletadas: 0,
+              }}
+            />
+          </div>
+
+          {/* Ausencias Widget - Fila 2 */}
+          <div className="h-full min-h-[220px]">
+            <AusenciasWidget
+              diasAcumulados={diasTotalesEquipo}
+              diasDisponibles={diasTotalesEquipo - diasUsadosEquipo}
+              diasUtilizados={diasUsadosEquipo}
+              proximasAusencias={ausenciasEquipo}
+              ausenciasPasadas={[]}
+            />
           </div>
         </div>
       </div>

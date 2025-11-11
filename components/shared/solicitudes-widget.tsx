@@ -121,7 +121,6 @@ export const SolicitudesWidget = memo(function SolicitudesWidget({
     <WidgetCard
       title="Solicitudes"
       href={dashboardHref}
-      height="h-full min-h-[480px]"
       badge={solicitudes.length > 0 ? solicitudes.length : undefined}
       contentClassName="overflow-y-auto"
     >
