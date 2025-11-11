@@ -133,6 +133,7 @@ export function EmpleadoDetailClient({ empleado, usuario }: EmpleadoDetailClient
         {activeTab === 'fichajes' && (
           <FichajesTabShared 
             empleadoId={empleado.id}
+            empleado={empleado}
             empleadoNombre={`${empleado.nombre} ${empleado.apellidos}`}
           />
         )}
