@@ -19,10 +19,10 @@ import { LoadingButton } from '@/components/shared/loading-button';
 import { CompensacionModal } from '@/components/hr/compensacion-modal';
 import { getAvatarStyle } from '@/lib/design-system';
 import type { Empleado, Usuario } from '@/types/empleado';
-import { GeneralTab as GeneralTabShared } from '@/app/(dashboard)/hr/mi-espacio/tabs/general-tab';
-import { FichajesTab as FichajesTabShared } from '@/app/(dashboard)/hr/mi-espacio/tabs/fichajes-tab';
-import { ContratosTab as ContratosTabShared } from '@/app/(dashboard)/hr/mi-espacio/tabs/contratos-tab';
-import { DocumentosTab as DocumentosTabShared } from '@/app/(dashboard)/hr/mi-espacio/tabs/documentos-tab';
+import { GeneralTab as GeneralTabShared } from '@/components/shared/mi-espacio/general-tab';
+import { FichajesTab as FichajesTabShared } from '@/components/shared/mi-espacio/fichajes-tab';
+import { ContratosTab as ContratosTabShared } from '@/components/shared/mi-espacio/contratos-tab';
+import { DocumentosTab as DocumentosTabShared } from '@/components/shared/mi-espacio/documentos-tab';
 import { getAusenciaEstadoLabel } from '@/lib/utils/formatters';
 import { EstadoAusencia } from '@/lib/constants/enums';
 
@@ -133,6 +133,7 @@ export function EmpleadoDetailClient({ empleado, usuario }: EmpleadoDetailClient
         {activeTab === 'fichajes' && (
           <FichajesTabShared 
             empleadoId={empleado.id}
+            empleado={empleado}
             empleadoNombre={`${empleado.nombre} ${empleado.apellidos}`}
           />
         )}

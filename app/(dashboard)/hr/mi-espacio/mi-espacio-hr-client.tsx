@@ -10,10 +10,10 @@ import { Edit2, Flag } from 'lucide-react';
 import { toast } from 'sonner';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { GeneralTab } from './tabs/general-tab';
-import { FichajesTab } from './tabs/fichajes-tab';
-import { ContratosTab } from './tabs/contratos-tab';
-import { DocumentosTab } from './tabs/documentos-tab';
+import { GeneralTab } from '@/components/shared/mi-espacio/general-tab';
+import { FichajesTab } from '@/components/shared/mi-espacio/fichajes-tab';
+import { ContratosTab } from '@/components/shared/mi-espacio/contratos-tab';
+import { DocumentosTab } from '@/components/shared/mi-espacio/documentos-tab';
 import { AusenciasTab } from '@/components/shared/mi-espacio/ausencias-tab';
 import { getAvatarStyle } from '@/lib/design-system';
 import { DenunciaDialog } from '@/components/empleado/denuncia-dialog';
@@ -146,7 +146,7 @@ export function MiEspacioHRClient({ empleado, usuario }: MiEspacioHRClientProps)
       <div className="flex-1 min-h-0 overflow-y-auto">
         {activeTab === 'general' && <GeneralTab empleado={empleado} usuario={usuario} rol="hr_admin" onFieldUpdate={handleFieldUpdate} />}
         {activeTab === 'ausencias' && <AusenciasTab empleadoId={empleado.id} />}
-        {activeTab === 'fichajes' && <FichajesTab empleadoId={empleado.id} />}
+        {activeTab === 'fichajes' && <FichajesTab empleadoId={empleado.id} empleado={empleado} />}
         {activeTab === 'contratos' && <ContratosTab empleado={empleado} rol="hr_admin" onFieldUpdate={handleFieldUpdate} />}
         {activeTab === 'documentos' && <DocumentosTab empleado={empleado} />}
       </div>
