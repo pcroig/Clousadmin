@@ -265,9 +265,9 @@ export function AusenciasTab({ empleadoId }: MiEspacioAusenciasTabProps) {
       completada: (ausencias || [])
         .filter((a) => a.estado === 'completada')
         .map((a) => ({
-          from: new Date(a.fechaInicio),
-          to: new Date(a.fechaFin),
-        })),
+        from: new Date(a.fechaInicio),
+        to: new Date(a.fechaFin),
+      })),
       rechazada: (ausencias || [])
         .filter((a) => a.estado === 'rechazada')
         .map((a) => ({ from: new Date(a.fechaInicio), to: new Date(a.fechaFin) })),
@@ -613,16 +613,16 @@ export function AusenciasTab({ empleadoId }: MiEspacioAusenciasTabProps) {
                   className="rounded-md border"
                   locale={es}
                 />
-                <Calendar
+              <Calendar
                   mode="single"
                   selected={selectedDate || undefined}
                   onDayClick={handleDayClick}
-                  modifiers={modifiers}
-                  modifiersClassNames={modifiersClassNames}
+                modifiers={modifiers}
+                modifiersClassNames={modifiersClassNames}
                   month={new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1)}
                   className="rounded-md border"
                   locale={es}
-                />
+              />
               </div>
 
               <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 space-y-3">
