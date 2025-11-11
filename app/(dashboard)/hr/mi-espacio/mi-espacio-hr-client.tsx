@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button';
 import { GeneralTab } from '@/components/shared/mi-espacio/general-tab';
 import { FichajesTab } from '@/components/shared/mi-espacio/fichajes-tab';
 import { ContratosTab } from '@/components/shared/mi-espacio/contratos-tab';
-import { DocumentosTab } from './tabs/documentos-tab';
+import { DocumentosTab } from '@/components/shared/mi-espacio/documentos-tab';
 import { AusenciasTab } from '@/components/shared/mi-espacio/ausencias-tab';
 import { getAvatarStyle } from '@/lib/design-system';
 import { DenunciaDialog } from '@/components/empleado/denuncia-dialog';
