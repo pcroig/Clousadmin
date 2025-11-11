@@ -21,7 +21,7 @@ import { getAvatarStyle } from '@/lib/design-system';
 import type { Empleado, Usuario } from '@/types/empleado';
 import { GeneralTab as GeneralTabShared } from '@/components/shared/mi-espacio/general-tab';
 import { FichajesTab as FichajesTabShared } from '@/components/shared/mi-espacio/fichajes-tab';
-import { ContratosTab as ContratosTabShared } from '@/app/(dashboard)/hr/mi-espacio/tabs/contratos-tab';
+import { ContratosTab as ContratosTabShared } from '@/components/shared/mi-espacio/contratos-tab';
 import { DocumentosTab as DocumentosTabShared } from '@/app/(dashboard)/hr/mi-espacio/tabs/documentos-tab';
 import { getAusenciaEstadoLabel } from '@/lib/utils/formatters';
 import { EstadoAusencia } from '@/lib/constants/enums';
