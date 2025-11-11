@@ -30,14 +30,12 @@ export const NotificacionesWidget = memo(function NotificacionesWidget({
   altura = 'normal',
   href = '/empleado/bandeja-entrada',
 }: NotificacionesWidgetProps) {
-  const alturaClass = altura === 'doble' ? 'h-full min-h-[480px]' : 'h-full min-h-[240px]';
   const notificacionesMostradas = notificaciones.slice(0, maxItems);
 
   return (
     <WidgetCard
       title="Notificaciones"
       href={href}
-      height={alturaClass}
       titleIcon={<Bell className="w-4 h-4" />}
       contentClassName="overflow-y-auto"
     >

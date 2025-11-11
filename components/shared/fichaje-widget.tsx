@@ -278,9 +278,9 @@ export function FichajeWidget({
   }
 
   return (
-    <>
+    <div className="h-full">
       {/* Mobile: Sin header, solo contenido */}
-      <div className="sm:hidden">
+      <div className="sm:hidden h-full">
         <Card className={`${MOBILE_DESIGN.widget.height.standard} flex flex-col overflow-hidden ${MOBILE_DESIGN.card.default}`}>
           <CardContent className={`flex-1 ${MOBILE_DESIGN.spacing.widget} flex flex-col`}>
             {/* Estado y Cronómetro juntos */}
@@ -346,9 +346,9 @@ export function FichajeWidget({
       </div>
 
       {/* Desktop: Con header y anillo */}
-      <div className="hidden sm:block">
-        <WidgetCard title="Fichaje" href={href} contentClassName="px-6 pb-6">
-          <div className="grid grid-cols-2 gap-4 h-full">
+      <div className="hidden sm:block h-full">
+        <WidgetCard title="Fichaje" href={href} contentClassName="px-6">
+          <div className="grid grid-cols-2 gap-4 h-full min-h-0">
             {/* Estado y botones */}
             <div className="flex flex-col justify-between">
               <div>
@@ -479,6 +479,6 @@ export function FichajeWidget({
           obtenerEstadoActual();
         }}
       />
-    </>
+    </div>
   );
 }

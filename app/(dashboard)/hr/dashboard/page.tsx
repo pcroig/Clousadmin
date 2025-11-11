@@ -176,24 +176,24 @@ export default async function HRDashboardPage() {
 
       {/* Responsive Grid Layout */}
       <div className="flex-1 min-h-0 pb-4 sm:pb-6 overflow-auto">
-        <div className="h-full grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 auto-rows-fr gap-3 sm:gap-4">
-          {/* Fichaje Widget */}
-          <div className="min-h-[240px] h-full">
+        <div className="h-full grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 lg:grid-rows-[1fr_1fr] gap-3 sm:gap-4">
+          {/* Fichaje Widget - Fila 1 */}
+          <div className="h-full min-h-[220px]">
             <FichajeWidget href="/hr/horario/fichajes" />
           </div>
 
           {/* Solicitudes Widget - Ocupa 2 filas en desktop */}
-          <div className="row-span-1 lg:row-span-2 min-h-[480px] h-full">
+          <div className="row-span-1 lg:row-span-2 h-full min-h-[440px]">
             <SolicitudesWidget solicitudes={solicitudes} maxItems={8} />
           </div>
 
-          {/* Notificaciones Widget */}
-          <div className="min-h-[240px] h-full">
+          {/* Notificaciones Widget - Fila 1 */}
+          <div className="h-full min-h-[220px]">
             <NotificacionesWidget notificaciones={notificaciones} maxItems={3} href="/hr/bandeja-entrada" />
           </div>
 
-          {/* Auto-completed Widget */}
-          <div className="min-h-[240px] h-full">
+          {/* Auto-completed Widget - Fila 2 */}
+          <div className="h-full min-h-[220px]">
             <AutoCompletadoWidget
               stats={{
                 fichajesCompletados: fichajesAutoCompletados,
@@ -203,8 +203,8 @@ export default async function HRDashboardPage() {
             />
           </div>
 
-          {/* Plantilla Widget */}
-          <div className="min-h-[240px] h-full">
+          {/* Plantilla Widget - Fila 2 */}
+          <div className="h-full min-h-[220px]">
             <PlantillaWidget
               trabajando={plantillaResumen.trabajando}
               ausentes={plantillaResumen.ausentes}

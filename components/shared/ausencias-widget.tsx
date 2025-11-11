@@ -54,9 +54,9 @@ export const AusenciasWidget = memo(function AusenciasWidget({
 }: AusenciasWidgetProps) {
 
   return (
-    <>
+    <div className="h-full">
       {/* Mobile: Sin header, solo próximas ausencias + botón */}
-      <div className="sm:hidden">
+      <div className="sm:hidden h-full">
         <Card className={`${MOBILE_DESIGN.widget.height.tall} flex flex-col overflow-hidden ${MOBILE_DESIGN.card.default}`}>
           <CardContent className={`flex-1 ${MOBILE_DESIGN.spacing.widget} flex flex-col overflow-hidden`}>
             {/* Header interno con botón */}
@@ -109,11 +109,10 @@ export const AusenciasWidget = memo(function AusenciasWidget({
       </div>
 
       {/* Desktop: Vista completa con header */}
-      <div className="hidden sm:block">
+      <div className="hidden sm:block h-full">
         <WidgetCard
           title="Ausencias"
           href="/empleado/horario/ausencias"
-          height="h-full min-h-[480px]"
           className="relative"
           contentClassName="overflow-y-auto px-6"
           headerAction={
@@ -229,6 +228,6 @@ export const AusenciasWidget = memo(function AusenciasWidget({
           </div>
         </WidgetCard>
       </div>
-    </>
+    </div>
   );
 });
