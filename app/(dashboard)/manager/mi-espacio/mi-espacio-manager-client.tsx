@@ -9,7 +9,7 @@ import { Edit2, Flag } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { GeneralTab } from '@/components/shared/mi-espacio/general-tab';
-import { FichajesTab } from '../../hr/mi-espacio/tabs/fichajes-tab';
+import { FichajesTab } from '@/components/shared/mi-espacio/fichajes-tab';
 import { ContratosTab } from '../../hr/mi-espacio/tabs/contratos-tab';
 import { DocumentosTab } from '../../hr/mi-espacio/tabs/documentos-tab';
 import { AusenciasTab } from '@/components/shared/mi-espacio/ausencias-tab';
