@@ -172,6 +172,59 @@ export function EventoDetailsClient({ eventoId }: { eventoId: string }) {
     }
   }, [searchParams]);
 
+  // Memoizaciones ANTES de cualquier early return (regla de hooks)
+  const nominasFiltradas = useMemo(() => {
+    if (!evento) return [];
+    return evento.nominas.filter((nomina) => {
+      const matchesSearch =
+        searchTerm === '' ||
+        nomina.empleado.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        nomina.empleado.apellidos.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        nomina.empleado.email.toLowerCase().includes(searchTerm.toLowerCase());
+
+      const matchesEstado =
+        filterEstado === 'todos' || nomina.estado === filterEstado;
+
+      const matchesAlertas =
+        filterAlertas === 'todos' ||
+        (filterAlertas === 'con_alertas' && nomina.alertas.length > 0) ||
+        (filterAlertas === 'sin_alertas' && nomina.alertas.length === 0);
+
+      const matchesComplementos =
+        filterComplementos === 'todos' ||
+        (filterComplementos === 'pendientes' && nomina.complementosPendientes) ||
+        (filterComplementos === 'completos' && !nomina.complementosPendientes);
+
+      return matchesSearch && matchesEstado && matchesAlertas && matchesComplementos;
+    });
+  }, [evento, searchTerm, filterEstado, filterAlertas, filterComplementos]);
+
+  // Obtener todas las alertas del evento (memoizado)
+  const { todasLasAlertas, alertasCriticas, alertasAdvertencias, alertasInformativas } = useMemo(() => {
+    if (!evento) {
+      return {
+        todasLasAlertas: [],
+        alertasCriticas: [],
+        alertasAdvertencias: [],
+        alertasInformativas: [],
+      };
+    }
+
+    const todas = evento.nominas.flatMap((nomina) =>
+      nomina.alertas.map((alerta) => ({
+        ...alerta,
+        empleado: nomina.empleado,
+      }))
+    );
+
+    return {
+      todasLasAlertas: todas,
+      alertasCriticas: todas.filter((a) => a.tipo === 'critico'),
+      alertasAdvertencias: todas.filter((a) => a.tipo === 'advertencia'),
+      alertasInformativas: todas.filter((a) => a.tipo === 'info'),
+    };
+  }, [evento]);
+
   const fetchEvento = async () => {
     try {
       const response = await fetch(`/api/nominas/eventos/${eventoId}`);
@@ -397,49 +450,6 @@ export function EventoDetailsClient({ eventoId }: { eventoId: string }) {
   const canImportar = ['exportada', 'definitiva'].includes(evento.estado);
   const canPublicar = evento.estado === 'definitiva';
 
-  // Filtrar nóminas (memoizado para performance)
-  const nominasFiltradas = useMemo(() => {
-    return evento.nominas.filter((nomina) => {
-      const matchesSearch =
-        searchTerm === '' ||
-        nomina.empleado.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        nomina.empleado.apellidos.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        nomina.empleado.email.toLowerCase().includes(searchTerm.toLowerCase());
-
-      const matchesEstado =
-        filterEstado === 'todos' || nomina.estado === filterEstado;
-
-      const matchesAlertas =
-        filterAlertas === 'todos' ||
-        (filterAlertas === 'con_alertas' && nomina.alertas.length > 0) ||
-        (filterAlertas === 'sin_alertas' && nomina.alertas.length === 0);
-
-      const matchesComplementos =
-        filterComplementos === 'todos' ||
-        (filterComplementos === 'pendientes' && nomina.complementosPendientes) ||
-        (filterComplementos === 'completos' && !nomina.complementosPendientes);
-
-      return matchesSearch && matchesEstado && matchesAlertas && matchesComplementos;
-    });
-  }, [evento.nominas, searchTerm, filterEstado, filterAlertas, filterComplementos]);
-
-  // Obtener todas las alertas del evento (memoizado)
-  const { todasLasAlertas, alertasCriticas, alertasAdvertencias, alertasInformativas } = useMemo(() => {
-    const todas = evento.nominas.flatMap((nomina) =>
-      nomina.alertas.map((alerta) => ({
-        ...alerta,
-        empleado: nomina.empleado,
-      }))
-    );
-
-    return {
-      todasLasAlertas: todas,
-      alertasCriticas: todas.filter((a) => a.tipo === 'critico'),
-      alertasAdvertencias: todas.filter((a) => a.tipo === 'advertencia'),
-      alertasInformativas: todas.filter((a) => a.tipo === 'info'),
-    };
-  }, [evento.nominas]);
-
   const tabs = [
     { id: 'nominas', label: 'Nóminas', count: nominasFiltradas.length },
     { id: 'alertas', label: 'Alertas', count: todasLasAlertas.length },
@@ -572,7 +582,7 @@ export function EventoDetailsClient({ eventoId }: { eventoId: string }) {
             disabled={!canImportar || actionLoading === 'importar'}
           >
             <Upload className="w-4 h-4 mr-2" />
-            {actionLoading === 'importar' ? 'Importando...' : 'Importar PDFs'}
+            {actionLoading === 'importar' ? 'Importando...' : 'Importar Nóminas'}
           </Button>
 
           <Button
