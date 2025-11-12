@@ -4,7 +4,12 @@
 // Funciones para calcular resúmenes mensuales pre-nómina
 
 import { prisma } from '@/lib/prisma';
-import { esDiaLaborable, getDiasLaborablesEmpresa } from './dias-laborables';
+import {
+  crearSetFestivos,
+  esDiaLaborable,
+  getDiasLaborablesEmpresa,
+  getFestivosActivosEnRango,
+} from './dias-laborables';
 import { EstadoAusencia, EstadoFichaje } from '@/lib/constants/enums';
 
 /**
@@ -35,21 +40,22 @@ export async function calcularDiasLaborablesMes(
   mes: number,
   anio: number
 ): Promise<number> {
-  // Obtener configuración de días laborables de la empresa
-  const diasLaborablesConfig = await getDiasLaborablesEmpresa(empresaId);
+  const fechaInicio = new Date(anio, mes - 1, 1);
+  const fechaFin = new Date(anio, mes, 0);
+
+  const [diasLaborablesConfig, festivos] = await Promise.all([
+    getDiasLaborablesEmpresa(empresaId),
+    getFestivosActivosEnRango(empresaId, fechaInicio, fechaFin),
+  ]);
+  const festivosSet = crearSetFestivos(festivos);
 
   let diasLaborables = 0;
   
-  // Primer día del mes
-  const fechaInicio = new Date(anio, mes - 1, 1);
-  // Último día del mes
-  const fechaFin = new Date(anio, mes, 0);
-
   const fecha = new Date(fechaInicio);
   
   while (fecha <= fechaFin) {
     // Verificar si el día es laborable
-    const esLaborable = await esDiaLaborable(fecha, empresaId, diasLaborablesConfig);
+    const esLaborable = await esDiaLaborable(fecha, empresaId, diasLaborablesConfig, festivosSet);
     
     if (esLaborable) {
       diasLaborables++;

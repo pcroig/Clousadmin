@@ -4,6 +4,52 @@
 
 import { prisma } from '@/lib/prisma';
 
+export type FestivosSet = Set<string>;
+
+type FestivoConFecha = {
+  fecha: Date;
+};
+
+function normalizarInicioDeDia(fecha: Date): Date {
+  return new Date(fecha.getFullYear(), fecha.getMonth(), fecha.getDate());
+}
+
+function normalizarFinDeDia(fecha: Date): Date {
+  return new Date(fecha.getFullYear(), fecha.getMonth(), fecha.getDate(), 23, 59, 59, 999);
+}
+
+export function formatearClaveFecha(fecha: Date): string {
+  const normalizada = normalizarInicioDeDia(fecha);
+  const year = normalizada.getFullYear();
+  const month = String(normalizada.getMonth() + 1).padStart(2, '0');
+  const day = String(normalizada.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+export function crearSetFestivos(festivos: FestivoConFecha[]): FestivosSet {
+  return new Set(festivos.map((festivo) => formatearClaveFecha(festivo.fecha)));
+}
+
+export async function getFestivosActivosEnRango(
+  empresaId: string,
+  fechaInicio: Date,
+  fechaFin: Date
+) {
+  return prisma.festivo.findMany({
+    where: {
+      empresaId,
+      fecha: {
+        gte: normalizarInicioDeDia(fechaInicio),
+        lte: normalizarFinDeDia(fechaFin),
+      },
+      activo: true,
+    },
+    orderBy: {
+      fecha: 'asc',
+    },
+  });
+}
+
 export interface DiasLaborables {
   lunes: boolean;
   martes: boolean;
@@ -98,11 +144,12 @@ function esDiaSemanaLaborable(fecha: Date, diasLaborables: DiasLaborables): bool
  */
 async function esFestivoActivo(fecha: Date, empresaId: string): Promise<boolean> {
   try {
+    const fechaNormalizada = normalizarInicioDeDia(fecha);
     const festivo = await prisma.festivo.findFirst({
       where: {
         empresaId,
         fecha: {
-          equals: fecha,
+          equals: fechaNormalizada,
         },
         activo: true,
       },
@@ -127,23 +174,26 @@ async function esFestivoActivo(fecha: Date, empresaId: string): Promise<boolean>
 export async function esDiaLaborable(
   fecha: Date,
   empresaId: string,
-  diasLaborables?: DiasLaborables
+  diasLaborables?: DiasLaborables,
+  festivosSet?: FestivosSet
 ): Promise<boolean> {
   // Obtener configuración si no se proporcionó
-  if (!diasLaborables) {
-    diasLaborables = await getDiasLaborablesEmpresa(empresaId);
-  }
+  const diasLaborablesConfig = diasLaborables ?? (await getDiasLaborablesEmpresa(empresaId));
 
   // Verificar si el día de la semana es laborable
-  const esDiaSemanaLab = esDiaSemanaLaborable(fecha, diasLaborables);
+  const esDiaSemanaLab = esDiaSemanaLaborable(fecha, diasLaborablesConfig);
   
   if (!esDiaSemanaLab) {
     return false;
   }
 
+  if (festivosSet) {
+    return !festivosSet.has(formatearClaveFecha(fecha));
+  }
+
   // Verificar si es festivo
   const esFestivo = await esFestivoActivo(fecha, empresaId);
-  
+
   return !esFestivo;
 }
 
@@ -155,15 +205,20 @@ export async function contarDiasLaborables(
   fechaFin: Date,
   empresaId: string
 ): Promise<number> {
-  const diasLaborables = await getDiasLaborablesEmpresa(empresaId);
+  const [diasLaborables, festivos] = await Promise.all([
+    getDiasLaborablesEmpresa(empresaId),
+    getFestivosActivosEnRango(empresaId, fechaInicio, fechaFin),
+  ]);
+  const festivosSet = crearSetFestivos(festivos);
   let count = 0;
   
   const fecha = new Date(fechaInicio);
   const fechaFinDate = new Date(fechaFin);
 
   while (fecha <= fechaFinDate) {
-    const esLaborable = await esDiaLaborable(fecha, empresaId, diasLaborables);
-    if (esLaborable) {
+    const esDiaSemana = esDiaSemanaLaborable(fecha, diasLaborables);
+    const esFestivo = festivosSet.has(formatearClaveFecha(fecha));
+    if (esDiaSemana && !esFestivo) {
       count++;
     }
     fecha.setDate(fecha.getDate() + 1);
@@ -180,14 +235,20 @@ export async function getDiasNoLaborables(
   fechaFin: Date,
   empresaId: string
 ): Promise<Date[]> {
-  const diasLaborables = await getDiasLaborablesEmpresa(empresaId);
+  const [diasLaborables, festivos] = await Promise.all([
+    getDiasLaborablesEmpresa(empresaId),
+    getFestivosActivosEnRango(empresaId, fechaInicio, fechaFin),
+  ]);
+  const festivosSet = crearSetFestivos(festivos);
   const diasNoLaborables: Date[] = [];
   
   const fecha = new Date(fechaInicio);
   const fechaFinDate = new Date(fechaFin);
 
   while (fecha <= fechaFinDate) {
-    const esLaborable = await esDiaLaborable(fecha, empresaId, diasLaborables);
+    const esDiaSemana = esDiaSemanaLaborable(fecha, diasLaborables);
+    const esFestivo = festivosSet.has(formatearClaveFecha(fecha));
+    const esLaborable = esDiaSemana && !esFestivo;
     if (!esLaborable) {
       diasNoLaborables.push(new Date(fecha));
     }
