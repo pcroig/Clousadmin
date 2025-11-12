@@ -28,6 +28,7 @@ import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { KpiCard } from '@/components/analytics/kpi-card';
 import { UploadNominasModal } from '@/components/payroll/upload-nominas-modal';
+import { DetailsPanel } from '@/components/shared/details-panel';
 
 interface Nomina {
   id: string;
@@ -147,6 +148,7 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
   } | null>(null);
   const [loadingAnalytics, setLoadingAnalytics] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
+  const [selectedNominaId, setSelectedNominaId] = useState<string | null>(null);
 
   const nombreMes = meses[mesActual - 1];
 
@@ -785,7 +787,7 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
                                   <Button
                                     size="sm"
                                     variant="ghost"
-                                    onClick={() => router.push(`/hr/payroll/nominas/${nomina.id}`)}
+                                    onClick={() => setSelectedNominaId(nomina.id)}
                                   >
                                     <Eye className="w-4 h-4 mr-2" />
                                     Ver Detalles
@@ -818,6 +820,171 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
           fetchAnalytics();
         }}
       />
+
+      {/* Nomina Details Panel */}
+      {selectedNominaId && (
+        <NominaDetailsPanel
+          nominaId={selectedNominaId}
+          isOpen={!!selectedNominaId}
+          onClose={() => setSelectedNominaId(null)}
+        />
+      )}
     </div>
+  );
+}
+
+// Componente de panel de detalles de nómina
+function NominaDetailsPanel({ 
+  nominaId, 
+  isOpen, 
+  onClose 
+}: { 
+  nominaId: string; 
+  isOpen: boolean; 
+  onClose: () => void;
+}) {
+  const router = useRouter();
+  const [nomina, setNomina] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (nominaId && isOpen) {
+      fetchNomina();
+    }
+  }, [nominaId, isOpen]);
+
+  const fetchNomina = async () => {
+    setLoading(true);
+    try {
+      const response = await fetch(`/api/nominas/${nominaId}`);
+      const data = await response.json();
+      if (response.ok) {
+        setNomina(data);
+      }
+    } catch (error) {
+      console.error('Error fetching nomina:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (!nomina && !loading) return null;
+
+  return (
+    <DetailsPanel
+      isOpen={isOpen}
+      onClose={onClose}
+      title={nomina ? `${nomina.empleado.nombre} ${nomina.empleado.apellidos}` : 'Cargando...'}
+      subtitle={nomina ? `Nómina ${meses[nomina.mes - 1]} ${nomina.anio}` : ''}
+    >
+      {loading ? (
+        <div className="flex items-center justify-center h-64">
+          <Clock className="w-8 h-8 animate-spin text-gray-400" />
+        </div>
+      ) : nomina ? (
+        <div className="space-y-6">
+          {/* Información básica */}
+          <div className="space-y-4">
+            <div>
+              <h3 className="text-sm font-medium text-gray-700 mb-3">Resumen</h3>
+              <dl className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <dt className="text-gray-600">Salario Base</dt>
+                  <dd className="font-medium text-gray-900">
+                    €{Number(nomina.salarioBase).toLocaleString('es-ES', { minimumFractionDigits: 2 })}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-gray-600">Complementos</dt>
+                  <dd className="font-medium text-gray-900">
+                    €{Number(nomina.totalComplementos).toLocaleString('es-ES', { minimumFractionDigits: 2 })}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-gray-600">Deducciones</dt>
+                  <dd className="font-medium text-gray-900">
+                    €{Number(nomina.totalDeducciones).toLocaleString('es-ES', { minimumFractionDigits: 2 })}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-gray-600">Total Bruto</dt>
+                  <dd className="font-medium text-gray-900">
+                    €{Number(nomina.totalBruto).toLocaleString('es-ES', { minimumFractionDigits: 2 })}
+                  </dd>
+                </div>
+                <div className="col-span-2">
+                  <dt className="text-gray-600">Total Neto</dt>
+                  <dd className="font-medium text-lg text-green-600">
+                    €{Number(nomina.totalNeto).toLocaleString('es-ES', { minimumFractionDigits: 2 })}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-gray-600">Días Trabajados</dt>
+                  <dd className="font-medium text-gray-900">{nomina.diasTrabajados}</dd>
+                </div>
+                <div>
+                  <dt className="text-gray-600">Días Ausencias</dt>
+                  <dd className="font-medium text-gray-900">{nomina.diasAusencias || 0}</dd>
+                </div>
+              </dl>
+            </div>
+          </div>
+
+          {/* Complementos */}
+          {nomina.complementosAsignados && nomina.complementosAsignados.length > 0 && (
+            <div>
+              <h3 className="text-sm font-medium text-gray-700 mb-3">Complementos</h3>
+              <div className="space-y-2">
+                {nomina.complementosAsignados.map((comp: any) => (
+                  <div key={comp.id} className="flex justify-between items-center p-2 bg-gray-50 rounded text-sm">
+                    <span className="text-gray-700">{comp.empleadoComplemento.tipoComplemento.nombre}</span>
+                    <span className="font-medium text-gray-900">
+                      €{Number(comp.importe).toLocaleString('es-ES', { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Alertas */}
+          {nomina.alertas && nomina.alertas.length > 0 && (
+            <div>
+              <h3 className="text-sm font-medium text-gray-700 mb-3">Alertas</h3>
+              <div className="space-y-2">
+                {nomina.alertas.map((alerta: any) => (
+                  <div key={alerta.id} className="p-3 bg-red-50 rounded text-sm">
+                    <div className="flex items-start gap-2">
+                      <AlertCircle className="w-4 h-4 text-red-600 mt-0.5" />
+                      <div>
+                        <p className="font-medium text-red-900">{alerta.mensaje}</p>
+                        {alerta.detalles && (
+                          <p className="text-xs text-red-700 mt-1">{JSON.stringify(alerta.detalles)}</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Botón para ver perfil completo */}
+          <div className="pt-4 border-t">
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => {
+                router.push(`/hr/organizacion/personas/${nomina.empleadoId}`);
+                onClose();
+              }}
+            >
+              <User className="w-4 h-4 mr-2" />
+              Ver perfil completo del empleado
+            </Button>
+          </div>
+        </div>
+      ) : null}
+    </DetailsPanel>
   );
 }
