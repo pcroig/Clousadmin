@@ -17,12 +17,14 @@ import { LoadingButton } from '@/components/shared/loading-button';
 import { Combobox, type ComboboxOption } from '@/components/shared/combobox';
 import { DocumentUploader } from '@/components/shared/document-uploader';
 import { DocumentList } from '@/components/shared/document-list';
+import { CarpetaSelector } from '@/components/shared/carpeta-selector';
 
 interface DocumentoSubido {
   id: string;
   nombre: string;
   tipoDocumento: string;
   file: File;
+  carpetaId?: string;
 }
 
 interface AddPersonaOnboardingFormProps {
@@ -39,6 +41,7 @@ export function AddPersonaOnboardingForm({ onSuccess, onCancel, tipoOnboarding =
   const [empleadoId, setEmpleadoId] = useState<string | null>(null);
   const [tipoDocumentoActual, setTipoDocumentoActual] = useState<string>('otro');
   const [nombreDocumentoActual, setNombreDocumentoActual] = useState<string>('');
+  const [carpetaIdSeleccionada, setCarpetaIdSeleccionada] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     nombre: '',
     apellidos: '',
@@ -108,6 +111,11 @@ export function AddPersonaOnboardingForm({ onSuccess, onCancel, tipoOnboarding =
       formData.append('file', file);
       formData.append('nombreDocumento', nombreDocumento);
       formData.append('tipoDocumento', tipoDocumento);
+      
+      // Añadir carpetaId si se seleccionó una carpeta
+      if (carpetaIdSeleccionada) {
+        formData.append('carpetaId', carpetaIdSeleccionada);
+      }
 
       const response = await fetch(`/api/empleados/${empleadoId}/onboarding/documentos`, {
         method: 'POST',
@@ -424,6 +432,7 @@ export function AddPersonaOnboardingForm({ onSuccess, onCancel, tipoOnboarding =
                     nombre: nombreDocumento,
                     tipoDocumento,
                     file,
+                    carpetaId: carpetaIdSeleccionada || undefined,
                   },
                 ]);
                 

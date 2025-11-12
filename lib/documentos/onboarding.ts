@@ -204,6 +204,8 @@ export async function listarDocumentosOnboarding(
 
 /**
  * Subir documento a carpeta de onboarding
+ * @param carpetaId - ID de carpeta destino (opcional). Si no se provee, se crea automáticamente.
+ * @param esCompartida - Si true, también crea referencia en carpeta compartida de HR
  */
 export async function subirDocumentoOnboarding(
   empresaId: string,
@@ -213,22 +215,51 @@ export async function subirDocumentoOnboarding(
   s3Key: string,
   s3Bucket: string,
   mimeType: string,
-  tamano: number
+  tamano: number,
+  carpetaId?: string,
+  esCompartida?: boolean
 ) {
   try {
-    // Crear carpetas si no existen
-    const carpetasResult = await crearCarpetasOnboardingDocumento(
-      empresaId,
-      empleadoId,
-      nombreDocumento,
-      tipoDocumento
-    );
+    let carpetaDestino;
+    let carpetaHR;
 
-    if (!carpetasResult.success) {
-      return {
-        success: false,
-        error: carpetasResult.error,
-      };
+    if (carpetaId) {
+      // Verificar que la carpeta existe y pertenece al empleado o es compartida
+      carpetaDestino = await prisma.carpeta.findFirst({
+        where: {
+          id: carpetaId,
+          empresaId,
+          OR: [
+            { empleadoId }, // Carpeta personal del empleado
+            { empleadoId: null, compartida: true }, // Carpeta compartida
+          ],
+        },
+      });
+
+      if (!carpetaDestino) {
+        return {
+          success: false,
+          error: 'Carpeta no encontrada o no autorizada',
+        };
+      }
+    } else {
+      // Crear carpetas automáticamente (comportamiento anterior)
+      const carpetasResult = await crearCarpetasOnboardingDocumento(
+        empresaId,
+        empleadoId,
+        nombreDocumento,
+        tipoDocumento
+      );
+
+      if (!carpetasResult.success) {
+        return {
+          success: false,
+          error: carpetasResult.error,
+        };
+      }
+
+      carpetaDestino = carpetasResult.carpetaEmpleado;
+      carpetaHR = carpetasResult.carpetaHR;
     }
 
     // Crear documento en carpeta del empleado
@@ -236,7 +267,7 @@ export async function subirDocumentoOnboarding(
       data: {
         empresaId,
         empleadoId,
-        carpetaId: carpetasResult.carpetaEmpleado!.id,
+        carpetaId: carpetaDestino!.id,
         nombre: nombreDocumento,
         tipoDocumento,
         s3Key,
@@ -249,8 +280,8 @@ export async function subirDocumentoOnboarding(
     return {
       success: true,
       documento,
-      carpetaHR: carpetasResult.carpetaHR,
-      carpetaEmpleado: carpetasResult.carpetaEmpleado,
+      carpetaHR,
+      carpetaEmpleado: carpetaDestino,
     };
   } catch (error) {
     console.error('[subirDocumentoOnboarding] Error:', error);
