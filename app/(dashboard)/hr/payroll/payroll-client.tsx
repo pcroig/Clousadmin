@@ -20,9 +20,6 @@ import {
   Send,
   Eye,
   User,
-  TrendingUp,
-  Users,
-  DollarSign,
   AlertCircle,
   AlertTriangle,
   Info,
@@ -30,6 +27,7 @@ import {
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { KpiCard } from '@/components/analytics/kpi-card';
+import { UploadNominasModal } from '@/components/payroll/upload-nominas-modal';
 
 interface Nomina {
   id: string;
@@ -148,6 +146,7 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
     variacionAnioAnterior: number;
   } | null>(null);
   const [loadingAnalytics, setLoadingAnalytics] = useState(false);
+  const [showUploadModal, setShowUploadModal] = useState(false);
 
   const nombreMes = meses[mesActual - 1];
 
@@ -477,6 +476,13 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
 
           <div className="flex gap-3">
             <Button
+              variant="outline"
+              onClick={() => setShowUploadModal(true)}
+            >
+              <Upload className="w-4 h-4 mr-2" />
+              Subir Nóminas
+            </Button>
+            <Button
               className="btn-primary"
               onClick={handleGenerarEvento}
               disabled={isGenerating}
@@ -564,19 +570,7 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
 
                 <Button
                   variant="outline"
-                  onClick={() => {
-                    const input = document.createElement('input');
-                    input.type = 'file';
-                    input.multiple = true;
-                    input.accept = 'application/pdf';
-                    input.onchange = (e) => {
-                      const files = (e.target as HTMLInputElement).files;
-                      if (files && files.length > 0) {
-                        toast.info('Función de subida directa en desarrollo');
-                      }
-                    };
-                    input.click();
-                  }}
+                  onClick={() => setShowUploadModal(true)}
                 >
                   <Upload className="w-4 h-4 mr-2" />
                   Subir Nóminas
@@ -600,7 +594,6 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
               const canGenerarPrenominas = ['generando', 'complementos_pendientes'].includes(
                 evento.estado
               );
-              const puedeAvanzarComplementos = evento.estado === 'complementos_pendientes';
               const canExportar = ['lista_exportar', 'exportada', 'definitiva', 'publicada'].includes(
                 evento.estado
               );
@@ -615,19 +608,30 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
                       {/* Info */}
                       <div className="flex-1">
                         <div className="flex items-center gap-3 mb-2">
-                          <button
-                            onClick={() => toggleEvento(evento.id)}
-                            className="flex items-center gap-2 hover:opacity-70 transition-opacity"
-                          >
-                            <h3 className="text-lg font-semibold text-gray-900">
-                              {meses[evento.mes - 1]} {evento.anio}
-                            </h3>
-                            {isExpanded ? (
-                              <ChevronUp className="w-5 h-5 text-gray-500" />
-                            ) : (
-                              <ChevronDown className="w-5 h-5 text-gray-500" />
-                            )}
-                          </button>
+                          <div className="flex items-center gap-3">
+                            <button
+                              onClick={() => toggleEvento(evento.id)}
+                              className="flex items-center gap-2 hover:opacity-70 transition-opacity"
+                            >
+                              <h3 className="text-lg font-semibold text-gray-900">
+                                {meses[evento.mes - 1]} {evento.anio}
+                              </h3>
+                              {isExpanded ? (
+                                <ChevronUp className="w-5 h-5 text-gray-500" />
+                              ) : (
+                                <ChevronDown className="w-5 h-5 text-gray-500" />
+                              )}
+                            </button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => router.push(`/hr/payroll/eventos/${evento.id}`)}
+                              className="text-xs"
+                            >
+                              <Eye className="w-3.5 h-3.5 mr-1.5" />
+                              Ver detalles
+                            </Button>
+                          </div>
                           <div className="group relative">
                             <span className={`text-xs font-medium px-2.5 py-0.5 rounded-full ${estadoInfo.color} cursor-help`}>
                               {estadoInfo.label}
@@ -692,33 +696,65 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
                           </div>
                         </div>
 
+                        {/* Indicador de estado de complementos */}
+                        {evento.estado === 'complementos_pendientes' && (
+                          <div className="mt-4 pt-4 border-t">
+                            <div className="flex items-center gap-2">
+                              {evento.empleadosConComplementos === evento.totalEmpleados ? (
+                                <div className="flex items-center gap-2 text-sm">
+                                  <CheckCircle className="w-4 h-4 text-green-600" />
+                                  <span className="font-medium text-green-700">
+                                    Complementos revisados
+                                  </span>
+                                </div>
+                              ) : (
+                                <div className="flex items-center gap-2 text-sm">
+                                  <AlertCircle className="w-4 h-4 text-orange-600" />
+                                  <span className="font-medium text-orange-700">
+                                    {evento.totalEmpleados - evento.empleadosConComplementos} empleado(s) sin complementos asignados
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
                         {/* Alertas */}
                         {evento.alertas && evento.alertas.total > 0 && (
                           <div className="mt-4 pt-4 border-t">
                             <div className="flex items-center gap-3 flex-wrap">
                               {evento.alertas.criticas > 0 && (
-                                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-red-50 rounded-lg">
+                                <button
+                                  onClick={() => router.push(`/hr/payroll/eventos/${evento.id}?tab=alertas&tipo=criticas`)}
+                                  className="flex items-center gap-1.5 px-3 py-1.5 bg-red-50 rounded-lg hover:bg-red-100 transition-colors"
+                                >
                                   <AlertCircle className="w-4 h-4 text-red-600" />
                                   <span className="text-sm font-medium text-red-700">
                                     {evento.alertas.criticas} crítica{evento.alertas.criticas !== 1 ? 's' : ''}
                                   </span>
-                                </div>
+                                </button>
                               )}
                               {evento.alertas.advertencias > 0 && (
-                                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-orange-50 rounded-lg">
+                                <button
+                                  onClick={() => router.push(`/hr/payroll/eventos/${evento.id}?tab=alertas&tipo=advertencias`)}
+                                  className="flex items-center gap-1.5 px-3 py-1.5 bg-orange-50 rounded-lg hover:bg-orange-100 transition-colors"
+                                >
                                   <AlertTriangle className="w-4 h-4 text-orange-600" />
                                   <span className="text-sm font-medium text-orange-700">
                                     {evento.alertas.advertencias} advertencia{evento.alertas.advertencias !== 1 ? 's' : ''}
                                   </span>
-                                </div>
+                                </button>
                               )}
                               {evento.alertas.informativas > 0 && (
-                                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 rounded-lg">
+                                <button
+                                  onClick={() => router.push(`/hr/payroll/eventos/${evento.id}?tab=alertas&tipo=informativas`)}
+                                  className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
+                                >
                                   <Info className="w-4 h-4 text-blue-600" />
                                   <span className="text-sm font-medium text-blue-700">
                                     {evento.alertas.informativas} info
                                   </span>
-                                </div>
+                                </button>
                               )}
                             </div>
                           </div>
@@ -745,27 +781,12 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => handleAvanzarEstado(evento.id, evento.estado)}
-                          disabled={!puedeAvanzarComplementos || isProcessing}
-                          title={
-                            puedeAvanzarComplementos
-                              ? 'Marca los complementos como revisados para continuar'
-                              : 'Solo disponible durante la fase de complementos'
-                          }
-                        >
-                          <TrendingUp className="w-4 h-4 mr-2" />
-                          Marcar complementos listos
-                        </Button>
-
-                        <Button
-                          size="sm"
-                          variant="outline"
                           onClick={() => handleExportar(evento.id)}
                           disabled={!canExportar || isProcessing}
                           title={
                             canExportar
-                              ? 'Descarga el Excel de nóminas para gestoría'
-                              : 'Disponible cuando el evento está listo para exportar'
+                              ? 'Descarga el Excel de pre-nóminas para enviar a gestoría'
+                              : 'Disponible cuando las pre-nóminas están listas'
                           }
                         >
                           <Download className="w-4 h-4 mr-2" />
@@ -903,6 +924,16 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
           </div>
         )}
       </div>
+
+      {/* Upload Modal */}
+      <UploadNominasModal
+        isOpen={showUploadModal}
+        onClose={() => setShowUploadModal(false)}
+        onSuccess={() => {
+          fetchEventos();
+          fetchAnalytics();
+        }}
+      />
     </div>
   );
 }
