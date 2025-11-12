@@ -18,7 +18,7 @@ interface Alerta {
   categoria: string;
   codigo: string;
   mensaje: string;
-  detalles?: any;
+  detalles?: Record<string, unknown>;
   accionUrl?: string;
   empleadoId: string;
   empleado?: {

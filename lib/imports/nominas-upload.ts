@@ -5,6 +5,7 @@
 
 import AdmZip from 'adm-zip';
 import { prisma } from '@/lib/prisma';
+import { Decimal } from '@prisma/client/runtime/library';
 import { clasificarNomina, type EmpleadoCandidato } from '@/lib/ia/clasificador-nominas';
 import { obtenerOCrearCarpetaSistema } from '@/lib/documentos';
 
@@ -323,11 +324,15 @@ export async function confirmarUpload(
           empleadoId,
           mes: session.mes,
           anio: session.anio,
-          salarioBruto: 0, // Se actualizará con extracción IA o manualmente
-          deducciones: 0,
-          salarioNeto: 0,
+          salarioBase: new Decimal(0), // Se actualizará con extracción IA o manualmente
+          totalComplementos: new Decimal(0),
+          totalDeducciones: new Decimal(0),
+          totalBruto: new Decimal(0),
+          totalNeto: new Decimal(0),
+          diasTrabajados: 0,
+          diasAusencias: 0,
           documentoId: documento.id,
-          estado: 'borrador',
+          estado: 'definitiva', // Upload directo va a estado definitiva (listo para publicar)
           subidoPor,
         },
       });
