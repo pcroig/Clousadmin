@@ -4,7 +4,7 @@
 
 import { getSession } from '@/lib/auth';
 import { redirect } from 'next/navigation';
-import { prisma } from '@/lib/prisma';
+import { prisma, Prisma } from '@/lib/prisma';
 import { BandejaEntradaEmpleadoClient } from './bandeja-entrada-client';
 
 import { UsuarioRol } from '@/lib/constants/enums';
@@ -59,7 +59,7 @@ export default async function EmpleadoBandejaEntradaPage() {
       mensaje: notif.mensaje,
       fecha: notif.createdAt,
       leida: notif.leida,
-      metadata: notif.metadata as any,
+      metadata: (notif.metadata as Prisma.JsonValue) as Record<string, unknown>,
     };
   });
 

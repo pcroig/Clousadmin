@@ -4,7 +4,7 @@
 // PATCH: Aprobar o rechazar solicitud de cambio
 
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { prisma, Prisma } from '@/lib/prisma';
 import {
   requireAuthAsHROrManager,
   validateRequest,
@@ -26,19 +26,6 @@ const solicitudAccionSchema = z.object({
   accion: z.enum(['aprobar', 'rechazar']),
   motivoRechazo: z.string().optional(),
 });
-
-// Whitelist de campos permitidos para cambios de datos personales
-// Excluye campos sensibles como rol, empresaId, salario, etc.
-const ALLOWED_EMPLOYEE_FIELDS = [
-  'nombre',
-  'apellidos',
-  'telefono',
-  'direccion',
-  'email',
-  'fechaNacimiento',
-  'numeroSeguridadSocial',
-  'cuentaBancaria',
-] as const;
 
 // PATCH /api/solicitudes/[id] - Aprobar o Rechazar solicitud (HR Admin o Manager)
 export async function PATCH(
@@ -126,10 +113,10 @@ export async function PATCH(
 
         // Aplicar los cambios al empleado con validación de campos permitidos
         if (solicitud.camposCambiados && typeof solicitud.camposCambiados === 'object') {
-          const cambios = solicitud.camposCambiados as Record<string, any>;
+          const cambios = solicitud.camposCambiados as Record<string, unknown>;
 
           // Filtrar solo campos permitidos
-          const cambiosValidados: Record<string, any> = {};
+          const cambiosValidados: Prisma.EmpleadoUpdateInput = {};
           const camposRechazados: string[] = [];
 
           for (const [campo, valor] of Object.entries(cambios)) {

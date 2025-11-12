@@ -36,6 +36,20 @@ interface OnboardingFormProps {
 
 type Paso = 0 | 1 | 2 | 3 | 4;
 
+interface DocumentoOnboarding {
+  id: string;
+  tipoDocumento: string;
+  nombre: string;
+  url?: string;
+  createdAt?: string;
+}
+
+interface DocumentoRequerido {
+  id: string;
+  nombre: string;
+  descripcion?: string;
+}
+
 // Mapeo de nombres de campos a etiquetas en español
 const campoLabels: Record<string, string> = {
   nif: 'NIF/NIE',
@@ -100,8 +114,8 @@ export function OnboardingForm({
   const avatarStyle = getAvatarStyle(`${empleado.nombre} ${empleado.apellidos || ''}`);
 
   // Paso 3: Documentos
-  const [documentos, setDocumentos] = useState<any[]>([]);
-  const [documentosRequeridos, setDocumentosRequeridos] = useState<any[]>([]);
+  const [documentos, setDocumentos] = useState<DocumentoOnboarding[]>([]);
+  const [documentosRequeridos, setDocumentosRequeridos] = useState<DocumentoRequerido[]>([]);
   const [loadingDocumentos, setLoadingDocumentos] = useState(false);
 
   // Paso 1: Datos Personales
@@ -1018,7 +1032,7 @@ export function OnboardingForm({
               {documentosRequeridos.length > 0 && (
                 <div className="space-y-4">
                   <h3 className="font-medium">Documentos requeridos:</h3>
-                  {documentosRequeridos.map((docReq: any) => {
+                  {documentosRequeridos.map((docReq: DocumentoRequerido) => {
                     const docSubido = documentos.find(
                       (d) => d.tipoDocumento === docReq.id
                     );

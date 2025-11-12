@@ -14,6 +14,17 @@ import {
 } from '@/lib/api-handler';
 import { z } from 'zod';
 
+interface EmpleadoConJornadaResumen {
+  id: string;
+  nombre: string;
+  apellidos: string;
+  jornadaId: string | null;
+  jornada: {
+    id: string;
+    nombre: string;
+  } | null;
+}
+
 const asignacionSchema = z.object({
   jornadaId: z.string().uuid(),
   nivel: z.enum(['empresa', 'equipo', 'individual']),
@@ -47,7 +58,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Validar jornadas previas antes de asignar
-    let empleadosConJornadasPrevias: any[] = [];
+    let empleadosConJornadasPrevias: EmpleadoConJornadaResumen[] = [];
     let jornadasPreviasUnicas: string[] = [];
 
     switch (validatedData.nivel) {
@@ -90,7 +101,7 @@ export async function POST(req: NextRequest) {
             empleadoId: true,
           },
         });
-        const empleadoIdsEquipos = [...new Set(miembrosEquipos.map(m => m.empleadoId))];
+        const empleadoIdsEquipos = [...new Set(miembrosEquipos.map((m) => m.empleadoId))];
         
         if (empleadoIdsEquipos.length > 0) {
           empleadosConJornadasPrevias = await prisma.empleado.findMany({
@@ -151,11 +162,10 @@ export async function POST(req: NextRequest) {
     }
 
     // Obtener nombres únicos de jornadas previas
-    jornadasPreviasUnicas = [...new Set(
-      empleadosConJornadasPrevias
-        .filter(e => e.jornada?.nombre)
-        .map(e => e.jornada.nombre)
-    )];
+    const jornadasPrevias = empleadosConJornadasPrevias
+      .map((empleado) => empleado.jornada?.nombre)
+      .filter((nombre): nombre is string => Boolean(nombre));
+    jornadasPreviasUnicas = [...new Set(jornadasPrevias)];
 
     let empleadosActualizados = 0;
 
@@ -190,7 +200,7 @@ export async function POST(req: NextRequest) {
           },
         });
 
-        const empleadoIdsEquipos = [...new Set(miembrosEquipos.map(m => m.empleadoId))];
+        const empleadoIdsEquipos = [...new Set(miembrosEquipos.map((m) => m.empleadoId))];
 
         if (empleadoIdsEquipos.length > 0) {
           const resultEquipos = await prisma.empleado.updateMany({

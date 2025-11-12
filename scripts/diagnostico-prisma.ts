@@ -16,6 +16,17 @@ const prisma = new PrismaClient({
   log: ['error', 'warn'],
 });
 
+const getErrorMessage = (error: unknown): string => {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  try {
+    return JSON.stringify(error);
+  } catch {
+    return String(error);
+  }
+};
+
 async function diagnosticar() {
   console.log('🔍 DIAGNÓSTICO PRISMA Y BASE DE DATOS\n');
   console.log('='.repeat(60));
@@ -40,9 +51,9 @@ async function diagnosticar() {
   try {
     await prisma.$connect();
     console.log('✅ Conexión exitosa a la base de datos');
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('❌ ERROR al conectar a la base de datos:');
-    console.error(`   ${error.message}`);
+    console.error(`   ${getErrorMessage(error)}`);
     console.log('\n💡 Posibles soluciones:');
     console.log('   - Verifica que PostgreSQL esté ejecutándose');
     console.log('   - Verifica que la base de datos exista');
@@ -61,9 +72,9 @@ async function diagnosticar() {
 
     const empleados = await prisma.empleado.findMany({ take: 1 });
     console.log(`✅ Tabla 'empleados' accesible (${empleados.length} registros encontrados)`);
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('❌ ERROR al acceder a las tablas:');
-    console.error(`   ${error.message}`);
+    console.error(`   ${getErrorMessage(error)}`);
     console.log('\n💡 Posibles soluciones:');
     console.log('   - Ejecuta las migraciones: npx prisma migrate deploy');
     console.log('   - O crea las migraciones: npx prisma migrate dev --name initial');
@@ -73,11 +84,13 @@ async function diagnosticar() {
   // 4. Verificar Prisma Client
   console.log('\n📋 4. Verificando Prisma Client...');
   try {
-    const clientVersion = await prisma.$queryRaw`SELECT version()`;
+    const versionResult = await prisma.$queryRaw<Array<{ version: string }>>`SELECT version()`;
+    const versionString = versionResult?.[0]?.version ?? 'versión no disponible';
     console.log('✅ Prisma Client está funcionando correctamente');
-  } catch (error: any) {
+    console.log(`   Versión de base de datos: ${versionString}`);
+  } catch (error: unknown) {
     console.error('❌ ERROR con Prisma Client:');
-    console.error(`   ${error.message}`);
+    console.error(`   ${getErrorMessage(error)}`);
     console.log('\n💡 Solución: Regenera Prisma Client');
     console.log('   npx prisma generate');
     process.exit(1);
@@ -100,9 +113,9 @@ async function diagnosticar() {
       console.log('\n⚠️  ADVERTENCIA: No hay empresas en la base de datos');
       console.log('💡 Ejecuta: npm run seed');
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('❌ ERROR al contar registros:');
-    console.error(`   ${error.message}`);
+    console.error(`   ${getErrorMessage(error)}`);
   }
 
   console.log('\n' + '='.repeat(60));

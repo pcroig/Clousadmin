@@ -78,12 +78,14 @@ export function EditarFichajeModal({ open, fichaje, fichajeDiaId, onClose, onSav
         });
 
         // Convertir eventos a formato editable
-        const evs = (data.eventos || []).map((e: any) => ({
+        const evs = (data.eventos || []).map(
+          (e: { id: string; tipo: string; hora: string; editado?: boolean }) => ({
           id: e.id,
           tipo: e.tipo,
           hora: format(new Date(e.hora), "yyyy-MM-dd'T'HH:mm"),
           editado: e.editado,
-        }));
+          })
+        );
         setEventos(evs);
       } catch (e) {
         console.error('[EditarFichajeModal] Error cargando fichaje:', e);

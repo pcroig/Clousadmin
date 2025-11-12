@@ -5,9 +5,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { CheckCircle2, XCircle, Clock, Info } from 'lucide-react';
 
 interface Notificacion {
@@ -17,7 +15,7 @@ interface Notificacion {
   mensaje: string;
   fecha: Date;
   leida: boolean;
-  metadata?: any;
+  metadata?: Record<string, unknown>;
 }
 
 interface BandejaEntradaEmpleadoClientProps {
@@ -30,32 +28,6 @@ export function BandejaEntradaEmpleadoClient({
   const [filtro, setFiltro] = useState<'todas' | 'aprobada' | 'rechazada' | 'pendiente'>('todas');
 
   const notificacionesNoLeidas = notificaciones.filter((n) => !n.leida).length;
-
-  const getBadgeVariant = (tipo: string): 'success' | 'destructive' | 'warning' | 'info' => {
-    switch (tipo) {
-      case 'aprobada':
-        return 'success';
-      case 'rechazada':
-        return 'destructive';
-      case 'pendiente':
-        return 'warning';
-      default:
-        return 'info';
-    }
-  };
-
-  const getBadgeLabel = (tipo: string) => {
-    switch (tipo) {
-      case 'aprobada':
-        return 'Aprobada';
-      case 'rechazada':
-        return 'Rechazada';
-      case 'pendiente':
-        return 'Pendiente';
-      default:
-        return 'Info';
-    }
-  };
 
   const handleMarcarLeida = async (id: string) => {
     try {

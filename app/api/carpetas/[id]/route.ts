@@ -4,7 +4,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { prisma, Prisma } from '@/lib/prisma';
 import { puedeAccederACarpeta } from '@/lib/documentos';
 
 import { UsuarioRol } from '@/lib/constants/enums';
@@ -189,7 +189,7 @@ export async function PATCH(
     }
 
     // Construir datos de actualización
-    const dataToUpdate: any = {};
+    const dataToUpdate: Prisma.CarpetaUpdateInput = {};
 
     if (compartida !== undefined) {
       dataToUpdate.compartida = compartida;

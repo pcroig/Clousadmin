@@ -20,7 +20,6 @@ export async function POST(request: NextRequest) {
     // Verificar autenticación (puede ser ejecutado por cron o por HR admin)
     const authResult = await requireAuth(request);
     if (authResult instanceof Response) return authResult;
-    const { session } = authResult;
 
     console.info('[Procesar Fichajes] Iniciando procesamiento de solicitudes pendientes');
 
@@ -52,8 +51,13 @@ export async function POST(request: NextRequest) {
 
     for (const solicitud of solicitudesPendientes) {
       try {
-        const camposCambiados = solicitud.camposCambiados as any;
-        const { fecha: fechaStr, tipo, hora: horaStr, motivo } = camposCambiados;
+        const camposCambiados = solicitud.camposCambiados as Record<string, unknown>;
+        const { fecha: fechaStr, tipo, hora: horaStr, motivo } = camposCambiados as {
+          fecha?: string;
+          tipo?: string;
+          hora?: string;
+          motivo?: string;
+        };
 
         if (!fechaStr || !tipo || !horaStr) {
           errores.push(`Solicitud ${solicitud.id}: Datos incompletos`);

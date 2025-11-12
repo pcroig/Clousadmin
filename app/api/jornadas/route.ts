@@ -8,12 +8,11 @@ import { jornadaCreateSchema } from '@/lib/validaciones/schemas';
 import {
   requireAuthAsHR,
   validateRequest,
-  verifyEmpresaAccess,
   handleApiError,
   successResponse,
   createdResponse,
-  badRequestResponse,
 } from '@/lib/api-handler';
+import type { JornadaConfig } from '@/lib/calculos/fichajes-helpers';
 
 // GET /api/jornadas - Listar jornadas (solo HR Admin)
 export async function GET(req: NextRequest) {
@@ -65,31 +64,31 @@ export async function POST(req: NextRequest) {
     const empresaId = session.user.empresaId;
 
     // Crear configuración por defecto si no se proporciona
-    let config: Record<string, any> = validatedData.config || {};
-    if (!validatedData.config) {
-      if (validatedData.tipo === 'fija') {
-        // Configuración por defecto: L-V 9:00-18:00 con 1h pausa
-        config = {
-          lunes: { activo: true, entrada: '09:00', salida: '18:00', pausa: 1 },
-          martes: { activo: true, entrada: '09:00', salida: '18:00', pausa: 1 },
-          miercoles: { activo: true, entrada: '09:00', salida: '18:00', pausa: 1 },
-          jueves: { activo: true, entrada: '09:00', salida: '18:00', pausa: 1 },
-          viernes: { activo: true, entrada: '09:00', salida: '18:00', pausa: 1 },
-          sabado: { activo: false },
-          domingo: { activo: false },
-        };
-      } else {
-        // Jornada flexible: todos los días activos
-        config = {
-          lunes: { activo: true },
-          martes: { activo: true },
-          miercoles: { activo: true },
-          jueves: { activo: true },
-          viernes: { activo: true },
-          sabado: { activo: false },
-          domingo: { activo: false },
-        };
-      }
+    let config: JornadaConfig;
+    if (validatedData.config) {
+      config = { ...(validatedData.config as JornadaConfig) };
+    } else if (validatedData.tipo === 'fija') {
+      // Configuración por defecto: L-V 9:00-18:00 con 1h pausa
+      config = {
+        lunes: { activo: true, entrada: '09:00', salida: '18:00', pausa_inicio: '14:00', pausa_fin: '15:00' },
+        martes: { activo: true, entrada: '09:00', salida: '18:00', pausa_inicio: '14:00', pausa_fin: '15:00' },
+        miercoles: { activo: true, entrada: '09:00', salida: '18:00', pausa_inicio: '14:00', pausa_fin: '15:00' },
+        jueves: { activo: true, entrada: '09:00', salida: '18:00', pausa_inicio: '14:00', pausa_fin: '15:00' },
+        viernes: { activo: true, entrada: '09:00', salida: '18:00', pausa_inicio: '14:00', pausa_fin: '15:00' },
+        sabado: { activo: false },
+        domingo: { activo: false },
+      };
+    } else {
+      // Jornada flexible: todos los días activos
+      config = {
+        lunes: { activo: true },
+        martes: { activo: true },
+        miercoles: { activo: true },
+        jueves: { activo: true },
+        viernes: { activo: true },
+        sabado: { activo: false },
+        domingo: { activo: false },
+      };
     }
 
     // Añadir límites de fichaje al config si se proporcionan
@@ -114,7 +113,7 @@ export async function POST(req: NextRequest) {
         nombre: validatedData.nombre,
         empresaId: empresaId,
         horasSemanales: validatedData.horasSemanales,
-        config: config as any,
+        config,
         esPredefinida: false,
         activa: true,
       },

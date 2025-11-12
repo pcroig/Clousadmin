@@ -1,8 +1,13 @@
 'use client';
 
 import { Button } from '@/components/ui/button';
+import type { MiEspacioEmpleado } from '@/types/empleado';
 
-export function MiEspacioDatosClient({ empleado }: any) {
+interface MiEspacioDatosClientProps {
+  empleado: MiEspacioEmpleado;
+}
+
+export function MiEspacioDatosClient({ empleado }: MiEspacioDatosClientProps) {
   return (
     <div className="space-y-6">
       <div>

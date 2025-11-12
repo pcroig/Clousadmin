@@ -26,7 +26,6 @@ import {
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import { KpiCard } from '@/components/analytics/kpi-card';
 import { UploadNominasModal } from '@/components/payroll/upload-nominas-modal';
 import { DetailsPanel } from '@/components/shared/details-panel';
 
@@ -64,6 +63,8 @@ interface EventoNomina {
   estado: string;
   fechaGeneracion: string | null;
   fechaExportacion: string | null;
+  fechaImportacion: string | null;
+  fechaPublicacion: string | null;
   totalEmpleados: number;
   empleadosConComplementos: number;
   complementosAsignados: number;
@@ -149,6 +150,7 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
   const [loadingAnalytics, setLoadingAnalytics] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [selectedNominaId, setSelectedNominaId] = useState<string | null>(null);
+  const [selectedEventoId, setSelectedEventoId] = useState<string | null>(null);
 
   const nombreMes = meses[mesActual - 1];
 
@@ -506,50 +508,6 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
         </div>
       </div>
 
-      {/* Analytics KPIs */}
-      {analytics && eventos.length > 0 && (
-        <div className="flex-shrink-0 mb-6">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <KpiCard
-              title="Coste Total Año"
-              value={`€${analytics.totalNeto.toLocaleString('es-ES', {
-                minimumFractionDigits: 0,
-                maximumFractionDigits: 0
-              })}`}
-              subtitle={`${anioActual}`}
-              trend={
-                analytics.variacionAnioAnterior !== 0
-                  ? {
-                      value: Math.abs(analytics.variacionAnioAnterior),
-                      isPositive: analytics.variacionAnioAnterior < 0, // Menos coste es positivo
-                    }
-                  : undefined
-              }
-            />
-
-            <KpiCard
-              title="Empleados"
-              value={analytics.empleadosUnicos}
-              subtitle="Empleados activos"
-            />
-
-            <KpiCard
-              title="Coste Promedio"
-              value={`€${analytics.promedioNeto.toLocaleString('es-ES', {
-                minimumFractionDigits: 0,
-                maximumFractionDigits: 0
-              })}`}
-              subtitle="Por empleado/año"
-            />
-
-            <KpiCard
-              title="Eventos Procesados"
-              value={eventos.length}
-              subtitle={`${anioActual}`}
-            />
-          </div>
-        </div>
-      )}
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto pb-6">
@@ -599,211 +557,114 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
                 color: 'bg-gray-100 text-gray-700',
                 descripcion: 'Estado no identificado',
               };
-              const isExpanded = expandedEventos.has(evento.id);
               const isProcessing = actionLoading?.startsWith(`${evento.id}:`) ?? false;
-              const isLoadingDetails = loadingEventoId === evento.id;
 
-              const canGenerarPrenominas = ['generando', 'complementos_pendientes'].includes(
-                evento.estado
-              );
-              const canExportar = ['lista_exportar', 'exportada', 'definitiva', 'publicada'].includes(
-                evento.estado
-              );
-              const canImportar = ['exportada', 'definitiva'].includes(evento.estado);
-              const canPublicar = evento.estado === 'definitiva';
+              // Lógica de botones según flujo:
+              // - Si NO has generado pre-nóminas: "Generar Pre-nóminas"
+              // - Si YA generaste pre-nóminas pero NO has importado: "Importar Nóminas" + "Rellenar Complementos"
+              const mostrarGenerarPrenominas = !evento.fechaGeneracion;
+              const mostrarImportarNominas = evento.fechaGeneracion && !evento.fechaImportacion;
+              const mostrarRellenarComplementos = evento.fechaGeneracion && !evento.fechaImportacion;
 
               return (
-                <Card key={evento.id} className="overflow-hidden">
-                  {/* Evento Header - Card compacta */}
+                <Card key={evento.id} className="overflow-hidden hover:shadow-md transition-shadow">
                   <div className="p-5">
                     <div className="flex items-center justify-between">
-                      <button
-                        onClick={() => toggleEvento(evento.id)}
-                        className="flex items-center gap-3 hover:opacity-70 transition-opacity flex-1"
-                      >
-                        <div className="flex items-center gap-2">
+                      {/* Información del evento */}
+                      <div className="flex items-center gap-4 flex-1">
+                        <div>
                           <h3 className="text-lg font-semibold text-gray-900">
                             {meses[evento.mes - 1]} {evento.anio}
                           </h3>
-                          {isExpanded ? (
-                            <ChevronUp className="w-5 h-5 text-gray-500" />
-                          ) : (
-                            <ChevronDown className="w-5 h-5 text-gray-500" />
-                          )}
-                        </div>
-                        <div className="group relative">
-                          <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${estadoInfo.color} cursor-help`}>
-                            {estadoInfo.label}
-                          </span>
-                          <div className="absolute left-0 top-full mt-2 w-64 p-2 bg-gray-900 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10">
-                            {estadoInfo.descripcion}
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${estadoInfo.color}`}>
+                              {estadoInfo.label}
+                            </span>
+                            {evento._count.nominas > 0 && (
+                              <span className="text-xs text-gray-500">
+                                {evento._count.nominas} nómina{evento._count.nominas !== 1 ? 's' : ''}
+                              </span>
+                            )}
                           </div>
                         </div>
-                      </button>
 
-                      {/* Botones de acción en la card */}
+                        {/* Preview de alertas */}
+                        {evento.alertas && evento.alertas.total > 0 && (
+                          <div className="flex items-center gap-2">
+                            {evento.alertas.criticas > 0 && (
+                              <div className="flex items-center gap-1 px-2 py-1 bg-red-50 rounded text-xs">
+                                <AlertCircle className="w-3 h-3 text-red-600" />
+                                <span className="text-red-700 font-medium">{evento.alertas.criticas}</span>
+                              </div>
+                            )}
+                            {evento.alertas.advertencias > 0 && (
+                              <div className="flex items-center gap-1 px-2 py-1 bg-orange-50 rounded text-xs">
+                                <AlertTriangle className="w-3 h-3 text-orange-600" />
+                                <span className="text-orange-700 font-medium">{evento.alertas.advertencias}</span>
+                              </div>
+                            )}
+                            {evento.alertas.informativas > 0 && (
+                              <div className="flex items-center gap-1 px-2 py-1 bg-blue-50 rounded text-xs">
+                                <Info className="w-3 h-3 text-blue-600" />
+                                <span className="text-blue-700 font-medium">{evento.alertas.informativas}</span>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Botones de acción */}
                       <div className="flex items-center gap-2">
-                        {canGenerarPrenominas && (
+                        {mostrarGenerarPrenominas && (
                           <Button
                             size="sm"
-                            variant="outline"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleGenerarPrenominas(evento.id);
-                            }}
+                            onClick={() => handleGenerarPrenominas(evento.id)}
                             disabled={isProcessing}
                           >
                             <FileText className="w-4 h-4 mr-2" />
-                            Generar
+                            Generar Pre-nóminas
                           </Button>
                         )}
-                        
-                        {canExportar && evento.estado === 'lista_exportar' && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleExportar(evento.id);
-                            }}
-                            disabled={isProcessing}
-                          >
-                            <Download className="w-4 h-4 mr-2" />
-                            Exportar
-                          </Button>
+
+                        {mostrarImportarNominas && (
+                          <>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleImportar(evento.id)}
+                              disabled={isProcessing}
+                            >
+                              <Upload className="w-4 h-4 mr-2" />
+                              Importar Nóminas
+                            </Button>
+
+                            {mostrarRellenarComplementos && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => {
+                                  setSelectedEventoId(evento.id);
+                                }}
+                                disabled={isProcessing}
+                              >
+                                <CheckCircle className="w-4 h-4 mr-2" />
+                                Rellenar Complementos
+                              </Button>
+                            )}
+                          </>
                         )}
-                        
-                        {canImportar && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleImportar(evento.id);
-                            }}
-                            disabled={isProcessing}
-                          >
-                            <Upload className="w-4 h-4 mr-2" />
-                            Importar
-                          </Button>
-                        )}
+
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setSelectedEventoId(evento.id)}
+                        >
+                          <Eye className="w-4 h-4 mr-2" />
+                          Ver Detalles
+                        </Button>
                       </div>
                     </div>
                   </div>
-                  
-                  {/* Alertas en la card */}
-                  {evento.alertas && evento.alertas.total > 0 && (
-                    <div className="px-5 pb-3">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        {evento.alertas.criticas > 0 && (
-                          <div className="flex items-center gap-1.5 px-2.5 py-1 bg-red-50 rounded text-xs">
-                            <AlertCircle className="w-3.5 h-3.5 text-red-600" />
-                            <span className="text-red-700 font-medium">
-                              {evento.alertas.criticas} crítica{evento.alertas.criticas !== 1 ? 's' : ''}
-                            </span>
-                          </div>
-                        )}
-                        {evento.alertas.advertencias > 0 && (
-                          <div className="flex items-center gap-1.5 px-2.5 py-1 bg-orange-50 rounded text-xs">
-                            <AlertTriangle className="w-3.5 h-3.5 text-orange-600" />
-                            <span className="text-orange-700 font-medium">
-                              {evento.alertas.advertencias} advertencia{evento.alertas.advertencias !== 1 ? 's' : ''}
-                            </span>
-                          </div>
-                        )}
-                        {evento.alertas.informativas > 0 && (
-                          <div className="flex items-center gap-1.5 px-2.5 py-1 bg-blue-50 rounded text-xs">
-                            <Info className="w-3.5 h-3.5 text-blue-600" />
-                            <span className="text-blue-700 font-medium">
-                              {evento.alertas.informativas} info
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Nóminas Expandidas */}
-                  {isExpanded && (
-                    <div className="border-t bg-gray-50">
-                      {isLoadingDetails ? (
-                        <div className="p-8 text-center">
-                          <Clock className="w-8 h-8 text-gray-400 mx-auto mb-2 animate-spin" />
-                          <p className="text-sm text-gray-600">Cargando nóminas...</p>
-                        </div>
-                      ) : evento.nominas && evento.nominas.length > 0 ? (
-                        <div className="p-6 space-y-3">
-                          {evento.nominas.map((nomina) => {
-                            const estadoNominaInfo = estadosNominaLabels[nomina.estado] || {
-                              label: nomina.estado,
-                              color: 'text-gray-700'
-                            };
-
-                            return (
-                              <div
-                                key={nomina.id}
-                                className="bg-white p-4 rounded-lg border hover:border-gray-300 transition-colors"
-                              >
-                                <div className="flex items-center justify-between">
-                                  <div className="flex items-center gap-4 flex-1">
-                                    <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center">
-                                      <User className="w-5 h-5 text-gray-600" />
-                                    </div>
-
-                                    <div className="flex-1">
-                                      <div className="flex items-center gap-2">
-                                        <h4 className="font-medium text-gray-900">
-                                          {nomina.empleado.nombre} {nomina.empleado.apellidos}
-                                        </h4>
-                                        <span className={`text-xs font-medium ${estadoNominaInfo.color}`}>
-                                          {estadoNominaInfo.label}
-                                        </span>
-                                      </div>
-                                      <p className="text-sm text-gray-600">{nomina.empleado.email}</p>
-                                    </div>
-
-                                    <div className="grid grid-cols-3 gap-6 text-sm">
-                                      <div>
-                                        <div className="text-gray-600">Base</div>
-                                        <div className="font-medium text-gray-900">
-                                          €{nomina.salarioBase.toLocaleString('es-ES')}
-                                        </div>
-                                      </div>
-                                      <div>
-                                        <div className="text-gray-600">Complementos</div>
-                                        <div className="font-medium text-gray-900">
-                                          €{nomina.totalComplementos.toLocaleString('es-ES')}
-                                        </div>
-                                      </div>
-                                      <div>
-                                        <div className="text-gray-600">Total Neto</div>
-                                        <div className="font-medium text-green-600">
-                                          €{nomina.totalNeto.toLocaleString('es-ES')}
-                                        </div>
-                                      </div>
-                                    </div>
-                                  </div>
-
-                                  <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    onClick={() => setSelectedNominaId(nomina.id)}
-                                  >
-                                    <Eye className="w-4 h-4 mr-2" />
-                                    Ver Detalles
-                                  </Button>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      ) : (
-                        <div className="p-8 text-center">
-                          <p className="text-sm text-gray-600">No hay nóminas en este evento</p>
-                        </div>
-                      )}
-                    </div>
-                  )}
                 </Card>
               );
             })}
@@ -820,6 +681,16 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
           fetchAnalytics();
         }}
       />
+
+      {/* Evento Details Panel */}
+      {selectedEventoId && (
+        <EventoDetailsPanel
+          eventoId={selectedEventoId}
+          isOpen={!!selectedEventoId}
+          onClose={() => setSelectedEventoId(null)}
+          onSelectNomina={(nominaId) => setSelectedNominaId(nominaId)}
+        />
+      )}
 
       {/* Nomina Details Panel */}
       {selectedNominaId && (
@@ -875,7 +746,6 @@ function NominaDetailsPanel({
       isOpen={isOpen}
       onClose={onClose}
       title={nomina ? `${nomina.empleado.nombre} ${nomina.empleado.apellidos}` : 'Cargando...'}
-      subtitle={nomina ? `Nómina ${meses[nomina.mes - 1]} ${nomina.anio}` : ''}
     >
       {loading ? (
         <div className="flex items-center justify-center h-64">
@@ -983,6 +853,191 @@ function NominaDetailsPanel({
               Ver perfil completo del empleado
             </Button>
           </div>
+        </div>
+      ) : null}
+    </DetailsPanel>
+  );
+}
+
+// Componente de panel de detalles de evento
+function EventoDetailsPanel({
+  eventoId,
+  isOpen,
+  onClose,
+  onSelectNomina,
+}: {
+  eventoId: string;
+  isOpen: boolean;
+  onClose: () => void;
+  onSelectNomina: (nominaId: string) => void;
+}) {
+  const [evento, setEvento] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (eventoId && isOpen) {
+      fetchEvento();
+    }
+  }, [eventoId, isOpen]);
+
+  const fetchEvento = async () => {
+    setLoading(true);
+    try {
+      const response = await fetch(`/api/nominas/eventos/${eventoId}`);
+      const data = await response.json();
+      if (response.ok) {
+        setEvento(data);
+      }
+    } catch (error) {
+      console.error('Error fetching evento:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (!evento && !loading) return null;
+
+  const estadosNominaLabels: Record<string, { label: string; color: string }> = {
+    pre_nomina: { label: 'Pre-nómina', color: 'text-blue-600' },
+    revisando: { label: 'Revisando', color: 'text-yellow-600' },
+    lista_exportar: { label: 'Lista Exportar', color: 'text-purple-600' },
+    exportada: { label: 'Exportada', color: 'text-indigo-600' },
+    definitiva: { label: 'Definitiva', color: 'text-green-600' },
+    publicada: { label: 'Publicada', color: 'text-gray-600' },
+  };
+
+  return (
+    <DetailsPanel
+      isOpen={isOpen}
+      onClose={onClose}
+      title={evento ? `Evento de Nóminas - ${meses[evento.mes - 1]} ${evento.anio}` : 'Cargando...'}
+    >
+      {loading ? (
+        <div className="flex items-center justify-center h-64">
+          <Clock className="w-8 h-8 animate-spin text-gray-400" />
+        </div>
+      ) : evento ? (
+        <div className="space-y-6">
+          {/* Información básica del evento */}
+          <div>
+            <h3 className="text-sm font-medium text-gray-700 mb-3">Información del Evento</h3>
+            <dl className="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <dt className="text-gray-600">Estado</dt>
+                <dd className="font-medium text-gray-900">
+                  {estadosLabels[evento.estado]?.label || evento.estado}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-gray-600">Total Nóminas</dt>
+                <dd className="font-medium text-gray-900">{evento.nominas?.length || 0}</dd>
+              </div>
+              {evento.fechaGeneracion && (
+                <div>
+                  <dt className="text-gray-600">Generado</dt>
+                  <dd className="font-medium text-gray-900">
+                    {new Date(evento.fechaGeneracion).toLocaleDateString('es-ES')}
+                  </dd>
+                </div>
+              )}
+              {evento.fechaImportacion && (
+                <div>
+                  <dt className="text-gray-600">Importado</dt>
+                  <dd className="font-medium text-gray-900">
+                    {new Date(evento.fechaImportacion).toLocaleDateString('es-ES')}
+                  </dd>
+                </div>
+              )}
+              {evento.fechaPublicacion && (
+                <div>
+                  <dt className="text-gray-600">Publicado</dt>
+                  <dd className="font-medium text-gray-900">
+                    {new Date(evento.fechaPublicacion).toLocaleDateString('es-ES')}
+                  </dd>
+                </div>
+              )}
+            </dl>
+          </div>
+
+          {/* Alertas del evento */}
+          {evento.alertas && evento.alertas.total > 0 && (
+            <div>
+              <h3 className="text-sm font-medium text-gray-700 mb-3">Alertas</h3>
+              <div className="space-y-2 text-sm">
+                {evento.alertas.criticas > 0 && (
+                  <div className="flex items-center gap-2 p-2 bg-red-50 rounded">
+                    <AlertCircle className="w-4 h-4 text-red-600" />
+                    <span className="text-red-900">{evento.alertas.criticas} alerta{evento.alertas.criticas !== 1 ? 's' : ''} crítica{evento.alertas.criticas !== 1 ? 's' : ''}</span>
+                  </div>
+                )}
+                {evento.alertas.advertencias > 0 && (
+                  <div className="flex items-center gap-2 p-2 bg-orange-50 rounded">
+                    <AlertTriangle className="w-4 h-4 text-orange-600" />
+                    <span className="text-orange-900">{evento.alertas.advertencias} advertencia{evento.alertas.advertencias !== 1 ? 's' : ''}</span>
+                  </div>
+                )}
+                {evento.alertas.informativas > 0 && (
+                  <div className="flex items-center gap-2 p-2 bg-blue-50 rounded">
+                    <Info className="w-4 h-4 text-blue-600" />
+                    <span className="text-blue-900">{evento.alertas.informativas} informativa{evento.alertas.informativas !== 1 ? 's' : ''}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Lista de nóminas */}
+          {evento.nominas && evento.nominas.length > 0 && (
+            <div>
+              <h3 className="text-sm font-medium text-gray-700 mb-3">Nóminas ({evento.nominas.length})</h3>
+              <div className="space-y-2">
+                {evento.nominas.map((nomina: any) => {
+                  const estadoNominaInfo = estadosNominaLabels[nomina.estado] || {
+                    label: nomina.estado,
+                    color: 'text-gray-700',
+                  };
+
+                  return (
+                    <button
+                      key={nomina.id}
+                      onClick={() => onSelectNomina(nomina.id)}
+                      className="w-full p-3 bg-gray-50 hover:bg-gray-100 rounded-lg text-left transition-colors"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3 flex-1">
+                          <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center flex-shrink-0">
+                            <User className="w-4 h-4 text-gray-600" />
+                          </div>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <h4 className="font-medium text-gray-900 text-sm truncate">
+                                {nomina.empleado.nombre} {nomina.empleado.apellidos}
+                              </h4>
+                              <span className={`text-xs font-medium ${estadoNominaInfo.color}`}>
+                                {estadoNominaInfo.label}
+                              </span>
+                            </div>
+                            <p className="text-xs text-gray-600 truncate">{nomina.empleado.email}</p>
+                          </div>
+                        </div>
+                        <div className="text-sm font-medium text-gray-900 ml-2">
+                          €{Number(nomina.totalNeto).toLocaleString('es-ES')}
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* No hay nóminas */}
+          {(!evento.nominas || evento.nominas.length === 0) && (
+            <div className="p-8 text-center text-gray-500">
+              <FileText className="w-8 h-8 mx-auto mb-2 text-gray-400" />
+              <p className="text-sm">No hay nóminas generadas para este evento.</p>
+            </div>
+          )}
         </div>
       ) : null}
     </DetailsPanel>

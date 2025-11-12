@@ -6,18 +6,27 @@ import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import {
   requireAuthAsHR,
-  validateRequest,
   handleApiError,
   successResponse,
   badRequestResponse,
 } from '@/lib/api-handler';
-import { z } from 'zod';
 
-const verificarSchema = z.object({
-  nivel: z.enum(['empresa', 'equipo', 'individual']),
-  equipoIds: z.array(z.string().uuid()).optional(),
-  empleadoIds: z.array(z.string().uuid()).optional(),
-});
+interface EmpleadoConJornadaResumen {
+  id: string;
+  nombre: string;
+  apellidos: string;
+  jornadaId: string | null;
+  jornada: {
+    id: string;
+    nombre: string;
+  } | null;
+}
+
+interface JornadaAgrupada {
+  nombre: string;
+  cantidad: number;
+  empleadoIds: string[];
+}
 
 // GET /api/jornadas/verificar-previas - Verificar jornadas previas antes de asignar
 export async function GET(req: NextRequest) {
@@ -30,14 +39,20 @@ export async function GET(req: NextRequest) {
     // Obtener parámetros de query
     const { searchParams } = new URL(req.url);
     const nivel = searchParams.get('nivel') as 'empresa' | 'equipo' | 'individual' | null;
-    const equipoIds = searchParams.get('equipoIds')?.split(',') || [];
-    const empleadoIds = searchParams.get('empleadoIds')?.split(',') || [];
+    const equipoIds = (searchParams.get('equipoIds') ?? '')
+      .split(',')
+      .map((id) => id.trim())
+      .filter(Boolean);
+    const empleadoIds = (searchParams.get('empleadoIds') ?? '')
+      .split(',')
+      .map((id) => id.trim())
+      .filter(Boolean);
 
     if (!nivel) {
       return badRequestResponse('Nivel de asignación requerido');
     }
 
-    let empleadosConJornadas: any[] = [];
+    let empleadosConJornadas: EmpleadoConJornadaResumen[] = [];
 
     switch (nivel) {
       case 'empresa':
@@ -74,7 +89,7 @@ export async function GET(req: NextRequest) {
             empleadoId: true,
           },
         });
-        const empleadoIdsEquipos = [...new Set(miembrosEquipos.map(m => m.empleadoId))];
+        const empleadoIdsEquipos = [...new Set(miembrosEquipos.map((m) => m.empleadoId))];
         
         if (empleadoIdsEquipos.length > 0) {
           empleadosConJornadas = await prisma.empleado.findMany({
@@ -128,9 +143,9 @@ export async function GET(req: NextRequest) {
     }
 
     // Agrupar por jornada
-    const jornadasPorNombre: Record<string, { nombre: string; cantidad: number; empleadoIds: string[] }> = {};
+    const jornadasPorNombre: Record<string, JornadaAgrupada> = {};
     
-    empleadosConJornadas.forEach(empleado => {
+    empleadosConJornadas.forEach((empleado) => {
       const nombreJornada = empleado.jornada?.nombre || 'Sin nombre';
       if (!jornadasPorNombre[nombreJornada]) {
         jornadasPorNombre[nombreJornada] = {

@@ -6,7 +6,7 @@
 // ========================================
 
 import { NextRequest } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { prisma, Prisma } from '@/lib/prisma';
 import {
   requireAuth,
   successResponse,
@@ -109,7 +109,7 @@ export async function PATCH(
     }
 
     // Preparar datos de actualización
-    const updateData: any = {};
+    const updateData: Prisma.FestivoUpdateInput = {};
 
     if (data.nombre !== undefined) {
       updateData.nombre = data.nombre;

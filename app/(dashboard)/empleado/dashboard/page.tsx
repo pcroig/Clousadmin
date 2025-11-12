@@ -3,11 +3,11 @@
 // ========================================
 
 import { getSession } from '@/lib/auth';
-import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import { Notificacion } from '@/components/shared/notificaciones-widget';
 import { AusenciaItem } from '@/components/shared/ausencias-widget';
 import { EmpleadoDashboardClient } from './dashboard-client';
+import type { Ausencia } from '@prisma/client';
 
 import { EstadoAusencia, UsuarioRol } from '@/lib/constants/enums';
 
@@ -26,7 +26,10 @@ const ESTADOS_AUSENCIAS_ABIERTAS: EstadoAusencia[] = [
 const ESTADO_AUSENCIA_COMPLETADA = EstadoAusencia.completada;
 
 interface DashboardData {
-  empleado: any;
+  empleado: {
+    id: string;
+    empresaId: string;
+  };
   notificaciones: Notificacion[];
   saldoFinal: {
     diasTotales: number;
@@ -121,7 +124,7 @@ async function obtenerDatosDashboard(session: { user: { id: string; empresaId: s
     }
   }
 
-  const notificaciones: Notificacion[] = ausenciasNotificaciones.map((aus: any) => {
+  const notificaciones: Notificacion[] = ausenciasNotificaciones.map((aus: Ausencia) => {
     const tipo =
       aus.estado === EstadoAusencia.confirmada || aus.estado === EstadoAusencia.completada
         ? 'aprobada'
@@ -187,7 +190,7 @@ async function obtenerDatosDashboard(session: { user: { id: string; empresaId: s
     take: 5,
   });
 
-  const ausenciasProximas: AusenciaItem[] = proximasAusencias.map((aus: any) => ({
+  const ausenciasProximas: AusenciaItem[] = proximasAusencias.map((aus: Ausencia) => ({
     id: aus.id,
     fecha: aus.fechaInicio,
     fechaFin: aus.fechaFin,
@@ -211,7 +214,7 @@ async function obtenerDatosDashboard(session: { user: { id: string; empresaId: s
     take: 3,
   });
 
-  const ausenciasPasadasItems: AusenciaItem[] = ausenciasPasadas.map((aus: any) => ({
+  const ausenciasPasadasItems: AusenciaItem[] = ausenciasPasadas.map((aus: Ausencia) => ({
     id: aus.id,
     fecha: aus.fechaInicio,
     fechaFin: aus.fechaFin,

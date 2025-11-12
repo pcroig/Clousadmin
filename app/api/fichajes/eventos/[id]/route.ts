@@ -3,7 +3,7 @@
 // ========================================
 
 import { NextRequest } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { prisma, Prisma } from '@/lib/prisma';
 import {
   requireAuth,
   validateRequest,
@@ -48,7 +48,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     await prisma.fichajeEvento.update({
       where: { id },
       data: {
-        tipo: (tipo as any) || evento.tipo,
+        tipo: (tipo as Prisma.TipoFichajeEvento) || evento.tipo,
         hora: hora ? new Date(hora) : evento.hora,
         editado: true,
         motivoEdicion: motivoEdicion ?? evento.motivoEdicion,

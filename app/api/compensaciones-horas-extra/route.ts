@@ -5,10 +5,9 @@
 // POST: Crear nueva solicitud de compensación
 
 import { NextRequest } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { prisma, Prisma } from '@/lib/prisma';
 import {
   requireAuth,
-  requireAuthAsHR,
   validateRequest,
   handleApiError,
   successResponse,
@@ -35,7 +34,7 @@ export async function GET(request: NextRequest) {
     const estado = searchParams.get('estado');
 
     // Construir filtros
-    const where: any = {
+    const where: Prisma.CompensacionHoraExtraWhereInput = {
       empresaId: session.user.empresaId,
     };
 

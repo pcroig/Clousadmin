@@ -4,7 +4,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { prisma, Prisma } from '@/lib/prisma';
 import { writeFile, mkdir } from 'fs/promises';
 import { join } from 'path';
 import { existsSync } from 'fs';
@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
     const tipoDocumento = searchParams.get('tipoDocumento');
 
     // Construir where clause
-    const where: any = {
+    const where: Prisma.DocumentoWhereInput = {
       empresaId: session.user.empresaId,
     };
 
@@ -178,7 +178,6 @@ export async function POST(request: NextRequest) {
     );
 
     // Guardar archivo en filesystem local (MVP)
-    const uploadDir = join(process.cwd(), 'uploads', session.user.empresaId);
     const fullPath = join(process.cwd(), 'uploads', rutaStorage);
     const dirPath = fullPath.substring(0, fullPath.lastIndexOf('/'));
 

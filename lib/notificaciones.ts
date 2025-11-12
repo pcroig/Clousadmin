@@ -3,7 +3,7 @@
 // ========================================
 // Servicio eficiente y escalable para gestionar notificaciones
 
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, Prisma } from '@prisma/client';
 
 import { UsuarioRol } from '@/lib/constants/enums';
 
@@ -46,12 +46,15 @@ export type TipoNotificacion =
 
 export type PrioridadNotificacion = 'baja' | 'normal' | 'alta' | 'critica';
 
-export interface NotificacionMetadata {
+type NotificacionMetadataBase = {
   prioridad?: PrioridadNotificacion;
   accionUrl?: string;
   accionTexto?: string;
-  [key: string]: any;
-}
+};
+
+export type NotificacionMetadata = NotificacionMetadataBase & {
+  [key: string]: Prisma.JsonValue | undefined;
+};
 
 // ========================================
 // FUNCIONES HELPER INTERNAS

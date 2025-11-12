@@ -7,6 +7,7 @@ import { redirect } from 'next/navigation';
 import { HorarioMiEspacioClient } from './horario-mi-espacio-client';
 import { obtenerResumenBalance } from '@/lib/calculos/balance-horas';
 import { prisma } from '@/lib/prisma';
+import type { Ausencia } from '@prisma/client';
 
 export default async function HorarioMiEspacioPage() {
   const session = await getSession();
@@ -65,9 +66,9 @@ export default async function HorarioMiEspacioPage() {
     take: 10,
   });
 
-  const ausencias = ausenciasRaw.map((a) => ({
+  const ausencias = ausenciasRaw.map((a: Ausencia) => ({
     ...a,
-    diasSolicitados: (a as any).diasSolicitados != null ? Number((a as any).diasSolicitados) : 0,
+    diasSolicitados: a.diasSolicitados != null ? Number(a.diasSolicitados) : 0,
   }));
 
   return (

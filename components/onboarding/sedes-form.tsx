@@ -70,8 +70,9 @@ export function SedesForm({ sedesIniciales = [] }: SedesFormProps) {
         if (!response.ok) {
           throw new Error('Error al cargar equipos');
         }
-        const data = await response.json();
-        const equiposTransformados = data.map((equipo: any) => ({
+        const data = await response.json() as { equipos?: Array<{ id: string; nombre: string }> };
+        const equiposList = Array.isArray(data.equipos) ? data.equipos : Array.isArray(data) ? data : [];
+        const equiposTransformados = equiposList.map((equipo) => ({
           id: equipo.id,
           nombre: equipo.nombre,
         })) as EquipoOption[];
@@ -155,7 +156,8 @@ export function SedesForm({ sedesIniciales = [] }: SedesFormProps) {
       if (result.success) {
         setSedes(sedes.filter((s) => s.id !== sedeId));
         setAsignaciones((prev) => {
-          const { [sedeId]: _, ...rest } = prev;
+          const { [sedeId]: removed, ...rest } = prev;
+          void removed; // Explicitly mark as unused
           return rest;
         });
         toast.success('Sede eliminada');

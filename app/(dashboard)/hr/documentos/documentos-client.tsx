@@ -90,7 +90,7 @@ export function DocumentosClient({ carpetas }: DocumentosClientProps) {
         const { empleados } = await empleadosRes.json();
         setEmpleados(empleados || []);
       }
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Error cargando datos:', error);
     } finally {
       setCargandoDatos(false);
@@ -153,8 +153,9 @@ export function DocumentosClient({ carpetas }: DocumentosClientProps) {
 
       // Recargar página para mostrar nueva carpeta
       router.refresh();
-    } catch (error: any) {
-      toast.error(error.message || 'Error al crear carpeta');
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Error al crear carpeta';
+      toast.error(message || 'Error al crear carpeta');
     } finally {
       setCargando(false);
     }

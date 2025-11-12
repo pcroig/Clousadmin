@@ -4,7 +4,7 @@
 // GET: Obtener notificaciones del usuario autenticado
 
 import { NextRequest } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { prisma, Prisma } from '@/lib/prisma';
 import {
   requireAuth,
   handleApiError,
@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
     const limit = searchParams.get('limit');
 
     // Construir filtros
-    const where: any = {
+    const where: Prisma.NotificacionWhereInput = {
       usuarioId: session.user.id,
       empresaId: session.user.empresaId,
     };

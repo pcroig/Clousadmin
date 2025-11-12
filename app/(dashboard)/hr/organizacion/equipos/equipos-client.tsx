@@ -60,7 +60,33 @@ export function EquiposClient({ equipos: initialEquipos }: EquiposClientProps) {
       const data = await response.json();
 
       // Transform data to match the expected format
-      const transformedData = data.map((equipo: any) => ({
+      interface ApiEquipo {
+        id: string;
+        nombre: string;
+        descripcion?: string | null;
+        managerId?: string | null;
+        manager?: {
+          nombre: string;
+          apellidos: string;
+        } | null;
+        miembros: Array<{
+          empleado: {
+            id: string;
+            nombre: string;
+            apellidos: string;
+            fotoUrl?: string | null;
+          };
+        }>;
+        sede?: {
+          id: string;
+          nombre: string;
+          ciudad?: string | null;
+        } | null;
+        sedeId?: string | null;
+      }
+
+      const apiData = data as ApiEquipo[];
+      const transformedData = apiData.map((equipo) => ({
         id: equipo.id,
         nombre: equipo.nombre,
         descripcion: equipo.descripcion || '',
@@ -69,7 +95,7 @@ export function EquiposClient({ equipos: initialEquipos }: EquiposClientProps) {
           : 'Sin responsable',
         responsableId: equipo.managerId,
         numeroEmpleados: equipo.miembros.length,
-        empleados: equipo.miembros.map((miembro: any) => ({
+        empleados: equipo.miembros.map((miembro) => ({
           id: miembro.empleado.id,
           nombre: `${miembro.empleado.nombre} ${miembro.empleado.apellidos}`,
           avatar: miembro.empleado.fotoUrl || undefined,

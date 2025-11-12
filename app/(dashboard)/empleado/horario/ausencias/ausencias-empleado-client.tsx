@@ -18,7 +18,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { TableHeader as PageHeader } from '@/components/shared/table-header';
 import { SolicitarAusenciaModal } from '@/components/empleado/solicitar-ausencia-modal';
-import { Calendar, Plus, ChevronDown, ChevronUp } from 'lucide-react';
+import { Calendar, ChevronDown, ChevronUp } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -53,10 +53,10 @@ interface CampanaData {
     id: string;
     completada: boolean;
     aceptada: boolean;
-    diasIdeales: any;
-    diasPrioritarios: any;
-    diasAlternativos: any;
-    propuestaIA: any;
+    diasIdeales: Record<string, unknown>;
+    diasPrioritarios: Record<string, unknown>;
+    diasAlternativos: Record<string, unknown>;
+    propuestaIA: Record<string, unknown>;
   } | null;
 }
 

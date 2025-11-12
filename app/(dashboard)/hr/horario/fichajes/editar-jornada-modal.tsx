@@ -43,12 +43,29 @@ import {
 import { Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { LoadingButton } from '@/components/shared/loading-button';
+import type { JornadaConfig, DiaConfig } from '@/lib/calculos/fichajes-helpers';
 
-interface Jornada {
+type DiaKey = 'lunes' | 'martes' | 'miercoles' | 'jueves' | 'viernes' | 'sabado' | 'domingo';
+
+const DIA_KEYS: DiaKey[] = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo'];
+
+const isDiaConfig = (value: unknown): value is DiaConfig =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+const getDiaConfig = (
+  config: JornadaConfig | null | undefined,
+  dia: DiaKey
+): DiaConfig | undefined => {
+  if (!config) return undefined;
+  const value = config[dia];
+  return isDiaConfig(value) ? value : undefined;
+};
+
+export interface JornadaDetalle {
   id: string;
   nombre: string;
   horasSemanales: number;
-  config: any;
+  config: JornadaConfig | null;
   esPredefinida?: boolean;
 }
 
@@ -69,7 +86,7 @@ interface HorarioDia {
 interface EditarJornadaModalProps {
   open: boolean;
   modo: 'crear' | 'editar';
-  jornada: Jornada | null;
+  jornada: JornadaDetalle | null;
   onClose: () => void;
 }
 
@@ -118,36 +135,37 @@ export function EditarJornadaModal({ open, modo, jornada, onClose }: EditarJorna
         setNombre(jornada.nombre);
         setHorasSemanales(jornada.horasSemanales.toString());
         
-        const config = jornada.config || {};
-        const esFija = Object.values(config).some((dia: any) => dia.entrada && dia.salida);
+        const config = jornada.config;
+        const esFija = DIA_KEYS.some((dia) => {
+          const diaConfig = getDiaConfig(config, dia);
+          return Boolean(diaConfig?.entrada && diaConfig?.salida);
+        });
         setTipoJornada(esFija ? 'fija' : 'flexible');
 
         setHorariosFijos(prevState => {
           const newState = { ...prevState };
 
-          Object.keys(newState).forEach((dia) => {
-            const diaConfig = config[dia];
-            const diaKey = dia as keyof typeof prevState;
-
-            if (diaConfig && typeof diaConfig === 'object') {
+          DIA_KEYS.forEach((dia) => {
+            const diaConfig = getDiaConfig(config, dia);
+            if (diaConfig) {
               if (esFija) {
-                newState[diaKey] = {
-                  ...newState[diaKey],
-                  activo: (diaConfig as any).activo ?? true,
-                  entrada: (diaConfig as any).entrada ?? newState[diaKey].entrada,
-                  salida: (diaConfig as any).salida ?? newState[diaKey].salida,
-                  pausa_inicio: (diaConfig as any).pausa_inicio,
-                  pausa_fin: (diaConfig as any).pausa_fin,
+                newState[dia] = {
+                  ...newState[dia],
+                  activo: diaConfig.activo ?? true,
+                  entrada: diaConfig.entrada ?? newState[dia].entrada,
+                  salida: diaConfig.salida ?? newState[dia].salida,
+                  pausa_inicio: diaConfig.pausa_inicio,
+                  pausa_fin: diaConfig.pausa_fin,
                 };
               } else {
-                newState[diaKey] = {
-                  ...newState[diaKey],
-                  activo: Boolean((diaConfig as any).activo),
+                newState[dia] = {
+                  ...newState[dia],
+                  activo: Boolean(diaConfig.activo),
                 };
               }
             } else {
-              newState[diaKey] = {
-                ...newState[diaKey],
+              newState[dia] = {
+                ...newState[dia],
                 activo: dia !== 'sabado' && dia !== 'domingo',
               };
             }
@@ -157,16 +175,21 @@ export function EditarJornadaModal({ open, modo, jornada, onClose }: EditarJorna
         });
 
         if (esFija) {
-          const algunDiaConPausa = Object.values(config).some((d: any) => d?.pausa_inicio && d?.pausa_fin);
+          const algunDiaConPausa = DIA_KEYS.some((dia) => {
+            const diaConfig = getDiaConfig(config, dia);
+            return Boolean(diaConfig?.pausa_inicio && diaConfig?.pausa_fin);
+          });
           setUsarDescanso(Boolean(algunDiaConPausa));
           setDescansoFlexible('');
         } else {
           setUsarDescanso(false);
-          setDescansoFlexible(typeof config.descansoMinimo === 'string' ? config.descansoMinimo : '');
+          const descansoMinimo =
+            typeof config?.descansoMinimo === 'string' ? config.descansoMinimo : '';
+          setDescansoFlexible(descansoMinimo);
         }
         
-        setLimiteInferior(config.limiteInferior || '');
-        setLimiteSuperior(config.limiteSuperior || '');
+        setLimiteInferior(config?.limiteInferior || '');
+        setLimiteSuperior(config?.limiteSuperior || '');
       } else {
         // Limpiar formulario para crear
         limpiarFormulario();
@@ -184,7 +207,7 @@ export function EditarJornadaModal({ open, modo, jornada, onClose }: EditarJorna
         const data = await response.json();
         setEmpleados(data);
       }
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Error cargando empleados:', error);
     }
   }
@@ -195,10 +218,14 @@ export function EditarJornadaModal({ open, modo, jornada, onClose }: EditarJorna
       if (response.ok) {
         const data = await response.json();
         setEquipos(
-          (data || []).map((e: any) => ({ id: e.id, nombre: e.nombre, miembros: e._count?.miembros || 0 }))
+          (data || []).map((equipo: { id: string; nombre: string; _count?: { miembros?: number } }) => ({
+            id: equipo.id,
+            nombre: equipo.nombre,
+            miembros: equipo._count?.miembros ?? 0,
+          }))
         );
       }
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Error cargando equipos:', error);
     }
   }
@@ -299,19 +326,19 @@ export function EditarJornadaModal({ open, modo, jornada, onClose }: EditarJorna
     setCargando(true);
     try {
       // Construir configuración
-      const config: any = {};
+      const config: JornadaConfig = {};
       
       if (tipoJornada === 'fija') {
-        Object.entries(horariosFijos).forEach(([dia, horario]) => {
+        DIA_KEYS.forEach((dia) => {
+          const horario = horariosFijos[dia];
           config[dia] = usarDescanso
             ? horario
-            : { activo: horario.activo, entrada: horario.entrada, salida: horario.salida };                                                                     
+            : { activo: horario.activo, entrada: horario.entrada, salida: horario.salida };
         });
       } else {
         // Jornada flexible: todos los días activos sin horario específico
-        const dias = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo'];                                                                
-        dias.forEach(dia => {
-          const estadoDia = horariosFijos[dia as keyof typeof horariosFijos];
+        DIA_KEYS.forEach((dia) => {
+          const estadoDia = horariosFijos[dia];
           config[dia] = { activo: estadoDia?.activo ?? false };
         });
 
@@ -322,7 +349,7 @@ export function EditarJornadaModal({ open, modo, jornada, onClose }: EditarJorna
 
       if (limiteInferior) config.limiteInferior = limiteInferior;
       if (limiteSuperior) config.limiteSuperior = limiteSuperior;
-      if (tipoJornada) config.tipo = tipoJornada;
+      config.tipo = tipoJornada;
 
       // Crear o actualizar jornada
       const url = modo === 'crear' ? '/api/jornadas' : `/api/jornadas/${jornada?.id}`;                                                                          

@@ -66,7 +66,7 @@ export function DarDeBajaModal({
     setLoading(true);
     try {
       // 1. Subir documentos si existen
-      let documentosIds: string[] = [];
+      const documentosIds: string[] = [];
       if (documentos.length > 0) {
         for (const doc of documentos) {
           const formData = new FormData();
@@ -108,9 +108,10 @@ export function DarDeBajaModal({
       toast.success('Contrato finalizado correctamente');
       onSuccess?.();
       handleClose();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('[DarDeBajaModal] Error:', error);
-      toast.error(error.message || 'Error al procesar la baja');
+      const errorMessage = error instanceof Error ? error.message : 'Error al procesar la baja';
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }

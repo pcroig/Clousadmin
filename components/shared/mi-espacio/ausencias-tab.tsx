@@ -1,17 +1,13 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { format, addMonths, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isWeekend, isSameDay } from 'date-fns';
+import { useEffect, useRef, useState } from 'react';
+import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Calendar as CalendarIcon } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
 
 interface Ausencia {
   id: string;
@@ -40,7 +36,14 @@ export function AusenciasTab({ empleadoId }: MiEspacioAusenciasTabProps) {
   });
   const [festivos, setFestivos] = useState<{ fecha: string; nombre: string }[]>([]);
   const [currentMonth, setCurrentMonth] = useState(new Date());
-  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
+  const [tooltipData, setTooltipData] = useState<{
+    date: Date;
+    ausencia: Ausencia | null;
+    position: { top: number; left: number };
+  } | null>(null);
+
+  const calendarContainerRef = useRef<HTMLDivElement>(null);
 
   // Cargar ausencias
   useEffect(() => {
@@ -55,8 +58,8 @@ export function AusenciasTab({ empleadoId }: MiEspacioAusenciasTabProps) {
           const data = await response.json();
           setAusencias(data.ausencias || []);
         }
-      } catch (error: any) {
-        if (error.name !== 'AbortError') {
+      } catch (error: unknown) {
+        if (error instanceof Error && error.name !== 'AbortError') {
           console.error('Error cargando ausencias:', error);
         }
       }
@@ -92,8 +95,8 @@ export function AusenciasTab({ empleadoId }: MiEspacioAusenciasTabProps) {
           const festivosData = await festivosResponse.json();
           setFestivos(festivosData.festivos || []);
         }
-      } catch (error: any) {
-        if (error.name !== 'AbortError') {
+      } catch (error: unknown) {
+        if (error instanceof Error && error.name !== 'AbortError') {
           console.error('Error cargando calendario laboral:', error);
         }
       }
@@ -164,99 +167,90 @@ export function AusenciasTab({ empleadoId }: MiEspacioAusenciasTabProps) {
     });
   };
 
-  // Renderizar calendario
-  const renderCalendar = (monthDate: Date) => {
-    const start = startOfMonth(monthDate);
-    const end = endOfMonth(monthDate);
-    const days = eachDayOfInterval({ start, end });
+  // Obtener ausencia de un día específico
+  const getAusenciaDelDia = (date: Date): Ausencia | null => {
+    const ausencia = ausencias.find((a) => {
+      const inicio = new Date(a.fechaInicio);
+      inicio.setHours(0, 0, 0, 0);
+      const fin = new Date(a.fechaFin);
+      fin.setHours(0, 0, 0, 0);
+      const checkDate = new Date(date);
+      checkDate.setHours(0, 0, 0, 0);
+      return checkDate >= inicio && checkDate <= fin;
+    });
+    return ausencia || null;
+  };
 
-    // Añadir días del mes anterior para completar la primera semana
-    const firstDayOfWeek = start.getDay();
-    const daysFromPrevMonth = [];
-    for (let i = firstDayOfWeek; i > 0; i--) {
-      const prevDay = new Date(start);
-      prevDay.setDate(start.getDate() - i);
-      daysFromPrevMonth.push(prevDay);
+  // Handler para click en día del calendario
+  const handleDayClick = (
+    date: Date | undefined,
+    _modifiers?: unknown,
+    event?: React.MouseEvent<HTMLButtonElement>
+  ) => {
+    if (!date || !event) return;
+
+    setSelectedDate(date);
+
+    const ausencia = getAusenciaDelDia(date);
+
+    if (!calendarContainerRef.current) {
+      setTooltipData({ date, ausencia, position: { top: 0, left: 0 } });
+      return;
     }
 
-    const allDays = [...daysFromPrevMonth, ...days];
+    const containerRect = calendarContainerRef.current.getBoundingClientRect();
+    const buttonRect = event.currentTarget.getBoundingClientRect();
 
-    return (
-      <div>
-        <h4 className="text-sm font-semibold text-gray-900 mb-3 capitalize">
-          {format(monthDate, 'MMMM yyyy', { locale: es })}
-        </h4>
-        <div className="grid grid-cols-7 gap-1">
-          {/* Encabezado días de la semana */}
-          {['L', 'M', 'X', 'J', 'V', 'S', 'D'].map((day, i) => (
-            <div key={i} className="text-center text-xs font-medium text-gray-500 py-2">
-              {day}
-            </div>
-          ))}
-          
-          {/* Días del calendario */}
-          {allDays.map((day, i) => {
-            const isCurrentMonth = isSameMonth(day, monthDate);
-            const isLaboral = esDiaLaborable(day);
-            const isFeriado = esFestivo(day);
-            const hasAusencia = tieneAusencia(day);
-            const isToday = isSameDay(day, new Date());
+    const tooltipWidth = 260;
+    const tooltipHeight = 160;
 
-            let bgColor = 'bg-white';
-            if (!isLaboral || isFeriado) {
-              bgColor = 'bg-gray-100';
-            }
-            if (hasAusencia) {
-              bgColor = 'bg-primary/10';
-            }
-            if (isToday) {
-              bgColor = 'bg-orange-100';
-            }
+    let left = buttonRect.left - containerRect.left + buttonRect.width / 2 - tooltipWidth / 2;
+    let top = buttonRect.bottom - containerRect.top + 12;
 
-            return (
-              <Popover key={i}>
-                <PopoverTrigger asChild>
-                  <button
-                    className={`
-                      aspect-square p-1 text-xs rounded
-                      ${bgColor}
-                      ${!isCurrentMonth ? 'text-gray-300' : 'text-gray-900'}
-                      ${isLaboral && isCurrentMonth ? 'hover:bg-gray-200 cursor-pointer' : 'cursor-default'}
-                      ${isToday ? 'font-bold border-2 border-orange-500' : ''}
-                    `}
-                    disabled={!isLaboral || !isCurrentMonth}
-                  >
-                    {format(day, 'd')}
-                  </button>
-                </PopoverTrigger>
-                {isLaboral && isCurrentMonth && (
-                  <PopoverContent className="w-64">
-                    <div className="space-y-2">
-                      <p className="font-semibold">{format(day, 'dd MMMM yyyy', { locale: es })}</p>
-                      {hasAusencia ? (
-                        <p className="text-sm text-primary">Día con ausencia</p>
-                      ) : (
-                        <p className="text-sm text-gray-600">Día laborable</p>
-                      )}
-                      {isFeriado && <p className="text-sm text-gray-500">Festivo</p>}
-                      <Button size="sm" className="w-full mt-2">
-                        Solicitar ausencia
-                      </Button>
-                    </div>
-                  </PopoverContent>
-                )}
-              </Popover>
-            );
-          })}
-        </div>
-      </div>
-    );
+    if (left + tooltipWidth > containerRect.width) {
+      left = containerRect.width - tooltipWidth - 16;
+    }
+    if (left < 16) {
+      left = 16;
+    }
+
+    if (top + tooltipHeight > containerRect.height) {
+      top = buttonRect.top - containerRect.top - tooltipHeight - 12;
+    }
+
+    if (!esDiaLaborable(date) && !ausencia) {
+      setTooltipData({
+        date,
+        ausencia: null,
+        position: { top, left },
+      });
+      return;
+    }
+
+    setTooltipData({
+      date,
+      ausencia,
+      position: { top, left },
+    });
+  };
+
+  // Modificadores para el calendario
+  const modifiers = {
+    ausencia: (date: Date) => tieneAusencia(date),
+    festivo: (date: Date) => esFestivo(date),
+    noLaborable: (date: Date) => !esDiaLaborable(date),
+  };
+
+  const modifiersClassNames = {
+    ausencia: 'relative after:absolute after:top-0 after:left-0 after:w-full after:h-full after:bg-[#d97757]/20 after:border-2 after:border-[#d97757] after:opacity-80 after:rounded-md after:transition-opacity hover:after:opacity-100 cursor-pointer',
+    festivo: 'relative after:absolute after:top-0 after:left-0 after:w-full after:h-full after:bg-red-50 after:border after:border-red-300 after:opacity-90 after:rounded-md',
+    noLaborable: 'bg-gray-50 text-gray-400',
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      {/* Columna izquierda */}
-      <div className="space-y-6">
+    <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+      {/* Columna izquierda - 2 columnas */}
+      <div className="lg:col-span-2 space-y-6">
         {/* Card de saldo */}
         <div className="bg-white rounded-lg border border-gray-200 p-6">
           <div className="flex items-center gap-2 mb-4">
@@ -321,62 +315,120 @@ export function AusenciasTab({ empleadoId }: MiEspacioAusenciasTabProps) {
         </div>
       </div>
 
-      {/* Columna derecha - Calendario */}
-      <div className="bg-white rounded-lg border border-gray-200 p-6">
+      {/* Columna derecha - Calendario (3 columnas) */}
+      <div className="lg:col-span-3 bg-white rounded-lg border border-gray-200 p-6">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold text-gray-900">Calendario</h3>
-          <Button size="sm">Solicitar ausencia</Button>
+          <Button size="sm" onClick={() => (window.location.href = '/empleado/horario/ausencias')}>
+            Solicitar ausencia
+          </Button>
         </div>
 
         {/* Leyenda */}
-        <div className="flex flex-wrap items-center gap-4 mb-6 text-xs">
+        <div className="flex flex-wrap items-center gap-3 mb-4 text-xs">
           <div className="flex items-center gap-1.5">
-            <div className="w-3 h-3 rounded bg-white border border-gray-300"></div>
+            <div className="w-3 h-3 rounded bg-white border-2 border-gray-300"></div>
             <span className="text-gray-600">Laborable</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <div className="w-3 h-3 rounded bg-gray-100"></div>
+            <div className="w-3 h-3 rounded bg-gray-50 border border-gray-200"></div>
             <span className="text-gray-600">No laborable</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <div className="w-3 h-3 rounded bg-primary/10"></div>
+            <div className="w-3 h-3 rounded bg-[#d97757]/20 border-2 border-[#d97757]"></div>
             <span className="text-gray-600">Ausencia</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <div className="w-3 h-3 rounded bg-orange-100 border-2 border-orange-500"></div>
-            <span className="text-gray-600">Hoy</span>
+            <div className="w-3 h-3 rounded bg-red-50 border border-red-300"></div>
+            <span className="text-gray-600">Festivo</span>
           </div>
         </div>
 
         {/* Calendario de 2 meses */}
-        <div className="grid grid-cols-2 gap-6">
-          {renderCalendar(currentMonth)}
-          {renderCalendar(addMonths(currentMonth, 1))}
-        </div>
+        <div className="relative flex justify-center overflow-x-auto" ref={calendarContainerRef}>
+          <Calendar
+            mode="single"
+            selected={selectedDate}
+            month={currentMonth}
+            onMonthChange={setCurrentMonth}
+            onDayClick={handleDayClick}
+            onSelect={setSelectedDate}
+            modifiers={modifiers}
+            modifiersClassNames={modifiersClassNames}
+            numberOfMonths={2}
+            className="rounded-lg border-0"
+            locale={es}
+          />
 
-        {/* Navegación de meses */}
-        <div className="flex justify-between items-center mt-6">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setCurrentMonth(addMonths(currentMonth, -1))}
-          >
-            Mes anterior
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setCurrentMonth(new Date())}
-          >
-            Hoy
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
-          >
-            Mes siguiente
-          </Button>
+          {tooltipData && (
+            <div
+              className="absolute z-20 max-w-[260px] rounded-lg border border-gray-200 bg-white p-4 shadow-lg"
+              style={{
+                top: tooltipData.position.top,
+                left: tooltipData.position.left,
+              }}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-sm font-semibold text-gray-900">
+                  {format(tooltipData.date, "EEEE, d 'de' MMMM yyyy", { locale: es })}
+                </p>
+                <button
+                  onClick={() => setTooltipData(null)}
+                  aria-label="Cerrar"
+                  className="text-gray-400 transition hover:text-gray-600"
+                >
+                  ×
+                </button>
+              </div>
+
+              <div className="mt-3 space-y-3 text-sm text-gray-700">
+                {tooltipData.ausencia ? (
+                  <>
+                    <div>
+                      <span className="text-xs text-gray-500">Tipo</span>
+                      <p className="font-medium text-gray-900">{tooltipData.ausencia.tipo}</p>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <span className="text-xs text-gray-500">Inicio</span>
+                        <p>{new Date(tooltipData.ausencia.fechaInicio).toLocaleDateString('es-ES')}</p>
+                      </div>
+                      <div>
+                        <span className="text-xs text-gray-500">Fin</span>
+                        <p>{new Date(tooltipData.ausencia.fechaFin).toLocaleDateString('es-ES')}</p>
+                      </div>
+                    </div>
+                    <div>
+                      <span className="text-xs text-gray-500">Días laborables</span>
+                      <p>
+                        {tooltipData.ausencia.diasLaborables}{' '}
+                        {tooltipData.ausencia.diasLaborables === 1 ? 'día' : 'días'}
+                      </p>
+                    </div>
+                    {tooltipData.ausencia.motivo && (
+                      <div>
+                        <span className="text-xs text-gray-500">Motivo</span>
+                        <p>{tooltipData.ausencia.motivo}</p>
+                      </div>
+                    )}
+                  </>
+                ) : esDiaLaborable(tooltipData.date) ? (
+                  <>
+                    <p className="text-sm text-gray-600">Día laborable disponible</p>
+                    <Button
+                      size="sm"
+                      className="w-full"
+                      onClick={() => (window.location.href = '/empleado/horario/ausencias')}
+                    >
+                      Solicitar ausencia
+                    </Button>
+                  </>
+                ) : (
+                  <p className="text-sm text-gray-500">Día no laborable</p>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

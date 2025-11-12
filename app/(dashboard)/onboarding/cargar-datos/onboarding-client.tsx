@@ -7,7 +7,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsContent } from '@/components/ui/tabs';
 import { SedesForm } from '@/components/onboarding/sedes-form';
 import { ImportarEmpleados } from '@/components/onboarding/importar-empleados';
 import { IntegracionesForm } from '@/components/onboarding/integraciones-form';
@@ -15,18 +15,38 @@ import { InvitarHRAdmins } from '@/components/onboarding/invitar-hr-admins';
 import { completarOnboardingAction } from './actions';
 import { Building2, Users, Plug, UserPlus, CheckCircle } from 'lucide-react';
 import { toast } from 'sonner';
+import type { Prisma } from '@prisma/client';
+
+interface Sede {
+  id: string;
+  nombre: string;
+  ciudad: string;
+  equipos?: Array<{
+    id: string;
+    nombre: string;
+  }>;
+}
+
+interface Integracion {
+  id: string;
+  tipo: string;
+  proveedor: string;
+  activa: boolean;
+  config: Prisma.JsonValue;
+}
 
 interface OnboardingClientProps {
-  sedes: any[];
-  integraciones: any[];
+  sedes: Sede[];
+  integraciones: Integracion[];
   nombreEmpresa: string;
 }
 
 export function OnboardingClient({
   sedes,
   integraciones,
-  nombreEmpresa,
+  nombreEmpresa: _nombreEmpresa,
 }: OnboardingClientProps) {
+  void _nombreEmpresa; // Explicitly mark as unused
   const router = useRouter();
   const [currentTab, setCurrentTab] = useState('sedes');
   const [loading, setLoading] = useState(false);
