@@ -800,12 +800,12 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
                           disabled={!canImportar || isProcessing}
                           title={
                             canImportar
-                              ? 'Sube los PDFs de nóminas definitivas recibidos de gestoría'
+                              ? 'Sube las nóminas definitivas recibidas de gestoría (PDFs individuales o ZIP)'
                               : 'Disponible una vez exportado el Excel'
                           }
                         >
                           <Upload className="w-4 h-4 mr-2" />
-                          Importar PDFs
+                          Importar Nóminas
                         </Button>
 
                         <Button
