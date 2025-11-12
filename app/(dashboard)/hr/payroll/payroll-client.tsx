@@ -133,17 +133,8 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
   const router = useRouter();
   const [eventos, setEventos] = useState<EventoNomina[]>([]);
   const [loading, setLoading] = useState(true);
-  const [expandedEventos, setExpandedEventos] = useState<Set<string>>(new Set());
-  const [loadingEventoId, setLoadingEventoId] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
-  const [analytics, setAnalytics] = useState<{
-    totalNeto: number;
-    empleadosUnicos: number;
-    promedioNeto: number;
-    variacionAnioAnterior: number;
-  } | null>(null);
-  const [loadingAnalytics, setLoadingAnalytics] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [selectedNominaId, setSelectedNominaId] = useState<string | null>(null);
   const [selectedEventoId, setSelectedEventoId] = useState<string | null>(null);
@@ -152,7 +143,6 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
 
   useEffect(() => {
     fetchEventos();
-    fetchAnalytics();
   }, [anioActual]);
 
   const fetchEventos = async () => {
@@ -168,58 +158,6 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
     }
   };
 
-  const fetchAnalytics = async () => {
-    try {
-      setLoadingAnalytics(true);
-      const response = await fetch(`/api/nominas/analytics?anio=${anioActual}`);
-      const data = await response.json();
-      setAnalytics(data.resumen);
-    } catch (error) {
-      console.error('Error fetching analytics:', error);
-      // No mostrar error, analytics es opcional
-    } finally {
-      setLoadingAnalytics(false);
-    }
-  };
-
-  const fetchEventoDetails = async (eventoId: string) => {
-    try {
-      setLoadingEventoId(eventoId);
-      const response = await fetch(`/api/nominas/eventos/${eventoId}`);
-      const data = await response.json();
-
-      // Actualizar el evento con sus nóminas
-      setEventos(prev => prev.map(e =>
-        e.id === eventoId ? { ...e, nominas: data.evento.nominas } : e
-      ));
-    } catch (error) {
-      console.error('Error fetching evento details:', error);
-      toast.error('Error al cargar detalles del evento');
-    } finally {
-      setLoadingEventoId(null);
-    }
-  };
-
-  const toggleEvento = async (eventoId: string) => {
-    const isExpanded = expandedEventos.has(eventoId);
-
-    if (isExpanded) {
-      // Contraer
-      setExpandedEventos(prev => {
-        const next = new Set(prev);
-        next.delete(eventoId);
-        return next;
-      });
-    } else {
-      // Expandir - cargar nóminas si no están cargadas
-      const evento = eventos.find(e => e.id === eventoId);
-      if (!evento?.nominas) {
-        await fetchEventoDetails(eventoId);
-      }
-
-      setExpandedEventos(prev => new Set(prev).add(eventoId));
-    }
-  };
 
   const handleGenerarEvento = async () => {
     try {
@@ -678,7 +616,6 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
         onClose={() => setShowUploadModal(false)}
         onSuccess={() => {
           fetchEventos();
-          fetchAnalytics();
         }}
       />
 
