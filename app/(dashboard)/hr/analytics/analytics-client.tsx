@@ -455,7 +455,6 @@ export function AnalyticsClient() {
                     color: '#ef4444',
                   },
                 }}
-                className="lg:col-span-2"
               />
             </div>
           </div>
