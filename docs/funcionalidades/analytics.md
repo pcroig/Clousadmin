@@ -71,6 +71,10 @@ Botón de exportación que genera un archivo Excel con 4 hojas:
    - Empleados agrupados por años en la empresa
    - Rangos: < 1 año, 1-3 años, 3-5 años, > 5 años
 
+6. **Rotación Mensual** (Gráfico de Área)
+   - Porcentaje de bajas sobre la plantilla de cada mes (últimos 6 meses)
+   - Calculado a partir de las bajas mensuales y el headcount medio
+
 **Métricas calculadas:**
 - Total de empleados activos
 - Cambio vs mes anterior
@@ -86,7 +90,8 @@ Botón de exportación que genera un archivo Excel con 4 hojas:
 **KPIs principales destacados:**
 1. **Coste total nómina**: Suma de todos los salarios brutos mensuales (muestra variación vs mes anterior)
 2. **Salario promedio**: Media del salario bruto mensual por empleado
-3. *(Opcional)* **Nóminas procesadas**: Número de nóminas emitidas en el año en curso (visible solo cuando existe histórico)
+3. **Brecha salarial (H vs M)**: Diferencia absoluta y porcentual entre los salarios promedios de hombres y mujeres
+4. *(Opcional)* **Nóminas procesadas**: Número de nóminas emitidas en el año en curso (visible solo cuando existe histórico)
 
 **KPIs de nóminas procesadas (año actual vs año anterior):**
 1. **Total neto abonado**: Total neto pagado en nóminas del año actual
@@ -450,10 +455,10 @@ Content (scroll)
 - ✅ Mejora de cabecera: filtros globales y exportación juntos en la parte superior derecha
 - ✅ Eliminado el botón de actualización manual y el timestamp para simplificar la UI
 - ✅ **KPIs de Plantilla optimizados**: Total empleados (con variación), Altas y Bajas del mes
-- ✅ **KPIs de Compensación optimizados**: Coste total nómina (con delta) y Salario promedio, mostrando Nóminas procesadas solo cuando hay histórico
+- ✅ **KPIs de Compensación optimizados**: Coste total nómina (con delta), Salario promedio y Brecha salarial (H vs M)
 - ✅ **KPI adicional en Fichajes**: Promedio horas/día
-- ✅ **Nueva gráfica en Plantilla**: Distribución por Antigüedad (calculada en tiempo real desde fechaAlta)
-- ✅ Endpoint de Plantilla actualizado con distribución por antigüedad
+- ✅ **Nuevas gráficas de Plantilla**: Distribución por Antigüedad (tiempo real) y Rotación mensual
+- ✅ Endpoint de Plantilla actualizado con distribución por antigüedad y endpoint de Compensación con promedios por género
 
 ### Versión 2.1 (12 Nov 2025)
 - ✅ Filtro de equipos basado en IDs (100% compatible con API)

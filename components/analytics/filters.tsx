@@ -79,9 +79,10 @@ export function AnalyticsFilters({
       {/* Botón de Exportación */}
       {onExport && (
         <Button
-          variant="outline"
+          variant="default"
+          size="sm"
           onClick={onExport}
-          className="ml-auto"
+          className="ml-auto bg-gray-900 text-white hover:bg-gray-800"
         >
           <Download className="w-4 h-4 mr-2" />
           Exportar
