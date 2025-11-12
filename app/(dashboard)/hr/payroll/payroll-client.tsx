@@ -28,6 +28,7 @@ import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { KpiCard } from '@/components/analytics/kpi-card';
 import { UploadNominasModal } from '@/components/payroll/upload-nominas-modal';
+import { EventoDetailsPanel } from '@/components/payroll/evento-details-panel';
 
 interface Nomina {
   id: string;
@@ -147,6 +148,8 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
   } | null>(null);
   const [loadingAnalytics, setLoadingAnalytics] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
+  const [selectedEventoId, setSelectedEventoId] = useState<string | null>(null);
+  const [showEventoPanel, setShowEventoPanel] = useState(false);
 
   const nombreMes = meses[mesActual - 1];
 
@@ -331,7 +334,7 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
     const input = document.createElement('input');
     input.type = 'file';
     input.multiple = true;
-    input.accept = 'application/pdf';
+    input.accept = 'application/pdf,.pdf,.zip';
 
     input.onchange = async (e) => {
       const files = (e.target as HTMLInputElement).files;
@@ -362,6 +365,16 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
         });
 
         fetchEventos();
+
+        // Preguntar si desea publicar
+        if (data.eventoCompleto) {
+          const shouldPublish = confirm(
+            '¿Deseas publicar las nóminas y notificar a los empleados ahora?'
+          );
+          if (shouldPublish) {
+            await handlePublicar(eventoId);
+          }
+        }
       } catch (error) {
         console.error('Error importando:', error);
         toast.error(error instanceof Error ? error.message : 'Error al importar');
@@ -625,7 +638,10 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
                             <Button
                               size="sm"
                               variant="ghost"
-                              onClick={() => router.push(`/hr/payroll/eventos/${evento.id}`)}
+                              onClick={() => {
+                                setSelectedEventoId(evento.id);
+                                setShowEventoPanel(true);
+                              }}
                               className="text-xs"
                             >
                               <Eye className="w-3.5 h-3.5 mr-1.5" />
@@ -725,7 +741,10 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
                             <div className="flex items-center gap-3 flex-wrap">
                               {evento.alertas.criticas > 0 && (
                                 <button
-                                  onClick={() => router.push(`/hr/payroll/eventos/${evento.id}?tab=alertas&tipo=criticas`)}
+                                  onClick={() => {
+                                    setSelectedEventoId(evento.id);
+                                    setShowEventoPanel(true);
+                                  }}
                                   className="flex items-center gap-1.5 px-3 py-1.5 bg-red-50 rounded-lg hover:bg-red-100 transition-colors"
                                 >
                                   <AlertCircle className="w-4 h-4 text-red-600" />
@@ -736,7 +755,10 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
                               )}
                               {evento.alertas.advertencias > 0 && (
                                 <button
-                                  onClick={() => router.push(`/hr/payroll/eventos/${evento.id}?tab=alertas&tipo=advertencias`)}
+                                  onClick={() => {
+                                    setSelectedEventoId(evento.id);
+                                    setShowEventoPanel(true);
+                                  }}
                                   className="flex items-center gap-1.5 px-3 py-1.5 bg-orange-50 rounded-lg hover:bg-orange-100 transition-colors"
                                 >
                                   <AlertTriangle className="w-4 h-4 text-orange-600" />
@@ -747,7 +769,10 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
                               )}
                               {evento.alertas.informativas > 0 && (
                                 <button
-                                  onClick={() => router.push(`/hr/payroll/eventos/${evento.id}?tab=alertas&tipo=informativas`)}
+                                  onClick={() => {
+                                    setSelectedEventoId(evento.id);
+                                    setShowEventoPanel(true);
+                                  }}
                                   className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
                                 >
                                   <Info className="w-4 h-4 text-blue-600" />
@@ -778,50 +803,31 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
                           Generar pre-nóminas
                         </Button>
 
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleExportar(evento.id)}
-                          disabled={!canExportar || isProcessing}
-                          title={
-                            canExportar
-                              ? 'Descarga el Excel de pre-nóminas para enviar a gestoría'
-                              : 'Disponible cuando las pre-nóminas están listas'
-                          }
-                        >
-                          <Download className="w-4 h-4 mr-2" />
-                          {evento.estado === 'lista_exportar' ? 'Exportar Excel' : 'Re-exportar'}
-                        </Button>
+                        {canExportar && evento.estado === 'lista_exportar' && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleExportar(evento.id)}
+                            disabled={isProcessing}
+                            title="Descarga el Excel de pre-nóminas para enviar a gestoría"
+                          >
+                            <Download className="w-4 h-4 mr-2" />
+                            Exportar Excel
+                          </Button>
+                        )}
 
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleImportar(evento.id)}
-                          disabled={!canImportar || isProcessing}
-                          title={
-                            canImportar
-                              ? 'Sube las nóminas definitivas recibidas de gestoría (PDFs individuales o ZIP)'
-                              : 'Disponible una vez exportado el Excel'
-                          }
-                        >
-                          <Upload className="w-4 h-4 mr-2" />
-                          Importar Nóminas
-                        </Button>
-
-                        <Button
-                          size="sm"
-                          className="btn-primary"
-                          onClick={() => handlePublicar(evento.id)}
-                          disabled={!canPublicar || isProcessing}
-                          title={
-                            canPublicar
-                              ? 'Publica las nóminas y notifica a los empleados'
-                              : 'Disponible cuando todas las nóminas son definitivas'
-                          }
-                        >
-                          <Send className="w-4 h-4 mr-2" />
-                          Publicar y Notificar
-                        </Button>
+                        {canImportar && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleImportar(evento.id)}
+                            disabled={isProcessing}
+                            title="Sube las nóminas definitivas recibidas de gestoría (PDFs individuales o ZIP)"
+                          >
+                            <Upload className="w-4 h-4 mr-2" />
+                            Importar Nóminas
+                          </Button>
+                        )}
 
                         {evento.estado === 'publicada' && (
                           <div className="flex items-center gap-2 px-3 py-2 bg-green-50 rounded-lg">
@@ -930,6 +936,20 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
         isOpen={showUploadModal}
         onClose={() => setShowUploadModal(false)}
         onSuccess={() => {
+          fetchEventos();
+          fetchAnalytics();
+        }}
+      />
+
+      {/* Evento Details Panel */}
+      <EventoDetailsPanel
+        eventoId={selectedEventoId}
+        isOpen={showEventoPanel}
+        onClose={() => {
+          setShowEventoPanel(false);
+          setSelectedEventoId(null);
+        }}
+        onUpdate={() => {
           fetchEventos();
           fetchAnalytics();
         }}
