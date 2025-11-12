@@ -28,7 +28,6 @@ import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { KpiCard } from '@/components/analytics/kpi-card';
 import { UploadNominasModal } from '@/components/payroll/upload-nominas-modal';
-import { EventoDetailsPanel } from '@/components/payroll/evento-details-panel';
 
 interface Nomina {
   id: string;
@@ -148,8 +147,6 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
   } | null>(null);
   const [loadingAnalytics, setLoadingAnalytics] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
-  const [selectedEventoId, setSelectedEventoId] = useState<string | null>(null);
-  const [showEventoPanel, setShowEventoPanel] = useState(false);
 
   const nombreMes = meses[mesActual - 1];
 
@@ -615,233 +612,114 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
 
               return (
                 <Card key={evento.id} className="overflow-hidden">
-                  {/* Evento Header */}
-                  <div className="p-6">
-                    <div className="flex items-start justify-between">
-                      {/* Info */}
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3 mb-2">
-                          <div className="flex items-center gap-3">
-                            <button
-                              onClick={() => toggleEvento(evento.id)}
-                              className="flex items-center gap-2 hover:opacity-70 transition-opacity"
-                            >
-                              <h3 className="text-lg font-semibold text-gray-900">
-                                {meses[evento.mes - 1]} {evento.anio}
-                              </h3>
-                              {isExpanded ? (
-                                <ChevronUp className="w-5 h-5 text-gray-500" />
-                              ) : (
-                                <ChevronDown className="w-5 h-5 text-gray-500" />
-                              )}
-                            </button>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => {
-                                setSelectedEventoId(evento.id);
-                                setShowEventoPanel(true);
-                              }}
-                              className="text-xs"
-                            >
-                              <Eye className="w-3.5 h-3.5 mr-1.5" />
-                              Ver detalles
-                            </Button>
-                          </div>
-                          <div className="group relative">
-                            <span className={`text-xs font-medium px-2.5 py-0.5 rounded-full ${estadoInfo.color} cursor-help`}>
-                              {estadoInfo.label}
-                            </span>
-                            <div className="absolute left-0 top-full mt-2 w-64 p-2 bg-gray-900 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10">
-                              {estadoInfo.descripcion}
-                            </div>
+                  {/* Evento Header - Card compacta */}
+                  <div className="p-5">
+                    <div className="flex items-center justify-between">
+                      <button
+                        onClick={() => toggleEvento(evento.id)}
+                        className="flex items-center gap-3 hover:opacity-70 transition-opacity flex-1"
+                      >
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-lg font-semibold text-gray-900">
+                            {meses[evento.mes - 1]} {evento.anio}
+                          </h3>
+                          {isExpanded ? (
+                            <ChevronUp className="w-5 h-5 text-gray-500" />
+                          ) : (
+                            <ChevronDown className="w-5 h-5 text-gray-500" />
+                          )}
+                        </div>
+                        <div className="group relative">
+                          <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${estadoInfo.color} cursor-help`}>
+                            {estadoInfo.label}
+                          </span>
+                          <div className="absolute left-0 top-full mt-2 w-64 p-2 bg-gray-900 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10">
+                            {estadoInfo.descripcion}
                           </div>
                         </div>
+                      </button>
 
-                        {/* Indicador de progreso visual */}
-                        <div className="mb-4">
-                          <div className="flex items-center gap-2 text-xs">
-                            {['complementos_pendientes', 'lista_exportar', 'exportada', 'definitiva', 'publicada'].map((estado, idx) => {
-                              const estadoActual = evento.estado;
-                              const estadosOrden = ['generando', 'complementos_pendientes', 'lista_exportar', 'exportada', 'definitiva', 'publicada'];
-                              const indexActual = estadosOrden.indexOf(estadoActual);
-                              const indexEtapa = estadosOrden.indexOf(estado);
-                              const completado = indexActual >= indexEtapa;
-                              const activo = indexActual === indexEtapa;
-
-                              return (
-                                <div key={estado} className="flex items-center flex-1">
-                                  <div
-                                    className={`h-1 flex-1 rounded-full transition-colors ${
-                                      completado ? 'bg-green-500' : activo ? 'bg-orange-400' : 'bg-gray-200'
-                                    }`}
-                                  />
-                                  {idx < 4 && <div className="w-1" />}
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4 text-sm">
-                          <div>
-                            <div className="text-gray-600">Empleados</div>
-                            <div className="font-medium text-gray-900">
-                              {evento.totalEmpleados}
-                            </div>
-                          </div>
-                          <div>
-                            <div className="text-gray-600">Con Complementos</div>
-                            <div className="font-medium text-gray-900">
-                              {evento.empleadosConComplementos}
-                            </div>
-                          </div>
-                          <div>
-                            <div className="text-gray-600">Nóminas</div>
-                            <div className="font-medium text-gray-900">
-                              {evento._count.nominas}
-                            </div>
-                          </div>
-                          <div>
-                            <div className="text-gray-600">Generación</div>
-                            <div className="font-medium text-gray-900">
-                              {evento.fechaGeneracion
-                                ? new Date(evento.fechaGeneracion).toLocaleDateString('es-ES')
-                                : '-'}
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Indicador de estado de complementos */}
-                        {evento.estado === 'complementos_pendientes' && (
-                          <div className="mt-4 pt-4 border-t">
-                            <div className="flex items-center gap-2">
-                              {evento.empleadosConComplementos === evento.totalEmpleados ? (
-                                <div className="flex items-center gap-2 text-sm">
-                                  <CheckCircle className="w-4 h-4 text-green-600" />
-                                  <span className="font-medium text-green-700">
-                                    Complementos revisados
-                                  </span>
-                                </div>
-                              ) : (
-                                <div className="flex items-center gap-2 text-sm">
-                                  <AlertCircle className="w-4 h-4 text-orange-600" />
-                                  <span className="font-medium text-orange-700">
-                                    {evento.totalEmpleados - evento.empleadosConComplementos} empleado(s) sin complementos asignados
-                                  </span>
-                                </div>
-                              )}
-                            </div>
-                          </div>
+                      {/* Botones de acción en la card */}
+                      <div className="flex items-center gap-2">
+                        {canGenerarPrenominas && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleGenerarPrenominas(evento.id);
+                            }}
+                            disabled={isProcessing}
+                          >
+                            <FileText className="w-4 h-4 mr-2" />
+                            Generar
+                          </Button>
                         )}
-
-                        {/* Alertas */}
-                        {evento.alertas && evento.alertas.total > 0 && (
-                          <div className="mt-4 pt-4 border-t">
-                            <div className="flex items-center gap-3 flex-wrap">
-                              {evento.alertas.criticas > 0 && (
-                                <button
-                                  onClick={() => {
-                                    setSelectedEventoId(evento.id);
-                                    setShowEventoPanel(true);
-                                  }}
-                                  className="flex items-center gap-1.5 px-3 py-1.5 bg-red-50 rounded-lg hover:bg-red-100 transition-colors"
-                                >
-                                  <AlertCircle className="w-4 h-4 text-red-600" />
-                                  <span className="text-sm font-medium text-red-700">
-                                    {evento.alertas.criticas} crítica{evento.alertas.criticas !== 1 ? 's' : ''}
-                                  </span>
-                                </button>
-                              )}
-                              {evento.alertas.advertencias > 0 && (
-                                <button
-                                  onClick={() => {
-                                    setSelectedEventoId(evento.id);
-                                    setShowEventoPanel(true);
-                                  }}
-                                  className="flex items-center gap-1.5 px-3 py-1.5 bg-orange-50 rounded-lg hover:bg-orange-100 transition-colors"
-                                >
-                                  <AlertTriangle className="w-4 h-4 text-orange-600" />
-                                  <span className="text-sm font-medium text-orange-700">
-                                    {evento.alertas.advertencias} advertencia{evento.alertas.advertencias !== 1 ? 's' : ''}
-                                  </span>
-                                </button>
-                              )}
-                              {evento.alertas.informativas > 0 && (
-                                <button
-                                  onClick={() => {
-                                    setSelectedEventoId(evento.id);
-                                    setShowEventoPanel(true);
-                                  }}
-                                  className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
-                                >
-                                  <Info className="w-4 h-4 text-blue-600" />
-                                  <span className="text-sm font-medium text-blue-700">
-                                    {evento.alertas.informativas} info
-                                  </span>
-                                </button>
-                              )}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Actions */}
-                      <div className="flex flex-col gap-2 ml-4 min-w-[240px]">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleGenerarPrenominas(evento.id)}
-                          disabled={!canGenerarPrenominas || isProcessing}
-                          title={
-                            canGenerarPrenominas
-                              ? 'Genera o recalcula las pre-nóminas del periodo'
-                              : 'Disponible antes de exportar las nóminas'
-                          }
-                        >
-                          <FileText className="w-4 h-4 mr-2" />
-                          Generar pre-nóminas
-                        </Button>
-
+                        
                         {canExportar && evento.estado === 'lista_exportar' && (
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={() => handleExportar(evento.id)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleExportar(evento.id);
+                            }}
                             disabled={isProcessing}
-                            title="Descarga el Excel de pre-nóminas para enviar a gestoría"
                           >
                             <Download className="w-4 h-4 mr-2" />
-                            Exportar Excel
+                            Exportar
                           </Button>
                         )}
-
+                        
                         {canImportar && (
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={() => handleImportar(evento.id)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleImportar(evento.id);
+                            }}
                             disabled={isProcessing}
-                            title="Sube las nóminas definitivas recibidas de gestoría (PDFs individuales o ZIP)"
                           >
                             <Upload className="w-4 h-4 mr-2" />
-                            Importar Nóminas
+                            Importar
                           </Button>
                         )}
-
-                        {evento.estado === 'publicada' && (
-                          <div className="flex items-center gap-2 px-3 py-2 bg-green-50 rounded-lg">
-                            <CheckCircle className="w-4 h-4 text-green-600" />
-                            <span className="text-sm font-medium text-green-700">
-                              Publicado{' '}
-                              {evento.fechaExportacion &&
-                                `el ${new Date(evento.fechaExportacion).toLocaleDateString('es-ES')}`}
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Alertas en la card */}
+                  {evento.alertas && evento.alertas.total > 0 && (
+                    <div className="px-5 pb-3">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {evento.alertas.criticas > 0 && (
+                          <div className="flex items-center gap-1.5 px-2.5 py-1 bg-red-50 rounded text-xs">
+                            <AlertCircle className="w-3.5 h-3.5 text-red-600" />
+                            <span className="text-red-700 font-medium">
+                              {evento.alertas.criticas} crítica{evento.alertas.criticas !== 1 ? 's' : ''}
+                            </span>
+                          </div>
+                        )}
+                        {evento.alertas.advertencias > 0 && (
+                          <div className="flex items-center gap-1.5 px-2.5 py-1 bg-orange-50 rounded text-xs">
+                            <AlertTriangle className="w-3.5 h-3.5 text-orange-600" />
+                            <span className="text-orange-700 font-medium">
+                              {evento.alertas.advertencias} advertencia{evento.alertas.advertencias !== 1 ? 's' : ''}
+                            </span>
+                          </div>
+                        )}
+                        {evento.alertas.informativas > 0 && (
+                          <div className="flex items-center gap-1.5 px-2.5 py-1 bg-blue-50 rounded text-xs">
+                            <Info className="w-3.5 h-3.5 text-blue-600" />
+                            <span className="text-blue-700 font-medium">
+                              {evento.alertas.informativas} info
                             </span>
                           </div>
                         )}
                       </div>
                     </div>
-                  </div>
+                  )}
 
                   {/* Nóminas Expandidas */}
                   {isExpanded && (
@@ -936,20 +814,6 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
         isOpen={showUploadModal}
         onClose={() => setShowUploadModal(false)}
         onSuccess={() => {
-          fetchEventos();
-          fetchAnalytics();
-        }}
-      />
-
-      {/* Evento Details Panel */}
-      <EventoDetailsPanel
-        eventoId={selectedEventoId}
-        isOpen={showEventoPanel}
-        onClose={() => {
-          setShowEventoPanel(false);
-          setSelectedEventoId(null);
-        }}
-        onUpdate={() => {
           fetchEventos();
           fetchAnalytics();
         }}
