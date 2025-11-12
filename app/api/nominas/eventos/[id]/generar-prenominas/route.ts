@@ -138,7 +138,9 @@ export async function POST(
 
         const diasTrabajados = Math.max(0, totalDiasMes - diasAusencias);
 
-        const salarioMensual = contratoVigente.salarioBruto ?? new Decimal(0);
+        // Calcular salario mensual desde el anual del contrato
+        const salarioAnual = contratoVigente.salarioBrutoAnual ?? new Decimal(0);
+        const salarioMensual = salarioAnual.div(12);
         const salarioBase = salarioMensual.mul(diasTrabajados).div(totalDiasMes);
 
         const tieneComplementosVariables = empleado.complementos.some(
