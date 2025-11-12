@@ -9,7 +9,16 @@ import {
   agruparFichajesPorDia,
   type FichajeConEventos,
 } from './fichajes';
-import type { FichajeEvento } from '@prisma/client';
+import type { FichajeEvento, PrismaClient } from '@prisma/client';
+import {
+  crearSetFestivos,
+  esDiaLaborable,
+  formatearClaveFecha,
+  getDiasLaborablesEmpresa,
+  getFestivosActivosEnRango,
+} from './dias-laborables';
+
+const prismaClient = prisma as PrismaClient;
 
 export interface BalanceDia {
   fecha: Date;
@@ -39,7 +48,7 @@ export async function calcularBalanceDiario(
   fechaInicio.setHours(0, 0, 0, 0);
 
   // Obtener fichajes del día
-  const fichajes = await prisma.fichaje.findMany({
+  const fichajes = await prismaClient.fichaje.findMany({
     where: {
       empleadoId,
       fecha: fechaInicio,
@@ -47,8 +56,8 @@ export async function calcularBalanceDiario(
   });
 
   // En el nuevo schema, horasTrabajadas ya está calculado en el Fichaje
-  const horasTrabajadas = fichajes.reduce((sum, f) => {
-    return sum + (f.horasTrabajadas != null ? Number(f.horasTrabajadas) : 0);
+  const horasTrabajadas = fichajes.reduce<number>((sum, fichaje) => {
+    return sum + (fichaje.horasTrabajadas != null ? Number(fichaje.horasTrabajadas) : 0);
   }, 0);
 
   const horasEsperadas = await obtenerHorasEsperadas(empleadoId, fecha);
@@ -106,7 +115,7 @@ export async function calcularBalancePeriodo(
   fechaFin: Date
 ): Promise<BalancePeriodo> {
   // Obtener todos los fichajes del período
-  const fichajes = await prisma.fichaje.findMany({
+  const fichajes = await prismaClient.fichaje.findMany({
     where: {
       empleadoId,
       fecha: {
@@ -134,7 +143,7 @@ export async function calcularBalancePeriodo(
   const fichajesPorDia = agruparFichajesPorDia(fichajesConEventos);
 
   // Obtener festivos del período
-  const empleado = await prisma.empleado.findUnique({
+  const empleado = await prismaClient.empleado.findUnique({
     where: { id: empleadoId },
     select: { empresaId: true },
   });
@@ -143,30 +152,23 @@ export async function calcularBalancePeriodo(
     throw new Error(`[BalanceHoras] Empleado ${empleadoId} no encontrado`);
   }
 
-  const festivos = await prisma.festivo.findMany({
-    where: {
-      empresaId: empleado.empresaId,
-      fecha: {
-        gte: fechaInicio,
-        lte: fechaFin,
-      },
-      activo: true,
-    },
-  });
-
-  const fechasFestivas = new Set(
-    festivos.map(f => f.fecha.toISOString().split('T')[0])
-  );
-
-  // ✅ OPTIMIZACIÓN: Pre-cargar calendario laboral de la empresa (evita N+1)
-  const { esDiaLaborable } = await import('@/lib/calculos/dias-laborables');
+  const [festivos, diasLaborablesConfig] = await Promise.all([
+    getFestivosActivosEnRango(empleado.empresaId, fechaInicio, fechaFin),
+    getDiasLaborablesEmpresa(empleado.empresaId),
+  ]);
+  const festivosSet = crearSetFestivos(festivos);
   const calendarioLaboralMap = new Map<string, boolean>();
   
   // Pre-calcular todos los días del rango
   const fechaTemp = new Date(fechaInicio);
   while (fechaTemp <= fechaFin) {
-    const fechaKey = fechaTemp.toISOString().split('T')[0];
-    const esLaborable = await esDiaLaborable(fechaTemp, empleado.empresaId);
+    const fechaKey = formatearClaveFecha(fechaTemp);
+    const esLaborable = await esDiaLaborable(
+      fechaTemp,
+      empleado.empresaId,
+      diasLaborablesConfig,
+      festivosSet
+    );
     calendarioLaboralMap.set(fechaKey, esLaborable);
     fechaTemp.setDate(fechaTemp.getDate() + 1);
   }
@@ -178,7 +180,7 @@ export async function calcularBalancePeriodo(
 
   const fechaActual = new Date(fechaInicio);
   while (fechaActual <= fechaFin) {
-    const fechaKey = fechaActual.toISOString().split('T')[0];
+    const fechaKey = formatearClaveFecha(fechaActual);
     const fichajeDia = fichajesPorDia[fechaKey] as FichajeConEventos | undefined;
     const eventosDia: FichajeEvento[] = fichajeDia?.eventos ?? [];
 
@@ -186,7 +188,7 @@ export async function calcularBalancePeriodo(
     const horasEsperadas = await obtenerHorasEsperadas(empleadoId, fechaActual);
     const balance = horasTrabajadas - horasEsperadas;
 
-    const esFestivo = fechasFestivas.has(fechaKey);
+    const esFestivo = festivosSet.has(fechaKey);
     const esLaborable = calendarioLaboralMap.get(fechaKey) ?? true;
 
     dias.push({

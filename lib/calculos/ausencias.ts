@@ -3,7 +3,13 @@
 // ========================================
 
 import { prisma } from '@/lib/prisma';
-import { esDiaLaborable, getDiasLaborablesEmpresa } from './dias-laborables';
+import {
+  crearSetFestivos,
+  esDiaLaborable,
+  formatearClaveFecha,
+  getDiasLaborablesEmpresa,
+  getFestivosActivosEnRango,
+} from './dias-laborables';
 
 import { EstadoAusencia } from '@/lib/constants/enums';
 
@@ -45,25 +51,6 @@ export async function esFestivo(fecha: Date, empresaId: string): Promise<boolean
 }
 
 /**
- * Obtiene todos los festivos activos de una empresa para un rango de fechas
- */
-export async function getFestivos(empresaId: string, fechaInicio: Date, fechaFin: Date) {
-  return await prisma.festivo.findMany({
-    where: {
-      empresaId,
-      fecha: {
-        gte: fechaInicio,
-        lte: fechaFin,
-      },
-      activo: true,
-    },
-    orderBy: {
-      fecha: 'asc',
-    },
-  });
-}
-
-/**
  * Calcula los días solicitados excluyendo días no laborables (según config empresa) y festivos
  * 
  * @param fechaInicio Fecha de inicio de la ausencia
@@ -78,8 +65,11 @@ export async function calcularDiasSolicitados(
   empresaId: string,
   medioDia: boolean = false
 ): Promise<number> {
-  // Obtener configuración de días laborables (una sola vez)
-  const diasLaborables = await getDiasLaborablesEmpresa(empresaId);
+  const [diasLaborables, festivos] = await Promise.all([
+    getDiasLaborablesEmpresa(empresaId),
+    getFestivosActivosEnRango(empresaId, fechaInicio, fechaFin),
+  ]);
+  const festivosSet = crearSetFestivos(festivos);
 
   let dias = 0;
   const fecha = new Date(fechaInicio);
@@ -87,7 +77,7 @@ export async function calcularDiasSolicitados(
 
   while (fecha <= fechaFinDate) {
     // Verificar si el día es laborable según configuración y festivos
-    const esLaborable = await esDiaLaborable(fecha, empresaId, diasLaborables);
+    const esLaborable = await esDiaLaborable(fecha, empresaId, diasLaborables, festivosSet);
     if (esLaborable) {
       dias++;
     }
@@ -114,12 +104,11 @@ export async function calcularDias(
   const diffTime = Math.abs(fechaFin.getTime() - fechaInicio.getTime());
   const diasNaturales = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1; // +1 para incluir el día de inicio
 
-  // Obtener festivos
-  const festivos = await getFestivos(empresaId, fechaInicio, fechaFin);
-  const festivosDates = festivos.map(f => f.fecha.toDateString());
-
-  // Obtener configuración de días laborables
-  const diasLaborablesConfig = await getDiasLaborablesEmpresa(empresaId);
+  const [diasLaborablesConfig, festivos] = await Promise.all([
+    getDiasLaborablesEmpresa(empresaId),
+    getFestivosActivosEnRango(empresaId, fechaInicio, fechaFin),
+  ]);
+  const festivosSet = crearSetFestivos(festivos);
 
   // Contar días laborables y solicitados según configuración de empresa
   let diasLaborables = 0;
@@ -149,8 +138,7 @@ export async function calcularDias(
     }
 
     // Días solicitados: solo días laborables que NO son festivos
-    // esDiaLaborable ya verifica festivos y días de semana
-    const esLaborable = await esDiaLaborable(fecha, empresaId, diasLaborablesConfig);
+    const esLaborable = await esDiaLaborable(fecha, empresaId, diasLaborablesConfig, festivosSet);
     if (esLaborable) {
       diasSolicitados++;
     }
@@ -430,12 +418,11 @@ export async function getDisponibilidadCalendario(
   // Obtener solapamiento
   const solapamiento = await calcularSolapamientoEquipo(equipoId, fechaInicio, fechaFin);
 
-  // Obtener festivos
-  const festivos = await getFestivos(empresaId, fechaInicio, fechaFin);
-  const festivosDates = festivos.map(f => f.fecha.toDateString());
-
-  // Obtener configuración de días laborables
-  const diasLaborablesConfig = await getDiasLaborablesEmpresa(empresaId);
+  const [festivos, diasLaborablesConfig] = await Promise.all([
+    getFestivosActivosEnRango(empresaId, fechaInicio, fechaFin),
+    getDiasLaborablesEmpresa(empresaId),
+  ]);
+  const festivosSet = crearSetFestivos(festivos);
 
   // Obtener política del equipo si existe
   const politica = await prisma.equipoPoliticaAusencias.findUnique({
@@ -444,8 +431,8 @@ export async function getDisponibilidadCalendario(
   const maxSolapamientoPct = politica?.maxSolapamientoPct || 50;
 
   return await Promise.all(solapamiento.map(async (s) => {
-    const esFest = festivosDates.includes(s.fecha.toDateString());
-    const esLaborable = await esDiaLaborable(s.fecha, empresaId, diasLaborablesConfig);
+    const esFest = festivosSet.has(formatearClaveFecha(s.fecha));
+    const esLaborable = await esDiaLaborable(s.fecha, empresaId, diasLaborablesConfig, festivosSet);
 
     let estado: 'muy_disponible' | 'disponible' | 'poco_disponible' | 'no_disponible';
 
