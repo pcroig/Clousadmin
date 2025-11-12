@@ -89,12 +89,12 @@ export const SettingsLayout = ({ rol, children }: SettingsLayoutProps) => {
                 className={cn(
                   'flex items-center gap-3 rounded-lg px-4 py-2.5 transition-colors',
                   active
-                    ? 'bg-[#EAE6DE] font-semibold text-gray-900'
-                    : 'text-gray-600 hover:bg-[#F4F1EB]'
+                    ? 'bg-gray-100 font-semibold text-gray-900'
+                    : 'text-gray-600 hover:bg-gray-50'
                 )}
               >
                 <span className="flex-1">{section.label}</span>
-                {active && <span className="h-1.5 w-1.5 rounded-full bg-[#1F6FEB]" />}
+                {active && <span className="h-1.5 w-1.5 rounded-full bg-primary" />}
               </Link>
             );
           })}

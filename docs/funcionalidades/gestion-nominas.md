@@ -438,7 +438,7 @@ Desde la refactorización de noviembre 2025 todos los cambios de estado utilizan
 - Endpoint: `GET /api/nominas/analytics?anio=YYYY`
 - Métricas incluidas:
   - Resumen general (bruto, neto, complementos, empleados).
-  - Distribución por departamento con min/max/mediana y complementos promedio.
+  - Distribución por equipo con min/max/mediana y complementos promedio.
   - Tendencia mensual (bruto, neto, complementos, nº nóminas).
   - Distribución salarial detallada (percentiles y rangos de 10k).
   - Análisis por puesto (total, promedio, min, max, mediana).

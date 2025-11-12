@@ -470,7 +470,7 @@ export function CarpetaDetailClient({ carpeta, empleados = [] }: CarpetaDetailCl
           {documentosFiltrados.length === 0 ? (
             <div className="bg-white rounded-lg border border-gray-200 p-6">
               <EmptyState
-                variant="secondary"
+                layout="inline"
                 icon={FileText}
                 title="No hay documentos en esta carpeta"
                 description="Haz clic en 'Subir Documentos' para añadir archivos"

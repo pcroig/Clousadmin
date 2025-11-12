@@ -19,3 +19,4 @@ UPDATE "fichajes" SET estado = 'pendiente' WHERE estado = 'revisado';
 
 
 
+

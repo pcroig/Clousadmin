@@ -86,8 +86,8 @@ export function EquipoDetails({ equipo, onUpdate, onDelete }: EquipoDetailsProps
         {/* Header */}
         <div className="pb-6 border-b border-gray-200">
           <div className="flex items-start gap-3 mb-3">
-            <div className="w-12 h-12 rounded-lg bg-blue-100 flex items-center justify-center flex-shrink-0">
-              <Users className="w-6 h-6 text-blue-600" />
+            <div className="w-12 h-12 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
+              <Users className="w-6 h-6 text-gray-600" />
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-start justify-between gap-2">
@@ -189,7 +189,7 @@ export function EquipoDetails({ equipo, onUpdate, onDelete }: EquipoDetailsProps
                       <p className="text-sm text-gray-900 font-medium">{empleado.nombre}</p>
                     </div>
                     {empleado.id === equipo.responsableId && (
-                      <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded font-medium">
+                      <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded font-medium">
                         Responsable
                       </span>
                     )}

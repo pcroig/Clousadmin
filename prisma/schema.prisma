@@ -85,6 +85,12 @@ enum EstadoAusencia {
   rechazada   // Rechazada por manager/HR
 }
 
+/// Periodo de ausencia de medio día
+enum PeriodoMedioDia {
+  manana // Ausencia en la mañana (no ficha entrada)
+  tarde  // Ausencia en la tarde (no ficha salida)
+}
+
 /// Estados de solicitud de cambio
 enum EstadoSolicitud {
   pendiente              // Recién creada
@@ -563,6 +569,7 @@ model Ausencia {
   fechaInicio DateTime     @db.Date
   fechaFin    DateTime     @db.Date
   medioDia    Boolean      @default(false)
+  periodo     PeriodoMedioDia? // Solo cuando medioDia=true: 'manana' o 'tarde'
 
   diasNaturales   Int // Total days (including weekends)
   diasLaborables  Int // Working days only

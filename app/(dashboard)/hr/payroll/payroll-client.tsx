@@ -94,7 +94,7 @@ const estadosLabels: Record<
 > = {
   generando: {
     label: 'Generando',
-    color: 'bg-blue-100 text-blue-700',
+    color: 'bg-gray-100 text-gray-700',
     descripcion: 'Se están generando las pre-nóminas automáticamente',
   },
   complementos_pendientes: {
@@ -104,12 +104,12 @@ const estadosLabels: Record<
   },
   lista_exportar: {
     label: 'Lista para Exportar',
-    color: 'bg-purple-100 text-purple-700',
+    color: 'bg-yellow-100 text-yellow-700',
     descripcion: 'Todas las nóminas están listas para enviar a gestoría',
   },
   exportada: {
     label: 'Exportada',
-    color: 'bg-indigo-100 text-indigo-700',
+    color: 'bg-gray-100 text-gray-700',
     descripcion: 'Excel enviado a gestoría. Esperando nóminas definitivas',
   },
   definitiva: {
@@ -125,10 +125,10 @@ const estadosLabels: Record<
 };
 
 const estadosNominaLabels: Record<string, { label: string; color: string }> = {
-  pre_nomina: { label: 'Pre-nómina', color: 'text-blue-600' },
+  pre_nomina: { label: 'Pre-nómina', color: 'text-gray-600' },
   complementos_pendientes: { label: 'Complementos Pendientes', color: 'text-orange-600' },
-  lista_exportar: { label: 'Lista Exportar', color: 'text-purple-600' },
-  exportada: { label: 'Exportada', color: 'text-indigo-600' },
+  lista_exportar: { label: 'Lista Exportar', color: 'text-yellow-600' },
+  exportada: { label: 'Exportada', color: 'text-gray-600' },
   definitiva: { label: 'Definitiva', color: 'text-green-600' },
   publicada: { label: 'Publicada', color: 'text-gray-900' },
 };

@@ -73,10 +73,17 @@ export async function GET(request: NextRequest) {
       },
     });
 
+    const equiposToLabel = (equipos: Array<{ equipo: { nombre: string } | null }>) => {
+      const nombres = equipos
+        .map((eq) => eq.equipo?.nombre)
+        .filter((nombre): nombre is string => Boolean(nombre));
+      return nombres.length > 0 ? nombres.join(', ') : 'Sin equipo';
+    };
+
     // Filtrar por equipo si aplica
     if (equipo && equipo !== 'todos') {
       empleados = empleados.filter((e) =>
-        e.equipos.some((eq) => eq.equipo.nombre === equipo)
+        e.equipos.some((eq) => eq.equipo?.nombre === equipo)
       );
     }
 
@@ -115,7 +122,7 @@ export async function GET(request: NextRequest) {
       Nombre: e.nombre,
       Apellidos: e.apellidos,
       Email: e.email,
-      Equipos: e.equipos.map((eq) => eq.equipo.nombre).join(', ') || 'Sin equipo',
+      Equipos: equiposToLabel(e.equipos),
       Género: e.genero || 'No especificado',
       'Fecha Alta': e.fechaAlta.toLocaleDateString('es-ES'),
       Antigüedad: calcularAntiguedad(e.fechaAlta),
@@ -128,7 +135,7 @@ export async function GET(request: NextRequest) {
       { wch: 15 }, // Nombre
       { wch: 20 }, // Apellidos
       { wch: 30 }, // Email
-      { wch: 20 }, // Departamento
+      { wch: 20 }, // Equipos
       { wch: 15 }, // Género
       { wch: 12 }, // Fecha Alta
       { wch: 15 }, // Antigüedad
@@ -142,7 +149,7 @@ export async function GET(request: NextRequest) {
     const compensacionData = empleados.map((e) => ({
       Nombre: e.nombre,
       Apellidos: e.apellidos,
-      Equipos: e.equipos.map((eq) => eq.equipo.nombre).join(', ') || 'Sin equipo',
+      Equipos: equiposToLabel(e.equipos),
       'Salario Bruto Mensual': e.salarioBrutoMensual
         ? `${Number(e.salarioBrutoMensual).toFixed(2)}€`
         : 'N/A',
@@ -158,7 +165,7 @@ export async function GET(request: NextRequest) {
     wsCompensacion['!cols'] = [
       { wch: 15 }, // Nombre
       { wch: 20 }, // Apellidos
-      { wch: 20 }, // Departamento
+      { wch: 20 }, // Equipos
       { wch: 20 }, // Salario Bruto Mensual
       { wch: 20 }, // Salario Bruto Anual
     ];
@@ -205,7 +212,7 @@ export async function GET(request: NextRequest) {
       return {
         Nombre: e.nombre,
         Apellidos: e.apellidos,
-        Departamento: e.departamento || 'Sin departamento',
+        Equipos: equiposToLabel(e.equipos),
         'Horas Trabajadas Mes': totalHoras.toFixed(2),
         'Horas en Pausa': totalPausas.toFixed(2),
         'Días Registrados': fichajesEmpleado.length,
@@ -217,7 +224,7 @@ export async function GET(request: NextRequest) {
     wsFichajes['!cols'] = [
       { wch: 15 }, // Nombre
       { wch: 20 }, // Apellidos
-      { wch: 20 }, // Departamento
+      { wch: 20 }, // Equipos
       { wch: 20 }, // Horas Trabajadas Mes
       { wch: 15 }, // Horas en Pausa
       { wch: 18 }, // Días Registrados

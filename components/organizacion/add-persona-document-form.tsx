@@ -25,9 +25,9 @@ export function AddPersonaDocumentForm({ onSuccess, onCancel }: AddPersonaDocume
   if (mode === 'select') {
     return (
       <div className="space-y-6">
-        <div className="text-sm text-gray-600 bg-blue-50 p-4 rounded-lg border border-blue-200">
-          <p className="font-medium text-blue-900 mb-2">📥 Importar empleados</p>
-          <p className="text-blue-800">Elige cómo deseas importar los datos de los empleados:</p>
+        <div className="text-sm text-gray-600 bg-gray-50 p-4 rounded-lg border border-gray-200">
+          <p className="font-medium text-gray-900 mb-2">📥 Importar empleados</p>
+          <p className="text-gray-600">Elige cómo deseas importar los datos de los empleados:</p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -36,8 +36,8 @@ export function AddPersonaDocumentForm({ onSuccess, onCancel }: AddPersonaDocume
             onClick={() => setMode('individual')}
             className="flex flex-col items-center p-6 border-2 border-gray-200 rounded-lg hover:border-primary hover:bg-gray-50 transition-all cursor-pointer group"
           >
-            <div className="w-16 h-16 rounded-full bg-blue-100 flex items-center justify-center mb-4 group-hover:bg-blue-200 transition-colors">
-              <FileText className="w-8 h-8 text-blue-600" />
+            <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mb-4 group-hover:bg-gray-200 transition-colors">
+              <FileText className="w-8 h-8 text-gray-600" />
             </div>
             <h3 className="font-semibold text-lg mb-2">Documento Individual</h3>
             <p className="text-sm text-gray-600 text-center">

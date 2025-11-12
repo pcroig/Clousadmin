@@ -21,7 +21,18 @@ interface ConfirmarImportacionBody {
 
 /**
  * POST /api/empleados/importar-excel/confirmar
- * Crea empleados, usuarios, equipos y envía invitaciones
+ * 
+ * FASE 2: Crea empleados, usuarios, equipos y envía invitaciones
+ * 
+ * IMPORTANTE: Este endpoint SÍ guarda datos en la base de datos.
+ * Debe ser llamado después de que el usuario revise el preview y confirme.
+ * 
+ * Flujo completo:
+ * 1. POST /api/empleados/importar-excel (análisis, NO guarda)
+ * 2. Usuario revisa preview
+ * 3. POST /api/empleados/importar-excel/confirmar (guarda en BD)
+ * 
+ * @see docs/funcionalidades/importacion-empleados-excel.md
  */
 export async function POST(req: NextRequest) {
   try {

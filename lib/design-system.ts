@@ -88,8 +88,8 @@ export const badgeVariants = {
   /** Estado cancelado/neutral */
   cancelled: 'bg-gray-100 text-gray-800',
 
-  /** Estado editado/info */
-  edited: 'bg-blue-100 text-blue-800',
+  /** Estado editado/modificado */
+  edited: 'bg-gray-100 text-gray-800',
 
   /** Estado completo */
   complete: 'bg-green-100 text-green-800',

@@ -211,7 +211,6 @@ export async function GET(req: NextRequest) {
       case 'resumen':
         return await generarResumen(session.user.empresaId, anio, mes, formato);
       
-      case 'departamento':
       case 'equipos':
         return await generarPorEquipos(session.user.empresaId, anio, formato);
       

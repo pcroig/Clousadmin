@@ -14,14 +14,14 @@ interface AnalyticsFiltersProps {
   filters: FilterValues
   onFilterChange: (key: keyof FilterValues, value: string) => void
   onExport?: () => Promise<void>
-  departamentos?: string[]
+  equipos?: string[]
 }
 
 export function AnalyticsFilters({
   filters,
   onFilterChange,
   onExport,
-  departamentos = [],
+  equipos = [],
 }: AnalyticsFiltersProps) {
   return (
     <div className="flex items-center gap-3">
@@ -48,10 +48,10 @@ export function AnalyticsFilters({
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="todos">Todos los equipos</SelectItem>
-          {departamentos.length > 0 ? (
-            departamentos.map((equipo) => (
-              <SelectItem key={equipo} value={equipo}>
-                {equipo}
+          {equipos.length > 0 ? (
+            equipos.map((nombre) => (
+              <SelectItem key={nombre} value={nombre}>
+                {nombre}
               </SelectItem>
             ))
           ) : (

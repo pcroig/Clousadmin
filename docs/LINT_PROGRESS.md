@@ -160,11 +160,12 @@ Endpoints con errores any que necesitan tipado:
 
 ## Próximos Pasos
 
-1. Continuar con lib/utils.ts, lib/env.ts, lib/crypto.ts
-2. Limpiar todos los archivos de lib/hooks/**
-3. Limpiar lib/calculos/**
-4. Abordar app/api/** endpoints por orden de uso
-5. Decidir estrategia para lib/ia/** (complejo, podría ser opcional)
+1. Analizar nuevos módulos ya saneados (Mi Espacio, onboarding) para marcarlos como completados.
+2. Continuar con lib/utils.ts, lib/env.ts, lib/crypto.ts.
+3. Limpiar todos los archivos de lib/hooks/**.
+4. Limpiar lib/calculos/**.
+5. Abordar app/api/** endpoints por orden de uso.
+6. Decidir estrategia para lib/ia/** (complejo, podría ser opcional).
 
 ## Notas
 

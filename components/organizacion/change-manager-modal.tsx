@@ -94,7 +94,7 @@ export function ChangeManagerModal({
                 onClick={() => setSelectedManagerId(null)}
                 className={`w-full flex items-center gap-3 p-3 rounded-lg border transition-colors ${
                   selectedManagerId === null
-                    ? 'border-blue-600 bg-blue-50'
+                    ? 'border-primary bg-primary/5'
                     : 'border-gray-200 hover:bg-gray-50'
                 }`}
               >
@@ -105,7 +105,7 @@ export function ChangeManagerModal({
                   <p className="text-sm font-medium text-gray-900">Sin responsable</p>
                 </div>
                 {selectedManagerId === null && (
-                  <Check className="h-5 w-5 text-blue-600" />
+                  <Check className="h-5 w-5 text-primary" />
                 )}
               </button>
 
@@ -119,7 +119,7 @@ export function ChangeManagerModal({
                     onClick={() => setSelectedManagerId(member.id)}
                     className={`w-full flex items-center gap-3 p-3 rounded-lg border transition-colors ${
                       selectedManagerId === member.id
-                        ? 'border-blue-600 bg-blue-50'
+                        ? 'border-primary bg-primary/5'
                         : 'border-gray-200 hover:bg-gray-50'
                     }`}
                   >
@@ -136,7 +136,7 @@ export function ChangeManagerModal({
                       <p className="text-sm font-medium text-gray-900">{member.nombre}</p>
                     </div>
                     {selectedManagerId === member.id && (
-                      <Check className="h-5 w-5 text-blue-600" />
+                      <Check className="h-5 w-5 text-primary" />
                     )}
                   </button>
                 );

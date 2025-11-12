@@ -116,10 +116,10 @@ export function FichajesTab({ empleadoId }: { empleadoId: string }) {
 
   function getEstadoBadge(estado: string) {
     const variants: Record<string, { label: string; className: string }> = {
-      en_curso: { label: 'En Curso', className: 'bg-blue-100 text-blue-800' },
+      en_curso: { label: 'En Curso', className: 'bg-yellow-100 text-yellow-800' },
       finalizado: { label: 'Finalizado', className: 'bg-green-100 text-green-800' },
       revisado: { label: 'Revisado', className: 'bg-gray-100 text-gray-800' },
-      pendiente: { label: 'Pendiente', className: 'bg-yellow-100 text-yellow-800' },
+      pendiente: { label: 'Pendiente', className: 'bg-gray-100 text-gray-800' },
     };
     const variant = variants[estado] || variants.finalizado;
     return <Badge className={variant.className}>{variant.label}</Badge>;

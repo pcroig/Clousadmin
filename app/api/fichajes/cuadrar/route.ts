@@ -174,7 +174,7 @@ export async function POST(request: NextRequest) {
           // Crear salida si falta (no crear si hay ausencia de tarde)
           if (!tiposEventos.includes('salida') 
               && validacion.eventosFaltantes.includes('salida')
-              && (!ausenciaMedioDia.tieneAusencia || ausenciaMedioDia.medioDia === 'mañana')) {
+              && (!ausenciaMedioDia.tieneAusencia || ausenciaMedioDia.medioDia === 'manana')) {
             const [horas, minutos] = configDia.salida.split(':').map(Number);
             const horaSalida = new Date(fechaBase);
             horaSalida.setHours(horas, minutos, 0, 0);
@@ -261,7 +261,7 @@ export async function POST(request: NextRequest) {
 
           // Crear salida si falta (no crear si hay ausencia de tarde)
           if (validacion.eventosFaltantes.includes('salida')
-              && (!ausenciaMedioDia.tieneAusencia || ausenciaMedioDia.medioDia === 'mañana')) {
+              && (!ausenciaMedioDia.tieneAusencia || ausenciaMedioDia.medioDia === 'manana')) {
             const descansoMs = config.descansoMinimo
               ? (() => {
                   const [h, m] = config.descansoMinimo.split(':').map(Number);

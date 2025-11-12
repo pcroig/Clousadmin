@@ -242,7 +242,7 @@ export function AnalyticsClient() {
         <AnalyticsFilters
           filters={filters}
           onFilterChange={handleFilterChange}
-          departamentos={equipos.map((e) => e.nombre)}
+          equipos={equipos.map((e) => e.nombre)}
         />
       </div>
 

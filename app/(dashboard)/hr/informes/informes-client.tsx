@@ -43,12 +43,12 @@ const ausenciasTipoData = [
   { tipo: 'Otros', value: 10, color: '#EFEFED' },
 ];
 
-const departamentosData = [
-  { departamento: 'Tech', empleados: 25 },
-  { departamento: 'Ventas', empleados: 18 },
-  { departamento: 'Marketing', empleados: 12 },
-  { departamento: 'HR', empleados: 8 },
-  { departamento: 'Finanzas', empleados: 10 },
+const equiposData = [
+  { equipo: 'Tech', empleados: 25 },
+  { equipo: 'Ventas', empleados: 18 },
+  { equipo: 'Marketing', empleados: 12 },
+  { equipo: 'HR', empleados: 8 },
+  { equipo: 'Finanzas', empleados: 10 },
 ];
 
 const horasTrabajadasData = [
@@ -60,7 +60,7 @@ const horasTrabajadasData = [
 
 export function InformesClient() {
   const [periodo, setPeriodo] = useState('ultimo-mes');
-  const [departamento, setDepartamento] = useState('todos');
+  const [equipo, setEquipo] = useState('todos');
 
   const handleExport = () => {
     // TODO: Implement export functionality
@@ -90,11 +90,11 @@ export function InformesClient() {
               </SelectContent>
             </Select>
 
-            {/* Filtro de Departamento */}
-            <Select value={departamento} onValueChange={setDepartamento}>
+            {/* Filtro de Equipo */}
+            <Select value={equipo} onValueChange={setEquipo}>
               <SelectTrigger className="w-[180px]">
                 <Users className="w-4 h-4 mr-2" />
-                <SelectValue placeholder="Departamento" />
+                <SelectValue placeholder="Equipo" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="todos">Todos</SelectItem>
@@ -185,15 +185,15 @@ export function InformesClient() {
         <div>
           <h2 className="text-lg font-semibold text-gray-900 mb-4">Plantilla</h2>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Gráfico 3: Empleados por Departamento */}
+            {/* Gráfico 3: Empleados por Equipo */}
             <Card className="p-6">
               <h3 className="text-base font-medium text-gray-700 mb-4">
-                Empleados por Departamento
+                Empleados por Equipo
               </h3>
               <ResponsiveContainer width="100%" height={250}>
-                <BarChart data={departamentosData}>
+                <BarChart data={equiposData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#EFEFED" />
-                  <XAxis dataKey="departamento" stroke="#6B6A64" />
+                  <XAxis dataKey="equipo" stroke="#6B6A64" />
                   <YAxis stroke="#6B6A64" />
                   <Tooltip />
                   <Bar dataKey="empleados" fill="#d97757" />

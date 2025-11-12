@@ -161,6 +161,25 @@ export async function verificarInvitacionSignup(token: string) {
 }
 
 /**
+ * Obtener invitación por token (aunque esté usada)
+ * Útil para continuar onboarding después de crear la cuenta
+ */
+export async function obtenerInvitacionSignupPorToken(token: string) {
+  if (!token || token.trim() === '') {
+    return null;
+  }
+
+  try {
+    return await prisma.invitacionSignup.findUnique({
+      where: { token },
+    });
+  } catch (error) {
+    console.error('[obtenerInvitacionSignupPorToken] Error:', error);
+    return null;
+  }
+}
+
+/**
  * Marcar invitación como usada
  */
 export async function usarInvitacionSignup(token: string) {

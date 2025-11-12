@@ -1,0 +1,33 @@
+name: Cron - Clasificar Fichajes
+
+on:
+  schedule:
+    # Se ejecuta todas las noches a las 23:30 UTC (00:30 España invierno, 01:30 verano)
+    - cron: '30 23 * * *'
+  workflow_dispatch:  # Permite ejecución manual para testing
+
+jobs:
+  clasificar-fichajes:
+    name: Cerrar jornadas del día anterior
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Ejecutar cierre de jornadas
+        run: |
+          response=$(curl -X POST ${{ secrets.APP_URL }}/api/cron/clasificar-fichajes \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            -w "\n%{http_code}" -s)
+          
+          http_code=$(echo "$response" | tail -n1)
+          body=$(echo "$response" | sed '$d')
+          
+          echo "Status Code: $http_code"
+          echo "Response: $body"
+          
+          if [ "$http_code" != "200" ]; then
+            echo "❌ Error: El cron falló con código $http_code"
+            exit 1
+          fi
+          
+          echo "✅ Cron ejecutado correctamente"
+

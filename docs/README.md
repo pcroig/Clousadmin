@@ -42,6 +42,7 @@ docs/
 │   ├── festivos.md
 │   ├── fichajes.md
 │   ├── gestion-nominas.md
+│   ├── importacion-empleados-excel.md # ✨ Importación masiva de empleados desde Excel
 │   ├── importacion-puestos-zip.md
 │   ├── jornadas.md
 │   ├── offboarding.md

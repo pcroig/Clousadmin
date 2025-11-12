@@ -8,6 +8,7 @@
 import { memo } from 'react';
 import { Bell, AlertCircle } from 'lucide-react';
 import { WidgetCard } from './widget-card';
+import { EmptyState } from './empty-state';
 
 export interface Notificacion {
   id: string;
@@ -41,9 +42,12 @@ export const NotificacionesWidget = memo(function NotificacionesWidget({
     >
       <div className="space-y-0">
         {notificacionesMostradas.length === 0 ? (
-          <div className="text-[13px] text-gray-500 text-center py-8">
-            No hay notificaciones
-          </div>
+          <EmptyState
+            layout="widget"
+            icon={Bell}
+            title="Sin notificaciones"
+            description="Aquí verás las últimas novedades en cuanto aparezcan."
+          />
         ) : (
           notificacionesMostradas.map((notif) => (
             <div

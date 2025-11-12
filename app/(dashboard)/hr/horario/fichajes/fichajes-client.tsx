@@ -355,10 +355,10 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
 
   function getFichajeBadge(estado: string) {
     const variants: Record<string, { label: string; className: string }> = {
-      en_curso: { label: 'En curso', className: 'bg-blue-100 text-blue-800' },
+      en_curso: { label: 'En curso', className: 'bg-yellow-100 text-yellow-800' },
       finalizado: { label: 'Finalizado', className: 'bg-green-100 text-green-800' },
       revisado: { label: 'Revisado', className: 'bg-green-50 text-green-700 border-green-200 border' },
-      pendiente: { label: 'Pendiente', className: 'bg-yellow-100 text-yellow-800' },
+      pendiente: { label: 'Pendiente', className: 'bg-gray-100 text-gray-800' },
       // Estados legacy (compatibilidad temporal con datos existentes)
       pendiente_revision: { label: 'Pendiente', className: 'bg-yellow-100 text-yellow-800' },
       aprobado: { label: 'Finalizado', className: 'bg-green-100 text-green-800' },

@@ -246,7 +246,7 @@ export function DocumentosClient({ carpetas }: DocumentosClientProps) {
             {carpetas.length === 0 && (
               <div className="col-span-full">
                 <EmptyState
-                  variant="primary"
+                  layout="card"
                   icon={Folder}
                   title="No hay carpetas creadas"
                   description="Crea tu primera carpeta para organizar los documentos de la empresa"

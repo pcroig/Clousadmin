@@ -31,7 +31,6 @@ export interface Empleado {
   salarioBrutoMensual?: number | null;
   tipoContrato?: string | null;
   puestoId?: string | null;
-  departamento?: string | null;
   categoriaProfesional?: string | null;
   grupoCotizacion?: string | null;
   jornadaId?: string | null;

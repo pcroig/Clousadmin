@@ -353,7 +353,7 @@ export function FichajesEmpleadoClient({ balanceInicial }: Props) {
                                       {f.tipo.replace('_', ' ')}
                                     </Badge>
                                     {f.editado && (
-                                      <Badge className="bg-blue-100 text-blue-800 text-xs">Editado</Badge>
+                                      <Badge className="bg-gray-100 text-gray-800 text-xs">Editado</Badge>
                                     )}
                                     {f.estado !== 'confirmado' && (
                                       <Badge className="bg-yellow-100 text-yellow-800 text-xs">{f.estado}</Badge>

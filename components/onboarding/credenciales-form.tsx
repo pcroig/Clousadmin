@@ -10,10 +10,12 @@ import { LoadingButton } from '@/components/shared/loading-button';
 import { toast } from 'sonner';
 import { getAvatarStyle } from '@/lib/design-system';
 
-interface OnboardingEmpleado {
+export interface OnboardingEmpleado {
   nombre?: string;
   apellidos?: string;
-  usuario?: { image?: string | null };
+  usuario?: { image?: string | null } | null;
+  empresaId?: string;
+  id?: string;
   [key: string]: unknown;
 }
 

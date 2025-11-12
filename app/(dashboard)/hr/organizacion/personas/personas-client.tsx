@@ -115,7 +115,7 @@ export function PersonasClient({ empleados }: PersonasClientProps) {
         <h1 className="text-2xl font-bold">Personas</h1>
         <div className="flex items-center gap-3">
           <Button
-            variant="outline"
+            variant="ghost"
             size="icon"
             onClick={() => setDenunciasDetailsOpen(true)}
             className="rounded-lg"

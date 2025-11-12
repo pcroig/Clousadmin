@@ -6,7 +6,7 @@
 'use client';
 
 import { memo, useCallback, useMemo, useState } from 'react';
-import { CheckCircle, XCircle } from 'lucide-react';
+import { CheckCircle, XCircle, ClipboardList } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
@@ -16,6 +16,7 @@ import {
   type SolicitudAccion,
   type SolicitudTipo,
 } from '@/lib/services/solicitudes-actions';
+import { EmptyState } from './empty-state';
 
 export interface Solicitud {
   id: string;
@@ -126,9 +127,12 @@ export const SolicitudesWidget = memo(function SolicitudesWidget({
     >
       <div className="space-y-0">
         {solicitudesMostradas.length === 0 ? (
-          <div className="text-[13px] text-gray-500 text-center py-8">
-            No hay solicitudes pendientes
-          </div>
+          <EmptyState
+            layout="widget"
+            icon={ClipboardList}
+            title="Sin solicitudes pendientes"
+            description="Todo al día por ahora."
+          />
         ) : (
           solicitudesMostradas.map((solicitud) => {
             const estaProcesando = accionEnCurso?.id === solicitud.id;
@@ -186,7 +190,7 @@ export const SolicitudesWidget = memo(function SolicitudesWidget({
       {solicitudes.length > maxItems && (
         <div className="mt-3 pt-3 border-t border-gray-200">
           <Link href={dashboardHref} className="block text-center">
-            <span className="text-[13px] text-blue-600 hover:text-blue-700 font-medium">
+            <span className="text-[13px] text-primary hover:text-primary/80 font-medium">
               Ver todas ({solicitudes.length})
             </span>
           </Link>

@@ -31,6 +31,12 @@ export type SignupInput = z.infer<typeof signupSchema>;
 export const sedeCreateSchema = z.object({
   ciudad: z.string().min(1, 'Ciudad requerida'),
   empresaId: z.string().uuid(),
+  asignacion: z
+    .object({
+      tipo: z.enum(['empresa', 'equipo']),
+      equipoId: z.string().uuid().optional(),
+    })
+    .optional(),
 });
 
 export type SedeCreateInput = z.infer<typeof sedeCreateSchema>;
@@ -132,6 +138,7 @@ export const ausenciaCreateSchema = z.object({
     z.date(),
   ]),
   medioDia: z.boolean().default(false),
+  periodo: z.enum(['manana', 'tarde']).optional(), // Solo cuando medioDia=true
   descripcion: z.string().optional(),
   motivo: z.string().optional(),
   justificanteUrl: z.string().url().optional(),
@@ -177,6 +184,7 @@ export const ausenciaUpdateSchema = z.object({
   fechaInicio: z.string().or(z.date()).optional(),
   fechaFin: z.string().or(z.date()).optional(),
   medioDia: z.boolean().optional(),
+  periodo: z.enum(['manana', 'tarde']).optional().nullable(), // Solo cuando medioDia=true
   descripcion: z.string().optional().nullable(),
   motivo: z.string().optional().nullable(),
   justificanteUrl: z.string().url().optional().nullable(),

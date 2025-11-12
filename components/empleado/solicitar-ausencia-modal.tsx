@@ -14,6 +14,11 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { InfoTooltip } from '@/components/shared/info-tooltip';
 import { Spinner } from '@/components/ui/spinner';
+import {
+  PERIODO_MEDIO_DIA_LABELS,
+  PERIODOS_MEDIO_DIA_OPTIONS,
+  PeriodoMedioDiaValue,
+} from '@/lib/constants/enums';
 
 interface ErrorDetail {
   field?: string;
@@ -115,6 +120,7 @@ export function SolicitarAusenciaModal({
   const [fechaInicio, setFechaInicio] = useState<Date>();
   const [fechaFin, setFechaFin] = useState<Date>();
   const [medioDia, setMedioDia] = useState(false);
+  const [periodo, setPeriodo] = useState<PeriodoMedioDiaValue>('manana');
   const [descripcion, setDescripcion] = useState('');
   const [justificante, setJustificante] = useState<File | null>(null);
   const [uploadingJustificante, setUploadingJustificante] = useState(false);
@@ -179,6 +185,7 @@ export function SolicitarAusenciaModal({
         fechaInicio: string;
         fechaFin: string;
         medioDia: boolean;
+        periodo?: PeriodoMedioDiaValue;
         descripcion?: string;
         justificanteUrl?: string;
         documentoId?: string;
@@ -190,6 +197,11 @@ export function SolicitarAusenciaModal({
         fechaFin: fechaFin.toISOString(),
         medioDia,
       };
+      
+      // Solo incluir periodo si medioDia es true
+      if (medioDia) {
+        payload.periodo = periodo;
+      }
 
       // Solo incluir descripcion si tiene valor
       if (descripcion.trim()) {
@@ -346,17 +358,41 @@ export function SolicitarAusenciaModal({
           </div>
 
           {/* Medio Día */}
-          <div className="flex items-center space-x-2">
-            <input
-              type="checkbox"
-              id="medioDia"
-              checked={medioDia}
-              onChange={(e) => setMedioDia(e.target.checked)}
-              className="rounded border-gray-300"
-            />
-            <Label htmlFor="medioDia" className="cursor-pointer">
-              Medio día
-            </Label>
+          <div className="space-y-3">
+            <div className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                id="medioDia"
+                checked={medioDia}
+                onChange={(e) => setMedioDia(e.target.checked)}
+                className="rounded border-gray-300"
+              />
+              <Label htmlFor="medioDia" className="cursor-pointer">
+                Medio día
+              </Label>
+            </div>
+
+            {/* Periodo (solo visible cuando medioDia=true) */}
+            {medioDia && (
+              <div>
+                <Label htmlFor="periodo">¿Qué medio día?</Label>
+                <Select
+                  value={periodo}
+                  onValueChange={(value) => setPeriodo(value as PeriodoMedioDiaValue)}
+                >
+                  <SelectTrigger id="periodo">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PERIODOS_MEDIO_DIA_OPTIONS.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
           </div>
 
           {/* Descripción */}
