@@ -6,7 +6,7 @@ El módulo de Analytics proporciona visualizaciones y métricas en tiempo real s
 
 **Ubicación:** `/hr/analytics`
 **Estado:** ✅ COMPLETADO Y LISTO PARA USAR
-**Versión:** 2.1
+**Versión:** 2.2
 **Fecha:** 12 de Noviembre de 2025
 
 ---
@@ -44,6 +44,12 @@ Botón de exportación que genera un archivo Excel con 4 hojas:
 
 ### Pestaña: Plantilla
 
+**KPIs destacados:**
+1. **Total empleados**: Número total de empleados activos
+2. **Altas del mes**: Nuevas incorporaciones en el mes actual
+3. **Bajas del mes**: Finalizaciones de contrato en el mes actual
+4. **Tasa de rotación**: Porcentaje de bajas sobre el total de plantilla
+
 **Gráficas disponibles:**
 
 1. **Empleados por Equipo** (Gráfico de Barras)
@@ -62,6 +68,10 @@ Botón de exportación que genera un archivo Excel con 4 hojas:
    - Comparativa de altas vs bajas en los últimos 6 meses
    - Color verde para altas, rojo para bajas
 
+5. **Distribución por Antigüedad** (Gráfico de Donut)
+   - Empleados agrupados por años en la empresa
+   - Rangos: < 1 año, 1-3 años, 3-5 años, > 5 años
+
 **Métricas calculadas:**
 - Total de empleados activos
 - Cambio vs mes anterior
@@ -70,20 +80,41 @@ Botón de exportación que genera un archivo Excel con 4 hojas:
 - Altas y bajas del mes
 - Distribución por género
 - Evolución de altas y bajas (6 meses)
+- Distribución por antigüedad (calculada en tiempo real)
 
 ### Pestaña: Compensación
 
+**KPIs principales destacados:**
+1. **Coste total nómina**: Suma de todos los salarios brutos mensuales
+2. **Salario promedio**: Media del salario bruto mensual de la empresa
+3. **Coste por empleado**: Coste promedio de nómina por empleado
+4. **Variación coste**: Porcentaje de cambio respecto al mes anterior
+
+**KPIs de nóminas procesadas (año actual vs año anterior):**
+1. **Total neto abonado**: Total neto pagado en nóminas del año actual
+2. **Complementos abonados**: Total de complementos pagados
+3. **Nóminas procesadas**: Número total de nóminas procesadas
+
 **Gráficas disponibles:**
 
-1. **Salario Promedio por Equipo** (Gráfico de Barras)
+1. **Total neto abonado** (Gráfico de Área)
+   - Evolución mensual del total neto abonado en el año actual
+   
+2. **Coste neto por equipo** (Gráfico de Barras)
+   - Top equipos por coste total neto del año actual
+
+3. **Top complementos abonados** (Gráfico de Barras)
+   - Complementos más utilizados por importe total del año actual
+
+4. **Salario Promedio por Equipo** (Gráfico de Barras)
    - Salario bruto mensual promedio por equipo
    - En euros mensuales
 
-2. **Evolución Coste Nómina** (Gráfico de Área)
+5. **Evolución Coste Nómina** (Gráfico de Área)
    - Tendencia del coste total de nómina en los últimos 6 meses
    - Muestra la suma de todos los salarios brutos mensuales
 
-3. **Distribución Salarial** (Gráfico de Barras)
+6. **Distribución Salarial** (Gráfico de Barras)
    - Número de empleados por rango salarial anual
    - Rangos: Menos de 20k, 20k-30k, 30k-40k, 40k-50k, 50k-70k, Más de 70k
 
@@ -94,8 +125,15 @@ Botón de exportación que genera un archivo Excel con 4 hojas:
 - Salario promedio por equipo
 - Evolución de coste (6 meses)
 - Distribución salarial por rangos (6 rangos)
+- Analytics de nóminas (año actual vs anterior)
 
 ### Pestaña: Fichajes
+
+**KPIs destacados:**
+1. **Total horas mes**: Suma de horas trabajadas en el mes actual
+2. **Promedio horas/día**: Media de horas trabajadas diarias
+3. **Balance acumulado**: Horas extra o pendientes acumuladas
+4. **Tasa de absentismo**: Porcentaje de días de ausencia sobre días posibles
 
 **Gráficas disponibles:**
 
@@ -116,6 +154,7 @@ Botón de exportación que genera un archivo Excel con 4 hojas:
 3. **Tasa de Absentismo por Equipo** (Gráfico de Barras)
    - Porcentaje de ausencias por equipo
    - Calculado sobre días laborables del mes
+   - Calcula días reales de ausencia (no solo número de ausencias)
 
 **Métricas calculadas:**
 - Total horas trabajadas del mes
@@ -395,12 +434,12 @@ Content (scroll)
 | Requisito | Estado | Notas |
 |-----------|--------|-------|
 | Datos reales (Equipos N:N) | ✅ | Implementado correctamente |
-| Más gráficas, menos KPIs | ✅ | 10 gráficas, 0 KPIs |
+| Más gráficas y KPIs relevantes | ✅ | 13 gráficas + 14 KPIs destacados |
 | Sistema de pestañas | ✅ | 3 pestañas implementadas |
 | Diseño consistente | ✅ | Matching mi-espacio |
-| Tabs + Export misma altura | ✅ | Layout correcto |
+| Tabs + Export misma altura | ✅ | Layout optimizado (botones arriba) |
 | Filtros debajo de tabs | ✅ | Posición correcta |
-| Exportación Excel | ✅ | Funcional |
+| Exportación Excel | ✅ | Funcional con filtros en BD |
 | Solo HR Admin | ✅ | Autenticación implementada |
 
 **Total:** 8/8 requisitos cumplidos ✅
@@ -409,7 +448,17 @@ Content (scroll)
 
 ## 11. Changelog
 
-### Versión 2.1 (Nov 2025)
+### Versión 2.2 (12 Nov 2025)
+- ✅ Mejora del layout: botones (Exportar/Actualizar) movidos arriba a la derecha
+- ✅ Filtros reubicados debajo de las tabs para mejor UX
+- ✅ Eliminado timestamp de "última actualización" para UI más limpia
+- ✅ **KPIs destacados añadidos en Plantilla**: Total empleados, Altas/Bajas del mes, Tasa de rotación
+- ✅ **KPIs principales añadidos en Compensación**: Coste total nómina, Salario promedio, Coste por empleado, Variación coste
+- ✅ **KPI adicional en Fichajes**: Promedio horas/día
+- ✅ **Nueva gráfica en Plantilla**: Distribución por Antigüedad (calculada en tiempo real desde fechaAlta)
+- ✅ Endpoint de Plantilla actualizado con distribución por antigüedad
+
+### Versión 2.1 (12 Nov 2025)
 - ✅ Filtro de equipos basado en IDs (100% compatible con API)
 - ✅ Queries optimizados (sin N+1) para plantilla y fichajes
 - ✅ Cálculo de absentismo por días reales
