@@ -4,7 +4,7 @@
 // Analytics - Client Component con Diseño Consistente
 // ========================================
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { AnalyticsFilters, FilterValues } from '@/components/analytics/filters';
 import { BarChartComponent } from '@/components/analytics/bar-chart';
@@ -72,6 +72,12 @@ interface CompensacionData {
   cambioCoste: number;
   salarioPromedio: number;
   salarioPromedioEquipo: Array<{ equipo: string; promedio: number }>;
+  salarioPromedioPorGenero: Array<{ genero: string; promedio: number }>;
+  brechaSalarialGenero: {
+    diferencia: number;
+    porcentaje: number;
+    generoMayor: 'hombre' | 'mujer' | 'igual';
+  };
   evolucionCoste: Array<{ mes: string; coste: number }>;
   distribucionSalarial: Array<{ rango: string; empleados: number }>;
   nominas: NominasAnalytics | null;
@@ -134,6 +140,53 @@ export function AnalyticsClient() {
   ];
 
   const nominasAnalytics = compensacionData?.nominas;
+
+  const rotacionMensual = useMemo(() => {
+    if (!plantillaData) return [];
+    const headcountByMes = new Map(
+      plantillaData.evolucionPlantilla.map((item) => [item.mes, item.empleados])
+    );
+    return plantillaData.evolucionAltasBajas
+      .map((entry) => {
+        const headcount = headcountByMes.get(entry.mes) ?? plantillaData.totalEmpleados;
+        if (headcount <= 0) {
+          return { mes: entry.mes, tasa: 0 };
+        }
+        const tasa = Number(((entry.bajas / headcount) * 100).toFixed(1));
+        return {
+          mes: entry.mes,
+          tasa,
+        };
+      })
+      .filter((item) => !Number.isNaN(item.tasa));
+  }, [plantillaData]);
+
+  const brechaSalarial = useMemo(() => {
+    if (!compensacionData) return null;
+    const generoPromedios = compensacionData.salarioPromedioPorGenero ?? [];
+    const promedioHombres =
+      generoPromedios.find((item) => item.genero === 'hombre')?.promedio ?? 0;
+    const promedioMujeres =
+      generoPromedios.find((item) => item.genero === 'mujer')?.promedio ?? 0;
+
+    if (promedioHombres === 0 && promedioMujeres === 0) {
+      return null;
+    }
+
+    const diferencia = promedioHombres - promedioMujeres;
+    const porcentaje =
+      promedioMujeres > 0
+        ? Number(((diferencia / promedioMujeres) * 100).toFixed(1))
+        : 0;
+
+    return {
+      diferencia,
+      porcentaje,
+      direccion: diferencia === 0 ? 'igual' : diferencia > 0 ? 'hombre' : 'mujer',
+      promedioHombres,
+      promedioMujeres,
+    };
+  }, [compensacionData]);
 
   const fetchEquipos = useCallback(async () => {
     try {
@@ -389,6 +442,21 @@ export function AnalyticsClient() {
                 }}
                 donut
               />
+
+              <AreaChartComponent
+                title="Rotación mensual"
+                description="Bajas sobre plantilla en los últimos 6 meses"
+                data={rotacionMensual}
+                dataKey="tasa"
+                xAxisKey="mes"
+                chartConfig={{
+                  tasa: {
+                    label: 'Tasa de rotación (%)',
+                    color: '#ef4444',
+                  },
+                }}
+                className="lg:col-span-2"
+              />
             </div>
           </div>
         )}
@@ -397,7 +465,7 @@ export function AnalyticsClient() {
         {activeTab === 'compensacion' && compensacionData && (
           <div className="space-y-6">
             {/* KPIs principales de Compensación */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               <KpiCard
                 title="Coste total nómina"
                 value={formatCurrency(compensacionData.costeTotalNomina)}
@@ -407,6 +475,23 @@ export function AnalyticsClient() {
                 title="Salario promedio"
                 value={formatCurrency(compensacionData.salarioPromedio)}
                 subtitle="Bruto mensual por empleado"
+              />
+              <KpiCard
+                title="Brecha salarial (H vs M)"
+                value={
+                  brechaSalarial
+                    ? formatCurrency(Math.abs(brechaSalarial.diferencia))
+                    : 'Sin datos'
+                }
+                subtitle={
+                  brechaSalarial
+                    ? brechaSalarial.diferencia === 0
+                      ? 'Sin diferencia entre géneros'
+                      : `${brechaSalarial.direccion === 'hombre' ? 'Mayor en hombres' : 'Mayor en mujeres'} (${formatPercent(
+                          brechaSalarial.porcentaje
+                        )})`
+                    : 'No hay datos suficientes'
+                }
               />
               {nominasAnalytics && (
                 <KpiCard

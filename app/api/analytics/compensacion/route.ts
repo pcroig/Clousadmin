@@ -23,6 +23,7 @@ const empleadoConEquiposSelect = Prisma.validator<Prisma.EmpleadoSelect>()({
   salarioBrutoMensual: true,
   salarioBrutoAnual: true,
   fechaAlta: true,
+  genero: true,
   equipos: {
     select: {
       equipo: {
@@ -230,6 +231,52 @@ export async function GET(request: NextRequest) {
       })
     );
 
+    // 5. Salario promedio por género
+    const salariosPorGenero: Record<string, { total: number; count: number }> =
+      {};
+
+    empleados.forEach((empleado: EmpleadoConEquipos) => {
+      const generoKey = (empleado.genero ?? 'no_especificado').toLowerCase();
+      if (!salariosPorGenero[generoKey]) {
+        salariosPorGenero[generoKey] = { total: 0, count: 0 };
+      }
+      salariosPorGenero[generoKey].total += Number(
+        empleado.salarioBrutoMensual || 0
+      );
+      salariosPorGenero[generoKey].count += 1;
+    });
+
+    const salarioPromedioPorGenero = Object.entries(salariosPorGenero).map(
+      ([generoKey, data]) => ({
+        genero: generoKey,
+        promedio: data.count > 0 ? Math.round(data.total / data.count) : 0,
+      })
+    );
+
+    const promedioHombres =
+      salarioPromedioPorGenero.find((item) => item.genero === 'hombre')
+        ?.promedio ?? 0;
+    const promedioMujeres =
+      salarioPromedioPorGenero.find((item) => item.genero === 'mujer')
+        ?.promedio ?? 0;
+
+    const diferenciaBrecha = promedioHombres - promedioMujeres;
+    const porcentajeBrecha =
+      promedioMujeres > 0
+        ? Number(((diferenciaBrecha / promedioMujeres) * 100).toFixed(1))
+        : 0;
+
+    const brechaSalarialGenero = {
+      diferencia: Math.round(diferenciaBrecha),
+      porcentaje: porcentajeBrecha,
+      generoMayor:
+        diferenciaBrecha > 0
+          ? 'hombre'
+          : diferenciaBrecha < 0
+            ? 'mujer'
+            : 'igual',
+    } as const;
+
     // 5. Evolución coste nómina (últimos 6 meses) - OPTIMIZADO
     // Usar agregación por nóminas en lugar de queries repetidas
     const hace6Meses = new Date();
@@ -320,6 +367,12 @@ export async function GET(request: NextRequest) {
         cambioCoste: 0,
         salarioPromedio: 0,
         salarioPromedioEquipo: [],
+        salarioPromedioPorGenero: [],
+        brechaSalarialGenero: {
+          diferencia: 0,
+          porcentaje: 0,
+          generoMayor: 'igual',
+        },
         evolucionCoste,
         distribucionSalarial: [],
         nominas: null,
@@ -613,6 +666,8 @@ export async function GET(request: NextRequest) {
       cambioCoste: Math.round(cambioCoste),
       salarioPromedio: Math.round(salarioPromedio),
       salarioPromedioEquipo,
+      salarioPromedioPorGenero,
+      brechaSalarialGenero,
       evolucionCoste,
       distribucionSalarial,
       nominas: nominasAnalytics,
