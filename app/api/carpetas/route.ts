@@ -4,7 +4,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { prisma, Prisma } from '@/lib/prisma';
 
 import { UsuarioRol } from '@/lib/constants/enums';
 
@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
     const incluirCompartidas = searchParams.get('incluirCompartidas') !== 'false';
 
     // Construir where clause
-    const whereClause: any = {
+    const whereClause: Prisma.CarpetaWhereInput = {
       empresaId: session.user.empresaId,
     };
 

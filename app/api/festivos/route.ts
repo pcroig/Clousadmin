@@ -5,7 +5,7 @@
 // ========================================
 
 import { NextRequest } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { prisma, Prisma } from '@/lib/prisma';
 import {
   requireAuth,
   successResponse,
@@ -33,7 +33,7 @@ export async function GET(req: NextRequest) {
     const activoParam = searchParams.get('activo');
 
     // Construir filtros
-    const where: any = {
+    const where: Prisma.FestivoWhereInput = {
       empresaId: session.user.empresaId,
     };
 

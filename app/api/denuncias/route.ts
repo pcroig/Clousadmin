@@ -4,7 +4,7 @@
 
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
-import { prisma } from '@/lib/prisma';
+import { prisma, Prisma } from '@/lib/prisma';
 import {
   requireAuth,
   validateRequest,
@@ -43,7 +43,7 @@ export async function GET(req: NextRequest) {
     }
 
     // Filtros
-    const where: any = {
+    const where: Prisma.DenunciaWhereInput = {
       empresaId: session.user.empresaId,
     };
 

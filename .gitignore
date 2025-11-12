@@ -52,3 +52,6 @@ next-env.d.ts
 # Environment variables
 .env
 .env.backup
+
+# Claude CLI local config
+.claudeignore

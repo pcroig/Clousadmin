@@ -118,8 +118,9 @@ export async function POST(request: NextRequest) {
           openaiFileId = await uploadPDFToOpenAI(buffer, file.name);
           documentInput = openaiFileId; // Usar file_id
           console.log(`[API Extraer] PDF subido a OpenAI con file_id: ${openaiFileId}`);
-        } catch (uploadError: any) {
-          console.warn(`[API Extraer] Error subiendo PDF a OpenAI: ${uploadError.message}`);
+        } catch (uploadError: unknown) {
+          const errorMessage = uploadError instanceof Error ? uploadError.message : 'Error desconocido';
+          console.warn(`[API Extraer] Error subiendo PDF a OpenAI: ${errorMessage}`);
           // Fallback a base64 si falla el upload
           console.log(`[API Extraer] Usando base64 como fallback...`);
           const base64 = buffer.toString('base64');

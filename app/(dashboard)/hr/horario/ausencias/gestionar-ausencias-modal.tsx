@@ -284,7 +284,14 @@ export function GestionarAusenciasModal({ open, onClose, onSaved }: GestionarAus
           <DialogTitle>Gestionar Ausencias</DialogTitle>
         </DialogHeader>
 
-        <Tabs value={tab} onValueChange={(v) => setTab(v as any)}>
+        <Tabs
+          value={tab}
+          onValueChange={(value) => {
+            if (value === 'pendientes' || value === 'historial') {
+              setTab(value);
+            }
+          }}
+        >
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="saldo">Saldo Anual</TabsTrigger>
             <TabsTrigger value="calendario">Calendario Laboral</TabsTrigger>
@@ -295,7 +302,14 @@ export function GestionarAusenciasModal({ open, onClose, onSaved }: GestionarAus
           <TabsContent value="saldo" className="space-y-4">
             <Field>
               <FieldLabel>Nivel de asignación</FieldLabel>
-              <Select value={nivel} onValueChange={(v) => setNivel(v as any)}>
+              <Select
+                value={nivel}
+                onValueChange={(value) => {
+                  if (value === 'empresa' || value === 'equipo' || value === 'empleado') {
+                    setNivel(value);
+                  }
+                }}
+              >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>

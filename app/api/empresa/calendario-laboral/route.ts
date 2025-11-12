@@ -4,7 +4,7 @@
 // ========================================
 
 import { NextRequest } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { prisma, Prisma } from '@/lib/prisma';
 import {
   requireAuth,
   successResponse,
@@ -52,9 +52,9 @@ export async function PATCH(req: NextRequest) {
     }
 
     // Actualizar config con días laborables
-    const configActual = empresa.config as any;
-    const nuevaConfig = {
-      ...configActual,
+    const configActual = empresa.config as Prisma.JsonValue;
+    const nuevaConfig: Prisma.JsonValue = {
+      ...(typeof configActual === 'object' && configActual !== null ? configActual : {}),
       diasLaborables,
     };
 
@@ -93,8 +93,12 @@ export async function GET(req: NextRequest) {
       return badRequestResponse('Empresa no encontrada');
     }
 
-    const config = empresa.config as any;
-    const diasLaborables = config.diasLaborables || {
+    const config = empresa.config as Prisma.JsonValue;
+    const diasLaborables = (
+      typeof config === 'object' && config !== null && 'diasLaborables' in config
+        ? config.diasLaborables
+        : null
+    ) || {
       lunes: true,
       martes: true,
       miercoles: true,

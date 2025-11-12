@@ -4,7 +4,7 @@
 // POST: Aprobar automáticamente todas las solicitudes pendientes
 
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { prisma, Prisma } from '@/lib/prisma';
 import { requireAuthAsHROrManager, handleApiError } from '@/lib/api-handler';
 
 import { EstadoAusencia, EstadoSolicitud } from '@/lib/constants/enums';
@@ -193,10 +193,10 @@ export async function POST(req: NextRequest) {
 
           // Aplicar cambios al empleado con validación de campos permitidos
           if (solicitud.camposCambiados && typeof solicitud.camposCambiados === 'object') {
-            const cambios = solicitud.camposCambiados as Record<string, any>;
+            const cambios = solicitud.camposCambiados as Record<string, unknown>;
 
             // Filtrar solo campos permitidos
-            const cambiosValidados: Record<string, any> = {};
+            const cambiosValidados: Prisma.EmpleadoUpdateInput = {};
             const camposRechazados: string[] = [];
 
             for (const [campo, valor] of Object.entries(cambios)) {

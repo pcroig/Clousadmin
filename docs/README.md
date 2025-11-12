@@ -16,6 +16,7 @@ docs/
 ├── HOOKS_REUTILIZABLES.md            # Hooks compartidos useApi/useMutation
 ├── INVITAR_USUARIOS.md              # Flujo de invitaciones y alta de usuarios
 ├── MIGRACION_ENUMS_Y_DEPARTAMENTO.md # Histórico de migraciones críticas
+├── ANALISIS_RENDIMIENTO_COMPLETO.md   # ✨ Análisis completo de rendimiento (132 problemas identificados)
 ├── OPTIMIZACION_PENDIENTE.md         # Lista de optimizaciones en curso
 ├── OPTIMIZACION_PRISMA.md            # Optimización de consultas Prisma
 ├── PATRONES_CODIGO.md                # Patrones de código compartidos
@@ -83,7 +84,8 @@ docs/
 3. Los **patrones de API** están en `API_REFACTORING.md` (refactorización 2025-01-27)
 4. La **documentación de funcionalidades** está en `funcionalidades/`
 5. Los **logs diarios** y consolidado mensual están en `daily/`
-6. Las **optimizaciones en curso** están en `OPTIMIZACION_PENDIENTE.md` y `PLAN_OPTIMIZACION_UNIFICADO.md`
+6. El **análisis completo de rendimiento** está en `ANALISIS_RENDIMIENTO_COMPLETO.md` (132 problemas identificados)
+7. Las **optimizaciones en curso** están en `OPTIMIZACION_PENDIENTE.md` y `PLAN_OPTIMIZACION_UNIFICADO.md`
 
 ### Para desplegar
 1. Sigue `SETUP.md` sección "Despliegue"

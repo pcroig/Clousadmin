@@ -39,7 +39,7 @@ interface Ausencia {
 
 export default function HorarioPage() {
   const [activeTab, setActiveTab] = useState('fichajes');
-  const [selectedItem, setSelectedItem] = useState<any>(null);
+  const [selectedItem, setSelectedItem] = useState<Ausencia | null>(null);
   const [currentMonth, setCurrentMonth] = useState('jun 2025');
 
   // Datos de ejemplo - Fichajes

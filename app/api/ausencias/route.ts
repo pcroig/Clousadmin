@@ -26,6 +26,7 @@ import {
 
 import { EstadoAusencia, UsuarioRol, TipoAusencia } from '@/lib/constants/enums';
 import { determinarEstadoTrasAprobacion } from '@/lib/calculos/ausencias';
+import type { Prisma } from '@prisma/client';
 
 // GET /api/ausencias - Listar ausencias
 export async function GET(req: NextRequest) {
@@ -40,7 +41,7 @@ export async function GET(req: NextRequest) {
     const empleadoId = searchParams.get('empleadoId');
 
     // Filtros base
-    const where: any = {
+    const where: Prisma.AusenciaWhereInput = {
       empresaId: session.user.empresaId,
     };
 

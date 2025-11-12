@@ -22,13 +22,27 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Clock, Edit2, Plus } from 'lucide-react';
-import { EditarJornadaModal } from './editar-jornada-modal';
+import { EditarJornadaModal, type JornadaDetalle } from './editar-jornada-modal';
+import type { JornadaConfig, DiaConfig } from '@/lib/calculos/fichajes-helpers';
 
-interface Jornada {
+type DiaKey = 'lunes' | 'martes' | 'miercoles' | 'jueves' | 'viernes' | 'sabado' | 'domingo';
+
+const DIA_KEYS: DiaKey[] = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo'];
+
+const isDiaConfig = (value: unknown): value is DiaConfig =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+const getDiaConfig = (config: JornadaConfig | null | undefined, dia: DiaKey): DiaConfig | undefined => {
+  if (!config) return undefined;
+  const value = config[dia];
+  return isDiaConfig(value) ? value : undefined;
+};
+
+interface JornadaResumen {
   id: string;
   nombre: string;
   horasSemanales: number;
-  config: any;
+  config: JornadaConfig | null;
   activa: boolean;
   _count?: {
     empleados: number;
@@ -41,7 +55,7 @@ interface JornadasModalProps {
 }
 
 export function JornadasModal({ open, onClose }: JornadasModalProps) {
-  const [jornadas, setJornadas] = useState<Jornada[]>([]);
+  const [jornadas, setJornadas] = useState<JornadaResumen[]>([]);
   const [cargando, setCargando] = useState(false);
   const [editarModal, setEditarModal] = useState<{
     open: boolean;
@@ -82,10 +96,10 @@ export function JornadasModal({ open, onClose }: JornadasModalProps) {
     });
   }
 
-  function handleEditar(jornada: Jornada) {
+  function handleEditar(jornada: JornadaResumen) {
     setEditarModal({
       open: true,
-      jornada,
+      jornada: jornada as JornadaDetalle,
       modo: 'editar',
     });
   }
@@ -99,9 +113,12 @@ export function JornadasModal({ open, onClose }: JornadasModalProps) {
     cargarJornadas(); // Recargar lista
   }
 
-  function getTipoBadge(jornada: Jornada) {
-    const config = jornada.config || {};
-    const esFija = Object.values(config).some((dia: any) => dia.entrada && dia.salida);
+  function getTipoBadge(jornada: JornadaResumen) {
+    const config = jornada.config;
+    const esFija = DIA_KEYS.some((dia) => {
+      const diaConfig = getDiaConfig(config, dia);
+      return Boolean(diaConfig?.entrada && diaConfig?.salida);
+    });
 
     return esFija ? (
       <Badge className="bg-green-100 text-green-800">Fija</Badge>
@@ -110,9 +127,11 @@ export function JornadasModal({ open, onClose }: JornadasModalProps) {
     );
   }
 
-  function getDescripcion(jornada: Jornada) {
-    const config = jornada.config || {};
-    const primerDiaActivo = Object.entries(config).find(([_, dia]: any) => dia.activo)?.[1] as any;
+  function getDescripcion(jornada: JornadaResumen) {
+    const config = jornada.config;
+    const primerDiaActivo = DIA_KEYS.map((dia) => getDiaConfig(config, dia)).find(
+      (diaConfig) => diaConfig?.activo
+    );
 
     if (primerDiaActivo?.entrada && primerDiaActivo?.salida) {
       return `${primerDiaActivo.entrada} - ${primerDiaActivo.salida}`;

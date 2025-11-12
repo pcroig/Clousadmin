@@ -18,7 +18,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { LoadingButton } from '@/components/shared/loading-button';
 import { CompensacionModal } from '@/components/hr/compensacion-modal';
 import { getAvatarStyle } from '@/lib/design-system';
-import type { Empleado, Usuario, MiEspacioEmpleado } from '@/types/empleado';
+import type { Usuario, MiEspacioEmpleado } from '@/types/empleado';
 import { GeneralTab as GeneralTabShared } from '@/components/shared/mi-espacio/general-tab';
 import { FichajesTab as FichajesTabShared } from '@/components/shared/mi-espacio/fichajes-tab';
 import { ContratosTab as ContratosTabShared } from '@/components/shared/mi-espacio/contratos-tab';
@@ -26,8 +26,28 @@ import { DocumentosTab as DocumentosTabShared } from '@/components/shared/mi-esp
 import { getAusenciaEstadoLabel } from '@/lib/utils/formatters';
 import { EstadoAusencia } from '@/lib/constants/enums';
 
+interface AusenciaResumen {
+  id: string;
+  tipo: string;
+  fechaInicio: string;
+  fechaFin: string;
+  diasLaborables: number | null;
+  estado: string;
+  motivo: string | null;
+}
+
+interface EmpleadoDetalle {
+  id: string;
+  nombre: string;
+  apellidos: string;
+  email: string;
+  fotoUrl?: string | null;
+  diasVacaciones?: number | null;
+  ausencias?: AusenciaResumen[];
+}
+
 interface EmpleadoDetailClientProps {
-  empleado: Empleado;
+  empleado: EmpleadoDetalle;
   empleadoMiEspacio: MiEspacioEmpleado;
   usuario: Usuario;
 }
@@ -37,7 +57,7 @@ export function EmpleadoDetailClient({ empleado, empleadoMiEspacio, usuario }: E
   const [activeTab, setActiveTab] = useState('general');
 
   // Función helper para actualizar campos del empleado
-  const handleFieldUpdate = async (field: string, value: any) => {
+  const handleFieldUpdate = async (field: string, value: unknown) => {
     try {
       const response = await fetch(`/api/empleados/${empleado.id}`, {
         method: 'PATCH',
@@ -155,22 +175,22 @@ export function EmpleadoDetailClient({ empleado, empleadoMiEspacio, usuario }: E
 // AusenciasTab Component
 // ========================================
 interface AusenciasTabProps {
-  empleado: Empleado;
+  empleado: EmpleadoDetalle;
 }
 
 function AusenciasTab({ empleado }: AusenciasTabProps) {
   // Calcular saldo de ausencias
   const calcularSaldo = () => {
     const totalDias = empleado.diasVacaciones || 22;
-    const ausencias = empleado.ausencias || [];
+    const ausencias = empleado.ausencias ?? [];
 
     const diasUsados = ausencias
-      .filter((a: any) => a.estado === 'approved')
-      .reduce((sum: number, a: any) => sum + (a.diasLaborables || 0), 0);
+      .filter((a) => a.estado === 'approved')
+      .reduce((sum, a) => sum + (a.diasLaborables ?? 0), 0);
 
     const diasPendientes = ausencias
-      .filter((a: any) => a.estado === 'pending')
-      .reduce((sum: number, a: any) => sum + (a.diasLaborables || 0), 0);
+      .filter((a) => a.estado === 'pending')
+      .reduce((sum, a) => sum + (a.diasLaborables ?? 0), 0);
 
     const diasDisponibles = totalDias - diasUsados - diasPendientes;
 
@@ -183,11 +203,12 @@ function AusenciasTab({ empleado }: AusenciasTabProps) {
   };
 
   const saldo = calcularSaldo();
-  const ausencias = empleado.ausencias || [];
+  const ausencias = empleado.ausencias ?? [];
 
   // Ordenar ausencias por fecha (más recientes primero)
-  const ausenciasOrdenadas = ausencias.sort((a: any, b: any) => 
-    new Date(b.fechaInicio).getTime() - new Date(a.fechaInicio).getTime()
+  const ausenciasOrdenadas = [...ausencias].sort(
+    (a, b) =>
+      new Date(b.fechaInicio).getTime() - new Date(a.fechaInicio).getTime()
   );
 
   const getEstadoBadge = (estado: string) => {
@@ -272,7 +293,7 @@ function AusenciasTab({ empleado }: AusenciasTabProps) {
                 </TableCell>
               </TableRow>
             ) : (
-              ausenciasOrdenadas.map((ausencia: any) => (
+              ausenciasOrdenadas.map((ausencia) => (
                 <TableRow key={ausencia.id}>
                   <TableCell className="font-medium">
                     {getTipoLabel(ausencia.tipo)}

@@ -7,7 +7,6 @@ import {
   handleApiError,
   successResponse,
   notFoundResponse,
-  forbiddenResponse,
   badRequestResponse,
 } from '@/lib/api-handler';
 import {
@@ -214,7 +213,7 @@ export async function PATCH(
 
     // Preparar datos para actualización
     // Limpiar campos undefined para evitar errores de Prisma
-    const datosParaActualizar: any = {};
+    const datosParaActualizar: Prisma.EmpleadoUpdateInput = {};
     
     // Solo incluir campos que tienen valores definidos y válidos
     if (empleadoData.fechaNacimiento !== undefined) {
@@ -272,7 +271,7 @@ export async function PATCH(
       // Actualizar datos del empleado con encriptación
       // Filtrar campos undefined/nulos que no deben actualizarse
       const datosLimpios = Object.fromEntries(
-        Object.entries(datosEncriptados).filter(([_, value]) => value !== undefined)
+        Object.entries(datosEncriptados).filter(([, value]) => value !== undefined)
       );
       
       // Si no hay datos para actualizar, retornar el empleado actual

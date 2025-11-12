@@ -5,7 +5,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { prisma, Prisma } from "@/lib/prisma";
 import { OAuthManager } from "@/lib/oauth/oauth-manager";
 import { getGoogleOAuthConfig } from "@/lib/oauth/config";
 import { createCalendarProvider } from "@/lib/integrations/calendar/providers";
@@ -145,14 +145,15 @@ async function processCalendarChanges(integracionId: string) {
           });
 
           // Eliminar del mapa
-          const { [ausenciaId]: _, ...restMap } = ausenciaEventMap;
+          const { [ausenciaId]: removed, ...restMap } = ausenciaEventMap;
+          void removed; // Explicitly mark as unused
           await prisma.integracion.update({
             where: { id: integracionId },
             data: {
               config: {
                 ...config,
                 ausenciaEventMap: restMap,
-              } as any,
+              } as Prisma.JsonValue,
             },
           });
         }

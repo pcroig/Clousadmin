@@ -3,7 +3,7 @@
 // ========================================
 
 import { NextRequest } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { prisma, Prisma } from '@/lib/prisma';
 import {
   requireAuth,
   validateRequest,
@@ -20,7 +20,7 @@ import { EstadoSolicitud, UsuarioRol } from '@/lib/constants/enums';
 // Schema de validación
 const solicitudCreateSchema = z.object({
   tipo: z.enum(['cambio_datos', 'fichaje_correccion', 'ausencia_modificacion', 'documento']),
-  camposCambiados: z.record(z.string(), z.any()),
+  camposCambiados: z.record(z.string(), z.unknown()),
   motivo: z.string().optional(),
 });
 
@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
 
     // Si es empleado, solo ver sus propias solicitudes
     // Si es HR Admin o Manager, ver todas las solicitudes
-    const where: any = {
+    const where: Prisma.SolicitudCambioWhereInput = {
       empresaId: session.user.empresaId,
       estado,
     };

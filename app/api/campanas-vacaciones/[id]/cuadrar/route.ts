@@ -3,7 +3,7 @@
 // ========================================
 
 import { NextRequest } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { prisma, Prisma } from '@/lib/prisma';
 import { cuadrarVacacionesIA } from '@/lib/ia/cuadrar-vacaciones';
 import { UsuarioRol, EstadoAusencia } from '@/lib/constants/enums';
 
@@ -100,7 +100,7 @@ export async function POST(
     await prisma.campanaVacaciones.update({
       where: { id: campanaId },
       data: {
-        propuestaIA: resultado as any,
+        propuestaIA: resultado as Prisma.JsonValue,
         estado: 'cuadrada',
         cuadradaEn: new Date(),
       },
@@ -114,7 +114,7 @@ export async function POST(
           empleadoId: propuesta.empleadoId,
         },
         data: {
-          propuestaIA: propuesta as any,
+          propuestaIA: propuesta as Prisma.JsonValue,
         },
       });
     }

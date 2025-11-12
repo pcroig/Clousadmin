@@ -62,13 +62,39 @@ export function PuestosClient({ puestos: initialPuestos }: PuestosClientProps) {
       const data = await response.json();
 
       // Transform data to match the expected format
-      const transformedData = data.map((puesto: any) => ({
+      interface ApiPuesto {
+        id: string;
+        nombre: string;
+        descripcion?: string | null;
+        _count: {
+          empleados: number;
+          documentos: number;
+        };
+        empleados: Array<{
+          id: string;
+          nombre: string;
+          apellidos: string;
+          fotoUrl?: string | null;
+        }>;
+        documentos?: Array<{
+          id: string;
+          nombre: string;
+          tipoDocumento: string;
+          mimeType: string;
+          tamano: number;
+          createdAt: string;
+          s3Key: string;
+        }>;
+      }
+
+      const apiData = data as ApiPuesto[];
+      const transformedData = apiData.map((puesto) => ({
         id: puesto.id,
         nombre: puesto.nombre,
         descripcion: puesto.descripcion || '',
         numeroEmpleados: puesto._count.empleados,
         numeroDocumentos: puesto._count.documentos,
-        empleados: puesto.empleados.map((emp: any) => ({
+        empleados: puesto.empleados.map((emp) => ({
           id: emp.id,
           nombre: `${emp.nombre} ${emp.apellidos}`,
           avatar: emp.fotoUrl || undefined,

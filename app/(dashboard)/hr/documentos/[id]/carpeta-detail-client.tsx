@@ -150,7 +150,7 @@ export function CarpetaDetailClient({ carpeta, empleados = [] }: CarpetaDetailCl
         const { empleados } = await empleadosRes.json();
         setEmpleadosList(empleados || []);
       }
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Error cargando datos:', error);
     } finally {
       setCargandoDatos(false);
@@ -207,8 +207,9 @@ export function CarpetaDetailClient({ carpeta, empleados = [] }: CarpetaDetailCl
       toast.success('Asignación actualizada correctamente');
       setModalEditarAsignacion(false);
       router.refresh();
-    } catch (error: any) {
-      toast.error(error.message || 'Error al actualizar asignación');
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Error al actualizar asignación';
+      toast.error(message);
     } finally {
       setActualizandoAsignacion(false);
     }
@@ -246,8 +247,9 @@ export function CarpetaDetailClient({ carpeta, empleados = [] }: CarpetaDetailCl
 
       // Recargar página para mostrar nuevos documentos
       router.refresh();
-    } catch (error: any) {
-      toast.error(error.message || 'Error al subir archivos');
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Error al subir archivos';
+      toast.error(message);
     } finally {
       setUploading(false);
       if (fileInputRef.current) {
@@ -275,7 +277,8 @@ export function CarpetaDetailClient({ carpeta, empleados = [] }: CarpetaDetailCl
       document.body.removeChild(a);
 
       toast.success('Documento descargado correctamente');
-    } catch (error) {
+    } catch (error: unknown) {
+      console.error('Error al descargar documento:', error);
       toast.error('Error al descargar documento');
     }
   };
@@ -298,8 +301,9 @@ export function CarpetaDetailClient({ carpeta, empleados = [] }: CarpetaDetailCl
       setDocumentoAEliminar(null);
       toast.success('Documento eliminado correctamente');
       router.refresh();
-    } catch (error: any) {
-      toast.error(error.message || 'Error al eliminar documento');
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Error al eliminar documento';
+      toast.error(message);
     } finally {
       setEliminando(false);
     }

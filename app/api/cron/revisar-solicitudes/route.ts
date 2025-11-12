@@ -16,7 +16,7 @@
 // Se ejecuta diariamente (frecuencia configurable)
 
 import { NextRequest } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { prisma, Prisma } from '@/lib/prisma';
 import { EstadoSolicitud } from '@/lib/constants/enums';
 import { esCampoPermitido } from '@/lib/constants/whitelist-campos';
 import { clasificarSolicitud } from '@/lib/ia';
@@ -150,8 +150,8 @@ export async function POST(request: NextRequest) {
 
             // Aplicar cambios al empleado con validación de campos permitidos
             if (solicitud.camposCambiados && typeof solicitud.camposCambiados === 'object') {
-              const cambios = solicitud.camposCambiados as Record<string, any>;
-              const cambiosPermitidos: Record<string, any> = {};
+              const cambios = solicitud.camposCambiados as Record<string, unknown>;
+              const cambiosPermitidos: Prisma.EmpleadoUpdateInput = {};
 
               // Filtrar solo campos permitidos
               for (const [campo, valor] of Object.entries(cambios)) {
