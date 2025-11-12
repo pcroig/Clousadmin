@@ -36,11 +36,19 @@ export async function GET(req: NextRequest) {
                 },
               },
             },
+            puestoRelacion: {
+              select: {
+                nombre: true,
+              },
+            },
           },
         },
         contrato: {
           select: {
-            puesto: true,
+            id: true,
+            tipoContrato: true,
+            fechaInicio: true,
+            fechaFin: true,
           },
         },
         complementosAsignados: {
@@ -190,7 +198,7 @@ export async function GET(req: NextRequest) {
     const porPuesto: Record<string, { total: number; count: number; salarios: number[] }> = {};
 
     for (const nomina of nominas) {
-      const puesto = nomina.contrato?.puesto || 'Sin puesto definido';
+      const puesto = nomina.empleado.puestoRelacion?.nombre || 'Sin puesto definido';
 
       if (!porPuesto[puesto]) {
         porPuesto[puesto] = { total: 0, count: 0, salarios: [] };
