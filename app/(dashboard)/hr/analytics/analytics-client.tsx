@@ -6,7 +6,6 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
-import { Download, RefreshCw } from 'lucide-react';
 import { AnalyticsFilters, FilterValues } from '@/components/analytics/filters';
 import { BarChartComponent } from '@/components/analytics/bar-chart';
 import { AreaChartComponent } from '@/components/analytics/area-chart';
@@ -23,6 +22,7 @@ interface PlantillaData {
   bajasMes: number;
   distribucionGenero: Array<{ genero: string; empleados: number }>;
   evolucionAltasBajas: Array<{ mes: string; altas: number; bajas: number }>;
+  distribucionAntiguedad: Array<{ rango: string; empleados: number }>;
 }
 
 interface NominaResumen {
@@ -98,6 +98,21 @@ const formatCurrency = (value: number) => currencyFormatter.format(Math.round(va
 
 const formatPercent = (value: number) => `${value > 0 ? '+' : ''}${value.toFixed(1)}%`;
 
+const formatCurrencyDelta = (value: number) => {
+  const base = formatCurrency(Math.abs(value));
+  if (value === 0) {
+    return base;
+  }
+  return `${value > 0 ? '+' : '-'}${base}`;
+};
+
+const formatSignedNumber = (value: number) => {
+  if (value === 0) {
+    return '0';
+  }
+  return `${value > 0 ? '+' : ''}${value}`;
+};
+
 export function AnalyticsClient() {
   const [activeTab, setActiveTab] = useState('plantilla');
   const [filters, setFilters] = useState<FilterValues>({
@@ -112,8 +127,6 @@ export function AnalyticsClient() {
   const [fichajesData, setFichajesData] = useState<FichajesData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
-
   const tabs = [
     { id: 'plantilla', label: 'Plantilla' },
     { id: 'compensacion', label: 'Compensación' },
@@ -162,7 +175,6 @@ export function AnalyticsClient() {
       setPlantillaData(plantilla);
       setCompensacionData(compensacion);
       setFichajesData(fichajes);
-      setLastUpdate(new Date());
       setError(null);
     } catch (error) {
       console.error('Error fetching analytics data:', error);
@@ -244,25 +256,19 @@ export function AnalyticsClient() {
   return (
     <div className="h-full w-full flex flex-col">
       {/* Header */}
-      <div className="mb-6">
-        <div className="flex items-center justify-between mb-6">
+      <div className="mb-6 space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-4">
           <h1 className="text-2xl font-bold text-gray-900">Analytics</h1>
-          
-          {/* Botones de acción */}
-          <div className="flex gap-2">
-            <Button onClick={fetchData} variant="outline" size="sm">
-              <RefreshCw className="w-4 h-4 mr-2" />
-              Actualizar
-            </Button>
-            <Button onClick={handleExport} size="sm">
-              <Download className="w-4 h-4 mr-2" />
-              Exportar
-            </Button>
-          </div>
+          <AnalyticsFilters
+            filters={filters}
+            onFilterChange={handleFilterChange}
+            equipos={equipos}
+            onExport={handleExport}
+          />
         </div>
 
         {/* Tabs */}
-        <div className="border-b border-gray-200 mb-4">
+        <div className="border-b border-gray-200">
           <div className="flex gap-4">
             {tabs.map((tab) => (
               <button
@@ -279,13 +285,6 @@ export function AnalyticsClient() {
             ))}
           </div>
         </div>
-
-        {/* Filtros debajo de las tabs */}
-        <AnalyticsFilters
-          filters={filters}
-          onFilterChange={handleFilterChange}
-          equipos={equipos}
-        />
       </div>
 
       {/* Content */}
@@ -293,12 +292,12 @@ export function AnalyticsClient() {
         {/* Tab: Plantilla */}
         {activeTab === 'plantilla' && (
           <div className="space-y-6">
-            {/* KPIs de Plantilla */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            {/* Métricas clave de Plantilla */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <KpiCard
                 title="Total empleados"
                 value={plantillaData.totalEmpleados}
-                subtitle={`${plantillaData.cambioMes >= 0 ? '+' : ''}${plantillaData.cambioMes} vs mes anterior`}
+                subtitle={`Variación vs mes anterior: ${formatSignedNumber(plantillaData.cambioMes)}`}
               />
               <KpiCard
                 title="Altas del mes"
@@ -309,11 +308,6 @@ export function AnalyticsClient() {
                 title="Bajas del mes"
                 value={plantillaData.bajasMes}
                 subtitle="Finalizaciones de contrato"
-              />
-              <KpiCard
-                title="Tasa de rotación"
-                value={`${plantillaData.totalEmpleados > 0 ? ((plantillaData.bajasMes / plantillaData.totalEmpleados) * 100).toFixed(1) : 0}%`}
-                subtitle="Bajas / Total plantilla"
               />
             </div>
 
@@ -402,28 +396,28 @@ export function AnalyticsClient() {
         {/* Tab: Compensación */}
         {activeTab === 'compensacion' && compensacionData && (
           <div className="space-y-6">
-            {/* KPIs Principales de Compensación */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            {/* KPIs principales de Compensación */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               <KpiCard
                 title="Coste total nómina"
                 value={formatCurrency(compensacionData.costeTotalNomina)}
-                subtitle={`${compensacionData.cambioCoste >= 0 ? '+' : ''}${formatCurrency(compensacionData.cambioCoste)} vs mes anterior`}
+                subtitle={`${formatCurrencyDelta(compensacionData.cambioCoste)} vs mes anterior`}
               />
               <KpiCard
                 title="Salario promedio"
                 value={formatCurrency(compensacionData.salarioPromedio)}
-                subtitle="Salario bruto mensual medio"
+                subtitle="Bruto mensual por empleado"
               />
-              <KpiCard
-                title="Coste por empleado"
-                value={formatCurrency(compensacionData.costeTotalNomina / (plantillaData?.totalEmpleados || 1))}
-                subtitle="Media empresa"
-              />
-              <KpiCard
-                title="Variación coste"
-                value={`${compensacionData.cambioCoste >= 0 ? '+' : ''}${((compensacionData.cambioCoste / (compensacionData.costeTotalNomina - compensacionData.cambioCoste || 1)) * 100).toFixed(1)}%`}
-                subtitle="Respecto mes anterior"
-              />
+              {nominasAnalytics && (
+                <KpiCard
+                  title="Nóminas procesadas"
+                  value={nominasAnalytics.resumen.actual.totalNominas}
+                  subtitle={`Variación anual: ${formatSignedNumber(
+                    nominasAnalytics.resumen.actual.totalNominas -
+                      nominasAnalytics.resumen.anterior.totalNominas
+                  )}`}
+                />
+              )}
             </div>
 
             {nominasAnalytics && (
