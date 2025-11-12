@@ -111,6 +111,17 @@ export async function GET(request: NextRequest) {
     }));
 
     // 4. Evolución plantilla (últimos 12 meses)
+    // Optimización: Cargar todos los empleados una vez y calcular en memoria
+    const todosEmpleados = await prisma.empleado.findMany({
+      where: {
+        empresaId: session.user.empresaId,
+      },
+      select: {
+        fechaAlta: true,
+        fechaBaja: true,
+      },
+    });
+
     const evolucionPlantilla = [];
     for (let i = 11; i >= 0; i--) {
       const fecha = new Date();
@@ -120,13 +131,12 @@ export async function GET(request: NextRequest) {
 
       const finMes = new Date(fecha.getFullYear(), fecha.getMonth() + 1, 0);
 
-      const count = await prisma.empleado.count({
-        where: {
-          empresaId: session.user.empresaId,
-          fechaAlta: { lte: finMes },
-          OR: [{ fechaBaja: null }, { fechaBaja: { gt: finMes } }],
-        },
-      });
+      // Calcular en memoria
+      const count = todosEmpleados.filter((emp) => {
+        const altaAntes = emp.fechaAlta <= finMes;
+        const sinBajaOBajaDespues = !emp.fechaBaja || emp.fechaBaja > finMes;
+        return altaAntes && sinBajaOBajaDespues;
+      }).length;
 
       evolucionPlantilla.push({
         mes: fecha.toLocaleDateString('es-ES', {
@@ -171,6 +181,7 @@ export async function GET(request: NextRequest) {
     );
 
     // 7. Evolución de altas y bajas (últimos 6 meses)
+    // Optimización: Usar todosEmpleados ya cargado y calcular en memoria
     const evolucionAltasBajas = [];
     for (let i = 5; i >= 0; i--) {
       const fecha = new Date();
@@ -178,25 +189,14 @@ export async function GET(request: NextRequest) {
       const inicioMes = new Date(fecha.getFullYear(), fecha.getMonth(), 1);
       const finMes = new Date(fecha.getFullYear(), fecha.getMonth() + 1, 0);
 
-      const altas = await prisma.empleado.count({
-        where: {
-          empresaId: session.user.empresaId,
-          fechaAlta: {
-            gte: inicioMes,
-            lte: finMes,
-          },
-        },
-      });
+      // Calcular en memoria
+      const altas = todosEmpleados.filter((emp) => {
+        return emp.fechaAlta >= inicioMes && emp.fechaAlta <= finMes;
+      }).length;
 
-      const bajas = await prisma.empleado.count({
-        where: {
-          empresaId: session.user.empresaId,
-          fechaBaja: {
-            gte: inicioMes,
-            lte: finMes,
-          },
-        },
-      });
+      const bajas = todosEmpleados.filter((emp) => {
+        return emp.fechaBaja && emp.fechaBaja >= inicioMes && emp.fechaBaja <= finMes;
+      }).length;
 
       evolucionAltasBajas.push({
         mes: fecha.toLocaleDateString('es-ES', {

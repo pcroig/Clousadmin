@@ -6,7 +6,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
-import { Download } from 'lucide-react';
+import { Download, RefreshCw } from 'lucide-react';
 import { AnalyticsFilters, FilterValues } from '@/components/analytics/filters';
 import { BarChartComponent } from '@/components/analytics/bar-chart';
 import { AreaChartComponent } from '@/components/analytics/area-chart';
@@ -111,6 +111,8 @@ export function AnalyticsClient() {
   const [compensacionData, setCompensacionData] = useState<CompensacionData | null>(null);
   const [fichajesData, setFichajesData] = useState<FichajesData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
 
   const tabs = [
     { id: 'plantilla', label: 'Plantilla' },
@@ -132,6 +134,7 @@ export function AnalyticsClient() {
 
   const fetchData = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
       const queryParams = new URLSearchParams({
         genero: filters.genero,
@@ -145,6 +148,11 @@ export function AnalyticsClient() {
         fetch(`/api/analytics/fichajes?${queryParams}`),
       ]);
 
+      // Verificar si hay errores en las respuestas
+      if (!plantillaRes.ok || !compensacionRes.ok || !fichajesRes.ok) {
+        throw new Error('Error al cargar los datos de analytics');
+      }
+
       const [plantilla, compensacion, fichajes] = await Promise.all([
         plantillaRes.json(),
         compensacionRes.json(),
@@ -154,8 +162,13 @@ export function AnalyticsClient() {
       setPlantillaData(plantilla);
       setCompensacionData(compensacion);
       setFichajesData(fichajes);
+      setLastUpdate(new Date());
+      setError(null);
     } catch (error) {
       console.error('Error fetching analytics data:', error);
+      const errorMsg = 'Error al cargar los datos. Por favor, inténtalo de nuevo.';
+      setError(errorMsg);
+      toast.error(errorMsg);
     } finally {
       setLoading(false);
     }
@@ -199,10 +212,31 @@ export function AnalyticsClient() {
     }
   };
 
-  if (loading || !plantillaData || !compensacionData || !fichajesData) {
+  if (loading) {
     return (
       <div className="h-full w-full flex items-center justify-center">
         <div className="text-gray-500">Cargando datos...</div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="h-full w-full flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-red-600 mb-4">{error}</p>
+          <Button onClick={fetchData}>
+            Reintentar
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!plantillaData || !compensacionData || !fichajesData) {
+    return (
+      <div className="h-full w-full flex items-center justify-center">
+        <div className="text-gray-500">No hay datos disponibles</div>
       </div>
     );
   }
@@ -211,9 +245,18 @@ export function AnalyticsClient() {
     <div className="h-full w-full flex flex-col">
       {/* Header */}
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900 mb-6">Analytics</h1>
+        <div className="flex items-center justify-between mb-6">
+          <h1 className="text-2xl font-bold text-gray-900">Analytics</h1>
+          
+          {/* Última actualización */}
+          {lastUpdate && (
+            <div className="text-sm text-gray-500">
+              Última actualización: {lastUpdate.toLocaleTimeString('es-ES')}
+            </div>
+          )}
+        </div>
 
-        {/* Tabs y Botón Exportar en la misma altura */}
+        {/* Tabs y Botones en la misma altura */}
         <div className="flex items-center justify-between border-b border-gray-200 mb-6">
           <div className="flex gap-4">
             {tabs.map((tab) => (
@@ -231,18 +274,24 @@ export function AnalyticsClient() {
             ))}
           </div>
 
-          {/* Botón Exportar */}
-          <Button onClick={handleExport} className="mb-2">
-            <Download className="w-4 h-4 mr-2" />
-            Exportar
-          </Button>
+          {/* Botones de acción */}
+          <div className="flex gap-2 mb-2">
+            <Button onClick={fetchData} variant="outline">
+              <RefreshCw className="w-4 h-4 mr-2" />
+              Actualizar
+            </Button>
+            <Button onClick={handleExport}>
+              <Download className="w-4 h-4 mr-2" />
+              Exportar
+            </Button>
+          </div>
         </div>
 
         {/* Filtros debajo de las tabs */}
         <AnalyticsFilters
           filters={filters}
           onFilterChange={handleFilterChange}
-          equipos={equipos.map((e) => e.nombre)}
+          equipos={equipos}
         />
       </div>
 
@@ -456,6 +505,25 @@ export function AnalyticsClient() {
         {/* Tab: Fichajes */}
         {activeTab === 'fichajes' && (
           <div className="space-y-6">
+            {/* KPIs de Fichajes */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <KpiCard
+                title="Total horas mes"
+                value={`${fichajesData.totalHorasMes.toFixed(1)}h`}
+                subtitle={`${fichajesData.cambioHoras >= 0 ? '+' : ''}${fichajesData.cambioHoras.toFixed(1)}h vs mes anterior`}
+              />
+              <KpiCard
+                title="Balance acumulado"
+                value={`${fichajesData.balanceAcumulado >= 0 ? '+' : ''}${fichajesData.balanceAcumulado.toFixed(1)}h`}
+                subtitle={fichajesData.balanceAcumulado >= 0 ? 'Horas extra' : 'Horas pendientes'}
+              />
+              <KpiCard
+                title="Tasa de absentismo"
+                value={`${fichajesData.tasaAbsentismo.toFixed(1)}%`}
+                subtitle="Días de ausencia / días posibles"
+              />
+            </div>
+
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <AreaChartComponent
                 title="Horas Trabajadas Diarias"

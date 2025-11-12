@@ -11,8 +11,17 @@ import {
   handleApiError,
   successResponse,
 } from '@/lib/api-handler';
-import { EstadoAusencia } from '@/lib/constants/enums';
+import { EstadoAusencia, EstadoFichaje } from '@/lib/constants/enums';
 import { obtenerRangoFechaAntiguedad } from '@/lib/calculos/antiguedad';
+
+const toNumber = (value: Prisma.Decimal | number | null | undefined): number =>
+  value ? Number(value) : 0;
+
+const clampDateRange = (inicio: Date, fin: Date, rangoInicio: Date, rangoFin: Date) => {
+  const start = inicio > rangoInicio ? inicio : rangoInicio;
+  const end = fin < rangoFin ? fin : rangoFin;
+  return end >= start ? { start, end } : { start, end: start };
+};
 
 // Función para calcular días laborables en un mes
 function calcularDiasLaborables(year: number, month: number): number {
@@ -81,7 +90,7 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    const empleadoIds = empleados.map((e) => e.id);
+    const empleadoIds = empleados.map((empleado) => empleado.id);
 
     // Obtener mes actual
     const hoy = new Date();
@@ -97,7 +106,7 @@ export async function GET(request: NextRequest) {
           gte: inicioMesActual,
           lte: finMesActual,
         },
-        estado: { in: ['finalizado', 'revisado'] },
+        estado: { in: [EstadoFichaje.finalizado, EstadoFichaje.pendiente] },
       },
       select: {
         horasTrabajadas: true,
@@ -105,10 +114,9 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    const totalHorasMes = fichajesMesActual.reduce(
-      (sum, f) => sum + Number(f.horasTrabajadas || 0),
-      0
-    );
+    const totalHorasMes = fichajesMesActual.reduce<number>((sum, fichaje) => {
+      return sum + toNumber(fichaje.horasTrabajadas);
+    }, 0);
 
     // 2. Cambio respecto mes anterior
     const inicioMesAnterior = new Date(hoy.getFullYear(), hoy.getMonth() - 1, 1);
@@ -122,17 +130,16 @@ export async function GET(request: NextRequest) {
           gte: inicioMesAnterior,
           lte: finMesAnterior,
         },
-        estado: { in: ['finalizado', 'revisado'] },
+        estado: { in: [EstadoFichaje.finalizado, EstadoFichaje.pendiente] },
       },
       select: {
         horasTrabajadas: true,
       },
     });
 
-    const totalHorasMesAnterior = fichajesMesAnterior.reduce(
-      (sum, f) => sum + Number(f.horasTrabajadas || 0),
-      0
-    );
+    const totalHorasMesAnterior = fichajesMesAnterior.reduce<number>((sum, fichaje) => {
+      return sum + toNumber(fichaje.horasTrabajadas);
+    }, 0);
 
     const cambioHoras = totalHorasMes - totalHorasMesAnterior;
 
@@ -147,39 +154,50 @@ export async function GET(request: NextRequest) {
         : 0;
 
     // 4. Horas trabajadas diarias del mes actual
+    // Optimización: 1 query para todo el mes, luego agrupar en memoria
+    const fichajesMesParaDias = await prisma.fichaje.findMany({
+      where: {
+        empresaId: session.user.empresaId,
+        empleadoId: { in: empleadoIds },
+        fecha: {
+          gte: inicioMesActual,
+          lte: finMesActual <= hoy ? finMesActual : hoy,
+        },
+        estado: { in: [EstadoFichaje.finalizado, EstadoFichaje.pendiente] },
+      },
+      select: {
+        fecha: true,
+        horasTrabajadas: true,
+      },
+    });
+
+    // Agrupar por fecha
+    const horasPorFecha: Record<string, number> = {};
+    for (const fichaje of fichajesMesParaDias) {
+      const fechaStr = fichaje.fecha.toISOString().split('T')[0];
+      horasPorFecha[fechaStr] = (horasPorFecha[fechaStr] || 0) + toNumber(fichaje.horasTrabajadas);
+    }
+
+    // Generar array de días laborables
     const horasDiarias: { fecha: string; horas: number }[] = [];
     const fecha = new Date(inicioMesActual);
 
     while (fecha <= finMesActual && fecha <= hoy) {
       const dayOfWeek = fecha.getDay();
       if (dayOfWeek !== 0 && dayOfWeek !== 6) {
-        const fichajesDia = await prisma.fichaje.findMany({
-          where: {
-            empresaId: session.user.empresaId,
-            empleadoId: { in: empleadoIds },
-            fecha: new Date(fecha.toISOString().split('T')[0]),
-            estado: { in: ['finalizado', 'revisado'] },
-          },
-          select: {
-            horasTrabajadas: true,
-          },
-        });
-
-        const horasDia = fichajesDia.reduce(
-          (sum, f) => sum + Number(f.horasTrabajadas || 0),
-          0
-        );
-
+        const fechaStr = fecha.toISOString().split('T')[0];
+        const horas = horasPorFecha[fechaStr] || 0;
         horasDiarias.push({
-          fecha: fecha.toISOString().split('T')[0],
-          horas: Math.round(horasDia * 10) / 10,
+          fecha: fechaStr,
+          horas: Math.round(horas * 10) / 10,
         });
       }
       fecha.setDate(fecha.getDate() + 1);
     }
 
     // 5. Tasa de absentismo
-    const ausenciasMes = await prisma.ausencia.count({
+    // Corregido: Calcular días reales de ausencia, no número de ausencias
+    const ausenciasMes = await prisma.ausencia.findMany({
       where: {
         empresaId: session.user.empresaId,
         empleadoId: { in: empleadoIds },
@@ -191,11 +209,28 @@ export async function GET(request: NextRequest) {
         },
         estado: { in: [EstadoAusencia.confirmada, EstadoAusencia.completada] },
       },
+      select: {
+        fechaInicio: true,
+        fechaFin: true,
+      },
     });
+
+    // Calcular días totales de ausencia
+    const totalDiasAusencia = ausenciasMes.reduce<number>((sum, ausencia) => {
+      const fechaFinAusencia = ausencia.fechaFin ?? finMesActual;
+      const { start, end } = clampDateRange(
+        ausencia.fechaInicio,
+        fechaFinAusencia,
+        inicioMesActual,
+        finMesActual
+      );
+      const dias = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+      return sum + Math.max(dias, 0);
+    }, 0);
 
     const diasPosiblesTrabajo = empleados.length * diasLaborables;
     const tasaAbsentismo =
-      diasPosiblesTrabajo > 0 ? (ausenciasMes / diasPosiblesTrabajo) * 100 : 0;
+      diasPosiblesTrabajo > 0 ? (totalDiasAusencia / diasPosiblesTrabajo) * 100 : 0;
 
     // 6. Balance de horas acumulado
     const horasEsperadas = empleados.length * diasLaborables * 8;
@@ -204,32 +239,31 @@ export async function GET(request: NextRequest) {
     // 7. NUEVA: Promedio de horas por equipo
     const horasPorEquipo: Record<string, { total: number; empleados: number }> = {};
 
-    empleados.forEach((emp) => {
+    for (const empleado of empleados) {
       const fichajesEmpleado = fichajesMesActual.filter(
-        (f) => f.empleadoId === emp.id
+        (fichaje) => fichaje.empleadoId === empleado.id
       );
-      const horasEmpleado = fichajesEmpleado.reduce(
-        (sum, f) => sum + Number(f.horasTrabajadas || 0),
-        0
-      );
+      const horasEmpleado = fichajesEmpleado.reduce<number>((sum, fichaje) => {
+        return sum + toNumber(fichaje.horasTrabajadas);
+      }, 0);
 
-      if (emp.equipos.length === 0) {
+      if (empleado.equipos.length === 0) {
         if (!horasPorEquipo['Sin equipo']) {
           horasPorEquipo['Sin equipo'] = { total: 0, empleados: 0 };
         }
         horasPorEquipo['Sin equipo'].total += horasEmpleado;
         horasPorEquipo['Sin equipo'].empleados += 1;
       } else {
-        emp.equipos.forEach((eq) => {
-          const nombreEquipo = eq.equipo.nombre;
+        for (const relacion of empleado.equipos) {
+          const nombreEquipo = relacion.equipo?.nombre ?? 'Sin equipo';
           if (!horasPorEquipo[nombreEquipo]) {
             horasPorEquipo[nombreEquipo] = { total: 0, empleados: 0 };
           }
           horasPorEquipo[nombreEquipo].total += horasEmpleado;
           horasPorEquipo[nombreEquipo].empleados += 1;
-        });
+        }
       }
-    });
+    }
 
     const promedioHorasPorEquipo = Object.entries(horasPorEquipo).map(
       ([equipo, data]) => ({
@@ -239,37 +273,60 @@ export async function GET(request: NextRequest) {
     );
 
     // 8. NUEVA: Absentismo por equipo
+    // Optimización: 1 query para todas las ausencias, calcular días reales
+    const ausenciasMesPorEmpleado = await prisma.ausencia.findMany({
+      where: {
+        empresaId: session.user.empresaId,
+        empleadoId: { in: empleadoIds },
+        fechaInicio: { lte: finMesActual },
+        fechaFin: { gte: inicioMesActual },
+        estado: { in: [EstadoAusencia.confirmada, EstadoAusencia.completada] },
+      },
+      select: {
+        empleadoId: true,
+        fechaInicio: true,
+        fechaFin: true,
+      },
+    });
+
+    // Agrupar días de ausencia por empleado
+    const diasAusenciaPorEmpleado: Record<string, number> = {};
+    for (const ausencia of ausenciasMesPorEmpleado) {
+      const fechaFinAusencia = ausencia.fechaFin ?? finMesActual;
+      const { start, end } = clampDateRange(
+        ausencia.fechaInicio,
+        fechaFinAusencia,
+        inicioMesActual,
+        finMesActual
+      );
+      const dias = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+      diasAusenciaPorEmpleado[ausencia.empleadoId] =
+        (diasAusenciaPorEmpleado[ausencia.empleadoId] || 0) + Math.max(dias, 0);
+    }
+
+    // Distribuir días de ausencia por equipo
     const absentismoPorEquipo: Record<string, number> = {};
+    for (const empleado of empleados) {
+      const diasAusenciaEmpleado = diasAusenciaPorEmpleado[empleado.id] || 0;
 
-    for (const emp of empleados) {
-      const ausenciasEmpleado = await prisma.ausencia.count({
-        where: {
-          empresaId: session.user.empresaId,
-          empleadoId: emp.id,
-          fechaInicio: { lte: finMesActual },
-          fechaFin: { gte: inicioMesActual },
-          estado: { in: [EstadoAusencia.confirmada, EstadoAusencia.completada] },
-        },
-      });
-
-      if (emp.equipos.length === 0) {
+      if (empleado.equipos.length === 0) {
         absentismoPorEquipo['Sin equipo'] =
-          (absentismoPorEquipo['Sin equipo'] || 0) + ausenciasEmpleado;
+          (absentismoPorEquipo['Sin equipo'] || 0) + diasAusenciaEmpleado;
       } else {
-        emp.equipos.forEach((eq) => {
-          const nombreEquipo = eq.equipo.nombre;
+        for (const relacion of empleado.equipos) {
+          const nombreEquipo = relacion.equipo?.nombre ?? 'Sin equipo';
           absentismoPorEquipo[nombreEquipo] =
-            (absentismoPorEquipo[nombreEquipo] || 0) + ausenciasEmpleado;
-        });
+            (absentismoPorEquipo[nombreEquipo] || 0) + diasAusenciaEmpleado;
+        }
       }
     }
 
     // Calcular tasa de absentismo por equipo (%)
     const tasaAbsentismoPorEquipo = Object.entries(absentismoPorEquipo).map(
-      ([equipo, ausencias]) => {
-        const empleadosEquipo = horasPorEquipo[equipo]?.empleados || 1;
+      ([equipo, diasAusencia]) => {
+        const empleadosEquipo = horasPorEquipo[equipo]?.empleados ?? 0;
         const diasPosibles = empleadosEquipo * diasLaborables;
-        const tasa = (ausencias / diasPosibles) * 100;
+        const tasa = diasPosibles > 0 ? (diasAusencia / diasPosibles) * 100 : 0;
         return {
           equipo,
           tasa: Math.round(tasa * 10) / 10,

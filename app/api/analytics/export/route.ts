@@ -4,6 +4,7 @@
 // GET: Exportar datos de analytics a archivo Excel
 
 import { NextRequest } from 'next/server';
+import type { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import {
   requireAuthAsHR,
@@ -11,19 +12,20 @@ import {
 } from '@/lib/api-handler';
 import { NextResponse } from 'next/server';
 import * as XLSX from 'xlsx';
+import { calcularAntiguedad, obtenerRangoFechaAntiguedad } from '@/lib/calculos/antiguedad';
+import { EstadoFichaje } from '@/lib/constants/enums';
 
-// Función auxiliar para calcular antigüedad
-function calcularAntiguedad(fechaAlta: Date): string {
-  const hoy = new Date();
-  const mesesAntiguedad =
-    (hoy.getFullYear() - fechaAlta.getFullYear()) * 12 +
-    (hoy.getMonth() - fechaAlta.getMonth());
-
-  if (mesesAntiguedad < 6) return '< 6 meses';
-  if (mesesAntiguedad < 12) return '6-12 meses';
-  if (mesesAntiguedad < 36) return '1-3 años';
-  if (mesesAntiguedad < 60) return '3-5 años';
-  return '> 5 años';
+// Función helper para formatear antigüedad a label
+function formatearAntiguedad(fechaAlta: Date): string {
+  const rango = calcularAntiguedad(fechaAlta);
+  const labels: Record<string, string> = {
+    'menos_6_meses': '< 6 meses',
+    '6_12_meses': '6-12 meses',
+    '1_3_años': '1-3 años',
+    '3_5_años': '3-5 años',
+    'mas_5_años': '> 5 años',
+  };
+  return labels[rango] || rango;
 }
 
 // GET /api/analytics/export - Exportar datos a Excel (solo HR Admin)
@@ -36,11 +38,11 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url);
     const genero = searchParams.get('genero');
-    const equipo = searchParams.get('equipo');
+    const equipoId = searchParams.get('equipo');
     const antiguedad = searchParams.get('antiguedad');
 
-    // Construir filtros base
-    const where: any = {
+    // Construir filtros base (igual que en otros endpoints)
+    const where: Prisma.EmpleadoWhereInput = {
       empresaId: session.user.empresaId,
       estadoEmpleado: 'activo',
     };
@@ -49,8 +51,25 @@ export async function GET(request: NextRequest) {
       where.genero = genero;
     }
 
-    // Obtener empleados con todos los datos necesarios
-    let empleados = await prisma.empleado.findMany({
+    // Filtrar por equipo en BD
+    if (equipoId && equipoId !== 'todos') {
+      where.equipos = {
+        some: {
+          equipoId: equipoId,
+        },
+      };
+    }
+
+    // Filtrar por antigüedad en BD
+    if (antiguedad && antiguedad !== 'todos') {
+      const rangoFecha = obtenerRangoFechaAntiguedad(antiguedad);
+      if (rangoFecha) {
+        where.fechaAlta = rangoFecha;
+      }
+    }
+
+    // Obtener empleados con filtros aplicados en BD
+    const empleados = await prisma.empleado.findMany({
       where,
       select: {
         id: true,
@@ -80,20 +99,6 @@ export async function GET(request: NextRequest) {
       return nombres.length > 0 ? nombres.join(', ') : 'Sin equipo';
     };
 
-    // Filtrar por equipo si aplica
-    if (equipo && equipo !== 'todos') {
-      empleados = empleados.filter((e) =>
-        e.equipos.some((eq) => eq.equipo?.nombre === equipo)
-      );
-    }
-
-    // Filtrar por antigüedad si aplica
-    if (antiguedad && antiguedad !== 'todos') {
-      empleados = empleados.filter(
-        (e) => calcularAntiguedad(e.fechaAlta) === antiguedad
-      );
-    }
-
     // Crear workbook
     const workbook = XLSX.utils.book_new();
 
@@ -106,7 +111,7 @@ export async function GET(request: NextRequest) {
       [''],
       ['Filtros aplicados:'],
       ['Género:', genero || 'Todos'],
-      ['Equipo:', equipo || 'Todos'],
+      ['Equipo ID:', equipoId || 'Todos'],
       ['Antigüedad:', antiguedad || 'Todos'],
       [''],
       ['Total empleados:', empleados.length],
@@ -125,7 +130,7 @@ export async function GET(request: NextRequest) {
       Equipos: equiposToLabel(e.equipos),
       Género: e.genero || 'No especificado',
       'Fecha Alta': e.fechaAlta.toLocaleDateString('es-ES'),
-      Antigüedad: calcularAntiguedad(e.fechaAlta),
+      Antigüedad: formatearAntiguedad(e.fechaAlta),
     }));
 
     const wsPlantilla = XLSX.utils.json_to_sheet(plantillaData);
@@ -189,7 +194,7 @@ export async function GET(request: NextRequest) {
           gte: inicioMesActual,
           lte: finMesActual,
         },
-        estado: { in: ['finalizado', 'revisado'] },
+        estado: { in: [EstadoFichaje.finalizado, EstadoFichaje.pendiente] },
       },
       select: {
         empleadoId: true,
