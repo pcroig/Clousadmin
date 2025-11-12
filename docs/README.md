@@ -13,6 +13,7 @@ docs/
 ├── CONFIGURACION_SEGURIDAD.md        # Checklist y configuración de seguridad
 ├── DESIGN_SYSTEM.md                  # Sistema de diseño UI/UX + patrones de componentes
 ├── ESTRUCTURA.md                     # Estructura actual del proyecto
+├── GUIA_GIT_MULTI_HERRAMIENTAS.md    # 🔄 Guía para trabajar con Git en múltiples herramientas simultáneamente
 ├── HOOKS_REUTILIZABLES.md            # Hooks compartidos useApi/useMutation
 ├── INVITAR_USUARIOS.md              # Flujo de invitaciones y alta de usuarios
 ├── MIGRACION_ENUMS_Y_DEPARTAMENTO.md # Histórico de migraciones críticas
@@ -76,6 +77,7 @@ docs/
 2. Revisa `ARQUITECTURA.md` para entender la estructura vigente
 3. Consulta `DESIGN_SYSTEM.md` para UI/UX y patrones de componentes
 4. Revisa `PATRONES_CODIGO.md` para convenciones de TypeScript/Next.js
+5. **Lee `GUIA_GIT_MULTI_HERRAMIENTAS.md`** si trabajas con múltiples herramientas (Claude Code, Claude Code Web, Cursor) simultáneamente
 
 ### Para desarrollar
 1. Las **máximas de desarrollo** están en `.cursorrules`

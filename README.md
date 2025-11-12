@@ -40,6 +40,7 @@ Toda la documentación está en `docs/`:
 - **[docs/SETUP.md](docs/SETUP.md)** - Guía de configuración completa
 - **[docs/ARQUITECTURA.md](docs/ARQUITECTURA.md)** - Decisiones técnicas y estructura
 - **[docs/DESIGN_SYSTEM.md](docs/DESIGN_SYSTEM.md)** - Guías de diseño UI/UX y patrones de componentes
+- **[docs/GUIA_GIT_MULTI_HERRAMIENTAS.md](docs/GUIA_GIT_MULTI_HERRAMIENTAS.md)** - 🔄 Guía para trabajar con Git en múltiples herramientas simultáneamente
 - **[docs/funcionalidades/](docs/funcionalidades/)** - Documentación de cada feature
 - **[.cursorrules](.cursorrules)** - Principios de desarrollo
 
