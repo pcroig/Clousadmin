@@ -55,6 +55,7 @@ export async function GET(
                 nombre: true,
                 apellidos: true,
                 email: true,
+                fotoUrl: true,
               },
             },
             complementosAsignados: {
@@ -66,7 +67,20 @@ export async function GET(
                 },
               },
             },
+            alertas: {
+              where: {
+                resuelta: false,
+              },
+              orderBy: [
+                { tipo: 'asc' }, // crítico primero
+                { createdAt: 'desc' },
+              ],
+            },
           },
+          orderBy: [
+            { empleado: { apellidos: 'asc' } },
+            { empleado: { nombre: 'asc' } },
+          ],
         },
         _count: {
           select: { notificacionesEnviadas: true },
@@ -78,7 +92,17 @@ export async function GET(
       return NextResponse.json({ error: 'Evento no encontrado' }, { status: 404 });
     }
 
-    return NextResponse.json({ evento });
+    // Calcular estadísticas agregadas
+    const stats = {
+      totalNominas: evento.nominas.length,
+      nominasConAlertas: evento.nominas.filter((n) => n.alertas.length > 0).length,
+      nominasConComplementosPendientes: evento.nominas.filter((n) => n.complementosPendientes).length,
+      alertasCriticas: evento.nominas.reduce((sum, n) => sum + n.alertas.filter((a) => a.tipo === 'critico').length, 0),
+      alertasAdvertencias: evento.nominas.reduce((sum, n) => sum + n.alertas.filter((a) => a.tipo === 'advertencia').length, 0),
+      alertasInformativas: evento.nominas.reduce((sum, n) => sum + n.alertas.filter((a) => a.tipo === 'info').length, 0),
+    };
+
+    return NextResponse.json({ evento, stats });
   } catch (error) {
     console.error('[GET /api/nominas/eventos/[id]] Error:', error);
     return NextResponse.json(
