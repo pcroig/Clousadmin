@@ -3,8 +3,13 @@
 // ========================================
 
 import { prisma } from '@/lib/prisma';
-import { calcularHorasTrabajadas, obtenerHorasEsperadas, agruparFichajesPorDia } from './fichajes';
-import { Fichaje } from '@prisma/client';
+import {
+  calcularHorasTrabajadas,
+  obtenerHorasEsperadas,
+  agruparFichajesPorDia,
+  type FichajeConEventos,
+} from './fichajes';
+import type { FichajeEvento } from '@prisma/client';
 
 export interface BalanceDia {
   fecha: Date;
@@ -112,10 +117,21 @@ export async function calcularBalancePeriodo(
     orderBy: [
       { fecha: 'asc' },
     ],
+    include: {
+      eventos: {
+        orderBy: {
+          hora: 'asc',
+        },
+      },
+    },
   });
 
   // Agrupar por día
-  const fichajesPorDia = agruparFichajesPorDia(fichajes as any);
+  const fichajesConEventos: FichajeConEventos[] = fichajes.map((fichaje) => ({
+    ...fichaje,
+    eventos: [...fichaje.eventos],
+  }));
+  const fichajesPorDia = agruparFichajesPorDia(fichajesConEventos);
 
   // Obtener festivos del período
   const empleado = await prisma.empleado.findUnique({
@@ -123,9 +139,13 @@ export async function calcularBalancePeriodo(
     select: { empresaId: true },
   });
 
+  if (!empleado) {
+    throw new Error(`[BalanceHoras] Empleado ${empleadoId} no encontrado`);
+  }
+
   const festivos = await prisma.festivo.findMany({
     where: {
-      empresaId: empleado?.empresaId,
+      empresaId: empleado.empresaId,
       fecha: {
         gte: fechaInicio,
         lte: fechaFin,
@@ -159,10 +179,10 @@ export async function calcularBalancePeriodo(
   const fechaActual = new Date(fechaInicio);
   while (fechaActual <= fechaFin) {
     const fechaKey = fechaActual.toISOString().split('T')[0];
-    const fichajeDia = fichajesPorDia[fechaKey];
-    const eventosDia = fichajeDia?.eventos || [];
+    const fichajeDia = fichajesPorDia[fechaKey] as FichajeConEventos | undefined;
+    const eventosDia: FichajeEvento[] = fichajeDia?.eventos ?? [];
 
-    const horasTrabajadas = calcularHorasTrabajadas(eventosDia as any);
+    const horasTrabajadas = calcularHorasTrabajadas(eventosDia);
     const horasEsperadas = await obtenerHorasEsperadas(empleadoId, fechaActual);
     const balance = horasTrabajadas - horasEsperadas;
 

@@ -141,7 +141,7 @@ export function JornadasClient() {
                 <TableRow>
                   <TableCell colSpan={6} className="p-0">
                     <EmptyState
-                      variant="secondary"
+                      layout="table"
                       icon={CalendarX}
                       title="No hay jornadas creadas"
                       description="Crea una jornada para asignarla a los empleados"

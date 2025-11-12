@@ -11,15 +11,14 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import { Check } from 'lucide-react';
 import type { ProgresoOnboardingSimplificado, DatosTemporales } from '@/lib/onboarding';
-import { CredencialesForm } from '@/components/onboarding/credenciales-form';
+import { CredencialesForm, type OnboardingEmpleado } from '@/components/onboarding/credenciales-form';
 import { IntegracionesForm } from '@/components/onboarding/integraciones-form';
 import { PWAExplicacion } from '@/components/onboarding/pwa-explicacion';
 
 interface OnboardingSimplificadoFormProps {
   token: string;
-  empleado: any;
+  empleado: OnboardingEmpleado & { empresaId?: string };
   progreso: ProgresoOnboardingSimplificado;
   datosTemporales: DatosTemporales | null;
 }
@@ -28,7 +27,7 @@ export function OnboardingSimplificadoForm({
   token,
   empleado,
   progreso,
-  datosTemporales,
+  datosTemporales: _datosTemporales,
 }: OnboardingSimplificadoFormProps) {
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState(() => {

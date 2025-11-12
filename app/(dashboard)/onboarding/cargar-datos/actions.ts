@@ -16,14 +16,25 @@ import { UsuarioRol } from '@/lib/constants/enums';
 /**
  * Helper function to safely convert values to Prisma JSON input
  */
-function toJsonValue<T extends Record<string, any>>(value: T): Prisma.InputJsonValue {
+function toJsonValue<T extends Record<string, unknown>>(value: T): Prisma.InputJsonValue {
   return value as unknown as Prisma.InputJsonValue;
 }
 
 /**
  * Crear una nueva sede para la empresa
  */
-export async function crearSedeAction(ciudad: string) {
+type AsignacionSedeInput = {
+  tipo: 'empresa' | 'equipo';
+  equipoId?: string;
+};
+
+export async function crearSedeAction({
+  ciudad,
+  asignacion,
+}: {
+  ciudad: string;
+  asignacion?: AsignacionSedeInput;
+}) {
   try {
     const session = await getSession();
     if (!session) {
@@ -36,6 +47,7 @@ export async function crearSedeAction(ciudad: string) {
     const validatedData = sedeCreateSchema.parse({
       ciudad,
       empresaId: session.user.empresaId,
+      asignacion,
     });
 
     // Auto-generar nombre desde ciudad
@@ -47,13 +59,75 @@ export async function crearSedeAction(ciudad: string) {
         nombre,
         ciudad: validatedData.ciudad,
       },
+      include: {
+        equipos: {
+          select: {
+            id: true,
+            nombre: true,
+          },
+        },
+      },
+    });
+
+    // Aplicar asignación inicial si procede
+    if (validatedData.asignacion?.tipo === 'empresa') {
+      await prisma.equipo.updateMany({
+        where: {
+          empresaId: session.user.empresaId,
+        },
+        data: {
+          sedeId: sede.id,
+        },
+      });
+    }
+
+    if (validatedData.asignacion?.tipo === 'equipo') {
+      if (!validatedData.asignacion.equipoId) {
+        return {
+          success: false,
+          error: 'Debes seleccionar un equipo para asignar la sede',
+        };
+      }
+
+      const equipo = await prisma.equipo.findFirst({
+        where: {
+          id: validatedData.asignacion.equipoId,
+          empresaId: session.user.empresaId,
+        },
+      });
+
+      if (!equipo) {
+        return {
+          success: false,
+          error: 'Equipo no encontrado o sin permisos',
+        };
+      }
+
+      await prisma.equipo.update({
+        where: { id: equipo.id },
+        data: {
+          sedeId: sede.id,
+        },
+      });
+    }
+
+    const sedeActualizada = await prisma.sede.findUnique({
+      where: { id: sede.id },
+      include: {
+        equipos: {
+          select: {
+            id: true,
+            nombre: true,
+          },
+        },
+      },
     });
 
     revalidatePath('/onboarding/cargar-datos');
 
     return {
       success: true,
-      sede,
+      sede: sedeActualizada ?? sede,
     };
   } catch (error) {
     console.error('[crearSedeAction] Error:', error);
@@ -68,6 +142,107 @@ export async function crearSedeAction(ciudad: string) {
     return {
       success: false,
       error: 'Error al crear la sede',
+    };
+  }
+}
+
+/**
+ * Asignar una sede a toda la empresa o a un equipo específico
+ */
+export async function asignarSedeAction(
+  sedeId: string,
+  asignacion: AsignacionSedeInput
+) {
+  try {
+    const session = await getSession();
+    if (!session) {
+      return {
+        success: false,
+        error: 'No autenticado',
+      };
+    }
+
+    const sede = await prisma.sede.findFirst({
+      where: {
+        id: sedeId,
+        empresaId: session.user.empresaId,
+      },
+      include: {
+        equipos: {
+          select: { id: true },
+        },
+      },
+    });
+
+    if (!sede) {
+      return {
+        success: false,
+        error: 'Sede no encontrada',
+      };
+    }
+
+    if (asignacion.tipo === 'empresa') {
+      await prisma.equipo.updateMany({
+        where: {
+          empresaId: session.user.empresaId,
+        },
+        data: {
+          sedeId: sede.id,
+        },
+      });
+    } else {
+      if (!asignacion.equipoId) {
+        return {
+          success: false,
+          error: 'Equipo requerido para la asignación',
+        };
+      }
+
+      const equipo = await prisma.equipo.findFirst({
+        where: {
+          id: asignacion.equipoId,
+          empresaId: session.user.empresaId,
+        },
+      });
+
+      if (!equipo) {
+        return {
+          success: false,
+          error: 'Equipo no encontrado o sin permisos',
+        };
+      }
+
+      await prisma.equipo.update({
+        where: { id: equipo.id },
+        data: {
+          sedeId: sede.id,
+        },
+      });
+    }
+
+    const sedeActualizada = await prisma.sede.findUnique({
+      where: { id: sede.id },
+      include: {
+        equipos: {
+          select: {
+            id: true,
+            nombre: true,
+          },
+        },
+      },
+    });
+
+    revalidatePath('/onboarding/cargar-datos');
+
+    return {
+      success: true,
+      sede: sedeActualizada ?? sede,
+    };
+  } catch (error) {
+    console.error('[asignarSedeAction] Error:', error);
+    return {
+      success: false,
+      error: 'Error al asignar la sede',
     };
   }
 }
@@ -124,7 +299,7 @@ export async function eliminarSedeAction(sedeId: string) {
 export async function configurarIntegracionAction(
   tipo: 'calendario' | 'comunicacion' | 'nominas',
   proveedor: string,
-  config?: Record<string, any>
+  config?: Record<string, unknown>
 ) {
   try {
     const session = await getSession();
@@ -166,10 +341,10 @@ export async function configurarIntegracionAction(
             empresaId: validatedData.empresaId,
             tipo: validatedData.tipo,
             proveedor: validatedData.proveedor,
-        config: toJsonValue(validatedData.config || {}),
-        activa: true,
-      },
-    });
+            config: toJsonValue(validatedData.config || {}),
+            activa: true,
+          },
+        });
 
     revalidatePath('/onboarding/cargar-datos');
 

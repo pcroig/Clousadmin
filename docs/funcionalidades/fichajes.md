@@ -201,15 +201,39 @@ El sistema valida automáticamente si un fichaje está completo basándose en la
 
 ### Ausencias de Medio Día
 
+El sistema soporta ausencias de medio día con campo `periodo` (`mañana` o `tarde`):
+
 Si un empleado tiene ausencia de medio día:
-- **Ausencia de mañana**: No se requiere `entrada` ni pausas de la mañana
-- **Ausencia de tarde**: No se requiere `salida` ni pausas de la tarde
+- **Ausencia de mañana** (`periodo='manana'`): No se requiere `entrada` ni pausas de la mañana
+- **Ausencia de tarde** (`periodo='tarde'`): No se requiere `salida` ni pausas de la tarde
 
 Los eventos requeridos se reducen proporcionalmente.
 
+**Modelo de datos:**
+```prisma
+model Ausencia {
+  // ...
+  medioDia Boolean @default(false)
+  periodo  PeriodoMedioDia? // 'manana' | 'tarde' (solo cuando medioDia=true)
+  // ...
+}
+
+enum PeriodoMedioDia {
+  manana // Ausencia en la mañana (no ficha entrada)
+  tarde  // Ausencia en la tarde (no ficha salida)
+}
+```
+
 ### CRON Nocturno (Cierre de Jornadas)
 
-**Ejecución**: Todas las noches a las 23:30
+**Ejecución**: Todas las noches a las 23:30 UTC (00:30 España invierno)
+
+**Estado**: ✅ Implementado con GitHub Actions
+
+**Configuración requerida**:
+- Secret `CRON_SECRET` en GitHub Actions
+- Secret `APP_URL` en GitHub Actions (URL de producción)
+- Variable de entorno `CRON_SECRET` en el servidor
 
 **Proceso:**
 1. Para cada empresa activa, procesa el día anterior
@@ -219,6 +243,8 @@ Los eventos requeridos se reducen proporcionalmente.
      - Valida si está completo según su jornada
      - Si completo → estado `finalizado`
      - Si incompleto → estado `pendiente`
+
+**Archivo**: `.github/workflows/cron-clasificar-fichajes.yml`
 
 ### Cuadrar Fichajes (HR)
 
@@ -581,6 +607,11 @@ model ProcesamientoMarcajes {
 
 ---
 
-**Versión**: 3.0
-**Última actualización**: 6 noviembre 2025
-**Estado**: Sistema de validación basado en eventos completos implementado. Auto-completado IA eliminado en favor de validación determinística.
+**Versión**: 3.1
+**Última actualización**: 12 noviembre 2025
+**Estado**: Sistema completo implementado:
+- ✅ Validación determinística de fichajes completos
+- ✅ Campo `periodo` en ausencias de medio día (mañana/tarde)
+- ✅ CRON nocturno configurado con GitHub Actions
+- ✅ Cuadre masivo con consideración de periodo de ausencia
+- ✅ Formularios actualizados con selector de periodo

@@ -93,6 +93,14 @@ export const ESTADO_AUSENCIA_LABELS: Record<EstadoAusencia, string> = {
   rechazada: 'Rechazada',
 };
 
+export const PERIODO_MEDIO_DIA_VALUES = ['manana', 'tarde'] as const;
+export type PeriodoMedioDiaValue = (typeof PERIODO_MEDIO_DIA_VALUES)[number];
+
+export const PERIODO_MEDIO_DIA_LABELS: Record<PeriodoMedioDiaValue, string> = {
+  manana: 'Mañana',
+  tarde: 'Tarde',
+};
+
 export const ESTADO_SOLICITUD_LABELS: Record<EstadoSolicitud, string> = {
   pendiente: 'Pendiente',
   requiere_revision: 'Requiere Revisión',
@@ -143,6 +151,11 @@ export const ESTADOS_AUSENCIA_OPTIONS = [
   { value: EstadoAusencia.completada, label: ESTADO_AUSENCIA_LABELS.completada },
   { value: EstadoAusencia.rechazada, label: ESTADO_AUSENCIA_LABELS.rechazada },
 ];
+
+export const PERIODOS_MEDIO_DIA_OPTIONS = [
+  { value: 'manana', label: PERIODO_MEDIO_DIA_LABELS.manana },
+  { value: 'tarde', label: PERIODO_MEDIO_DIA_LABELS.tarde },
+] as const;
 
 export const ESTADOS_FICHAJE_OPTIONS = [
   { value: EstadoFichaje.en_curso, label: ESTADO_FICHAJE_LABELS.en_curso },

@@ -7,6 +7,8 @@
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { getInitials } from './utils';
 import { getAvatarStyle } from '@/lib/design-system';
+import { EmptyState } from './empty-state';
+import { type LucideIcon } from 'lucide-react';
 
 export interface Column<T> {
   id: string;
@@ -22,6 +24,10 @@ interface DataTableProps<T extends object> {
   onRowClick?: (row: T) => void;
   getRowId?: (row: T) => string;
   emptyMessage?: string;
+  emptyDescription?: string;
+  emptyAction?: React.ReactNode;
+  emptyIcon?: LucideIcon;
+  emptyContent?: React.ReactNode;
 }
 
 export function DataTable<T extends object>({
@@ -30,6 +36,10 @@ export function DataTable<T extends object>({
   onRowClick,
   getRowId,
   emptyMessage = 'No hay datos disponibles',
+  emptyDescription,
+  emptyAction,
+  emptyIcon,
+  emptyContent,
 }: DataTableProps<T>) {
 
   return (
@@ -52,11 +62,16 @@ export function DataTable<T extends object>({
           <tbody className="divide-y divide-gray-200">
             {data.length === 0 ? (
               <tr>
-                <td
-                  colSpan={columns.length}
-                  className="px-6 py-12 text-center text-sm text-gray-500"
-                >
-                  {emptyMessage}
+                <td colSpan={columns.length} className="p-0">
+                  {emptyContent ?? (
+                    <EmptyState
+                      layout="table"
+                      icon={emptyIcon}
+                      title={emptyMessage}
+                      description={emptyDescription}
+                      action={emptyAction}
+                    />
+                  )}
                 </td>
               </tr>
             ) : (

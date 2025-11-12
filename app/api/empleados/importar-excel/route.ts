@@ -11,7 +11,15 @@ import { UsuarioRol } from '@/lib/constants/enums';
 
 /**
  * POST /api/empleados/importar-excel
- * Analiza un archivo Excel y retorna preview de empleados detectados
+ * 
+ * FASE 1: Analiza un archivo Excel y retorna preview de empleados detectados
+ * 
+ * IMPORTANTE: Este endpoint NO guarda datos en la base de datos.
+ * Solo procesa el Excel con IA y retorna los datos detectados para preview.
+ * 
+ * Para guardar los datos, usar: POST /api/empleados/importar-excel/confirmar
+ * 
+ * @see docs/funcionalidades/importacion-empleados-excel.md
  */
 export async function POST(req: NextRequest) {
   try {
@@ -129,6 +137,7 @@ export async function POST(req: NextRequest) {
     );
   }
 }
+
 
 
 

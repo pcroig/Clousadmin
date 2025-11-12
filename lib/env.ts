@@ -23,7 +23,7 @@ const envSchema = z.object({
 
   // SES (OPCIONAL para desarrollo local, requerido en producción)
   SES_FROM_EMAIL: z.string().email().optional(),
-  SES_REGION: z.string().min(1).default('eu-west-1').optional(),
+  SES_REGION: z.string().min(1).optional().default('eu-west-1'),
 
   // Proveedores de IA (al menos uno debe estar configurado)
   // OpenAI
@@ -69,11 +69,15 @@ const envSchema = z.object({
     .min(32, 'CRON_SECRET debe tener al menos 32 caracteres para seguridad')
     .optional(),
   SOLICITUDES_PERIODO_REVISION_HORAS: z
-    .string()
-    .transform((val) => parseInt(val || '48', 10))
-    .pipe(z.number().min(1).max(168))
-    .optional()
-    .default('48' as unknown as string),
+    .union([z.string(), z.number(), z.undefined()])
+    .transform((value) => {
+      if (typeof value === 'number') {
+        return value;
+      }
+      const parsed = Number.parseInt((value ?? '48').toString(), 10);
+      return Number.isFinite(parsed) ? parsed : 48;
+    })
+    .pipe(z.number().min(1).max(168)),
 });
 
 // Validate and export

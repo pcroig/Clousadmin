@@ -4,7 +4,7 @@
 
 import { prisma } from '@/lib/prisma';
 
-interface DiasLaborables {
+export interface DiasLaborables {
   lunes: boolean;
   martes: boolean;
   miercoles: boolean;
@@ -40,19 +40,29 @@ export async function getDiasLaborablesEmpresa(empresaId: string): Promise<DiasL
       return DIAS_LABORABLES_DEFAULT;
     }
 
-    const config = empresa.config as any;
-    
-    // Si existe la configuración de días laborables, usarla
-    if (config.diasLaborables && typeof config.diasLaborables === 'object') {
-      return {
-        lunes: config.diasLaborables.lunes ?? DIAS_LABORABLES_DEFAULT.lunes,
-        martes: config.diasLaborables.martes ?? DIAS_LABORABLES_DEFAULT.martes,
-        miercoles: config.diasLaborables.miercoles ?? DIAS_LABORABLES_DEFAULT.miercoles,
-        jueves: config.diasLaborables.jueves ?? DIAS_LABORABLES_DEFAULT.jueves,
-        viernes: config.diasLaborables.viernes ?? DIAS_LABORABLES_DEFAULT.viernes,
-        sabado: config.diasLaborables.sabado ?? DIAS_LABORABLES_DEFAULT.sabado,
-        domingo: config.diasLaborables.domingo ?? DIAS_LABORABLES_DEFAULT.domingo,
-      };
+    const config = empresa.config;
+
+    const isRecord = (value: unknown): value is Record<string, unknown> =>
+      typeof value === 'object' && value !== null;
+
+    const getFlag = (
+      source: Record<string, unknown>,
+      key: keyof DiasLaborables
+    ): boolean => (typeof source[key] === 'boolean' ? (source[key] as boolean) : DIAS_LABORABLES_DEFAULT[key]);
+
+    if (isRecord(config) && 'diasLaborables' in config) {
+      const diasConfig = (config as Record<string, unknown>).diasLaborables;
+      if (isRecord(diasConfig)) {
+        return {
+          lunes: getFlag(diasConfig, 'lunes'),
+          martes: getFlag(diasConfig, 'martes'),
+          miercoles: getFlag(diasConfig, 'miercoles'),
+          jueves: getFlag(diasConfig, 'jueves'),
+          viernes: getFlag(diasConfig, 'viernes'),
+          sabado: getFlag(diasConfig, 'sabado'),
+          domingo: getFlag(diasConfig, 'domingo'),
+        };
+      }
     }
 
     // Si no existe, retornar default

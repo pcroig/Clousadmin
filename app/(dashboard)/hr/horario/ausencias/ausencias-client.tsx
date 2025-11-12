@@ -174,7 +174,7 @@ export function AusenciasClient() {
   function getEstadoBadge(estado: string) {
     const variants: Record<string, { label: string; className: string }> = {
       pendiente: { label: getAusenciaEstadoLabel(EstadoAusencia.pendiente), className: 'bg-yellow-100 text-yellow-800' },
-      confirmada: { label: getAusenciaEstadoLabel(EstadoAusencia.confirmada), className: 'bg-blue-100 text-blue-800' },
+      confirmada: { label: getAusenciaEstadoLabel(EstadoAusencia.confirmada), className: 'bg-green-100 text-green-800' },
       completada: { label: getAusenciaEstadoLabel(EstadoAusencia.completada), className: 'bg-gray-100 text-gray-800' },
       rechazada: { label: getAusenciaEstadoLabel(EstadoAusencia.rechazada), className: 'bg-red-100 text-red-800' },
     };
@@ -231,7 +231,7 @@ export function AusenciasClient() {
             onClick={() => setCampanasExpandidas(!campanasExpandidas)}
           >
             <div className="flex items-center gap-3">
-              <Calendar className="w-5 h-5 text-blue-600" />
+              <Calendar className="w-5 h-5 text-gray-600" />
               <div>
                 <h3 className="font-semibold text-gray-900">
                   Campañas de Vacaciones en Curso
@@ -242,7 +242,7 @@ export function AusenciasClient() {
               </div>
             </div>
             <div className="flex items-center gap-3">
-              <Badge className="bg-blue-100 text-blue-800 border-0">
+              <Badge className="bg-yellow-100 text-yellow-800 border-0">
                 En curso
               </Badge>
               {campanasExpandidas ? (
@@ -474,7 +474,7 @@ export function AusenciasClient() {
                 />
               </div>
 
-              <div className="bg-blue-50 p-3 rounded text-sm text-blue-800">
+              <div className="bg-gray-50 p-3 rounded text-sm text-gray-600">
                 💡 Esta funcionalidad requiere la API de edición. Por ahora es solo vista previa.
               </div>
             </div>

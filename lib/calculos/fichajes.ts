@@ -695,7 +695,7 @@ export async function crearFichajesAutomaticos(
  */
 export interface AusenciaMedioDia {
   tieneAusencia: boolean;
-  medioDia: 'mañana' | 'tarde' | null;
+  medioDia: 'manana' | 'tarde' | null;
   ausencia: Ausencia | null;
 }
 
@@ -734,7 +734,7 @@ export async function obtenerAusenciaMedioDia(
 
   return {
     tieneAusencia: true,
-    medioDia: 'mañana', // Por defecto mañana, TODO: Añadir campo 'turno' a Ausencia
+    medioDia: ausencia.periodo || 'manana', // Usar campo periodo o 'manana' por defecto para ausencias antiguas
     ausencia,
   };
 }
@@ -819,7 +819,7 @@ export async function validarFichajeCompleto(
       eventosRequeridos.push('entrada');
     }
     
-    if (!ausenciaMedioDia.tieneAusencia || ausenciaMedioDia.medioDia === 'mañana') {
+    if (!ausenciaMedioDia.tieneAusencia || ausenciaMedioDia.medioDia === 'manana') {
       eventosRequeridos.push('salida');
     }
 
@@ -846,7 +846,7 @@ export async function validarFichajeCompleto(
       eventosRequeridos.push('entrada');
     }
     
-    if (!ausenciaMedioDia.tieneAusencia || ausenciaMedioDia.medioDia === 'mañana') {
+    if (!ausenciaMedioDia.tieneAusencia || ausenciaMedioDia.medioDia === 'manana') {
       eventosRequeridos.push('salida');
     }
 

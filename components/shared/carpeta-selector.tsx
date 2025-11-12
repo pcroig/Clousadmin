@@ -118,7 +118,7 @@ export function CarpetaSelector({
         </Select>
         {onNuevaCarpeta && (
           <Button
-            variant="outline"
+            variant="ghost"
             size="icon"
             onClick={() => setCreandoCarpeta(true)}
             disabled={loading || disabled}

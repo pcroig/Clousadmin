@@ -58,6 +58,10 @@ El sistema crea automáticamente carpetas organizadas:
 - **medico** - Certificados médicos
 - **otro** - Otros documentos
 
+> ℹ️ **Integración con Mi Espacio**  
+> Los documentos compartidos apuntan al mismo datastore que `Mi Espacio`.  
+> Componentes como `DocumentList` y `DocumentUploader` se reutilizan tanto en onboarding como en Mi Espacio.
+
 ### Formatos Aceptados
 
 - PDF (`application/pdf`)
@@ -248,7 +252,9 @@ El progreso se almacena en `OnboardingEmpleado.progreso`:
   "credenciales_completadas": boolean,
   "datos_personales": boolean,
   "datos_bancarios": boolean,
-  "datos_documentos": boolean  // Se actualiza automáticamente cuando todos los requeridos están completos
+  "datos_documentos": boolean,  // Clave en onboarding completo
+  "integraciones": boolean,      // Clave en onboarding simplificado
+  "pwa_explicacion": boolean
 }
 ```
 

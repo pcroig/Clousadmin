@@ -276,7 +276,7 @@ export function PuestoFormModal({
                         key={empleado.id}
                         className={cn(
                           "flex items-center space-x-2 cursor-pointer hover:bg-gray-50 p-2 rounded",
-                          empleadosSeleccionados.includes(empleado.id) && "bg-blue-50"
+                          empleadosSeleccionados.includes(empleado.id) && "bg-primary/5"
                         )}
                       >
                         <input
@@ -289,7 +289,7 @@ export function PuestoFormModal({
                           {empleado.nombre} {empleado.apellidos}
                         </span>
                         {empleadosSeleccionados.includes(empleado.id) && (
-                          <Check className="h-4 w-4 text-blue-600" />
+                          <Check className="h-4 w-4 text-primary" />
                         )}
                       </label>
                     ))

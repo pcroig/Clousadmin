@@ -292,22 +292,16 @@ export function AddPersonaOnboardingForm({ onSuccess, onCancel, tipoOnboarding =
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      <div className="text-sm text-gray-600 bg-blue-50 p-4 rounded-lg border border-blue-200">
-        <p className="font-medium text-blue-900 mb-2">📧 Activar Onboarding Automático</p>
-        <ul className="space-y-1 text-blue-800">
-          <li>• Introduce los datos básicos del nuevo empleado</li>
-          <li>• Se enviará un email con un link único de onboarding</li>
-          <li>• El empleado completará sus datos personales y bancarios</li>
-          <li>• Una vez completado, el empleado podrá acceder al portal</li>
-          <li>• El link de onboarding expira en 7 días</li>
-        </ul>
-      </div>
-
       {/* Datos Básicos */}
       <div className="space-y-4">
-        <h3 className="text-sm font-semibold text-gray-900 border-b pb-2">
-          Datos Básicos del Empleado
-        </h3>
+        <div className="flex items-center gap-2">
+          <h3 className="text-sm font-semibold text-gray-900 border-b pb-2 flex-1">
+            Datos Básicos del Empleado
+          </h3>
+        </div>
+        <p className="text-sm text-gray-600">
+          Se enviará un email automático con un link único para que el empleado complete su onboarding. El link expira en 7 días.
+        </p>
         <div className="grid grid-cols-2 gap-4">
           <div>
             <Label htmlFor="nombre">Nombre *</Label>

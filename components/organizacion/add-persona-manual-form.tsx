@@ -205,20 +205,20 @@ export function AddPersonaManualForm({ onSuccess, onCancel }: AddPersonaManualFo
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       {/* Sección de Importar */}
-      <div className="border border-blue-200 rounded-lg bg-blue-50/50">
+      <div className="border border-gray-200 rounded-lg bg-gray-50">
         <button
           type="button"
           onClick={() => setShowImportSection(!showImportSection)}
-          className="w-full flex items-center justify-between p-4 hover:bg-blue-100/50 transition-colors rounded-lg"
+          className="w-full flex items-center justify-between p-4 hover:bg-gray-100 transition-colors rounded-lg"
         >
           <div className="flex items-center gap-2">
-            <Upload className="h-5 w-5 text-blue-600" />
-            <span className="font-medium text-blue-900">¿Prefieres importar empleado(s)?</span>
+            <Upload className="h-5 w-5 text-gray-600" />
+            <span className="font-medium text-gray-900">¿Prefieres importar empleado(s)?</span>
           </div>
           {showImportSection ? (
-            <ChevronUp className="h-5 w-5 text-blue-600" />
+            <ChevronUp className="h-5 w-5 text-gray-600" />
           ) : (
-            <ChevronDown className="h-5 w-5 text-blue-600" />
+            <ChevronDown className="h-5 w-5 text-gray-600" />
           )}
         </button>
         

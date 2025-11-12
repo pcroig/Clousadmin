@@ -59,6 +59,19 @@ function processData(data: any) { ... }
 
 // ✅ GOOD: Generic with constraints
 function processData<T extends EmpleadoFormData>(data: T) { ... }
+
+// ✅ GOOD: Unknown obliga a validar antes de usar
+function parseResponse(raw: unknown) {
+  if (typeof raw !== 'object' || raw === null) {
+    throw new Error('Formato inesperado');
+  }
+  const record = raw as Record<string, unknown>;
+  const id = typeof record.id === 'string' ? record.id : '';
+  // ...
+}
+
+// ❌ BAD: @ts-ignore tapa el error sin solucionarlo
+// ✅ Preferir @ts-expect-error documentando la excepción y arreglarla cuanto antes
 ```
 
 ---

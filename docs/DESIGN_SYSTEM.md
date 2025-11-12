@@ -65,9 +65,16 @@
 - Iconos por defecto en gris (`text-gray-600` / `text-gray-700`), **sin fondo de color**.
 - Iconos destacados usan `text-[#d97757]`; el hover utiliza `hover:text-[#c6613f]`.
 - No usar el color naranja antiguo `#f26c21`.
-- Fondos y superficies se limitan a `bg-white`, `bg-gray-50`, `bg-gray-100`, `bg-stone-100`.
+- Fondos y superficies se limitan a `bg-white`, `bg-gray-50`, `bg-gray-100`.
 - Los únicos botones verdes/rojos permitidos son las acciones de aprobar/rechazar; el resto usa el acento.
 - Badges y estados usan la paleta definida (`bg-green-100 text-green-700`, etc.).
+- **IMPORTANTE**: Solo usar colores documentados en este sistema. No usar `bg-blue-*`, `bg-indigo-*`, `bg-cyan-*`, `bg-sky-*` u otros no especificados.
+- **Estados hover**: Casi siempre deben ser grisáceos (`hover:bg-gray-50`, `hover:bg-gray-100`), NO usar color terciario/tierra (`hover:bg-stone-*`, `hover:bg-amber-*`).
+- **Botones con solo icono**: NO deben tener fondo de color, solo el icono.
+- **Dialogs**: NO incluir banners informativos dentro de dialogs. Usar alternatives:
+  - Alerts o Sonners para notificaciones temporales
+  - Tooltip con icono "i" al lado de títulos cuando se necesite contexto adicional
+  - Descripciones de campos en los propios inputs
 
 ---
 
@@ -141,6 +148,87 @@
 <button className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded">
   Rechazar
 </button>
+
+// ✅ Botón con solo icono (sin fondo)
+<Button variant="ghost" size="icon">
+  <Settings className="h-4 w-4" />
+</Button>
+
+// ❌ Prohibido: Botón icono con fondo de color
+<Button variant="outline" size="icon" className="bg-primary">
+  <Settings className="h-4 w-4" />
+</Button>
+```
+
+### Estados Hover
+
+Los estados hover deben ser consistentes y usar colores grisáceos:
+
+```tsx
+// ✅ Hover grisáceo (CORRECTO)
+<button className="hover:bg-gray-50 transition-colors">
+  Elemento interactivo
+</button>
+
+<button className="hover:bg-gray-100 transition-colors">
+  Elemento interactivo con más contraste
+</button>
+
+// ✅ Hover en sidebar/menú
+<Link 
+  href="/ruta" 
+  className="text-gray-700 hover:bg-gray-100 hover:text-gray-900"
+>
+  Elemento de navegación
+</Link>
+
+// ❌ Prohibido: Hover con color terciario/tierra
+<button className="hover:bg-stone-100">
+  Incorrecto
+</button>
+
+<button className="hover:bg-amber-50">
+  Incorrecto
+</button>
+
+<button className="hover:bg-[#d97757]">
+  Incorrecto (solo usar accent para elementos destacados, no hovers generales)
+</button>
+```
+
+**Excepciones de hover:**
+- Botones principales con background accent pueden usar `hover:bg-[#c6613f]` (accent-hover)
+- Enlaces/iconos destacados pueden usar `hover:text-[#c6613f]`
+
+### Tooltips Informativos
+
+Para proporcionar contexto adicional, usar tooltips con icono "i":
+
+```tsx
+import { InfoTooltip } from '@/components/shared/info-tooltip';
+
+// ✅ Tooltip al lado de título
+<div className="flex items-center gap-2">
+  <h3 className="text-lg font-semibold">Configuración avanzada</h3>
+  <InfoTooltip content="Esta configuración solo está disponible para administradores" />
+</div>
+
+// ✅ Tooltip en campo de formulario
+<Label htmlFor="campo" className="flex items-center gap-2">
+  Nombre del campo
+  <InfoTooltip content="El nombre debe ser único en toda la organización" />
+</Label>
+
+// ❌ Prohibido: Banner dentro de dialog
+<Dialog>
+  <DialogContent>
+    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+      <AlertCircle className="h-5 w-5 text-blue-600" />
+      <p>Información importante</p>
+    </div>
+    {/* contenido del dialog */}
+  </DialogContent>
+</Dialog>
 ```
 
 ---

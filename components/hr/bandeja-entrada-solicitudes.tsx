@@ -7,7 +7,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { MoreVertical, Check, X } from 'lucide-react';
+import { MoreVertical, Check, X, ClipboardList } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -56,6 +56,7 @@ interface BandejaEntradaSolicitudesProps {
 type VistaType = 'pendientes' | 'resueltas';
 
 import { formatRelativeTime } from '@/lib/utils/formatRelativeTime';
+import { EmptyState } from '@/components/shared/empty-state';
 
 const DATE_FORMATTER = new Intl.DateTimeFormat('es-ES', {
   day: 'numeric',
@@ -254,6 +255,15 @@ export function BandejaEntradaSolicitudes({
 
   // Determinar qué solicitudes mostrar
   const solicitudesActuales = vista === 'pendientes' ? solicitudesPendientes : solicitudesResueltas;
+  const emptyStateCopy = vista === 'pendientes'
+    ? {
+        title: 'Sin solicitudes pendientes',
+        description: 'Cuando un empleado envíe una solicitud aparecerá aquí para que la revises.',
+      }
+    : {
+        title: 'Sin solicitudes resueltas',
+        description: 'Gestiona una solicitud pendiente para verla en este listado.',
+      };
 
   return (
     <div className="space-y-4">
@@ -283,11 +293,12 @@ export function BandejaEntradaSolicitudes({
 
       {/* Lista de solicitudes */}
       {solicitudesActuales.length === 0 ? (
-        <div className="text-center py-12">
-          <p className="text-gray-500">
-            {vista === 'pendientes' ? 'No hay solicitudes pendientes' : 'No hay solicitudes resueltas'}
-          </p>
-        </div>
+        <EmptyState
+          icon={ClipboardList}
+          title={emptyStateCopy.title}
+          description={emptyStateCopy.description}
+          className="py-10"
+        />
       ) : (
         <div className="space-y-3">
           {solicitudesActuales.map((solicitud) => {

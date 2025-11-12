@@ -37,10 +37,15 @@ export default async function NominaDetailsPage({
           email: true,
           numeroSeguridadSocial: true,
           iban: true,
-          departamento: {
-            select: {
-              nombre: true,
-            },
+            equipos: {
+              select: {
+                equipo: {
+                  select: {
+                    id: true,
+                    nombre: true,
+                  },
+                },
+              },
           },
         },
       },

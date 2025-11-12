@@ -74,7 +74,7 @@ export const FUNCTION_CONFIGS: Record<string, ModelConfig> = {
     systemMessage: 'Eres un asistente experto en análisis de datos de recursos humanos y mapeo de información de empleados desde hojas de cálculo.',
   },
   'clasificador-nominas': {
-    model: MODELS.GPT_4_1,
+    model: MODELS.GPT_4_1_MINI,
     temperature: 0.2,
     responseFormat: 'json_object',
     systemMessage: 'Eres un asistente experto en análisis de nóminas y matching de documentos con empleados.',

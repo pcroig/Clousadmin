@@ -4,18 +4,72 @@
 // Wrapper del SDK de OpenAI con interfaz unificada
 
 import OpenAI from 'openai';
+import { File } from 'node:buffer';
 import {
   AIProvider,
   AIMessage,
   AIResponse,
-  AIChoice,
   MessageRole,
   ModelConfig,
   AICallOptions,
-  isTextContent,
   hasImageContent,
   AICallMetadata,
 } from '../types';
+
+type FilesCreateParams = Parameters<OpenAI['files']['create']>;
+type OpenAIFileInput = FilesCreateParams[0]['file'];
+
+const PDF_MIME_TYPE = 'application/pdf';
+
+const isErrorWithMessage = (error: unknown): error is { message: string } =>
+  typeof error === 'object' &&
+  error !== null &&
+  'message' in error &&
+  typeof (error as { message: unknown }).message === 'string';
+
+const getErrorMessage = (error: unknown): string => {
+  if (isErrorWithMessage(error)) {
+    return error.message;
+  }
+  try {
+    return JSON.stringify(error);
+  } catch {
+    return String(error);
+  }
+};
+
+const getErrorStatus = (error: unknown): number | undefined => {
+  if (
+    typeof error === 'object' &&
+    error !== null &&
+    'status' in error &&
+    typeof (error as { status?: unknown }).status === 'number'
+  ) {
+    return (error as { status: number }).status;
+  }
+  return undefined;
+};
+
+async function buildFileUploadInput(
+  fileBuffer: Buffer,
+  filename: string
+): Promise<{ input: OpenAIFileInput; strategy: 'file' | 'stream' }> {
+  try {
+    const file = new File([fileBuffer], filename, { type: PDF_MIME_TYPE });
+    return {
+      input: file as unknown as OpenAIFileInput,
+      strategy: 'file',
+    };
+  } catch {
+    const { Readable } = await import('stream');
+    const stream = Readable.from(fileBuffer);
+    Object.assign(stream, { path: filename });
+    return {
+      input: stream as unknown as OpenAIFileInput,
+      strategy: 'stream',
+    };
+  }
+}
 
 /**
  * Cliente de OpenAI (singleton)
@@ -85,43 +139,19 @@ export async function uploadPDFToOpenAI(
   const client = getOpenAIClient();
   
   try {
-    // En Node.js, el SDK de OpenAI acepta File, Blob, o ReadableStream
-    // Crear un File object compatible con Node.js
-    // @ts-ignore - File puede no estar disponible en tipos, pero funciona en runtime
-    const file = new File([fileBuffer], filename, { type: 'application/pdf' });
-    
-    // Subir a OpenAI Files API
-    // OpenAI recomienda 'user_data' para archivos usados como input del modelo
+    const { input, strategy } = await buildFileUploadInput(fileBuffer, filename);
     const uploadedFile = await client.files.create({
-      file: file as any, // Type assertion para compatibilidad
+      file: input,
       purpose: 'user_data',
     });
-    
-    console.info(`[OpenAI Provider] PDF subido con ID: ${uploadedFile.id}`);
+
+    const strategyLabel = strategy === 'stream' ? ' (usando stream)' : '';
+    console.info(`[OpenAI Provider] PDF subido con ID${strategyLabel}: ${uploadedFile.id}`);
     return uploadedFile.id;
-  } catch (error: any) {
-    // Si File no está disponible, intentar con ReadableStream
-    if (error.message?.includes('File') || error.message?.includes('is not defined')) {
-      try {
-        // Crear un ReadableStream desde el Buffer
-        const { Readable } = await import('stream');
-        const stream = Readable.from(fileBuffer);
-        
-        const uploadedFile = await client.files.create({
-          file: stream as any,
-          purpose: 'user_data',
-        });
-        
-        console.info(`[OpenAI Provider] PDF subido con ID (usando stream): ${uploadedFile.id}`);
-        return uploadedFile.id;
-      } catch (streamError: any) {
-        console.error('[OpenAI Provider] Error subiendo PDF con stream:', streamError.message);
-        throw new Error(`Error subiendo PDF a OpenAI: ${streamError.message}`);
-      }
-    }
-    
-    console.error('[OpenAI Provider] Error subiendo PDF:', error.message);
-    throw new Error(`Error subiendo PDF a OpenAI: ${error.message}`);
+  } catch (error) {
+    const message = getErrorMessage(error);
+    console.error('[OpenAI Provider] Error subiendo PDF:', message);
+    throw new Error(`Error subiendo PDF a OpenAI: ${message}`);
   }
 }
 
@@ -134,8 +164,11 @@ export async function deleteOpenAIFile(fileId: string): Promise<void> {
   try {
     await client.files.del(fileId);
     console.info(`[OpenAI Provider] Archivo eliminado: ${fileId}`);
-  } catch (error: any) {
-    console.warn(`[OpenAI Provider] Error eliminando archivo ${fileId}:`, error.message);
+  } catch (error) {
+    console.warn(
+      `[OpenAI Provider] Error eliminando archivo ${fileId}:`,
+      getErrorMessage(error)
+    );
     // No lanzar error, es una operación de limpieza
   }
 }
@@ -174,12 +207,11 @@ function convertMessagesToOpenAI(messages: AIMessage[]): OpenAI.Chat.ChatComplet
             }
             // Verificar si es base64 de PDF (data:application/pdf;base64,...)
             if (c.image_url.url.startsWith('data:application/pdf;base64,')) {
-              // Extraer filename del objeto image_url si está disponible
-              const filename = (c.image_url as any).filename || 'document.pdf';
+              const filename = c.image_url.filename ?? 'document.pdf';
               return {
                 type: 'file' as const,
                 file: {
-                  filename: filename,
+                  filename,
                   file_data: c.image_url.url, // Ya incluye el prefijo data:application/pdf;base64,
                 },
               };
@@ -222,15 +254,14 @@ function convertMessagesToOpenAI(messages: AIMessage[]): OpenAI.Chat.ChatComplet
       }
       // Verificar si es base64 de PDF
       if (msg.content.image_url.url.startsWith('data:application/pdf;base64,')) {
-        // Extraer filename del objeto image_url si está disponible
-        const filename = (msg.content.image_url as any).filename || 'document.pdf';
+        const filename = msg.content.image_url.filename ?? 'document.pdf';
         return {
           role: msg.role as 'system' | 'user' | 'assistant',
           content: [
             {
               type: 'file' as const,
               file: {
-                filename: filename,
+                filename,
                 file_data: msg.content.image_url.url,
               },
             },
@@ -320,31 +351,31 @@ export async function callOpenAI(
     
     console.info(`[OpenAI Provider] Respuesta recibida (${response.usage?.total_tokens || 0} tokens)`);
     return convertOpenAIResponse(response);
-  } catch (error: any) {
-    console.error('[OpenAI Provider] Error:', error.message);
+  } catch (error) {
+    const status = getErrorStatus(error);
+    const message = getErrorMessage(error);
+    console.error('[OpenAI Provider] Error:', message);
     
-    // Mensajes de error más descriptivos
-    if (error.status === 401) {
-      if (error.message?.includes('insufficient permissions') || error.message?.includes('Missing scopes')) {
+    if (status === 401) {
+      if (message.includes('insufficient permissions') || message.includes('Missing scopes')) {
         throw new Error(
           'OpenAI API key no tiene permisos suficientes. ' +
           'La key necesita el scope "model.request". ' +
           'Crea una nueva API key en https://platform.openai.com/api-keys con permisos completos.'
         );
-      } else {
-        throw new Error('OpenAI API key inválida o expirada. Verifica tu key en https://platform.openai.com/api-keys');
       }
+      throw new Error('OpenAI API key inválida o expirada. Verifica tu key en https://platform.openai.com/api-keys');
     }
     
-    if (error.status === 429) {
+    if (status === 429) {
       throw new Error('OpenAI: Límite de rate limit alcanzado. Espera unos minutos e intenta de nuevo.');
     }
     
-    if (error.status === 500 || error.status === 503) {
+    if (status === 500 || status === 503) {
       throw new Error('OpenAI: Error del servidor. Intenta de nuevo en unos momentos.');
     }
     
-    throw new Error(`OpenAI error: ${error.message}`);
+    throw new Error(`OpenAI error: ${message}`);
   }
 }
 

@@ -207,7 +207,7 @@ export function AusenciasTab({ empleadoId }: MiEspacioAusenciasTabProps) {
               bgColor = 'bg-gray-100';
             }
             if (hasAusencia) {
-              bgColor = 'bg-blue-100';
+              bgColor = 'bg-primary/10';
             }
             if (isToday) {
               bgColor = 'bg-orange-100';
@@ -234,7 +234,7 @@ export function AusenciasTab({ empleadoId }: MiEspacioAusenciasTabProps) {
                     <div className="space-y-2">
                       <p className="font-semibold">{format(day, 'dd MMMM yyyy', { locale: es })}</p>
                       {hasAusencia ? (
-                        <p className="text-sm text-blue-600">Día con ausencia</p>
+                        <p className="text-sm text-primary">Día con ausencia</p>
                       ) : (
                         <p className="text-sm text-gray-600">Día laborable</p>
                       )}
@@ -339,7 +339,7 @@ export function AusenciasTab({ empleadoId }: MiEspacioAusenciasTabProps) {
             <span className="text-gray-600">No laborable</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <div className="w-3 h-3 rounded bg-blue-100"></div>
+            <div className="w-3 h-3 rounded bg-primary/10"></div>
             <span className="text-gray-600">Ausencia</span>
           </div>
           <div className="flex items-center gap-1.5">

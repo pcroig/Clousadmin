@@ -411,7 +411,7 @@ export function RevisionModal({ open, onClose, onReviewed, onEditFichaje }: Revi
                                   <Button
                                     size="icon"
                                     variant="ghost"
-                                    className="h-8 w-8 text-gray-600 hover:text-blue-600"
+                                    className="h-8 w-8 text-gray-600 hover:text-primary"
                                     title="Editar fichaje"
                                     onClick={() => {
                                       if (fichaje.fichajeId) {

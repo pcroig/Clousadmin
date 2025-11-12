@@ -43,9 +43,12 @@ interface NominaDetailsClientProps {
       email: string;
       numeroSeguroSocial: string | null;
       iban: string | null;
-      departamento: {
-        nombre: string;
-      } | null;
+      equipos: Array<{
+        equipo: {
+          id: string;
+          nombre: string;
+        } | null;
+      }>;
     };
     contrato: {
       puesto: string;
@@ -117,6 +120,11 @@ const tiposAusenciaLabels: Record<string, string> = {
 export function NominaDetailsClient({ nomina, ausencias }: NominaDetailsClientProps) {
   const router = useRouter();
   const [uploadingPDF, setUploadingPDF] = useState(false);
+
+  const equiposEmpleado = nomina.empleado.equipos
+    .map((relacion) => relacion.equipo?.nombre)
+    .filter((nombre): nombre is string => Boolean(nombre));
+  const equiposLabel = equiposEmpleado.length > 0 ? equiposEmpleado.join(', ') : '-';
 
   const estadoInfo = estadosLabels[nomina.estado] || {
     label: nomina.estado,
@@ -332,9 +340,9 @@ export function NominaDetailsClient({ nomina, ausencias }: NominaDetailsClientPr
             </div>
 
             <div>
-              <div className="text-sm text-gray-600 mb-1">Departamento</div>
+              <div className="text-sm text-gray-600 mb-1">Equipos</div>
               <div className="font-medium text-gray-900">
-                {nomina.empleado.departamento?.nombre || '-'}
+                {equiposLabel}
               </div>
             </div>
 

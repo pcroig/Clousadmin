@@ -6,6 +6,7 @@
 
 import { Bell, CheckCircle2, XCircle, AlertCircle, Info } from 'lucide-react';
 import { formatRelativeTime } from '@/lib/utils/formatRelativeTime';
+import { EmptyState } from '@/components/shared/empty-state';
 
 interface NotificacionItem {
   id: string;
@@ -44,10 +45,12 @@ export function BandejaEntradaNotificaciones({
   return (
     <div className="space-y-4">
       {notificaciones.length === 0 ? (
-        <div className="text-center py-12">
-          <Bell className="w-16 h-16 mx-auto mb-4 text-gray-300" />
-          <p className="text-gray-500">No hay notificaciones</p>
-        </div>
+        <EmptyState
+          layout="inline"
+          icon={Bell}
+          title="Sin notificaciones"
+          description="Te avisaremos aquí cuando haya novedades."
+        />
       ) : (
         <div className="bg-white rounded-lg border border-gray-200 divide-y divide-gray-100">
           {notificaciones.map((notificacion) => (

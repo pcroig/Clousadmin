@@ -17,13 +17,13 @@ type SensitiveField = (typeof SENSITIVE_FIELDS)[number];
  * @returns Datos con campos sensibles encriptados
  */
 export function encryptEmpleadoData<T extends Partial<Empleado>>(data: T): T {
-  const encrypted = { ...data };
+  const encrypted: T = { ...data };
 
   for (const field of SENSITIVE_FIELDS) {
-    const value = data[field as keyof T];
+    const value = data[field];
     if (value !== null && value !== undefined && value !== '') {
       try {
-        encrypted[field as keyof T] = encrypt(String(value)) as any;
+        encrypted[field] = encrypt(String(value)) as T[typeof field];
       } catch (error) {
         console.error(`[Empleado Crypto] Error encriptando ${field}:`, error);
         throw new Error(`Error encriptando campo ${field}`);
@@ -42,10 +42,10 @@ export function encryptEmpleadoData<T extends Partial<Empleado>>(data: T): T {
 export function decryptEmpleadoData<T extends Partial<Empleado>>(empleado: T): T {
   if (!empleado) return empleado;
 
-  const decrypted = { ...empleado };
+  const decrypted: T = { ...empleado };
 
   for (const field of SENSITIVE_FIELDS) {
-    const value = empleado[field as keyof T];
+    const value = empleado[field];
     if (value !== null && value !== undefined && value !== '') {
       const stringValue = String(value);
       
@@ -53,7 +53,7 @@ export function decryptEmpleadoData<T extends Partial<Empleado>>(empleado: T): T
       // Esto maneja casos donde hay datos antiguos sin encriptar
       if (isFieldEncrypted(stringValue)) {
         try {
-          decrypted[field as keyof T] = decrypt(stringValue) as any;
+          decrypted[field] = decrypt(stringValue) as T[typeof field];
         } catch (error) {
           // Si falla la desencriptación, mantener el valor original
           // Esto puede pasar si la key cambió o hay datos corruptos
@@ -104,20 +104,20 @@ export function getSensitiveFields(): readonly SensitiveField[] {
 export function sanitizeEmpleadoForLogs<T extends Partial<Empleado>>(
   empleado: T
 ): Partial<T> {
-  const sanitized = { ...empleado };
+  const sanitized: Partial<T> = { ...empleado };
 
   for (const field of SENSITIVE_FIELDS) {
-    if (empleado[field as keyof T]) {
-      sanitized[field as keyof T] = '[REDACTED]' as any;
+    if (empleado[field]) {
+      sanitized[field] = '[REDACTED]' as T[typeof field];
     }
   }
 
   // También sanitizar salarios si existen
   if ('salarioBrutoAnual' in sanitized) {
-    sanitized.salarioBrutoAnual = '[REDACTED]' as any;
+    (sanitized as Partial<Empleado>).salarioBrutoAnual = '[REDACTED]' as unknown as Empleado['salarioBrutoAnual'];
   }
   if ('salarioBrutoMensual' in sanitized) {
-    sanitized.salarioBrutoMensual = '[REDACTED]' as any;
+    (sanitized as Partial<Empleado>).salarioBrutoMensual = '[REDACTED]' as unknown as Empleado['salarioBrutoMensual'];
   }
 
   return sanitized;

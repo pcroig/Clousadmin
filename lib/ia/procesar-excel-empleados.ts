@@ -222,11 +222,15 @@ function obtenerMapeoBasicoColumnas(): Record<string, keyof EmpleadoDetectado> {
     // Puesto
     'puesto': 'puesto',
     'cargo': 'puesto',
-    // Departamento y equipo (departamento se mapea a equipo ahora)
+    // Equipo (compatibilidad con columna "departamento")
     'departamento': 'equipo',
+    'department': 'equipo',
     'equipo': 'equipo',
+    'team': 'equipo',
+    // Manager
     'manager': 'manager',
     'jefe': 'manager',
+    'responsable': 'manager',
     // Fechas
     'fecha de nacimiento': 'fechaNacimiento',
     'fechanacimiento': 'fechaNacimiento',
@@ -351,7 +355,7 @@ function procesarEmpleadosConMapeo(
       }
     });
 
-    // Post-procesamiento: calcular salario mensual
+    // Post-procesamiento: calcular salario mensual, normalizar equipo, etc.
     if (empleado.salarioBrutoAnual && !empleado.salarioBrutoMensual) {
       empleado.salarioBrutoMensual = empleado.salarioBrutoAnual / 12;
     }
@@ -423,7 +427,7 @@ Analiza los siguientes datos de empleados desde un archivo Excel y mapea cada co
 **IMPORTANTE:**
 - Si un campo no existe o está vacío, usa null
 - Detecta todas las variaciones posibles de nombres de columnas (ej: "email", "correo", "e-mail", etc.)
-- Identifica equipos/departamentos únicos
+- Identifica equipos únicos (si la columna se llama "departamento", mapea el valor a equipo)
 - Identifica managers (pueden estar en columna "Manager", "Jefe", "Responsable", etc.)
 - Normaliza fechas al formato ISO (YYYY-MM-DD)
 - Los salarios deben ser números sin símbolos
@@ -443,7 +447,6 @@ ${JSON.stringify(registrosParaIA, null, 2)}
       "telefono": string | null,
       "fechaNacimiento": string | null,
       "puesto": string | null,
-      "departamento": string | null,
       "equipo": string | null,
       "manager": string | null,
       "fechaAlta": string | null,
@@ -503,8 +506,9 @@ ${usarMuestra
       
       // Si contiene "/", tomar el primero (ej: "nombre/apellidos" -> "nombre")
       const campoNormalizado = campo.includes('/') ? campo.split('/')[0].trim() : campo.trim();
-      if (campoNormalizado && camposValidos.has(campoNormalizado)) {
-        mapeoLimpio[columna] = campoNormalizado;
+      const campoFinal = campoNormalizado === 'departamento' ? 'equipo' : campoNormalizado;
+      if (campoFinal && camposValidos.has(campoFinal)) {
+        mapeoLimpio[columna] = campoFinal;
       }
     });
 

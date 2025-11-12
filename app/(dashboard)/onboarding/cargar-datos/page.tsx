@@ -30,6 +30,14 @@ export default async function CargarDatosPage() {
     orderBy: {
       createdAt: 'asc',
     },
+    include: {
+      equipos: {
+        select: {
+          id: true,
+          nombre: true,
+        },
+      },
+    },
   });
 
   // Obtener integraciones existentes
@@ -58,6 +66,7 @@ export default async function CargarDatosPage() {
     />
   );
 }
+
 
 
 

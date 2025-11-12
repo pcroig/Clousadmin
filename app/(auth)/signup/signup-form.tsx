@@ -106,12 +106,12 @@ export function SignupForm({ token, emailInvitacion }: SignupFormProps) {
       descripcion: 'Configura tu empresa en Clousadmin y empieza a gestionar tu equipo. Tu email ya ha sido verificado.',
     },
     {
-      titulo: 'Configura las sedes',
-      descripcion: 'Añade las oficinas o centros de trabajo de tu empresa',
-    },
-    {
       titulo: 'Importa empleados',
       descripcion: 'Sube un archivo Excel con los datos de tus empleados',
+    },
+    {
+      titulo: 'Configura las sedes',
+      descripcion: 'Añade las oficinas o centros de trabajo y decide a quién se asignan',
     },
     {
       titulo: 'Integraciones (opcional)',
@@ -262,10 +262,10 @@ export function SignupForm({ token, emailInvitacion }: SignupFormProps) {
       </form>
       )}
 
-      {/* Paso 1: Sedes */}
+      {/* Paso 1: Empleados */}
       {pasoActual === 1 && (
         <div className="space-y-6">
-          <SedesForm sedesIniciales={[]} />
+          <ImportarEmpleados />
           <div className="flex justify-between pt-4 border-t">
             <Button variant="outline" onClick={handleAnterior}>
               Anterior
@@ -277,10 +277,10 @@ export function SignupForm({ token, emailInvitacion }: SignupFormProps) {
         </div>
       )}
 
-      {/* Paso 2: Empleados */}
+      {/* Paso 2: Sedes */}
       {pasoActual === 2 && (
         <div className="space-y-6">
-          <ImportarEmpleados />
+          <SedesForm sedesIniciales={[]} />
           <div className="flex justify-between pt-4 border-t">
             <Button variant="outline" onClick={handleAnterior}>
               Anterior
@@ -322,17 +322,6 @@ export function SignupForm({ token, emailInvitacion }: SignupFormProps) {
         </div>
       )}
 
-      {/* Opción de saltar */}
-      {pasoActual > 0 && (
-        <div className="text-center pt-2">
-          <button
-            onClick={handleFinalizarOnboarding}
-            className="text-sm text-gray-500 hover:text-gray-700 underline"
-          >
-            Saltar y empezar ahora
-          </button>
-        </div>
-      )}
     </div>
   );
 }
