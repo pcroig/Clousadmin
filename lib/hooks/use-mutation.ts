@@ -35,7 +35,7 @@ export interface UseMutationReturn<TData, TVariables> {
  * };
  * ```
  */
-export function useMutation<TData = any, TVariables = any>(
+export function useMutation<TData = unknown, TVariables = unknown>(
   options?: UseMutationOptions<TData, TVariables>
 ): UseMutationReturn<TData, TVariables> {
   const [loading, setLoading] = useState(false);
@@ -119,6 +119,7 @@ export function useMutation<TData = any, TVariables = any>(
     reset,
   };
 }
+
 
 
 

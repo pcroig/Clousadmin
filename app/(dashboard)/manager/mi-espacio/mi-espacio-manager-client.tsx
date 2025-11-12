@@ -15,10 +15,11 @@ import { DocumentosTab } from '@/components/shared/mi-espacio/documentos-tab';
 import { AusenciasTab } from '@/components/shared/mi-espacio/ausencias-tab';
 import { getAvatarStyle } from '@/lib/design-system';
 import { DenunciaDialog } from '@/components/empleado/denuncia-dialog';
+import type { MiEspacioEmpleado, Usuario } from '@/types/empleado';
 
 interface MiEspacioManagerClientProps {
-  empleado: any;
-  usuario: any;
+  empleado: MiEspacioEmpleado;
+  usuario: Usuario;
 }
 
 export function MiEspacioManagerClient({ empleado, usuario }: MiEspacioManagerClientProps) {
@@ -27,7 +28,9 @@ export function MiEspacioManagerClient({ empleado, usuario }: MiEspacioManagerCl
   const [denunciaDialogOpen, setDenunciaDialogOpen] = useState(false);
 
   const getInitials = () => {
-    return `${empleado.nombre.charAt(0)}${empleado.apellidos.charAt(0)}`.toUpperCase();
+    const nombreInicial = empleado.nombre?.charAt(0) ?? '';
+    const apellidoInicial = empleado.apellidos?.charAt(0) ?? '';
+    return `${nombreInicial}${apellidoInicial}`.toUpperCase() || '??';
   };
 
   const avatarStyle = getAvatarStyle(`${empleado.nombre} ${empleado.apellidos}`);

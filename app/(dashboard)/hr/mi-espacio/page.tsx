@@ -35,6 +35,23 @@ export default async function MiEspacioHRPage() {
           año: new Date().getFullYear(),
         },
       },
+      jornada: {
+        select: {
+          id: true,
+          nombre: true,
+          horasSemanales: true,
+        },
+      },
+      equipos: {
+        include: {
+          equipo: {
+            select: {
+              id: true,
+              nombre: true,
+            },
+          },
+        },
+      },
     },
   });
 
@@ -47,6 +64,10 @@ export default async function MiEspacioHRPage() {
       id: session.user.id,
     },
   });
+
+  if (!usuario) {
+    redirect('/login');
+  }
 
   // Serializar campos Decimal para Client Component
   const empleadoSerializado = serializeEmpleado(empleado);

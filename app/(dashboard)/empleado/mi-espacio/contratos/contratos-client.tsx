@@ -2,8 +2,13 @@
 
 import { Button } from '@/components/ui/button';
 import { Download } from 'lucide-react';
+import type { MiEspacioEmpleado } from '@/types/empleado';
 
-export function MiEspacioContratosClient({ empleado }: any) {
+interface MiEspacioContratosClientProps {
+  empleado: MiEspacioEmpleado;
+}
+
+export function MiEspacioContratosClient({ empleado }: MiEspacioContratosClientProps) {
   const contratoActual = empleado.contratos?.[0];
 
   return (
@@ -53,7 +58,7 @@ export function MiEspacioContratosClient({ empleado }: any) {
         <div className="bg-white rounded-lg border border-gray-200 p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Histórico</h3>
           <div className="space-y-3">
-            {empleado.contratos.slice(1).map((contrato: any) => (
+            {empleado.contratos.slice(1).map((contrato) => (
               <div key={contrato.id} className="flex items-center justify-between p-3 border border-gray-200 rounded-lg">
                 <div>
                   <p className="text-sm font-medium text-gray-900">{contrato.tipoContrato}</p>

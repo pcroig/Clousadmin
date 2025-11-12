@@ -207,3 +207,4 @@ El dominio debe estar verificado en Resend antes de enviar emails desde él. Sig
 
 **Última actualización**: 2025-11-10
 
+

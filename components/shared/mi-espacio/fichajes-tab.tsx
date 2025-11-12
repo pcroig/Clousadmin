@@ -6,7 +6,6 @@ import { es } from 'date-fns/locale';
 import { Clock } from 'lucide-react';
 
 import { useApi } from '@/lib/hooks';
-import { EstadoFichaje } from '@/lib/constants/enums';
 import {
   agruparFichajesEnJornadas,
   calcularResumenJornadas,
@@ -15,6 +14,7 @@ import {
   type FichajeNormalizado,
   type JornadaUI,
 } from '@/lib/utils/fichajesHistorial';
+import type { MiEspacioEmpleado } from '@/types/empleado';
 
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -38,7 +38,7 @@ function getEstadoBadge(estado: string) {
 
 interface FichajesTabProps {
   empleadoId: string;
-  empleado?: any; // Para obtener jornada si está disponible
+  empleado?: MiEspacioEmpleado;
 }
 
 export function FichajesTab({ empleadoId, empleado }: FichajesTabProps) {
@@ -109,11 +109,11 @@ export function FichajesTab({ empleadoId, empleado }: FichajesTabProps) {
       </Card>
 
       {/* Tabla de fichajes */}
-      <Card>
-        <CardHeader className="border-b border-gray-200 px-6 py-4">
-          <CardTitle className="text-sm font-semibold text-gray-900">Historial por jornadas</CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
+      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+        <div className="border-b border-gray-200 px-6 py-4">
+          <h3 className="text-sm font-semibold text-gray-900">Historial por jornadas</h3>
+        </div>
+        <div className="overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
@@ -182,8 +182,8 @@ export function FichajesTab({ empleadoId, empleado }: FichajesTabProps) {
               )}
             </TableBody>
           </Table>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       {/* Modal Editar Fichaje */}
       {fichajeEditando && (

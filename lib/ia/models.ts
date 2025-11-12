@@ -180,12 +180,20 @@ export async function callAIWithConfig(
     temperature: config.temperature,
     maxTokens: config.maxTokens,
     responseFormat: config.responseFormat,
+    metadata: {
+      feature: functionName,
+      useCase: 'feature-config',
+    },
   };
   
   // Llamar al cliente unificado (con fallback automático)
   return callAI(aiMessages, modelConfig as any, {
     responseFormat: config.responseFormat,
     maxTokens: config.maxTokens,
+    metadata: {
+      feature: functionName,
+      useCase: 'feature-config',
+    },
   });
 }
 

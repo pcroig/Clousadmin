@@ -42,6 +42,23 @@ export default async function MiEspacioPage({ searchParams }: MiEspacioPageProps
           documentos: true,
         },
       },
+      jornada: {
+        select: {
+          id: true,
+          nombre: true,
+          horasSemanales: true,
+        },
+      },
+      equipos: {
+        include: {
+          equipo: {
+            select: {
+              id: true,
+              nombre: true,
+            },
+          },
+        },
+      },
     },
   });
 
@@ -54,6 +71,10 @@ export default async function MiEspacioPage({ searchParams }: MiEspacioPageProps
       id: session.user.id,
     },
   });
+
+  if (!usuario) {
+    redirect('/login');
+  }
 
   // Serializar campos Decimal para Client Component
   const empleadoSerializado = serializeEmpleado(empleado);

@@ -6,7 +6,7 @@
 
 import { z } from 'zod';
 import { callAI, getPrimaryProvider } from '../core/client';
-import { AIMessage, MessageRole, AIProvider } from '../core/types';
+import { AIMessage, MessageRole, AIProvider, AICallMetadata } from '../core/types';
 import { createConfigForUseCase, AIUseCase } from '../core/config';
 
 // ========================================
@@ -71,6 +71,9 @@ export interface ClassificationOptions {
   
   /** Temperatura */
   temperature?: number;
+
+  /** Metadatos para logging/observabilidad */
+  metadata?: AICallMetadata;
 }
 
 // ========================================
@@ -166,10 +169,24 @@ RESPUESTA (JSON estricto, sin markdown):
   const config = createConfigForUseCase(AIUseCase.CLASSIFICATION, provider, {
     temperature: options?.temperature,
   });
+
+  const classificationMetadata: AICallMetadata = {
+    feature: options?.metadata?.feature || config.metadata?.feature || 'classification.generic',
+    useCase: config.metadata?.useCase || 'classification',
+    description,
+    inputPreview: input.slice(0, 120),
+    ...(options?.metadata || {}),
+  };
+
+  config.metadata = {
+    ...config.metadata,
+    ...classificationMetadata,
+  };
   
   try {
     const response = await callAI(messages, config, {
       responseFormat: 'json_object',
+      metadata: classificationMetadata,
     });
     
     const content = response.choices[0]?.message?.content || '{}';
@@ -421,6 +438,7 @@ export function matchBasic<T = any>(
     provider: AIProvider.OPENAI, // Placeholder
   };
 }
+
 
 
 

@@ -14,6 +14,7 @@ import {
   AICallOptions,
   isTextContent,
   hasImageContent,
+  AICallMetadata,
 } from '../types';
 
 /**
@@ -287,6 +288,7 @@ export async function callOpenAI(
   options?: AICallOptions
 ): Promise<AIResponse> {
   const client = getOpenAIClient();
+  const metadata = serializeMetadata(config.metadata, options?.metadata);
   
   // Construir parámetros de la llamada
   const params: OpenAI.Chat.ChatCompletionCreateParams = {
@@ -298,6 +300,13 @@ export async function callOpenAI(
     frequency_penalty: config.frequencyPenalty,
     presence_penalty: config.presencePenalty,
   };
+
+  if (metadata.openAIMetadata && Object.keys(metadata.openAIMetadata).length > 0) {
+    params.metadata = metadata.openAIMetadata;
+  }
+  if (metadata.user) {
+    params.user = metadata.user;
+  }
   
   // Formato de respuesta
   const responseFormat = options?.responseFormat ?? config.responseFormat;
@@ -360,5 +369,43 @@ export function getAppropriateModel(messages: AIMessage[], defaultModel: string)
   }
   
   return defaultModel;
+}
+
+function serializeMetadata(
+  configMetadata?: AICallMetadata,
+  optionsMetadata?: AICallMetadata
+): {
+  openAIMetadata: Record<string, string>;
+  user?: string;
+} {
+  const combined: Record<string, string> = {};
+  const merge = (source?: AICallMetadata) => {
+    if (!source) return;
+    Object.entries(source).forEach(([key, value]) => {
+      if (value === undefined || value === null) return;
+      const serialized = String(value);
+      if (key === 'usuarioId') {
+        combined['origin_user'] = serialized.slice(0, 60);
+      } else {
+        combined[key] = serialized.slice(0, 60);
+      }
+    });
+  };
+
+  merge(configMetadata);
+  merge(optionsMetadata);
+
+  const user =
+    (optionsMetadata?.usuarioId || configMetadata?.usuarioId)?.toString().slice(0, 60);
+
+  if (combined.useCase) {
+    combined.use_case = combined.useCase;
+    delete combined.useCase;
+  }
+
+  return {
+    openAIMetadata: combined,
+    user,
+  };
 }
 

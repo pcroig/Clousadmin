@@ -1,8 +1,10 @@
 'use client';
 
 // ========================================
-// Importar Empleados desde Excel - Documentos
+// Importar Empleados Excel - Componente Unificado
 // ========================================
+// Componente reutilizable para importación masiva de empleados desde Excel
+// Usado en: Onboarding y HR/Organización/Añadir Personas
 
 import { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
@@ -10,28 +12,8 @@ import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
-import { Upload, FileText, CheckCircle, XCircle, Users, AlertCircle, ChevronDown, ChevronRight } from 'lucide-react';
+import { Upload, FileText, CheckCircle, XCircle, AlertCircle, ChevronDown, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
-
-interface EmpleadoPreview {
-  nombre: string | null;
-  apellidos: string | null;
-  email: string | null;
-  puesto: string | null;
-  equipo: string | null;
-  valido: boolean;
-  errores: string[];
-}
-
-interface PreviewData {
-  empleados: EmpleadoPreview[];
-  equiposDetectados: string[];
-  resumen: {
-    total: number;
-    validos: number;
-    invalidos: number;
-  };
-}
 
 interface EmpleadoImportado {
   id: string;
@@ -55,116 +37,119 @@ interface ResultadoImportacion {
 }
 
 interface ImportarEmpleadosExcelProps {
+  /** Callback ejecutado después de una importación exitosa */
   onSuccess?: () => void;
+  
+  /** Callback para cancelar la operación */
   onCancel?: () => void;
+  
+  /** Mostrar notificaciones toast (true por defecto) */
+  showToast?: boolean;
+  
+  /** Título personalizado */
+  title?: string;
+  
+  /** Descripción personalizada */
+  description?: string;
+  
+  /** Mostrar botón de cancelar (true si onCancel está definido) */
+  showCancelButton?: boolean;
+  
+  /** Mostrar botón "Guardar y volver" después de importar (true por defecto si onSuccess definido) */
+  showFinishButton?: boolean;
 }
 
-export function ImportarEmpleadosExcel({ onSuccess, onCancel }: ImportarEmpleadosExcelProps = {}) {
+export function ImportarEmpleadosExcel({
+  onSuccess,
+  onCancel,
+  showToast = true,
+  title = 'Importar múltiples empleados',
+  description = 'Sube un archivo Excel con los datos de múltiples empleados. La IA procesará automáticamente la estructura.',
+  showCancelButton,
+  showFinishButton,
+}: ImportarEmpleadosExcelProps) {
   const router = useRouter();
   const [archivo, setArchivo] = useState<File | null>(null);
-  const [procesando, setProcesando] = useState(false);
   const [importando, setImportando] = useState(false);
-  const [previewData, setPreviewData] = useState<PreviewData | null>(null);
   const [resultadoImportacion, setResultadoImportacion] = useState<ResultadoImportacion | null>(null);
   const [invitarEmpleados, setInvitarEmpleados] = useState(true);
   const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
   const [empleadosExpandidos, setEmpleadosExpandidos] = useState<Set<string>>(new Set());
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const shouldShowCancelButton = showCancelButton ?? (onCancel !== undefined);
+  const shouldShowFinishButton = showFinishButton ?? (onSuccess !== undefined);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       setArchivo(file);
-      setPreviewData(null);
       setResultadoImportacion(null);
       setError('');
-      setSuccess('');
     }
   };
 
-  const handleProcesarArchivo = async () => {
+  const handleImportarDirecto = async () => {
     if (!archivo) return;
 
     setError('');
-    setProcesando(true);
+    setImportando(true);
 
     try {
+      // PASO 1: Analizar archivo con IA
       const formData = new FormData();
       formData.append('file', archivo);
 
-      const response = await fetch('/api/empleados/importar-excel', {
+      const analyzeResponse = await fetch('/api/empleados/importar-excel', {
         method: 'POST',
         body: formData,
       });
 
-      const result = await response.json();
+      const analyzeResult = await analyzeResponse.json();
 
-      if (result.success) {
-        setPreviewData(result.data);
-        toast.success('Archivo analizado correctamente');
-      } else {
-        setError(result.error || 'Error al procesar el archivo');
-        toast.error('Error al procesar el archivo');
+      if (!analyzeResult.success) {
+        setError(analyzeResult.error || 'Error al analizar el archivo');
+        if (showToast) toast.error('Error al analizar el archivo');
+        setImportando(false);
+        return;
       }
-    } catch (err) {
-      setError('Error al procesar el archivo');
-      toast.error('Error al procesar el archivo');
-      console.error('Error:', err);
-    } finally {
-      setProcesando(false);
-    }
-  };
 
-  const handleConfirmarImportacion = async () => {
-    if (!previewData) return;
-
-    setError('');
-    setImportando(true);
-    setPreviewData(null); // Ocultar preview para mostrar loader
-
-    try {
-      const response = await fetch('/api/empleados/importar-excel/confirmar', {
+      // PASO 2: Importar directamente (sin preview intermedio)
+      const { empleados, equiposDetectados } = analyzeResult.data;
+      
+      const importResponse = await fetch('/api/empleados/importar-excel/confirmar', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          empleados: previewData.empleados,
-          equiposDetectados: previewData.equiposDetectados,
+          empleados,
+          equiposDetectados,
           managersDetectados: [],
           invitarEmpleados,
         }),
       });
 
-      const result = await response.json();
+      const importResult = await importResponse.json();
 
-      if (result.success) {
-        setResultadoImportacion(result.data);
-        const mensaje = `✅ ${result.data.empleadosCreados} empleados importados, ${result.data.equiposCreados} equipos creados${
-          invitarEmpleados ? `, ${result.data.invitacionesEnviadas} invitaciones enviadas` : ''
-        }`;
-        setSuccess(mensaje);
-        toast.success('Importación completada');
+      if (importResult.success) {
+        setResultadoImportacion(importResult.data);
+        if (showToast) {
+          toast.success('Importación completada');
+        }
         
+        // Limpiar archivo
         setArchivo(null);
         if (fileInputRef.current) {
           fileInputRef.current.value = '';
         }
-
-        // Llamar onSuccess si existe después de un breve delay para que el usuario vea el resultado
-        if (onSuccess) {
-          setTimeout(() => onSuccess(), 2000);
-        } else {
-          router.refresh();
-        }
       } else {
-        setError(result.error || 'Error al importar empleados');
-        toast.error('Error al importar empleados');
+        setError(importResult.error || 'Error al importar empleados');
+        if (showToast) toast.error('Error al importar empleados');
       }
     } catch (err) {
-      setError('Error al importar empleados');
-      toast.error('Error al importar empleados');
+      setError('Error al procesar la importación');
+      if (showToast) toast.error('Error al procesar la importación');
       console.error('Error:', err);
     } finally {
       setImportando(false);
@@ -183,13 +168,29 @@ export function ImportarEmpleadosExcel({ onSuccess, onCancel }: ImportarEmpleado
     });
   };
 
+  const handleReiniciar = () => {
+    setResultadoImportacion(null);
+    setArchivo(null);
+    setError('');
+    setEmpleadosExpandidos(new Set());
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const handleFinalizar = () => {
+    if (onSuccess) {
+      onSuccess();
+    } else {
+      router.refresh();
+    }
+  };
+
   return (
     <div className="space-y-6 max-w-4xl">
       <div>
-        <h3 className="text-lg font-medium">Importar múltiples empleados</h3>
-        <p className="text-sm text-gray-500">
-          Sube un archivo Excel con los datos de múltiples empleados. La IA procesará automáticamente la estructura.
-        </p>
+        <h3 className="text-lg font-medium">{title}</h3>
+        <p className="text-sm text-gray-500">{description}</p>
       </div>
 
       {/* Loader durante importación */}
@@ -201,7 +202,7 @@ export function ImportarEmpleadosExcel({ onSuccess, onCancel }: ImportarEmpleado
               Procesando empleados...
             </p>
             <p className="mt-2 text-sm text-gray-600">
-              Esto puede tardar unos segundos. Estamos creando cuentas, asignando equipos y enviando invitaciones.
+              Estamos analizando el archivo, creando cuentas, asignando equipos y enviando invitaciones.
             </p>
           </div>
         </div>
@@ -330,11 +331,29 @@ export function ImportarEmpleadosExcel({ onSuccess, onCancel }: ImportarEmpleado
               })}
             </div>
           </div>
+
+          {/* Botones de acción después de importar */}
+          <div className="flex flex-col gap-2 pt-2 sm:flex-row sm:items-center sm:justify-between">
+            <Button variant="outline" onClick={handleReiniciar}>
+              Importar más empleados
+            </Button>
+            
+            {shouldShowFinishButton && (
+              <div className="flex gap-2 sm:justify-end">
+                {shouldShowCancelButton && onCancel && (
+                  <Button variant="ghost" onClick={onCancel}>
+                    Cancelar
+                  </Button>
+                )}
+                <Button onClick={handleFinalizar}>Guardar y volver</Button>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
-      {/* Área de carga de archivo */}
-      {!previewData && !importando && !resultadoImportacion && (
+      {/* Área de carga de archivo (solo si no hay resultado) */}
+      {!importando && !resultadoImportacion && (
         <div className="space-y-4">
           <div
             className="rounded-lg border-2 border-dashed p-8 text-center cursor-pointer hover:border-primary transition-colors"
@@ -367,122 +386,38 @@ export function ImportarEmpleadosExcel({ onSuccess, onCancel }: ImportarEmpleado
                   </p>
                 </div>
               </div>
-              <Button onClick={handleProcesarArchivo} disabled={procesando}>
-                {procesando ? 'Analizando...' : 'Analizar con IA'}
+              <Button onClick={handleImportarDirecto} disabled={importando}>
+                {importando ? 'Importando...' : 'Importar empleados'}
+              </Button>
+            </div>
+          )}
+
+          {/* Opción de invitar */}
+          {archivo && (
+            <div className="flex items-center space-x-2 rounded-lg border p-4">
+              <Checkbox
+                id="invitar"
+                checked={invitarEmpleados}
+                onCheckedChange={(checked) => setInvitarEmpleados(checked as boolean)}
+              />
+              <Label htmlFor="invitar" className="text-sm cursor-pointer">
+                Enviar invitaciones automáticamente a todos los empleados
+              </Label>
+            </div>
+          )}
+
+          {/* Botón cancelar (solo si está al inicio) */}
+          {shouldShowCancelButton && onCancel && (
+            <div className="flex justify-end pt-4 border-t">
+              <Button type="button" variant="outline" onClick={onCancel}>
+                Cancelar
               </Button>
             </div>
           )}
         </div>
       )}
 
-      {/* Preview de empleados */}
-      {previewData && (
-        <div className="space-y-4">
-          {/* Resumen */}
-          <div className="rounded-lg bg-blue-50 p-4">
-            <div className="flex items-start gap-3">
-              <Users className="h-5 w-5 text-blue-500 mt-0.5" />
-              <div>
-                <h4 className="font-medium text-sm">Resumen de importación</h4>
-                <div className="mt-2 space-y-1 text-xs text-gray-600">
-                  <p>Total de empleados: {previewData.resumen.total}</p>
-                  <p className="text-green-600">✓ Válidos: {previewData.resumen.validos}</p>
-                  <p className="text-red-600">✗ Inválidos: {previewData.resumen.invalidos}</p>
-                  {previewData.equiposDetectados.length > 0 && (
-                    <p>Equipos detectados: {previewData.equiposDetectados.join(', ')}</p>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Lista de empleados (primeros 10) */}
-          <div className="space-y-2">
-            <h4 className="text-sm font-medium">Vista previa (primeros 10 empleados):</h4>
-            <div className="space-y-2 max-h-96 overflow-y-auto">
-              {previewData.empleados.slice(0, 10).map((emp, index) => (
-                <div
-                  key={index}
-                  className={`rounded-lg border p-3 ${
-                    emp.valido ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'
-                  }`}
-                >
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-start gap-2">
-                      {emp.valido ? (
-                        <CheckCircle className="h-4 w-4 text-green-500 mt-0.5" />
-                      ) : (
-                        <XCircle className="h-4 w-4 text-red-500 mt-0.5" />
-                      )}
-                      <div>
-                        <p className="text-sm font-medium">
-                          {emp.nombre} {emp.apellidos}
-                        </p>
-                        <p className="text-xs text-gray-600">{emp.email}</p>
-                        {emp.puesto && (
-                          <p className="text-xs text-gray-500">
-                            {emp.puesto} {emp.equipo ? `• ${emp.equipo}` : ''}
-                          </p>
-                        )}
-                        {!emp.valido && emp.errores.length > 0 && (
-                          <p className="text-xs text-red-600 mt-1">
-                            {emp.errores.join(', ')}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-            {previewData.empleados.length > 10 && (
-              <p className="text-xs text-gray-500 text-center">
-                Y {previewData.empleados.length - 10} empleados más...
-              </p>
-            )}
-          </div>
-
-          {/* Opción de invitar */}
-          <div className="flex items-center space-x-2 rounded-lg border p-4">
-            <Checkbox
-              id="invitar"
-              checked={invitarEmpleados}
-              onCheckedChange={(checked) => setInvitarEmpleados(checked as boolean)}
-            />
-            <Label htmlFor="invitar" className="text-sm cursor-pointer">
-              Enviar invitaciones automáticamente a todos los empleados
-            </Label>
-          </div>
-
-          {/* Botones de acción */}
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              onClick={() => {
-                if (onCancel) {
-                  onCancel();
-                } else {
-                  setPreviewData(null);
-                  setArchivo(null);
-                  if (fileInputRef.current) {
-                    fileInputRef.current.value = '';
-                  }
-                }
-              }}
-            >
-              Cancelar
-            </Button>
-            <Button
-              onClick={handleConfirmarImportacion}
-              disabled={importando || previewData.resumen.validos === 0}
-            >
-              {importando ? 'Importando...' : `Importar ${previewData.resumen.validos} empleados`}
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {/* Mensajes de error/éxito */}
+      {/* Mensajes de error */}
       {error && (
         <div className="rounded-md bg-red-50 p-4 flex items-start gap-3">
           <AlertCircle className="h-5 w-5 text-red-500 mt-0.5" />
@@ -490,15 +425,8 @@ export function ImportarEmpleadosExcel({ onSuccess, onCancel }: ImportarEmpleado
         </div>
       )}
 
-      {success && (
-        <div className="rounded-md bg-green-50 p-4 flex items-start gap-3">
-          <CheckCircle className="h-5 w-5 text-green-500 mt-0.5" />
-          <p className="text-sm text-green-600">{success}</p>
-        </div>
-      )}
-
       {/* Información adicional */}
-      {!previewData && !archivo && (
+      {!archivo && !resultadoImportacion && (
         <div className="rounded-lg bg-gray-50 p-4">
           <p className="text-sm text-gray-600">
             <strong>💡 Tip:</strong> El Excel puede tener cualquier estructura. La IA detectará automáticamente las columnas y mapeará los datos correctamente.

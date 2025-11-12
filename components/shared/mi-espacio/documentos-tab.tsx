@@ -1,12 +1,18 @@
 'use client';
 
 import { useState } from 'react';
+import type { MiEspacioCarpeta, MiEspacioEmpleado } from '@/types/empleado';
 
-export function DocumentosTab({ empleado }: any) {
+interface DocumentosTabProps {
+  empleado: MiEspacioEmpleado;
+}
+
+export function DocumentosTab({ empleado }: DocumentosTabProps) {
   const [activeDocTab, setActiveDocTab] = useState<'personales' | 'compartidos'>('personales');
 
-  const carpetasPersonales = empleado.carpetas?.filter((c: any) => !c.compartida) || [];
-  const carpetasCompartidas = empleado.carpetas?.filter((c: any) => c.compartida) || [];
+  const carpetas: MiEspacioCarpeta[] = empleado.carpetas ?? [];
+  const carpetasPersonales = carpetas.filter((c) => !c.compartida);
+  const carpetasCompartidas = carpetas.filter((c) => c.compartida);
 
   return (
     <div className="space-y-6">
@@ -43,15 +49,15 @@ export function DocumentosTab({ empleado }: any) {
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
         {activeDocTab === 'personales' ? (
           carpetasPersonales.length > 0 ? (
-            carpetasPersonales.map((carpeta: any) => (
+            carpetasPersonales.map((carpeta) => (
               <div key={carpeta.id} className="flex flex-col items-center cursor-pointer group">
                 <svg className="w-16 h-16 text-gray-600 mb-3 group-hover:text-[#c6613f] transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
                 </svg>
                 <p className="text-sm font-medium text-gray-900 text-center">{carpeta.nombre}</p>
-                {carpeta.documentos.length > 0 && (
+                {(carpeta.documentos?.length ?? 0) > 0 && (
                   <p className="text-xs text-gray-500 mt-1">
-                    {carpeta.documentos.length} documento{carpeta.documentos.length !== 1 ? 's' : ''}
+                    {carpeta.documentos?.length ?? 0} documento{(carpeta.documentos?.length ?? 0) !== 1 ? 's' : ''}
                   </p>
                 )}
               </div>
@@ -65,15 +71,15 @@ export function DocumentosTab({ empleado }: any) {
             </div>
           )
         ) : carpetasCompartidas.length > 0 ? (
-          carpetasCompartidas.map((carpeta: any) => (
+          carpetasCompartidas.map((carpeta) => (
             <div key={carpeta.id} className="flex flex-col items-center cursor-pointer group">
               <svg className="w-16 h-16 text-gray-600 mb-3 group-hover:text-[#c6613f] transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
               </svg>
               <p className="text-sm font-medium text-gray-900 text-center">{carpeta.nombre}</p>
-              {carpeta.documentos.length > 0 && (
+              {(carpeta.documentos?.length ?? 0) > 0 && (
                 <p className="text-xs text-gray-500 mt-1">
-                  {carpeta.documentos.length} documento{carpeta.documentos.length !== 1 ? 's' : ''}
+                  {carpeta.documentos?.length ?? 0} documento{(carpeta.documentos?.length ?? 0) !== 1 ? 's' : ''}
                 </p>
               )}
             </div>

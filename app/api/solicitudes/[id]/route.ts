@@ -20,6 +20,7 @@ import {
   crearNotificacionSolicitudAprobada,
   crearNotificacionSolicitudRechazada,
 } from '@/lib/notificaciones';
+import { resolveAprobadorEmpleadoId } from '@/lib/solicitudes/aprobador';
 
 const solicitudAccionSchema = z.object({
   accion: z.enum(['aprobar', 'rechazar']),
@@ -95,6 +96,11 @@ export async function PATCH(
     }
 
     const ahora = new Date();
+    const aprobadorEmpleadoId = await resolveAprobadorEmpleadoId(
+      prisma,
+      session,
+      'API PATCH /api/solicitudes/[id]'
+    );
 
     // Usar transacción para asegurar consistencia de datos
     const result = await prisma.$transaction(async (tx) => {
@@ -104,7 +110,7 @@ export async function PATCH(
           where: { id },
           data: {
             estado: EstadoSolicitud.aprobada_manual,
-            aprobadorId: session.user.id,
+              aprobadorId: aprobadorEmpleadoId,
             fechaRespuesta: ahora,
           },
           include: {
@@ -158,7 +164,7 @@ export async function PATCH(
           where: { id },
           data: {
             estado: EstadoSolicitud.rechazada,
-            aprobadorId: session.user.id,
+              aprobadorId: aprobadorEmpleadoId,
             fechaRespuesta: ahora,
             motivoRechazo: motivoRechazo,
           },

@@ -11,7 +11,7 @@ import { useState } from 'react';
 import { FileText, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { SubirDocumentoIndividual } from '@/components/documentos/subir-documento-individual';
-import { ImportarEmpleadosExcel } from '@/components/documentos/importar-empleados-excel';
+import { ImportarEmpleadosExcel } from '@/components/shared/importar-empleados-excel';
 
 interface AddPersonaDocumentFormProps {
   onSuccess: () => void;

@@ -24,29 +24,7 @@ export interface UseApiReturn<T> extends UseApiState<T> {
   reset: () => void;
 }
 
-/**
- * Hook para manejar llamadas API con estados de loading, error y data
- * 
- * Utiliza refs para almacenar callbacks opcionales, evitando que cambios
- * en el objeto options causen recreación de execute y ciclos infinitos.
- * 
- * @example
- * ```tsx
- * const { data, loading, error, execute } = useApi<Ausencia[]>();
- * 
- * useEffect(() => {
- *   execute('/api/ausencias');
- * }, [execute]);
- * ```
- * 
- * @example Con callbacks
- * ```tsx
- * const { execute } = useApi<SaldoAusencias>({
- *   onSuccess: (data) => setSaldo(data),
- * });
- * ```
- */
-export function useApi<T = any>(
+export function useApi<T = unknown>(
   options?: UseApiOptions<T>
 ): UseApiReturn<T> {
   const [state, setState] = useState<UseApiState<T>>({

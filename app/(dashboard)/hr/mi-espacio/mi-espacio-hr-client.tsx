@@ -17,10 +17,11 @@ import { DocumentosTab } from '@/components/shared/mi-espacio/documentos-tab';
 import { AusenciasTab } from '@/components/shared/mi-espacio/ausencias-tab';
 import { getAvatarStyle } from '@/lib/design-system';
 import { DenunciaDialog } from '@/components/empleado/denuncia-dialog';
+import type { MiEspacioEmpleado, Usuario } from '@/types/empleado';
 
 interface MiEspacioHRClientProps {
-  empleado: any;
-  usuario: any;
+  empleado: MiEspacioEmpleado;
+  usuario: Usuario;
 }
 
 export function MiEspacioHRClient({ empleado, usuario }: MiEspacioHRClientProps) {
@@ -30,12 +31,14 @@ export function MiEspacioHRClient({ empleado, usuario }: MiEspacioHRClientProps)
   const [denunciaDialogOpen, setDenunciaDialogOpen] = useState(false);
 
   const getInitials = () => {
-    return `${empleado.nombre.charAt(0)}${empleado.apellidos.charAt(0)}`.toUpperCase();
+    const nombreInicial = empleado.nombre?.charAt(0) ?? '';
+    const apellidoInicial = empleado.apellidos?.charAt(0) ?? '';
+    return `${nombreInicial}${apellidoInicial}`.toUpperCase() || '??';
   };
 
   const avatarStyle = getAvatarStyle(`${empleado.nombre} ${empleado.apellidos}`);
 
-  const handleFieldUpdate = async (field: string, value: any) => {
+  const handleFieldUpdate = async (field: keyof MiEspacioEmpleado, value: unknown) => {
     try {
       const response = await fetch(`/api/empleados/${empleado.id}`, {
         method: 'PATCH',
@@ -147,7 +150,7 @@ export function MiEspacioHRClient({ empleado, usuario }: MiEspacioHRClientProps)
         {activeTab === 'general' && <GeneralTab empleado={empleado} usuario={usuario} rol="hr_admin" onFieldUpdate={handleFieldUpdate} />}
         {activeTab === 'ausencias' && <AusenciasTab empleadoId={empleado.id} />}
         {activeTab === 'fichajes' && <FichajesTab empleadoId={empleado.id} empleado={empleado} />}
-        {activeTab === 'contratos' && <ContratosTab empleado={empleado} rol="hr_admin" onFieldUpdate={handleFieldUpdate} />}
+        {activeTab === 'contratos' && <ContratosTab empleado={empleado} rol="hr_admin" />}
         {activeTab === 'documentos' && <DocumentosTab empleado={empleado} />}
       </div>
 

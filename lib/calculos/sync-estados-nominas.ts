@@ -306,6 +306,3 @@ export async function recalcularEstadisticasEvento(
   );
 }
 
-
-
-

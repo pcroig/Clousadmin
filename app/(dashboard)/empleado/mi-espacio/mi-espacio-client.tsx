@@ -6,7 +6,7 @@
 
 import { useState, useEffect } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { User, Edit2, Flag } from 'lucide-react';
+import { Edit2, Flag } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { GeneralTab } from '@/components/shared/mi-espacio/general-tab';
@@ -16,10 +16,11 @@ import { ContratosTab } from '@/components/shared/mi-espacio/contratos-tab';
 import { DocumentosTab } from '@/components/shared/mi-espacio/documentos-tab';
 import { getAvatarStyle } from '@/lib/design-system';
 import { DenunciaDialog } from '@/components/empleado/denuncia-dialog';
+import type { MiEspacioEmpleado, Usuario } from '@/types/empleado';
 
 interface MiEspacioClientProps {
-  empleado: any;
-  usuario: any;
+  empleado: MiEspacioEmpleado;
+  usuario: Usuario;
 }
 
 export function MiEspacioClient({ empleado, usuario }: MiEspacioClientProps) {
@@ -31,13 +32,16 @@ export function MiEspacioClient({ empleado, usuario }: MiEspacioClientProps) {
   const [denunciaDialogOpen, setDenunciaDialogOpen] = useState(false);
 
   useEffect(() => {
-    if (searchParams.get('tab')) {
-      setActiveTab(searchParams.get('tab') || 'general');
+    const tabParam = searchParams.get('tab');
+    if (tabParam && tabParam !== activeTab) {
+      setActiveTab(tabParam);
     }
-  }, [searchParams]);
+  }, [searchParams, activeTab]);
 
   const getInitials = () => {
-    return `${empleado.nombre.charAt(0)}${empleado.apellidos.charAt(0)}`.toUpperCase();
+    const nombreInicial = empleado.nombre?.charAt(0) ?? '';
+    const apellidoInicial = empleado.apellidos?.charAt(0) ?? '';
+    return `${nombreInicial}${apellidoInicial}`.toUpperCase() || '??';
   };
 
   const avatarStyle = getAvatarStyle(`${empleado.nombre} ${empleado.apellidos}`);

@@ -13,6 +13,7 @@ import {
   AIResult,
   AISuccess,
   AIError,
+  AICallMetadata,
 } from './types';
 import {
   isOpenAIAvailable,
@@ -138,6 +139,7 @@ function adaptConfigToProvider(config: ModelConfig, provider: AIProvider): Model
     ...config,
     provider,
     model: adaptedModel,
+    metadata: config.metadata,
   };
 }
 
@@ -169,6 +171,28 @@ async function callProvider(
   }
 }
 
+function mergeMetadata(
+  configMetadata?: AICallMetadata,
+  optionsMetadata?: AICallMetadata
+): AICallMetadata | undefined {
+  if (!configMetadata && !optionsMetadata) {
+    return undefined;
+  }
+
+  return {
+    ...(configMetadata || {}),
+    ...(optionsMetadata || {}),
+  };
+}
+
+function formatMetadataForLog(metadata?: AICallMetadata): string {
+  if (!metadata) return '';
+  const entries = Object.entries(metadata)
+    .filter(([, value]) => value !== undefined && value !== null)
+    .map(([key, value]) => `${key}=${String(value)}`);
+  return entries.length ? ` (${entries.join(', ')})` : '';
+}
+
 /**
  * Realiza una llamada a IA con fallback automático entre proveedores
  * 
@@ -192,6 +216,18 @@ export async function callAI(
     );
   }
   
+  const combinedMetadata = mergeMetadata(config.metadata, options?.metadata);
+  const configWithMetadata: ModelConfig = {
+    ...config,
+    metadata: combinedMetadata,
+  };
+  const optionsWithMetadata: AICallOptions | undefined = options
+    ? { ...options, metadata: combinedMetadata }
+    : (combinedMetadata ? { metadata: combinedMetadata } : undefined);
+
+  const metadataLog = formatMetadataForLog(combinedMetadata);
+  console.info(`[AI Client] Iniciando llamada${metadataLog}`);
+
   // Intentar con cada proveedor disponible (según prioridad)
   const errors: Array<{ provider: AIProvider; error: string }> = [];
   
@@ -201,14 +237,24 @@ export async function callAI(
     }
     
     try {
-      console.info(`[AI Client] Intentando con proveedor: ${provider}`);
-      const response = await callProvider(provider, messages, config, options);
+      console.info(
+        `[AI Client] Intentando con proveedor: ${provider}${metadataLog ? ` ${metadataLog}` : ''}`
+      );
+      const response = await callProvider(provider, messages, configWithMetadata, optionsWithMetadata);
       
       // Éxito - log si hubo fallback
       if (errors.length > 0) {
         console.warn(
           `[AI Client] Fallback exitoso a ${provider} después de ${errors.length} intento(s) fallido(s)`
         );
+      }
+
+      if (response.usage) {
+        console.info(
+          `[AI Client] Llamada completada (${response.usage.totalTokens} tokens)${metadataLog}`
+        );
+      } else {
+        console.info(`[AI Client] Llamada completada${metadataLog}`);
       }
       
       return response;
