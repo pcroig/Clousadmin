@@ -24,7 +24,7 @@ export function AnalyticsFilters({
   equipos = [],
 }: AnalyticsFiltersProps) {
   return (
-    <div className="flex items-center gap-3">
+    <div className="flex flex-wrap items-center gap-3">
       {/* Filtro de Género */}
       <Select value={filters.genero} onValueChange={(value) => onFilterChange('genero', value)}>
         <SelectTrigger className="w-[180px]">
