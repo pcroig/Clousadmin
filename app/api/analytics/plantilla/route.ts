@@ -167,7 +167,7 @@ export async function GET(request: NextRequest) {
     });
 
     // 6. Distribución por género
-    const porGenero = empleados.reduce((acc: any, e) => {
+    const porGenero = empleados.reduce((acc: Record<string, number>, e) => {
       const gen = e.genero || 'No especificado';
       acc[gen] = (acc[gen] || 0) + 1;
       return acc;
@@ -208,6 +208,38 @@ export async function GET(request: NextRequest) {
       });
     }
 
+    // 7. Distribución por antigüedad
+    const hoy = new Date();
+    const distribucionAntiguedad = empleados.reduce<Record<string, number>>(
+      (acc, emp) => {
+        const antiguedadAnios = Math.floor(
+          (hoy.getTime() - emp.fechaAlta.getTime()) / (1000 * 60 * 60 * 24 * 365.25)
+        );
+
+        let rango: string;
+        if (antiguedadAnios < 1) {
+          rango = '< 1 año';
+        } else if (antiguedadAnios < 3) {
+          rango = '1-3 años';
+        } else if (antiguedadAnios < 5) {
+          rango = '3-5 años';
+        } else {
+          rango = '> 5 años';
+        }
+
+        acc[rango] = (acc[rango] || 0) + 1;
+        return acc;
+      },
+      { '< 1 año': 0, '1-3 años': 0, '3-5 años': 0, '> 5 años': 0 }
+    );
+
+    const distribucionAntiguedadArray = Object.entries(distribucionAntiguedad).map(
+      ([rango, empleados]) => ({
+        rango,
+        empleados,
+      })
+    );
+
     return successResponse({
       totalEmpleados,
       cambioMes,
@@ -217,6 +249,7 @@ export async function GET(request: NextRequest) {
       bajasMes,
       distribucionGenero,
       evolucionAltasBajas,
+      distribucionAntiguedad: distribucionAntiguedadArray,
     });
   } catch (error) {
     return handleApiError(error, 'API GET /api/analytics/plantilla');

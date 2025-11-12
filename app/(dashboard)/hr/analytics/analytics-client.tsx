@@ -248,16 +248,21 @@ export function AnalyticsClient() {
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-2xl font-bold text-gray-900">Analytics</h1>
           
-          {/* Última actualización */}
-          {lastUpdate && (
-            <div className="text-sm text-gray-500">
-              Última actualización: {lastUpdate.toLocaleTimeString('es-ES')}
-            </div>
-          )}
+          {/* Botones de acción */}
+          <div className="flex gap-2">
+            <Button onClick={fetchData} variant="outline" size="sm">
+              <RefreshCw className="w-4 h-4 mr-2" />
+              Actualizar
+            </Button>
+            <Button onClick={handleExport} size="sm">
+              <Download className="w-4 h-4 mr-2" />
+              Exportar
+            </Button>
+          </div>
         </div>
 
-        {/* Tabs y Botones en la misma altura */}
-        <div className="flex items-center justify-between border-b border-gray-200 mb-6">
+        {/* Tabs */}
+        <div className="border-b border-gray-200 mb-4">
           <div className="flex gap-4">
             {tabs.map((tab) => (
               <button
@@ -272,18 +277,6 @@ export function AnalyticsClient() {
                 {tab.label}
               </button>
             ))}
-          </div>
-
-          {/* Botones de acción */}
-          <div className="flex gap-2 mb-2">
-            <Button onClick={fetchData} variant="outline">
-              <RefreshCw className="w-4 h-4 mr-2" />
-              Actualizar
-            </Button>
-            <Button onClick={handleExport}>
-              <Download className="w-4 h-4 mr-2" />
-              Exportar
-            </Button>
           </div>
         </div>
 
@@ -300,6 +293,30 @@ export function AnalyticsClient() {
         {/* Tab: Plantilla */}
         {activeTab === 'plantilla' && (
           <div className="space-y-6">
+            {/* KPIs de Plantilla */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <KpiCard
+                title="Total empleados"
+                value={plantillaData.totalEmpleados}
+                subtitle={`${plantillaData.cambioMes >= 0 ? '+' : ''}${plantillaData.cambioMes} vs mes anterior`}
+              />
+              <KpiCard
+                title="Altas del mes"
+                value={plantillaData.altasMes}
+                subtitle="Nuevas incorporaciones"
+              />
+              <KpiCard
+                title="Bajas del mes"
+                value={plantillaData.bajasMes}
+                subtitle="Finalizaciones de contrato"
+              />
+              <KpiCard
+                title="Tasa de rotación"
+                value={`${plantillaData.totalEmpleados > 0 ? ((plantillaData.bajasMes / plantillaData.totalEmpleados) * 100).toFixed(1) : 0}%`}
+                subtitle="Bajas / Total plantilla"
+              />
+            </div>
+
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <BarChartComponent
                 title="Empleados por Equipo"
@@ -363,6 +380,21 @@ export function AnalyticsClient() {
                   },
                 }}
               />
+
+              <PieChartComponent
+                title="Distribución por Antigüedad"
+                description="Empleados según años en la empresa"
+                data={plantillaData.distribucionAntiguedad || []}
+                dataKey="empleados"
+                nameKey="rango"
+                chartConfig={{
+                  '< 1 año': { label: '< 1 año', color: '#0ea5e9' },
+                  '1-3 años': { label: '1-3 años', color: '#d97757' },
+                  '3-5 años': { label: '3-5 años', color: '#6B6A64' },
+                  '> 5 años': { label: '> 5 años', color: '#22c55e' },
+                }}
+                donut
+              />
             </div>
           </div>
         )}
@@ -370,6 +402,30 @@ export function AnalyticsClient() {
         {/* Tab: Compensación */}
         {activeTab === 'compensacion' && compensacionData && (
           <div className="space-y-6">
+            {/* KPIs Principales de Compensación */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <KpiCard
+                title="Coste total nómina"
+                value={formatCurrency(compensacionData.costeTotalNomina)}
+                subtitle={`${compensacionData.cambioCoste >= 0 ? '+' : ''}${formatCurrency(compensacionData.cambioCoste)} vs mes anterior`}
+              />
+              <KpiCard
+                title="Salario promedio"
+                value={formatCurrency(compensacionData.salarioPromedio)}
+                subtitle="Salario bruto mensual medio"
+              />
+              <KpiCard
+                title="Coste por empleado"
+                value={formatCurrency(compensacionData.costeTotalNomina / (plantillaData?.totalEmpleados || 1))}
+                subtitle="Media empresa"
+              />
+              <KpiCard
+                title="Variación coste"
+                value={`${compensacionData.cambioCoste >= 0 ? '+' : ''}${((compensacionData.cambioCoste / (compensacionData.costeTotalNomina - compensacionData.cambioCoste || 1)) * 100).toFixed(1)}%`}
+                subtitle="Respecto mes anterior"
+              />
+            </div>
+
             {nominasAnalytics && (
               <div className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -506,11 +562,16 @@ export function AnalyticsClient() {
         {activeTab === 'fichajes' && (
           <div className="space-y-6">
             {/* KPIs de Fichajes */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <KpiCard
                 title="Total horas mes"
                 value={`${fichajesData.totalHorasMes.toFixed(1)}h`}
                 subtitle={`${fichajesData.cambioHoras >= 0 ? '+' : ''}${fichajesData.cambioHoras.toFixed(1)}h vs mes anterior`}
+              />
+              <KpiCard
+                title="Promedio horas/día"
+                value={`${fichajesData.promedioHorasDia.toFixed(1)}h`}
+                subtitle="Media de horas trabajadas diarias"
               />
               <KpiCard
                 title="Balance acumulado"
