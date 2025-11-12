@@ -155,7 +155,6 @@ export default async function ManagerBandejaEntradaPage() {
       },
       tipo: 'ausencia' as const,
       detalles: `Solicitud de ${aus.tipo}`,
-      fechaLimite: new Date(aus.fechaFin),
       fechaCreacion: aus.createdAt,
       estado: EstadoAusencia.pendiente as const,
       metadata: {
@@ -173,9 +172,12 @@ export default async function ManagerBandejaEntradaPage() {
       },
       tipo: 'cambio_datos' as const,
       detalles: `Solicitud de cambio de ${sol.tipo}`,
-      fechaLimite: new Date(sol.createdAt.getTime() + 7 * 24 * 60 * 60 * 1000),
       fechaCreacion: sol.createdAt,
       estado: EstadoAusencia.pendiente as const,
+      metadata: {
+        tipoCambioDatos: sol.tipo,
+        camposCambiados: sol.camposCambiados as Record<string, unknown>,
+      },
     })),
   ].sort((a, b) => b.fechaCreacion.getTime() - a.fechaCreacion.getTime());
 
@@ -190,7 +192,6 @@ export default async function ManagerBandejaEntradaPage() {
       },
       tipo: 'ausencia' as const,
       detalles: `Solicitud de ${aus.tipo}`,
-      fechaLimite: new Date(aus.fechaFin),
       fechaCreacion: aus.createdAt,
       estado: aus.estado,
       fechaResolucion: aus.aprobadaEn || undefined,
@@ -209,7 +210,6 @@ export default async function ManagerBandejaEntradaPage() {
       },
       tipo: 'cambio_datos' as const,
       detalles: `Solicitud de cambio de ${sol.tipo}`,
-      fechaLimite: new Date(sol.createdAt.getTime() + 7 * 24 * 60 * 60 * 1000),
       fechaCreacion: sol.createdAt,
       estado:
         sol.estado === EstadoSolicitud.aprobada_manual || sol.estado === EstadoSolicitud.auto_aprobada
@@ -218,6 +218,10 @@ export default async function ManagerBandejaEntradaPage() {
             ? EstadoAusencia.rechazada
             : EstadoAusencia.pendiente,
       fechaResolucion: sol.fechaRespuesta || undefined,
+      metadata: {
+        tipoCambioDatos: sol.tipo,
+        camposCambiados: sol.camposCambiados as Record<string, unknown>,
+      },
     })),
   ].sort((a, b) => (b.fechaResolucion?.getTime() || 0) - (a.fechaResolucion?.getTime() || 0));
 
@@ -333,14 +337,12 @@ export default async function ManagerBandejaEntradaPage() {
 
   return (
     <div className="p-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Bandeja de entrada</h1>
-        <p className="text-gray-600 mt-2">
-          Gestiona solicitudes de tu equipo, revisa elementos completados y recibe notificaciones
-        </p>
-      </div>
-
       <BandejaEntradaTabs
+        header={{
+          title: 'Bandeja de entrada',
+          description:
+            'Gestiona solicitudes de tu equipo, revisa elementos completados y recibe notificaciones',
+        }}
         solicitudesPendientes={solicitudesPendientes}
         solicitudesResueltas={solicitudesResueltas}
         solvedStats={solvedStats}

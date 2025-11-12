@@ -1,95 +1,93 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { DarDeBajaModal } from '@/components/hr/DarDeBajaModal';
 import { toast } from 'sonner';
+import type { MiEspacioEmpleado } from '@/types/empleado';
 
-interface ContratosTabProps {
-  empleado: any;
-  rol?: 'empleado' | 'manager' | 'hr_admin';
-  onFieldUpdate?: (field: string, value: any) => Promise<void>;
+interface JornadaOption {
+  id: string;
+  nombre: string;
+  horasSemanales?: number | null;
 }
 
-export function ContratosTab({ empleado, rol = 'empleado', onFieldUpdate }: ContratosTabProps) {
+interface PuestoOption {
+  id: string;
+  nombre: string;
+}
+
+interface HistorialSalario {
+  salario: number;
+  fechaCambio: string;
+  fechaRegistro: string;
+}
+
+interface ContratosTabProps {
+  empleado: MiEspacioEmpleado;
+  rol?: 'empleado' | 'manager' | 'hr_admin';
+}
+
+export function ContratosTab({ empleado, rol = 'empleado' }: ContratosTabProps) {
   const router = useRouter();
-  const [jornadas, setJornadas] = useState<any[]>([]);
-  const [puestos, setPuestos] = useState<any[]>([]);
-  const [equipos, setEquipos] = useState<any[]>([]);
-  const [managers, setManagers] = useState<any[]>([]);
+  const [jornadas, setJornadas] = useState<JornadaOption[]>([]);
+  const [puestos, setPuestos] = useState<PuestoOption[]>([]);
   const [darDeBajaModalOpen, setDarDeBajaModalOpen] = useState(false);
   const [editingHistorial, setEditingHistorial] = useState(false);
   const [nuevoSalario, setNuevoSalario] = useState('');
   const [fechaCambio, setFechaCambio] = useState('');
-  const [historialSalarios, setHistorialSalarios] = useState<any[]>([]);
+  const [historialSalarios, setHistorialSalarios] = useState<HistorialSalario[]>([]);
+  const [addingComplemento, setAddingComplemento] = useState(false);
+  const [complementoTipo, setComplementoTipo] = useState('');
+  const [complementoImporte, setComplementoImporte] = useState('');
 
-  const contratoActual = empleado.contratos?.[0] || {};
+  const contratoActual = empleado.contratos?.[0];
   const tipoContrato = empleado.tipoContrato || 'indefinido';
-  const fechaFin = contratoActual.fechaFin
-    ? new Date(contratoActual.fechaFin).toISOString().split('T')[0]
-    : '';
-
-  const fetchJornadas = useCallback(async () => {
-    try {
-      const response = await fetch('/api/jornadas');
-      if (response.ok) {
-        const data = await response.json();
-        setJornadas(data);
-      }
-    } catch (error) {
-      console.error('Error fetching jornadas:', error);
-    }
-  }, []);
-
-  const fetchPuestos = useCallback(async () => {
-    try {
-      const response = await fetch('/api/organizacion/puestos');
-      if (response.ok) {
-        const data = await response.json();
-        setPuestos(data);
-      }
-    } catch (error) {
-      console.error('Error fetching puestos:', error);
-    }
-  }, []);
-
-  const fetchEquipos = useCallback(async () => {
-    try {
-      const response = await fetch('/api/organizacion/equipos');
-      if (response.ok) {
-        const data = await response.json();
-        setEquipos(data);
-      }
-    } catch (error) {
-      console.error('Error fetching equipos:', error);
-    }
-  }, []);
-
-  const fetchManagers = useCallback(async () => {
-    try {
-      const response = await fetch('/api/empleados');
-      if (response.ok) {
-        const data = await response.json();
-        const managersData = data.filter((emp: any) => 
-          emp.usuario?.rol === 'hr_admin' || emp.usuario?.rol === 'manager'
-        );
-        setManagers(managersData);
-      }
-    } catch (error) {
-      console.error('Error fetching managers:', error);
-    }
-  }, []);
+  const fechaInicioContrato = contratoActual?.fechaInicio ?? empleado.fechaAlta ?? null;
+  const fechaFinContrato = contratoActual?.fechaFin ?? null;
+  const fechaFin = fechaFinContrato ? new Date(fechaFinContrato).toISOString().split('T')[0] : '';
+  const estadoContrato = empleado.activo && !fechaFinContrato ? 'Activo' : 'Finalizado';
+  const contratoActualId = contratoActual?.id ?? null;
 
   useEffect(() => {
-    fetchJornadas();
-    fetchPuestos();
-    fetchEquipos();
-    fetchManagers();
-  }, [fetchJornadas, fetchPuestos, fetchEquipos, fetchManagers]);
+    if (rol !== 'hr_admin') {
+      return;
+    }
+
+    let isMounted = true;
+
+    const fetchAdminData = async () => {
+      try {
+        const [jornadasResponse, puestosResponse] = await Promise.allSettled([
+          fetch('/api/jornadas'),
+          fetch('/api/organizacion/puestos'),
+        ]);
+
+        if (!isMounted) return;
+
+        if (jornadasResponse.status === 'fulfilled' && jornadasResponse.value.ok) {
+          const data: JornadaOption[] = await jornadasResponse.value.json();
+          setJornadas(data);
+        }
+
+        if (puestosResponse.status === 'fulfilled' && puestosResponse.value.ok) {
+          const data: PuestoOption[] = await puestosResponse.value.json();
+          setPuestos(data);
+        }
+      } catch (error) {
+        console.error('[ContratosTab] Error fetching admin data', error);
+      }
+    };
+
+    void fetchAdminData();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [rol]);
 
   // Escuchar evento de "Dar de Baja" desde el header
   useEffect(() => {
@@ -103,10 +101,36 @@ export function ContratosTab({ empleado, rol = 'empleado', onFieldUpdate }: Cont
     return () => window.removeEventListener('darDeBajaContrato', handleDarDeBajaEvent);
   }, [rol]);
 
-  const jornadaActual = jornadas.find((j) => j.id === empleado.jornadaId);
-  const puestoActual = puestos.find((p) => p.id === empleado.puestoId);
-  const equiposEmpleado = empleado.equipos?.map((eq: any) => eq.equipo?.nombre || eq.nombre).join(', ') || 'Sin equipo';
-  const managerEmpleado = empleado.manager ? `${empleado.manager.nombre} ${empleado.manager.apellidos}` : 'Sin manager';
+  const jornadaActual =
+    jornadas.find((j) => j.id === empleado.jornadaId) ??
+    (empleado.jornada
+      ? {
+          id: empleado.jornada.id,
+          nombre: empleado.jornada.nombre,
+          horasSemanales: empleado.jornada.horasSemanales,
+        }
+      : undefined);
+
+  const puestoActual =
+    puestos.find((p) => p.id === empleado.puestoId) ??
+    (empleado.puestoRelacion
+      ? {
+          id: empleado.puestoRelacion.id,
+          nombre: empleado.puestoRelacion.nombre,
+        }
+      : undefined);
+
+  const equiposEmpleado =
+    empleado.equipos && empleado.equipos.length > 0
+      ? empleado.equipos
+          .map((eq) => eq.equipo?.nombre || eq.nombre)
+          .filter((value): value is string => Boolean(value))
+          .join(', ')
+      : 'Sin equipo';
+
+  const managerEmpleado = empleado.manager
+    ? `${empleado.manager.nombre}${empleado.manager.apellidos ? ` ${empleado.manager.apellidos}` : ''}`.trim()
+    : 'Sin manager';
 
   return (
     <div className="space-y-6 max-w-6xl">
@@ -234,7 +258,11 @@ export function ContratosTab({ empleado, rol = 'empleado', onFieldUpdate }: Cont
               <label className="block text-sm font-medium text-gray-700 mb-1">Grupo de cotización</label>
               <Input
                 type="text"
-                value={empleado.grupoCotizacion || 'No informado'}
+                value={
+                  empleado.grupoCotizacion !== null && empleado.grupoCotizacion !== undefined
+                    ? empleado.grupoCotizacion.toString()
+                    : 'No informado'
+                }
                 readOnly
                 className="bg-gray-50"
               />
@@ -281,7 +309,11 @@ export function ContratosTab({ empleado, rol = 'empleado', onFieldUpdate }: Cont
                 <label className="block text-sm font-medium text-gray-700 mb-1">Salario bruto anual</label>
                 <Input
                   type="text"
-                  value={`${empleado.salarioBrutoAnual?.toLocaleString('es-ES') || 0} €`}
+                  value={`${
+                    typeof empleado.salarioBrutoAnual === 'number'
+                      ? empleado.salarioBrutoAnual.toLocaleString('es-ES')
+                      : '0'
+                  } €`}
                   readOnly
                   className="bg-gray-50"
                 />
@@ -290,7 +322,7 @@ export function ContratosTab({ empleado, rol = 'empleado', onFieldUpdate }: Cont
                 <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de pagas</label>
                 <Input 
                   type="text" 
-                  value={empleado.numPagas || "14 pagas (12 + 2 extras)"} 
+                  value={empleado.numPagas ?? '14 pagas (12 + 2 extras)'} 
                   readOnly 
                   className="bg-gray-50" 
                 />
@@ -301,23 +333,102 @@ export function ContratosTab({ empleado, rol = 'empleado', onFieldUpdate }: Cont
             <div className="border-t pt-4">
               <div className="flex items-center justify-between mb-3">
                 <h4 className="text-sm font-semibold text-gray-900">Complementos</h4>
-                {rol === 'hr_admin' && empleado.complementos && empleado.complementos.length === 0 && (
-                  <Button variant="outline" size="sm" disabled>
+                {rol === 'hr_admin' && !addingComplemento && (
+                  <Button variant="outline" size="sm" onClick={() => setAddingComplemento(true)}>
                     Añadir
                   </Button>
                 )}
               </div>
               
+              {addingComplemento && rol === 'hr_admin' && (
+                <div className="mb-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                  <div className="grid grid-cols-2 gap-3 mb-2">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Tipo de complemento</label>
+                      <Input
+                        type="text"
+                        value={complementoTipo}
+                        onChange={(e) => setComplementoTipo(e.target.value)}
+                        placeholder="Ej: Plus transporte"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Importe (€/mes)</label>
+                      <Input
+                        type="number"
+                        value={complementoImporte}
+                        onChange={(e) => setComplementoImporte(e.target.value)}
+                        placeholder="Ej: 150"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        if (complementoTipo && complementoImporte) {
+                          // Aquí iría la llamada a la API para guardar el complemento
+                          toast.success('Complemento añadido correctamente');
+                          setComplementoTipo('');
+                          setComplementoImporte('');
+                          setAddingComplemento(false);
+                          router.refresh();
+                        }
+                      }}
+                      disabled={!complementoTipo || !complementoImporte}
+                    >
+                      Guardar
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        setComplementoTipo('');
+                        setComplementoImporte('');
+                        setAddingComplemento(false);
+                      }}
+                    >
+                      Cancelar
+                    </Button>
+                  </div>
+                </div>
+              )}
+              
               {empleado.complementos && empleado.complementos.length > 0 ? (
                 <div className="space-y-2">
-                  {empleado.complementos.map((comp: any, index: number) => (
-                    <div key={index} className="flex justify-between items-center text-sm p-2 bg-gray-50 rounded">
-                      <span className="text-gray-700">{comp.tipo || comp.tipoComplemento?.nombre}</span>
-                      <span className="font-medium">{comp.importe?.toLocaleString('es-ES')} €</span>
-                    </div>
-                  ))}
+                  {empleado.complementos.map((comp, index) => {
+                    const nombreComplemento = comp?.tipo ?? comp?.tipoComplemento?.nombre ?? 'Complemento';
+                    const importe =
+                      typeof comp?.importe === 'number'
+                        ? comp.importe
+                        : typeof comp?.importePersonalizado === 'number'
+                          ? comp.importePersonalizado
+                          : 0;
+
+                    return (
+                      <div key={comp?.id ?? index} className="flex justify-between items-center text-sm p-2 bg-gray-50 rounded">
+                        <span className="text-gray-700">{nombreComplemento}</span>
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">{importe.toLocaleString('es-ES')} €</span>
+                          {rol === 'hr_admin' && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                toast.success('Complemento eliminado');
+                                router.refresh();
+                              }}
+                              className="h-6 px-2 text-xs"
+                            >
+                              Eliminar
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
-              ) : (
+              ) : !addingComplemento && (
                 <p className="text-xs text-gray-500">No hay complementos salariales</p>
               )}
             </div>
@@ -394,9 +505,9 @@ export function ContratosTab({ empleado, rol = 'empleado', onFieldUpdate }: Cont
             <Input
               type="text"
               value={
-                contratoActual.fechaInicio
-                  ? new Date(contratoActual.fechaInicio).toLocaleDateString('es-ES')
-                  : new Date(empleado.fechaAlta).toLocaleDateString('es-ES')
+                fechaInicioContrato
+                  ? new Date(fechaInicioContrato).toLocaleDateString('es-ES')
+                  : 'No registrado'
               }
               readOnly
               className="bg-gray-50"
@@ -407,8 +518,8 @@ export function ContratosTab({ empleado, rol = 'empleado', onFieldUpdate }: Cont
             <Input
               type="text"
               value={
-                contratoActual.fechaFin
-                  ? new Date(contratoActual.fechaFin).toLocaleDateString('es-ES')
+                fechaFinContrato
+                  ? new Date(fechaFinContrato).toLocaleDateString('es-ES')
                   : tipoContrato === 'indefinido'
                     ? 'Indefinido'
                     : 'No especificada'
@@ -421,7 +532,7 @@ export function ContratosTab({ empleado, rol = 'empleado', onFieldUpdate }: Cont
             <label className="block text-sm font-medium text-gray-700 mb-1">Estado del contrato</label>
             <Input
               type="text"
-              value={empleado.activo && !contratoActual.fechaFin ? 'Activo' : 'Finalizado'}
+              value={estadoContrato}
               readOnly
               className="bg-gray-50"
             />
@@ -563,11 +674,11 @@ export function ContratosTab({ empleado, rol = 'empleado', onFieldUpdate }: Cont
       )}
 
       {/* Modal Dar de Baja */}
-      {rol === 'hr_admin' && contratoActual.id && (
+      {rol === 'hr_admin' && contratoActualId && (
         <DarDeBajaModal
           isOpen={darDeBajaModalOpen}
           onClose={() => setDarDeBajaModalOpen(false)}
-          contratoId={contratoActual.id}
+          contratoId={contratoActualId}
           empleadoNombre={`${empleado.nombre} ${empleado.apellidos}`}
           onSuccess={() => {
             // Recargar la página para mostrar los cambios

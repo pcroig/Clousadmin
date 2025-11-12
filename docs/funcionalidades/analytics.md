@@ -93,10 +93,6 @@ Botón de exportación que genera un archivo Excel con 4 hojas:
 - Salario promedio por equipo
 - Evolución de coste (6 meses)
 - Distribución salarial por rangos (6 rangos)
-- Percentiles salariales (p10, p25, p50, p75, p90) y min/max
-- Distribución por rangos dinámicos de 10k
-- Desglose por puesto (total, promedio, mediana, min, max)
-- Top complementos asignados (veces, importe total y promedio)
 
 ### Pestaña: Fichajes
 
@@ -401,12 +397,6 @@ Content (scroll)
 ---
 
 ## 11. Changelog
-
-### Versión 2.1 (Nov 2025)
-- ✅ Añadida API extendida de nóminas (`/api/nominas/analytics`) con percentiles salariales y rangos dinámicos.
-- ✅ Incorporado desglose por puesto (total, promedio, min, max, mediana).
-- ✅ Top 10 complementos más asignados con importe total y promedio.
-- ✅ Comparativa de departamentos con mediana y complementos promedio.
 
 ### Versión 2.0 (Nov 2024)
 - ✅ Implementado sistema de pestañas

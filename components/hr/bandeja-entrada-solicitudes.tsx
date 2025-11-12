@@ -34,7 +34,6 @@ interface SolicitudItem {
   };
   tipo: 'ausencia' | 'cambio_datos';
   detalles: string;
-  fechaLimite: Date;
   fechaCreacion: Date;
   estado: SolicitudEstado;
   fechaResolucion?: Date;
@@ -42,6 +41,8 @@ interface SolicitudItem {
     tipoAusencia?: string;
     fechaInicio?: Date;
     fechaFin?: Date;
+    tipoCambioDatos?: string;
+    camposCambiados?: Record<string, unknown>;
   };
 }
 
@@ -54,51 +55,156 @@ interface BandejaEntradaSolicitudesProps {
 
 type VistaType = 'pendientes' | 'resueltas';
 
+import { formatRelativeTime } from '@/lib/utils/formatRelativeTime';
+
 const DATE_FORMATTER = new Intl.DateTimeFormat('es-ES', {
   day: 'numeric',
-  month: 'long',
+  month: 'short',
   year: 'numeric',
 });
+
+const PERIOD_FORMATTER = new Intl.DateTimeFormat('es-ES', {
+  day: 'numeric',
+  month: 'short',
+});
+
+const DEFAULT_RELATIVE_OPTIONS = {
+  locale: 'es',
+  minimalUnit: 'minute' as const,
+  style: 'short' as const,
+};
+
+const DEADLINE_RELATIVE_OPTIONS = {
+  locale: 'es',
+  minimalUnit: 'day' as const,
+  style: 'short' as const,
+};
 
 const capitalize = (value: string) => {
   if (!value) return value;
   return value.charAt(0).toLocaleUpperCase('es-ES') + value.slice(1);
 };
 
+const toTitleCase = (value: string) =>
+  value
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toLocaleUpperCase('es-ES') + word.slice(1).toLocaleLowerCase())
+    .join(' ');
+
 const humanize = (value: string) =>
   value
     .split('_')
-    .map((segment) => capitalize(segment))
+    .map((segment) => segment.toLocaleLowerCase('es-ES'))
     .join(' ');
+
+const humanizeKey = (value: string) =>
+  value
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .replace(/[_-]+/g, ' ')
+    .toLocaleLowerCase('es-ES');
+
+const CAMBIO_TIPO_LABELS: Record<string, string> = {
+  datos_personales: 'datos personales',
+  datos_bancarios: 'datos bancarios',
+  datos_laborales: 'datos laborales',
+  datos_contacto: 'datos de contacto',
+  datos_fiscales: 'datos fiscales',
+  documento: 'documentación',
+};
+
+const CAMPO_CAMBIO_LABELS: Record<string, string> = {
+  direccion: 'dirección',
+  telefono: 'teléfono',
+  email: 'correo electrónico',
+  correo: 'correo electrónico',
+  iban: 'IBAN',
+  entidad: 'entidad bancaria',
+  banco: 'banco',
+  titularCuenta: 'titular de la cuenta',
+  salarioBrutoAnual: 'salario bruto anual',
+  salarioBrutoMensual: 'salario bruto mensual',
+  categoriaProfesional: 'categoría profesional',
+  grupoCotizacion: 'grupo de cotización',
+  puestoId: 'puesto',
+  jornadaId: 'jornada asignada',
+  equipoIds: 'equipos',
+  fechaAlta: 'fecha de alta',
+  estadoCivil: 'estado civil',
+  numeroHijos: 'número de hijos',
+  nif: 'NIF',
+  nss: 'NSS',
+};
+
+const getCambioCategoria = (tipo?: string) => {
+  if (!tipo) return 'datos personales';
+  const normalized = tipo.toLocaleLowerCase('es-ES');
+  return CAMBIO_TIPO_LABELS[normalized] || humanizeKey(normalized);
+};
+
+const formatCampoEtiqueta = (campo: string) =>
+  CAMPO_CAMBIO_LABELS[campo] || toTitleCase(humanizeKey(campo));
+
+const formatCamposCambios = (campos?: Record<string, unknown>) => {
+  if (!campos) return null;
+  const keys = Object.keys(campos);
+  if (keys.length === 0) return null;
+  const etiquetas = keys.map((campo) => formatCampoEtiqueta(campo));
+  const MAX_LABELS = 2;
+  if (etiquetas.length <= MAX_LABELS) {
+    return etiquetas.join(', ');
+  }
+  const visibles = etiquetas.slice(0, MAX_LABELS).join(', ');
+  const restantes = etiquetas.length - MAX_LABELS;
+  return `${visibles} (+${restantes} más)`;
+};
+
+const getTipoCambioValor = (solicitud: SolicitudItem) => {
+  if (solicitud.metadata?.tipoCambioDatos) {
+    return solicitud.metadata.tipoCambioDatos;
+  }
+  const match = solicitud.detalles.match(/cambio de\s+(.+)/i);
+  if (match) {
+    return match[1].trim().replace(/\.$/, '');
+  }
+  return solicitud.detalles;
+};
 
 const formatDate = (date: Date) => DATE_FORMATTER.format(date);
 
 const getSolicitudTitulo = (solicitud: SolicitudItem) => {
   if (solicitud.tipo === 'ausencia') {
     const detalle = solicitud.metadata?.tipoAusencia
-      ? humanize(solicitud.metadata.tipoAusencia)
+      ? toTitleCase(humanize(solicitud.metadata.tipoAusencia))
       : 'Ausencia';
     return `${detalle} · ${solicitud.empleado.nombre} ${solicitud.empleado.apellidos}`;
   }
 
-  const mapaTitulo: Record<SolicitudItem['tipo'], string> = {
-    ausencia: 'Ausencia',
-    cambio_datos: 'Cambio de datos personales',
-  };
+  const categoria = toTitleCase(getCambioCategoria(getTipoCambioValor(solicitud)));
+  return `Actualización de ${categoria} · ${solicitud.empleado.nombre} ${solicitud.empleado.apellidos}`;
+};
 
-  return `${mapaTitulo[solicitud.tipo] || humanize(solicitud.tipo)} · ${solicitud.empleado.nombre} ${solicitud.empleado.apellidos}`;
+const formatPeriodo = (inicio?: Date, fin?: Date) => {
+  if (!inicio || !fin) return null;
+  const mismoAnyo = inicio.getFullYear() === fin.getFullYear();
+  const inicioTexto = mismoAnyo ? PERIOD_FORMATTER.format(inicio) : formatDate(inicio);
+  const finTexto = formatDate(fin);
+  return `${inicioTexto} – ${finTexto}`;
 };
 
 const getSolicitudDescripcion = (solicitud: SolicitudItem) => {
   const partes: string[] = [];
 
-  partes.push(`Solicitada el ${formatDate(solicitud.fechaCreacion)}`);
+  const relativaCreacion = formatRelativeTime(solicitud.fechaCreacion, DEFAULT_RELATIVE_OPTIONS);
+  partes.push(relativaCreacion);
 
-  if (solicitud.estado === 'pendiente' || solicitud.estado === 'pendiente_aprobacion') {
-    partes.push(`Revisar antes del ${formatDate(solicitud.fechaLimite)}`);
-  } else if (solicitud.estado === 'en_curso') {
+  if (solicitud.estado === 'en_curso') {
     if (solicitud.metadata?.fechaFin) {
-      partes.push(`En curso · Termina el ${formatDate(solicitud.metadata.fechaFin)}`);
+      const relativaFin = formatRelativeTime(
+        solicitud.metadata.fechaFin,
+        DEADLINE_RELATIVE_OPTIONS,
+      );
+      partes.push(`Termina ${relativaFin.toLocaleLowerCase('es-ES')}`);
     } else {
       partes.push('En curso');
     }
@@ -112,48 +218,28 @@ const getSolicitudDescripcion = (solicitud: SolicitudItem) => {
           : solicitud.estado === 'cancelada'
             ? 'Cancelada'
             : 'Aprobada';
-    partes.push(`${estadoLabel} el ${formatDate(fechaCierre)}`);
+    const relativaCierre = formatRelativeTime(fechaCierre, DEFAULT_RELATIVE_OPTIONS);
+    partes.push(`${estadoLabel} ${relativaCierre.toLocaleLowerCase('es-ES')}`);
   }
 
   if (solicitud.metadata?.fechaInicio && solicitud.metadata?.fechaFin) {
-    partes.push(
-      `Del ${formatDate(solicitud.metadata.fechaInicio)} al ${formatDate(solicitud.metadata.fechaFin)}`,
-    );
+    const periodo = formatPeriodo(solicitud.metadata.fechaInicio, solicitud.metadata.fechaFin);
+    if (periodo) {
+      partes.push(`Periodo ${periodo}`);
+    }
+  }
+
+  if (solicitud.tipo === 'cambio_datos') {
+    const categoria = toTitleCase(getCambioCategoria(getTipoCambioValor(solicitud)));
+    partes.push(`Área ${categoria}`);
+    const camposResumen = formatCamposCambios(solicitud.metadata?.camposCambiados);
+    if (camposResumen) {
+      partes.push(`Campos ${camposResumen}`);
+    }
   }
 
   return partes.join(' · ');
 };
-
-const getEstadoPillClasses = (estado: SolicitudItem['estado']) => {
-  switch (estado) {
-    case 'pendiente':
-    case 'pendiente_aprobacion':
-    case 'en_curso':
-      return 'bg-amber-100 text-amber-700';
-    case 'confirmada':
-    case 'completada':
-    case 'auto_aprobada':
-      return 'bg-emerald-100 text-emerald-700';
-    case 'rechazada':
-    case 'cancelada':
-      return 'bg-red-100 text-red-700';
-    default:
-      return 'bg-gray-100 text-gray-700';
-  }
-};
-
-const estadoLabels: Record<SolicitudEstado, string> = {
-  pendiente: 'Pendiente',
-  pendiente_aprobacion: 'Pendiente',
-  en_curso: 'En curso',
-  confirmada: 'Confirmada',
-  completada: 'Completada',
-  auto_aprobada: 'Auto-aprobada',
-  rechazada: 'Rechazada',
-  cancelada: 'Cancelada',
-};
-
-const getEstadoLabel = (estado: SolicitudItem['estado']) => estadoLabels[estado];
 
 export function BandejaEntradaSolicitudes({
   solicitudesPendientes,
@@ -218,18 +304,9 @@ export function BandejaEntradaSolicitudes({
                     </AvatarFallback>
                   </Avatar>
 
-                  <div className="flex-1 space-y-2">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="space-y-1">
-                        <p className="text-sm font-semibold text-gray-900">{titulo}</p>
-                        <p className="text-sm text-gray-600">{descripcion}</p>
-                      </div>
-                      <span
-                        className={`px-2 py-0.5 text-xs font-medium rounded-full whitespace-nowrap ${getEstadoPillClasses(solicitud.estado)}`}
-                      >
-                        {getEstadoLabel(solicitud.estado)}
-                      </span>
-                    </div>
+                  <div className="flex-1 space-y-1">
+                    <p className="text-sm font-semibold text-gray-900">{titulo}</p>
+                    <p className="text-sm text-gray-600">{descripcion}</p>
                   </div>
 
                   <div className="flex items-center gap-2">

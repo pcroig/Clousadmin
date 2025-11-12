@@ -11,26 +11,23 @@ import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { EmptyState } from '@/components/shared/empty-state';
 import { LoadingButton } from '@/components/shared/loading-button';
+import type { MiEspacioCarpeta, MiEspacioDocumento } from '@/types/empleado';
 
-interface Documento {
-  id: string;
-  nombre: string;
+type CarpetaDocumento = MiEspacioDocumento & {
   tipoDocumento: string;
-  mimeType: string;
   tamano: number;
   createdAt: string;
-}
+  mimeType?: string | null;
+};
 
-interface Carpeta {
-  id: string;
-  nombre: string;
-  esSistema: boolean;
-  compartida: boolean;
-  documentos: Documento[];
-}
+type CarpetaDetalle = MiEspacioCarpeta & {
+  esSistema?: boolean;
+  compartida?: boolean;
+  documentos: CarpetaDocumento[];
+};
 
 interface CarpetaDetailClientEmpleadoProps {
-  carpeta: Carpeta;
+  carpeta: CarpetaDetalle;
   puedeSubir: boolean;
 }
 
@@ -42,9 +39,7 @@ export function CarpetaDetailClientEmpleado({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
 
-  const handleSubirArchivo = async (
-    event: React.ChangeEvent<HTMLInputElement>
-  ) => {
+  const handleSubirArchivo = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
     if (!files || files.length === 0) return;
 
@@ -74,8 +69,9 @@ export function CarpetaDetailClientEmpleado({
 
       // Recargar página para mostrar nuevos documentos
       router.refresh();
-    } catch (error: any) {
-      toast.error(error.message || 'Error al subir archivos');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Error al subir archivos';
+      toast.error(message);
     } finally {
       setUploading(false);
       if (fileInputRef.current) {
@@ -138,7 +134,7 @@ export function CarpetaDetailClientEmpleado({
 
         <div className="flex items-center justify-between">
           <div>
-                        <div className="flex items-center gap-2 mb-2">
+            <div className="flex items-center gap-2 mb-2">
               <Folder
                 className={`w-6 h-6 ${
                   carpeta.compartida ? 'text-blue-600' : 'text-gray-600'
@@ -148,12 +144,12 @@ export function CarpetaDetailClientEmpleado({
                 {carpeta.nombre}
               </h1>
               {carpeta.esSistema && (
-                <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">                                                                      
+                <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">
                   Sistema
                 </span>
               )}
               {carpeta.compartida && (
-                <span className="text-xs bg-blue-100 text-blue-600 px-2 py-1 rounded">                                                                          
+                <span className="text-xs bg-blue-100 text-blue-600 px-2 py-1 rounded">
                   Compartida
                 </span>
               )}

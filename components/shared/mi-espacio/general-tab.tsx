@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { toast } from 'sonner';
 
 import { UsuarioRol } from '@/lib/constants/enums';
+import type { MiEspacioEmpleado, Usuario } from '@/types/empleado';
 
 type GeneralFormData = {
   nif: string;
@@ -47,7 +48,7 @@ const FORM_FIELDS: Array<keyof GeneralFormData> = [
   'titularCuenta',
 ];
 
-const buildInitialFormData = (empleado: any, usuario: any): GeneralFormData => ({
+const buildInitialFormData = (empleado: MiEspacioEmpleado, usuario: Usuario): GeneralFormData => ({
   nif: empleado.nif ?? '',
   nss: empleado.nss ?? '',
   fechaNacimiento: empleado.fechaNacimiento ? new Date(empleado.fechaNacimiento).toISOString().split('T')[0] : '',
@@ -71,7 +72,7 @@ const normalizeValue = (value: string) => value.trim();
 const formsAreEqual = (current: GeneralFormData, initial: GeneralFormData) =>
   FORM_FIELDS.every((field) => normalizeValue(current[field]) === normalizeValue(initial[field]));
 
-const prepareValueForPayload = (field: keyof GeneralFormData, value: string) => {
+const prepareValueForPayload = (field: keyof GeneralFormData, value: string): string | number | null => {
   const trimmed = value.trim();
 
   if (trimmed === '') {
@@ -95,8 +96,8 @@ const prepareValueForPayload = (field: keyof GeneralFormData, value: string) => 
   return trimmed;
 };
 
-const diffFormData = (current: GeneralFormData, initial: GeneralFormData) => {
-  const diff: Record<string, any> = {};
+const diffFormData = (current: GeneralFormData, initial: GeneralFormData): Record<string, string | number | null> => {
+  const diff: Record<string, string | number | null> = {};
 
   FORM_FIELDS.forEach((field) => {
     if (normalizeValue(current[field]) !== normalizeValue(initial[field])) {
@@ -108,10 +109,10 @@ const diffFormData = (current: GeneralFormData, initial: GeneralFormData) => {
 };
 
 interface GeneralTabProps {
-  empleado: any;
-  usuario: any;
+  empleado: MiEspacioEmpleado;
+  usuario: Usuario;
   rol?: 'empleado' | 'hr_admin' | 'manager';
-  onFieldUpdate?: (field: string, value: any) => Promise<void>;
+  onFieldUpdate?: (field: keyof MiEspacioEmpleado, value: unknown) => Promise<void>;
   onSaveReady?: (saveFunction: () => Promise<void>, hasChanges: boolean) => void;
 }
 
@@ -158,7 +159,7 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado', onFieldUpdate,
   );
   
   // Función helper para actualizar campos individualmente (guardado automático para HR)
-  const handleFieldUpdate = async (field: string, value: any) => {
+  const handleFieldUpdate = async (field: keyof MiEspacioEmpleado, value: unknown) => {
     if (!isHrAdmin || !onFieldUpdate) {
       return;
     }

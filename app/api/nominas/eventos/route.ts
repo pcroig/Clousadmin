@@ -7,7 +7,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { z } from 'zod';
-import type { Notificacion } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 
 import { UsuarioRol } from '@/lib/constants/enums';
@@ -64,25 +63,18 @@ export async function GET(req: NextRequest) {
       },
     });
 
-    type EventoConNominas = (typeof eventos)[number];
-    type NominaConAlertas = EventoConNominas['nominas'][number];
-    type Alerta = NominaConAlertas['alertas'][number];
-
     // Calcular conteo de alertas por evento
-    const eventosConAlertas = eventos.map((evento: EventoConNominas) => {
-      const alertas = evento.nominas.flatMap(
-        (nomina: NominaConAlertas) => nomina.alertas
-      );
+    const eventosConAlertas = eventos.map((evento) => {
+      const alertas = evento.nominas.flatMap((n) => n.alertas);
 
       const conteoAlertas = {
-        criticas: alertas.filter((alerta: Alerta) => alerta.tipo === 'critico').length,
-        advertencias: alertas.filter((alerta: Alerta) => alerta.tipo === 'advertencia').length,
-        informativas: alertas.filter((alerta: Alerta) => alerta.tipo === 'info').length,
+        criticas: alertas.filter((a) => a.tipo === 'critico').length,
+        advertencias: alertas.filter((a) => a.tipo === 'advertencia').length,
+        informativas: alertas.filter((a) => a.tipo === 'info').length,
         total: alertas.length,
       };
 
-      // Extraer solo las propiedades necesarias sin 'nominas'
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      // Eliminar el array de nóminas del response (solo queremos el conteo)
       const { nominas, ...eventoSinNominas } = evento;
 
       return {
@@ -143,7 +135,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Calcular fecha límite por defecto (último día del mes)
-    const fechaLimite = data.fechaLimiteComplementos
+    let fechaLimite = data.fechaLimiteComplementos
       ? new Date(data.fechaLimiteComplementos)
       : new Date(data.anio, data.mes, 0, 23, 59, 59); // Último día del mes
 
@@ -198,10 +190,6 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    type EmpleadoConRelaciones = (typeof empleados)[number];
-    type Ausencia = EmpleadoConRelaciones['ausencias'][number];
-    type ComplementoEmpleado = EmpleadoConRelaciones['complementos'][number];
-
     // Crear el evento de nómina
     const evento = await prisma.eventoNomina.create({
       data: {
@@ -219,7 +207,7 @@ export async function POST(req: NextRequest) {
     let empleadosConComplementos = 0;
     let totalComplementosAsignados = 0;
 
-    for (const empleado of empleados as EmpleadoConRelaciones[]) {
+    for (const empleado of empleados) {
       const contratoVigente = empleado.contratos[0];
 
       if (!contratoVigente) {
@@ -233,8 +221,7 @@ export async function POST(req: NextRequest) {
 
       // Restar días de ausencias
       let totalDiasAusencias = 0;
-      const ausenciasEmpleado: Ausencia[] = empleado.ausencias;
-      for (const ausencia of ausenciasEmpleado) {
+      for (const ausencia of empleado.ausencias) {
         // Cálculo simplificado de días de ausencia en el mes
         const inicioAusencia = new Date(Math.max(
           ausencia.fechaInicio.getTime(),
@@ -261,8 +248,7 @@ export async function POST(req: NextRequest) {
         .div(totalDiasMes);
 
       // Verificar si tiene complementos con importe variable (sin importePersonalizado ni importeFijo)
-      const complementosEmpleado: ComplementoEmpleado[] = empleado.complementos;
-      const tieneComplementosVariables = complementosEmpleado.some(
+      const tieneComplementosVariables = empleado.complementos.some(
         (comp) => !comp.importePersonalizado && !comp.tipoComplemento.importeFijo
       );
 
@@ -287,9 +273,9 @@ export async function POST(req: NextRequest) {
 
       nominasCreadas.push(nomina);
 
-      if (complementosEmpleado.length > 0) {
+      if (empleado.complementos.length > 0) {
         empleadosConComplementos++;
-        totalComplementosAsignados += complementosEmpleado.length;
+        totalComplementosAsignados += empleado.complementos.length;
       }
     }
 
@@ -304,122 +290,41 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // Enviar notificaciones SOLO a managers con empleados que tienen complementos pendientes
+    // Enviar notificaciones a TODOS los managers
     const managers = await prisma.usuario.findMany({
       where: {
         empresaId: session.user.empresaId,
         rol: UsuarioRol.manager,
         activo: true,
-        empleado: {
-          equiposGestionados: {
-            some: {
-              miembros: {
-                some: {
-                  empleado: {
-                    complementos: {
-                      some: {
-                        activo: true,
-                      },
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
-      include: {
-        empleado: {
-          include: {
-            equiposGestionados: {
-              include: {
-                miembros: {
-                  include: {
-                    empleado: {
-                      select: {
-                        id: true,
-                        complementos: {
-                          where: {
-                            activo: true,
-                          },
-                          select: {
-                            id: true,
-                          },
-                        },
-                      },
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
       },
     });
 
-    type ManagerConEquipos = (typeof managers)[number];
-    type EquipoGestionado =
-      NonNullable<ManagerConEquipos['empleado']>['equiposGestionados'][number];
-    type MiembroEquipo = EquipoGestionado['miembros'][number];
-
-    let totalNotificaciones = 0;
-    if (managers.length > 0) {
-      const notificaciones = await Promise.all(
-        managers.map((manager: ManagerConEquipos) => {
-          const equipos = manager.empleado?.equiposGestionados ?? [];
-          const empleadosConComplementos = equipos.reduce(
-            (count: number, equipo: EquipoGestionado) => {
-              const miembrosConComplementos = equipo.miembros.filter(
-                (miembro: MiembroEquipo) => miembro.empleado.complementos.length > 0
-              ).length;
-              return count + miembrosConComplementos;
-            },
-            0
-          );
-
-          if (empleadosConComplementos === 0) {
-            return null;
-          }
-
-          return prisma.notificacion.create({
-            data: {
-              usuarioId: manager.id,
-              tipo: 'nomina_generada',
-              titulo: `Nóminas ${data.mes}/${data.anio} - Complementos pendientes`,
-              mensaje: `Se han generado las pre-nóminas. Tienes ${empleadosConComplementos} empleado(s) con complementos salariales que requieren validación antes del ${fechaLimite.toLocaleDateString()}.`,
-              eventoNominaId: evento.id,
-            },
-          });
+    const notificaciones = await Promise.all(
+      managers.map((manager) =>
+        prisma.notificacion.create({
+          data: {
+            usuarioId: manager.id,
+            tipo: 'nomina_generada',
+            titulo: `Nóminas ${data.mes}/${data.anio} generadas`,
+            mensaje: `Se han generado ${nominasCreadas.length} pre-nóminas. Por favor, revisa y asigna complementos antes del ${fechaLimite.toLocaleDateString()}.`,
+            eventoNominaId: evento.id,
+          },
         })
-      );
-
-      totalNotificaciones = notificaciones.filter(
-        (notificacion): notificacion is Notificacion => notificacion !== null
-      ).length;
-
-      if (totalNotificaciones > 0) {
-        console.log(
-          `[Generar Evento] Notificaciones enviadas a ${totalNotificaciones} manager(s) con complementos pendientes`
-        );
-      } else {
-        console.log('[Generar Evento] Managers sin complementos pendientes - sin notificaciones');
-      }
-    } else {
-      console.log('[Generar Evento] No hay managers con empleados con complementos activos - sin notificaciones');
-    }
+      )
+    );
 
     return NextResponse.json(
       {
         evento,
         nominasGeneradas: nominasCreadas.length,
-        notificacionesEnviadas: totalNotificaciones,
+        notificacionesEnviadas: notificaciones.length,
       },
       { status: 201 }
     );
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
-        { error: 'Datos inválidos', details: error.issues },
+        { error: 'Datos inválidos', details: error.errors },
         { status: 400 }
       );
     }

@@ -6,6 +6,32 @@ Patrones específicos y ejemplos de código para el proyecto.
 
 ## 📝 TypeScript Patterns
 
+### ⏱️ Formateo de tiempos relativos
+
+Utiliza `formatRelativeTime` para mostrar fechas relativas en interfaz (ej. "hace 2 días", "dentro de 3 horas").
+
+```typescript
+import { formatRelativeTime } from '@/lib/utils/formatRelativeTime';
+
+// Mostrar "Hace 5 min"
+const creado = formatRelativeTime(solicitud.fechaCreacion, {
+  locale: 'es',
+  minimalUnit: 'minute',
+  style: 'short',
+});
+
+// Mostrar "Dentro de 2 d"
+const proximaRevision = formatRelativeTime(tarea.proximaRevision, {
+  locale: 'es',
+  minimalUnit: 'day',
+  style: 'short',
+});
+```
+
+- Mantén `locale: 'es'` para coherencia.
+- Usa `minimalUnit` para evitar resultados como "hace 0 segundos".
+- Centraliza lógica relativa en `lib/utils/formatRelativeTime.ts` antes de crear nuevos helpers.
+
 ### Type Safety
 ```typescript
 // ✅ GOOD: Explicit types

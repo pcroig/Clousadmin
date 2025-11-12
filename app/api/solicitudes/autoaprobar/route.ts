@@ -10,6 +10,7 @@ import { requireAuthAsHROrManager, handleApiError } from '@/lib/api-handler';
 import { EstadoAusencia, EstadoSolicitud } from '@/lib/constants/enums';
 import { esCampoPermitido } from '@/lib/constants/whitelist-campos';
 import { crearNotificacionSolicitudAprobada } from '@/lib/notificaciones';
+import { resolveAprobadorEmpleadoId } from '@/lib/solicitudes/aprobador';
 
 export async function POST(req: NextRequest) {
   try {
@@ -19,6 +20,11 @@ export async function POST(req: NextRequest) {
     const { session } = authResult;
 
     const ahora = new Date();
+    const aprobadorEmpleadoId = await resolveAprobadorEmpleadoId(
+      prisma,
+      session,
+      'AUTOAPROBAR Solicitudes'
+    );
 
     // 1. Obtener todas las ausencias pendientes de la empresa
     const ausenciasPendientes = await prisma.ausencia.findMany({
@@ -180,7 +186,7 @@ export async function POST(req: NextRequest) {
             where: { id: solicitud.id },
             data: {
               estado: EstadoSolicitud.auto_aprobada,
-              aprobadorId: session.user.id,
+              aprobadorId: aprobadorEmpleadoId,
               fechaRespuesta: ahora,
             },
           });

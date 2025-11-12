@@ -9,6 +9,7 @@ import { EmpleadoDetailClient } from './empleado-detail-client';
 import { notFound } from 'next/navigation';
 import { decryptEmpleadoData } from '@/lib/empleado-crypto';
 import { asegurarCarpetasSistemaParaEmpleado } from '@/lib/documentos';
+import { serializeEmpleado } from '@/lib/utils';
 
 import { UsuarioRol } from '@/lib/constants/enums';
 
@@ -209,57 +210,21 @@ export default async function EmpleadoDetailPage({ params }: EmpleadoDetailPageP
   // Desencriptar campos sensibles antes de pasar al componente
   const empleadoDesencriptado = decryptEmpleadoData(empleadoActualizado);
 
+  const empleadoMiEspacio = serializeEmpleado({
+    ...empleadoActualizado,
+    ...empleadoDesencriptado,
+  });
+
   const empleadoData = {
-    id: empleadoDesencriptado.id,
-    nombre: empleadoDesencriptado.nombre,
-    apellidos: empleadoDesencriptado.apellidos,
-    email: empleadoDesencriptado.email,
-    fotoUrl: empleadoDesencriptado.fotoUrl,
-    nif: empleadoDesencriptado.nif,
-    nss: empleadoDesencriptado.nss,
-    fechaNacimiento: empleadoDesencriptado.fechaNacimiento,
-    telefono: empleadoDesencriptado.telefono,
-    direccionCalle: empleadoDesencriptado.direccionCalle,
-    direccionNumero: empleadoDesencriptado.direccionNumero,
-    direccionPiso: empleadoDesencriptado.direccionPiso,
-    codigoPostal: empleadoDesencriptado.codigoPostal,
-    ciudad: empleadoDesencriptado.ciudad,
-    direccionProvincia: empleadoDesencriptado.direccionProvincia,
-    estadoCivil: empleadoDesencriptado.estadoCivil,
-    numeroHijos: empleadoDesencriptado.numeroHijos,
-    genero: empleadoDesencriptado.genero,
-    iban: empleadoDesencriptado.iban,
-    titularCuenta: empleadoDesencriptado.titularCuenta,
-    puesto: empleadoDesencriptado.puesto,
-    puestoId: empleadoDesencriptado.puestoId,
-    puestoRelacion: empleado.puestoRelacion ? {
-      id: empleado.puestoRelacion.id,
-      nombre: empleado.puestoRelacion.nombre,
-    } : null,
-    managerId: empleadoDesencriptado.managerId,
-    fechaAlta: empleadoDesencriptado.fechaAlta,
-    fechaBaja: empleadoDesencriptado.fechaBaja,
-    tipoContrato: empleadoDesencriptado.tipoContrato,
-    categoriaProfesional: empleadoDesencriptado.categoriaProfesional,
-    grupoCotizacion: empleadoDesencriptado.grupoCotizacion,
-    estadoEmpleado: empleadoDesencriptado.estadoEmpleado,
-    salarioBrutoAnual: empleadoDesencriptado.salarioBrutoAnual ? Number(empleadoDesencriptado.salarioBrutoAnual) : null,
-    salarioBrutoMensual: empleadoDesencriptado.salarioBrutoMensual ? Number(empleadoDesencriptado.salarioBrutoMensual) : null,
-    diasVacaciones: empleadoDesencriptado.diasVacaciones,
-    activo: empleadoDesencriptado.activo,
-    manager: empleadoActualizado.manager ? {
-      nombre: `${empleadoActualizado.manager.nombre} ${empleadoActualizado.manager.apellidos}`,
-    } : null,
-    jornada: empleadoActualizado.jornada ? {
-      nombre: empleadoActualizado.jornada.nombre,
-      horasSemanales: Number(empleadoActualizado.jornada.horasSemanales),
-    } : null,
-    equipos: empleadoActualizado.equipos.map((eq) => ({
-      equipoId: eq.equipo.id,
-      equipo: {
-        id: eq.equipo.id,
-        nombre: eq.equipo.nombre,
-      },
+    ...empleadoDesencriptado,
+    ausencias: empleadoActualizado.ausencias.map((a) => ({
+      id: a.id,
+      tipo: a.tipo,
+      fechaInicio: a.fechaInicio,
+      fechaFin: a.fechaFin,
+      diasLaborables: a.diasLaborables,
+      estado: a.estado,
+      motivo: a.motivo,
     })),
     fichajes: empleadoActualizado.fichajes.map((f) => ({
       id: f.id,
@@ -273,29 +238,53 @@ export default async function EmpleadoDetailPage({ params }: EmpleadoDetailPageP
         editado: e.editado,
       })),
     })),
-    ausencias: empleadoActualizado.ausencias.map((a) => ({
-      id: a.id,
-      tipo: a.tipo,
-      fechaInicio: a.fechaInicio,
-      fechaFin: a.fechaFin,
-      diasLaborables: a.diasLaborables,
-      estado: a.estado,
-      motivo: a.motivo,
-    })),
     contratos: empleadoActualizado.contratos.map((c) => ({
       id: c.id,
       fechaInicio: c.fechaInicio,
       fechaFin: c.fechaFin,
-      tipo: c.tipoContrato,
-      salarioBruto: Number(c.salarioBrutoAnual),
+      tipoContrato: c.tipoContrato,
+      salarioBrutoAnual: Number(c.salarioBrutoAnual),
     })),
+    equipos: empleadoActualizado.equipos.map((eq) => ({
+      equipoId: eq.equipo.id,
+      equipo: {
+        id: eq.equipo.id,
+        nombre: eq.equipo.nombre,
+      },
+    })),
+    jornada: empleadoActualizado.jornada
+      ? {
+          id: empleadoActualizado.jornada.id,
+          nombre: empleadoActualizado.jornada.nombre,
+          horasSemanales: Number(empleadoActualizado.jornada.horasSemanales),
+        }
+      : null,
+    puestoRelacion: empleado.puestoRelacion
+      ? {
+          id: empleado.puestoRelacion.id,
+          nombre: empleado.puestoRelacion.nombre,
+        }
+      : null,
     carpetas: empleadoActualizado.carpetas.map((c) => ({
       id: c.id,
       nombre: c.nombre,
       esSistema: c.esSistema,
-      numeroDocumentos: c.documentos.length,
+      compartida: c.compartida,
+      documentos: c.documentos.map((doc) => ({
+        id: doc.id,
+        nombre: doc.nombre,
+        tipoDocumento: doc.tipoDocumento,
+        tamano: doc.tamano,
+        createdAt: doc.createdAt,
+      })),
     })),
   };
 
-  return <EmpleadoDetailClient empleado={empleadoData} usuario={empleado.usuario} />;
+  return (
+    <EmpleadoDetailClient
+      empleado={empleadoData}
+      empleadoMiEspacio={empleadoMiEspacio}
+      usuario={empleado.usuario}
+    />
+  );
 }

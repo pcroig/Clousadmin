@@ -18,7 +18,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { LoadingButton } from '@/components/shared/loading-button';
 import { CompensacionModal } from '@/components/hr/compensacion-modal';
 import { getAvatarStyle } from '@/lib/design-system';
-import type { Empleado, Usuario } from '@/types/empleado';
+import type { Empleado, Usuario, MiEspacioEmpleado } from '@/types/empleado';
 import { GeneralTab as GeneralTabShared } from '@/components/shared/mi-espacio/general-tab';
 import { FichajesTab as FichajesTabShared } from '@/components/shared/mi-espacio/fichajes-tab';
 import { ContratosTab as ContratosTabShared } from '@/components/shared/mi-espacio/contratos-tab';
@@ -28,10 +28,11 @@ import { EstadoAusencia } from '@/lib/constants/enums';
 
 interface EmpleadoDetailClientProps {
   empleado: Empleado;
+  empleadoMiEspacio: MiEspacioEmpleado;
   usuario: Usuario;
 }
 
-export function EmpleadoDetailClient({ empleado, usuario }: EmpleadoDetailClientProps) {
+export function EmpleadoDetailClient({ empleado, empleadoMiEspacio, usuario }: EmpleadoDetailClientProps) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState('general');
 
@@ -124,7 +125,7 @@ export function EmpleadoDetailClient({ empleado, usuario }: EmpleadoDetailClient
       <div className="flex-1 min-h-0 overflow-y-auto">
         {activeTab === 'general' && (
           <GeneralTabShared
-            empleado={empleado}
+            empleado={empleadoMiEspacio}
             usuario={usuario}
             rol="hr_admin"
             onFieldUpdate={handleFieldUpdate}
@@ -133,19 +134,18 @@ export function EmpleadoDetailClient({ empleado, usuario }: EmpleadoDetailClient
         {activeTab === 'fichajes' && (
           <FichajesTabShared 
             empleadoId={empleado.id}
-            empleado={empleado}
+            empleado={empleadoMiEspacio}
             empleadoNombre={`${empleado.nombre} ${empleado.apellidos}`}
           />
         )}
         {activeTab === 'ausencias' && <AusenciasTab empleado={empleado} />}
         {activeTab === 'contratos' && (
           <ContratosTabShared
-            empleado={empleado}
+            empleado={empleadoMiEspacio}
             rol="hr_admin"
-            onFieldUpdate={handleFieldUpdate}
           />
         )}
-        {activeTab === 'documentos' && <DocumentosTabShared empleado={empleado} />}
+        {activeTab === 'documentos' && <DocumentosTabShared empleado={empleadoMiEspacio} />}
       </div>
     </div>
   );

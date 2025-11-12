@@ -4,8 +4,8 @@
 
 'use client';
 
-import { Button } from '@/components/ui/button';
 import { Bell, CheckCircle2, XCircle, AlertCircle, Info } from 'lucide-react';
+import { formatRelativeTime } from '@/lib/utils/formatRelativeTime';
 
 interface NotificacionItem {
   id: string;
@@ -19,16 +19,12 @@ interface NotificacionItem {
 interface BandejaEntradaNotificacionesProps {
   notificaciones: NotificacionItem[];
   onMarcarLeida?: (id: string) => void;
-  onMarcarTodasLeidas?: () => void;
 }
 
 export function BandejaEntradaNotificaciones({
   notificaciones,
   onMarcarLeida,
-  onMarcarTodasLeidas,
 }: BandejaEntradaNotificacionesProps) {
-  const notificacionesNoLeidas = notificaciones.filter((n) => !n.leida).length;
-
   const getIcon = (tipo: NotificacionItem['tipo']) => {
     switch (tipo) {
       case 'success':
@@ -43,30 +39,10 @@ export function BandejaEntradaNotificaciones({
   };
 
   const formatFecha = (fecha: Date) =>
-    new Intl.DateTimeFormat('es-ES', {
-      day: 'numeric',
-      month: 'long',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    }).format(fecha);
+    formatRelativeTime(fecha, { locale: 'es', minimalUnit: 'minute', style: 'short' });
 
   return (
     <div className="space-y-4">
-      {/* Bot\u00f3n "Leer todas" */}
-      {notificacionesNoLeidas > 0 && (
-        <div className="flex justify-end">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={onMarcarTodasLeidas}
-            className="text-sm"
-          >
-            Leer todas ({notificacionesNoLeidas})
-          </Button>
-        </div>
-      )}
-
       {notificaciones.length === 0 ? (
         <div className="text-center py-12">
           <Bell className="w-16 h-16 mx-auto mb-4 text-gray-300" />

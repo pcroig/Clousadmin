@@ -24,15 +24,22 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
+import { iconButtonClasses } from '@/lib/design-system';
 
-// Reutilizar tipos de componentes hijos
-type SolicitudItem = Parameters<typeof BandejaEntradaSolicitudes>[0]['solicitudesPendientes'][0];
-type SolvedItem = Parameters<typeof BandejaEntradaSolved>[0]['items'][0];
-type NotificacionItem = Parameters<typeof BandejaEntradaNotificaciones>[0]['notificaciones'][0];
+type SolicitudPendiente = Parameters<
+  typeof BandejaEntradaSolicitudes
+>[0]['solicitudesPendientes'][number];
+type SolicitudResuelta = Parameters<
+  typeof BandejaEntradaSolicitudes
+>[0]['solicitudesResueltas'][number];
+type SolvedItem = Parameters<typeof BandejaEntradaSolved>[0]['items'][number];
+type NotificacionItem = Parameters<
+  typeof BandejaEntradaNotificaciones
+>[0]['notificaciones'][number];
 
 interface BandejaEntradaTabsProps {
-  solicitudesPendientes: SolicitudItem[];
-  solicitudesResueltas: SolicitudItem[];
+  solicitudesPendientes: SolicitudPendiente[];
+  solicitudesResueltas: SolicitudResuelta[];
   solvedStats: {
     fichajesActualizados: number;
     ausenciasRevisadas: number;
@@ -40,6 +47,10 @@ interface BandejaEntradaTabsProps {
   };
   solvedItems: SolvedItem[];
   notificaciones: NotificacionItem[];
+  header?: {
+    title: string;
+    description?: string;
+  };
 }
 
 type TabType = 'solicitudes' | 'auto-completed' | 'notificaciones';
@@ -50,6 +61,7 @@ export function BandejaEntradaTabs({
   solvedStats,
   solvedItems,
   notificaciones,
+  header,
 }: BandejaEntradaTabsProps) {
   const [activeTab, setActiveTab] = useState<TabType>('solicitudes');
   const router = useRouter();
@@ -64,11 +76,16 @@ export function BandejaEntradaTabs({
     [solicitudesPendientes],
   );
 
+  const notificacionesNoLeidas = useMemo(
+    () => notificaciones.filter((n) => !n.leida).length,
+    [notificaciones],
+  );
+
   const handleAprobar = async (id: string) => {
-    // Determinar el tipo de solicitud (ausencia o cambio_datos)
     const solicitudPendiente = solicitudesPendientes.find((s) => s.id === id);
     if (!solicitudPendiente) {
       console.error('[BandejaEntradaTabs] Solicitud no encontrada:', { solicitudId: id });
+      toast.error('No encontramos la solicitud, recarga la página.');
       return;
     }
 
@@ -91,14 +108,14 @@ export function BandejaEntradaTabs({
       error: resultado.error,
       data: resultado.data,
     });
-    toast.error('Error al aprobar la solicitud');
+    toast.error('No se pudo aprobar la solicitud');
   };
 
   const handleRechazar = async (id: string) => {
-    // Determinar el tipo de solicitud (ausencia o cambio_datos)
     const solicitudPendiente = solicitudesPendientes.find((s) => s.id === id);
     if (!solicitudPendiente) {
       console.error('[BandejaEntradaTabs] Solicitud no encontrada:', { solicitudId: id });
+      toast.error('No encontramos la solicitud, recarga la página.');
       return;
     }
 
@@ -125,7 +142,7 @@ export function BandejaEntradaTabs({
       error: resultado.error,
       data: resultado.data,
     });
-    toast.error('Error al rechazar la solicitud');
+    toast.error('No se pudo rechazar la solicitud');
   };
 
   const handleMarcarLeida = async (id: string) => {
@@ -142,7 +159,7 @@ export function BandejaEntradaTabs({
           notificacionId: id,
           status: response.status,
         });
-        toast.error('No se pudo marcar la notificación como leída');
+        toast.error('No se pudo actualizar la notificación');
       }
     } catch (error) {
       console.error('[BandejaEntradaTabs] Error al marcar notificación como leída:', {
@@ -163,11 +180,11 @@ export function BandejaEntradaTabs({
         toast.success('Todas las notificaciones han sido marcadas como leídas');
         router.refresh();
       } else {
-        console.error('Error al marcar todas las notificaciones como leídas');
-        toast.error('No se pudieron marcar todas las notificaciones como leídas');
+        console.error('[BandejaEntradaTabs] Error al marcar todas las notificaciones como leídas');
+        toast.error('No se pudieron marcar todas como leídas');
       }
     } catch (error) {
-      console.error('Error al marcar todas las notificaciones como leídas:', error);
+      console.error('[BandejaEntradaTabs] Error al marcar todas las notificaciones como leídas:', error);
       toast.error('Error de red al actualizar las notificaciones');
     }
   };
@@ -187,133 +204,140 @@ export function BandejaEntradaTabs({
         router.refresh();
       } else {
         const error = await response.json();
-        console.error('Error al auto-aprobar:', error);
-        toast.error(error.error || 'Error al auto-aprobar las solicitudes');
+        console.error('[BandejaEntradaTabs] Error al auto-aprobar:', error);
+        toast.error(error.error || 'No se pudieron auto-aprobar las solicitudes');
       }
     } catch (error) {
-      console.error('Error al auto-aprobar:', error);
+      console.error('[BandejaEntradaTabs] Error al auto-aprobar:', error);
       toast.error('Error de red al auto-aprobar las solicitudes');
     } finally {
       setAutoApproveLoading(false);
     }
   };
 
-  const notificacionesNoLeidas = notificaciones.filter((n) => !n.leida).length;
+  const actionButtons = (
+    <>
+      {activeTab === 'solicitudes' && solicitudesPendientes.length > 0 && (
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button
+              variant="outline"
+              size="sm"
+              className="border-gray-300 text-sm"
+              disabled={autoApproveLoading}
+            >
+              Autoaprobar
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Auto-aprobar solicitudes pendientes</AlertDialogTitle>
+              <AlertDialogDescription asChild>
+                <div className="space-y-3 text-sm text-muted-foreground">
+                  <p>Se aprobarán automáticamente todas las solicitudes pendientes:</p>
+                  <ul className="list-disc list-inside space-y-1">
+                    <li>{ausenciasPendientes.length} ausencias</li>
+                    <li>{solicitudesCambioPendientes.length} solicitudes de cambio</li>
+                  </ul>
+                  <p className="font-medium text-amber-600">
+                    Esta acción no se puede deshacer.
+                  </p>
+                </div>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={autoApproveLoading}>Cancelar</AlertDialogCancel>
+              <AlertDialogAction asChild>
+                <Button
+                  onClick={handleAutoaprobar}
+                  disabled={autoApproveLoading}
+                >
+                  {autoApproveLoading ? 'Auto-aprobando...' : 'Confirmar auto-aprobación'}
+                </Button>
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
+
+      {activeTab === 'notificaciones' && notificacionesNoLeidas > 0 && (
+        <Button
+          variant="outline"
+          size="sm"
+          className="border-gray-300 text-sm"
+          onClick={handleMarcarTodasLeidas}
+        >
+          Leer todas ({notificacionesNoLeidas})
+        </Button>
+      )}
+
+      <button
+        type="button"
+        className={iconButtonClasses.default}
+        aria-label="Abrir ajustes de la bandeja"
+      >
+        <Settings className="h-4 w-4" />
+      </button>
+    </>
+  );
 
   return (
     <div className="space-y-6">
-      {/* Header with Tabs and Actions */}
-      <div className="border-b border-gray-200 pb-3">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-6">
-            <button
-              onClick={() => setActiveTab('solicitudes')}
-              className={`relative pb-3 px-2 text-sm font-medium transition-colors ${
-                activeTab === 'solicitudes'
-                  ? 'text-gray-900'
-                  : 'text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              Solicitudes
-              {activeTab === 'solicitudes' && (
-                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gray-900" />
-              )}
-            </button>
-
-            <button
-              onClick={() => setActiveTab('auto-completed')}
-              className={`relative pb-3 px-2 text-sm font-medium transition-colors ${
-                activeTab === 'auto-completed'
-                  ? 'text-gray-900'
-                  : 'text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              Auto-completed
-              {activeTab === 'auto-completed' && (
-                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gray-900" />
-              )}
-            </button>
-
-            <button
-              onClick={() => setActiveTab('notificaciones')}
-              className={`relative pb-3 px-2 text-sm font-medium transition-colors ${
-                activeTab === 'notificaciones'
-                  ? 'text-gray-900'
-                  : 'text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              Notificaciones
-              {activeTab === 'notificaciones' && (
-                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gray-900" />
-              )}
-            </button>
-          </div>
-
-          <div className="flex items-center gap-2">
-            {activeTab === 'solicitudes' && solicitudesPendientes.length > 0 && (
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className="border-gray-300"
-                    disabled={autoApproveLoading}
-                  >
-                    Autoaprobar
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Auto-aprobar solicitudes pendientes</AlertDialogTitle>
-                    <AlertDialogDescription asChild>
-                      <div className="space-y-3 text-sm text-muted-foreground">
-                        <p>Se aprobarán automáticamente todas las solicitudes pendientes:</p>
-                        <ul className="list-disc list-inside space-y-1">
-                          <li>{ausenciasPendientes.length} ausencias</li>
-                          <li>{solicitudesCambioPendientes.length} solicitudes de cambio</li>
-                        </ul>
-                        <p className="font-medium text-amber-600">Esta acción no se puede deshacer.</p>
-                      </div>
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel disabled={autoApproveLoading}>Cancelar</AlertDialogCancel>
-                    <AlertDialogAction asChild>
-                      <Button
-                        onClick={handleAutoaprobar}
-                        disabled={autoApproveLoading}
-                      >
-                        {autoApproveLoading ? 'Auto-aprobando...' : 'Confirmar auto-aprobación'}
-                      </Button>
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        {header ? (
+          <div>
+            <h1 className="text-2xl font-semibold text-gray-900">{header.title}</h1>
+            {header.description && (
+              <p className="mt-1 text-sm text-gray-600">{header.description}</p>
             )}
-
-            {activeTab === 'notificaciones' && notificacionesNoLeidas > 0 && (
-              <Button
-                variant="outline"
-                onClick={handleMarcarTodasLeidas}
-                className="border-gray-300"
-              >
-                Marcar leídas ({notificacionesNoLeidas})
-              </Button>
-            )}
-
-            <Button
-              variant="ghost"
-              size="icon"
-              aria-label="Abrir ajustes de la bandeja"
-              className="text-gray-500 hover:text-gray-700"
-            >
-              <Settings className="h-4 w-4" />
-            </Button>
           </div>
+        ) : (
+          <div className="flex-1" />
+        )}
+
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          {actionButtons}
         </div>
       </div>
 
-      {/* Tab Content */}
-      <div className="pt-6">
+      <div className="border-b border-gray-200">
+        <nav className="-mb-px flex flex-wrap items-center gap-6 pb-3">
+          <button
+            onClick={() => setActiveTab('solicitudes')}
+            className={`border-b-2 pb-3 px-2 text-sm font-medium transition-colors ${
+              activeTab === 'solicitudes'
+                ? 'border-gray-900 text-gray-900'
+                : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
+            }`}
+          >
+            Solicitudes
+          </button>
+
+          <button
+            onClick={() => setActiveTab('auto-completed')}
+            className={`border-b-2 pb-3 px-2 text-sm font-medium transition-colors ${
+              activeTab === 'auto-completed'
+                ? 'border-gray-900 text-gray-900'
+                : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
+            }`}
+          >
+            Auto-completed
+          </button>
+
+          <button
+            onClick={() => setActiveTab('notificaciones')}
+            className={`border-b-2 pb-3 px-2 text-sm font-medium transition-colors ${
+              activeTab === 'notificaciones'
+                ? 'border-gray-900 text-gray-900'
+                : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
+            }`}
+          >
+            Notificaciones
+          </button>
+        </nav>
+      </div>
+
+      <div className="pt-4">
         {activeTab === 'solicitudes' && (
           <BandejaEntradaSolicitudes
             solicitudesPendientes={solicitudesPendientes}

@@ -37,6 +37,27 @@ export enum ContentType {
 }
 
 // ========================================
+// METADATOS
+// ========================================
+
+export type AICallMetadataValue = string | number | boolean;
+
+export interface AICallMetadata {
+  /** Nombre de la funcionalidad que hace la llamada (ej. clasificador-nominas) */
+  feature?: string;
+  /** Caso de uso genérico (ej. classification, extraction) */
+  useCase?: string;
+  /** Empresa asociada a la llamada */
+  empresaId?: string;
+  /** Usuario que originó la llamada */
+  usuarioId?: string;
+  /** Identificador único para trazabilidad */
+  requestId?: string;
+  /** Información adicional */
+  [key: string]: AICallMetadataValue | undefined;
+}
+
+// ========================================
 // INTERFACES DE MENSAJES
 // ========================================
 
@@ -106,6 +127,9 @@ export interface ModelConfig {
   
   /** Mensaje del sistema por defecto */
   systemMessage?: string;
+  
+  /** Metadatos asociados a la llamada (para logs/observabilidad) */
+  metadata?: AICallMetadata;
 }
 
 // ========================================
@@ -174,6 +198,9 @@ export interface AICallOptions {
   
   /** Streaming (no soportado en esta versión) */
   stream?: boolean;
+  
+  /** Metadatos adicionales para logging y trazabilidad */
+  metadata?: AICallMetadata;
 }
 
 // ========================================
@@ -299,6 +326,7 @@ export function hasImageContent(content: MessageContent): boolean {
   }
   return content.type === ContentType.IMAGE_URL;
 }
+
 
 
 

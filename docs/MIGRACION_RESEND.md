@@ -221,3 +221,4 @@ Si por alguna razón necesitas volver a AWS SES:
 **Fecha**: 2025-11-10  
 **Revisión requerida**: No (migración backward-compatible)
 
+

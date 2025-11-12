@@ -133,12 +133,14 @@ CRON_SECRET=xxx                         # Para autenticación del cron
 - ✅ Valida estados `pendiente` o `requiere_revision`
 - ✅ Actualiza a `aprobada_manual` o `rechazada`
 - ✅ Usa whitelist centralizada
+- ✅ Resuelve el aprobador con `resolveAprobadorEmpleadoId()` para persistir siempre el `aprobadorId` del **empleado** asociado al usuario autenticado
 - ✅ Notificaciones tipadas fuera de transacción
 
 #### `/api/solicitudes/autoaprobar/route.ts` (POST)
 - ✅ Filtra por `[pendiente, requiere_revision]`
 - ✅ Actualiza a `auto_aprobada`
 - ✅ Usa whitelist centralizada
+- ✅ Aplica `resolveAprobadorEmpleadoId()` para registrar al empleado aprobador cuando el proceso se ejecuta en contexto HR/manager
 - ✅ Notificación con flag `aprobadoPor: 'ia'`
 
 #### `/api/ausencias/route.ts` (POST)

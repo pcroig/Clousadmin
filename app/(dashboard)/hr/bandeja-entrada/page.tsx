@@ -115,7 +115,6 @@ export default async function HRBandejaEntradaPage() {
       },
       tipo: 'ausencia' as const,
       detalles: `Solicitud de ${aus.tipo}`,
-      fechaLimite: new Date(aus.fechaFin),
       fechaCreacion: aus.createdAt,
       estado: EstadoAusencia.pendiente as const,
       metadata: {
@@ -133,9 +132,12 @@ export default async function HRBandejaEntradaPage() {
       },
       tipo: 'cambio_datos' as const,
       detalles: `Solicitud de cambio de ${sol.tipo}`,
-      fechaLimite: new Date(sol.createdAt.getTime() + 7 * 24 * 60 * 60 * 1000),
       fechaCreacion: sol.createdAt,
       estado: EstadoAusencia.pendiente as const,
+      metadata: {
+        tipoCambioDatos: sol.tipo,
+        camposCambiados: sol.camposCambiados as Record<string, unknown>,
+      },
     })),
   ].sort((a, b) => b.fechaCreacion.getTime() - a.fechaCreacion.getTime());
 
@@ -150,7 +152,6 @@ export default async function HRBandejaEntradaPage() {
       },
       tipo: 'ausencia' as const,
       detalles: `Solicitud de ${aus.tipo}`,
-      fechaLimite: new Date(aus.fechaFin),
       fechaCreacion: aus.createdAt,
       estado: aus.estado,
       fechaResolucion: aus.aprobadaEn || undefined,
@@ -169,7 +170,6 @@ export default async function HRBandejaEntradaPage() {
       },
       tipo: 'cambio_datos' as const,
       detalles: `Solicitud de cambio de ${sol.tipo}`,
-      fechaLimite: new Date(sol.createdAt.getTime() + 7 * 24 * 60 * 60 * 1000),
       fechaCreacion: sol.createdAt,
       estado:
         sol.estado === EstadoSolicitud.aprobada_manual || sol.estado === EstadoSolicitud.auto_aprobada
@@ -178,6 +178,10 @@ export default async function HRBandejaEntradaPage() {
             ? EstadoAusencia.rechazada
             : EstadoAusencia.pendiente,
       fechaResolucion: sol.fechaRespuesta || undefined,
+      metadata: {
+        tipoCambioDatos: sol.tipo,
+        camposCambiados: sol.camposCambiados as Record<string, unknown>,
+      },
     })),
   ].sort((a, b) => (b.fechaResolucion?.getTime() || 0) - (a.fechaResolucion?.getTime() || 0));
 
@@ -281,11 +285,8 @@ export default async function HRBandejaEntradaPage() {
 
   return (
     <div className="p-8">
-      <div className="mb-6">
-        <h1 className="text-2xl font-semibold text-gray-900">Bandeja de entrada</h1>
-      </div>
-
       <BandejaEntradaTabs
+        header={{ title: 'Bandeja de entrada' }}
         solicitudesPendientes={solicitudesPendientes}
         solicitudesResueltas={solicitudesResueltas}
         solvedStats={solvedStats}

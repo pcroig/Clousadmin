@@ -136,6 +136,26 @@ async function crearNotificaciones(
   });
 }
 
+const humanizeTexto = (value: string) =>
+  value
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .replace(/[_-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .toLocaleLowerCase('es-ES')
+    .trim();
+
+const formatLabel = (value: string) => {
+  if (!value) return '';
+  const humanized = humanizeTexto(value);
+  if (!humanized) return '';
+  return humanized.charAt(0).toLocaleUpperCase('es-ES') + humanized.slice(1);
+};
+
+const formatRange = (inicio: Date, fin: Date) =>
+  `${inicio.toLocaleDateString('es-ES')} al ${fin.toLocaleDateString('es-ES')}`;
+
+const formatDias = (dias: number) => (dias === 1 ? '1 día' : `${dias} días`);
+
 // ========================================
 // AUSENCIAS
 // ========================================
@@ -170,8 +190,8 @@ export async function crearNotificacionAusenciaSolicitada(
     empresaId,
     usuarioIds,
     tipo: 'ausencia_solicitada',
-    titulo: `Nueva solicitud de ${tipo}`,
-    mensaje: `${empleadoNombre} ha solicitado ${diasSolicitados} día(s) de ${tipo} del ${fechaInicio.toLocaleDateString('es-ES')} al ${fechaFin.toLocaleDateString('es-ES')}.`,
+    titulo: `${empleadoNombre} solicita ${formatDias(diasSolicitados)} de ${formatLabel(tipo)}`,
+    mensaje: `${empleadoNombre} ha solicitado ${formatDias(diasSolicitados)} de ${formatLabel(tipo)} (${formatRange(fechaInicio, fechaFin)}).`,
     metadata: {
       ausenciaId,
       tipo,
@@ -209,8 +229,8 @@ export async function crearNotificacionAusenciaAprobada(
     empresaId,
     usuarioIds,
     tipo: 'ausencia_aprobada',
-    titulo: 'Ausencia aprobada',
-    mensaje: `Tu solicitud de ${tipo} del ${fechaInicio.toLocaleDateString('es-ES')} al ${fechaFin.toLocaleDateString('es-ES')} ha sido aprobada.`,
+    titulo: `${formatLabel(tipo)} aprobada`,
+    mensaje: `Tu solicitud de ${formatLabel(tipo)} (${formatRange(fechaInicio, fechaFin)}) ha sido aprobada.`,
     metadata: {
       ausenciaId,
       tipo,
@@ -246,8 +266,8 @@ export async function crearNotificacionAusenciaRechazada(
     empresaId,
     usuarioIds,
     tipo: 'ausencia_rechazada',
-    titulo: 'Ausencia rechazada',
-    mensaje: `Tu solicitud de ${tipo} del ${fechaInicio.toLocaleDateString('es-ES')} al ${fechaFin.toLocaleDateString('es-ES')} ha sido rechazada${motivoRechazo ? `: ${motivoRechazo}` : '.'}`,
+    titulo: `${formatLabel(tipo)} rechazada`,
+    mensaje: `Tu solicitud de ${formatLabel(tipo)} (${formatRange(fechaInicio, fechaFin)}) ha sido rechazada${motivoRechazo ? `: ${motivoRechazo}` : '.'}`,
     metadata: {
       ausenciaId,
       tipo,
@@ -289,8 +309,8 @@ export async function crearNotificacionAusenciaCancelada(
     empresaId,
     usuarioIds,
     tipo: 'ausencia_cancelada',
-    titulo: 'Ausencia cancelada',
-    mensaje: `${empleadoNombre} ha cancelado su ${tipo} del ${fechaInicio.toLocaleDateString('es-ES')} al ${fechaFin.toLocaleDateString('es-ES')}.`,
+    titulo: `${empleadoNombre} canceló ${formatLabel(tipo).toLocaleLowerCase('es-ES')}`,
+    mensaje: `Periodo cancelado: ${formatRange(fechaInicio, fechaFin)}.`,
     metadata: {
       tipo,
       fechaInicio: fechaInicio.toISOString(),
@@ -323,8 +343,8 @@ export async function crearNotificacionAusenciaAutoAprobada(
     empresaId,
     usuarioIds,
     tipo: 'ausencia_aprobada',
-    titulo: 'Ausencia aprobada automáticamente',
-    mensaje: `Tu ausencia por ${tipo} del ${fechaInicio.toLocaleDateString('es-ES')} al ${fechaFin.toLocaleDateString('es-ES')} ha sido aprobada automáticamente.`,
+    titulo: `${formatLabel(tipo)} aprobada automáticamente`,
+    mensaje: `Tu solicitud (${formatRange(fechaInicio, fechaFin)}) ha sido aprobada automáticamente.`,
     metadata: {
       ausenciaId,
       tipo,
@@ -845,8 +865,8 @@ export async function crearNotificacionSolicitudCreada(
     empresaId,
     usuarioIds,
     tipo: 'solicitud_creada',
-    titulo: 'Nueva solicitud',
-    mensaje: `${empleadoNombre} ha creado una solicitud de ${tipoDescripcion}.`,
+    titulo: `${empleadoNombre} solicita ${tipoDescripcion}`,
+    mensaje: 'Revisa los cambios propuestos antes de la fecha límite.',
     metadata: {
       solicitudId,
       tipo,
@@ -886,8 +906,8 @@ export async function crearNotificacionSolicitudAprobada(
     empresaId,
     usuarioIds,
     tipo: 'solicitud_aprobada',
-    titulo: 'Solicitud aprobada',
-    mensaje: `Tu solicitud de ${tipoDescripcion} ha sido aprobada${mensajeExtra}.`,
+    titulo: `Tu solicitud de ${tipoDescripcion} fue aprobada`,
+    mensaje: `Los cambios solicitados han sido aceptados${mensajeExtra}.`,
     metadata: {
       solicitudId,
       tipo,
@@ -926,8 +946,10 @@ export async function crearNotificacionSolicitudRechazada(
     empresaId,
     usuarioIds,
     tipo: 'solicitud_rechazada',
-    titulo: 'Solicitud rechazada',
-    mensaje: `Tu solicitud de ${tipoDescripcion} ha sido rechazada${motivoRechazo ? `: ${motivoRechazo}` : '.'}`,
+    titulo: `Tu solicitud de ${tipoDescripcion} fue rechazada`,
+    mensaje: motivoRechazo
+      ? `Motivo proporcionado: ${motivoRechazo}.`
+      : 'No se ha indicado un motivo. Contacta con RR.HH. para más detalles.',
     metadata: {
       solicitudId,
       tipo,
@@ -966,8 +988,8 @@ export async function crearNotificacionSolicitudRequiereRevision(
     empresaId,
     usuarioIds,
     tipo: 'solicitud_creada', // Reutilizamos el tipo pero con prioridad crítica
-    titulo: 'Solicitud requiere revisión manual',
-    mensaje: `La solicitud de ${tipoDescripcion} de ${empleadoNombre} requiere tu revisión manual.`,
+    titulo: `${empleadoNombre} solicita ${tipoDescripcion} - revisión manual necesaria`,
+    mensaje: 'La IA no pudo validar los datos. Revisa la solicitud manualmente.',
     metadata: {
       solicitudId,
       tipo,

@@ -225,12 +225,21 @@ export function createConfigForUseCase(
   const baseConfig = getConfigForUseCase(useCase);
   const model = getModelForUseCase(useCase, provider);
   
-  return {
+  const config = {
     provider,
     model,
     ...baseConfig,
     ...overrides,
   } as ModelConfig;
+
+  const baseMetadata = (baseConfig as ModelConfig | undefined)?.metadata;
+  config.metadata = {
+    useCase,
+    ...baseMetadata,
+    ...overrides?.metadata,
+  };
+
+  return config;
 }
 
 // ========================================
@@ -296,10 +305,17 @@ export function getFeatureConfig(
 ): ModelConfig {
   const featureConfig = FEATURE_CONFIGS[featureName];
   
-  return createConfigForUseCase(featureConfig.useCase, provider, {
+  const config = createConfigForUseCase(featureConfig.useCase, provider, {
     systemMessage: featureConfig.systemMessage,
     temperature: featureConfig.temperature,
   });
+
+  config.metadata = {
+    ...config.metadata,
+    feature: featureName,
+  };
+
+  return config;
 }
 
 // ========================================

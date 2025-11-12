@@ -5,24 +5,24 @@
 // ========================================
 // Vista consolidada: Eventos expandibles con sus nóminas
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { EmptyState } from '@/components/shared/empty-state';
-import { CardSkeleton, ListSkeleton } from '@/components/shared/loading-skeletons';
-import { LoadingButton } from '@/components/shared/loading-button';
-import { Spinner } from '@/components/ui/spinner';
 import {
   FileText,
   Upload,
   Download,
   Plus,
   CheckCircle,
+  Clock,
   ChevronDown,
   ChevronUp,
   Send,
   Eye,
   User,
+  TrendingUp,
+  Users,
+  DollarSign,
   AlertCircle,
   AlertTriangle,
   Info,
@@ -88,7 +88,10 @@ const meses = [
   'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
 ];
 
-const estadosLabels: Record<string, { label: string; color: string; descripcion: string }> = {
+const estadosLabels: Record<
+  string,
+  { label: string; color: string; descripcion: string }
+> = {
   generando: {
     label: 'Generando',
     color: 'bg-blue-100 text-blue-700',
@@ -146,7 +149,14 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
   } | null>(null);
   const [loadingAnalytics, setLoadingAnalytics] = useState(false);
 
-  const fetchEventos = useCallback(async () => {
+  const nombreMes = meses[mesActual - 1];
+
+  useEffect(() => {
+    fetchEventos();
+    fetchAnalytics();
+  }, [anioActual]);
+
+  const fetchEventos = async () => {
     try {
       const response = await fetch('/api/nominas/eventos');
       const data = await response.json();
@@ -157,9 +167,9 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
     } finally {
       setLoading(false);
     }
-  }, []);
+  };
 
-  const fetchAnalytics = useCallback(async () => {
+  const fetchAnalytics = async () => {
     try {
       setLoadingAnalytics(true);
       const response = await fetch(`/api/nominas/analytics?anio=${anioActual}`);
@@ -171,12 +181,7 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
     } finally {
       setLoadingAnalytics(false);
     }
-  }, [anioActual]);
-
-  useEffect(() => {
-    fetchEventos();
-    fetchAnalytics();
-  }, [fetchEventos, fetchAnalytics]);
+  };
 
   const fetchEventoDetails = async (eventoId: string) => {
     try {
@@ -249,9 +254,45 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
     }
   };
 
-  const handleExportar = async (eventoId: string) => {
+  const handleGenerarPrenominas = async (eventoId: string) => {
+    const actionKey = `${eventoId}:generar`;
     try {
-      setActionLoading(eventoId);
+      setActionLoading(actionKey);
+
+      const response = await fetch(`/api/nominas/eventos/${eventoId}/generar-prenominas`, {
+        method: 'POST',
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Error al generar pre-nóminas');
+      }
+
+      toast.success(
+        data.nominasGeneradas > 0
+          ? `${data.nominasGeneradas} pre-nómina(s) generada(s)`
+          : 'Las pre-nóminas ya estaban generadas',
+        {
+          description: data.alertasGeneradas
+            ? `${data.alertasGeneradas} alerta(s) detectada(s)`
+            : undefined,
+        }
+      );
+
+      fetchEventos();
+    } catch (error) {
+      console.error('Error generando pre-nóminas:', error);
+      toast.error(error instanceof Error ? error.message : 'Error al generar pre-nóminas');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleExportar = async (eventoId: string) => {
+    const actionKey = `${eventoId}:exportar`;
+    try {
+      setActionLoading(actionKey);
 
       const response = await fetch(`/api/nominas/eventos/${eventoId}/exportar`);
 
@@ -287,6 +328,7 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
   };
 
   const handleImportar = async (eventoId: string) => {
+    const actionKey = `${eventoId}:importar`;
     const input = document.createElement('input');
     input.type = 'file';
     input.multiple = true;
@@ -297,7 +339,7 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
       if (!files || files.length === 0) return;
 
       try {
-        setActionLoading(eventoId);
+        setActionLoading(actionKey);
 
         const formData = new FormData();
         for (let i = 0; i < files.length; i++) {
@@ -333,12 +375,18 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
   };
 
   const handlePublicar = async (eventoId: string) => {
-    if (!confirm('¿Estás seguro de publicar las nóminas? Los empleados recibirán notificaciones.')) {
+    if (
+      !confirm(
+        '¿Estás seguro de publicar las nóminas? Los empleados recibirán notificaciones.'
+      )
+    ) {
       return;
     }
 
+    const actionKey = `${eventoId}:publicar`;
+
     try {
-      setActionLoading(eventoId);
+      setActionLoading(actionKey);
 
       const response = await fetch(`/api/nominas/eventos/${eventoId}/publicar`, {
         method: 'POST',
@@ -363,45 +411,53 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
     }
   };
 
+  const handleAvanzarEstado = async (eventoId: string, estadoActual: string) => {
+    const nextEstadoMap: Record<string, string> = {
+      complementos_pendientes: 'lista_exportar',
+    };
+
+    const siguienteEstado = nextEstadoMap[estadoActual];
+    if (!siguienteEstado) {
+      return;
+    }
+
+    const actionKey = `${eventoId}:avanzar`;
+
+    try {
+      setActionLoading(actionKey);
+
+      const response = await fetch(`/api/nominas/eventos/${eventoId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ estado: siguienteEstado }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'No se pudo avanzar al siguiente estado');
+      }
+
+      toast.success(
+        `Evento actualizado a ${
+          estadosLabels[siguienteEstado]?.label ?? siguienteEstado
+        }`
+      );
+      fetchEventos();
+    } catch (error) {
+      console.error('Error avanzando estado:', error);
+      toast.error(error instanceof Error ? error.message : 'Error al avanzar de estado');
+    } finally {
+      setActionLoading(null);
+    }
+  };
 
   if (loading) {
     return (
-      <div className="h-full w-full flex flex-col">
-        {/* Header */}
-        <div className="flex-shrink-0 mb-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">Nóminas</h1>
-              <p className="text-sm text-gray-600 mt-1">
-                Gestiona el ciclo completo de nóminas mensuales
-              </p>
-            </div>
-
-            <div className="flex gap-3">
-              <LoadingButton className="btn-primary" loading>
-                Generando...
-              </LoadingButton>
-              <Button variant="outline" disabled>
-                <Upload className="w-4 h-4 mr-2" />
-                Subir Nóminas
-              </Button>
-            </div>
-          </div>
-        </div>
-
-        {/* Analytics skeleton */}
-        <div className="flex-shrink-0 mb-6">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            {Array.from({ length: 4 }).map((_, index) => (
-              <CardSkeleton key={index} className="h-32" />
-            ))}
-          </div>
-        </div>
-
-        <div className="flex-1 overflow-y-auto pb-6">
-          <Card className="p-6">
-            <ListSkeleton items={4} />
-          </Card>
+      <div className="h-full flex items-center justify-center">
+        <div className="text-center">
+          <Clock className="w-12 h-12 text-gray-400 mx-auto mb-4 animate-spin" />
+          <p className="text-gray-600">Cargando nóminas...</p>
         </div>
       </div>
     );
@@ -420,92 +476,92 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
           </div>
 
           <div className="flex gap-3">
-            <LoadingButton
+            <Button
               className="btn-primary"
               onClick={handleGenerarEvento}
-              loading={isGenerating}
               disabled={isGenerating}
             >
               <Plus className="w-4 h-4 mr-2" />
               {isGenerating ? 'Generando...' : 'Generar Evento Mensual'}
-            </LoadingButton>
+            </Button>
           </div>
         </div>
       </div>
 
       {/* Analytics KPIs */}
-      {eventos.length > 0 && (
+      {analytics && eventos.length > 0 && (
         <div className="flex-shrink-0 mb-6">
-          {loadingAnalytics || !analytics ? (
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              {Array.from({ length: 4 }).map((_, index) => (
-                <CardSkeleton key={index} className="h-32" />
-              ))}
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <KpiCard
-                title="Coste Total Año"
-                value={`€${analytics.totalNeto.toLocaleString('es-ES', {
-                  minimumFractionDigits: 0,
-                  maximumFractionDigits: 0
-                })}`}
-                subtitle={`${anioActual}`}
-                trend={
-                  analytics.variacionAnioAnterior !== 0
-                    ? {
-                        value: Math.abs(analytics.variacionAnioAnterior),
-                        isPositive: analytics.variacionAnioAnterior < 0, // Menos coste es positivo
-                      }
-                    : undefined
-                }
-              />
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <KpiCard
+              title="Coste Total Año"
+              value={`€${analytics.totalNeto.toLocaleString('es-ES', {
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 0
+              })}`}
+              subtitle={`${anioActual}`}
+              trend={
+                analytics.variacionAnioAnterior !== 0
+                  ? {
+                      value: Math.abs(analytics.variacionAnioAnterior),
+                      isPositive: analytics.variacionAnioAnterior < 0, // Menos coste es positivo
+                    }
+                  : undefined
+              }
+            />
 
-              <KpiCard
-                title="Empleados"
-                value={analytics.empleadosUnicos}
-                subtitle="Empleados activos"
-              />
+            <KpiCard
+              title="Empleados"
+              value={analytics.empleadosUnicos}
+              subtitle="Empleados activos"
+            />
 
-              <KpiCard
-                title="Coste Promedio"
-                value={`€${analytics.promedioNeto.toLocaleString('es-ES', {
-                  minimumFractionDigits: 0,
-                  maximumFractionDigits: 0
-                })}`}
-                subtitle="Por empleado/año"
-              />
+            <KpiCard
+              title="Coste Promedio"
+              value={`€${analytics.promedioNeto.toLocaleString('es-ES', {
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 0
+              })}`}
+              subtitle="Por empleado/año"
+            />
 
-              <KpiCard
-                title="Eventos Procesados"
-                value={eventos.length}
-                subtitle={`${anioActual}`}
-              />
-            </div>
-          )}
+            <KpiCard
+              title="Eventos Procesados"
+              value={eventos.length}
+              subtitle={`${anioActual}`}
+            />
+          </div>
         </div>
       )}
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto pb-6">
         {eventos.length === 0 ? (
-          <div className="py-16">
-            <EmptyState
-              variant="primary"
-              icon={FileText}
-              title="No hay nóminas registradas"
-              description="Genera un evento mensual para crear automáticamente las pre-nóminas de todo el equipo o sube las nóminas manualmente."
-              action={
-                <div className="flex flex-wrap items-center justify-center gap-4">
-                  <LoadingButton
+          /* Empty State */
+          <Card className="p-12">
+            <div className="flex flex-col items-center justify-center text-center">
+              <div className="w-20 h-20 bg-orange-50 rounded-full flex items-center justify-center mb-6">
+                <FileText className="w-10 h-10 text-[#d97757]" />
+              </div>
+
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                No hay nóminas registradas
+              </h3>
+
+              <p className="text-gray-600 max-w-md mb-8">
+                Genera un evento mensual para crear automáticamente las pre-nóminas
+                de todos los empleados activos, o sube nóminas directamente.
+              </p>
+
+              <div className="flex gap-4">
+                <Button
                   className="btn-primary"
                   onClick={handleGenerarEvento}
-                    loading={isGenerating}
                   disabled={isGenerating}
                 >
                   <Plus className="w-4 h-4 mr-2" />
                   {isGenerating ? 'Generando...' : 'Generar Evento'}
-                  </LoadingButton>
+                </Button>
+
                 <Button
                   variant="outline"
                   onClick={() => {
@@ -526,20 +582,30 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
                   Subir Nóminas
                 </Button>
               </div>
-              }
-            />
             </div>
+          </Card>
         ) : (
           /* Lista de Eventos */
           <div className="space-y-4">
             {eventos.map((evento) => {
               const estadoInfo = estadosLabels[evento.estado] || {
                 label: evento.estado,
-                color: 'bg-gray-100 text-gray-700'
+                color: 'bg-gray-100 text-gray-700',
+                descripcion: 'Estado no identificado',
               };
               const isExpanded = expandedEventos.has(evento.id);
-              const isProcessing = actionLoading === evento.id;
+              const isProcessing = actionLoading?.startsWith(`${evento.id}:`) ?? false;
               const isLoadingDetails = loadingEventoId === evento.id;
+
+              const canGenerarPrenominas = ['generando', 'complementos_pendientes'].includes(
+                evento.estado
+              );
+              const puedeAvanzarComplementos = evento.estado === 'complementos_pendientes';
+              const canExportar = ['lista_exportar', 'exportada', 'definitiva', 'publicada'].includes(
+                evento.estado
+              );
+              const canImportar = ['exportada', 'definitiva'].includes(evento.estado);
+              const canPublicar = evento.estado === 'definitiva';
 
               return (
                 <Card key={evento.id} className="overflow-hidden">
@@ -660,72 +726,89 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
                       </div>
 
                       {/* Actions */}
-                      <div className="flex flex-col gap-2 ml-4">
-                        {/* Exportar */}
-                        {['lista_exportar', 'exportada', 'definitiva', 'publicada'].includes(evento.estado) && (
-                          <div className="group relative">
-                            <LoadingButton
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleExportar(evento.id)}
-                              loading={isProcessing}
-                              disabled={isProcessing}
-                            >
-                              <Download className="w-4 h-4 mr-2" />
-                              {evento.estado === 'lista_exportar' ? 'Exportar Excel' : 'Re-exportar'}
-                            </LoadingButton>
-                            {evento.estado === 'lista_exportar' && (
-                              <div className="absolute right-0 top-full mt-2 w-56 p-2 bg-gray-900 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10">
-                                Descarga Excel con todas las nóminas para enviar a gestoría
-                              </div>
-                            )}
-                          </div>
-                        )}
+                      <div className="flex flex-col gap-2 ml-4 min-w-[240px]">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleGenerarPrenominas(evento.id)}
+                          disabled={!canGenerarPrenominas || isProcessing}
+                          title={
+                            canGenerarPrenominas
+                              ? 'Genera o recalcula las pre-nóminas del periodo'
+                              : 'Disponible antes de exportar las nóminas'
+                          }
+                        >
+                          <FileText className="w-4 h-4 mr-2" />
+                          Generar pre-nóminas
+                        </Button>
 
-                        {/* Importar */}
-                        {['exportada', 'definitiva'].includes(evento.estado) && (
-                          <div className="group relative">
-                            <LoadingButton
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleImportar(evento.id)}
-                              loading={isProcessing}
-                              disabled={isProcessing}
-                            >
-                              <Upload className="w-4 h-4 mr-2" />
-                              Importar PDFs
-                            </LoadingButton>
-                            <div className="absolute right-0 top-full mt-2 w-56 p-2 bg-gray-900 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10">
-                              Sube los PDFs de nóminas definitivas recibidas de gestoría
-                            </div>
-                          </div>
-                        )}
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleAvanzarEstado(evento.id, evento.estado)}
+                          disabled={!puedeAvanzarComplementos || isProcessing}
+                          title={
+                            puedeAvanzarComplementos
+                              ? 'Marca los complementos como revisados para continuar'
+                              : 'Solo disponible durante la fase de complementos'
+                          }
+                        >
+                          <TrendingUp className="w-4 h-4 mr-2" />
+                          Marcar complementos listos
+                        </Button>
 
-                        {/* Publicar */}
-                        {evento.estado === 'definitiva' && (
-                          <div className="group relative">
-                            <LoadingButton
-                              size="sm"
-                              className="btn-primary"
-                              onClick={() => handlePublicar(evento.id)}
-                              loading={isProcessing}
-                              disabled={isProcessing}
-                            >
-                              <Send className="w-4 h-4 mr-2" />
-                              Publicar y Notificar
-                            </LoadingButton>
-                            <div className="absolute right-0 top-full mt-2 w-56 p-2 bg-gray-900 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10">
-                              Publica las nóminas y envía notificaciones a todos los empleados
-                            </div>
-                          </div>
-                        )}
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleExportar(evento.id)}
+                          disabled={!canExportar || isProcessing}
+                          title={
+                            canExportar
+                              ? 'Descarga el Excel de nóminas para gestoría'
+                              : 'Disponible cuando el evento está listo para exportar'
+                          }
+                        >
+                          <Download className="w-4 h-4 mr-2" />
+                          {evento.estado === 'lista_exportar' ? 'Exportar Excel' : 'Re-exportar'}
+                        </Button>
 
-                        {/* Publicado badge */}
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleImportar(evento.id)}
+                          disabled={!canImportar || isProcessing}
+                          title={
+                            canImportar
+                              ? 'Sube los PDFs de nóminas definitivas recibidos de gestoría'
+                              : 'Disponible una vez exportado el Excel'
+                          }
+                        >
+                          <Upload className="w-4 h-4 mr-2" />
+                          Importar PDFs
+                        </Button>
+
+                        <Button
+                          size="sm"
+                          className="btn-primary"
+                          onClick={() => handlePublicar(evento.id)}
+                          disabled={!canPublicar || isProcessing}
+                          title={
+                            canPublicar
+                              ? 'Publica las nóminas y notifica a los empleados'
+                              : 'Disponible cuando todas las nóminas son definitivas'
+                          }
+                        >
+                          <Send className="w-4 h-4 mr-2" />
+                          Publicar y Notificar
+                        </Button>
+
                         {evento.estado === 'publicada' && (
                           <div className="flex items-center gap-2 px-3 py-2 bg-green-50 rounded-lg">
                             <CheckCircle className="w-4 h-4 text-green-600" />
                             <span className="text-sm font-medium text-green-700">
-                              Publicado {evento.fechaExportacion && `el ${new Date(evento.fechaExportacion).toLocaleDateString('es-ES')}`}
+                              Publicado{' '}
+                              {evento.fechaExportacion &&
+                                `el ${new Date(evento.fechaExportacion).toLocaleDateString('es-ES')}`}
                             </span>
                           </div>
                         )}
@@ -737,9 +820,9 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
                   {isExpanded && (
                     <div className="border-t bg-gray-50">
                       {isLoadingDetails ? (
-                        <div className="p-8 text-center flex flex-col items-center gap-2 text-sm text-gray-600">
-                          <Spinner className="size-6 text-gray-500" />
-                          Cargando nóminas...
+                        <div className="p-8 text-center">
+                          <Clock className="w-8 h-8 text-gray-400 mx-auto mb-2 animate-spin" />
+                          <p className="text-sm text-gray-600">Cargando nóminas...</p>
                         </div>
                       ) : evento.nominas && evento.nominas.length > 0 ? (
                         <div className="p-6 space-y-3">

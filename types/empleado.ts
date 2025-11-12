@@ -88,6 +88,123 @@ export interface Carpeta {
   numeroDocumentos: number;
 }
 
+export interface MiEspacioPuesto {
+  id: string;
+  nombre: string;
+}
+
+export interface MiEspacioJornada {
+  id: string;
+  nombre: string;
+  horasSemanales: number | null;
+}
+
+export interface MiEspacioManager {
+  id?: string;
+  nombre: string;
+  apellidos?: string;
+}
+
+export interface MiEspacioEquipoResumen {
+  equipoId: string | null;
+  nombre?: string | null;
+  equipo?: {
+    id: string;
+    nombre: string;
+  } | null;
+  rol?: string | null;
+}
+
+export interface MiEspacioContratoResumen {
+  id: string;
+  tipoContrato: string | null;
+  fechaInicio: string;
+  fechaFin?: string | null;
+  salarioBrutoAnual?: number | null;
+  documentoId?: string | null;
+}
+
+export interface MiEspacioComplementoResumen {
+  id?: string;
+  tipo?: string | null;
+  tipoComplemento?: {
+    id: string;
+    nombre: string;
+  } | null;
+  importe?: number | null;
+  importePersonalizado?: number | null;
+}
+
+export interface MiEspacioDocumento {
+  id: string;
+  nombre: string;
+  tipoDocumento?: string | null;
+  tamano?: number | null;
+  createdAt?: string | null;
+}
+
+export interface MiEspacioCarpeta {
+  id: string;
+  nombre: string;
+  esSistema?: boolean;
+  compartida?: boolean;
+  documentos?: MiEspacioDocumento[];
+}
+
+export interface MiEspacioSaldoAusencia {
+  id: string;
+  año: number;
+  diasTotales: number;
+  diasUsados: number;
+  diasPendientes: number;
+  origen?: string | null;
+}
+
+export interface MiEspacioEmpleado {
+  id: string;
+  nombre: string;
+  apellidos: string;
+  email: string;
+  fotoUrl?: string | null;
+  fechaAlta: string;
+  fechaBaja?: string | null;
+  fechaNacimiento?: string | null;
+  nif?: string | null;
+  nss?: string | null;
+  telefono?: string | null;
+  direccionCalle?: string | null;
+  direccionNumero?: string | null;
+  direccionPiso?: string | null;
+  codigoPostal?: string | null;
+  ciudad?: string | null;
+  direccionProvincia?: string | null;
+  estadoCivil?: string | null;
+  numeroHijos?: number | null;
+  genero?: string | null;
+  iban?: string | null;
+  titularCuenta?: string | null;
+  puesto?: string | null;
+  puestoId?: string | null;
+  puestoRelacion?: MiEspacioPuesto | null;
+  jornadaId?: string | null;
+  jornada?: MiEspacioJornada | null;
+  manager?: MiEspacioManager | null;
+  tipoContrato?: string | null;
+  categoriaProfesional?: string | null;
+  nivelEducacion?: string | null;
+  grupoCotizacion?: number | null;
+  estadoEmpleado?: string | null;
+  activo: boolean;
+  salarioBrutoAnual?: number | null;
+  salarioBrutoMensual?: number | null;
+  numPagas?: number | string | null;
+  complementos?: MiEspacioComplementoResumen[];
+  contratos?: MiEspacioContratoResumen[];
+  equipos?: MiEspacioEquipoResumen[];
+  saldosAusencias?: MiEspacioSaldoAusencia[];
+  carpetas?: MiEspacioCarpeta[];
+}
+
 export interface Puesto {
   id: string;
   nombre: string;
