@@ -15,10 +15,6 @@ import {
   Plus,
   CheckCircle,
   Clock,
-  ChevronDown,
-  ChevronUp,
-  Send,
-  Eye,
   User,
   AlertCircle,
   AlertTriangle,
@@ -568,29 +564,35 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
 
               return (
                 <Card key={evento.id} className="overflow-hidden hover:shadow-md transition-shadow">
-                  <div className="p-5">
-                    <div className="flex items-center justify-between">
-                      {/* Información del evento */}
-                      <div className="flex items-center gap-4 flex-1">
-                        <div>
+                  <div 
+                    className="p-5 cursor-pointer" 
+                    onClick={() => setSelectedEventoId(evento.id)}
+                  >
+                    <div className="flex items-center justify-between gap-4">
+                      {/* Información del evento - PREVIEW */}
+                      <div className="flex items-center gap-6 flex-1 min-w-0">
+                        {/* Período */}
+                        <div className="flex-shrink-0">
                           <h3 className="text-lg font-semibold text-gray-900">
                             {meses[evento.mes - 1]} {evento.anio}
                           </h3>
-                          <div className="flex items-center gap-2 mt-1">
-                            <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${estadoInfo.color}`}>
-                              {estadoInfo.label}
-                            </span>
-                            {evento._count.nominas > 0 && (
-                              <span className="text-xs text-gray-500">
-                                {evento._count.nominas} nómina{evento._count.nominas !== 1 ? 's' : ''}
-                              </span>
-                            )}
-                          </div>
+                          {evento._count.nominas > 0 && (
+                            <p className="text-xs text-gray-500 mt-0.5">
+                              {evento._count.nominas} nómina{evento._count.nominas !== 1 ? 's' : ''}
+                            </p>
+                          )}
+                        </div>
+
+                        {/* Estado */}
+                        <div className="flex-shrink-0">
+                          <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${estadoInfo.color}`}>
+                            {estadoInfo.label}
+                          </span>
                         </div>
 
                         {/* Preview de alertas */}
                         {evento.alertas && evento.alertas.total > 0 && (
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 flex-shrink-0">
                             {evento.alertas.criticas > 0 && (
                               <div className="flex items-center gap-1 px-2 py-1 bg-red-50 rounded text-xs">
                                 <AlertCircle className="w-3 h-3 text-red-600" />
@@ -614,11 +616,14 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
                       </div>
 
                       {/* Botones de acción */}
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-shrink-0">
                         {mostrarGenerarPrenominas && (
                           <Button
                             size="sm"
-                            onClick={() => handleGenerarPrenominas(evento.id)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleGenerarPrenominas(evento.id);
+                            }}
                             disabled={isProcessing}
                           >
                             <FileText className="w-4 h-4 mr-2" />
@@ -631,7 +636,10 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
                             <Button
                               size="sm"
                               variant="outline"
-                              onClick={() => handleImportar(evento.id)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleImportar(evento.id);
+                              }}
                               disabled={isProcessing}
                             >
                               <Upload className="w-4 h-4 mr-2" />
@@ -642,7 +650,8 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
                               <Button
                                 size="sm"
                                 variant="outline"
-                                onClick={() => {
+                                onClick={(e) => {
+                                  e.stopPropagation();
                                   setSelectedEventoId(evento.id);
                                 }}
                                 disabled={isProcessing}
@@ -653,15 +662,6 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
                             )}
                           </>
                         )}
-
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => setSelectedEventoId(evento.id)}
-                        >
-                          <Eye className="w-4 h-4 mr-2" />
-                          Ver Detalles
-                        </Button>
                       </div>
                     </div>
                   </div>
