@@ -89,10 +89,11 @@ Clousadmin/
 - Gestión de ausencias (solicitud, aprobación, saldo)
 - Fichajes y control horario (entrada/salida, pausas)
 - Jornadas laborales configurables
+- Analytics HR con filtros avanzados y reporting (plantilla, compensación, fichajes)
+- Balance de horas acumulado en analytics
 
 ### 🚧 En Desarrollo
 - Auto-completado de fichajes con IA
-- Balance de horas acumulado
 - Módulo de nóminas
 - Módulo de documentos con firma digital
 

@@ -44,36 +44,42 @@ export function AreaChartComponent({
         {description && <CardDescription>{description}</CardDescription>}
       </CardHeader>
       <CardContent>
-        <ChartContainer config={chartConfig}>
-          <AreaChart
-            accessibilityLayer
-            data={data}
-            margin={{
-              left: 12,
-              right: 12,
-            }}
-          >
-            <CartesianGrid vertical={false} />
-            <XAxis
-              dataKey={xAxisKey}
-              tickLine={false}
-              axisLine={false}
-              tickMargin={8}
-              tickFormatter={(value) => value.toString().slice(0, 3)}
-            />
-            <ChartTooltip
-              cursor={false}
-              content={<ChartTooltipContent indicator="line" />}
-            />
-            <Area
-              dataKey={dataKey}
-              type="natural"
-              fill={`var(--color-${dataKey})`}
-              fillOpacity={0.4}
-              stroke={`var(--color-${dataKey})`}
-            />
-          </AreaChart>
-        </ChartContainer>
+        {!data || data.length === 0 ? (
+          <div className="flex items-center justify-center h-[250px] text-gray-500">
+            No hay datos disponibles para este período
+          </div>
+        ) : (
+          <ChartContainer config={chartConfig}>
+            <AreaChart
+              accessibilityLayer
+              data={data}
+              margin={{
+                left: 12,
+                right: 12,
+              }}
+            >
+              <CartesianGrid vertical={false} />
+              <XAxis
+                dataKey={xAxisKey}
+                tickLine={false}
+                axisLine={false}
+                tickMargin={8}
+                tickFormatter={(value) => value.toString().slice(0, 3)}
+              />
+              <ChartTooltip
+                cursor={false}
+                content={<ChartTooltipContent indicator="line" />}
+              />
+              <Area
+                dataKey={dataKey}
+                type="natural"
+                fill={`var(--color-${dataKey})`}
+                fillOpacity={0.4}
+                stroke={`var(--color-${dataKey})`}
+              />
+            </AreaChart>
+          </ChartContainer>
+        )}
       </CardContent>
       {footer && <CardFooter>{footer}</CardFooter>}
     </Card>

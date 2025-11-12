@@ -6,8 +6,8 @@ El módulo de Analytics proporciona visualizaciones y métricas en tiempo real s
 
 **Ubicación:** `/hr/analytics`
 **Estado:** ✅ COMPLETADO Y LISTO PARA USAR
-**Versión:** 2.0
-**Fecha:** 1 de Noviembre de 2025
+**Versión:** 2.1
+**Fecha:** 12 de Noviembre de 2025
 
 ---
 
@@ -26,7 +26,7 @@ El módulo está organizado en 3 pestañas principales:
 Los filtros se aplican a todas las visualizaciones en tiempo real:
 
 - **Género**: Todos, Hombre, Mujer, Otro, No especificado
-- **Equipo**: Filtro dinámico basado en los equipos activos de la empresa
+- **Equipo**: Filtro dinámico basado en los equipos activos de la empresa (usa IDs reales)
 - **Antigüedad**: Todos, < 6 meses, 6-12 meses, 1-3 años, 3-5 años, > 5 años
 
 ### 1.3 Exportación a Excel
@@ -36,6 +36,7 @@ Botón de exportación que genera un archivo Excel con 4 hojas:
 - **Plantilla**: Listado de empleados con datos personales
 - **Compensación**: Salarios por empleado
 - **Fichajes**: Resumen de horas trabajadas del mes
+- Todos los filtros se aplican directamente en la base de datos (sin filtrado en memoria)
 
 ---
 
@@ -98,10 +99,15 @@ Botón de exportación que genera un archivo Excel con 4 hojas:
 
 **Gráficas disponibles:**
 
+0. **KPIs de Control Horario** (Tarjetas KPI)
+   - Total de horas del mes con variación respecto al mes anterior
+   - Balance acumulado (horas extra o pendientes)
+   - Tasa de absentismo global (en %)
+
 1. **Horas Trabajadas Diarias** (Gráfico de Área)
    - Total de horas trabajadas por día del mes actual
    - Solo incluye días laborables (lunes a viernes)
-   - Solo incluye fichajes con estado 'finalizado' o 'revisado'
+   - Solo incluye fichajes con estado 'finalizado' o 'pendiente (revisión)'
 
 2. **Promedio de Horas por Equipo** (Gráfico de Barras)
    - Horas trabajadas promedio del mes por equipo
@@ -316,7 +322,9 @@ function calcularAntiguedad(fechaAlta: Date): string {
 - ✅ Layout responsive (desktop/tablet/móvil)
 - ✅ Colores corporativos (#d97757, #6B6A64, etc.)
 - ✅ Botón Exportar alineado con tabs (misma altura)
+- ✅ Botón de *refresh* manual y timestamp de "Última actualización"
 - ✅ Filtros posicionados debajo de tabs
+- ✅ Estados vacíos con mensaje "No hay datos" en todas las gráficas
 
 ### Layout Estructura
 
@@ -338,10 +346,12 @@ Content (scroll)
 ### Características UX
 
 - Estado de carga implementado ("Cargando datos...")
+- Mensajes de error visibles con botón de reintento y toast de notificación
 - Tooltips en todas las gráficas
 - Gráficas responsive
 - Diseño limpio y profesional
 - Carga paralela de datos (Promise.all)
+- Placeholders informativos cuando no hay datos disponibles
 
 ---
 
@@ -354,6 +364,7 @@ Content (scroll)
 5. **Más gráficas:**
    - Compensación: Evolución salario promedio
    - Plantilla: Tasa de retención
+6. **Análisis avanzado nóminas:** Integrar pestaña adicional con insights de /api/nominas/analytics
 
 ---
 
@@ -374,7 +385,7 @@ Content (scroll)
 ### Problema: Datos incorrectos
 **Solución:**
 1. Verificar que los empleados están asignados a equipos correctamente
-2. Verificar que los fichajes tienen estado 'finalizado' o 'revisado'
+2. Verificar que los fichajes tienen estado 'finalizado' o 'pendiente (revisión)'
 3. Verificar que los salarios están correctamente asignados
 
 ---
@@ -398,6 +409,16 @@ Content (scroll)
 
 ## 11. Changelog
 
+### Versión 2.1 (Nov 2025)
+- ✅ Filtro de equipos basado en IDs (100% compatible con API)
+- ✅ Queries optimizados (sin N+1) para plantilla y fichajes
+- ✅ Cálculo de absentismo por días reales
+- ✅ Exportación con filtros aplicados en base de datos
+- ✅ Manejo de errores visible + botón de reintento y toast
+- ✅ Timestamp de última carga y botón de actualización manual
+- ✅ Placeholders de "No hay datos" en gráficas
+- ✅ Balance acumulado expuesto como KPI en fichajes
+
 ### Versión 2.0 (Nov 2024)
 - ✅ Implementado sistema de pestañas
 - ✅ Migrado de Departamentos a Equipos (relación N:N)
@@ -407,12 +428,6 @@ Content (scroll)
 - ✅ Añadidas métricas de fichajes por equipo
 - ✅ Diseño consistente con resto de la app
 
-### Versión 1.0 (Nov 2024)
-- ✅ Implementación inicial con dashboard único
-- ✅ Filtros globales (género, equipo, antigüedad)
-- ✅ Exportación a Excel
-- ✅ 3 endpoints principales (plantilla, compensación, fichajes)
-
 ---
 
 ## 12. Características Destacadas
@@ -421,7 +436,7 @@ Content (scroll)
 - Usa relación N:N correcta (Empleado ↔ Equipo)
 - Usa la relación `Equipo` en lugar del campo `departamento` eliminado
 - Cálculo dinámico de antigüedad
-- Solo fichajes finalizados/revisados
+- Solo fichajes finalizados o en revisión pendiente
 
 ### ⚡ Performance
 - Carga paralela de datos (Promise.all)
@@ -438,6 +453,6 @@ Content (scroll)
 
 **Estado Final:** ✅ **APROBADO PARA PRODUCCIÓN**
 
-**Última actualización:** 1 de Noviembre de 2025
-**Versión:** 2.0
+**Última actualización:** 12 de Noviembre de 2025
+**Versión:** 2.1
 **Mantenedor:** Clousadmin Development Team

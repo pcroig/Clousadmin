@@ -14,7 +14,7 @@ interface AnalyticsFiltersProps {
   filters: FilterValues
   onFilterChange: (key: keyof FilterValues, value: string) => void
   onExport?: () => Promise<void>
-  equipos?: string[]
+  equipos?: Array<{ id: string; nombre: string }>
 }
 
 export function AnalyticsFilters({
@@ -49,9 +49,9 @@ export function AnalyticsFilters({
         <SelectContent>
           <SelectItem value="todos">Todos los equipos</SelectItem>
           {equipos.length > 0 ? (
-            equipos.map((nombre) => (
-              <SelectItem key={nombre} value={nombre}>
-                {nombre}
+            equipos.map((equipo) => (
+              <SelectItem key={equipo.id} value={equipo.id}>
+                {equipo.nombre}
               </SelectItem>
             ))
           ) : (

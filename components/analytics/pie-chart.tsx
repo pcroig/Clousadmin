@@ -45,7 +45,8 @@ export function PieChartComponent({
   centerValue,
 }: PieChartComponentProps) {
   const totalValue = React.useMemo(() => {
-    return data.reduce((acc, curr) => acc + curr[dataKey], 0)
+    if (!data || data.length === 0) return 0;
+    return data.reduce((acc, curr) => acc + (Number(curr[dataKey]) || 0), 0)
   }, [data, dataKey])
 
   return (
@@ -55,56 +56,62 @@ export function PieChartComponent({
         {description && <CardDescription>{description}</CardDescription>}
       </CardHeader>
       <CardContent className="flex-1 pb-0">
-        <ChartContainer
-          config={chartConfig}
-          className="mx-auto aspect-square max-h-[250px]"
-        >
-          <PieChart>
-            <ChartTooltip
-              cursor={false}
-              content={<ChartTooltipContent hideLabel />}
-            />
-            <Pie
-              data={data}
-              dataKey={dataKey}
-              nameKey={nameKey}
-              innerRadius={donut ? 60 : 0}
-              strokeWidth={5}
-            >
-              {donut && centerValue !== undefined && (
-                <Label
-                  content={({ viewBox }) => {
-                    if (viewBox && "cx" in viewBox && "cy" in viewBox) {
-                      return (
-                        <text
-                          x={viewBox.cx}
-                          y={viewBox.cy}
-                          textAnchor="middle"
-                          dominantBaseline="middle"
-                        >
-                          <tspan
+        {!data || data.length === 0 ? (
+          <div className="flex items-center justify-center h-[250px] text-gray-500">
+            No hay datos disponibles para este período
+          </div>
+        ) : (
+          <ChartContainer
+            config={chartConfig}
+            className="mx-auto aspect-square max-h-[250px]"
+          >
+            <PieChart>
+              <ChartTooltip
+                cursor={false}
+                content={<ChartTooltipContent hideLabel />}
+              />
+              <Pie
+                data={data}
+                dataKey={dataKey}
+                nameKey={nameKey}
+                innerRadius={donut ? 60 : 0}
+                strokeWidth={5}
+              >
+                {donut && centerValue !== undefined && (
+                  <Label
+                    content={({ viewBox }) => {
+                      if (viewBox && "cx" in viewBox && "cy" in viewBox) {
+                        return (
+                          <text
                             x={viewBox.cx}
                             y={viewBox.cy}
-                            className="fill-foreground text-3xl font-bold"
+                            textAnchor="middle"
+                            dominantBaseline="middle"
                           >
-                            {centerValue.toLocaleString()}
-                          </tspan>
-                          <tspan
-                            x={viewBox.cx}
-                            y={(viewBox.cy || 0) + 24}
-                            className="fill-muted-foreground"
-                          >
-                            {centerLabel}
-                          </tspan>
-                        </text>
-                      )
-                    }
-                  }}
-                />
-              )}
-            </Pie>
-          </PieChart>
-        </ChartContainer>
+                            <tspan
+                              x={viewBox.cx}
+                              y={viewBox.cy}
+                              className="fill-foreground text-3xl font-bold"
+                            >
+                              {centerValue.toLocaleString()}
+                            </tspan>
+                            <tspan
+                              x={viewBox.cx}
+                              y={(viewBox.cy || 0) + 24}
+                              className="fill-muted-foreground"
+                            >
+                              {centerLabel}
+                            </tspan>
+                          </text>
+                        )
+                      }
+                    }}
+                  />
+                )}
+              </Pie>
+            </PieChart>
+          </ChartContainer>
+        )}
       </CardContent>
       {footer && <CardFooter className="flex-col gap-2 text-sm">{footer}</CardFooter>}
     </Card>
