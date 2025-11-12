@@ -303,101 +303,109 @@ Permite asignar complementos específicos a nóminas individuales.
 ## Interfaz de Usuario
 
 ### 1. Vista Principal `/hr/payroll`
-- Selector de mes/año
+
+**Header:**
+- Título "Nóminas" con descripción
 - Botones de acción:
   - **Subir Nóminas**: Subida directa de PDFs sin generar evento (flujo alternativo)
   - **Generar Evento Mensual**: Crea evento y genera pre-nóminas automáticamente
-- Analytics KPIs: Coste total año, empleados, coste promedio, eventos procesados
-- Lista de eventos expandibles con:
-  - Header con mes/año y botón "Ver detalles"
-  - Indicador de workflow con barra de progreso visual
-  - Métricas: Empleados, Con Complementos, Nóminas, Fecha de generación
-  - **Indicador visual de complementos** (solo en estado `complementos_pendientes`):
-    - ✅ Verde: "Complementos revisados" (todos asignados)
-    - ⚠️ Naranja: "X empleado(s) sin complementos asignados"
-  - Alertas clickeables por tipo (críticas, advertencias, informativas) que navegan a página de detalles
-  - Botonera de acciones:
-    - **Generar pre-nóminas**: Recalcular pre-nóminas del evento
-    - **Exportar/Re-exportar**: Descargar Excel para gestoría
-    - **Importar PDFs**: Subir nóminas definitivas desde gestoría
-    - **Publicar y Notificar**: Publicar nóminas para empleados
-  - Lista expandible de nóminas individuales (al hacer clic en el evento)
-- Empty State con CTAs: **Generar Evento** o **Subir Nóminas**
 
-### 2. Vista de Detalles de Evento `/hr/payroll/eventos/[id]` ⭐ NUEVO
-Página completa de detalles de un evento mensual con información detallada.
+**Lista de Eventos (Cards Clickeables):**
 
-**Header:**
-- Breadcrumb con botón "Volver"
-- Título: Mes y Año del evento
-- Badge de estado con tooltip descriptivo
-- Barra de progreso visual del workflow (6 etapas)
+Cada card es **completamente clickeable** y muestra un preview básico:
 
-**Métricas Agregadas (6 cards):**
-- Total Nóminas
-- Empleados
-- Con Alertas
-- Complementos asignados
-- Pendientes de complementos
-- Alertas críticas
+**Información visible en la card (`className="p-5"`):**
+- **Período**: Mes y año (ej: "Enero 2025")
+- **Estado**: Badge con color según estado del workflow
+- **Número de nóminas**: Contador de nóminas generadas
+- **Preview de alertas**: Badges compactos con conteo:
+  - 🔴 Críticas (rojo)
+  - 🟠 Advertencias (naranja)
+  - 🔵 Informativas (azul)
 
-**Botonera de Acciones:**
-- Generar pre-nóminas
-- Exportar Excel / Re-exportar
-- Importar PDFs
-- Publicar y Notificar
-- Badge "Publicado" cuando está publicado
+**Botones de acción dentro de la card:**
+- **Generar Pre-nóminas**: Visible si `!fechaGeneracion` (evento sin pre-nóminas)
+- **Importar Nóminas**: Visible si `fechaGeneracion && !fechaImportacion` (pre-nóminas generadas pero sin importar)
+- **Rellenar Complementos**: Visible si `fechaGeneracion && !fechaImportacion` (mismo estado que importar)
+- Todos los botones usan `stopPropagation()` para no activar el click de la card
 
-**Sistema de Tabs:**
+**Comportamiento:**
+- Click en cualquier parte de la card → Abre `EventoDetailsPanel` (panel lateral)
+- Click en botones de acción → Ejecuta acción sin abrir panel
 
-**Tab "Nóminas":**
-- **Filtros avanzados:**
-  - Búsqueda por nombre/email del empleado
-  - Filtro por estado de nómina (todos, pre_nomina, complementos_pendientes, etc.)
-  - Filtro por alertas (todos, con alertas, sin alertas)
-  - Filtro por complementos (todos, pendientes, completos)
-- **Lista de nóminas** (cards):
-  - Avatar/foto del empleado
-  - Nombre completo y email
-  - Badge de estado de nómina
-  - Indicadores visuales:
-    - Alertas (iconos por tipo: crítico, advertencia, info)
-    - Complementos pendientes (badge naranja)
-  - Métricas: Salario base, Complementos, Total neto
-  - Botón "Ver Detalles" → abre drawer lateral
-- **Drawer de Detalles de Nómina** (panel lateral derecho):
-  - Tab "Resumen": Salario base, complementos, deducciones, totales, días trabajados
-  - Tab "Complementos": Lista de complementos asignados con importes
-  - Tab "Alertas": Lista de alertas específicas de la nómina
-  - Botón "Ver perfil completo del empleado"
+**Empty State:**
+- Mensaje informativo
+- CTAs: **Generar Evento** o **Subir Nóminas**
 
-**Tab "Alertas":**
+### 2. EventoDetailsPanel (Panel Lateral) ⭐
+
+Panel lateral que se abre al hacer click en una card de evento.
+
+**Header del Panel:**
+- Título: "Evento de Nóminas - [Mes] [Año]"
+- Botón cerrar (X)
+
+**Contenido:**
+
+**1. Información del Evento:**
+- Estado actual
+- Total de nóminas
+- Fecha de generación (si existe)
+- Fecha de importación (si existe)
+- Fecha de publicación (si existe)
+
+**2. Alertas del Evento:**
 - Agrupadas por tipo (Críticas, Advertencias, Informativas)
+- Cada tipo muestra conteo y badge de color
+
+**3. Lista de Nóminas (Sub-eventos):**
+- Cada nómina es un botón clickeable
+- Muestra:
+  - Avatar/icono del empleado
+  - Nombre completo y email
+  - Badge de estado de nómina (pre_nomina, definitiva, publicada, etc.)
+  - Total neto
+- Click en nómina → Abre `NominaDetailsPanel` (doble nivel de panel)
+
+**4. Estado vacío:**
+- Si no hay nóminas generadas, muestra mensaje informativo
+
+### 3. NominaDetailsPanel (Panel Lateral - Doble Nivel) ⭐
+
+Panel lateral que se abre al hacer click en una nómina dentro del `EventoDetailsPanel`.
+
+**Header del Panel:**
+- Título: Nombre completo del empleado
+- Botón cerrar (X)
+
+**Contenido:**
+
+**1. Resumen:**
+- Salario Base
+- Complementos
+- Deducciones
+- Total Bruto
+- **Total Neto** (destacado en verde)
+- Días Trabajados
+- Días Ausencias
+
+**2. Complementos Asignados:**
+- Lista de complementos con:
+  - Nombre del tipo de complemento
+  - Importe
+
+**3. Alertas:**
+- Lista de alertas no resueltas de la nómina
 - Cada alerta muestra:
-  - Badge de tipo
-  - Empleado afectado
-  - Mensaje descriptivo
-  - Categoría y código
-  - Botón "Ver empleado" (navega a perfil)
-  - Botón "Resolver" (marca alerta como resuelta)
-- Contador de alertas por tipo en el tab
+  - Icono de tipo
+  - Mensaje
+  - Detalles (si existen)
 
-### 3. Vista de Eventos `/hr/payroll/eventos`
-- Lista de eventos mensuales
-- Información de cada evento:
-  - Mes/Año
-  - Nóminas generadas
-  - Complementos pendientes
-  - Estado actual
-- Contador de alertas por severidad
-- Acciones por evento:
-  - Generar/Recalcular pre-nóminas
-  - Exportar a Excel
-  - Importar PDFs
-  - Publicar y notificar
-- Tooltip contextual en cada acción y estado de disponibilidad
+**4. Acción:**
+- Botón "Ver perfil completo del empleado" → Navega a `/hr/organizacion/personas/[id]`
 
-### 4. Subida Directa de Nóminas ⭐ NUEVO
+### 4. Subida Directa de Nóminas ⭐
+
 Modal completo para subir PDFs sin generar evento previo.
 
 **Flujo:**
@@ -699,48 +707,50 @@ Desde la refactorización de noviembre 2025 todos los cambios de estado utilizan
 - Drag & drop y selector de archivos
 - Integración con IA para matching automático
 
-### Páginas
+### Páginas y Componentes
 
 **`app/(dashboard)/hr/payroll/page.tsx`**
-- Vista principal con lista de eventos
-- Server component que pasa datos a client
+- Server component principal
+- Pasa `mesActual` y `anioActual` al client component
 
 **`app/(dashboard)/hr/payroll/payroll-client.tsx`**
 - Client component principal
-- Maneja estado de eventos expandidos
-- Integra modal de upload
+- **Cards clickeables** de eventos (preview con info básica)
+- **EventoDetailsPanel**: Componente interno que muestra detalles del evento
+- **NominaDetailsPanel**: Componente interno que muestra detalles de nómina individual
+- Integra modal de upload (`UploadNominasModal`)
+- Maneja estados: `selectedEventoId`, `selectedNominaId`
+- Lógica de botones dinámicos según `fechaGeneracion` y `fechaImportacion`
 
-**`app/(dashboard)/hr/payroll/eventos/[id]/page.tsx`**
-- Server component para página de detalles
-- Valida permisos y pasa eventoId
+**Componentes Internos (dentro de `payroll-client.tsx`):**
 
-**`app/(dashboard)/hr/payroll/eventos/[id]/evento-details-client.tsx`**
-- Client component de detalles
-- Sistema de tabs (Nóminas | Alertas)
-- Filtros avanzados
-- Drawer de detalles de nómina individual
+**`EventoDetailsPanel`**
+- Panel lateral que se abre al hacer click en una card
+- Muestra: información del evento, alertas agregadas, lista de nóminas
+- Cada nómina es clickeable y abre `NominaDetailsPanel`
+
+**`NominaDetailsPanel`**
+- Panel lateral de doble nivel (se abre sobre `EventoDetailsPanel`)
+- Muestra: resumen financiero, complementos, alertas individuales
+- Botón para navegar al perfil del empleado
 
 ## Arquitectura de Archivos
 
 ```
 app/(dashboard)/hr/payroll/
 ├── page.tsx                          # Server component principal
-├── payroll-client.tsx                # Client component principal
-├── eventos/
-│   ├── page.tsx                      # Lista de eventos
-│   ├── eventos-client.tsx            # Client de lista
-│   └── [id]/
-│       ├── page.tsx                  # Server component detalles
-│       └── evento-details-client.tsx # Client component detalles
-└── nominas/
-    └── [id]/
-        ├── page.tsx                  # Detalles de nómina individual
-        └── nomina-details-client.tsx # Client de nómina
+└── payroll-client.tsx                  # Client component principal
+    ├── PayrollClient                  # Componente principal
+    ├── EventoDetailsPanel             # Panel lateral de evento (interno)
+    └── NominaDetailsPanel             # Panel lateral de nómina (interno)
 
 components/payroll/
-├── alerta-badge.tsx                  # Badge de alertas
-├── alerta-list.tsx                   # Lista de alertas
-└── upload-nominas-modal.tsx          # Modal de upload
+├── alerta-badge.tsx                  # Badge de alertas (reutilizable)
+├── alerta-list.tsx                    # Lista de alertas (reutilizable)
+└── upload-nominas-modal.tsx          # Modal de upload directo
+
+components/shared/
+└── details-panel.tsx                  # Componente base de panel lateral
 
 app/api/nominas/
 ├── eventos/
@@ -748,15 +758,19 @@ app/api/nominas/
 │   └── [id]/
 │       ├── route.ts                  # GET/PATCH evento individual
 │       ├── exportar/route.ts         # Exportar Excel
-│       ├── generar-prenominas/route.ts
+│       ├── generar-prenominas/route.ts # Generar pre-nóminas
 │       ├── importar/route.ts         # Importar PDFs
 │       └── publicar/route.ts         # Publicar nóminas
-├── upload/route.ts                   # Upload directo (nuevo)
-├── confirmar-upload/route.ts        # Confirmar upload (nuevo)
+├── [id]/
+│   └── route.ts                      # GET detalles de nómina individual
+├── upload/route.ts                   # Upload directo (sin evento)
+├── confirmar-upload/route.ts        # Confirmar upload directo
 └── alertas/
     └── [id]/
         └── resolver/route.ts         # Resolver alerta
 ```
+
+**Nota:** Ya no existen páginas separadas para detalles de evento o nómina. Todo se maneja mediante `DetailsPanel` lateral desde la vista principal.
 
 ## Referencias
 

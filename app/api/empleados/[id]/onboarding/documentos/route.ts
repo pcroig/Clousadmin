@@ -64,6 +64,8 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
     const file = formData.get('file') as File;
     const nombreDocumento = formData.get('nombreDocumento') as string;
     const tipoDocumento = formData.get('tipoDocumento') as string;
+    const carpetaId = formData.get('carpetaId') as string | null; // Carpeta destino (opcional)
+    const esCompartida = formData.get('esCompartida') === 'true'; // Si debe ir a carpeta compartida
 
     if (!file || !nombreDocumento || !tipoDocumento) {
       return badRequestResponse(
@@ -114,7 +116,9 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
       s3Key,
       s3Bucket,
       file.type,
-      file.size
+      file.size,
+      carpetaId || undefined, // Carpeta destino (opcional)
+      esCompartida // Si debe ir a carpeta compartida
     );
 
     if (!resultado.success) {

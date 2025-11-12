@@ -823,7 +823,19 @@ function EventoDetailsPanel({
       const response = await fetch(`/api/nominas/eventos/${eventoId}`);
       const data = await response.json();
       if (response.ok) {
-        setEvento(data);
+        // El endpoint devuelve { evento, stats }
+        const eventoData = data.evento || data;
+        // Calcular alertas agregadas desde las nóminas si no vienen en el formato esperado
+        if (eventoData.nominas && !eventoData.alertas) {
+          const alertas = eventoData.nominas.flatMap((n: any) => n.alertas || []);
+          eventoData.alertas = {
+            criticas: alertas.filter((a: any) => a.tipo === 'critico').length,
+            advertencias: alertas.filter((a: any) => a.tipo === 'advertencia').length,
+            informativas: alertas.filter((a: any) => a.tipo === 'info').length,
+            total: alertas.length,
+          };
+        }
+        setEvento(eventoData);
       }
     } catch (error) {
       console.error('Error fetching evento:', error);
