@@ -1,0 +1,22 @@
+// Actualización del modelo Carpeta en schema.prisma
+// Agregar estos campos al modelo Carpeta existente:
+
+// Nuevos campos para vincular carpetas a procesos de onboarding/offboarding
+vinculadaAProceso    String? @db.VarChar(50) // 'onboarding' | 'offboarding' | null
+requiereFirma        Boolean @default(false)  // Si requiere firma digital (Fase 2)
+requiereRellenarDatos Boolean @default(false) // Si requiere completar campos antes de generar documento
+camposRequeridos     Json?                     // Array de campos requeridos: ["nif", "direccion", "iban"]
+
+// Índice para búsquedas por proceso
+@@index([vinculadaAProceso])
+
+// Comentarios para el modelo:
+// - vinculadaAProceso: Proceso al que está vinculada la carpeta (onboarding, offboarding, o NULL)
+// - requiereFirma: Si los documentos de esta carpeta requieren firma digital
+// - requiereRellenarDatos: Si requiere que el empleado complete campos antes de generar documento
+// - camposRequeridos: Array JSON de campos que el empleado debe completar
+
+// Después de agregar estos campos al modelo Carpeta en schema.prisma, ejecutar:
+// npx prisma migrate dev --name add_carpeta_proceso_fields
+// npx prisma generate
+
