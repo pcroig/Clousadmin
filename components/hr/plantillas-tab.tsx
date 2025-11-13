@@ -127,7 +127,7 @@ export function PlantillasTab() {
 
     try {
       const formData = new FormData();
-      formData.append('archivo', archivoSeleccionado);
+      formData.append('file', archivoSeleccionado);
       formData.append('nombre', nombrePlantilla.trim());
       if (descripcionPlantilla.trim()) {
         formData.append('descripcion', descripcionPlantilla.trim());
