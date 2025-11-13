@@ -414,6 +414,42 @@ export function AddPersonaOnboardingForm({ onSuccess, onCancel, tipoOnboarding =
                 />
               </div>
             </div>
+            
+            {/* Selector de Carpeta - solo cuando el empleado ya existe */}
+            {empleadoId && (
+              <CarpetaSelector
+                empleadoId={empleadoId}
+                value={carpetaIdSeleccionada}
+                onChange={setCarpetaIdSeleccionada}
+                label="Carpeta de destino (opcional)"
+                placeholder="Seleccionar carpeta o crear automáticamente"
+                onNuevaCarpeta={async (nombre) => {
+                  try {
+                    const response = await fetch('/api/carpetas', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        nombre,
+                        empleadoId,
+                        compartida: false,
+                      }),
+                    });
+                    
+                    if (!response.ok) {
+                      toast.error('Error al crear carpeta');
+                      return null;
+                    }
+                    
+                    const { carpeta } = await response.json();
+                    toast.success('Carpeta creada correctamente');
+                    return carpeta.id;
+                  } catch (error) {
+                    toast.error('Error al crear carpeta');
+                    return null;
+                  }
+                }}
+              />
+            )}
             <DocumentUploader
               label="Subir documento"
               description="PDF, JPG o PNG (máx. 5MB)"
@@ -480,6 +516,40 @@ export function AddPersonaOnboardingForm({ onSuccess, onCancel, tipoOnboarding =
                 />
               </div>
             </div>
+            
+            {/* Selector de Carpeta */}
+            <CarpetaSelector
+              empleadoId={empleadoId}
+              value={carpetaIdSeleccionada}
+              onChange={setCarpetaIdSeleccionada}
+              label="Carpeta de destino (opcional)"
+              placeholder="Seleccionar carpeta o crear automáticamente"
+              onNuevaCarpeta={async (nombre) => {
+                try {
+                  const response = await fetch('/api/carpetas', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      nombre,
+                      empleadoId,
+                      compartida: false,
+                    }),
+                  });
+                  
+                  if (!response.ok) {
+                    toast.error('Error al crear carpeta');
+                    return null;
+                  }
+                  
+                  const { carpeta } = await response.json();
+                  toast.success('Carpeta creada correctamente');
+                  return carpeta.id;
+                } catch (error) {
+                  toast.error('Error al crear carpeta');
+                  return null;
+                }
+              }}
+            />
             <DocumentUploader
               label="Subir documento adicional"
               description="PDF, JPG o PNG (máx. 5MB)"

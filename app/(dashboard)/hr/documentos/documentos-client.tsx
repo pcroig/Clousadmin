@@ -30,6 +30,7 @@ import { EmptyState } from '@/components/shared/empty-state';
 import { SearchableSelect } from '@/components/shared/searchable-select';
 import { SearchableMultiSelect } from '@/components/shared/searchable-multi-select';
 import { LoadingButton } from '@/components/shared/loading-button';
+import { Checkbox } from '@/components/ui/checkbox';
 
 interface Carpeta {
   id: string;
@@ -65,6 +66,10 @@ export function DocumentosClient({ carpetas }: DocumentosClientProps) {
   const [empleados, setEmpleados] = useState<Empleado[]>([]);
   const [cargando, setCargando] = useState(false);
   const [cargandoDatos, setCargandoDatos] = useState(false);
+  
+  // Estados para subir documentos tras crear carpeta
+  const [subirDocumentosTrasCrear, setSubirDocumentosTrasCrear] = useState(false);
+  const [carpetaCreadaId, setCarpetaCreadaId] = useState<string | null>(null);
 
   // Cargar equipos y empleados cuando se abre el modal
   useEffect(() => {
@@ -141,7 +146,9 @@ export function DocumentosClient({ carpetas }: DocumentosClientProps) {
         throw new Error(error.error || 'Error al crear carpeta');
       }
 
-      // Resetear form y cerrar modal
+      const { carpeta } = await response.json();
+
+      // Resetear form
       setNombreCarpeta('');
       setTipoAsignacion('todos');
       setEquipoSeleccionado('');
@@ -151,8 +158,13 @@ export function DocumentosClient({ carpetas }: DocumentosClientProps) {
       // Mostrar notificación de éxito
       toast.success('Carpeta creada exitosamente');
 
-      // Recargar página para mostrar nueva carpeta
-      router.refresh();
+      // Si se marcó para subir documentos, redirigir a la carpeta
+      if (subirDocumentosTrasCrear) {
+        router.push(`/hr/documentos/${carpeta.id}`);
+      } else {
+        // Recargar página para mostrar nueva carpeta
+        router.refresh();
+      }
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Error al crear carpeta';
       toast.error(message || 'Error al crear carpeta');
@@ -351,6 +363,23 @@ export function DocumentosClient({ carpetas }: DocumentosClientProps) {
                 )}
               </div>
             )}
+
+            {/* Opciones adicionales */}
+            <div className="space-y-3 pt-2 border-t">
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="subirDocumentos"
+                  checked={subirDocumentosTrasCrear}
+                  onCheckedChange={(checked) => setSubirDocumentosTrasCrear(checked as boolean)}
+                />
+                <Label
+                  htmlFor="subirDocumentos"
+                  className="text-sm font-normal cursor-pointer"
+                >
+                  Subir documentos después de crear la carpeta
+                </Label>
+              </div>
+            </div>
           </div>
 
           <DialogFooter>

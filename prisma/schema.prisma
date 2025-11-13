@@ -1075,6 +1075,13 @@ model EmpleadoComplemento {
 
   activo Boolean @default(true)
 
+  // Validación de complementos (para nóminas)
+  validado        Boolean   @default(false)
+  validadoPor     String?   // Usuario ID que validó
+  fechaValidacion DateTime?
+  rechazado       Boolean   @default(false)
+  motivoRechazo   String?   @db.Text
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

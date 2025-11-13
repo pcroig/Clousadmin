@@ -50,41 +50,64 @@ Documento {
 }
 ```
 
-### Carpetas del Sistema (Automáticas)
+### Tipos de Carpetas
 
-Cada empleado tiene 5 carpetas creadas automáticamente:
+El sistema gestiona **3 tipos distintos** de carpetas:
 
-1. **📄 Contratos** (`esSistema: true`)
-   - Contratos laborales
-   - Modificaciones
-   - Anexos
-   - Finiquitos
-   - Se suben durante onboarding (opcional)
+#### 1. **Carpetas del Sistema Individuales** (por empleado)
+Se crean automáticamente para cada empleado, conectadas a funcionalidades de la plataforma:
 
-2. **💰 Nóminas** (`esSistema: true`)
-   - PDFs de nóminas mensuales
-   - Importados masivamente o manualmente desde módulo de nóminas
-   - Se reasignan automáticamente a cada empleado
-   - **Vista HR**: Carpeta global agregada con filtros por empleado
+- **📄 Contratos** (`esSistema: true`, `empleadoId: <id>`)
+  - Contratos laborales, modificaciones, anexos, finiquitos
+  - Se suben durante onboarding (opcional)
+  - Vinculados al modelo `Contrato`
 
-3. **📋 Justificantes** (`esSistema: true`)
-   - Justificantes de ausencias
-   - Se crean automáticamente desde el módulo de ausencias
-   - Vinculados a registros de ausencia (campo `documentoId`)
-   - **Vista HR**: Carpeta global agregada con filtros por empleado
+- **💰 Nóminas** (`esSistema: true`, `empleadoId: <id>`)
+  - PDFs de nóminas mensuales
+  - Importados masivamente o manualmente desde módulo de nóminas
+  - Se reasignan automáticamente a cada empleado
 
-4. **👤 Personales** (`esSistema: true`)
-   - DNI/NIE/Pasaporte
-   - Certificado bancario
-   - Certificado SS
-   - Títulos académicos
-   - Empleados pueden subir archivos
+- **📋 Justificantes** (`esSistema: true`, `empleadoId: <id>`)
+  - Justificantes de ausencias
+  - Se crean automáticamente desde el módulo de ausencias
+  - Vinculados a registros de ausencia (campo `documentoId`)
 
-5. **🏥 Médicos** (`esSistema: true`)
-   - Partes de baja
-   - Justificantes médicos
-   - Se vinculan a ausencias
-   - Empleados pueden subir archivos
+- **👤 Personales** (`esSistema: true`, `empleadoId: <id>`)
+  - DNI/NIE/Pasaporte, certificado bancario, certificado SS, títulos académicos
+  - Empleados pueden subir archivos libremente
+
+- **🏥 Médicos** (`esSistema: true`, `empleadoId: <id>`)
+  - Partes de baja, justificantes médicos
+  - Se vinculan a ausencias médicas
+  - Empleados pueden subir archivos
+
+#### 2. **Carpetas Globales HR** (agregación con filtros)
+Una carpeta por empresa, agregan documentos de TODOS los empleados:
+
+- **🌍 Contratos (Global)** (`esSistema: true`, `empleadoId: null`, `compartida: true`)
+  - Vista agregada de todos los contratos de la empresa
+  - Filtros por empleado y búsqueda
+  - Solo visible para HR Admin
+
+- **🌍 Nóminas (Global)** (`esSistema: true`, `empleadoId: null`, `compartida: true`)
+  - Vista agregada de todas las nóminas de la empresa
+  - Filtros por empleado y búsqueda
+  - Solo visible para HR Admin
+
+- **🌍 Justificantes (Global)** (`esSistema: true`, `empleadoId: null`, `compartida: true`)
+  - Vista agregada de todos los justificantes de la empresa
+  - Filtros por empleado y búsqueda
+  - Solo visible para HR Admin
+
+#### 3. **Carpetas Compartidas Manuales** (creadas por HR)
+Carpetas creadas manualmente por HR para compartir documentos con la organización:
+
+- **📁 Ejemplos**: "Políticas 2025", "Convenio Colectivo", "Protocolos", "Formación"
+- **Características**:
+  - `esSistema: false`, `empleadoId: null`, `compartida: true`
+  - `asignadoA`: 'todos' | 'equipo:id' | 'empleado:id1,empleado:id2'
+  - Visibles en sección "Compartidos" del empleado
+  - Sin filtros especiales (a diferencia de las globales)
 
 ---
 
@@ -472,25 +495,57 @@ await fetch('/api/ausencias', {
 // 5. Visible en carpeta global "Nóminas" (HR) y personal (Empleado)
 ```
 
-### 4. Integración con Onboarding
+### 4. Integración con Onboarding/Offboarding
 
+#### Selector de Carpeta al Subir Documentos
+
+Cuando HR sube documentos durante onboarding o offboarding, tiene 3 opciones:
+
+1. **Carpetas existentes del empleado**: Contratos, Personales, Médicos, etc.
+2. **Crear nueva carpeta**: Por ejemplo, "DNI" o "Certificados"
+3. **Automático** (por defecto): Si no se elige carpeta, se crea automáticamente en "Onboarding"
+
+**Componente**: `CarpetaSelector`
+
+**Endpoint**:
 ```typescript
-// Durante proceso de onboarding
-// Documentos subidos se guardan en carpetas correspondientes:
-// - Contrato → Carpeta "Contratos"
-// - DNI → Carpeta "Personales"
-// - Certificado bancario → Carpeta "Personales"
-// Lógica en: lib/documentos/onboarding.ts
+POST /api/empleados/[id]/onboarding/documentos
+FormData:
+  - file: File
+  - nombreDocumento: string
+  - tipoDocumento: string
+  - carpetaId?: string (opcional - si se elige carpeta específica)
+  - esCompartida?: boolean (opcional - si debe ir a carpeta compartida)
 ```
 
-### 5. Integración con Offboarding
-
+**Flujo completo**:
 ```typescript
-// Durante proceso de offboarding
-// Documentos (finiquito, carta de baja) se guardan en carpeta especial
-// Visible solo para HR Admin
-// Lógica en: components/hr/DarDeBajaModal.tsx
+// 1. HR selecciona carpeta o crea una nueva
+const carpetaId = await CarpetaSelector.getValue();
+
+// 2. Sube documento con carpetaId
+const formData = new FormData();
+formData.append('file', file);
+formData.append('nombreDocumento', 'Contrato Indefinido');
+formData.append('tipoDocumento', 'contrato');
+if (carpetaId) {
+  formData.append('carpetaId', carpetaId);
+}
+
+await fetch(`/api/empleados/${empleadoId}/onboarding/documentos`, {
+  method: 'POST',
+  body: formData,
+});
+
+// 3. Si no se especifica carpetaId, se crea automáticamente:
+//    - Carpeta HR: "Onboarding - {nombreDocumento}"
+//    - Carpeta Empleado: "Onboarding > {nombreDocumento}"
 ```
+
+**Implementación**: 
+- Frontend: `components/organizacion/add-persona-onboarding-form.tsx`
+- Backend: `lib/documentos/onboarding.ts` → `subirDocumentoOnboarding()`
+- API: `app/api/empleados/[id]/onboarding/documentos/route.ts`
 
 ---
 
@@ -727,13 +782,38 @@ Para dudas o mejoras:
 
 ---
 
-**Última actualización**: 2025-11-08  
-**Versión**: 1.1.0 MVP  
+**Última actualización**: 2025-11-12  
+**Versión**: 1.2.0 MVP  
 **Status**: ✅ COMPLETADO Y FUNCIONAL
 
 ---
 
-## 🆕 Changelog v1.1.0 (2025-11-08)
+## 🆕 Changelog
+
+### v1.2.0 (2025-11-12)
+
+#### ✨ Nuevas Funcionalidades
+- 🗂️ **Selector de Carpeta en Onboarding/Offboarding**: HR puede elegir carpeta destino al subir documentos
+  - Opción 1: Seleccionar carpeta existente del empleado
+  - Opción 2: Crear nueva carpeta personalizada
+  - Opción 3: Automático (crear carpeta "Onboarding" por defecto)
+- 📁 **Clarificación de Tipos de Carpetas**: Documentación detallada de los 3 tipos de carpetas
+  - Carpetas del Sistema Individuales (por empleado)
+  - Carpetas Globales HR (con filtros)
+  - Carpetas Compartidas Manuales (sin filtros especiales)
+
+#### 🔧 Mejoras Técnicas
+- 🔄 `subirDocumentoOnboarding()` acepta `carpetaId` opcional
+- 🎯 Endpoint `/api/empleados/[id]/onboarding/documentos` soporta selección de carpeta
+- 🧩 Componente `CarpetaSelector` integrado en formularios de onboarding
+- 📖 Documentación actualizada con ejemplos de flujos completos
+
+#### 🛠️ Preparado para Futuro
+- ✅ Compatible con sistema de Plantillas de Documentos (próxima implementación)
+- ✅ Compatible con Firma Digital (próxima implementación)
+- ✅ Estructura lista para generación automática de documentos desde plantillas
+
+### v1.1.0 (2025-11-08)
 
 ### ✨ Nuevas Funcionalidades
 - ➕ Añadida carpeta "Justificantes" a carpetas del sistema (ahora son 5)
