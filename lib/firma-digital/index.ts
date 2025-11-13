@@ -14,3 +14,6 @@ export * from './certificado';
 
 // Validación
 export * from './validacion';
+
+// Marcas visuales en PDFs
+export * from './pdf-marca';
