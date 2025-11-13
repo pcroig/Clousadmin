@@ -46,7 +46,11 @@ export async function POST(
     // Obtener empleado asociado al usuario autenticado
     const empleado = await prisma.empleado.findUnique({
       where: { usuarioId: session.user.id },
-      select: { id: true },
+      select: {
+        id: true,
+        firmaGuardada: true,
+        firmaS3Key: true,
+      },
     });
 
     if (!empleado) {
@@ -63,6 +67,14 @@ export async function POST(
       userAgent: request.headers.get('user-agent') || 'unknown',
       timestamp: new Date().toISOString(),
     };
+
+    // Si el empleado tiene firma guardada, incluir en datos capturados
+    // (a menos que explícitamente se indique no usarla)
+    const usarFirmaGuardada = body.usarFirmaGuardada !== false; // Por defecto true
+    if (empleado.firmaGuardada && empleado.firmaS3Key && usarFirmaGuardada) {
+      datosCapturados.firmaGuardadaUsada = true;
+      datosCapturados.firmaGuardadaS3Key = empleado.firmaS3Key;
+    }
 
     // Firmar documento
     const resultado = await firmarDocumento(firmaId, empleado.id, datosCapturados);

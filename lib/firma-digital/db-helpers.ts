@@ -4,12 +4,14 @@
  */
 
 import { prisma } from '@/lib/prisma';
-import { downloadFromS3 } from '@/lib/s3';
+import { downloadFromS3, uploadToS3 } from '@/lib/s3';
 import {
   generarHashDocumento,
   generarCertificadoFirmaSimple,
   validarIntegridadDocumento,
   validarComplecionFirmas,
+  anadirMarcasFirmasPDF,
+  esPDFValido,
 } from '@/lib/firma-digital';
 import type {
   CrearSolicitudFirmaInput,
@@ -302,6 +304,62 @@ export async function firmarDocumento(
         firmadoEn: ahora,
       },
     });
+
+    // 9. Generar PDF firmado con marcas visuales (solo para PDFs)
+    try {
+      const esPDF = await esPDFValido(documentoBuffer);
+
+      if (esPDF) {
+        // Obtener todas las firmas completadas con información de empleados
+        const firmasCompletadas = await prisma.firma.findMany({
+          where: {
+            solicitudFirmaId: firma.solicitudFirmaId,
+            firmado: true,
+          },
+          include: {
+            empleado: {
+              select: {
+                nombre: true,
+                apellidos: true,
+              },
+            },
+          },
+          orderBy: { firmadoEn: 'asc' }, // Orden cronológico
+        });
+
+        // Generar marcas de firma para cada firmante
+        const marcas = firmasCompletadas.map((f: any) => ({
+          nombreFirmante: `${f.empleado.nombre} ${f.empleado.apellidos}`,
+          fechaFirma: f.firmadoEn?.toLocaleString('es-ES', {
+            dateStyle: 'short',
+            timeStyle: 'short',
+          }) || 'N/A',
+          tipoFirma: f.tipo,
+          certificadoHash: f.certificadoHash,
+        }));
+
+        // Aplicar marcas al PDF
+        const pdfConMarcas = await anadirMarcasFirmasPDF(documentoBuffer, marcas);
+
+        // Subir PDF firmado a S3
+        const extension = firma.solicitudFirma.documento.nombre.split('.').pop() || 'pdf';
+        const pdfFirmadoS3Key = `documentos-firmados/${firma.solicitudFirma.empresaId}/${firma.solicitudFirma.id}/firmado.${extension}`;
+
+        await uploadToS3(pdfConMarcas, pdfFirmadoS3Key, 'application/pdf');
+
+        // Actualizar solicitud con ubicación del PDF firmado
+        await prisma.solicitudFirma.update({
+          where: { id: firma.solicitudFirmaId },
+          data: {
+            pdfFirmadoS3Key,
+          },
+        });
+      }
+    } catch (error) {
+      console.error('[firmarDocumento] Error generando PDF firmado:', error);
+      // No fallar el proceso de firma si falla la generación del PDF con marcas
+      // El usuario aún puede descargar el documento original
+    }
   } else {
     // Actualizar estado a 'en_proceso' si es la primera firma
     await prisma.solicitudFirma.update({
@@ -426,6 +484,7 @@ export async function obtenerEstadoSolicitud(
     creadoPor: solicitud.creadoPor ?? undefined,
     createdAt: solicitud.createdAt,
     completadaEn: solicitud.completadaEn ?? undefined,
+    pdfFirmadoS3Key: solicitud.pdfFirmadoS3Key ?? undefined,
   };
 }
 
