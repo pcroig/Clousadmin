@@ -23,81 +23,81 @@ datasource db {
 /// Roles de usuario en el sistema
 enum UsuarioRol {
   platform_admin // Admin de la plataforma (super admin)
-  hr_admin       // Admin de RR.HH. de la empresa
-  manager        // Manager de equipo
-  empleado       // Empleado regular
+  hr_admin // Admin de RR.HH. de la empresa
+  manager // Manager de equipo
+  empleado // Empleado regular
 }
 
 /// Estados posibles de un empleado
 enum EstadoEmpleado {
-  activo     // Empleado activo
-  baja       // Empleado dado de baja
+  activo // Empleado activo
+  baja // Empleado dado de baja
   suspendido // Empleado suspendido temporalmente
 }
 
 /// Tipos de contrato laboral (España)
 enum TipoContrato {
-  indefinido        // Contrato indefinido
-  temporal          // Contrato temporal
-  administrador     // Administrador societario
-  fijo_discontinuo  // Fijo discontinuo
-  becario           // Becario
-  practicas         // Prácticas
-  obra_y_servicio   // Obra y servicio
+  indefinido // Contrato indefinido
+  temporal // Contrato temporal
+  administrador // Administrador societario
+  fijo_discontinuo // Fijo discontinuo
+  becario // Becario
+  practicas // Prácticas
+  obra_y_servicio // Obra y servicio
 }
 
 /// Tipos de equipo
 enum TipoEquipo {
-  proyecto  // Equipo de proyecto
-  squad     // Squad ágil
-  temporal  // Equipo temporal
+  proyecto // Equipo de proyecto
+  squad // Squad ágil
+  temporal // Equipo temporal
 }
 
 /// Estados del fichaje (día completo)
 enum EstadoFichaje {
-  en_curso   // Fichaje iniciado, aún no completado
-  pendiente  // Requiere revisión manual de HR
+  en_curso // Fichaje iniciado, aún no completado
+  pendiente // Requiere revisión manual de HR
   finalizado // Fichaje completo y aprobado
 }
 
 /// Tipos de evento de fichaje
 enum TipoFichajeEvento {
-  entrada       // Inicio de jornada
-  pausa_inicio  // Inicio de pausa/descanso
-  pausa_fin     // Fin de pausa/reanudación
-  salida        // Fin de jornada
+  entrada // Inicio de jornada
+  pausa_inicio // Inicio de pausa/descanso
+  pausa_fin // Fin de pausa/reanudación
+  salida // Fin de jornada
 }
 
 /// Tipos de ausencia (fijos, no configurables)
 enum TipoAusencia {
-  vacaciones             // Vacaciones anuales
-  enfermedad             // Baja por enfermedad propia
-  enfermedad_familiar    // Cuidado familiar
-  maternidad_paternidad  // Permisos parentales
-  otro                   // Otros permisos
+  vacaciones // Vacaciones anuales
+  enfermedad // Baja por enfermedad propia
+  enfermedad_familiar // Cuidado familiar
+  maternidad_paternidad // Permisos parentales
+  otro // Otros permisos
 }
 
 /// Estados de ausencia
 enum EstadoAusencia {
-  pendiente   // Solicitud registrada y pendiente de revisión
-  confirmada  // Aprobada y todavía vigente
-  completada  // Finalizada (fechas pasadas)
-  rechazada   // Rechazada por manager/HR
+  pendiente // Solicitud registrada y pendiente de revisión
+  confirmada // Aprobada y todavía vigente
+  completada // Finalizada (fechas pasadas)
+  rechazada // Rechazada por manager/HR
 }
 
 /// Periodo de ausencia de medio día
 enum PeriodoMedioDia {
   manana // Ausencia en la mañana (no ficha entrada)
-  tarde  // Ausencia en la tarde (no ficha salida)
+  tarde // Ausencia en la tarde (no ficha salida)
 }
 
 /// Estados de solicitud de cambio
 enum EstadoSolicitud {
-  pendiente              // Recién creada
-  requiere_revision      // IA determina que necesita revisión manual
-  auto_aprobada          // IA la aprobó tras 48h
-  aprobada_manual        // HR/Manager la aprobó
-  rechazada              // Rechazada por HR/Manager
+  pendiente // Recién creada
+  requiere_revision // IA determina que necesita revisión manual
+  auto_aprobada // IA la aprobó tras 48h
+  aprobada_manual // HR/Manager la aprobó
+  rechazada // Rechazada por HR/Manager
 }
 
 // ========================================
@@ -124,38 +124,38 @@ model Empresa {
   updatedAt DateTime @updatedAt
 
   // Relations (one-to-many)
-  usuarios               Usuario[]
-  empleados              Empleado[]
-  equipos                Equipo[]
-  puestos                Puesto[]
-  ausencias              Ausencia[]
-  fichajes               Fichaje[]
-  jornadas               Jornada[]
-  documentos             Documento[]
-  carpetas               Carpeta[]
-  alertasNomina          AlertaNomina[]
-  solicitudesCambio      SolicitudCambio[]
-  festivos               Festivo[]
-  empleadoSaldos         EmpleadoSaldoAusencias[]
-  equipoPoliticas        EquipoPoliticaAusencias[]
-  autoCompletados        AutoCompletado[]
-  invitaciones           InvitacionEmpleado[]
-  onboardings            OnboardingEmpleado[]
-  onboardingConfig       OnboardingConfig?
-  notificaciones         Notificacion[]
-  campanasVacaciones     CampanaVacaciones[]
-  preferenciasVacaciones PreferenciaVacaciones[]
-  sedes                  Sede[]
-  integraciones          Integracion[]
-  resumenesNomina        ResumenMensualNomina[]
-  eventosNomina          EventoNomina[]
-  tiposComplemento       TipoComplemento[]
-  exportsGestoria        ExportGestoria[]
-  auditoriaAccesos       AuditoriaAcceso[]
-  consentimientos        Consentimiento[]
-  solicitudesEliminacion SolicitudEliminacionDatos[]
+  usuarios                 Usuario[]
+  empleados                Empleado[]
+  equipos                  Equipo[]
+  puestos                  Puesto[]
+  ausencias                Ausencia[]
+  fichajes                 Fichaje[]
+  jornadas                 Jornada[]
+  documentos               Documento[]
+  carpetas                 Carpeta[]
+  alertasNomina            AlertaNomina[]
+  solicitudesCambio        SolicitudCambio[]
+  festivos                 Festivo[]
+  empleadoSaldos           EmpleadoSaldoAusencias[]
+  equipoPoliticas          EquipoPoliticaAusencias[]
+  autoCompletados          AutoCompletado[]
+  invitaciones             InvitacionEmpleado[]
+  onboardings              OnboardingEmpleado[]
+  onboardingConfig         OnboardingConfig?
+  notificaciones           Notificacion[]
+  campanasVacaciones       CampanaVacaciones[]
+  preferenciasVacaciones   PreferenciaVacaciones[]
+  sedes                    Sede[]
+  integraciones            Integracion[]
+  resumenesNomina          ResumenMensualNomina[]
+  eventosNomina            EventoNomina[]
+  tiposComplemento         TipoComplemento[]
+  exportsGestoria          ExportGestoria[]
+  auditoriaAccesos         AuditoriaAcceso[]
+  consentimientos          Consentimiento[]
+  solicitudesEliminacion   SolicitudEliminacionDatos[]
   compensacionesHorasExtra CompensacionHoraExtra[]
-  denuncias              Denuncia[]
+  denuncias                Denuncia[]
 
   @@index([cif])
   @@map("empresas")
@@ -252,14 +252,14 @@ model Empleado {
   titularCuenta String? @db.VarChar(200)
 
   // Employment info
-  puesto               String?   @db.VarChar(100) // DEPRECATED - use puestoId instead
+  puesto               String?        @db.VarChar(100) // DEPRECATED - use puestoId instead
   puestoId             String? // Foreign key to Puesto
   fechaAlta            DateTime
   fechaBaja            DateTime?
-  tipoContrato         TipoContrato    @default(indefinido)
-  categoriaProfesional String?   @db.VarChar(50) // 'directivo', 'mando_intermedio', 'tecnico', 'trabajador_cualificado', 'trabajador_baja_cualificacion'
-  nivelEducacion       String?   @db.VarChar(50) // 'nivel_basico', 'eso_equivalente', 'bachillerato_grado_medio', 'formacion_profesional_superior', 'educacion_universitaria_postgrado'
-  grupoCotizacion      Int?      @db.SmallInt // 1-11 (Spanish social security groups)
+  tipoContrato         TipoContrato   @default(indefinido)
+  categoriaProfesional String?        @db.VarChar(50) // 'directivo', 'mando_intermedio', 'tecnico', 'trabajador_cualificado', 'trabajador_baja_cualificacion'
+  nivelEducacion       String?        @db.VarChar(50) // 'nivel_basico', 'eso_equivalente', 'bachillerato_grado_medio', 'formacion_profesional_superior', 'educacion_universitaria_postgrado'
+  grupoCotizacion      Int?           @db.SmallInt // 1-11 (Spanish social security groups)
   estadoEmpleado       EstadoEmpleado @default(activo)
 
   // Manager relationship (self-referencing)
@@ -335,14 +335,14 @@ model Empleado {
 
 /// Equipo - Flexible team groupings (projects, squads)
 model Equipo {
-  id          String  @id @default(uuid())
+  id          String     @id @default(uuid())
   empresaId   String
-  nombre      String  @db.VarChar(100)
+  nombre      String     @db.VarChar(100)
   managerId   String?
   sedeId      String? // Sede donde opera el equipo
-  descripcion String? @db.Text
+  descripcion String?    @db.Text
   tipo        TipoEquipo @default(proyecto)
-  activo      Boolean @default(true)
+  activo      Boolean    @default(true)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -503,7 +503,7 @@ model Fichaje {
   cuadradoMasivamente Boolean   @default(false) // Marcado si fue cuadrado desde "Cuadrar fichajes"
   cuadradoPor         String? // Usuario ID que cuadró masivamente
   cuadradoEn          DateTime? // Fecha del cuadre masivo
-  
+
   // Legacy field (deprecated - no longer used)
   autoCompletado  Boolean   @default(false)
   fechaAprobacion DateTime? // Fecha en que fue aprobado/finalizado por HR
@@ -534,7 +534,7 @@ model FichajeEvento {
   fichajeId String
 
   tipo TipoFichajeEvento
-  hora DateTime       @db.Timestamptz(6)
+  hora DateTime          @db.Timestamptz(6)
 
   // Metadata del evento
   ubicacion String? @db.Text // GPS coords o nombre oficina
@@ -566,9 +566,9 @@ model Ausencia {
 
   // Absence details (FIXED TYPES)
   tipo        TipoAusencia
-  fechaInicio DateTime     @db.Date
-  fechaFin    DateTime     @db.Date
-  medioDia    Boolean      @default(false)
+  fechaInicio DateTime         @db.Date
+  fechaFin    DateTime         @db.Date
+  medioDia    Boolean          @default(false)
   periodo     PeriodoMedioDia? // Solo cuando medioDia=true: 'manana' o 'tarde'
 
   diasNaturales   Int // Total days (including weekends)
@@ -606,10 +606,10 @@ model Ausencia {
   updatedAt DateTime @updatedAt
 
   // Relations
-  empresa                 Empresa                 @relation(fields: [empresaId], references: [id], onDelete: Cascade)
-  empleado                Empleado                @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
-  equipo                  Equipo?                 @relation(fields: [equipoId], references: [id], onDelete: SetNull)
-  compensacionHoraExtra   CompensacionHoraExtra?
+  empresa               Empresa                @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  empleado              Empleado               @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+  equipo                Equipo?                @relation(fields: [equipoId], references: [id], onDelete: SetNull)
+  compensacionHoraExtra CompensacionHoraExtra?
 
   @@index([empresaId])
   @@index([empleadoId])
@@ -699,7 +699,7 @@ model CompensacionHoraExtra {
   // Auditoría
   aprobadoPor   String? // HR admin que aprobó
   aprobadoEn    DateTime?
-  motivoRechazo String?  @db.Text
+  motivoRechazo String?   @db.Text
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -755,6 +755,12 @@ model Carpeta {
   compartida Boolean @default(false) // true = accessible by multiple users
   asignadoA  String? @db.Text // 'todos' | 'grupo:id' | 'empleado:id' (comma-separated for multiple)
 
+  // Process linking (onboarding/offboarding)
+  vinculadaAProceso     String? @db.VarChar(50) // 'onboarding' | 'offboarding' | null
+  requiereFirma         Boolean @default(false) // Si requiere firma digital (Fase 2)
+  requiereRellenarDatos Boolean @default(false) // Si requiere completar campos antes de generar documento
+  camposRequeridos      Json? // Array de campos requeridos: ["nif", "direccion", "iban"]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -769,6 +775,7 @@ model Carpeta {
   @@index([empleadoId])
   @@index([parentId])
   @@index([compartida])
+  @@index([vinculadaAProceso])
   @@map("carpetas")
 }
 
@@ -825,9 +832,9 @@ model Contrato {
 
   // Contract details
   tipoContrato      TipoContrato
-  fechaInicio       DateTime  @db.Date
-  fechaFin          DateTime? @db.Date
-  salarioBrutoAnual Decimal   @db.Decimal(10, 2)
+  fechaInicio       DateTime     @db.Date
+  fechaFin          DateTime?    @db.Date
+  salarioBrutoAnual Decimal      @db.Decimal(10, 2)
 
   // Document reference
   documentoId String? @unique // Link to Documento table
@@ -852,21 +859,21 @@ model Contrato {
 /// Nomina - Payslips
 /// Monthly payroll records
 model Nomina {
-  id              String  @id @default(uuid())
-  empleadoId      String
-  contratoId      String? // Contrato vigente en el momento de generación
-  eventoNominaId  String? // Vinculado al ciclo mensual
+  id             String  @id @default(uuid())
+  empleadoId     String
+  contratoId     String? // Contrato vigente en el momento de generación
+  eventoNominaId String? // Vinculado al ciclo mensual
 
   // Period
   mes  Int @db.SmallInt // 1-12
   anio Int @db.SmallInt // 2024-2099
 
   // Amounts (base)
-  salarioBase      Decimal @db.Decimal(10, 2) // Salario base del periodo
+  salarioBase       Decimal @db.Decimal(10, 2) // Salario base del periodo
   totalComplementos Decimal @default(0) @db.Decimal(10, 2) // Suma de complementos asignados
   totalDeducciones  Decimal @default(0) @db.Decimal(10, 2) // Total deducciones (IRPF, SS)
-  totalBruto       Decimal @db.Decimal(10, 2) // Salario base + complementos
-  totalNeto        Decimal @db.Decimal(10, 2) // Total bruto - deducciones
+  totalBruto        Decimal @db.Decimal(10, 2) // Salario base + complementos
+  totalNeto         Decimal @db.Decimal(10, 2) // Total bruto - deducciones
 
   // Días trabajados
   diasTrabajados Int @default(0) @db.SmallInt // Días efectivamente trabajados
@@ -902,10 +909,10 @@ model Nomina {
   updatedAt DateTime @updatedAt
 
   // Relations
-  empleado              Empleado                   @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
-  contrato              Contrato?                  @relation(fields: [contratoId], references: [id], onDelete: SetNull)
-  eventoNomina          EventoNomina?              @relation(fields: [eventoNominaId], references: [id], onDelete: SetNull)
-  documento             Documento?                 @relation(fields: [documentoId], references: [id], onDelete: SetNull)
+  empleado              Empleado                @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+  contrato              Contrato?               @relation(fields: [contratoId], references: [id], onDelete: SetNull)
+  eventoNomina          EventoNomina?           @relation(fields: [eventoNominaId], references: [id], onDelete: SetNull)
+  documento             Documento?              @relation(fields: [documentoId], references: [id], onDelete: SetNull)
   alertas               AlertaNomina[]
   complementosAsignados AsignacionComplemento[]
 
@@ -1043,11 +1050,11 @@ model TipoComplemento {
   id        String @id @default(uuid())
   empresaId String
 
-  nombre      String @db.VarChar(200) // "Plus transporte", "Bonus objetivos"
+  nombre      String  @db.VarChar(200) // "Plus transporte", "Bonus objetivos"
   descripcion String? @db.Text
 
   // Tipo de importe
-  esImporteFijo Boolean @default(true) // true = fijo, false = variable
+  esImporteFijo Boolean  @default(true) // true = fijo, false = variable
   importeFijo   Decimal? @db.Decimal(10, 2) // Si es fijo, el importe por defecto
 
   activo Boolean @default(true)
@@ -1056,7 +1063,7 @@ model TipoComplemento {
   updatedAt DateTime @updatedAt
 
   // Relations
-  empresa              Empresa                @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  empresa              Empresa               @relation(fields: [empresaId], references: [id], onDelete: Cascade)
   empleadoComplementos EmpleadoComplemento[]
 
   @@index([empresaId, activo])
@@ -1077,7 +1084,7 @@ model EmpleadoComplemento {
 
   // Validación de complementos (para nóminas)
   validado        Boolean   @default(false)
-  validadoPor     String?   // Usuario ID que validó
+  validadoPor     String? // Usuario ID que validó
   fechaValidacion DateTime?
   rechazado       Boolean   @default(false)
   motivoRechazo   String?   @db.Text
@@ -1086,9 +1093,9 @@ model EmpleadoComplemento {
   updatedAt DateTime @updatedAt
 
   // Relations
-  empleado        Empleado                   @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
-  tipoComplemento TipoComplemento            @relation(fields: [tipoComplementoId], references: [id], onDelete: Cascade)
-  contrato        Contrato?                  @relation(fields: [contratoId], references: [id], onDelete: SetNull)
+  empleado        Empleado                @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+  tipoComplemento TipoComplemento         @relation(fields: [tipoComplementoId], references: [id], onDelete: Cascade)
+  contrato        Contrato?               @relation(fields: [contratoId], references: [id], onDelete: SetNull)
   asignaciones    AsignacionComplemento[]
 
   @@index([empleadoId, activo])
@@ -1107,9 +1114,9 @@ model AsignacionComplemento {
   importe Decimal @db.Decimal(10, 2)
 
   // Tracking
-  asignadoPor      String? // Usuario ID que asignó
+  asignadoPor     String? // Usuario ID que asignó
   fechaAsignacion DateTime @default(now()) // Fecha de asignación
-  notas           String? @db.Text // Notas adicionales sobre la asignación
+  notas           String?  @db.Text // Notas adicionales sobre la asignación
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1176,9 +1183,9 @@ model SolicitudCambio {
   fechaRespuesta DateTime?
 
   // AI classification
-  revisionIA                Json?    // Análisis del clasificador IA
-  revisadaPorIA             Boolean  @default(false)
-  requiereAprobacionManual  Boolean  @default(false)
+  revisionIA               Json? // Análisis del clasificador IA
+  revisadaPorIA            Boolean @default(false)
+  requiereAprobacionManual Boolean @default(false)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1406,10 +1413,10 @@ model OnboardingConfig {
 
 /// Notificacion - Sistema de notificaciones para usuarios
 model Notificacion {
-  id              String  @id @default(uuid())
-  empresaId       String
-  usuarioId       String
-  eventoNominaId  String? // Vinculado a evento de nómina (opcional)
+  id             String  @id @default(uuid())
+  empresaId      String
+  usuarioId      String
+  eventoNominaId String? // Vinculado a evento de nómina (opcional)
 
   tipo    String @db.VarChar(50) // 'info', 'success', 'warning', 'error', 'ausencia_aprobada', 'ausencia_rechazada', 'nomina_complementos', etc.
   titulo  String @db.VarChar(255)
@@ -1439,24 +1446,24 @@ model Notificacion {
 /// Denuncia - Canal de denuncias internas
 /// Permite a empleados reportar situaciones irregulares de forma anónima o identificada
 model Denuncia {
-  id              String  @id @default(uuid())
-  empresaId       String
-  denuncianteId   String? // NULL si es anónima
+  id            String  @id @default(uuid())
+  empresaId     String
+  denuncianteId String? // NULL si es anónima
 
   // Contenido de la denuncia
-  descripcion     String  @db.Text
-  esAnonima       Boolean @default(false)
+  descripcion String  @db.Text
+  esAnonima   Boolean @default(false)
 
   // Documentos adjuntos (S3 keys en JSON)
-  documentos      Json? // Array de { id, nombre, s3Key, mimeType, tamano, uploadedAt }
+  documentos Json? // Array de { id, nombre, s3Key, mimeType, tamano, uploadedAt }
 
   // Timestamps
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
-  empresa         Empresa  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
-  denunciante     Empleado? @relation(fields: [denuncianteId], references: [id], onDelete: SetNull)
+  empresa     Empresa   @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  denunciante Empleado? @relation(fields: [denuncianteId], references: [id], onDelete: SetNull)
 
   @@index([empresaId])
   @@index([denuncianteId])
