@@ -6,8 +6,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
+import { getSession } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 
 /**
@@ -19,9 +18,9 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const session = await getServerSession(authOptions);
+    const session = await getSession();
 
-    if (!session?.user) {
+    if (!session) {
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
     }
 
@@ -76,9 +75,9 @@ export async function PATCH(
   { params }: { params: { id: string } }
 ) {
   try {
-    const session = await getServerSession(authOptions);
+    const session = await getSession();
 
-    if (!session?.user || session.user.rol !== 'hr_admin') {
+    if (!session || session.user.rol !== 'hr_admin') {
       return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
     }
 
@@ -139,9 +138,9 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
-    const session = await getServerSession(authOptions);
+    const session = await getSession();
 
-    if (!session?.user || session.user.rol !== 'hr_admin') {
+    if (!session || session.user.rol !== 'hr_admin') {
       return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
     }
 

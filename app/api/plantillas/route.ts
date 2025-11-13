@@ -5,8 +5,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
+import { getSession } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { subirDocumento } from '@/lib/s3';
 import { extraerVariablesDePlantilla, extraerCamposPDF } from '@/lib/plantillas';
@@ -18,9 +17,9 @@ import { sanitizarNombreArchivo } from '@/lib/plantillas/sanitizar';
  */
 export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
+    const session = await getSession();
 
-    if (!session?.user) {
+    if (!session) {
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
     }
 
@@ -105,9 +104,9 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
+    const session = await getSession();
 
-    if (!session?.user || session.user.rol !== 'hr_admin') {
+    if (!session || session.user.rol !== 'hr_admin') {
       return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
     }
 
