@@ -803,6 +803,15 @@ model Documento {
   s3Key    String @unique @db.Text // S3 object key
   s3Bucket String @db.VarChar(255)
 
+  // Digital signature fields
+  requiereFirma Boolean   @default(false)
+  firmado       Boolean   @default(false)
+  firmadoEn     DateTime?
+  hashDocumento String?   @db.Text // SHA-256 hash for integrity verification
+
+  // Template generation tracking
+  generadoDesdePlantilla Boolean @default(false)
+
   // AI extraction flag
   procesadoIA    Boolean @default(false)
   datosExtraidos Json? // AI-extracted data (flexible schema)
@@ -824,12 +833,17 @@ model Documento {
   solicitudesFirma    SolicitudFirma[]
   documentoGenerado   DocumentoGenerado?
 
+  // Digital signature relations
+  solicitudesFirma SolicitudFirma[]
+
   @@index([empresaId])
   @@index([empleadoId])
   @@index([carpetaId])
   @@index([puestoId])
   @@index([tipoDocumento])
   @@index([s3Key])
+  @@index([requiereFirma, firmado])
+  @@index([generadoDesdePlantilla])
   @@map("documentos")
 }
 
@@ -1891,39 +1905,48 @@ model JobGeneracionDocumentos {
   @@map("jobs_generacion_documentos")
 }
 
-/// SolicitudFirma - Tracking de solicitudes de firma de documentos
-/// Gestiona el workflow completo de firma digital (simple o cualificada)
+/// SolicitudFirma - Workflow de firma digital para documentos
+/// Gestiona el proceso completo de firma: creación, envío, recordatorios, y seguimiento
 model SolicitudFirma {
   id          String @id @default(uuid())
   empresaId   String
   documentoId String
 
-  // Solicitante
-  solicitadoPor String   // Usuario ID (HR Admin)
-  solicitadoEn  DateTime @default(now())
+  // Solicitante/Creador
+  solicitadoPor String?   @db.VarChar(100) // Usuario ID (HR Admin) - alias de creadoPor
+  creadoPor     String?   @db.VarChar(100) // Usuario ID que creó la solicitud
+  solicitadoEn  DateTime? @default(now())
 
   // Configuración de la solicitud
-  mensaje     String?   @db.Text // Mensaje opcional al empleado
+  titulo      String  @db.VarChar(255)
+  mensaje     String? @db.Text // Mensaje opcional al empleado
   fechaLimite DateTime? // Fecha límite para firmar (opcional)
-  requiereOrden Boolean @default(false) // Firma secuencial (Fase 2)
+  ordenFirma  Boolean @default(false) // Si true, firmantes deben firmar en orden secuencial (alias de requiereOrden)
 
-  // Estado general de la solicitud
-  // Estados: pendiente, completada, expirada, cancelada
+  // Proveedor de firma
+  proveedor String @default("interno") @db.VarChar(50) // 'interno' | 'lleidanetworks' (Fase 2)
+  proveedorData Json? // { envelopeId, accessCode, etc } - Metadata del proveedor externo (si aplica)
+
+  // Recordatorios automáticos
+  recordatorioAutomatico Boolean @default(true)
+  diasRecordatorio       Int     @default(3) // Días entre recordatorios
+
+  // Snapshot del documento (para verificación de integridad)
+  nombreDocumento String @db.VarChar(255)
+  hashDocumento   String @db.Text // SHA-256 del documento original
+
+  // Estado del workflow
+  // Estados: pendiente, en_proceso, completada, expirada, cancelada
   estado String @default("pendiente") @db.VarChar(50)
 
   // Tipo de solicitud (para tracking)
   tipo String @default("individual") @db.VarChar(50) // individual, masiva, automatica
 
-  // Proveedor de firma (para fase 2)
-  proveedor String @default("interno") @db.VarChar(50) // interno, lleida, docusign
-
-  // Metadata del proveedor externo (si aplica)
-  proveedorData Json? // { envelopeId, accessCode, etc }
-
   // Timestamps
-  completadaEn DateTime? // Cuando todos firmaron
-  expiradaEn   DateTime? // Cuando expiró
-  canceladaEn  DateTime? // Cuando HR canceló
+  completadaEn      DateTime? // Cuando todos firmaron
+  expiradaEn        DateTime? // Cuando expiró
+  canceladaEn       DateTime? // Cuando HR canceló
+  motivoCancelacion String?   @db.Text
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1939,6 +1962,8 @@ model SolicitudFirma {
   @@index([fechaLimite])
   @@index([tipo])
   @@index([solicitadoPor])
+  @@index([empresaId, estado])
+  @@index([empresaId, createdAt])
   @@map("solicitudes_firma")
 }
 
@@ -1949,43 +1974,58 @@ model Firma {
   solicitudFirmaId String
   empleadoId       String
 
+  // Orden de firma (solo si ordenFirma=true en SolicitudFirma)
+  orden Int @default(0) // 0 = sin orden, 1+ = secuencia de firma
+
+  // Tipo de firma
+  tipo          String @default("simple") @db.VarChar(50) // 'simple', 'avanzada', 'cualificada'
+  metodoCaptura String @default("click") @db.VarChar(50) // 'click', 'manuscrita', 'certificado' (alias de metodoFirma)
+
   // Estado individual de esta firma
   // Estados: pendiente, visto, firmado, rechazado, expirado
   estado String @default("pendiente") @db.VarChar(50)
+  firmado   Boolean   @default(false)
+  firmadoEn DateTime?
 
   // Tracking de eventos
-  enviadoEn   DateTime  @default(now())
+  enviadoEn   DateTime? // Cuando se envió la solicitud
   vistoEn     DateTime? // Cuando empleado abrió el documento
-  firmadoEn   DateTime? // Cuando firmó
   rechazadoEn DateTime? // Si rechazó (Fase 2)
 
-  // Datos de firma (para auditoría y validez legal)
-  ipAddress String? @db.VarChar(50) // IP desde donde firmó
-  userAgent String? @db.Text // Navegador usado
-  ubicacion Json? // Geolocation opcional (lat, lon, city)
+  // Datos de firma capturados (para auditoría y validez legal)
+  datosCapturados Json? // { tipo: 'click', ip: '...', userAgent: '...', coords: [...] }
+  ipAddress       String? @db.VarChar(50) // IP desde donde firmó
+  userAgent       String? @db.Text // Navegador usado
+  ubicacion       Json? // Geolocation opcional (lat, lon, city)
 
   // Certificado de firma digital
-  certificado String? @db.Text // Hash SHA-256 del documento + timestamp
-  metodoFirma String? @db.VarChar(50) // click, biometrica, otp, certificado
+  certificado     String? @db.Text // Hash SHA-256 del documento + timestamp (alias de certificadoHash)
+  certificadoHash String? @db.Text // Hash SHA-256 del certificado de firma (si aplica)
+  metodoFirma     String? @db.VarChar(50) // click, biometrica, otp, certificado (alias de metodoCaptura)
 
   // Rechazo (Fase 2)
   motivoRechazo String? @db.Text
 
   // Recordatorios enviados
-  recordatoriosEnviados Int       @default(0)
+  recordatoriosEnviados Int       @default(0) // alias de numRecordatorios
+  numRecordatorios      Int       @default(0)
   ultimoRecordatorio    DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   // Relations
-  solicitud SolicitudFirma @relation(fields: [solicitudFirmaId], references: [id], onDelete: Cascade)
-  empleado  Empleado       @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+  solicitudFirma SolicitudFirma @relation(fields: [solicitudFirmaId], references: [id], onDelete: Cascade)
+  empleado       Empleado       @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
 
   @@unique([solicitudFirmaId, empleadoId]) // Un empleado solo firma una vez por solicitud
   @@index([solicitudFirmaId])
   @@index([empleadoId])
   @@index([estado])
+  @@index([firmado])
   @@index([firmadoEn])
+  @@index([enviadoEn])
+  @@index([solicitudFirmaId, firmado])
+  @@index([empleadoId, firmado])
   @@map("firmas")
 }
