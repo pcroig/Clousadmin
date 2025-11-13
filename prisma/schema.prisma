@@ -293,6 +293,11 @@ model Empleado {
   documentosCompletos     Boolean   @default(false)
   documentosCompletadosEn DateTime?
 
+  // Firma guardada (para firma digital rápida)
+  firmaGuardada     Boolean @default(false) // Si el empleado tiene firma guardada
+  firmaS3Key        String? @db.Text // S3 key de la imagen de firma (PNG/SVG)
+  firmaGuardadaData Json? // Datos de trazo de firma manuscrita (opcional)
+
   // Control
   activo    Boolean  @default(true)
   createdAt DateTime @default(now())
@@ -1934,6 +1939,9 @@ model SolicitudFirma {
   // Snapshot del documento (para verificación de integridad)
   nombreDocumento String @db.VarChar(255)
   hashDocumento   String @db.Text // SHA-256 del documento original
+
+  // PDF firmado con marcas visuales (generado al completar todas las firmas)
+  pdfFirmadoS3Key String? @db.Text // S3 key del PDF con marcas de firma
 
   // Estado del workflow
   // Estados: pendiente, en_proceso, completada, expirada, cancelada
