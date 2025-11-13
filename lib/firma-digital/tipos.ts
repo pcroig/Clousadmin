@@ -109,6 +109,7 @@ export interface EstadoSolicitudFirmaDetallado {
   creadoPor?: string;
   createdAt: Date;
   completadaEn?: Date;
+  pdfFirmadoS3Key?: string; // S3 key del PDF con marcas de firma (disponible cuando completada)
 }
 
 /**
