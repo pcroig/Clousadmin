@@ -4,8 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next/auth';
-import { authOptions } from '@/lib/auth';
+import { getSession} from '@/lib/auth';
 import { VARIABLES_DISPONIBLES } from '@/lib/plantillas';
 
 /**
@@ -14,9 +13,9 @@ import { VARIABLES_DISPONIBLES } from '@/lib/plantillas';
  */
 export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
+    const session = await getSession();
 
-    if (!session?.user) {
+    if (!session) {
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
     }
 

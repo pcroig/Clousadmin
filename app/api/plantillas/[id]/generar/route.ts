@@ -4,8 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
+import { getSession } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { agregarJobGeneracion } from '@/lib/plantillas';
 
@@ -18,9 +17,9 @@ export async function POST(
   { params }: { params: { id: string } }
 ) {
   try {
-    const session = await getServerSession(authOptions);
+    const session = await getSession();
 
-    if (!session?.user || session.user.rol !== 'hr_admin') {
+    if (!session || session.user.rol !== 'hr_admin') {
       return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
     }
 
