@@ -624,3 +624,5 @@ Si todos los checkboxes están marcados, has implementado exitosamente el **MVP 
 **Fecha**: 12 de Noviembre 2025  
 **Proyecto**: Clousadmin
 
+
+

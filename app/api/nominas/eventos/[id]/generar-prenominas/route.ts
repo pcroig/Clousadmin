@@ -16,6 +16,9 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const HORAS_EXTRA_MULTIPLICADOR = new Decimal(1.5);
+  const HORAS_MENSUALES_ESTIMADAS = new Decimal(160);
+
   try {
     const session = await getSession();
     if (!session || !['hr_admin', 'platform_admin'].includes(session.user.rol)) {
@@ -143,12 +146,31 @@ export async function POST(
         const salarioAnual = contratoVigente.salarioBrutoAnual ?? new Decimal(0);
         const salarioMensual = salarioAnual.div(12);
         const salarioBase = salarioMensual.mul(diasTrabajados).div(totalDiasMes);
+        const precioHora = salarioMensual.div(HORAS_MENSUALES_ESTIMADAS);
 
         const tieneComplementosVariables = empleado.complementos.some(
           (comp) => !comp.importePersonalizado && !comp.tipoComplemento.importeFijo
         );
 
-        await tx.nomina.create({
+        const compensacionesPendientes = await tx.compensacionHoraExtra.findMany({
+          where: {
+            empleadoId: empleado.id,
+            tipoCompensacion: 'nomina',
+            estado: 'aprobada',
+            nominaId: null,
+          },
+        });
+
+        let horasExtras = new Decimal(0);
+        compensacionesPendientes.forEach((comp) => {
+          horasExtras = horasExtras.plus(new Decimal(comp.horasBalance));
+        });
+
+        const importeHorasExtras = horasExtras.gt(0)
+          ? precioHora.mul(horasExtras).mul(HORAS_EXTRA_MULTIPLICADOR)
+          : new Decimal(0);
+
+        const nuevaNomina = await tx.nomina.create({
           data: {
             empleadoId: empleado.id,
             contratoId: contratoVigente.id,
@@ -157,15 +179,26 @@ export async function POST(
             anio: evento.anio,
             estado: 'pre_nomina',
             salarioBase,
-            totalComplementos: new Decimal(0),
+            totalComplementos: importeHorasExtras,
             totalDeducciones: new Decimal(0),
-            totalBruto: salarioBase,
-            totalNeto: salarioBase,
+            totalBruto: salarioBase.plus(importeHorasExtras),
+            totalNeto: salarioBase.plus(importeHorasExtras),
             diasTrabajados,
             diasAusencias,
             complementosPendientes: tieneComplementosVariables,
           },
         });
+
+        if (compensacionesPendientes.length > 0) {
+          await tx.compensacionHoraExtra.updateMany({
+            where: {
+              id: { in: compensacionesPendientes.map((c) => c.id) },
+            },
+            data: {
+              nominaId: nuevaNomina.id,
+            },
+          });
+        }
 
         if (empleado.complementos.length > 0) {
           empleadosConComplementos += 1;

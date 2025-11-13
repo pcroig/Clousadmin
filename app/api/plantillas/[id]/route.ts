@@ -1,7 +1,7 @@
 /**
  * API: /api/plantillas/[id]
- * GET: Obtener detalle de plantilla
- * PATCH: Actualizar plantilla
+ * GET: Obtener plantilla por ID
+ * PATCH: Actualizar plantilla (metadata)
  * DELETE: Eliminar plantilla
  */
 
@@ -11,7 +11,7 @@ import { prisma } from '@/lib/prisma';
 
 /**
  * GET /api/plantillas/[id]
- * Obtener detalle completo de una plantilla
+ * Obtener detalles de una plantilla
  */
 export async function GET(
   request: NextRequest,
@@ -24,13 +24,14 @@ export async function GET(
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
     }
 
+    const { id } = params;
+
     const plantilla = await prisma.plantillaDocumento.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         _count: {
           select: {
             documentosGenerados: true,
-            jobsGeneracion: true,
           },
         },
       },
@@ -51,7 +52,6 @@ export async function GET(
         ...plantilla,
         variablesUsadas: plantilla.variablesUsadas as string[],
         totalDocumentosGenerados: plantilla._count.documentosGenerados,
-        totalJobsGeneracion: plantilla._count.jobsGeneracion,
       },
     });
   } catch (error) {
@@ -68,7 +68,7 @@ export async function GET(
 
 /**
  * PATCH /api/plantillas/[id]
- * Actualizar plantilla (solo personalizadas)
+ * Actualizar metadata de plantilla
  */
 export async function PATCH(
   request: NextRequest,
@@ -81,35 +81,49 @@ export async function PATCH(
       return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
     }
 
+    const { id } = params;
     const body = await request.json();
-    const { nombre, descripcion, activa, carpetaDestinoDefault, requiereFirma } = body;
 
-    // Obtener plantilla
-    const plantilla = await prisma.plantillaDocumento.findUnique({
-      where: { id: params.id },
+    // Verificar que la plantilla existe y pertenece a su empresa
+    const plantillaExistente = await prisma.plantillaDocumento.findUnique({
+      where: { id },
     });
 
-    if (!plantilla) {
+    if (!plantillaExistente) {
       return NextResponse.json({ error: 'Plantilla no encontrada' }, { status: 404 });
     }
 
-    // Verificar que sea de la empresa y no sea oficial
-    if (plantilla.empresaId !== session.user.empresaId || plantilla.esOficial) {
+    // No permitir editar plantillas oficiales
+    if (plantillaExistente.esOficial) {
       return NextResponse.json(
-        { error: 'No se pueden modificar plantillas oficiales' },
+        { error: 'No se pueden editar plantillas oficiales' },
         { status: 403 }
       );
     }
 
-    // Actualizar
+    // Verificar permisos
+    if (plantillaExistente.empresaId !== session.user.empresaId) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
+    }
+
+    // Actualizar solo campos permitidos
+    const { nombre, descripcion, categoria, activa, carpetaDestinoDefault, requiereFirma, configuracionIA } = body;
+
     const plantillaActualizada = await prisma.plantillaDocumento.update({
-      where: { id: params.id },
+      where: { id },
       data: {
-        nombre,
-        descripcion,
-        activa,
-        carpetaDestinoDefault,
-        requiereFirma,
+        ...(nombre && { nombre }),
+        ...(descripcion !== undefined && { descripcion }),
+        ...(categoria !== undefined && { categoria }),
+        ...(activa !== undefined && { activa }),
+        ...(carpetaDestinoDefault !== undefined && { carpetaDestinoDefault }),
+        ...(requiereFirma !== undefined && { requiereFirma }),
+        ...(configuracionIA !== undefined && { 
+          configuracionIA: {
+            ...(plantillaExistente.configuracionIA as any || {}),
+            ...configuracionIA,
+          } as any,
+        }),
       },
     });
 
@@ -131,7 +145,7 @@ export async function PATCH(
 
 /**
  * DELETE /api/plantillas/[id]
- * Eliminar plantilla (solo personalizadas sin documentos generados)
+ * Eliminar plantilla personalizada
  */
 export async function DELETE(
   request: NextRequest,
@@ -144,46 +158,34 @@ export async function DELETE(
       return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
     }
 
-    // Obtener plantilla
+    const { id } = params;
+
+    // Verificar que la plantilla existe
     const plantilla = await prisma.plantillaDocumento.findUnique({
-      where: { id: params.id },
-      include: {
-        _count: {
-          select: {
-            documentosGenerados: true,
-          },
-        },
-      },
+      where: { id },
     });
 
     if (!plantilla) {
       return NextResponse.json({ error: 'Plantilla no encontrada' }, { status: 404 });
     }
 
-    // Verificar permisos
-    if (plantilla.empresaId !== session.user.empresaId || plantilla.esOficial) {
+    // No permitir eliminar plantillas oficiales
+    if (plantilla.esOficial) {
       return NextResponse.json(
         { error: 'No se pueden eliminar plantillas oficiales' },
         { status: 403 }
       );
     }
 
-    // Verificar que no tenga documentos generados
-    if (plantilla._count.documentosGenerados > 0) {
-      return NextResponse.json(
-        {
-          error: `No se puede eliminar: hay ${plantilla._count.documentosGenerados} documentos generados con esta plantilla`,
-        },
-        { status: 400 }
-      );
+    // Verificar permisos
+    if (plantilla.empresaId !== session.user.empresaId) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
     }
 
-    // Eliminar
+    // Eliminar plantilla (los documentos generados se mantienen por integridad)
     await prisma.plantillaDocumento.delete({
-      where: { id: params.id },
+      where: { id },
     });
-
-    // TODO: Eliminar archivo de S3
 
     return NextResponse.json({
       success: true,

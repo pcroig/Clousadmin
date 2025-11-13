@@ -479,3 +479,5 @@ if (contratoGenerado) {
 **Autor**: Sofia Roig (con asistencia de Claude AI)  
 **Proyecto**: Clousadmin
 
+
+

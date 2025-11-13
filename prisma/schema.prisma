@@ -821,11 +821,6 @@ model Documento {
   procesadoIA    Boolean @default(false)
   datosExtraidos Json? // AI-extracted data (flexible schema)
 
-  // Firma digital tracking
-  requiereFirma Boolean   @default(false) // Si este documento requiere firma
-  firmado       Boolean   @default(false) // Si fue firmado
-  fechaFirma    DateTime? // Fecha de última firma
-
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -837,9 +832,6 @@ model Documento {
   nomina              Nomina? // One-to-one relation: a document can be a payslip PDF
   solicitudesFirma    SolicitudFirma[]
   documentoGenerado   DocumentoGenerado?
-
-  // Digital signature relations
-  solicitudesFirma SolicitudFirma[]
 
   @@index([empresaId])
   @@index([empleadoId])
@@ -1766,6 +1758,12 @@ model PlantillaDocumento {
   usarIAParaExtraer Boolean @default(false) // Usar IA para extraer campos de PDF
   configuracionIA   Json? // Configuración específica de IA para esta plantilla
 
+  // Auto-generation configuration (Fase 4)
+  autoGenerarOnboarding  Boolean @default(false) // Auto-generar al crear empleado (onboarding)
+  autoGenerarOffboarding Boolean @default(false) // Auto-generar al dar de baja empleado (offboarding)
+  requiereRevision       Boolean @default(false) // HR debe revisar antes de enviar a empleado
+  permiteRellenar        Boolean @default(false) // Empleado puede rellenar campos antes de firmar
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -1808,6 +1806,9 @@ model DocumentoGenerado {
   notificado Boolean @default(false)
   visto      Boolean @default(false)
   vistoEn    DateTime?
+  pendienteRellenar Boolean @default(false)
+  camposCompletados Json?
+  rellenadoEn DateTime?
 
   // Firma digital (integración con sistema de firma)
   requiereFirma Boolean   @default(false)

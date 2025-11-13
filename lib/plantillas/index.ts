@@ -34,9 +34,20 @@ export {
 // PDFs rellenables
 export {
   extraerCamposPDF,
+  escanearPDFConVision,
+  fusionarCamposDetectados,
   extraerDatosPDFConVision,
   generarDocumentoDesdePDFRellenable,
 } from './pdf-rellenable';
+
+// Plantillas híbridas
+export {
+  generarDocumentoHibrido,
+  convertirDOCXaPDF,
+  analizarDOCXParaCampos,
+  crearPlantillaHibridaConfig,
+} from './hibrido';
+export type { ConfiguracionHibrido, ResultadoHibrido, ConfiguracionPlantillaHibrida } from './hibrido';
 
 // Utilidades de sanitización
 export {
@@ -68,3 +79,6 @@ export {
   obtenerEstadisticasCola,
   cerrarQueue,
 } from './queue';
+
+// Auto-generación en procesos
+export { autoGenerarDocumentosOffboarding } from './auto-generacion';
