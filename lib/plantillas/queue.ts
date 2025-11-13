@@ -1,0 +1,402 @@
+/**
+ * Sistema de colas con BullMQ para generación asíncrona de documentos
+ * Permite generar documentos en background con tracking de progreso
+ */
+
+import { Queue, Worker, Job, QueueEvents } from 'bullmq';
+import { redis, redisSubscriber } from '@/lib/redis';
+import { JobConfig, ResultadoGeneracion, JobProgress } from './tipos';
+import { generarDocumentoDesdePlantilla } from './generar-documento';
+import { generarDocumentoDesdePDFRellenable } from './pdf-rellenable';
+import { prisma } from '@/lib/prisma';
+
+// Configuración de conexión Redis para BullMQ
+const connection = {
+  host: process.env.REDIS_HOST || 'localhost',
+  port: parseInt(process.env.REDIS_PORT || '6379'),
+  maxRetriesPerRequest: null,
+};
+
+/**
+ * Cola de generación de documentos
+ */
+export const documentosQueue = new Queue('documentos-generacion', {
+  connection,
+  defaultJobOptions: {
+    attempts: 3, // Máximo 3 reintentos
+    backoff: {
+      type: 'exponential',
+      delay: 2000, // Inicial: 2s, luego 4s, 8s
+    },
+    removeOnComplete: {
+      age: 86400, // Mantener jobs completados 24h
+      count: 1000, // Máximo 1000 jobs completados
+    },
+    removeOnFail: {
+      age: 604800, // Mantener jobs fallidos 7 días
+    },
+  },
+});
+
+/**
+ * Eventos de la cola (para tracking en tiempo real)
+ */
+export const documentosQueueEvents = new QueueEvents('documentos-generacion', {
+  connection,
+});
+
+/**
+ * Agregar job de generación de documentos
+ */
+export async function agregarJobGeneracion(config: JobConfig): Promise<string> {
+  console.log(`[Queue] Agregando job para ${config.empleadoIds.length} empleados`);
+
+  // Validar que no exceda el límite
+  if (config.empleadoIds.length > 500) {
+    throw new Error('Máximo 500 empleados por job');
+  }
+
+  // Crear registro en BD
+  const jobRecord = await prisma.jobGeneracionDocumentos.create({
+    data: {
+      empresaId: config.empresaId,
+      plantillaId: config.plantillaId,
+      solicitadoPor: config.solicitadoPor,
+      empleadoIds: config.empleadoIds,
+      configuracion: config.configuracion as any,
+      estado: 'en_cola',
+      totalEmpleados: config.empleadoIds.length,
+    },
+  });
+
+  // Agregar a la cola
+  const job = await documentosQueue.add(
+    'generar-documentos',
+    {
+      jobId: jobRecord.id,
+      ...config,
+    },
+    {
+      jobId: jobRecord.id, // Usar el mismo ID para facilitar tracking
+    }
+  );
+
+  console.log(`[Queue] Job agregado: ${job.id}`);
+
+  return jobRecord.id;
+}
+
+/**
+ * Obtener estado de un job
+ */
+export async function obtenerEstadoJob(jobId: string): Promise<JobProgress | null> {
+  try {
+    // Buscar en BD
+    const jobRecord = await prisma.jobGeneracionDocumentos.findUnique({
+      where: { id: jobId },
+    });
+
+    if (!jobRecord) return null;
+
+    return {
+      jobId: jobRecord.id,
+      estado: jobRecord.estado as any,
+      progreso: jobRecord.progreso,
+      totalEmpleados: jobRecord.totalEmpleados,
+      procesados: jobRecord.procesados,
+      exitosos: jobRecord.exitosos,
+      fallidos: jobRecord.fallidos,
+      resultados: jobRecord.resultados as ResultadoGeneracion[] | undefined,
+      error: jobRecord.error || undefined,
+      tiempoTotal: jobRecord.tiempoTotal || undefined,
+    };
+  } catch (error) {
+    console.error(`[Queue] Error al obtener estado de job ${jobId}:`, error);
+    return null;
+  }
+}
+
+/**
+ * Cancelar job en progreso
+ */
+export async function cancelarJob(jobId: string): Promise<boolean> {
+  try {
+    const job = await documentosQueue.getJob(jobId);
+    if (!job) return false;
+
+    await job.remove();
+
+    // Actualizar en BD
+    await prisma.jobGeneracionDocumentos.update({
+      where: { id: jobId },
+      data: {
+        estado: 'fallido',
+        error: 'Cancelado por el usuario',
+        completadoEn: new Date(),
+      },
+    });
+
+    console.log(`[Queue] Job cancelado: ${jobId}`);
+    return true;
+  } catch (error) {
+    console.error(`[Queue] Error al cancelar job ${jobId}:`, error);
+    return false;
+  }
+}
+
+/**
+ * Worker que procesa los jobs de generación
+ */
+export const documentosWorker = new Worker(
+  'documentos-generacion',
+  async (job: Job) => {
+    const config: JobConfig & { jobId: string } = job.data;
+    const jobId = config.jobId;
+
+    console.log(`[Worker] Procesando job ${jobId} - ${config.empleadoIds.length} empleados`);
+
+    // Actualizar estado a "procesando"
+    await prisma.jobGeneracionDocumentos.update({
+      where: { id: jobId },
+      data: {
+        estado: 'procesando',
+        iniciadoEn: new Date(),
+      },
+    });
+
+    const resultados: ResultadoGeneracion[] = [];
+    const total = config.empleadoIds.length;
+    let exitosos = 0;
+    let fallidos = 0;
+
+    // Obtener formato de plantilla
+    const plantilla = await prisma.plantillaDocumento.findUnique({
+      where: { id: config.plantillaId },
+      select: { formato: true },
+    });
+
+    if (!plantilla) {
+      throw new Error('Plantilla no encontrada');
+    }
+
+    // Procesar cada empleado
+    for (let i = 0; i < config.empleadoIds.length; i++) {
+      const empleadoId = config.empleadoIds[i];
+
+      try {
+        // Generar documento según formato
+        let resultado: ResultadoGeneracion;
+
+        if (plantilla.formato === 'pdf_rellenable') {
+          resultado = await generarDocumentoDesdePDFRellenable(
+            config.plantillaId,
+            empleadoId,
+            config.configuracion,
+            config.solicitadoPor
+          );
+        } else {
+          // DOCX por defecto
+          resultado = await generarDocumentoDesdePlantilla(
+            config.plantillaId,
+            empleadoId,
+            config.configuracion,
+            config.solicitadoPor
+          );
+        }
+
+        resultados.push(resultado);
+
+        if (resultado.success) {
+          exitosos++;
+        } else {
+          fallidos++;
+        }
+      } catch (error) {
+        console.error(`[Worker] Error al procesar empleado ${empleadoId}:`, error);
+
+        resultados.push({
+          success: false,
+          empleadoId,
+          error: error instanceof Error ? error.message : 'Error desconocido',
+        });
+
+        fallidos++;
+      }
+
+      // Actualizar progreso
+      const procesados = i + 1;
+      const progreso = Math.round((procesados / total) * 100);
+
+      await prisma.jobGeneracionDocumentos.update({
+        where: { id: jobId },
+        data: {
+          progreso,
+          procesados,
+          exitosos,
+          fallidos,
+          resultados: resultados as any,
+        },
+      });
+
+      // Reportar progreso al job
+      await job.updateProgress(progreso);
+
+      console.log(`[Worker] Progreso: ${progreso}% (${procesados}/${total})`);
+    }
+
+    // Completar job
+    const tiempoTotal = Date.now() - (job.processedOn || Date.now());
+
+    await prisma.jobGeneracionDocumentos.update({
+      where: { id: jobId },
+      data: {
+        estado: 'completado',
+        progreso: 100,
+        procesados: total,
+        exitosos,
+        fallidos,
+        completadoEn: new Date(),
+        tiempoTotal,
+        resultados: resultados as any,
+      },
+    });
+
+    // Notificar al solicitante
+    await prisma.notificacion.create({
+      data: {
+        empresaId: config.empresaId,
+        usuarioId: config.solicitadoPor,
+        tipo: exitosos === total ? 'success' : fallidos > 0 ? 'warning' : 'info',
+        titulo: 'Generación de documentos completada',
+        mensaje: `Se generaron ${exitosos} documentos exitosamente${fallidos > 0 ? `, ${fallidos} fallidos` : ''}.`,
+        metadata: {
+          jobId,
+          totalEmpleados: total,
+          exitosos,
+          fallidos,
+        },
+      },
+    });
+
+    console.log(`[Worker] Job completado: ${exitosos} exitosos, ${fallidos} fallidos (${tiempoTotal}ms)`);
+
+    return {
+      exitosos,
+      fallidos,
+      total,
+      tiempoTotal,
+    };
+  },
+  {
+    connection,
+    concurrency: 2, // Procesar máximo 2 jobs simultáneamente
+    limiter: {
+      max: 10, // Máximo 10 jobs por...
+      duration: 60000, // ... 60 segundos (rate limiting)
+    },
+  }
+);
+
+/**
+ * Event listeners del worker
+ */
+documentosWorker.on('completed', (job) => {
+  console.log(`[Worker] ✅ Job completado: ${job.id}`);
+});
+
+documentosWorker.on('failed', async (job, error) => {
+  console.error(`[Worker] ❌ Job fallido: ${job?.id}`, error);
+
+  if (job) {
+    const config: JobConfig & { jobId: string } = job.data;
+
+    // Actualizar en BD
+    await prisma.jobGeneracionDocumentos.update({
+      where: { id: config.jobId },
+      data: {
+        estado: 'fallido',
+        error: error.message,
+        completadoEn: new Date(),
+        intentos: { increment: 1 },
+        ultimoIntento: new Date(),
+      },
+    });
+
+    // Notificar al solicitante
+    await prisma.notificacion.create({
+      data: {
+        empresaId: config.empresaId,
+        usuarioId: config.solicitadoPor,
+        tipo: 'error',
+        titulo: 'Error en generación de documentos',
+        mensaje: `Ocurrió un error al generar los documentos: ${error.message}`,
+        metadata: {
+          jobId: config.jobId,
+          error: error.message,
+        },
+      },
+    });
+  }
+});
+
+documentosWorker.on('progress', (job, progress) => {
+  console.log(`[Worker] Job ${job.id} - Progreso: ${progress}%`);
+});
+
+/**
+ * Limpiar jobs antiguos (ejecutar periódicamente)
+ */
+export async function limpiarJobsAntiguos(): Promise<void> {
+  try {
+    // Limpiar jobs completados hace más de 7 días
+    const hace7Dias = new Date();
+    hace7Dias.setDate(hace7Dias.getDate() - 7);
+
+    const eliminados = await prisma.jobGeneracionDocumentos.deleteMany({
+      where: {
+        estado: 'completado',
+        completadoEn: {
+          lt: hace7Dias,
+        },
+      },
+    });
+
+    console.log(`[Queue] Limpiados ${eliminados.count} jobs antiguos`);
+  } catch (error) {
+    console.error('[Queue] Error al limpiar jobs antiguos:', error);
+  }
+}
+
+/**
+ * Obtener estadísticas de la cola
+ */
+export async function obtenerEstadisticasCola() {
+  const [waiting, active, completed, failed] = await Promise.all([
+    documentosQueue.getWaitingCount(),
+    documentosQueue.getActiveCount(),
+    documentosQueue.getCompletedCount(),
+    documentosQueue.getFailedCount(),
+  ]);
+
+  return {
+    enCola: waiting,
+    procesando: active,
+    completados: completed,
+    fallidos: failed,
+  };
+}
+
+/**
+ * Cerrar workers y colas (para shutdown graceful)
+ */
+export async function cerrarQueue(): Promise<void> {
+  console.log('[Queue] Cerrando workers y colas...');
+
+  await Promise.all([
+    documentosWorker.close(),
+    documentosQueue.close(),
+    documentosQueueEvents.close(),
+  ]);
+
+  console.log('[Queue] Workers y colas cerrados');
+}
