@@ -23,6 +23,7 @@ import {
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { UploadNominasModal } from '@/components/payroll/upload-nominas-modal';
+import { ValidarComplementosDialog } from '@/components/payroll/validar-complementos-dialog';
 import { DetailsPanel } from '@/components/shared/details-panel';
 
 interface Nomina {
@@ -136,6 +137,8 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [showUploadModal, setShowUploadModal] = useState(false);
+  const [showValidarComplementosDialog, setShowValidarComplementosDialog] = useState(false);
+  const [eventoIdParaValidar, setEventoIdParaValidar] = useState<string | null>(null);
   const [selectedNominaId, setSelectedNominaId] = useState<string | null>(null);
   const [selectedEventoId, setSelectedEventoId] = useState<string | null>(null);
 
@@ -495,7 +498,7 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
 
               // Lógica de botones según flujo:
               // - Si NO has generado pre-nóminas: "Generar Pre-nóminas"
-              // - Si YA generaste pre-nóminas pero NO has importado: "Importar Nóminas" + "Rellenar Complementos"
+              // - Si YA generaste pre-nóminas pero NO has importado: "Importar Nóminas" + "Validar Complementos"
               const mostrarGenerarPrenominas = !evento.fechaGeneracion;
               const mostrarImportarNominas = evento.fechaGeneracion && !evento.fechaImportacion;
               const mostrarRellenarComplementos = evento.fechaGeneracion && !evento.fechaImportacion;
@@ -511,9 +514,9 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
                       <div className="flex items-center gap-6 flex-1 min-w-0">
                         {/* Período */}
                         <div className="flex-shrink-0">
-                          <h3 className="text-lg font-semibold text-gray-900">
-                            {meses[evento.mes - 1]} {evento.anio}
-                          </h3>
+                            <h3 className="text-lg font-semibold text-gray-900">
+                              {meses[evento.mes - 1]} {evento.anio}
+                            </h3>
                           {evento._count.nominas > 0 && (
                             <p className="text-xs text-gray-500 mt-0.5">
                               {evento._count.nominas} nómina{evento._count.nominas !== 1 ? 's' : ''}
@@ -524,9 +527,9 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
                         {/* Estado */}
                         <div className="flex-shrink-0">
                           <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${estadoInfo.color}`}>
-                            {estadoInfo.label}
-                          </span>
-                        </div>
+                              {estadoInfo.label}
+                            </span>
+                            </div>
 
                         {/* Preview de alertas */}
                         {evento.alertas && evento.alertas.total > 0 && (
@@ -535,7 +538,7 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
                               <div className="flex items-center gap-1 px-2 py-1 bg-red-50 rounded text-xs">
                                 <AlertCircle className="w-3 h-3 text-red-600" />
                                 <span className="text-red-700 font-medium">{evento.alertas.criticas}</span>
-                              </div>
+                          </div>
                             )}
                             {evento.alertas.advertencias > 0 && (
                               <div className="flex items-center gap-1 px-2 py-1 bg-orange-50 rounded text-xs">
@@ -551,7 +554,7 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
                             )}
                           </div>
                         )}
-                      </div>
+                        </div>
 
                       {/* Botones de acción */}
                       <div className="flex items-center gap-2 flex-shrink-0">
@@ -590,25 +593,26 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
                                 variant="outline"
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  setSelectedEventoId(evento.id);
+                                  setEventoIdParaValidar(evento.id);
+                                  setShowValidarComplementosDialog(true);
                                 }}
                                 disabled={isProcessing}
                               >
                                 <CheckCircle className="w-4 h-4 mr-2" />
-                                Rellenar Complementos
+                                Validar Complementos
                               </Button>
                             )}
                           </>
                         )}
-                      </div>
+                                </div>
                     </div>
                   </div>
                 </Card>
-              );
-            })}
-          </div>
+                              );
+                            })}
+                          </div>
         )}
-      </div>
+                        </div>
 
       {/* Upload Modal */}
       <UploadNominasModal
@@ -618,6 +622,19 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
           fetchEventos();
         }}
       />
+
+      {/* Validar Complementos Dialog */}
+      {eventoIdParaValidar && (
+        <ValidarComplementosDialog
+          isOpen={showValidarComplementosDialog}
+          onClose={() => {
+            setShowValidarComplementosDialog(false);
+            setEventoIdParaValidar(null);
+            fetchEventos(); // Refrescar para actualizar badges/stats
+          }}
+          eventoId={eventoIdParaValidar}
+        />
+      )}
 
       {/* Evento Details Panel */}
       {selectedEventoId && (
@@ -637,7 +654,7 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
           onClose={() => setSelectedNominaId(null)}
         />
       )}
-    </div>
+                            </div>
   );
 }
 
@@ -687,12 +704,12 @@ function NominaDetailsPanel({
       {loading ? (
         <div className="flex items-center justify-center h-64">
           <Clock className="w-8 h-8 animate-spin text-gray-400" />
-        </div>
+                          </div>
       ) : nomina ? (
         <div className="space-y-6">
           {/* Información básica */}
           <div className="space-y-4">
-            <div>
+                          <div>
               <h3 className="text-sm font-medium text-gray-700 mb-3">Resumen</h3>
               <dl className="grid grid-cols-2 gap-4 text-sm">
                 <div>
@@ -700,19 +717,19 @@ function NominaDetailsPanel({
                   <dd className="font-medium text-gray-900">
                     €{Number(nomina.salarioBase).toLocaleString('es-ES', { minimumFractionDigits: 2 })}
                   </dd>
-                </div>
+                            </div>
                 <div>
                   <dt className="text-gray-600">Complementos</dt>
                   <dd className="font-medium text-gray-900">
                     €{Number(nomina.totalComplementos).toLocaleString('es-ES', { minimumFractionDigits: 2 })}
                   </dd>
-                </div>
-                <div>
+                          </div>
+                          <div>
                   <dt className="text-gray-600">Deducciones</dt>
                   <dd className="font-medium text-gray-900">
                     €{Number(nomina.totalDeducciones).toLocaleString('es-ES', { minimumFractionDigits: 2 })}
                   </dd>
-                </div>
+                            </div>
                 <div>
                   <dt className="text-gray-600">Total Bruto</dt>
                   <dd className="font-medium text-gray-900">
@@ -724,18 +741,18 @@ function NominaDetailsPanel({
                   <dd className="font-medium text-lg text-green-600">
                     €{Number(nomina.totalNeto).toLocaleString('es-ES', { minimumFractionDigits: 2 })}
                   </dd>
-                </div>
-                <div>
+                          </div>
+                          <div>
                   <dt className="text-gray-600">Días Trabajados</dt>
                   <dd className="font-medium text-gray-900">{nomina.diasTrabajados}</dd>
-                </div>
+                            </div>
                 <div>
                   <dt className="text-gray-600">Días Ausencias</dt>
                   <dd className="font-medium text-gray-900">{nomina.diasAusencias || 0}</dd>
                 </div>
               </dl>
-            </div>
-          </div>
+                          </div>
+                        </div>
 
           {/* Complementos */}
           {nomina.complementosAsignados && nomina.complementosAsignados.length > 0 && (
@@ -747,11 +764,11 @@ function NominaDetailsPanel({
                     <span className="text-gray-700">{comp.empleadoComplemento.tipoComplemento.nombre}</span>
                     <span className="font-medium text-gray-900">
                       €{Number(comp.importe).toLocaleString('es-ES', { minimumFractionDigits: 2 })}
-                    </span>
-                  </div>
+                                  </span>
+                                </div>
                 ))}
-              </div>
-            </div>
+                                </div>
+                                </div>
           )}
 
           {/* Alertas */}
@@ -767,10 +784,10 @@ function NominaDetailsPanel({
                         <p className="font-medium text-red-900">{alerta.mensaje}</p>
                         {alerta.detalles && (
                           <p className="text-xs text-red-700 mt-1">{JSON.stringify(alerta.detalles)}</p>
-                        )}
+                              )}
+                            </div>
+                          </div>
                       </div>
-                    </div>
-                  </div>
                 ))}
               </div>
             </div>
@@ -778,8 +795,8 @@ function NominaDetailsPanel({
 
           {/* Botón para ver perfil completo */}
           <div className="pt-4 border-t">
-            <Button
-              variant="outline"
+                        <Button
+                          variant="outline"
               className="w-full"
               onClick={() => {
                 router.push(`/hr/organizacion/personas/${nomina.empleadoId}`);
@@ -788,7 +805,7 @@ function NominaDetailsPanel({
             >
               <User className="w-4 h-4 mr-2" />
               Ver perfil completo del empleado
-            </Button>
+                        </Button>
           </div>
         </div>
       ) : null}
@@ -887,15 +904,15 @@ function EventoDetailsPanel({
                   <dd className="font-medium text-gray-900">
                     {new Date(evento.fechaGeneracion).toLocaleDateString('es-ES')}
                   </dd>
-                </div>
-              )}
+                          </div>
+                        )}
               {evento.fechaImportacion && (
                 <div>
                   <dt className="text-gray-600">Importado</dt>
                   <dd className="font-medium text-gray-900">
                     {new Date(evento.fechaImportacion).toLocaleDateString('es-ES')}
                   </dd>
-                </div>
+                      </div>
               )}
               {evento.fechaPublicacion && (
                 <div>
@@ -903,10 +920,10 @@ function EventoDetailsPanel({
                   <dd className="font-medium text-gray-900">
                     {new Date(evento.fechaPublicacion).toLocaleDateString('es-ES')}
                   </dd>
-                </div>
+                    </div>
               )}
             </dl>
-          </div>
+                  </div>
 
           {/* Alertas del evento */}
           {evento.alertas && evento.alertas.total > 0 && (
@@ -917,7 +934,7 @@ function EventoDetailsPanel({
                   <div className="flex items-center gap-2 p-2 bg-red-50 rounded">
                     <AlertCircle className="w-4 h-4 text-red-600" />
                     <span className="text-red-900">{evento.alertas.criticas} alerta{evento.alertas.criticas !== 1 ? 's' : ''} crítica{evento.alertas.criticas !== 1 ? 's' : ''}</span>
-                  </div>
+                        </div>
                 )}
                 {evento.alertas.advertencias > 0 && (
                   <div className="flex items-center gap-2 p-2 bg-orange-50 rounded">
@@ -941,53 +958,53 @@ function EventoDetailsPanel({
               <h3 className="text-sm font-medium text-gray-700 mb-3">Nóminas ({evento.nominas.length})</h3>
               <div className="space-y-2">
                 {evento.nominas.map((nomina: any) => {
-                  const estadoNominaInfo = estadosNominaLabels[nomina.estado] || {
-                    label: nomina.estado,
+                            const estadoNominaInfo = estadosNominaLabels[nomina.estado] || {
+                              label: nomina.estado,
                     color: 'text-gray-700',
-                  };
+                            };
 
-                  return (
+                            return (
                     <button
-                      key={nomina.id}
+                                key={nomina.id}
                       onClick={() => onSelectNomina(nomina.id)}
                       className="w-full p-3 bg-gray-50 hover:bg-gray-100 rounded-lg text-left transition-colors"
-                    >
-                      <div className="flex items-center justify-between">
+                              >
+                                <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3 flex-1">
                           <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center flex-shrink-0">
                             <User className="w-4 h-4 text-gray-600" />
-                          </div>
+                                    </div>
                           <div className="min-w-0">
-                            <div className="flex items-center gap-2">
+                                      <div className="flex items-center gap-2">
                               <h4 className="font-medium text-gray-900 text-sm truncate">
-                                {nomina.empleado.nombre} {nomina.empleado.apellidos}
-                              </h4>
-                              <span className={`text-xs font-medium ${estadoNominaInfo.color}`}>
-                                {estadoNominaInfo.label}
-                              </span>
-                            </div>
+                                          {nomina.empleado.nombre} {nomina.empleado.apellidos}
+                                        </h4>
+                                        <span className={`text-xs font-medium ${estadoNominaInfo.color}`}>
+                                          {estadoNominaInfo.label}
+                                        </span>
+                                      </div>
                             <p className="text-xs text-gray-600 truncate">{nomina.empleado.email}</p>
-                          </div>
-                        </div>
+                                    </div>
+                                        </div>
                         <div className="text-sm font-medium text-gray-900 ml-2">
                           €{Number(nomina.totalNeto).toLocaleString('es-ES')}
-                        </div>
-                      </div>
+                                      </div>
+                                        </div>
                     </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
+                            );
+                          })}
+                        </div>
+                        </div>
+                      )}
 
           {/* No hay nóminas */}
           {(!evento.nominas || evento.nominas.length === 0) && (
             <div className="p-8 text-center text-gray-500">
               <FileText className="w-8 h-8 mx-auto mb-2 text-gray-400" />
               <p className="text-sm">No hay nóminas generadas para este evento.</p>
-            </div>
-          )}
-        </div>
+                    </div>
+                  )}
+          </div>
       ) : null}
     </DetailsPanel>
   );

@@ -106,6 +106,7 @@ export async function POST(
     const totalDiasMes = new Date(evento.anio, evento.mes, 0).getDate();
     let empleadosConComplementos = 0;
     let complementosAsignados = 0;
+    let empleadosConComplementosPendientes = 0;
 
     await prisma.$transaction(async (tx) => {
       for (const empleado of empleados) {
@@ -170,6 +171,10 @@ export async function POST(
           empleadosConComplementos += 1;
           complementosAsignados += empleado.complementos.length;
         }
+
+        if (tieneComplementosVariables) {
+          empleadosConComplementosPendientes += 1;
+        }
       }
 
       await tx.eventoNomina.update({
@@ -191,6 +196,8 @@ export async function POST(
       nominasGeneradas: empleados.length,
       empleadosProcesados: empleados.length,
       alertasGeneradas: 0, // Las alertas se detectan en procesos posteriores
+      complementosPendientes: empleadosConComplementosPendientes > 0,
+      empleadosConComplementosPendientes,
     });
   } catch (error) {
     console.error('[POST /api/nominas/eventos/[id]/generar-prenominas] Error:', error);
