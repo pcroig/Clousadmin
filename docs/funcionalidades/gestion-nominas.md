@@ -273,7 +273,148 @@ Confirma y crea nóminas desde la sesión de upload directo.
 4. Vincula documentos a nóminas
 5. Retorna resumen de nóminas creadas
 
-#### 4.6 Publicar y Notificar
+#### 4.6 Validar Complementos Masivamente ⭐ NUEVO
+`POST /api/nominas/eventos/[id]/validar-complementos`
+
+Permite validar o rechazar complementos de empleados de un evento de forma masiva.
+
+**Request:**
+```typescript
+{
+  complementoIds: string[],
+  accion: 'validar' | 'rechazar',
+  motivoRechazo?: string  // Requerido si accion === 'rechazar'
+}
+```
+
+**Permisos:**
+- `hr_admin` y `platform_admin`: Pueden validar cualquier complemento del evento
+- `manager`: Solo puede validar complementos de empleados de su equipo
+
+**Proceso:**
+1. Verifica permisos según rol
+2. Para managers, valida que todos los complementos pertenezcan a su equipo
+3. Actualiza campos de validación en `EmpleadoComplemento`:
+   - `validado`: true/false
+   - `rechazado`: true/false
+   - `validadoPor`: ID del usuario que valida
+   - `fechaValidacion`: Fecha actual
+   - `motivoRechazo`: Motivo si se rechaza
+
+**Respuesta:**
+```json
+{
+  "success": true,
+  "complementosActualizados": 5,
+  "accion": "validar"
+}
+```
+
+**Endpoint relacionado:**
+- `GET /api/nominas/eventos/[id]/complementos-pendientes` - Lista complementos pendientes de validación
+
+#### 4.7 Compensar Horas Extra Masivamente (Bolsa de Horas) ⭐ NUEVO
+`POST /api/nominas/eventos/[id]/compensar-horas-masivo`
+
+Permite compensar horas extra de múltiples empleados de un evento. Las horas pueden compensarse como ausencias (días de vacaciones) o como complemento en nómina.
+
+**Request:**
+```typescript
+{
+  empleadoIds: string[],
+  tipoCompensacion: 'ausencia' | 'nomina',
+  horasPorEmpleado?: Record<string, number>,  // { empleadoId: horas }
+  usarTodasLasHoras: boolean  // Si true, usa todo el balance disponible
+}
+```
+
+**Permisos:**
+- Solo `hr_admin` y `platform_admin`
+
+**Proceso:**
+
+**Tipo `ausencia`:**
+1. Calcula balance mensual de horas extra para cada empleado
+2. Convierte horas a días (8 horas = 1 día)
+3. Crea ausencia auto-aprobada de tipo `otro`
+4. Actualiza saldo de ausencias del empleado (suma días)
+5. Crea registro `CompensacionHoraExtra` vinculado a la ausencia
+
+**Tipo `nomina`:**
+1. Calcula balance mensual de horas extra para cada empleado
+2. Crea registro `CompensacionHoraExtra` con estado `aprobada`
+3. La compensación se asignará automáticamente a la pre-nómina cuando se genere
+
+**Integración con Pre-nóminas:**
+- Las compensaciones tipo `nomina` se incluyen automáticamente en `totalComplementos` al generar pre-nóminas
+- Se calcula el importe según las horas compensadas y el salario del empleado
+
+**Respuesta:**
+```json
+{
+  "success": true,
+  "compensacionesCreadas": 8,
+  "errores": 0,
+  "detalles": {
+    "compensaciones": ["empleadoId1", "empleadoId2"],
+    "errores": []
+  }
+}
+```
+
+**Endpoints relacionados:**
+- `GET /api/empleados/[id]/balance-horas-mes?mes=X&anio=Y` - Obtiene balance mensual de horas extra
+
+#### 4.8 Obtener Incidencias de una Nómina ⭐ NUEVO
+`GET /api/nominas/[id]/incidencias`
+
+Devuelve todas las incidencias relevantes para una nómina: ausencias, cambios de contrato (altas/bajas) y resumen de fichajes del mes.
+
+**Permisos:**
+- `hr_admin` y `platform_admin`: Acceso completo
+- `manager`: Solo nóminas de su equipo
+- `empleado`: Solo su propia nómina
+
+**Respuesta:**
+```json
+{
+  "nominaId": "uuid",
+  "mes": 1,
+  "anio": 2025,
+  "incidencias": {
+    "ausencias": [
+      {
+        "id": "uuid",
+        "tipo": "vacaciones",
+        "estado": "completada",
+        "fechaInicio": "2025-01-15T00:00:00Z",
+        "fechaFin": "2025-01-20T00:00:00Z",
+        "diasSolicitados": 5
+      }
+    ],
+    "contratos": [
+      {
+        "id": "uuid",
+        "fechaInicio": "2025-01-10T00:00:00Z",
+        "fechaFin": null,
+        "tipoContrato": "indefinido"
+      }
+    ],
+    "fichajes": {
+      "diasRegistrados": 20,
+      "diasPendientes": 2,
+      "horasTrabajadas": 160.5
+    }
+  }
+}
+```
+
+**Lógica:**
+- **Ausencias**: Solo incluye ausencias confirmadas o completadas que se solapan con el período de la nómina
+- **Contratos**: Incluye contratos cuya fecha de inicio o fin cae dentro del mes de la nómina
+- **Fichajes**: Resumen de todos los fichajes del mes con totales
+
+#### 4.9 Publicar y Notificar
 `POST /api/nominas/eventos/[id]/publicar`
 
 Publica nóminas para que los empleados puedan verlas.
@@ -284,6 +425,10 @@ Publica nóminas para que los empleados puedan verlas.
 3. Sincroniza el estado del `EventoNomina` con las nóminas publicadas
 4. Recalcula estadísticas del evento (empleados con complementos, etc.)
 5. Crea notificaciones para todos los empleados
+
+**Nota sobre Exportar:**
+- El botón "Exportar Pre-nóminas" muestra un diálogo de confirmación si existen alertas críticas
+- Permite continuar con la exportación incluso si hay alertas (solo advierte)
 
 ### 5. Asignación de Complementos a Nóminas
 
@@ -308,7 +453,12 @@ Permite asignar complementos específicos a nóminas individuales.
 - Título "Nóminas" con descripción
 - Botones de acción:
   - **Subir Nóminas**: Subida directa de PDFs sin generar evento (flujo alternativo)
-  - **Generar Evento Mensual**: Crea evento y genera pre-nóminas automáticamente
+  - **Generar Evento Mensual**: Crea evento mensual. Incluye un **checkbox** "Generar pre-nóminas automáticamente" para controlar si se crean las pre-nóminas en el momento o se harán manualmente más tarde.
+
+**Nota sobre Período Vencido:**
+- Si la fecha actual es antes del día 10 del mes, el sistema muestra automáticamente el mes anterior como "mes actual"
+- Esto permite trabajar con nóminas del mes vencido hasta el día 10 del mes siguiente
+- Ejemplo: Si estamos el 5 de enero, el sistema muestra diciembre como mes actual
 
 **Lista de Eventos (Cards Clickeables):**
 
@@ -317,16 +467,16 @@ Cada card es **completamente clickeable** y muestra un preview básico:
 **Información visible en la card (`className="p-5"`):**
 - **Período**: Mes y año (ej: "Enero 2025")
 - **Estado**: Badge con color según estado del workflow
+- **Workflow Stepper**: Versión compacta del `WorkflowStepper` que muestra el progreso del evento (generando → publicados)
 - **Número de nóminas**: Contador de nóminas generadas
-- **Preview de alertas**: Badges compactos con conteo:
-  - 🔴 Críticas (rojo)
-  - 🟠 Advertencias (naranja)
-  - 🔵 Informativas (azul)
+- **Resumen de alertas**: `AlertasSummary` compacto con los totales por criticidad (clicable para ir al panel)
 
 **Botones de acción dentro de la card:**
-- **Generar Pre-nóminas**: Visible si `!fechaGeneracion` (evento sin pre-nóminas)
-- **Importar Nóminas**: Visible si `fechaGeneracion && !fechaImportacion` (pre-nóminas generadas pero sin importar)
-- **Rellenar Complementos**: Visible si `fechaGeneracion && !fechaImportacion` (mismo estado que importar)
+- **Generar Pre-nóminas**: Visible si `!fechaGeneracion`
+- **Exportar Pre-nóminas**: Visible si `fechaGeneracion && !fechaExportacion`. Lanza diálogo de confirmación si existen alertas críticas.
+- **Compensar Horas**: Siempre disponible; abre el diálogo de bolsa de horas (ver sección 3)
+- **Importar Nóminas**: Visible si `fechaGeneracion && !fechaImportacion`
+- **Validar Complementos**: Visible si `fechaGeneracion && !fechaImportacion` y abre el `ValidarComplementosDialog`
 - Todos los botones usan `stopPropagation()` para no activar el click de la card
 
 **Comportamiento:**
@@ -344,19 +494,19 @@ Panel lateral que se abre al hacer click en una card de evento.
 **Header del Panel:**
 - Título: "Evento de Nóminas - [Mes] [Año]"
 - Botón cerrar (X)
+- `WorkflowStepper` completo ocupando la parte superior del panel
 
 **Contenido:**
 
 **1. Información del Evento:**
-- Estado actual
+  - Estado actual
 - Total de nóminas
 - Fecha de generación (si existe)
 - Fecha de importación (si existe)
 - Fecha de publicación (si existe)
 
 **2. Alertas del Evento:**
-- Agrupadas por tipo (Críticas, Advertencias, Informativas)
-- Cada tipo muestra conteo y badge de color
+- Se usa `AlertasSummary` para mostrar totales de críticas/advertencias/informativas con diseño consistente
 
 **3. Lista de Nóminas (Sub-eventos):**
 - Cada nómina es un botón clickeable
@@ -401,8 +551,13 @@ Panel lateral que se abre al hacer click en una nómina dentro del `EventoDetail
   - Mensaje
   - Detalles (si existen)
 
-**4. Acción:**
-- Botón "Ver perfil completo del empleado" → Navega a `/hr/organizacion/personas/[id]`
+**4. Incidencias (Nueva sección):**
+- **Ausencias**: listado de ausencias del mes con tipo, estado y fechas
+- **Cambios de contrato**: altas/bajas cuya fecha cae dentro del mes
+- **Resumen de fichajes**: días registrados, días pendientes y horas trabajadas acumuladas
+
+**5. Acciones:**
+- Botón para ver el perfil completo del empleado
 
 ### 4. Subida Directa de Nóminas ⭐
 
@@ -446,13 +601,37 @@ model TipoComplemento {
 ### EmpleadoComplemento
 ```prisma
 model EmpleadoComplemento {
-  id                   String   @id @default(uuid())
+  id                   String    @id @default(uuid())
   empleadoId           String
   tipoComplementoId    String
   contratoId           String?
   importePersonalizado Decimal?
-  fechaAsignacion      DateTime @default(now())
-  activo               Boolean  @default(true)
+  fechaAsignacion      DateTime  @default(now())
+  activo               Boolean   @default(true)
+  // Campos de validación ⭐ NUEVO
+  validado             Boolean   @default(false)
+  validadoPor          String?
+  fechaValidacion      DateTime?
+  rechazado            Boolean   @default(false)
+  motivoRechazo        String?
+}
+```
+
+### CompensacionHoraExtra ⭐ NUEVO
+```prisma
+model CompensacionHoraExtra {
+  id                String   @id @default(uuid())
+  empresaId         String
+  empleadoId        String
+  horasBalance      Decimal
+  tipoCompensacion  String   // 'ausencia' | 'nomina'
+  estado            String   // 'pendiente' | 'aprobada' | 'rechazada'
+  diasAusencia      Decimal? // Solo si tipoCompensacion === 'ausencia'
+  ausenciaId        String?  // Solo si tipoCompensacion === 'ausencia'
+  aprobadoPor       String?
+  aprobadoEn        DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 }
 ```
 
@@ -671,9 +850,28 @@ Desde la refactorización de noviembre 2025 todos los cambios de estado utilizan
   - API `/api/nominas/eventos/[id]` incluye alertas no resueltas de cada nómina.
   - Vista principal muestra alertas clickeables que navegan a página de detalles.
   - Página de detalles tiene tab dedicado con filtros por tipo.
-  - Componentes reutilizables: `AlertaBadge` y `AlertaList`.
+  - Componentes reutilizables: `AlertaBadge`, `AlertaList` y `AlertasSummary`.
 - Solo se exponen alertas **no resueltas** para mantener el foco.
 - Endpoint de resolución: `POST /api/nominas/alertas/[id]/resolver`
+
+**Tipos de Alertas:**
+
+**Críticas** (bloquean exportación):
+- `NO_IBAN`: Sin IBAN configurado
+- `NO_NSS`: Sin número de Seguridad Social
+- `NO_SALARIO`: Salario no configurado
+- `FICHAJE_INCOMPLETO`: Fichajes sin cerrar de días pasados
+
+**Advertencias** (requieren revisión pero no bloquean):
+- `COMPLEMENTOS_PENDIENTES`: Complementos sin validar ⭐ NUEVO
+- `AUSENCIAS_PENDIENTES`: Ausencias pendientes de aprobación ⭐ NUEVO
+- `HORAS_BAJAS`: Horas trabajadas significativamente por debajo de lo esperado
+- `HORAS_ALTAS`: Horas trabajadas significativamente por encima de lo esperado
+
+**Informativas** (solo informan):
+- `ALTA_CONTRATO`: Alta de contrato durante el mes ⭐ NUEVO
+- `BAJA_CONTRATO`: Baja de contrato durante el mes ⭐ NUEVO
+- `SIN_FICHAJES`: Sin fichajes registrados en el mes
 
 ### Reportes y Analítica de Nóminas
 
@@ -701,6 +899,33 @@ Desde la refactorización de noviembre 2025 todos los cambios de estado utilizan
 - Props: `alertas`, `onResolve`
 - Acciones: Ver empleado, Resolver alerta
 
+**`components/payroll/alertas-summary.tsx`** ⭐ NUEVO
+- Resumen visual de alertas por criticidad
+- Props: `alertas` (objeto con total, criticas, advertencias, informativas), `compact`, `onClick`
+- Muestra totales con iconos y colores diferenciados
+- Versión compacta para cards, versión completa para paneles
+
+**`components/payroll/workflow-stepper.tsx`** ⭐ NUEVO
+- Visualizador de progreso del workflow de nóminas
+- Props: `estadoActual`, `compact`
+- Muestra los 6 estados del workflow con indicadores visuales
+- Versión compacta (solo puntos) y completa (con etiquetas)
+
+**`components/payroll/validar-complementos-dialog.tsx`** ⭐ NUEVO
+- Diálogo para validar/rechazar complementos de forma masiva
+- Lista todos los empleados del evento con sus complementos pendientes
+- Filtros por empleado y estado de validación
+- Acciones masivas: validar todos, rechazar todos, o selección individual
+- Integra con `GET /api/nominas/eventos/[id]/complementos-pendientes` y `POST /api/nominas/eventos/[id]/validar-complementos`
+
+**`components/payroll/compensar-horas-dialog.tsx`** ⭐ NUEVO
+- Diálogo para compensar horas extra de forma masiva
+- Lista empleados con balance de horas extra disponible
+- Opciones de compensación:
+  - Tipo: `ausencia` (días de vacaciones) o `nomina` (complemento salarial)
+  - Horas: usar todas las horas disponibles o especificar por empleado
+- Integra con `GET /api/empleados/[id]/balance-horas-mes` y `POST /api/nominas/eventos/[id]/compensar-horas-masivo`
+
 **`components/payroll/upload-nominas-modal.tsx`**
 - Modal completo para subida directa de PDFs
 - 3 estados: Upload → Review → Success
@@ -715,12 +940,13 @@ Desde la refactorización de noviembre 2025 todos los cambios de estado utilizan
 
 **`app/(dashboard)/hr/payroll/payroll-client.tsx`**
 - Client component principal
-- **Cards clickeables** de eventos (preview con info básica)
-- **EventoDetailsPanel**: Componente interno que muestra detalles del evento
-- **NominaDetailsPanel**: Componente interno que muestra detalles de nómina individual
-- Integra modal de upload (`UploadNominasModal`)
-- Maneja estados: `selectedEventoId`, `selectedNominaId`
-- Lógica de botones dinámicos según `fechaGeneracion` y `fechaImportacion`
+- **Checkbox** en el header para auto-generar o no pre-nóminas al crear el evento
+- **Cards clickeables** de eventos (preview con info básica, stepper compacto y `AlertasSummary`)
+- **EventoDetailsPanel**: Stepper completo + alertas + lista de nóminas
+- **NominaDetailsPanel**: Resumen, complementos, alertas e **incidencias** (ausencias, contratos, fichajes)
+- Integra modales: `UploadNominasModal`, `ValidarComplementosDialog`, `CompensarHorasDialog`
+- Maneja estados: `selectedEventoId`, `selectedNominaId`, `eventoIdParaValidar`, `eventoCompensarContext`
+- Lógica de botones dinámicos según `fechaGeneracion`, `fechaExportacion` y `fechaImportacion`
 
 **Componentes Internos (dentro de `payroll-client.tsx`):**
 
@@ -760,14 +986,22 @@ app/api/nominas/
 │       ├── exportar/route.ts         # Exportar Excel
 │       ├── generar-prenominas/route.ts # Generar pre-nóminas
 │       ├── importar/route.ts         # Importar PDFs
-│       └── publicar/route.ts         # Publicar nóminas
+│       ├── publicar/route.ts         # Publicar nóminas
+│       ├── validar-complementos/route.ts ⭐ NUEVO # Validar complementos masivamente
+│       ├── complementos-pendientes/route.ts ⭐ NUEVO # Listar complementos pendientes
+│       └── compensar-horas-masivo/route.ts ⭐ NUEVO # Compensar horas extra masivamente
 ├── [id]/
-│   └── route.ts                      # GET detalles de nómina individual
+│   ├── route.ts                      # GET detalles de nómina individual
+│   └── incidencias/route.ts ⭐ NUEVO # GET incidencias (ausencias, contratos, fichajes)
 ├── upload/route.ts                   # Upload directo (sin evento)
 ├── confirmar-upload/route.ts        # Confirmar upload directo
 └── alertas/
     └── [id]/
         └── resolver/route.ts         # Resolver alerta
+
+app/api/empleados/
+└── [id]/
+    └── balance-horas-mes/route.ts ⭐ NUEVO # GET balance mensual de horas extra
 ```
 
 **Nota:** Ya no existen páginas separadas para detalles de evento o nómina. Todo se maneja mediante `DetailsPanel` lateral desde la vista principal.

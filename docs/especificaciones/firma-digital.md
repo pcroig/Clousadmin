@@ -1610,3 +1610,5 @@ describe('generarCertificadoFirma', () => {
 **Autor**: Sofia Roig (con asistencia de Claude AI)  
 **Proyecto**: Clousadmin - Sistema de Gestión de RRHH
 
+
+

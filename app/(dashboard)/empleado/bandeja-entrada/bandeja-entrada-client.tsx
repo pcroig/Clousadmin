@@ -5,6 +5,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { CheckCircle2, XCircle, Clock, Info } from 'lucide-react';
 
@@ -184,6 +185,7 @@ export function BandejaEntradaEmpleadoClient({
                         <p className="text-sm text-gray-600 mt-1">
                           {notif.mensaje}
                         </p>
+                        {renderAccion(notif.metadata)}
                       </div>
                       {!notif.leida && (
                         <div className="w-2 h-2 bg-[#d97757] rounded-full ml-2 mt-2 flex-shrink-0" />
@@ -205,6 +207,25 @@ export function BandejaEntradaEmpleadoClient({
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+function renderAccion(metadata?: Record<string, unknown>) {
+  if (!metadata || typeof metadata.url !== 'string') {
+    return null;
+  }
+
+  return (
+    <div className="mt-3">
+      <Button
+        asChild
+        variant="outline"
+        size="sm"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <Link href={metadata.url}>Ver detalle</Link>
+      </Button>
     </div>
   );
 }

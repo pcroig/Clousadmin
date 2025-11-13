@@ -485,3 +485,5 @@ Los datos sensibles se encriptan antes de guardar:
 **Última actualización:** 2025-01-27  
 **Versión:** 2.0.0
 
+
+

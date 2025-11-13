@@ -177,6 +177,66 @@ async function detectarAlertasAdvertencia(
   const fechaFin = new Date(anio, mes, 0);
   fechaFin.setHours(23, 59, 59, 999);
 
+  // Complementos pendientes de validación
+  const complementosPendientes = await prisma.empleadoComplemento.count({
+    where: {
+      empleadoId,
+      activo: true,
+      validado: false,
+      rechazado: false,
+    },
+  });
+
+  if (complementosPendientes > 0) {
+    alertas.push({
+      empleadoId,
+      tipo: 'advertencia',
+      categoria: 'datos_faltantes',
+      codigo: 'COMPLEMENTOS_PENDIENTES',
+      mensaje: `${complementosPendientes} complemento(s) pendientes de validar`,
+      detalles: {
+        complementosPendientes,
+      },
+      accionUrl: `/hr/organizacion/personas/${empleadoId}?tab=complementos`,
+    });
+  }
+
+  // Ausencias pendientes de aprobación
+  const ausenciasPendientes = await prisma.ausencia.count({
+    where: {
+      empleadoId,
+      estado: EstadoAusencia.pendiente,
+      OR: [
+        {
+          fechaInicio: {
+            gte: fechaInicio,
+            lte: fechaFin,
+          },
+        },
+        {
+          fechaFin: {
+            gte: fechaInicio,
+            lte: fechaFin,
+          },
+        },
+      ],
+    },
+  });
+
+  if (ausenciasPendientes > 0) {
+    alertas.push({
+      empleadoId,
+      tipo: 'advertencia',
+      categoria: 'ausencias',
+      codigo: 'AUSENCIAS_PENDIENTES',
+      mensaje: `${ausenciasPendientes} ausencia(s) pendientes de aprobación`,
+      detalles: {
+        ausenciasPendientes,
+      },
+      accionUrl: `/hr/horario/ausencias?empleadoId=${empleadoId}&estado=pendiente`,
+    });
+  }
+
   // 1. HORAS_BAJAS / HORAS_ALTAS: Comparar horas trabajadas con esperadas
   const fichajes = await prisma.fichaje.findMany({
     where: {
@@ -476,9 +536,69 @@ async function detectarAlertasInformativas(
     });
   }
 
-  // 2. CAMBIO_SALARIO: Salario modificado mid-mes
-  // (Requeriría tracking de cambios - por ahora solo placeholder)
-  // TODO: Implementar si se agrega historial de cambios salariales
+  // 2. Altas/Bajas de contrato dentro del mes
+  const contratosMes = await prisma.contrato.findMany({
+    where: {
+      empleadoId,
+      OR: [
+        {
+          fechaInicio: {
+            gte: new Date(anio, mes - 1, 1),
+            lte: new Date(anio, mes, 0, 23, 59, 59),
+          },
+        },
+        {
+          fechaFin: {
+            gte: new Date(anio, mes - 1, 1),
+            lte: new Date(anio, mes, 0, 23, 59, 59),
+          },
+        },
+      ],
+    },
+    select: {
+      fechaInicio: true,
+      fechaFin: true,
+      tipoContrato: true,
+    },
+  });
+
+  contratosMes.forEach((contrato) => {
+    if (
+      contrato.fechaInicio &&
+      contrato.fechaInicio.getMonth() + 1 === mes &&
+      contrato.fechaInicio.getFullYear() === anio
+    ) {
+      alertas.push({
+        empleadoId,
+        tipo: 'info',
+        categoria: 'cambios',
+        codigo: 'ALTA_CONTRATO',
+        mensaje: `Alta de contrato (${contrato.tipoContrato})`,
+        detalles: {
+          fechaInicio: contrato.fechaInicio,
+          tipoContrato: contrato.tipoContrato,
+        },
+      });
+    }
+
+    if (
+      contrato.fechaFin &&
+      contrato.fechaFin.getMonth() + 1 === mes &&
+      contrato.fechaFin.getFullYear() === anio
+    ) {
+      alertas.push({
+        empleadoId,
+        tipo: 'info',
+        categoria: 'cambios',
+        codigo: 'BAJA_CONTRATO',
+        mensaje: `Baja de contrato (${contrato.tipoContrato})`,
+        detalles: {
+          fechaFin: contrato.fechaFin,
+          tipoContrato: contrato.tipoContrato,
+        },
+      });
+    }
+  });
 
   return alertas;
 }

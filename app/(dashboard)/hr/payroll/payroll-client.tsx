@@ -24,6 +24,10 @@ import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { UploadNominasModal } from '@/components/payroll/upload-nominas-modal';
 import { ValidarComplementosDialog } from '@/components/payroll/validar-complementos-dialog';
+import { CompensarHorasDialog } from '@/components/payroll/compensar-horas-dialog';
+import { WorkflowStepper } from '@/components/payroll/workflow-stepper';
+import { AlertasSummary } from '@/components/payroll/alertas-summary';
+import { Checkbox } from '@/components/ui/checkbox';
 import { DetailsPanel } from '@/components/shared/details-panel';
 
 interface Nomina {
@@ -139,8 +143,15 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [showValidarComplementosDialog, setShowValidarComplementosDialog] = useState(false);
   const [eventoIdParaValidar, setEventoIdParaValidar] = useState<string | null>(null);
+  const [showCompensarHorasDialog, setShowCompensarHorasDialog] = useState(false);
+  const [eventoCompensarContext, setEventoCompensarContext] = useState<{
+    eventoId: string;
+    mes: number;
+    anio: number;
+  } | null>(null);
   const [selectedNominaId, setSelectedNominaId] = useState<string | null>(null);
   const [selectedEventoId, setSelectedEventoId] = useState<string | null>(null);
+  const [autoGenerarEvento, setAutoGenerarEvento] = useState(true);
 
   const nombreMes = meses[mesActual - 1];
 
@@ -172,6 +183,7 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
         body: JSON.stringify({
           mes: mesActual,
           anio: anioActual,
+          autoGenerarPrenominas: autoGenerarEvento,
         }),
       });
 
@@ -181,9 +193,15 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
         throw new Error(data.error || 'Error al generar evento');
       }
 
-      toast.success(`Pre-nóminas generadas: ${data.nominasGeneradas} nóminas`, {
-        description: `${data.notificacionesEnviadas} managers notificados`,
-      });
+      if (data.autoGeneradas === false) {
+        toast.success('Evento creado sin generar pre-nóminas', {
+          description: 'Podrás generarlas cuando lo necesites desde la tarjeta del evento.',
+        });
+      } else {
+        toast.success(`Pre-nóminas generadas: ${data.nominasGeneradas} nóminas`, {
+          description: `${data.notificacionesEnviadas} managers notificados`,
+        });
+      }
 
       fetchEventos();
     } catch (error) {
@@ -229,8 +247,18 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
     }
   };
 
-  const handleExportar = async (eventoId: string) => {
-    const actionKey = `${eventoId}:exportar`;
+  const handleExportar = async (evento: EventoNomina) => {
+    if (evento.alertas?.criticas > 0) {
+      const confirmed = window.confirm(
+        `Hay ${evento.alertas.criticas} alerta(s) crítica(s) pendientes.\n` +
+          '¿Deseas exportar igualmente?'
+      );
+      if (!confirmed) {
+        return;
+      }
+    }
+
+    const actionKey = `${evento.id}:exportar`;
     try {
       setActionLoading(actionKey);
 
@@ -443,6 +471,16 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
             </Button>
           </div>
         </div>
+        <div className="flex items-center gap-2 text-sm text-gray-600 mt-3">
+          <Checkbox
+            id="auto-generar"
+            checked={autoGenerarEvento}
+            onCheckedChange={(checked) => setAutoGenerarEvento(Boolean(checked))}
+          />
+          <label htmlFor="auto-generar" className="cursor-pointer select-none">
+            Generar pre-nóminas automáticamente
+          </label>
+        </div>
       </div>
 
 
@@ -502,6 +540,7 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
               const mostrarGenerarPrenominas = !evento.fechaGeneracion;
               const mostrarImportarNominas = evento.fechaGeneracion && !evento.fechaImportacion;
               const mostrarRellenarComplementos = evento.fechaGeneracion && !evento.fechaImportacion;
+              const mostrarExportarPrenominas = evento.fechaGeneracion && !evento.fechaExportacion;
 
               return (
                 <Card key={evento.id} className="overflow-hidden hover:shadow-md transition-shadow">
@@ -524,36 +563,16 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
                           )}
                         </div>
 
-                        {/* Estado */}
-                        <div className="flex-shrink-0">
+                        {/* Estado + Stepper */}
+                        <div className="flex-shrink-0 flex flex-col gap-1 items-start">
                           <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${estadoInfo.color}`}>
-                              {estadoInfo.label}
-                            </span>
-                            </div>
+                            {estadoInfo.label}
+                          </span>
+                          <WorkflowStepper estadoActual={evento.estado} compact />
+                        </div>
 
                         {/* Preview de alertas */}
-                        {evento.alertas && evento.alertas.total > 0 && (
-                          <div className="flex items-center gap-2 flex-shrink-0">
-                            {evento.alertas.criticas > 0 && (
-                              <div className="flex items-center gap-1 px-2 py-1 bg-red-50 rounded text-xs">
-                                <AlertCircle className="w-3 h-3 text-red-600" />
-                                <span className="text-red-700 font-medium">{evento.alertas.criticas}</span>
-                          </div>
-                            )}
-                            {evento.alertas.advertencias > 0 && (
-                              <div className="flex items-center gap-1 px-2 py-1 bg-orange-50 rounded text-xs">
-                                <AlertTriangle className="w-3 h-3 text-orange-600" />
-                                <span className="text-orange-700 font-medium">{evento.alertas.advertencias}</span>
-                              </div>
-                            )}
-                            {evento.alertas.informativas > 0 && (
-                              <div className="flex items-center gap-1 px-2 py-1 bg-blue-50 rounded text-xs">
-                                <Info className="w-3 h-3 text-blue-600" />
-                                <span className="text-blue-700 font-medium">{evento.alertas.informativas}</span>
-                              </div>
-                            )}
-                          </div>
-                        )}
+                        <AlertasSummary alertas={evento.alertas} compact />
                         </div>
 
                       {/* Botones de acción */}
@@ -569,6 +588,39 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
                           >
                             <FileText className="w-4 h-4 mr-2" />
                             Generar Pre-nóminas
+                          </Button>
+                        )}
+
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEventoCompensarContext({
+                              eventoId: evento.id,
+                              mes: evento.mes,
+                              anio: evento.anio,
+                            });
+                            setShowCompensarHorasDialog(true);
+                          }}
+                          disabled={isProcessing}
+                        >
+                          <Clock className="w-4 h-4 mr-2" />
+                          Compensar Horas
+                        </Button>
+
+                        {mostrarExportarPrenominas && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleExportar(evento);
+                            }}
+                            disabled={isProcessing}
+                          >
+                            <Download className="w-4 h-4 mr-2" />
+                            Exportar Pre-nóminas
                           </Button>
                         )}
 
@@ -636,6 +688,21 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
         />
       )}
 
+      {/* Compensar Horas Dialog */}
+      {eventoCompensarContext && (
+        <CompensarHorasDialog
+          eventoId={eventoCompensarContext.eventoId}
+          mes={eventoCompensarContext.mes}
+          anio={eventoCompensarContext.anio}
+          isOpen={showCompensarHorasDialog}
+          onClose={() => {
+            setShowCompensarHorasDialog(false);
+            setEventoCompensarContext(null);
+            fetchEventos();
+          }}
+        />
+      )}
+
       {/* Evento Details Panel */}
       {selectedEventoId && (
         <EventoDetailsPanel
@@ -671,10 +738,33 @@ function NominaDetailsPanel({
   const router = useRouter();
   const [nomina, setNomina] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+  const [incidencias, setIncidencias] = useState<{
+    ausencias: Array<{
+      id: string;
+      tipo: string;
+      estado: string;
+      fechaInicio: string;
+      fechaFin: string;
+      diasSolicitados: number | null;
+    }>;
+    contratos: Array<{
+      id: string;
+      fechaInicio: string | null;
+      fechaFin: string | null;
+      tipoContrato: string;
+    }>;
+    fichajes: {
+      diasRegistrados: number;
+      diasPendientes: number;
+      horasTrabajadas: number;
+    };
+  } | null>(null);
+  const [loadingIncidencias, setLoadingIncidencias] = useState(false);
 
   useEffect(() => {
     if (nominaId && isOpen) {
       fetchNomina();
+      fetchIncidencias();
     }
   }, [nominaId, isOpen]);
 
@@ -690,6 +780,21 @@ function NominaDetailsPanel({
       console.error('Error fetching nomina:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchIncidencias = async () => {
+    setLoadingIncidencias(true);
+    try {
+      const response = await fetch(`/api/nominas/${nominaId}/incidencias`);
+      const data = await response.json();
+      if (response.ok) {
+        setIncidencias(data.incidencias || null);
+      }
+    } catch (error) {
+      console.error('Error fetching incidencias:', error);
+    } finally {
+      setLoadingIncidencias(false);
     }
   };
 
@@ -793,6 +898,97 @@ function NominaDetailsPanel({
             </div>
           )}
 
+          {/* Incidencias */}
+          <div>
+            <h3 className="text-sm font-medium text-gray-700 mb-3">Incidencias</h3>
+            {loadingIncidencias ? (
+              <div className="text-sm text-gray-500">Cargando incidencias...</div>
+            ) : incidencias ? (
+              <div className="space-y-4">
+                <div>
+                  <h4 className="text-xs uppercase text-gray-500 mb-2">
+                    Ausencias ({incidencias.ausencias.length})
+                  </h4>
+                  {incidencias.ausencias.length === 0 ? (
+                    <p className="text-sm text-gray-500">Sin ausencias registradas.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {incidencias.ausencias.map((ausencia) => (
+                        <div
+                          key={ausencia.id}
+                          className="p-2 bg-gray-50 rounded text-xs text-gray-700 flex justify-between"
+                        >
+                          <span>
+                            {ausencia.tipo} ({ausencia.estado})
+                          </span>
+                          <span>
+                            {new Date(ausencia.fechaInicio).toLocaleDateString('es-ES')} -{' '}
+                            {new Date(ausencia.fechaFin).toLocaleDateString('es-ES')}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <h4 className="text-xs uppercase text-gray-500 mb-2">
+                    Cambios de contrato ({incidencias.contratos.length})
+                  </h4>
+                  {incidencias.contratos.length === 0 ? (
+                    <p className="text-sm text-gray-500">Sin altas/bajas de contrato.</p>
+                  ) : (
+                    <div className="space-y-2 text-xs text-gray-700">
+                      {incidencias.contratos.map((contrato) => (
+                        <div key={contrato.id} className="p-2 bg-gray-50 rounded">
+                          <div className="font-medium">{contrato.tipoContrato}</div>
+                          {contrato.fechaInicio && (
+                            <div>
+                              Alta: {new Date(contrato.fechaInicio).toLocaleDateString('es-ES')}
+                            </div>
+                          )}
+                          {contrato.fechaFin && (
+                            <div>
+                              Baja: {new Date(contrato.fechaFin).toLocaleDateString('es-ES')}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <h4 className="text-xs uppercase text-gray-500 mb-2">Resumen de fichajes</h4>
+                  {incidencias.fichajes ? (
+                    <div className="grid grid-cols-3 gap-2 text-xs text-gray-700">
+                      <div className="bg-gray-50 rounded p-2 text-center">
+                        <div className="text-xl font-semibold">{incidencias.fichajes.diasRegistrados}</div>
+                        <div className="text-gray-500">Días registrados</div>
+                      </div>
+                      <div className="bg-gray-50 rounded p-2 text-center">
+                        <div className="text-xl font-semibold text-orange-600">
+                          {incidencias.fichajes.diasPendientes}
+                        </div>
+                        <div className="text-gray-500">Días pendientes</div>
+                      </div>
+                      <div className="bg-gray-50 rounded p-2 text-center">
+                        <div className="text-xl font-semibold">
+                          {incidencias.fichajes.horasTrabajadas.toFixed(1)}h
+                        </div>
+                        <div className="text-gray-500">Horas trabajadas</div>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-500">Sin datos de fichajes.</p>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm text-gray-500">Sin incidencias registradas.</p>
+            )}
+          </div>
+
           {/* Botón para ver perfil completo */}
           <div className="pt-4 border-t">
                         <Button
@@ -884,6 +1080,10 @@ function EventoDetailsPanel({
         </div>
       ) : evento ? (
         <div className="space-y-6">
+          <div>
+            <WorkflowStepper estadoActual={evento.estado} />
+          </div>
+
           {/* Información básica del evento */}
           <div>
             <h3 className="text-sm font-medium text-gray-700 mb-3">Información del Evento</h3>
@@ -929,26 +1129,7 @@ function EventoDetailsPanel({
           {evento.alertas && evento.alertas.total > 0 && (
             <div>
               <h3 className="text-sm font-medium text-gray-700 mb-3">Alertas</h3>
-              <div className="space-y-2 text-sm">
-                {evento.alertas.criticas > 0 && (
-                  <div className="flex items-center gap-2 p-2 bg-red-50 rounded">
-                    <AlertCircle className="w-4 h-4 text-red-600" />
-                    <span className="text-red-900">{evento.alertas.criticas} alerta{evento.alertas.criticas !== 1 ? 's' : ''} crítica{evento.alertas.criticas !== 1 ? 's' : ''}</span>
-                        </div>
-                )}
-                {evento.alertas.advertencias > 0 && (
-                  <div className="flex items-center gap-2 p-2 bg-orange-50 rounded">
-                    <AlertTriangle className="w-4 h-4 text-orange-600" />
-                    <span className="text-orange-900">{evento.alertas.advertencias} advertencia{evento.alertas.advertencias !== 1 ? 's' : ''}</span>
-                  </div>
-                )}
-                {evento.alertas.informativas > 0 && (
-                  <div className="flex items-center gap-2 p-2 bg-blue-50 rounded">
-                    <Info className="w-4 h-4 text-blue-600" />
-                    <span className="text-blue-900">{evento.alertas.informativas} informativa{evento.alertas.informativas !== 1 ? 's' : ''}</span>
-                  </div>
-                )}
-              </div>
+              <AlertasSummary alertas={evento.alertas} />
             </div>
           )}
 

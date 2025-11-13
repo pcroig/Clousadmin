@@ -380,7 +380,11 @@ export function GestionarOnboardingModal({
 
                 {/* Tab: Plantillas */}
                 <TabsContent value="plantillas" className="space-y-4 mt-6">
-                  <PlantillasTab />
+                  <PlantillasTab
+                    seleccionadas={plantillasDocumentos}
+                    onSeleccionChange={setPlantillasDocumentos}
+                    camposRequeridos={camposRequeridos}
+                  />
                 </TabsContent>
               </Tabs>
             )}

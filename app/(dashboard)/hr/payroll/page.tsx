@@ -17,8 +17,16 @@ export default async function PayrollPage() {
   }
 
   const ahora = new Date();
-  const mesActual = ahora.getMonth() + 1; // 1-12
-  const anioActual = ahora.getFullYear();
+  let mesActual = ahora.getMonth() + 1; // 1-12
+  let anioActual = ahora.getFullYear();
+
+  if (ahora.getDate() <= 10) {
+    mesActual -= 1;
+    if (mesActual === 0) {
+      mesActual = 12;
+      anioActual -= 1;
+    }
+  }
 
   return (
     <PayrollClient

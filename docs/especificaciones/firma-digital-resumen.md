@@ -638,3 +638,5 @@ Este resumen forma parte de un conjunto de 4 documentos:
 **Autor**: Sofia Roig (con asistencia de Claude AI)  
 **Proyecto**: Clousadmin
 
+
+

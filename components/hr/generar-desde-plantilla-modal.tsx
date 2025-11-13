@@ -48,14 +48,26 @@ interface GenerarDesdePlantillaModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess?: () => void;
+  plantillaIdPreseleccionada?: string;
 }
+
+type Paso = 'plantilla' | 'empleados' | 'configuracion' | 'resumen' | 'procesando';
+
+const PASOS: Array<{ id: Paso; titulo: string; descripcion: string }> = [
+  { id: 'plantilla', titulo: 'Plantilla', descripcion: 'Elige qué documento usarás' },
+  { id: 'empleados', titulo: 'Empleados', descripcion: 'Selecciona destinatarios' },
+  { id: 'configuracion', titulo: 'Opciones', descripcion: 'Define carpeta, avisos y firma' },
+  { id: 'resumen', titulo: 'Resumen', descripcion: 'Revisa antes de generar' },
+  { id: 'procesando', titulo: 'Generación', descripcion: 'Seguimiento del job' },
+];
 
 export function GenerarDesdePlantillaModal({
   open,
   onOpenChange,
   onSuccess,
+  plantillaIdPreseleccionada,
 }: GenerarDesdePlantillaModalProps) {
-  const [paso, setPaso] = useState<'plantilla' | 'empleados' | 'configuracion' | 'procesando'>('plantilla');
+  const [paso, setPaso] = useState<Paso>('plantilla');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -81,6 +93,11 @@ export function GenerarDesdePlantillaModal({
     if (open) {
       cargarPlantillas();
       cargarEmpleados();
+      
+      // Si hay plantilla preseleccionada, cargarla y saltar al paso de empleados
+      if (plantillaIdPreseleccionada) {
+        cargarPlantillaPreseleccionada(plantillaIdPreseleccionada);
+      }
     } else {
       // Reset al cerrar
       setPaso('plantilla');
@@ -92,7 +109,7 @@ export function GenerarDesdePlantillaModal({
       setJobId(null);
       setJobStatus(null);
     }
-  }, [open]);
+  }, [open, plantillaIdPreseleccionada]);
 
   // Polling del job status
   useEffect(() => {
@@ -160,6 +177,25 @@ export function GenerarDesdePlantillaModal({
       }
     } catch (err) {
       console.error('[cargarEmpleados] Error:', err);
+    }
+  };
+
+  const cargarPlantillaPreseleccionada = async (plantillaId: string) => {
+    try {
+      const res = await fetch(`/api/plantillas/${plantillaId}`);
+      const data = await res.json();
+
+      if (data.success && data.plantilla) {
+        const plantilla = data.plantilla;
+        setPlantillaSeleccionada(plantilla);
+        setNombreDocumento(plantilla.nombre);
+        setCarpetaDestino(plantilla.carpetaDestinoDefault || '');
+        setRequiereFirma(plantilla.requiereFirma);
+        setPaso('empleados');
+      }
+    } catch (err) {
+      console.error('[cargarPlantillaPreseleccionada] Error:', err);
+      setError('Error al cargar plantilla');
     }
   };
 
@@ -334,6 +370,9 @@ export function GenerarDesdePlantillaModal({
     </div>
   );
 
+  const puedeIrAResumen =
+    Boolean(plantillaSeleccionada) && empleadosSeleccionados.size > 0;
+
   const renderPasoConfiguracion = () => (
     <div className="space-y-4">
       <p className="text-sm text-gray-600">Configura las opciones de generación</p>
@@ -401,12 +440,174 @@ export function GenerarDesdePlantillaModal({
         <Button variant="outline" onClick={() => setPaso('empleados')}>
           Atrás
         </Button>
-        <LoadingButton onClick={handleGenerarDocumentos} loading={loading}>
-          Generar Documentos
-        </LoadingButton>
+        <Button
+          onClick={() => setPaso('resumen')}
+          disabled={!puedeIrAResumen}
+        >
+          Revisar resumen
+        </Button>
       </div>
     </div>
   );
+
+  const renderPasoResumen = () => {
+    const empleadosSeleccionadosArray = empleados.filter((empleado) =>
+      empleadosSeleccionados.has(empleado.id)
+    );
+
+    return (
+      <div className="space-y-6">
+        <div className="space-y-1">
+          <h3 className="text-base font-semibold text-gray-900">Resumen</h3>
+          <p className="text-sm text-gray-600">
+            Revisa la información antes de iniciar la generación masiva.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div className="rounded-lg border p-4 space-y-2">
+            <div className="flex items-center justify-between">
+              <h4 className="font-medium text-gray-900">Plantilla</h4>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setPaso('plantilla')}
+              >
+                Cambiar
+              </Button>
+            </div>
+            {plantillaSeleccionada ? (
+              <>
+                <p className="text-sm text-gray-700">{plantillaSeleccionada.nombre}</p>
+                <p className="text-xs text-gray-500 capitalize">
+                  {plantillaSeleccionada.formato === 'docx'
+                    ? 'DOCX con variables'
+                    : 'PDF rellenable'}
+                </p>
+                <div className="text-xs text-gray-500 flex flex-wrap gap-2">
+                  {plantillaSeleccionada.esOficial && (
+                    <span className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded-full">
+                      Oficial
+                    </span>
+                  )}
+                  {plantillaSeleccionada.requiereFirma && (
+                    <span className="px-2 py-0.5 bg-amber-50 text-amber-700 rounded-full">
+                      Requiere firma
+                    </span>
+                  )}
+                </div>
+              </>
+            ) : (
+              <p className="text-sm text-red-600">Selecciona una plantilla</p>
+            )}
+          </div>
+
+          <div className="rounded-lg border p-4 space-y-2">
+            <div className="flex items-center justify-between">
+              <h4 className="font-medium text-gray-900">Empleados</h4>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setPaso('empleados')}
+              >
+                Editar
+              </Button>
+            </div>
+            {empleadosSeleccionadosArray.length > 0 ? (
+              <>
+                <p className="text-sm text-gray-700">
+                  {empleadosSeleccionadosArray.length} empleado
+                  {empleadosSeleccionadosArray.length === 1 ? '' : 's'}
+                </p>
+                <ul className="text-xs text-gray-500 space-y-1">
+                  {empleadosSeleccionadosArray.slice(0, 3).map((empleado) => (
+                    <li key={empleado.id}>
+                      {empleado.nombre} {empleado.apellidos}
+                    </li>
+                  ))}
+                  {empleadosSeleccionadosArray.length > 3 && (
+                    <li>+{empleadosSeleccionadosArray.length - 3} más</li>
+                  )}
+                </ul>
+              </>
+            ) : (
+              <p className="text-sm text-red-600">
+                Debes seleccionar al menos un empleado
+              </p>
+            )}
+          </div>
+        </div>
+
+        <div className="rounded-lg border p-4 space-y-2">
+          <div className="flex items-center justify-between">
+            <h4 className="font-medium text-gray-900">Configuración</h4>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setPaso('configuracion')}
+            >
+              Modificar
+            </Button>
+          </div>
+          <dl className="grid grid-cols-1 gap-3 text-sm text-gray-700 md:grid-cols-2">
+            <div>
+              <dt className="text-gray-500 text-xs uppercase tracking-wide">
+                Nombre del documento
+              </dt>
+              <dd>{nombreDocumento || 'Nombre por defecto de la plantilla'}</dd>
+            </div>
+            <div>
+              <dt className="text-gray-500 text-xs uppercase tracking-wide">
+                Carpeta destino
+              </dt>
+              <dd>{carpetaDestino || 'Automática (según plantilla)'}</dd>
+            </div>
+            <div>
+              <dt className="text-gray-500 text-xs uppercase tracking-wide">
+                Notificar empleado
+              </dt>
+              <dd>{notificarEmpleado ? 'Sí' : 'No'}</dd>
+            </div>
+            <div>
+              <dt className="text-gray-500 text-xs uppercase tracking-wide">
+                Requiere firma digital
+              </dt>
+              <dd>{requiereFirma ? 'Sí' : 'No'}</dd>
+            </div>
+            {requiereFirma && (
+              <>
+                <div>
+                  <dt className="text-gray-500 text-xs uppercase tracking-wide">
+                    Fecha límite de firma
+                  </dt>
+                  <dd>{fechaLimiteFirma || 'Sin fecha límite'}</dd>
+                </div>
+                <div>
+                  <dt className="text-gray-500 text-xs uppercase tracking-wide">
+                    Mensaje
+                  </dt>
+                  <dd>{mensajeFirma || 'Mensaje por defecto'}</dd>
+                </div>
+              </>
+            )}
+          </dl>
+        </div>
+
+        <div className="flex items-center justify-between pt-4 border-t">
+          <Button variant="outline" onClick={() => setPaso('configuracion')}>
+            Atrás
+          </Button>
+          <LoadingButton
+            onClick={handleGenerarDocumentos}
+            loading={loading}
+            disabled={!puedeIrAResumen}
+          >
+            Generar documentos
+          </LoadingButton>
+        </div>
+      </div>
+    );
+  };
 
   const renderPasoProcesando = () => (
     <div className="space-y-4">
@@ -478,9 +679,39 @@ export function GenerarDesdePlantillaModal({
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto px-6 py-4">
+          <div className="mb-6">
+            <ol className="flex flex-wrap gap-3 text-sm">
+              {PASOS.map((item, index) => {
+                const pasoActualIndex = PASOS.findIndex((p) => p.id === paso);
+                const completado = pasoActualIndex > index;
+                const activo = item.id === paso;
+
+                return (
+                  <li
+                    key={item.id}
+                    className={`flex flex-col border rounded-lg px-3 py-2 min-w-[120px] ${
+                      activo
+                        ? 'border-gray-900 bg-gray-50'
+                        : completado
+                        ? 'border-green-200 bg-green-50 text-green-700'
+                        : 'border-gray-200 text-gray-500'
+                    }`}
+                  >
+                    <span className="text-xs uppercase tracking-wide">{`Paso ${
+                      index + 1
+                    }`}</span>
+                    <span className="font-medium">{item.titulo}</span>
+                    <span className="text-xs text-gray-500">{item.descripcion}</span>
+                  </li>
+                );
+              })}
+            </ol>
+          </div>
+
           {paso === 'plantilla' && renderPasoPlantilla()}
           {paso === 'empleados' && renderPasoEmpleados()}
           {paso === 'configuracion' && renderPasoConfiguracion()}
+          {paso === 'resumen' && renderPasoResumen()}
           {paso === 'procesando' && renderPasoProcesando()}
 
           {error && paso !== 'procesando' && (

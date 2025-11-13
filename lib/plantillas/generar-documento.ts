@@ -102,6 +102,7 @@ export async function generarDocumentoDesdePlantilla(
         formato: true,
         carpetaDestinoDefault: true,
         requiereFirma: true,
+        permiteRellenar: true,
         empresaId: true,
         variablesUsadas: true,
       },
@@ -278,6 +279,9 @@ export async function generarDocumentoDesdePlantilla(
     });
 
     // 11. Crear registro de DocumentoGenerado
+    const requiereFirmaFinal = configuracion.requiereFirma || plantilla.requiereFirma;
+    const permiteRellenar = Boolean(plantilla.permiteRellenar);
+
     const documentoGenerado = await prisma.documentoGenerado.create({
       data: {
         empresaId: empleado.empresaId,
@@ -289,12 +293,13 @@ export async function generarDocumentoDesdePlantilla(
         usadaIA: true,
         confianzaIA: 0.95,
         tiempoGeneracion: Date.now() - inicio,
-        requiereFirma: configuracion.requiereFirma || plantilla.requiereFirma,
+        requiereFirma: requiereFirmaFinal,
+        pendienteRellenar: permiteRellenar,
       },
     });
 
     // 12. Notificar al empleado (si configurado)
-    if (configuracion.notificarEmpleado) {
+    if (configuracion.notificarEmpleado && !permiteRellenar) {
       await prisma.notificacion.create({
         data: {
           empresaId: empleado.empresaId,
@@ -310,8 +315,27 @@ export async function generarDocumentoDesdePlantilla(
       });
     }
 
+    // Notificación especial si el documento requiere ser rellenado por el empleado
+    if (permiteRellenar && empleado.usuarioId) {
+      await prisma.notificacion.create({
+        data: {
+          empresaId: empleado.empresaId,
+          usuarioId: empleado.usuarioId,
+          tipo: 'pendiente',
+          titulo: 'Documento pendiente de completar',
+          mensaje: `Completa los campos del documento ${nombreDocumentoFinal} antes de firmarlo.`,
+          metadata: {
+            tipo: 'pendiente_rellenar',
+            documentoGeneradoId: documentoGenerado.id,
+            documentoId: documento.id,
+            url: `/empleado/documentos/pendientes/${documentoGenerado.id}`,
+          },
+        },
+      });
+    }
+
     // 13. Si requiere firma, crear solicitud automáticamente
-    if (configuracion.requiereFirma || plantilla.requiereFirma) {
+    if (!permiteRellenar && requiereFirmaFinal) {
       const solicitudFirma = await prisma.solicitudFirma.create({
         data: {
           empresaId: empleado.empresaId,
