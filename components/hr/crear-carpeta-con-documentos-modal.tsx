@@ -89,24 +89,43 @@ export function CrearCarpetaConDocumentosModal({
       // 2. Subir documentos si hay alguno
       if (documentos.length > 0) {
         const uploadPromises = documentos.map(async (doc) => {
-          const formData = new FormData();
-          formData.append('file', doc.file);
-          formData.append('carpetaId', carpeta.id);
-          formData.append('tipo', doc.tipoDocumento || 'otro');
+          try {
+            const formData = new FormData();
+            
+            // Si el nombre fue editado, crear un nuevo File con ese nombre
+            // (Nota: La API actualmente usa el nombre del File, pero podríamos mejorar esto)
+            const fileToUpload = doc.nombre !== doc.file.name 
+              ? new File([doc.file], doc.nombre, { type: doc.file.type })
+              : doc.file;
+            
+            formData.append('file', fileToUpload);
+            formData.append('carpetaId', carpeta.id);
+            formData.append('tipoDocumento', doc.tipoDocumento || 'otro');
 
-          const uploadResponse = await fetch('/api/documentos', {
-            method: 'POST',
-            body: formData,
-          });
+            const uploadResponse = await fetch('/api/documentos', {
+              method: 'POST',
+              body: formData,
+            });
 
-          if (!uploadResponse.ok) {
-            console.error(`Error subiendo ${doc.nombre}`);
+            if (!uploadResponse.ok) {
+              const error = await uploadResponse.json();
+              throw new Error(error.error || `Error subiendo ${doc.nombre}`);
+            }
+
+            return await uploadResponse.json();
+          } catch (error) {
+            console.error(`Error subiendo ${doc.nombre}:`, error);
+            throw error;
           }
-
-          return uploadResponse;
         });
 
-        await Promise.allSettled(uploadPromises);
+        const results = await Promise.allSettled(uploadPromises);
+        
+        // Verificar si hubo errores
+        const errores = results.filter(r => r.status === 'rejected');
+        if (errores.length > 0) {
+          console.warn(`${errores.length} documento(s) no se pudieron subir`);
+        }
       }
 
       // 3. Resetear y cerrar

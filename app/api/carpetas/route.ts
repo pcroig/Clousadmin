@@ -20,9 +20,9 @@ export async function GET(request: NextRequest) {
     };
 
     // Filtrar por empleado si se proporciona
-    if (empleadoId) {
+      if (empleadoId) {
       where.empleadoId = empleadoId;
-    }
+      }
 
     // Filtrar por proceso vinculado
     if (proceso && (proceso === 'onboarding' || proceso === 'offboarding')) {
