@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "seed": "tsx prisma/seed.ts",
+    "seed:plantillas": "tsx prisma/seed-plantillas.ts",
     "diagnostico": "tsx scripts/diagnostico-prisma.ts",
     "db:generate": "prisma generate",
     "db:studio": "prisma studio",
