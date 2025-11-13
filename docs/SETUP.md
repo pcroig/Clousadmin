@@ -70,11 +70,12 @@ NEXTAUTH_SECRET="your-super-secret-jwt-key-minimum-32-characters-long"
 NEXT_PUBLIC_APP_URL="http://localhost:3000"
 NODE_ENV="development"
 
-# AWS (OPCIONAL para desarrollo local)
-AWS_REGION="eu-west-1"
-AWS_ACCESS_KEY_ID=""
-AWS_SECRET_ACCESS_KEY=""
-S3_BUCKET=""
+# Hetzner Object Storage (OPCIONAL para desarrollo local, requerido en producción)
+STORAGE_ENDPOINT="https://fsn1.your-objectstorage.com"
+STORAGE_REGION="eu-central-1"
+STORAGE_ACCESS_KEY=""
+STORAGE_SECRET_KEY=""
+STORAGE_BUCKET=""
 
 # OpenAI (OPCIONAL)
 OPENAI_API_KEY=""
@@ -86,7 +87,7 @@ PLATFORM_ADMIN_EMAIL="admin@tu-plataforma.com"
 
 # Feature Flags
 ENABLE_AI_EXTRACTION="false"
-ENABLE_S3_UPLOAD="false"
+ENABLE_CLOUD_STORAGE="false"
 ENABLE_EMAIL_NOTIFICATIONS="false"
 ```
 

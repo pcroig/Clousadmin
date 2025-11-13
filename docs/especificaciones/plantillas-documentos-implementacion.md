@@ -1091,7 +1091,7 @@ export async function POST(request: NextRequest) {
         tipo: 'personalizada',
         formato: 'docx',
         s3Key,
-        s3Bucket: process.env.AWS_S3_BUCKET || 'clousadmin-dev',
+        s3Bucket: process.env.STORAGE_BUCKET || 'local',
         variablesUsadas: variablesDetectadas,
         carpetaDestinoDefault,
         activa: true,
@@ -1270,7 +1270,7 @@ export async function POST(
             mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
             tamano: bufferDocumento.length,
             s3Key: s3KeyDocumento,
-            s3Bucket: process.env.AWS_S3_BUCKET || 'clousadmin-dev',
+            s3Bucket: process.env.STORAGE_BUCKET || 'local',
           },
         });
 
@@ -1694,7 +1694,7 @@ export async function seedPlantillasOficiales() {
           tipo: 'oficial',
           formato: plantilla.formato,
           s3Key,
-          s3Bucket: process.env.AWS_S3_BUCKET || 'clousadmin-dev',
+          s3Bucket: process.env.STORAGE_BUCKET || 'local',
           variablesUsadas: plantilla.variablesUsadas,
           activa: true,
           esOficial: true,

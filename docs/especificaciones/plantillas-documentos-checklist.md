@@ -545,9 +545,11 @@
 ### 9.3 Deploy
 
 - [ ] **Verificar** que `.env` tiene variables necesarias:
-  - [ ] `AWS_S3_BUCKET`
-  - [ ] `AWS_ACCESS_KEY_ID`
-  - [ ] `AWS_SECRET_ACCESS_KEY`
+  - [ ] `STORAGE_BUCKET`
+  - [ ] `STORAGE_ENDPOINT`
+  - [ ] `STORAGE_ACCESS_KEY`
+  - [ ] `STORAGE_SECRET_KEY`
+  - [ ] `STORAGE_REGION`
 
 - [ ] **Ejecutar** migraciones en staging:
   ```bash
