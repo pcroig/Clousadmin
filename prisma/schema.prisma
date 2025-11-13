@@ -156,6 +156,7 @@ model Empresa {
   solicitudesEliminacion   SolicitudEliminacionDatos[]
   compensacionesHorasExtra CompensacionHoraExtra[]
   denuncias                Denuncia[]
+  solicitudesFirma         SolicitudFirma[]
 
   @@index([cif])
   @@map("empresas")
@@ -321,6 +322,7 @@ model Empleado {
   solicitudesEliminacion     SolicitudEliminacionDatos[]
   compensacionesHorasExtra   CompensacionHoraExtra[]
   denuncias                  Denuncia[]
+  firmas                     Firma[]
 
   @@index([empresaId])
   @@index([usuarioId])
@@ -797,6 +799,15 @@ model Documento {
   s3Key    String @unique @db.Text // S3 object key
   s3Bucket String @db.VarChar(255)
 
+  // Digital signature fields
+  requiereFirma Boolean   @default(false)
+  firmado       Boolean   @default(false)
+  firmadoEn     DateTime?
+  hashDocumento String?   @db.Text // SHA-256 hash for integrity verification
+
+  // Template generation tracking
+  generadoDesdePlantilla Boolean @default(false)
+
   // AI extraction flag
   procesadoIA    Boolean @default(false)
   datosExtraidos Json? // AI-extracted data (flexible schema)
@@ -811,12 +822,17 @@ model Documento {
   puesto   Puesto?   @relation(fields: [puestoId], references: [id], onDelete: Cascade)
   nomina   Nomina? // One-to-one relation: a document can be a payslip PDF
 
+  // Digital signature relations
+  solicitudesFirma SolicitudFirma[]
+
   @@index([empresaId])
   @@index([empleadoId])
   @@index([carpetaId])
   @@index([puestoId])
   @@index([tipoDocumento])
   @@index([s3Key])
+  @@index([requiereFirma, firmado])
+  @@index([generadoDesdePlantilla])
   @@map("documentos")
 }
 
@@ -1691,4 +1707,101 @@ model SolicitudEliminacionDatos {
   @@index([empleadoId])
   @@index([estado])
   @@map("solicitudes_eliminacion_datos")
+}
+
+// ========================================
+// 19. FIRMA DIGITAL
+// ========================================
+
+/// SolicitudFirma - Workflow de firma digital para documentos
+/// Gestiona el proceso completo de firma: creación, envío, recordatorios, y seguimiento
+model SolicitudFirma {
+  id          String @id @default(uuid())
+  empresaId   String
+  documentoId String
+
+  // Configuración de la solicitud
+  titulo     String  @db.VarChar(255)
+  mensaje    String? @db.Text
+  ordenFirma Boolean @default(false) // Si true, firmantes deben firmar en orden secuencial
+
+  // Proveedor de firma
+  proveedor String @default("interno") @db.VarChar(50) // 'interno' | 'lleidanetworks' (Fase 2)
+
+  // Recordatorios automáticos
+  recordatorioAutomatico Boolean @default(true)
+  diasRecordatorio       Int     @default(3) // Días entre recordatorios
+
+  // Snapshot del documento (para verificación de integridad)
+  nombreDocumento String @db.VarChar(255)
+  hashDocumento   String @db.Text // SHA-256 del documento original
+
+  // Estado del workflow
+  estado String @default("pendiente") @db.VarChar(50) // 'pendiente', 'en_proceso', 'completada', 'cancelada'
+
+  // Tracking
+  creadoPor         String?   @db.VarChar(100) // Usuario ID que creó la solicitud
+  completadaEn      DateTime?
+  canceladaEn       DateTime?
+  motivoCancelacion String?   @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  empresa   Empresa  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  documento Documento @relation(fields: [documentoId], references: [id], onDelete: Cascade)
+  firmas    Firma[]
+
+  @@index([empresaId])
+  @@index([documentoId])
+  @@index([estado])
+  @@index([empresaId, estado])
+  @@index([empresaId, createdAt])
+  @@map("solicitudes_firma")
+}
+
+/// Firma - Individual signature within a signature request
+/// Tracks each signer's progress and signature data
+model Firma {
+  id               String @id @default(uuid())
+  solicitudFirmaId String
+  empleadoId       String
+
+  // Orden de firma (solo si ordenFirma=true en SolicitudFirma)
+  orden Int @default(0) // 0 = sin orden, 1+ = secuencia de firma
+
+  // Tipo de firma
+  tipo          String @default("simple") @db.VarChar(50) // 'simple', 'avanzada', 'cualificada'
+  metodoCaptura String @default("click") @db.VarChar(50) // 'click', 'manuscrita', 'certificado'
+
+  // Estado de la firma
+  firmado   Boolean   @default(false)
+  firmadoEn DateTime?
+
+  // Datos de firma capturados
+  datosCapturados Json? // { tipo: 'click', ip: '...', userAgent: '...', coords: [...] }
+  ipAddress       String? @db.VarChar(50)
+  certificadoHash String? @db.Text // Hash SHA-256 del certificado de firma (si aplica)
+
+  // Envío y recordatorios
+  enviadoEn          DateTime?
+  ultimoRecordatorio DateTime?
+  numRecordatorios   Int       @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  solicitudFirma SolicitudFirma @relation(fields: [solicitudFirmaId], references: [id], onDelete: Cascade)
+  empleado       Empleado       @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+
+  @@unique([solicitudFirmaId, empleadoId]) // Un empleado solo firma una vez por solicitud
+  @@index([solicitudFirmaId])
+  @@index([empleadoId])
+  @@index([firmado])
+  @@index([enviadoEn])
+  @@index([solicitudFirmaId, firmado])
+  @@index([empleadoId, firmado])
+  @@map("firmas")
 }
