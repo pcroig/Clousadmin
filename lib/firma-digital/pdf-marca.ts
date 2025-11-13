@@ -185,7 +185,7 @@ export async function anadirMarcasFirmasPDF(
  * }
  * ```
  */
-export async function esPDFValido(buffer: Buffer): boolean {
+export async function esPDFValido(buffer: Buffer): Promise<boolean> {
   try {
     await PDFDocument.load(buffer);
     return true;
