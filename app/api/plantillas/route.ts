@@ -27,6 +27,8 @@ export async function GET(request: NextRequest) {
     const categoria = searchParams.get('categoria');
     const tipo = searchParams.get('tipo');
     const activa = searchParams.get('activa');
+    const autoOnboarding = searchParams.get('autoOnboarding');
+    const autoOffboarding = searchParams.get('autoOffboarding');
 
     // Filtros
     const where: any = {
@@ -48,6 +50,14 @@ export async function GET(request: NextRequest) {
       where.activa = activa === 'true';
     }
 
+    if (autoOnboarding === 'true') {
+      where.autoGenerarOnboarding = true;
+    }
+
+    if (autoOffboarding === 'true') {
+      where.autoGenerarOffboarding = true;
+    }
+
     const plantillas = await prisma.plantillaDocumento.findMany({
       where,
       select: {
@@ -57,11 +67,16 @@ export async function GET(request: NextRequest) {
         categoria: true,
         tipo: true,
         formato: true,
+        s3Key: true,
         activa: true,
         esOficial: true,
         requiereContrato: true,
         requiereFirma: true,
         carpetaDestinoDefault: true,
+        autoGenerarOnboarding: true,
+        autoGenerarOffboarding: true,
+        requiereRevision: true,
+        permiteRellenar: true,
         variablesUsadas: true,
         createdAt: true,
         updatedAt: true,
@@ -118,6 +133,10 @@ export async function POST(request: NextRequest) {
     const carpetaDestinoDefault = formData.get('carpetaDestinoDefault') as string | null;
     const requiereContrato = formData.get('requiereContrato') === 'true';
     const requiereFirma = formData.get('requiereFirma') === 'true';
+    const autoGenerarOnboarding = formData.get('autoGenerarOnboarding') === 'true';
+    const autoGenerarOffboarding = formData.get('autoGenerarOffboarding') === 'true';
+    const requiereRevision = formData.get('requiereRevision') === 'true';
+    const permiteRellenar = formData.get('permiteRellenar') === 'true';
 
     // Validaciones
     if (!file) {
@@ -128,16 +147,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Faltan campos requeridos' }, { status: 400 });
     }
 
-    // Validar tipo de archivo
+    // Validar tipo de archivo - solo DOCX por ahora (PDF rellenable en fase posterior)
     const extension = file.name.split('.').pop()?.toLowerCase();
-    if (!extension || !['docx', 'pdf'].includes(extension)) {
+    if (!extension || extension !== 'docx') {
       return NextResponse.json(
-        { error: 'Solo se permiten archivos DOCX o PDF' },
+        { 
+          error: 'Solo se permiten archivos DOCX con variables. El soporte para PDFs rellenables llegará en una fase posterior.',
+          tip: 'Crea tu plantilla en Word usando variables como {{empleado_nombre}}, {{empleado_nif}}, etc.'
+        },
         { status: 400 }
       );
     }
 
-    const formato = extension === 'docx' ? 'docx' : 'pdf_rellenable';
+    const formato = 'docx';
 
     // Leer archivo
     const arrayBuffer = await file.arrayBuffer();
@@ -150,15 +172,10 @@ export async function POST(request: NextRequest) {
     // Subir a S3
     await subirDocumento(buffer, s3Key, file.type);
 
-    // Extraer variables de la plantilla
+    // Extraer variables de la plantilla DOCX
     let variablesUsadas: string[] = [];
     try {
-      if (formato === 'docx') {
-        variablesUsadas = await extraerVariablesDePlantilla(s3Key);
-      } else {
-        // PDF rellenable
-        variablesUsadas = await extraerCamposPDF(s3Key);
-      }
+      variablesUsadas = await extraerVariablesDePlantilla(s3Key);
     } catch (error) {
       console.warn('[API] No se pudieron extraer variables:', error);
     }
@@ -178,6 +195,10 @@ export async function POST(request: NextRequest) {
         carpetaDestinoDefault,
         requiereContrato,
         requiereFirma,
+        autoGenerarOnboarding,
+        autoGenerarOffboarding,
+        requiereRevision,
+        permiteRellenar,
         activa: true,
         esOficial: false,
       },

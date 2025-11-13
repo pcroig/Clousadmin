@@ -8,6 +8,11 @@
 
 ## 🎯 Resumen Rápido
 
+### 🔧 Estado actual (enero 2026)
+- **Producción**: motor de plantillas **DOCX con variables** (docxtemplater). Es el flujo oficial hoy.
+- **En pausa documentada**: motor **PDF rellenable**. El código base (`lib/plantillas/pdf-rellenable.ts`, API `/api/plantillas/[id]/escanear-campos`) está implementado parcialmente pero **deshabilitado hasta nueva fase**. Falta UI de mapeo persistente y QA, por lo que no se expone todavía.
+- **Escenarios descartados**: generación “híbrida” (DOCX→PDF con Vision) queda fuera del alcance.
+
 ### ¿Qué es?
 Un sistema que permite:
 1. **Crear plantillas de documentos** con variables (ej: `{{empleado_nombre}}`)
@@ -179,7 +184,7 @@ npm install docxtemplater pizzip
 npm install pdf-lib
 ```
 - **Qué hace**: Manipula PDFs, rellena formularios
-- **Ventajas**: Sin dependencias externas, funciona en browser y Node.js
+- **Estado**: Código base listo pero **no activo**. Requiere completar mapeo UI + validaciones antes de exponerlo.
 
 ### Arquitectura
 
@@ -300,6 +305,7 @@ Storage (AWS S3)
 - ❌ No crea las plantillas Word por ti (las subes tú desde Word)
 - ❌ No valida el contenido legal de los documentos
 - ❌ No convierte DOCX → PDF automáticamente (en MVP, solo DOCX)
+- ❌ No genera ni rellena PDFs normales. El soporte PDF rellenable se reactivará en una fase posterior cuando completemos mapeo y QA.
 - ❌ No firma digitalmente (eso va aparte)
 - ❌ No envía documentos por email (solo notificación interna)
 
@@ -372,6 +378,19 @@ Este resumen forma parte de un conjunto de 3 documentos:
    - Seeders de plantillas oficiales
    - Ejemplos de uso
 
+### Anexo: Estado del módulo PDF rellenable
+
+- **Código existente**:
+  - `lib/plantillas/pdf-rellenable.ts`: extracción de campos nativos, mapeo IA, rellenado con `pdf-lib`.
+  - `app/api/plantillas/[id]/escanear-campos/route.ts`: escaneo híbrido (campos nativos + IA Vision) y guardado en `configuracionIA`.
+  - `components/hr/plantilla-mapear-campos-modal.tsx`: UI inicial para revisar y mapear campos.
+- **Pendiente para activarlo**:
+  1. Persistir el mapping campo PDF → variable sin depender de IA en cada generación.
+  2. UI definitiva para que HR confirme/edite los campos detectados.
+  3. Tests end-to-end y handling para PDFs sin campos.
+  4. Documentar proceso de subida de PDFs oficiales rellenables (Modelo 145, etc.).
+- **Decisión**: mantener el código como “feature flag” hasta que se priorice la fase PDF. Mientras tanto, el scope oficial es DOCX con variables.
+
 ---
 
 ## ✅ Próximos Pasos
@@ -405,4 +424,6 @@ Este resumen forma parte de un conjunto de 3 documentos:
 **Fecha**: 12 de Noviembre 2025  
 **Autor**: Sofia Roig (con asistencia de Claude AI)  
 **Proyecto**: Clousadmin
+
+
 

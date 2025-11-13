@@ -4,7 +4,7 @@
  */
 
 import { Queue, Worker, Job, QueueEvents } from 'bullmq';
-import { redis, redisSubscriber } from '@/lib/redis';
+import { redis, redisSubscriber, cache } from '@/lib/redis';
 import { JobConfig, ResultadoGeneracion, JobProgress } from './tipos';
 import { generarDocumentoDesdePlantilla } from './generar-documento';
 import { generarDocumentoDesdePDFRellenable } from './pdf-rellenable';
@@ -15,10 +15,41 @@ const connection = {
   host: process.env.REDIS_HOST || 'localhost',
   port: parseInt(process.env.REDIS_PORT || '6379'),
   maxRetriesPerRequest: null,
+  enableOfflineQueue: false, // No encolar comandos si está offline
+  retryStrategy: (times: number) => {
+    // Limitar reintentos - después de 5 intentos, dejar de intentar
+    if (times > 5) {
+      return null; // No más reintentos
+    }
+    return Math.min(times * 50, 2000);
+  },
 };
+
+// Verificar si Redis está disponible antes de inicializar
+let redisAvailable = false;
+let availabilityChecked = false;
+
+async function checkRedisAvailability(): Promise<boolean> {
+  if (availabilityChecked) return redisAvailable;
+  
+  try {
+    redisAvailable = await cache.isAvailable();
+    availabilityChecked = true;
+    
+    if (!redisAvailable) {
+      console.warn('[Queue] Redis no disponible - colas deshabilitadas');
+    }
+  } catch {
+    redisAvailable = false;
+    availabilityChecked = true;
+  }
+  
+  return redisAvailable;
+}
 
 /**
  * Cola de generación de documentos
+ * Solo funciona si Redis está disponible
  */
 export const documentosQueue = new Queue('documentos-generacion', {
   connection,
@@ -38,11 +69,37 @@ export const documentosQueue = new Queue('documentos-generacion', {
   },
 });
 
+// Manejar errores de conexión silenciosamente
+let queueErrorLogged = false;
+documentosQueue.on('error', (error) => {
+  // Solo mostrar error una vez si es de conexión
+  if (error.message.includes('ECONNREFUSED') || error.message.includes('connect')) {
+    if (!queueErrorLogged) {
+      // Ya se muestra en redis.ts, no duplicar
+      queueErrorLogged = true;
+    }
+  } else {
+    console.error('[Queue] Error en cola:', error.message);
+  }
+});
+
 /**
  * Eventos de la cola (para tracking en tiempo real)
  */
 export const documentosQueueEvents = new QueueEvents('documentos-generacion', {
   connection,
+});
+
+// Manejar errores de eventos silenciosamente
+let eventsErrorLogged = false;
+documentosQueueEvents.on('error', (error) => {
+  // Solo mostrar error una vez si es de conexión
+  if (error?.message?.includes('ECONNREFUSED') || error?.message?.includes('connect')) {
+    if (!eventsErrorLogged) {
+      // Ya se muestra en redis.ts, no duplicar
+      eventsErrorLogged = true;
+    }
+  }
 });
 
 /**
@@ -146,6 +203,7 @@ export async function cancelarJob(jobId: string): Promise<boolean> {
 
 /**
  * Worker que procesa los jobs de generación
+ * Se inicializa automáticamente pero maneja errores silenciosamente
  */
 export const documentosWorker = new Worker(
   'documentos-generacion',
@@ -188,12 +246,8 @@ export const documentosWorker = new Worker(
         let resultado: ResultadoGeneracion;
 
         if (plantilla.formato === 'pdf_rellenable') {
-          resultado = await generarDocumentoDesdePDFRellenable(
-            config.plantillaId,
-            empleadoId,
-            config.configuracion,
-            config.solicitadoPor
-          );
+          // PDF rellenable desactivado en esta fase
+          throw new Error('La generación desde PDFs rellenables está desactivada. Solo se soportan plantillas DOCX con variables.');
         } else {
           // DOCX por defecto
           resultado = await generarDocumentoDesdePlantilla(
@@ -297,6 +351,20 @@ export const documentosWorker = new Worker(
   }
 );
 
+// Manejar errores de conexión silenciosamente
+let workerErrorLogged = false;
+documentosWorker.on('error', (error) => {
+  // Solo mostrar error una vez si es de conexión
+  if (error?.message?.includes('ECONNREFUSED') || error?.message?.includes('connect') || error?.code === 'ECONNREFUSED') {
+    if (!workerErrorLogged) {
+      // Ya se muestra en redis.ts, no duplicar
+      workerErrorLogged = true;
+    }
+  } else if (error) {
+    console.error('[Worker] Error:', error.message || error);
+  }
+});
+
 /**
  * Event listeners del worker
  */
@@ -392,11 +460,18 @@ export async function obtenerEstadisticasCola() {
 export async function cerrarQueue(): Promise<void> {
   console.log('[Queue] Cerrando workers y colas...');
 
-  await Promise.all([
-    documentosWorker.close(),
+  const promises: Promise<void>[] = [
     documentosQueue.close(),
     documentosQueueEvents.close(),
-  ]);
+  ];
+
+  if (documentosWorker) {
+    promises.push(documentosWorker.close());
+  }
+
+  await Promise.all(promises.map(p => p.catch(() => {
+    // Silenciar errores al cerrar si Redis no está disponible
+  })));
 
   console.log('[Queue] Workers y colas cerrados');
 }

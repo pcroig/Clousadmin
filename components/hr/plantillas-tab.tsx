@@ -4,7 +4,7 @@
 // Plantillas Tab - Gestión de plantillas de documentos
 // ========================================
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { LoadingButton } from '@/components/shared/loading-button';
 import { Label } from '@/components/ui/label';
@@ -14,14 +14,20 @@ import { Spinner } from '@/components/ui/spinner';
 import {
   FileText,
   Upload,
-  Download,
   Trash2,
-  Eye,
   Plus,
   CheckCircle2,
   AlertCircle,
   FileType,
 } from 'lucide-react';
+import type {
+  PlantillaDocumento as ConfigPlantilla,
+  CamposRequeridos,
+} from '@/lib/onboarding-config';
+import {
+  obtenerCamposFaltantesDePlantilla,
+  validarPlantillasContraCampos,
+} from '@/lib/validaciones/plantillas-campos';
 
 interface Plantilla {
   id: string;
@@ -37,15 +43,77 @@ interface Plantilla {
   carpetaDestinoDefault: string | null;
   totalDocumentosGenerados?: number;
   creadoEn: string;
+  s3Key: string;
 }
 
-export function PlantillasTab() {
+interface PlantillasTabProps {
+  seleccionadas: ConfigPlantilla[];
+  onSeleccionChange: (plantillas: ConfigPlantilla[]) => void;
+  camposRequeridos: CamposRequeridos;
+}
+
+const VARIABLE_TO_CAMPO: Record<
+  string,
+  { grupo: keyof CamposRequeridos; campo: string; label: string }
+> = {
+  empleado_nif: { grupo: 'datos_personales', campo: 'nif', label: 'NIF/NIE' },
+  empleado_nss: { grupo: 'datos_personales', campo: 'nss', label: 'Nº Seguridad Social' },
+  empleado_telefono: { grupo: 'datos_personales', campo: 'telefono', label: 'Teléfono' },
+  empleado_direccion_calle: {
+    grupo: 'datos_personales',
+    campo: 'direccionCalle',
+    label: 'Dirección - Calle',
+  },
+  empleado_direccion_numero: {
+    grupo: 'datos_personales',
+    campo: 'direccionNumero',
+    label: 'Dirección - Número',
+  },
+  empleado_direccion_piso: {
+    grupo: 'datos_personales',
+    campo: 'direccionPiso',
+    label: 'Dirección - Piso',
+  },
+  empleado_codigo_postal: {
+    grupo: 'datos_personales',
+    campo: 'codigoPostal',
+    label: 'Código Postal',
+  },
+  empleado_ciudad: { grupo: 'datos_personales', campo: 'ciudad', label: 'Ciudad' },
+  empleado_provincia: {
+    grupo: 'datos_personales',
+    campo: 'direccionProvincia',
+    label: 'Provincia',
+  },
+  empleado_estado_civil: {
+    grupo: 'datos_personales',
+    campo: 'estadoCivil',
+    label: 'Estado civil',
+  },
+  empleado_numero_hijos: {
+    grupo: 'datos_personales',
+    campo: 'numeroHijos',
+    label: 'Número de hijos',
+  },
+  empleado_iban: { grupo: 'datos_bancarios', campo: 'iban', label: 'IBAN' },
+  empleado_titular_cuenta: {
+    grupo: 'datos_bancarios',
+    campo: 'titularCuenta',
+    label: 'Titular de la cuenta',
+  },
+};
+
+export function PlantillasTab({
+  seleccionadas,
+  onSeleccionChange,
+  camposRequeridos,
+}: PlantillasTabProps) {
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [savingSeleccion, setSavingSeleccion] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [plantillas, setPlantillas] = useState<Plantilla[]>([]);
-  const [plantillasSeleccionadas, setPlantillasSeleccionadas] = useState<Set<string>>(new Set());
 
   // Estados para subir nueva plantilla
   const [mostrarFormularioSubida, setMostrarFormularioSubida] = useState(false);
@@ -57,6 +125,11 @@ export function PlantillasTab() {
   useEffect(() => {
     cargarPlantillas();
   }, []);
+
+  const seleccionadasIds = useMemo(
+    () => new Set(seleccionadas.map((p) => p.id)),
+    [seleccionadas]
+  );
 
   const cargarPlantillas = async () => {
     setLoading(true);
@@ -79,24 +152,67 @@ export function PlantillasTab() {
     }
   };
 
-  const handleSeleccionarPlantilla = (id: string) => {
-    const nuevaSeleccion = new Set(plantillasSeleccionadas);
-    if (nuevaSeleccion.has(id)) {
-      nuevaSeleccion.delete(id);
-    } else {
-      nuevaSeleccion.add(id);
+  const handleGuardarSeleccion = async () => {
+    setSavingSeleccion(true);
+    setError('');
+    setSuccess('');
+
+    try {
+      const res = await fetch('/api/hr/onboarding-config', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tipo: 'plantillas_documentos',
+          data: seleccionadas,
+        }),
+      });
+      const data = await res.json();
+
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Error al guardar plantillas seleccionadas');
+      }
+
+      if (data.config?.plantillasDocumentos) {
+        onSeleccionChange(data.config.plantillasDocumentos);
+      }
+
+      setSuccess('Plantillas guardadas correctamente');
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (err) {
+      console.error('[PlantillasTab] Error guardando selección:', err);
+      setError(
+        err instanceof Error ? err.message : 'Error al guardar plantillas seleccionadas'
+      );
+    } finally {
+      setSavingSeleccion(false);
     }
-    setPlantillasSeleccionadas(nuevaSeleccion);
+  };
+
+  const handleToggleSeleccion = (plantilla: Plantilla) => {
+    if (seleccionadasIds.has(plantilla.id)) {
+      onSeleccionChange(seleccionadas.filter((p) => p.id !== plantilla.id));
+      return;
+    }
+
+    const nuevaPlantilla: ConfigPlantilla = {
+      id: plantilla.id,
+      nombre: plantilla.nombre,
+      s3Key: plantilla.s3Key,
+      tipoDocumento: plantilla.categoria || plantilla.tipo || 'generico',
+      descripcion: plantilla.descripcion || undefined,
+    };
+
+    onSeleccionChange([...seleccionadas, nuevaPlantilla]);
   };
 
   const handleArchivoSeleccionado = (e: React.ChangeEvent<HTMLInputElement>) => {
     const archivo = e.target.files?.[0];
     if (!archivo) return;
 
-    // Validar tipo de archivo
+    // Validar tipo de archivo - solo DOCX por ahora
     const extension = archivo.name.split('.').pop()?.toLowerCase();
-    if (extension !== 'docx' && extension !== 'pdf') {
-      setError('Solo se permiten archivos .docx o .pdf');
+    if (extension !== 'docx') {
+      setError('Solo se permiten archivos .docx con variables. El soporte para PDFs rellenables llegará en una fase posterior.');
       return;
     }
 
@@ -105,7 +221,7 @@ export function PlantillasTab() {
 
     // Auto-rellenar nombre si está vacío
     if (!nombrePlantilla) {
-      const nombreSinExtension = archivo.name.replace(/\.(docx|pdf)$/, '');
+      const nombreSinExtension = archivo.name.replace(/\.docx$/, '');
       setNombrePlantilla(nombreSinExtension);
     }
   };
@@ -195,6 +311,20 @@ export function PlantillasTab() {
   const plantillasOficiales = plantillas.filter((p) => p.esOficial);
   const plantillasPersonalizadas = plantillas.filter((p) => !p.esOficial);
 
+  const advertenciasGlobales = useMemo(() => {
+    const faltantes = new Map<string, Set<string>>();
+
+    plantillas.forEach((plantilla) => {
+      if (!seleccionadasIds.has(plantilla.id)) return;
+      const campos = obtenerCamposFaltantes(plantilla, camposRequeridos);
+      if (campos.length) {
+        faltantes.set(plantilla.nombre, new Set(campos));
+      }
+    });
+
+    return faltantes;
+  }, [plantillas, seleccionadasIds, camposRequeridos]);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -231,6 +361,39 @@ export function PlantillasTab() {
         </Button>
       </div>
 
+      <div className="rounded-lg border border-gray-200 p-4 space-y-3 bg-white">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm text-gray-600">Plantillas incluidas en el onboarding</p>
+            <p className="text-lg font-semibold">
+              {seleccionadas.length} seleccionada{seleccionadas.length === 1 ? '' : 's'}
+            </p>
+          </div>
+          <LoadingButton
+            onClick={handleGuardarSeleccion}
+            loading={savingSeleccion}
+            disabled={savingSeleccion}
+          >
+            Guardar selección
+          </LoadingButton>
+        </div>
+        {advertenciasGlobales.size > 0 && (
+          <div className="rounded-md bg-amber-50 border border-amber-200 p-3 text-sm text-amber-800 space-y-2">
+            <p className="font-semibold flex items-center gap-2">
+              <AlertCircle className="h-4 w-4" />
+              Activa estos campos en Datos requeridos:
+            </p>
+            <ul className="list-disc pl-5 space-y-1">
+              {[...advertenciasGlobales.entries()].map(([nombre, campos]) => (
+                <li key={nombre}>
+                  <span className="font-semibold">{nombre}:</span> {[...campos].join(', ')}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
+
       {/* Formulario de subida */}
       {mostrarFormularioSubida && (
         <div className="border rounded-lg p-4 space-y-4 bg-gray-50">
@@ -241,10 +404,10 @@ export function PlantillasTab() {
 
           <div className="space-y-3">
             <div>
-              <Label>Archivo (DOCX o PDF)</Label>
+              <Label>Archivo (DOCX con variables)</Label>
               <Input
                 type="file"
-                accept=".docx,.pdf"
+                accept=".docx"
                 onChange={handleArchivoSeleccionado}
                 disabled={uploading}
               />
@@ -253,6 +416,9 @@ export function PlantillasTab() {
                   Archivo seleccionado: {archivoSeleccionado.name}
                 </p>
               )}
+              <p className="text-xs text-gray-500 mt-1">
+                Solo se aceptan plantillas DOCX con variables. El soporte para PDFs rellenables llegará en una fase posterior.
+              </p>
             </div>
 
             <div>
@@ -309,9 +475,10 @@ export function PlantillasTab() {
               <PlantillaCard
                 key={plantilla.id}
                 plantilla={plantilla}
-                seleccionada={plantillasSeleccionadas.has(plantilla.id)}
-                onSeleccionar={handleSeleccionarPlantilla}
+                seleccionada={seleccionadasIds.has(plantilla.id)}
+                onSeleccionar={handleToggleSeleccion}
                 onEliminar={handleEliminarPlantilla}
+                warnings={obtenerCamposFaltantes(plantilla, camposRequeridos)}
               />
             ))}
           </div>
@@ -330,9 +497,10 @@ export function PlantillasTab() {
               <PlantillaCard
                 key={plantilla.id}
                 plantilla={plantilla}
-                seleccionada={plantillasSeleccionadas.has(plantilla.id)}
-                onSeleccionar={handleSeleccionarPlantilla}
+                seleccionada={seleccionadasIds.has(plantilla.id)}
+                onSeleccionar={handleToggleSeleccion}
                 onEliminar={handleEliminarPlantilla}
+                warnings={obtenerCamposFaltantes(plantilla, camposRequeridos)}
               />
             ))}
           </div>
@@ -370,11 +538,20 @@ export function PlantillasTab() {
 interface PlantillaCardProps {
   plantilla: Plantilla;
   seleccionada: boolean;
-  onSeleccionar: (id: string) => void;
+  onSeleccionar: (plantilla: Plantilla) => void;
   onEliminar: (id: string, nombre: string) => void;
+  warnings: string[];
 }
 
-function PlantillaCard({ plantilla, seleccionada, onSeleccionar, onEliminar }: PlantillaCardProps) {
+function PlantillaCard({
+  plantilla,
+  seleccionada,
+  onSeleccionar,
+  onEliminar,
+  warnings,
+}: PlantillaCardProps) {
+  const formatoLabel = plantilla.formato === 'docx' ? 'DOCX' : 'PDF rellenable';
+
   return (
     <div
       className={`border rounded-lg p-4 transition-all ${
@@ -387,7 +564,7 @@ function PlantillaCard({ plantilla, seleccionada, onSeleccionar, onEliminar }: P
           <Checkbox
             id={`plantilla-${plantilla.id}`}
             checked={seleccionada}
-            onCheckedChange={() => onSeleccionar(plantilla.id)}
+            onCheckedChange={() => onSeleccionar(plantilla)}
             className="mt-1"
           />
 
@@ -402,9 +579,13 @@ function PlantillaCard({ plantilla, seleccionada, onSeleccionar, onEliminar }: P
 
               {/* Badges */}
               <div className="flex items-center gap-1">
-                {plantilla.esOficial && (
+                {plantilla.esOficial ? (
                   <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
                     Oficial
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700">
+                    Personalizada
                   </span>
                 )}
                 {!plantilla.activa && (
@@ -413,7 +594,7 @@ function PlantillaCard({ plantilla, seleccionada, onSeleccionar, onEliminar }: P
                   </span>
                 )}
                 <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700">
-                  {plantilla.formato.toUpperCase()}
+                  {formatoLabel}
                 </span>
               </div>
             </div>
@@ -458,6 +639,40 @@ function PlantillaCard({ plantilla, seleccionada, onSeleccionar, onEliminar }: P
           </div>
         )}
       </div>
+      {warnings.length > 0 && (
+        <div className="mt-3 rounded-md bg-amber-50 border border-amber-200 p-3 text-xs text-amber-800 flex gap-2">
+          <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+          <div>
+            <p className="font-semibold">Activa estos campos en Datos requeridos:</p>
+            <ul className="list-disc pl-4 space-y-0.5 mt-1">
+              {warnings.map((warning) => (
+                <li key={warning}>{warning}</li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      )}
     </div>
   );
+}
+
+function obtenerCamposFaltantes(
+  plantilla: Plantilla,
+  camposRequeridos: CamposRequeridos
+): string[] {
+  const faltantes: string[] = [];
+
+  for (const variable of plantilla.variablesUsadas) {
+    const mapping = VARIABLE_TO_CAMPO[variable];
+    if (!mapping) continue;
+
+    const grupo = camposRequeridos[mapping.grupo] as Record<string, boolean> | undefined;
+    if (!grupo) continue;
+
+    if (!grupo[mapping.campo]) {
+      faltantes.push(mapping.label);
+    }
+  }
+
+  return faltantes;
 }
