@@ -14,6 +14,7 @@ import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Spinner } from '@/components/ui/spinner';
 import { Settings, FileText, FolderOpen, Plus, Trash2 } from 'lucide-react';
+import { PlantillasTab } from './plantillas-tab';
 import type {
   CamposRequeridos,
   DocumentoRequerido,
@@ -379,13 +380,7 @@ export function GestionarOnboardingModal({
 
                 {/* Tab: Plantillas */}
                 <TabsContent value="plantillas" className="space-y-4 mt-6">
-                  <div className="text-center py-12 text-gray-500">
-                    <FolderOpen className="h-12 w-12 mx-auto mb-3 text-gray-400" />
-                    <p>Gestión de plantillas próximamente</p>
-                    <p className="text-sm">
-                      Podrás subir plantillas de documentos que se asignarán automáticamente
-                    </p>
-                  </div>
+                  <PlantillasTab />
                 </TabsContent>
               </Tabs>
             )}
