@@ -103,8 +103,8 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
     const fileExtension = file.name.split('.').pop();
     const s3Key = `onboarding/${empleado.empresaId}/${empleadoId}/${tipoDocumento}-${timestamp}-${randomString}.${fileExtension}`;
 
-    // Subir a S3
-    const s3Bucket = process.env.S3_BUCKET!;
+    // Subir a Object Storage
+    const s3Bucket = process.env.STORAGE_BUCKET || 'local';
     await uploadToS3(buffer, s3Key, file.type);
 
     // Guardar documento en base de datos

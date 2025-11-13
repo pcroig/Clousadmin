@@ -246,8 +246,7 @@ export async function guardarCredenciales(
       const fileExtension = avatarFile.filename.split('.').pop();
       const s3Key = `avatars/${onboarding.empresaId}/${onboarding.empleadoId}/${timestamp}-${randomString}.${fileExtension}`;
       
-      await uploadToS3(avatarFile.buffer, s3Key, avatarFile.mimeType);
-      avatarUrl = `https://${process.env.S3_BUCKET}.s3.${process.env.AWS_REGION}.amazonaws.com/${s3Key}`;
+      avatarUrl = await uploadToS3(avatarFile.buffer, s3Key, avatarFile.mimeType);
     }
 
     // Actualizar usuario con contraseña y avatar

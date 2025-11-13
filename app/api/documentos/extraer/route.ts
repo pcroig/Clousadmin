@@ -95,10 +95,11 @@ export async function POST(request: NextRequest) {
     
     // Determinar si usar URL pública, base64, o file_id de OpenAI
     const isS3Configured = !!(
-      process.env.AWS_REGION &&
-      process.env.AWS_ACCESS_KEY_ID &&
-      process.env.AWS_SECRET_ACCESS_KEY &&
-      process.env.S3_BUCKET
+      process.env.STORAGE_ENDPOINT &&
+      process.env.STORAGE_REGION &&
+      process.env.STORAGE_ACCESS_KEY &&
+      process.env.STORAGE_SECRET_KEY &&
+      process.env.STORAGE_BUCKET
     );
     
     const isPDF = file.type === 'application/pdf';
