@@ -6,10 +6,11 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Folder, Upload, FolderPlus } from 'lucide-react';
+import { Folder, Upload, FolderPlus, FileType } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/shared/empty-state';
 import { CrearCarpetaConDocumentosModal } from '@/components/hr/crear-carpeta-con-documentos-modal';
+import { GenerarDesdePlantillaModal } from '@/components/hr/generar-desde-plantilla-modal';
 
 interface Carpeta {
   id: string;
@@ -26,6 +27,7 @@ interface DocumentosClientProps {
 export function DocumentosClient({ carpetas }: DocumentosClientProps) {
   const router = useRouter();
   const [modalCrearCarpeta, setModalCrearCarpeta] = useState(false);
+  const [modalGenerarPlantilla, setModalGenerarPlantilla] = useState(false);
 
   const handleAbrirCarpeta = (carpetaId: string) => {
     router.push(`/hr/documentos/${carpetaId}`);
@@ -50,6 +52,13 @@ export function DocumentosClient({ carpetas }: DocumentosClientProps) {
               >
                 <FolderPlus className="w-4 h-4 mr-2" />
                 Crear Carpeta
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => setModalGenerarPlantilla(true)}
+              >
+                <FileType className="w-4 h-4 mr-2" />
+                Generar desde Plantilla
               </Button>
               <Button
                 variant="default"
@@ -136,6 +145,16 @@ export function DocumentosClient({ carpetas }: DocumentosClientProps) {
         onClose={() => setModalCrearCarpeta(false)}
         onSuccess={(carpetaId) => {
           // Recargar página para mostrar nueva carpeta
+          router.refresh();
+        }}
+      />
+
+      {/* Modal Generar desde Plantilla */}
+      <GenerarDesdePlantillaModal
+        open={modalGenerarPlantilla}
+        onOpenChange={setModalGenerarPlantilla}
+        onSuccess={() => {
+          // Recargar página para mostrar nuevos documentos
           router.refresh();
         }}
       />
