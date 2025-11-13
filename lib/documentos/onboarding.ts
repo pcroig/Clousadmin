@@ -244,18 +244,18 @@ export async function subirDocumentoOnboarding(
       }
     } else {
       // Crear carpetas automáticamente (comportamiento anterior)
-      const carpetasResult = await crearCarpetasOnboardingDocumento(
-        empresaId,
-        empleadoId,
-        nombreDocumento,
-        tipoDocumento
-      );
+    const carpetasResult = await crearCarpetasOnboardingDocumento(
+      empresaId,
+      empleadoId,
+      nombreDocumento,
+      tipoDocumento
+    );
 
-      if (!carpetasResult.success) {
-        return {
-          success: false,
-          error: carpetasResult.error,
-        };
+    if (!carpetasResult.success) {
+      return {
+        success: false,
+        error: carpetasResult.error,
+      };
       }
 
       carpetaDestino = carpetasResult.carpetaEmpleado;
