@@ -290,6 +290,11 @@ model Empleado {
   documentosCompletos     Boolean   @default(false)
   documentosCompletadosEn DateTime?
 
+  // Firma guardada (para firma digital rápida)
+  firmaGuardada     Boolean @default(false) // Si el empleado tiene firma guardada
+  firmaS3Key        String? @db.Text // S3 key de la imagen de firma (PNG/SVG)
+  firmaGuardadaData Json? // Datos de trazo de firma manuscrita (opcional)
+
   // Control
   activo    Boolean  @default(true)
   createdAt DateTime @default(now())
