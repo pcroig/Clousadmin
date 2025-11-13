@@ -78,6 +78,8 @@ export interface DatosCapturadosFirma {
   timestamp: string;
   coords?: number[]; // Para firma manuscrita (Fase 2)
   certificadoData?: string; // Para certificado digital (Fase 3)
+  firmaGuardadaUsada?: boolean; // Si se usó la firma guardada del empleado
+  firmaGuardadaS3Key?: string; // S3 key de la firma usada (si aplica)
 }
 
 /**
