@@ -156,6 +156,10 @@ model Empresa {
   solicitudesEliminacion   SolicitudEliminacionDatos[]
   compensacionesHorasExtra CompensacionHoraExtra[]
   denuncias                Denuncia[]
+  plantillasDocumentos     PlantillaDocumento[]
+  documentosGenerados      DocumentoGenerado[]
+  jobsGeneracionDocumentos JobGeneracionDocumentos[]
+  solicitudesFirma         SolicitudFirma[]
 
   @@index([cif])
   @@map("empresas")
@@ -321,6 +325,8 @@ model Empleado {
   solicitudesEliminacion     SolicitudEliminacionDatos[]
   compensacionesHorasExtra   CompensacionHoraExtra[]
   denuncias                  Denuncia[]
+  documentosGenerados        DocumentoGenerado[]
+  firmas                     Firma[]
 
   @@index([empresaId])
   @@index([usuarioId])
@@ -801,15 +807,22 @@ model Documento {
   procesadoIA    Boolean @default(false)
   datosExtraidos Json? // AI-extracted data (flexible schema)
 
+  // Firma digital tracking
+  requiereFirma Boolean   @default(false) // Si este documento requiere firma
+  firmado       Boolean   @default(false) // Si fue firmado
+  fechaFirma    DateTime? // Fecha de última firma
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   // Relations
-  empresa  Empresa   @relation(fields: [empresaId], references: [id], onDelete: Cascade)
-  empleado Empleado? @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
-  carpeta  Carpeta?  @relation(fields: [carpetaId], references: [id], onDelete: SetNull)
-  puesto   Puesto?   @relation(fields: [puestoId], references: [id], onDelete: Cascade)
-  nomina   Nomina? // One-to-one relation: a document can be a payslip PDF
+  empresa             Empresa             @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  empleado            Empleado?           @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+  carpeta             Carpeta?            @relation(fields: [carpetaId], references: [id], onDelete: SetNull)
+  puesto              Puesto?             @relation(fields: [puestoId], references: [id], onDelete: Cascade)
+  nomina              Nomina? // One-to-one relation: a document can be a payslip PDF
+  solicitudesFirma    SolicitudFirma[]
+  documentoGenerado   DocumentoGenerado?
 
   @@index([empresaId])
   @@index([empleadoId])
@@ -1691,4 +1704,288 @@ model SolicitudEliminacionDatos {
   @@index([empleadoId])
   @@index([estado])
   @@map("solicitudes_eliminacion_datos")
+}
+
+// ========================================
+// 19. PLANTILLAS DE DOCUMENTOS Y FIRMA DIGITAL
+// ========================================
+
+/// PlantillaDocumento - Template storage and metadata
+/// Stores document templates with variables for auto-generation
+model PlantillaDocumento {
+  id        String  @id @default(uuid())
+  empresaId String? // NULL = plantilla oficial (todas empresas), NOT NULL = personalizada por empresa
+
+  // Metadata
+  nombre      String  @db.VarChar(255) // "Contrato Indefinido", "Modelo 145"
+  descripcion String? @db.Text
+  categoria   String  @db.VarChar(100) // 'contrato', 'fiscal', 'ausencia', 'personal'
+
+  // Template type
+  tipo    String @db.VarChar(50) // 'oficial' | 'personalizada'
+  formato String @db.VarChar(20) // 'docx' | 'pdf_rellenable'
+
+  // File storage
+  s3Key    String @unique @db.Text // S3 key to template file
+  s3Bucket String @db.VarChar(255)
+
+  // Variables used in template (JSON array of variable names)
+  // Example: ["empleado_nombre", "empleado_nif", "contrato_fecha_inicio"]
+  // NOTE: Solo almacena KEYS, no valores (por seguridad GDPR)
+  variablesUsadas Json @default("[]")
+
+  // Configuration
+  activa           Boolean @default(true)
+  esOficial        Boolean @default(false) // Sistema predefinida
+  requiereContrato Boolean @default(false) // Necesita datos de contrato
+  requiereFirma    Boolean @default(false) // Requiere firma digital
+
+  // Folder destination default
+  carpetaDestinoDefault String? @db.VarChar(50) // 'Contratos', 'Personales', etc.
+
+  // AI configuration
+  usarIAParaExtraer Boolean @default(false) // Usar IA para extraer campos de PDF
+  configuracionIA   Json? // Configuración específica de IA para esta plantilla
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  empresa             Empresa?              @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  documentosGenerados DocumentoGenerado[]
+  jobsGeneracion      JobGeneracionDocumentos[]
+
+  @@index([empresaId])
+  @@index([tipo])
+  @@index([categoria])
+  @@index([activa])
+  @@index([esOficial])
+  @@map("plantillas_documentos")
+}
+
+/// DocumentoGenerado - Documents generated from templates
+/// Tracking de documentos generados a partir de plantillas
+model DocumentoGenerado {
+  id          String @id @default(uuid())
+  empresaId   String
+  empleadoId  String
+  plantillaId String
+  documentoId String @unique // Link to Documento table (final PDF/DOCX)
+
+  // Generation metadata
+  generadoPor String? // Usuario ID (HR Admin)
+  generadoEn  DateTime @default(now())
+
+  // Variables used (SOLO KEYS, no valores por seguridad)
+  // Example: ["empleado_nombre", "empleado_nif", "contrato_fecha_inicio"]
+  variablesUtilizadas Json // Array de strings con nombres de variables
+
+  // AI extraction metadata (si se usó IA)
+  usadaIA         Boolean @default(false)
+  confianzaIA     Decimal? @db.Decimal(3, 2) // 0.00-1.00
+  tiempoGeneracion Int? // Milliseconds
+
+  // Delivery tracking
+  notificado Boolean @default(false)
+  visto      Boolean @default(false)
+  vistoEn    DateTime?
+
+  // Firma digital (integración con sistema de firma)
+  requiereFirma Boolean   @default(false)
+  firmado       Boolean   @default(false)
+  firmadoEn     DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  empresa   Empresa            @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  empleado  Empleado           @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+  plantilla PlantillaDocumento @relation(fields: [plantillaId], references: [id], onDelete: Cascade)
+  documento Documento          @relation(fields: [documentoId], references: [id], onDelete: Cascade)
+
+  @@index([empresaId])
+  @@index([empleadoId])
+  @@index([plantillaId])
+  @@index([documentoId])
+  @@index([generadoEn])
+  @@index([firmado])
+  @@index([usadaIA])
+  @@map("documentos_generados")
+}
+
+/// VariableMapping - Cache de mappings de variables resueltos por IA
+/// Almacena el resultado de la IA para evitar llamadas repetidas
+model VariableMapping {
+  id           String @id @default(uuid())
+  variableName String @unique @db.VarChar(200) // "empleado_nombre", "contrato_salario_mensual"
+
+  // Mapping configuration (resultado de IA)
+  jsonPath            String  @db.Text // "empleado.nombre", "contratos[0].salarioBrutoAnual"
+  requiresDecryption  Boolean @default(false)
+  requiresFormatting  Boolean @default(false)
+  formatType          String? @db.VarChar(50) // 'date', 'currency', 'number', null
+  formatPattern       String? @db.VarChar(100) // 'dd/MM/yyyy', 'EUR', etc.
+
+  // AI metadata
+  generadoPorIA Boolean   @default(true)
+  confianza     Decimal   @db.Decimal(3, 2) // 0.00-1.00
+  verificado    Boolean   @default(false) // Verificado manualmente por developer
+  vecesUsado    Int       @default(0) // Contador de uso
+
+  // Cache control
+  ultimoUso DateTime @default(now())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([variableName])
+  @@index([ultimoUso])
+  @@map("variable_mappings")
+}
+
+/// JobGeneracionDocumentos - Background jobs para generación asíncrona
+/// Gestiona la generación masiva de documentos con tracking de progreso
+model JobGeneracionDocumentos {
+  id          String @id @default(uuid())
+  empresaId   String
+  plantillaId String
+  solicitadoPor String // Usuario ID que solicitó la generación
+
+  // Configuration
+  empleadoIds    Json // Array de empleado IDs
+  configuracion  Json // { nombreDocumento, carpetaDestino, notificar, requiereFirma }
+
+  // Status tracking
+  estado           String @default("en_cola") @db.VarChar(50) // 'en_cola', 'procesando', 'completado', 'fallido'
+  progreso         Int    @default(0) @db.SmallInt // 0-100
+  totalEmpleados   Int
+  procesados       Int    @default(0)
+  exitosos         Int    @default(0)
+  fallidos         Int    @default(0)
+
+  // Timing
+  iniciadoEn    DateTime?
+  completadoEn  DateTime?
+  tiempoTotal   Int? // Milliseconds
+
+  // Results (JSON array de resultados por empleado)
+  resultados Json? // [{ empleadoId, success, documentoId?, error? }]
+
+  // Error handling
+  error      String? @db.Text
+  intentos   Int     @default(0) @db.SmallInt
+  ultimoIntento DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  empresa   Empresa            @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  plantilla PlantillaDocumento @relation(fields: [plantillaId], references: [id], onDelete: Cascade)
+
+  @@index([empresaId])
+  @@index([plantillaId])
+  @@index([estado])
+  @@index([solicitadoPor])
+  @@index([createdAt])
+  @@map("jobs_generacion_documentos")
+}
+
+/// SolicitudFirma - Tracking de solicitudes de firma de documentos
+/// Gestiona el workflow completo de firma digital (simple o cualificada)
+model SolicitudFirma {
+  id          String @id @default(uuid())
+  empresaId   String
+  documentoId String
+
+  // Solicitante
+  solicitadoPor String   // Usuario ID (HR Admin)
+  solicitadoEn  DateTime @default(now())
+
+  // Configuración de la solicitud
+  mensaje     String?   @db.Text // Mensaje opcional al empleado
+  fechaLimite DateTime? // Fecha límite para firmar (opcional)
+  requiereOrden Boolean @default(false) // Firma secuencial (Fase 2)
+
+  // Estado general de la solicitud
+  // Estados: pendiente, completada, expirada, cancelada
+  estado String @default("pendiente") @db.VarChar(50)
+
+  // Tipo de solicitud (para tracking)
+  tipo String @default("individual") @db.VarChar(50) // individual, masiva, automatica
+
+  // Proveedor de firma (para fase 2)
+  proveedor String @default("interno") @db.VarChar(50) // interno, lleida, docusign
+
+  // Metadata del proveedor externo (si aplica)
+  proveedorData Json? // { envelopeId, accessCode, etc }
+
+  // Timestamps
+  completadaEn DateTime? // Cuando todos firmaron
+  expiradaEn   DateTime? // Cuando expiró
+  canceladaEn  DateTime? // Cuando HR canceló
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  empresa   Empresa   @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  documento Documento @relation(fields: [documentoId], references: [id], onDelete: Cascade)
+  firmas    Firma[] // Array de firmas individuales
+
+  @@index([empresaId])
+  @@index([documentoId])
+  @@index([estado])
+  @@index([fechaLimite])
+  @@index([tipo])
+  @@index([solicitadoPor])
+  @@map("solicitudes_firma")
+}
+
+/// Firma - Tracking individual de firma por empleado
+/// Cada empleado tiene su propio registro de firma con certificado digital
+model Firma {
+  id               String @id @default(uuid())
+  solicitudFirmaId String
+  empleadoId       String
+
+  // Estado individual de esta firma
+  // Estados: pendiente, visto, firmado, rechazado, expirado
+  estado String @default("pendiente") @db.VarChar(50)
+
+  // Tracking de eventos
+  enviadoEn   DateTime  @default(now())
+  vistoEn     DateTime? // Cuando empleado abrió el documento
+  firmadoEn   DateTime? // Cuando firmó
+  rechazadoEn DateTime? // Si rechazó (Fase 2)
+
+  // Datos de firma (para auditoría y validez legal)
+  ipAddress String? @db.VarChar(50) // IP desde donde firmó
+  userAgent String? @db.Text // Navegador usado
+  ubicacion Json? // Geolocation opcional (lat, lon, city)
+
+  // Certificado de firma digital
+  certificado String? @db.Text // Hash SHA-256 del documento + timestamp
+  metodoFirma String? @db.VarChar(50) // click, biometrica, otp, certificado
+
+  // Rechazo (Fase 2)
+  motivoRechazo String? @db.Text
+
+  // Recordatorios enviados
+  recordatoriosEnviados Int       @default(0)
+  ultimoRecordatorio    DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  solicitud SolicitudFirma @relation(fields: [solicitudFirmaId], references: [id], onDelete: Cascade)
+  empleado  Empleado       @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+
+  @@unique([solicitudFirmaId, empleadoId]) // Un empleado solo firma una vez por solicitud
+  @@index([solicitudFirmaId])
+  @@index([empleadoId])
+  @@index([estado])
+  @@index([firmadoEn])
+  @@map("firmas")
 }
