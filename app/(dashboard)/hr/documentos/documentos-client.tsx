@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/shared/empty-state';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { CrearCarpetaConDocumentosModal } from '@/components/hr/crear-carpeta-con-documentos-modal';
-import { GenerarDesdePlantillaModal } from '@/components/hr/generar-desde-plantilla-modal';
+import { SubirPlantillaModal } from '@/components/hr/subir-plantilla-modal';
 import { PlantillasList } from '@/components/hr/plantillas-list';
 
 interface Carpeta {
@@ -30,7 +30,7 @@ export function DocumentosClient({ carpetas }: DocumentosClientProps) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState('documentos');
   const [modalCrearCarpeta, setModalCrearCarpeta] = useState(false);
-  const [modalGenerarPlantilla, setModalGenerarPlantilla] = useState(false);
+  const [modalSubirPlantilla, setModalSubirPlantilla] = useState(false);
 
   const handleAbrirCarpeta = (carpetaId: string) => {
     router.push(`/hr/documentos/${carpetaId}`);
@@ -62,13 +62,6 @@ export function DocumentosClient({ carpetas }: DocumentosClientProps) {
                     Crear Carpeta
                   </Button>
                   <Button
-                    variant="outline"
-                    onClick={() => setModalGenerarPlantilla(true)}
-                  >
-                    <FileType className="w-4 h-4 mr-2" />
-                    Generar desde Plantilla
-                  </Button>
-                  <Button
                     variant="default"
                     onClick={() => router.push('/hr/documentos/subir')}
                   >
@@ -79,10 +72,10 @@ export function DocumentosClient({ carpetas }: DocumentosClientProps) {
               ) : (
                 <Button
                   variant="default"
-                  onClick={() => router.push('/hr/settings/compania')}
+                  onClick={() => setModalSubirPlantilla(true)}
                 >
-                  <FileType className="w-4 h-4 mr-2" />
-                  Gestionar Plantillas
+                  <Upload className="w-4 h-4 mr-2" />
+                  Subir Plantilla
                 </Button>
               )}
             </div>
@@ -187,12 +180,12 @@ export function DocumentosClient({ carpetas }: DocumentosClientProps) {
         }}
       />
 
-      {/* Modal Generar desde Plantilla */}
-      <GenerarDesdePlantillaModal
-        open={modalGenerarPlantilla}
-        onOpenChange={setModalGenerarPlantilla}
+      {/* Modal Subir Plantilla */}
+      <SubirPlantillaModal
+        open={modalSubirPlantilla}
+        onOpenChange={setModalSubirPlantilla}
         onSuccess={() => {
-          // Recargar página para mostrar nuevos documentos
+          // Recargar página para mostrar nueva plantilla
           router.refresh();
         }}
       />

@@ -20,7 +20,7 @@ const PREVIEW_TTL_SECONDS = 60 * 10; // 10 minutos
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getSession();
@@ -39,8 +39,11 @@ export async function GET(
       );
     }
 
+    // Await params en Next.js 15+
+    const { id } = await params;
+
     const plantilla = await prisma.plantillaDocumento.findUnique({
-      where: { id: params.id },
+      where: { id },
       select: {
         id: true,
         empresaId: true,

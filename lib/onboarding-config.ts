@@ -34,9 +34,9 @@ export interface CamposRequeridos {
 export interface DocumentoRequerido {
   id: string;
   nombre: string;
-  descripcion?: string;
   requerido: boolean;
-  tipoDocumento: string; // 'dni', 'contrato', 'seguridad_social', 'otro'
+  requiereVisualizacion: boolean;
+  requiereFirma: boolean;
 }
 
 /**

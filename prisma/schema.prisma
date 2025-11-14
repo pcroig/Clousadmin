@@ -1931,7 +1931,6 @@ model SolicitudFirma {
 
   // Proveedor de firma
   proveedor String @default("interno") @db.VarChar(50) // 'interno' | 'lleidanetworks' (Fase 2)
-  proveedorData Json? // { envelopeId, accessCode, etc } - Metadata del proveedor externo (si aplica)
 
   // Recordatorios automáticos
   recordatorioAutomatico Boolean @default(true)
@@ -1998,7 +1997,6 @@ model Firma {
 
   // Tracking de eventos
   enviadoEn   DateTime? // Cuando se envió la solicitud
-  vistoEn     DateTime? // Cuando empleado abrió el documento
   rechazadoEn DateTime? // Si rechazó (Fase 2)
 
   // Datos de firma capturados (para auditoría y validez legal)
@@ -2012,13 +2010,8 @@ model Firma {
   certificadoHash String? @db.Text // Hash SHA-256 del certificado de firma (si aplica)
   metodoFirma     String? @db.VarChar(50) // click, biometrica, otp, certificado (alias de metodoCaptura)
 
-  // Rechazo (Fase 2)
-  motivoRechazo String? @db.Text
-
-  // Recordatorios enviados
-  recordatoriosEnviados Int       @default(0) // alias de numRecordatorios
-  numRecordatorios      Int       @default(0)
-  ultimoRecordatorio    DateTime?
+  // Recordatorios enviados (tracking general)
+  numRecordatorios Int @default(0)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
