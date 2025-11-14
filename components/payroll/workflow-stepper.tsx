@@ -63,3 +63,4 @@ export function WorkflowStepper({ estadoActual, compact = false }: WorkflowStepp
 
 export { WORKFLOW_STEPS };
 
+

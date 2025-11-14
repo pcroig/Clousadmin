@@ -63,15 +63,8 @@ export async function POST(
       return NextResponse.json({ error: 'Evento no encontrado' }, { status: 404 });
     }
 
-    // Verificar que el evento está en estado correcto para importar
-    if (!['exportada', 'definitiva'].includes(evento.estado)) {
-      return NextResponse.json(
-        {
-          error: `No se pueden importar nóminas en estado '${evento.estado}'. El evento debe estar exportado.`,
-        },
-        { status: 400 }
-      );
-    }
+    // No verificar estado - permitir importar en cualquier momento después de generar pre-nóminas
+    // (comentado el bloqueo por estado)
 
     // Parse FormData
     const formData = await req.formData();

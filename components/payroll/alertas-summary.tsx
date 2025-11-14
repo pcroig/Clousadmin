@@ -90,3 +90,4 @@ export function AlertasSummary({ alertas, compact = false, onClick }: AlertasSum
   );
 }
 
+

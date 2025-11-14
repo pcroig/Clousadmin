@@ -129,7 +129,7 @@ export async function POST(request: NextRequest) {
     const file = formData.get('file') as File;
     const nombre = formData.get('nombre') as string;
     const descripcion = formData.get('descripcion') as string | null;
-    const categoria = formData.get('categoria') as string;
+    const categoria = (formData.get('categoria') as string) || 'general'; // Default a 'general'
     const carpetaDestinoDefault = formData.get('carpetaDestinoDefault') as string | null;
     const requiereContrato = formData.get('requiereContrato') === 'true';
     const requiereFirma = formData.get('requiereFirma') === 'true';
@@ -143,8 +143,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Falta archivo' }, { status: 400 });
     }
 
-    if (!nombre || !categoria) {
-      return NextResponse.json({ error: 'Faltan campos requeridos' }, { status: 400 });
+    if (!nombre) {
+      return NextResponse.json({ error: 'Falta el nombre de la plantilla' }, { status: 400 });
     }
 
     // Validar tipo de archivo - solo DOCX por ahora (PDF rellenable en fase posterior)

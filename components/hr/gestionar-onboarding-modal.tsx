@@ -155,9 +155,9 @@ export function GestionarOnboardingModal({
     const nuevoDoc: DocumentoRequerido = {
       id: `doc_${Date.now()}`,
       nombre: '',
-      descripcion: '',
       requerido: true,
-      tipoDocumento: 'otro',
+      requiereVisualizacion: false,
+      requiereFirma: false,
     };
     setDocumentosRequeridos([...documentosRequeridos, nuevoDoc]);
   };
@@ -294,57 +294,47 @@ export function GestionarOnboardingModal({
                       <div key={doc.id} className="border rounded-lg p-4 space-y-3">
                         <div className="flex items-start justify-between">
                           <div className="flex-1 space-y-3">
-                            <div className="grid grid-cols-2 gap-3">
-                              <div>
-                                <Label>Nombre del documento</Label>
-                                <Input
-                                  value={doc.nombre}
-                                  onChange={(e) =>
-                                    actualizarDocumentoRequerido(doc.id, 'nombre', e.target.value)
-                                  }
-                                  placeholder="ej: DNI/NIE"
-                                />
-                              </div>
-                              <div>
-                                <Label>Tipo</Label>
-                                <select
-                                  value={doc.tipoDocumento}
-                                  onChange={(e) =>
-                                    actualizarDocumentoRequerido(
-                                      doc.id,
-                                      'tipoDocumento',
-                                      e.target.value
-                                    )
-                                  }
-                                  className="w-full border border-gray-300 rounded-md px-3 py-2"
-                                >
-                                  <option value="dni">DNI/NIE</option>
-                                  <option value="contrato">Contrato</option>
-                                  <option value="seguridad_social">Seguridad Social</option>
-                                  <option value="certificado">Certificado</option>
-                                  <option value="otro">Otro</option>
-                                </select>
-                              </div>
-                            </div>
                             <div>
-                              <Label>Descripción (opcional)</Label>
+                              <Label>Nombre del documento</Label>
                               <Input
-                                value={doc.descripcion || ''}
+                                value={doc.nombre}
                                 onChange={(e) =>
-                                  actualizarDocumentoRequerido(doc.id, 'descripcion', e.target.value)
+                                  actualizarDocumentoRequerido(doc.id, 'nombre', e.target.value)
                                 }
-                                placeholder="Descripción del documento"
+                                placeholder="ej: DNI/NIE, Certificado de estudios, etc."
                               />
                             </div>
-                            <div className="flex items-center space-x-2">
-                              <Checkbox
-                                id={`req-${doc.id}`}
-                                checked={doc.requerido}
-                                onCheckedChange={(checked) =>
-                                  actualizarDocumentoRequerido(doc.id, 'requerido', checked === true)
-                                }
-                              />
-                              <Label htmlFor={`req-${doc.id}`}>Requerido</Label>
+                            <div className="space-y-2">
+                              <div className="flex items-center space-x-2">
+                                <Checkbox
+                                  id={`req-${doc.id}`}
+                                  checked={doc.requerido}
+                                  onCheckedChange={(checked) =>
+                                    actualizarDocumentoRequerido(doc.id, 'requerido', checked === true)
+                                  }
+                                />
+                                <Label htmlFor={`req-${doc.id}`}>Requerido</Label>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <Checkbox
+                                  id={`ver-${doc.id}`}
+                                  checked={doc.requiereVisualizacion || false}
+                                  onCheckedChange={(checked) =>
+                                    actualizarDocumentoRequerido(doc.id, 'requiereVisualizacion', checked === true)
+                                  }
+                                />
+                                <Label htmlFor={`ver-${doc.id}`}>Requiere visualización</Label>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <Checkbox
+                                  id={`firmar-${doc.id}`}
+                                  checked={doc.requiereFirma || false}
+                                  onCheckedChange={(checked) =>
+                                    actualizarDocumentoRequerido(doc.id, 'requiereFirma', checked === true)
+                                  }
+                                />
+                                <Label htmlFor={`firmar-${doc.id}`}>Requiere firma digital</Label>
+                              </div>
                             </div>
                           </div>
                           <Button

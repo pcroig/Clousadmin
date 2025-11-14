@@ -119,8 +119,6 @@ export function PlantillasTab({
   const [mostrarFormularioSubida, setMostrarFormularioSubida] = useState(false);
   const [archivoSeleccionado, setArchivoSeleccionado] = useState<File | null>(null);
   const [nombrePlantilla, setNombrePlantilla] = useState('');
-  const [descripcionPlantilla, setDescripcionPlantilla] = useState('');
-  const [categoriaPlantilla, setCategoriaPlantilla] = useState('');
 
   useEffect(() => {
     cargarPlantillas();
@@ -245,12 +243,6 @@ export function PlantillasTab({
       const formData = new FormData();
       formData.append('file', archivoSeleccionado);
       formData.append('nombre', nombrePlantilla.trim());
-      if (descripcionPlantilla.trim()) {
-        formData.append('descripcion', descripcionPlantilla.trim());
-      }
-      if (categoriaPlantilla.trim()) {
-        formData.append('categoria', categoriaPlantilla.trim());
-      }
 
       const res = await fetch('/api/plantillas', {
         method: 'POST',
@@ -260,20 +252,21 @@ export function PlantillasTab({
       const data = await res.json();
 
       if (data.success) {
-        setSuccess('Plantilla subida correctamente');
+        setSuccess('Plantilla subida correctamente. Variables detectadas automáticamente.');
         setTimeout(() => setSuccess(''), 3000);
 
         // Resetear formulario
         setMostrarFormularioSubida(false);
         setArchivoSeleccionado(null);
         setNombrePlantilla('');
-        setDescripcionPlantilla('');
-        setCategoriaPlantilla('');
 
         // Recargar plantillas
         cargarPlantillas();
       } else {
         setError(data.error || 'Error al subir plantilla');
+        if (data.tip) {
+          setError(`${data.error}\n${data.tip}`);
+        }
       }
     } catch (err) {
       console.error('[handleSubirPlantilla] Error:', err);
@@ -426,29 +419,16 @@ export function PlantillasTab({
               <Input
                 value={nombrePlantilla}
                 onChange={(e) => setNombrePlantilla(e.target.value)}
-                placeholder="ej: Contrato Temporal"
+                placeholder="ej: Contrato Temporal, Modelo 145, etc."
                 disabled={uploading}
               />
             </div>
 
-            <div>
-              <Label>Descripción (opcional)</Label>
-              <Input
-                value={descripcionPlantilla}
-                onChange={(e) => setDescripcionPlantilla(e.target.value)}
-                placeholder="ej: Contrato para empleados temporales"
-                disabled={uploading}
-              />
-            </div>
-
-            <div>
-              <Label>Categoría (opcional)</Label>
-              <Input
-                value={categoriaPlantilla}
-                onChange={(e) => setCategoriaPlantilla(e.target.value)}
-                placeholder="ej: contratos, onboarding, legal"
-                disabled={uploading}
-              />
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+              <p className="text-xs text-blue-900">
+                El sistema detectará automáticamente las variables del formato{' '}
+                <code className="bg-blue-100 px-1 rounded">{'{{nombre_variable}}'}</code> presentes en el documento.
+              </p>
             </div>
 
             <LoadingButton

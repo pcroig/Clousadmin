@@ -49,9 +49,6 @@ export function CrearCarpetaConDocumentosModal({
   // Datos de la carpeta
   const [nombreCarpeta, setNombreCarpeta] = useState('');
   const [asignadoA, setAsignadoA] = useState<string>('todos');
-  const [vinculadaAProceso, setVinculadaAProceso] = useState<string | null>(null);
-  const [requiereFirma, setRequiereFirma] = useState(false);
-  const [requiereRellenarDatos, setRequiereRellenarDatos] = useState(false);
   
   // Documentos a subir
   const [documentos, setDocumentos] = useState<UploadedFile[]>([]);
@@ -73,9 +70,6 @@ export function CrearCarpetaConDocumentosModal({
           nombre: nombreCarpeta,
           compartida: true,
           asignadoA,
-          vinculadaAProceso: vinculadaAProceso || undefined,
-          requiereFirma,
-          requiereRellenarDatos,
         }),
       });
 
@@ -131,9 +125,6 @@ export function CrearCarpetaConDocumentosModal({
       // 3. Resetear y cerrar
       setNombreCarpeta('');
       setAsignadoA('todos');
-      setVinculadaAProceso(null);
-      setRequiereFirma(false);
-      setRequiereRellenarDatos(false);
       setDocumentos([]);
       
       onClose();
@@ -190,76 +181,6 @@ export function CrearCarpetaConDocumentosModal({
                 {/* Futuro: equipos, departamentos, etc. */}
               </SelectContent>
             </Select>
-          </div>
-
-          {/* Vinculación a proceso */}
-          <div className="space-y-3 p-4 bg-blue-50 rounded-lg border border-blue-200">
-            <div className="flex items-center gap-2">
-              <Label className="text-sm font-medium">Vincular a proceso (opcional)</Label>
-              <InfoTooltip
-                content="Si vinculas esta carpeta a onboarding u offboarding, podrás solicitar documentos, firmas o completar datos específicos durante estos procesos."
-                variant="subtle"
-              />
-            </div>
-            
-            <Select
-              value={vinculadaAProceso || 'ninguno'}
-              onValueChange={(value) => setVinculadaAProceso(value === 'ninguno' ? null : value)}
-              disabled={loading}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ninguno">Sin vincular</SelectItem>
-                <SelectItem value="onboarding">📥 Onboarding (Alta de empleado)</SelectItem>
-                <SelectItem value="offboarding">📤 Offboarding (Baja de empleado)</SelectItem>
-              </SelectContent>
-            </Select>
-
-            {vinculadaAProceso && (
-              <div className="space-y-2 mt-3">
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="requiereFirma"
-                    checked={requiereFirma}
-                    onCheckedChange={(checked) => setRequiereFirma(checked as boolean)}
-                    disabled={loading}
-                  />
-                  <Label
-                    htmlFor="requiereFirma"
-                    className="text-sm font-normal cursor-pointer flex items-center gap-2"
-                  >
-                    ✍️ Requiere firma digital
-                    <InfoTooltip
-                      content="Los documentos de esta carpeta requerirán firma electrónica del empleado (funcionalidad en desarrollo)."
-                      variant="subtle"
-                      side="right"
-                    />
-                  </Label>
-                </div>
-
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="requiereRellenarDatos"
-                    checked={requiereRellenarDatos}
-                    onCheckedChange={(checked) => setRequiereRellenarDatos(checked as boolean)}
-                    disabled={loading}
-                  />
-                  <Label
-                    htmlFor="requiereRellenarDatos"
-                    className="text-sm font-normal cursor-pointer flex items-center gap-2"
-                  >
-                    📝 Requiere completar datos
-                    <InfoTooltip
-                      content="El empleado deberá completar ciertos campos (NIF, dirección, IBAN, etc.) antes de generar el documento final."
-                      variant="subtle"
-                      side="right"
-                    />
-                  </Label>
-                </div>
-              </div>
-            )}
           </div>
 
           {/* Subida de documentos */}

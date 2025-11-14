@@ -14,7 +14,7 @@ import { agregarJobGeneracion } from '@/lib/plantillas';
  */
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getSession();
@@ -22,6 +22,9 @@ export async function POST(
     if (!session || session.user.rol !== 'hr_admin') {
       return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
     }
+
+    // Await params en Next.js 15+
+    const { id } = await params;
 
     const body = await request.json();
     const {
@@ -51,7 +54,7 @@ export async function POST(
 
     // Verificar que la plantilla existe
     const plantilla = await prisma.plantillaDocumento.findUnique({
-      where: { id: params.id },
+      where: { id },
       select: {
         id: true,
         nombre: true,
@@ -103,7 +106,7 @@ export async function POST(
     console.log(`[API] Creando job para generar ${empleadoIds.length} documentos...`);
 
     const jobId = await agregarJobGeneracion({
-      plantillaId: params.id,
+      plantillaId: id,
       empleadoIds,
       configuracion,
       solicitadoPor: session.user.id,

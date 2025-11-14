@@ -11,7 +11,7 @@ import { UsuarioRol } from '@/lib/constants/enums';
 export default async function PlantillaDetailPage({
   params,
 }: {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }) {
   const session = await getSession();
 
@@ -19,7 +19,7 @@ export default async function PlantillaDetailPage({
     redirect('/login');
   }
 
-  const { id } = params;
+  const { id } = await params;
 
   // Obtener plantilla con datos completos
   const plantilla = await prisma.plantillaDocumento.findUnique({
@@ -67,7 +67,7 @@ export default async function PlantillaDetailPage({
     requiereContrato: plantilla.requiereContrato,
     requiereFirma: plantilla.requiereFirma,
     carpetaDestinoDefault: plantilla.carpetaDestinoDefault,
-    variablesUsadas: plantilla.variablesUsadas as string[],
+    variablesUsadas: (plantilla.variablesUsadas as string[]) || [],
     usarIAParaExtraer: plantilla.usarIAParaExtraer,
     configuracionIA: plantilla.configuracionIA,
     totalDocumentosGenerados: plantilla._count.documentosGenerados,
@@ -85,4 +85,5 @@ export default async function PlantillaDetailPage({
 
   return <PlantillaDetailClient plantilla={plantillaData} />;
 }
+
 
