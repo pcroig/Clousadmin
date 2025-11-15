@@ -205,8 +205,11 @@ export async function POST(
           },
         });
 
-        // Actualizar estado usando función de sincronización
-        await actualizarEstadoNomina(nomina.id, 'definitiva');
+        // Publicar automáticamente la nómina importada
+        await actualizarEstadoNomina(nomina.id, 'publicada', {
+          fechaPublicacion: new Date(),
+          empleadoNotificado: false,
+        });
 
         resultados.push({
           empleado: `${nomina.empleado.nombre} ${nomina.empleado.apellidos}`,
@@ -222,9 +225,6 @@ export async function POST(
       }
     }
 
-    // Sincronizar estado del evento (automático basado en estados de nóminas individuales)
-    await sincronizarEstadoEvento(id);
-
     // Verificar si todas las nóminas tienen documentos
     const nominasSinDocumento = await prisma.nomina.count({
       where: {
@@ -232,6 +232,24 @@ export async function POST(
         documentoId: null,
       },
     });
+
+    const ahora = new Date();
+
+    await prisma.eventoNomina.update({
+      where: { id },
+      data: {
+        fechaImportacion: ahora,
+        ...(nominasSinDocumento === 0
+          ? {
+              estado: 'publicada',
+              fechaPublicacion: ahora,
+            }
+          : {}),
+      },
+    });
+
+    // Sincronizar estado del evento tras las actualizaciones
+    await sincronizarEstadoEvento(id);
 
     return NextResponse.json({
       importadas: resultados.length,
