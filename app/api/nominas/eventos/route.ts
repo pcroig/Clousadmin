@@ -15,7 +15,6 @@ const GenerarEventoSchema = z.object({
   mes: z.number().int().min(1).max(12),
   anio: z.number().int().min(2020).max(2100),
   fechaLimiteComplementos: z.string().datetime().optional(),
-  autoGenerarPrenominas: z.boolean().optional(),
 });
 
 // ========================================
@@ -142,7 +141,7 @@ export async function GET(req: NextRequest) {
 // ========================================
 // Genera un nuevo evento de nómina mensual
 // 1. Crea el evento
-// 2. Genera pre-nóminas para todos los empleados activos
+// 2. SIEMPRE genera pre-nóminas para todos los empleados activos (estado: pendiente)
 // 3. Envía notificaciones a managers
 export async function POST(req: NextRequest) {
   try {
@@ -158,7 +157,6 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json();
     const data = GenerarEventoSchema.parse(body);
-    const shouldAutoGenerar = data.autoGenerarPrenominas ?? true;
 
     // Verificar que no existe ya un evento para este mes/año
     const existente = await prisma.eventoNomina.findFirst({
@@ -235,14 +233,15 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // Crear el evento de nómina (siempre en estado 'generando' inicial)
+    // Crear el evento de nómina (estado: abierto)
     const evento = await prisma.eventoNomina.create({
       data: {
         empresaId: session.user.empresaId,
         mes: data.mes,
         anio: data.anio,
-        estado: 'generando',
+        estado: 'abierto',
         fechaLimiteComplementos: fechaLimite,
+        fechaGeneracion: new Date(),
         totalEmpleados: empleados.length,
       },
     });
@@ -251,8 +250,8 @@ export async function POST(req: NextRequest) {
     let empleadosConComplementos = 0;
     let totalComplementosAsignados = 0;
 
-    // Solo generar pre-nóminas si se solicitó explícitamente
-    if (shouldAutoGenerar) {
+    // SIEMPRE generar pre-nóminas para todos los empleados activos
+    {
       for (const empleado of empleados) {
         const contratoVigente = empleado.contratos[0];
 
@@ -300,7 +299,7 @@ export async function POST(req: NextRequest) {
             eventoNominaId: evento.id,
             mes: data.mes,
             anio: data.anio,
-            estado: 'pre_nomina',
+            estado: 'pendiente', // Estado inicial: pendiente
             salarioBase: salarioBase,
             totalComplementos: new Decimal(0),
             totalDeducciones: new Decimal(0),
@@ -320,18 +319,15 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      // Actualizar evento con fecha de generación y pasar a 'complementos_pendientes'
+      // Actualizar estadísticas del evento
       await prisma.eventoNomina.update({
         where: { id: evento.id },
         data: {
-          estado: 'complementos_pendientes',
-          fechaGeneracion: new Date(),
           empleadosConComplementos,
           complementosAsignados: totalComplementosAsignados,
         },
       });
     }
-    // Si NO se auto-genera, el evento queda en 'generando' sin pre-nóminas
 
     // Enviar notificaciones a TODOS los managers
     const managers = await prisma.usuario.findMany({
@@ -342,29 +338,26 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    const notificaciones = shouldAutoGenerar
-      ? await Promise.all(
-          managers.map((manager) =>
-            prisma.notificacion.create({
-              data: {
-                empresaId: session.user.empresaId,
-                usuarioId: manager.id,
-                tipo: 'nomina_generada',
-                titulo: `Nóminas ${data.mes}/${data.anio} generadas`,
-                mensaje: `Se han generado ${nominasGeneradas} pre-nóminas. Por favor, revisa y asigna complementos antes del ${fechaLimite.toLocaleDateString()}.`,
-                eventoNominaId: evento.id,
-              },
-            })
-          )
-        )
-      : [];
+    const notificaciones = await Promise.all(
+      managers.map((manager) =>
+        prisma.notificacion.create({
+          data: {
+            empresaId: session.user.empresaId,
+            usuarioId: manager.id,
+            tipo: 'nomina_generada',
+            titulo: `Nóminas ${data.mes}/${data.anio} generadas`,
+            mensaje: `Se han generado ${nominasGeneradas} pre-nóminas. Por favor, revisa y asigna complementos antes del ${fechaLimite.toLocaleDateString()}.`,
+            eventoNominaId: evento.id,
+          },
+        })
+      )
+    );
 
     return NextResponse.json(
       {
         evento,
         nominasGeneradas,
         notificacionesEnviadas: notificaciones.length,
-        autoGeneradas: shouldAutoGenerar,
       },
       { status: 201 }
     );
