@@ -50,6 +50,7 @@ export async function GET(req: NextRequest) {
         nominas: {
           select: {
             id: true,
+            complementosPendientes: true,
             alertas: {
               where: {
                 resuelta: false, // Solo alertas no resueltas
@@ -65,24 +66,66 @@ export async function GET(req: NextRequest) {
     });
 
     // Calcular conteo de alertas por evento
-    const eventosConAlertas = eventos.map((evento) => {
-      const alertas = evento.nominas.flatMap((n) => n.alertas);
+    const eventosConAlertas = await Promise.all(
+      eventos.map(async (evento) => {
+        const alertas = evento.nominas.flatMap((n) => n.alertas);
 
-      const conteoAlertas = {
-        criticas: alertas.filter((a) => a.tipo === 'critico').length,
-        advertencias: alertas.filter((a) => a.tipo === 'advertencia').length,
-        informativas: alertas.filter((a) => a.tipo === 'info').length,
-        total: alertas.length,
-      };
+        const conteoAlertas = {
+          criticas: alertas.filter((a) => a.tipo === 'critico').length,
+          advertencias: alertas.filter((a) => a.tipo === 'advertencia').length,
+          informativas: alertas.filter((a) => a.tipo === 'info').length,
+          total: alertas.length,
+        };
 
-      // Eliminar el array de nóminas del response (solo queremos el conteo)
-      const { nominas, ...eventoSinNominas } = evento;
+        const nominasConComplementosPendientes = evento.nominas.filter(
+          (n) => n.complementosPendientes
+        ).length;
 
-      return {
-        ...eventoSinNominas,
-        alertas: conteoAlertas,
-      };
-    });
+        // Calcular estado de bolsa de horas para el mes del evento
+        const inicioMes = new Date(evento.anio, evento.mes - 1, 1);
+        const siguienteMes = new Date(evento.anio, evento.mes, 1);
+
+        const compensaciones = await prisma.compensacionHoraExtra.findMany({
+          where: {
+            empresaId: session.user.empresaId,
+            createdAt: {
+              gte: inicioMes,
+              lt: siguienteMes,
+            },
+          },
+          select: {
+            estado: true,
+            horasBalance: true,
+          },
+        });
+
+        const horasExtra = compensaciones.reduce(
+          (acc, item) => {
+            const horas = Number(item.horasBalance);
+            if (item.estado === 'pendiente') {
+              acc.pendientes += 1;
+              acc.horasPendientes += horas;
+            } else if (item.estado === 'aprobada') {
+              acc.aprobadas += 1;
+            }
+            acc.total += 1;
+            return acc;
+          },
+          { pendientes: 0, aprobadas: 0, total: 0, horasPendientes: 0 }
+        );
+
+        // Eliminar el array de nóminas del response (solo queremos el conteo)
+        const { nominas, ...eventoSinNominas } = evento;
+
+        return {
+          ...eventoSinNominas,
+          alertas: conteoAlertas,
+          nominasConComplementosPendientes,
+          tieneComplementos: evento.empleadosConComplementos > 0,
+          horasExtra,
+        };
+      })
+    );
 
     return NextResponse.json({ eventos: eventosConAlertas });
   } catch (error) {
@@ -192,7 +235,7 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // Crear el evento de nómina
+    // Crear el evento de nómina (siempre en estado 'generando' inicial)
     const evento = await prisma.eventoNomina.create({
       data: {
         empresaId: session.user.empresaId,
@@ -208,6 +251,7 @@ export async function POST(req: NextRequest) {
     let empleadosConComplementos = 0;
     let totalComplementosAsignados = 0;
 
+    // Solo generar pre-nóminas si se solicitó explícitamente
     if (shouldAutoGenerar) {
       for (const empleado of empleados) {
         const contratoVigente = empleado.contratos[0];
@@ -276,6 +320,7 @@ export async function POST(req: NextRequest) {
         }
       }
 
+      // Actualizar evento con fecha de generación y pasar a 'complementos_pendientes'
       await prisma.eventoNomina.update({
         where: { id: evento.id },
         data: {
@@ -286,6 +331,7 @@ export async function POST(req: NextRequest) {
         },
       });
     }
+    // Si NO se auto-genera, el evento queda en 'generando' sin pre-nóminas
 
     // Enviar notificaciones a TODOS los managers
     const managers = await prisma.usuario.findMany({
@@ -301,6 +347,7 @@ export async function POST(req: NextRequest) {
           managers.map((manager) =>
             prisma.notificacion.create({
               data: {
+                empresaId: session.user.empresaId,
                 usuarioId: manager.id,
                 tipo: 'nomina_generada',
                 titulo: `Nóminas ${data.mes}/${data.anio} generadas`,

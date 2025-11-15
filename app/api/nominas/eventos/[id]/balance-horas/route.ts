@@ -10,7 +10,7 @@ import { prisma } from '@/lib/prisma';
 import { getSession } from '@/lib/auth';
 import { calcularBalanceMensual } from '@/lib/calculos/balance-horas';
 
-export async function GET(
+async function balanceHorasHandler(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -91,4 +91,4 @@ export async function GET(
   }
 }
 
-
+export { balanceHorasHandler as GET };

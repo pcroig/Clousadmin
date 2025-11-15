@@ -50,22 +50,6 @@ export async function POST(
       );
     }
 
-    if (evento._count.nominas > 0) {
-      const stats = await prisma.nomina.aggregate({
-        where: { eventoNominaId: id },
-        _count: { _all: true },
-      });
-
-      await sincronizarEstadoEvento(id);
-
-      return NextResponse.json({
-        nominasGeneradas: 0,
-        yaExistian: true,
-        totalNominas: stats._count._all,
-        message: 'Las pre-nóminas ya estaban generadas',
-      });
-    }
-
     // Obtener empleados activos y sus contratos vigentes
     const empleados = await prisma.empleado.findMany({
       where: {
@@ -106,12 +90,33 @@ export async function POST(
       );
     }
 
+    const teniaNominasPrevias = evento._count.nominas > 0;
     const totalDiasMes = new Date(evento.anio, evento.mes, 0).getDate();
     let empleadosConComplementos = 0;
     let complementosAsignados = 0;
     let empleadosConComplementosPendientes = 0;
 
     await prisma.$transaction(async (tx) => {
+      if (teniaNominasPrevias) {
+        const nominasPrevias = await tx.nomina.findMany({
+          where: { eventoNominaId: evento.id },
+          select: { id: true },
+        });
+
+        const nominaIds = nominasPrevias.map((n) => n.id);
+
+        if (nominaIds.length > 0) {
+          await tx.compensacionHoraExtra.updateMany({
+            where: { nominaId: { in: nominaIds } },
+            data: { nominaId: null },
+          });
+
+          await tx.nomina.deleteMany({
+            where: { id: { in: nominaIds } },
+          });
+        }
+      }
+
       for (const empleado of empleados) {
         const contratoVigente = empleado.contratos[0];
         if (!contratoVigente) {
@@ -231,6 +236,10 @@ export async function POST(
       alertasGeneradas: 0, // Las alertas se detectan en procesos posteriores
       complementosPendientes: empleadosConComplementosPendientes > 0,
       empleadosConComplementosPendientes,
+      recalculado: teniaNominasPrevias,
+      message: teniaNominasPrevias
+        ? 'Pre-nóminas recalculadas correctamente'
+        : 'Pre-nóminas generadas correctamente',
     });
   } catch (error) {
     console.error('[POST /api/nominas/eventos/[id]/generar-prenominas] Error:', error);
@@ -239,6 +248,3 @@ export async function POST(
       { status: 500 }
     );
   }
-}
-
-
