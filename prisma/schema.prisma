@@ -915,8 +915,11 @@ model Nomina {
   tieneAnomalias   Boolean @default(false)
 
   // Upload & publishing workflow
-  // Estados: pre_nomina → complementos_pendientes → lista_exportar → exportada → definitiva → publicada → anulada
-  estado           String    @default("pre_nomina") @db.VarChar(50)
+  // Estados: pendiente → completada (opcional) → publicada
+  // pendiente: Pre-nómina creada, puede tener complementos/alertas pendientes
+  // completada: Complementos y alertas resueltos (OPCIONAL, se puede saltar)
+  // publicada: PDF importado y notificado al empleado
+  estado           String    @default("pendiente") @db.VarChar(50)
   fechaPublicacion DateTime?
   subidoPor        String? // Usuario ID que subió la nómina
 
@@ -1038,8 +1041,10 @@ model EventoNomina {
   mes  Int @db.SmallInt // 1-12
   anio Int @db.SmallInt // 2024-2099
 
-  // Estados: generando → pre_nomina → pendiente_exportar → exportada → pendiente_importar → completada → cerrada
-  estado String @default("generando") @db.VarChar(50)
+  // Estados del evento (resumen de nóminas individuales)
+  // abierto: Evento activo, nóminas pueden modificarse
+  // cerrado: Mes cerrado, solo lectura
+  estado String @default("abierto") @db.VarChar(50)
 
   // Fechas del ciclo
   fechaGeneracion         DateTime? // Cuando se generaron las pre-nóminas

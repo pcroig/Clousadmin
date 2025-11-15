@@ -63,8 +63,13 @@ export async function POST(
       return NextResponse.json({ error: 'Evento no encontrado' }, { status: 404 });
     }
 
-    // No verificar estado - permitir importar en cualquier momento después de generar pre-nóminas
-    // (comentado el bloqueo por estado)
+    // Verificar que el evento no esté cerrado
+    if (evento.estado === 'cerrado') {
+      return NextResponse.json(
+        { error: 'No se pueden importar nóminas en un evento cerrado' },
+        { status: 400 }
+      );
+    }
 
     // Parse FormData
     const formData = await req.formData();
@@ -205,10 +210,14 @@ export async function POST(
           },
         });
 
-        // Publicar automáticamente la nómina importada
-        await actualizarEstadoNomina(nomina.id, 'publicada', {
-          fechaPublicacion: new Date(),
-          empleadoNotificado: false,
+        // Actualizar nómina a estado 'publicada' al importar el PDF
+        await prisma.nomina.update({
+          where: { id: nomina.id },
+          data: {
+            estado: 'publicada',
+            fechaPublicacion: new Date(),
+            empleadoNotificado: false,
+          },
         });
 
         resultados.push({
@@ -235,21 +244,26 @@ export async function POST(
 
     const ahora = new Date();
 
-    await prisma.eventoNomina.update({
-      where: { id },
-      data: {
-        fechaImportacion: ahora,
-        ...(nominasSinDocumento === 0
-          ? {
-              estado: 'publicada',
-              fechaPublicacion: ahora,
-            }
-          : {}),
-      },
-    });
-
-    // Sincronizar estado del evento tras las actualizaciones
-    await sincronizarEstadoEvento(id);
+    // Actualizar fecha de importación si es la primera
+    if (!evento.fechaImportacion) {
+      await prisma.eventoNomina.update({
+        where: { id },
+        data: {
+          fechaImportacion: ahora,
+          nominasImportadas: resultados.length,
+        },
+      });
+    } else {
+      // Incrementar contador de nóminas importadas
+      await prisma.eventoNomina.update({
+        where: { id },
+        data: {
+          nominasImportadas: {
+            increment: resultados.length,
+          },
+        },
+      });
+    }
 
     return NextResponse.json({
       importadas: resultados.length,
