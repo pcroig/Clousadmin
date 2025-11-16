@@ -48,13 +48,10 @@ interface MigrationStats {
  * Encuentra documentos legacy (almacenados localmente)
  */
 async function findLegacyDocuments() {
+  // Nota: s3Bucket es NOT NULL en el esquema, así que filtramos por 'local'
   const documentos = await prisma.documento.findMany({
     where: {
-      OR: [
-        { s3Bucket: 'local' },
-        { s3Bucket: null },
-        { s3Bucket: '' },
-      ],
+      s3Bucket: 'local',
     },
     select: {
       id: true,
