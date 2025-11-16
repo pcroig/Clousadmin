@@ -5,41 +5,22 @@
 // PRINCIPIO: El estado del evento debe reflejar el estado AGREGADO de todas sus nóminas
 
 import { prisma } from '@/lib/prisma';
+import {
+  EVENTO_ESTADOS,
+  NOMINA_ESTADOS,
+  type EventoEstado,
+  type NominaEstado,
+} from '@/lib/constants/nomina-estados';
 
-/**
- * Estados válidos de EventoNomina
- */
-export type EstadoEventoNomina =
-  | 'generando'
-  | 'complementos_pendientes'
-  | 'lista_exportar'
-  | 'exportada'
-  | 'definitiva'
-  | 'publicada'
-  | 'cerrada';
-
-/**
- * Estados válidos de Nomina individual
- */
-export type EstadoNomina =
-  | 'pre_nomina'
-  | 'complementos_pendientes'
-  | 'lista_exportar'
-  | 'exportada'
-  | 'definitiva'
-  | 'publicada'
-  | 'anulada';
+export type EstadoEventoNomina = EventoEstado;
+export type EstadoNomina = NominaEstado;
 
 /**
  * Lógica de cálculo del estado del evento basado en las nóminas individuales
  *
  * REGLAS:
- * - Si TODAS las nóminas están en 'publicada' → evento 'publicada'
- * - Si TODAS las nóminas están en 'definitiva' → evento 'definitiva'
- * - Si AL MENOS UNA nómina está en 'exportada' → evento 'exportada'
- * - Si TODAS las nóminas están en 'lista_exportar' → evento 'lista_exportar'
- * - Si HAY complementos pendientes → evento 'complementos_pendientes'
- * - Si está generando → evento 'generando'
+ * - Si TODAS las nóminas están en 'publicada' → evento 'cerrado'
+ * - En cualquier otro caso → evento 'abierto'
  */
 export async function sincronizarEstadoEvento(
   eventoNominaId: string
@@ -70,45 +51,12 @@ export async function sincronizarEstadoEvento(
   }
 
   const estadoPrevio = evento.estado;
-  let estadoCalculado: EstadoEventoNomina;
-
-  // 2. Analizar estados de las nóminas
-  const estadosNominas = evento.nominas.map((n) => n.estado);
-  const totalNominas = evento.nominas.length;
-
-  const count = {
-    publicada: estadosNominas.filter((e) => e === 'publicada').length,
-    definitiva: estadosNominas.filter((e) => e === 'definitiva').length,
-    exportada: estadosNominas.filter((e) => e === 'exportada').length,
-    lista_exportar: estadosNominas.filter((e) => e === 'lista_exportar').length,
-    complementos_pendientes: estadosNominas.filter((e) => e === 'complementos_pendientes').length,
-    pre_nomina: estadosNominas.filter((e) => e === 'pre_nomina').length,
-  };
-
-  const hayComplementosPendientes = evento.nominas.some((n) => n.complementosPendientes);
-
-  console.log(`[SyncEstados] Análisis - Total: ${totalNominas}`, count);
-
-  // 3. Aplicar lógica de cálculo
-  if (count.publicada === totalNominas) {
-    // TODAS publicadas
-    estadoCalculado = 'publicada';
-  } else if (count.definitiva === totalNominas) {
-    // TODAS definitivas (listas para publicar)
-    estadoCalculado = 'definitiva';
-  } else if (count.exportada > 0 || count.definitiva > 0) {
-    // Al menos una exportada o definitiva → en proceso de importación
-    estadoCalculado = 'exportada';
-  } else if (count.lista_exportar === totalNominas) {
-    // TODAS listas para exportar
-    estadoCalculado = 'lista_exportar';
-  } else if (hayComplementosPendientes || count.complementos_pendientes > 0) {
-    // Hay complementos pendientes de asignar
-    estadoCalculado = 'complementos_pendientes';
-  } else {
-    // Por defecto, si hay pre-nóminas o estados mixtos
-    estadoCalculado = 'complementos_pendientes';
-  }
+  const todasPublicadas = evento.nominas.every(
+    (n) => n.estado === NOMINA_ESTADOS.PUBLICADA
+  );
+  const estadoCalculado = todasPublicadas
+    ? EVENTO_ESTADOS.CERRADO
+    : EVENTO_ESTADOS.ABIERTO;
 
   // 4. Actualizar evento si hay cambio
   if (estadoCalculado !== estadoPrevio) {
@@ -181,10 +129,6 @@ export async function actualizarEstadosNominasLote(
     const result = await tx.nomina.updateMany({
       where: {
         eventoNominaId,
-        // Solo actualizar si el estado actual permite la transición
-        estado: {
-          not: 'anulada', // No actualizar nóminas anuladas
-        },
       },
       data: {
         estado: nuevoEstado,
@@ -193,49 +137,14 @@ export async function actualizarEstadosNominasLote(
     });
 
     // 2. Sincronizar el estado del evento
-    // Obtener evento con nóminas actualizadas
-    const evento = await tx.eventoNomina.findUnique({
-      where: { id: eventoNominaId },
-      include: {
-        nominas: {
-          select: {
-            estado: true,
-            complementosPendientes: true,
-          },
-        },
-      },
-    });
-
-    if (!evento) {
-      throw new Error(`[SyncEstados] Evento ${eventoNominaId} no encontrado`);
-    }
-
-    // Calcular estado basado en nóminas actualizadas
-    const estadosNominas = evento.nominas.map((n) => n.estado);
-    const totalNominas = evento.nominas.length;
-
-    const count = {
-      publicada: estadosNominas.filter((e) => e === 'publicada').length,
-      definitiva: estadosNominas.filter((e) => e === 'definitiva').length,
-      exportada: estadosNominas.filter((e) => e === 'exportada').length,
-      lista_exportar: estadosNominas.filter((e) => e === 'lista_exportar').length,
-    };
-
-    let estadoCalculado: EstadoEventoNomina = 'complementos_pendientes';
-
-    if (count.publicada === totalNominas) {
-      estadoCalculado = 'publicada';
-    } else if (count.definitiva === totalNominas) {
-      estadoCalculado = 'definitiva';
-    } else if (count.exportada > 0 || count.definitiva > 0) {
-      estadoCalculado = 'exportada';
-    } else if (count.lista_exportar === totalNominas) {
-      estadoCalculado = 'lista_exportar';
-    }
-
     await tx.eventoNomina.update({
       where: { id: eventoNominaId },
-      data: { estado: estadoCalculado },
+      data: {
+        estado:
+          nuevoEstado === NOMINA_ESTADOS.PUBLICADA
+            ? EVENTO_ESTADOS.CERRADO
+            : EVENTO_ESTADOS.ABIERTO,
+      },
     });
 
     console.log(
@@ -254,13 +163,12 @@ export function esTransicionValida(
   estadoNuevo: EstadoNomina
 ): boolean {
   const transicionesValidas: Record<EstadoNomina, EstadoNomina[]> = {
-    pre_nomina: ['complementos_pendientes', 'lista_exportar'],
-    complementos_pendientes: ['lista_exportar'],
-    lista_exportar: ['exportada'],
-    exportada: ['definitiva'],
-    definitiva: ['publicada'],
-    publicada: ['anulada'], // Solo se puede anular después de publicar
-    anulada: [], // Estado final
+    [NOMINA_ESTADOS.PENDIENTE]: [
+      NOMINA_ESTADOS.COMPLETADA,
+      NOMINA_ESTADOS.PUBLICADA, // Se puede saltar la confirmación de complementos
+    ],
+    [NOMINA_ESTADOS.COMPLETADA]: [NOMINA_ESTADOS.PENDIENTE, NOMINA_ESTADOS.PUBLICADA],
+    [NOMINA_ESTADOS.PUBLICADA]: [],
   };
 
   return transicionesValidas[estadoActual]?.includes(estadoNuevo) || false;

@@ -310,16 +310,22 @@ const envelope = await lleida.createEnvelope({
 
 ## 🔗 Integraciones con Módulos Existentes
 
-### Con Sistema de Documentos (✅ Implementado)
-```typescript
-// app/(dashboard)/hr/documentos/[id]/carpeta-detail-client.tsx
-// Agregar botón "Solicitar Firma" en menú de documento
+### Con Sistema de Documentos (✅ Planificado en esta rama)
 
-<DropdownMenuItem onClick={() => solicitarFirma(documento.id)}>
-  <FileSignature className="mr-2 h-4 w-4" />
-  Solicitar Firma
-</DropdownMenuItem>
-```
+- `app/(dashboard)/hr/documentos/[id]/carpeta-detail-client.tsx`
+  - Añadir un botón `FileSignature` junto a “Descargar / Eliminar” **solo cuando el `mimeType` sea `application/pdf`**.
+  - Al hacer click se abrirá `SolicitarFirmaDialog`, que consumirá `POST /api/firma/solicitudes`.
+  - El dialog cargará empleados de la empresa (reutilizar `SearchableMultiSelect`) y permitirá activar orden secuencial.
+- `components/hr/SolicitarFirmaDialog.tsx`
+  - Modal controlado por el componente anterior.
+  - Props mínimas: `documentoId`, `documentoNombre`, `onSuccess`.
+- `components/firma/FirmarDocumentoDialog.tsx`
+  - Modal reutilizable para firmar (se invoca desde widget de pendientes).
+  - Renderiza visor PDF + canvas/firma guardada.
+- `components/firma/FirmasPendientesWidget.tsx`
+  - Consumirá `GET /api/firma/pendientes`.
+  - Se mostrará en `app/(dashboard)/empleado/dashboard-client.tsx` (desktop) y opcionalmente en mobile como sección colapsable.
+- Para respetar la regla “PDF oficial”, el visor usará `<iframe src={signedUrl}>` apuntando al PDF generado tras la conversión DOCX→PDF.
 
 ### Con Sistema de Plantillas (⏳ En especificación)
 ```typescript
@@ -478,4 +484,9 @@ if (contratoGenerado) {
 **Versión**: 1.0.0  
 **Autor**: Sofia Roig (con asistencia de Claude AI)  
 **Proyecto**: Clousadmin
+
+
+
+
+
 

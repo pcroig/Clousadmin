@@ -204,6 +204,55 @@ export async function getSignedDownloadUrl(key: string, expiresIn = 300): Promis
 }
 
 /**
+ * Download a file from S3 as Buffer (or local storage in development)
+ * @param key S3 key (path) of the file
+ * @returns File content as Buffer
+ */
+export async function downloadFromS3(key: string): Promise<Buffer> {
+  // Fallback to local storage in development
+  if (!isS3Configured()) {
+    const filePath = path.join(LOCAL_UPLOAD_DIR, key);
+    try {
+      const fileBuffer = await fs.readFile(filePath);
+      return fileBuffer;
+    } catch (error) {
+      console.error('[Local Storage] Error leyendo archivo:', error);
+      throw new Error('Archivo no encontrado en almacenamiento local');
+    }
+  }
+
+  const s3Client = getS3Client();
+  if (!s3Client || !BUCKET_NAME) {
+    throw new Error('S3 client no disponible');
+  }
+
+  try {
+    const command = new GetObjectCommand({
+      Bucket: BUCKET_NAME,
+      Key: key,
+    });
+
+    const response = await s3Client.send(command);
+
+    if (!response.Body) {
+      throw new Error('Respuesta de S3 sin contenido');
+    }
+
+    // Convert stream to buffer
+    const chunks: Uint8Array[] = [];
+    for await (const chunk of response.Body as any) {
+      chunks.push(chunk);
+    }
+
+    return Buffer.concat(chunks);
+  } catch (error) {
+    const errorMessage = getS3ErrorMessage(error);
+    console.error('[S3 Download Error]', errorMessage, error);
+    throw new Error(errorMessage);
+  }
+}
+
+/**
  * Delete a file from S3 (or local storage in development)
  * @param key S3 key (path) of the file to delete
  */
@@ -233,4 +282,60 @@ export async function deleteFromS3(key: string): Promise<void> {
   }
 }
 
+// ========================================
+// Aliases y utilidades adicionales para sistema de plantillas
+// ========================================
 
+/**
+ * Alias de uploadToS3 para compatibilidad con código de plantillas
+ */
+export const subirDocumento = uploadToS3;
+
+/**
+ * Descargar documento desde S3 como Buffer (para procesamiento de plantillas)
+ * @param key S3 key (path) of the file to download
+ * @returns Buffer with file contents
+ */
+export async function descargarDocumento(key: string): Promise<Buffer> {
+  // Fallback to local storage in development
+  if (!isS3Configured()) {
+    const filePath = path.join(LOCAL_UPLOAD_DIR, key);
+    try {
+      const buffer = await fs.readFile(filePath);
+      return buffer;
+    } catch (error) {
+      console.error('[Local Storage] Error leyendo archivo:', error);
+      throw new Error(`Error al leer archivo local: ${key}`);
+    }
+  }
+
+  const s3Client = getS3Client();
+  if (!s3Client || !BUCKET_NAME) {
+    throw new Error('S3 client no disponible');
+  }
+
+  try {
+    const command = new GetObjectCommand({
+      Bucket: BUCKET_NAME,
+      Key: key,
+    });
+
+    const response = await s3Client.send(command);
+
+    if (!response.Body) {
+      throw new Error('No se recibió contenido del documento');
+    }
+
+    // Convertir stream a buffer
+    const chunks: Uint8Array[] = [];
+    for await (const chunk of response.Body as any) {
+      chunks.push(chunk);
+    }
+
+    return Buffer.concat(chunks);
+  } catch (error) {
+    const errorMessage = getS3ErrorMessage(error);
+    console.error('[S3 Download Error]', errorMessage, error);
+    throw new Error(errorMessage);
+  }
+}

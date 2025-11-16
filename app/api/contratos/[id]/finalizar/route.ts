@@ -16,6 +16,7 @@ import {
   notFoundResponse,
 } from '@/lib/api-handler';
 import { z } from 'zod';
+import { autoGenerarDocumentosOffboarding } from '@/lib/plantillas';
 
 // Schema de validación - Fecha de finalización es obligatoria
 const finalizarContratoSchema = z.object({
@@ -160,18 +161,33 @@ export async function POST(
       };
     });
 
+    let autoGenerados = 0;
+    try {
+      autoGenerados = await autoGenerarDocumentosOffboarding({
+        empresaId: session.user.empresaId,
+        empleadoId: contrato.empleadoId,
+        solicitadoPor: session.user.id,
+      });
+    } catch (autoError) {
+      console.error('[Offboarding] Error auto-generando documentos:', autoError);
+    }
+
     console.info('[Offboarding] Empleado dado de baja:', {
       empleadoId: result.empleadoId,
       contratoId: result.contratoId,
       fechaFin: result.fechaFinalizacion,
       documentos: result.documentosProcesados,
       hrAdminId: session.user.id,
+      autoGenerados,
     });
 
     return successResponse({
       success: true,
       message: 'Empleado dado de baja correctamente',
-      data: result,
+      data: {
+        ...result,
+        plantillasAutoGeneradas: autoGenerados,
+      },
     });
   } catch (error) {
     console.error('[API Error] /api/contratos/[id]/finalizar:', error);

@@ -43,13 +43,32 @@ export default async function EmpleadoBandejaEntradaPage() {
   const notificacionesFormateadas = notificaciones.map((notif) => {
     // Determinar tipo para UI basado en el tipo de notificación
     let tipoUI: 'aprobada' | 'rechazada' | 'pendiente' | 'info' = 'info';
-    
-    if (notif.tipo.includes('aprobada')) {
+    let icono: 'firma' | undefined;
+
+    if (notif.tipo === 'firma_pendiente') {
+      tipoUI = 'pendiente';
+      icono = 'firma';
+    } else if (notif.tipo === 'firma_completada') {
+      tipoUI = 'aprobada';
+      icono = 'firma';
+    } else if (notif.tipo.includes('aprobada')) {
       tipoUI = 'aprobada';
     } else if (notif.tipo.includes('rechazada')) {
       tipoUI = 'rechazada';
     } else if (notif.tipo.includes('pendiente') || notif.tipo === 'solicitud_creada') {
       tipoUI = 'pendiente';
+    }
+
+    const metadata =
+      ((notif.metadata as Prisma.JsonValue) as Record<string, unknown> | undefined) ?? {};
+    if (icono) {
+      metadata.icono = icono;
+    }
+    if (!metadata.url && typeof metadata.accionUrl === 'string') {
+      metadata.url = metadata.accionUrl;
+    }
+    if (!metadata.accionTexto && typeof metadata.accionText === 'string') {
+      metadata.accionTexto = metadata.accionText;
     }
 
     return {
@@ -59,7 +78,8 @@ export default async function EmpleadoBandejaEntradaPage() {
       mensaje: notif.mensaje,
       fecha: notif.createdAt,
       leida: notif.leida,
-      metadata: (notif.metadata as Prisma.JsonValue) as Record<string, unknown>,
+      icono,
+      metadata,
     };
   });
 
