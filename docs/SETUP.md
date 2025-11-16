@@ -69,16 +69,30 @@ NEXTAUTH_SECRET="your-super-secret-jwt-key-minimum-32-characters-long"
 # App
 NEXT_PUBLIC_APP_URL="http://localhost:3000"
 NODE_ENV="development"
+ENCRYPTION_KEY="3f70cf35f9f2efeff971a06fb8b3f2440d9b30b0271fd6936c9b72bd183216df"  # openssl rand -hex 32
 
-# Hetzner Object Storage (OPCIONAL para desarrollo local, requerido en producción)
+# Redis / Workers
+REDIS_URL="redis://localhost:6379"
+DISABLE_EMBEDDED_WORKER="false"  # En producción ponlo en true y usa scripts/start-worker.js
+
+# Hetzner Object Storage (requerido cuando ENABLE_CLOUD_STORAGE=true)
+ENABLE_CLOUD_STORAGE="false"
 STORAGE_ENDPOINT="https://fsn1.your-objectstorage.com"
 STORAGE_REGION="eu-central-1"
 STORAGE_ACCESS_KEY=""
 STORAGE_SECRET_KEY=""
-STORAGE_BUCKET=""
+STORAGE_BUCKET="clousadmin-storage-dev"
+BACKUP_BUCKET="clousadmin-backups"
 
-# OpenAI (OPCIONAL)
+# Email (Resend)
+RESEND_API_KEY=""
+RESEND_FROM_EMAIL="notificaciones@tu-dominio.com"
+RESEND_FROM_NAME="Clousadmin"
+
+# AI Providers (al menos uno en producción)
 OPENAI_API_KEY=""
+ANTHROPIC_API_KEY=""
+GOOGLE_AI_API_KEY=""
 
 # Platform Admin - Invitar usuarios al signup (OPCIONAL)
 # Genera una clave segura: openssl rand -hex 32
@@ -87,8 +101,6 @@ PLATFORM_ADMIN_EMAIL="admin@tu-plataforma.com"
 
 # Feature Flags
 ENABLE_AI_EXTRACTION="false"
-ENABLE_CLOUD_STORAGE="false"
-ENABLE_EMAIL_NOTIFICATIONS="false"
 ```
 
 **Generar JWT Secret:**

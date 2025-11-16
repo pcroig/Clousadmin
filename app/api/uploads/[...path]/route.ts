@@ -1,88 +1,62 @@
-// ========================================
-// API Route: Serve Local Uploaded Files
-// ========================================
-// Serves files from local uploads directory (development fallback)
-// Only used when S3 is not configured
-
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAuth } from '@/lib/api-handler';
-import { promises as fs } from 'fs';
+import { getSession } from '@/lib/auth';
+import { shouldUseCloudStorage } from '@/lib/s3';
+import { UsuarioRol } from '@/lib/constants/enums';
 import path from 'path';
+import { promises as fs } from 'fs';
 
-const UPLOAD_DIR = path.join(process.cwd(), 'uploads');
-
-// Simple MIME type detection based on file extension
-function getContentType(filePath: string): string {
-  const ext = path.extname(filePath).toLowerCase();
-  const mimeTypes: Record<string, string> = {
-    '.pdf': 'application/pdf',
-    '.jpg': 'image/jpeg',
-    '.jpeg': 'image/jpeg',
-    '.png': 'image/png',
-    '.gif': 'image/gif',
-    '.webp': 'image/webp',
-    '.txt': 'text/plain',
-    '.html': 'text/html',
-    '.css': 'text/css',
-    '.js': 'application/javascript',
-    '.json': 'application/json',
-    '.xml': 'application/xml',
-    '.zip': 'application/zip',
-  };
-  return mimeTypes[ext] || 'application/octet-stream';
-}
+export const runtime = 'nodejs';
 
 export async function GET(
-  req: NextRequest,
-  { params }: { params: Promise<{ path: string[] }> }
+  _req: NextRequest,
+  context: { params: Promise<{ path: string[] }> }
 ) {
+  if (shouldUseCloudStorage()) {
+    return NextResponse.json({ error: 'Recurso no disponible' }, { status: 404 });
+  }
+
+  const session = await getSession();
+  if (!session) {
+    return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+  }
+
+  const { path: pathSegments = [] } = await context.params;
+  const segments = Array.isArray(pathSegments) ? pathSegments : [pathSegments];
+  const relativePath = segments.join('/');
+
+  if (!relativePath || relativePath.includes('..')) {
+    return NextResponse.json({ error: 'Ruta inválida' }, { status: 400 });
+  }
+
+  // Determinar empresa asociada a la ruta
+  const parts = relativePath.split('/');
+  let empresaEnRuta = parts[0];
+  if (empresaEnRuta === 'exports') {
+    empresaEnRuta = parts[1];
+  }
+
+  if (
+    session.user.rol !== UsuarioRol.hr_admin &&
+    empresaEnRuta &&
+    empresaEnRuta !== session.user.empresaId
+  ) {
+    return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
+  }
+
+  const baseDir = path.join(process.cwd(), 'uploads');
+  const filePath = path.join(baseDir, relativePath);
+
   try {
-    // Verificar autenticación (solo usuarios autenticados pueden descargar)
-    const authResult = await requireAuth(req);
-    if (authResult instanceof Response) return authResult;
-
-    const { path: pathSegments } = await params;
-    const filePath = pathSegments.join('/');
-
-    // Security: Prevent directory traversal attacks
-    const resolvedPath = path.resolve(UPLOAD_DIR, filePath);
-    if (!resolvedPath.startsWith(UPLOAD_DIR)) {
-      return NextResponse.json(
-        { error: 'Ruta no válida' },
-        { status: 403 }
-      );
-    }
-
-    // Check if file exists
-    try {
-      const fileBuffer = await fs.readFile(resolvedPath);
-      
-      // Determine content type
-      const contentType = getContentType(resolvedPath);
-      
-      // Return file with appropriate headers
-      return new NextResponse(fileBuffer, {
-        headers: {
-          'Content-Type': contentType,
-          'Content-Disposition': `inline; filename="${path.basename(resolvedPath)}"`,
-          'Cache-Control': 'private, max-age=3600', // Cache for 1 hour
-        },
-      });
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
-        return NextResponse.json(
-          { error: 'Archivo no encontrado' },
-          { status: 404 }
-        );
-      }
-      throw error;
-    }
+    const buffer = await fs.readFile(filePath);
+    return new NextResponse(buffer, {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/octet-stream',
+        'Cache-Control': 'private, no-store',
+      },
+    });
   } catch (error) {
-    console.error('[Uploads API] Error sirviendo archivo:', error);
-    return NextResponse.json(
-      { error: 'Error al servir archivo' },
-      { status: 500 }
-    );
+    console.error('[API uploads] Error leyendo archivo:', error);
+    return NextResponse.json({ error: 'Archivo no encontrado' }, { status: 404 });
   }
 }
-

@@ -8,6 +8,9 @@ import { prisma } from '@/lib/prisma';
 import { Decimal } from '@prisma/client/runtime/library';
 import { clasificarNomina, type EmpleadoCandidato } from '@/lib/ia/clasificador-nominas';
 import { obtenerOCrearCarpetaSistema } from '@/lib/documentos';
+import { uploadToS3, shouldUseCloudStorage } from '@/lib/s3';
+import { promises as fs } from 'fs';
+import path from 'path';
 
 /**
  * Resultado del matching de una nómina
@@ -247,6 +250,9 @@ export async function confirmarUpload(
     confirmaciones.map((c) => [c.filename, c.empleadoId])
   );
 
+  const useCloudStorage = shouldUseCloudStorage();
+  const bucketName = process.env.STORAGE_BUCKET;
+
   // Procesar cada resultado
   for (const result of session.results) {
     try {
@@ -291,17 +297,23 @@ export async function confirmarUpload(
       const nombreArchivo = `${session.anio}_${String(session.mes).padStart(2, '0')}_${timestamp}.pdf`;
       const rutaArchivo = `${session.empresaId}/${empleadoId}/nominas/${nombreArchivo}`;
 
-      // Guardar archivo en filesystem
-      const fs = require('fs').promises;
-      const path = require('path');
-      const fullPath = path.join(uploadDir, rutaArchivo);
-      const dirPath = path.dirname(fullPath);
+      let storageKey = rutaArchivo;
+      let storageBucket = 'local';
 
-      // Crear directorios si no existen
-      await fs.mkdir(dirPath, { recursive: true });
+      if (useCloudStorage) {
+        if (!bucketName) {
+          throw new Error('STORAGE_BUCKET no configurado');
+        }
+        storageKey = `nominas/${rutaArchivo}`;
+        await uploadToS3(result.buffer, storageKey, 'application/pdf');
+        storageBucket = bucketName;
+      } else {
+        const fullPath = path.join(uploadDir, rutaArchivo);
+        const dirPath = path.dirname(fullPath);
 
-      // Escribir archivo
-      await fs.writeFile(fullPath, result.buffer);
+        await fs.mkdir(dirPath, { recursive: true });
+        await fs.writeFile(fullPath, result.buffer);
+      }
 
       // Crear documento
       const documento = await prisma.documento.create({
@@ -313,8 +325,8 @@ export async function confirmarUpload(
           tipoDocumento: 'nomina',
           mimeType: 'application/pdf',
           tamano: result.buffer.length,
-          s3Key: rutaArchivo,
-          s3Bucket: 'local',
+          s3Key: storageKey,
+          s3Bucket: storageBucket,
         },
       });
 

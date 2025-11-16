@@ -6,6 +6,23 @@
 
 set -e
 
+# Flags
+INSTALL_LOCAL_DB=false
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --local-db)
+            INSTALL_LOCAL_DB=true
+            shift
+            ;;
+        *)
+            echo "⚠️  Flag desconocida: $1"
+            echo "Uso: ./setup-server.sh [--local-db]"
+            exit 1
+            ;;
+    esac
+done
+
 echo "🚀 Configurando servidor Hetzner para Clousadmin..."
 echo ""
 
@@ -50,16 +67,22 @@ else
     echo "✅ Node.js ya está instalado: $(node --version)"
 fi
 
-# 4. Instalar PostgreSQL
+# 4. Instalar PostgreSQL (opcional, usar --local-db)
 echo ""
-echo "📦 Instalando PostgreSQL..."
-if ! command -v psql &> /dev/null; then
-    sudo apt install -y postgresql postgresql-contrib
-    sudo systemctl enable postgresql
-    sudo systemctl start postgresql
-    echo "✅ PostgreSQL instalado"
+if [[ "$INSTALL_LOCAL_DB" == true ]]; then
+    echo "📦 Instalando PostgreSQL local..."
+    if ! command -v psql &> /dev/null; then
+        sudo apt install -y postgresql postgresql-contrib
+        sudo systemctl enable postgresql
+        sudo systemctl start postgresql
+        echo "✅ PostgreSQL instalado"
+    else
+        echo "✅ PostgreSQL ya está instalado"
+    fi
 else
-    echo "✅ PostgreSQL ya está instalado"
+    echo "ℹ️  Saltando instalación local de PostgreSQL."
+    echo "    Recomendamos Hetzner Managed PostgreSQL o un servidor dedicado."
+    echo "    Configura DATABASE_URL apuntando a la instancia gestionada."
 fi
 
 # 5. Instalar Redis (usando script separado)
@@ -83,6 +106,16 @@ if ! command -v pm2 &> /dev/null; then
     echo "✅ PM2 instalado"
 else
     echo "✅ PM2 ya está instalado"
+fi
+
+# 6.1 Configurar rotación de logs (pm2-logrotate)
+if command -v pm2 &> /dev/null; then
+    echo "🌀 Configurando rotación de logs PM2..."
+    pm2 install pm2-logrotate >/dev/null 2>&1 || true
+    pm2 set pm2-logrotate:max_size 10M >/dev/null 2>&1 || true
+    pm2 set pm2-logrotate:retain 10 >/dev/null 2>&1 || true
+    pm2 set pm2-logrotate:compress true >/dev/null 2>&1 || true
+    pm2 set pm2-logrotate:workerInterval 60 >/dev/null 2>&1 || true
 fi
 
 # 7. Configurar firewall (UFW)
@@ -123,17 +156,31 @@ echo ""
 echo "📋 Software instalado:"
 echo "   ✅ Node.js $(node --version)"
 echo "   ✅ npm $(npm --version)"
-echo "   ✅ PostgreSQL $(psql --version 2>/dev/null || echo 'instalado')"
+if [[ "$INSTALL_LOCAL_DB" == true ]]; then
+    echo "   ✅ PostgreSQL $(psql --version 2>/dev/null || echo 'instalado')"
+else
+    echo "   ⚠️  PostgreSQL local no instalado (usa base de datos gestionada)"
+fi
 echo "   ✅ Redis $(redis-cli --version 2>/dev/null || echo 'instalado')"
 echo "   ✅ PM2 $(pm2 --version 2>/dev/null || echo 'instalado')"
 echo ""
 echo "📝 Próximos pasos:"
-echo "   1. Configurar PostgreSQL (crear base de datos y usuario)"
-echo "   2. Clonar tu repositorio"
-echo "   3. Configurar variables de entorno (.env)"
-echo "   4. Ejecutar migraciones: npx prisma migrate deploy"
-echo "   5. Build de la aplicación: npm run build"
-echo "   6. Iniciar con PM2: pm2 start npm --name clousadmin -- start"
+NEXT_STEP=1
+if [[ "$INSTALL_LOCAL_DB" == true ]]; then
+    echo "   $NEXT_STEP. Configurar PostgreSQL local (crear base de datos y usuario)"
+else
+    echo "   $NEXT_STEP. Configurar conexión a la base de datos gestionada (DATABASE_URL)"
+fi
+NEXT_STEP=$((NEXT_STEP + 1))
+echo "   $NEXT_STEP. Clonar tu repositorio"
+NEXT_STEP=$((NEXT_STEP + 1))
+echo "   $NEXT_STEP. Configurar variables de entorno (.env)"
+NEXT_STEP=$((NEXT_STEP + 1))
+echo "   $NEXT_STEP. Ejecutar migraciones: npx prisma migrate deploy"
+NEXT_STEP=$((NEXT_STEP + 1))
+echo "   $NEXT_STEP. Build de la aplicación: npm run build"
+NEXT_STEP=$((NEXT_STEP + 1))
+echo "   $NEXT_STEP. Iniciar con PM2: pm2 start npm --name clousadmin -- start"
 echo ""
 echo "📚 Ver documentación completa en: docs/DEPLOY_HETZNER.md"
 echo ""

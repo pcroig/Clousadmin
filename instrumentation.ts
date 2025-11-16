@@ -7,6 +7,11 @@
 export async function register() {
   // Solo ejecutar en el servidor (Node.js runtime)
   if (process.env.NEXT_RUNTIME === 'nodejs') {
+    if (process.env.DISABLE_EMBEDDED_WORKER === 'true') {
+      console.log('[Instrumentation] Worker embebido desactivado (DISABLE_EMBEDDED_WORKER=true)');
+      return;
+    }
+
     console.log('[Instrumentation] Inicializando servicios en background...');
 
     // Importar dinámicamente para evitar problemas con edge runtime
