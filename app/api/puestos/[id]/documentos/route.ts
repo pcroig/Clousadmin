@@ -140,7 +140,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         mimeType: file.type,
         tamano: file.size,
         s3Key,
-        s3Bucket: process.env.AWS_S3_BUCKET || 'clousadmin-docs',
+        s3Bucket: process.env.STORAGE_BUCKET || 'local',
       },
     });
 

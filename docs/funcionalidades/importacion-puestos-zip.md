@@ -145,7 +145,7 @@ interface ImportacionResultado {
    - Buscar puesto existente (normalizado)
    - Si existe → Asignar documento
    - Si no existe → Crear puesto + Asignar documento
-4. Guardar documentos en S3
+4. Guardar documentos en Object Storage
 5. Crear registros en base de datos
 6. Retornar resumen
 

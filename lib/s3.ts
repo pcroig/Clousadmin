@@ -1,71 +1,75 @@
 // ========================================
-// S3 File Storage Utilities
+// Object Storage Utilities
 // ========================================
-// AWS S3 integration for file uploads and retrieval
+// Hetzner Object Storage integration (S3-compatible API)
 // Optimized for production with better error handling
-// Fallback to local filesystem in development when S3 is not configured
+// Fallback to local filesystem in development when Object Storage is not configured
 
 import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { promises as fs } from 'fs';
 import path from 'path';
 
-const BUCKET_NAME = process.env.S3_BUCKET;
+const BUCKET_NAME = process.env.STORAGE_BUCKET;
 
 // Local storage configuration (only used in development)
 const LOCAL_UPLOAD_DIR = path.join(process.cwd(), 'uploads');
 const LOCAL_BASE_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
 /**
- * Check if S3 is configured
- * @returns true if S3 environment variables are set
+ * Check if Object Storage is configured
+ * @returns true if Object Storage environment variables are set
  */
 export function isS3Configured(): boolean {
   return !!(
-    process.env.AWS_REGION &&
-    process.env.AWS_ACCESS_KEY_ID &&
-    process.env.AWS_SECRET_ACCESS_KEY &&
-    process.env.S3_BUCKET
+    process.env.STORAGE_ENDPOINT &&
+    process.env.STORAGE_REGION &&
+    process.env.STORAGE_ACCESS_KEY &&
+    process.env.STORAGE_SECRET_KEY &&
+    process.env.STORAGE_BUCKET
   );
 }
 
-// Create S3 client only if configured (lazy initialization)
+// Create S3-compatible client for Hetzner Object Storage (lazy initialization)
 function getS3Client(): S3Client | null {
   if (!isS3Configured()) {
     return null;
   }
 
   return new S3Client({
-    region: process.env.AWS_REGION!,
+    region: process.env.STORAGE_REGION!,
+    endpoint: process.env.STORAGE_ENDPOINT!,
     credentials: {
-      accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
-      secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
+      accessKeyId: process.env.STORAGE_ACCESS_KEY!,
+      secretAccessKey: process.env.STORAGE_SECRET_KEY!,
     },
+    // Force path style for Hetzner compatibility
+    forcePathStyle: false,
     // Retry configuration for production reliability
     maxAttempts: 3,
   });
 }
 
-// Helper: Extract meaningful error message from AWS SDK errors
+// Helper: Extract meaningful error message from S3-compatible API errors
 function getS3ErrorMessage(error: unknown): string {
   if (error && typeof error === 'object' && 'name' in error) {
-    const awsError = error as { name: string; message?: string };
-    switch (awsError.name) {
+    const storageError = error as { name: string; message?: string };
+    switch (storageError.name) {
       case 'NoSuchBucket':
-        return 'El bucket de S3 no existe';
+        return 'El bucket no existe en Hetzner Object Storage';
       case 'AccessDenied':
-        return 'Acceso denegado a S3. Verifica permisos IAM';
+        return 'Acceso denegado. Verifica las credenciales de Hetzner';
       case 'InvalidAccessKeyId':
-        return 'Las credenciales de AWS son inválidas';
+        return 'Las credenciales de acceso son inválidas';
       case 'SignatureDoesNotMatch':
-        return 'La firma de AWS no coincide. Verifica las credenciales';
+        return 'La firma no coincide. Verifica las credenciales';
       case 'NetworkingError':
-        return 'Error de red al conectar con S3';
+        return 'Error de red al conectar con Object Storage';
       default:
-        return awsError.message || 'Error desconocido en S3';
+        return storageError.message || 'Error desconocido en Object Storage';
     }
   }
-  return 'Error al interactuar con S3';
+  return 'Error al interactuar con Object Storage';
 }
 
 // ========================================
@@ -130,11 +134,11 @@ async function deleteFromLocal(key: string): Promise<void> {
 }
 
 /**
- * Upload a file to S3 (or local storage in development)
+ * Upload a file to Object Storage (or local storage in development)
  * @param file Buffer of the file to upload
- * @param key S3 key (path) where to store the file
+ * @param key Object key (path) where to store the file
  * @param contentType MIME type of the file
- * @returns The full URL of the uploaded file (S3 or local)
+ * @returns The full URL of the uploaded file (Object Storage or local)
  */
 export async function uploadToS3(
   file: Buffer,
@@ -143,13 +147,13 @@ export async function uploadToS3(
 ): Promise<string> {
   // Fallback to local storage in development
   if (!isS3Configured()) {
-    console.warn('[S3] S3 no configurado. Usando almacenamiento local (desarrollo):', key);
+    console.warn('[Storage] Object Storage no configurado. Usando almacenamiento local (desarrollo):', key);
     return uploadToLocal(file, key);
   }
 
   const s3Client = getS3Client();
   if (!s3Client || !BUCKET_NAME) {
-    throw new Error('S3 client no disponible');
+    throw new Error('Object Storage client no disponible');
   }
 
   try {
@@ -162,18 +166,20 @@ export async function uploadToS3(
       })
     );
 
-    // Return the S3 URL
-    return `https://${BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${key}`;
+    // Return the Object Storage URL (Hetzner format)
+    // Format: https://{bucket}.{endpoint}/{key}
+    const endpoint = process.env.STORAGE_ENDPOINT!.replace('https://', '');
+    return `https://${BUCKET_NAME}.${endpoint}/${key}`;
   } catch (error) {
     const errorMessage = getS3ErrorMessage(error);
-    console.error('[S3 Upload Error]', errorMessage, error);
+    console.error('[Storage Upload Error]', errorMessage, error);
     throw new Error(errorMessage);
   }
 }
 
 /**
- * Get a pre-signed URL to download a file from S3 (or local URL in development)
- * @param key S3 key (path) of the file
+ * Get a pre-signed URL to download a file from Object Storage (or local URL in development)
+ * @param key Object key (path) of the file
  * @param expiresIn URL expiration time in seconds (default: 5 minutes) - ignored in local mode
  * @returns Pre-signed URL (or local URL in development)
  */
@@ -185,7 +191,7 @@ export async function getSignedDownloadUrl(key: string, expiresIn = 300): Promis
 
   const s3Client = getS3Client();
   if (!s3Client || !BUCKET_NAME) {
-    throw new Error('S3 client no disponible');
+    throw new Error('Object Storage client no disponible');
   }
 
   try {
@@ -198,7 +204,7 @@ export async function getSignedDownloadUrl(key: string, expiresIn = 300): Promis
     return url;
   } catch (error) {
     const errorMessage = getS3ErrorMessage(error);
-    console.error('[S3 Get URL Error]', errorMessage, error);
+    console.error('[Storage Get URL Error]', errorMessage, error);
     throw new Error(errorMessage);
   }
 }
@@ -253,8 +259,8 @@ export async function downloadFromS3(key: string): Promise<Buffer> {
 }
 
 /**
- * Delete a file from S3 (or local storage in development)
- * @param key S3 key (path) of the file to delete
+ * Delete a file from Object Storage (or local storage in development)
+ * @param key Object key (path) of the file to delete
  */
 export async function deleteFromS3(key: string): Promise<void> {
   // Fallback to local storage in development
@@ -265,7 +271,7 @@ export async function deleteFromS3(key: string): Promise<void> {
 
   const s3Client = getS3Client();
   if (!s3Client || !BUCKET_NAME) {
-    throw new Error('S3 client no disponible');
+    throw new Error('Object Storage client no disponible');
   }
 
   try {
@@ -277,7 +283,7 @@ export async function deleteFromS3(key: string): Promise<void> {
     );
   } catch (error) {
     const errorMessage = getS3ErrorMessage(error);
-    console.error('[S3 Delete Error]', errorMessage, error);
+    console.error('[Storage Delete Error]', errorMessage, error);
     throw new Error(errorMessage);
   }
 }

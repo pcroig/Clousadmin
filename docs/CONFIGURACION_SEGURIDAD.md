@@ -24,7 +24,7 @@ ENCRYPTION_KEY=3f70cf35f9f2efeff971a06fb8b3f2440d9b30b0271fd6936c9b72bd183216df
 - **NUNCA** commitear este valor a Git
 - **NUNCA** compartir esta key por canales inseguros
 - **Cada empresa debe tener su propia key única**
-- **En producción**: Usar AWS Secrets Manager o similar
+- **En producción**: Usar gestores de secretos (Hetzner Cloud, HashiCorp Vault, o similar)
 - **Backup**: Guardar de forma segura, sin la key no se pueden desencriptar los datos
 
 ### Generar Nueva Key
@@ -126,7 +126,7 @@ Se registrarán todos los accesos a datos sensibles:
 - [ ] File upload validation
 - [ ] Sanitización de logs
 - [ ] Tests de seguridad
-- [ ] Migración a AWS Secrets Manager (producción)
+- [ ] Configurar gestor de secretos en producción (Hetzner Cloud, Vault, etc.)
 - [ ] Configuración de WAF (producción)
 
 ---
@@ -136,9 +136,9 @@ Se registrarán todos los accesos a datos sensibles:
 ### Checklist Pre-Deploy
 
 1. **Secrets**:
-   - [ ] Migrar `ENCRYPTION_KEY` a AWS Secrets Manager
+   - [ ] Migrar `ENCRYPTION_KEY` a gestor de secretos
    - [ ] Rotar `NEXTAUTH_SECRET`
-   - [ ] Configurar credenciales AWS con IAM roles (no keys hardcodeadas)
+   - [ ] Configurar credenciales de Hetzner con variables de entorno seguras
 
 2. **Rate Limiting**:
    - [ ] Migrar de Map a Redis/Upstash
