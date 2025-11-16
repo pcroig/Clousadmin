@@ -11,6 +11,14 @@ import { EstadoAusencia, UsuarioRol } from '@/lib/constants/enums';
 const prisma = new PrismaClient();
 
 async function main() {
+  // Protección contra ejecución en producción
+  if (process.env.NODE_ENV === 'production' && process.env.FORCE_SEED !== 'true') {
+    console.error('❌ ERROR: No se puede ejecutar seed en producción');
+    console.error('   El seed está diseñado solo para desarrollo/staging');
+    console.error('   Si realmente quieres ejecutarlo, usa: FORCE_SEED=true npm run seed');
+    process.exit(1);
+  }
+
   console.log('🌱 Iniciando seed de la base de datos...\n');
 
   // Limpiar datos previos si existen (opcional)
