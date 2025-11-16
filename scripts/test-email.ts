@@ -3,9 +3,17 @@
 
 import { config } from 'dotenv';
 import { resolve } from 'path';
+import { existsSync } from 'fs';
 
-// Cargar variables de entorno desde .env.local
-config({ path: resolve(process.cwd(), '.env.local') });
+// Cargar variables de entorno desde .env.local (desarrollo) o .env (producción)
+const envLocalPath = resolve(process.cwd(), '.env.local');
+const envPath = resolve(process.cwd(), '.env');
+
+if (existsSync(envLocalPath)) {
+  config({ path: envLocalPath });
+} else if (existsSync(envPath)) {
+  config({ path: envPath });
+}
 
 import { sendEmail } from '../lib/email';
 
