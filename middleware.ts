@@ -30,6 +30,8 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith('/_next') ||
     pathname.startsWith('/api/auth') ||
     pathname.startsWith('/api/onboarding') ||
+    pathname.startsWith('/api/cron') || // Rutas de cron usan CRON_SECRET, no cookies
+    pathname.startsWith('/api/health') || // Health check público
     pathname.includes('.')
   ) {
     return NextResponse.next();
