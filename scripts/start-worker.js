@@ -4,12 +4,12 @@
 const { spawn } = require('child_process');
 const path = require('path');
 
-// Usar tsx directamente desde node_modules
-const tsxPath = require.resolve('tsx');
+// Usar npx tsx directamente
 const workerEntry = path.join(__dirname, 'start-worker.ts');
 
-const child = spawn(process.execPath, [tsxPath, workerEntry], {
+const child = spawn('npx', ['tsx', workerEntry], {
   stdio: 'inherit',
+  shell: true,
 });
 
 child.on('exit', (code, signal) => {
