@@ -119,6 +119,9 @@ Clousadmin/
 
 ### Producción
 
+Ver **[docs/DEPLOY_HETZNER.md](docs/DEPLOY_HETZNER.md)** para la guía completa de despliegue en Hetzner.
+
+**Resumen rápido:**
 ```bash
 # Build
 npm run build
@@ -127,12 +130,9 @@ npm run build
 npm start
 ```
 
-### Variables de Entorno (Producción)
-
-Ver `.env.example` para todas las variables requeridas.
-
-**Críticas:**
+**Variables de Entorno (Producción):**
 - `DATABASE_URL` - PostgreSQL connection string
+- `REDIS_URL` - Redis connection (generado automáticamente)
 - `NEXTAUTH_SECRET` - JWT secret (generar con `openssl rand -base64 32`)
 - `NEXT_PUBLIC_APP_URL` - URL pública de la app
 

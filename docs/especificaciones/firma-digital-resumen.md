@@ -338,9 +338,6 @@ model SolicitudFirma {
   // Proveedor (para fase 2)
   proveedor String @default("interno") // interno, lleida, docusign
   
-  // Metadata del proveedor
-  proveedorData Json? // ID externo, envelope, etc
-  
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   
@@ -370,7 +367,6 @@ model Firma {
   
   // Tracking
   enviadoEn   DateTime  @default(now())
-  vistoEn     DateTime?
   firmadoEn   DateTime?
   rechazadoEn DateTime?
   
@@ -383,12 +379,8 @@ model Firma {
   certificado     String? @db.Text // Certificado/hash de firma
   metodofirma     String? // click, biometrica, otp, certificado
   
-  // Rechazo
-  motivoRechazo String? @db.Text
-  
   // Recordatorios
-  recordatoriosEnviados Int @default(0)
-  ultimoRecordatorio    DateTime?
+  numRecordatorios Int @default(0)
   
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -637,4 +629,7 @@ Este resumen forma parte de un conjunto de 4 documentos:
 **Fecha**: 12 de Noviembre 2025  
 **Autor**: Sofia Roig (con asistencia de Claude AI)  
 **Proyecto**: Clousadmin
+
+
+
 

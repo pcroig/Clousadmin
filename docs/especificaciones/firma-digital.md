@@ -110,6 +110,8 @@
 - **Descripción**: Empleado puede ver todas sus solicitudes de firma pendientes
 - **Funcionalidad**:
   - Sección "Documentos Pendientes de Firma" en `/empleado/mi-espacio/documentos`
+  - Tab específica `?tab=firmas` con panel lateral (lista) + visor de PDF a ancho completo
+  - Botón visible “Firmar” que abre un modal reducido solo con el lienzo/captura de firma
   - Badge en menú: "3 documentos por firmar"
   - Lista de documentos con:
     - Nombre del documento
@@ -278,6 +280,7 @@ model SolicitudFirma {
   mensaje        String? @db.Text // Mensaje opcional al empleado
   fechaLimite    DateTime? // Fecha límite para firmar (opcional)
   requiereOrden  Boolean @default(false) // Firma secuencial (Fase 2)
+  posicionFirma  Json?   // Coordenadas { pagina, x, y } seleccionadas visualmente por HR
   
   // Estado general de la solicitud
   // Estados: pendiente (al menos 1 sin firmar), completada (todos firmaron), 
@@ -289,9 +292,6 @@ model SolicitudFirma {
   
   // Proveedor de firma (para fase 2)
   proveedor String @default("interno") @db.VarChar(50) // interno, lleida, docusign
-  
-  // Metadata del proveedor externo (si aplica)
-  proveedorData Json? // { envelopeId, accessCode, etc }
   
   // Timestamps
   completadaEn DateTime? // Cuando todos firmaron
@@ -330,7 +330,6 @@ model Firma {
   
   // Tracking de eventos
   enviadoEn   DateTime  @default(now())
-  vistoEn     DateTime? // Cuando empleado abrió el documento
   firmadoEn   DateTime? // Cuando firmó
   rechazadoEn DateTime? // Si rechazó (Fase 2)
   
@@ -343,12 +342,8 @@ model Firma {
   certificado   String? @db.Text      // Hash SHA-256 del documento + timestamp
   metodoFirma   String? @db.VarChar(50) // click, biometrica, otp, certificado
   
-  // Rechazo (Fase 2)
-  motivoRechazo String? @db.Text
-  
   // Recordatorios enviados
-  recordatoriosEnviados Int @default(0)
-  ultimoRecordatorio    DateTime?
+  numRecordatorios Int @default(0)
   
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -490,7 +485,6 @@ model DocumentoGenerado {
 ```typescript
 {
   aceptado: boolean; // true = firma, false = rechaza
-  motivoRechazo?: string; // Solo si aceptado = false
 }
 ```
 
@@ -507,7 +501,6 @@ model DocumentoGenerado {
    - Enviar notificación a HR
 5. Si aceptado = false:
    - Actualizar estado a "rechazado"
-   - Guardar motivo
    - Enviar notificación a HR
 6. Verificar si solicitud está completada (todos firmaron)
 7. Retornar firma actualizada
@@ -1609,4 +1602,7 @@ describe('generarCertificadoFirma', () => {
 **Última actualización**: 12 de Noviembre 2025  
 **Autor**: Sofia Roig (con asistencia de Claude AI)  
 **Proyecto**: Clousadmin - Sistema de Gestión de RRHH
+
+
+
 

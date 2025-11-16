@@ -9,10 +9,7 @@ import { getSession } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { uploadToS3 } from '@/lib/s3';
 import { clasificarNomina } from '@/lib/ia/clasificador-nominas';
-import {
-  actualizarEstadoNomina,
-  sincronizarEstadoEvento,
-} from '@/lib/calculos/sync-estados-nominas';
+import { NOMINA_ESTADOS, EVENTO_ESTADOS } from '@/lib/constants/nomina-estados';
 
 // ========================================
 // POST /api/nominas/eventos/[id]/importar
@@ -63,12 +60,10 @@ export async function POST(
       return NextResponse.json({ error: 'Evento no encontrado' }, { status: 404 });
     }
 
-    // Verificar que el evento está en estado correcto para importar
-    if (!['exportada', 'definitiva'].includes(evento.estado)) {
+    // Verificar que el evento no esté cerrado
+    if (evento.estado === EVENTO_ESTADOS.CERRADO) {
       return NextResponse.json(
-        {
-          error: `No se pueden importar nóminas en estado '${evento.estado}'. El evento debe estar exportado.`,
-        },
+        { error: 'No se pueden importar nóminas en un evento cerrado' },
         { status: 400 }
       );
     }
@@ -212,8 +207,15 @@ export async function POST(
           },
         });
 
-        // Actualizar estado usando función de sincronización
-        await actualizarEstadoNomina(nomina.id, 'definitiva');
+        // Actualizar nómina a estado 'publicada' al importar el PDF
+        await prisma.nomina.update({
+          where: { id: nomina.id },
+          data: {
+            estado: NOMINA_ESTADOS.PUBLICADA,
+            fechaPublicacion: new Date(),
+            empleadoNotificado: false,
+          },
+        });
 
         resultados.push({
           empleado: `${nomina.empleado.nombre} ${nomina.empleado.apellidos}`,
@@ -229,9 +231,6 @@ export async function POST(
       }
     }
 
-    // Sincronizar estado del evento (automático basado en estados de nóminas individuales)
-    await sincronizarEstadoEvento(id);
-
     // Verificar si todas las nóminas tienen documentos
     const nominasSinDocumento = await prisma.nomina.count({
       where: {
@@ -239,13 +238,44 @@ export async function POST(
         documentoId: null,
       },
     });
+    const eventoCompleto = nominasSinDocumento === 0;
+    const ahora = new Date();
+
+    // Actualizar fecha de importación si es la primera
+    if (!evento.fechaImportacion) {
+      await prisma.eventoNomina.update({
+        where: { id },
+        data: {
+          fechaImportacion: ahora,
+          nominasImportadas: resultados.length,
+          ...(eventoCompleto && {
+            estado: EVENTO_ESTADOS.CERRADO,
+            fechaPublicacion: ahora,
+          }),
+        },
+      });
+    } else {
+      // Incrementar contador de nóminas importadas
+      await prisma.eventoNomina.update({
+        where: { id },
+        data: {
+          nominasImportadas: {
+            increment: resultados.length,
+          },
+          ...(eventoCompleto && {
+            estado: EVENTO_ESTADOS.CERRADO,
+            fechaPublicacion: evento.fechaPublicacion ?? ahora,
+          }),
+        },
+      });
+    }
 
     return NextResponse.json({
       importadas: resultados.length,
       errores: errores.length,
       resultados,
       errores,
-      eventoCompleto: nominasSinDocumento === 0,
+      eventoCompleto,
     });
   } catch (error) {
     console.error('[POST /api/nominas/eventos/[id]/importar] Error:', error);

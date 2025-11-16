@@ -78,11 +78,16 @@ export async function GET(
 
     const fileBuffer = await readFile(filePath);
 
+    const searchParams = request.nextUrl.searchParams;
+    const inlineParam = searchParams.get('inline') ?? searchParams.get('preview');
+    const isInline = inlineParam === '1' || inlineParam === 'true';
+    const dispositionType = isInline ? 'inline' : 'attachment';
+
     // Devolver archivo con headers apropiados
     return new NextResponse(fileBuffer, {
       headers: {
         'Content-Type': documento.mimeType,
-        'Content-Disposition': `attachment; filename="${encodeURIComponent(documento.nombre)}"`,
+        'Content-Disposition': `${dispositionType}; filename="${encodeURIComponent(documento.nombre)}"`,
         'Content-Length': documento.tamano.toString(),
       },
     });

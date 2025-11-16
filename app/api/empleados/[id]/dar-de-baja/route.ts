@@ -13,6 +13,7 @@ import {
   notFoundResponse,
 } from '@/lib/api-handler';
 import { z } from 'zod';
+import { autoGenerarDocumentosOffboarding } from '@/lib/plantillas';
 
 // Schema de validación
 const darDeBajaSchema = z.object({
@@ -178,24 +179,41 @@ export async function POST(
       };
     });
 
+    let autoGenerados = 0;
+    try {
+      autoGenerados = await autoGenerarDocumentosOffboarding({
+        empresaId: session.user.empresaId,
+        empleadoId: empleado.id,
+        solicitadoPor: session.user.id,
+      });
+    } catch (autoError) {
+      console.error('[Offboarding] Error auto-generando documentos:', autoError);
+    }
+
     console.info('[Offboarding] Empleado dado de baja (sin contrato previo):', {
       empleadoId: result.empleadoId,
       fechaFin: result.fechaFinalizacion,
       documentos: result.documentosProcesados,
       contratoCreado: result.contratoCreado,
       hrAdminId: session.user.id,
+      autoGenerados,
     });
 
     return successResponse({
       success: true,
       message: 'Empleado dado de baja correctamente',
-      data: result,
+      data: {
+        ...result,
+        plantillasAutoGeneradas: autoGenerados,
+      },
     });
   } catch (error) {
     console.error('[API Error] /api/empleados/[id]/dar-de-baja:', error);
     return handleApiError(error, 'API POST /api/empleados/[id]/dar-de-baja');
   }
 }
+
+
 
 
 

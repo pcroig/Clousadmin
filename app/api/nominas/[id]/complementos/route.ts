@@ -8,6 +8,7 @@ import { getSession } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { z } from 'zod';
 import { Decimal } from '@prisma/client/runtime/library';
+import { NOMINA_ESTADOS } from '@/lib/constants/nomina-estados';
 
 const AsignarComplementoSchema = z.object({
   empleadoComplementoId: z.string().uuid(),
@@ -158,10 +159,10 @@ export async function POST(
     }
 
     // Verificar que la nómina está en estado válido para asignar complementos
-    if (!['pre_nomina', 'complementos_pendientes'].includes(nomina.estado)) {
+    if (nomina.estado === NOMINA_ESTADOS.PUBLICADA) {
       return NextResponse.json(
         {
-          error: `No se pueden asignar complementos en estado '${nomina.estado}'`,
+          error: 'No se pueden asignar complementos a una nómina publicada',
         },
         { status: 400 }
       );
@@ -265,7 +266,9 @@ export async function POST(
         totalBruto,
         totalNeto,
         complementosPendientes,
-        estado: complementosPendientes ? 'complementos_pendientes' : 'lista_exportar',
+        estado: complementosPendientes
+          ? NOMINA_ESTADOS.PENDIENTE
+          : NOMINA_ESTADOS.COMPLETADA,
       },
     });
 

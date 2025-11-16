@@ -6,9 +6,9 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
-import { Mail, CheckCircle2, Upload, X, FileText } from 'lucide-react';
+import { Mail, CheckCircle2, Upload, X, FileText, Eye, FileType } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -18,6 +18,9 @@ import { Combobox, type ComboboxOption } from '@/components/shared/combobox';
 import { DocumentUploader } from '@/components/shared/document-uploader';
 import { DocumentList } from '@/components/shared/document-list';
 import { CarpetaSelector } from '@/components/shared/carpeta-selector';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Badge } from '@/components/ui/badge';
+import { Spinner } from '@/components/ui/spinner';
 
 interface DocumentoSubido {
   id: string;
@@ -25,6 +28,20 @@ interface DocumentoSubido {
   tipoDocumento: string;
   file: File;
   carpetaId?: string;
+}
+
+interface PlantillaAutoOnboarding {
+  id: string;
+  nombre: string;
+  descripcion?: string | null;
+  categoria?: string | null;
+  formato: 'docx' | 'pdf_rellenable';
+  requiereFirma: boolean;
+  carpetaDestinoDefault?: string | null;
+  esOficial: boolean;
+  autoGenerarOnboarding: boolean;
+  permiteRellenar: boolean;
+  requiereRevision: boolean;
 }
 
 interface AddPersonaOnboardingFormProps {
@@ -42,6 +59,11 @@ export function AddPersonaOnboardingForm({ onSuccess, onCancel, tipoOnboarding =
   const [tipoDocumentoActual, setTipoDocumentoActual] = useState<string>('otro');
   const [nombreDocumentoActual, setNombreDocumentoActual] = useState<string>('');
   const [carpetaIdSeleccionada, setCarpetaIdSeleccionada] = useState<string | null>(null);
+  const [plantillasDisponibles, setPlantillasDisponibles] = useState<PlantillaAutoOnboarding[]>([]);
+  const [plantillasSeleccionadas, setPlantillasSeleccionadas] = useState<Set<string>>(new Set());
+  const [plantillasLoading, setPlantillasLoading] = useState(true);
+  const [plantillasError, setPlantillasError] = useState('');
+  const [generandoPlantillasAuto, setGenerandoPlantillasAuto] = useState(false);
   const [formData, setFormData] = useState({
     nombre: '',
     apellidos: '',
@@ -49,6 +71,11 @@ export function AddPersonaOnboardingForm({ onSuccess, onCancel, tipoOnboarding =
     fechaAlta: new Date().toISOString().split('T')[0],
     puestoId: '',
   });
+
+  const plantillasSeleccionadasArray = useMemo(
+    () => plantillasDisponibles.filter((plantilla) => plantillasSeleccionadas.has(plantilla.id)),
+    [plantillasDisponibles, plantillasSeleccionadas]
+  );
 
   useEffect(() => {
     async function fetchPuestos() {
@@ -63,6 +90,10 @@ export function AddPersonaOnboardingForm({ onSuccess, onCancel, tipoOnboarding =
       }
     }
     fetchPuestos();
+  }, []);
+
+  useEffect(() => {
+    cargarPlantillasOnboarding();
   }, []);
 
   // Convertir puestos a formato ComboboxOption
@@ -94,6 +125,128 @@ export function AddPersonaOnboardingForm({ onSuccess, onCancel, tipoOnboarding =
       console.error('[AddPersonaOnboardingForm] Error creating puesto:', error);
       toast.error('Error al crear puesto');
       return null;
+    }
+  };
+
+  const cargarPlantillasOnboarding = async () => {
+    setPlantillasLoading(true);
+    setPlantillasError('');
+
+    try {
+      const response = await fetch('/api/plantillas?activa=true');
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        setPlantillasError(data.error || 'Error al cargar plantillas automáticas');
+        return;
+      }
+
+      const plantillas: PlantillaAutoOnboarding[] = (data.plantillas || []).map((plantilla: any) => ({
+        id: plantilla.id,
+        nombre: plantilla.nombre,
+        descripcion: plantilla.descripcion,
+        categoria: plantilla.categoria,
+        formato: plantilla.formato,
+        requiereFirma: Boolean(plantilla.requiereFirma),
+        carpetaDestinoDefault: plantilla.carpetaDestinoDefault,
+        esOficial: Boolean(plantilla.esOficial),
+        autoGenerarOnboarding: Boolean(plantilla.autoGenerarOnboarding),
+        permiteRellenar: Boolean(plantilla.permiteRellenar),
+        requiereRevision: Boolean(plantilla.requiereRevision),
+      }));
+
+      setPlantillasDisponibles(plantillas);
+      setPlantillasSeleccionadas((prev) => {
+        if (prev.size > 0) {
+          return new Set(prev);
+        }
+        const autoSet = new Set<string>();
+        plantillas.forEach((plantilla) => {
+          if (plantilla.autoGenerarOnboarding) {
+            autoSet.add(plantilla.id);
+          }
+        });
+        return autoSet;
+      });
+    } catch (error) {
+      console.error('[AddPersonaOnboardingForm] Error al cargar plantillas:', error);
+      setPlantillasError('Error al cargar plantillas automáticas');
+    } finally {
+      setPlantillasLoading(false);
+    }
+  };
+
+  const togglePlantillaSeleccion = (id: string) => {
+    setPlantillasSeleccionadas((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const handlePreviewPlantilla = (id: string) => {
+    if (typeof window === 'undefined') return;
+    window.open(`/hr/documentos/plantillas/${id}`, '_blank', 'noopener,noreferrer');
+  };
+
+  const generarPlantillasAutomaticas = async (empleadoGeneradoId: string) => {
+    const plantillasParaGenerar = plantillasDisponibles.filter((plantilla) =>
+      plantillasSeleccionadas.has(plantilla.id)
+    );
+
+    if (plantillasParaGenerar.length === 0) {
+      return;
+    }
+
+    setGenerandoPlantillasAuto(true);
+
+    try {
+      const resultados = await Promise.allSettled(
+        plantillasParaGenerar.map(async (plantilla) => {
+          const response = await fetch(`/api/plantillas/${plantilla.id}/generar`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              empleadoIds: [empleadoGeneradoId],
+              nombreDocumento: undefined,
+              carpetaDestino: plantilla.carpetaDestinoDefault || undefined,
+              notificarEmpleado: false,
+              requiereFirma: plantilla.requiereFirma,
+            }),
+          });
+
+          const data = await response.json();
+
+          if (!response.ok || !data.success) {
+            throw new Error(data.error || data.details || 'Error al iniciar generación');
+          }
+
+          return data;
+        })
+      );
+
+      const exitos = resultados.filter((resultado) => resultado.status === 'fulfilled').length;
+      if (exitos > 0) {
+        toast.success(`Se iniciaron ${exitos} generación(es) automáticas`);
+      }
+
+      const errores = resultados.filter(
+        (resultado) => resultado.status === 'rejected'
+      ) as PromiseRejectedResult[];
+
+      if (errores.length > 0) {
+        console.error('[AddPersonaOnboardingForm] Errores al generar plantillas automáticas:', errores);
+        toast.error(`${errores.length} plantilla(s) no se pudieron generar automáticamente`);
+      }
+    } catch (error) {
+      console.error('[AddPersonaOnboardingForm] Error al iniciar generación automática:', error);
+      toast.error('Error al iniciar la generación automática de plantillas');
+    } finally {
+      setGenerandoPlantillasAuto(false);
     }
   };
 
@@ -285,6 +438,8 @@ export function AddPersonaOnboardingForm({ onSuccess, onCancel, tipoOnboarding =
         }
       }
 
+      await generarPlantillasAutomaticas(dataEmpleado.id);
+
       toast.success(
         `Empleado creado y email de onboarding enviado a ${formData.email}`,
         { duration: 5000 }
@@ -367,6 +522,60 @@ export function AddPersonaOnboardingForm({ onSuccess, onCancel, tipoOnboarding =
             />
           </div>
         </div>
+      </div>
+
+      {/* Plantillas automáticas */}
+      <div className="space-y-4">
+        <div className="flex items-center gap-2">
+          <h3 className="text-sm font-semibold text-gray-900 border-b pb-2 flex-1">
+            Plantillas automáticas (opcional)
+          </h3>
+          {plantillasSeleccionadasArray.length > 0 && (
+            <Badge variant="secondary" className="text-xs">
+              {plantillasSeleccionadasArray.length} seleccionada
+              {plantillasSeleccionadasArray.length === 1 ? '' : 's'}
+            </Badge>
+          )}
+        </div>
+        <p className="text-sm text-gray-600">
+          Selecciona los documentos que quieres generar automáticamente para este empleado al crear su
+          onboarding. Se guardarán en las carpetas configuradas y aparecerán en su bandeja para revisar,
+          rellenar y firmar si corresponde.
+        </p>
+
+        {plantillasLoading ? (
+          <div className="flex items-center justify-center py-6">
+            <Spinner className="size-6 text-gray-400" />
+          </div>
+        ) : plantillasDisponibles.length === 0 ? (
+          <div className="rounded-lg border border-dashed border-gray-200 p-4 text-center text-sm text-gray-500">
+            No hay plantillas configuradas. Puedes añadirlas desde Gestionar On/Offboarding → Plantillas.
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {plantillasDisponibles.map((plantilla) => (
+              <PlantillaAutoCard
+                key={plantilla.id}
+                plantilla={plantilla}
+                seleccionado={plantillasSeleccionadas.has(plantilla.id)}
+                onToggle={togglePlantillaSeleccion}
+                onPreview={handlePreviewPlantilla}
+              />
+            ))}
+          </div>
+        )}
+
+        {plantillasError && (
+          <div className="rounded-md bg-red-50 p-3">
+            <p className="text-sm text-red-600">{plantillasError}</p>
+          </div>
+        )}
+
+        {plantillasSeleccionadasArray.length > 0 && (
+          <p className="text-xs text-gray-500">
+            Se iniciará un job de generación por cada plantilla seleccionada después de crear al empleado.
+          </p>
+        )}
       </div>
 
       {/* Subida de Documentos (Opcional) */}
@@ -612,15 +821,25 @@ export function AddPersonaOnboardingForm({ onSuccess, onCancel, tipoOnboarding =
               {documentosSubidos.length} documento(s) se subirán automáticamente después de crear el empleado.
             </span>
           )}
+          {plantillasSeleccionadasArray.length > 0 && (
+            <span className="block mt-1">
+              {plantillasSeleccionadasArray.length} plantilla(s) se generarán automáticamente tras crear al empleado.
+            </span>
+          )}
         </p>
       </div>
 
       {/* Botones */}
       <div className="flex justify-end gap-3 pt-4 border-t">
-        <Button type="button" variant="outline" onClick={onCancel} disabled={loading || uploadingDocs}>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={onCancel}
+          disabled={loading || uploadingDocs || generandoPlantillasAuto}
+        >
           Cancelar
         </Button>
-        <LoadingButton type="submit" loading={loading || uploadingDocs}>
+        <LoadingButton type="submit" loading={loading || uploadingDocs || generandoPlantillasAuto}>
           <Mail className="h-4 w-4 mr-2" />
           Crear y Enviar Onboarding
         </LoadingButton>
@@ -629,6 +848,76 @@ export function AddPersonaOnboardingForm({ onSuccess, onCancel, tipoOnboarding =
   );
 }
 
+interface PlantillaAutoCardProps {
+  plantilla: PlantillaAutoOnboarding;
+  seleccionado: boolean;
+  onToggle: (id: string) => void;
+  onPreview: (id: string) => void;
+}
+
+function PlantillaAutoCard({ plantilla, seleccionado, onToggle, onPreview }: PlantillaAutoCardProps) {
+  return (
+    <div
+      className={`border rounded-lg p-4 transition-colors ${
+        seleccionado ? 'border-blue-500 bg-blue-50/40' : 'border-gray-200 hover:border-gray-300'
+      }`}
+    >
+      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+        <div className="flex flex-1 gap-3">
+          <Checkbox
+            id={`plantilla-auto-${plantilla.id}`}
+            checked={seleccionado}
+            onCheckedChange={() => onToggle(plantilla.id)}
+            className="mt-1"
+          />
+          <FileType className="h-5 w-5 text-gray-400 mt-1 hidden sm:block" />
+          <div className="flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <Label
+                htmlFor={`plantilla-auto-${plantilla.id}`}
+                className="font-medium cursor-pointer text-base text-gray-900"
+              >
+                {plantilla.nombre}
+              </Label>
+              {plantilla.esOficial && (
+                <Badge className="bg-blue-100 text-blue-800">Oficial</Badge>
+              )}
+              <Badge variant="outline">{plantilla.formato === 'docx' ? 'DOCX' : 'PDF'}</Badge>
+              {plantilla.requiereFirma && (
+                <Badge className="bg-amber-100 text-amber-800">Requiere firma</Badge>
+              )}
+              {plantilla.autoGenerarOnboarding && (
+                <Badge className="bg-emerald-100 text-emerald-800">Auto (config)</Badge>
+              )}
+            </div>
+            {plantilla.descripcion && (
+              <p className="text-sm text-gray-600 mt-1">{plantilla.descripcion}</p>
+            )}
+            <div className="mt-2 flex flex-wrap gap-3 text-xs text-gray-500">
+              {plantilla.categoria && <span>Categoría: {plantilla.categoria}</span>}
+              {plantilla.permiteRellenar && <span>Permite rellenar antes de firmar</span>}
+              {plantilla.requiereRevision && <span>Revisión manual de HR</span>}
+              {plantilla.carpetaDestinoDefault && (
+                <span>Carpeta: {plantilla.carpetaDestinoDefault}</span>
+              )}
+            </div>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => onPreview(plantilla.id)}
+          >
+            <Eye className="h-4 w-4 mr-1" />
+            Ver detalle
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 
 
