@@ -11,19 +11,41 @@ import { generarDocumentoDesdePDFRellenable } from './pdf-rellenable';
 import { prisma } from '@/lib/prisma';
 
 // Configuración de conexión Redis para BullMQ
-const connection = {
-  host: process.env.REDIS_HOST || 'localhost',
-  port: parseInt(process.env.REDIS_PORT || '6379'),
-  maxRetriesPerRequest: null,
-  enableOfflineQueue: false, // No encolar comandos si está offline
-  retryStrategy: (times: number) => {
-    // Limitar reintentos - después de 5 intentos, dejar de intentar
-    if (times > 5) {
-      return null; // No más reintentos
-    }
-    return Math.min(times * 50, 2000);
-  },
-};
+// Parsear REDIS_URL si está disponible, sino usar configuración por defecto
+const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
+let connection: any;
+
+try {
+  const url = new URL(REDIS_URL);
+  connection = {
+    host: url.hostname,
+    port: parseInt(url.port || '6379'),
+    password: url.password || undefined,
+    maxRetriesPerRequest: null,
+    enableOfflineQueue: false,
+    retryStrategy: (times: number) => {
+      if (times > 5) {
+        return null;
+      }
+      return Math.min(times * 50, 2000);
+    },
+  };
+} catch {
+  // Fallback a configuración por defecto si REDIS_URL no es válida
+  connection = {
+    host: process.env.REDIS_HOST || 'localhost',
+    port: parseInt(process.env.REDIS_PORT || '6379'),
+    password: process.env.REDIS_PASSWORD,
+    maxRetriesPerRequest: null,
+    enableOfflineQueue: false,
+    retryStrategy: (times: number) => {
+      if (times > 5) {
+        return null;
+      }
+      return Math.min(times * 50, 2000);
+    },
+  };
+}
 
 // Verificar si Redis está disponible antes de inicializar
 let redisAvailable = false;
