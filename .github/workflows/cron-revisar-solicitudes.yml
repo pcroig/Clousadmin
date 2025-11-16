@@ -1,9 +1,10 @@
 name: Cron - Revisar Solicitudes con IA
 
 on:
-  schedule:
-    - cron: '0 2 * * *'  # Diario a las 2 AM UTC
-  workflow_dispatch:  # Ejecución manual
+  # Schedule deshabilitado - Los crons se ejecutan desde el servidor Hetzner (crontab)
+  # schedule:
+  #   - cron: '0 2 * * *'  # Diario a las 2 AM UTC
+  workflow_dispatch:  # Ejecución manual (para testing o ejecución bajo demanda)
 
 jobs:
   revisar-solicitudes:
