@@ -8,6 +8,7 @@ import { getSession } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { z } from 'zod';
 import { Decimal } from '@prisma/client/runtime/library';
+import { NOMINA_ESTADOS } from '@/lib/constants/nomina-estados';
 
 const UpdateAsignacionSchema = z.object({
   importe: z.number().positive().optional(),
@@ -65,10 +66,10 @@ export async function PATCH(
     }
 
     // Verificar estado de la nómina
-    if (!['pre_nomina', 'complementos_pendientes', 'lista_exportar'].includes(asignacion.nomina.estado)) {
+    if (asignacion.nomina.estado === NOMINA_ESTADOS.PUBLICADA) {
       return NextResponse.json(
         {
-          error: `No se puede modificar complemento en estado '${asignacion.nomina.estado}'`,
+          error: 'No se puede modificar complementos en una nómina publicada',
         },
         { status: 400 }
       );
@@ -174,10 +175,10 @@ export async function DELETE(
     }
 
     // Verificar estado
-    if (!['pre_nomina', 'complementos_pendientes', 'lista_exportar'].includes(asignacion.nomina.estado)) {
+    if (asignacion.nomina.estado === NOMINA_ESTADOS.PUBLICADA) {
       return NextResponse.json(
         {
-          error: `No se puede eliminar complemento en estado '${asignacion.nomina.estado}'`,
+          error: 'No se puede eliminar complementos de una nómina publicada',
         },
         { status: 400 }
       );
@@ -202,7 +203,7 @@ export async function DELETE(
         totalBruto: nuevoTotalBruto,
         totalNeto: nuevoTotalBruto,
         complementosPendientes: true,
-        estado: 'complementos_pendientes',
+        estado: NOMINA_ESTADOS.PENDIENTE,
       },
     });
 

@@ -6,6 +6,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { uploadToS3 } from '@/lib/s3';
+import { NOMINA_ESTADOS } from '@/lib/constants/nomina-estados';
 
 export async function POST(
   req: NextRequest,
@@ -92,15 +93,15 @@ export async function POST(
       });
     }
 
-    // Actualizar estado de la nómina si corresponde
-    if (nomina.estado === 'pre_nomina' || nomina.estado === 'complementos_pendientes') {
-      await prisma.nomina.update({
-        where: { id: nomina.id },
-        data: {
-          estado: 'definitiva',
-        },
-      });
-    }
+    // Actualizar estado de la nómina (publicada)
+    await prisma.nomina.update({
+      where: { id: nomina.id },
+      data: {
+        estado: NOMINA_ESTADOS.PUBLICADA,
+        fechaPublicacion: new Date(),
+        empleadoNotificado: false,
+      },
+    });
 
     return NextResponse.json({
       success: true,

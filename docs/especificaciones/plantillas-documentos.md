@@ -862,6 +862,43 @@ export async function extraerVariables(
 7. Alerta si faltan variables requeridas
 ```
 
+### 5.5 Flujo extremo a extremo (DOCX con variables)
+
+```
+1. Subida:
+   - HR Admin abre /hr/documentos → pestaña "Plantillas" → "Subir Plantilla".
+   - Adjunta DOCX con variables {{variable}}.
+2. Detección y normalización:
+   - API valida formato, guarda en S3 y extrae variables (document.xml + headers/footers).
+   - IA cruza cada variable con los modelos internos (empleado, empresa, contrato, jornada, manager).
+   - Plantilla queda registrada con listado de variables soportadas y personalizadas.
+3. Previsualización:
+   - En detalle `/hr/documentos/plantillas/:id` se elige empleado de referencia.
+   - Sistema resuelve valores disponibles, etiqueta en verde los campos auto rellenables y en ámbar los que quedarán vacíos.
+   - El visor muestra el DOCX original con los {{campos}} resaltados para validar la configuración antes de enviar.
+4. Selección y configuración:
+   - HR Admin marca empleados individuales o masivos (filtros por equipo/departamento en fases posteriores).
+   - Define carpeta destino, nombre del archivo, notificación y si requiere firma.
+5. Generación asíncrona:
+   - Se crea job en BullMQ por lote (máx 500 empleados) para no bloquear la UI.
+   - Cada job descarga la plantilla, vuelve a resolver variables y genera un DOCX por empleado.
+6. Firma opcional:
+   - Si la plantilla o la acción solicita firma, se crea `solicitudFirma` y se asignan las firmas pendientes automáticamente.
+7. Notificaciones:
+   - Cuando no se requiere edición se envía notificación de documento disponible.
+   - Si requiere firma/visualización se generan avisos tipo `warning/pending`.
+8. Distribución y almacenamiento:
+   - Documento se sube a S3 en `documentos/{empresa}/{empleado}/{carpetaDestino}/`.
+   - Se crea registro en `documentos` y `documentosGenerados` para auditoría.
+   - Se replica (si aplica) en carpeta compartida de administradores para seguimiento.
+9. Experiencia del empleado:
+   - Empleado recibe aviso en portal/correo → abre carpeta → descarga o firma online.
+   - Al ver o firmar se actualiza el estado en `documentosGenerados` (visto, firmado, pendiente).
+10. Backoffice:
+    - HR Admin visualiza métricas en la ficha de plantilla (documentos generados, últimos envíos, cobertura de variables).
+    - Se generan notificaciones internas si hay documentos sin firma tras la fecha límite.
+```
+
 ---
 
 ## 6. Fases de Implementación
@@ -1525,6 +1562,7 @@ _________________                  _________________
 **Proyecto**: Clousadmin - Sistema de Gestión de RRHH
 
 ---
+
 
 
 

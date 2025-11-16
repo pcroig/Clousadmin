@@ -47,6 +47,137 @@ async function checkRedisAvailability(): Promise<boolean> {
   return redisAvailable;
 }
 
+async function procesarJobSinCola(jobId: string, config: JobConfig) {
+  console.warn('[Queue] Redis no disponible. Procesando job sin cola.');
+
+  await prisma.jobGeneracionDocumentos.update({
+    where: { id: jobId },
+    data: {
+      estado: 'procesando',
+      iniciadoEn: new Date(),
+    },
+  });
+
+  const resultados: ResultadoGeneracion[] = [];
+  const total = config.empleadoIds.length;
+  let exitosos = 0;
+  let fallidos = 0;
+  const inicio = Date.now();
+
+  try {
+    const plantilla = await prisma.plantillaDocumento.findUnique({
+      where: { id: config.plantillaId },
+      select: { formato: true },
+    });
+
+    if (!plantilla) {
+      throw new Error('Plantilla no encontrada');
+    }
+
+    for (let i = 0; i < config.empleadoIds.length; i++) {
+      const empleadoId = config.empleadoIds[i];
+      try {
+        if (plantilla.formato === 'pdf_rellenable') {
+          throw new Error('La generación desde PDFs rellenables está desactivada. Solo se soportan plantillas DOCX con variables.');
+        }
+
+        const resultado = await generarDocumentoDesdePlantilla(
+          config.plantillaId,
+          empleadoId,
+          config.configuracion,
+          config.solicitadoPor
+        );
+
+        resultados.push(resultado);
+        if (resultado.success) {
+          exitosos++;
+        } else {
+          fallidos++;
+        }
+      } catch (error) {
+        console.error(`[Queue] Error procesando empleado ${empleadoId}:`, error);
+        resultados.push({
+          success: false,
+          empleadoId,
+          error: error instanceof Error ? error.message : 'Error desconocido',
+        });
+        fallidos++;
+      }
+
+      const procesados = i + 1;
+      const progreso = Math.round((procesados / total) * 100);
+
+      await prisma.jobGeneracionDocumentos.update({
+        where: { id: jobId },
+        data: {
+          progreso,
+          procesados,
+          exitosos,
+          fallidos,
+          resultados: resultados as any,
+        },
+      });
+    }
+
+    await prisma.jobGeneracionDocumentos.update({
+      where: { id: jobId },
+      data: {
+        estado: 'completado',
+        progreso: 100,
+        procesados: total,
+        exitosos,
+        fallidos,
+        completadoEn: new Date(),
+        tiempoTotal: Date.now() - inicio,
+        resultados: resultados as any,
+      },
+    });
+
+    await prisma.notificacion.create({
+      data: {
+        empresaId: config.empresaId,
+        usuarioId: config.solicitadoPor,
+        tipo: exitosos === total ? 'success' : fallidos > 0 ? 'warning' : 'info',
+        titulo: 'Generación de documentos completada',
+        mensaje: `Se generaron ${exitosos} documentos exitosamente${fallidos > 0 ? `, ${fallidos} fallidos` : ''}.`,
+        metadata: {
+          jobId,
+          totalEmpleados: total,
+          exitosos,
+          fallidos,
+        },
+      },
+    });
+  } catch (error) {
+    await prisma.jobGeneracionDocumentos.update({
+      where: { id: jobId },
+      data: {
+        estado: 'fallido',
+        error: error instanceof Error ? error.message : 'Error al generar documentos',
+        completadoEn: new Date(),
+      },
+    });
+
+    await prisma.notificacion.create({
+      data: {
+        empresaId: config.empresaId,
+        usuarioId: config.solicitadoPor,
+        tipo: 'error',
+        titulo: 'Error en generación de documentos',
+        mensaje:
+          error instanceof Error
+            ? `Ocurrió un error al generar los documentos: ${error.message}`
+            : 'Ocurrió un error al generar los documentos.',
+        metadata: {
+          jobId,
+        },
+      },
+    });
+
+    throw error;
+  }
+}
+
 /**
  * Cola de generación de documentos
  * Solo funciona si Redis está disponible
@@ -126,21 +257,53 @@ export async function agregarJobGeneracion(config: JobConfig): Promise<string> {
     },
   });
 
-  // Agregar a la cola
-  const job = await documentosQueue.add(
-    'generar-documentos',
-    {
-      jobId: jobRecord.id,
-      ...config,
-    },
-    {
-      jobId: jobRecord.id, // Usar el mismo ID para facilitar tracking
+  const redisDisponible = await checkRedisAvailability();
+
+  const agregarEnCola = async () => {
+    const job = await documentosQueue.add(
+      'generar-documentos',
+      {
+        jobId: jobRecord.id,
+        ...config,
+      },
+      {
+        jobId: jobRecord.id,
+      }
+    );
+    console.log(`[Queue] Job agregado: ${job.id}`);
+  };
+
+  if (!redisDisponible) {
+    await procesarJobSinCola(jobRecord.id, config);
+    return jobRecord.id;
+  }
+
+  try {
+    await agregarEnCola();
+    return jobRecord.id;
+  } catch (error: any) {
+    const isConexion =
+      error?.code === 'ECONNREFUSED' ||
+      error?.message?.includes('ECONNREFUSED') ||
+      error?.message?.includes('connect');
+
+    if (isConexion) {
+      console.warn('[Queue] Redis no disponible durante el encolado. Ejecutando en modo inmediato.');
+      await procesarJobSinCola(jobRecord.id, config);
+      return jobRecord.id;
     }
-  );
 
-  console.log(`[Queue] Job agregado: ${job.id}`);
-
-  return jobRecord.id;
+    // Si es otro error, actualizar el registro y relanzar
+    await prisma.jobGeneracionDocumentos.update({
+      where: { id: jobRecord.id },
+      data: {
+        estado: 'fallido',
+        error: error?.message || 'Error al agregar job',
+        completadoEn: new Date(),
+      },
+    });
+    throw error;
+  }
 }
 
 /**

@@ -14,6 +14,8 @@ import {
   Trash2,
   Folder,
   Settings,
+  FileSignature,
+  Eye,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
@@ -39,6 +41,7 @@ import { LoadingButton } from '@/components/shared/loading-button';
 import { SearchableSelect } from '@/components/shared/searchable-select';
 import { SearchableMultiSelect } from '@/components/shared/searchable-multi-select';
 import { InfoTooltip } from '@/components/shared/info-tooltip';
+import { SolicitarFirmaDialog } from '@/components/firma/solicitar-firma-dialog';
 
 interface Documento {
   id: string;
@@ -108,6 +111,8 @@ export function CarpetaDetailClient({ carpeta, empleados = [] }: CarpetaDetailCl
   const [empleadosList, setEmpleadosList] = useState<Empleado[]>([]);
   const [cargandoDatos, setCargandoDatos] = useState(false);
   const [actualizandoAsignacion, setActualizandoAsignacion] = useState(false);
+  const [documentoParaFirma, setDocumentoParaFirma] = useState<Documento | null>(null);
+  const [modalSolicitarFirma, setModalSolicitarFirma] = useState(false);
 
   const parsearAsignadoA = useCallback(() => {
     if (!carpeta.asignadoA) {
@@ -283,6 +288,23 @@ export function CarpetaDetailClient({ carpeta, empleados = [] }: CarpetaDetailCl
     }
   };
 
+  const handleVerDocumento = (documento: Documento) => {
+    const url = `/api/documentos/${documento.id}?inline=1`;
+    const newWindow = window.open(url, '_blank', 'noopener,noreferrer');
+    if (!newWindow) {
+      toast.error('Tu navegador bloqueó la vista previa. Permite pop-ups para Clousadmin.');
+    }
+  };
+
+  const handleSolicitarFirma = (documento: Documento) => {
+    if (documento.mimeType !== 'application/pdf') {
+      toast.error('Solo los documentos PDF pueden enviarse a firma.');
+      return;
+    }
+    setDocumentoParaFirma(documento);
+    setModalSolicitarFirma(true);
+  };
+
   const handleEliminar = async () => {
     if (!documentoAEliminar) return;
 
@@ -324,18 +346,16 @@ export function CarpetaDetailClient({ carpeta, empleados = [] }: CarpetaDetailCl
   };
 
   // Filtrar documentos (solo para carpetas globales)
-  const documentosFiltrados = carpeta.esGlobal 
+  const documentosFiltrados = carpeta.esGlobal
     ? carpeta.documentos.filter((doc) => {
-        // Filtro por empleado
         if (filtroEmpleado !== 'todos' && doc.empleado?.id !== filtroEmpleado) {
           return false;
         }
-        // Filtro por búsqueda (nombre del documento o empleado)
         if (busqueda.trim()) {
-          const terminoBusqueda = busqueda.toLowerCase();
-          const coincideNombre = doc.nombre.toLowerCase().includes(terminoBusqueda);
-          const coincideEmpleado = doc.empleado 
-            ? `${doc.empleado.nombre} ${doc.empleado.apellidos}`.toLowerCase().includes(terminoBusqueda)
+          const termino = busqueda.toLowerCase();
+          const coincideNombre = doc.nombre.toLowerCase().includes(termino);
+          const coincideEmpleado = doc.empleado
+            ? `${doc.empleado.nombre} ${doc.empleado.apellidos}`.toLowerCase().includes(termino)
             : false;
           return coincideNombre || coincideEmpleado;
         }
@@ -490,7 +510,7 @@ export function CarpetaDetailClient({ carpeta, empleados = [] }: CarpetaDetailCl
               />
             </div>
           ) : (
-            <div className="bg-white rounded-lg border border-gray-200">
+            <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
               <table className="w-full">
                 <thead className="bg-gray-50 border-b border-gray-200">
                   <tr>
@@ -522,30 +542,33 @@ export function CarpetaDetailClient({ carpeta, empleados = [] }: CarpetaDetailCl
                       key={documento.id}
                       className="border-b border-gray-100 last:border-0 hover:bg-gray-50 transition-colors"
                     >
-                    <td className="py-3 px-4">
-                      <div className="flex items-center gap-3">
-                        <FileText className="w-5 h-5 text-gray-400" />
-                        <span className="text-sm font-medium text-gray-900">
-                          {documento.nombre}
-                        </span>
-                      </div>
-                    </td>
-                    {carpeta.esGlobal && (
                       <td className="py-3 px-4">
-                        {documento.empleado ? (
-                          <span className="text-sm text-gray-700">
-                            {documento.empleado.nombre} {documento.empleado.apellidos}
-                          </span>
-                        ) : (
-                          <span className="text-sm text-gray-400 italic">Sin asignar</span>
-                        )}
+                        <div className="flex items-center gap-3">
+                          <FileText className="w-5 h-5 text-gray-400" />
+                          <div className="flex flex-col">
+                            <span className="text-sm font-medium text-gray-900">
+                              {documento.nombre}
+                            </span>
+                            <span className="text-xs text-gray-500">{documento.mimeType}</span>
+                          </div>
+                        </div>
                       </td>
-                    )}
-                    <td className="py-3 px-4">
-                      <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">
-                        {documento.tipoDocumento}
-                      </span>
-                    </td>
+                      {carpeta.esGlobal && (
+                        <td className="py-3 px-4">
+                          {documento.empleado ? (
+                            <span className="text-sm text-gray-700">
+                              {documento.empleado.nombre} {documento.empleado.apellidos}
+                            </span>
+                          ) : (
+                            <span className="text-sm text-gray-400 italic">Sin asignar</span>
+                          )}
+                        </td>
+                      )}
+                      <td className="py-3 px-4">
+                        <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">
+                          {documento.tipoDocumento || 'Documento'}
+                        </span>
+                      </td>
                       <td className="py-3 px-4 text-sm text-gray-600">
                         {formatearTamano(documento.tamano)}
                       </td>
@@ -553,26 +576,47 @@ export function CarpetaDetailClient({ carpeta, empleados = [] }: CarpetaDetailCl
                         {formatearFecha(documento.createdAt)}
                       </td>
                       <td className="py-3 px-4">
-                        <div className="flex items-center justify-end gap-2">
-                          <button
-                            onClick={() =>
-                              handleDescargar(documento.id, documento.nombre)
-                            }
-                            className="p-2 rounded-full hover:bg-gray-100 transition-colors group"
-                            title="Descargar"
+                        <div className="flex items-center justify-end gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            title="Ver documento"
+                            onClick={() => handleVerDocumento(documento)}
                           >
-                            <Download className="w-4 h-4 text-gray-600 group-hover:text-blue-600" />
-                          </button>
-                          <button
+                            <Eye className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            title={
+                              documento.mimeType === 'application/pdf'
+                                ? 'Solicitar firma'
+                                : 'Solo los PDF se pueden enviar a firma'
+                            }
+                            disabled={documento.mimeType !== 'application/pdf'}
+                            onClick={() => handleSolicitarFirma(documento)}
+                          >
+                            <FileSignature className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            title="Descargar"
+                            onClick={() => handleDescargar(documento.id, documento.nombre)}
+                          >
+                            <Download className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            title="Eliminar"
                             onClick={() => {
                               setDocumentoAEliminar(documento.id);
                               setModalEliminar(true);
                             }}
-                            className="p-2 rounded-full hover:bg-gray-100 transition-colors group"
-                            title="Eliminar"
                           >
-                            <Trash2 className="w-4 h-4 text-gray-600 group-hover:text-red-600" />
-                          </button>
+                            <Trash2 className="w-4 h-4 text-gray-600" />
+                          </Button>
                         </div>
                       </td>
                     </tr>
@@ -708,6 +752,24 @@ export function CarpetaDetailClient({ carpeta, empleados = [] }: CarpetaDetailCl
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {documentoParaFirma && (
+        <SolicitarFirmaDialog
+          open={modalSolicitarFirma}
+          onOpenChange={(open) => {
+            setModalSolicitarFirma(open);
+            if (!open) {
+              setDocumentoParaFirma(null);
+            }
+          }}
+          documentoId={documentoParaFirma.id}
+          documentoNombre={documentoParaFirma.nombre}
+          onSuccess={() => {
+            setDocumentoParaFirma(null);
+            router.refresh();
+          }}
+        />
+      )}
     </>
   );
 }

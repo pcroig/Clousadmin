@@ -110,6 +110,8 @@
 - **Descripción**: Empleado puede ver todas sus solicitudes de firma pendientes
 - **Funcionalidad**:
   - Sección "Documentos Pendientes de Firma" en `/empleado/mi-espacio/documentos`
+  - Tab específica `?tab=firmas` con panel lateral (lista) + visor de PDF a ancho completo
+  - Botón visible “Firmar” que abre un modal reducido solo con el lienzo/captura de firma
   - Badge en menú: "3 documentos por firmar"
   - Lista de documentos con:
     - Nombre del documento
@@ -278,6 +280,7 @@ model SolicitudFirma {
   mensaje        String? @db.Text // Mensaje opcional al empleado
   fechaLimite    DateTime? // Fecha límite para firmar (opcional)
   requiereOrden  Boolean @default(false) // Firma secuencial (Fase 2)
+  posicionFirma  Json?   // Coordenadas { pagina, x, y } seleccionadas visualmente por HR
   
   // Estado general de la solicitud
   // Estados: pendiente (al menos 1 sin firmar), completada (todos firmaron), 

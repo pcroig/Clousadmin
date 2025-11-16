@@ -9,10 +9,7 @@ import { getSession } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { uploadToS3 } from '@/lib/s3';
 import { clasificarNomina } from '@/lib/ia/clasificador-nominas';
-import {
-  actualizarEstadoNomina,
-  sincronizarEstadoEvento,
-} from '@/lib/calculos/sync-estados-nominas';
+import { NOMINA_ESTADOS, EVENTO_ESTADOS } from '@/lib/constants/nomina-estados';
 
 // ========================================
 // POST /api/nominas/eventos/[id]/importar
@@ -64,7 +61,7 @@ export async function POST(
     }
 
     // Verificar que el evento no esté cerrado
-    if (evento.estado === 'cerrado') {
+    if (evento.estado === EVENTO_ESTADOS.CERRADO) {
       return NextResponse.json(
         { error: 'No se pueden importar nóminas en un evento cerrado' },
         { status: 400 }
@@ -214,7 +211,7 @@ export async function POST(
         await prisma.nomina.update({
           where: { id: nomina.id },
           data: {
-            estado: 'publicada',
+            estado: NOMINA_ESTADOS.PUBLICADA,
             fechaPublicacion: new Date(),
             empleadoNotificado: false,
           },
@@ -241,7 +238,7 @@ export async function POST(
         documentoId: null,
       },
     });
-
+    const eventoCompleto = nominasSinDocumento === 0;
     const ahora = new Date();
 
     // Actualizar fecha de importación si es la primera
@@ -251,6 +248,10 @@ export async function POST(
         data: {
           fechaImportacion: ahora,
           nominasImportadas: resultados.length,
+          ...(eventoCompleto && {
+            estado: EVENTO_ESTADOS.CERRADO,
+            fechaPublicacion: ahora,
+          }),
         },
       });
     } else {
@@ -261,6 +262,10 @@ export async function POST(
           nominasImportadas: {
             increment: resultados.length,
           },
+          ...(eventoCompleto && {
+            estado: EVENTO_ESTADOS.CERRADO,
+            fechaPublicacion: evento.fechaPublicacion ?? ahora,
+          }),
         },
       });
     }
@@ -270,7 +275,7 @@ export async function POST(
       errores: errores.length,
       resultados,
       errores,
-      eventoCompleto: nominasSinDocumento === 0,
+      eventoCompleto,
     });
   } catch (error) {
     console.error('[POST /api/nominas/eventos/[id]/importar] Error:', error);

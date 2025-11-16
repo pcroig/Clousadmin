@@ -28,6 +28,30 @@ crearNotificacionOnboardingCompletado(prisma, { ... })
 crearNotificacionComplementosPendientes(prisma, { ..., requiresModal: true })
 ```
 
+#### 🔐 Nuevas Notificaciones de Firma Digital
+- ✅ `crearNotificacionFirmaPendiente(prisma, { empresaId, empleadoId, firmaId, solicitudId, documentoId, documentoNombre })`
+  - Tipo: `firma_pendiente`
+  - Metadata:  
+    ```jsonc
+    {
+      "icono": "firma",
+      "prioridad": "alta",
+      "accionTexto": "Firmar documento",
+      "accionUrl": "/empleado/mi-espacio/documentos?tab=firmas",
+      "url": "/empleado/mi-espacio/documentos?tab=firmas",
+      "firmaId": "...",
+      "solicitudId": "...",
+      "documentoId": "...",
+      "documentoNombre": "Contrato indefinido"
+    }
+    ```
+  - UI: Icono de firma (`FileSignature`) + botón “Firmar documento”.
+- ✅ `crearNotificacionFirmaCompletada(prisma, { empresaId, solicitudId, documentoId, documentoNombre, usuarioDestinoId?, pdfFirmadoS3Key? })`
+  - Tipo: `firma_completada`
+  - Metadata similar, `accionUrl` → `/hr/documentos`
+  - Se envía al usuario que creó la solicitud o, en su defecto, a HR Admin.
+- ✅ Las notificaciones de firma reutilizan el `NotificacionesWidget` existente y la bandeja de entrada del empleado (sin widgets duplicados). El CTA “Firmar documento” abre directamente la vista de documentos con `?tab=firmas`.
+
 #### Clasificador IA (`lib/ia/clasificador-solicitudes.ts`)
 ```typescript
 // Sigue Classification Pattern del core IA

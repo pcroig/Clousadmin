@@ -4,13 +4,24 @@
 // Plantilla Detail Client - Vista de detalle de plantilla
 // ========================================
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Spinner } from '@/components/ui/spinner';
-import { CheckCircle2, FileText, Send, Loader2, AlertCircle, ArrowLeft } from 'lucide-react';
+import {
+  CheckCircle2,
+  FileText,
+  Send,
+  Loader2,
+  AlertCircle,
+  ArrowLeft,
+  AlertTriangle,
+  Download,
+} from 'lucide-react';
 import { toast } from 'sonner';
+import PizZip from 'pizzip';
+import { VARIABLES_DISPONIBLES } from '@/lib/plantillas/constantes';
 
 interface Plantilla {
   id: string;
@@ -39,21 +50,183 @@ interface PlantillaDetailClientProps {
 
 export function PlantillaDetailClient({ plantilla }: PlantillaDetailClientProps) {
   const router = useRouter();
-  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
-  const [loadingPdf, setLoadingPdf] = useState(true);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [loadingPreview, setLoadingPreview] = useState(true);
+  const [previewRenderState, setPreviewRenderState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
+  const [previewError, setPreviewError] = useState<string | null>(null);
+  const previewContainerRef = useRef<HTMLDivElement>(null);
   const [empleados, setEmpleados] = useState<any[]>([]);
   const [empleadosSeleccionados, setEmpleadosSeleccionados] = useState<Set<string>>(new Set());
   const [loadingEmpleados, setLoadingEmpleados] = useState(true);
   const [generando, setGenerando] = useState(false);
-  const variablesDetectadas = Array.isArray(plantilla.variablesUsadas)
-    ? plantilla.variablesUsadas
-    : [];
+  const [empleadoPreviewId, setEmpleadoPreviewId] = useState<string | null>(null);
+  const [variablesConValor, setVariablesConValor] = useState<string[]>([]);
+  const [variablesSinValor, setVariablesSinValor] = useState<string[]>([]);
+  const [variablesValores, setVariablesValores] = useState<Record<string, string>>({});
+
+  const variablesDetectadas = useMemo(
+    () => (Array.isArray(plantilla.variablesUsadas) ? plantilla.variablesUsadas : []),
+    [plantilla.variablesUsadas]
+  );
+
+  const definicionesVariables = useMemo(() => {
+    const mapa = new Map<string, (typeof VARIABLES_DISPONIBLES)[number]>();
+    VARIABLES_DISPONIBLES.forEach((def) => {
+      if (!mapa.has(def.key)) {
+        mapa.set(def.key, def);
+      }
+    });
+    return mapa;
+  }, []);
+
+  const variablesAutoCompletadas = useMemo(
+    () => Array.from(new Set(variablesConValor)),
+    [variablesConValor]
+  );
+
+  const variablesSinDatos = useMemo(() => {
+    if (variablesSinValor.length > 0) {
+      return Array.from(new Set(variablesSinValor));
+    }
+    if (variablesDetectadas.length === 0) return [];
+    return variablesDetectadas.filter((variable) => !variablesAutoCompletadas.includes(variable));
+  }, [variablesSinValor, variablesDetectadas, variablesAutoCompletadas]);
+
+  const renderDocxToHtml = async (
+    buffer: ArrayBuffer,
+    container: HTMLDivElement,
+    options?: {
+      autoFill?: Set<string>;
+      missing?: Set<string>;
+    }
+  ) => {
+    const zip = new PizZip(buffer);
+    const documentXml = zip.file('word/document.xml')?.asText();
+    if (!documentXml) {
+      throw new Error('No se encontró el documento principal dentro del DOCX');
+    }
+
+    const parser = new DOMParser();
+    const xmlDoc = parser.parseFromString(documentXml, 'application/xml');
+    const paragraphs = Array.from(xmlDoc.getElementsByTagName('w:p'));
+    const fragment = document.createDocumentFragment();
+
+    let renderedParagraphs = 0;
+
+    paragraphs.forEach((paragraph) => {
+      const texts = Array.from(paragraph.getElementsByTagName('w:t'))
+        .map((node) => node.textContent || '')
+        .join('');
+
+      if (!texts.trim()) {
+        return;
+      }
+
+      const tokens = texts.split(/(\{\{[a-z_][a-z0-9_]*\}\})/gi);
+      const p = document.createElement('p');
+      p.className = 'text-sm text-gray-800 mb-2 leading-relaxed break-words';
+
+      tokens.forEach((token) => {
+        if (!token) {
+          return;
+        }
+
+        const variableMatch = token.match(/^\{\{([a-z_][a-z0-9_]*)\}\}$/i);
+        if (variableMatch) {
+          const variableKey = variableMatch[1];
+          const normalizedKey = variableKey.toLowerCase();
+          const span = document.createElement('span');
+          span.dataset.variable = normalizedKey;
+          span.className =
+            'inline-flex items-center px-1.5 py-0.5 mr-1 rounded border text-xs font-semibold font-mono';
+
+          if (options?.autoFill?.has(normalizedKey)) {
+            span.classList.add('bg-green-100', 'text-green-800', 'border-green-200');
+            span.title = 'Campo soportado y rellenado automáticamente';
+          } else if (options?.missing?.has(normalizedKey)) {
+            span.classList.add('bg-amber-100', 'text-amber-800', 'border-amber-200');
+            span.title = 'Campo sin datos en los modelos actuales';
+          } else {
+            span.classList.add('bg-blue-100', 'text-blue-800', 'border-blue-200');
+            span.title = 'Campo personalizado o pendiente de mapear';
+          }
+
+          span.textContent = `{{${variableKey}}}`;
+          p.appendChild(span);
+          return;
+        }
+
+        p.appendChild(document.createTextNode(token));
+      });
+
+      fragment.appendChild(p);
+      renderedParagraphs += 1;
+    });
+
+    if (renderedParagraphs === 0) {
+      const empty = document.createElement('p');
+      empty.className = 'text-sm text-gray-500 italic';
+      empty.textContent = 'No se pudo interpretar el contenido. Descarga el DOCX para revisarlo.';
+      fragment.appendChild(empty);
+    }
+
+    container.appendChild(fragment);
+  };
 
   useEffect(() => {
-    setPdfUrl(null);
+    setPreviewUrl(null);
+    setPreviewRenderState('idle');
+    setPreviewError(null);
+    setVariablesConValor([]);
+    setVariablesSinValor([]);
+    setVariablesValores({});
     setEmpleadosSeleccionados(new Set());
     cargarDatosIniciales();
   }, [plantilla.id]);
+
+  useEffect(() => {
+    if (!previewUrl) return;
+    if (typeof window === 'undefined') return;
+
+    const controller = new AbortController();
+
+    const renderPreview = async () => {
+      try {
+        setPreviewRenderState('loading');
+        const res = await fetch(previewUrl, { signal: controller.signal });
+        if (!res.ok) {
+          throw new Error('No se pudo descargar la previsualización');
+        }
+
+        const buffer = await res.arrayBuffer();
+        if (controller.signal.aborted) return;
+
+        const container = previewContainerRef.current;
+        if (!container) return;
+        container.innerHTML = '';
+
+        await renderDocxToHtml(buffer, container, {
+          autoFill: new Set(variablesAutoCompletadas.map((value) => value.toLowerCase())),
+          missing: new Set(variablesSinDatos.map((value) => value.toLowerCase())),
+        });
+
+        if (!controller.signal.aborted) {
+          setPreviewRenderState('ready');
+        }
+      } catch (error) {
+        if (controller.signal.aborted) return;
+        console.error('[DocxPreview] Error al renderizar DOCX:', error);
+        setPreviewRenderState('error');
+        setPreviewError('No se pudo renderizar la previsualización. Descarga el DOCX para revisarlo.');
+      }
+    };
+
+    renderPreview();
+
+    return () => {
+      controller.abort();
+    };
+  }, [previewUrl, variablesAutoCompletadas, variablesSinDatos]);
 
   const normalizarRespuestaEmpleados = (data: any) => {
     if (!data) return [];
@@ -72,7 +245,12 @@ export function PlantillaDetailClient({ plantilla }: PlantillaDetailClientProps)
 
   const cargarDatosIniciales = async () => {
     setLoadingEmpleados(true);
-    setLoadingPdf(true);
+    setLoadingPreview(true);
+    setPreviewRenderState('idle');
+    setPreviewError(null);
+    setPreviewUrl(null);
+    setEmpleadoPreviewId(null);
+
     try {
       const res = await fetch('/api/empleados?activos=true');
       const data = await res.json();
@@ -81,21 +259,30 @@ export function PlantillaDetailClient({ plantilla }: PlantillaDetailClientProps)
       setEmpleados(listaEmpleados);
 
       if (listaEmpleados.length > 0) {
+        setEmpleadoPreviewId(listaEmpleados[0].id);
         await cargarPrevisualizacion(listaEmpleados[0].id);
       } else {
-        setLoadingPdf(false);
+        setLoadingPreview(false);
+        setPreviewRenderState('error');
+        setPreviewError('Necesitas al menos un empleado activo para generar la previsualización.');
       }
     } catch (error) {
       console.error('Error cargando empleados:', error);
-      setLoadingPdf(false);
+      setLoadingPreview(false);
+      setPreviewRenderState('error');
+      setPreviewError('No se pudieron cargar los empleados para la previsualización.');
     } finally {
       setLoadingEmpleados(false);
     }
   };
 
   const cargarPrevisualizacion = async (empleadoId: string) => {
+    if (!empleadoId) return;
+
     try {
-      if (!empleadoId) return;
+      setLoadingPreview(true);
+      setPreviewRenderState('loading');
+      setPreviewError(null);
 
       const res = await fetch(
         `/api/plantillas/${plantilla.id}/previsualizar?empleadoId=${empleadoId}`
@@ -103,12 +290,39 @@ export function PlantillaDetailClient({ plantilla }: PlantillaDetailClientProps)
       const data = await res.json();
 
       if (data.success && data.previewUrl) {
-        setPdfUrl(data.previewUrl);
+        setPreviewUrl(data.previewUrl);
+        const valores = data.variablesResueltas || {};
+        setVariablesValores(valores);
+
+        const conValor =
+          data.variablesConValor ||
+          Object.entries(valores)
+            .filter(([, value]) => {
+              if (value === null || value === undefined) return false;
+              if (typeof value === 'string') return value.trim().length > 0;
+              return String(value).trim().length > 0;
+            })
+            .map(([key]) => key);
+
+        const sinValorBase =
+          data.variablesSinValor ||
+          data.variablesFaltantes ||
+          variablesDetectadas.filter((variable) => !conValor.includes(variable));
+
+        setVariablesConValor(Array.from(new Set(conValor)));
+        setVariablesSinValor(
+          Array.from(new Set(sinValorBase.length ? sinValorBase : []))
+        );
+      } else {
+        setPreviewRenderState('error');
+        setPreviewError(data.error || 'No se pudo generar la previsualización');
       }
     } catch (error) {
       console.error('Error cargando previsualización:', error);
+      setPreviewRenderState('error');
+      setPreviewError('No se pudo generar la previsualización');
     } finally {
-      setLoadingPdf(false);
+      setLoadingPreview(false);
     }
   };
 
@@ -143,7 +357,7 @@ export function PlantillaDetailClient({ plantilla }: PlantillaDetailClientProps)
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          empleadosIds: Array.from(empleadosSeleccionados),
+          empleadoIds: Array.from(empleadosSeleccionados),
           configuracion: {
             requiereFirma: plantilla.requiereFirma,
           },
@@ -170,25 +384,27 @@ export function PlantillaDetailClient({ plantilla }: PlantillaDetailClientProps)
   };
 
   const getVariableLabel = (variable: string) => {
-    const labels: Record<string, string> = {
-      first_name: 'Name',
-      last_name: 'Last Name',
-      birthday_year: 'Birthday year',
-      id_number: 'ID number',
-      city: 'City',
-      address: 'Address',
-      postal_code: 'Postal code',
-      province: 'Province',
-      phone: 'Phone',
-      email: 'Email',
-      nif: 'NIF/NIE',
-      nss: 'Social Security Number',
-      iban: 'IBAN',
-      // Agregar más según sea necesario
-    };
+    const definicion = definicionesVariables.get(variable);
+    if (definicion) {
+      return definicion.label;
+    }
 
-    return labels[variable] || variable.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase());
+    return variable
+      .replace(/_/g, ' ')
+      .replace(/\b\w/g, (l) => l.toUpperCase());
   };
+
+  const handleRefrescarPrevisualizacion = () => {
+    const objetivo = empleadoPreviewId || empleados[0]?.id;
+    if (objetivo) {
+      setEmpleadoPreviewId(objetivo);
+      cargarPrevisualizacion(objetivo);
+    }
+  };
+
+  const totalVariables = variablesDetectadas.length;
+  const cobertura =
+    totalVariables > 0 ? Math.round((variablesAutoCompletadas.length / totalVariables) * 100) : 0;
 
   return (
     <div className="h-full w-full flex flex-col">
@@ -232,25 +448,63 @@ export function PlantillaDetailClient({ plantilla }: PlantillaDetailClientProps)
         {/* Left: Preview */}
         <div className="flex flex-col min-h-0">
           <div className="border rounded-lg overflow-hidden bg-white flex-1 flex flex-col">
-            {loadingPdf ? (
-              <div className="flex-1 flex items-center justify-center">
-                <Spinner className="w-8 h-8 text-gray-400" />
-              </div>
-            ) : pdfUrl ? (
-              <iframe
-                src={pdfUrl}
-                className="w-full flex-1"
-                title="Vista previa del documento"
-              />
-            ) : (
-              <div className="flex-1 flex flex-col items-center justify-center text-gray-500 p-8">
-                <FileText className="w-16 h-16 mb-4 text-gray-300" />
-                <p className="text-center">No se pudo cargar la previsualización</p>
-                <p className="text-sm text-center mt-2">
-                  El documento se generará correctamente al seleccionar empleados
+            <div className="flex items-start justify-between border-b px-4 py-3">
+              <div>
+                <p className="text-sm font-medium text-gray-900">Previsualización</p>
+                <p className="text-xs text-gray-500">
+                  Generada con los datos reales del empleado y la empresa para validar variables.
                 </p>
               </div>
-            )}
+              <div className="flex items-center gap-2">
+                <Button variant="ghost" size="sm" onClick={handleRefrescarPrevisualizacion}>
+                  Reprocesar
+                </Button>
+                {previewUrl && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => window.open(previewUrl, '_blank')}
+                  >
+                    <Download className="w-4 h-4 mr-2" />
+                    Descargar DOCX
+                  </Button>
+                )}
+              </div>
+            </div>
+
+            <div className="relative flex-1 overflow-auto bg-gray-50">
+              <div
+                ref={previewContainerRef}
+                className="docx-preview-wrapper min-h-[480px] w-full px-4 py-4"
+              />
+
+              {(loadingPreview || previewRenderState === 'loading') && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/90 text-center gap-3">
+                  <Spinner className="w-6 h-6 text-gray-500" />
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">Generando previsualización</p>
+                    <p className="text-xs text-gray-500">
+                      Renderizamos el DOCX con los datos reales para validar variables.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {previewRenderState === 'error' && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/95 text-center gap-3 px-6">
+                  <AlertCircle className="w-6 h-6 text-red-500" />
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">No se pudo previsualizar</p>
+                    <p className="text-xs text-gray-600">
+                      {previewError || 'Intenta reprocesar la previsualización.'}
+                    </p>
+                  </div>
+                  <Button variant="outline" size="sm" onClick={handleRefrescarPrevisualizacion}>
+                    Reintentar
+                  </Button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -259,7 +513,7 @@ export function PlantillaDetailClient({ plantilla }: PlantillaDetailClientProps)
           {/* Card: Generar */}
           <div className="border rounded-lg bg-white p-6 flex flex-col">
             <p className="text-sm text-gray-600 mb-4">
-              Select an employee to preview how the variables are replaced by the information of the employee.
+              Selecciona los empleados que recibirán el documento generado con las variables completadas automáticamente.
             </p>
 
             <div className="space-y-4">
@@ -336,41 +590,133 @@ export function PlantillaDetailClient({ plantilla }: PlantillaDetailClientProps)
           {/* Card: Variables */}
           <div className="border rounded-lg bg-white p-6 flex flex-col min-h-0">
             <div className="mb-4">
-              <h3 className="font-medium text-gray-900">
-                {variablesDetectadas.length} recognized variables
-              </h3>
+              <div className="flex items-center justify-between">
+                <h3 className="font-medium text-gray-900">Cobertura de variables</h3>
+                <span className="text-xs text-gray-500">
+                  {variablesAutoCompletadas.length}/{totalVariables} auto-rellenas
+                </span>
+              </div>
               <p className="text-xs text-gray-500 mt-1">
-                Check the complete list of available variables in case you are missing any.
+                Identificamos qué campos se rellenan automáticamente con los datos del modelo
+                (empleado, empresa, contrato) y cuáles seguirán vacíos si no se proporcionan.
               </p>
+              {totalVariables > 0 && (
+                <p className="text-xs text-gray-500 mt-1">
+                  Cobertura automática actual: <span className="font-semibold text-gray-900">{cobertura}%</span>
+                </p>
+              )}
             </div>
 
-            <div className="flex-1 overflow-y-auto">
-              <div className="space-y-3">
-                {variablesDetectadas.map((variable) => (
-                  <div
-                    key={variable}
-                    className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200"
-                  >
-                    <CheckCircle2 className="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5" />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-900">
-                        {getVariableLabel(variable)}
-                      </p>
-                      <p className="text-xs text-gray-600 font-mono mt-0.5">
-                        {'{{'}{variable}{'}}'}
+            {totalVariables === 0 ? (
+              <div className="flex flex-col items-center justify-center text-gray-500 py-10 text-center">
+                <AlertCircle className="w-10 h-10 mb-3 text-gray-300" />
+                <p className="text-sm font-medium">No se detectaron variables en esta plantilla</p>
+                <p className="text-xs">
+                  Sube una versión con campos {'{{variable}}'} para automatizarla.
+                </p>
+              </div>
+            ) : (
+              <div className="flex-1 overflow-y-auto space-y-6">
+                <section>
+                  <div className="flex items-start gap-3 mb-2">
+                    <CheckCircle2 className="w-5 h-5 text-green-500 mt-0.5" />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-gray-900">Se rellenan automáticamente</p>
+                      <p className="text-xs text-gray-500">
+                        Valores resueltos con IA a partir de los modelos de datos existentes.
                       </p>
                     </div>
+                    <span className="text-xs font-semibold text-green-600">
+                      {variablesAutoCompletadas.length}
+                    </span>
                   </div>
-                ))}
+                  {variablesAutoCompletadas.length > 0 ? (
+                    <div className="space-y-2">
+                      {variablesAutoCompletadas.map((variable) => {
+                        const definicion = definicionesVariables.get(variable);
+                        return (
+                          <div
+                            key={variable}
+                            className="flex items-start gap-3 rounded-lg border border-green-100 bg-green-50/70 p-3"
+                          >
+                            <CheckCircle2 className="w-4 h-4 text-green-600 mt-1" />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-gray-900">
+                                {getVariableLabel(variable)}
+                              </p>
+                              <p className="text-xs font-mono text-gray-600">
+                                {'{{'}{variable}{'}}'}
+                              </p>
+                              <p className="text-xs text-gray-500 mt-1">
+                                {definicion
+                                  ? `Campo soportado (${definicion.categoria})`
+                                  : 'Campo personalizado detectado por IA'}
+                              </p>
+                              {variablesValores[variable] && (
+                                <p className="text-xs text-gray-500 mt-1 line-clamp-1">
+                                  Ejemplo: {String(variablesValores[variable])}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-gray-500 pl-8">
+                      Calculando cobertura… reprocesa la previsualización si ya actualizaste los datos.
+                    </p>
+                  )}
+                </section>
 
-                {variablesDetectadas.length === 0 && (
-                  <div className="text-center py-8 text-gray-500">
-                    <AlertCircle className="w-12 h-12 mx-auto mb-3 text-gray-300" />
-                    <p className="text-sm">No se detectaron variables en esta plantilla</p>
+                <section>
+                  <div className="flex items-start gap-3 mb-2">
+                    <AlertTriangle className="w-5 h-5 text-amber-500 mt-0.5" />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-gray-900">Variables sin datos</p>
+                      <p className="text-xs text-gray-500">
+                        Permanecerán en blanco hasta que se añadan esos campos al modelo o se completen manualmente.
+                      </p>
+                    </div>
+                    <span className="text-xs font-semibold text-amber-600">
+                      {variablesSinDatos.length}
+                    </span>
                   </div>
-                )}
+                  {variablesSinDatos.length > 0 ? (
+                    <div className="space-y-2">
+                      {variablesSinDatos.map((variable) => {
+                        const definicion = definicionesVariables.get(variable);
+                        return (
+                          <div
+                            key={variable}
+                            className="flex items-start gap-3 rounded-lg border border-amber-100 bg-amber-50 p-3"
+                          >
+                            <AlertTriangle className="w-4 h-4 text-amber-500 mt-1" />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-gray-900">
+                                {getVariableLabel(variable)}
+                              </p>
+                              <p className="text-xs font-mono text-gray-600">
+                                {'{{'}{variable}{'}}'}
+                              </p>
+                              <p className="text-xs text-gray-600 mt-1">
+                                {definicion
+                                  ? 'Campo soportado pero sin valor en el empleado seleccionado.'
+                                  : 'Campo no mapeado en los modelos actuales. Añádelo a la ficha o mantenlo como manual.'}
+                              </p>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+                      Todas las variables se completan automáticamente con los datos actuales.
+                    </div>
+                  )}
+                </section>
               </div>
-            </div>
+            )}
           </div>
         </div>
       </div>

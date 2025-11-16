@@ -43,11 +43,17 @@ export {
 // Plantillas híbridas
 export {
   generarDocumentoHibrido,
-  convertirDOCXaPDF,
   analizarDOCXParaCampos,
   crearPlantillaHibridaConfig,
 } from './hibrido';
 export type { ConfiguracionHibrido, ResultadoHibrido, ConfiguracionPlantillaHibrida } from './hibrido';
+
+// Conversión DOCX → PDF
+export {
+  convertDocxBufferToPdf,
+  convertDocxFromS3ToPdf,
+} from './docx-to-pdf';
+export type { ConvertDocxFromS3ToPdfResult } from './docx-to-pdf';
 
 // Utilidades de sanitización
 export {

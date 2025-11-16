@@ -29,6 +29,7 @@ export async function POST(
     const body = await request.json();
     const {
       empleadoIds,
+      empleadosIds,
       nombreDocumento,
       carpetaDestino,
       notificarEmpleado = true,
@@ -37,15 +38,21 @@ export async function POST(
       mensajeFirma,
     } = body;
 
+    const ids: string[] = Array.isArray(empleadoIds)
+      ? empleadoIds
+      : Array.isArray(empleadosIds)
+        ? empleadosIds
+        : [];
+
     // Validaciones
-    if (!empleadoIds || !Array.isArray(empleadoIds) || empleadoIds.length === 0) {
+    if (ids.length === 0) {
       return NextResponse.json(
         { error: 'Se requiere al menos un empleado' },
         { status: 400 }
       );
     }
 
-    if (empleadoIds.length > 500) {
+    if (ids.length > 500) {
       return NextResponse.json(
         { error: 'Máximo 500 empleados por generación' },
         { status: 400 }
@@ -79,13 +86,13 @@ export async function POST(
     // Verificar que todos los empleados existen y pertenecen a la empresa
     const empleados = await prisma.empleado.findMany({
       where: {
-        id: { in: empleadoIds },
+        id: { in: ids },
         empresaId: session.user.empresaId,
       },
       select: { id: true },
     });
 
-    if (empleados.length !== empleadoIds.length) {
+    if (empleados.length !== ids.length) {
       return NextResponse.json(
         { error: 'Algunos empleados no fueron encontrados' },
         { status: 400 }
@@ -103,11 +110,11 @@ export async function POST(
     };
 
     // Crear job en la cola
-    console.log(`[API] Creando job para generar ${empleadoIds.length} documentos...`);
+    console.log(`[API] Creando job para generar ${ids.length} documentos...`);
 
     const jobId = await agregarJobGeneracion({
       plantillaId: id,
-      empleadoIds,
+      empleadoIds: ids,
       configuracion,
       solicitadoPor: session.user.id,
       empresaId: session.user.empresaId,
@@ -118,8 +125,8 @@ export async function POST(
     return NextResponse.json({
       success: true,
       jobId,
-      totalEmpleados: empleadoIds.length,
-      message: `Job de generación creado. Procesando ${empleadoIds.length} documento(s)...`,
+      totalEmpleados: ids.length,
+      message: `Job de generación creado. Procesando ${ids.length} documento(s)...`,
     });
   } catch (error) {
     console.error('[API] Error al generar documentos:', error);

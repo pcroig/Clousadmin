@@ -7,16 +7,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { z } from 'zod';
+import {
+  EVENTO_ESTADOS,
+  NOMINA_ESTADOS,
+} from '@/lib/constants/nomina-estados';
 
 const UpdateEventoSchema = z.object({
-  estado: z.enum([
-    'generando',
-    'complementos_pendientes',
-    'lista_exportar',
-    'exportada',
-    'definitiva',
-    'publicada',
-  ]).optional(),
+  estado: z.enum([EVENTO_ESTADOS.ABIERTO, EVENTO_ESTADOS.CERRADO]).optional(),
   fechaExportacion: z.string().datetime().optional(),
   fechaLimiteComplementos: z.string().datetime().optional(),
 });
@@ -144,25 +141,26 @@ export async function PATCH(
     }
 
     // Validaciones de transiciones de estado
-    if (data.estado) {
-      const estadosValidos: Record<string, string[]> = {
-        generando: ['complementos_pendientes'],
-        complementos_pendientes: ['lista_exportar'],
-        lista_exportar: ['exportada'],
-        exportada: ['definitiva'],
-        definitiva: ['publicada'],
-        publicada: [],
-      };
-
-      const siguientesEstados = estadosValidos[evento.estado];
-      if (!siguientesEstados.includes(data.estado)) {
-        return NextResponse.json(
-          {
-            error: `No se puede cambiar de estado '${evento.estado}' a '${data.estado}'`,
-            estadosValidos: siguientesEstados,
+    if (data.estado && data.estado !== evento.estado) {
+      if (data.estado === EVENTO_ESTADOS.CERRADO) {
+        const pendientes = await prisma.nomina.count({
+          where: {
+            eventoNominaId: id,
+            estado: {
+              not: NOMINA_ESTADOS.PUBLICADA,
+            },
           },
-          { status: 400 }
-        );
+        });
+
+        if (pendientes > 0) {
+          return NextResponse.json(
+            {
+              error:
+                'No se puede cerrar el evento porque aún hay nóminas sin publicar',
+            },
+            { status: 400 }
+          );
+        }
       }
     }
 

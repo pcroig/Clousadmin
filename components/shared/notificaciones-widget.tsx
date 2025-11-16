@@ -6,7 +6,7 @@
 'use client';
 
 import { memo } from 'react';
-import { Bell, AlertCircle } from 'lucide-react';
+import { Bell, AlertCircle, FileSignature, FileText } from 'lucide-react';
 import { WidgetCard } from './widget-card';
 import { EmptyState } from './empty-state';
 
@@ -15,7 +15,9 @@ export interface Notificacion {
   tipo: 'aprobada' | 'rechazada' | 'pendiente' | 'info';
   mensaje: string;
   fecha: Date;
-  icono?: 'entrada' | 'salida' | 'ausencia' | 'solicitud';
+  icono?: 'entrada' | 'salida' | 'ausencia' | 'solicitud' | 'firma' | 'documento';
+  ctaUrl?: string;
+  ctaTexto?: string;
 }
 
 interface NotificacionesWidgetProps {
@@ -32,6 +34,17 @@ export const NotificacionesWidget = memo(function NotificacionesWidget({
   href = '/empleado/bandeja-entrada',
 }: NotificacionesWidgetProps) {
   const notificacionesMostradas = notificaciones.slice(0, maxItems);
+
+  const renderIcon = (notif: Notificacion) => {
+    switch (notif.icono) {
+      case 'firma':
+        return <FileSignature className="w-5 h-5 text-gray-600" />;
+      case 'documento':
+        return <FileText className="w-5 h-5 text-gray-600" />;
+      default:
+        return <AlertCircle className="w-5 h-5 text-gray-600" />;
+    }
+  };
 
   return (
     <WidgetCard
@@ -55,7 +68,7 @@ export const NotificacionesWidget = memo(function NotificacionesWidget({
               className="flex items-start gap-3 py-2.5 border-b border-gray-200 last:border-0 hover:bg-gray-50 transition-colors px-2 -mx-2"
             >
               <div className="flex items-center justify-center flex-shrink-0 pt-1">
-                <AlertCircle className="w-5 h-5 text-gray-600" />
+                {renderIcon(notif)}
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-[13px] text-gray-900 font-medium line-clamp-2 mb-0.5">
@@ -68,6 +81,14 @@ export const NotificacionesWidget = memo(function NotificacionesWidget({
                     year: 'numeric'
                   })}
                 </p>
+                {notif.ctaUrl && notif.ctaTexto && (
+                  <a
+                    href={notif.ctaUrl}
+                    className="text-[11px] text-blue-600 hover:underline mt-1 inline-flex items-center gap-1"
+                  >
+                    {notif.ctaTexto}
+                  </a>
+                )}
               </div>
             </div>
           ))

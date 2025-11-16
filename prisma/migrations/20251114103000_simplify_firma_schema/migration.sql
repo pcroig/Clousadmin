@@ -11,3 +11,6 @@ DROP COLUMN IF EXISTS "motivoRechazo",
 DROP COLUMN IF EXISTS "recordatoriosEnviados",
 DROP COLUMN IF EXISTS "ultimoRecordatorio";
 
+
+
+

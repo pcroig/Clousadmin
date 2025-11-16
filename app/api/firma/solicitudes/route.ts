@@ -146,6 +146,25 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    let posicionFirma: CrearSolicitudFirmaInput['posicionFirma'];
+    if (body.posicionFirma) {
+      const { pagina, x, y } = body.posicionFirma;
+      const valoresSonNumeros =
+        typeof pagina === 'number' && typeof x === 'number' && typeof y === 'number';
+      if (!valoresSonNumeros || Number.isNaN(pagina) || Number.isNaN(x) || Number.isNaN(y)) {
+        return NextResponse.json(
+          { error: 'La posicionFirma debe incluir pagina, x e y numéricos' },
+          { status: 400 }
+        );
+      }
+      const paginaNormalizada = pagina === -1 ? -1 : Math.max(1, Math.floor(pagina));
+      posicionFirma = {
+        pagina: paginaNormalizada,
+        x,
+        y,
+      };
+    }
+
     // Crear input para db-helper
     const input: CrearSolicitudFirmaInput = {
       documentoId: body.documentoId,
@@ -158,6 +177,7 @@ export async function POST(request: NextRequest) {
       recordatorioAutomatico: body.recordatorioAutomatico ?? true,
       diasRecordatorio: body.diasRecordatorio ?? 3,
       creadoPor: session.user.email || session.user.id,
+      posicionFirma,
     };
 
     // Crear solicitud

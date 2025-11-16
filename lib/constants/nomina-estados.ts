@@ -43,3 +43,4 @@ export const EVENTO_ESTADO_LABELS: Record<string, { label: string; color: string
   },
 };
 
+

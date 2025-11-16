@@ -8,7 +8,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { subirDocumento } from '@/lib/s3';
-import { extraerVariablesDePlantilla, extraerCamposPDF } from '@/lib/plantillas';
+import { extraerVariablesDePlantilla } from '@/lib/plantillas';
 import { sanitizarNombreArchivo } from '@/lib/plantillas/sanitizar';
 
 /**
