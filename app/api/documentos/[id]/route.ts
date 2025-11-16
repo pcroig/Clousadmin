@@ -11,6 +11,7 @@ import { existsSync } from 'fs';
 import { puedeAccederACarpeta } from '@/lib/documentos';
 
 import { UsuarioRol } from '@/lib/constants/enums';
+import { deleteFromS3, getSignedDownloadUrl } from '@/lib/s3';
 
 // GET /api/documentos/[id] - Descargar documento
 export async function GET(
@@ -42,6 +43,13 @@ export async function GET(
       return NextResponse.json({ error: 'Documento no encontrado' }, { status: 404 });
     }
 
+    if (!documento.s3Key) {
+      return NextResponse.json(
+        { error: 'Documento sin ruta de almacenamiento' },
+        { status: 500 }
+      );
+    }
+
     // Validar permisos de acceso a la carpeta
     if (documento.carpetaId) {
       const puedeAcceder = await puedeAccederACarpeta(
@@ -66,7 +74,25 @@ export async function GET(
       }
     }
 
-    // Leer archivo del filesystem
+    const searchParams = request.nextUrl.searchParams;
+    const inlineParam = searchParams.get('inline') ?? searchParams.get('preview');
+    const isInline = inlineParam === '1' || inlineParam === 'true';
+    const dispositionType = isInline ? 'inline' : 'attachment';
+
+    const isCloudDocument =
+      documento.s3Bucket && documento.s3Bucket !== 'local' && documento.s3Key;
+
+    if (isCloudDocument) {
+      const signedUrl = await getSignedDownloadUrl(documento.s3Key, {
+        responseContentType: documento.mimeType,
+        responseContentDisposition: `${dispositionType}; filename="${encodeURIComponent(
+          documento.nombre
+        )}"`,
+      });
+      return NextResponse.redirect(signedUrl, 302);
+    }
+
+    // Leer archivo del filesystem (modo local / legado)
     const filePath = join(process.cwd(), 'uploads', documento.s3Key);
 
     if (!existsSync(filePath)) {
@@ -78,12 +104,6 @@ export async function GET(
 
     const fileBuffer = await readFile(filePath);
 
-    const searchParams = request.nextUrl.searchParams;
-    const inlineParam = searchParams.get('inline') ?? searchParams.get('preview');
-    const isInline = inlineParam === '1' || inlineParam === 'true';
-    const dispositionType = isInline ? 'inline' : 'attachment';
-
-    // Devolver archivo con headers apropiados
     return new NextResponse(fileBuffer, {
       headers: {
         'Content-Type': documento.mimeType,
@@ -125,11 +145,25 @@ export async function DELETE(
       return NextResponse.json({ error: 'Documento no encontrado' }, { status: 404 });
     }
 
-    // Eliminar archivo del filesystem
-    const filePath = join(process.cwd(), 'uploads', documento.s3Key);
+    if (!documento.s3Key) {
+      return NextResponse.json(
+        { error: 'Documento sin ruta de almacenamiento' },
+        { status: 500 }
+      );
+    }
 
-    if (existsSync(filePath)) {
-      await unlink(filePath);
+    const isCloudDocument =
+      documento.s3Bucket && documento.s3Bucket !== 'local' && documento.s3Key;
+
+    if (isCloudDocument) {
+      await deleteFromS3(documento.s3Key);
+    } else {
+      // Eliminar archivo del filesystem
+      const filePath = join(process.cwd(), 'uploads', documento.s3Key);
+
+      if (existsSync(filePath)) {
+        await unlink(filePath);
+      }
     }
 
     // Eliminar registro de DB

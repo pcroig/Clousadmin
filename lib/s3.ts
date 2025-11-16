@@ -184,13 +184,24 @@ export async function uploadToS3(
   }
 }
 
+export type SignedUrlOptions = {
+  expiresIn?: number;
+  responseContentType?: string;
+  responseContentDisposition?: string;
+};
+
 /**
  * Get a pre-signed URL to download a file from Object Storage (or local URL in development)
  * @param key Object key (path) of the file
- * @param expiresIn URL expiration time in seconds (default: 5 minutes) - ignored in local mode
+ * @param options Signed URL options (expiration, response headers)
  * @returns Pre-signed URL (or local URL in development)
  */
-export async function getSignedDownloadUrl(key: string, expiresIn = 300): Promise<string> {
+export async function getSignedDownloadUrl(
+  key: string,
+  options?: SignedUrlOptions
+): Promise<string> {
+  const { expiresIn = 300, responseContentType, responseContentDisposition } = options ?? {};
+
   // Fallback to local storage in development
   if (!isS3Configured()) {
     return getLocalFileUrl(key);
@@ -205,6 +216,8 @@ export async function getSignedDownloadUrl(key: string, expiresIn = 300): Promis
     const command = new GetObjectCommand({
       Bucket: BUCKET_NAME,
       Key: key,
+      ...(responseContentType ? { ResponseContentType: responseContentType } : {}),
+      ...(responseContentDisposition ? { ResponseContentDisposition: responseContentDisposition } : {}),
     });
 
     const url = await getSignedUrl(s3Client, command, { expiresIn });
