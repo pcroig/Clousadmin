@@ -4,10 +4,11 @@
 const { spawn } = require('child_process');
 const path = require('path');
 
-const tsxCli = require.resolve('tsx/dist/cli.js');
+// Usar tsx directamente desde node_modules
+const tsxPath = require.resolve('tsx');
 const workerEntry = path.join(__dirname, 'start-worker.ts');
 
-const child = spawn(process.execPath, [tsxCli, workerEntry], {
+const child = spawn(process.execPath, [tsxPath, workerEntry], {
   stdio: 'inherit',
 });
 
