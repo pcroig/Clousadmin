@@ -12,8 +12,6 @@ const nextConfig: NextConfig = {
     serverActions: {
       bodySizeLimit: '10mb', // Permitir uploads de hasta 10MB
     },
-    // Instrumentation hook para inicializar workers de BullMQ
-    instrumentationHook: true,
   },
 
   // Configuración de imágenes (para Hetzner Object Storage y avatares)

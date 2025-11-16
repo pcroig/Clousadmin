@@ -7,13 +7,76 @@
 
 ## 📋 Resumen
 
-Clousadmin ha migrado de AWS a Hetzner como proveedor de infraestructura cloud. Esta migración incluye:
+Clousadmin ha migrado de AWS a Hetzner como proveedor de infraestructura cloud y ahora contamos con una guía completa para ejecutar toda la plataforma en producción. Los pilares son:
 
 - ✅ **Object Storage**: Migrado de AWS S3 a Hetzner Object Storage (S3-compatible)
 - ✅ **Variables de entorno**: Actualizadas para Hetzner
 - ✅ **Código**: Todas las referencias actualizadas
-- ❌ **AWS Cognito**: Removido (nunca se usó, usamos JWT)
+- ✅ **Infraestructura recomendada**: Base de datos y Redis gestionados + servidores de aplicación con Nginx/HTTPS
 - ✅ **Email**: Ya migrado a Resend (ver MIGRACION_RESEND.md)
+- ❌ **AWS Cognito**: Removido (nunca se usó, usamos JWT)
+
+---
+
+## 🏗️ Arquitectura recomendada en Hetzner
+
+| Componente | Recomendación | Notas |
+|------------|---------------|-------|
+| Base de datos | **Hetzner Managed PostgreSQL** (o servidor dedicado) | Evita instalar Postgres en el mismo VPS. Usa `scripts/hetzner/setup-server.sh --local-db` solo para entornos de laboratorio. |
+| Redis / BullMQ | Redis gestionado (Upstash, Valkey administrado o VPS dedicado) | Requerido para colas de plantillas, rate limiting y caché. Configura `REDIS_URL`. |
+| Servidor de aplicación | VPS CX31/CX41 con Node.js 20, PM2 y logs rotados | Usa `scripts/hetzner/setup-server.sh` para el bootstrap inicial. |
+| Reverse proxy + TLS | Nginx + Certbot (Let's Encrypt) | Termina TLS en Nginx y reenvía al app server (`localhost:3000`). |
+| Object Storage | Hetzner Object Storage | Buckets separados para dev/staging/prod. |
+| Backups | `pg_dump` + subida a Object Storage | Complementar con snapshots del bucket si aplica. |
+| Cron jobs | `crontab` en el servidor (curl a APIs protegidas con `CRON_SECRET`) | Mantén GitHub Actions solo como respaldo manual. |
+
+### Base de datos
+
+1. **Provisiona** una instancia de Hetzner Managed PostgreSQL (plan mínimo CPX11 funciona para arranque).
+2. **Configura** acceso privado (VPC) o IP pública con allowlist.
+3. **Actualiza** `DATABASE_URL` con el string gestionado (incluye SSL si aplica).
+4. **Scripts locales**: ejecuta `./scripts/hetzner/setup-server.sh --local-db` únicamente si necesitas un Postgres en el mismo VPS (QA o demos).
+
+### Redis y workers BullMQ
+
+1. **Selecciona** un servicio Redis con TLS (gestionado) o despliega uno dedicado con `scripts/hetzner/setup-redis.sh`.
+2. **Configura** `REDIS_URL` con autenticación (`redis://:password@host:6379`).
+3. **Workers**:
+   - En servidores web establece `DISABLE_EMBEDDED_WORKER="true"` para desactivar el worker embebido de Next.
+   - Inicia un proceso dedicado con `pm2 start scripts/start-worker.js --name clousadmin-worker`.
+   - Logs y restart gestionados por PM2.
+
+### Servidor de aplicación
+
+1. Provisiona un VPS (Ubuntu 22.04 recomendado).
+2. Ejecuta `scripts/hetzner/setup-server.sh` para instalar Node.js 20, PM2, UFW y herramientas básicas.
+3. Opcional: pasa `--local-db` si quieres instalar PostgreSQL local (no recomendado para producción).
+4. Clona el repo, instala dependencias y prepara `.env`.
+
+### Reverse proxy y HTTPS
+
+1. Instala Nginx + Certbot (ver `docs/NGINX_SETUP.md` cuando esté disponible).
+2. Configura un host virtual que:
+   - Escuche en 80/443.
+   - Redirija HTTP → HTTPS.
+   - Proxy a `http://127.0.0.1:3000`.
+   - Pase cabeceras `X-Forwarded-*`.
+3. Habilita HSTS y HTTP/2.
+
+### Object Storage
+
+Se mantiene igual que en la versión anterior (ver sección siguiente), con buckets dedicados por entorno.
+
+### Cron jobs y automatizaciones
+
+- Usa `scripts/hetzner/setup-cron.sh` (sección Cron) para instalar crons que llamen a `/api/cron/*` con `CRON_SECRET`.
+- Conserva los workflows de GitHub Actions como mecanismo manual o redundante.
+
+### Backups
+
+- Base de datos: Usa `scripts/backup-db.sh` (cron diario 02:00). Envía el dump comprimido a `s3://<BACKUP_BUCKET>/backups/postgres/`.
+- Object Storage: evalúa duplicar a un bucket en otra región (`hel1`) semanalmente si manejas datos críticos.
+- Documentación completa en `docs/DISASTER_RECOVERY.md`.
 
 ---
 
@@ -232,6 +295,11 @@ import { S3Client, CopyObjectCommand } from '@aws-sdk/client-s3';
 - [x] Eliminar credenciales AWS del código
 - [x] Actualizar documentación
 - [x] Eliminar amplify.yml
+- [ ] Provisionar base de datos gestionada y apuntar `DATABASE_URL`
+- [ ] Configurar Redis gestionado (o dedicado) y actualizar `REDIS_URL`
+- [ ] Desplegar Nginx + TLS + HSTS frente al servidor de aplicación
+- [ ] Instalar cron jobs en el servidor (clasificar fichajes, revisar solicitudes)
+- [ ] Configurar backups automáticos (base de datos + storage)
 - [ ] Configurar backups en Hetzner
 - [ ] Configurar lifecycle policies (opcional)
 - [ ] Migrar datos existentes de AWS (si aplica)

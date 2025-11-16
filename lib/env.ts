@@ -6,9 +6,22 @@
 
 import { z } from 'zod';
 
+const booleanString = z
+  .union([z.literal('true'), z.literal('false'), z.boolean()])
+  .default(false)
+  .transform((value) => value === true || value === 'true');
+
 const envSchema = z.object({
   // Database
   DATABASE_URL: z.string().url(),
+
+  // Encryption (required)
+  ENCRYPTION_KEY: z
+    .string()
+    .regex(/^[a-fA-F0-9]{64}$/, 'ENCRYPTION_KEY debe ser una cadena hex de 64 caracteres'),
+
+  // Redis (obligatorio en producción)
+  REDIS_URL: z.string().url().optional(),
 
   // Hetzner Object Storage (OPCIONAL para desarrollo local, requerido en producción)
   STORAGE_ENDPOINT: z.string().url().optional(),
@@ -16,6 +29,9 @@ const envSchema = z.object({
   STORAGE_ACCESS_KEY: z.string().min(1).optional(),
   STORAGE_SECRET_KEY: z.string().min(1).optional(),
   STORAGE_BUCKET: z.string().min(1).optional(),
+  BACKUP_BUCKET: z.string().min(1).optional(),
+  ENABLE_CLOUD_STORAGE: booleanString,
+  DISABLE_EMBEDDED_WORKER: booleanString.optional(),
 
   // Proveedores de IA (al menos uno debe estar configurado)
   // OpenAI
@@ -45,6 +61,11 @@ const envSchema = z.object({
 
   // JWT Secret (required)
   NEXTAUTH_SECRET: z.string().min(32, 'NEXTAUTH_SECRET debe tener al menos 32 caracteres'),
+
+  // Email (Resend)
+  RESEND_API_KEY: z.string().min(1).optional(),
+  RESEND_FROM_EMAIL: z.string().email().optional(),
+  RESEND_FROM_NAME: z.string().min(1).optional(),
 
   // Platform Admin (opcional - solo necesario para invitar usuarios)
   // Si se proporciona, debe tener al menos 32 caracteres, pero puede no estar presente
@@ -79,13 +100,47 @@ const validatedEnv = envSchema.parse(process.env);
 const hasOpenAI = !!(validatedEnv.OPENAI_API_KEY && validatedEnv.OPENAI_API_KEY.startsWith('sk-'));
 const hasAnthropic = !!(validatedEnv.ANTHROPIC_API_KEY && validatedEnv.ANTHROPIC_API_KEY.trim() !== '');
 const hasGoogleAI = !!(validatedEnv.GOOGLE_AI_API_KEY && validatedEnv.GOOGLE_AI_API_KEY.trim() !== '');
+const isProduction = validatedEnv.NODE_ENV === 'production';
+const hasStorageConfig =
+  !!validatedEnv.STORAGE_ENDPOINT &&
+  !!validatedEnv.STORAGE_REGION &&
+  !!validatedEnv.STORAGE_ACCESS_KEY &&
+  !!validatedEnv.STORAGE_SECRET_KEY &&
+  !!validatedEnv.STORAGE_BUCKET;
 
 if (!hasOpenAI && !hasAnthropic && !hasGoogleAI) {
+  if (isProduction) {
+    throw new Error(
+      '[ENV] Debes configurar al menos un proveedor de IA (OPENAI_API_KEY, ANTHROPIC_API_KEY o GOOGLE_AI_API_KEY) en producción.'
+    );
+  }
   console.warn(
     '⚠️  [ENV] No hay proveedores de IA configurados. ' +
     'Las funcionalidades de IA no estarán disponibles. ' +
     'Configura al menos uno: OPENAI_API_KEY, ANTHROPIC_API_KEY, o GOOGLE_AI_API_KEY'
   );
+}
+
+if (validatedEnv.ENABLE_CLOUD_STORAGE && !hasStorageConfig) {
+  throw new Error('[ENV] ENABLE_CLOUD_STORAGE está activo pero faltan variables STORAGE_*');
+}
+
+if (isProduction) {
+  if (!validatedEnv.REDIS_URL) {
+    throw new Error('[ENV] REDIS_URL es obligatorio en producción');
+  }
+
+  if (!hasStorageConfig) {
+    throw new Error('[ENV] STORAGE_* son obligatorias en producción');
+  }
+
+  if (!validatedEnv.RESEND_API_KEY || !validatedEnv.RESEND_FROM_EMAIL) {
+    throw new Error('[ENV] RESEND_API_KEY y RESEND_FROM_EMAIL son obligatorios en producción');
+  }
+
+  if (!validatedEnv.CRON_SECRET) {
+    throw new Error('[ENV] CRON_SECRET es obligatorio en producción');
+  }
 }
 
 export const env = validatedEnv;

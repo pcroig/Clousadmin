@@ -6,10 +6,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { generarExcelGestoria, guardarExportGestoria } from '@/lib/exports/excel-gestoria';
 import { tieneAlertasCriticas } from '@/lib/validaciones/nominas';
-import { join } from 'path';
-import { writeFile } from 'fs/promises';
+import { join, dirname } from 'path';
+import { writeFile, mkdir } from 'fs/promises';
 
 import { UsuarioRol } from '@/lib/constants/enums';
+import { uploadToS3, shouldUseCloudStorage } from '@/lib/s3';
 
 // GET /api/nominas/export-gestoria?mes=X&anio=Y
 export async function GET(req: NextRequest) {
@@ -68,30 +69,40 @@ export async function GET(req: NextRequest) {
       anio
     );
 
-    // Guardar archivo en filesystem (opcional, para tracking)
+    // Guardar archivo (S3 o filesystem para tracking)
     const nombreArchivo = `nominas_${session.user.empresaId}_${anio}_${String(mes).padStart(2, '0')}.xlsx`;
     const rutaArchivo = `exports/${session.user.empresaId}/${nombreArchivo}`;
-    const fullPath = join(process.cwd(), 'uploads', rutaArchivo);
+    let archivoReferencia = rutaArchivo;
 
-    try {
-      const { mkdir } = require('fs/promises');
-      const { dirname } = require('path');
-      await mkdir(dirname(fullPath), { recursive: true });
-      await writeFile(fullPath, buffer);
-
-      // Guardar registro del export
-      await guardarExportGestoria(
-        session.user.empresaId,
-        mes,
-        anio,
-        rutaArchivo,
-        nombreArchivo,
-        session.user.id
+    if (shouldUseCloudStorage()) {
+      const bucketName = process.env.STORAGE_BUCKET;
+      if (!bucketName) {
+        throw new Error('STORAGE_BUCKET no configurado');
+      }
+      const s3Key = `exports/${rutaArchivo}`;
+      archivoReferencia = await uploadToS3(
+        buffer,
+        s3Key,
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
       );
-    } catch (saveError) {
-      console.error('[API export-gestoria] Error guardando archivo:', saveError);
-      // Continuar aunque falle el guardado, ya que el buffer se retorna
+    } else {
+      const fullPath = join(process.cwd(), 'uploads', rutaArchivo);
+      try {
+        await mkdir(dirname(fullPath), { recursive: true });
+        await writeFile(fullPath, buffer);
+      } catch (saveError) {
+        console.error('[API export-gestoria] Error guardando archivo:', saveError);
+      }
     }
+
+    await guardarExportGestoria(
+      session.user.empresaId,
+      mes,
+      anio,
+      archivoReferencia,
+      nombreArchivo,
+      session.user.id
+    );
 
     // Retornar archivo para descarga
     return new NextResponse(new Uint8Array(buffer), {
@@ -114,6 +125,7 @@ export async function GET(req: NextRequest) {
     );
   }
 }
+
 
 
 

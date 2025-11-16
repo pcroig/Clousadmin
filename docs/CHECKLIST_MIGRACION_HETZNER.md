@@ -33,6 +33,39 @@ Este checklist te guía paso a paso en la migración completa de AWS a Hetzner. 
 
 ---
 
+## 🏗️ Infraestructura Base
+
+### 1. Base de Datos
+
+- [ ] Provisionar **Hetzner Managed PostgreSQL** (o servidor dedicado solo para DB)
+- [ ] Crear usuario + base de datos `clousadmin`
+- [ ] Habilitar TLS / IP allowlist
+- [ ] Actualizar `DATABASE_URL` en Secrets/Staging/Producción
+- [ ] (Opcional) Si requieres Postgres local para QA: `./scripts/hetzner/setup-server.sh --local-db`
+
+### 2. Redis y BullMQ
+
+- [ ] Elegir servicio Redis gestionado (Upstash, Hetzner, Valkey) o servidor dedicado
+- [ ] Configurar autenticación obligatoria (`requirepass`)
+- [ ] Obtener `REDIS_URL` completo (`redis://:password@host:6379/0`)
+- [ ] Actualizar `.env` (dev/staging/prod)
+
+### 3. Servidor de Aplicación
+
+- [ ] Provisionar VPS (Ubuntu 22.04, CX31/CX41)
+- [ ] Ejecutar `./scripts/hetzner/setup-server.sh`
+- [ ] Instalar PM2 (`pm2 startup` ya incluido en el script)
+- [ ] Clonar repo + configurar variables de entorno
+
+### 4. Reverse Proxy + TLS
+
+- [ ] Instalar Nginx + Certbot (`docs/NGINX_SETUP.md`)
+- [ ] Crear host `app.tudominio.com` → proxy a `127.0.0.1:3000`
+- [ ] Forzar HTTPS y habilitar HSTS
+- [ ] Configurar cabeceras `X-Forwarded-*` y `client_max_body_size 15m`
+
+---
+
 ## 🔧 Configuración de Hetzner
 
 ### 1. Crear Cuenta y Proyecto
@@ -118,6 +151,8 @@ Este checklist te guía paso a paso en la migración completa de AWS a Hetzner. 
   - [ ] `STORAGE_SECRET_KEY`
   - [ ] `STORAGE_BUCKET` (usar bucket de staging)
   - [ ] `ENABLE_CLOUD_STORAGE="true"`
+  - [ ] `REDIS_URL`
+  - [ ] `RESEND_API_KEY` / `RESEND_FROM_EMAIL`
 
 - [ ] **Producción** - Configurar variables en servidor de producción:
   - [ ] `STORAGE_ENDPOINT`
@@ -126,6 +161,9 @@ Este checklist te guía paso a paso en la migración completa de AWS a Hetzner. 
   - [ ] `STORAGE_SECRET_KEY`
   - [ ] `STORAGE_BUCKET` (usar bucket de producción)
   - [ ] `ENABLE_CLOUD_STORAGE="true"`
+  - [ ] `REDIS_URL`
+  - [ ] `RESEND_API_KEY` / `RESEND_FROM_EMAIL`
+  - [ ] `ENCRYPTION_KEY`
 
 - [ ] **Eliminar variables obsoletas de AWS** (en todos los ambientes):
   - [ ] Eliminar `AWS_REGION`
@@ -154,6 +192,11 @@ Este checklist te guía paso a paso en la migración completa de AWS a Hetzner. 
   ```
 
 - [ ] **Deploy a Producción** (después de testing en staging)
+
+- [ ] **Configurar workers** (BullMQ)
+  - [ ] En servidores web: `DISABLE_EMBEDDED_WORKER="true"`
+  - [ ] Proceso dedicado: `pm2 start scripts/start-worker.js --name clousadmin-worker`
+  - [ ] Verificar logs (`pm2 logs clousadmin-worker`)
 
 ---
 
@@ -246,6 +289,7 @@ Este checklist te guía paso a paso en la migración completa de AWS a Hetzner. 
   - [ ] ✅ Smoke test: subir y descargar un documento de prueba
   - [ ] ✅ Verificar que documentos existentes (migrados) sean accesibles
   - [ ] ✅ Monitorear logs por errores
+  - [ ] ✅ Ejecutar `scripts/smoke-tests.sh` apuntando a producción
 
 ### 7. Pruebas de Performance
 
@@ -280,6 +324,18 @@ Este checklist te guía paso a paso en la migración completa de AWS a Hetzner. 
   - [ ] ✅ Habilitar logging en Hetzner (si está disponible)
   - [ ] ✅ Configurar alertas de acceso no autorizado
   - [ ] ✅ Revisar logs de aplicación por errores
+  - [ ] ✅ Configurar rotación de logs PM2 (`pm2 install pm2-logrotate`)
+
+---
+
+## 💾 Backups y Logging
+
+- [ ] Instalar `awscli` o `s3cmd` en el servidor de producción.
+- [ ] Configurar variables `BACKUP_BUCKET`, `STORAGE_*`, `DATABASE_URL`.
+- [ ] Probar `scripts/backup-db.sh` manualmente.
+- [ ] Añadir cron diario (`0 2 * * * /opt/clousadmin/scripts/backup-db.sh`).
+- [ ] Documentar ubicación de backups en `docs/DISASTER_RECOVERY.md`.
+- [ ] Revisar retención en el bucket (lifecycle / replicación).
 
 ---
 
@@ -342,6 +398,8 @@ Este checklist te guía paso a paso en la migración completa de AWS a Hetzner. 
 - [x] ✅ docs/CONFIGURACION_SEGURIDAD.md actualizado
 - [x] ✅ docs/MIGRACION_HETZNER.md creado
 - [x] ✅ .cursorrules actualizado
+- [ ] ✅ docs/NGINX_SETUP.md
+- [ ] ✅ docs/PRODUCCION_CHECKLIST.md / RUNBOOK / TROUBLESHOOTING_PROD.md
 - [ ] **Documentar decisiones**
   - [ ] Razones de la migración
   - [ ] Comparativa de costos

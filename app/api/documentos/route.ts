@@ -9,6 +9,7 @@ import { writeFile, mkdir } from 'fs/promises';
 import { join } from 'path';
 import { existsSync } from 'fs';
 import { UsuarioRol } from '@/lib/constants/enums';
+import { uploadToS3, shouldUseCloudStorage } from '@/lib/s3';
 
 import {
   validarMimeType,
@@ -177,17 +178,29 @@ export async function POST(request: NextRequest) {
       nombreUnico
     );
 
-    // Guardar archivo en filesystem local (MVP)
-    const fullPath = join(process.cwd(), 'uploads', rutaStorage);
-    const dirPath = fullPath.substring(0, fullPath.lastIndexOf('/'));
+    const useCloudStorage = shouldUseCloudStorage();
+    let storageKey = rutaStorage;
+    let storageBucket = 'local';
 
-    // Crear directorios si no existen
-    if (!existsSync(dirPath)) {
-      await mkdir(dirPath, { recursive: true });
+    if (useCloudStorage) {
+      const bucketName = process.env.STORAGE_BUCKET;
+      if (!bucketName) {
+        throw new Error('STORAGE_BUCKET no configurado');
+      }
+      storageKey = `documentos/${rutaStorage}`;
+      await uploadToS3(buffer, storageKey, file.type);
+      storageBucket = bucketName;
+    } else {
+      // Guardar archivo en filesystem local
+      const fullPath = join(process.cwd(), 'uploads', rutaStorage);
+      const dirPath = fullPath.substring(0, fullPath.lastIndexOf('/'));
+
+      if (!existsSync(dirPath)) {
+        await mkdir(dirPath, { recursive: true });
+      }
+
+      await writeFile(fullPath, buffer);
     }
-
-    // Escribir archivo
-    await writeFile(fullPath, buffer);
 
     // Crear registro en DB
     const documento = await prisma.documento.create({
@@ -199,8 +212,8 @@ export async function POST(request: NextRequest) {
         tipoDocumento: tipoDocumento || 'otro',
         mimeType: file.type,
         tamano: file.size,
-        s3Key: rutaStorage,
-        s3Bucket: 'local', // En MVP es local, en Fase 2 será el bucket de S3
+        s3Key: storageKey,
+        s3Bucket: storageBucket,
       },
       include: {
         carpeta: true,

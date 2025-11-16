@@ -30,6 +30,13 @@ export function isS3Configured(): boolean {
   );
 }
 
+/**
+ * True if cloud storage flag is enabled and credentials exist
+ */
+export function shouldUseCloudStorage(): boolean {
+  return process.env.ENABLE_CLOUD_STORAGE === 'true' && isS3Configured();
+}
+
 // Create S3-compatible client for Hetzner Object Storage (lazy initialization)
 function getS3Client(): S3Client | null {
   if (!isS3Configured()) {
