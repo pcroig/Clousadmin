@@ -122,8 +122,8 @@ Clousadmin is an HR management platform for Spanish companies built with Next.js
 - **State**: React Server Components + Server Actions (no Redux/Zustand unless necessary)
 - **Validation**: Zod schemas
 - **Forms**: react-hook-form + @hookform/resolvers
-- **AWS Services**: S3, RDS, Cognito, SES
-- **AI**: OpenAI GPT-4 Vision
+- **Cloud Storage**: Hetzner Object Storage (S3-compatible)
+- **AI**: OpenAI GPT-4 Vision, Anthropic Claude, Google Gemini
 
 ### 2. Project Structure (Follow README.md)
 ```

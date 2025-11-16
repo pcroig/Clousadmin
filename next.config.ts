@@ -16,16 +16,24 @@ const nextConfig: NextConfig = {
     instrumentationHook: true,
   },
 
-  // Configuración de imágenes (para S3 y avatares)
+  // Configuración de imágenes (para Hetzner Object Storage y avatares)
   images: {
     remotePatterns: [
       {
         protocol: 'https',
-        hostname: '**.amazonaws.com', // AWS S3
+        hostname: '**.your-objectstorage.com', // Hetzner Object Storage
       },
       {
         protocol: 'https',
-        hostname: 'clousadmin-documentos.s3.*.amazonaws.com',
+        hostname: '**.fsn1.your-objectstorage.com', // Hetzner Falkenstein
+      },
+      {
+        protocol: 'https',
+        hostname: '**.nbg1.your-objectstorage.com', // Hetzner Nuremberg
+      },
+      {
+        protocol: 'https',
+        hostname: '**.hel1.your-objectstorage.com', // Hetzner Helsinki
       },
     ],
   },

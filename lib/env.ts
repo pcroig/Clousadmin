@@ -10,20 +10,12 @@ const envSchema = z.object({
   // Database
   DATABASE_URL: z.string().url(),
 
-  // AWS (OPCIONAL para desarrollo local, requerido en producción)
-  AWS_REGION: z.string().min(1).optional(),
-  AWS_ACCESS_KEY_ID: z.string().min(1).optional(),
-  AWS_SECRET_ACCESS_KEY: z.string().min(1).optional(),
-  S3_BUCKET: z.string().min(1).optional(),
-
-  // Cognito (OPCIONAL - no lo usamos, tenemos JWT)
-  COGNITO_USER_POOL_ID: z.string().optional(),
-  COGNITO_CLIENT_ID: z.string().optional(),
-  COGNITO_CLIENT_SECRET: z.string().optional(),
-
-  // SES (OPCIONAL para desarrollo local, requerido en producción)
-  SES_FROM_EMAIL: z.string().email().optional(),
-  SES_REGION: z.string().min(1).optional().default('eu-west-1'),
+  // Hetzner Object Storage (OPCIONAL para desarrollo local, requerido en producción)
+  STORAGE_ENDPOINT: z.string().url().optional(),
+  STORAGE_REGION: z.string().min(1).optional(),
+  STORAGE_ACCESS_KEY: z.string().min(1).optional(),
+  STORAGE_SECRET_KEY: z.string().min(1).optional(),
+  STORAGE_BUCKET: z.string().min(1).optional(),
 
   // Proveedores de IA (al menos uno debe estar configurado)
   // OpenAI

@@ -1,6 +1,6 @@
 # 🏢 CLOUSADMIN
 
-Plataforma de gestión de RRHH para empresas españolas construida con Next.js 14, Prisma, AWS y procesamiento de documentos con IA.
+Plataforma de gestión de RRHH para empresas españolas construida con Next.js 14, Prisma, Hetzner y procesamiento de documentos con IA.
 
 ---
 
@@ -52,7 +52,7 @@ Para documentación histórica, ver [docs/historial/](docs/historial/)
 - **Frontend**: Next.js 16 (App Router) con React 19, TypeScript, Tailwind CSS 4, shadcn/ui
 - **Backend**: Node.js, Prisma, PostgreSQL
 - **Auth**: JWT (jose) + bcryptjs
-- **Cloud**: AWS S3, RDS, Cognito, SES (opcional)
+- **Cloud**: Hetzner Object Storage (S3-compatible)
 - **IA**: OpenAI GPT-4 Vision (opcional)
 
 ---
@@ -98,11 +98,11 @@ Clousadmin/
 - Módulo de documentos con firma digital
 
 ### 📋 Roadmap
-- Integración AWS S3 para documentos
-- Extracción IA de contratos y nóminas
+- Extracción IA de contratos y nóminas con más proveedores
 - Calendario inteligente de vacaciones
 - Integración Google Calendar/Outlook
 - Analytics y reporting avanzado
+- Módulo de formación y desarrollo
 
 ---
 
@@ -191,6 +191,6 @@ Para preguntas o soporte: [info@clousadmin.com](mailto:info@clousadmin.com)
 
 ---
 
-**Versión**: 1.1.0  
-**Última actualización**: 7 de noviembre de 2025
-**Última limpieza**: 7 de noviembre de 2025
+**Versión**: 1.2.0
+**Última actualización**: 13 de noviembre de 2025
+**Migración a Hetzner**: 13 de noviembre de 2025

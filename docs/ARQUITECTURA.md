@@ -34,8 +34,8 @@ Documentación de la arquitectura del proyecto, decisiones técnicas y estructur
 - **Validación**: Zod schemas
 
 ### Cloud & External (Opcional)
-- **AWS**: S3, RDS, Cognito, SES
-- **IA**: OpenAI GPT-4 Vision
+- **Storage**: Hetzner Object Storage (S3-compatible)
+- **IA**: OpenAI GPT-4 Vision, Anthropic Claude, Google Gemini
 
 ---
 

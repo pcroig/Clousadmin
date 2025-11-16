@@ -84,7 +84,7 @@ export async function POST(req: NextRequest) {
           mimeType: file.type,
           tamano: file.size,
           s3Key,
-          s3Bucket: process.env.S3_BUCKET || 'local',
+          s3Bucket: process.env.STORAGE_BUCKET || 'local',
         },
       });
     }
