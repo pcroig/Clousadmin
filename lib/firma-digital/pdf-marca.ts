@@ -35,9 +35,11 @@ export async function anadirMarcaFirmaPDF(
 
     // Determinar en qué página añadir la marca
     const paginas = pdfDoc.getPages();
-    const paginaIndex = marca.posicion?.pagina
-      ? Math.min(marca.posicion.pagina - 1, paginas.length - 1)
-      : paginas.length - 1; // Por defecto última página
+    const paginaSolicitada = marca.posicion?.pagina ?? -1;
+    const paginaIndex =
+      paginaSolicitada <= 0
+        ? paginas.length - 1
+        : Math.min(paginaSolicitada - 1, paginas.length - 1);
 
     const pagina = paginas[paginaIndex];
     const { width, height } = pagina.getSize();
@@ -47,25 +49,48 @@ export async function anadirMarcaFirmaPDF(
     const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
 
     // Posición de la marca (por defecto abajo a la derecha)
-    const x = marca.posicion?.x ?? width - 250;
+    const defaultWidth = 260;
+    const x = marca.posicion?.x ?? Math.max(40, width - defaultWidth - 40);
     const y = marca.posicion?.y ?? 50;
 
     const fontSize = 9;
     const lineHeight = 12;
 
+    // Calcular dimensiones según imagen de firma (si existe)
+    let firmaImagenHeight = 0;
+    let firmaImagenWidth = 0;
+    if (marca.firmaImagen?.buffer) {
+      const isJpg = marca.firmaImagen.contentType?.includes('jpeg') || marca.firmaImagen.contentType?.includes('jpg');
+      const firmaImagen = isJpg
+        ? await pdfDoc.embedJpg(marca.firmaImagen.buffer)
+        : await pdfDoc.embedPng(marca.firmaImagen.buffer);
+      const maxWidth = Math.min(marca.firmaImagen.width ?? 180, defaultWidth - 40);
+      const ratio = firmaImagen.height / firmaImagen.width;
+      firmaImagenWidth = maxWidth;
+      firmaImagenHeight = marca.firmaImagen.height ?? maxWidth * ratio;
+      pagina.drawImage(firmaImagen, {
+        x: x + 10,
+        y: y + 25,
+        width: firmaImagenWidth,
+        height: firmaImagenHeight,
+      });
+    }
+
+    const blockHeight = Math.max(80, firmaImagenHeight + 90);
+
     // Dibujar fondo semi-transparente (opcional)
     pagina.drawRectangle({
       x: x - 5,
       y: y - 5,
-      width: 240,
-      height: 80,
+      width: defaultWidth,
+      height: blockHeight,
       borderColor: rgb(0.7, 0.7, 0.7),
       borderWidth: 1,
       opacity: 0.1,
     });
 
     // Título de la marca
-    let currentY = y + 65;
+    let currentY = y + blockHeight - 15;
     pagina.drawText('FIRMADO DIGITALMENTE', {
       x,
       y: currentY,
@@ -75,7 +100,7 @@ export async function anadirMarcaFirmaPDF(
     });
 
     // Nombre del firmante
-    currentY -= lineHeight + 3;
+    currentY -= lineHeight + 6;
     pagina.drawText(`Firmante: ${marca.nombreFirmante}`, {
       x,
       y: currentY,
@@ -154,7 +179,7 @@ export async function anadirMarcasFirmasPDF(
     const marca = marcas[i];
 
     // Calcular posición Y para apilar marcas
-    const offsetY = 50 + (i * 90); // 80px altura + 10px separación
+    const offsetY = 50 + i * 140; // Altura estimada de cada bloque
 
     const marcaConPosicion: OpcionesMarcaFirma = {
       ...marca,

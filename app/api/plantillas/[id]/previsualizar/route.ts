@@ -11,10 +11,7 @@ import {
   resolverVariables,
   type DatosEmpleado,
 } from '@/lib/plantillas';
-import { descargarDocumento, uploadToS3, getSignedDownloadUrl } from '@/lib/s3';
-import Docxtemplater from 'docxtemplater';
-import PizZip from 'pizzip';
-import { randomUUID } from 'crypto';
+import { getSignedDownloadUrl } from '@/lib/s3';
 
 const PREVIEW_TTL_SECONDS = 60 * 10; // 10 minutos
 
@@ -137,7 +134,6 @@ export async function GET(
       );
     }
 
-    const plantillaBuffer = await descargarDocumento(plantilla.s3Key);
     const variables = await extraerVariablesDePlantilla(plantilla.s3Key);
 
     const empleadoData: DatosEmpleado = {
@@ -153,38 +149,41 @@ export async function GET(
 
     const valoresResueltos = await resolverVariables(variables, empleadoData);
 
-    const zip = new PizZip(plantillaBuffer);
-    const doc = new Docxtemplater(zip, {
-      paragraphLoop: true,
-      linebreaks: true,
-      delimiters: { start: '{{', end: '}}' },
-    });
-
-    doc.setData(valoresResueltos);
-    doc.render();
-
-    const previewBuffer = doc.getZip().generate({
-      type: 'nodebuffer',
-      compression: 'DEFLATE',
-    });
-
-    const previewKey = `previews/${session.user.empresaId}/${plantilla.id}/${randomUUID()}.docx`;
-    await uploadToS3(
-      previewBuffer,
-      previewKey,
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    const previewUrl = await getSignedDownloadUrl(
+      plantilla.s3Key,
+      PREVIEW_TTL_SECONDS
     );
+    const variablesConValor = Object.entries(valoresResueltos)
+      .filter(([, value]) => {
+        if (value === null || value === undefined) return false;
+        if (typeof value === 'string') {
+          return value.trim().length > 0;
+        }
+        return String(value).trim().length > 0;
+      })
+      .map(([key]) => key);
 
-    const previewUrl = await getSignedDownloadUrl(previewKey, PREVIEW_TTL_SECONDS);
-    const variablesFaltantes = variables.filter(
-      (variable) => !valoresResueltos[variable]
+    const variablesSinValor = Array.from(
+      new Set(
+        variables.filter((variable) => {
+          const valor = valoresResueltos[variable];
+          if (valor === null || valor === undefined) return true;
+          if (typeof valor === 'string') {
+            return valor.trim().length === 0;
+          }
+          return String(valor).trim().length === 0;
+        })
+      )
     );
 
     return NextResponse.json({
       success: true,
       previewUrl,
       variablesResueltas: valoresResueltos,
-      variablesFaltantes,
+      variablesFaltantes: variablesSinValor, // compat legacy
+      variablesConValor,
+      variablesSinValor,
+      totalVariables: variables.length,
     });
   } catch (error) {
     console.error('[API] Error al generar previsualización:', error);

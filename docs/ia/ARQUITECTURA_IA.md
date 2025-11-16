@@ -500,3 +500,6 @@ const result = await extractStructuredData(
 
 
 
+
+
+

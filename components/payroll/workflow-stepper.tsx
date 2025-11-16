@@ -1,16 +1,13 @@
 'use client';
 
 const WORKFLOW_STEPS = [
-  { key: 'generando', label: 'Generando' },
-  { key: 'complementos_pendientes', label: 'Complementos' },
-  { key: 'lista_exportar', label: 'Exportar' },
-  { key: 'exportada', label: 'Enviada' },
-  { key: 'definitiva', label: 'Definitiva' },
+  { key: 'pendiente', label: 'Pendiente' },
+  { key: 'completada', label: 'Completada' },
   { key: 'publicada', label: 'Publicada' },
 ];
 
 interface WorkflowStepperProps {
-  estadoActual: string;
+  estadoActual: 'pendiente' | 'completada' | 'publicada';
   compact?: boolean;
 }
 
@@ -62,5 +59,4 @@ export function WorkflowStepper({ estadoActual, compact = false }: WorkflowStepp
 }
 
 export { WORKFLOW_STEPS };
-
 

@@ -10,6 +10,9 @@ import { extraerVariablesDeTexto, sanitizarNombreArchivo } from './sanitizar';
 import { descargarDocumento, subirDocumento } from '@/lib/s3';
 import { prisma } from '@/lib/prisma';
 import { format } from 'date-fns';
+import { convertDocxFromS3ToPdf } from './docx-to-pdf';
+
+const DOCX_MIME_TYPE = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 
 /**
  * Extraer variables de una plantilla DOCX
@@ -31,12 +34,18 @@ export async function extraerVariablesDePlantilla(s3Key: string): Promise<string
     // Extraer variables {{variable_nombre}}
     const variables = extraerVariablesDeTexto(documentXml);
 
-    // También revisar headers y footers
+    // También revisar headers y footers (JSZip no siempre expone forEach en folder)
     const headersFooters: string[] = [];
-    zip.folder('word')?.forEach((relativePath, file) => {
+    Object.keys(zip.files).forEach((path) => {
+      if (!path.startsWith('word/')) return;
+
+      const relativePath = path.replace('word/', '');
       if (relativePath.startsWith('header') || relativePath.startsWith('footer')) {
-        const content = file.asText();
-        headersFooters.push(...extraerVariablesDeTexto(content));
+        const file = zip.file(path);
+        if (file) {
+          const content = file.asText();
+          headersFooters.push(...extraerVariablesDeTexto(content));
+        }
       }
     });
 
@@ -211,11 +220,8 @@ export async function generarDocumentoDesdePlantilla(
       },
     });
 
-    // Asignar valores
-    doc.setData(valoresVariables);
-
-    // Renderizar
-    doc.render();
+    // Renderizar con valores
+    doc.render(valoresVariables);
 
     // Obtener buffer del documento generado
     const documentoBuffer = doc.getZip().generate({
@@ -229,6 +235,7 @@ export async function generarDocumentoDesdePlantilla(
     const nombreDocumentoFinal = nombreDocumento.endsWith('.docx')
       ? nombreDocumento
       : `${nombreDocumento}.docx`;
+    const nombreDocumentoPdf = nombreDocumentoFinal.replace(/\.docx$/i, '.pdf');
 
     console.log(`[Generar] Nombre del documento: ${nombreDocumentoFinal}`);
 
@@ -236,9 +243,13 @@ export async function generarDocumentoDesdePlantilla(
     const carpetaDestino = configuracion.carpetaDestino || plantilla.carpetaDestinoDefault || 'Personales';
     const s3Key = `documentos/${empleado.empresaId}/${empleadoId}/${carpetaDestino}/${nombreDocumentoFinal}`;
 
-    await subirDocumento(documentoBuffer, s3Key, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+    await subirDocumento(documentoBuffer, s3Key, DOCX_MIME_TYPE);
 
     console.log(`[Generar] Documento subido a S3: ${s3Key}`);
+
+    // 9. Convertir DOCX a PDF oficial
+    const { pdfS3Key, pdfSize } = await convertDocxFromS3ToPdf(s3Key);
+    console.log(`[Generar] PDF generado a partir de DOCX: ${pdfS3Key}`);
 
     // 9. Buscar o crear carpeta destino
     let carpeta = await prisma.carpeta.findFirst({
@@ -262,19 +273,26 @@ export async function generarDocumentoDesdePlantilla(
       console.log(`[Generar] Carpeta creada: ${carpetaDestino}`);
     }
 
-    // 10. Crear registro de Documento
+    // 10. Crear registro de Documento (siempre PDF)
     const documento = await prisma.documento.create({
       data: {
         empresaId: empleado.empresaId,
         empleadoId: empleadoId,
         carpetaId: carpeta.id,
-        nombre: nombreDocumentoFinal,
+        nombre: nombreDocumentoPdf,
         tipoDocumento: 'generado',
-        mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        tamano: documentoBuffer.length,
-        s3Key,
+        mimeType: 'application/pdf',
+        tamano: pdfSize,
+        s3Key: pdfS3Key,
         s3Bucket: process.env.AWS_S3_BUCKET || 'clousadmin-documents',
         requiereFirma: configuracion.requiereFirma || plantilla.requiereFirma,
+        datosExtraidos: {
+          origenDocx: {
+            nombre: nombreDocumentoFinal,
+            s3Key,
+            mimeType: DOCX_MIME_TYPE,
+          },
+        },
       },
     });
 
@@ -306,7 +324,7 @@ export async function generarDocumentoDesdePlantilla(
           usuarioId: empleado.usuarioId,
           tipo: 'info',
           titulo: 'Nuevo documento generado',
-          mensaje: `Se ha generado un nuevo documento: ${nombreDocumentoFinal}`,
+          mensaje: `Se ha generado un nuevo documento: ${nombreDocumentoPdf}`,
           metadata: {
             documentoId: documento.id,
             plantillaId: plantilla.id,
@@ -323,7 +341,7 @@ export async function generarDocumentoDesdePlantilla(
           usuarioId: empleado.usuarioId,
           tipo: 'pendiente',
           titulo: 'Documento pendiente de completar',
-          mensaje: `Completa los campos del documento ${nombreDocumentoFinal} antes de firmarlo.`,
+          mensaje: `Completa los campos del documento ${nombreDocumentoPdf} antes de firmarlo.`,
           metadata: {
             tipo: 'pendiente_rellenar',
             documentoGeneradoId: documentoGenerado.id,
@@ -342,7 +360,7 @@ export async function generarDocumentoDesdePlantilla(
           documentoId: documento.id,
           solicitadoPor: solicitadoPor,
           tipo: 'automatica',
-          mensaje: configuracion.mensajeFirma || `Por favor firma el documento: ${nombreDocumentoFinal}`,
+          mensaje: configuracion.mensajeFirma || `Por favor firma el documento: ${nombreDocumentoPdf}`,
           fechaLimite: configuracion.fechaLimiteFirma,
         },
       });
@@ -363,7 +381,7 @@ export async function generarDocumentoDesdePlantilla(
           usuarioId: empleado.usuarioId,
           tipo: 'warning',
           titulo: 'Documento pendiente de firma',
-          mensaje: configuracion.mensajeFirma || `Por favor firma el documento: ${nombreDocumentoFinal}`,
+          mensaje: configuracion.mensajeFirma || `Por favor firma el documento: ${nombreDocumentoPdf}`,
           metadata: {
             firmaId: solicitudFirma.id,
             documentoId: documento.id,
@@ -380,7 +398,7 @@ export async function generarDocumentoDesdePlantilla(
       empleadoId: empleadoId,
       empleadoNombre: `${empleado.nombre} ${empleado.apellidos}`,
       documentoId: documento.id,
-      documentoNombre: nombreDocumentoFinal,
+      documentoNombre: nombreDocumentoPdf,
       tiempoMs: tiempoTotal,
     };
   } catch (error) {

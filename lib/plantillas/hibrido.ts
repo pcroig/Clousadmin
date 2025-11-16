@@ -7,18 +7,10 @@
  * 3. El PDF resultante puede tener campos rellenables adicionales
  */
 
-import { promises as fs } from 'fs';
-import path from 'path';
-import os from 'os';
-import { randomUUID } from 'crypto';
-import { execFile } from 'child_process';
-import { promisify } from 'util';
 import { generarDocumentoDesdePlantilla } from './generar-documento';
 import { escanearPDFConVision, fusionarCamposDetectados } from './pdf-rellenable';
-import { subirDocumento, descargarDocumento } from '@/lib/s3';
+import { convertDocxFromS3ToPdf } from './docx-to-pdf';
 import { prisma } from '@/lib/prisma';
-
-const execFileAsync = promisify(execFile);
 
 export interface ConfiguracionHibrido {
   plantillaId: string;
@@ -81,7 +73,7 @@ export async function generarDocumentoHibrido(
     // 2. Convertir DOCX a PDF
     console.log(`[Híbrido] Convirtiendo DOCX a PDF...`);
 
-    const pdfS3Key = await convertirDOCXaPDF(resultadoDOCX.s3Key!);
+    const { pdfS3Key } = await convertDocxFromS3ToPdf(resultadoDOCX.s3Key!);
 
     // 3. Actualizar registro del documento con el PDF
     const documento = await prisma.documento.update({
@@ -134,72 +126,6 @@ export async function generarDocumentoHibrido(
  * 
  * Por ahora, esta función crea un PDF básico con el contenido del DOCX
  */
-export async function convertirDOCXaPDF(docxS3Key: string): Promise<string> {
-  console.log(`[DOCX→PDF] Convirtiendo ${docxS3Key} a PDF...`);
-
-  try {
-    // Descargar DOCX
-    const docxBuffer = await descargarDocumento(docxS3Key);
-
-    const libreOfficePath = process.env.LIBREOFFICE_PATH || 'soffice';
-    const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'clousadmin-docx-'));
-    const inputFile = path.join(tmpDir, `${randomUUID()}.docx`);
-    const outputFile = inputFile.replace(/\.docx$/, '.pdf');
-
-    try {
-      await fs.writeFile(inputFile, docxBuffer);
-
-      try {
-        await execFileAsync(libreOfficePath, [
-          '--headless',
-          '--convert-to',
-          'pdf',
-          '--outdir',
-          tmpDir,
-          inputFile,
-        ]);
-      } catch (commandError) {
-        const errorMessage =
-          commandError instanceof Error ? commandError.message : 'Error desconocido ejecutando LibreOffice';
-        if ((commandError as NodeJS.ErrnoException).code === 'ENOENT') {
-          throw new Error(
-            '[DOCX→PDF] LibreOffice no está disponible. Define la variable LIBREOFFICE_PATH o instala `soffice` en el servidor.'
-          );
-        }
-        throw new Error(`[DOCX→PDF] Error al convertir DOCX a PDF: ${errorMessage}`);
-      }
-
-      const pdfExists = await fs
-        .access(outputFile)
-        .then(() => true)
-        .catch(() => false);
-
-      if (!pdfExists) {
-        throw new Error('[DOCX→PDF] LibreOffice no generó el archivo PDF esperado');
-      }
-
-      const pdfBuffer = await fs.readFile(outputFile);
-
-      // Subir PDF a S3 (reemplazar extensión .docx con .pdf)
-      const pdfS3Key = docxS3Key.replace(/\.docx$/, '.pdf');
-      await subirDocumento(pdfBuffer, pdfS3Key, 'application/pdf');
-
-      console.log(`[DOCX→PDF] PDF generado y subido: ${pdfS3Key}`);
-      return pdfS3Key;
-    } finally {
-      // Limpieza de temporales
-      try {
-        await fs.rm(tmpDir, { recursive: true, force: true });
-      } catch (cleanupError) {
-        console.warn('[DOCX→PDF] No se pudo eliminar temporales:', cleanupError);
-      }
-    }
-  } catch (error) {
-    console.error('[DOCX→PDF] Error al convertir DOCX a PDF:', error);
-    throw error;
-  }
-}
-
 /**
  * Analizar DOCX con Vision para detectar campos potenciales antes de convertir a PDF
  * 
@@ -212,7 +138,7 @@ export async function analizarDOCXParaCampos(
 
   try {
     // Convertir temporalmente a PDF para análisis
-    const pdfS3Key = await convertirDOCXaPDF(docxS3Key);
+    const { pdfS3Key } = await convertDocxFromS3ToPdf(docxS3Key);
 
     // Detectar campos con IA
     const campos = await escanearPDFConVision(pdfS3Key);

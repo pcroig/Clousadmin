@@ -176,6 +176,69 @@
 - Notificaciones automáticas al empleado cuando se genera documento
 - Notificaciones de firma pendiente si requiereFirma = true
 
+#### 6. **Colas y Redis – Estado Actual (DOCX → PDF + Jobs)** (Actualizado)
+
+**Archivo**: `lib/plantillas/queue.ts`
+
+- Backend usa **BullMQ** + Redis para la cola `documentos-generacion`.
+- Configuración de conexión centralizada (`connection`) con:
+  - `enableOfflineQueue: false` → si Redis no está disponible no se acumulan comandos.
+  - `retryStrategy` limitada (máx. 5 intentos).
+- Se monitoriza la disponibilidad de Redis vía `cache.isAvailable()`:
+  - `checkRedisAvailability()` cachea el resultado en memoria (`availabilityChecked`, `redisAvailable`).
+  - Si Redis no está disponible, se deja trazado: `[Queue] Redis no disponible - colas deshabilitadas`.
+
+**Ejecución de jobs (estado actual):**
+
+- Función principal de orquestación: `agregarJobGeneracion(config: JobConfig)`.
+  - Siempre crea primero el registro `JobGeneracionDocumentos` en BD (`estado = 'en_cola'`).
+  - Llama a `checkRedisAvailability()`:
+    - Si Redis **está disponible**:
+      - Intenta encolar el job en BullMQ:
+        - `documentosQueue.add('generar-documentos', { jobId, ...config }, { jobId })`.
+      - Si el `add` falla con error de conexión (`ECONNREFUSED` / `connect`), cae al modo inmediato (ver abajo).
+    - Si Redis **no está disponible**, **no intenta encolar** y pasa directamente a modo inmediato.
+
+- **Modo inmediato sin Redis**: `procesarJobSinCola(jobId, config)`
+  - Pensado como fallback temporal mientras no se tenga Redis operativo a nivel plataforma.
+  - Cambia el job a `estado = 'procesando'` y recorre `config.empleadoIds` secuencialmente:
+    - Obtiene el formato de la plantilla:
+      - Si es `pdf_rellenable` lanza error explícito:
+        - `"La generación desde PDFs rellenables está desactivada. Solo se soportan plantillas DOCX con variables."`
+      - En caso contrario, llama a `generarDocumentoDesdePlantilla(...)`.
+    - Va acumulando `ResultadoGeneracion` (success/error) y actualizando en cada iteración:
+      - `progreso`, `procesados`, `exitosos`, `fallidos`, `resultados`.
+  - Al finalizar:
+    - Marca el job como `estado = 'completado'`, `progreso = 100`, `tiempoTotal`, etc.
+    - Crea una `Notificacion` al solicitante con resumen de éxitos/fallos.
+  - Si ocurre un error de nivel job (por ejemplo, plantilla no encontrada):
+    - Marca el job como `estado = 'fallido'`, guarda el mensaje en `error` y fecha `completadoEn`.
+    - Crea una notificación de tipo `error` con el detalle.
+
+**Workers BullMQ (cuando Redis esté operativo):**
+
+- `documentosQueue` y `documentosQueueEvents` se inicializan siempre, pero:
+  - Manejan errores de conexión silenciosamente (solo log de conexión rechazado una vez).
+- `documentosWorker`:
+  - Procesa jobs `generar-documentos` con concurrencia 2 y limitador de tasa.
+  - Lógica interna prácticamente equivalente a `procesarJobSinCola`:
+    - Mismos pasos de actualización de progreso, estados, notificaciones.
+  - Listeners:
+    - `completed` → log sencillo.
+    - `failed` → actualiza job a `estado = 'fallido'`, rellena `error`, notifica al solicitante.
+
+**Impacto para futuras mejoras de Redis (cuando lo soluciones a nivel plataforma):**
+
+- Todo el comportamiento específico de colas de plantillas está centralizado en `lib/plantillas/queue.ts`:
+  - Si en el futuro:
+    - Cambias el proveedor de Redis.
+    - Quieres desactivar el modo inmediato y hacer que falle si Redis no está.
+    - O quieres unificar la lógica con otras colas globales.
+  - Solo tendrás que tocar este archivo y, opcionalmente, cómo se resuelve `cache.isAvailable()` en `lib/redis.ts`.
+- Mientras tanto:
+  - Si Redis no está disponible, **la generación de documentos sigue funcionando** (modo síncrono).
+  - El usuario ve exactamente el mismo tracking en BD y notificaciones, solo que el trabajo se hace en el proceso HTTP en lugar de un worker separado.
+
 ### ⚠️ Lo que FALTA por Implementar
 
 #### 1. **UI de Generación de Documentos** (PRIORIDAD ALTA)

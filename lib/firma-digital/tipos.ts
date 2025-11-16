@@ -57,6 +57,7 @@ export interface CrearSolicitudFirmaInput {
   recordatorioAutomatico?: boolean;
   diasRecordatorio?: number;
   creadoPor?: string;
+  posicionFirma?: PosicionFirma;
 }
 
 /**
@@ -80,6 +81,16 @@ export interface DatosCapturadosFirma {
   certificadoData?: string; // Para certificado digital (Fase 3)
   firmaGuardadaUsada?: boolean; // Si se usó la firma guardada del empleado
   firmaGuardadaS3Key?: string; // S3 key de la firma usada (si aplica)
+  firmaImagenS3Key?: string; // Imagen capturada al firmar (canvas)
+  firmaImagenWidth?: number;
+  firmaImagenHeight?: number;
+  firmaImagenContentType?: string;
+}
+
+export interface PosicionFirma {
+  pagina: number;
+  x: number;
+  y: number;
 }
 
 /**
@@ -139,10 +150,12 @@ export interface OpcionesMarcaFirma {
   fechaFirma: string;
   tipoFirma: TipoFirma;
   certificadoHash?: string;
-  posicion?: {
-    pagina: number;
-    x: number;
-    y: number;
+  posicion?: PosicionFirma;
+  firmaImagen?: {
+    buffer: Buffer;
+    width?: number;
+    height?: number;
+    contentType?: string;
   };
 }
 

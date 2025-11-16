@@ -40,6 +40,9 @@ export type TipoNotificacion =
   | 'documento_solicitado'
   | 'documento_subido'
   | 'documento_rechazado'
+  // Firmas digitales
+  | 'firma_pendiente'
+  | 'firma_completada'
   // Denuncias
   | 'denuncia_recibida'
   | 'denuncia_actualizada';
@@ -357,6 +360,86 @@ export async function crearNotificacionAusenciaAutoAprobada(
       prioridad: 'normal',
       accionUrl: '/empleado/horario/ausencias',
       accionTexto: 'Ver ausencia',
+    },
+  });
+}
+
+// ========================================
+// FIRMAS DIGITALES
+// ========================================
+
+export async function crearNotificacionFirmaPendiente(
+  prisma: PrismaClient,
+  params: {
+    empresaId: string;
+    empleadoId: string;
+    firmaId: string;
+    solicitudId: string;
+    documentoId: string;
+    documentoNombre: string;
+  }
+) {
+  const { empresaId, empleadoId, firmaId, solicitudId, documentoId, documentoNombre } = params;
+
+  const usuarioIds = await obtenerUsuariosANotificar(prisma, empresaId, {
+    empleado: empleadoId,
+  });
+
+  await crearNotificaciones(prisma, {
+    empresaId,
+    usuarioIds,
+    tipo: 'firma_pendiente',
+    titulo: 'Documento pendiente de firma',
+    mensaje: `Tienes un documento pendiente: ${documentoNombre}.`,
+    metadata: {
+      firmaId,
+      solicitudId,
+      documentoId,
+      documentoNombre,
+      prioridad: 'alta',
+      icono: 'firma',
+      accionTexto: 'Firmar documento',
+      accionUrl: '/empleado/mi-espacio/documentos?tab=firmas',
+      url: '/empleado/mi-espacio/documentos?tab=firmas',
+    },
+  });
+}
+
+export async function crearNotificacionFirmaCompletada(
+  prisma: PrismaClient,
+  params: {
+    empresaId: string;
+    solicitudId: string;
+    documentoId: string;
+    documentoNombre: string;
+    usuarioDestinoId?: string | null;
+    pdfFirmadoS3Key?: string | null;
+  }
+) {
+  const { empresaId, solicitudId, documentoId, documentoNombre, usuarioDestinoId, pdfFirmadoS3Key } = params;
+
+  const usuarioIds = usuarioDestinoId ? [usuarioDestinoId] : await obtenerUsuariosANotificar(prisma, empresaId, { hrAdmin: true });
+
+  if (!usuarioIds.length) {
+    return;
+  }
+
+  await crearNotificaciones(prisma, {
+    empresaId,
+    usuarioIds,
+    tipo: 'firma_completada',
+    titulo: 'Documento firmado',
+    mensaje: `El documento ${documentoNombre} ya fue firmado por todos los participantes.`,
+    metadata: {
+      solicitudId,
+      documentoId,
+      documentoNombre,
+      pdfFirmadoS3Key,
+      icono: 'firma',
+      prioridad: 'normal',
+      accionTexto: 'Ver documento',
+      accionUrl: '/hr/documentos',
+      url: '/hr/documentos',
     },
   });
 }

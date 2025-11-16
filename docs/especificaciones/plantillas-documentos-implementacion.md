@@ -201,6 +201,20 @@ npx prisma generate
 
 ## 3. Implementación de Utilidades
 
+### 3.0 `lib/plantillas/docx-to-pdf.ts`
+
+**Regla de negocio clave:** todos los documentos que se visualizan o se firman en Clousadmin deben estar en PDF, aunque la fuente original sea un DOCX.  
+Para garantizarlo existe una capa única de conversión (`lib/plantillas/docx-to-pdf.ts`) que:
+
+- Descarga el DOCX (o recibe el buffer en memoria), ejecuta LibreOffice (`soffice --headless`) y genera un PDF fiel.
+- Permite definir `LIBREOFFICE_PATH` cuando el binario no está en el `PATH`.
+- Proporciona dos funciones:
+  - `convertDocxBufferToPdf(buffer, options?)`: retorna un `Buffer` con el PDF listo para guardarse.
+  - `convertDocxFromS3ToPdf(docxS3Key, options?)`: reutiliza la anterior, sube el PDF a S3 y devuelve la nueva `s3Key`.
+- Es la **única** forma admitida de obtener un PDF firmable desde una plantilla DOCX y se debe invocar inmediatamente después de renderizar el DOCX con `docxtemplater`.
+
+> Nota: la firma digital (SolicitudFirma/Firma) siempre usa el PDF generado por esta capa; el DOCX se puede conservar como referencia (metadatos, auditoría) pero no se expone para firma.
+
 ### 3.1 `lib/plantillas/tipos.ts`
 
 ```typescript
@@ -1858,11 +1872,41 @@ export async function generarDocumentoDesdeContrato(
 
 ---
 
+## 8. QA Manual y Limitaciones MVP
+
+### 8.1 Plan de pruebas manuales
+
+1. **Generación básica sin firma**
+   - Subir una plantilla DOCX con variables.
+   - Generar documento para un empleado sin `requiereFirma`.
+   - Confirmar en `/hr/documentos` que el archivo resultante es PDF (iframe del navegador) y que en la base de datos `documentos.datosExtraidos` contiene `origenDocx` con la `s3Key` original.
+2. **Generación con firma automática**
+   - Activar `requiereFirma` en la plantilla o en la configuración de generación.
+   - Tras generar, verificar que existe `SolicitudFirma` apuntando al documento PDF y que `GET /api/firma/solicitudes/[id]/pdf-firmado` devuelve un PDF con marcas tras completar todas las firmas.
+3. **Solicitud manual (HR)**
+   - Crear un documento PDF manual en una carpeta HR.
+   - Ejecutar `POST /api/firma/solicitudes` para ese documento y validar que se crea la solicitud.
+   - Repetir el POST con un documento DOCX y comprobar que responde con el error “Solo se pueden solicitar firmas sobre documentos PDF”.
+4. **Firma guardada del empleado**
+   - Guardar firma mediante `POST /api/empleados/firma`.
+   - Firmar un documento y revisar que el certificado contiene `firmaGuardadaUsada = true`.
+
+### 8.2 Limitaciones MVP
+
+- La firma digital únicamente soporta PDF. Si el documento original es DOCX, debe pasar por `convertDocxFromS3ToPdf` antes de solicitar la firma.
+- Los documentos DOCX subidos manualmente todavía se pueden descargar, pero no se pueden firmar hasta que exista un flujo de conversión en la UI.
+- El visor fiel depende del motor PDF del navegador; la previsualización de plantillas (DOCX) sigue siendo simplificada.
+- La conversión requiere LibreOffice (`soffice`) instalado en el entorno de generación. Si no está presente se lanzará un error guiando la configuración de `LIBREOFFICE_PATH`.
+
+---
+
 **FIN DE LA GUÍA DE IMPLEMENTACIÓN**
 
 **Versión**: 1.0.0  
 **Última actualización**: 12 de Noviembre 2025  
 **Proyecto**: Clousadmin
+
+
 
 
 

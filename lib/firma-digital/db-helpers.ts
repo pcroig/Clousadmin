@@ -17,8 +17,10 @@ import type {
   CrearSolicitudFirmaInput,
   DatosCapturadosFirma,
   EstadoSolicitudFirmaDetallado,
+  PosicionFirma,
   ResultadoFirma,
 } from '@/lib/firma-digital';
+import { crearNotificacionFirmaPendiente, crearNotificacionFirmaCompletada } from '@/lib/notificaciones';
 
 // Re-export types for API convenience
 export type {
@@ -70,6 +72,7 @@ export async function crearSolicitudFirma(input: CrearSolicitudFirmaInput) {
       nombre: true,
       s3Key: true,
       empresaId: true,
+      mimeType: true,
     },
   });
 
@@ -79,6 +82,10 @@ export async function crearSolicitudFirma(input: CrearSolicitudFirmaInput) {
 
   if (documento.empresaId !== empresaId) {
     throw new Error('El documento no pertenece a esta empresa');
+  }
+
+  if (documento.mimeType !== 'application/pdf') {
+    throw new Error('Solo se pueden solicitar firmas sobre documentos PDF.');
   }
 
   // Descargar documento y generar hash
@@ -98,6 +105,7 @@ export async function crearSolicitudFirma(input: CrearSolicitudFirmaInput) {
       diasRecordatorio,
       nombreDocumento: documento.nombre,
       hashDocumento,
+      posicionFirma,
       estado: 'pendiente',
       creadoPor,
     },
@@ -116,6 +124,27 @@ export async function crearSolicitudFirma(input: CrearSolicitudFirmaInput) {
   await prisma.firma.createMany({
     data: firmasData,
   });
+
+  const firmasCreadas = await prisma.firma.findMany({
+    where: { solicitudFirmaId: solicitud.id },
+    select: {
+      id: true,
+      empleadoId: true,
+    },
+  });
+
+  await Promise.all(
+    firmasCreadas.map((firmaPendiente) =>
+      crearNotificacionFirmaPendiente(prisma, {
+        empresaId,
+        empleadoId: firmaPendiente.empleadoId,
+        firmaId: firmaPendiente.id,
+        solicitudId: solicitud.id,
+        documentoId: documento.id,
+        documentoNombre: documento.nombre,
+      })
+    )
+  );
 
   // 4. Actualizar documento para indicar que requiere firma
   await prisma.documento.update({
@@ -239,6 +268,10 @@ export async function firmarDocumento(
     }
   }
 
+  if (firma.solicitudFirma.documento.mimeType !== 'application/pdf') {
+    throw new Error('Solo se pueden firmar documentos PDF generados desde plantillas.');
+  }
+
   // 4. Validar integridad del documento
   const documentoBuffer = await downloadFromS3(firma.solicitudFirma.documento.s3Key);
   const validacion = validarIntegridadDocumento(
@@ -275,6 +308,8 @@ export async function firmarDocumento(
       datosCapturados,
       ipAddress: datosCapturados.ip,
       certificadoHash: certificado.certificadoHash,
+      metodoCaptura: datosCapturados.tipo,
+      metodoFirma: datosCapturados.tipo,
     },
   });
 
@@ -316,7 +351,11 @@ export async function firmarDocumento(
             solicitudFirmaId: firma.solicitudFirmaId,
             firmado: true,
           },
-          include: {
+          select: {
+            firmadoEn: true,
+            tipo: true,
+            certificadoHash: true,
+            datosCapturados: true,
             empleado: {
               select: {
                 nombre: true,
@@ -324,19 +363,56 @@ export async function firmarDocumento(
               },
             },
           },
-          orderBy: { firmadoEn: 'asc' }, // Orden cronológico
+          orderBy: { firmadoEn: 'asc' },
         });
 
-        // Generar marcas de firma para cada firmante
-        const marcas = firmasCompletadas.map((f: any) => ({
-          nombreFirmante: `${f.empleado.nombre} ${f.empleado.apellidos}`,
-          fechaFirma: f.firmadoEn?.toLocaleString('es-ES', {
-            dateStyle: 'short',
-            timeStyle: 'short',
-          }) || 'N/A',
-          tipoFirma: f.tipo,
-          certificadoHash: f.certificadoHash,
-        }));
+        // Generar marcas de firma para cada firmante (incluyendo imagen manuscrita si existe)
+        const posicionBase = (firma.solicitudFirma.posicionFirma as PosicionFirma | null) ?? null;
+
+        const marcas = await Promise.all(
+          firmasCompletadas.map(async (f, index) => {
+            const capturados = (f.datosCapturados as DatosCapturadosFirma | null) ?? null;
+            let firmaImagenBuffer: Buffer | undefined;
+            let firmaImagenWidth = capturados?.firmaImagenWidth;
+            let firmaImagenHeight = capturados?.firmaImagenHeight;
+            let firmaImagenContentType = capturados?.firmaImagenContentType;
+
+            const firmaImagenKey = capturados?.firmaImagenS3Key || capturados?.firmaGuardadaS3Key;
+            if (firmaImagenKey) {
+              try {
+                firmaImagenBuffer = await downloadFromS3(firmaImagenKey);
+              } catch (error) {
+                console.error('[firmarDocumento] No se pudo descargar imagen de firma:', error);
+              }
+            }
+
+            return {
+              nombreFirmante: `${f.empleado.nombre} ${f.empleado.apellidos}`,
+              fechaFirma:
+                f.firmadoEn?.toLocaleString('es-ES', {
+                  dateStyle: 'short',
+                  timeStyle: 'short',
+                }) || 'N/A',
+              tipoFirma: f.tipo,
+              certificadoHash: f.certificadoHash,
+               posicion: posicionBase
+                ? {
+                    pagina: posicionBase.pagina,
+                    x: posicionBase.x,
+                    y: posicionBase.y + index * 140,
+                  }
+                : undefined,
+              firmaImagen: firmaImagenBuffer
+                ? {
+                    buffer: firmaImagenBuffer,
+                    width: firmaImagenWidth ?? 180,
+                    height: firmaImagenHeight ?? 60,
+                    contentType: firmaImagenContentType,
+                  }
+                : undefined,
+            };
+          })
+        );
 
         // Aplicar marcas al PDF
         const pdfConMarcas = await anadirMarcasFirmasPDF(documentoBuffer, marcas);
@@ -348,11 +424,20 @@ export async function firmarDocumento(
         await uploadToS3(pdfConMarcas, pdfFirmadoS3Key, 'application/pdf');
 
         // Actualizar solicitud con ubicación del PDF firmado
-        await prisma.solicitudFirma.update({
+        const solicitudActualizada = await prisma.solicitudFirma.update({
           where: { id: firma.solicitudFirmaId },
           data: {
             pdfFirmadoS3Key,
           },
+        });
+
+        await crearNotificacionFirmaCompletada(prisma, {
+          empresaId: solicitudActualizada.empresaId,
+          solicitudId: solicitudActualizada.id,
+          documentoId: solicitudActualizada.documentoId,
+          documentoNombre: solicitudActualizada.nombreDocumento,
+          usuarioDestinoId: solicitudActualizada.creadoPor,
+          pdfFirmadoS3Key,
         });
       }
     } catch (error) {

@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
+import { NOMINA_ESTADO_LABELS, NOMINA_ESTADOS } from '@/lib/constants/nomina-estados';
 
 interface NominaDetailsClientProps {
   nomina: {
@@ -100,13 +101,10 @@ const meses = [
   'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
 ];
 
-const estadosLabels: Record<string, { label: string; color: string }> = {
-  pre_nomina: { label: 'Pre-nómina', color: 'bg-blue-100 text-blue-700' },
-  complementos_pendientes: { label: 'Complementos Pendientes', color: 'bg-orange-100 text-orange-700' },
-  lista_exportar: { label: 'Lista Exportar', color: 'bg-purple-100 text-purple-700' },
-  exportada: { label: 'Exportada', color: 'bg-indigo-100 text-indigo-700' },
-  definitiva: { label: 'Definitiva', color: 'bg-green-100 text-green-700' },
-  publicada: { label: 'Publicada', color: 'bg-gray-900 text-white' },
+const estadoBadgeStyles: Record<string, string> = {
+  [NOMINA_ESTADOS.PENDIENTE]: 'bg-orange-50 text-orange-700',
+  [NOMINA_ESTADOS.COMPLETADA]: 'bg-green-50 text-green-700',
+  [NOMINA_ESTADOS.PUBLICADA]: 'bg-gray-900 text-white',
 };
 
 const tiposAusenciaLabels: Record<string, string> = {
@@ -126,9 +124,14 @@ export function NominaDetailsClient({ nomina, ausencias }: NominaDetailsClientPr
     .filter((nombre): nombre is string => Boolean(nombre));
   const equiposLabel = equiposEmpleado.length > 0 ? equiposEmpleado.join(', ') : '-';
 
-  const estadoInfo = estadosLabels[nomina.estado] || {
+  const estadoInfo = NOMINA_ESTADO_LABELS[nomina.estado]
+    ? {
+        label: NOMINA_ESTADO_LABELS[nomina.estado].label,
+        color: estadoBadgeStyles[nomina.estado] || 'bg-gray-100 text-gray-700',
+      }
+    : {
     label: nomina.estado,
-    color: 'bg-gray-100 text-gray-700'
+        color: 'bg-gray-100 text-gray-700',
   };
 
   const handleDownloadPDF = async () => {

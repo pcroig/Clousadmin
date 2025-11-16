@@ -87,10 +87,6 @@ export function EmpleadoDashboardClient({
               />
             </div>
 
-            {/* Widget vacío - Hidden on mobile */}
-            <div className="min-h-[240px] h-full hidden lg:block">
-              {/* Por ahora vacío */}
-            </div>
           </div>
         </div>
       </div>

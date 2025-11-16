@@ -30,6 +30,10 @@ import { AlertasSummary } from '@/components/payroll/alertas-summary';
 import { Checkbox } from '@/components/ui/checkbox';
 import { DetailsPanel } from '@/components/shared/details-panel';
 import {
+  EVENTO_ESTADOS,
+  NOMINA_ESTADO_LABELS,
+} from '@/lib/constants/nomina-estados';
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -122,38 +126,34 @@ const meses = [
 ];
 
 const workflowSteps = [
-  { key: 'completando', title: 'Completando', tooltip: 'Complementos y horas extra' },
-  { key: 'pre_nomina', title: 'Pre-nómina', tooltip: 'Generada y lista para exportar o importar' },
-  { key: 'publicada', title: 'Publicada', tooltip: 'Notificada a empleados' },
+  {
+    key: 'pendiente',
+    title: 'Pendiente',
+    tooltip: 'Complementos y alertas opcionales',
+  },
+  {
+    key: 'completada',
+    title: 'Completada',
+    tooltip: 'Complementos revisados (opcional)',
+  },
+  {
+    key: 'publicada',
+    title: 'Publicada',
+    tooltip: 'PDF importados y notificados',
+  },
 ];
 
-const getStepIndexFromState = (estado: string, evento: EventoNomina): number => {
-  // Workflow de 3 pasos:
-  // 1. Completando (generando, complementos_pendientes)
-  // 2. Pre-nómina (lista_exportar, exportada, definitiva) - listas para exportar o ya exportadas
-  // 3. Publicada (definitiva importada o ya publicada)
-
-  if (evento.fechaPublicacion || evento.fechaImportacion || estado === 'publicada') {
+const getStepIndexFromState = (evento: EventoNomina): number => {
+  if (evento.estado === EVENTO_ESTADOS.CERRADO) {
     return 3;
   }
 
-  if (
-    evento.fechaGeneracion &&
-    (['lista_exportar', 'exportada', 'definitiva'].includes(estado) || !!evento.fechaExportacion)
-  ) {
+  const tienePendientes = (evento.nominasConComplementosPendientes ?? 0) > 0;
+  if (!tienePendientes) {
     return 2;
   }
 
   return 1;
-};
-
-const estadosNominaLabels: Record<string, { label: string; color: string }> = {
-  pre_nomina: { label: 'Pre-nómina', color: 'text-gray-600' },
-  complementos_pendientes: { label: 'Complementos Pendientes', color: 'text-orange-600' },
-  lista_exportar: { label: 'Lista Exportar', color: 'text-yellow-600' },
-  exportada: { label: 'Exportada', color: 'text-gray-600' },
-  definitiva: { label: 'Definitiva', color: 'text-green-600' },
-  publicada: { label: 'Publicada', color: 'text-gray-900' },
 };
 
 export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
@@ -174,9 +174,8 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
   } | null>(null);
   const [selectedNominaId, setSelectedNominaId] = useState<string | null>(null);
   const [selectedEventoId, setSelectedEventoId] = useState<string | null>(null);
-  const [autoGenerarEvento, setAutoGenerarEvento] = useState(true);
-  const [compensarHorasEnCreacion, setCompensarHorasEnCreacion] = useState(false);
-  const [validarComplementosEnCreacion, setValidarComplementosEnCreacion] = useState(false);
+  const [abrirCompensarTrasCreacion, setAbrirCompensarTrasCreacion] = useState(false);
+  const [abrirValidarTrasCreacion, setAbrirValidarTrasCreacion] = useState(false);
 
   const nombreMes = meses[mesActual - 1];
 
@@ -208,7 +207,6 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
         body: JSON.stringify({
           mes: mesActual,
           anio: anioActual,
-          autoGenerarPrenominas: autoGenerarEvento,
         }),
       });
 
@@ -218,10 +216,8 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
         throw new Error(data.error || 'Error al generar evento');
       }
 
-      // Si se pidió auto-generar, hacer los pasos adicionales
-      if (autoGenerarEvento && data.evento) {
-        // Si se pidió compensar horas, abrir el dialog
-        if (compensarHorasEnCreacion) {
+      if (data.evento?.id) {
+        if (abrirCompensarTrasCreacion) {
           setEventoCompensarContext({
             eventoId: data.evento.id,
             mes: mesActual,
@@ -230,22 +226,15 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
           setShowCompensarHorasDialog(true);
         }
 
-        // Si se pidió validar complementos, abrir el dialog
-        if (validarComplementosEnCreacion) {
+        if (abrirValidarTrasCreacion) {
           setEventoIdParaValidar(data.evento.id);
           setShowValidarComplementosDialog(true);
         }
       }
 
-      if (data.autoGeneradas === false) {
-        toast.success('Evento creado sin generar pre-nóminas', {
-          description: 'Podrás generarlas cuando lo necesites desde la tarjeta del evento.',
-        });
-      } else {
-      toast.success(`Pre-nóminas generadas: ${data.nominasGeneradas} nóminas`, {
-        description: `${data.notificacionesEnviadas} managers notificados`,
+      toast.success('Evento generado correctamente', {
+        description: `${data.nominasGeneradas ?? 0} pre-nómina(s) creadas`,
       });
-      }
 
       setShowCreateEventDialog(false);
       if (data.evento?.id) {
@@ -258,43 +247,6 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
       toast.error(error instanceof Error ? error.message : 'Error al generar evento');
     } finally {
       setIsGenerating(false);
-    }
-  };
-
-  const handleGenerarPrenominas = async (eventoId: string) => {
-    const actionKey = `${eventoId}:generar`;
-    try {
-      setActionLoading(actionKey);
-
-      const response = await fetch(`/api/nominas/eventos/${eventoId}/generar-prenominas`, {
-        method: 'POST',
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Error al generar pre-nóminas');
-      }
-
-      const mensajeToast =
-        data.nominasGeneradas > 0
-          ? data.recalculado
-            ? `${data.nominasGeneradas} pre-nómina(s) recalculada(s)`
-            : `${data.nominasGeneradas} pre-nómina(s) generada(s)`
-          : data.message || 'No se generaron pre-nóminas';
-
-      toast.success(mensajeToast, {
-        description: data.alertasGeneradas
-          ? `${data.alertasGeneradas} alerta(s) detectada(s)`
-          : data.message,
-      });
-
-      fetchEventos();
-    } catch (error) {
-      console.error('Error generando pre-nóminas:', error);
-      toast.error(error instanceof Error ? error.message : 'Error al generar pre-nóminas');
-    } finally {
-      setActionLoading(null);
     }
   };
 
@@ -452,47 +404,6 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
     }
   };
 
-  const handleAvanzarEstado = async (eventoId: string, estadoActual: string) => {
-    const nextEstadoMap: Record<string, string> = {
-      complementos_pendientes: 'lista_exportar',
-    };
-
-    const siguienteEstado = nextEstadoMap[estadoActual];
-    if (!siguienteEstado) {
-      return;
-    }
-
-    const actionKey = `${eventoId}:avanzar`;
-
-    try {
-      setActionLoading(actionKey);
-
-      const response = await fetch(`/api/nominas/eventos/${eventoId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ estado: siguienteEstado }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'No se pudo avanzar al siguiente estado');
-      }
-
-      toast.success(
-        `Evento actualizado a ${
-          estadosNominaLabels[siguienteEstado]?.label ?? siguienteEstado
-        }`
-      );
-      fetchEventos();
-    } catch (error) {
-      console.error('Error avanzando estado:', error);
-      toast.error(error instanceof Error ? error.message : 'Error al avanzar de estado');
-    } finally {
-      setActionLoading(null);
-    }
-  };
-
   if (loading) {
     return (
       <div className="h-full flex items-center justify-center">
@@ -590,39 +501,28 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
               const tieneComplementos =
                 evento.tieneComplementos ?? evento.empleadosConComplementos > 0;
 
-              // Lógica de botones según flujo:
-              // - En paso 1 (Completando): generar, revisar complementos, compensar horas, importar
-              // - En paso 2 (Pre-nómina): exportar/importar
-              // - En paso 3 (Publicada): sin acciones
-              const mostrarGenerarPrenominas = stepIndex === 1;
-              const puedeGenerarPrenominas =
-                mostrarGenerarPrenominas &&
-                ['generando', 'complementos_pendientes'].includes(evento.estado);
-              const etiquetaGenerarPrenominas = evento.fechaGeneracion
-                ? 'Recalcular Pre-nóminas'
-                : 'Generar Pre-nóminas';
+              const eventoAbierto = evento.estado !== EVENTO_ESTADOS.CERRADO;
 
-              const mostrarRevisarComplementos = stepIndex === 1;
-              const puedeRevisarComplementos = tieneComplementos && Boolean(evento.fechaGeneracion);
+              const mostrarRevisarComplementos = eventoAbierto && tieneComplementos;
+              const puedeRevisarComplementos = mostrarRevisarComplementos;
 
-              const mostrarCompensarHoras = stepIndex === 1;
-              const puedeCompensarHoras = Boolean(evento.fechaGeneracion);
+              const mostrarCompensarHoras = eventoAbierto;
+              const puedeCompensarHoras = eventoAbierto;
 
-              const mostrarExportarPrenominas = stepIndex === 2;
-              const puedeExportarPrenominas = !evento.fechaExportacion;
+              const mostrarExportarPrenominas = eventoAbierto;
+              const puedeExportarPrenominas = eventoAbierto;
 
-              const mostrarImportarNominas = stepIndex <= 2;
-              const puedeImportarNominas = Boolean(evento.fechaGeneracion);
+              const mostrarImportarNominas = eventoAbierto;
+              const puedeImportarNominas = eventoAbierto && evento._count.nominas > 0;
 
               // Calcular información contextual según el paso actual
-              const enPasoCompletando = stepIndex === 1;
+              const enPasoPendiente = stepIndex === 1;
               const fechaPasoTres = evento.fechaPublicacion ?? evento.fechaImportacion;
               const labelPasoTres = evento.fechaPublicacion ? 'Publicada' : 'Importada';
               const primaryActionClass =
                 'bg-gray-900 text-white hover:bg-gray-800 focus-visible:ring-gray-900 focus-visible:ring-offset-2';
 
               const complementosInfo = {
-                prenominasGeneradas: Boolean(evento.fechaGeneracion),
                 tieneComplementos,
                 empleadosConComplementos: evento.empleadosConComplementos || 0,
                 totalEmpleados: evento.totalEmpleados || 0,
@@ -652,15 +552,11 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
 
                       {/* Información contextual según el estado */}
                       <div className="flex-1 flex flex-col items-end gap-1">
-                        {/* Paso "Completando": Mostrar estado de complementos, horas extra y alertas */}
-                        {enPasoCompletando && (
+                        {/* Paso "Pendiente": Mostrar estado de complementos, horas extra y alertas */}
+                        {enPasoPendiente && (
                           <div className="flex flex-col gap-1 items-end text-right">
                             <div className="flex items-center gap-1 text-xs text-gray-600">
-                              {!complementosInfo.prenominasGeneradas ? (
-                                <span className="text-gray-500">
-                                  Pre-nóminas pendientes de generar
-                                </span>
-                              ) : complementosInfo.tieneComplementos ? (
+                              {complementosInfo.tieneComplementos ? (
                                 complementosInfo.nominasPendientes > 0 ? (
                                   <>
                                     <AlertTriangle className="w-3.5 h-3.5 text-orange-600" />
@@ -673,7 +569,7 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
                                   <>
                                     <CheckCircle className="w-3.5 h-3.5 text-green-600" />
                                     <span className="text-green-700">
-                                      Complementos listos para {complementosInfo.totalNominas} nómina
+                                      Complementos revisados para {complementosInfo.totalNominas} nómina
                                       {complementosInfo.totalNominas !== 1 ? 's' : ''}
                                     </span>
                                   </>
@@ -765,128 +661,92 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
                       </Stepper>
                       </div>
 
-                    {(stepIndex === 1 || stepIndex === 2) && (
+                    {eventoAbierto && (
                       <div className="mt-4 flex flex-wrap gap-3">
-                        {stepIndex === 1 ? (
-                          <>
-                            {mostrarGenerarPrenominas && (
+                        {mostrarRevisarComplementos && (
                         <Button
                           size="sm"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleGenerarPrenominas(evento.id);
-                                }}
-                                disabled={!puedeGenerarPrenominas || isProcessing}
-                                className={`flex-1 min-w-[190px] justify-center ${primaryActionClass}`}
+                          variant="outline"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setEventoIdParaValidar(evento.id);
+                              setShowValidarComplementosDialog(true);
+                            }}
+                            disabled={!puedeRevisarComplementos || isProcessing}
+                            className="flex-1 min-w-[190px] justify-between"
+                          >
+                            <div className="flex items-center gap-2">
+                              <ListChecks className="w-4 h-4" />
+                              <span>Validar complementos</span>
+                            </div>
+                            {complementosPendientesNominas > 0 && (
+                              <span className="text-xs text-orange-600 font-medium">
+                                {complementosPendientesNominas} pendientes
+                              </span>
+                            )}
+                        </Button>
+                        )}
+
+                        {mostrarCompensarHoras && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setEventoCompensarContext({
+                                eventoId: evento.id,
+                                mes: evento.mes,
+                                anio: evento.anio,
+                              });
+                              setShowCompensarHorasDialog(true);
+                            }}
+                            disabled={!puedeCompensarHoras || isProcessing}
+                            className="flex-1 min-w-[190px] justify-between"
+                          >
+                            <div className="flex items-center gap-2">
+                              <Clock className="w-4 h-4" />
+                              <span>Compensar horas</span>
+                            </div>
+                            {horasExtraInfo.horasPendientes > 0 && (
+                              <span className="text-xs text-orange-600 font-medium">
+                                {horasExtraInfo.horasPendientes.toFixed(1)}h pendientes
+                              </span>
+                            )}
+                        </Button>
+                        )}
+
+                        {mostrarExportarPrenominas && (
+                        <Button
+                          size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleExportar(evento);
+                            }}
+                            disabled={!puedeExportarPrenominas || isProcessing}
+                            className={`flex-1 min-w-[200px] justify-center ${primaryActionClass}`}
                         >
-                          <FileText className="w-4 h-4 mr-2" />
-                                {etiquetaGenerarPrenominas}
+                          <Download className="w-4 h-4 mr-2" />
+                            Exportar Pre-nóminas
                         </Button>
-                            )}
+                        )}
 
-                            {mostrarRevisarComplementos && (
+                        {mostrarImportarNominas && (
                         <Button
                           size="sm"
                           variant="outline"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setEventoIdParaValidar(evento.id);
-                                  setShowValidarComplementosDialog(true);
-                                }}
-                                disabled={!puedeRevisarComplementos || isProcessing}
-                                className="flex-1 min-w-[190px] justify-between"
-                              >
-                                <div className="flex items-center gap-2">
-                                  <ListChecks className="w-4 h-4" />
-                                  <span>Validar complementos</span>
-                                </div>
-                                {complementosPendientesNominas > 0 && (
-                                  <span className="text-xs text-orange-600 font-medium">
-                                    {complementosPendientesNominas} pendientes
-                                  </span>
-                                )}
-                        </Button>
-                            )}
-
-                            {mostrarCompensarHoras && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setEventoCompensarContext({
-                                    eventoId: evento.id,
-                                    mes: evento.mes,
-                                    anio: evento.anio,
-                                  });
-                                  setShowCompensarHorasDialog(true);
-                                }}
-                                disabled={!puedeCompensarHoras || isProcessing}
-                                className="flex-1 min-w-[190px] justify-between"
-                              >
-                                <div className="flex items-center gap-2">
-                                  <Clock className="w-4 h-4" />
-                                  <span>Compensar horas</span>
-                                </div>
-                                {horasExtraInfo.horasPendientes > 0 && (
-                                  <span className="text-xs text-orange-600 font-medium">
-                                    {horasExtraInfo.horasPendientes.toFixed(1)}h pendientes
-                                  </span>
-                                )}
-                        </Button>
-                            )}
-
-                            {mostrarImportarNominas && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleImportar(evento.id);
-                                }}
-                                disabled={!puedeImportarNominas || isProcessing}
-                                className="flex-1 min-w-[190px] justify-center"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleImportar(evento.id);
+                            }}
+                            disabled={!puedeImportarNominas || isProcessing}
+                            className="flex-1 min-w-[190px] justify-center"
                         >
                           <Upload className="w-4 h-4 mr-2" />
-                                Importar Nóminas
+                            Importar Nóminas
                         </Button>
-                            )}
-                          </>
-                        ) : (
-                          <>
-                            {mostrarExportarPrenominas && (
-                        <Button
-                          size="sm"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleExportar(evento);
-                                }}
-                                disabled={!puedeExportarPrenominas || isProcessing}
-                                className={`flex-1 min-w-[200px] justify-center ${primaryActionClass}`}
-                              >
-                                <Download className="w-4 h-4 mr-2" />
-                                Exportar Pre-nóminas
-                        </Button>
-                            )}
-                            {mostrarImportarNominas && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleImportar(evento.id);
-                                }}
-                                disabled={!puedeImportarNominas || isProcessing}
-                                className="flex-1 min-w-[190px] justify-center"
-                              >
-                                <Upload className="w-4 h-4 mr-2" />
-                                Importar Nóminas
-                              </Button>
-                            )}
-                          </>
                         )}
-                          </div>
-                        )}
+                      </div>
+                    )}
                       </div>
                 </Card>
               );
@@ -906,75 +766,53 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
           </DialogHeader>
 
           <div className="space-y-6 py-4">
-            {/* Opción: Auto-generar pre-nóminas */}
+            <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700">
+              Las pre-nóminas se generan automáticamente para todos los empleados activos.
+              Puedes completar complementos, compensar horas o importar PDFs cuando quieras.
+            </div>
+
             <div className="flex items-start gap-3">
               <Checkbox
-                id="auto-generar-modal"
-                checked={autoGenerarEvento}
-                onCheckedChange={(checked) => setAutoGenerarEvento(Boolean(checked))}
+                id="compensar-horas-modal"
+                checked={abrirCompensarTrasCreacion}
+                onCheckedChange={(checked) =>
+                  setAbrirCompensarTrasCreacion(Boolean(checked))
+                }
               />
               <div className="flex-1">
                 <label
-                  htmlFor="auto-generar-modal"
+                  htmlFor="compensar-horas-modal"
                   className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
                 >
-                  Generar pre-nóminas automáticamente
+                  Abrir compensación de horas extra al crear el evento
                 </label>
                 <p className="text-xs text-gray-500 mt-1">
-                  Se generarán las pre-nóminas para todos los empleados activos inmediatamente
+                  Abre automáticamente el diálogo para revisar la bolsa de horas del mes.
                 </p>
-                        </div>
+              </div>
             </div>
 
-            {/* Opciones adicionales (solo si auto-generar está activado) */}
-            {autoGenerarEvento && (
-              <>
-                {/* Opción: Compensar horas */}
-                <div className="flex items-start gap-3 pl-7">
-                  <Checkbox
-                    id="compensar-horas-modal"
-                    checked={compensarHorasEnCreacion}
-                    onCheckedChange={(checked) =>
-                      setCompensarHorasEnCreacion(Boolean(checked))
-                    }
-                  />
-                  <div className="flex-1">
-                    <label
-                      htmlFor="compensar-horas-modal"
-                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-                    >
-                      Compensar horas extra (Bolsa de horas)
-                    </label>
-                    <p className="text-xs text-gray-500 mt-1">
-                      Abrirá un diálogo para gestionar las compensaciones de horas extra del mes
-                    </p>
-                          </div>
-                      </div>
-
-                {/* Opción: Validar complementos */}
-                <div className="flex items-start gap-3 pl-7">
-                  <Checkbox
-                    id="validar-complementos-modal"
-                    checked={validarComplementosEnCreacion}
-                    onCheckedChange={(checked) =>
-                      setValidarComplementosEnCreacion(Boolean(checked))
-                    }
-                  />
-                  <div className="flex-1">
-                    <label
-                      htmlFor="validar-complementos-modal"
-                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-                    >
-                      Validar complementos
-                    </label>
-                    <p className="text-xs text-gray-500 mt-1">
-                      Abrirá un diálogo para validar o rechazar los complementos pendientes
-                    </p>
-                    </div>
-                </div>
-              </>
-            )}
-                  </div>
+            <div className="flex items-start gap-3">
+              <Checkbox
+                id="validar-complementos-modal"
+                checked={abrirValidarTrasCreacion}
+                onCheckedChange={(checked) =>
+                  setAbrirValidarTrasCreacion(Boolean(checked))
+                }
+              />
+              <div className="flex-1">
+                <label
+                  htmlFor="validar-complementos-modal"
+                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                >
+                  Abrir validación de complementos tras crear el evento
+                </label>
+                <p className="text-xs text-gray-500 mt-1">
+                  Accede directamente al flujo de revisión de complementos.
+                </p>
+              </div>
+            </div>
+          </div>
 
           <DialogFooter>
             <Button
@@ -983,7 +821,7 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
               disabled={isGenerating}
             >
               Cancelar
-            </Button>
+                        </Button>
             <Button onClick={handleGenerarEvento} disabled={isGenerating}>
               {isGenerating ? (
                 <>
@@ -1045,10 +883,6 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
           isOpen={!!selectedEventoId}
           onClose={() => setSelectedEventoId(null)}
           onSelectNomina={(nominaId) => setSelectedNominaId(nominaId)}
-          onGenerarPrenominas={async (eventoId) => {
-            await handleGenerarPrenominas(eventoId);
-            fetchEventos();
-          }}
         />
       )}
 
@@ -1212,12 +1046,12 @@ function NominaDetailsPanel({
                     <span className="text-gray-700">{comp.empleadoComplemento.tipoComplemento.nombre}</span>
                     <span className="font-medium text-gray-900">
                       €{Number(comp.importe).toLocaleString('es-ES', { minimumFractionDigits: 2 })}
-                                        </span>
+                            </span>
                                       </div>
                 ))}
                                     </div>
-                        </div>
-          )}
+                          </div>
+                        )}
 
           {/* Documento */}
                                       <div>
@@ -1229,16 +1063,16 @@ function NominaDetailsPanel({
                     {nomina.documento.nombre || 'Nómina PDF'}
                   </p>
                   <p className="text-xs text-gray-500">Disponible para descarga</p>
-                                        </div>
+                      </div>
                 <Button size="sm" variant="outline" onClick={handleDescargarPdf}>
                   <Download className="w-4 h-4 mr-2" />
                   Descargar PDF
                 </Button>
-                                      </div>
+                    </div>
             ) : (
               <p className="text-sm text-gray-500">Aún no se ha importado el PDF de esta nómina.</p>
             )}
-          </div>
+                  </div>
 
                         {/* Alertas */}
           {nomina.alertas && nomina.alertas.length > 0 && (
@@ -1254,7 +1088,7 @@ function NominaDetailsPanel({
                         {alerta.detalles && (
                           <p className="text-xs text-red-700 mt-1">{JSON.stringify(alerta.detalles)}</p>
                               )}
-                                        </div>
+                        </div>
                                       </div>
                       </div>
                 ))}
@@ -1298,7 +1132,7 @@ function NominaDetailsPanel({
                                       <div>
                   <h4 className="text-xs uppercase text-gray-500 mb-2">
                     Cambios de contrato ({incidencias.contratos.length})
-                  </h4>
+                                        </h4>
                   {incidencias.contratos.length === 0 ? (
                     <p className="text-sm text-gray-500">Sin altas/bajas de contrato.</p>
                   ) : (
@@ -1309,7 +1143,7 @@ function NominaDetailsPanel({
                           {contrato.fechaInicio && (
                             <div>
                               Alta: {new Date(contrato.fechaInicio).toLocaleDateString('es-ES')}
-                                        </div>
+                                      </div>
                               )}
                           {contrato.fechaFin && (
                             <div>
@@ -1320,38 +1154,38 @@ function NominaDetailsPanel({
                       ))}
                           </div>
                         )}
-                                  </div>
+                                    </div>
 
-                <div>
+                                      <div>
                   <h4 className="text-xs uppercase text-gray-500 mb-2">Resumen de fichajes</h4>
                   {incidencias.fichajes ? (
                     <div className="grid grid-cols-3 gap-2 text-xs text-gray-700">
                       <div className="bg-gray-50 rounded p-2 text-center">
                         <div className="text-xl font-semibold">{incidencias.fichajes.diasRegistrados}</div>
                         <div className="text-gray-500">Días registrados</div>
-                      </div>
+                                        </div>
                       <div className="bg-gray-50 rounded p-2 text-center">
                         <div className="text-xl font-semibold text-orange-600">
                           {incidencias.fichajes.diasPendientes}
-                        </div>
+                                      </div>
                         <div className="text-gray-500">Días pendientes</div>
-                      </div>
+                                        </div>
                       <div className="bg-gray-50 rounded p-2 text-center">
                         <div className="text-xl font-semibold">
                           {incidencias.fichajes.horasTrabajadas.toFixed(1)}h
-                        </div>
+                                      </div>
                         <div className="text-gray-500">Horas trabajadas</div>
-                      </div>
-                    </div>
+                                        </div>
+                                      </div>
                   ) : (
                     <p className="text-sm text-gray-500">Sin datos de fichajes.</p>
                   )}
-                </div>
+                                    </div>
               </div>
             ) : (
               <p className="text-sm text-gray-500">Sin incidencias registradas.</p>
             )}
-          </div>
+                                  </div>
 
           {/* Botón para ver perfil completo */}
           <div className="pt-4 border-t">
@@ -1379,13 +1213,11 @@ function EventoDetailsPanel({
   isOpen,
   onClose,
   onSelectNomina,
-  onGenerarPrenominas,
 }: {
   eventoId: string;
   isOpen: boolean;
   onClose: () => void;
   onSelectNomina: (nominaId: string) => void;
-  onGenerarPrenominas?: (eventoId: string) => Promise<void> | void;
 }) {
   const [evento, setEvento] = useState<any>(null);
   const [loading, setLoading] = useState(false);
@@ -1424,22 +1256,6 @@ function EventoDetailsPanel({
   };
 
   if (!evento && !loading) return null;
-
-  const puedeGenerarDesdePanel =
-    !!evento && ['generando', 'complementos_pendientes'].includes(evento.estado);
-
-  const etiquetaAccionPrenominas = evento?.fechaGeneracion
-    ? 'Recalcular Pre-nóminas'
-    : 'Generar Pre-nóminas';
-
-  const estadosNominaLabels: Record<string, { label: string; color: string }> = {
-    pre_nomina: { label: 'Pre-nómina', color: 'text-blue-600' },
-    revisando: { label: 'Revisando', color: 'text-yellow-600' },
-    lista_exportar: { label: 'Lista Exportar', color: 'text-purple-600' },
-    exportada: { label: 'Exportada', color: 'text-indigo-600' },
-    definitiva: { label: 'Definitiva', color: 'text-green-600' },
-    publicada: { label: 'Publicada', color: 'text-gray-600' },
-  };
 
   return (
     <DetailsPanel
@@ -1488,34 +1304,6 @@ function EventoDetailsPanel({
             </dl>
                   </div>
 
-          {puedeGenerarDesdePanel && evento && onGenerarPrenominas && (
-            <div className="rounded-lg border border-orange-200 bg-orange-50 p-4 flex flex-col gap-3">
-              <div>
-                <p className="text-sm font-semibold text-orange-900">
-                  {evento.fechaGeneracion
-                    ? `Última generación: ${new Date(evento.fechaGeneracion).toLocaleDateString('es-ES')}`
-                    : 'Pre-nóminas pendientes de generar'}
-                </p>
-                <p className="text-xs text-orange-800">
-                  {evento.fechaGeneracion
-                    ? 'Recalcula el lote para reflejar altas/bajas o cambios recientes antes de exportar.'
-                    : 'Genera el lote para revisar complementos y compensar horas.'}
-                </p>
-              </div>
-              <Button
-                size="sm"
-                className="w-full sm:w-auto bg-gray-900 text-white hover:bg-gray-800"
-                onClick={async () => {
-                  await onGenerarPrenominas(evento.id);
-                  fetchEvento();
-                }}
-              >
-                <FileText className="w-4 h-4 mr-2" />
-                {etiquetaAccionPrenominas}
-              </Button>
-            </div>
-          )}
-
           {/* Alertas del evento */}
           {evento.alertas && evento.alertas.total > 0 && (
             <div>
@@ -1530,7 +1318,7 @@ function EventoDetailsPanel({
               <h3 className="text-sm font-medium text-gray-700 mb-3">Nóminas ({evento.nominas.length})</h3>
               <div className="space-y-2">
                 {evento.nominas.map((nomina: any) => {
-                            const estadoNominaInfo = estadosNominaLabels[nomina.estado] || {
+                            const estadoNominaInfo = NOMINA_ESTADO_LABELS[nomina.estado] || {
                               label: nomina.estado,
                     color: 'text-gray-700',
                             };

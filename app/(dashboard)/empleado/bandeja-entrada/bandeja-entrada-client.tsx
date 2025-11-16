@@ -7,7 +7,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { CheckCircle2, XCircle, Clock, Info } from 'lucide-react';
+import { CheckCircle2, XCircle, Clock, Info, FileSignature } from 'lucide-react';
 
 interface Notificacion {
   id: string;
@@ -17,6 +17,7 @@ interface Notificacion {
   fecha: Date;
   leida: boolean;
   metadata?: Record<string, unknown>;
+  icono?: 'firma' | 'documento' | 'alerta';
 }
 
 interface BandejaEntradaEmpleadoClientProps {
@@ -68,8 +69,17 @@ export function BandejaEntradaEmpleadoClient({
       : notificaciones.filter((n) => n.tipo === filtro);
 
   // Iconos sin fondo - siempre gris oscuro según sistema de diseño
-  const getIcono = (tipo: string) => {
-    switch (tipo) {
+  const getIcono = (notif: Notificacion) => {
+    const metaIcono =
+      notif.metadata && typeof notif.metadata.icono === 'string'
+        ? (notif.metadata.icono as string)
+        : undefined;
+    const iconoPreferido = notif.icono || metaIcono;
+    if (iconoPreferido === 'firma') {
+      return <FileSignature className="w-5 h-5 text-gray-600" />;
+    }
+
+    switch (notif.tipo) {
       case 'aprobada':
         return <CheckCircle2 className="w-5 h-5 text-gray-600" />;
       case 'rechazada':
@@ -174,7 +184,7 @@ export function BandejaEntradaEmpleadoClient({
                 <div className="flex items-start gap-4">
                   {/* Icono sin fondo - solo gris oscuro según sistema de diseño */}
                   <div className="flex-shrink-0 pt-0.5">
-                    {getIcono(notif.tipo)}
+                    {getIcono(notif)}
                   </div>
                   <div className="flex-1">
                     <div className="flex items-start justify-between">
@@ -212,9 +222,23 @@ export function BandejaEntradaEmpleadoClient({
 }
 
 function renderAccion(metadata?: Record<string, unknown>) {
-  if (!metadata || typeof metadata.url !== 'string') {
+  if (!metadata) {
     return null;
   }
+
+  const accionUrl =
+    typeof metadata.accionUrl === 'string'
+      ? (metadata.accionUrl as string)
+      : typeof metadata.url === 'string'
+      ? (metadata.url as string)
+      : undefined;
+
+  if (!accionUrl) {
+    return null;
+  }
+
+  const accionTexto =
+    typeof metadata.accionTexto === 'string' ? (metadata.accionTexto as string) : 'Ver detalle';
 
   return (
     <div className="mt-3">
@@ -224,7 +248,7 @@ function renderAccion(metadata?: Record<string, unknown>) {
         size="sm"
         onClick={(event) => event.stopPropagation()}
       >
-        <Link href={metadata.url}>Ver detalle</Link>
+        <Link href={accionUrl}>{accionTexto}</Link>
       </Button>
     </div>
   );

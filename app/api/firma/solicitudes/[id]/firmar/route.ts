@@ -5,10 +5,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { uploadToS3 } from '@/lib/s3';
 import {
   firmarDocumento,
   type DatosCapturadosFirma,
 } from '@/lib/firma-digital/db-helpers';
+import { randomUUID } from 'crypto';
 
 /**
  * POST /api/firma/solicitudes/[id]/firmar - Firmar documento
@@ -22,7 +24,7 @@ import {
  */
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getSession();
@@ -31,17 +33,12 @@ export async function POST(
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
 
-    const firmaId = params.id;
+    const { id: firmaId } = await context.params;
     const body = await request.json();
 
-    // Validar tipo de firma (MVP solo click)
-    const tipoFirma = body.tipo || 'click';
-    if (tipoFirma !== 'click') {
-      return NextResponse.json(
-        { error: 'En la versión MVP solo se soporta firma por click' },
-        { status: 400 }
-      );
-    }
+    const firmaImagen: string | undefined = body.firmaImagen;
+    const firmaImagenWidth: number | undefined = body.firmaImagenWidth;
+    const firmaImagenHeight: number | undefined = body.firmaImagenHeight;
 
     // Obtener empleado asociado al usuario autenticado
     const empleado = await prisma.empleado.findUnique({
@@ -61,16 +58,35 @@ export async function POST(
     }
 
     // Capturar datos de la firma
+    let metodoCaptura: DatosCapturadosFirma['tipo'] = 'click';
     const datosCapturados: DatosCapturadosFirma = {
-      tipo: tipoFirma,
+      tipo: metodoCaptura,
       ip: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown',
       userAgent: request.headers.get('user-agent') || 'unknown',
       timestamp: new Date().toISOString(),
     };
 
+    // Adjuntar firma manuscrita si se envió desde el canvas
+    if (firmaImagen) {
+      const { buffer, mimeType } = dataUrlToBuffer(firmaImagen);
+      metodoCaptura = 'manuscrita';
+      datosCapturados.tipo = metodoCaptura;
+
+      const firmaImagenS3Key = `firmas-manuscritas/${session.user.empresaId}/${session.user.id}/${firmaId}-${randomUUID()}.png`;
+      await uploadToS3(buffer, firmaImagenS3Key, mimeType);
+
+      datosCapturados.firmaImagenS3Key = firmaImagenS3Key;
+      datosCapturados.firmaImagenWidth = firmaImagenWidth;
+      datosCapturados.firmaImagenHeight = firmaImagenHeight;
+      datosCapturados.firmaImagenContentType = mimeType;
+    }
+
     // Si el empleado tiene firma guardada, incluir en datos capturados
-    // (a menos que explícitamente se indique no usarla)
-    const usarFirmaGuardada = body.usarFirmaGuardada !== false; // Por defecto true
+    // (a menos que explícitamente se indique no usarla o se haya enviado una firma manuscrita)
+    let usarFirmaGuardada = body.usarFirmaGuardada !== false; // Por defecto true
+    if (firmaImagen) {
+      usarFirmaGuardada = false;
+    }
     if (empleado.firmaGuardada && empleado.firmaS3Key && usarFirmaGuardada) {
       datosCapturados.firmaGuardadaUsada = true;
       datosCapturados.firmaGuardadaS3Key = empleado.firmaS3Key;
@@ -113,4 +129,19 @@ export async function POST(
       { status: 500 }
     );
   }
+}
+
+function dataUrlToBuffer(dataUrl: string): { buffer: Buffer; mimeType: string } {
+  const matches = dataUrl.match(/^data:(.+);base64,(.*)$/);
+  if (!matches) {
+    return {
+      buffer: Buffer.from(dataUrl, 'base64'),
+      mimeType: 'image/png',
+    };
+  }
+  const [, mimeType, base64Data] = matches;
+  return {
+    buffer: Buffer.from(base64Data, 'base64'),
+    mimeType,
+  };
 }

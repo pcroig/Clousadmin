@@ -5,7 +5,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { uploadToS3, deleteFromS3 } from '@/lib/s3';
+import { uploadToS3, deleteFromS3, getSignedDownloadUrl } from '@/lib/s3';
 
 /**
  * GET /api/empleados/firma - Obtener firma guardada del empleado autenticado
@@ -38,10 +38,20 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    let firmaUrl: string | undefined;
+    if (empleado.firmaGuardada && empleado.firmaS3Key) {
+      try {
+        firmaUrl = await getSignedDownloadUrl(empleado.firmaS3Key);
+      } catch (error) {
+        console.error('[GET /api/empleados/firma] Error generando URL firmada:', error);
+      }
+    }
+
     return NextResponse.json({
       firmaGuardada: empleado.firmaGuardada,
       firmaS3Key: empleado.firmaS3Key,
       firmaGuardadaData: empleado.firmaGuardadaData,
+      firmaUrl,
     });
   } catch (error) {
     console.error('[GET /api/empleados/firma] Error:', error);

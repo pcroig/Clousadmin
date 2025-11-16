@@ -7,9 +7,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import {
-  actualizarEstadosNominasLote,
-  recalcularEstadisticasEvento,
+  sincronizarEstadoEvento,
 } from '@/lib/calculos/sync-estados-nominas';
+import { NOMINA_ESTADOS, EVENTO_ESTADOS } from '@/lib/constants/nomina-estados';
 
 // ========================================
 // POST /api/nominas/eventos/[id]/publicar
@@ -41,7 +41,9 @@ export async function POST(
       include: {
         nominas: {
           where: {
-            estado: 'definitiva', // Solo publicar las que están en estado definitiva
+            estado: {
+              in: [NOMINA_ESTADOS.PENDIENTE, NOMINA_ESTADOS.COMPLETADA],
+            },
           },
           include: {
             empleado: {
@@ -62,41 +64,26 @@ export async function POST(
       return NextResponse.json({ error: 'Evento no encontrado' }, { status: 404 });
     }
 
-    // Verificar que el evento está en estado definitiva
-    if (evento.estado !== 'definitiva') {
+    if (evento.estado === EVENTO_ESTADOS.CERRADO) {
       return NextResponse.json(
-        {
-          error: `No se pueden publicar nóminas en estado '${evento.estado}'. Debe estar en estado 'definitiva'.`,
-        },
+        { error: 'Este evento ya está cerrado' },
         { status: 400 }
       );
     }
 
-    // Verificar que hay nóminas para publicar
-    if (evento.nominas.length === 0) {
+    // Tomar nóminas que tengan documento (PDF importado)
+    const nominasPublicables = evento.nominas.filter(
+      (n) => n.documentoId
+    );
+
+    if (nominasPublicables.length === 0) {
       return NextResponse.json(
-        { error: 'No hay nóminas definitivas para publicar' },
+        { error: 'No hay nóminas con PDF listo para publicar' },
         { status: 400 }
       );
     }
 
-    // Verificar que todas las nóminas tienen documentos
-    const nominasSinDocumento = evento.nominas.filter((n) => !n.documentoId);
-    if (nominasSinDocumento.length > 0) {
-      return NextResponse.json(
-        {
-          error: `${nominasSinDocumento.length} nóminas no tienen documento PDF asociado`,
-          nominasSinDocumento: nominasSinDocumento.map((n) => ({
-            empleado: `${n.empleado.nombre} ${n.empleado.apellidos}`,
-            nominaId: n.id,
-          })),
-        },
-        { status: 400 }
-      );
-    }
-
-    // Obtener usuarios de los empleados para notificaciones
-    const empleadosIds = evento.nominas.map((n) => n.empleadoId);
+    const empleadosIds = nominasPublicables.map((n) => n.empleadoId);
     const usuarios = await prisma.usuario.findMany({
       where: {
         empleadoId: { in: empleadosIds },
@@ -104,19 +91,22 @@ export async function POST(
       },
     });
 
-    // Actualizar en transacción para garantizar atomicidad
-    // Usar la función centralizadora para mantener sincronización
-    const cantidadActualizada = await actualizarEstadosNominasLote(
-      id,
-      'publicada',
-      {
-        fechaPublicacion: new Date(),
-        empleadoNotificado: true,
-        fechaNotificacion: new Date(),
-      }
-    );
+    const ahora = new Date();
 
-    // Crear notificaciones para los empleados
+    await prisma.nomina.updateMany({
+      where: {
+        id: {
+          in: nominasPublicables.map((n) => n.id),
+        },
+      },
+      data: {
+        estado: NOMINA_ESTADOS.PUBLICADA,
+        fechaPublicacion: ahora,
+        empleadoNotificado: true,
+        fechaNotificacion: ahora,
+      },
+    });
+
     const notificaciones = await Promise.all(
       usuarios.map((usuario) =>
         prisma.notificacion.create({
@@ -131,11 +121,10 @@ export async function POST(
       )
     );
 
-    // Recalcular estadísticas del evento
-    await recalcularEstadisticasEvento(id);
+    await sincronizarEstadoEvento(id);
 
     return NextResponse.json({
-      nominasPublicadas: cantidadActualizada,
+      nominasPublicadas: nominasPublicables.length,
       empleadosNotificados: notificaciones.length,
       mes: evento.mes,
       anio: evento.anio,
