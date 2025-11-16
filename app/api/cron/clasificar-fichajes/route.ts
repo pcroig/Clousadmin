@@ -41,12 +41,8 @@ export async function POST(request: NextRequest) {
 
     console.log(`[CRON Cerrar Jornadas] Procesando día: ${ayer.toISOString().split('T')[0]}`);
 
-    // Obtener todas las empresas activas
-    const empresas = await prisma.empresa.findMany({
-      where: {
-        activa: true,
-      },
-    });
+    // Obtener todas las empresas
+    const empresas = await prisma.empresa.findMany();
 
     let fichajesCreados = 0;
     let fichajesPendientes = 0;
