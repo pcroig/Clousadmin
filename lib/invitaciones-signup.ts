@@ -5,7 +5,7 @@
 
 import { prisma } from '@/lib/prisma';
 import { randomBytes } from 'crypto';
-import { sendSignupInvitationEmail, sendWaitlistInvitationEmail } from '@/lib/email';
+import { sendSignupInvitationEmail, sendWaitlistInvitationEmail, getBaseUrl } from '@/lib/email';
 
 /**
  * Crear invitación para signup (crear empresa y cuenta)
@@ -34,8 +34,7 @@ export async function crearInvitacionSignup(
         },
       });
 
-      const baseUrl = process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-      const url = `${baseUrl}/signup?token=${token}`;
+      const url = `${getBaseUrl()}/signup?token=${token}`;
 
       // Enviar email
       try {
