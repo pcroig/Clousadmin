@@ -1,10 +1,10 @@
 name: Cron - Clasificar Fichajes
 
 on:
-  schedule:
-    # Se ejecuta todas las noches a las 23:30 UTC (00:30 España invierno, 01:30 verano)
-    - cron: '30 23 * * *'
-  workflow_dispatch:  # Permite ejecución manual para testing
+  # Schedule deshabilitado - Los crons se ejecutan desde el servidor Hetzner (crontab)
+  # schedule:
+  #   - cron: '30 23 * * *'  # Diario a las 23:30 UTC (00:30 España invierno, 01:30 verano)
+  workflow_dispatch:  # Ejecución manual (para testing o ejecución bajo demanda)
 
 jobs:
   clasificar-fichajes:
@@ -30,6 +30,7 @@ jobs:
           fi
           
           echo "✅ Cron ejecutado correctamente"
+
 
 
 

@@ -41,8 +41,16 @@ grep -q "api/cron/clasificar-fichajes" "$TMP_CRON" 2>/dev/null || {
   echo '30 23 * * * curl -s -X POST '"$APP_URL"'/api/cron/clasificar-fichajes -H "Authorization: Bearer '"$CRON_SECRET"'" >> '"$LOG_FILE"' 2>&1' >> "$TMP_CRON"
 }
 
-# 2) Backup DB diario 02:00 (requiere envs de storage y DB)
+# 2) Revisar solicitudes con IA: cada día 02:00 UTC
+grep -q "api/cron/revisar-solicitudes" "$TMP_CRON" 2>/dev/null || {
+  echo '0 2 * * * curl -s -X POST '"$APP_URL"'/api/cron/revisar-solicitudes -H "Authorization: Bearer '"$CRON_SECRET"'" >> '"$LOG_FILE"' 2>&1' >> "$TMP_CRON"
+}
+
+# 3) Backup DB diario 02:00 (requiere envs de storage y DB)
 if [[ -n "${DATABASE_URL:-}" && -n "${STORAGE_ENDPOINT:-}" && -n "${STORAGE_ACCESS_KEY:-}" && -n "${STORAGE_SECRET_KEY:-}" && -n "${STORAGE_REGION:-}" && -n "${BACKUP_BUCKET:-}" ]]; then
+  # Asegurar permisos de ejecución del script de backup
+  chmod +x /opt/clousadmin/scripts/backup-db.sh 2>/dev/null || true
+  
   grep -q "scripts/backup-db.sh" "$TMP_CRON" 2>/dev/null || {
     echo '0 2 * * * DATABASE_URL="'"$DATABASE_URL"'" STORAGE_ENDPOINT="'"$STORAGE_ENDPOINT"'" STORAGE_ACCESS_KEY="'"$STORAGE_ACCESS_KEY"'" STORAGE_SECRET_KEY="'"$STORAGE_SECRET_KEY"'" STORAGE_REGION="'"$STORAGE_REGION"'" BACKUP_BUCKET="'"$BACKUP_BUCKET"'" /opt/clousadmin/scripts/backup-db.sh >> '"$LOG_FILE"' 2>&1' >> "$TMP_CRON"
   }
@@ -53,5 +61,5 @@ fi
 crontab "$TMP_CRON"
 rm -f "$TMP_CRON"
 
-echo "✅ Crons instalados. Revisa $LOG_FILE para logs."***
+echo "✅ Crons instalados. Revisa $LOG_FILE para logs."
 
