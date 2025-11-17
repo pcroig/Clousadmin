@@ -6,6 +6,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { getSignedDownloadUrl } from '@/lib/s3';
+import { logAccesoSensibles } from '@/lib/auditoria';
 
 export async function GET(
   req: NextRequest,
@@ -36,6 +37,16 @@ export async function GET(
       return NextResponse.json({ error: 'Nómina no encontrada' }, { status: 404 });
     }
 
+    // Registrar acceso a datos sensibles (nómina PDF)
+    await logAccesoSensibles({
+      request: req,
+      session,
+      recurso: 'nomina_pdf',
+      empleadoAccedidoId: nomina.empleadoId,
+      accion: 'lectura',
+      camposAccedidos: ['documento_pdf'],
+    });
+
     if (!nomina.documento || !nomina.documento.url) {
       return NextResponse.json({ error: 'No hay PDF disponible' }, { status: 404 });
     }
@@ -53,6 +64,7 @@ export async function GET(
     );
   }
 }
+
 
 
 

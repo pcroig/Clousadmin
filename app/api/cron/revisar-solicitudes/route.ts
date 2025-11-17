@@ -16,19 +16,21 @@
 // Se ejecuta diariamente (frecuencia configurable)
 
 import { NextRequest } from 'next/server';
-import { prisma, Prisma } from '@/lib/prisma';
+import { prisma } from '@/lib/prisma';
 import { EstadoSolicitud } from '@/lib/constants/enums';
-import { esCampoPermitido } from '@/lib/constants/whitelist-campos';
 import { clasificarSolicitud } from '@/lib/ia';
 import {
   crearNotificacionSolicitudAprobada,
   crearNotificacionSolicitudRequiereRevision,
 } from '@/lib/notificaciones';
+import { initCronLogger } from '@/lib/cron/logger';
+import { aplicarCambiosSolicitud } from '@/lib/solicitudes/aplicar-cambios';
 
 // Configuración: periodo en horas para considerar solicitudes elegibles
 const PERIODO_REVISION_HORAS = parseInt(process.env.SOLICITUDES_PERIODO_REVISION_HORAS || '48');
 
 export async function POST(request: NextRequest) {
+  let cronLogger: ReturnType<typeof initCronLogger> | null = null;
   try {
     // Verificar CRON_SECRET
     const cronSecret = request.headers.get('authorization');
@@ -36,7 +38,7 @@ export async function POST(request: NextRequest) {
       return new Response('Unauthorized', { status: 401 });
     }
 
-    console.log('[CRON Revisar Solicitudes] Iniciando proceso...');
+    cronLogger = initCronLogger('Revisar Solicitudes');
 
     const ahora = new Date();
     const limiteTiempo = new Date(ahora.getTime() - PERIODO_REVISION_HORAS * 60 * 60 * 1000);
@@ -148,33 +150,14 @@ export async function POST(request: NextRequest) {
               },
             });
 
-            // Aplicar cambios al empleado con validación de campos permitidos
+            // Aplicar cambios al empleado con validación y cifrado
             if (solicitud.camposCambiados && typeof solicitud.camposCambiados === 'object') {
-              const cambios = solicitud.camposCambiados as Record<string, unknown>;
-              const cambiosPermitidos: Prisma.EmpleadoUpdateInput = {};
-
-              // Filtrar solo campos permitidos
-              for (const [campo, valor] of Object.entries(cambios)) {
-                if (esCampoPermitido(campo)) {
-                  cambiosPermitidos[campo] = valor;
-                } else {
-                  console.warn(
-                    `[CRON Revisar Solicitudes] Campo no permitido ignorado: ${campo}`
-                  );
-                }
-              }
-
-              // Aplicar cambios si hay campos válidos
-              if (Object.keys(cambiosPermitidos).length > 0) {
-                await tx.empleado.update({
-                  where: { id: solicitud.empleadoId },
-                  data: cambiosPermitidos,
-                });
-
-                console.log(
-                  `[CRON Revisar Solicitudes] Cambios aplicados: ${Object.keys(cambiosPermitidos).join(', ')}`
-                );
-              }
+              await aplicarCambiosSolicitud(
+                tx,
+                solicitud.id,
+                solicitud.empleadoId,
+                solicitud.camposCambiados as Record<string, unknown>
+              );
             }
           });
 
@@ -226,6 +209,15 @@ export async function POST(request: NextRequest) {
     };
 
     console.log('[CRON Revisar Solicitudes] Proceso completado:', resultado);
+    await cronLogger.finish({
+      success: true,
+      metadata: {
+        solicitudesRevisadas: resultado.solicitudesRevisadas,
+        autoAprobadas: resultado.autoAprobadas,
+        requierenRevision: resultado.requierenRevision,
+        errores: resultado.errores.length,
+      },
+    });
 
     return new Response(JSON.stringify(resultado), {
       status: 200,
@@ -235,6 +227,12 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error('[CRON Revisar Solicitudes] Error fatal:', error);
+    if (cronLogger) {
+      await cronLogger.finish({
+        success: false,
+        errors: [error instanceof Error ? error.message : 'Error desconocido'],
+      });
+    }
     return new Response(
       JSON.stringify({
         success: false,

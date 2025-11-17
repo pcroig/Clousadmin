@@ -4,13 +4,13 @@
 // POST: Aprobar automáticamente todas las solicitudes pendientes
 
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma, Prisma } from '@/lib/prisma';
+import { prisma } from '@/lib/prisma';
 import { requireAuthAsHROrManager, handleApiError } from '@/lib/api-handler';
 
 import { EstadoAusencia, EstadoSolicitud } from '@/lib/constants/enums';
-import { esCampoPermitido } from '@/lib/constants/whitelist-campos';
 import { crearNotificacionSolicitudAprobada } from '@/lib/notificaciones';
 import { resolveAprobadorEmpleadoId } from '@/lib/solicitudes/aprobador';
+import { aplicarCambiosSolicitud } from '@/lib/solicitudes/aplicar-cambios';
 
 export async function POST(req: NextRequest) {
   try {
@@ -191,34 +191,14 @@ export async function POST(req: NextRequest) {
             },
           });
 
-          // Aplicar cambios al empleado con validación de campos permitidos
+          // Aplicar cambios al empleado con validación y cifrado
           if (solicitud.camposCambiados && typeof solicitud.camposCambiados === 'object') {
-            const cambios = solicitud.camposCambiados as Record<string, unknown>;
-
-            // Filtrar solo campos permitidos
-            const cambiosValidados: Prisma.EmpleadoUpdateInput = {};
-            const camposRechazados: string[] = [];
-
-            for (const [campo, valor] of Object.entries(cambios)) {
-              if (esCampoPermitido(campo)) {
-                cambiosValidados[campo] = valor;
-              } else {
-                camposRechazados.push(campo);
-              }
-            }
-
-            // Log si hay campos rechazados por seguridad
-            if (camposRechazados.length > 0) {
-              console.warn(`[AUTOAPROBAR] Campos rechazados por seguridad en solicitud ${solicitud.id}: ${camposRechazados.join(', ')}`);
-            }
-
-            // Aplicar solo cambios validados
-            if (Object.keys(cambiosValidados).length > 0) {
-              await tx.empleado.update({
-                where: { id: solicitud.empleadoId },
-                data: cambiosValidados,
-              });
-            }
+            await aplicarCambiosSolicitud(
+              tx,
+              solicitud.id,
+              solicitud.empleadoId,
+              solicitud.camposCambiados as Record<string, unknown>
+            );
           }
 
         });

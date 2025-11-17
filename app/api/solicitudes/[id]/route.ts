@@ -15,12 +15,12 @@ import {
 import { z } from 'zod';
 
 import { EstadoSolicitud } from '@/lib/constants/enums';
-import { esCampoPermitido } from '@/lib/constants/whitelist-campos';
 import {
   crearNotificacionSolicitudAprobada,
   crearNotificacionSolicitudRechazada,
 } from '@/lib/notificaciones';
 import { resolveAprobadorEmpleadoId } from '@/lib/solicitudes/aprobador';
+import { aplicarCambiosSolicitud } from '@/lib/solicitudes/aplicar-cambios';
 
 const solicitudAccionSchema = z.object({
   accion: z.enum(['aprobar', 'rechazar']),
@@ -111,34 +111,14 @@ export async function PATCH(
           },
         });
 
-        // Aplicar los cambios al empleado con validación de campos permitidos
+        // Aplicar los cambios al empleado con validación y cifrado
         if (solicitud.camposCambiados && typeof solicitud.camposCambiados === 'object') {
-          const cambios = solicitud.camposCambiados as Record<string, unknown>;
-
-          // Filtrar solo campos permitidos
-          const cambiosValidados: Prisma.EmpleadoUpdateInput = {};
-          const camposRechazados: string[] = [];
-
-          for (const [campo, valor] of Object.entries(cambios)) {
-            if (esCampoPermitido(campo)) {
-              cambiosValidados[campo] = valor;
-            } else {
-              camposRechazados.push(campo);
-            }
-          }
-
-          // Log si hay campos rechazados por seguridad
-          if (camposRechazados.length > 0) {
-            console.warn(`[SOLICITUDES] Campos rechazados por seguridad en solicitud ${id}: ${camposRechazados.join(', ')}`);
-          }
-
-          // Aplicar solo cambios validados
-          if (Object.keys(cambiosValidados).length > 0) {
-            await tx.empleado.update({
-              where: { id: solicitud.empleadoId },
-              data: cambiosValidados,
-            });
-          }
+          await aplicarCambiosSolicitud(
+            tx,
+            solicitud.id,
+            solicitud.empleadoId,
+            solicitud.camposCambiados as Record<string, unknown>
+          );
         }
 
         return {

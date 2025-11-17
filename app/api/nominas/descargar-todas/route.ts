@@ -8,6 +8,7 @@ import { prisma } from '@/lib/prisma';
 import { readFile } from 'fs/promises';
 import { join } from 'path';
 import AdmZip from 'adm-zip';
+import { logAccesoSensibles } from '@/lib/auditoria';
 
 // GET /api/nominas/descargar-todas?anio=2025
 export async function GET(req: NextRequest) {
@@ -48,6 +49,16 @@ export async function GET(req: NextRequest) {
     console.log(
       `[API descargar-todas] GET ${anio} para empleado ${empleado.id}`
     );
+
+    // Registrar acceso a datos sensibles (exportación masiva de nóminas)
+    await logAccesoSensibles({
+      request: req,
+      session,
+      recurso: 'nominas_zip',
+      empleadoAccedidoId: empleado.id,
+      accion: 'exportacion',
+      camposAccedidos: [`pdfs_año_${anio}`],
+    });
 
     // Obtener nóminas publicadas del año
     const nominas = await prisma.nomina.findMany({
@@ -147,6 +158,7 @@ function getMesNombre(mes: number): string {
   ];
   return meses[mes - 1] || `Mes_${mes}`;
 }
+
 
 
 
