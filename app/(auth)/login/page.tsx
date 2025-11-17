@@ -4,6 +4,7 @@
 
 import { GalleryVerticalEnd } from 'lucide-react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { LoginForm } from './login-form';
 import { getSession } from '@/lib/auth';
 import { redirect } from 'next/navigation';
@@ -55,10 +56,13 @@ export default async function LoginPage({
         </div>
       </div>
       <div className="bg-muted relative hidden lg:block">
-        <img
-          src="/login-hero.jpg"
+        <Image
+          src="/login-hero.png"
           alt="HR Management"
-          className="absolute inset-0 h-full w-full object-cover dark:brightness-[0.2] dark:grayscale"
+          fill
+          priority
+          className="object-cover dark:brightness-[0.2] dark:grayscale"
+          sizes="50vw"
         />
       </div>
     </div>
