@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation';
+import Image from 'next/image';
 import { obtenerInvitacionSignupPorToken, verificarInvitacionSignup } from '@/lib/invitaciones-signup';
 import { SignupForm } from './signup-form';
 import { getSession } from '@/lib/auth';
@@ -48,25 +49,26 @@ export default async function SignupPage({ searchParams }: SignupPageProps) {
   }
 
   return (
-    <div className="flex min-h-screen flex-col lg:flex-row">
+    <div className="grid min-h-svh lg:grid-cols-2">
       {/* Columna izquierda: Formulario */}
-      <div className="flex flex-1 items-start justify-center bg-white py-8">
-        <div className="w-full max-w-xl px-6">
-          <SignupForm token={token} emailInvitacion={invitacion.email || ''} />
+      <div className="flex flex-col gap-4 p-6 md:p-10">
+        <div className="flex flex-1 items-center justify-center">
+          <div className="w-full max-w-xl">
+            <SignupForm token={token} emailInvitacion={invitacion.email || ''} />
+          </div>
         </div>
       </div>
 
-      {/* Columna derecha: Fondo/Imagen */}
-      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-primary to-primary/80 p-12 flex-col justify-between">
-        <div>
-          <h1 className="text-4xl font-bold text-white mb-4">Clous</h1>
-          <p className="text-xl text-white/90">
-            La plataforma de gestión de RRHH más completa y fácil de usar
-          </p>
-        </div>
-        <div className="text-white/70 text-sm">
-          © 2025 Clousadmin. Todos los derechos reservados.
-        </div>
+      {/* Columna derecha: Imagen */}
+      <div className="bg-muted relative hidden lg:block">
+        <Image
+          src="/login-hero.png"
+          alt="HR Management"
+          fill
+          priority
+          className="object-cover dark:brightness-[0.2] dark:grayscale"
+          sizes="50vw"
+        />
       </div>
     </div>
   );
