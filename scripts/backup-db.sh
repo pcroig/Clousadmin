@@ -4,7 +4,7 @@
 # ========================================
 # Requisitos:
 #  - pg_dump
-#  - awscli (compatible con Hetzner via endpoint S3)
+#  - Node.js y npm (ya instalados en el proyecto)
 #  - Variables de entorno:
 #       DATABASE_URL           -> Cadena completa de conexión PostgreSQL
 #       STORAGE_ENDPOINT       -> https://fsn1.your-objectstorage.com
@@ -41,26 +41,54 @@ if ! command -v pg_dump >/dev/null 2>&1; then
   exit 1
 fi
 
-if ! command -v aws >/dev/null 2>&1; then
-  echo "❌ awscli no está instalado. Ejecuta: sudo apt install -y awscli"
+if ! command -v node >/dev/null 2>&1; then
+  echo "❌ Node.js no está instalado"
   exit 1
 fi
 
+# Obtener directorio del script y del proyecto
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+
 echo "🗄️  Generando backup PostgreSQL..."
-pg_dump "$DATABASE_URL" > "$dump_path"
+if ! pg_dump "$DATABASE_URL" > "$dump_path"; then
+  echo "❌ Error generando backup de PostgreSQL"
+  rm -f "$dump_path"
+  exit 1
+fi
+
+# Verificar que el dump se generó correctamente
+if [[ ! -s "$dump_path" ]]; then
+  echo "❌ El backup generado está vacío"
+  rm -f "$dump_path"
+  exit 1
+fi
+
+echo "📦 Comprimiendo backup..."
 gzip -f "$dump_path"
 
-export AWS_ACCESS_KEY_ID="$STORAGE_ACCESS_KEY"
-export AWS_SECRET_ACCESS_KEY="$STORAGE_SECRET_KEY"
-export AWS_DEFAULT_REGION="$STORAGE_REGION"
-
-object_path="s3://${BACKUP_BUCKET}/backups/postgres/${host_tag}_${timestamp}.sql.gz"
+# Verificar que el archivo comprimido existe
+if [[ ! -f "$archive_path" ]]; then
+  echo "❌ Error al comprimir el backup"
+  rm -f "$dump_path"
+  exit 1
+fi
 
 echo "☁️  Subiendo backup a Hetzner Object Storage..."
-aws --endpoint-url "$STORAGE_ENDPOINT" s3 cp "$archive_path" "$object_path"
+cd "$PROJECT_DIR"
+if ! STORAGE_ENDPOINT="$STORAGE_ENDPOINT" \
+  STORAGE_REGION="$STORAGE_REGION" \
+  STORAGE_ACCESS_KEY="$STORAGE_ACCESS_KEY" \
+  STORAGE_SECRET_KEY="$STORAGE_SECRET_KEY" \
+  BACKUP_BUCKET="$BACKUP_BUCKET" \
+  npx tsx scripts/backup-db-upload.ts "$archive_path"; then
+  echo "❌ Error subiendo backup a Object Storage"
+  rm -f "$archive_path"
+  exit 1
+fi
 
 echo "🧹 Limpiando archivos temporales..."
 rm -f "$archive_path"
 
-echo "✅ Backup completado: $object_path"
+echo "✅ Backup completado exitosamente"
 
