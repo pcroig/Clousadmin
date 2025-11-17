@@ -2,6 +2,11 @@
 
 ## ✅ Estado: COMPLETADO
 
+## 🔄 Actualización 16 nov 2025
+- Nuevo helper `lib/cron/logger.ts` estandariza métricas y permite alertas opcionales.
+- Endpoints `/api/cron/revisar-solicitudes` y `/api/cron/clasificar-fichajes` envían alertas si fallan (configura `CRON_ALERT_WEBHOOK`).
+- Inventario completo y guías Hetzner en `docs/cron/INVENTARIO.md`.
+
 **Fecha**: 8 de Noviembre, 2025  
 **Tiempo de implementación**: ~15 minutos  
 **Build**: ✅ PASSING (0 errores)

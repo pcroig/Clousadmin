@@ -1843,7 +1843,7 @@ export async function generarDocumentoDesdeContrato(
       mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
       tamano: buffer.length,
       s3Key,
-      s3Bucket: process.env.AWS_S3_BUCKET || 'clousadmin-dev',
+      s3Bucket: process.env.STORAGE_BUCKET || 'clousadmin-dev',
     },
   });
 

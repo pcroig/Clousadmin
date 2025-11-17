@@ -13,6 +13,10 @@ El módulo de Analytics proporciona visualizaciones y métricas en tiempo real s
 
 ## 1. Características Principales
 
+### Definiciones únicas de métricas
+- Las definiciones de cada KPI viven en `lib/analytics/metrics.ts`.
+- Todos los endpoints (`/api/analytics/*`) devuelven `metadata.metrics` con esa misma lista, evitando divergencias entre frontend y documentación.
+
 ### 1.1 Organización por Pestañas
 
 El módulo está organizado en 3 pestañas principales:

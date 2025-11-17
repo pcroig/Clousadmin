@@ -4,6 +4,9 @@
 // Registro de accesos a datos sensibles para cumplimiento GDPR/LOPD
 
 import { prisma } from '@/lib/prisma';
+import { getClientIP } from '@/lib/rate-limit';
+import type { NextRequest } from 'next/server';
+import type { SessionData } from '@/types/auth';
 
 interface RegistrarAccesoParams {
   empresaId: string;
@@ -41,6 +44,41 @@ export async function registrarAcceso(params: RegistrarAccesoParams): Promise<vo
     // Pero loggear el error para investigar
     console.error('[Auditoría] Error registrando acceso:', error);
   }
+}
+
+interface LogAccesoOptions {
+  request?: NextRequest | null;
+  session: SessionData;
+  recurso: string;
+  accion?: RegistrarAccesoParams['accion'];
+  empleadoAccedidoId?: string | null;
+  camposAccedidos?: string[];
+  motivo?: string;
+}
+
+/**
+ * Helper de conveniencia para registrar accesos desde APIs
+ */
+export async function logAccesoSensibles({
+  request,
+  session,
+  recurso,
+  accion = 'lectura',
+  empleadoAccedidoId,
+  camposAccedidos,
+  motivo,
+}: LogAccesoOptions): Promise<void> {
+  await registrarAcceso({
+    empresaId: session.user.empresaId,
+    usuarioId: session.user.id,
+    empleadoAccedidoId: empleadoAccedidoId ?? undefined,
+    recurso,
+    accion,
+    camposAccedidos,
+    motivo,
+    ipAddress: request ? getClientIP(request.headers) : undefined,
+    userAgent: request?.headers.get('user-agent') ?? undefined,
+  });
 }
 
 /**

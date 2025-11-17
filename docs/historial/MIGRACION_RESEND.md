@@ -1,5 +1,7 @@
 # Migración de AWS SES a Resend - Verificación Completa
 
+> **NOTA HISTÓRICA**: Este documento describe la migración de AWS SES a Resend. Posteriormente, el proyecto también migró de AWS S3 a Hetzner Object Storage. Ver `docs/MIGRACION_HETZNER.md` para información completa sobre la migración a Hetzner.
+
 ## Resumen de la Migración
 
 **Fecha**: 2025-11-10  
@@ -17,9 +19,9 @@ Se ha migrado exitosamente el sistema de envío de emails de AWS SES a Resend, m
 **Desinstalado:**
 - `@aws-sdk/client-ses` - Ya no se necesita para emails
 
-**Mantenido:**
-- `@aws-sdk/client-s3` - Sigue siendo necesario para almacenamiento S3
-- `@aws-sdk/s3-request-presigner` - Necesario para URLs firmadas de S3
+**Mantenido (hasta migración a Hetzner):**
+- `@aws-sdk/client-s3` - Ya no se usa (migrado a Hetzner Object Storage)
+- `@aws-sdk/s3-request-presigner` - Ya no se usa (migrado a Hetzner Object Storage)
 
 ### 2. Archivo Refactorizado
 
@@ -94,7 +96,7 @@ SES_FROM_EMAIL=xxx
 SES_REGION=xxx
 ```
 
-**⚠️ IMPORTANTE**: Si usas S3 (que es el caso), mantén `AWS_ACCESS_KEY_ID` y `AWS_SECRET_ACCESS_KEY`.
+**⚠️ IMPORTANTE**: Este documento es histórico. El proyecto ahora usa Hetzner Object Storage. Ver `docs/MIGRACION_HETZNER.md` para configuración actual.
 
 ## Verificación de Compatibilidad
 

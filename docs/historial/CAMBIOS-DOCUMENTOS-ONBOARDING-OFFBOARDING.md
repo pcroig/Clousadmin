@@ -358,7 +358,7 @@ test('HR puede crear carpeta vinculada a onboarding con documentos', async ({ pa
 
 ### Error al subir documentos
 **Causa**: Permisos de S3 o tamaño máximo excedido  
-**Solución**: Verificar env vars `AWS_S3_BUCKET` y límites en `lib/documentos.ts`
+**Solución**: Verificar env vars `STORAGE_BUCKET` (Hetzner Object Storage) y límites en `lib/documentos.ts` - **NOTA**: Este documento es histórico. El proyecto ahora usa Hetzner Object Storage.
 
 ### Carpeta no se filtra por proceso
 **Causa**: Campo `vinculadaAProceso` es null  

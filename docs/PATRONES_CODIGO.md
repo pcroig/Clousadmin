@@ -334,13 +334,22 @@ import { z } from 'zod';
 
 const envSchema = z.object({
   DATABASE_URL: z.string().url(),
-  AWS_REGION: z.string(),
-  AWS_ACCESS_KEY_ID: z.string(),
-  AWS_SECRET_ACCESS_KEY: z.string(),
-  S3_BUCKET: z.string(),
-  OPENAI_API_KEY: z.string().startsWith('sk-'),
-  COGNITO_USER_POOL_ID: z.string(),
-  COGNITO_CLIENT_ID: z.string()
+  // Hetzner Object Storage (S3-compatible)
+  STORAGE_ENDPOINT: z.string().url(),
+  STORAGE_REGION: z.string(),
+  STORAGE_ACCESS_KEY: z.string(),
+  STORAGE_SECRET_KEY: z.string(),
+  STORAGE_BUCKET: z.string(),
+  ENABLE_CLOUD_STORAGE: z.boolean(),
+  // AI Providers
+  OPENAI_API_KEY: z.string().startsWith('sk-').optional(),
+  ANTHROPIC_API_KEY: z.string().optional(),
+  GOOGLE_AI_API_KEY: z.string().optional(),
+  // Email (Resend)
+  RESEND_API_KEY: z.string(),
+  RESEND_FROM_EMAIL: z.string().email(),
+  // Auth (JWT - Cognito ya no se usa)
+  NEXTAUTH_SECRET: z.string().min(32),
 });
 
 export const env = envSchema.parse(process.env);

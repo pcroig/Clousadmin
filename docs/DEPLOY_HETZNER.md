@@ -213,4 +213,4 @@ redis-cli ping  # Debería responder PONG
 
 ---
 
-**Última actualización**: 13 de enero 2025
+**Última actualización**: 27 de enero 2025

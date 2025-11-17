@@ -153,7 +153,8 @@ export function UploadNominasModal({ isOpen, onClose, onSuccess }: UploadNominas
       }
 
       setStep('success');
-      toast.success(`${data.nominasCreadas} nómina(s) creada(s) correctamente`);
+      const creadas = typeof data.imported === 'number' ? data.imported : 0;
+      toast.success(`${creadas} nómina(s) creada(s) correctamente`);
 
       setTimeout(() => {
         onSuccess();

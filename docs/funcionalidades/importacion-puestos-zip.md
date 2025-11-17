@@ -476,7 +476,7 @@ export async function procesarZipPuestos(
           mimeType: `application/${extension}`,
           tamano: buffer.length,
           s3Key,
-          s3Bucket: process.env.AWS_S3_BUCKET || 'clousadmin-docs',
+          s3Bucket: process.env.STORAGE_BUCKET || 'clousadmin-docs',
           procesadoIA: true,
           datosExtraidos: {
             ...puestoExtraido,

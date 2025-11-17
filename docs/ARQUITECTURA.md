@@ -422,7 +422,7 @@ model Ausencia {
 ## 📝 Próximos Pasos
 
 - Implementar auto-completado de fichajes
-- Integrar AWS S3 para documentos
+- ✅ Integrar Hetzner Object Storage para documentos (completado)
 - Implementar IA para extracción de datos
 - Tests unitarios e integración
 

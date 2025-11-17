@@ -359,7 +359,7 @@ El sistema permite subir justificantes (documentos) para ausencias, especialment
 
 - **Tipos de archivo permitidos**: PDF, JPG, PNG
 - **Tamaño máximo**: 5MB
-- **Almacenamiento**: AWS S3
+- **Almacenamiento**: Hetzner Object Storage (S3-compatible)
 - **Momento de subida**: 
   - Al crear la ausencia (recomendado para tipos sin aprobación)
   - Al editar una ausencia existente

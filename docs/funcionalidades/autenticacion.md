@@ -222,7 +222,7 @@ model Usuario {
   empleadoId      String?  @unique // NULL si es admin sin empleado
   email           String   @unique
   password        String?  // Bcrypt hash
-  cognitoId       String?  @unique // Para futuro AWS Cognito
+  cognitoId       String?  @unique // DEPRECADO: Campo legacy, no se usa (solo JWT)
   rol             String   @default("empleado") // 'hr_admin', 'manager', 'empleado'
   nombre          String
   apellidos       String
@@ -596,7 +596,7 @@ console.log('[loginAction] Password válida:', isValid)
 
 ### Fase 2 (Pendiente)
 - [ ] Google OAuth completamente funcional
-- [ ] Envío de emails de invitación (AWS SES o Resend)
+- [x] Envío de emails de invitación (Resend) - Ver `docs/CONFIGURACION_RESEND.md`
 - [ ] Botón "Reenviar invitación" en UI
 - [ ] Recuperación de contraseña
 - [ ] Verificación de email adicional

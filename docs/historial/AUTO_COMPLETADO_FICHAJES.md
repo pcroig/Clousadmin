@@ -1,5 +1,7 @@
 # 📋 Auto-completado de Fichajes - Especificación y Testing
 
+> **NOTA HISTÓRICA**: Este documento es histórico. El sistema ahora usa crontab en servidor Hetzner en lugar de AWS EventBridge. Ver `docs/funcionalidades/fichajes.md` y `docs/MIGRACION_HETZNER.md` para información actualizada.
+
 **Fecha**: Noviembre 2025  
 **Estado**: Implementado y funcional
 
@@ -7,7 +9,7 @@
 
 ## 📊 Resumen
 
-Sistema de clasificación y auto-completado automático de fichajes incompletos, ejecutado cada noche mediante AWS EventBridge. Utiliza reglas determinísticas (sin IA) para clasificar fichajes y aplicar auto-completados o solicitar revisión manual de HR.
+Sistema de clasificación y auto-completado automático de fichajes incompletos, ejecutado cada noche mediante crontab en servidor Hetzner. Utiliza reglas determinísticas (sin IA) para clasificar fichajes y aplicar auto-completados o solicitar revisión manual de HR.
 
 **Nota**: Este documento consolida la especificación y guía de testing del sistema de auto-completado de fichajes.
 
@@ -106,6 +108,8 @@ El seed crea **4 casos de prueba** para diferentes escenarios:
 ---
 
 **Nota**: Para información actualizada sobre el sistema de auto-completado, consultar `docs/funcionalidades/fichajes.md` o el código actual en `lib/ia/clasificador-fichajes.ts`.
+
+
 
 
 

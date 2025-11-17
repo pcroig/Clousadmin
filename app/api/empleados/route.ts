@@ -10,8 +10,8 @@ import {
   requireAuthAsHR,
   successResponse,
 } from '@/lib/api-handler';
-import { UsuarioRol } from '@/lib/constants/enums';
-import { encryptEmpleadoData } from '@/lib/empleado-crypto';
+import { encryptEmpleadoData, decryptEmpleadoList } from '@/lib/empleado-crypto';
+import { logAccesoSensibles } from '@/lib/auditoria';
 import { prisma } from '@/lib/prisma';
 import { crearNotificacionEmpleadoCreado } from '@/lib/notificaciones';
 import { getOrCreateDefaultJornada } from '@/lib/jornadas/get-or-create-default';
@@ -70,7 +70,16 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    return successResponse(empleados);
+    const empleadosDesencriptados = decryptEmpleadoList(empleados);
+
+    await logAccesoSensibles({
+      request,
+      session,
+      recurso: 'empleados',
+      camposAccedidos: ['listado'],
+    });
+
+    return successResponse(empleadosDesencriptados);
   } catch (error) {
     return handleApiError(error, 'API GET /api/empleados');
   }

@@ -165,9 +165,9 @@ Antes de empezar implementación, necesitas decidir:
 - **pdf-lib** (Fase 2): PDFs rellenables
 
 ### Arquitectura
-- **Next.js 14**: App Router, Server Components, API Routes
+- **Next.js 16**: App Router, Server Components, API Routes
 - **Prisma**: ORM para PostgreSQL
-- **AWS S3**: Almacenamiento de plantillas y documentos
+- **Hetzner Object Storage**: Almacenamiento de plantillas y documentos (S3-compatible)
 - **TypeScript**: Type-safe en todo el stack
 
 ---
@@ -251,6 +251,8 @@ Antes de empezar implementación, necesitas decidir:
 ---
 
 **Última actualización**: 12 de Noviembre 2025
+
+
 
 
 

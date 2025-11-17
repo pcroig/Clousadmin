@@ -305,7 +305,7 @@ npm install @tanstack/react-query @tanstack/react-query-devtools
 ### Configuración del Cron Job
 El cron debe configurarse para ejecutarse diariamente:
 
-**Vercel Cron** (vercel.json):
+**Cron Job (HISTÓRICO - Ahora usa crontab en Hetzner)**:
 ```json
 {
   "crons": [{

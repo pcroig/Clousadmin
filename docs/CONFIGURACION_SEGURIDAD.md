@@ -42,13 +42,13 @@ node -e "console.log('ENCRYPTION_KEY=' + require('crypto').randomBytes(32).toStr
 Los siguientes campos se encriptan automáticamente en la aplicación:
 
 ### Empleado
-- `iban` - Cuenta bancaria *(pendiente de aplicar en altas/updates)*
-- `nif` - Identificación fiscal *(pendiente de aplicar en altas/updates)*
-- `nss` - Número de Seguridad Social *(pendiente de aplicar en altas/updates)*
-- `salarioBrutoAnual` - Salario anual *(futuro, requiere revisar ordenamientos)*
-- `salarioBrutoMensual` - Salario mensual *(futuro)*
+- `iban` - Cuenta bancaria ✅ cifrado en altas/updates e importaciones (POST/PATCH `/api/empleados`, onboarding, importación Excel)
+- `nif` - Identificación fiscal ✅ cifrado en altas/updates e importaciones
+- `nss` - Número de Seguridad Social ✅ cifrado en altas/updates e importaciones
+- `salarioBrutoAnual` - **no se cifra** (requisito confirmado: no es necesario para este release)
+- `salarioBrutoMensual` - **no se cifra**
 
-> **Estado actual**: Las utilidades `encryptEmpleadoData` / `decryptEmpleadoData` ya existen (`lib/empleado-crypto.ts`), pero los endpoints de creación/actualización aún no aplican el cifrado (nov 2025). Priorizar la adopción en `app/api/empleados`.
+> **Migración histórica**: usa `tsx scripts/encrypt-empleados.ts --confirm-backup --dry-run` para detectar registros legacy y vuelve a ejecutar sin `--dry-run` para cifrarlos. Procedimiento documentado en `docs/migraciones/2025-11-16-encriptar-empleados.md`.
 
 ---
 
@@ -158,6 +158,9 @@ Se registrarán todos los accesos a datos sensibles:
    - [ ] Alertas de rate limiting excedido
    - [ ] Dashboards de sesiones activas
    - [ ] Auditoría de accesos a datos sensibles
+
+## 📚 Referencias
+- `docs/SEGURIDAD_SECRETS.md` para gestión de secrets en GitHub y Hetzner
 
 ---
 

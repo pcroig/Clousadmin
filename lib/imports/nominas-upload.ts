@@ -308,11 +308,11 @@ export async function confirmarUpload(
         await uploadToS3(result.buffer, storageKey, 'application/pdf');
         storageBucket = bucketName;
       } else {
-        const fullPath = path.join(uploadDir, rutaArchivo);
-        const dirPath = path.dirname(fullPath);
+      const fullPath = path.join(uploadDir, rutaArchivo);
+      const dirPath = path.dirname(fullPath);
 
-        await fs.mkdir(dirPath, { recursive: true });
-        await fs.writeFile(fullPath, result.buffer);
+      await fs.mkdir(dirPath, { recursive: true });
+      await fs.writeFile(fullPath, result.buffer);
       }
 
       // Crear documento

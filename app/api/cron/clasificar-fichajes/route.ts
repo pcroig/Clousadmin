@@ -23,8 +23,10 @@ import {
   actualizarCalculosFichaje,
   obtenerEmpleadosDisponibles,
 } from '@/lib/calculos/fichajes';
+import { initCronLogger } from '@/lib/cron/logger';
 
 export async function POST(request: NextRequest) {
+  let cronLogger: ReturnType<typeof initCronLogger> | null = null;
   try {
     // Verificar CRON_SECRET
     const cronSecret = request.headers.get('authorization');
@@ -32,7 +34,7 @@ export async function POST(request: NextRequest) {
       return new Response('Unauthorized', { status: 401 });
     }
 
-    console.log('[CRON Cerrar Jornadas] Iniciando proceso...');
+    cronLogger = initCronLogger('Cerrar Jornadas');
 
     // Fecha de ayer (el día que queremos cerrar)
     const ayer = new Date();
@@ -153,6 +155,16 @@ export async function POST(request: NextRequest) {
     };
 
     console.log('[CRON Cerrar Jornadas] Proceso completado:', resultado);
+    await cronLogger.finish({
+      success: true,
+      metadata: {
+        empresas: resultado.empresas,
+        fichajesCreados: resultado.fichajesCreados,
+        fichajesPendientes: resultado.fichajesPendientes,
+        fichajesFinalizados: resultado.fichajesFinalizados,
+        errores: resultado.errores.length,
+      },
+    });
 
     return new Response(JSON.stringify(resultado), {
       status: 200,
@@ -162,6 +174,12 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error('[CRON Cerrar Jornadas] Error fatal:', error);
+    if (cronLogger) {
+      await cronLogger.finish({
+        success: false,
+        errors: [error instanceof Error ? error.message : 'Error desconocido'],
+      });
+    }
     return new Response(
       JSON.stringify({
         success: false,

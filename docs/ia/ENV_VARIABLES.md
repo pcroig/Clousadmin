@@ -167,11 +167,14 @@ NEXT_PUBLIC_APP_URL="http://localhost:3000"
 NODE_ENV="development"
 NEXTAUTH_SECRET="your-jwt-secret-min-32-chars"
 
-# AWS (Opcional en desarrollo)
-AWS_REGION="eu-west-1"
-AWS_ACCESS_KEY_ID="your-access-key"
-AWS_SECRET_ACCESS_KEY="your-secret-key"
-S3_BUCKET="clousadmin-docs"
+# Hetzner Object Storage (S3-compatible)
+# Ver docs/MIGRACION_HETZNER.md para configuración completa
+STORAGE_ENDPOINT="https://fsn1.your-objectstorage.com"
+STORAGE_REGION="eu-central-1"
+STORAGE_ACCESS_KEY="your-access-key"
+STORAGE_SECRET_KEY="your-secret-key"
+STORAGE_BUCKET="clousadmin-docs"
+ENABLE_CLOUD_STORAGE="true"
 ```
 
 ## Más Información
@@ -180,6 +183,8 @@ S3_BUCKET="clousadmin-docs"
 - [OpenAI Platform](https://platform.openai.com/)
 - [Anthropic Console](https://console.anthropic.com/)
 - [Google AI Studio](https://makersuite.google.com/)
+
+
 
 
 

@@ -1,5 +1,7 @@
 ## 2025-11-11 · Refactor gestión de nóminas
 
+> **NOTA HISTÓRICA**: Este documento describe cambios realizados en noviembre 2025. Los estados de nóminas han cambiado desde entonces. Ver `docs/funcionalidades/gestion-nominas.md` para la documentación actualizada.
+
 ### Contexto
 - Auditoría completa del módulo de nóminas tras cambios recientes.
 - Objetivo: asegurar sincronización de estados, exponer alertas y ampliar analytics.

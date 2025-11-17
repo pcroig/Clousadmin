@@ -361,21 +361,33 @@ Navegar a: /empleado/mi-espacio/documentos
 
 ## 💾 Storage
 
-### Actual (MVP): Filesystem Local
+### Hetzner Object Storage (Producción)
+
+El sistema utiliza Hetzner Object Storage (S3-compatible) para almacenar todos los documentos en producción. En desarrollo local, se puede usar filesystem como fallback.
+
+**Configuración:**
+- Variables de entorno: `STORAGE_ENDPOINT`, `STORAGE_REGION`, `STORAGE_ACCESS_KEY`, `STORAGE_SECRET_KEY`, `STORAGE_BUCKET`
+- Feature flag: `ENABLE_CLOUD_STORAGE=true` para activar Object Storage
+- Fallback local: Si `ENABLE_CLOUD_STORAGE=false`, se usa `/uploads/` en el servidor
+
+**Estructura en S3:**
 ```
-/uploads/
-  ├─ [empresaId]/
-  │   ├─ [empleadoId]/
-  │   │   ├─ contratos/
-  │   │   ├─ nominas/
-  │   │   ├─ personales/
-  │   │   └─ medicos/
-  │   └─ compartidos/
-  │       └─ [carpetaId]/
+s3://[STORAGE_BUCKET]/
+  ├─ documentos/
+  │   ├─ [empresaId]/
+  │   │   ├─ [empleadoId]/
+  │   │   │   ├─ contratos/
+  │   │   │   ├─ nominas/
+  │   │   │   ├─ personales/
+  │   │   │   └─ medicos/
+  │   │   └─ compartidos/
+  │   │       └─ [carpetaId]/
 ```
 
-### Futuro (Fase 2): AWS S3
-El código ya está preparado con campos `s3Key` y `s3Bucket` en el modelo.
+**Características:**
+- URLs firmadas para descargas seguras
+- Eliminación automática al borrar documentos
+- Migración automática desde storage local (ver `scripts/migrate-documents-to-s3.ts`)
 
 ---
 
@@ -597,7 +609,6 @@ curl http://localhost:3000/api/documentos
 - 🔜 Firma electrónica
 - 🔜 Workflow de aprobación
 - 🔜 OCR para documentos escaneados
-- 🔜 Migración a AWS S3
 - 🔜 CDN para descargas rápidas
 
 ---
@@ -653,7 +664,7 @@ const carpetaGlobal = await obtenerOCrearCarpetaGlobal(
 
 ### Preparación para IA
 - Los campos `procesadoIA` y `datosExtraidos` ya existen en el modelo pero no se usan en MVP
-- El campo `s3Key` se usa para el path local en MVP, será la key de S3 en Fase 2
+- El campo `s3Key` contiene la ruta completa del objeto en Hetzner Object Storage
 - Validación en cada API usando `getSession()` y verificando rol
 - Endpoint `/api/documentos/extraer` preparado para extracción de datos con OpenAI
 - Lógica de IA en: `lib/ia/extraccion-contratos.ts`, `lib/ia/extraccion-nominas.ts`
@@ -700,7 +711,7 @@ model contrato {
 4. **TypeScript**
    - Todo tipado correctamente
    - Sin errores de compilación en código nuevo
-   - Compatible con Next.js 15 (async params)
+   - Compatible con Next.js 16 (async params)
 
 ---
 
@@ -744,7 +755,7 @@ Para dudas o mejoras:
 - [x] Validaciones de archivos
 - [x] Script de migración ejecutado
 - [x] TypeScript sin errores
-- [x] Compatible con Next.js 15
+- [x] Compatible con Next.js 16
 
 ### Vistas y UI
 - [x] Vista HR de carpetas

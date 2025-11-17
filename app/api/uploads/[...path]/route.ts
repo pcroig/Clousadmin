@@ -26,7 +26,7 @@ export async function GET(
 
   if (!relativePath || relativePath.includes('..')) {
     return NextResponse.json({ error: 'Ruta inválida' }, { status: 400 });
-  }
+    }
 
   // Determinar empresa asociada a la ruta
   const parts = relativePath.split('/');
@@ -50,11 +50,11 @@ export async function GET(
     const buffer = await fs.readFile(filePath);
     return new NextResponse(buffer, {
       status: 200,
-      headers: {
+        headers: {
         'Content-Type': 'application/octet-stream',
         'Cache-Control': 'private, no-store',
-      },
-    });
+        },
+      });
   } catch (error) {
     console.error('[API uploads] Error leyendo archivo:', error);
     return NextResponse.json({ error: 'Archivo no encontrado' }, { status: 404 });

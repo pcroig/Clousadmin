@@ -12,6 +12,7 @@ import {
   successResponse,
 } from '@/lib/api-handler';
 import { obtenerRangoFechaAntiguedad } from '@/lib/calculos/antiguedad';
+import { PLANTILLA_METRICS } from '@/lib/analytics/metrics';
 
 // GET /api/analytics/plantilla - Obtener métricas de plantilla (solo HR Admin)
 export async function GET(request: NextRequest) {
@@ -250,6 +251,9 @@ export async function GET(request: NextRequest) {
       distribucionGenero,
       evolucionAltasBajas,
       distribucionAntiguedad: distribucionAntiguedadArray,
+      metadata: {
+        metrics: PLANTILLA_METRICS,
+      },
     });
   } catch (error) {
     return handleApiError(error, 'API GET /api/analytics/plantilla');
