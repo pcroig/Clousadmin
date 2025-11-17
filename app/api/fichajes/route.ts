@@ -3,7 +3,7 @@
 // ========================================
 // NUEVO MODELO: Fichaje = día completo, POST crea eventos dentro del fichaje
 
-import { NextRequest } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import {
   calcularHorasTrabajadas,
@@ -39,7 +39,7 @@ export async function GET(req: NextRequest) {
   try {
     // Verificar autenticación
     const authResult = await requireAuth(req);
-    if (authResult instanceof Response) return authResult;
+    if (authResult instanceof NextResponse) return authResult;
     const { session } = authResult;
 
     // Validar que la sesión tiene empresaId
@@ -220,12 +220,12 @@ export async function POST(req: NextRequest) {
   try {
     // Verificar autenticación
     const authResult = await requireAuth(req);
-    if (authResult instanceof Response) return authResult;
+    if (authResult instanceof NextResponse) return authResult;
     const { session } = authResult;
 
     // Validar request body
     const validationResult = await validateRequest(req, fichajeEventoCreateSchema);
-    if (validationResult instanceof Response) return validationResult;
+    if (validationResult instanceof NextResponse) return validationResult;
     const { data: validatedData } = validationResult;
 
     // 3. Determinar fecha y hora

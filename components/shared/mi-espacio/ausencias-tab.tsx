@@ -1,13 +1,15 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Calendar as CalendarIcon } from 'lucide-react';
+import { Calendar as CalendarIcon, ChevronRight } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
+import { SolicitarAusenciaModal } from '@/components/empleado/solicitar-ausencia-modal';
+import { FechaCalendar } from '@/components/shared/fecha-calendar';
 
 interface Ausencia {
   id: string;
@@ -19,12 +21,21 @@ interface Ausencia {
   motivo: string | null;
 }
 
-interface MiEspacioAusenciasTabProps {
-  empleadoId: string;
+interface SaldoResponse {
+  diasTotales: number;
+  diasUsados: number;
+  diasPendientes: number;
+  diasDisponibles: number;
 }
 
-export function AusenciasTab({ empleadoId }: MiEspacioAusenciasTabProps) {
+interface MiEspacioAusenciasTabProps {
+  empleadoId: string;
+  contexto?: 'empleado' | 'manager' | 'hr_admin';
+}
+
+export function AusenciasTab({ empleadoId, contexto = 'empleado' }: MiEspacioAusenciasTabProps) {
   const [ausencias, setAusencias] = useState<Ausencia[]>([]);
+  const [saldo, setSaldo] = useState<SaldoResponse | null>(null);
   const [diasLaborables, setDiasLaborables] = useState({
     lunes: true,
     martes: true,
@@ -42,33 +53,70 @@ export function AusenciasTab({ empleadoId }: MiEspacioAusenciasTabProps) {
     ausencia: Ausencia | null;
     position: { top: number; left: number };
   } | null>(null);
+  const [solicitudModalOpen, setSolicitudModalOpen] = useState(false);
+  const [listaAusenciasTab, setListaAusenciasTab] = useState<'proximas' | 'pasadas'>('proximas');
 
   const calendarContainerRef = useRef<HTMLDivElement>(null);
+  const puedeSolicitar = contexto === 'empleado' || contexto === 'manager';
 
-  // Cargar ausencias
-  useEffect(() => {
-    const controller = new AbortController();
-
-    async function cargarAusencias() {
+  const cargarAusencias = useCallback(
+    async (signal?: AbortSignal) => {
       try {
         const response = await fetch(`/api/ausencias?empleadoId=${empleadoId}`, {
-          signal: controller.signal,
+          signal,
         });
         if (response.ok) {
           const data = await response.json();
-          setAusencias(data.ausencias || []);
+          const normalized =
+            Array.isArray(data)
+              ? data
+              : Array.isArray(data?.ausencias)
+              ? data.ausencias
+              : Array.isArray(data?.data)
+              ? data.data
+              : [];
+          setAusencias(normalized);
         }
       } catch (error: unknown) {
         if (error instanceof Error && error.name !== 'AbortError') {
           console.error('Error cargando ausencias:', error);
         }
       }
-    }
+    },
+    [empleadoId],
+  );
 
-    cargarAusencias();
-
+  // Cargar ausencias
+  useEffect(() => {
+    const controller = new AbortController();
+    cargarAusencias(controller.signal);
     return () => controller.abort();
-  }, [empleadoId]);
+  }, [cargarAusencias]);
+
+  const cargarSaldo = useCallback(
+    async (signal?: AbortSignal) => {
+      try {
+        const response = await fetch(`/api/ausencias/saldo?empleadoId=${empleadoId}`, {
+          signal,
+        });
+        if (response.ok) {
+          const data = await response.json();
+          setSaldo(data?.data ?? data);
+        }
+      } catch (error: unknown) {
+        if (error instanceof Error && error.name !== 'AbortError') {
+          console.error('Error cargando saldo de ausencias:', error);
+        }
+      }
+    },
+    [empleadoId],
+  );
+
+  useEffect(() => {
+    const controller = new AbortController();
+    cargarSaldo(controller.signal);
+    return () => controller.abort();
+  }, [cargarSaldo]);
 
   // Cargar calendario laboral y festivos
   useEffect(() => {
@@ -121,12 +169,17 @@ export function AusenciasTab({ empleadoId }: MiEspacioAusenciasTabProps) {
     return { diasTotales, diasUsados, diasPendientes, diasDisponibles };
   };
 
-  const saldo = calcularSaldo();
+  const saldoResumen = useMemo(() => saldo ?? calcularSaldo(), [saldo, ausencias]);
 
   // Próximas ausencias
   const proximasAusencias = ausencias
     .filter((a) => new Date(a.fechaInicio) >= new Date())
     .sort((a, b) => new Date(a.fechaInicio).getTime() - new Date(b.fechaInicio).getTime())
+    .slice(0, 5);
+
+  const ausenciasPasadas = ausencias
+    .filter((a) => new Date(a.fechaInicio) < new Date())
+    .sort((a, b) => new Date(b.fechaInicio).getTime() - new Date(a.fechaInicio).getTime())
     .slice(0, 5);
 
   const getEstadoBadge = (estado: string) => {
@@ -247,10 +300,50 @@ export function AusenciasTab({ empleadoId }: MiEspacioAusenciasTabProps) {
     noLaborable: 'bg-gray-50 text-gray-400',
   };
 
+  const handleOpenSolicitud = () => {
+    if (!puedeSolicitar) {
+      return;
+    }
+    setSolicitudModalOpen(true);
+  };
+
+  const renderAusenciaCard = (ausencia: Ausencia, isPast = false) => (
+    <div
+      key={ausencia.id}
+      className={`flex items-center gap-3 rounded-xl border border-gray-100 bg-white px-3 py-3 transition hover:border-gray-200 ${
+        isPast ? 'opacity-70 hover:opacity-100' : ''
+      }`}
+    >
+      <div className="flex items-center gap-2">
+        <FechaCalendar date={new Date(ausencia.fechaInicio)} />
+        {new Date(ausencia.fechaFin).toDateString() !== new Date(ausencia.fechaInicio).toDateString() && (
+          <>
+            <ChevronRight className="h-4 w-4 text-gray-400" />
+            <FechaCalendar date={new Date(ausencia.fechaFin)} />
+          </>
+        )}
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="truncate text-sm font-semibold text-gray-900">
+          {ausencia.tipo || 'Ausencia'}
+        </p>
+        <p className="text-xs text-gray-500">
+          {ausencia.diasLaborables} {ausencia.diasLaborables === 1 ? 'día' : 'días'}
+        </p>
+      </div>
+      {getEstadoBadge(ausencia.estado)}
+    </div>
+  );
+
+  const listaActual =
+    listaAusenciasTab === 'proximas'
+      ? { data: proximasAusencias, empty: 'No hay ausencias próximas', isPast: false }
+      : { data: ausenciasPasadas, empty: 'No hay ausencias pasadas recientes', isPast: true };
+
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-      {/* Columna izquierda - 2 columnas */}
-      <div className="lg:col-span-2 space-y-6">
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+      {/* Columna izquierda */}
+      <div className="space-y-6">
         {/* Card de saldo */}
         <div className="bg-white rounded-lg border border-gray-200 p-6">
           <div className="flex items-center gap-2 mb-4">
@@ -264,64 +357,73 @@ export function AusenciasTab({ empleadoId }: MiEspacioAusenciasTabProps) {
           </p>
           <div className="grid grid-cols-4 gap-4">
             <div>
-              <div className="text-2xl font-bold text-gray-900">{saldo.diasTotales}</div>
+              <div className="text-2xl font-bold text-gray-900">{saldoResumen.diasTotales}</div>
               <div className="text-xs text-gray-500 mt-1">Total</div>
             </div>
             <div>
-              <div className="text-2xl font-bold text-gray-600">{saldo.diasUsados}</div>
+              <div className="text-2xl font-bold text-gray-600">{saldoResumen.diasUsados}</div>
               <div className="text-xs text-gray-500 mt-1">Usados</div>
             </div>
             <div>
-              <div className="text-2xl font-bold text-yellow-600">{saldo.diasPendientes}</div>
+              <div className="text-2xl font-bold text-yellow-600">{saldoResumen.diasPendientes}</div>
               <div className="text-xs text-gray-500 mt-1">Pendientes</div>
             </div>
             <div>
-              <div className="text-2xl font-bold text-green-600">{saldo.diasDisponibles}</div>
+              <div className="text-2xl font-bold text-green-600">{saldoResumen.diasDisponibles}</div>
               <div className="text-xs text-gray-500 mt-1">Disponibles</div>
             </div>
           </div>
         </div>
 
-        {/* Próximas ausencias */}
-        <div className="bg-white rounded-lg border border-gray-200 p-6">
-          <div className="flex items-center gap-2 mb-4">
-            <svg className="w-5 h-5 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <h3 className="text-sm font-semibold text-gray-900">Próximas ausencias</h3>
+        {/* Ausencias listado */}
+        <div className="rounded-lg border border-gray-200 bg-white p-6">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <CalendarIcon className="h-5 w-5 text-gray-600" />
+              <h3 className="text-sm font-semibold text-gray-900">Ausencias</h3>
+            </div>
+            <div className="inline-flex rounded-full border border-gray-200 p-1 text-xs font-medium">
+              <button
+                onClick={() => setListaAusenciasTab('proximas')}
+                className={`rounded-full px-3 py-1 transition ${
+                  listaAusenciasTab === 'proximas'
+                    ? 'bg-gray-900 text-white shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                Próximas
+              </button>
+              <button
+                onClick={() => setListaAusenciasTab('pasadas')}
+                className={`rounded-full px-3 py-1 transition ${
+                  listaAusenciasTab === 'pasadas'
+                    ? 'bg-gray-900 text-white shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                Historial
+              </button>
+            </div>
           </div>
           <div className="space-y-3">
-            {proximasAusencias.length === 0 ? (
-              <p className="text-sm text-gray-500 text-center py-4">No hay ausencias próximas</p>
+            {listaActual.data.length === 0 ? (
+              <p className="py-6 text-center text-sm text-gray-500">{listaActual.empty}</p>
             ) : (
-              proximasAusencias.map((ausencia) => (
-                <div key={ausencia.id} className="flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-2">
-                    <CalendarIcon className="w-4 h-4 text-gray-400" />
-                    <div>
-                      <p className="text-sm font-medium text-gray-900">
-                        {new Date(ausencia.fechaInicio).toLocaleDateString('es-ES')} → {new Date(ausencia.fechaFin).toLocaleDateString('es-ES')}
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        {ausencia.diasLaborables} {ausencia.diasLaborables === 1 ? 'día' : 'días'}
-                      </p>
-                    </div>
-                  </div>
-                  {getEstadoBadge(ausencia.estado)}
-                </div>
-              ))
+              listaActual.data.map((ausencia) => renderAusenciaCard(ausencia, listaActual.isPast))
             )}
           </div>
         </div>
       </div>
 
-      {/* Columna derecha - Calendario (3 columnas) */}
-      <div className="lg:col-span-3 bg-white rounded-lg border border-gray-200 p-6">
+      {/* Columna derecha - Calendario */}
+      <div className="rounded-lg border border-gray-200 bg-white p-6">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold text-gray-900">Calendario</h3>
-          <Button size="sm" onClick={() => (window.location.href = '/empleado/horario/ausencias')}>
-            Solicitar ausencia
-          </Button>
+          {puedeSolicitar && (
+            <Button size="sm" onClick={handleOpenSolicitud}>
+              Solicitar ausencia
+            </Button>
+          )}
         </div>
 
         {/* Leyenda */}
@@ -412,13 +514,13 @@ export function AusenciasTab({ empleadoId }: MiEspacioAusenciasTabProps) {
                       </div>
                     )}
                   </>
-                ) : esDiaLaborable(tooltipData.date) ? (
+                ) : esDiaLaborable(tooltipData.date) && puedeSolicitar ? (
                   <>
                     <p className="text-sm text-gray-600">Día laborable disponible</p>
                     <Button
                       size="sm"
                       className="w-full"
-                      onClick={() => (window.location.href = '/empleado/horario/ausencias')}
+                      onClick={handleOpenSolicitud}
                     >
                       Solicitar ausencia
                     </Button>
@@ -431,6 +533,18 @@ export function AusenciasTab({ empleadoId }: MiEspacioAusenciasTabProps) {
           )}
         </div>
       </div>
+
+      {puedeSolicitar && (
+        <SolicitarAusenciaModal
+          open={solicitudModalOpen}
+          onClose={() => setSolicitudModalOpen(false)}
+          onSuccess={async () => {
+            setSolicitudModalOpen(false);
+            await Promise.all([cargarAusencias(), cargarSaldo()]);
+          }}
+          saldoDisponible={saldoResumen.diasDisponibles}
+        />
+      )}
     </div>
   );
 }

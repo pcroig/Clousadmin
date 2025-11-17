@@ -287,7 +287,7 @@ export function GestionarAusenciasModal({ open, onClose, onSaved }: GestionarAus
         <Tabs
           value={tab}
           onValueChange={(value) => {
-            if (value === 'pendientes' || value === 'historial') {
+            if (value === 'saldo' || value === 'calendario' || value === 'politicas') {
               setTab(value);
             }
           }}

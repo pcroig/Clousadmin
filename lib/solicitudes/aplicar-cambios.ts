@@ -6,7 +6,7 @@
 
 import { encryptEmpleadoData } from '@/lib/empleado-crypto';
 import { esCampoPermitido } from '@/lib/constants/whitelist-campos';
-import { Prisma, PrismaClient } from '@prisma/client';
+import { Prisma, PrismaClient, type Empleado } from '@prisma/client';
 
 type TransactionClient = Omit<
   PrismaClient,
@@ -28,13 +28,13 @@ export async function aplicarCambiosSolicitud(
   empleadoId: string,
   camposCambiados: Record<string, unknown>
 ): Promise<{ aplicados: string[]; rechazados: string[] }> {
-  const cambiosValidados: Prisma.EmpleadoUpdateInput = {};
+  const cambiosValidados: Partial<Empleado> = {};
   const camposRechazados: string[] = [];
 
   // Filtrar solo campos permitidos (whitelist de seguridad)
   for (const [campo, valor] of Object.entries(camposCambiados)) {
     if (esCampoPermitido(campo)) {
-      cambiosValidados[campo] = valor;
+      (cambiosValidados as Record<string, unknown>)[campo] = valor;
     } else {
       camposRechazados.push(campo);
     }
@@ -54,7 +54,7 @@ export async function aplicarCambiosSolicitud(
     
     await tx.empleado.update({
       where: { id: empleadoId },
-      data: cambiosEncriptados,
+      data: cambiosEncriptados as Prisma.EmpleadoUpdateInput,
     });
 
     console.log(

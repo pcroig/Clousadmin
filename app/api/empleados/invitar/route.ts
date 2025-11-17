@@ -61,6 +61,32 @@ export async function POST(req: NextRequest) {
       return badRequestResponse('El empleado no tiene email configurado');
     }
 
+    // Verificar si ya existe un onboarding activo reciente (últimos 10 segundos)
+    // Esto previene llamadas duplicadas que generan tokens inválidos
+    const onboardingExistente = await prisma.onboardingEmpleado.findUnique({
+      where: { empleadoId },
+    });
+
+    if (onboardingExistente && !onboardingExistente.completado) {
+      const tiempoDesdeCreacion = Date.now() - onboardingExistente.createdAt.getTime();
+      const TIEMPO_MINIMO_SEGUNDOS = 10 * 1000; // 10 segundos
+
+      if (tiempoDesdeCreacion < TIEMPO_MINIMO_SEGUNDOS) {
+        // Ya existe un onboarding activo creado recientemente, devolver el existente
+        const baseUrl = process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+        const path = onboardingExistente.tipoOnboarding === 'completo' ? 'onboarding' : 'onboarding-simplificado';
+        const url = `${baseUrl}/${path}/${onboardingExistente.token}`;
+
+        console.log(`[Onboarding] Onboarding ya existe para empleado ${empleadoId}, reutilizando token existente`);
+        
+        return successResponse({
+          success: true,
+          url,
+          message: 'Invitación de onboarding ya existe (reutilizando token existente)',
+        });
+      }
+    }
+
     // Crear onboarding (genera token y link)
     const result = await crearOnboarding(
       empleadoId,

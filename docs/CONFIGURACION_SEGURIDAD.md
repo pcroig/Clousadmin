@@ -50,6 +50,36 @@ Los siguientes campos se encriptan automáticamente en la aplicación:
 
 > **Migración histórica**: usa `tsx scripts/encrypt-empleados.ts --confirm-backup --dry-run` para detectar registros legacy y vuelve a ejecutar sin `--dry-run` para cifrarlos. Procedimiento documentado en `docs/migraciones/2025-11-16-encriptar-empleados.md`.
 
+### Cobertura actual
+
+- Altas HR (`app/api/empleados/route.ts`) → cifrado de `nif`, `nss`, `iban` antes de `create`.
+- Ediciones HR (`app/api/empleados/[id]/route.ts`) → `encryptEmpleadoData` justo antes del `update`.
+- Importaciones desde Excel (`app/api/empleados/importar-excel/confirmar/route.ts`).
+- Onboarding automático (`lib/onboarding.ts`).
+- Aprobación de solicitudes de cambios (`lib/solicitudes/aplicar-cambios.ts`).
+
+El 17/11/2025 se ejecutó el script `scripts/encrypt-empleados.ts` (ver registro en `docs/migraciones/2025-11-16-encriptar-empleados.md`) con resultado:
+
+```
+Registros procesados  : 6
+Registros actualizados: 6
+Registros sin cambios : 0
+NIF sin cifrar        : 0 (SELECT COUNT(*) ... NOT LIKE '%:%:%:%')
+```
+
+### Rotación y backup de claves
+
+1. Ejecutar `scripts/backup-db.sh` + backup de storage y documentar la hora.
+2. Generar nuevas claves:
+   ```bash
+   node -e "console.log(require('crypto').randomBytes(32).toString('hex'))" # ENCRYPTION_KEY
+   openssl rand -base64 32                                                  # NEXTAUTH_SECRET
+   ```
+3. Actualizar los secretos del entorno (Hetzner Secrets, `.env.production`, etc.) sin commitearlos.
+4. Reiniciar procesos (`pm2 restart clousadmin && pm2 restart clousadmin-worker`).
+5. Ejecutar `tsx scripts/encrypt-empleados.ts --confirm-backup --dry-run` para verificar que no quedan campos pendientes.
+6. Registrar el resultado en `docs/migraciones/2025-11-16-encriptar-empleados.md`.
+
 ---
 
 ## 🛡️ Rate Limiting
@@ -97,13 +127,33 @@ cleanupExpiredSessions()
 
 ## 🔍 Auditoría de Accesos
 
-**Estado**: Pendiente de implementación (Fase 5)
+**Estado**: Implementado (Fase 5 completa)
 
-Se registrarán todos los accesos a datos sensibles:
-- Quién accedió
-- Qué datos
-- Cuándo
-- Desde dónde (IP)
+- Registro exhaustivo desde `lib/auditoria.ts` e integración en endpoints de empleados, documentos y nóminas.
+- API `app/api/auditoria/empleados/[id]/route.ts` para consultas por HR.
+- Vista para HR en `app/(dashboard)/hr/auditoria/page.tsx`.
+
+---
+
+## ⚖️ Derechos GDPR mínimos (versión 1)
+
+### Exportación de datos personales (Artículo 15)
+- **UI**: Página `HR > Organización > Personas > Detalle` → botón `Exportar datos`.
+- **API**: `GET /api/empleados/[id]/export`
+  - Requiere HR Admin autenticado.
+  - Devuelve un JSON con: ficha del empleado (campos desencriptados), usuario asociado, equipos, ausencias, fichajes recientes, contratos, documentos y los últimos 50 registros de auditoría.
+  - El endpoint registra la acción con `logAccesoSensibles` (`accion: 'exportacion'`).
+
+### Derecho al olvido / anonimización (Artículo 17)
+- **UI**: Mismo detalle de empleado → botón `Derecho al olvido`.
+- **API**: `POST /api/empleados/[id]/anonymize`
+  - Limpia datos personales, bancarios y de contacto.
+  - Desactiva la cuenta (`usuarios`, `empleados`) y elimina consentimientos/equipos asociados.
+  - Mantiene relaciones históricas (ausencias, fichajes, nóminas) sin información identificativa.
+  - Registra la acción en auditoría con `accion: 'eliminacion'`.
+- **Precauciones**:
+  1. La acción es irreversible → el empleado pierde acceso a la plataforma.
+  2. Se recomienda exportar los datos antes de anonimizar si el empleado lo solicita.
 
 ---
 
@@ -115,10 +165,10 @@ Se registrarán todos los accesos a datos sensibles:
 - [x] Utilidades de encriptación AES-256-GCM
 - [x] Verificación de usuario activo en cada request
 - [x] Timing attack mitigation en login
+- [x] Encriptación de campos sensibles en BD (APIs + migración legacy)
+- [x] Auditoría de accesos operativa (API + UI)
 
 ### En Progreso
-- [ ] Encriptación de campos sensibles en BD (APIs pendientes)
-- [ ] Auditoría de accesos
 - [ ] GDPR compliance (consentimientos, derecho al olvido, exportación)
 
 ### Pendiente

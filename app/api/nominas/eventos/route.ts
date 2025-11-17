@@ -178,7 +178,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Calcular fecha límite por defecto (último día del mes)
-    let fechaLimite = data.fechaLimiteComplementos
+    const fechaLimite = data.fechaLimiteComplementos
       ? new Date(data.fechaLimiteComplementos)
       : new Date(data.anio, data.mes, 0, 23, 59, 59); // Último día del mes
 
@@ -283,7 +283,9 @@ export async function POST(req: NextRequest) {
 
         diasTrabajados = Math.max(0, totalDiasMes - totalDiasAusencias);
 
-        const salarioMensual = contratoVigente.salarioBruto || new Decimal(0);
+        const salarioMensual = contratoVigente.salarioBrutoAnual
+          ? contratoVigente.salarioBrutoAnual.dividedBy(12)
+          : new Decimal(0);
         const salarioBase = salarioMensual
           .mul(diasTrabajados)
           .div(totalDiasMes);
@@ -364,7 +366,7 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
-        { error: 'Datos inválidos', details: error.errors },
+        { error: 'Datos inválidos', details: error.issues },
         { status: 400 }
       );
     }

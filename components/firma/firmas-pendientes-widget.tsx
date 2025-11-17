@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -31,7 +31,7 @@ export function FirmasPendientesWidget() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [firmaSeleccionada, setFirmaSeleccionada] = useState<FirmaPendiente | null>(null);
 
-  const cargarFirmas = () => {
+  const cargarFirmas = useCallback(() => {
     setLoading(true);
     setError(null);
     fetch('/api/firma/pendientes')
@@ -55,11 +55,11 @@ export function FirmasPendientesWidget() {
         setError('No se pudieron cargar las firmas pendientes');
       })
       .finally(() => setLoading(false));
-  };
+  }, []);
 
   useEffect(() => {
     cargarFirmas();
-  }, []);
+  }, [cargarFirmas]);
 
   const handleFirmarClick = (firma: FirmaPendiente) => {
     setFirmaSeleccionada(firma);

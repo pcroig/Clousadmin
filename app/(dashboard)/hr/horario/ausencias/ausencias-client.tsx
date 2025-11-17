@@ -26,9 +26,10 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 import { TableHeader as PageHeader } from '@/components/shared/table-header';
 import { TableFilters } from '@/components/shared/table-filters';
-import { Check, X, Calendar, Filter, Edit2, CheckCircle, Search, Settings, ChevronDown, ChevronUp } from 'lucide-react';
+import { Check, X, Calendar, Filter, Edit2, CheckCircle, Search, Settings, ChevronDown, ChevronUp, Paperclip } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { GestionarAusenciasModal } from './gestionar-ausencias-modal';
@@ -40,13 +41,20 @@ import { getAusenciaEstadoLabel } from '@/lib/utils/formatters';
 
 interface Ausencia {
   id: string;
+  empleadoId: string;
   tipo: string;
   fechaInicio: string;
   fechaFin: string;
   diasLaborables: number;
+  diasSolicitados?: number;
+  medioDia: boolean;
+  periodo?: string | null;
   estado: string;
   motivo: string | null;
   motivoRechazo: string | null;
+  descripcion?: string | null;
+  justificanteUrl?: string | null;
+  documentoId?: string | null;
   empleado: {
     nombre: string;
     apellidos: string;
@@ -67,6 +75,30 @@ interface Campana {
   };
 }
 
+type EditFormState = {
+  tipo: string;
+  estado: EstadoAusencia;
+  fechaInicio: string;
+  fechaFin: string;
+  medioDia: boolean;
+  motivo: string;
+  descripcion: string;
+  justificanteUrl: string | null;
+  documentoId: string | null;
+};
+
+const createEmptyEditForm = (): EditFormState => ({
+  tipo: 'vacaciones',
+  estado: EstadoAusencia.pendiente,
+  fechaInicio: '',
+  fechaFin: '',
+  medioDia: false,
+  motivo: '',
+  descripcion: '',
+  justificanteUrl: null,
+  documentoId: null,
+});
+
 export function AusenciasClient() {
   const [ausencias, setAusencias] = useState<Ausencia[]>([]);
   const [campanas, setCampanas] = useState<Campana[]>([]);
@@ -85,6 +117,11 @@ export function AusenciasClient() {
     open: false,
     ausencia: null
   });
+  const [editForm, setEditForm] = useState<EditFormState>(createEmptyEditForm());
+  const [editJustificanteFile, setEditJustificanteFile] = useState<File | null>(null);
+  const [uploadingEditJustificante, setUploadingEditJustificante] = useState(false);
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [editError, setEditError] = useState('');
   const [motivoRechazo, setMotivoRechazo] = useState('');
 
   const fetchAusencias = useCallback(async () => {
@@ -96,16 +133,23 @@ export function AusenciasClient() {
       }
 
       const response = await fetch(`/api/ausencias?${params}`);
+      
+      if (!response.ok) {
+        throw new Error('Error al cargar las ausencias');
+      }
+      
       const data = await response.json();
-      setAusencias(data);
+      setAusencias(Array.isArray(data) ? data : []);
     } catch (error) {
-      console.error('Error fetching ausencias:', error);
+      console.error('[fetchAusencias] Error:', error);
+      toast.error('No se pudieron cargar las ausencias');
+      setAusencias([]);
     } finally {
       setLoading(false);
     }
   }, [filtroEstado]);
 
-  const fetchCampanas = useCallback(async () => {
+const fetchCampanas = useCallback(async () => {
     try {
       const response = await fetch('/api/campanas-vacaciones?estado=abierta');
       if (response.ok) {
@@ -116,6 +160,34 @@ export function AusenciasClient() {
       console.error('Error fetching campañas:', error);
     }
   }, []);
+
+  useEffect(() => {
+    if (editarModal.ausencia) {
+      const ausencia = editarModal.ausencia;
+      const fechaInicio = ausencia.fechaInicio ? format(new Date(ausencia.fechaInicio), 'yyyy-MM-dd') : '';
+      const fechaFin = ausencia.fechaFin ? format(new Date(ausencia.fechaFin), 'yyyy-MM-dd') : '';
+
+      setEditForm({
+        tipo: ausencia.tipo,
+        estado: (ausencia.estado as EstadoAusencia) || EstadoAusencia.pendiente,
+        fechaInicio,
+        fechaFin,
+        medioDia: Boolean(ausencia.medioDia),
+        motivo: ausencia.motivo || '',
+        descripcion: ausencia.descripcion || '',
+        justificanteUrl: ausencia.justificanteUrl || null,
+        documentoId: ausencia.documentoId || null,
+      });
+      setEditJustificanteFile(null);
+      setEditError('');
+    } else {
+      setEditForm(createEmptyEditForm());
+      setEditJustificanteFile(null);
+      setEditError('');
+      setUploadingEditJustificante(false);
+      setSavingEdit(false);
+    }
+  }, [editarModal.ausencia]);
 
   useEffect(() => {
     fetchAusencias();
@@ -130,11 +202,17 @@ export function AusenciasClient() {
         body: JSON.stringify({ accion: 'aprobar' }),
       });
 
+      const data = await response.json();
+      
       if (response.ok) {
+        toast.success('Ausencia aprobada correctamente');
         fetchAusencias();
+      } else {
+        toast.error(data.error || 'Error al aprobar la ausencia');
       }
     } catch (error) {
-      console.error('Error aprobando ausencia:', error);
+      console.error('[handleAprobar] Error:', error);
+      toast.error('Error de conexión al aprobar la ausencia');
     }
   }
 
@@ -151,13 +229,19 @@ export function AusenciasClient() {
         }),
       });
 
+      const data = await response.json();
+
       if (response.ok) {
+        toast.success('Ausencia rechazada correctamente');
         setRechazarModal({ open: false, ausenciaId: null });
         setMotivoRechazo('');
         fetchAusencias();
+      } else {
+        toast.error(data.error || 'Error al rechazar la ausencia');
       }
     } catch (error) {
-      console.error('Error rechazando ausencia:', error);
+      console.error('[handleRechazar] Error:', error);
+      toast.error('Error de conexión al rechazar la ausencia');
     }
   }
 
@@ -170,6 +254,146 @@ export function AusenciasClient() {
     // TODO: Implementar modal de cuadrado manual
     toast.info('Funcionalidad de cuadrado manual próximamente');
   }
+
+  const estadoOptions = [
+    EstadoAusencia.pendiente,
+    EstadoAusencia.confirmada,
+    EstadoAusencia.completada,
+    EstadoAusencia.rechazada,
+  ];
+
+  const tipoOptions = [
+    { value: 'vacaciones', label: 'Vacaciones' },
+    { value: 'enfermedad', label: 'Enfermedad' },
+    { value: 'enfermedad_familiar', label: 'Enfermedad Familiar' },
+    { value: 'maternidad_paternidad', label: 'Maternidad/Paternidad' },
+    { value: 'otro', label: 'Otro' },
+  ];
+
+  const closeEditarModal = () => {
+    setEditarModal({ open: false, ausencia: null });
+    setEditForm(createEmptyEditForm());
+    setEditJustificanteFile(null);
+    setEditError('');
+    setUploadingEditJustificante(false);
+    setSavingEdit(false);
+  };
+
+  /**
+   * Sube un justificante al servidor y retorna la URL y documentoId
+   * @param file - Archivo a subir
+   * @param empleadoId - ID del empleado asociado
+   * @returns Promise con { url, documentoId }
+   */
+  const uploadJustificante = async (file: File, empleadoId: string): Promise<{ url: string; documentoId: string | null }> => {
+    setUploadingEditJustificante(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('tipo', 'justificante');
+      formData.append('crearDocumento', 'true');
+      formData.append('empleadoId', empleadoId);
+
+      const uploadResponse = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      });
+      
+      const uploadData = await uploadResponse.json();
+      
+      if (!uploadResponse.ok) {
+        throw new Error(uploadData.error || 'Error al subir justificante');
+      }
+
+      return {
+        url: uploadData.url,
+        documentoId: uploadData.documento?.id || null,
+      };
+    } finally {
+      setUploadingEditJustificante(false);
+    }
+  };
+
+  const handleGuardarEdicion = async () => {
+    if (!editarModal.ausencia) return;
+    
+    // Validaciones
+    if (!editForm.fechaInicio || !editForm.fechaFin) {
+      setEditError('Selecciona las fechas de inicio y fin');
+      return;
+    }
+
+    const fechaInicio = new Date(editForm.fechaInicio);
+    const fechaFin = new Date(editForm.fechaFin);
+    
+    if (fechaFin < fechaInicio) {
+      setEditError('La fecha de fin debe ser posterior o igual a la fecha de inicio');
+      return;
+    }
+
+    if (editForm.tipo === 'otro' && !editForm.motivo?.trim()) {
+      setEditError('El motivo es obligatorio para ausencias de tipo "Otro"');
+      return;
+    }
+
+    setSavingEdit(true);
+    setEditError('');
+
+    try {
+      let justificanteUrl = editForm.justificanteUrl;
+      let documentoIdToSend: string | null | undefined;
+
+      // Subir justificante si hay archivo nuevo
+      if (editJustificanteFile) {
+        if (!editarModal.ausencia.empleadoId) {
+          throw new Error('No se puede subir justificante: falta empleado');
+        }
+        const uploadResult = await uploadJustificante(editJustificanteFile, editarModal.ausencia.empleadoId);
+        justificanteUrl = uploadResult.url;
+        documentoIdToSend = uploadResult.documentoId;
+      }
+
+      const payload: Record<string, any> = {
+        tipo: editForm.tipo,
+        fechaInicio: editForm.fechaInicio,
+        fechaFin: editForm.fechaFin,
+        medioDia: editForm.medioDia,
+        motivo: editForm.motivo || null,
+        descripcion: editForm.descripcion || null,
+        estado: editForm.estado,
+      };
+
+      if (justificanteUrl !== null) {
+        payload.justificanteUrl = justificanteUrl;
+      }
+      if (documentoIdToSend !== undefined) {
+        payload.documentoId = documentoIdToSend;
+      }
+
+      const response = await fetch(`/api/ausencias/${editarModal.ausencia.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Error al actualizar la ausencia');
+      }
+
+      toast.success('Ausencia actualizada correctamente');
+      closeEditarModal();
+      fetchAusencias();
+    } catch (error: any) {
+      console.error('[handleGuardarEdicion] Error:', error);
+      const errorMessage = error.message || 'Error al actualizar la ausencia';
+      setEditError(errorMessage);
+      toast.error(errorMessage);
+    } finally {
+      setSavingEdit(false);
+      setUploadingEditJustificante(false);
+    }
+  };
 
   function getEstadoBadge(estado: string) {
     const variants: Record<string, { label: string; className: string }> = {
@@ -325,8 +549,9 @@ export function AusenciasClient() {
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto">
-        <Card className="p-0">
-          <Table>
+        <Card className="overflow-hidden">
+          <div className="overflow-x-auto px-2 sm:px-4">
+            <Table className="min-w-full">
             <TableHeader>
               <TableRow>
                 <TableHead>Nombre</TableHead>
@@ -360,12 +585,30 @@ export function AusenciasClient() {
                     <TableCell>{ausencia.diasLaborables} días</TableCell>
                     <TableCell>{getEstadoBadge(ausencia.estado)}</TableCell>
                     <TableCell>{getTipoBadge(ausencia.tipo)}</TableCell>
-                    <TableCell className="text-gray-500 text-sm">-</TableCell>
+                    <TableCell className="text-sm">
+                      {ausencia.justificanteUrl ? (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="px-0 text-primary flex items-center gap-1"
+                          asChild
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <a href={ausencia.justificanteUrl} target="_blank" rel="noopener noreferrer">
+                            <Paperclip className="h-4 w-4" />
+                            Ver
+                          </a>
+                        </Button>
+                      ) : (
+                        <span className="text-gray-500">-</span>
+                      )}
+                    </TableCell>
                   </TableRow>
                 ))
               )}
             </TableBody>
-          </Table>
+            </Table>
+          </div>
         </Card>
       </div>
 
@@ -402,7 +645,14 @@ export function AusenciasClient() {
       </Dialog>
 
       {/* Modal Editar Ausencia */}
-      <Dialog open={editarModal.open} onOpenChange={(open) => setEditarModal({ open, ausencia: null })}>
+      <Dialog
+        open={editarModal.open}
+        onOpenChange={(open) => {
+          if (!open) {
+            closeEditarModal();
+          }
+        }}
+      >
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>Editar Ausencia</DialogTitle>
@@ -420,30 +670,38 @@ export function AusenciasClient() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label>Tipo</Label>
-                  <Select defaultValue={editarModal.ausencia.tipo}>
+                  <Select
+                    value={editForm.tipo}
+                    onValueChange={(value) => setEditForm((prev) => ({ ...prev, tipo: value }))}
+                  >
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="vacaciones">Vacaciones</SelectItem>
-                      <SelectItem value="enfermedad">Enfermedad</SelectItem>
-                      <SelectItem value="enfermedad_familiar">Enfermedad Familiar</SelectItem>
-                      <SelectItem value="maternidad_paternidad">Maternidad/Paternidad</SelectItem>
-                      <SelectItem value="otro">Otro</SelectItem>
+                      {tipoOptions.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
 
                 <div>
                   <Label>Estado</Label>
-                  <Select defaultValue={editarModal.ausencia.estado}>
+                  <Select
+                    value={editForm.estado}
+                    onValueChange={(value) => setEditForm((prev) => ({ ...prev, estado: value as EstadoAusencia }))}
+                  >
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="pendiente">Pendiente</SelectItem>
-                      <SelectItem value="confirmada">Confirmada</SelectItem>
-                      <SelectItem value="rechazada">Rechazada</SelectItem>
+                      {estadoOptions.map((estado) => (
+                        <SelectItem key={estado} value={estado}>
+                          {getAusenciaEstadoLabel(estado)}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -454,41 +712,94 @@ export function AusenciasClient() {
                   <Label>Fecha inicio</Label>
                   <Input
                     type="date"
-                    defaultValue={editarModal.ausencia.fechaInicio}
+                    value={editForm.fechaInicio}
+                    onChange={(e) => setEditForm((prev) => ({ ...prev, fechaInicio: e.target.value }))}
                   />
                 </div>
                 <div>
                   <Label>Fecha fin</Label>
                   <Input
                     type="date"
-                    defaultValue={editarModal.ausencia.fechaFin}
+                    value={editForm.fechaFin}
+                    onChange={(e) => setEditForm((prev) => ({ ...prev, fechaFin: e.target.value }))}
                   />
                 </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <input
+                  id="edit-medio-dia"
+                  type="checkbox"
+                  checked={editForm.medioDia}
+                  onChange={(e) => setEditForm((prev) => ({ ...prev, medioDia: e.target.checked }))}
+                  className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                />
+                <Label htmlFor="edit-medio-dia" className="cursor-pointer text-sm text-gray-700">
+                  Medio día
+                </Label>
               </div>
 
               <div>
                 <Label>Motivo</Label>
                 <Input
                   placeholder="Motivo de la ausencia"
-                  defaultValue={editarModal.ausencia.motivo || ''}
+                  value={editForm.motivo}
+                  onChange={(e) => setEditForm((prev) => ({ ...prev, motivo: e.target.value }))}
                 />
               </div>
 
-              <div className="bg-gray-50 p-3 rounded text-sm text-gray-600">
-                💡 Esta funcionalidad requiere la API de edición. Por ahora es solo vista previa.
+              <div>
+                <Label>Descripción</Label>
+                <Textarea
+                  placeholder="Descripción adicional"
+                  value={editForm.descripcion}
+                  onChange={(e) => setEditForm((prev) => ({ ...prev, descripcion: e.target.value }))}
+                  rows={3}
+                />
               </div>
+
+              <div className="space-y-2">
+                <Label>Justificante</Label>
+                {editForm.justificanteUrl && (
+                  <Button variant="link" size="sm" asChild className="px-0">
+                    <a href={editForm.justificanteUrl} target="_blank" rel="noopener noreferrer">
+                      Ver justificante actual
+                    </a>
+                  </Button>
+                )}
+                <Input
+                  type="file"
+                  accept=".pdf,.jpg,.jpeg,.png"
+                  onChange={(e) => setEditJustificanteFile(e.target.files?.[0] || null)}
+                  disabled={uploadingEditJustificante || savingEdit}
+                />
+                <p className="text-xs text-gray-500">
+                  PDF, JPG o PNG. Máx. 5MB.
+                </p>
+                {editJustificanteFile && (
+                  <p className="text-xs text-gray-600">
+                    Archivo seleccionado: {editJustificanteFile.name}
+                  </p>
+                )}
+              </div>
+
+              {editError && (
+                <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                  {editError}
+                </div>
+              )}
             </div>
           )}
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setEditarModal({ open: false, ausencia: null })}>
+            <Button variant="outline" onClick={closeEditarModal} disabled={savingEdit}>
               Cancelar
             </Button>
             <Button
-              disabled
-              className="bg-gray-400 cursor-not-allowed"
+              onClick={handleGuardarEdicion}
+              disabled={savingEdit || uploadingEditJustificante}
             >
-              Guardar Cambios (Próximamente)
+              {savingEdit ? 'Guardando...' : 'Guardar cambios'}
             </Button>
           </DialogFooter>
         </DialogContent>

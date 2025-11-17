@@ -376,12 +376,20 @@ export async function getVariableMapping(
     });
 
     if (dbMapping) {
+      // Validar y convertir formatType de forma segura
+      const formatTypeValue = dbMapping.formatType;
+      const validFormatTypes = ['date', 'currency', 'number'] as const;
+      const formatType: 'date' | 'currency' | 'number' | null = 
+        typeof formatTypeValue === 'string' && validFormatTypes.includes(formatTypeValue as typeof validFormatTypes[number])
+          ? (formatTypeValue as 'date' | 'currency' | 'number')
+          : null;
+
       const mapping: VariableMapping = {
         variableName: dbMapping.variableName,
         jsonPath: dbMapping.jsonPath,
         requiresDecryption: dbMapping.requiresDecryption,
         requiresFormatting: dbMapping.requiresFormatting,
-        formatType: dbMapping.formatType as any,
+        formatType,
         formatPattern: dbMapping.formatPattern || undefined,
         confianza: dbMapping.confianza ? Number(dbMapping.confianza) : undefined,
       };

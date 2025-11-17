@@ -8,56 +8,134 @@ import { PrismaClient, Prisma } from '@prisma/client';
 import { UsuarioRol } from '@/lib/constants/enums';
 
 // ========================================
-// TIPOS
+// TIPOS Y CATEGORÍAS
 // ========================================
 
+/**
+ * Categorías de notificaciones para organización y UI
+ */
+export type CategoriaNotificacion =
+  | 'ausencias' // Solicitudes, aprobaciones, rechazos de ausencias
+  | 'fichajes' // Fichajes, autocompletados, revisiones
+  | 'nominas' // Nóminas, complementos, errores de payroll
+  | 'fichas' // Datos personales, documentos, fichas de empleado
+  | 'generales'; // Cambios de equipo, manager, jornadas, etc.
+
+/**
+ * Tipos de notificaciones específicos
+ */
 export type TipoNotificacion =
   // Ausencias
   | 'ausencia_solicitada'
   | 'ausencia_aprobada'
   | 'ausencia_rechazada'
   | 'ausencia_cancelada'
-  // Empleados
+  | 'campana_vacaciones_creada' // 🎯 Especial: requiere selección de días
+  | 'campana_vacaciones_completada'
+  // Empleados/Fichas
   | 'empleado_creado'
-  // Fichajes
-  | 'fichaje_autocompletado'
-  | 'fichaje_requiere_revision'
-  | 'fichaje_resuelto'
-  // Equipos
   | 'cambio_manager'
   | 'asignado_equipo'
   | 'nuevo_empleado_equipo'
   | 'cambio_puesto'
   | 'jornada_asignada'
-  // Solicitudes
+  // Fichajes
+  | 'fichaje_autocompletado'
+  | 'fichaje_requiere_revision'
+  | 'fichaje_resuelto'
+  // Solicitudes generales
   | 'solicitud_creada'
   | 'solicitud_aprobada'
   | 'solicitud_rechazada'
   // Payroll/Nóminas
   | 'nomina_disponible'
   | 'nomina_error'
+  | 'complementos_pendientes' // 🎯 Especial: requiere completar complementos (managers)
   // Documentos
   | 'documento_solicitado'
   | 'documento_subido'
   | 'documento_rechazado'
   // Firmas digitales
-  | 'firma_pendiente'
+  | 'firma_pendiente' // 🎯 Especial: requiere firma digital
   | 'firma_completada'
   // Denuncias
   | 'denuncia_recibida'
-  | 'denuncia_actualizada';
+  | 'denuncia_actualizada'
+  // Onboarding
+  | 'onboarding_completado';
 
 export type PrioridadNotificacion = 'baja' | 'normal' | 'alta' | 'critica';
 
+/**
+ * Metadata base para todas las notificaciones
+ */
 type NotificacionMetadataBase = {
   prioridad?: PrioridadNotificacion;
   accionUrl?: string;
   accionTexto?: string;
+  // Flags especiales para acciones
+  requiresModal?: boolean; // Si requiere abrir un modal al hacer clic
+  requiresSignature?: boolean; // Si requiere firma digital
+  requiresSelection?: boolean; // Si requiere selección (ej: días de vacaciones)
 };
 
 export type NotificacionMetadata = NotificacionMetadataBase & {
   [key: string]: Prisma.JsonValue | undefined;
 };
+
+/**
+ * Obtiene la categoría de una notificación según su tipo
+ */
+export function obtenerCategoria(tipo: TipoNotificacion): CategoriaNotificacion {
+  // Ausencias
+  if (
+    tipo.startsWith('ausencia_') ||
+    tipo.startsWith('campana_vacaciones')
+  ) {
+    return 'ausencias';
+  }
+
+  // Fichajes
+  if (tipo.startsWith('fichaje_')) {
+    return 'fichajes';
+  }
+
+  // Nóminas
+  if (
+    tipo.startsWith('nomina_') ||
+    tipo === 'complementos_pendientes'
+  ) {
+    return 'nominas';
+  }
+
+  // Fichas (datos personales, documentos, cambios de equipo/puesto)
+  if (
+    tipo.startsWith('documento_') ||
+    tipo.startsWith('firma_') ||
+    tipo === 'empleado_creado' ||
+    tipo === 'cambio_puesto' ||
+    tipo === 'jornada_asignada'
+  ) {
+    return 'fichas';
+  }
+
+  // Generales (resto de tipos)
+  return 'generales';
+}
+
+/**
+ * Verifica si una notificación requiere una acción especial
+ */
+export function requiereAccionEspecial(tipo: TipoNotificacion): boolean {
+  const tiposEspeciales: TipoNotificacion[] = [
+    'firma_pendiente',
+    'campana_vacaciones_creada',
+    'complementos_pendientes',
+    'documento_solicitado',
+  ];
+
+  return tiposEspeciales.includes(tipo);
+}
 
 // ========================================
 // FUNCIONES HELPER INTERNAS
@@ -243,7 +321,7 @@ export async function crearNotificacionAusenciaAprobada(
       fechaInicio: fechaInicio.toISOString(),
       fechaFin: fechaFin.toISOString(),
       prioridad: 'normal',
-      accionUrl: '/empleado/horario/ausencias',
+      accionUrl: '/empleado/mi-espacio/ausencias',
       accionTexto: 'Ver ausencia',
     },
   });
@@ -281,7 +359,7 @@ export async function crearNotificacionAusenciaRechazada(
       fechaFin: fechaFin.toISOString(),
       ...(motivoRechazo && { motivoRechazo }),
       prioridad: 'normal',
-      accionUrl: '/empleado/horario/ausencias',
+      accionUrl: '/empleado/mi-espacio/ausencias',
       accionTexto: 'Ver detalles',
     },
   });
@@ -358,7 +436,7 @@ export async function crearNotificacionAusenciaAutoAprobada(
       fechaFin: fechaFin.toISOString(),
       autoAprobada: true,
       prioridad: 'normal',
-      accionUrl: '/empleado/horario/ausencias',
+      accionUrl: '/empleado/mi-espacio/ausencias',
       accionTexto: 'Ver ausencia',
     },
   });
@@ -401,6 +479,7 @@ export async function crearNotificacionFirmaPendiente(
       accionTexto: 'Firmar documento',
       accionUrl: '/empleado/mi-espacio/documentos?tab=firmas',
       url: '/empleado/mi-espacio/documentos?tab=firmas',
+      requiresSignature: true, // ✅ Acción especial: firma digital
     },
   });
 }
@@ -479,7 +558,7 @@ export async function crearNotificacionFichajeAutocompletado(
       salidaSugerida: salidaSugerida.toISOString(),
       razon,
       prioridad: 'normal',
-      accionUrl: '/empleado/horario/fichajes',
+      accionUrl: '/empleado/mi-espacio/fichajes',
       accionTexto: 'Ver fichaje',
     },
   });
@@ -546,7 +625,7 @@ export async function crearNotificacionFichajeResuelto(
       fichajeId,
       fecha: fecha.toISOString(),
       prioridad: 'normal',
-      accionUrl: '/empleado/horario/fichajes',
+      accionUrl: '/empleado/mi-espacio/fichajes',
       accionTexto: 'Ver fichaje',
     },
   });
@@ -1291,7 +1370,7 @@ export async function crearNotificacionCampanaCreada(
       await crearNotificaciones(prisma, {
         empresaId,
         usuarioIds,
-        tipo: 'solicitud_creada', // Reutilizamos tipo genérico
+        tipo: 'campana_vacaciones_creada', // 🎯 Tipo específico para campañas
         titulo: 'Nueva campaña de vacaciones',
         mensaje: `Se ha iniciado la campaña "${titulo}" para planificar tus vacaciones del ${fechaInicio.toLocaleDateString('es-ES')} al ${fechaFin.toLocaleDateString('es-ES')}. Por favor, indica tus preferencias.`,
         metadata: {
@@ -1300,7 +1379,8 @@ export async function crearNotificacionCampanaCreada(
           fechaFin: fechaFin.toISOString(),
           prioridad: 'alta',
           accionUrl: `/empleado/vacaciones/campanas/${campanaId}`,
-          accionTexto: 'Ver campaña',
+          accionTexto: 'Seleccionar días preferidos',
+          requiresSelection: true, // ✅ Acción especial: selección de días
         },
       });
     }
@@ -1326,7 +1406,7 @@ export async function crearNotificacionCampanaCompletada(
   await crearNotificaciones(prisma, {
     empresaId,
     usuarioIds,
-    tipo: 'solicitud_creada',
+    tipo: 'campana_vacaciones_completada',
     titulo: 'Campaña de vacaciones completada',
     mensaje: `Todos los empleados (${totalEmpleados}) han completado sus preferencias para la campaña "${titulo}". Ya puedes cuadrar las vacaciones.`,
     metadata: {
@@ -1368,7 +1448,7 @@ export async function crearNotificacionOnboardingCompletado(
   await crearNotificaciones(prisma, {
     empresaId,
     usuarioIds,
-    tipo: 'solicitud_creada',
+    tipo: 'onboarding_completado',
     titulo: 'Onboarding completado',
     mensaje: `${empleadoNombre} ha completado su proceso de onboarding y está listo para comenzar.`,
     metadata: {
@@ -1407,7 +1487,7 @@ export async function crearNotificacionComplementosPendientes(
   await crearNotificaciones(prisma, {
     empresaId,
     usuarioIds,
-    tipo: 'solicitud_creada',
+    tipo: 'complementos_pendientes', // 🎯 Tipo específico para complementos
     titulo: 'Complementos de nómina pendientes',
     mensaje: `Tienes ${empleadosCount} empleado(s) en tu equipo que requieren complementos de nómina para ${meses[mes - 1]} ${año}. Por favor, completa la información.`,
     metadata: {
@@ -1418,7 +1498,7 @@ export async function crearNotificacionComplementosPendientes(
       prioridad: 'alta',
       accionUrl: '/manager/bandeja-entrada',
       accionTexto: 'Completar complementos',
-      requiresModal: true, // Flag especial para abrir modal
+      requiresModal: true, // ✅ Acción especial: abrir modal
     },
   });
 }

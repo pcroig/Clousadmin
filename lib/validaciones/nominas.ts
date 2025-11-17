@@ -358,8 +358,12 @@ async function detectarAlertasAdvertencia(
     select: { config: true },
   });
 
-  const config = empresa?.config as any;
-  const diasLaborables = config?.dias_laborables || {
+  // Tipar config de forma segura
+  const config = empresa?.config;
+  const configObj = typeof config === 'object' && config !== null 
+    ? config as Record<string, unknown>
+    : {};
+  const diasLaborables = (configObj.dias_laborables as Record<string, boolean>) || {
     lunes: true,
     martes: true,
     miercoles: true,

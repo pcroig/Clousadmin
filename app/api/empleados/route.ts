@@ -4,6 +4,7 @@
 
 import { NextRequest } from 'next/server';
 import { hash } from 'bcryptjs';
+import { Prisma } from '@prisma/client';
 
 import {
   handleApiError,
@@ -17,6 +18,7 @@ import { crearNotificacionEmpleadoCreado } from '@/lib/notificaciones';
 import { getOrCreateDefaultJornada } from '@/lib/jornadas/get-or-create-default';
 import { CARPETAS_SISTEMA } from '@/lib/documentos';
 import { invitarEmpleado } from '@/lib/invitaciones';
+import { UsuarioRol } from '@/lib/constants/enums';
 
 // GET /api/empleados - Listar todos los empleados (solo HR Admin)
 export async function GET(request: NextRequest) {
@@ -181,6 +183,15 @@ export async function POST(request: NextRequest) {
       });
 
       // Preparar datos del empleado
+      const salarioBrutoAnual =
+        body.salarioBrutoAnual !== undefined && body.salarioBrutoAnual !== null
+          ? new Prisma.Decimal(body.salarioBrutoAnual)
+          : null;
+      const salarioBrutoMensual =
+        body.salarioBrutoMensual !== undefined && body.salarioBrutoMensual !== null
+          ? new Prisma.Decimal(body.salarioBrutoMensual)
+          : null;
+
       const empleadoData = {
         usuarioId: usuario.id,
         empresaId: session.user.empresaId,
@@ -206,22 +217,26 @@ export async function POST(request: NextRequest) {
         jornadaId: jornadaPorDefecto.id, // Asignar jornada por defecto
         fechaAlta: body.fechaAlta ? new Date(body.fechaAlta) : new Date(),
         tipoContrato: body.tipoContrato || 'indefinido',
-        salarioBrutoAnual: body.salarioBrutoAnual
-          ? parseFloat(body.salarioBrutoAnual)
-          : null,
-        salarioBrutoMensual: body.salarioBrutoMensual
-          ? parseFloat(body.salarioBrutoMensual)
-          : null,
+        salarioBrutoAnual,
+        salarioBrutoMensual,
         activo: body.activo !== undefined ? body.activo : true,
         onboardingCompletado: body.onboardingCompletado || false,
       };
 
       // Encriptar datos sensibles antes de crear
-      const datosEncriptados = encryptEmpleadoData(empleadoData);
+      const datosEncriptados = encryptEmpleadoData({
+        nif: empleadoData.nif,
+        nss: empleadoData.nss,
+        iban: empleadoData.iban,
+      });
+      const empleadoCreateData = {
+        ...empleadoData,
+        ...datosEncriptados,
+      };
 
       // Crear empleado con datos encriptados
       const empleado = await tx.empleado.create({
-        data: datosEncriptados,
+        data: empleadoCreateData,
       });
 
       // Garantizar vínculo bidireccional usuario <-> empleado

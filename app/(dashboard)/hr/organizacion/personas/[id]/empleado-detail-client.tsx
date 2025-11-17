@@ -6,7 +6,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Edit2, Calendar, ChevronRight } from 'lucide-react';
+import { ArrowLeft, Calendar, Download, Shield, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import { toast } from 'sonner';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -55,6 +55,9 @@ interface EmpleadoDetailClientProps {
 export function EmpleadoDetailClient({ empleado, empleadoMiEspacio, usuario }: EmpleadoDetailClientProps) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState('general');
+  const [isExporting, setIsExporting] = useState(false);
+  const [showAnonymizeDialog, setShowAnonymizeDialog] = useState(false);
+  const [isAnonymizing, setIsAnonymizing] = useState(false);
 
   // Función helper para actualizar campos del empleado
   const handleFieldUpdate = async (field: string, value: unknown) => {
@@ -84,6 +87,58 @@ export function EmpleadoDetailClient({ empleado, empleadoMiEspacio, usuario }: E
 
   const avatarStyle = getAvatarStyle(`${empleado.nombre} ${empleado.apellidos || ''}`);
 
+  const handleExport = async () => {
+    setIsExporting(true);
+    try {
+      const response = await fetch(`/api/empleados/${empleado.id}/export`);
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        throw new Error(error.error || 'No se pudo exportar los datos');
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const filename = `empleado-${empleado.id}-export.json`;
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      toast.success('Exportación generada correctamente');
+    } catch (error) {
+      console.error('Error exportando datos:', error);
+      toast.error(error instanceof Error ? error.message : 'Error al exportar datos');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleAnonymize = async () => {
+    setIsAnonymizing(true);
+    try {
+      const response = await fetch(`/api/empleados/${empleado.id}/anonymize`, {
+        method: 'POST',
+      });
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        throw new Error(error.error || 'No se pudo anonimizar el empleado');
+      }
+
+      toast.success('Empleado anonimizado correctamente');
+      setShowAnonymizeDialog(false);
+      router.push('/hr/organizacion/personas');
+    } catch (error) {
+      console.error('Error anonimizado empleado:', error);
+      toast.error(error instanceof Error ? error.message : 'Error al anonimizar empleado');
+    } finally {
+      setIsAnonymizing(false);
+    }
+  };
+
   const tabs = [
     { id: 'general', label: 'General' },
     { id: 'fichajes', label: 'Fichajes' },
@@ -104,22 +159,44 @@ export function EmpleadoDetailClient({ empleado, empleadoMiEspacio, usuario }: E
           <span className="text-sm">Volver</span>
         </Link>
 
-        <div className="flex items-center gap-4">
-          <Avatar className="h-16 w-16">
-            {empleado.fotoUrl && <AvatarImage src={empleado.fotoUrl} />}
-            <AvatarFallback
-              className="text-lg font-semibold uppercase"
-              style={avatarStyle}
-            >
-              {getInitials()}
-            </AvatarFallback>
-          </Avatar>
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div className="flex items-center gap-4">
+            <Avatar className="h-16 w-16">
+              {empleado.fotoUrl && <AvatarImage src={empleado.fotoUrl} />}
+              <AvatarFallback
+                className="text-lg font-semibold uppercase"
+                style={avatarStyle}
+              >
+                {getInitials()}
+              </AvatarFallback>
+            </Avatar>
 
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">
-              {empleado.nombre} {empleado.apellidos}
-            </h1>
-            <p className="text-sm text-gray-500">{empleado.email}</p>
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">
+                {empleado.nombre} {empleado.apellidos}
+              </h1>
+              <p className="text-sm text-gray-500">{empleado.email}</p>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-3">
+            <LoadingButton
+              variant="outline"
+              onClick={handleExport}
+              loading={isExporting}
+              className="inline-flex items-center gap-2"
+            >
+              <Download className="h-4 w-4" />
+              Exportar datos
+            </LoadingButton>
+            <Button
+              variant="destructive"
+              className="inline-flex items-center gap-2"
+              onClick={() => setShowAnonymizeDialog(true)}
+            >
+              <Shield className="h-4 w-4" />
+              Derecho al olvido
+            </Button>
           </div>
         </div>
       </div>
@@ -155,7 +232,7 @@ export function EmpleadoDetailClient({ empleado, empleadoMiEspacio, usuario }: E
           <FichajesTabShared 
             empleadoId={empleado.id}
             empleado={empleadoMiEspacio}
-            empleadoNombre={`${empleado.nombre} ${empleado.apellidos}`}
+            contexto="hr_admin"
           />
         )}
         {activeTab === 'ausencias' && <AusenciasTab empleado={empleado} />}
@@ -167,6 +244,39 @@ export function EmpleadoDetailClient({ empleado, empleadoMiEspacio, usuario }: E
         )}
         {activeTab === 'documentos' && <DocumentosTabShared empleado={empleadoMiEspacio} />}
       </div>
+
+      <Dialog open={showAnonymizeDialog} onOpenChange={setShowAnonymizeDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-600">
+              <Trash2 className="h-4 w-4" />
+              Anonimizar empleado
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 text-sm text-gray-600">
+            <p>
+              Esta acción elimina de forma irreversible los datos personales del empleado para cumplir con el derecho al olvido.
+            </p>
+            <ul className="list-disc pl-5 space-y-1">
+              <li>Se limpian datos personales, bancarios y de contacto.</li>
+              <li>Se desactiva la cuenta y se rompe el acceso al portal.</li>
+              <li>Los registros históricos permanecen sin información identificativa.</li>
+            </ul>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setShowAnonymizeDialog(false)}>
+              Cancelar
+            </Button>
+            <LoadingButton
+              variant="destructive"
+              loading={isAnonymizing}
+              onClick={handleAnonymize}
+            >
+              Confirmar anonimización
+            </LoadingButton>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -274,50 +384,52 @@ function AusenciasTab({ empleado }: AusenciasTabProps) {
           <h3 className="text-sm font-semibold text-gray-900">Historial de Ausencias</h3>
         </div>
 
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Tipo</TableHead>
-              <TableHead>Fecha Inicio</TableHead>
-              <TableHead>Fecha Fin</TableHead>
-              <TableHead>Días</TableHead>
-              <TableHead>Estado</TableHead>
-              <TableHead>Motivo</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {ausenciasOrdenadas.length === 0 ? (
+        <div className="overflow-x-auto px-4 pb-4">
+          <Table className="min-w-full">
+            <TableHeader>
               <TableRow>
-                <TableCell colSpan={6} className="text-center py-8 text-gray-500">
-                  No hay ausencias registradas
-                </TableCell>
+                <TableHead>Tipo</TableHead>
+                <TableHead>Fecha Inicio</TableHead>
+                <TableHead>Fecha Fin</TableHead>
+                <TableHead>Días</TableHead>
+                <TableHead>Estado</TableHead>
+                <TableHead>Motivo</TableHead>
               </TableRow>
-            ) : (
-              ausenciasOrdenadas.map((ausencia) => (
-                <TableRow key={ausencia.id}>
-                  <TableCell className="font-medium">
-                    {getTipoLabel(ausencia.tipo)}
-                  </TableCell>
-                  <TableCell>
-                    {new Date(ausencia.fechaInicio).toLocaleDateString('es-ES')}
-                  </TableCell>
-                  <TableCell>
-                    {new Date(ausencia.fechaFin).toLocaleDateString('es-ES')}
-                  </TableCell>
-                  <TableCell>
-                    {ausencia.diasLaborables || 0} {ausencia.diasLaborables === 1 ? 'día' : 'días'}
-                  </TableCell>
-                  <TableCell>
-                    {getEstadoBadge(ausencia.estado)}
-                  </TableCell>
-                  <TableCell className="text-sm text-gray-600">
-                    {ausencia.motivo || '-'}
+            </TableHeader>
+            <TableBody>
+              {ausenciasOrdenadas.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center py-8 text-gray-500">
+                    No hay ausencias registradas
                   </TableCell>
                 </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
+              ) : (
+                ausenciasOrdenadas.map((ausencia) => (
+                  <TableRow key={ausencia.id}>
+                    <TableCell className="font-medium">
+                      {getTipoLabel(ausencia.tipo)}
+                    </TableCell>
+                    <TableCell>
+                      {new Date(ausencia.fechaInicio).toLocaleDateString('es-ES')}
+                    </TableCell>
+                    <TableCell>
+                      {new Date(ausencia.fechaFin).toLocaleDateString('es-ES')}
+                    </TableCell>
+                    <TableCell>
+                      {ausencia.diasLaborables || 0} {ausencia.diasLaborables === 1 ? 'día' : 'días'}
+                    </TableCell>
+                    <TableCell>
+                      {getEstadoBadge(ausencia.estado)}
+                    </TableCell>
+                    <TableCell className="text-sm text-gray-600">
+                      {ausencia.motivo || '-'}
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
       </div>
     </div>
   );

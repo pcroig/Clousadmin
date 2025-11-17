@@ -13,9 +13,18 @@ import { Textarea } from '@/components/ui/textarea';
 import { LoadingButton } from '@/components/shared/loading-button';
 import { toast } from 'sonner';
 
+interface CompensacionEmpleado {
+  nombre: string;
+  apellidos: string;
+  email: string;
+}
+
 interface Compensacion {
   id: string;
-  [key: string]: unknown;
+  empleado: CompensacionEmpleado;
+  horasBalance: number | string;
+  tipoCompensacion: 'ausencia' | 'nomina';
+  createdAt: string | Date;
 }
 
 interface CompensacionModalProps {

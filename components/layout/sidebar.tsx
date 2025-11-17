@@ -14,6 +14,8 @@ import {
   FolderOpen,
   DollarSign,
   BarChart3,
+  Calendar,
+  FileText,
   ChevronDown,
   User,
   ChevronLeft,
@@ -206,15 +208,29 @@ export function Sidebar({ rol, usuario }: SidebarProps) {
       icon: Inbox,
     },
     {
-      name: 'Mi espacio',
+      name: 'Mi perfil',
+      href: '/empleado/mi-perfil',
       icon: User,
-      children: [
-        { name: 'General', href: '/empleado/mi-espacio?tab=general' },
-        { name: 'Ausencias', href: '/empleado/mi-espacio?tab=ausencias' },
-        { name: 'Fichajes', href: '/empleado/mi-espacio?tab=fichajes' },
-        { name: 'Contratos', href: '/empleado/mi-espacio?tab=contratos' },
-        { name: 'Documentos', href: '/empleado/mi-espacio?tab=documentos' },
-      ],
+    },
+    {
+      name: 'Ausencias',
+      href: '/empleado/mi-espacio/ausencias',
+      icon: Calendar,
+    },
+    {
+      name: 'Fichajes',
+      href: '/empleado/mi-espacio/fichajes',
+      icon: Clock,
+    },
+    {
+      name: 'Contratos',
+      href: '/empleado/mi-espacio/contratos',
+      icon: FileText,
+    },
+    {
+      name: 'Documentos',
+      href: '/empleado/mi-espacio/documentos',
+      icon: FolderOpen,
     },
   ];
 

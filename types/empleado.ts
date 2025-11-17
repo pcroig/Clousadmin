@@ -54,7 +54,7 @@ export interface Usuario {
   nombre: string;
   apellidos: string;
   email: string;
-  rol: UsuarioRol.hr_admin | 'manager' | 'empleado' | 'platform_admin';
+  rol: UsuarioRol;
   avatar?: string | null;
   empresaId: string;
 }

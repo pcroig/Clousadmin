@@ -337,11 +337,11 @@ function procesarEmpleadosConMapeo(
       // Procesar según tipo de campo
       if (campoMapeado === 'fechaNacimiento' || campoMapeado === 'fechaAlta') {
         const fechaISO = convertirFechaExcelAISO(valor);
-        // @ts-ignore - Asignación dinámica
+        // @ts-expect-error - Asignación dinámica basada en mapeo de columnas validado
         empleado[campoMapeado] = fechaISO;
       } else if (campoMapeado === 'salarioBrutoAnual' || campoMapeado === 'salarioBrutoMensual') {
         const num = convertirANumero(valor);
-        // @ts-ignore - Asignación dinámica
+        // @ts-expect-error - Asignación dinámica basada en mapeo de columnas validado
         empleado[campoMapeado] = num;
       } else if (campoMapeado === 'nombre' && typeof valor === 'string' && valor.includes(' ')) {
         // Dividir nombre completo si tiene espacios
@@ -350,7 +350,7 @@ function procesarEmpleadosConMapeo(
         empleado.apellidos = apellidos || null;
       } else {
         // Campos de texto normales
-        // @ts-ignore - Asignación dinámica
+        // @ts-expect-error - Asignación dinámica basada en mapeo de columnas validado
         empleado[campoMapeado] = String(valor).trim() || null;
       }
     });

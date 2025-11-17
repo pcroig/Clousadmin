@@ -55,6 +55,4 @@
 ---
 
 ## Aprobación
-- Si todos los pasos anteriores pasan, staging queda aprobado para promover a producción.*** End Patch```}>>>
-++```json
-
+- Si todos los pasos anteriores pasan, staging queda aprobado para promover a producción.

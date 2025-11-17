@@ -149,8 +149,8 @@ export async function callAIWithConfig(
   }
 
   // Import del cliente unificado
-  const { callAI, AIProvider, MessageRole } = await import('./core/client');
-  const { MessageRole: MsgRole } = await import('./core/types');
+  const { callAI } = await import('./core/client');
+  const { AIProvider, MessageRole: MsgRole } = await import('./core/types');
   
   // Convertir mensajes de formato OpenAI a formato unificado
   const aiMessages: any[] = [];
@@ -187,7 +187,8 @@ export async function callAIWithConfig(
   };
   
   // Llamar al cliente unificado (con fallback automático)
-  return callAI(aiMessages, modelConfig as any, {
+  // modelConfig ya tiene la estructura correcta de ModelConfig del core
+  return callAI(aiMessages, modelConfig, {
     responseFormat: config.responseFormat,
     maxTokens: config.maxTokens,
     metadata: {

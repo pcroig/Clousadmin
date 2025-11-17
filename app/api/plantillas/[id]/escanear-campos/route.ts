@@ -5,7 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { prisma, Prisma } from '@/lib/prisma';
 import {
   extraerCamposPDF,
   escanearPDFConVision,
@@ -79,7 +79,9 @@ export async function POST(
 
     // 4. Guardar en configuracionIA de la plantilla
     const configuracionIA = {
-      ...((plantilla.configuracionIA as any) || {}),
+      ...(typeof plantilla.configuracionIA === 'object' && plantilla.configuracionIA !== null
+        ? plantilla.configuracionIA as Record<string, unknown>
+        : {}),
       ultimoEscaneo: new Date().toISOString(),
       camposDetectados: camposIA,
       camposNativos,
@@ -90,8 +92,8 @@ export async function POST(
     await prisma.plantillaDocumento.update({
       where: { id },
       data: {
-        configuracionIA: configuracionIA as any,
-        variablesUsadas: camposFusionados.map((c) => c.nombre) as any,
+        configuracionIA: configuracionIA as Prisma.InputJsonValue,
+        variablesUsadas: camposFusionados.map((c) => c.nombre) as Prisma.InputJsonValue,
       },
     });
 

@@ -140,7 +140,8 @@ export const SolicitudesWidget = memo(function SolicitudesWidget({
             return (
               <div
                 key={solicitud.id}
-                className="py-2.5 border-b border-gray-200 last:border-0 hover:bg-gray-50 transition-colors px-2 -mx-2"
+                onClick={() => router.push(dashboardHref)}
+                className="py-3 border-b border-gray-200 last:border-0 hover:bg-gray-50 transition-colors px-2 -mx-2 cursor-pointer"
               >
                 <div className="flex items-start gap-3">
                   <div className="w-10 h-10 rounded-full bg-stone-200 flex items-center justify-center text-[13px] font-semibold text-stone-700 flex-shrink-0">
@@ -159,7 +160,7 @@ export const SolicitudesWidget = memo(function SolicitudesWidget({
                           {solicitud.descripcion.toLowerCase()}
                         </span>
                       </p>
-                      <div className="flex gap-2 flex-shrink-0">
+                      <div className="flex flex-shrink-0" onClick={(e) => e.stopPropagation()}>
                         <button
                           onClick={() => handleAprobar(solicitud.id)}
                           className="w-7 h-7 rounded-full flex items-center justify-center transition-colors group disabled:opacity-50 disabled:pointer-events-none"

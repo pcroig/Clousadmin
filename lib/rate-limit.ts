@@ -1,8 +1,10 @@
 // ========================================
 // Rate Limiting System
 // ========================================
-// Rate limiting con fallback a memoria (Map) para desarrollo local
-// En producción se puede migrar a Redis/Upstash para sincronización multi-instancia
+// Rate limiting con Redis en producción y fallback a memoria (Map) en desarrollo/test
+// Soporta sincronización multi-instancia en producción
+
+import { redis } from './redis';
 
 interface RateLimitEntry {
   count: number;
@@ -39,9 +41,11 @@ const RATE_LIMITS = {
 
 type RateLimitType = keyof typeof RATE_LIMITS;
 
-// Storage en memoria (Map)
-// En producción, migrar a Redis para persistencia y sincronización
+// Storage en memoria (Map) - Usado solo en desarrollo/test
 const rateLimitStore = new Map<string, RateLimitEntry>();
+
+// Determinar si usar Redis o Map
+const USE_REDIS = process.env.NODE_ENV === 'production' || process.env.FORCE_REDIS === 'true';
 
 /**
  * Limpiar entradas expiradas del store (ejecutar periódicamente)
@@ -59,6 +63,111 @@ function cleanupExpiredEntries(): void {
 setInterval(cleanupExpiredEntries, 5 * 60 * 1000);
 
 /**
+ * Rate limiting con Redis (producción)
+ */
+async function rateLimitRedis(
+  key: string,
+  config: { window: number; max: number },
+  now: number
+): Promise<RateLimitResult> {
+  try {
+    // Usar Redis para rate limiting con comandos atómicos
+    const ttlSeconds = Math.ceil(config.window / 1000);
+    
+    // INCR es atómico - incrementa y retorna el nuevo valor
+    const count = await redis.incr(key);
+    
+    if (count === 1) {
+      // Primera request en esta ventana - setear TTL
+      await redis.expire(key, ttlSeconds);
+    }
+    
+    const resetAt = now + config.window;
+    
+    if (count > config.max) {
+      // Límite excedido
+      const ttl = await redis.ttl(key);
+      const retryAfter = Math.max(1, ttl);
+      
+      return {
+        success: false,
+        limit: config.max,
+        remaining: 0,
+        reset: resetAt,
+        retryAfter,
+      };
+    }
+    
+    // Dentro del límite
+    return {
+      success: true,
+      limit: config.max,
+      remaining: config.max - count,
+      reset: resetAt,
+    };
+  } catch (error) {
+    // Si Redis falla, permitir request (fail-open)
+    console.error('[Rate Limit Redis] Error, allowing request:', error);
+    return {
+      success: true,
+      limit: Infinity,
+      remaining: Infinity,
+      reset: Date.now(),
+    };
+  }
+}
+
+/**
+ * Rate limiting con Map (desarrollo/test)
+ */
+function rateLimitMap(
+  key: string,
+  config: { window: number; max: number },
+  now: number
+): RateLimitResult {
+  // Obtener entrada existente o crear nueva
+  const entry = rateLimitStore.get(key);
+
+  if (!entry || entry.resetAt < now) {
+    // Nueva ventana o expirada
+    const resetAt = now + config.window;
+    rateLimitStore.set(key, { count: 1, resetAt });
+    
+    return {
+      success: true,
+      limit: config.max,
+      remaining: config.max - 1,
+      reset: resetAt,
+    };
+  }
+
+  // Incrementar contador
+  entry.count++;
+  rateLimitStore.set(key, entry);
+
+  if (entry.count > config.max) {
+    // Límite excedido
+    const retryAfter = Math.ceil((entry.resetAt - now) / 1000);
+    
+    return {
+      success: false,
+      limit: config.max,
+      remaining: 0,
+      reset: entry.resetAt,
+      retryAfter,
+    };
+  }
+
+  // Dentro del límite
+  return {
+    success: true,
+    limit: config.max,
+    remaining: config.max - entry.count,
+    reset: entry.resetAt,
+  };
+}
+
+/**
  * Rate limiting principal
  * @param identifier - Identificador único (IP, email, IP+email, etc.)
  * @param type - Tipo de rate limit a aplicar
@@ -71,48 +180,14 @@ export async function rateLimit(
   try {
     const config = RATE_LIMITS[type];
     const now = Date.now();
-    const key = `${type}:${identifier}`;
+    const key = `ratelimit:${type}:${identifier}`;
 
-    // Obtener entrada existente o crear nueva
-    const entry = rateLimitStore.get(key);
-
-    if (!entry || entry.resetAt < now) {
-      // Nueva ventana o expirada
-      const resetAt = now + config.window;
-      rateLimitStore.set(key, { count: 1, resetAt });
-      
-      return {
-        success: true,
-        limit: config.max,
-        remaining: config.max - 1,
-        reset: resetAt,
-      };
+    // Usar Redis en producción, Map en desarrollo/test
+    if (USE_REDIS) {
+      return await rateLimitRedis(key, config, now);
+    } else {
+      return rateLimitMap(key, config, now);
     }
-
-    // Incrementar contador
-    entry.count++;
-    rateLimitStore.set(key, entry);
-
-    if (entry.count > config.max) {
-      // Límite excedido
-      const retryAfter = Math.ceil((entry.resetAt - now) / 1000);
-      
-      return {
-        success: false,
-        limit: config.max,
-        remaining: 0,
-        reset: entry.resetAt,
-        retryAfter,
-      };
-    }
-
-    // Dentro del límite
-    return {
-      success: true,
-      limit: config.max,
-      remaining: config.max - entry.count,
-      reset: entry.resetAt,
-    };
   } catch (error) {
     // Fallback: si falla el rate limiting, permitir request
     // En producción, loggear este error para investigar
@@ -190,37 +265,76 @@ export function getClientIP(headers: Headers): string {
  * Reset rate limit para un identificador específico
  * Útil para testing o para resetear después de verificación exitosa
  */
-export function resetRateLimit(identifier: string, type: RateLimitType = 'api'): void {
-  const key = `${type}:${identifier}`;
-  rateLimitStore.delete(key);
+export async function resetRateLimit(identifier: string, type: RateLimitType = 'api'): Promise<void> {
+  const key = `ratelimit:${type}:${identifier}`;
+  
+  if (USE_REDIS) {
+    try {
+      await redis.del(key);
+    } catch (error) {
+      console.error('[Rate Limit] Error resetting Redis key:', error);
+    }
+  } else {
+    rateLimitStore.delete(key);
+  }
 }
 
 /**
  * Obtener estadísticas actuales de rate limit
  * Útil para debugging y monitoreo
  */
-export function getRateLimitStats(identifier: string, type: RateLimitType = 'api'): {
+export async function getRateLimitStats(identifier: string, type: RateLimitType = 'api'): Promise<{
   attempts: number;
   remaining: number;
   resetAt: number | null;
-} {
-  const key = `${type}:${identifier}`;
-  const entry = rateLimitStore.get(key);
+}> {
+  const key = `ratelimit:${type}:${identifier}`;
   const config = RATE_LIMITS[type];
 
-  if (!entry || entry.resetAt < Date.now()) {
+  if (USE_REDIS) {
+    try {
+      const count = await redis.get(key);
+      const ttl = await redis.ttl(key);
+      
+      if (!count || ttl <= 0) {
+        return {
+          attempts: 0,
+          remaining: config.max,
+          resetAt: null,
+        };
+      }
+      
+      const attempts = parseInt(count, 10);
+      return {
+        attempts,
+        remaining: Math.max(0, config.max - attempts),
+        resetAt: Date.now() + (ttl * 1000),
+      };
+    } catch (error) {
+      console.error('[Rate Limit] Error getting Redis stats:', error);
+      return {
+        attempts: 0,
+        remaining: config.max,
+        resetAt: null,
+      };
+    }
+  } else {
+    const entry = rateLimitStore.get(key);
+    
+    if (!entry || entry.resetAt < Date.now()) {
+      return {
+        attempts: 0,
+        remaining: config.max,
+        resetAt: null,
+      };
+    }
+
     return {
-      attempts: 0,
-      remaining: config.max,
-      resetAt: null,
+      attempts: entry.count,
+      remaining: Math.max(0, config.max - entry.count),
+      resetAt: entry.resetAt,
     };
   }
-
-  return {
-    attempts: entry.count,
-    remaining: Math.max(0, config.max - entry.count),
-    resetAt: entry.resetAt,
-  };
 }
 
 

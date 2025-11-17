@@ -141,9 +141,11 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
     });
 
     return Object.entries(grupos).map(([fecha, fichajesDelDia]) => {
-      const ordenados = [...fichajesDelDia].sort((a, b) =>
-        new Date(a.hora).getTime() - new Date(b.hora).getTime()
-      );
+      const eventosOrdenados = fichajesDelDia
+        .flatMap<FichajeEvento>((registro) => registro.eventos)
+        .sort(
+          (a, b) => new Date(a.hora).getTime() - new Date(b.hora).getTime()
+        );
 
       let horasTrabajadas = 0;
       const fichaje = fichajesDelDia[0];
@@ -151,14 +153,14 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
         const valor = fichaje.horasTrabajadas;
         horasTrabajadas = typeof valor === 'string' ? parseFloat(valor) : valor;
         if (Number.isNaN(horasTrabajadas)) {
-          horasTrabajadas = calcularHorasTrabajadas(ordenados);
+          horasTrabajadas = calcularHorasTrabajadas(eventosOrdenados);
         }
       } else {
-        horasTrabajadas = calcularHorasTrabajadas(ordenados);
+        horasTrabajadas = calcularHorasTrabajadas(eventosOrdenados);
       }
 
-      const entrada = ordenados.find(e => e.tipo === 'entrada');
-      const salida = ordenados.find(e => e.tipo === 'salida');
+      const entrada = eventosOrdenados.find(e => e.tipo === 'entrada');
+      const salida = eventosOrdenados.find(e => e.tipo === 'salida');
 
       const horarioEntrada = entrada ? format(new Date(entrada.hora), 'HH:mm') : null;
       const horarioSalida = salida ? format(new Date(salida.hora), 'HH:mm') : null;
@@ -529,8 +531,9 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto">
-        <Card className="p-0">
-          <Table>
+        <Card className="overflow-hidden">
+          <div className="overflow-x-auto px-2 sm:px-4">
+            <Table className="min-w-full">
             <TableHeader>
               <TableRow>
                 <TableHead className="w-[40px]"></TableHead>
@@ -638,7 +641,8 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
                 })
               )}
             </TableBody>
-          </Table>
+            </Table>
+          </div>
         </Card>
       </div>
 

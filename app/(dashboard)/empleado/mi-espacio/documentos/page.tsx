@@ -1,7 +1,7 @@
 import { getSession } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
-import { serializeEmpleado } from '@/lib/utils';
+import { serializeEmpleadoSeguro } from '@/lib/empleados/serialize';
 import { MiEspacioDocumentosClient } from './documentos-client';
 import { asegurarCarpetasSistemaParaEmpleado } from '@/lib/documentos';
 
@@ -54,7 +54,7 @@ export default async function MiEspacioDocumentosPage() {
   }
 
   // Serializar campos Decimal para Client Component
-  const empleadoSerializado = serializeEmpleado(empleadoActualizado);
+  const empleadoSerializado = serializeEmpleadoSeguro(empleadoActualizado);
 
   return <MiEspacioDocumentosClient empleado={empleadoSerializado} />;
 }

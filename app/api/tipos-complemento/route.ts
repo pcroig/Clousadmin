@@ -100,7 +100,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ tipoComplemento }, { status: 201 });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: 'Datos inválidos', details: error.errors }, { status: 400 });
+      return NextResponse.json({ error: 'Datos inválidos', details: error.issues }, { status: 400 });
     }
 
     console.error('[POST /api/tipos-complemento] Error:', error);

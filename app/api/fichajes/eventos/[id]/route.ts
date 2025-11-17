@@ -2,7 +2,7 @@
 // API FichajeEventos - Editar / Eliminar evento
 // ========================================
 
-import { NextRequest } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { prisma, Prisma } from '@/lib/prisma';
 import {
   requireAuth,
@@ -20,18 +20,18 @@ const fichajeEventoUpdateSchema = z.object({
 });
 
 // PATCH /api/fichajes/eventos/[id] - Editar evento de fichaje
-export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   try {
     // Verificar autenticación
     const authResult = await requireAuth(req);
-    if (authResult instanceof Response) return authResult;
+    if (authResult instanceof NextResponse) return authResult;
     const { session } = authResult;
 
-    const { id } = await params;
+    const { id } = params;
 
     // Validar request body
     const validationResult = await validateRequest(req, fichajeEventoUpdateSchema);
-    if (validationResult instanceof Response) return validationResult;
+    if (validationResult instanceof NextResponse) return validationResult;
     const { data: validatedData } = validationResult;
 
     const { tipo, hora, motivoEdicion } = validatedData;
@@ -72,14 +72,14 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 }
 
 // DELETE /api/fichajes/eventos/[id] - Eliminar evento de fichaje
-export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
   try {
     // Verificar autenticación
     const authResult = await requireAuth(_req);
-    if (authResult instanceof Response) return authResult;
+    if (authResult instanceof NextResponse) return authResult;
     const { session } = authResult;
 
-    const { id } = await params;
+    const { id } = params;
 
     // Verificar que el evento existe y pertenece a la empresa
     const evento = await prisma.fichajeEvento.findUnique({

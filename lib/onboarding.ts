@@ -107,46 +107,49 @@ export async function crearOnboarding(
   tipoOnboarding: TipoOnboarding = 'completo'
 ): Promise<CrearOnboardingResult> {
   try {
-    // Verificar si ya existe un onboarding activo
-    const onboardingExistente = await prisma.onboardingEmpleado.findUnique({
-      where: { empleadoId },
-    });
-
-    if (onboardingExistente && !onboardingExistente.completado) {
-      // Si existe y no está completado, eliminar para crear uno nuevo
-      await prisma.onboardingEmpleado.delete({
-        where: { id: onboardingExistente.id },
-      });
-    }
-
-    // Generar token único
+    // Generar token único antes de la transacción
     const token = randomBytes(32).toString('hex');
     const tokenExpira = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 días
 
-    // Definir progreso inicial según tipo de onboarding
-    const progresoInicial = tipoOnboarding === 'completo'
-      ? {
-          credenciales_completadas: false,
-          datos_personales: false,
-          datos_bancarios: false,
-          datos_documentos: false,
-          pwa_explicacion: false,
-        }
-      : {
-          credenciales_completadas: false,
-          integraciones: false,
-          pwa_explicacion: false,
-        };
+    // Usar transacción para evitar condiciones de carrera
+    const onboarding = await prisma.$transaction(async (tx) => {
+      // Verificar si ya existe un onboarding activo
+      const onboardingExistente = await tx.onboardingEmpleado.findUnique({
+        where: { empleadoId },
+      });
 
-    const onboarding = await prisma.onboardingEmpleado.create({
-      data: {
-        empresaId,
-        empleadoId,
-        token,
-        tokenExpira,
-        tipoOnboarding,
-        progreso: toJsonValue(progresoInicial),
-      },
+      if (onboardingExistente && !onboardingExistente.completado) {
+        // Si existe y no está completado, eliminar para crear uno nuevo
+        await tx.onboardingEmpleado.delete({
+          where: { id: onboardingExistente.id },
+        });
+      }
+
+      // Definir progreso inicial según tipo de onboarding
+      const progresoInicial = tipoOnboarding === 'completo'
+        ? {
+            credenciales_completadas: false,
+            datos_personales: false,
+            datos_bancarios: false,
+            datos_documentos: false,
+            pwa_explicacion: false,
+          }
+        : {
+            credenciales_completadas: false,
+            integraciones: false,
+            pwa_explicacion: false,
+          };
+
+      return await tx.onboardingEmpleado.create({
+        data: {
+          empresaId,
+          empleadoId,
+          token,
+          tokenExpira,
+          tipoOnboarding,
+          progreso: toJsonValue(progresoInicial),
+        },
+      });
     });
 
     const baseUrl = process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
@@ -259,6 +262,16 @@ export async function guardarCredenciales(
         activo: true,
       },
     });
+
+    // Guardar avatar también en el registro del empleado para reutilizarlo en la app
+    if (avatarUrl) {
+      await prisma.empleado.update({
+        where: { id: onboarding.empleadoId },
+        data: {
+          fotoUrl: avatarUrl,
+        },
+      });
+    }
 
     // Actualizar progreso
     const progresoActual = onboarding.progreso as unknown as ProgresoOnboarding;

@@ -380,7 +380,7 @@ async function agregarHojaCambios(
   });
 
   for (const cambio of cambiosSalario) {
-    const campos = cambio.camposCambiados as any;
+    const campos = cambio.camposCambiados as Record<string, unknown>;
     let detalle = '';
 
     if (campos.iban) {

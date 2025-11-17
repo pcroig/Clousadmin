@@ -62,6 +62,13 @@ const layoutConfig: Record<
     icon: 'h-7 w-7',
     content: 'items-center',
   },
+  widget: {
+    empty: 'border-none bg-transparent py-4 px-4',
+    header: 'items-center text-center gap-2',
+    media: 'size-12 rounded-full bg-gray-100 text-gray-300',
+    icon: 'h-6 w-6',
+    content: 'items-center',
+  },
 };
 
 export function EmptyState({

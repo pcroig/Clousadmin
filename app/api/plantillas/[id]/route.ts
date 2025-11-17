@@ -7,7 +7,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { prisma, Prisma } from '@/lib/prisma';
 
 /**
  * GET /api/plantillas/[id]
@@ -120,9 +120,11 @@ export async function PATCH(
         ...(requiereFirma !== undefined && { requiereFirma }),
         ...(configuracionIA !== undefined && { 
           configuracionIA: {
-            ...(plantillaExistente.configuracionIA as any || {}),
+            ...(typeof plantillaExistente.configuracionIA === 'object' && plantillaExistente.configuracionIA !== null 
+              ? plantillaExistente.configuracionIA as Record<string, unknown>
+              : {}),
             ...configuracionIA,
-          } as any,
+          } as Prisma.InputJsonValue,
         }),
       },
     });

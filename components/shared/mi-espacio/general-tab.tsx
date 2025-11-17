@@ -1,14 +1,18 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { Lock, Unlock } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
+import { Button } from '@/components/ui/button';
 
 import { UsuarioRol } from '@/lib/constants/enums';
 import type { MiEspacioEmpleado, Usuario } from '@/types/empleado';
+import { useSensitiveUnlock, type SensitiveFieldKey } from '@/lib/hooks/useSensitiveUnlock';
+import { SensitiveUnlockDialog } from '@/components/shared/sensitive-unlock-dialog';
 
 type GeneralFormData = {
   nif: string;
@@ -47,6 +51,12 @@ const FORM_FIELDS: Array<keyof GeneralFormData> = [
   'iban',
   'titularCuenta',
 ];
+
+const SENSITIVE_FIELD_LABELS: Record<SensitiveFieldKey, string> = {
+  nif: 'DNI/NIE',
+  nss: 'Número de Seguridad Social',
+  iban: 'IBAN',
+};
 
 const buildInitialFormData = (empleado: MiEspacioEmpleado, usuario: Usuario): GeneralFormData => ({
   nif: empleado.nif ?? '',
@@ -123,6 +133,18 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado', onFieldUpdate,
   const isHrAdmin = rol === UsuarioRol.hr_admin;
   const requiresSolicitud = isEmpleado || isManager; // Empleados y managers crean solicitudes
 
+  const {
+    isUnlocked,
+    requestUnlock,
+    dialogState,
+    password: unlockPassword,
+    setPassword: setUnlockPassword,
+    error: unlockError,
+    confirmUnlock,
+    closeDialog,
+    loading: unlockingSensitiveData,
+  } = useSensitiveUnlock();
+
   // Estados para datos del formulario (solo info personal, contacto, bancaria)
   const [formData, setFormData] = useState<GeneralFormData>(() => buildInitialFormData(empleado, usuario));
   const initialFormDataRef = useRef<GeneralFormData>(formData);
@@ -169,7 +191,73 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado', onFieldUpdate,
     } catch (error) {
       console.error(`Error updating ${field}:`, error);
     }
-  }
+  };
+
+  const renderSensitiveInput = (
+    field: SensitiveFieldKey,
+    {
+      id,
+      label,
+      value,
+      placeholder = 'No especificado',
+      onChange,
+      onBlur,
+    }: {
+      id: string;
+      label: string;
+      value: string;
+      placeholder?: string;
+      onChange: (value: string) => void;
+      onBlur?: (value: string) => void;
+    }
+  ) => {
+    const unlocked = isUnlocked(field);
+
+    return (
+      <div>
+        <Label htmlFor={id}>{label}</Label>
+        <div className="relative">
+          <Input
+            id={id}
+            type={unlocked ? 'text' : 'password'}
+            value={value}
+            onChange={(event) => {
+              if (!unlocked) return;
+              onChange(event.target.value);
+            }}
+            onBlur={(event) => {
+              if (!unlocked) return;
+              onBlur?.(event.target.value);
+            }}
+            readOnly={!unlocked}
+            placeholder={unlocked ? placeholder : 'Desbloquea para ver'}
+          />
+          {unlocked ? (
+            <div className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs text-emerald-600">
+              <Unlock className="mr-1 h-3.5 w-3.5" />
+              Visible
+            </div>
+          ) : (
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              className="absolute inset-y-1 right-1 px-3 text-xs"
+              onClick={() => requestUnlock(field)}
+            >
+              <Lock className="mr-1 h-3.5 w-3.5" />
+              Desbloquear
+            </Button>
+          )}
+        </div>
+        {!unlocked && (
+          <p className="mt-1 text-xs text-gray-500">
+            Protegido. Desbloquea una sola vez para ver o editar todos los campos sensibles.
+          </p>
+        )}
+      </div>
+    );
+  };
 
   const handleSave = useCallback(async () => {
     if (saving) {
@@ -268,46 +356,41 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado', onFieldUpdate,
   }, [hasChanges, requiresSolicitud, onSaveReady, handleSave]);
 
   return (
-    <div className="space-y-6">
+    <>
+      <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Información Personal */}
         <div className="bg-white rounded-lg border border-gray-200 p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Información Personal</h3>
           <div className="space-y-4">
-            <div>
-              <Label htmlFor="nif">DNI/NIE</Label>
-              <Input
-                id="nif"
-                value={formData.nif}
-                onChange={(e) => setFieldValue('nif', e.target.value)}
-                onBlur={(e) => {
+            {renderSensitiveInput('nif', {
+              id: 'nif',
+              label: 'DNI/NIE',
+              value: formData.nif,
+              onChange: (value) => setFieldValue('nif', value),
+              onBlur: (value) => {
                   if (isHrAdmin && onFieldUpdate) {
-                    const newValue = e.target.value || null;
+                  const newValue = value || null;
                     if (newValue !== (empleado.nif || null)) {
                       handleFieldUpdate('nif', newValue);
                     }
                   }
-                }}
-                placeholder="No especificado"
-              />
-            </div>
-            <div>
-              <Label htmlFor="nss">Número de Seguridad Social</Label>
-              <Input
-                id="nss"
-                value={formData.nss}
-                onChange={(e) => setFieldValue('nss', e.target.value)}
-                onBlur={(e) => {
+              },
+            })}
+            {renderSensitiveInput('nss', {
+              id: 'nss',
+              label: 'Número de Seguridad Social',
+              value: formData.nss,
+              onChange: (value) => setFieldValue('nss', value),
+              onBlur: (value) => {
                   if (isHrAdmin && onFieldUpdate) {
-                    const newValue = e.target.value || null;
+                  const newValue = value || null;
                     if (newValue !== (empleado.nss || null)) {
                       handleFieldUpdate('nss', newValue);
                     }
                   }
-                }}
-                placeholder="No especificado"
-              />
-            </div>
+              },
+            })}
             <div>
               <Label htmlFor="fechaNacimiento">Fecha de Nacimiento</Label>
               <Input
@@ -546,23 +629,21 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado', onFieldUpdate,
         <div className="bg-white rounded-lg border border-gray-200 p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Información Bancaria</h3>
           <div className="space-y-4">
-            <div>
-              <Label htmlFor="iban">IBAN</Label>
-              <Input
-                id="iban"
-                value={formData.iban}
-                onChange={(e) => setFieldValue('iban', e.target.value)}
-                onBlur={(e) => {
+            {renderSensitiveInput('iban', {
+              id: 'iban',
+              label: 'IBAN',
+              value: formData.iban,
+              placeholder: 'ES00 0000 0000 0000 0000 0000',
+              onChange: (value) => setFieldValue('iban', value),
+              onBlur: (value) => {
                   if (isHrAdmin && onFieldUpdate) {
-                    const newValue = e.target.value || null;
+                  const newValue = value || null;
                     if (newValue !== (empleado.iban || null)) {
                       handleFieldUpdate('iban', newValue);
                     }
                   }
-                }}
-                placeholder="ES00 0000 0000 0000 0000 0000"
-              />
-            </div>
+              },
+            })}
             <div>
               <Label htmlFor="titularCuenta">Titular de la Cuenta</Label>
               <Input
@@ -583,7 +664,18 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado', onFieldUpdate,
           </div>
         </div>
       </div>
-    </div>
+      </div>
+      <SensitiveUnlockDialog
+        isOpen={dialogState.isOpen}
+        fieldLabel={dialogState.field ? SENSITIVE_FIELD_LABELS[dialogState.field] : undefined}
+        password={unlockPassword}
+        error={unlockError}
+        loading={unlockingSensitiveData}
+        onPasswordChange={setUnlockPassword}
+        onClose={closeDialog}
+        onConfirm={confirmUnlock}
+      />
+    </>
   );
 }
 

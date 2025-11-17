@@ -296,7 +296,6 @@ export function SolicitarAusenciaModal({
             <div className="flex items-center gap-2 text-sm text-gray-600">
               <InfoTooltip
                 content="Incluye los días de vacaciones disponibles teniendo en cuenta solicitudes aprobadas y pendientes."
-                variant="subtle"
                 side="right"
               />
               <span>

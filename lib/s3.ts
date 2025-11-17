@@ -265,9 +265,29 @@ export async function downloadFromS3(key: string): Promise<Buffer> {
     }
 
     // Convert stream to buffer
+    // AWS SDK v3 Body puede ser ReadableStream, Blob, o Readable
     const chunks: Uint8Array[] = [];
-    for await (const chunk of response.Body as any) {
-      chunks.push(chunk);
+    if (response.Body && typeof response.Body === 'object') {
+      // Type guard para verificar que es iterable
+      const body = response.Body as { [Symbol.asyncIterator]?: () => AsyncIterableIterator<Uint8Array> };
+      if (body[Symbol.asyncIterator]) {
+        for await (const chunk of body) {
+          chunks.push(chunk);
+        }
+      } else {
+        // Fallback: intentar como ReadableStream
+        const stream = response.Body as ReadableStream<Uint8Array>;
+        const reader = stream.getReader();
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            if (value) chunks.push(value);
+          }
+        } finally {
+          reader.releaseLock();
+        }
+      }
     }
 
     return Buffer.concat(chunks);
@@ -353,9 +373,29 @@ export async function descargarDocumento(key: string): Promise<Buffer> {
     }
 
     // Convertir stream a buffer
+    // AWS SDK v3 Body puede ser ReadableStream, Blob, o Readable
     const chunks: Uint8Array[] = [];
-    for await (const chunk of response.Body as any) {
-      chunks.push(chunk);
+    if (response.Body && typeof response.Body === 'object') {
+      // Type guard para verificar que es iterable
+      const body = response.Body as { [Symbol.asyncIterator]?: () => AsyncIterableIterator<Uint8Array> };
+      if (body[Symbol.asyncIterator]) {
+        for await (const chunk of body) {
+          chunks.push(chunk);
+        }
+      } else {
+        // Fallback: intentar como ReadableStream
+        const stream = response.Body as ReadableStream<Uint8Array>;
+        const reader = stream.getReader();
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            if (value) chunks.push(value);
+          }
+        } finally {
+          reader.releaseLock();
+        }
+      }
     }
 
     return Buffer.concat(chunks);

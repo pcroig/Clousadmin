@@ -29,6 +29,13 @@ Cifrar los campos sensibles (`iban`, `nif`, `nss`) ya almacenados en `empleados`
 
 > ℹ️ El script exige `--confirm-backup` para evitar ejecuciones accidentales sin respaldo.
 
+## Registro de ejecuciones
+
+| Fecha (UTC)        | Entorno          | Modo        | Procesados | Actualizados | Sin cambios | Comentarios                    |
+|--------------------|------------------|-------------|------------|--------------|-------------|--------------------------------|
+| 2025-11-17 10:12   | Desarrollo local | `--dry-run` | 6          | 6            | 0           | Identificados NIF pendientes.  |
+| 2025-11-17 10:15   | Desarrollo local | Real        | 6          | 6            | 0           | Todos los NIF cifrados (`COUNT(*) ... NOT LIKE '%:%:%:%' = 0`). |
+
 ## Rollback
 Si algo falla:
 1. Restaura la BD con el último backup (`docs/DISASTER_RECOVERY.md` · sección 3.1).

@@ -65,7 +65,7 @@ export function BandejaEntradaNotificaciones({
                   <div className="flex items-start justify-between gap-3">
                     <p className="text-sm font-semibold text-gray-900">{notificacion.titulo}</p>
                     {!notificacion.leida && (
-                      <span className="w-2 h-2 rounded-full bg-blue-600 mt-2" />
+                      <span className="w-2 h-2 rounded-full mt-2" style={{ backgroundColor: '#d97757' }} />
                     )}
                   </div>
                   <p className="text-sm text-gray-600">{notificacion.mensaje}</p>

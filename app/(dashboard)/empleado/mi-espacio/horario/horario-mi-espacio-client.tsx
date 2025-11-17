@@ -219,12 +219,12 @@ export function HorarioMiEspacioClient({
 
       {/* Acciones rápidas */}
       <div className="flex gap-4">
-        <Button onClick={() => window.location.href = '/empleado/horario/fichajes'}>
+        <Button onClick={() => window.location.href = '/empleado/mi-espacio/fichajes'}>
           Ver fichajes completos
         </Button>
         <Button
           variant="outline"
-          onClick={() => window.location.href = '/empleado/horario/ausencias'}
+          onClick={() => window.location.href = '/empleado/mi-espacio/ausencias'}
         >
           Ver ausencias completas
         </Button>

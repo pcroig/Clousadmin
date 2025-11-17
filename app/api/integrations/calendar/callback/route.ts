@@ -126,7 +126,7 @@ export async function GET(req: NextRequest) {
       await prisma.integracion.update({
         where: { id: existingIntegration.id },
         data: {
-          config: integrationConfig as Prisma.JsonValue,
+          config: integrationConfig as Prisma.InputJsonValue,
           calendarId: calendarId,
           activa: true,
         },
@@ -139,7 +139,7 @@ export async function GET(req: NextRequest) {
           usuarioId: integrationType === "personal" ? session.user.id : null,
           tipo: "calendario",
           proveedor: "google_calendar",
-          config: integrationConfig as Prisma.JsonValue,
+          config: integrationConfig as Prisma.InputJsonValue,
           calendarId: calendarId,
           activa: true,
         },

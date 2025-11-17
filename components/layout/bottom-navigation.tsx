@@ -6,7 +6,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, Inbox, Clock, User, Settings, MoreHorizontal } from 'lucide-react';
+import { Home, Inbox, Clock, User, Settings, Calendar } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface BottomNavigationProps {
@@ -38,19 +38,25 @@ export function BottomNavigation({ rol }: BottomNavigationProps) {
       isActive: (path) => path.includes('/empleado/bandeja-entrada'),
     },
     {
-      name: 'Fichajes',
-      href: '/empleado/horario/fichajes',
-      icon: Clock,
-      isActive: (path) => path.includes('/empleado/horario/fichajes'),
+      name: 'Ausencias',
+      href: '/empleado/mi-espacio/ausencias',
+      icon: Calendar,
+      isActive: (path) => path.includes('/empleado/mi-espacio/ausencias'),
     },
     {
-      name: 'Otros',
-      href: '/empleado/settings',
-      icon: MoreHorizontal,
+      name: 'Fichajes',
+      href: '/empleado/mi-espacio/fichajes',
+      icon: Clock,
+      isActive: (path) => path.includes('/empleado/mi-espacio/fichajes'),
+    },
+    {
+      name: 'Perfil',
+      href: '/empleado/mi-perfil',
+      icon: User,
       isActive: (path) =>
-        path.includes('/empleado/settings') ||
-        path.includes('/empleado/mi-espacio') ||
-        path.includes('/empleado/horario/ausencias'),
+        path.startsWith('/empleado/mi-perfil') ||
+        path.includes('/empleado/mi-espacio/contratos') ||
+        path.includes('/empleado/mi-espacio/documentos'),
     },
   ];
 

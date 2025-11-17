@@ -236,10 +236,12 @@ export function notFoundResponse(message: string = 'Recurso no encontrado'): Nex
  * Respuesta de bad request
  */
 export function badRequestResponse(message: string, details?: unknown): NextResponse {
-  return NextResponse.json(
-    { error: message, ...(details && { details }) },
-    { status: 400 }
-  );
+  const payload: { error: string; details?: unknown } = { error: message };
+  if (typeof details !== 'undefined') {
+    payload.details = details;
+  }
+
+  return NextResponse.json(payload, { status: 400 });
 }
 
 /**

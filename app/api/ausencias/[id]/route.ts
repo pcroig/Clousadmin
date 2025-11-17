@@ -295,6 +295,7 @@ export async function PATCH(
         motivo: z.string().nullable().optional(),
         descripcion: z.string().nullable().optional(),
         justificanteUrl: z.string().nullable().optional(),
+        documentoId: z.string().uuid().nullable().optional(),
         estado: z.enum(['pendiente', 'confirmada', 'completada', 'rechazada']).optional(),
       }).refine((data) => {
         if (data.fechaInicio && data.fechaFin) {
@@ -440,6 +441,7 @@ export async function PATCH(
           ...(dataEdicion.tipo && { tipo: dataEdicion.tipo }),
           ...(dataEdicion.fechaInicio && { fechaInicio: nuevaFechaInicio }),
           ...(dataEdicion.justificanteUrl !== undefined && { justificanteUrl: dataEdicion.justificanteUrl }),
+          ...(dataEdicion.documentoId !== undefined && { documentoId: dataEdicion.documentoId || null }),
           ...(dataEdicion.fechaFin && { fechaFin: nuevaFechaFin }),
           ...(dataEdicion.medioDia !== undefined && { medioDia: nuevoMedioDia }),
           ...(dataEdicion.motivo !== undefined && { motivo: dataEdicion.motivo }),

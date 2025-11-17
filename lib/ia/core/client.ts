@@ -14,6 +14,7 @@ import {
   AISuccess,
   AIError,
   AICallMetadata,
+  MessageRole,
 } from './types';
 import {
   isOpenAIAvailable,
@@ -385,11 +386,11 @@ export async function callAIForJSON<T = any>(
       
       // Agregar mensaje adicional pidiendo JSON válido
       messages.push({
-        role: 'assistant' as any,
+        role: MessageRole.ASSISTANT,
         content: content,
       });
       messages.push({
-        role: 'user' as any,
+        role: MessageRole.USER,
         content: 'La respuesta anterior no es JSON válido. Por favor, responde SOLO con un objeto JSON válido, sin markdown ni texto adicional.',
       });
     }
