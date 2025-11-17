@@ -3,6 +3,12 @@
 // ========================================
 // Este archivo muestra SOLO los modelos modificados
 // Para el schema completo, aplicar estos cambios al schema.prisma principal
+//
+// NOTA HISTÓRICA: Este documento describe cambios históricos al schema.
+// Los estados de nómina han cambiado desde entonces:
+// - Estados antiguos: pre_nomina → complementos_pendientes → lista_exportar → exportada → definitiva → publicada
+// - Estados actuales: pendiente → completada → publicada (ver lib/constants/nomina-estados.ts)
+// Ver docs/funcionalidades/gestion-nominas.md para la documentación actualizada.
 
 // ========================================
 // MODELO OPTIMIZADO: Fichaje

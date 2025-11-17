@@ -8,6 +8,15 @@ import { procesarNominas } from '@/lib/imports/nominas-upload';
 
 import { UsuarioRol } from '@/lib/constants/enums';
 
+const MAX_NOMINA_FILE_BYTES = parseInt(
+  process.env.NOMINAS_MAX_UPLOAD_BYTES || `${15 * 1024 * 1024}`
+);
+const ALLOWED_NOMINA_TYPES = [
+  'application/pdf',
+  'application/zip',
+  'application/x-zip-compressed',
+];
+
 // POST /api/nominas/upload
 export async function POST(req: NextRequest) {
   try {
@@ -47,6 +56,34 @@ export async function POST(req: NextRequest) {
     console.log(
       `[API nominas/upload] ${files.length} archivo(s) para ${mes}/${anio}`
     );
+
+    // Validación de archivos
+    for (const file of files) {
+      const nombre = file.name.toLowerCase();
+      const esZip = nombre.endsWith('.zip');
+      const esPdf = nombre.endsWith('.pdf');
+
+      if (!esZip && !esPdf) {
+        return NextResponse.json(
+          { error: `Formato no permitido: ${file.name}. Solo ZIP o PDF.` },
+          { status: 400 }
+        );
+      }
+
+      if (
+        file.size > MAX_NOMINA_FILE_BYTES ||
+        (file.type && !ALLOWED_NOMINA_TYPES.includes(file.type) && !esZip)
+      ) {
+        return NextResponse.json(
+          {
+            error: `El archivo ${file.name} excede el tamaño máximo permitido (${Math.round(
+              MAX_NOMINA_FILE_BYTES / (1024 * 1024)
+            )}MB).`,
+          },
+          { status: 400 }
+        );
+      }
+    }
 
     // Convertir files a buffers
     const filesWithBuffers: Array<{ filename: string; buffer: Buffer }> = [];
@@ -91,6 +128,8 @@ export async function POST(req: NextRequest) {
     );
   }
 }
+
+
 
 
 

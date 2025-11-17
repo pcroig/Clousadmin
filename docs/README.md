@@ -16,15 +16,17 @@ docs/
 ├── HOOKS_REUTILIZABLES.md            # Hooks compartidos useApi/useMutation
 ├── INVITAR_USUARIOS.md              # Flujo de invitaciones y alta de usuarios
 ├── MIGRACION_ENUMS_Y_DEPARTAMENTO.md # Histórico de migraciones críticas
-├── ANALISIS_RENDIMIENTO_COMPLETO.md   # ✨ Análisis completo de rendimiento (132 problemas identificados)
-├── OPTIMIZACION_PENDIENTE.md         # Lista de optimizaciones en curso
-├── OPTIMIZACION_PRISMA.md            # Optimización de consultas Prisma
-├── PATRONES_CODIGO.md                # Patrones de código compartidos
-├── PLAN_LIMPIEZA_DOCUMENTACION.md    # Plan de depuración de documentación
-├── PLAN_OPTIMIZACION_UNIFICADO.md    # Hoja de ruta consolidada
+├── MIGRACION_HETZNER.md              # Guía de migración a Hetzner
+├── CHECKLIST_MIGRACION_HETZNER.md    # Checklist de migración
+├── PRODUCCION_CHECKLIST.md           # Checklist de producción
+├── NGINX_SETUP.md                    # Configuración de Nginx
+├── DISASTER_RECOVERY.md              # Recuperación ante desastres
+├── RUNBOOK.md                        # Runbook operacional
+├── TROUBLESHOOTING_PROD.md           # Troubleshooting en producción
+├── MIGRACION_DOCUMENTOS_S3.md        # Migración de documentos a S3
 ├── RESUMEN_SEGURIDAD_IMPLEMENTADA.md # Estado de medidas de seguridad
 ├── SETUP.md                          # Guía de configuración inicial
-├── SETUP_AUTENTICACION.md            # Configuración de autenticación (Cognito + JWT)
+├── SETUP_AUTENTICACION.md            # Configuración de autenticación (JWT)
 ├── TROUBLESHOOTING.md                # Resolución de problemas recurrentes
 │
 ├── daily/                            # Logs diarios y consolidado por mes

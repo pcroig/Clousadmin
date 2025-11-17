@@ -250,7 +250,7 @@ model Empleado {
 ### 1. **ENCRYPTION_KEY**
 - ⚠️ **CRÍTICO**: Sin esta key, NO se pueden desencriptar datos existentes
 - ⚠️ **CRÍTICO**: Guardar backup de forma segura antes de producción
-- ⚠️ **CRÍTICO**: En producción, usar AWS Secrets Manager
+- ⚠️ **CRÍTICO**: En producción, usar gestor de secretos seguro (HashiCorp Vault, 1Password Secrets Automation, o similar) - **NOTA**: Este documento es histórico.
 
 ### 2. **Datos Existentes**
 - ⚠️ Los datos existentes en BD NO están encriptados automáticamente

@@ -13,7 +13,7 @@
 - [ ] **Revisar y aprobar** especificación técnica (`plantillas-documentos.md`)
 - [ ] **Leer** guía de implementación (`plantillas-documentos-implementacion.md`)
 - [ ] **Decidir** qué plantillas oficiales incluir en MVP
-- [ ] **Verificar** que AWS S3 está configurado y funcionando
+- [ ] **Verificar** que Hetzner Object Storage está configurado y funcionando (ver `docs/MIGRACION_HETZNER.md`)
 - [ ] **Confirmar** que módulo de documentos existente funciona correctamente
 
 ### Diseño de Plantillas Word
@@ -564,11 +564,11 @@
 - [ ] **Testing en staging**:
   - [ ] Probar flujo completo
   - [ ] Verificar generación de documentos
-  - [ ] Verificar que S3 funciona correctamente
+  - [ ] Verificar que Hetzner Object Storage funciona correctamente
 
 - [ ] **Deploy a producción**:
   - [ ] Merge a rama `main`
-  - [ ] Deploy automático (Amplify/Vercel)
+  - [ ] Deploy en servidor Hetzner (ver `docs/DEPLOY_HETZNER.md`)
   - [ ] Ejecutar migraciones en producción
   - [ ] Ejecutar seeders en producción
 

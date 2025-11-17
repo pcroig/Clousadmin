@@ -38,7 +38,7 @@ Guarda el resultado, lo necesitarás en el siguiente paso.
 
 ### 3. Agregar variables de entorno a tu hosting
 
-En tu plataforma de hosting (Vercel, Netlify, AWS Amplify, etc.), agrega:
+En tu servidor Hetzner (o plataforma de hosting), agrega a `.env`:
 
 ```bash
 CRON_SECRET=tu-secret-generado-aqui
@@ -194,7 +194,7 @@ openssl rand -base64 32
 2. Actualiza en GitHub:
    - Settings → Secrets → CRON_SECRET → Update
 
-3. Actualiza en tu hosting (Vercel, etc.)
+3. Actualiza en tu servidor Hetzner (archivo `.env`)
 
 4. El cambio es inmediato, no requiere redeploy del código
 
@@ -267,7 +267,7 @@ openssl rand -base64 32
 
 Los logs del cron se guardan en:
 - **GitHub Actions**: Actions → Workflow → Ver run
-- **Tu servidor**: Depende del hosting (Vercel Logs, CloudWatch, etc.)
+- **Tu servidor Hetzner**: Logs de PM2 (`pm2 logs clousadmin`) o logs del sistema (`journalctl`)
 
 Busca líneas como:
 ```

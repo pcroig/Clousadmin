@@ -86,23 +86,23 @@ export async function GET(req: NextRequest) {
         'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
       );
     } else {
-      const fullPath = join(process.cwd(), 'uploads', rutaArchivo);
-      try {
-        await mkdir(dirname(fullPath), { recursive: true });
-        await writeFile(fullPath, buffer);
+    const fullPath = join(process.cwd(), 'uploads', rutaArchivo);
+    try {
+      await mkdir(dirname(fullPath), { recursive: true });
+      await writeFile(fullPath, buffer);
       } catch (saveError) {
         console.error('[API export-gestoria] Error guardando archivo:', saveError);
       }
     }
 
-    await guardarExportGestoria(
-      session.user.empresaId,
-      mes,
-      anio,
+      await guardarExportGestoria(
+        session.user.empresaId,
+        mes,
+        anio,
       archivoReferencia,
-      nombreArchivo,
-      session.user.id
-    );
+        nombreArchivo,
+        session.user.id
+      );
 
     // Retornar archivo para descarga
     return new NextResponse(new Uint8Array(buffer), {

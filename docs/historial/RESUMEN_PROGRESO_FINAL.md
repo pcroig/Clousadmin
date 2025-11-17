@@ -301,7 +301,7 @@ GOOGLE_AI_API_KEY=...
 DATABASE_URL=postgresql://...
 ```
 
-#### Cron Job en Vercel
+#### Cron Job (HISTÓRICO - Ahora usa crontab en Hetzner)
 ```json
 {
   "crons": [

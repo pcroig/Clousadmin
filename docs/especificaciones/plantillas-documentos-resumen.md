@@ -203,7 +203,7 @@ Database (PostgreSQL + Prisma)
     ├─ DocumentoGenerado
     └─ Documento (existente)
     ↓
-Storage (AWS S3)
+Storage (Hetzner Object Storage - S3-compatible)
     ├─ Plantillas originales
     └─ Documentos generados
 ```

@@ -13,6 +13,7 @@ import {
 } from '@/lib/api-handler';
 import { EstadoAusencia, EstadoFichaje } from '@/lib/constants/enums';
 import { obtenerRangoFechaAntiguedad } from '@/lib/calculos/antiguedad';
+import { FICHAJES_METRICS } from '@/lib/analytics/metrics';
 
 const toNumber = (value: Prisma.Decimal | number | null | undefined): number =>
   value ? Number(value) : 0;
@@ -343,6 +344,9 @@ export async function GET(request: NextRequest) {
       balanceAcumulado: Math.round(balanceAcumulado * 10) / 10,
       promedioHorasPorEquipo,
       tasaAbsentismoPorEquipo,
+      metadata: {
+        metrics: FICHAJES_METRICS,
+      },
     });
   } catch (error) {
     return handleApiError(error, 'API GET /api/analytics/fichajes');

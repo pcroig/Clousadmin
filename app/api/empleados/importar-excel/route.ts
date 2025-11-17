@@ -9,6 +9,8 @@ import { mapearEmpleadosConIA, validarEmpleado } from '@/lib/ia/procesar-excel-e
 
 import { UsuarioRol } from '@/lib/constants/enums';
 
+const MAX_EXCEL_BYTES = parseInt(process.env.IMPORT_EXCEL_MAX_BYTES || `${5 * 1024 * 1024}`);
+
 /**
  * POST /api/empleados/importar-excel
  * 
@@ -53,6 +55,16 @@ export async function POST(req: NextRequest) {
         {
           success: false,
           error: 'Formato de archivo no válido. Usa .xlsx, .xls o .csv',
+        },
+        { status: 400 }
+      );
+    }
+
+    if (file.size > MAX_EXCEL_BYTES) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'El archivo es demasiado grande. Máximo 5MB.',
         },
         { status: 400 }
       );

@@ -275,7 +275,7 @@ Para las notificaciones proactivas que requieren revisión periódica, se recomi
    ```typescript
    // /app/api/cron/daily-notifications/route.ts
    export async function GET(request: NextRequest) {
-     // Validar token de autorización (Vercel Cron, etc.)
+     // Validar token de autorización (CRON_SECRET para crontab en Hetzner)
      const authHeader = request.headers.get('authorization');
      if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
        return new Response('Unauthorized', { status: 401 });
@@ -289,9 +289,9 @@ Para las notificaciones proactivas que requieren revisión periódica, se recomi
    }
    ```
 
-2. **Configurar en Vercel**:
-   ```json
-   // vercel.json
+2. **Configurar en servidor Hetzner** (ver `docs/hetzner/setup-cron.sh`):
+   ```bash
+   # Añadir a crontab
    {
      "crons": [
        {

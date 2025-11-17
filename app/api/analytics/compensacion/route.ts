@@ -17,6 +17,7 @@ import {
   calcularVariacion,
   MESES,
 } from '@/lib/utils/analytics-helpers';
+import { COMPENSACION_METRICS } from '@/lib/analytics/metrics';
 
 const empleadoConEquiposSelect = Prisma.validator<Prisma.EmpleadoSelect>()({
   id: true,
@@ -671,6 +672,9 @@ export async function GET(request: NextRequest) {
       evolucionCoste,
       distribucionSalarial,
       nominas: nominasAnalytics,
+      metadata: {
+        metrics: COMPENSACION_METRICS,
+      },
     });
   } catch (error) {
     return handleApiError(error, 'API GET /api/analytics/compensacion');

@@ -84,7 +84,7 @@ Abre en `http://localhost:5555`
 
 ## 6. Próximos Pasos
 
-- [ ] Configurar email service (AWS SES o Resend)
+- [x] Configurar email service (Resend) - Ver `docs/CONFIGURACION_RESEND.md`
 - [ ] Implementar botón "Enviar invitación" en UI
 - [ ] Configurar Google OAuth
 - [ ] Implementar recuperación de contraseña

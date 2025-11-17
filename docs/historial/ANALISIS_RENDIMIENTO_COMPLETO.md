@@ -2130,7 +2130,7 @@ El proyecto Clousadmin tiene una **arquitectura sólida y bien organizada**, per
 
 ### Fortalezas
 - ✅ Arquitectura en capas bien definida
-- ✅ Uso de tecnologías modernas (Next.js 14, React Query, Prisma)
+- ✅ Uso de tecnologías modernas (Next.js 16, React Query, Prisma) - **NOTA**: Este documento es histórico. El proyecto ahora usa Next.js 16.
 - ✅ Separación de concerns (components, lib, app)
 - ✅ Type safety con TypeScript
 

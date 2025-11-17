@@ -12,6 +12,7 @@ import { puedeAccederACarpeta } from '@/lib/documentos';
 
 import { UsuarioRol } from '@/lib/constants/enums';
 import { deleteFromS3, getSignedDownloadUrl } from '@/lib/s3';
+import { logAccesoSensibles } from '@/lib/auditoria';
 
 // GET /api/documentos/[id] - Descargar documento
 export async function GET(
@@ -39,7 +40,7 @@ export async function GET(
       },
     });
 
-    if (!documento) {
+    if (!documento || documento.empresaId !== session.user.empresaId) {
       return NextResponse.json({ error: 'Documento no encontrado' }, { status: 404 });
     }
 
@@ -81,6 +82,14 @@ export async function GET(
 
     const isCloudDocument =
       documento.s3Bucket && documento.s3Bucket !== 'local' && documento.s3Key;
+
+    await logAccesoSensibles({
+      request,
+      session,
+      recurso: 'documento',
+      empleadoAccedidoId: documento.empleadoId ?? undefined,
+      camposAccedidos: [documento.tipoDocumento ?? 'documento'],
+    });
 
     if (isCloudDocument) {
       const signedUrl = await getSignedDownloadUrl(documento.s3Key, {
@@ -169,6 +178,15 @@ export async function DELETE(
     // Eliminar registro de DB
     await prisma.documento.delete({
       where: { id },
+    });
+
+    await logAccesoSensibles({
+      request,
+      session,
+      recurso: 'documento',
+      accion: 'eliminacion',
+      empleadoAccedidoId: documento.empleadoId ?? undefined,
+      camposAccedidos: [documento.tipoDocumento ?? 'documento'],
     });
 
     return NextResponse.json({

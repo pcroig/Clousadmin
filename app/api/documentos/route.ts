@@ -192,14 +192,14 @@ export async function POST(request: NextRequest) {
       storageBucket = bucketName;
     } else {
       // Guardar archivo en filesystem local
-      const fullPath = join(process.cwd(), 'uploads', rutaStorage);
-      const dirPath = fullPath.substring(0, fullPath.lastIndexOf('/'));
+    const fullPath = join(process.cwd(), 'uploads', rutaStorage);
+    const dirPath = fullPath.substring(0, fullPath.lastIndexOf('/'));
 
-      if (!existsSync(dirPath)) {
-        await mkdir(dirPath, { recursive: true });
-      }
+    if (!existsSync(dirPath)) {
+      await mkdir(dirPath, { recursive: true });
+    }
 
-      await writeFile(fullPath, buffer);
+    await writeFile(fullPath, buffer);
     }
 
     // Crear registro en DB

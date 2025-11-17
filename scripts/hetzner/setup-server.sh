@@ -71,13 +71,13 @@ fi
 echo ""
 if [[ "$INSTALL_LOCAL_DB" == true ]]; then
     echo "📦 Instalando PostgreSQL local..."
-    if ! command -v psql &> /dev/null; then
-        sudo apt install -y postgresql postgresql-contrib
-        sudo systemctl enable postgresql
-        sudo systemctl start postgresql
-        echo "✅ PostgreSQL instalado"
-    else
-        echo "✅ PostgreSQL ya está instalado"
+if ! command -v psql &> /dev/null; then
+    sudo apt install -y postgresql postgresql-contrib
+    sudo systemctl enable postgresql
+    sudo systemctl start postgresql
+    echo "✅ PostgreSQL instalado"
+else
+    echo "✅ PostgreSQL ya está instalado"
     fi
 else
     echo "ℹ️  Saltando instalación local de PostgreSQL."
@@ -157,7 +157,7 @@ echo "📋 Software instalado:"
 echo "   ✅ Node.js $(node --version)"
 echo "   ✅ npm $(npm --version)"
 if [[ "$INSTALL_LOCAL_DB" == true ]]; then
-    echo "   ✅ PostgreSQL $(psql --version 2>/dev/null || echo 'instalado')"
+echo "   ✅ PostgreSQL $(psql --version 2>/dev/null || echo 'instalado')"
 else
     echo "   ⚠️  PostgreSQL local no instalado (usa base de datos gestionada)"
 fi

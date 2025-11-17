@@ -1,6 +1,6 @@
 # 🏢 CLOUSADMIN
 
-Plataforma de gestión de RRHH para empresas españolas construida con Next.js 14, Prisma, Hetzner y procesamiento de documentos con IA.
+Plataforma de gestión de RRHH para empresas españolas construida con Next.js 16, Prisma, Hetzner y procesamiento de documentos con IA.
 
 ---
 
@@ -192,5 +192,4 @@ Para preguntas o soporte: [info@clousadmin.com](mailto:info@clousadmin.com)
 ---
 
 **Versión**: 1.2.0
-**Última actualización**: 13 de noviembre de 2025
-**Migración a Hetzner**: 13 de noviembre de 2025
+**Última actualización**: 27 de enero de 2025

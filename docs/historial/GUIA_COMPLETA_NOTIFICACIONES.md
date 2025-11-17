@@ -516,7 +516,7 @@ queryClient.invalidateQueries({ queryKey: ['solicitudes'] });
 Antes de deploy:
 
 - [ ] Variables de entorno configuradas (`CRON_SECRET`, API keys IA)
-- [ ] Cron job programado en Vercel/plataforma
+- [ ] Cron job programado en servidor Hetzner (crontab) - Ver `docs/MIGRACION_HETZNER.md`
 - [ ] Migración de Prisma aplicada en prod
 - [ ] Tests unitarios pasando
 - [ ] Tests de integración pasando

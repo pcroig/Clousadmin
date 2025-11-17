@@ -87,7 +87,7 @@ Clousadmin is an HR management platform for Spanish companies built with Next.js
 5. 🧪 **Consider edge cases** that might break
 
 **When integrating external code or libraries:**
-- ✅ **Verify tech stack compatibility** before integration (does it match Next.js 14, Prisma, TypeScript?)
+- ✅ **Verify tech stack compatibility** before integration (does it match Next.js 16, Prisma, TypeScript?)
 - ✅ **Ask about project structure** if unclear (monorepo? single app? where is the code located?)
 - ✅ **DO NOT assume** project structure - verify paths and conventions match
 - ✅ **Check all dependencies** - ensure they're compatible with existing stack
@@ -113,7 +113,7 @@ Clousadmin is an HR management platform for Spanish companies built with Next.js
 ## Core Architecture Principles
 
 ### 1. Stack & Technology
-- **Framework**: Next.js 14 (App Router)
+- **Framework**: Next.js 16 (App Router)
 - **Language**: TypeScript (strict mode)
 - **Runtime**: Node.js 18+
 - **Database**: PostgreSQL with Prisma ORM

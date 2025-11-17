@@ -86,7 +86,20 @@ Si se pierde el bucket principal:
 
 ---
 
-## 6. Contactos
+## 6. Verificación periódica de backups
+
+1. Ejecuta trimestralmente `bash scripts/verify-latest-backup.sh` en un host con acceso al bucket (usa las mismas credenciales que el cron de backup).
+2. El script descarga el último dump, valida la integridad con `gunzip -t` y limpia el archivo temporal.
+3. (Opcional) Restaura el archivo en una base de datos temporal:
+   ```bash
+   aws --endpoint-url $STORAGE_ENDPOINT s3 cp s3://$BACKUP_BUCKET/backups/postgres/<archivo>.sql.gz .
+   gunzip <archivo>.sql.gz
+   createdb clousadmin_restore
+   psql clousadmin_restore < <archivo>.sql
+   ```
+4. Documenta la verificación en `docs/daily/` indicando fecha, archivo y resultado.
+
+## 7. Contactos
 
 - **Hetzner Support**: https://console.hetzner.cloud/support
 - **Hetzner Status**: https://status.hetzner.com/

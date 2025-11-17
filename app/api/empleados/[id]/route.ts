@@ -17,6 +17,7 @@ import {
 } from '@/lib/notificaciones';
 import { z } from 'zod';
 import { encryptEmpleadoData, decryptEmpleadoData } from '@/lib/empleado-crypto';
+import { logAccesoSensibles } from '@/lib/auditoria';
 
 // Schema de validación para actualizar empleado
 const empleadoUpdateSchema = z.object({
@@ -100,6 +101,14 @@ export async function GET(
 
     // Desencriptar datos sensibles antes de retornar
     const empleadoDesencriptado = decryptEmpleadoData(empleado);
+
+    await logAccesoSensibles({
+      request,
+      session,
+      recurso: 'empleado',
+      empleadoAccedidoId: empleado.id,
+      camposAccedidos: ['perfil', 'datos_personales'],
+    });
 
     return successResponse(empleadoDesencriptado);
   } catch (error) {
@@ -413,6 +422,15 @@ export async function PATCH(
     }
 
     const empleadoDesencriptado = decryptEmpleadoData(empleado);
+
+    await logAccesoSensibles({
+      request,
+      session,
+      recurso: 'empleado',
+      accion: 'modificacion',
+      empleadoAccedidoId: id,
+      camposAccedidos: Object.keys(datosParaActualizar),
+    });
 
     return successResponse(empleadoDesencriptado);
   } catch (error) {
