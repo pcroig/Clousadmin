@@ -5,7 +5,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -23,9 +23,19 @@ interface FichajeManualModalProps {
 
 export function FichajeManualModal({ open, onClose, onSuccess }: FichajeManualModalProps) {
   const [tipo, setTipo] = useState<'entrada' | 'pausa_inicio' | 'pausa_fin' | 'salida'>('entrada');
+  const [fecha, setFecha] = useState(() => new Date().toISOString().split('T')[0]);
   const [hora, setHora] = useState('');
   const [motivo, setMotivo] = useState('');
   const [guardando, setGuardando] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      setTipo('entrada');
+      setHora('');
+      setMotivo('');
+      setFecha(new Date().toISOString().split('T')[0]);
+    }
+  }, [open]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,9 +48,7 @@ export function FichajeManualModal({ open, onClose, onSuccess }: FichajeManualMo
     setGuardando(true);
 
     try {
-      // Obtener fecha actual en formato YYYY-MM-DD
-      const hoy = new Date();
-      const fecha = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-${String(hoy.getDate()).padStart(2, '0')}`;
+      const fechaSeleccionada = fecha || new Date().toISOString().split('T')[0];
 
       // Crear solicitud de fichaje manual
       const response = await fetch('/api/solicitudes', {
@@ -49,9 +57,9 @@ export function FichajeManualModal({ open, onClose, onSuccess }: FichajeManualMo
         body: JSON.stringify({
           tipo: 'fichaje_manual',
           camposCambiados: {
-            fecha,
+            fecha: fechaSeleccionada,
             tipo,
-            hora: `${fecha}T${hora}:00`,
+            hora: `${fechaSeleccionada}T${hora}:00`,
             motivo: motivo || 'Fichaje manual',
           },
           motivo: motivo || 'Fichaje manual',
@@ -69,6 +77,7 @@ export function FichajeManualModal({ open, onClose, onSuccess }: FichajeManualMo
       setTipo('entrada');
       setHora('');
       setMotivo('');
+      setFecha(new Date().toISOString().split('T')[0]);
       
       onClose();
       
@@ -89,12 +98,23 @@ export function FichajeManualModal({ open, onClose, onSuccess }: FichajeManualMo
         <DialogHeader>
           <DialogTitle>Añadir Fichaje Manual</DialogTitle>
           <p className="text-sm text-gray-500 mt-1">
-            Crea una solicitud de fichaje para el día de hoy. Se procesará automáticamente.
+            Crea una solicitud de fichaje indicando el día y la hora. Se procesará automáticamente tras enviarla.
           </p>
         </DialogHeader>
 
         <form onSubmit={handleSubmit}>
           <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="fecha">Fecha</Label>
+              <Input
+                id="fecha"
+                type="date"
+                value={fecha}
+                onChange={(e) => setFecha(e.target.value)}
+                required
+              />
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="tipo">Tipo de Evento</Label>
               <Select value={tipo} onValueChange={(v) => setTipo(v as typeof tipo)}>
@@ -119,9 +139,6 @@ export function FichajeManualModal({ open, onClose, onSuccess }: FichajeManualMo
                 onChange={(e) => setHora(e.target.value)}
                 required
               />
-              <p className="text-xs text-gray-500">
-                Solo para el día de hoy ({new Date().toLocaleDateString('es-ES')})
-              </p>
             </div>
 
             <div className="space-y-2">

@@ -264,6 +264,9 @@ export default async function ManagerBandejaEntradaPage() {
     },
   });
 
+  const treintaDiasAtras = new Date();
+  treintaDiasAtras.setDate(treintaDiasAtras.getDate() - 30);
+
   const ausenciasRevisadas = await prisma.ausencia.count({
     where: {
       empresaId: session.user.empresaId,
@@ -274,7 +277,7 @@ export default async function ManagerBandejaEntradaPage() {
         in: empleadoIds,
       },
       aprobadaEn: {
-        gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
+        gte: treintaDiasAtras,
       },
     },
   });

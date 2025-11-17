@@ -94,7 +94,6 @@ export function ResultadoVacacionesModal({
             </div>
             <InfoTooltip
               content="El sistema ajusta automáticamente las vacaciones para evitar solapamientos y respetar las preferencias indicadas."
-              variant="subtle"
             />
           </div>
         </DialogHeader>

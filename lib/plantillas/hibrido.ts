@@ -179,7 +179,7 @@ export async function crearPlantillaHibridaConfig(
         variablesAResolver: config.variablesAResolver,
         camposADejar: config.camposADejar,
         configuradoEn: new Date().toISOString(),
-      } as any,
+      } as Prisma.InputJsonValue,
     },
   });
 

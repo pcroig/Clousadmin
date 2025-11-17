@@ -123,8 +123,10 @@ export function MiEspacioManagerClient({ empleado, usuario }: MiEspacioManagerCl
       {/* Content */}
       <div className="flex-1 min-h-0 overflow-y-auto">
         {activeTab === 'general' && <GeneralTab empleado={empleado} usuario={usuario} rol="manager" />}
-        {activeTab === 'ausencias' && <AusenciasTab empleadoId={empleado.id} />}
-        {activeTab === 'fichajes' && <FichajesTab empleadoId={empleado.id} empleado={empleado} />}
+        {activeTab === 'ausencias' && <AusenciasTab empleadoId={empleado.id} contexto="manager" />}
+        {activeTab === 'fichajes' && (
+          <FichajesTab empleadoId={empleado.id} empleado={empleado} contexto="manager" />
+        )}
         {activeTab === 'contratos' && <ContratosTab empleado={empleado} rol="manager" />}
         {activeTab === 'documentos' && <DocumentosTab empleado={empleado} />}
       </div>

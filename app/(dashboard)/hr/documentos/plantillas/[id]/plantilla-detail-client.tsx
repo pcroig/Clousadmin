@@ -22,6 +22,38 @@ import {
 import { toast } from 'sonner';
 import PizZip from 'pizzip';
 import { VARIABLES_DISPONIBLES } from '@/lib/plantillas/constantes';
+import { Prisma } from '@prisma/client';
+
+interface ConfiguracionIA {
+  esHibrida?: boolean;
+  variablesAResolver?: string[];
+  camposADejar?: string[];
+  configuradoEn?: string;
+  [key: string]: unknown;
+}
+
+interface DocumentoGeneradoResumen {
+  id: string;
+  empleadoId: string;
+  documentoId: string | null;
+  generadoEn: string;
+  variablesUtilizadas: string[];
+  usadaIA: boolean;
+  notificado: boolean;
+  firmado: boolean;
+}
+
+interface EmpleadoResumen {
+  id: string;
+  nombre?: string;
+  apellidos?: string;
+  email?: string;
+  usuario?: {
+    nombre?: string;
+    apellidos?: string;
+    email?: string;
+  };
+}
 
 interface Plantilla {
   id: string;
@@ -37,11 +69,11 @@ interface Plantilla {
   carpetaDestinoDefault: string | null;
   variablesUsadas: string[];
   usarIAParaExtraer: boolean;
-  configuracionIA: any;
+  configuracionIA: ConfiguracionIA | Prisma.JsonValue | null;
   totalDocumentosGenerados: number;
   createdAt: string;
   updatedAt: string;
-  documentosGenerados: any[];
+  documentosGenerados: DocumentoGeneradoResumen[];
 }
 
 interface PlantillaDetailClientProps {
@@ -55,7 +87,7 @@ export function PlantillaDetailClient({ plantilla }: PlantillaDetailClientProps)
   const [previewRenderState, setPreviewRenderState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
   const [previewError, setPreviewError] = useState<string | null>(null);
   const previewContainerRef = useRef<HTMLDivElement>(null);
-  const [empleados, setEmpleados] = useState<any[]>([]);
+  const [empleados, setEmpleados] = useState<Array<{ id: string; nombre: string; apellidos: string; email: string }>>([]);
   const [empleadosSeleccionados, setEmpleadosSeleccionados] = useState<Set<string>>(new Set());
   const [loadingEmpleados, setLoadingEmpleados] = useState(true);
   const [generando, setGenerando] = useState(false);
@@ -228,15 +260,18 @@ export function PlantillaDetailClient({ plantilla }: PlantillaDetailClientProps)
     };
   }, [previewUrl, variablesAutoCompletadas, variablesSinDatos]);
 
-  const normalizarRespuestaEmpleados = (data: any) => {
+  const normalizarRespuestaEmpleados = (data: unknown): EmpleadoResumen[] => {
     if (!data) return [];
-    if (Array.isArray(data)) return data;
-    if (Array.isArray(data.empleados)) return data.empleados;
-    if (Array.isArray(data.data)) return data.data;
+    if (Array.isArray(data)) return data as EmpleadoResumen[];
+    if (typeof data === 'object' && data !== null) {
+      const obj = data as Record<string, unknown>;
+      if (Array.isArray(obj.empleados)) return obj.empleados as EmpleadoResumen[];
+      if (Array.isArray(obj.data)) return obj.data as EmpleadoResumen[];
+    }
     return [];
   };
 
-  const mapearEmpleado = (empleado: any) => ({
+  const mapearEmpleado = (empleado: EmpleadoResumen): { id: string; nombre: string; apellidos: string; email: string } => ({
     id: empleado.id,
     nombre: empleado?.usuario?.nombre || empleado?.nombre || '',
     apellidos: empleado?.usuario?.apellidos || empleado?.apellidos || '',

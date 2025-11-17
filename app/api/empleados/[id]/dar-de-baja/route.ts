@@ -44,7 +44,7 @@ export async function POST(
     
     if (!validation.success) {
       return successResponse(
-        { error: 'Datos inválidos', details: validation.error.errors },
+        { error: 'Datos inválidos', details: validation.error.issues },
         { status: 400 }
       );
     }

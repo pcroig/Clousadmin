@@ -27,7 +27,7 @@ export {
   getModelConfig,
   getModelConfigOrDefault,
   callOpenAIWithConfig,
-  type ModelName,
-  type ModelConfig,
 } from './ia';
+
+export type { LegacyModelConfig as ModelConfig, ModelName } from './ia';
 

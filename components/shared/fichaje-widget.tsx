@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { WidgetCard } from './widget-card';
 import { FichajeManualModal } from './fichaje-manual-modal';
-import { calcularHorasTrabajadas } from '@/lib/calculos/fichajes';
+import { calcularHorasTrabajadas } from '@/lib/calculos/fichajes-cliente';
 import { formatTiempoTrabajado, formatearHorasMinutos } from '@/lib/utils/formatters';
 import { MOBILE_DESIGN } from '@/lib/constants/mobile-design';
 import type { FichajeEvento } from '@prisma/client';
@@ -38,7 +38,7 @@ interface Fichaje {
 }
 
 export function FichajeWidget({
-  href = '/empleado/horario/fichajes',
+  href = '/empleado/mi-espacio/fichajes',
 }: FichajeWidgetProps) {
   const [estadoActual, setEstadoActual] = useState<EstadoFichaje>('sin_fichar');
   const [tiempoTrabajado, setTiempoTrabajado] = useState('00:00');

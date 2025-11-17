@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { Prisma } from '@prisma/client';
 import { subirDocumento } from '@/lib/s3';
 import { extraerVariablesDePlantilla } from '@/lib/plantillas';
 import { sanitizarNombreArchivo } from '@/lib/plantillas/sanitizar';
@@ -191,7 +192,7 @@ export async function POST(request: NextRequest) {
         formato,
         s3Key,
         s3Bucket: process.env.AWS_S3_BUCKET || 'clousadmin-documents',
-        variablesUsadas: variablesUsadas as any,
+        variablesUsadas: variablesUsadas as Prisma.InputJsonValue,
         carpetaDestinoDefault,
         requiereContrato,
         requiereFirma,

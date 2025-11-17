@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import type { MiEspacioCarpeta, MiEspacioEmpleado } from '@/types/empleado';
 import { FirmasTab } from '@/components/firma/firmas-tab';
+import { CarpetasGrid, type CarpetaCardData } from '@/components/shared/carpetas-grid';
 
 interface DocumentosTabProps {
   empleado: MiEspacioEmpleado;
@@ -14,6 +15,7 @@ type DocumentosTabKey = 'personales' | 'compartidos' | 'firmas';
 export function DocumentosTab({ empleado }: DocumentosTabProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const pathname = usePathname();
 
   const initialTab = useMemo<DocumentosTabKey>(() => {
     const tabParam = searchParams.get('tab');
@@ -29,113 +31,79 @@ export function DocumentosTab({ empleado }: DocumentosTabProps) {
     setActiveDocTab(initialTab);
   }, [initialTab]);
 
-  const handleChangeTab = (tab: DocumentosTabKey) => {
-    setActiveDocTab(tab);
-    router.replace(`/empleado/mi-espacio/documentos?tab=${tab}`);
-  };
-
-  const carpetas: MiEspacioCarpeta[] = empleado.carpetas ?? [];
-  const carpetasPersonales = carpetas.filter((c) => !c.compartida);
-  const carpetasCompartidas = carpetas.filter((c) => c.compartida);
-
-  const renderCarpetas = () => (
-    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
-      {activeDocTab === 'personales' ? (
-        carpetasPersonales.length > 0 ? (
-          carpetasPersonales.map((carpeta) => (
-            <div key={carpeta.id} className="flex flex-col items-center cursor-pointer group">
-              <svg
-                className="w-16 h-16 text-gray-600 mb-3 group-hover:text-[#c6613f] transition-colors"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"
-                />
-              </svg>
-              <p className="text-sm font-medium text-gray-900 text-center">{carpeta.nombre}</p>
-              {(carpeta.documentos?.length ?? 0) > 0 && (
-                <p className="text-xs text-gray-500 mt-1">
-                  {carpeta.documentos?.length ?? 0} documento
-                  {(carpeta.documentos?.length ?? 0) !== 1 ? 's' : ''}
-                </p>
-              )}
-            </div>
-          ))
-        ) : (
-          <div className="col-span-full text-center py-12 bg-white rounded-lg border border-gray-200">
-            <svg className="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"
-              />
-            </svg>
-            <p className="text-sm text-gray-500">No hay carpetas personales</p>
-          </div>
-        )
-      ) : carpetasCompartidas.length > 0 ? (
-        carpetasCompartidas.map((carpeta) => (
-          <div key={carpeta.id} className="flex flex-col items-center cursor-pointer group">
-            <svg
-              className="w-16 h-16 text-gray-600 mb-3 group-hover:text-[#c6613f] transition-colors"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"
-              />
-            </svg>
-            <p className="text-sm font-medium text-gray-900 text-center">{carpeta.nombre}</p>
-            {(carpeta.documentos?.length ?? 0) > 0 && (
-              <p className="text-xs text-gray-500 mt-1">
-                {carpeta.documentos?.length ?? 0} documento
-                {(carpeta.documentos?.length ?? 0) !== 1 ? 's' : ''}
-              </p>
-            )}
-          </div>
-        ))
-      ) : (
-        <div className="col-span-full text-center py-12 bg-white rounded-lg border border-gray-200">
-          <svg className="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"
-            />
-          </svg>
-          <p className="text-sm text-gray-500">No hay documentos compartidos</p>
-        </div>
-      )}
-    </div>
+  const handleChangeTab = useCallback(
+    (tab: DocumentosTabKey) => {
+      setActiveDocTab(tab);
+      const params = new URLSearchParams(searchParams?.toString() ?? '');
+      params.set('tab', tab);
+      const queryString = params.toString();
+      router.replace(queryString ? `${pathname}?${queryString}` : pathname);
+    },
+    [searchParams, pathname, router]
   );
 
+  // Memoizar carpetas filtradas
+  const { carpetasPersonales, carpetasCompartidas } = useMemo(() => {
+    const carpetas: MiEspacioCarpeta[] = empleado.carpetas ?? [];
+    return {
+      carpetasPersonales: carpetas.filter((c) => !c.compartida),
+      carpetasCompartidas: carpetas.filter((c) => c.compartida),
+    };
+  }, [empleado.carpetas]);
+
+  // Convertir a formato compatible con CarpetaCardData
+  const carpetasVisibles = useMemo<CarpetaCardData[]>(() => {
+    const carpetas = activeDocTab === 'personales' ? carpetasPersonales : carpetasCompartidas;
+    return carpetas.map((c) => ({
+      id: c.id,
+      nombre: c.nombre,
+      esSistema: c.esSistema,
+      compartida: c.compartida,
+      documentos: c.documentos,
+    }));
+  }, [activeDocTab, carpetasPersonales, carpetasCompartidas]);
+
+  const handleCarpetaClick = useCallback(
+    (carpetaId: string) => {
+      // Navegar a la carpeta según el contexto
+      const basePath = pathname?.includes('/hr/') ? '/hr' : '/empleado/mi-espacio';
+      router.push(`${basePath}/documentos/${carpetaId}`);
+    },
+    [pathname, router]
+  );
+
+  const emptyStateConfig = useMemo(() => {
+    if (activeDocTab === 'personales') {
+      return {
+        title: 'No hay carpetas personales',
+        description: 'Empieza subiendo documentos desde el escritorio principal',
+      };
+    }
+    return {
+      title: 'No hay carpetas compartidas',
+      description: 'Las carpetas compartidas aparecerán aquí',
+    };
+  }, [activeDocTab]);
+
   return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-xl font-bold text-gray-900">Mis Documentos</h2>
-        <p className="text-sm text-gray-500 mt-1">
+    <div className="space-y-8">
+      <div className="flex flex-col gap-2">
+        <div>
+          <p className="text-sm uppercase tracking-wide text-gray-500">Documentos</p>
+          <h2 className="text-2xl font-semibold text-gray-900">Mis carpetas</h2>
+        </div>
+        <p className="text-sm text-gray-500">
           Accede a tus documentos personales, compartidos y solicitudes de firma
         </p>
       </div>
 
       {/* Toggle Personales/Compartidos/Firmas */}
-      <div className="inline-flex flex-wrap rounded-lg border border-gray-200 p-1 gap-2">
+      <div className="inline-flex flex-wrap items-center gap-2 rounded-2xl border border-gray-200/80 bg-white/60 p-1 shadow-sm">
         <button
           onClick={() => handleChangeTab('personales')}
-          className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+          className={`rounded-xl px-4 py-2 text-sm font-medium transition ${
             activeDocTab === 'personales'
-              ? 'bg-gray-900 text-white'
+              ? 'bg-gray-900 text-white shadow-sm'
               : 'text-gray-600 hover:text-gray-900'
           }`}
         >
@@ -143,9 +111,9 @@ export function DocumentosTab({ empleado }: DocumentosTabProps) {
         </button>
         <button
           onClick={() => handleChangeTab('compartidos')}
-          className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+          className={`rounded-xl px-4 py-2 text-sm font-medium transition ${
             activeDocTab === 'compartidos'
-              ? 'bg-gray-900 text-white'
+              ? 'bg-gray-900 text-white shadow-sm'
               : 'text-gray-600 hover:text-gray-900'
           }`}
         >
@@ -153,9 +121,9 @@ export function DocumentosTab({ empleado }: DocumentosTabProps) {
         </button>
         <button
           onClick={() => handleChangeTab('firmas')}
-          className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+          className={`rounded-xl px-4 py-2 text-sm font-medium transition ${
             activeDocTab === 'firmas'
-              ? 'bg-gray-900 text-white'
+              ? 'bg-gray-900 text-white shadow-sm'
               : 'text-gray-600 hover:text-gray-900'
           }`}
         >
@@ -163,7 +131,23 @@ export function DocumentosTab({ empleado }: DocumentosTabProps) {
         </button>
       </div>
 
-      {activeDocTab === 'firmas' ? <FirmasTab /> : renderCarpetas()}
+      {activeDocTab === 'firmas' ? (
+        <FirmasTab />
+      ) : (
+        <div className="space-y-4">
+          <p className="text-sm font-medium text-gray-600">
+            {activeDocTab === 'personales'
+              ? `${carpetasPersonales.length} ${carpetasPersonales.length === 1 ? 'carpeta personal' : 'carpetas personales'}`
+              : `${carpetasCompartidas.length} ${carpetasCompartidas.length === 1 ? 'carpeta compartida' : 'carpetas compartidas'}`}
+          </p>
+          <CarpetasGrid
+            carpetas={carpetasVisibles}
+            onCarpetaClick={handleCarpetaClick}
+            emptyStateTitle={emptyStateConfig.title}
+            emptyStateDescription={emptyStateConfig.description}
+          />
+        </div>
+      )}
     </div>
   );
 }

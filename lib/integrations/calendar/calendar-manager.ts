@@ -3,7 +3,7 @@
  * Gestión de sincronización entre Clousadmin y calendarios externos
  */
 
-import { prisma } from "@/lib/prisma";
+import { prisma, Prisma } from "@/lib/prisma";
 import { OAuthManager } from "@/lib/oauth/oauth-manager";
 import { getGoogleCalendarOAuthConfig } from "@/lib/oauth/config";
 import { createCalendarProvider } from "./providers";
@@ -171,7 +171,7 @@ export class CalendarManager {
 
         await prisma.integracion.update({
           where: { id: integracionId },
-          data: { config: updatedConfig as any },
+          data: { config: updatedConfig as Prisma.InputJsonValue },
         });
       }
 
@@ -258,7 +258,7 @@ export class CalendarManager {
               config: {
                 ...restConfig,
                 ausenciaEventMap,
-              } as any,
+              } as Prisma.InputJsonValue,
             },
           });
         } catch (error) {

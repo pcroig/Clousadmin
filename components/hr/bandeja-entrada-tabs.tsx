@@ -226,15 +226,15 @@ export function BandejaEntradaTabs({
               className="border-gray-300 text-sm"
               disabled={autoApproveLoading}
             >
-              Autoaprobar
+              Aprobar todas
             </Button>
           </AlertDialogTrigger>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Auto-aprobar solicitudes pendientes</AlertDialogTitle>
+              <AlertDialogTitle>Aprobar todas las solicitudes pendientes</AlertDialogTitle>
               <AlertDialogDescription asChild>
                 <div className="space-y-3 text-sm text-muted-foreground">
-                  <p>Se aprobarán automáticamente todas las solicitudes pendientes:</p>
+                  <p>Se aprobarán todas las solicitudes pendientes:</p>
                   <ul className="list-disc list-inside space-y-1">
                     <li>{ausenciasPendientes.length} ausencias</li>
                     <li>{solicitudesCambioPendientes.length} solicitudes de cambio</li>
@@ -252,7 +252,7 @@ export function BandejaEntradaTabs({
                   onClick={handleAutoaprobar}
                   disabled={autoApproveLoading}
                 >
-                  {autoApproveLoading ? 'Auto-aprobando...' : 'Confirmar auto-aprobación'}
+                  {autoApproveLoading ? 'Aprobando...' : 'Confirmar aprobación'}
                 </Button>
               </AlertDialogAction>
             </AlertDialogFooter>
@@ -301,7 +301,7 @@ export function BandejaEntradaTabs({
       </div>
 
       <div className="border-b border-gray-200">
-        <nav className="-mb-px flex flex-wrap items-center gap-6 pb-3">
+        <nav className="flex flex-wrap items-center gap-6">
           <button
             onClick={() => setActiveTab('solicitudes')}
             className={`border-b-2 pb-3 px-2 text-sm font-medium transition-colors ${

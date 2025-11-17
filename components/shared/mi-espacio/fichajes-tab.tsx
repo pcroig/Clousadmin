@@ -17,6 +17,7 @@ import {
 import type { MiEspacioEmpleado } from '@/types/empleado';
 
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Table,
@@ -28,6 +29,7 @@ import {
 } from '@/components/ui/table';
 
 import { EditarFichajeModal } from '@/app/(dashboard)/hr/horario/fichajes/editar-fichaje-modal';
+import { FichajeManualModal } from '@/components/shared/fichaje-manual-modal';
 
 const MAX_FILAS = 30;
 
@@ -39,11 +41,13 @@ function getEstadoBadge(estado: string) {
 interface FichajesTabProps {
   empleadoId: string;
   empleado?: MiEspacioEmpleado;
+  contexto?: 'empleado' | 'manager' | 'hr_admin';
 }
 
-export function FichajesTab({ empleadoId, empleado }: FichajesTabProps) {
+export function FichajesTab({ empleadoId, empleado, contexto = 'empleado' }: FichajesTabProps) {
   const [jornadas, setJornadas] = useState<JornadaUI[]>([]);
   const [fichajeEditando, setFichajeEditando] = useState<FichajeNormalizado | null>(null);
+  const [fichajeManualModalOpen, setFichajeManualModalOpen] = useState(false);
 
   // Obtener horas objetivo desde jornada del empleado
   const horasObjetivo = useMemo(() => {
@@ -68,6 +72,7 @@ export function FichajesTab({ empleadoId, empleado }: FichajesTabProps) {
   }, [empleadoId, refetchFichajes]);
 
   const resumen = useMemo(() => calcularResumenJornadas(jornadas), [jornadas]);
+  const puedeCrearManual = contexto === 'empleado' || contexto === 'manager';
 
   return (
     <div className="space-y-6">
@@ -109,9 +114,18 @@ export function FichajesTab({ empleadoId, empleado }: FichajesTabProps) {
       </Card>
 
       {/* Tabla de fichajes */}
-      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-        <div className="border-b border-gray-200 px-6 py-4">
+      <div className="rounded-lg border border-gray-200 bg-white">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 px-6 py-4">
           <h3 className="text-sm font-semibold text-gray-900">Historial por jornadas</h3>
+          {puedeCrearManual && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setFichajeManualModalOpen(true)}
+            >
+              Abrir fichaje
+            </Button>
+          )}
         </div>
         <div className="overflow-x-auto">
           <Table>
@@ -194,6 +208,17 @@ export function FichajesTab({ empleadoId, empleado }: FichajesTabProps) {
           onClose={() => setFichajeEditando(null)}
           onSave={() => {
             setFichajeEditando(null);
+            refetchFichajes(`/api/fichajes?empleadoId=${empleadoId}&propios=1`);
+          }}
+        />
+      )}
+
+      {puedeCrearManual && (
+        <FichajeManualModal
+          open={fichajeManualModalOpen}
+          onClose={() => setFichajeManualModalOpen(false)}
+          onSuccess={() => {
+            setFichajeManualModalOpen(false);
             refetchFichajes(`/api/fichajes?empleadoId=${empleadoId}&propios=1`);
           }}
         />

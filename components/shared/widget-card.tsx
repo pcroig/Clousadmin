@@ -42,8 +42,8 @@ export const WidgetCard = memo(function WidgetCard({
       {showHeader && (
         <CardHeader className={`flex-shrink-0 py-3 sm:py-4 ${headerClassName}`}>
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <CardTitle className="text-[13px] sm:text-[14px] font-normal text-gray-900 flex items-center gap-2">
+            <div className="flex items-center">
+              <CardTitle className="text-[13px] sm:text-[14px] font-normal text-gray-900 flex items-center">
                 {titleIcon}
                 {title}
               </CardTitle>

@@ -50,6 +50,7 @@ export function ContratosTab({ empleado, rol = 'empleado' }: ContratosTabProps) 
   const fechaFinContrato = contratoActual?.fechaFin ?? null;
   const fechaFin = fechaFinContrato ? new Date(fechaFinContrato).toISOString().split('T')[0] : '';
   const estadoContrato = empleado.activo && !fechaFinContrato ? 'Activo' : 'Finalizado';
+  const estadoEmpleado = estadoContrato;
   const contratoActualId = contratoActual?.id ?? null;
 
   useEffect(() => {
@@ -529,19 +530,10 @@ export function ContratosTab({ empleado, rol = 'empleado' }: ContratosTabProps) 
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Estado del contrato</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Estado (empleado y contrato)</label>
             <Input
               type="text"
-              value={estadoContrato}
-              readOnly
-              className="bg-gray-50"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Estado del empleado</label>
-            <Input
-              type="text"
-              value={empleado.estadoEmpleado === 'activo' ? 'Activo' : empleado.estadoEmpleado || 'Activo'}
+              value={estadoEmpleado}
               readOnly
               className="bg-gray-50"
             />

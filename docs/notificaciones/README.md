@@ -2,168 +2,234 @@
 
 ## Resumen
 
-Sistema centralizado de notificaciones para la plataforma de gestión de recursos humanos. Proporciona notificaciones en tiempo real para eventos críticos y gestión de flujos de aprobación.
+Sistema centralizado de notificaciones para la plataforma de gestión de recursos humanos. Proporciona notificaciones en tiempo real para eventos críticos y gestión de flujos de aprobación, organizadas en **5 categorías** con iconos y acciones específicas.
 
 ## 📦 Estructura
 
 ```
 lib/
-└── notificaciones.ts          # Servicio centralizado de notificaciones
+├── notificaciones.ts           # Servicio centralizado de notificaciones
+└── notificaciones/
+    └── helpers.ts              # Helpers para iconos y UI
+
+components/shared/
+└── notificaciones-widget.tsx   # Widget de notificaciones
 
 docs/notificaciones/
 ├── README.md                   # Este archivo
 └── sugerencias-futuras.md     # Fases 3 y 4 (por implementar)
 ```
 
+---
+
+## 🎯 Categorías de Notificaciones
+
+Las notificaciones se organizan en **5 categorías principales**, cada una con su propio icono:
+
+### 1. **Ausencias** 📅
+- **Icono**: `Calendar`
+- **Incluye**:
+  - Solicitudes, aprobaciones, rechazos de ausencias
+  - Campañas de vacaciones
+  - **Especial**: Selección de días preferidos
+
+### 2. **Fichajes** ⏰
+- **Icono**: `Clock`
+- **Incluye**:
+  - Fichajes autocompletados
+  - Fichajes que requieren revisión
+  - Fichajes resueltos
+
+### 3. **Nóminas** 💰
+- **Icono**: `DollarSign`
+- **Incluye**:
+  - Nóminas disponibles
+  - Errores en nóminas
+  - **Especial**: Complementos pendientes (managers)
+
+### 4. **Fichas** 📄
+- **Icono**: `FileText`
+- **Incluye**:
+  - Documentos (solicitar/subir/rechazar)
+  - **Especial**: Firmas digitales pendientes
+  - Cambios de puesto/jornada
+  - Alta de nuevos empleados
+
+### 5. **Generales** 🔔
+- **Icono**: `Bell`
+- **Incluye**:
+  - Cambios de manager/equipo
+  - Solicitudes genéricas
+  - Denuncias
+  - Onboarding completado
+
+> **Nota**: Todos los iconos usan el color terciario definido en el sistema de diseño (`text-tertiary`)
+
+---
+
+## 🎯 Tipos Especiales (con Acciones)
+
+Algunos tipos requieren **acciones específicas** del usuario:
+
+| Tipo | Acción | Flag | CTA |
+|------|--------|------|-----|
+| `firma_pendiente` | Firma digital | `requiresSignature: true` | "Firmar documento" |
+| `campana_vacaciones_creada` | Selección de días | `requiresSelection: true` | "Seleccionar días preferidos" |
+| `complementos_pendientes` | Completar complementos | `requiresModal: true` | "Completar complementos" |
+| `documento_solicitado` | Subir documento | - | "Subir documento" |
+
+---
+
 ## ✅ Estado Actual de Implementación
 
 ### Fase 1 - Notificaciones Críticas (✅ COMPLETADO)
 
-#### Ausencias
-- ✅ **ausencia_solicitada** - `/app/api/ausencias/route.ts:250`
-  - Notifica a HR Admin y Manager cuando un empleado solicita una ausencia
-  - Prioridad: Alta
-
-- ✅ **ausencia_aprobada** - `/app/api/ausencias/[id]/route.ts:212`
-  - Notifica al empleado cuando se aprueba su ausencia
-  - Prioridad: Normal
-
-- ✅ **ausencia_rechazada** - `/app/api/ausencias/[id]/route.ts:222`
-  - Notifica al empleado cuando se rechaza su ausencia, incluye motivo
-  - Prioridad: Normal
-
-- ✅ **ausencia_cancelada** - `/app/api/ausencias/[id]/route.ts:477`
-  - Notifica a HR Admin y Manager cuando un empleado cancela su ausencia
-  - Prioridad: Normal
-
-#### Fichajes
-- ✅ **fichaje_autocompletado** - `/lib/ia/clasificador-fichajes.ts:352`
-  - Notifica al empleado cuando el sistema completa automáticamente su fichaje
-  - Prioridad: Normal
-
-- ✅ **fichaje_requiere_revision** - `/lib/ia/clasificador-fichajes.ts:435`
-  - Notifica a HR Admin cuando un fichaje necesita revisión manual
-  - Prioridad: Alta
-
-- ✅ **fichaje_resuelto** - `/app/api/fichajes/revision/route.ts:290`
-  - Notifica al empleado cuando se resuelve su fichaje pendiente
-  - Prioridad: Normal
-
-**Total Fase 1**: 7 notificaciones implementadas
+| Tipo | Categoría | Destinatarios | Prioridad | Ubicación |
+|------|-----------|---------------|-----------|-----------|
+| `ausencia_solicitada` | Ausencias | HR Admin + Manager | Alta | `/app/api/ausencias/route.ts` |
+| `ausencia_aprobada` | Ausencias | Empleado | Normal | `/app/api/ausencias/[id]/route.ts` |
+| `ausencia_rechazada` | Ausencias | Empleado | Normal | `/app/api/ausencias/[id]/route.ts` |
+| `ausencia_cancelada` | Ausencias | HR Admin + Manager | Normal | `/app/api/ausencias/[id]/route.ts` |
+| `fichaje_autocompletado` | Fichajes | Empleado | Normal | `/lib/ia/clasificador-fichajes.ts` |
+| `fichaje_requiere_revision` | Fichajes | HR Admin | Alta | `/lib/ia/clasificador-fichajes.ts` |
+| `fichaje_resuelto` | Fichajes | Empleado | Normal | `/app/api/fichajes/revision/route.ts` |
 
 ### Fase 2 - Alta Prioridad (✅ COMPLETADO)
 
-#### Equipos y Gestión
-- ✅ **cambio_manager** - `/app/api/empleados/[id]/route.ts:241`
-  - Notifica al empleado, nuevo manager y anterior manager
-  - Prioridad: Alta
+| Tipo | Categoría | Destinatarios | Prioridad | Ubicación |
+|------|-----------|---------------|-----------|-----------|
+| `cambio_manager` | Generales | Empleado + Managers | Alta | `/app/api/empleados/[id]/route.ts` |
+| `asignado_equipo` | Generales | Empleado + Manager | Normal | `/app/api/empleados/[id]/route.ts` |
+| `solicitud_creada` | Generales | HR Admin | Alta | `/app/api/solicitudes/route.ts` |
 
-- ✅ **asignado_equipo** - `/app/api/empleados/[id]/route.ts:266`
-  - Notifica al empleado y manager cuando es asignado a un equipo
-  - Prioridad: Normal
+### Fase 2.5 - Tipos Especiales (✅ COMPLETADO)
 
-#### Solicitudes
-- ✅ **solicitud_creada** - `/app/api/solicitudes/route.ts:117`
-  - Notifica a HR Admin cuando se crea una solicitud de cambio
-  - Soporta tipos: `cambio_datos`, `fichaje_correccion`, `ausencia_modificacion`, `documento`
-  - Prioridad: Alta
-
-**Total Fase 2**: 3 notificaciones implementadas
+| Tipo | Categoría | Acción Especial | Flag |
+|------|-----------|-----------------|------|
+| `campana_vacaciones_creada` | Ausencias | Selección de días | `requiresSelection: true` |
+| `complementos_pendientes` | Nóminas | Completar complementos | `requiresModal: true` |
+| `firma_pendiente` | Fichas | Firma digital | `requiresSignature: true` |
+| `firma_completada` | Fichas | - | - |
+| `onboarding_completado` | Generales | - | - |
 
 ## 📊 Estadísticas
 
-- **Total Implementado**: 10 tipos de notificaciones
-- **Archivos Modificados**: 6 APIs
+- **Total Implementado**: 15 tipos de notificaciones
+- **Categorías**: 5 (Ausencias, Fichajes, Nóminas, Fichas, Generales)
+- **Tipos Especiales**: 3 (con acciones requeridas)
 - **Prioridades**:
-  - Crítica: 0
-  - Alta: 4
-  - Normal: 6
-  - Baja: 0
+  - Alta: 4 tipos
+  - Normal: 11 tipos
 
-## 🎯 Tipos de Notificación
+---
 
-### Estructura de Metadatos
+## 📚 Lista Completa de Tipos
 
-Cada notificación incluye:
-- `tipo`: Tipo de notificación (ej. `ausencia_solicitada`)
-- `titulo`: Título breve
-- `mensaje`: Descripción detallada
-- `prioridad`: `baja` | `normal` | `alta` | `critica`
-- `metadata`: Objeto JSON con información específica
-- `leida`: Boolean, estado de lectura
-- `empresaId`: ID de la empresa
-- `usuarioId`: ID del destinatario
+| Tipo | Categoría | Acción Especial | Icono |
+|------|-----------|-----------------|-------|
+| `ausencia_solicitada` | Ausencias | ❌ | `Calendar` |
+| `ausencia_aprobada` | Ausencias | ❌ | `CheckCircle` |
+| `ausencia_rechazada` | Ausencias | ❌ | `XCircle` |
+| `ausencia_cancelada` | Ausencias | ❌ | `Calendar` |
+| `campana_vacaciones_creada` | Ausencias | ✅ Selección | `Calendar` |
+| `campana_vacaciones_completada` | Ausencias | ❌ | `Calendar` |
+| `fichaje_autocompletado` | Fichajes | ❌ | `Clock` |
+| `fichaje_requiere_revision` | Fichajes | ❌ | `Clock` |
+| `fichaje_resuelto` | Fichajes | ❌ | `Clock` |
+| `nomina_disponible` | Nóminas | ❌ | `DollarSign` |
+| `nomina_error` | Nóminas | ❌ | `AlertCircle` |
+| `complementos_pendientes` | Nóminas | ✅ Modal | `DollarSign` |
+| `documento_solicitado` | Fichas | ✅ Subir | `FileText` |
+| `documento_subido` | Fichas | ❌ | `FileText` |
+| `documento_rechazado` | Fichas | ❌ | `FileText` |
+| `firma_pendiente` | Fichas | ✅ Firma | `FileSignature` |
+| `firma_completada` | Fichas | ❌ | `FileSignature` |
+| `empleado_creado` | Fichas | ❌ | `FileText` |
+| `cambio_puesto` | Fichas | ❌ | `FileText` |
+| `jornada_asignada` | Fichas | ❌ | `FileText` |
+| `cambio_manager` | Generales | ❌ | `Bell` |
+| `asignado_equipo` | Generales | ❌ | `Users` |
+| `nuevo_empleado_equipo` | Generales | ❌ | `Users` |
+| `solicitud_creada` | Generales | ❌ | `Bell` |
+| `solicitud_aprobada` | Generales | ❌ | `Bell` |
+| `solicitud_rechazada` | Generales | ❌ | `Bell` |
+| `denuncia_recibida` | Generales | ❌ | `AlertCircle` |
+| `denuncia_actualizada` | Generales | ❌ | `AlertCircle` |
+| `onboarding_completado` | Generales | ❌ | `Bell` |
 
-### Metadata por Tipo
+---
+
+## 🔧 Estructura de Metadata
+
+Todas las notificaciones incluyen metadata flexible según el contexto:
 
 ```typescript
-// Ejemplo: ausencia_solicitada
-{
-  ausenciaId: string,
-  tipo: string,
-  fechaInicio: Date,
-  fechaFin: Date,
-  diasSolicitados: number,
-  empleadoId: string,
-  empleadoNombre: string,
-  accionUrl: '/hr/horario/ausencias'
-}
-
-// Ejemplo: fichaje_autocompletado
-{
-  fichajeId: string,
-  fecha: Date,
-  salidaSugerida: Date,
-  razon: string,
-  accionUrl: '/empleado/horario/fichajes'
-}
-
-// Ejemplo: cambio_manager
-{
-  empleadoId: string,
-  empleadoNombre: string,
-  nuevoManagerId: string,
-  nuevoManagerNombre: string,
-  anteriorManagerId?: string,
-  anteriorManagerNombre?: string,
-  accionUrl: '/hr/organizacion/personas/{empleadoId}'
+interface NotificacionMetadata {
+  // Acción y prioridad
+  prioridad?: 'baja' | 'normal' | 'alta' | 'critica';
+  accionUrl?: string;
+  accionTexto?: string;
+  
+  // Flags para acciones especiales
+  requiresModal?: boolean;       // Abre modal al hacer clic
+  requiresSignature?: boolean;   // Requiere firma digital
+  requiresSelection?: boolean;   // Requiere selección
+  
+  // Datos específicos del contexto
+  [key: string]: any; // Flexible para cada tipo
 }
 ```
 
-## 🔧 Uso del Servicio
-
-### Importar Funciones
+### Ejemplos de Metadata
 
 ```typescript
-import {
-  // Ausencias
-  crearNotificacionAusenciaSolicitada,
-  crearNotificacionAusenciaAprobada,
-  crearNotificacionAusenciaRechazada,
-  crearNotificacionAusenciaCancelada,
+// Campaña de vacaciones (acción especial)
+{
+  campanaId: 'uuid',
+  fechaInicio: '2025-07-01',
+  fechaFin: '2025-08-31',
+  prioridad: 'alta',
+  accionUrl: '/empleado/vacaciones/campanas/uuid',
+  accionTexto: 'Seleccionar días preferidos',
+  requiresSelection: true
+}
 
-  // Fichajes
-  crearNotificacionFichajeAutocompletado,
-  crearNotificacionFichajeRequiereRevision,
-  crearNotificacionFichajeResuelto,
+// Firma pendiente (acción especial)
+{
+  firmaId: 'uuid',
+  documentoId: 'uuid',
+  documentoNombre: 'Contrato Temporal',
+  prioridad: 'alta',
+  accionUrl: '/empleado/mi-espacio/documentos?tab=firmas',
+  accionTexto: 'Firmar documento',
+  requiresSignature: true
+}
 
-  // Equipos
-  crearNotificacionCambioManager,
-  crearNotificacionAsignadoEquipo,
-
-  // Solicitudes
-  crearNotificacionSolicitudCreada,
-} from '@/lib/notificaciones';
+// Complementos pendientes (acción especial para managers)
+{
+  nominaId: 'uuid',
+  mes: 5,
+  año: 2025,
+  empleadosCount: 3,
+  prioridad: 'alta',
+  accionUrl: '/manager/bandeja-entrada',
+  accionTexto: 'Completar complementos',
+  requiresModal: true
+}
 ```
 
-### Ejemplo de Uso
+---
+
+## 💻 Uso del Servicio
+
+### 1. Crear Notificaciones (Backend)
 
 ```typescript
-// En un API route
-import { prisma } from '@/lib/prisma';
+// Importar funciones necesarias
 import { crearNotificacionAusenciaSolicitada } from '@/lib/notificaciones';
+import prisma from '@/lib/prisma';
 
-// Después de crear una ausencia
+// En un API route o Server Action
 await crearNotificacionAusenciaSolicitada(prisma, {
   ausenciaId: ausencia.id,
   empresaId: session.user.empresaId,
@@ -176,129 +242,200 @@ await crearNotificacionAusenciaSolicitada(prisma, {
 });
 ```
 
-## 🎨 UI - Componentes de Notificaciones
+### 2. Mostrar Notificaciones (Frontend)
 
-### Dónde se Muestran
+```tsx
+// En un Server Component
+import { NotificacionesWidget } from '@/components/shared/notificaciones-widget';
+import prisma from '@/lib/prisma';
 
-Las notificaciones se muestran en:
-1. **Header/Navbar**: Icono de campana con contador
-2. **Panel de Notificaciones**: Dropdown con lista de notificaciones
-3. **Página de Notificaciones**: Vista completa `/notificaciones`
+// Obtener notificaciones de la base de datos
+const notificacionesRaw = await prisma.notificacion.findMany({
+  where: {
+    usuarioId: session.user.id,
+    empresaId: session.user.empresaId,
+  },
+  orderBy: { createdAt: 'desc' },
+  take: 10,
+});
 
-### Acciones Disponibles
+// Mapear a formato del widget
+const notificaciones = notificacionesRaw.map((n) => ({
+  id: n.id,
+  tipo: n.tipo as any,
+  titulo: n.titulo,
+  mensaje: n.mensaje,
+  fecha: n.createdAt,
+  leida: n.leida,
+  metadata: n.metadata as any,
+}));
 
-Cada notificación puede incluir:
-- ✅ **Marcar como leída**
-- 🔗 **Link a acción** (ej. ver ausencia, revisar fichaje)
-- 🗑️ **Eliminar** (soft delete)
+// Renderizar widget
+<NotificacionesWidget
+  notificaciones={notificaciones}
+  maxItems={5}
+  href="/empleado/bandeja-entrada"
+/>
+```
 
-## 📋 Nuevos Tipos de Solicitudes
+### 3. Obtener Categoría e Icono
 
-El sistema ahora soporta los siguientes tipos de solicitudes de cambio:
+```typescript
+import { obtenerCategoria } from '@/lib/notificaciones';
+import { obtenerIconoPorTipo } from '@/lib/notificaciones/helpers';
 
-### 1. `cambio_datos`
-Solicitud de cambio de datos personales (ya existía)
+const tipo = 'campana_vacaciones_creada';
+const categoria = obtenerCategoria(tipo); // 'ausencias'
+const IconComponent = obtenerIconoPorTipo(tipo); // Calendar
 
-### 2. `fichaje_correccion` (NUEVO)
-Solicitud de corrección de fichajes
-- **Uso**: Empleado solicita corregir un error en su fichaje
-- **Aprobador**: Manager o HR Admin
-- **Campos**: `{ fichajeId, nuevoEntrada, nuevoSalida, motivo }`
+// Renderizar
+<IconComponent className="w-5 h-5 text-tertiary" />
+```
 
-### 3. `ausencia_modificacion` (NUEVO)
-Solicitud de modificación de ausencia existente
-- **Uso**: Empleado solicita modificar fechas o tipo de ausencia ya aprobada
-- **Aprobador**: Manager o HR Admin
-- **Campos**: `{ ausenciaId, nuevoFechaInicio, nuevoFechaFin, motivo }`
+---
 
-### 4. `documento` (NUEVO)
-Solicitud relacionada con documentos
-- **Uso**: Empleado solicita ayuda con documento pendiente o disputa sobre documento
-- **Aprobador**: HR Admin
-- **Campos**: `{ documentoId, tipoSolicitud, descripcion }`
+## 🎨 UI - Características Visuales
+
+### Indicadores Visuales
+
+- **No leídas**: Fondo azul claro + punto azul en la esquina
+- **Acciones especiales**: CTA destacado con fondo azul y flecha (→)
+- **Todos los iconos**: Color terciario del sistema (`text-tertiary`)
+
+### Widget de Notificaciones
+
+El componente `NotificacionesWidget` incluye:
+- ✅ Iconos dinámicos según tipo/categoría
+- ✅ Título y mensaje formateados
+- ✅ Fecha en formato español
+- ✅ CTA (Call-to-Action) si hay acción disponible
+- ✅ Indicador visual de no leídas
+- ✅ Estado vacío con mensaje amigable
+
+---
+
+## 🔄 Añadir Nuevo Tipo de Notificación
+
+Para añadir un nuevo tipo:
+
+1. **Actualizar `TipoNotificacion` en `lib/notificaciones.ts`**:
+```typescript
+export type TipoNotificacion =
+  // ...
+  | 'mi_nuevo_tipo';
+```
+
+2. **Añadir a `obtenerCategoria()` si necesita categoría especial**:
+```typescript
+// En lib/notificaciones.ts
+export function obtenerCategoria(tipo: TipoNotificacion): CategoriaNotificacion {
+  if (tipo === 'mi_nuevo_tipo') {
+    return 'mi_categoria';
+  }
+  // ...
+}
+```
+
+3. **Crear función helper**:
+```typescript
+export async function crearNotificacionMiNuevoTipo(
+  prisma: PrismaClient,
+  params: { ... }
+) {
+  await crearNotificaciones(prisma, {
+    empresaId,
+    usuarioIds,
+    tipo: 'mi_nuevo_tipo',
+    titulo: '...',
+    mensaje: '...',
+    metadata: { ... },
+  });
+}
+```
+
+4. **(Opcional) Icono específico en `lib/notificaciones/helpers.ts`**:
+```typescript
+const iconosEspecificos: Partial<Record<TipoNotificacion, LucideIcon>> = {
+  mi_nuevo_tipo: MiIcono,
+  // ...
+};
+```
+
+---
 
 ## 🚀 Próximos Pasos
 
+### Fase 3 - Notificaciones Proactivas (Planificado)
+
 Ver `/docs/notificaciones/sugerencias-futuras.md` para:
-- **Fase 3**: Notificaciones proactivas (documentos, contratos, onboarding)
-- **Fase 4**: Notificaciones de métricas (vacaciones, evaluaciones, formación)
+- **Documentos por caducar** (7 días antes)
+- **Contratos por vencer** (30 días antes)
+- **Onboarding** (bienvenida y checklist)
 
-### Fase 3 - Prioridades Inmediatas
+### Fase 4 - Notificaciones de Métricas (Planificado)
 
-1. **Cron Job - Documentos por Caducar**
-   - Ejecutar diariamente
-   - Notificar 7 días antes de caducidad
-   - Ver implementación en `sugerencias-futuras.md`
+- **Vacaciones**: Recordatorio de días pendientes
+- **Evaluaciones**: Recordatorio de evaluaciones pendientes
+- **Formación**: Recordatorio de cursos obligatorios
 
-2. **Cron Job - Contratos por Vencer**
-   - Ejecutar semanalmente
-   - Notificar 30 días antes de fin de contrato
-   - Ver implementación en `sugerencias-futuras.md`
+---
 
-3. **Onboarding - Bienvenida**
-   - Al crear nuevo empleado
-   - Incluir checklist de documentos pendientes
+## 🔒 Seguridad y Privacidad
 
-## 🔒 Seguridad y Permisos
+### Control de Acceso
 
-### Quién Recibe Cada Notificación
+- ✅ Las notificaciones solo se envían a usuarios con permisos apropiados
+- ✅ Los managers solo reciben notificaciones de sus equipos
+- ✅ Los empleados solo reciben notificaciones que les conciernen directamente
+- ✅ Validación de `empresaId` en todas las consultas (multi-tenant)
 
-| Notificación | Empleado | Manager | HR Admin |
-|-------------|----------|---------|----------|
-| ausencia_solicitada | ❌ | ✅ | ✅ |
-| ausencia_aprobada | ✅ | ❌ | ❌ |
-| ausencia_rechazada | ✅ | ❌ | ❌ |
-| ausencia_cancelada | ❌ | ✅ | ✅ |
-| fichaje_autocompletado | ✅ | ❌ | ❌ |
-| fichaje_requiere_revision | ❌ | ❌ | ✅ |
-| fichaje_resuelto | ✅ | ❌ | ❌ |
-| cambio_manager | ✅ | ✅ (ambos) | ✅ |
-| asignado_equipo | ✅ | ✅ | ❌ |
-| solicitud_creada | ❌ | ❌ | ✅ |
+### Quién Recibe Cada Tipo
 
-### Privacidad
+| Tipo | Empleado | Manager | HR Admin |
+|------|----------|---------|----------|
+| `ausencia_solicitada` | ❌ | ✅ | ✅ |
+| `ausencia_aprobada/rechazada` | ✅ | ❌ | ❌ |
+| `fichaje_autocompletado` | ✅ | ❌ | ❌ |
+| `fichaje_requiere_revision` | ❌ | ❌ | ✅ |
+| `complementos_pendientes` | ❌ | ✅ | ❌ |
+| `firma_pendiente` | ✅ | ❌ | ❌ |
+| `solicitud_creada` | ❌ | ❌ | ✅ |
 
-- Las notificaciones solo se envían a usuarios con permisos apropiados
-- Los managers solo reciben notificaciones de sus equipos
-- Los empleados solo reciben notificaciones que les conciernen directamente
+---
 
-## 🧪 Testing
+## 📚 Archivos Clave
 
-### Datos de Prueba
+| Archivo | Descripción |
+|---------|-------------|
+| `lib/notificaciones.ts` | Servicio centralizado, todas las funciones de creación |
+| `lib/notificaciones/helpers.ts` | Helpers para iconos y UI |
+| `components/shared/notificaciones-widget.tsx` | Widget de notificaciones |
+| `prisma/schema.prisma` | Modelo `Notificacion` en DB |
+| `docs/notificaciones/sugerencias-futuras.md` | Fases 3 y 4 planificadas |
 
-El seed de la base de datos (`prisma/seed.ts`) incluye notificaciones de ejemplo para testing.
+---
 
-### Verificar Implementación
+## ✨ Características del Sistema
 
-```bash
-# 1. Crear una ausencia como empleado
-POST /api/ausencias
+### Escalabilidad
+- ✅ Arquitectura modular y extensible
+- ✅ Metadata flexible (JSON) para cada tipo
+- ✅ Categorización automática por tipo
+- ✅ Iconos y estilos centralizados
 
-# 2. Verificar notificación creada
-GET /api/notificaciones
-# Debe mostrar notificación tipo 'ausencia_solicitada' para HR/Manager
+### Eficiencia
+- ✅ Código limpio y reutilizable
+- ✅ Helpers separados para lógica de UI
+- ✅ Sin duplicación de código
+- ✅ Funciones especializadas por tipo
 
-# 3. Aprobar ausencia como HR
-PATCH /api/ausencias/{id}
-{ "accion": "aprobar" }
+### Mantenibilidad
+- ✅ Documentación completa
+- ✅ TypeScript con tipos estrictos
+- ✅ Comentarios descriptivos en código
+- ✅ Estructura clara y organizada
 
-# 4. Verificar notificación de aprobación
-GET /api/notificaciones
-# Debe mostrar notificación tipo 'ausencia_aprobada' para empleado
-```
+---
 
-## 📚 Referencias
-
-- **Servicio de Notificaciones**: `/lib/notificaciones.ts`
-- **Schema Prisma**: `/prisma/schema.prisma` - Model `Notificacion`
-- **API Notificaciones**: `/app/api/notificaciones/route.ts`
-- **Sugerencias Futuras**: `/docs/notificaciones/sugerencias-futuras.md`
-
-## 🤝 Contribuir
-
-Al añadir nuevas notificaciones:
-1. Añadir tipo a `TipoNotificacion` en `/lib/notificaciones.ts`
-2. Crear función `crearNotificacion{Nombre}` siguiendo el patrón existente
-3. Integrar en el API correspondiente
-4. Actualizar esta documentación
-5. Añadir datos de prueba en seed si es necesario
+**Versión**: 2.0.0  
+**Última actualización**: 2025-01-27

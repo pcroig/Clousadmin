@@ -189,7 +189,6 @@ export function CrearCarpetaConDocumentosModal({
               <Label>Documentos (opcional)</Label>
               <InfoTooltip
                 content="Puedes subir documentos ahora o hacerlo más tarde desde la carpeta."
-                variant="subtle"
               />
             </div>
             <DocumentUploaderInline

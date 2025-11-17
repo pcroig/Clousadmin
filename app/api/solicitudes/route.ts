@@ -2,7 +2,7 @@
 // API Solicitudes - GET, POST
 // ========================================
 
-import { NextRequest } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { prisma, Prisma } from '@/lib/prisma';
 import {
   requireAuth,
@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
   try {
     // Verificar autenticación
     const authResult = await requireAuth(request);
-    if (authResult instanceof Response) return authResult;
+    if (authResult instanceof NextResponse) return authResult;
     const { session } = authResult;
 
     const searchParams = request.nextUrl.searchParams;
@@ -82,7 +82,7 @@ export async function POST(request: NextRequest) {
   try {
     // Verificar autenticación
     const authResult = await requireAuth(request);
-    if (authResult instanceof Response) return authResult;
+    if (authResult instanceof NextResponse) return authResult;
     const { session } = authResult;
 
     // Solo empleados pueden crear solicitudes de cambio
@@ -92,7 +92,7 @@ export async function POST(request: NextRequest) {
 
     // Validar request body
     const validationResult = await validateRequest(request, solicitudCreateSchema);
-    if (validationResult instanceof Response) return validationResult;
+    if (validationResult instanceof NextResponse) return validationResult;
     const { data: validatedData } = validationResult;
 
     const solicitud = await prisma.solicitudCambio.create({
@@ -100,7 +100,7 @@ export async function POST(request: NextRequest) {
         empresaId: session.user.empresaId,
         empleadoId: session.user.empleadoId,
         tipo: validatedData.tipo,
-        camposCambiados: validatedData.camposCambiados,
+        camposCambiados: validatedData.camposCambiados as Prisma.InputJsonValue,
         motivo: validatedData.motivo,
         estado: EstadoSolicitud.pendiente,
       },

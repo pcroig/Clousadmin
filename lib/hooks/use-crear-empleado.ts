@@ -3,7 +3,7 @@
 // ========================================
 // Para usar cuando se implemente la funcionalidad de crear empleados
 
-import { prisma } from '../prisma';
+import { prisma, Prisma } from '../prisma';
 import { asegurarCarpetasSistemaParaEmpleado } from '../documentos';
 
 /**
@@ -19,20 +19,18 @@ import { asegurarCarpetasSistemaParaEmpleado } from '../documentos';
  * });
  */
 export async function crearEmpleadoConCarpetas(
-  data: {
+  data: Prisma.EmpleadoCreateInput & {
     empresaId: string;
     nombre: string;
     apellidos: string;
     email: string;
-    // Añadir otros campos necesarios según el modelo Empleado
-    [key: string]: any;
   }
 ) {
   // Crear empleado en una transacción
   const empleado = await prisma.$transaction(async (tx) => {
     // 1. Crear empleado
     const nuevoEmpleado = await tx.empleado.create({
-      data: data as any,
+      data,
     });
 
     return nuevoEmpleado;

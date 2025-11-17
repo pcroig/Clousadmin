@@ -3,6 +3,7 @@
 // ========================================
 
 import { NextRequest, NextResponse } from 'next/server';
+import { Prisma } from '@prisma/client';
 import { getSession } from '@/lib/auth';
 import { encryptEmpleadoData } from '@/lib/empleado-crypto';
 import { prisma } from '@/lib/prisma';
@@ -249,6 +250,15 @@ export async function POST(req: NextRequest) {
               }
 
               // Preparar datos del empleado
+              const salarioBrutoAnual =
+                empleadoData.salarioBrutoAnual !== undefined && empleadoData.salarioBrutoAnual !== null
+                  ? new Prisma.Decimal(empleadoData.salarioBrutoAnual)
+                  : null;
+              const salarioBrutoMensual =
+                empleadoData.salarioBrutoMensual !== undefined && empleadoData.salarioBrutoMensual !== null
+                  ? new Prisma.Decimal(empleadoData.salarioBrutoMensual)
+                  : null;
+
               const datosEmpleado = {
                 usuarioId: usuario.id,
                 empresaId: session.user.empresaId,
@@ -268,12 +278,8 @@ export async function POST(req: NextRequest) {
                 fechaAlta: empleadoData.fechaAlta
                   ? new Date(empleadoData.fechaAlta)
                   : new Date(),
-                salarioBrutoAnual: empleadoData.salarioBrutoAnual
-                  ? parseFloat(empleadoData.salarioBrutoAnual.toString())
-                  : null,
-                salarioBrutoMensual: empleadoData.salarioBrutoMensual
-                  ? parseFloat(empleadoData.salarioBrutoMensual.toString())
-                  : null,
+                salarioBrutoAnual,
+                salarioBrutoMensual,
                 direccionCalle: sanitizeOptionalString(empleadoData.direccionCalle),
                 direccionNumero: sanitizeOptionalString(empleadoData.direccionNumero),
                 direccionPiso: sanitizeOptionalString(empleadoData.direccionPiso),
@@ -285,11 +291,19 @@ export async function POST(req: NextRequest) {
               };
 
               // Encriptar datos sensibles antes de crear
-              const datosEncriptados = encryptEmpleadoData(datosEmpleado);
+              const datosEncriptados = encryptEmpleadoData({
+                nif: datosEmpleado.nif,
+                nss: datosEmpleado.nss,
+                iban: datosEmpleado.iban,
+              });
+              const empleadoCreateData = {
+                ...datosEmpleado,
+                ...datosEncriptados,
+              };
 
               // Crear empleado con datos encriptados
               const empleado = await tx.empleado.create({
-                data: datosEncriptados,
+                data: empleadoCreateData,
               });
 
               // Vincular empleado al usuario

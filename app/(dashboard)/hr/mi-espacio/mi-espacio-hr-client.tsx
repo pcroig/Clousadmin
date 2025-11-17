@@ -148,8 +148,10 @@ export function MiEspacioHRClient({ empleado, usuario }: MiEspacioHRClientProps)
       {/* Content */}
       <div className="flex-1 min-h-0 overflow-y-auto">
         {activeTab === 'general' && <GeneralTab empleado={empleado} usuario={usuario} rol="hr_admin" onFieldUpdate={handleFieldUpdate} />}
-        {activeTab === 'ausencias' && <AusenciasTab empleadoId={empleado.id} />}
-        {activeTab === 'fichajes' && <FichajesTab empleadoId={empleado.id} empleado={empleado} />}
+        {activeTab === 'ausencias' && <AusenciasTab empleadoId={empleado.id} contexto="hr_admin" />}
+        {activeTab === 'fichajes' && (
+          <FichajesTab empleadoId={empleado.id} empleado={empleado} contexto="hr_admin" />
+        )}
         {activeTab === 'contratos' && <ContratosTab empleado={empleado} rol="hr_admin" />}
         {activeTab === 'documentos' && <DocumentosTab empleado={empleado} />}
       </div>

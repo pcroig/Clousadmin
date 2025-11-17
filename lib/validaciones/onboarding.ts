@@ -4,7 +4,7 @@
 // Validación de datos del onboarding de empleados
 
 import { z } from 'zod';
-import { normalizarIdentificacion, obtenerInfoValidacionNIF } from './nif';
+import { normalizarIdentificacion } from './nif';
 import { validarIBAN } from './iban';
 
 /**
@@ -23,6 +23,13 @@ function validarNSS(nss: string): boolean {
   return regexNSS.test(nssLimpio);
 }
 
+function validarIdentificacionEspanola(identificacion: string): boolean {
+  if (!identificacion) return false;
+  const idLimpio = normalizarIdentificacion(identificacion);
+  const regex = /^(?:\d{8}|[XYZ]\d{7})[A-Z]$/;
+  return regex.test(idLimpio);
+}
+
 /**
  * Schema para datos personales (Paso 1)
  */
@@ -33,11 +40,10 @@ export const datosPersonalesSchema = z.object({
     .min(1, 'El NIF/NIE es obligatorio')
     .transform((val) => normalizarIdentificacion(val))
     .superRefine((val, ctx) => {
-      const info = obtenerInfoValidacionNIF(val);
-      if (!info.valido) {
+      if (!validarIdentificacionEspanola(val)) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          message: info.mensaje || 'NIF/NIE inválido. Formato: 8 dígitos + letra (ej: 12345678Z)',
+          message: 'Formato de NIF/NIE inválido (8 dígitos + letra, ej: 12345678Z o X1234567L)',
         });
       }
     }),

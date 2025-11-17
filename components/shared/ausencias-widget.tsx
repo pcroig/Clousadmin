@@ -28,7 +28,7 @@ export interface AusenciaItem {
   fechaFin?: Date;
   tipo: string;
   dias: number;
-  estado: EstadoAusencia.pendiente | EstadoAusencia.confirmada | EstadoAusencia.completada | EstadoAusencia.rechazada | 'pendiente' | 'confirmada';
+  estado: EstadoAusencia;
 }
 
 interface AusenciasWidgetProps {
@@ -112,7 +112,7 @@ export const AusenciasWidget = memo(function AusenciasWidget({
       <div className="hidden sm:block h-full">
         <WidgetCard
           title="Ausencias"
-          href="/empleado/horario/ausencias"
+          href="/empleado/mi-espacio/ausencias"
           className="relative"
           contentClassName="overflow-y-auto px-6"
           headerAction={

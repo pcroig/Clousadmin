@@ -56,7 +56,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const config = (integracion.config || {}) as unknown as CalendarIntegrationConfig;
+    const config = (integracion.config ?? {}) as CalendarIntegrationConfig;
 
     // Verificar que el webhook pertenece a esta integración
     if (config.channelId !== channelId || config.resourceId !== resourceId) {
@@ -96,8 +96,10 @@ async function processCalendarChanges(integracionId: string) {
       return;
     }
 
-    const config = (integracion.config || {}) as unknown as CalendarIntegrationConfig;
-    const ausenciaEventMap = config.ausenciaEventMap || {};
+    const config = (integracion.config ?? {}) as CalendarIntegrationConfig & {
+      ausenciaEventMap?: Record<string, string>;
+    };
+    const ausenciaEventMap = config.ausenciaEventMap ?? {};
 
     // Obtener access token válido
     const usuarioId =
@@ -146,14 +148,14 @@ async function processCalendarChanges(integracionId: string) {
 
           // Eliminar del mapa
           const { [ausenciaId]: removed, ...restMap } = ausenciaEventMap;
-          void removed; // Explicitly mark as unused
+          void removed;
           await prisma.integracion.update({
             where: { id: integracionId },
             data: {
               config: {
                 ...config,
                 ausenciaEventMap: restMap,
-              } as Prisma.JsonValue,
+              } as Prisma.InputJsonValue,
             },
           });
         }

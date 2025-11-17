@@ -87,12 +87,26 @@ export default async function HRDashboardPage() {
     })),
   ].sort((a, b) => b.fecha.getTime() - a.fecha.getTime());
 
-  // Notificaciones (simuladas)
-  const notificaciones: Notificacion[] = ausenciasPendientes.slice(0, 3).map((aus) => ({
-    id: aus.id,
-    tipo: 'pendiente' as const,
-    mensaje: `Está pendiente la solicitud de ausencias de... Ausencias - ${aus.fechaInicio.toLocaleDateString('es-ES')}`,
-    fecha: aus.createdAt,
+  // Notificaciones reales del usuario HR actual
+  const notificacionesDb = await prisma.notificacion.findMany({
+    where: {
+      empresaId: session.user.empresaId,
+      usuarioId: session.user.id,
+    },
+    orderBy: {
+      createdAt: 'desc',
+    },
+    take: 10,
+  });
+
+  const notificaciones: Notificacion[] = notificacionesDb.map((notif) => ({
+    id: notif.id,
+    tipo: notif.tipo as Notificacion['tipo'],
+    titulo: notif.titulo,
+    mensaje: notif.mensaje,
+    fecha: notif.createdAt,
+    leida: notif.leida,
+    metadata: (notif.metadata as Record<string, unknown>) ?? undefined,
   }));
 
   // Resumen actual de la plantilla
@@ -192,6 +206,15 @@ export default async function HRDashboardPage() {
             <NotificacionesWidget notificaciones={notificaciones} maxItems={3} href="/hr/bandeja-entrada" />
           </div>
 
+          {/* Plantilla Widget - Fila 2 (debajo de fichajes) */}
+          <div className="h-full min-h-[220px]">
+            <PlantillaWidget
+              trabajando={plantillaResumen.trabajando}
+              ausentes={plantillaResumen.ausentes}
+              sinFichar={plantillaResumen.sinFichar}
+            />
+          </div>
+
           {/* Auto-completed Widget - Fila 2 */}
           <div className="h-full min-h-[220px]">
             <AutoCompletadoWidget
@@ -200,15 +223,6 @@ export default async function HRDashboardPage() {
                 ausenciasCompletadas: ausenciasAutoCompletadas,
                 solicitudesCompletadas: solicitudesAutoCompletadas,
               }}
-            />
-          </div>
-
-          {/* Plantilla Widget - Fila 2 */}
-          <div className="h-full min-h-[220px]">
-            <PlantillaWidget
-              trabajando={plantillaResumen.trabajando}
-              ausentes={plantillaResumen.ausentes}
-              sinFichar={plantillaResumen.sinFichar}
             />
           </div>
         </div>

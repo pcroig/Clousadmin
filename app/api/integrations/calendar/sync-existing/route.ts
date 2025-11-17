@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { CalendarManager } from "@/lib/integrations/calendar/calendar-manager";
+import { EstadoAusencia } from '@/lib/constants/enums';
 
 export async function GET(req: NextRequest) {
   try {
@@ -29,7 +30,11 @@ export async function GET(req: NextRequest) {
       where: {
         empleadoId: session.user.empleadoId,
         estado: {
-          in: ["en_curso", "completada", "auto_aprobada"],
+          in: [
+            EstadoAusencia.en_curso,
+            EstadoAusencia.completada,
+            EstadoAusencia.auto_aprobada,
+          ],
         },
       },
       include: {

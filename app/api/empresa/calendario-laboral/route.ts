@@ -62,7 +62,7 @@ export async function PATCH(req: NextRequest) {
     await prisma.empresa.update({
       where: { id: session.user.empresaId },
       data: {
-        config: nuevaConfig,
+        config: nuevaConfig as Prisma.InputJsonValue,
       },
     });
 

@@ -3,7 +3,7 @@
 // ========================================
 // POST: Cuadrar fichajes pendientes creando eventos según jornada
 
-import { NextRequest } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import {
   requireAuthAsHR,
@@ -28,12 +28,12 @@ export async function POST(request: NextRequest) {
   try {
     // Verificar autenticación y rol HR Admin
     const authResult = await requireAuthAsHR(request);
-    if (authResult instanceof Response) return authResult;
+    if (authResult instanceof NextResponse) return authResult;
     const { session } = authResult;
 
     // Validar request body
     const validationResult = await validateRequest(request, cuadrarSchema);
-    if (validationResult instanceof Response) return validationResult;
+    if (validationResult instanceof NextResponse) return validationResult;
     const { data: validatedData } = validationResult;
 
     const { fichajeIds } = validatedData;

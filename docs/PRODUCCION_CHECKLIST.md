@@ -1,18 +1,21 @@
 # ✅ Checklist de Producción - Clousadmin
 
-Última actualización: 16/11/2025
+Última actualización: 17/11/2025
 
 ---
 
 ## 1. Pre-flight
 - [ ] Code review aprobado y PR mergeado en `main`.
-- [ ] `npm run build` ejecutado localmente (sin errores).
+- [ ] CI en GitHub Actions pasó correctamente (lint, tests, build).
+- [ ] `npm run build` ejecutado localmente (sin errores de TypeScript).
 - [ ] Migraciones Prisma aplicadas en staging (`npx prisma migrate deploy`).
+- [ ] Tests ejecutados localmente (`npm run test`).
 
 ## 2. Infraestructura
-- [ ] Managed PostgreSQL operativo (monitorización sin alertas).
-- [ ] Redis dedicado/gestionado accesible (`REDIS_URL` actualizado).
-- [ ] Object Storage configurado (`ENABLE_CLOUD_STORAGE=true`, `STORAGE_*`).
+- [ ] **CRÍTICO**: Managed PostgreSQL operativo (monitorización sin alertas).
+- [ ] **CRÍTICO**: Object Storage configurado (`ENABLE_CLOUD_STORAGE=true`, `STORAGE_*`).
+- [ ] **OPCIONAL**: Redis dedicado/gestionado accesible (`REDIS_URL` actualizado).
+  - Nota: La aplicación funciona sin Redis (modo degradado). Redis mejora rendimiento de caché y rate limiting.
 - [ ] Servidor de app actualizado (`scripts/hetzner/setup-server.sh`).
 - [ ] Nginx + TLS activos (`docs/NGINX_SETUP.md`).
 - [ ] Crons instalados (`scripts/hetzner/setup-cron.sh`).
@@ -25,8 +28,14 @@
 - [ ] `pm2 save`.
 
 ## 4. Verificaciones técnicas
-- [ ] `curl https://app.tudominio.com/api/health` devuelve 200.
-- [ ] Logs de PM2 sin errores críticos.
+- [ ] **Healthcheck**: `curl https://app.tudominio.com/api/health` devuelve 200.
+  - Verifica: `healthy: true`, `database: "ok"`, `storage: "enabled"`
+  - Redis puede estar en `degraded` (no crítico)
+- [ ] Logs de PM2 sin errores críticos (`pm2 logs clousadmin --lines 100`).
+- [ ] Tests de seguridad:
+  - [ ] Cifrado de empleados verificado (NIF, NSS, IBAN encriptados)
+  - [ ] Rate limiting funciona (probar con >100 requests)
+  - [ ] Acceso a logs de auditoría funcional
 - [ ] Backups diarios activos (`scripts/backup-db.sh` + cron).
 - [ ] Alertas/monitorización configuradas (UptimeRobot/Hetzner).
 

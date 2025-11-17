@@ -64,6 +64,16 @@ export {
   calculateCallCost,
 } from './core/config';
 
+export {
+  MODELS,
+  getModelConfig,
+  getModelConfigOrDefault,
+  callOpenAIWithConfig,
+  callAIWithConfig,
+} from './models';
+
+export type { ModelName, ModelConfig as LegacyModelConfig } from './models';
+
 // ========================================
 // PATTERNS - Patrones Reutilizables
 // ========================================

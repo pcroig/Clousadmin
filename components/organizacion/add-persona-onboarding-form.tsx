@@ -309,6 +309,11 @@ export function AddPersonaOnboardingForm({ onSuccess, onCancel, tipoOnboarding =
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    // Prevenir doble submit
+    if (loading || uploadingDocs) {
+      return;
+    }
+
     // Validaciones básicas
     if (!formData.nombre || !formData.apellidos || !formData.email) {
       toast.error('Nombre, apellidos y email son requeridos');

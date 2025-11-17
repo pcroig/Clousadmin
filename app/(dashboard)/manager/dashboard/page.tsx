@@ -9,9 +9,10 @@ import { FichajeWidget } from '@/components/shared/fichaje-widget';
 import { SolicitudesWidget } from '@/components/shared/solicitudes-widget';
 import { NotificacionesWidget, Notificacion } from '@/components/shared/notificaciones-widget';
 import { AutoCompletadoWidget } from '@/components/shared/auto-completado-widget';
-import { AusenciasWidget, AusenciaItem } from '@/components/shared/ausencias-widget';
+import { PlantillaWidget } from '@/components/dashboard/plantilla-widget';
 
 import { EstadoAusencia, UsuarioRol } from '@/lib/constants/enums';
+import { obtenerResumenPlantillaEquipo } from '@/lib/calculos/plantilla';
 
 export default async function ManagerDashboardPage() {
   const session = await getSession();
@@ -71,12 +72,26 @@ export default async function ManagerDashboardPage() {
     prioridad: 'media' as const,
   }));
 
-  // Notificaciones
-  const notificaciones: Notificacion[] = ausenciasPendientes.slice(0, 3).map((aus) => ({
-    id: aus.id,
-    tipo: 'pendiente' as const,
-    mensaje: `${aus.empleado.nombre} solicita ${aus.tipo}`,
-    fecha: aus.createdAt,
+  // Notificaciones reales para el manager actual
+  const notificacionesDb = await prisma.notificacion.findMany({
+    where: {
+      empresaId: session.user.empresaId,
+      usuarioId: session.user.id,
+    },
+    orderBy: {
+      createdAt: 'desc',
+    },
+    take: 10,
+  });
+
+  const notificaciones: Notificacion[] = notificacionesDb.map((notif) => ({
+    id: notif.id,
+    tipo: notif.tipo as Notificacion['tipo'],
+    titulo: notif.titulo,
+    mensaje: notif.mensaje,
+    fecha: notif.createdAt,
+    leida: notif.leida,
+    metadata: (notif.metadata as Record<string, unknown>) ?? undefined,
   }));
 
   // Estadísticas de fichaje
@@ -156,62 +171,11 @@ export default async function ManagerDashboardPage() {
       })
     : 0;
 
-  // Ausencias del equipo
-  const añoActual = new Date().getFullYear();
-
-  // Total de días de ausencias del equipo
-  const saldosEquipo = await prisma.empleadoSaldoAusencias.findMany({
-    where: {
-      año: añoActual,
-      empleado: {
-        managerId: manager.id,
-      },
-    },
-  });
-
-  const diasTotalesEquipo = saldosEquipo.reduce((acc, s) => acc + s.diasTotales, 0);
-  const diasUsadosEquipo = saldosEquipo.reduce((acc, s) => acc + Number(s.diasUsados), 0);
-
-  // Próximas ausencias del equipo
-  const hoy = new Date();
-  const proximasAusencias = await prisma.ausencia.findMany({
-    where: {
-      empresaId: session.user.empresaId,
-      empleado: {
-        managerId: manager.id,
-      },
-      fechaInicio: {
-        gte: hoy,
-      },
-      estado: EstadoAusencia.confirmada,
-    },
-    select: {
-      id: true,
-      fechaInicio: true,
-      fechaFin: true,
-      tipo: true,
-      diasLaborables: true,
-      estado: true,
-      empleado: {
-        select: {
-          nombre: true,
-        },
-      },
-    },
-    orderBy: {
-      fechaInicio: 'asc',
-    },
-    take: 5,
-  });
-
-  const ausenciasEquipo: AusenciaItem[] = proximasAusencias.map((aus) => ({
-    id: aus.id,
-    fecha: aus.fechaInicio,
-    fechaFin: aus.fechaFin,
-    tipo: `${aus.empleado.nombre} - ${aus.tipo}`,
-    dias: aus.diasLaborables || 0,
-    estado: aus.estado as 'pendiente' | 'aprobada' | 'rechazada',
-  }));
+  // Resumen de plantilla del equipo del manager (solo su equipo)
+  const plantillaResumenEquipo = await obtenerResumenPlantillaEquipo(
+    session.user.empresaId,
+    manager.id
+  );
 
   return (
     <div className="h-full w-full flex flex-col overflow-hidden">
@@ -245,6 +209,16 @@ export default async function ManagerDashboardPage() {
             <NotificacionesWidget notificaciones={notificaciones} maxItems={3} />
           </div>
 
+          {/* Plantilla Widget - Fila 2 (debajo de fichajes) */}
+          <div className="h-full min-h-[220px]">
+            <PlantillaWidget
+              trabajando={plantillaResumenEquipo.trabajando}
+              ausentes={plantillaResumenEquipo.ausentes}
+              sinFichar={plantillaResumenEquipo.sinFichar}
+              rol="manager"
+            />
+          </div>
+
           {/* Auto-completed Widget - Fila 2 */}
           <div className="h-full min-h-[220px]">
             <AutoCompletadoWidget
@@ -253,17 +227,6 @@ export default async function ManagerDashboardPage() {
                 ausenciasCompletadas: pendientes,
                 solicitudesCompletadas: 0,
               }}
-            />
-          </div>
-
-          {/* Ausencias Widget - Fila 2 */}
-          <div className="h-full min-h-[220px]">
-            <AusenciasWidget
-              diasAcumulados={diasTotalesEquipo}
-              diasDisponibles={diasTotalesEquipo - diasUsadosEquipo}
-              diasUtilizados={diasUsadosEquipo}
-              proximasAusencias={ausenciasEquipo}
-              ausenciasPasadas={[]}
             />
           </div>
         </div>

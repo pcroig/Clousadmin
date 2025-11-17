@@ -607,6 +607,7 @@ model Ausencia {
 
   // Supporting documents (e.g., medical certificate)
   documentoId String? // Link to Documento
+  documento   Documento? @relation("AusenciaJustificante", fields: [documentoId], references: [id], onDelete: SetNull)
 
   // AI optimization
   revisionIA   Json? // { auto_aprobada: boolean, motivo: string, score: 0-100 }
@@ -627,6 +628,7 @@ model Ausencia {
   @@index([equipoId])
   @@index([tipo])
   @@index([estado])
+  @@index([documentoId]) // Index for justificante lookup
   @@index([fechaInicio, fechaFin])
   @@index([empresaId, estado]) // Composite index for filtering by company and status
   @@index([empresaId, tipo, estado]) // Composite index for combined filters
@@ -832,6 +834,7 @@ model Documento {
   nomina              Nomina? // One-to-one relation: a document can be a payslip PDF
   solicitudesFirma    SolicitudFirma[]
   documentoGenerado   DocumentoGenerado?
+  ausenciasJustificantes Ausencia[] @relation("AusenciaJustificante")
 
   @@index([empresaId])
   @@index([empleadoId])

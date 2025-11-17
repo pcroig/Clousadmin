@@ -15,13 +15,26 @@ const globalForPrisma = globalThis as unknown as {
 // Production optimization: connection pooling
 // RDS PostgreSQL recommended: connection_limit=10 for serverless
 const getDatabaseUrl = () => {
-  const baseUrl = process.env.DATABASE_URL;
+  // Try multiple sources for DATABASE_URL
+  const baseUrl = 
+    process.env.DATABASE_URL || 
+    process.env.NEXT_PUBLIC_DATABASE_URL ||
+    (typeof window === 'undefined' ? process.env.DATABASE_URL : undefined);
   
   if (!baseUrl) {
+    // Debug info
+    console.error('[Prisma] DATABASE_URL no encontrada. Variables disponibles:', {
+      hasDATABASE_URL: !!process.env.DATABASE_URL,
+      hasNEXT_PUBLIC_DATABASE_URL: !!process.env.NEXT_PUBLIC_DATABASE_URL,
+      NODE_ENV: process.env.NODE_ENV,
+      cwd: process.cwd(),
+    });
+    
     throw new Error(
       'DATABASE_URL is not defined. ' +
       'Please create a .env.local file with DATABASE_URL="postgresql://..." ' +
-      'See docs/SETUP.md for more information.'
+      'See docs/SETUP.md for more information. ' +
+      'Make sure to restart the Next.js dev server after creating/updating .env.local'
     );
   }
 
@@ -52,14 +65,9 @@ const getDatabaseUrl = () => {
   }
 };
 
-// Lazy initialization: create Prisma client only when first accessed
-// This ensures environment variables are loaded before Prisma initializes
-function getPrismaInstance(): PrismaClient {
-  if (globalForPrisma.prisma) {
-    return globalForPrisma.prisma;
-  }
-
-  const prisma = new PrismaClient({
+const prismaClientSingleton =
+  globalForPrisma.prisma ??
+  new PrismaClient({
     datasources: {
       db: {
         url: getDatabaseUrl(),
@@ -68,40 +76,9 @@ function getPrismaInstance(): PrismaClient {
     log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
   });
 
-  if (process.env.NODE_ENV !== 'production') {
-    globalForPrisma.prisma = prisma;
-  }
-
-  return prisma;
+if (process.env.NODE_ENV !== 'production') {
+  globalForPrisma.prisma = prismaClientSingleton;
 }
 
-// Export Prisma with lazy initialization
-// The client is created only when first accessed, ensuring env vars are loaded
-export const prisma = new Proxy({} as PrismaClient, {
-  get(_: unknown, prop: string | symbol) {
-    void _;
-    const instance = getPrismaInstance();
-    const value = (instance as Record<string | symbol, unknown>)[prop];
-    
-    // If it's a function, bind it to maintain 'this' context
-    if (typeof value === 'function') {
-      return (value as unknown as { bind: (ctx: PrismaClient) => unknown }).bind(instance);
-    }
-    
-    return value;
-  },
-  has(_: unknown, prop: string | symbol) {
-    void _;
-    return prop in getPrismaInstance();
-  },
-  ownKeys(_: unknown) {
-    void _;
-    return Reflect.ownKeys(getPrismaInstance());
-  },
-  getOwnPropertyDescriptor(_: unknown, prop: string | symbol) {
-    void _;
-    return Reflect.getOwnPropertyDescriptor(getPrismaInstance(), prop);
-  },
-});
-
+export const prisma = prismaClientSingleton;
 export { Prisma };

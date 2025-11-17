@@ -18,7 +18,7 @@ interface SettingsSection {
 }
 
 interface SettingsLayoutProps {
-  rol: UsuarioRol.hr_admin | 'manager' | 'empleado';
+  rol: UsuarioRol;
   children: React.ReactNode;
 }
 

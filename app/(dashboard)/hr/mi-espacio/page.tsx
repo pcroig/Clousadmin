@@ -1,7 +1,7 @@
 import { getSession } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
-import { serializeEmpleado } from '@/lib/utils';
+import { serializeEmpleadoSeguro } from '@/lib/empleados/serialize';
 import { MiEspacioHRClient } from './mi-espacio-hr-client';
 
 import { UsuarioRol } from '@/lib/constants/enums';
@@ -70,7 +70,7 @@ export default async function MiEspacioHRPage() {
   }
 
   // Serializar campos Decimal para Client Component
-  const empleadoSerializado = serializeEmpleado(empleado);
+  const empleadoSerializado = serializeEmpleadoSeguro(empleado);
 
   return <MiEspacioHRClient empleado={empleadoSerializado} usuario={usuario} />;
 }

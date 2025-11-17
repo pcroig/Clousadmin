@@ -43,7 +43,7 @@ export function EmpleadoDashboardClient({
 
   const handleClickAusencia = (ausenciaId: string) => {
     // Por ahora navegar a la página de ausencias
-    router.push('/empleado/horario/ausencias');
+    router.push('/empleado/mi-espacio/ausencias');
   };
 
   return (
@@ -62,7 +62,7 @@ export function EmpleadoDashboardClient({
           <div className="h-full grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 auto-rows-fr gap-3 sm:gap-4">
             {/* Fichaje Widget */}
             <div className="min-h-[240px] h-full">
-              <FichajeWidget href="/empleado/horario/fichajes" />
+              <FichajeWidget href="/empleado/mi-espacio/fichajes" />
             </div>
 
             {/* Notificaciones Widget - Hidden on mobile */}

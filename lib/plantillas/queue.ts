@@ -9,6 +9,7 @@ import { JobConfig, ResultadoGeneracion, JobProgress } from './tipos';
 import { generarDocumentoDesdePlantilla } from './generar-documento';
 import { generarDocumentoDesdePDFRellenable } from './pdf-rellenable';
 import { prisma } from '@/lib/prisma';
+import { Prisma } from '@prisma/client';
 
 // Configuración de conexión Redis para BullMQ
 // Parsear REDIS_URL si está disponible, sino usar configuración por defecto
@@ -136,7 +137,7 @@ async function procesarJobSinCola(jobId: string, config: JobConfig) {
           procesados,
           exitosos,
           fallidos,
-          resultados: resultados as any,
+          resultados: resultados as Prisma.InputJsonValue,
         },
       });
     }
@@ -151,7 +152,7 @@ async function procesarJobSinCola(jobId: string, config: JobConfig) {
         fallidos,
         completadoEn: new Date(),
         tiempoTotal: Date.now() - inicio,
-        resultados: resultados as any,
+        resultados: resultados as Prisma.InputJsonValue,
       },
     });
 
@@ -273,7 +274,7 @@ export async function agregarJobGeneracion(config: JobConfig): Promise<string> {
       plantillaId: config.plantillaId,
       solicitadoPor: config.solicitadoPor,
       empleadoIds: config.empleadoIds,
-      configuracion: config.configuracion as any,
+      configuracion: config.configuracion as Prisma.InputJsonValue,
       estado: 'en_cola',
       totalEmpleados: config.empleadoIds.length,
     },
@@ -342,7 +343,7 @@ export async function obtenerEstadoJob(jobId: string): Promise<JobProgress | nul
 
     return {
       jobId: jobRecord.id,
-      estado: jobRecord.estado as any,
+      estado: jobRecord.estado as 'en_cola' | 'procesando' | 'completado' | 'fallido',
       progreso: jobRecord.progreso,
       totalEmpleados: jobRecord.totalEmpleados,
       procesados: jobRecord.procesados,
@@ -473,7 +474,7 @@ export const documentosWorker = new Worker(
           procesados,
           exitosos,
           fallidos,
-          resultados: resultados as any,
+          resultados: resultados as Prisma.InputJsonValue,
         },
       });
 
@@ -496,7 +497,7 @@ export const documentosWorker = new Worker(
         fallidos,
         completadoEn: new Date(),
         tiempoTotal,
-        resultados: resultados as any,
+        resultados: resultados as Prisma.InputJsonValue,
       },
     });
 

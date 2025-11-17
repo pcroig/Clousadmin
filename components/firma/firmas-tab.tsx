@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Spinner } from '@/components/ui/spinner';
@@ -29,6 +29,7 @@ export function FirmasTab() {
   const [firmas, setFirmas] = useState<FirmaPendiente[]>([]);
   const [selectedFirmaId, setSelectedFirmaId] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const cacheBusterRef = useRef(Date.now());
 
   const cargarFirmas = () => {
     setLoading(true);
@@ -76,7 +77,7 @@ export function FirmasTab() {
 
   const previewUrl = useMemo(() => {
     if (!selectedFirma) return null;
-    return `/api/documentos/${selectedFirma.documento.id}?inline=1&ts=${Date.now()}`;
+    return `/api/documentos/${selectedFirma.documento.id}?inline=1&ts=${cacheBusterRef.current}`;
   }, [selectedFirma]);
 
   return (

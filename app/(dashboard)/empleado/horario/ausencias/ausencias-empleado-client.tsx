@@ -18,7 +18,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { TableHeader as PageHeader } from '@/components/shared/table-header';
 import { SolicitarAusenciaModal } from '@/components/empleado/solicitar-ausencia-modal';
-import { Calendar, ChevronDown, ChevronUp } from 'lucide-react';
+import { Calendar, ChevronDown, ChevronUp, Paperclip } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -35,6 +35,7 @@ interface Ausencia {
   motivo: string | null;
   motivoRechazo: string | null;
   createdAt: string;
+  justificanteUrl?: string | null;
 }
 
 interface SaldoData {
@@ -225,14 +226,16 @@ export function AusenciasEmpleadoClient({ saldo, campanas = [] }: Props) {
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto">
-        <Card>
-          <Table>
+        <Card className="overflow-hidden">
+          <div className="overflow-x-auto px-2 sm:px-4">
+            <Table className="min-w-full">
             <TableHeader>
               <TableRow>
                 <TableHead>Tipo</TableHead>
                 <TableHead>Fechas</TableHead>
                 <TableHead>Días</TableHead>
                 <TableHead>Estado</TableHead>
+                <TableHead>Justificante</TableHead>
                 <TableHead>Solicitado</TableHead>
                 <TableHead>Motivo/Observaciones</TableHead>
               </TableRow>
@@ -240,13 +243,13 @@ export function AusenciasEmpleadoClient({ saldo, campanas = [] }: Props) {
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8 text-gray-500">
+                  <TableCell colSpan={7} className="text-center py-8 text-gray-500">
                     Cargando...
                   </TableCell>
                 </TableRow>
               ) : ausencias.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8 text-gray-500">
+                  <TableCell colSpan={7} className="text-center py-8 text-gray-500">
                     No tienes ausencias registradas
                   </TableCell>
                 </TableRow>
@@ -268,6 +271,23 @@ export function AusenciasEmpleadoClient({ saldo, campanas = [] }: Props) {
                       <span className="font-semibold">{ausencia.diasSolicitados}</span> días
                     </TableCell>
                     <TableCell>{getEstadoBadge(ausencia.estado)}</TableCell>
+                    <TableCell>
+                      {ausencia.justificanteUrl ? (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="px-0 text-primary flex items-center gap-1"
+                          asChild
+                        >
+                          <a href={ausencia.justificanteUrl} target="_blank" rel="noopener noreferrer">
+                            <Paperclip className="h-4 w-4" />
+                            Ver
+                          </a>
+                        </Button>
+                      ) : (
+                        <span className="text-gray-500 text-sm">-</span>
+                      )}
+                    </TableCell>
                     <TableCell className="text-sm text-gray-500">
                       {format(new Date(ausencia.createdAt), 'dd MMM yyyy', { locale: es })}
                     </TableCell>
@@ -282,7 +302,8 @@ export function AusenciasEmpleadoClient({ saldo, campanas = [] }: Props) {
                 ))
               )}
             </TableBody>
-          </Table>
+            </Table>
+          </div>
         </Card>
       </div>
 

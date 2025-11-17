@@ -43,9 +43,10 @@ export function PreferenciasVacacionesModal({
   const [modoSeleccion, setModoSeleccion] = useState<'ideales' | 'prioritarios' | 'alternativos'>('ideales');
 
   interface MutationVariables {
-    diasIdeales: Date[];
-    diasPrioritarios: Date[];
-    diasAlternativos: Date[];
+    diasIdeales: string[];
+    diasPrioritarios: string[];
+    diasAlternativos: string[];
+    completada: boolean;
   }
   
   const { mutate: guardarPreferencias, loading: guardando } = useMutation<Record<string, unknown>, MutationVariables>({
@@ -167,7 +168,6 @@ export function PreferenciasVacacionesModal({
                   </ul>
                 </div>
               )}
-              variant="subtle"
               side="left"
             />
           </div>

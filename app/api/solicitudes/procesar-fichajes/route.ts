@@ -3,7 +3,7 @@
 // ========================================
 // Procesa solicitudes de fichaje manual pendientes y crea los eventos correspondientes
 
-import { NextRequest } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import {
   requireAuth,
@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
   try {
     // Verificar autenticación (puede ser ejecutado por cron o por HR admin)
     const authResult = await requireAuth(request);
-    if (authResult instanceof Response) return authResult;
+    if (authResult instanceof NextResponse) return authResult;
 
     console.info('[Procesar Fichajes] Iniciando procesamiento de solicitudes pendientes');
 

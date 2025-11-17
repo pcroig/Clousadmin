@@ -17,6 +17,7 @@ import type {
   CrearSolicitudFirmaInput,
   DatosCapturadosFirma,
   EstadoSolicitudFirmaDetallado,
+  EstadoSolicitudFirma,
   PosicionFirma,
   ResultadoFirma,
 } from '@/lib/firma-digital';
@@ -373,9 +374,9 @@ export async function firmarDocumento(
           firmasCompletadas.map(async (f, index) => {
             const capturados = (f.datosCapturados as DatosCapturadosFirma | null) ?? null;
             let firmaImagenBuffer: Buffer | undefined;
-            let firmaImagenWidth = capturados?.firmaImagenWidth;
-            let firmaImagenHeight = capturados?.firmaImagenHeight;
-            let firmaImagenContentType = capturados?.firmaImagenContentType;
+            const firmaImagenWidth = capturados?.firmaImagenWidth;
+            const firmaImagenHeight = capturados?.firmaImagenHeight;
+            const firmaImagenContentType = capturados?.firmaImagenContentType;
 
             const firmaImagenKey = capturados?.firmaImagenS3Key || capturados?.firmaGuardadaS3Key;
             if (firmaImagenKey) {
@@ -561,7 +562,7 @@ export async function obtenerEstadoSolicitud(
     solicitudId: solicitud.id,
     documentoId: solicitud.documentoId,
     documentoNombre: solicitud.nombreDocumento,
-    estado: solicitud.estado as any,
+    estado: solicitud.estado as EstadoSolicitudFirma,
     totalFirmantes: estadoComplecion.total,
     firmantesCompletados: estadoComplecion.firmadas,
     porcentajeCompletado: estadoComplecion.porcentaje,

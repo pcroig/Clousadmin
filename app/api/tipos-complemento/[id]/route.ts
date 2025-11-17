@@ -54,7 +54,7 @@ export async function PATCH(
     return NextResponse.json({ tipoComplemento: updated });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: 'Datos inválidos', details: error.errors }, { status: 400 });
+      return NextResponse.json({ error: 'Datos inválidos', details: error.issues }, { status: 400 });
     }
 
     console.error('[PATCH /api/tipos-complemento/[id]] Error:', error);

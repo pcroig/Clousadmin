@@ -311,19 +311,19 @@ export async function POST(req: NextRequest) {
       }
     });
 
-    // Actualizar saldo si descuenta (incrementar días pendientes)
-    if (descuentaSaldo) {
-      const año = fechaInicio.getFullYear();
-      await actualizarSaldo(
-        session.user.empleadoId,
-        año,
-        'solicitar',
-        diasSolicitadosFinal
-      );
-    }
-
-    // Crear notificación apropiada según si fue auto-aprobada o requiere aprobación
+    // Actualizar saldo y crear notificaciones según si fue auto-aprobada o requiere aprobación
     if (esAutoAprobable) {
+      // Si es auto-aprobable y descuenta saldo, actualizar saldo como "aprobar" (pendientes -> usados)
+      if (descuentaSaldo) {
+        const año = fechaInicio.getFullYear();
+        await actualizarSaldo(
+          session.user.empleadoId,
+          año,
+          'aprobar', // ✅ Auto-aprobada: pasar directamente a usados
+          diasSolicitadosFinal
+        );
+      }
+
       // Notificar al empleado que su ausencia fue auto-aprobada
       await crearNotificacionAusenciaAutoAprobada(prisma, {
         ausenciaId: ausencia.id,
@@ -334,6 +334,17 @@ export async function POST(req: NextRequest) {
         fechaFin: ausencia.fechaFin,
       });
     } else {
+      // Si requiere aprobación y descuenta saldo, incrementar días pendientes
+      if (descuentaSaldo) {
+        const año = fechaInicio.getFullYear();
+        await actualizarSaldo(
+          session.user.empleadoId,
+          año,
+          'solicitar', // Pendiente de aprobación: incrementar pendientes
+          diasSolicitadosFinal
+        );
+      }
+
       // Notificar a HR/Manager que hay una ausencia pendiente de aprobación
       await crearNotificacionAusenciaSolicitada(prisma, {
         ausenciaId: ausencia.id,

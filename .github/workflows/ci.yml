@@ -1,0 +1,100 @@
+name: CI
+
+# Ejecutar en push a main y en todos los PRs
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Permisos mínimos necesarios
+permissions:
+  contents: read
+
+jobs:
+  lint-test-build:
+    name: Lint, Test & Build
+    runs-on: ubuntu-latest
+    
+    # Timeout de 15 minutos para evitar jobs colgados
+    timeout-minutes: 15
+
+    # Variables de entorno necesarias para build
+    env:
+      # Node.js
+      NODE_ENV: test
+      
+      # Base de datos (mock - no se usa en tests actuales)
+      DATABASE_URL: "postgresql://test:test@localhost:5432/test"
+      
+      # Secrets mínimos para que el build pase
+      NEXTAUTH_SECRET: "test-secret-min-32-chars-long-for-ci"
+      ENCRYPTION_KEY: "3f70cf35f9f2efeff971a06fb8b3f2440d9b30b0271fd6936c9b72bd183216df"
+      
+      # AWS (mock - no se usa en build)
+      AWS_COGNITO_USER_POOL_ID: "test"
+      AWS_COGNITO_CLIENT_ID: "test"
+      AWS_ACCESS_KEY_ID: "test"
+      AWS_SECRET_ACCESS_KEY: "test"
+      AWS_S3_BUCKET: "test"
+      AWS_REGION: "eu-west-1"
+      
+      # Redis (opcional - rate limiting funciona sin él en test)
+      REDIS_URL: "redis://localhost:6379"
+      
+      # Email (mock - no se usa en build)
+      RESEND_API_KEY: "test"
+      
+      # OpenAI (opcional - no se usa en tests actuales)
+      OPENAI_API_KEY: ""
+
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Generar Prisma Client
+        run: npm run db:generate
+
+      - name: Ejecutar linter
+        run: npm run lint
+
+      - name: Ejecutar tests
+        run: npm run test
+
+      - name: Build producción
+        run: npm run build
+        env:
+          # TypeScript check habilitado
+          # Si hay errores de TypeScript, el build fallará
+
+      - name: Verificar artefactos de build
+        run: |
+          if [ ! -d ".next" ]; then
+            echo "❌ Error: directorio .next no generado"
+            exit 1
+          fi
+          echo "✅ Build exitoso - artefactos generados"
+
+  # Job de resumen
+  ci-success:
+    name: CI Success
+    runs-on: ubuntu-latest
+    needs: [lint-test-build]
+    if: success()
+    steps:
+      - name: CI completado exitosamente
+        run: |
+          echo "✅ Todos los checks de CI pasaron correctamente"
+          echo "   - Linter: OK"
+          echo "   - Tests: OK"
+          echo "   - Build: OK"
+

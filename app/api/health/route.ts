@@ -9,7 +9,7 @@ export const revalidate = 0;
 export async function GET() {
   const status: {
     database: 'ok' | 'error';
-    redis: 'ok' | 'error';
+    redis: 'ok' | 'degraded' | 'error';
     storage: 'enabled' | 'disabled' | 'error';
   } = {
     database: 'ok',
@@ -17,6 +17,7 @@ export async function GET() {
     storage: shouldUseCloudStorage() ? 'enabled' : 'disabled',
   };
 
+  // Database check - CRÍTICO
   try {
     await prisma.$queryRaw`SELECT 1`;
   } catch (error) {
@@ -24,22 +25,27 @@ export async function GET() {
     status.database = 'error';
   }
 
+  // Redis check - OPCIONAL (fail-open)
+  // La aplicación funciona sin Redis, solo afecta caché y rate limiting
   try {
-    if (!(await cache.isAvailable())) {
-      status.redis = 'error';
+    const available = await cache.isAvailable();
+    if (!available) {
+      status.redis = 'degraded'; // No crítico - funciona sin él
     }
   } catch (error) {
     console.error('[Health] Error al comprobar Redis:', error);
-    status.redis = 'error';
+    status.redis = 'degraded'; // No crítico - funciona sin él
   }
 
+  // Storage check - Solo verificar si está habilitado
   if (shouldUseCloudStorage() && !isS3Configured()) {
     status.storage = 'error';
   }
 
+  // HEALTHY = Database OK + Storage OK (si está habilitado)
+  // Redis NO es crítico para la salud del sistema
   const healthy =
     status.database === 'ok' &&
-    status.redis === 'ok' &&
     status.storage !== 'error';
 
   return NextResponse.json(
@@ -47,6 +53,7 @@ export async function GET() {
       healthy,
       status,
       timestamp: new Date().toISOString(),
+      version: process.env.npm_package_version || 'unknown',
     },
     { status: healthy ? 200 : 503 }
   );

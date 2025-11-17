@@ -1,9 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // TypeScript check - Desactivado temporalmente para optimizar build
+  // TypeScript check - Activado para garantizar calidad del código
   typescript: {
-    ignoreBuildErrors: true, // TODO: Activar cuando se definan todos los tipos
+    ignoreBuildErrors: false,
   },
 
   // Experimental features
