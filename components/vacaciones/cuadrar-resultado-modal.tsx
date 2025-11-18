@@ -1,0 +1,390 @@
+'use client';
+
+import { useEffect, useMemo, useState } from 'react';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
+import { cn } from '@/lib/utils';
+
+type TipoPropuesta = 'ideal' | 'alternativo' | 'ajustado';
+
+export interface VacacionesAjustePayload {
+  preferenciaId: string;
+  fechaInicio: string;
+  fechaFin: string;
+  tipo: TipoPropuesta;
+  motivo: string;
+}
+
+interface EmpleadoInfo {
+  id: string;
+  nombre: string;
+  apellidos: string;
+  fotoUrl: string | null;
+  email: string;
+}
+
+interface PreferenciaConEmpleado {
+  id: string;
+  completada: boolean;
+  diasIdeales: string[] | null;
+  diasPrioritarios: string[] | null;
+  diasAlternativos: string[] | null;
+  empleado: EmpleadoInfo;
+  propuestaIA?: {
+    empleadoId: string;
+    fechaInicio: string;
+    fechaFin: string;
+    dias: number;
+    tipo: TipoPropuesta;
+    motivo: string;
+    prioridad?: number;
+  } | null;
+}
+
+interface CuadrarVacacionesResultadoModalProps {
+  open: boolean;
+  onClose: () => void;
+  campana: {
+    id: string;
+    titulo: string;
+    fechaInicioObjetivo: string;
+    fechaFinObjetivo: string;
+  };
+  preferencias: PreferenciaConEmpleado[];
+  propuestas?: Array<{
+    empleadoId: string;
+    fechaInicio: string;
+    fechaFin: string;
+    dias: number;
+    tipo: TipoPropuesta;
+    motivo: string;
+    prioridad?: number;
+  }> | null;
+  onGuardarAjustes?: (ajustes: VacacionesAjustePayload[]) => Promise<void>;
+  guardando?: boolean;
+}
+
+interface AjusteFormState {
+  fechaInicio: string;
+  fechaFin: string;
+  tipo: TipoPropuesta;
+  motivo: string;
+}
+
+const TIPO_OPTIONS: { value: TipoPropuesta; label: string }[] = [
+  { value: 'ideal', label: 'Fechas ideales' },
+  { value: 'alternativo', label: 'Fechas alternativas' },
+  { value: 'ajustado', label: 'Fechas ajustadas' },
+];
+
+const formatFecha = (fecha: string) =>
+  format(new Date(fecha), 'dd MMM yyyy', { locale: es });
+
+const parseDias = (dias: string[] | null) => Array.isArray(dias) ? dias : [];
+
+export function CuadrarVacacionesResultadoModal({
+  open,
+  onClose,
+  campana,
+  preferencias,
+  propuestas,
+  onGuardarAjustes,
+  guardando = false,
+}: CuadrarVacacionesResultadoModalProps) {
+  const [formularios, setFormularios] = useState<Record<string, AjusteFormState>>({});
+
+  const propuestasPorEmpleado = useMemo(() => {
+    if (!propuestas) return {};
+    return propuestas.reduce<Record<string, typeof propuestas[number]>>((acc, propuesta) => {
+      acc[propuesta.empleadoId] = propuesta;
+      return acc;
+    }, {});
+  }, [propuestas]);
+
+  useEffect(() => {
+    const inicial: Record<string, AjusteFormState> = {};
+    for (const pref of preferencias) {
+      const propuestaPreferencia =
+        propuestasPorEmpleado[pref.empleado.id] || pref.propuestaIA;
+
+      let fechaInicio = campana.fechaInicioObjetivo;
+      let fechaFin = campana.fechaFinObjetivo;
+      let tipo: TipoPropuesta = 'ajustado';
+      let motivo = 'Pendiente de asignar';
+
+      if (propuestaPreferencia?.fechaInicio && propuestaPreferencia?.fechaFin) {
+        fechaInicio = propuestaPreferencia.fechaInicio;
+        fechaFin = propuestaPreferencia.fechaFin;
+      }
+
+      if (propuestaPreferencia?.tipo) {
+        tipo = propuestaPreferencia.tipo;
+      }
+
+      if (propuestaPreferencia?.motivo) {
+        motivo = propuestaPreferencia.motivo;
+      }
+
+      inicial[pref.id] = {
+        fechaInicio: fechaInicio.split('T')[0],
+        fechaFin: fechaFin.split('T')[0],
+        tipo,
+        motivo,
+      };
+    }
+
+    setFormularios(inicial);
+  }, [preferencias, campana.fechaInicioObjetivo, campana.fechaFinObjetivo, propuestasPorEmpleado]);
+
+  const handleChange = (preferenciaId: string, campo: keyof AjusteFormState, valor: string) => {
+    setFormularios((prev) => ({
+      ...prev,
+      [preferenciaId]: {
+        ...prev[preferenciaId],
+        [campo]: valor,
+      },
+    }));
+  };
+
+  const handleGuardar = async () => {
+    if (!onGuardarAjustes) {
+      onClose();
+      return;
+    }
+
+    const ajustes: VacacionesAjustePayload[] = Object.entries(formularios).map(
+      ([preferenciaId, form]) => ({
+        preferenciaId,
+        fechaInicio: form.fechaInicio,
+        fechaFin: form.fechaFin,
+        tipo: form.tipo,
+        motivo: form.motivo || 'Ajuste manual',
+      })
+    );
+
+    await onGuardarAjustes(ajustes);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <div className="flex flex-col gap-2">
+            <DialogTitle className="text-2xl font-semibold text-gray-900">
+              Cuadrar vacaciones · {campana.titulo}
+            </DialogTitle>
+            <p className="text-sm text-gray-600">
+              {formatFecha(campana.fechaInicioObjetivo)} — {formatFecha(campana.fechaFinObjetivo)}
+            </p>
+          </div>
+        </DialogHeader>
+
+        <div className="space-y-6 py-2">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="rounded-lg border border-blue-200 bg-blue-50 p-3">
+              <p className="text-xs text-blue-600 uppercase font-semibold mb-1">
+                Preferencias recibidas
+              </p>
+              <p className="text-2xl font-bold text-blue-950">
+                {preferencias.length}
+              </p>
+            </div>
+            <div className="rounded-lg border border-green-200 bg-green-50 p-3">
+              <p className="text-xs text-green-600 uppercase font-semibold mb-1">
+                Propuestas asignadas
+              </p>
+              <p className="text-2xl font-bold text-green-800">
+                {
+                  preferencias.filter((pref) => pref.propuestaIA || propuestasPorEmpleado[pref.empleado.id])
+                    .length
+                }
+              </p>
+            </div>
+            <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+              <p className="text-xs text-gray-600 uppercase font-semibold mb-1">
+                Pendientes de completar
+              </p>
+              <p className="text-2xl font-bold text-gray-900">
+                {preferencias.filter((pref) => !pref.completada).length}
+              </p>
+            </div>
+          </div>
+
+          <div className="border border-gray-200 rounded-lg">
+            <div className="hidden lg:grid grid-cols-[220px_1fr_1fr] gap-4 border-b border-gray-200 px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">
+              <span>Persona</span>
+              <span>Preferencias</span>
+              <span>Asignación propuesta</span>
+            </div>
+
+            <div className="divide-y divide-gray-100">
+              {preferencias.map((pref) => {
+                const form = formularios[pref.id];
+                const diasIdeales = parseDias(pref.diasIdeales);
+                const diasPrioritarios = parseDias(pref.diasPrioritarios);
+                const diasAlternativos = parseDias(pref.diasAlternativos);
+
+                return (
+                  <div
+                    key={pref.id}
+                    className="flex flex-col lg:grid lg:grid-cols-[220px_1fr_1fr] gap-4 px-4 py-4"
+                  >
+                    <div className="flex items-start gap-3">
+                      <Avatar className="h-12 w-12">
+                        <AvatarImage src={pref.empleado.fotoUrl ?? undefined} />
+                        <AvatarFallback>
+                          {pref.empleado.nombre.charAt(0)}
+                          {pref.empleado.apellidos.charAt(0)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="space-y-1">
+                        <p className="font-semibold text-gray-900">
+                          {pref.empleado.nombre} {pref.empleado.apellidos}
+                        </p>
+                        <p className="text-xs text-gray-500">{pref.empleado.email}</p>
+                        <Badge variant={pref.completada ? 'outline' : 'secondary'}>
+                          {pref.completada ? 'Preferencias completas' : 'Pendiente'}
+                        </Badge>
+                      </div>
+                    </div>
+
+                    <div className="rounded-lg border border-gray-100 bg-gray-50 p-3 space-y-2">
+                      <PreferenceList label="Ideales" color="text-blue-700" dias={diasIdeales} />
+                      <PreferenceList label="Prioritarios" color="text-orange-700" dias={diasPrioritarios} />
+                      <PreferenceList label="Alternativos" color="text-gray-700" dias={diasAlternativos} />
+                    </div>
+
+                    <div className="rounded-lg border border-gray-100 bg-white p-3 space-y-3">
+                      {form ? (
+                        <>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div>
+                              <Label className="text-xs text-gray-600">Inicio</Label>
+                              <Input
+                                type="date"
+                                value={form.fechaInicio}
+                                onChange={(e) => handleChange(pref.id, 'fechaInicio', e.target.value)}
+                              />
+                            </div>
+                            <div>
+                              <Label className="text-xs text-gray-600">Fin</Label>
+                              <Input
+                                type="date"
+                                value={form.fechaFin}
+                                onChange={(e) => handleChange(pref.id, 'fechaFin', e.target.value)}
+                              />
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div>
+                              <Label className="text-xs text-gray-600">Tipo</Label>
+                              <Select
+                                value={form.tipo}
+                                onValueChange={(value) =>
+                                  handleChange(pref.id, 'tipo', value as TipoPropuesta)
+                                }
+                              >
+                                <SelectTrigger>
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {TIPO_OPTIONS.map((option) => (
+                                    <SelectItem key={option.value} value={option.value}>
+                                      {option.label}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div>
+                              <Label className="text-xs text-gray-600">Motivo</Label>
+                              <Textarea
+                                value={form.motivo}
+                                onChange={(e) => handleChange(pref.id, 'motivo', e.target.value)}
+                                rows={2}
+                              />
+                            </div>
+                          </div>
+                        </>
+                      ) : (
+                        <p className="text-sm text-gray-500">
+                          Sin propuesta disponible. Ejecuta el cuadrado para generar una.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
+          <Button variant="ghost" onClick={onClose}>
+            Cerrar
+          </Button>
+          <Button onClick={handleGuardar} disabled={guardando} className="min-w-[160px]">
+            {guardando ? 'Guardando...' : 'Guardar ajustes'}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function PreferenceList({
+  label,
+  color,
+  dias,
+}: {
+  label: string;
+  color: string;
+  dias: string[];
+}) {
+  if (!dias.length) {
+    return (
+      <p className={cn('text-xs italic text-gray-400')}>
+        {label}: sin días
+      </p>
+    );
+  }
+
+  return (
+    <div>
+      <p className={cn('text-xs font-semibold mb-1', color)}>{label}</p>
+      <div className="flex flex-wrap gap-1.5">
+        {dias.slice(0, 4).map((dia) => (
+          <Badge key={`${label}-${dia}`} variant="secondary" className="text-[11px]">
+            {formatFecha(dia)}
+          </Badge>
+        ))}
+        {dias.length > 4 && (
+          <Badge variant="outline" className="text-[10px]">
+            +{dias.length - 4}
+          </Badge>
+        )}
+      </div>
+    </div>
+  );
+}
+

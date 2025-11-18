@@ -78,3 +78,4 @@ export const CarpetaCard = memo(function CarpetaCard({ carpeta, onClick }: Carpe
 
 
 
+

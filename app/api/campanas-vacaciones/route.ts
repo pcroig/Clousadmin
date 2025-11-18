@@ -98,16 +98,19 @@ export async function POST(req: NextRequest) {
     const data = validationResult.data;
 
     // Determinar empleados asignados
-    interface EmpleadoAsignado {
-      id: string;
-      usuarioId: string;
-      nombre: string;
-      apellidos: string;
-      email: string;
-      estadoEmpleado?: string;
-    }
+interface EmpleadoAsignado {
+  id: string;
+  usuarioId: string | null;
+  nombre: string;
+  apellidos: string;
+  email: string;
+  estadoEmpleado?: string | null;
+}
     
     let empleadosAsignados: EmpleadoAsignado[] = [];
+
+    const solapamientoMaximoPct =
+      data.alcance === 'equipos' ? data.solapamientoMaximoPct ?? null : null;
 
     if (data.alcance === 'todos') {
       // Todos los empleados activos de la empresa
@@ -122,6 +125,7 @@ export async function POST(req: NextRequest) {
           nombre: true,
           apellidos: true,
           email: true,
+          estadoEmpleado: true,
         }
       });
     } else if (data.alcance === 'equipos' && data.equipoIds && data.equipoIds.length > 0) {
@@ -132,6 +136,16 @@ export async function POST(req: NextRequest) {
           empresaId: session.user.empresaId,
         },
         include: {
+          manager: {
+            select: {
+              id: true,
+              usuarioId: true,
+              nombre: true,
+              apellidos: true,
+              email: true,
+              estadoEmpleado: true,
+            },
+          },
           miembros: {
             include: {
               empleado: {
@@ -162,6 +176,15 @@ export async function POST(req: NextRequest) {
             empleadosSet.add(miembro.empleado.id);
             empleadosAsignados.push(miembro.empleado);
           }
+        }
+
+        if (
+          equipo.manager &&
+          equipo.manager.estadoEmpleado === 'activo' &&
+          !empleadosSet.has(equipo.manager.id)
+        ) {
+          empleadosSet.add(equipo.manager.id);
+          empleadosAsignados.push(equipo.manager);
         }
       }
     } else {
@@ -224,7 +247,7 @@ export async function POST(req: NextRequest) {
         titulo: data.titulo,
         alcance: data.alcance,
         equipoIds: (data.equipoIds || null) as unknown as Prisma.InputJsonValue,
-        solapamientoMaximoPct: data.solapamientoMaximoPct,
+        solapamientoMaximoPct,
         fechaInicioObjetivo,
         fechaFinObjetivo,
         totalEmpleadosAsignados: empleadosAsignados.length,

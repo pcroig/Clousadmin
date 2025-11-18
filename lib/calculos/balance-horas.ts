@@ -6,6 +6,7 @@ import { prisma } from '@/lib/prisma';
 import {
   calcularHorasTrabajadas,
   obtenerHorasEsperadas,
+  obtenerHorasEsperadasBatch,
   agruparFichajesPorDia,
   type FichajeConEventos,
 } from './fichajes';
@@ -19,6 +20,11 @@ import {
 } from './dias-laborables';
 
 const prismaClient = prisma as PrismaClient;
+
+export interface DiaCalculo {
+  fecha: Date;
+  key: string;
+}
 
 export interface BalanceDia {
   fecha: Date;
@@ -34,6 +40,36 @@ export interface BalancePeriodo {
   totalHorasEsperadas: number;
   balanceTotal: number;
   dias: BalanceDia[];
+}
+
+export function generarDiasDelPeriodo(fechaInicio: Date, fechaFin: Date): DiaCalculo[] {
+  const dias: DiaCalculo[] = [];
+  const cursor = new Date(fechaInicio.getFullYear(), fechaInicio.getMonth(), fechaInicio.getDate());
+  const finNormalizado = new Date(fechaFin.getFullYear(), fechaFin.getMonth(), fechaFin.getDate());
+
+  while (cursor <= finNormalizado) {
+    const fecha = new Date(cursor);
+    fecha.setHours(0, 0, 0, 0);
+    dias.push({
+      fecha,
+      key: formatearClaveFecha(fecha),
+    });
+    cursor.setDate(cursor.getDate() + 1);
+  }
+
+  return dias;
+}
+
+export function calcularHorasTrabajadasDelDia(fichaje?: FichajeConEventos): number {
+  if (!fichaje) {
+    return 0;
+  }
+
+  if (fichaje.horasTrabajadas !== null && fichaje.horasTrabajadas !== undefined) {
+    return Number(fichaje.horasTrabajadas);
+  }
+
+  return calcularHorasTrabajadas(fichaje.eventos);
 }
 
 /**
@@ -152,47 +188,51 @@ export async function calcularBalancePeriodo(
     throw new Error(`[BalanceHoras] Empleado ${empleadoId} no encontrado`);
   }
 
+  const diasDelPeriodo = generarDiasDelPeriodo(fechaInicio, fechaFin);
+
   const [festivos, diasLaborablesConfig] = await Promise.all([
     getFestivosActivosEnRango(empleado.empresaId, fechaInicio, fechaFin),
     getDiasLaborablesEmpresa(empleado.empresaId),
   ]);
   const festivosSet = crearSetFestivos(festivos);
   const calendarioLaboralMap = new Map<string, boolean>();
-  
-  // Pre-calcular todos los días del rango
-  const fechaTemp = new Date(fechaInicio);
-  while (fechaTemp <= fechaFin) {
-    const fechaKey = formatearClaveFecha(fechaTemp);
+
+  for (const dia of diasDelPeriodo) {
     const esLaborable = await esDiaLaborable(
-      fechaTemp,
+      dia.fecha,
       empleado.empresaId,
       diasLaborablesConfig,
       festivosSet
     );
-    calendarioLaboralMap.set(fechaKey, esLaborable);
-    fechaTemp.setDate(fechaTemp.getDate() + 1);
+    calendarioLaboralMap.set(dia.key, esLaborable);
   }
+
+  const horasEsperadasEntradas = diasDelPeriodo.map((dia) => ({
+    empleadoId,
+    fecha: dia.fecha,
+  }));
+  const horasEsperadasMap = await obtenerHorasEsperadasBatch(horasEsperadasEntradas);
 
   // Calcular balance por día
   const dias: BalanceDia[] = [];
   let totalHorasTrabajadas = 0;
   let totalHorasEsperadas = 0;
 
-  const fechaActual = new Date(fechaInicio);
-  while (fechaActual <= fechaFin) {
-    const fechaKey = formatearClaveFecha(fechaActual);
-    const fichajeDia = fichajesPorDia[fechaKey] as FichajeConEventos | undefined;
+  for (const dia of diasDelPeriodo) {
+    const fichajeDia = fichajesPorDia[dia.key] as FichajeConEventos | undefined;
     const eventosDia: FichajeEvento[] = fichajeDia?.eventos ?? [];
 
-    const horasTrabajadas = calcularHorasTrabajadas(eventosDia);
-    const horasEsperadas = await obtenerHorasEsperadas(empleadoId, fechaActual);
+    const horasTrabajadas = calcularHorasTrabajadasDelDia(
+      fichajeDia ? { ...fichajeDia, eventos: eventosDia } : undefined
+    );
+    const horasEsperadas = horasEsperadasMap[`${empleadoId}_${dia.key}`] ?? 0;
     const balance = horasTrabajadas - horasEsperadas;
 
-    const esFestivo = festivosSet.has(fechaKey);
-    const esLaborable = calendarioLaboralMap.get(fechaKey) ?? true;
+    const esFestivo = festivosSet.has(dia.key);
+    const esLaborable = calendarioLaboralMap.get(dia.key) ?? true;
 
     dias.push({
-      fecha: new Date(fechaActual),
+      fecha: new Date(dia.fecha),
       horasTrabajadas,
       horasEsperadas,
       balance,
@@ -203,7 +243,6 @@ export async function calcularBalancePeriodo(
     totalHorasTrabajadas += horasTrabajadas;
     totalHorasEsperadas += horasEsperadas;
 
-    fechaActual.setDate(fechaActual.getDate() + 1);
   }
 
   return {

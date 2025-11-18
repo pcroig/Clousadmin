@@ -182,14 +182,10 @@ export async function PATCH(
     if (validationResult instanceof Response) return validationResult;
     const { data: validatedData } = validationResult;
 
-    // Verificar permisos: empleados solo pueden editar sus propios fichajes y solo para solicitar corrección
-    if (session.user.rol === UsuarioRol.empleado && fichaje.empleadoId !== session.user.empleadoId) {
-      return forbiddenResponse('Solo puedes editar tus propios fichajes');
-    }
-
-    // Si es empleado, debe tener motivoEdicion
-    if (session.user.rol === UsuarioRol.empleado && !validatedData.motivoEdicion) {
-      return badRequestResponse('Debes proporcionar un motivo para la corrección');
+    if (session.user.rol === UsuarioRol.empleado) {
+      return forbiddenResponse(
+        'Las modificaciones deben solicitarse desde el formulario de correcciones'
+      );
     }
 
     // Actualizar evento del fichaje (por ahora solo actualizar la hora si se proporciona)

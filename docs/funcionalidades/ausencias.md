@@ -1,8 +1,76 @@
 # 🏖️ DOCUMENTACIÓN: GESTIÓN DE AUSENCIAS - ESTADO ACTUAL
 
-**Versión**: 3.1  
-**Fecha**: 27 Enero 2025  
-**Estado**: Sistema completo y operativo con Festivos, Calendario Laboral, Justificantes y Campañas para Empleados
+**Versión**: 3.2.2  
+**Fecha**: 18 Noviembre 2025  
+**Estado**: Sistema refactorizado con validaciones robustas, transacciones atómicas y prevención REAL de race conditions (campo único de motivo/detalle)
+
+---
+
+## 🔄 CAMBIOS RECIENTES
+
+### v3.2.2 - Campo Único de Motivo/Detalle (18 Nov 2025)
+
+**✔ Cambios**:
+1. Se elimina `descripcion` del modelo `Ausencia`; `motivo` es el único campo semántico (obligatorio solo para tipo `otro`)
+2. Migración automática que fusiona datos existentes (si solo había descripción se conserva en motivo)
+3. Formularios de empleado y HR muestran un único campo “Motivo o detalles”
+4. API/validaciones/documentación y calendarios actualizados
+
+**📄 Ver**: `docs/funcionalidades/MEJORA_AUSENCIAS_v3.2.2.md` para el desglose completo
+
+---
+
+### v3.2.1 - Bugfixes Críticos (18 Nov 2025)
+
+**🐛 Correcciones**:
+1. **Race Condition Real**: `calcularSaldoDisponible()` ahora usa valores de tabla cuando se ejecuta en transacción, evitando recalcular desde ausencias (causa de race condition)
+2. **Tests**: Corregidos imports inexistentes (`validarSaldoSuficienteConTransaccion` → `validarSaldoSuficiente`)
+3. **Documentación**: Alineada con código real (eliminadas referencias a funciones que no existen)
+4. **Cleanup Justificantes**: Limpieza de documentos huérfanos ahora ocurre en TODOS los paths de error, no solo en `SaldoInsuficienteError`
+5. **Código Muerto**: Eliminado schema duplicado (`ausenciaEditarSchema`) y función helper redundante (`failWithCleanup`)
+
+**📄 Ver**: `docs/funcionalidades/BUGFIX_AUSENCIAS_v3.2.1.md` para detalles completos
+
+---
+
+### v3.2 - Refactoring Mayor (18 Nov 2025)
+
+### Mejoras Críticas de Seguridad y Robustez
+
+1. **Validaciones Reforzadas**:
+   - Medio día restringido a ausencias de un solo día
+   - Campo `periodo` obligatorio cuando `medioDia=true`
+   - Campo `motivo` obligatorio para tipo 'otro'
+   - Validación de solapamiento incluye estados completados y auto-aprobados
+
+2. **Transacciones Atómicas para Saldos**:
+   - `calcularSaldoDisponible()` usa valores de tabla cuando se ejecuta en transacción
+   - Validación + actualización en una única transacción previene race conditions
+   - Protección contra saldos negativos en solicitudes concurrentes
+
+3. **Saldos Multi-Año**:
+   - `calcularSaldoDisponible()` recalcula ausencias por año fuera de transacción
+   - Cálculo correcto considerando ausencias que cruzan límites de año
+   - Cada año mantiene su propio registro independiente en `EmpleadoSaldoAusencias`
+
+4. **Sincronización Completa**:
+   - Ausencias auto-aprobadas ahora se sincronizan con Google Calendar
+   - Notificaciones con manejo de errores mejorado (logs + eventual consistency)
+   - Documentos huérfanos se limpian automáticamente tras 7 días
+
+5. **Constantes Centralizadas**:
+   - `lib/constants/ausencias.ts`: tipos auto-aprobables y que descuentan saldo
+   - Single source of truth para reglas de negocio
+   - Reutilización en API y componentes UI
+
+6. **Optimizaciones de Performance**:
+   - Eliminado `JSON.parse(JSON.stringify())` innecesario
+   - `validarSolapamientoMaximo()` optimizado (sin cálculo doble)
+   - Memoización de fecha `today` en modales para evitar re-creación
+
+7. **Restricciones de Edición**:
+   - Cambio de tipo solo permitido en estado `pendiente`
+   - Validaciones coherentes en POST y PATCH
 
 ---
 
@@ -24,6 +92,10 @@
 12. **Selector de Tipos Mejorado**: Información visual sobre aprobación y descuento de saldo
 13. **Campañas para Empleados**: Widget y panel de campañas activas en vista de empleados
 14. **Vista de Personas Mejorada**: Tabla de ausencias en lugar de cards
+15. **✨ NUEVO: Transacciones Atómicas**: Prevención de race conditions en saldos
+16. **✨ NUEVO: Saldos Multi-Año**: Gestión correcta de ausencias que cruzan años
+17. **✨ NUEVO: Validaciones Robustas**: Medio día, motivo, periodo, solapamiento mejorados
+18. **✨ NUEVO: Cleanup Automático**: Documentos huérfanos eliminados tras 7 días
 
 ---
 
@@ -104,7 +176,7 @@
 - ✅ Búsqueda por nombre de empleado
 - ✅ Modal aprobar individual
 - ✅ Modal rechazar individual
-- ✅ Modal editar ausencia (tipo, fechas, motivo, descripción, medio día)
+- ✅ Modal editar ausencia (tipo, fechas, motivo/detalles, medio día)
 - ✅ Botón "Actualizar ausencias" (aprobar todas pendientes)
 - ✅ Botón "Gestionar ausencias" (modal con tabs)
 
@@ -222,7 +294,7 @@ const diasPendientes = ausencias
    - Empleado accede a `/empleado/mi-espacio` → Tab Ausencias o widget de ausencias
    - Click "Solicitar ausencia" (botón con bordes)
    - Selecciona tipo de ausencia (con información visual sobre aprobación y descuento)
-   - Completa formulario (tipo, fechas, motivo si aplica, descripción)
+   - Completa formulario (tipo, fechas, motivo/detalles según tipo)
    - **Opcional**: Sube justificante (recomendado para enfermedad, enfermedad_familiar, maternidad_paternidad)
    - Sistema valida saldo disponible (si es vacaciones)
    - Se crea ausencia con estado `pendiente_aprobacion` (o directamente aprobada según tipo)
@@ -263,7 +335,7 @@ const diasPendientes = ausencias
 
 5. **Editar Ausencia**
    - Desde tabla o desde perfil de empleado
-   - Permite modificar: tipo, fechas, motivo, descripción, medio día, **justificante**
+   - Permite modificar: tipo, fechas, motivo/detalles, medio día, **justificante**
    - Recalcula días automáticamente
    - Valida saldo si cambia número de días
    - Permite subir/actualizar justificante después de crear la ausencia
@@ -289,8 +361,7 @@ FormData:
   "tipo": "vacaciones",
   "fechaInicio": "2025-12-01",
   "fechaFin": "2025-12-05",
-  "motivo": "Descanso",
-  "descripcion": "Vacaciones de Navidad",
+  "motivo": "Vacaciones de Navidad",
   "medioDia": false,
   "justificanteUrl": "https://bucket.s3.../justificante_xxx.pdf" // opcional
 }
@@ -620,30 +691,77 @@ Todas las funciones de cálculo de días usan la configuración:
 
 ## 🎯 PRÓXIMOS PASOS SUGERIDOS
 
-1. **Widget saldo en dashboard empleado** (1 hora)
-2. **Testing completo de sistema festivos** (2 horas)
-3. **Migración de empresas existentes a festivos** (1 hora)
+### Prioridad ALTA
+1. **Tests de Integración** (4-6 horas)
+   - Implementar suite completa de tests en `lib/calculos/__tests__/ausencias.test.ts`
+   - Tests de race conditions para validación concurrente de saldos
+   - Tests de ausencias multi-año
+   - Tests de validaciones (medio día, motivo, periodo)
+
+2. **Job de Cleanup de Documentos Huérfanos** (2 horas)
+   - Implementar cron/job que ejecute `limpiarDocumentosHuerfanos()`
+   - Configurar en `/api/cron/cleanup-documentos` (similar a revisar-solicitudes)
+   - Ejecutar diariamente a las 3 AM
+
+### Prioridad MEDIA
+3. **Widget saldo en dashboard empleado** (1 hora)
+4. **Monitoreo de Notificaciones Fallidas** (2 horas)
+   - Implementar sistema de logs/alertas para notificaciones que fallan
+   - Considerar cola de reintentos con BullMQ
+
+### Prioridad BAJA
+5. **Migración de empresas existentes a festivos** (1 hora)
+6. **Optimizaciones adicionales** (según necesidad)
 
 ---
 
 ## 📚 REFERENCIAS
 
-- Schema: `prisma/schema.prisma` - Modelo Ausencia líneas 354-407
+### Core
+- Schema: `prisma/schema.prisma` - Modelo Ausencia líneas 572-637
+- Constantes: `lib/constants/ausencias.ts` - TIPOS_AUTO_APROBABLES, TIPOS_DESCUENTAN_SALDO
 - API Core: `app/api/ausencias/route.ts`
 - API Individual: `app/api/ausencias/[id]/route.ts`
 - API Masivo: `app/api/ausencias/actualizar-masivo/route.ts`
+
+### Lógica de Negocio
+- Cálculos: `lib/calculos/ausencias.ts`
+  - `calcularSaldoDisponible()` - Cálculo atómico en transacciones
+  - `validarSaldoSuficiente()` - Validación con soporte transaccional
+  - `calcularDias()`, `validarPoliticasEquipo()`
+- Días Laborables: `lib/calculos/dias-laborables.ts`
+- Validaciones: `lib/validaciones/schemas.ts` (ausenciaCreateSchema, ausenciaUpdateSchema)
+
+### UI
 - UI HR: `app/(dashboard)/hr/horario/ausencias/ausencias-client.tsx`
-- UI Empleado: `app/(dashboard)/empleado/mi-espacio/tabs/ausencias-tab.tsx`
+- UI Empleado Mi Espacio: `app/(dashboard)/empleado/mi-espacio/tabs/ausencias-tab.tsx`
 - UI Empleado Ausencias: `app/(dashboard)/empleado/horario/ausencias/ausencias-empleado-client.tsx`
 - Modal Solicitar: `components/empleado/solicitar-ausencia-modal.tsx`
 - Modal Gestionar: `app/(dashboard)/hr/horario/ausencias/gestionar-ausencias-modal.tsx`
 - Widget Ausencias: `components/shared/ausencias-widget.tsx`
 - Widget Campañas: `components/empleado/campanas-vacaciones-widget.tsx`
+
+### Integraciones
 - API Upload: `app/api/upload/route.ts`
-- Validaciones: `lib/validaciones/schemas.ts` (ausenciaCreateSchema, ausenciaUpdateSchema)
+- Documentos: `lib/documentos.ts` - limpiarDocumentosHuerfanos()
+- Calendar Sync: `lib/integrations/calendar/calendar-manager.ts`
+- Notificaciones: `lib/notificaciones.ts`
+
+### Tests
+- Tests Unitarios: `lib/calculos/__tests__/ausencias.test.ts`
 
 ---
 
-**Última actualización**: 27 Enero 2025
-**Estado**: Sistema completo y operativo con Estados Unificados, Festivos, Calendario Laboral, Justificantes y Campañas para Empleados
+## 🔒 NOTAS DE SEGURIDAD
+
+1. **Race Conditions**: Siempre pasar `tx` (transacción) a `validarSaldoSuficiente()` y `calcularSaldoDisponible()` para que usen valores atómicos de la tabla en lugar de recalcular desde ausencias
+2. **Validación de Entrada**: Todos los endpoints validan con Zod antes de procesar
+3. **Autorización**: HR Admin/Manager required para aprobar/rechazar/editar
+4. **Cleanup**: Documentos huérfanos se eliminan en caso de error de validación y tras 7 días sin referencia (cron job)
+
+---
+
+**Última actualización**: 18 Noviembre 2025  
+**Versión**: 3.2.2  
+**Estado**: Sistema refactorizado con validaciones robustas, transacciones atómicas y campo único de motivo/detalles (bugs críticos corregidos)
 

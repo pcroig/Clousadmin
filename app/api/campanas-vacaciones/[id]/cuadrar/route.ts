@@ -55,6 +55,16 @@ export async function POST(
                 apellidos: true,
                 diasVacaciones: true,
                 usuarioId: true,
+                equipos: {
+                  include: {
+                    equipo: {
+                      select: {
+                        id: true,
+                        nombre: true,
+                      },
+                    },
+                  },
+                },
               },
             },
           },

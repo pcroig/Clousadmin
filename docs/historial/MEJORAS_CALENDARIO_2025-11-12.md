@@ -130,7 +130,7 @@ Nuevo modal que muestra información completa de una ausencia:
 - Fechas formateadas
 - Días solicitados
 - Medio día (si aplica)
-- Motivo y descripción (si existen)
+- Motivo o detalles (si existen)
 
 ---
 

@@ -50,9 +50,17 @@ export interface ResultadoCuadrado {
 interface CuadrarVacacionesInput {
   empresaId: string;
   campanaId: string;
-  solapamientoMaximoPct: number;
+  solapamientoMaximoPct?: number | null;
   preferencias: (PreferenciaVacaciones & {
-    empleado: Pick<Empleado, 'id' | 'nombre' | 'apellidos' | 'diasVacaciones'>;
+    empleado: Pick<Empleado, 'id' | 'nombre' | 'apellidos' | 'diasVacaciones'> & {
+      equipos: Array<{
+        equipoId: string;
+        equipo: {
+          id: string;
+          nombre: string | null;
+        } | null;
+      }>;
+    };
   })[];
   ausenciasAprobadas: Ausencia[];
   fechaInicioObjetivo: Date;
@@ -77,7 +85,37 @@ export async function cuadrarVacacionesIA(
     diasIdeales: pref.diasIdeales as string[],
     diasPrioritarios: (pref.diasPrioritarios as string[] | null) || [],
     diasAlternativos: (pref.diasAlternativos as string[] | null) || [],
+    equipos: pref.empleado.equipos.map((e) => ({
+      id: e.equipo?.id || e.equipoId,
+      nombre: e.equipo?.nombre || 'Equipo sin nombre',
+    })),
   }));
+
+  const equiposResumen = preferenciasFormateadas.reduce<
+    Array<{ id: string; nombre: string; miembros: string[] }>
+  >((acc, pref) => {
+    if (!pref.equipos.length) {
+      return acc;
+    }
+
+    for (const equipo of pref.equipos) {
+      if (!equipo.id) continue;
+      const existente = acc.find((item) => item.id === equipo.id);
+      if (existente) {
+        if (!existente.miembros.includes(pref.empleadoNombre)) {
+          existente.miembros.push(pref.empleadoNombre);
+        }
+      } else {
+        acc.push({
+          id: equipo.id,
+          nombre: equipo.nombre,
+          miembros: [pref.empleadoNombre],
+        });
+      }
+    }
+
+    return acc;
+  }, []);
 
   const ausenciasFormateadas = ausenciasAprobadas.map(ausencia => ({
     empleadoId: ausencia.empleadoId,
@@ -90,7 +128,8 @@ export async function cuadrarVacacionesIA(
   const prompt = construirPrompt({
     preferencias: preferenciasFormateadas,
     ausenciasAprobadas: ausenciasFormateadas,
-    solapamientoMaximoPct,
+    solapamientoMaximoPct: solapamientoMaximoPct ?? undefined,
+    equipos: equiposResumen,
     totalEmpleados: preferencias.length,
     fechaInicioObjetivo: fechaInicioObjetivo.toISOString().split('T')[0],
     fechaFinObjetivo: fechaFinObjetivo.toISOString().split('T')[0],
@@ -141,19 +180,32 @@ export async function cuadrarVacacionesIA(
 function construirPrompt(data: {
   preferencias: any[];
   ausenciasAprobadas: any[];
-  solapamientoMaximoPct: number;
+  solapamientoMaximoPct?: number;
+  equipos?: Array<{ id: string; nombre: string; miembros: string[] }>;
   totalEmpleados: number;
   fechaInicioObjetivo: string;
   fechaFinObjetivo: string;
 }): string {
-  const { preferencias, ausenciasAprobadas, solapamientoMaximoPct, totalEmpleados, fechaInicioObjetivo, fechaFinObjetivo } = data;
+  const {
+    preferencias,
+    ausenciasAprobadas,
+    solapamientoMaximoPct,
+    equipos = [],
+    totalEmpleados,
+    fechaInicioObjetivo,
+    fechaFinObjetivo,
+  } = data;
+
+  const solapamientoTexto = solapamientoMaximoPct
+    ? `- Máximo solapamiento permitido: ${solapamientoMaximoPct}% de un mismo equipo simultáneamente.\n- Equipos y miembros:\n${JSON.stringify(equipos, null, 2)}`
+    : '- No hay límite estricto de solapamiento. Prioriza que cada equipo conserve personal suficiente.';
 
   return `
 Necesito que optimices la distribución de vacaciones para una empresa española.
 
 **CONTEXTO:**
-- Total de empleados: ${totalEmpleados}
-- Máximo solapamiento permitido: ${solapamientoMaximoPct}% (${Math.ceil((solapamientoMaximoPct / 100) * totalEmpleados)} empleados simultáneos)
+- Total de empleados con preferencias válidas: ${totalEmpleados}
+- ${solapamientoTexto}
 - Período objetivo de vacaciones: ${fechaInicioObjetivo} a ${fechaFinObjetivo}
 - Los empleados han indicado sus preferencias de fechas
 

@@ -144,7 +144,6 @@ export const ausenciaCreateSchema = z.object({
   ]),
   medioDia: z.boolean().default(false),
   periodo: z.enum(['manana', 'tarde']).optional(), // Solo cuando medioDia=true
-  descripcion: z.string().optional(),
   motivo: z.string().optional(),
   justificanteUrl: z.string().url().optional(),
   documentoId: z.string().uuid().optional(), // ID del documento justificante
@@ -165,6 +164,28 @@ export const ausenciaCreateSchema = z.object({
   {
     message: 'La fecha de fin debe ser posterior o igual a la fecha de inicio',
     path: ['fechaFin'],
+  }
+).refine(
+  (data) => {
+    if (data.medioDia && !data.periodo) {
+      return false;
+    }
+    return true;
+  },
+  {
+    message: 'Debe especificar el periodo (mañana o tarde) cuando es medio día',
+    path: ['periodo'],
+  }
+).refine(
+  (data) => {
+    if (data.tipo === 'otro') {
+      return Boolean(data.motivo && data.motivo.trim().length > 0);
+    }
+    return true;
+  },
+  {
+    message: 'El motivo es obligatorio para ausencias de tipo "Otro"',
+    path: ['motivo'],
   }
 );
 
@@ -190,7 +211,6 @@ export const ausenciaUpdateSchema = z.object({
   fechaFin: z.string().or(z.date()).optional(),
   medioDia: z.boolean().optional(),
   periodo: z.enum(['manana', 'tarde']).optional().nullable(), // Solo cuando medioDia=true
-  descripcion: z.string().optional().nullable(),
   motivo: z.string().optional().nullable(),
   justificanteUrl: z.string().url().optional().nullable(),
   documentoId: z.string().uuid().optional().nullable(), // ID del documento justificante
@@ -312,7 +332,7 @@ export const campanaVacacionesCreateSchema = z.object({
   titulo: z.string().min(1, 'Título requerido').max(200),
   alcance: z.enum(['todos', 'equipos']).default('todos'),
   equipoIds: z.array(z.string().uuid()).optional(),
-  solapamientoMaximoPct: z.number().int().min(0).max(100).default(30),
+  solapamientoMaximoPct: z.number().int().min(0).max(100).optional(),
   fechaInicioObjetivo: z.string().or(z.date()),
   fechaFinObjetivo: z.string().or(z.date()),
 }).refine(
@@ -325,7 +345,15 @@ export const campanaVacacionesCreateSchema = z.object({
     message: 'La fecha de fin debe ser posterior o igual a la fecha de inicio',
     path: ['fechaFinObjetivo'],
   }
-);
+).superRefine((data, ctx) => {
+  if (data.solapamientoMaximoPct !== undefined && data.alcance !== 'equipos') {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'El solapamiento sólo aplica cuando la campaña es por equipos',
+      path: ['solapamientoMaximoPct'],
+    });
+  }
+});
 
 export type CampanaVacacionesCreateInput = z.infer<typeof campanaVacacionesCreateSchema>;
 

@@ -10,6 +10,7 @@ import { EmpleadoDashboardClient } from './dashboard-client';
 import type { Ausencia } from '@prisma/client';
 
 import { EstadoAusencia, UsuarioRol } from '@/lib/constants/enums';
+import { obtenerCampanaPendiente } from '@/lib/services/campanas-vacaciones';
 
 const ESTADOS_AUSENCIAS_ABIERTAS: EstadoAusencia[] = [
   EstadoAusencia.pendiente,
@@ -73,47 +74,7 @@ async function obtenerDatosDashboard(session: { user: { id: string; empresaId: s
   });
 
   // Buscar campaña activa con preferencia pendiente del empleado
-  const preferenciaPendiente = await prisma.preferenciaVacaciones.findFirst({
-    where: {
-      empleadoId: empleado.id,
-      empresaId: session.user.empresaId,
-      completada: false,
-    },
-    include: {
-      campana: {
-        select: {
-          id: true,
-          titulo: true,
-          fechaInicioObjetivo: true,
-          fechaFinObjetivo: true,
-          estado: true,
-        },
-      },
-    },
-    orderBy: {
-      createdAt: 'desc',
-    },
-  });
-
-  // Si hay preferencia pendiente y la campaña está abierta
-  let campanaPendiente: DashboardData['campanaPendiente'] = null;
-  if (preferenciaPendiente) {
-    const campana = preferenciaPendiente.campana;
-
-    if (!campana) {
-      console.warn('[EmpleadoDashboard] Preferencia de vacaciones sin campaña asociada:', {
-        preferenciaId: preferenciaPendiente.id,
-        empleadoId: empleado.id,
-      });
-    } else if (campana.estado === 'abierta') {
-      campanaPendiente = {
-        id: campana.id,
-        titulo: campana.titulo,
-        fechaInicioObjetivo: campana.fechaInicioObjetivo,
-        fechaFinObjetivo: campana.fechaFinObjetivo,
-      };
-    }
-  }
+  const campanaPendiente = await obtenerCampanaPendiente(empleado.id, session.user.empresaId);
 
   const notificaciones: Notificacion[] = notificacionesDb.map((notif) => ({
     id: notif.id,

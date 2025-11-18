@@ -77,9 +77,20 @@ export async function PATCH(
       return badRequestResponse('Empleado no encontrado');
     }
 
+    const diasIdeales = Array.isArray(body.diasIdeales) ? body.diasIdeales : [];
+    const diasPrioritarios = Array.isArray(body.diasPrioritarios) ? body.diasPrioritarios : [];
+    const diasAlternativos = Array.isArray(body.diasAlternativos) ? body.diasAlternativos : [];
+
     // Validar datos
-    if (!body.diasIdeales && !body.diasPrioritarios && !body.diasAlternativos) {
+    if (diasIdeales.length === 0 && diasPrioritarios.length === 0 && diasAlternativos.length === 0) {
       return badRequestResponse('Debe seleccionar al menos una fecha');
+    }
+
+    if (diasIdeales.length > 0) {
+      const minimoAlternativos = Math.ceil(diasIdeales.length * 0.5);
+      if (diasAlternativos.length < minimoAlternativos) {
+        return badRequestResponse(`Debes añadir al menos ${minimoAlternativos} días alternativos (50% de los días ideales)`);
+      }
     }
 
     // Buscar preferencia existente
@@ -99,9 +110,9 @@ export async function PATCH(
     const preferenciaActualizada = await prisma.preferenciaVacaciones.update({
       where: { id: preferenciaExistente.id },
       data: {
-        diasIdeales: (body.diasIdeales || []) as unknown as Prisma.InputJsonValue,
-        diasPrioritarios: (body.diasPrioritarios || []) as unknown as Prisma.InputJsonValue,
-        diasAlternativos: (body.diasAlternativos || []) as unknown as Prisma.InputJsonValue,
+        diasIdeales: diasIdeales as unknown as Prisma.InputJsonValue,
+        diasPrioritarios: diasPrioritarios as unknown as Prisma.InputJsonValue,
+        diasAlternativos: diasAlternativos as unknown as Prisma.InputJsonValue,
         completada: body.completada !== undefined ? body.completada : preferenciaExistente.completada,
       },
     });

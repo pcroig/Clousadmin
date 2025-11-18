@@ -9,6 +9,8 @@ import './antiguedad.test';
 import './procesar-excel-validaciones.test';
 import './rate-limit.test';
 import './api-smoke.test';
+import './balance-horas.test';
+import './correcciones-fichaje.test';
 
 console.log('\n✅ Todos los tests ejecutados con éxito');
 

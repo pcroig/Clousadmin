@@ -30,6 +30,9 @@ import { es } from 'date-fns/locale';
 import { useApi } from '@/lib/hooks';
 import { getAvatarStyle } from '@/lib/design-system';
 import { toast } from 'sonner';
+import { CuadrarVacacionesResultadoModal } from '@/components/vacaciones/cuadrar-resultado-modal';
+import type { PropuestaVacacionEmpleado } from '@/lib/ia/cuadrar-vacaciones';
+import type { VacacionesAjustePayload } from '@/components/vacaciones/cuadrar-resultado-modal';
 
 interface Preferencia {
   id: string;
@@ -77,12 +80,20 @@ export function PopoverMonitoreoCampana({
 }: PopoverMonitoreoCampanaProps) {
   const [open, setOpen] = useState(false);
   const { data: campana, loading, execute: refetch } = useApi<CampanaDetalle>();
+  const [resultadoModalOpen, setResultadoModalOpen] = useState(false);
+  const [resultadoPropuestas, setResultadoPropuestas] = useState<PropuestaVacacionEmpleado[] | null>(null);
+  const [guardandoResultado, setGuardandoResultado] = useState(false);
 
   useEffect(() => {
     if (open && campanaId) {
       refetch(`/api/campanas-vacaciones/${campanaId}`);
     }
   }, [open, campanaId, refetch]);
+
+  const refreshCampana = async () => {
+    if (!campanaId) return null;
+    return refetch(`/api/campanas-vacaciones/${campanaId}`);
+  };
 
   const handleCuadrarIA = async () => {
     if (!campanaId || !onCuadrarIA) return;
@@ -100,12 +111,21 @@ export function PopoverMonitoreoCampana({
       }
 
       const resultado = await response.json();
+      const propuestasGeneradas: PropuestaVacacionEmpleado[] =
+        resultado.resultado?.propuestas ||
+        resultado.propuestas ||
+        [];
+
+      setResultadoPropuestas(propuestasGeneradas);
       
       // Cerrar popover y notificar al padre
       setOpen(false);
 
       // Mostrar mensaje de éxito
-      toast.success(`Vacaciones cuadradas exitosamente! ${resultado.propuestas?.length || 0} propuestas creadas y notificaciones enviadas a los empleados.`);
+      toast.success(`Vacaciones cuadradas exitosamente. ${propuestasGeneradas.length} propuestas creadas.`);
+
+      await refreshCampana();
+      setResultadoModalOpen(true);
 
       if (onCuadrarIA) {
         onCuadrarIA(campanaId);
@@ -118,8 +138,35 @@ export function PopoverMonitoreoCampana({
 
   const handleCuadrarManual = () => {
     setOpen(false);
+    setResultadoPropuestas(null);
+    setResultadoModalOpen(true);
     if (onCuadrarManual) {
       onCuadrarManual(campanaId);
+    }
+  };
+
+  const handleGuardarAjustes = async (ajustes: VacacionesAjustePayload[]) => {
+    if (!campanaId || ajustes.length === 0) return;
+    setGuardandoResultado(true);
+    try {
+      const response = await fetch(`/api/campanas-vacaciones/${campanaId}/propuestas`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ajustes }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ error: 'Error desconocido' }));
+        throw new Error(error.error || 'No se pudieron guardar los ajustes');
+      }
+
+      toast.success('Ajustes guardados correctamente');
+      await refreshCampana();
+    } catch (error) {
+      console.error('[Monitoreo] Error guardando ajustes:', error);
+      toast.error(error instanceof Error ? error.message : 'Error guardando ajustes');
+    } finally {
+      setGuardandoResultado(false);
     }
   };
 
@@ -149,14 +196,15 @@ export function PopoverMonitoreoCampana({
   };
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button variant="outline" size="sm" className="gap-2">
-          <Eye className="w-4 h-4" />
-          Monitorear
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-[520px] p-0 shadow-lg border border-gray-200" align="end">
+    <>
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <Button variant="outline" size="sm" className="gap-2">
+            <Eye className="w-4 h-4" />
+            Monitorear
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-[520px] p-0 shadow-lg border border-gray-200" align="end">
         {loading ? (
           <div className="flex items-center justify-center p-8">
             <Spinner className="w-6 h-6 text-gray-400" />
@@ -353,7 +401,7 @@ export function PopoverMonitoreoCampana({
                   variant="default"
                   className="flex-1 gap-2"
                   onClick={handleCuadrarIA}
-                  disabled={preferenciasPendientes.length > 0 || campana.estado !== 'abierta'}
+                  disabled={campana.estado !== 'abierta'}
                 >
                   <Sparkles className="w-4 h-4" />
                   Cuadrar con IA
@@ -363,7 +411,7 @@ export function PopoverMonitoreoCampana({
                   variant="outline"
                   className="flex-1 gap-2 border-gray-300"
                   onClick={handleCuadrarManual}
-                  disabled={preferenciasPendientes.length > 0 || campana.estado !== 'abierta'}
+                  disabled={campana.estado !== 'abierta'}
                 >
                   <Settings className="w-4 h-4" />
                   Cuadrar Manual
@@ -371,18 +419,49 @@ export function PopoverMonitoreoCampana({
               </div>
               {preferenciasPendientes.length > 0 ? (
                 <p className="text-xs text-gray-500 mt-3 text-center">
-                  ⏳ Espera a que todos completen sus preferencias
+                  ⚠️ Algunos empleados siguen pendientes. Puedes cuadrar: sólo se usarán las preferencias completadas.
                 </p>
               ) : campana.estado === 'abierta' ? (
                 <p className="text-xs text-green-600 mt-3 text-center font-medium">
                   ✓ Todos completaron. Ya puedes cuadrar las vacaciones
                 </p>
               ) : null}
+              {campana.estado === 'cuadrada' && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full mt-3 text-gray-600 justify-center"
+                  onClick={() => {
+                    setResultadoPropuestas(null);
+                    setResultadoModalOpen(true);
+                  }}
+                >
+                  Ver y ajustar cuadrado existente
+                </Button>
+              )}
             </div>
           </div>
         )}
-      </PopoverContent>
-    </Popover>
+        </PopoverContent>
+      </Popover>
+
+      {campana && (
+        <CuadrarVacacionesResultadoModal
+          open={resultadoModalOpen}
+          onClose={() => setResultadoModalOpen(false)}
+          campana={{
+            id: campana.id,
+            titulo: campana.titulo,
+            fechaInicioObjetivo: campana.fechaInicioObjetivo,
+            fechaFinObjetivo: campana.fechaFinObjetivo,
+          }}
+          preferencias={campana.preferencias}
+          propuestas={resultadoPropuestas}
+          onGuardarAjustes={handleGuardarAjustes}
+          guardando={guardandoResultado}
+        />
+      )}
+    </>
   );
 }
 

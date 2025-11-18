@@ -24,6 +24,7 @@ import {
   obtenerEmpleadosDisponibles,
 } from '@/lib/calculos/fichajes';
 import { initCronLogger } from '@/lib/cron/logger';
+import { crearNotificacionFichajeRequiereRevision } from '@/lib/notificaciones';
 
 export async function POST(request: NextRequest) {
   let cronLogger: ReturnType<typeof initCronLogger> | null = null;
@@ -125,6 +126,15 @@ export async function POST(request: NextRequest) {
 
                 console.log(`[CRON Cerrar Jornadas] Fichaje pendiente: ${empleado.nombre} ${empleado.apellidos} - ${validacion.razon}`);
                 fichajesPendientes++;
+
+              await crearNotificacionFichajeRequiereRevision(prisma, {
+                fichajeId: fichaje.id,
+                empresaId: empresa.id,
+                empleadoId: empleado.id,
+                empleadoNombre: `${empleado.nombre} ${empleado.apellidos}`,
+                fecha: fichaje.fecha,
+                razon: validacion.razon ?? 'Faltan eventos por registrar',
+              });
               }
             }
           } catch (error) {
@@ -144,8 +154,9 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    const huboErrores = errores.length > 0;
     const resultado = {
-      success: true,
+      success: !huboErrores,
       fecha: ayer.toISOString().split('T')[0],
       empresas: empresas.length,
       fichajesCreados,
@@ -154,9 +165,14 @@ export async function POST(request: NextRequest) {
       errores,
     };
 
-    console.log('[CRON Cerrar Jornadas] Proceso completado:', resultado);
+    if (huboErrores) {
+      console.warn('[CRON Cerrar Jornadas] Finalizado con errores:', errores);
+    } else {
+      console.log('[CRON Cerrar Jornadas] Proceso completado:', resultado);
+    }
+
     await cronLogger.finish({
-      success: true,
+      success: !huboErrores,
       metadata: {
         empresas: resultado.empresas,
         fichajesCreados: resultado.fichajesCreados,
@@ -164,6 +180,7 @@ export async function POST(request: NextRequest) {
         fichajesFinalizados: resultado.fichajesFinalizados,
         errores: resultado.errores.length,
       },
+      errors: huboErrores ? errores : undefined,
     });
 
     return new Response(JSON.stringify(resultado), {

@@ -4,6 +4,10 @@
 // Helper functions for document management system
 
 import { prisma } from './prisma';
+import { deleteFromS3 } from './s3';
+import { existsSync } from 'fs';
+import { unlink } from 'fs/promises';
+import { join } from 'path';
 
 import { UsuarioRol } from '@/lib/constants/enums';
 
@@ -458,4 +462,30 @@ export async function asegurarCarpetasGlobales(empresaId: string) {
   }
 
   return carpetas;
+}
+
+export async function eliminarDocumentoPorId(documentoId: string) {
+  const documento = await prisma.documento.findUnique({
+    where: { id: documentoId },
+  });
+
+  if (!documento) {
+    return;
+  }
+
+  if (documento.s3Key) {
+    const isCloudDocument = documento.s3Bucket && documento.s3Bucket !== 'local';
+    if (isCloudDocument) {
+      await deleteFromS3(documento.s3Key);
+    } else {
+      const filePath = join(process.cwd(), 'uploads', documento.s3Key);
+      if (existsSync(filePath)) {
+        await unlink(filePath);
+      }
+    }
+  }
+
+  await prisma.documento.delete({
+    where: { id: documentoId },
+  });
 }

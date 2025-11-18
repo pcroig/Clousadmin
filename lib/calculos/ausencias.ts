@@ -3,6 +3,7 @@
 // ========================================
 
 import { prisma } from '@/lib/prisma';
+import type { Prisma } from '@prisma/client';
 import {
   crearSetFestivos,
   esDiaLaborable,
@@ -156,12 +157,23 @@ export async function calcularDias(
 /**
  * Obtiene o crea el saldo de ausencias de un empleado para un año
  */
-export async function getSaldoEmpleado(empleadoId: string, año: number) {
-  let saldo = await prisma.empleadoSaldoAusencias.findFirst({
-      where: {
-        empleadoId,
-        año,
-      },
+type PrismaTx = Prisma.TransactionClient;
+
+export async function getSaldoEmpleado(
+  empleadoId: string,
+  año: number,
+  tx?: PrismaTx,
+  options?: { lock?: boolean }
+) {
+  const executor = tx ?? prisma;
+
+  // Nota: Prisma no soporta SELECT ... FOR UPDATE directamente
+  // Para locking, usar transacciones aisladas o row versioning
+  let saldo = await executor.empleadoSaldoAusencias.findFirst({
+    where: {
+      empleadoId,
+      año,
+    },
   });
 
   // Si no existe, crear uno por defecto
@@ -175,7 +187,7 @@ export async function getSaldoEmpleado(empleadoId: string, año: number) {
       throw new Error('Empleado no encontrado');
     }
 
-    saldo = await prisma.empleadoSaldoAusencias.create({
+    saldo = await executor.empleadoSaldoAusencias.create({
       data: {
         empleadoId,
         empresaId: empleado.empresaId,
@@ -193,37 +205,122 @@ export async function getSaldoEmpleado(empleadoId: string, año: number) {
 
 /**
  * Calcula el saldo disponible de un empleado
- * Recalcula desde las ausencias reales para mantener sincronización
+ * 
+ * IMPORTANTE: Cuando se usa dentro de una transacción (`tx` presente), 
+ * confía en los valores de la tabla para evitar race conditions.
+ * Fuera de transacción, recalcula desde ausencias para verificación.
  */
-export async function calcularSaldoDisponible(empleadoId: string, año: number): Promise<{
+export async function calcularSaldoDisponible(
+  empleadoId: string,
+  año: number,
+  tx?: PrismaTx,
+  options?: { lock?: boolean }
+): Promise<{
   diasTotales: number;
   diasUsados: number;
   diasPendientes: number;
   diasDisponibles: number;
 }> {
-  const saldo = await getSaldoEmpleado(empleadoId, año);
+  const saldo = await getSaldoEmpleado(empleadoId, año, tx, options);
 
-  // Recalcular desde ausencias reales para mantener sincronización
-  const ausencias = await prisma.ausencia.findMany({
+  // Si estamos en transacción, confiar en los valores de la tabla (no recalcular)
+  // para evitar race conditions
+  if (tx) {
+    const diasDisponibles = saldo.diasTotales - Number(saldo.diasUsados) - Number(saldo.diasPendientes);
+    return {
+      diasTotales: saldo.diasTotales,
+      diasUsados: Number(saldo.diasUsados),
+      diasPendientes: Number(saldo.diasPendientes),
+      diasDisponibles,
+    };
+  }
+
+  // Fuera de transacción: recalcular desde ausencias para sincronización
+  const executor = prisma;
+  const yearStart = new Date(Date.UTC(año, 0, 1));
+  const nextYearStart = new Date(Date.UTC(año + 1, 0, 1));
+  const yearEnd = new Date(nextYearStart.getTime() - 24 * 60 * 60 * 1000);
+
+  const ausencias = await executor.ausencia.findMany({
     where: {
       empleadoId,
-      descuentaSaldo: true, // Solo contar ausencias que descuentan saldo (vacaciones)
+      descuentaSaldo: true,
+      fechaFin: {
+        gte: yearStart,
+      },
       fechaInicio: {
-        gte: new Date(`${año}-01-01`),
-        lt: new Date(`${año + 1}-01-01`),
+        lt: nextYearStart,
       },
     },
   });
 
-  // Días usados: ausencias aprobadas y disfrutadas
-  const diasUsados = ausencias
-    .filter((a) => a.estado === EstadoAusencia.confirmada || a.estado === EstadoAusencia.completada)
-    .reduce((sum, a) => sum + Number(a.diasSolicitados), 0);
+  const [diasLaborablesConfig, festivos] = await Promise.all([
+    getDiasLaborablesEmpresa(saldo.empresaId),
+    getFestivosActivosEnRango(saldo.empresaId, yearStart, nextYearStart),
+  ]);
+  const festivosSet = crearSetFestivos(festivos);
 
-  // Días pendientes: ausencias esperando aprobación
-  const diasPendientes = ausencias
-    .filter((a) => a.estado === EstadoAusencia.pendiente)
-    .reduce((sum, a) => sum + Number(a.diasSolicitados), 0);
+  const contarDiasLaborablesEnMemoria = (inicio: Date, fin: Date) => {
+    const fecha = new Date(inicio);
+    const limite = new Date(fin);
+    let count = 0;
+
+    while (fecha <= limite) {
+      const diaSemana = fecha.getDay();
+      const mapaDias: Record<number, keyof typeof diasLaborablesConfig> = {
+        0: 'domingo',
+        1: 'lunes',
+        2: 'martes',
+        3: 'miercoles',
+        4: 'jueves',
+        5: 'viernes',
+        6: 'sabado',
+      };
+      const nombreDia = mapaDias[diaSemana];
+      const esLaborable = diasLaborablesConfig[nombreDia] && !festivosSet.has(formatearClaveFecha(fecha));
+      if (esLaborable) {
+        count++;
+      }
+      fecha.setDate(fecha.getDate() + 1);
+    }
+
+    return count;
+  };
+
+  let diasUsados = 0;
+  let diasPendientes = 0;
+
+  for (const ausencia of ausencias) {
+    const tramoInicio = ausencia.fechaInicio > yearStart ? ausencia.fechaInicio : yearStart;
+    const tramoFin = ausencia.fechaFin < yearEnd ? ausencia.fechaFin : yearEnd;
+    if (tramoInicio > tramoFin) {
+      continue;
+    }
+
+    let diasEnAño = 0;
+    const esMedioDia = ausencia.medioDia && ausencia.fechaInicio.toDateString() === ausencia.fechaFin.toDateString();
+    if (esMedioDia) {
+      const fechaMedioDia = ausencia.fechaInicio;
+      if (fechaMedioDia >= yearStart && fechaMedioDia < nextYearStart) {
+        diasEnAño = 0.5;
+      }
+    } else {
+      diasEnAño = contarDiasLaborablesEnMemoria(tramoInicio, tramoFin);
+    }
+
+    if (diasEnAño === 0) {
+      continue;
+    }
+
+    if (ausencia.estado === EstadoAusencia.pendiente) {
+      diasPendientes += diasEnAño;
+    } else if (
+      ausencia.estado === EstadoAusencia.confirmada ||
+      ausencia.estado === EstadoAusencia.completada
+    ) {
+      diasUsados += diasEnAño;
+    }
+  }
 
   const diasDisponibles = saldo.diasTotales - diasUsados - diasPendientes;
 
@@ -241,13 +338,15 @@ export async function calcularSaldoDisponible(empleadoId: string, año: number):
 export async function validarSaldoSuficiente(
   empleadoId: string,
   año: number,
-  diasSolicitados: number
+  diasSolicitados: number,
+  tx?: PrismaTx,
+  options?: { lock?: boolean }
 ): Promise<{
   suficiente: boolean;
   saldoActual: number;
   mensaje?: string;
 }> {
-  const { diasDisponibles } = await calcularSaldoDisponible(empleadoId, año);
+  const { diasDisponibles } = await calcularSaldoDisponible(empleadoId, año, tx, options);
 
   if (diasDisponibles < diasSolicitados) {
     return {
@@ -270,51 +369,58 @@ export async function actualizarSaldo(
   empleadoId: string,
   año: number,
   accion: 'solicitar' | 'aprobar' | 'rechazar' | 'cancelar',
-  diasSolicitados: number
+  diasSolicitados: number,
+  tx?: PrismaTx
 ) {
-  const saldo = await getSaldoEmpleado(empleadoId, año);
+  const ejecutar = async (client: PrismaTx) => {
+    const saldo = await getSaldoEmpleado(empleadoId, año, client, { lock: true });
 
-  switch (accion) {
-    case 'solicitar':
-      // Incrementar días pendientes
-      await prisma.empleadoSaldoAusencias.update({
-        where: { id: saldo.id },
-        data: {
-          diasPendientes: {
-            increment: diasSolicitados,
+    switch (accion) {
+      case 'solicitar':
+        await client.empleadoSaldoAusencias.update({
+          where: { id: saldo.id },
+          data: {
+            diasPendientes: {
+              increment: diasSolicitados,
+            },
           },
-        },
-      });
-      break;
+        });
+        break;
 
-    case 'aprobar':
-      // Mover días de pendientes a usados
-      await prisma.empleadoSaldoAusencias.update({
-        where: { id: saldo.id },
-        data: {
-          diasPendientes: {
-            decrement: diasSolicitados,
+      case 'aprobar':
+        await client.empleadoSaldoAusencias.update({
+          where: { id: saldo.id },
+          data: {
+            diasPendientes: {
+              decrement: diasSolicitados,
+            },
+            diasUsados: {
+              increment: diasSolicitados,
+            },
           },
-          diasUsados: {
-            increment: diasSolicitados,
-          },
-        },
-      });
-      break;
+        });
+        break;
 
-    case 'rechazar':
-    case 'cancelar':
-      // Devolver días pendientes
-      await prisma.empleadoSaldoAusencias.update({
-        where: { id: saldo.id },
-        data: {
-          diasPendientes: {
-            decrement: diasSolicitados,
+      case 'rechazar':
+      case 'cancelar':
+        await client.empleadoSaldoAusencias.update({
+          where: { id: saldo.id },
+          data: {
+            diasPendientes: {
+              decrement: diasSolicitados,
+            },
           },
-        },
-      });
-      break;
+        });
+        break;
+    }
+  };
+
+  if (tx) {
+    await ejecutar(tx);
+    return;
   }
+
+  await prisma.$transaction(async (transaction) => ejecutar(transaction));
 }
 
 /**
@@ -552,103 +658,57 @@ export async function validarSolapamientoMaximo(
     return { valida: true };
   }
 
-  const solapamiento = await calcularSolapamientoEquipo(equipoId, fechaInicio, fechaFin);
+  const totalEquipo = await prisma.empleadoEquipo.count({
+    where: { equipoId },
+  });
 
-  // Si es una edición, excluir la ausencia actual del cálculo
-  if (excluirAusenciaId) {
-    // Obtener la ausencia actual para restar su solapamiento
-    const ausenciaActual = await prisma.ausencia.findUnique({
-      where: { id: excluirAusenciaId },
-      select: { fechaInicio: true, fechaFin: true },
-    });
+  if (totalEquipo === 0) {
+    return { valida: true, maxPorcentaje: politica.maxSolapamientoPct };
+  }
 
-    if (ausenciaActual) {
-      // Ajustar el cálculo restando la ausencia actual
-      // Esto se puede hacer ajustando el conteo, pero por simplicidad
-      // recalculamos sin esa ausencia
-      const ausenciasEquipo = await prisma.ausencia.findMany({
-        where: {
-          equipoId,
-          estado: {
-            in: [EstadoAusencia.pendiente, EstadoAusencia.confirmada, EstadoAusencia.completada],
-          },
-          id: { not: excluirAusenciaId },
-          OR: [
-            {
-              AND: [
-                { fechaInicio: { lte: fechaFin } },
-                { fechaFin: { gte: fechaInicio } },
-              ],
-            },
+  const ausenciasEquipo = await prisma.ausencia.findMany({
+    where: {
+      equipoId,
+      estado: {
+        in: [EstadoAusencia.pendiente, EstadoAusencia.confirmada, EstadoAusencia.completada],
+      },
+      ...(excluirAusenciaId && { id: { not: excluirAusenciaId } }),
+      OR: [
+        {
+          AND: [
+            { fechaInicio: { lte: fechaFin } },
+            { fechaFin: { gte: fechaInicio } },
           ],
         },
-      });
+      ],
+    },
+    select: {
+      fechaInicio: true,
+      fechaFin: true,
+    },
+  });
 
-      const totalEquipo = await prisma.empleadoEquipo.count({
-        where: { equipoId },
-      });
+  const fecha = new Date(fechaInicio);
+  const fechaFinDate = new Date(fechaFin);
 
-      if (totalEquipo > 0) {
-        // Recalcular solapamiento día por día
-        const fecha = new Date(fechaInicio);
-        const fechaFinDate = new Date(fechaFin);
+  while (fecha <= fechaFinDate) {
+    const ausentesEsteDia = ausenciasEquipo.filter(
+      (a) =>
+        new Date(a.fechaInicio) <= fecha && new Date(a.fechaFin) >= fecha
+    ).length;
 
-        while (fecha <= fechaFinDate) {
-          const ausentesEsteDia = ausenciasEquipo.filter(
-            (a) =>
-              new Date(a.fechaInicio) <= fecha && new Date(a.fechaFin) >= fecha
-          ).length;
+    const porcentaje = ((ausentesEsteDia + 1) / totalEquipo) * 100;
 
-          // Agregar 1 por la ausencia que se está solicitando
-          const porcentaje = ((ausentesEsteDia + 1) / totalEquipo) * 100;
-
-          if (porcentaje > politica.maxSolapamientoPct) {
-            return {
-              valida: false,
-              mensaje: `El solapamiento máximo permitido es ${politica.maxSolapamientoPct}%. En la fecha ${fecha.toLocaleDateString('es-ES')} habría ${Math.round(porcentaje)}% del equipo ausente.`,
-              maxPorcentaje: politica.maxSolapamientoPct,
-              fechaProblema: new Date(fecha),
-            };
-          }
-
-          fecha.setDate(fecha.getDate() + 1);
-        }
-      }
-    }
-  } else {
-    // Nueva ausencia: verificar solapamiento incluyendo esta
-    const totalEquipo = await prisma.empleadoEquipo.count({
-      where: { equipoId },
-    });
-
-    if (totalEquipo === 0) {
-      return { valida: true, maxPorcentaje: politica.maxSolapamientoPct };
+    if (porcentaje > politica.maxSolapamientoPct) {
+      return {
+        valida: false,
+        mensaje: `El solapamiento máximo permitido es ${politica.maxSolapamientoPct}%. En la fecha ${fecha.toLocaleDateString('es-ES')} habría ${Math.round(porcentaje)}% del equipo ausente.`,
+        maxPorcentaje: politica.maxSolapamientoPct,
+        fechaProblema: new Date(fecha),
+      };
     }
 
-    // Recalcular día por día incluyendo la nueva ausencia
-    const fecha = new Date(fechaInicio);
-    const fechaFinDate = new Date(fechaFin);
-
-    while (fecha <= fechaFinDate) {
-      // Contar ausentes este día (sin incluir la nueva)
-      const ausentesEsteDia = solapamiento.find(
-        (s) => s.fecha.toDateString() === fecha.toDateString()
-      )?.ausentes || 0;
-
-      // Agregar 1 por la nueva ausencia
-      const porcentajeConNueva = ((ausentesEsteDia + 1) / totalEquipo) * 100;
-
-      if (porcentajeConNueva > politica.maxSolapamientoPct) {
-        return {
-          valida: false,
-          mensaje: `El solapamiento máximo permitido es ${politica.maxSolapamientoPct}%. En la fecha ${fecha.toLocaleDateString('es-ES')} habría ${Math.round(porcentajeConNueva)}% del equipo ausente (${ausentesEsteDia + 1} de ${totalEquipo} miembros).`,
-          maxPorcentaje: politica.maxSolapamientoPct,
-          fechaProblema: new Date(fecha),
-        };
-      }
-
-      fecha.setDate(fecha.getDate() + 1);
-    }
+    fecha.setDate(fecha.getDate() + 1);
   }
 
   return { valida: true, maxPorcentaje: politica.maxSolapamientoPct };

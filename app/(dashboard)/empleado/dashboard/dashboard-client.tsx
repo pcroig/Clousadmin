@@ -4,13 +4,13 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { FichajeWidget } from '@/components/shared/fichaje-widget';
 import { NotificacionesWidget, Notificacion } from '@/components/shared/notificaciones-widget';
 import { AusenciasWidget, AusenciaItem } from '@/components/shared/ausencias-widget';
 import { SolicitarAusenciaModal } from '@/components/empleado/solicitar-ausencia-modal';
-import { PreferenciasVacacionesModal } from '@/components/empleado/preferencias-vacaciones-modal';
+import { CampanaVacacionesReminder } from '@/components/vacaciones/campana-vacaciones-reminder';
 
 interface DashboardClientProps {
   userName: string;
@@ -38,8 +38,17 @@ export function EmpleadoDashboardClient({
   campanaPendiente,
 }: DashboardClientProps) {
   const [modalAusencia, setModalAusencia] = useState(false);
-  const [modalPreferencias, setModalPreferencias] = useState(!!campanaPendiente);
   const router = useRouter();
+
+  const reminderData = useMemo(() => {
+    if (!campanaPendiente) return null;
+    return {
+      id: campanaPendiente.id,
+      titulo: campanaPendiente.titulo,
+      fechaInicioObjetivo: campanaPendiente.fechaInicioObjetivo.toISOString().split('T')[0],
+      fechaFinObjetivo: campanaPendiente.fechaFinObjetivo.toISOString().split('T')[0],
+    };
+  }, [campanaPendiente]);
 
   const handleClickAusencia = (ausenciaId: string) => {
     // Por ahora navegar a la página de ausencias
@@ -101,21 +110,10 @@ export function EmpleadoDashboardClient({
         }}
       />
 
-      {/* Modal de preferencias de vacaciones (se muestra automáticamente si hay campaña pendiente) */}
-      {campanaPendiente && (
-        <PreferenciasVacacionesModal
-          open={modalPreferencias}
-          onClose={() => setModalPreferencias(false)}
-          onSuccess={() => {
-            setModalPreferencias(false);
-            window.location.reload(); // Recargar para actualizar los datos
-          }}
-          campanaId={campanaPendiente.id}
-          campanaTitulo={campanaPendiente.titulo}
-          fechaInicioObjetivo={campanaPendiente.fechaInicioObjetivo.toISOString().split('T')[0]}
-          fechaFinObjetivo={campanaPendiente.fechaFinObjetivo.toISOString().split('T')[0]}
-        />
-      )}
+      <CampanaVacacionesReminder
+        campanaPendiente={reminderData}
+        onCompleted={() => window.location.reload()}
+      />
     </>
   );
 }

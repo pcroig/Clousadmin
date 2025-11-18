@@ -170,3 +170,4 @@ echo "   4. Verifica el .env tiene la DATABASE_URL correcta"
 echo ""
 
 
+

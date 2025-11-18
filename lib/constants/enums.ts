@@ -14,6 +14,7 @@ import {
   TipoAusencia,
   EstadoAusencia,
   EstadoSolicitud,
+  EstadoSolicitudCorreccionFichaje,
 } from '@prisma/client';
 
 // ========================================
@@ -30,6 +31,7 @@ export {
   TipoAusencia,
   EstadoAusencia,
   EstadoSolicitud,
+  EstadoSolicitudCorreccionFichaje,
 };
 
 // ========================================
@@ -109,6 +111,12 @@ export const ESTADO_SOLICITUD_LABELS: Record<EstadoSolicitud, string> = {
   rechazada: 'Rechazada',
 };
 
+export const ESTADO_SOLICITUD_CORRECCION_FICHAJE_LABELS: Record<EstadoSolicitudCorreccionFichaje, string> = {
+  pendiente: 'Pendiente',
+  aprobada: 'Aprobada',
+  rechazada: 'Rechazada',
+};
+
 // ========================================
 // HELPERS DE VALIDACIÓN
 // ========================================
@@ -131,6 +139,10 @@ export function isValidTipoFichajeEvento(value: string): value is TipoFichajeEve
 
 export function isValidEstadoSolicitud(value: string): value is EstadoSolicitud {
   return Object.values(EstadoSolicitud).includes(value as EstadoSolicitud);
+}
+
+export function isValidEstadoSolicitudCorreccionFichaje(value: string): value is EstadoSolicitudCorreccionFichaje {
+  return Object.values(EstadoSolicitudCorreccionFichaje).includes(value as EstadoSolicitudCorreccionFichaje);
 }
 
 // ========================================

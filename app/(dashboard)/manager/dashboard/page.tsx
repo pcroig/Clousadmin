@@ -13,6 +13,8 @@ import { PlantillaWidget } from '@/components/dashboard/plantilla-widget';
 
 import { EstadoAusencia, UsuarioRol } from '@/lib/constants/enums';
 import { obtenerResumenPlantillaEquipo } from '@/lib/calculos/plantilla';
+import { obtenerCampanaPendiente } from '@/lib/services/campanas-vacaciones';
+import { CampanaVacacionesReminder } from '@/components/vacaciones/campana-vacaciones-reminder';
 
 export default async function ManagerDashboardPage() {
   const session = await getSession();
@@ -34,6 +36,8 @@ export default async function ManagerDashboardPage() {
   if (!manager) {
     redirect('/login');
   }
+
+  const campanaPendiente = await obtenerCampanaPendiente(manager.id, session.user.empresaId);
 
   // Obtener solicitudes pendientes del equipo del manager
   const ausenciasPendientes = await prisma.ausencia.findMany({
@@ -178,7 +182,8 @@ export default async function ManagerDashboardPage() {
   );
 
   return (
-    <div className="h-full w-full flex flex-col overflow-hidden">
+    <>
+      <div className="h-full w-full flex flex-col overflow-hidden">
       {/* Header */}
       <div className="flex-shrink-0 mb-3 sm:mb-4">
         <h1 className="text-xl sm:text-2xl font-bold text-gray-900">
@@ -231,6 +236,20 @@ export default async function ManagerDashboardPage() {
           </div>
         </div>
       </div>
-    </div>
+      </div>
+      <CampanaVacacionesReminder
+        campanaPendiente={
+          campanaPendiente
+            ? {
+                id: campanaPendiente.id,
+                titulo: campanaPendiente.titulo,
+                fechaInicioObjetivo: campanaPendiente.fechaInicioObjetivo.toISOString().split('T')[0],
+                fechaFinObjetivo: campanaPendiente.fechaFinObjetivo.toISOString().split('T')[0],
+              }
+            : null
+        }
+        autoOpen={true}
+      />
+    </>
   );
 }

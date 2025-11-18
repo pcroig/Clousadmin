@@ -1,9 +1,8 @@
 'use client';
 
 // ========================================
-// Modal de Preferencias de Vacaciones
+// Modal de Preferencias de Vacaciones (General)
 // ========================================
-// Modal para que empleados indiquen sus preferencias de vacaciones en una campaña
 
 import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -12,11 +11,13 @@ import { LoadingButton } from '@/components/shared/loading-button';
 import { Calendar } from '@/components/ui/calendar';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
-import { Calendar as CalendarIcon, X } from 'lucide-react';
+import { Calendar as CalendarIcon } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useMutation } from '@/lib/hooks';
 import { InfoTooltip } from '@/components/shared/info-tooltip';
+
+const MIN_ALTERNATIVOS_RATIO = 0.5;
 
 interface PreferenciasVacacionesModalProps {
   open: boolean;
@@ -41,6 +42,7 @@ export function PreferenciasVacacionesModal({
   const [diasPrioritarios, setDiasPrioritarios] = useState<Date[]>([]);
   const [diasAlternativos, setDiasAlternativos] = useState<Date[]>([]);
   const [modoSeleccion, setModoSeleccion] = useState<'ideales' | 'prioritarios' | 'alternativos'>('ideales');
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   interface MutationVariables {
     diasIdeales: string[];
@@ -76,6 +78,8 @@ export function PreferenciasVacacionesModal({
           }
         })
         .catch(err => console.error('Error cargando preferencia:', err));
+    } else if (!open) {
+      setErrorMessage(null);
     }
   }, [open, campanaId]);
 
@@ -85,31 +89,34 @@ export function PreferenciasVacacionesModal({
   const toggleFecha = (fecha: Date, modo: 'ideales' | 'prioritarios' | 'alternativos') => {
     const fechaStr = fecha.toISOString().split('T')[0];
     
+    const toggle = (lista: Date[], setLista: (value: Date[]) => void) => {
+      const existe = lista.some(d => d.toISOString().split('T')[0] === fechaStr);
+      if (existe) {
+        setLista(lista.filter(d => d.toISOString().split('T')[0] !== fechaStr));
+      } else {
+        setLista([...lista, fecha]);
+      }
+    };
+
     if (modo === 'ideales') {
-      const existe = diasIdeales.some(d => d.toISOString().split('T')[0] === fechaStr);
-      if (existe) {
-        setDiasIdeales(diasIdeales.filter(d => d.toISOString().split('T')[0] !== fechaStr));
-      } else {
-        setDiasIdeales([...diasIdeales, fecha]);
-      }
+      toggle(diasIdeales, setDiasIdeales);
     } else if (modo === 'prioritarios') {
-      const existe = diasPrioritarios.some(d => d.toISOString().split('T')[0] === fechaStr);
-      if (existe) {
-        setDiasPrioritarios(diasPrioritarios.filter(d => d.toISOString().split('T')[0] !== fechaStr));
-      } else {
-        setDiasPrioritarios([...diasPrioritarios, fecha]);
-      }
+      toggle(diasPrioritarios, setDiasPrioritarios);
     } else {
-      const existe = diasAlternativos.some(d => d.toISOString().split('T')[0] === fechaStr);
-      if (existe) {
-        setDiasAlternativos(diasAlternativos.filter(d => d.toISOString().split('T')[0] !== fechaStr));
-      } else {
-        setDiasAlternativos([...diasAlternativos, fecha]);
-      }
+      toggle(diasAlternativos, setDiasAlternativos);
     }
   };
 
+  const alternativosRequeridos = Math.ceil(diasIdeales.length * MIN_ALTERNATIVOS_RATIO);
+  const cumpleAlternativos = diasIdeales.length === 0 || diasAlternativos.length >= alternativosRequeridos;
+
   const handleGuardar = () => {
+    if (!cumpleAlternativos) {
+      setErrorMessage(`Añade al menos ${alternativosRequeridos} días alternativos (50% de tus días ideales).`);
+      return;
+    }
+    setErrorMessage(null);
+
     guardarPreferencias(
       `/api/campanas-vacaciones/${campanaId}/preferencia`,
       {
@@ -133,11 +140,11 @@ export function PreferenciasVacacionesModal({
     }
   };
 
-  const puedeGuardar = diasIdeales.length > 0 || diasPrioritarios.length > 0 || diasAlternativos.length > 0;
+  const puedeGuardar = (diasIdeales.length > 0 || diasPrioritarios.length > 0 || diasAlternativos.length > 0) && cumpleAlternativos;
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
@@ -160,10 +167,10 @@ export function PreferenciasVacacionesModal({
                       <strong>Fechas ideales:</strong> Tus días preferidos de vacaciones
                     </li>
                     <li>
-                      <strong>Fechas prioritarias:</strong> Días muy importantes para ti
+                      <strong>Fechas prioritarias:</strong> Días críticos que no puedes mover
                     </li>
                     <li>
-                      <strong>Fechas alternativas:</strong> Opciones si no están disponibles las anteriores
+                      <strong>Fechas alternativas:</strong> Opciones de respaldo (mínimo 50% de los días ideales)
                     </li>
                   </ul>
                 </div>
@@ -226,14 +233,19 @@ export function PreferenciasVacacionesModal({
               modifiersClassNames={{
                 ideal: 'bg-blue-600 text-white hover:bg-blue-700',
                 prioritario: 'bg-orange-600 text-white hover:bg-orange-700',
-                alternativo: 'bg-gray-400 text-white hover:bg-gray-500',
+                alternativo: 'bg-gray-600 text-white hover:bg-gray-700',
               }}
               className="w-full"
             />
+            {diasIdeales.length > 0 && !cumpleAlternativos && (
+              <p className="mt-3 text-xs text-red-600">
+                Necesitas al menos {alternativosRequeridos} días alternativos para continuar.
+              </p>
+            )}
           </div>
 
           {/* Resumen */}
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="border border-blue-200 rounded-lg p-3 bg-blue-50">
               <Label className="text-xs text-blue-700 font-medium mb-2 block">
                 Fechas Ideales
@@ -284,10 +296,14 @@ export function PreferenciasVacacionesModal({
               </Label>
               <div className="flex flex-wrap gap-1.5 min-h-[60px]">
                 {diasAlternativos.length === 0 ? (
-                  <span className="text-xs text-gray-600">Ninguna seleccionada</span>
+                  <span className="text-xs text-gray-600">
+                    {diasIdeales.length > 0
+                      ? `Selecciona al menos ${alternativosRequeridos}`
+                      : 'Ninguna seleccionada'}
+                  </span>
                 ) : (
                   diasAlternativos.slice(0, 5).map((fecha) => (
-                    <Badge key={fecha.toISOString()} className="bg-gray-600 text-white border-0 text-xs">
+                    <Badge key={fecha.toISOString()} className="bg-gray-700 text-white border-0 text-xs">
                       {format(fecha, 'dd MMM', { locale: es })}
                     </Badge>
                   ))
@@ -303,6 +319,15 @@ export function PreferenciasVacacionesModal({
         </div>
 
         <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
+          <div className="flex-1 text-sm text-gray-500 self-center">
+            {diasIdeales.length > 0 && (
+              <span>
+                Recordatorio: necesitamos al menos {alternativosRequeridos} días alternativos para garantizar
+                flexibilidad del equipo.
+              </span>
+            )}
+            {errorMessage && <p className="text-red-600 mt-1">{errorMessage}</p>}
+          </div>
           <Button variant="outline" onClick={onClose} disabled={guardando}>
             Cancelar
           </Button>
@@ -310,12 +335,13 @@ export function PreferenciasVacacionesModal({
             onClick={handleGuardar} 
             loading={guardando}
             disabled={!puedeGuardar || guardando}
-            className="min-w-[120px]"
+            className="min-w-[160px]"
           >
-            {guardando ? 'Guardando...' : 'Guardar Preferencias'}
+            {guardando ? 'Guardando...' : 'Guardar preferencias'}
           </LoadingButton>
         </div>
       </DialogContent>
     </Dialog>
   );
 }
+

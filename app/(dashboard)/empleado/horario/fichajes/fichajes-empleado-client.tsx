@@ -33,14 +33,21 @@ import { formatearHorasMinutos } from '@/lib/utils/formatters';
 import { toast } from 'sonner';
 import { EstadoFichaje } from '@/lib/constants/enums';
 
-interface Fichaje {
+interface FichajeEvento {
   id: string;
   tipo: string;
-  fecha: string;
   hora: string;
-  estado: string;
   editado: boolean;
   motivoEdicion: string | null;
+}
+
+interface FichajeDia {
+  id: string;
+  fecha: string;
+  estado: string;
+  horasTrabajadas: number | string | null;
+  horasEnPausa: number | string | null;
+  eventos: FichajeEvento[];
 }
 
 interface BalanceResumen {
@@ -52,7 +59,8 @@ interface BalanceResumen {
 
 interface JornadaDia {
   fecha: Date;
-  fichajes: Fichaje[];
+  fichajeId: string;
+  eventos: FichajeEvento[];
   horasTrabajadas: number;
   horarioEntrada: string | null;
   horarioSalida: string | null;
@@ -68,22 +76,27 @@ export function FichajesEmpleadoClient({ balanceInicial }: Props) {
   const [jornadas, setJornadas] = useState<JornadaDia[]>([]);
   const [loading, setLoading] = useState(true);
   const [jornadaExpandida, setJornadaExpandida] = useState<string | null>(null);
-  const [correccionModal, setCorreccionModal] = useState<{ open: boolean; fichaje: Fichaje | null }>({
+  const [correccionModal, setCorreccionModal] = useState<{ 
+    open: boolean; 
+    fichajeId: string | null;
+    evento: FichajeEvento | null;
+  }>({
     open: false,
-    fichaje: null
+    fichajeId: null,
+    evento: null
   });
   const [motivoCorreccion, setMotivoCorreccion] = useState('');
   const [nuevaFecha, setNuevaFecha] = useState('');
   const [nuevaHora, setNuevaHora] = useState('');
 
-  const calcularHorasTrabajadas = useCallback((fichajes: Fichaje[]): number => {
+  const calcularHorasTrabajadas = useCallback((eventos: FichajeEvento[]): number => {
     let horasTotales = 0;
     let inicioTrabajo: Date | null = null;
 
-    for (const fichaje of fichajes) {
-      const hora = new Date(fichaje.hora);
+    for (const evento of eventos) {
+      const hora = new Date(evento.hora);
 
-      switch (fichaje.tipo) {
+      switch (evento.tipo) {
         case 'entrada':
           inicioTrabajo = hora;
           break;
@@ -113,25 +126,17 @@ export function FichajesEmpleadoClient({ balanceInicial }: Props) {
     return Math.round(horasTotales * 10) / 10;
   }, []);
 
-  const agruparPorJornada = useCallback((fichajes: Fichaje[]): JornadaDia[] => {
-    const grupos: Record<string, Fichaje[]> = {};
-
-    fichajes.forEach(f => {
-      if (!grupos[f.fecha]) {
-        grupos[f.fecha] = [];
-      }
-      grupos[f.fecha].push(f);
-    });
-
-    return Object.entries(grupos).map(([fecha, fichajesDelDia]) => {
-      const ordenados = [...fichajesDelDia].sort((a, b) =>
+  const agruparPorJornada = useCallback((fichajes: FichajeDia[]): JornadaDia[] => {
+    return fichajes.map((fichaje) => {
+      const eventos = fichaje.eventos || [];
+      const eventosOrdenados = [...eventos].sort((a, b) =>
         new Date(a.hora).getTime() - new Date(b.hora).getTime()
       );
 
-      const horasTrabajadas = calcularHorasTrabajadas(ordenados);
+      const horasTrabajadas = calcularHorasTrabajadas(eventosOrdenados);
 
-      const entrada = ordenados.find(f => f.tipo === 'entrada');
-      const salida = ordenados.find(f => f.tipo === 'salida');
+      const entrada = eventosOrdenados.find(e => e.tipo === 'entrada');
+      const salida = eventosOrdenados.find(e => e.tipo === 'salida');
 
       const horarioEntrada = entrada ? format(new Date(entrada.hora), 'HH:mm') : null;
       const horarioSalida = salida ? format(new Date(salida.hora), 'HH:mm') : null;
@@ -140,15 +145,16 @@ export function FichajesEmpleadoClient({ balanceInicial }: Props) {
       if (!entrada || !salida) {
         estado = 'incompleta';
       }
-      if (fichajesDelDia.some((f) => f.estado === EstadoFichaje.pendiente)) {
+      if (fichaje.estado === EstadoFichaje.pendiente) {
         estado = 'pendiente';
       }
 
       const balance = horasTrabajadas - 8;
 
       return {
-        fecha: new Date(fecha),
-        fichajes: ordenados,
+        fecha: new Date(fichaje.fecha),
+        fichajeId: fichaje.id,
+        eventos: eventosOrdenados,
         horasTrabajadas,
         horarioEntrada,
         horarioSalida,
@@ -179,26 +185,29 @@ export function FichajesEmpleadoClient({ balanceInicial }: Props) {
   }, [fetchFichajes]);
 
   async function handleSolicitarCorreccion() {
-    if (!correccionModal.fichaje || !motivoCorreccion.trim()) return;
+    if (!correccionModal.fichajeId || !motivoCorreccion.trim()) return;
 
     try {
-      const response = await fetch(`/api/fichajes/${correccionModal.fichaje.id}`, {
-        method: 'PATCH',
+      const horaIso = nuevaHora ? new Date(`${nuevaFecha || new Date().toISOString().split('T')[0]}T${nuevaHora}`).toISOString() : undefined;
+
+      const response = await fetch('/api/fichajes/correcciones', {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          fecha: nuevaFecha || undefined,
-          hora: nuevaHora ? new Date(`${nuevaFecha || correccionModal.fichaje.fecha}T${nuevaHora}`).toISOString() : undefined,
-          motivoEdicion: motivoCorreccion,
+          fichajeId: correccionModal.fichajeId,
+          motivo: motivoCorreccion,
+          nuevaFecha: nuevaFecha || undefined,
+          nuevaHora: horaIso,
         }),
       });
 
       if (response.ok) {
-        setCorreccionModal({ open: false, fichaje: null });
+        setCorreccionModal({ open: false, fichajeId: null, evento: null });
         setMotivoCorreccion('');
         setNuevaFecha('');
         setNuevaHora('');
         fetchFichajes();
-        toast.success('Solicitud de corrección enviada correctamente');
+        toast.success('Solicitud de corrección enviada para revisión');
       } else {
         toast.error('Error al solicitar corrección');
       }
@@ -342,39 +351,38 @@ export function FichajesEmpleadoClient({ balanceInicial }: Props) {
                         <TableRow key={`${key}-expanded`}>
                           <TableCell colSpan={6} className="bg-gray-50 p-4">
                             <div className="space-y-2">
-                              <div className="text-sm font-semibold text-gray-700 mb-3">Fichajes del día:</div>
-                              {jornada.fichajes.map(f => (
-                                <div key={f.id} className="flex items-center justify-between text-sm py-2 px-3 bg-white rounded border border-gray-200">
+                              <div className="text-sm font-semibold text-gray-700 mb-3">Eventos del día:</div>
+                              {jornada.eventos.map(evento => (
+                                <div key={evento.id} className="flex items-center justify-between text-sm py-2 px-3 bg-white rounded border border-gray-200">
                                   <div className="flex items-center gap-4">
                                     <span className="font-medium text-gray-900 w-16">
-                                      {format(new Date(f.hora), 'HH:mm')}
+                                      {format(new Date(evento.hora), 'HH:mm')}
                                     </span>
                                     <Badge variant="outline" className="text-xs">
-                                      {f.tipo.replace('_', ' ')}
+                                      {evento.tipo.replace('_', ' ')}
                                     </Badge>
-                                    {f.editado && (
+                                    {evento.editado && (
                                       <Badge className="bg-gray-100 text-gray-800 text-xs">Editado</Badge>
                                     )}
-                                    {f.estado !== 'confirmado' && (
-                                      <Badge className="bg-yellow-100 text-yellow-800 text-xs">{f.estado}</Badge>
-                                    )}
                                   </div>
-                                  {f.estado !== 'confirmado' && (
-                                    <Button
-                                      size="sm"
-                                      variant="ghost"
-                                      className="text-gray-600 hover:text-gray-700 text-xs"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        setCorreccionModal({ open: true, fichaje: f });
-                                        setNuevaFecha(f.fecha);
-                                        setNuevaHora(format(new Date(f.hora), 'HH:mm'));
-                                      }}
-                                    >
-                                      <AlertCircle className="w-3 h-3 mr-1" />
-                                      Solicitar Corrección
-                                    </Button>
-                                  )}
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="text-gray-600 hover:text-gray-700 text-xs"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setCorreccionModal({ 
+                                        open: true, 
+                                        fichajeId: jornada.fichajeId,
+                                        evento
+                                      });
+                                      setNuevaFecha(format(jornada.fecha, 'yyyy-MM-dd'));
+                                      setNuevaHora(format(new Date(evento.hora), 'HH:mm'));
+                                    }}
+                                  >
+                                    <AlertCircle className="w-3 h-3 mr-1" />
+                                    Solicitar Corrección
+                                  </Button>
                                 </div>
                               ))}
                             </div>
@@ -391,20 +399,19 @@ export function FichajesEmpleadoClient({ balanceInicial }: Props) {
       </div>
 
       {/* Modal Solicitar Corrección */}
-      <Dialog open={correccionModal.open} onOpenChange={(open) => setCorreccionModal({ open, fichaje: null })}>
+      <Dialog open={correccionModal.open} onOpenChange={(open) => setCorreccionModal({ open, fichajeId: null, evento: null })}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Solicitar Corrección de Fichaje</DialogTitle>
           </DialogHeader>
           
-          {correccionModal.fichaje && (
+          {correccionModal.evento && (
             <div className="space-y-4">
               <div className="bg-gray-50 p-4 rounded-lg">
-                <div className="text-sm text-gray-600 mb-1">Fichaje actual:</div>
+                <div className="text-sm text-gray-600 mb-1">Evento actual:</div>
                 <div className="text-sm font-medium">
-                  {format(new Date(correccionModal.fichaje.fecha), 'dd MMM yyyy', { locale: es })} - {' '}
-                  {format(new Date(correccionModal.fichaje.hora), 'HH:mm')} - {' '}
-                  {correccionModal.fichaje.tipo.replace('_', ' ')}
+                  {format(new Date(correccionModal.evento.hora), 'HH:mm')} - {' '}
+                  {correccionModal.evento.tipo.replace('_', ' ')}
                 </div>
               </div>
 
@@ -446,7 +453,7 @@ export function FichajesEmpleadoClient({ balanceInicial }: Props) {
           )}
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setCorreccionModal({ open: false, fichaje: null })}>
+            <Button variant="outline" onClick={() => setCorreccionModal({ open: false, fichajeId: null, evento: null })}>
               Cancelar
             </Button>
             <Button

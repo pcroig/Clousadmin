@@ -100,6 +100,12 @@ enum EstadoSolicitud {
   rechazada // Rechazada por HR/Manager
 }
 
+enum EstadoSolicitudCorreccionFichaje {
+  pendiente
+  aprobada
+  rechazada
+}
+
 // ========================================
 // 1. CORE ENTITIES (Empresa, Usuario, Empleado)
 // ========================================
@@ -160,6 +166,7 @@ model Empresa {
   documentosGenerados      DocumentoGenerado[]
   jobsGeneracionDocumentos JobGeneracionDocumentos[]
   solicitudesFirma         SolicitudFirma[]
+  solicitudesCorreccionFichaje SolicitudCorreccionFichaje[]
 
   @@index([cif])
   @@map("empresas")
@@ -332,6 +339,8 @@ model Empleado {
   denuncias                  Denuncia[]
   documentosGenerados        DocumentoGenerado[]
   firmas                     Firma[]
+  solicitudesCorreccionFichaje SolicitudCorreccionFichaje[]
+  solicitudesCorreccionGestionadas SolicitudCorreccionFichaje[] @relation("CorreccionFichajeAprobador")
 
   @@index([empresaId])
   @@index([usuarioId])
@@ -526,6 +535,7 @@ model Fichaje {
   empresa  Empresa         @relation(fields: [empresaId], references: [id], onDelete: Cascade)
   empleado Empleado        @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
   eventos  FichajeEvento[] // Eventos del día (entrada, pausas, salida)
+  solicitudesCorreccion SolicitudCorreccionFichaje[]
 
   @@unique([empleadoId, fecha]) // CRÍTICO: Un fichaje por empleado por día
   @@index([empresaId])
@@ -564,6 +574,7 @@ model FichajeEvento {
   @@index([fichajeId])
   @@index([tipo])
   @@index([hora])
+  @@index([fichajeId, hora])
   @@map("fichaje_eventos")
 }
 
@@ -587,8 +598,7 @@ model Ausencia {
   diasSolicitados Decimal @db.Decimal(4, 1) // Días reales solicitados (excluye festivos)
 
   // Optional fields
-  descripcion     String? @db.Text
-  motivo          String? @db.Text // For tipo='otro'
+  motivo          String? @db.Text // Motivo o descripción (obligatorio para tipo 'otro')
   justificanteUrl String? @db.Text // S3 path to uploaded document
 
   // Saldo management
@@ -1235,6 +1245,36 @@ model SolicitudCambio {
   @@map("solicitudes_cambio")
 }
 
+model SolicitudCorreccionFichaje {
+  id         String @id @default(uuid())
+  empresaId  String
+  fichajeId  String
+  empleadoId String
+
+  estado    EstadoSolicitudCorreccionFichaje @default(pendiente)
+  motivo    String  @db.Text
+  detalles  Json
+  respuesta String? @db.Text
+
+  revisadaPor String?
+  revisadaEn  DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  empresa  Empresa  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  fichaje  Fichaje  @relation(fields: [fichajeId], references: [id], onDelete: Cascade)
+  empleado Empleado @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+  aprobador Empleado? @relation("CorreccionFichajeAprobador", fields: [revisadaPor], references: [id], onDelete: SetNull)
+
+  @@index([empresaId])
+  @@index([fichajeId])
+  @@index([empleadoId])
+  @@index([estado])
+  @@index([revisadaPor])
+  @@map("solicitudes_correccion_fichaje")
+}
+
 // ========================================
 // 7. AUTO-COMPLETADOS (Auditoría y aprobación)
 // ========================================
@@ -1520,8 +1560,8 @@ model CampanaVacaciones {
   // Estado de la campaña
   estado String @default("abierta") @db.VarChar(50) // 'abierta', 'cerrada', 'cuadrada'
 
-  // Configuración de solapamiento
-  solapamientoMaximoPct Int @default(30) // % máximo de empleados de vacaciones simultáneamente
+  // Configuración de solapamiento (opcional por equipo)
+  solapamientoMaximoPct Int? // % máximo de miembros de un equipo de vacaciones simultáneamente
 
   // Período objetivo de vacaciones
   fechaInicioObjetivo DateTime @db.Date

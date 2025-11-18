@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { LoadingButton } from '@/components/shared/loading-button';
@@ -19,6 +19,7 @@ import {
   PERIODOS_MEDIO_DIA_OPTIONS,
   PeriodoMedioDiaValue,
 } from '@/lib/constants/enums';
+import { TIPOS_DESCUENTAN_SALDO } from '@/lib/constants/ausencias';
 
 interface ErrorDetail {
   field?: string;
@@ -42,48 +43,21 @@ interface SolicitarAusenciaModalProps {
 type TipoAusenciaOption = {
   value: string;
   label: string;
-  descripcion: string;
   needsApproval: boolean;
   descuentaSaldo: boolean;
 };
 
 const TIPOS_AUSENCIA: TipoAusenciaOption[] = [
-  { 
-    value: 'vacaciones', 
-    label: 'Vacaciones', 
-    descripcion: 'Necesita aprobación • Descuenta saldo',
-    needsApproval: true,
-    descuentaSaldo: true
-  },
-  { 
-    value: 'enfermedad', 
-    label: 'Enfermedad', 
-    descripcion: 'No necesita aprobación • No descuenta saldo',
-    needsApproval: false,
-    descuentaSaldo: false
-  },
-  { 
-    value: 'enfermedad_familiar', 
-    label: 'Enfermedad familiar', 
-    descripcion: 'No necesita aprobación • No descuenta saldo',
-    needsApproval: false,
-    descuentaSaldo: false
-  },
-  { 
-    value: 'maternidad_paternidad', 
-    label: 'Maternidad/Paternidad', 
-    descripcion: 'No necesita aprobación • No descuenta saldo',
-    needsApproval: false,
-    descuentaSaldo: false
-  },
-  { 
-    value: 'otro', 
-    label: 'Otro', 
-    descripcion: 'Necesita aprobación • No descuenta saldo',
-    needsApproval: true,
-    descuentaSaldo: false
-  },
-];
+  { value: 'vacaciones', label: 'Vacaciones' },
+  { value: 'enfermedad', label: 'Enfermedad' },
+  { value: 'enfermedad_familiar', label: 'Enfermedad familiar' },
+  { value: 'maternidad_paternidad', label: 'Maternidad/Paternidad' },
+  { value: 'otro', label: 'Otro' },
+].map((tipo) => ({
+  ...tipo,
+  needsApproval: tipo.value === 'vacaciones' || tipo.value === 'otro',
+  descuentaSaldo: TIPOS_DESCUENTAN_SALDO.includes(tipo.value as (typeof TIPOS_DESCUENTAN_SALDO)[number]),
+}));
 
 const getApprovalCopy = (needsApproval: boolean) =>
   needsApproval ? '⏱ Necesita aprobación' : '✓ No necesita aprobación';
@@ -121,7 +95,7 @@ export function SolicitarAusenciaModal({
   const [fechaFin, setFechaFin] = useState<Date>();
   const [medioDia, setMedioDia] = useState(false);
   const [periodo, setPeriodo] = useState<PeriodoMedioDiaValue>('manana');
-  const [descripcion, setDescripcion] = useState('');
+  const [motivo, setMotivo] = useState('');
   const [justificante, setJustificante] = useState<File | null>(null);
   const [uploadingJustificante, setUploadingJustificante] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -132,6 +106,27 @@ export function SolicitarAusenciaModal({
     [tipo],
   );
 
+  const today = useMemo(() => {
+    const base = new Date();
+    base.setHours(0, 0, 0, 0);
+    return base;
+  }, []);
+
+  const isSingleDaySelection = useMemo(() => {
+    if (!fechaInicio || !fechaFin) return false;
+    return fechaInicio.toDateString() === fechaFin.toDateString();
+  }, [fechaInicio, fechaFin]);
+
+  const medioDiaDisponible = Boolean(fechaInicio && fechaFin && isSingleDaySelection);
+  const requiereMotivo = tipo === 'otro';
+  const motivoValido = !requiereMotivo || motivo.trim().length > 0;
+
+  useEffect(() => {
+    if (medioDia && !medioDiaDisponible) {
+      setMedioDia(false);
+    }
+  }, [medioDia, medioDiaDisponible]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -139,6 +134,18 @@ export function SolicitarAusenciaModal({
 
     if (!fechaInicio || !fechaFin) {
       setError('Por favor selecciona las fechas');
+      setLoading(false);
+      return;
+    }
+
+    if (medioDia && !medioDiaDisponible) {
+      setError('El medio día solo está disponible para ausencias de un solo día');
+      setLoading(false);
+      return;
+    }
+
+    if (!motivoValido) {
+      setError('El motivo es obligatorio para ausencias de tipo "Otro"');
       setLoading(false);
       return;
     }
@@ -186,7 +193,7 @@ export function SolicitarAusenciaModal({
         fechaFin: string;
         medioDia: boolean;
         periodo?: PeriodoMedioDiaValue;
-        descripcion?: string;
+        motivo?: string;
         justificanteUrl?: string;
         documentoId?: string;
       }
@@ -203,9 +210,8 @@ export function SolicitarAusenciaModal({
         payload.periodo = periodo;
       }
 
-      // Solo incluir descripcion si tiene valor
-      if (descripcion.trim()) {
-        payload.descripcion = descripcion.trim();
+      if (motivo.trim()) {
+        payload.motivo = motivo.trim();
       }
 
       // Incluir justificante URL y documentoId si se subió
@@ -244,7 +250,7 @@ export function SolicitarAusenciaModal({
       setFechaInicio(undefined);
       setFechaFin(undefined);
       setMedioDia(false);
-      setDescripcion('');
+      setMotivo('');
       setJustificante(null);
     } catch (err) {
       const error = err instanceof Error ? err : new Error('Error desconocido');
@@ -323,7 +329,7 @@ export function SolicitarAusenciaModal({
                     mode="single"
                     selected={fechaInicio}
                     onSelect={setFechaInicio}
-                    disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
+                    disabled={(date) => date < today}
                   />
                 </PopoverContent>
               </Popover>
@@ -347,7 +353,6 @@ export function SolicitarAusenciaModal({
                     selected={fechaFin}
                     onSelect={setFechaFin}
                     disabled={(date) => {
-                      const today = new Date(new Date().setHours(0, 0, 0, 0));
                       return date < today || (fechaInicio ? date < fechaInicio : false);
                     }}
                   />
@@ -358,17 +363,28 @@ export function SolicitarAusenciaModal({
 
           {/* Medio Día */}
           <div className="space-y-3">
-            <div className="flex items-center space-x-2">
-              <input
-                type="checkbox"
-                id="medioDia"
-                checked={medioDia}
-                onChange={(e) => setMedioDia(e.target.checked)}
-                className="rounded border-gray-300"
-              />
-              <Label htmlFor="medioDia" className="cursor-pointer">
-                Medio día
-              </Label>
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id="medioDia"
+                  checked={medioDia}
+                  onChange={(e) => setMedioDia(e.target.checked)}
+                  className="rounded border-gray-300"
+                  disabled={!medioDiaDisponible}
+                />
+                <Label
+                  htmlFor="medioDia"
+                  className={medioDiaDisponible ? 'cursor-pointer' : 'cursor-not-allowed text-gray-400'}
+                >
+                  Medio día
+                </Label>
+              </div>
+              {!medioDiaDisponible && (
+                <p className="text-xs text-gray-500">
+                  Selecciona la misma fecha de inicio y fin para solicitar medio día.
+                </p>
+              )}
             </div>
 
             {/* Periodo (solo visible cuando medioDia=true) */}
@@ -394,17 +410,24 @@ export function SolicitarAusenciaModal({
             )}
           </div>
 
-          {/* Descripción */}
+          {/* Motivo obligatorio para tipo "otro" */}
           <div>
-            <Label htmlFor="descripcion">Descripción (opcional)</Label>
+            <Label htmlFor="motivo">
+              Motivo o detalles {tipo === 'otro' ? '*' : '(opcional)'}
+            </Label>
             <textarea
-              id="descripcion"
-              value={descripcion}
-              onChange={(e) => setDescripcion(e.target.value)}
+              id="motivo"
+              value={motivo}
+              onChange={(e) => setMotivo(e.target.value)}
               maxLength={500}
               rows={3}
               className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
-              placeholder="Agrega detalles adicionales..."
+              placeholder={
+                tipo === 'otro'
+                  ? 'Explica el motivo de la ausencia'
+                  : 'Agrega detalles adicionales (opcional)'
+              }
+              required={tipo === 'otro'}
             />
           </div>
 
@@ -458,7 +481,7 @@ export function SolicitarAusenciaModal({
             <LoadingButton
               type="submit"
               loading={loading || uploadingJustificante}
-              disabled={loading || uploadingJustificante}
+              disabled={loading || uploadingJustificante || (tipo === 'otro' && !motivoValido)}
             >
               {uploadingJustificante ? 'Subiendo justificante...' : loading ? 'Enviando...' : 'Solicitar'}
             </LoadingButton>

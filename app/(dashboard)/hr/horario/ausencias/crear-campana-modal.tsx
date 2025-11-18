@@ -24,12 +24,12 @@ import { Info } from 'lucide-react';
 import { toast } from 'sonner';
 import { SearchableMultiSelect } from '@/components/shared/searchable-multi-select';
 import { LoadingButton } from '@/components/shared/loading-button';
+import { Switch } from '@/components/ui/switch';
 
 interface CrearCampanaModalProps {
   open: boolean;
   onClose: () => void;
   onCreated: () => void;
-  solapamientoMaximoPct: number;
 }
 
 interface Equipo {
@@ -41,7 +41,6 @@ export function CrearCampanaModal({
   open,
   onClose,
   onCreated,
-  solapamientoMaximoPct,
 }: CrearCampanaModalProps) {
   const [cargando, setCargando] = useState(false);
   const [titulo, setTitulo] = useState('');
@@ -50,6 +49,8 @@ export function CrearCampanaModal({
   const [equiposSeleccionados, setEquiposSeleccionados] = useState<string[]>([]);
   const [fechaInicio, setFechaInicio] = useState('');
   const [fechaFin, setFechaFin] = useState('');
+  const [limitarSolapamiento, setLimitarSolapamiento] = useState(false);
+  const [solapamientoPct, setSolapamientoPct] = useState('30');
 
   useEffect(() => {
     if (open) {
@@ -60,6 +61,8 @@ export function CrearCampanaModal({
       setEquiposSeleccionados([]);
       setFechaInicio('');
       setFechaFin('');
+      setLimitarSolapamiento(false);
+      setSolapamientoPct('30');
     }
   }, [open]);
 
@@ -89,6 +92,16 @@ export function CrearCampanaModal({
     if (!fechaInicio || !fechaFin) {
       toast.error('Debes indicar fecha de inicio y fin del período objetivo');
       return;
+    }
+
+    let solapamientoMaximoPct: number | undefined;
+    if (alcance === 'equipos' && limitarSolapamiento) {
+      const pct = parseInt(solapamientoPct, 10);
+      if (Number.isNaN(pct) || pct < 0 || pct > 100) {
+        toast.error('El porcentaje de solapamiento debe estar entre 0 y 100');
+        return;
+      }
+      solapamientoMaximoPct = pct;
     }
 
     const fechaInicioDate = new Date(fechaInicio);
@@ -184,6 +197,40 @@ export function CrearCampanaModal({
             </Field>
           )}
 
+          {alcance === 'equipos' && (
+            <Field>
+              <div className="flex items-center justify-between">
+                <div>
+                  <FieldLabel>Limitar solapamiento por equipo</FieldLabel>
+                  <p className="text-xs text-gray-500">
+                    Opcional. Define qué porcentaje máximo del equipo puede ausentarse simultáneamente.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-gray-500">Desactivado</span>
+                  <Switch
+                    checked={limitarSolapamiento}
+                    onCheckedChange={setLimitarSolapamiento}
+                  />
+                  <span className="text-xs text-gray-900 font-medium">Activado</span>
+                </div>
+              </div>
+              {limitarSolapamiento && (
+                <div className="mt-3 flex items-center gap-3">
+                  <Input
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={solapamientoPct}
+                    onChange={(e) => setSolapamientoPct(e.target.value)}
+                    className="w-32"
+                  />
+                  <span className="text-sm text-gray-600">% máximo por equipo</span>
+                </div>
+              )}
+            </Field>
+          )}
+
           <Field>
             <FieldLabel>Fecha inicio objetivo</FieldLabel>
             <Input
@@ -219,7 +266,10 @@ export function CrearCampanaModal({
                       <li>Los empleados recibirán una notificación para indicar sus preferencias</li>
                       <li>Podrán seleccionar días ideales, prioritarios y alternativos</li>
                       <li>Cuando todos completen o cuando tú decidas, podrás cerrar la campaña</li>
-                      <li>El sistema usará IA para cuadrar las vacaciones respetando el {solapamientoMaximoPct}% de solapamiento máximo</li>
+                      <li>
+                        El sistema usará IA para cuadrar las vacaciones respetando el límite
+                        de solapamiento que definas (si está activado)
+                      </li>
                       <li>Los empleados recibirán la propuesta y podrán aceptarla o solicitar cambios</li>
                     </ol>
                   </div>

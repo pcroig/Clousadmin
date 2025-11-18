@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { z } from 'zod';
+import { crearNotificacionFichajeResuelto } from '@/lib/notificaciones';
 
 const revisionSchema = z.object({
   revisiones: z.array(
@@ -290,6 +291,14 @@ export async function POST(request: NextRequest) {
                 autoCompletado: true,
                 fechaAprobacion: new Date(),
               },
+            });
+
+            await crearNotificacionFichajeResuelto(prisma, {
+              fichajeId,
+              empresaId: session.user.empresaId,
+              empleadoId: autoCompletado.empleadoId,
+              empleadoNombre: `${autoCompletado.empleado.nombre} ${autoCompletado.empleado.apellidos}`,
+              fecha: fichaje.fecha,
             });
           }
 

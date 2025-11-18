@@ -21,8 +21,11 @@ import {
 } from '@/lib/api-handler';
 import { crearNotificacionAusenciaSolicitada, crearNotificacionAusenciaAutoAprobada } from '@/lib/notificaciones';
 import { registrarAutoCompletadoAusencia } from '@/lib/auto-completado';
+import { CalendarManager } from '@/lib/integrations/calendar/calendar-manager';
+import { eliminarDocumentoPorId } from '@/lib/documentos';
+import { TIPOS_AUTO_APROBABLES, TIPOS_DESCUENTAN_SALDO } from '@/lib/constants/ausencias';
 
-import { EstadoAusencia, UsuarioRol, TipoAusencia } from '@/lib/constants/enums';
+import { EstadoAusencia, UsuarioRol } from '@/lib/constants/enums';
 import { determinarEstadoTrasAprobacion } from '@/lib/calculos/ausencias';
 import type { Prisma } from '@prisma/client';
 
@@ -128,8 +131,19 @@ export async function POST(req: NextRequest) {
     if (validationResult instanceof Response) return validationResult;
     const { data: validatedData } = validationResult;
 
+    const cleanupDocumentoHuérfano = async () => {
+      if (validatedData.documentoId) {
+        try {
+          await eliminarDocumentoPorId(validatedData.documentoId);
+        } catch (error) {
+          console.error('[Ausencias] Error limpiando documento huérfano:', error);
+        }
+      }
+    };
+
     // Validar fechas
     if (validatedData.fechaInicio > validatedData.fechaFin) {
+      await cleanupDocumentoHuérfano();
       return badRequestResponse('La fecha de fin debe ser posterior a la fecha de inicio');
     }
 
@@ -141,11 +155,23 @@ export async function POST(req: NextRequest) {
       ? validatedData.fechaFin 
       : new Date(validatedData.fechaFin);
 
+    if (validatedData.medioDia) {
+      if (!validatedData.periodo) {
+        await cleanupDocumentoHuérfano();
+        return badRequestResponse('Debes especificar si el medio día es de mañana o tarde');
+      }
+      const esMismoDia = fechaInicioCheck.toDateString() === fechaFinCheck.toDateString();
+      if (!esMismoDia) {
+        await cleanupDocumentoHuérfano();
+        return badRequestResponse('El medio día solo se puede aplicar a ausencias de un solo día');
+      }
+    }
+
     const ausenciasSolapadas = await prisma.ausencia.findMany({
       where: {
         empleadoId: session.user.empleadoId,
         estado: {
-          in: [EstadoAusencia.pendiente, EstadoAusencia.confirmada],
+          in: [EstadoAusencia.pendiente, EstadoAusencia.confirmada, EstadoAusencia.completada],
         },
         OR: [
           // Caso 1: La nueva ausencia comienza durante una ausencia existente
@@ -183,6 +209,7 @@ export async function POST(req: NextRequest) {
     if (ausenciasSolapadas.length > 0) {
       const ausencia = ausenciasSolapadas[0];
       const formatFecha = (date: Date) => date.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
+      await cleanupDocumentoHuérfano();
       return badRequestResponse(
         `Ya tienes una ausencia de tipo "${ausencia.tipo}" en este período (${formatFecha(ausencia.fechaInicio)} - ${formatFecha(ausencia.fechaFin)}). No puedes solicitar ausencias que se solapen en fechas.`,
         { ausenciaSolapada: ausencia }
@@ -202,27 +229,7 @@ export async function POST(req: NextRequest) {
       : diasSolicitados;
 
     // Determinar si descuenta saldo según el tipo
-    const descuentaSaldo = validatedData.tipo === 'vacaciones';
-
-    // Validar saldo si descuenta
-    if (descuentaSaldo) {
-      const fechaInicio = validatedData.fechaInicio instanceof Date 
-        ? validatedData.fechaInicio 
-        : new Date(validatedData.fechaInicio);
-      const año = fechaInicio.getFullYear();
-      const validacion = await validarSaldoSuficiente(
-        session.user.empleadoId,
-        año,
-        diasSolicitadosFinal
-      );
-
-      if (!validacion.suficiente) {
-        return badRequestResponse(validacion.mensaje || 'Saldo insuficiente', {
-          saldoDisponible: validacion.saldoActual,
-          diasSolicitados: diasSolicitadosFinal,
-        });
-      }
-    }
+    const descuentaSaldo = TIPOS_DESCUENTAN_SALDO.includes(validatedData.tipo);
 
     // Obtener equipoId del empleado si no se proporcionó
     let equipoId: string | null = validatedData.equipoId || null;
@@ -255,6 +262,7 @@ export async function POST(req: NextRequest) {
       );
 
       if (!validacionPoliticas.valida) {
+        await cleanupDocumentoHuérfano();
         return badRequestResponse(
           validacionPoliticas.errores.join('. '),
           { errores: validacionPoliticas.errores }
@@ -263,104 +271,136 @@ export async function POST(req: NextRequest) {
     }
 
     // Determinar si la ausencia es auto-aprobable
-    // Tipos auto-aprobables: enfermedad, enfermedad_familiar, maternidad_paternidad
-    const tiposAutoAprobables = [
-      TipoAusencia.enfermedad,
-      TipoAusencia.enfermedad_familiar,
-      TipoAusencia.maternidad_paternidad,
-    ];
-    const esAutoAprobable = tiposAutoAprobables.includes(validatedData.tipo as TipoAusencia);
+    const esAutoAprobable = TIPOS_AUTO_APROBABLES.includes(validatedData.tipo);
     const estadoInicial = esAutoAprobable
       ? determinarEstadoTrasAprobacion(fechaFin)
       : EstadoAusencia.pendiente;
 
-    // Crear ausencia
-    const ausencia = await prisma.ausencia.create({
-      data: {
-        empleadoId: session.user.empleadoId,
-        empresaId: session.user.empresaId,
-        equipoId,
-        tipo: validatedData.tipo,
-        fechaInicio,
-        fechaFin,
-        medioDia: validatedData.medioDia || false,
-        diasNaturales,
-        diasLaborables,
-        diasSolicitados: diasSolicitadosFinal,
-        descripcion: validatedData.descripcion,
-        motivo: validatedData.motivo,
-        justificanteUrl: validatedData.justificanteUrl,
-        documentoId: validatedData.documentoId, // Vincular documento justificante
-        descuentaSaldo,
-        diasIdeales: validatedData.diasIdeales ? JSON.parse(JSON.stringify(validatedData.diasIdeales)) : null,
-        diasPrioritarios: validatedData.diasPrioritarios ? JSON.parse(JSON.stringify(validatedData.diasPrioritarios)) : null,
-        diasAlternativos: validatedData.diasAlternativos ? JSON.parse(JSON.stringify(validatedData.diasAlternativos)) : null,
-        estado: estadoInicial,
-      },
-      include: {
-        empleado: {
-          select: {
-            nombre: true,
-            apellidos: true,
-            puesto: true,
-            fotoUrl: true,
-            managerId: true,
-          },
-        },
+    class SaldoInsuficienteError extends Error {
+      saldoDisponible: number;
+
+      constructor(saldoDisponible: number, mensaje?: string) {
+        super(mensaje || 'Saldo insuficiente');
+        this.name = 'SaldoInsuficienteError';
+        this.saldoDisponible = saldoDisponible;
       }
-    });
+    }
+
+    let ausencia;
+    try {
+      ausencia = await prisma.$transaction(async (tx) => {
+        if (descuentaSaldo) {
+          const año = fechaInicio.getFullYear();
+          const validacion = await validarSaldoSuficiente(
+            session.user.empleadoId,
+            año,
+            diasSolicitadosFinal,
+            tx,
+            { lock: true }
+          );
+
+          if (!validacion.suficiente) {
+            throw new SaldoInsuficienteError(validacion.saldoActual, validacion.mensaje);
+          }
+
+          await actualizarSaldo(
+            session.user.empleadoId,
+            año,
+            'solicitar',
+            diasSolicitadosFinal,
+            tx
+          );
+        }
+
+        return tx.ausencia.create({
+          data: {
+            empleadoId: session.user.empleadoId,
+            empresaId: session.user.empresaId,
+            equipoId,
+            tipo: validatedData.tipo,
+            fechaInicio,
+            fechaFin,
+            medioDia: validatedData.medioDia || false,
+            periodo: validatedData.medioDia ? validatedData.periodo || null : null,
+            diasNaturales,
+            diasLaborables,
+            diasSolicitados: diasSolicitadosFinal,
+            motivo: validatedData.motivo,
+            justificanteUrl: validatedData.justificanteUrl,
+            documentoId: validatedData.documentoId,
+            descuentaSaldo,
+            diasIdeales: validatedData.diasIdeales || null,
+            diasPrioritarios: validatedData.diasPrioritarios || null,
+            diasAlternativos: validatedData.diasAlternativos || null,
+            estado: estadoInicial,
+          },
+          include: {
+            empleado: {
+              select: {
+                nombre: true,
+                apellidos: true,
+                puesto: true,
+                fotoUrl: true,
+                managerId: true,
+              },
+            },
+          },
+        });
+      });
+    } catch (error) {
+      if (error instanceof SaldoInsuficienteError) {
+        await cleanupDocumentoHuérfano();
+        return badRequestResponse(error.message, {
+          saldoDisponible: error.saldoDisponible,
+          diasSolicitados: diasSolicitadosFinal,
+        });
+      }
+      throw error;
+    }
 
     // Actualizar saldo y crear notificaciones según si fue auto-aprobada o requiere aprobación
     if (esAutoAprobable) {
-      // Ausencias que NO requieren aprobación (enfermedad, etc.)
-      // NO se registran en AutoCompletado porque no hubo "aprobación automática"
-      // Solo se notifica a HR/Manager para información
-      
-      // Si descuenta saldo, actualizar saldo como "aprobar" (pendientes -> usados)
-      if (descuentaSaldo) {
-        const año = fechaInicio.getFullYear();
-        await actualizarSaldo(
-          session.user.empleadoId,
-          año,
-          'aprobar', // ✅ Directo a usados porque no requiere aprobación
-          diasSolicitadosFinal
-        );
+      try {
+        await crearNotificacionAusenciaAutoAprobada(prisma, {
+          ausenciaId: ausencia.id,
+          empresaId: session.user.empresaId,
+          empleadoId: session.user.empleadoId,
+          empleadoNombre: `${ausencia.empleado.nombre} ${ausencia.empleado.apellidos}`,
+          managerId: ausencia.empleado.managerId,
+          tipo: ausencia.tipo,
+          fechaInicio: ausencia.fechaInicio,
+          fechaFin: ausencia.fechaFin,
+        });
+      } catch (error) {
+        console.error('[Ausencias] Error creando notificación auto-aprobada:', error);
       }
 
-      // Notificar a HR/Manager que se registró una ausencia (NO al empleado)
-      await crearNotificacionAusenciaAutoAprobada(prisma, {
-        ausenciaId: ausencia.id,
-        empresaId: session.user.empresaId,
-        empleadoId: session.user.empleadoId,
-        empleadoNombre: `${ausencia.empleado.nombre} ${ausencia.empleado.apellidos}`,
-        managerId: ausencia.empleado.managerId,
-        tipo: ausencia.tipo,
-        fechaInicio: ausencia.fechaInicio,
-        fechaFin: ausencia.fechaFin,
-      });
+      try {
+        await CalendarManager.syncAusenciaToCalendars({
+          ...ausencia,
+          empleado: {
+            nombre: ausencia.empleado.nombre,
+            apellidos: ausencia.empleado.apellidos,
+          },
+        });
+      } catch (error) {
+        console.error('[Ausencias] Error sincronizando ausencia auto-aprobada:', error);
+      }
     } else {
-      // Si requiere aprobación y descuenta saldo, incrementar días pendientes
-      if (descuentaSaldo) {
-        const año = fechaInicio.getFullYear();
-        await actualizarSaldo(
-          session.user.empleadoId,
-          año,
-          'solicitar', // Pendiente de aprobación: incrementar pendientes
-          diasSolicitadosFinal
-        );
+      try {
+        await crearNotificacionAusenciaSolicitada(prisma, {
+          ausenciaId: ausencia.id,
+          empresaId: session.user.empresaId,
+          empleadoId: session.user.empleadoId,
+          empleadoNombre: `${ausencia.empleado.nombre} ${ausencia.empleado.apellidos}`,
+          tipo: ausencia.tipo,
+          fechaInicio: ausencia.fechaInicio,
+          fechaFin: ausencia.fechaFin,
+          diasSolicitados: diasSolicitadosFinal,
+        });
+      } catch (error) {
+        console.error('[Ausencias] Error creando notificación de solicitud:', error);
       }
-
-      // Notificar a HR/Manager que hay una ausencia pendiente de aprobación
-      await crearNotificacionAusenciaSolicitada(prisma, {
-        ausenciaId: ausencia.id,
-        empresaId: session.user.empresaId,
-        empleadoId: session.user.empleadoId,
-        empleadoNombre: `${ausencia.empleado.nombre} ${ausencia.empleado.apellidos}`,
-        tipo: ausencia.tipo,
-        fechaInicio: ausencia.fechaInicio,
-        fechaFin: ausencia.fechaFin,
-        diasSolicitados: diasSolicitadosFinal,
-      });
     }
 
     return createdResponse(ausencia);

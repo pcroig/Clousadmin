@@ -52,7 +52,6 @@ interface Ausencia {
   estado: string;
   motivo: string | null;
   motivoRechazo: string | null;
-  descripcion?: string | null;
   justificanteUrl?: string | null;
   documentoId?: string | null;
   empleado: {
@@ -82,7 +81,6 @@ type EditFormState = {
   fechaFin: string;
   medioDia: boolean;
   motivo: string;
-  descripcion: string;
   justificanteUrl: string | null;
   documentoId: string | null;
 };
@@ -94,7 +92,6 @@ const createEmptyEditForm = (): EditFormState => ({
   fechaFin: '',
   medioDia: false,
   motivo: '',
-  descripcion: '',
   justificanteUrl: null,
   documentoId: null,
 });
@@ -178,7 +175,6 @@ const fetchCampanas = useCallback(async () => {
         fechaFin,
         medioDia: Boolean(ausencia.medioDia),
         motivo: ausencia.motivo || '',
-        descripcion: ausencia.descripcion || '',
         justificanteUrl: ausencia.justificanteUrl || null,
         documentoId: ausencia.documentoId || null,
       });
@@ -363,7 +359,6 @@ const fetchCampanas = useCallback(async () => {
         fechaFin: editForm.fechaFin,
         medioDia: editForm.medioDia,
         motivo: editForm.motivo || null,
-        descripcion: editForm.descripcion || null,
         estado: editForm.estado,
       };
 
@@ -746,21 +741,14 @@ const fetchCampanas = useCallback(async () => {
                 </Label>
               </div>
 
-              <div>
-                <Label>Motivo</Label>
-                <Input
-                  placeholder="Motivo de la ausencia"
+              <div className="col-span-2">
+                <Label>
+                  Motivo o detalles {editForm.tipo === 'otro' ? '*' : '(opcional)'}
+                </Label>
+                <Textarea
+                  placeholder="Describe el motivo o aporta detalles (requerido si el tipo es 'Otro')"
                   value={editForm.motivo}
                   onChange={(e) => setEditForm((prev) => ({ ...prev, motivo: e.target.value }))}
-                />
-              </div>
-
-              <div>
-                <Label>Descripción</Label>
-                <Textarea
-                  placeholder="Descripción adicional"
-                  value={editForm.descripcion}
-                  onChange={(e) => setEditForm((prev) => ({ ...prev, descripcion: e.target.value }))}
                   rows={3}
                 />
               </div>
@@ -830,7 +818,6 @@ const fetchCampanas = useCallback(async () => {
           fetchCampanas();
           setCrearCampanaModal(false);
         }}
-        solapamientoMaximoPct={30}
       />
     </div>
   );

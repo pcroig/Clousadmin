@@ -23,33 +23,22 @@ import {
 import { CalendarManager } from '@/lib/integrations/calendar/calendar-manager';
 import { z } from 'zod';
 
-import { EstadoAusencia, UsuarioRol } from '@/lib/constants/enums';
+import { EstadoAusencia, TipoAusencia, UsuarioRol } from '@/lib/constants/enums';
+
+class SaldoInsuficienteError extends Error {
+  saldoDisponible: number;
+
+  constructor(saldoDisponible: number, mensaje?: string) {
+    super(mensaje || 'Saldo insuficiente');
+    this.name = 'SaldoInsuficienteError';
+    this.saldoDisponible = saldoDisponible;
+  }
+}
 
 // Schema para aprobar/rechazar
 const ausenciaAccionSchema = z.object({
   accion: z.enum(['aprobar', 'rechazar']),
   motivoRechazo: z.string().optional(),
-});
-
-// Schema para editar ausencia
-      const ausenciaEditarSchema = z.object({
-        tipo: z.enum(['vacaciones', 'enfermedad', 'enfermedad_familiar', 'maternidad_paternidad', 'otro']).optional(),
-        fechaInicio: z.string().optional(),
-        fechaFin: z.string().optional(),
-        medioDia: z.boolean().optional(),
-        motivo: z.string().nullable().optional(),
-        descripcion: z.string().nullable().optional(),
-        justificanteUrl: z.string().url().nullable().optional(),
-        estado: z.enum(['pendiente', 'confirmada', 'completada', 'rechazada']).optional(),
-      }).refine((data) => {
-  // Si hay fechas, validar que fechaFin >= fechaInicio
-  if (data.fechaInicio && data.fechaFin) {
-    return new Date(data.fechaFin) >= new Date(data.fechaInicio);
-  }
-  return true;
-}, {
-  message: 'La fecha de fin debe ser posterior o igual a la fecha de inicio',
-  path: ['fechaFin'],
 });
 
 // PATCH /api/ausencias/[id] - Aprobar/Rechazar o Editar ausencia (HR Admin o Manager)
@@ -141,7 +130,23 @@ export async function PATCH(
     }
 
       // Usar transacción para asegurar consistencia de datos
-      const result = await prisma.$transaction(async (tx) => {
+      const ejecutarTransaccion = () => prisma.$transaction(async (tx) => {
+        if (accion === 'aprobar' && ausencia.descuentaSaldo) {
+          const año = ausencia.fechaInicio.getFullYear();
+          const diasSolicitados = Number(ausencia.diasSolicitados);
+          const validacionSaldo = await validarSaldoSuficiente(
+            ausencia.empleadoId,
+            año,
+            diasSolicitados,
+            tx,
+            { lock: true }
+          );
+
+          if (!validacionSaldo.suficiente) {
+            throw new SaldoInsuficienteError(validacionSaldo.saldoActual, validacionSaldo.mensaje);
+          }
+        }
+
     // Actualizar ausencia
         const updatedAusencia = await tx.ausencia.update({
       where: { id },
@@ -233,17 +238,37 @@ export async function PATCH(
         return updatedAusencia;
       });
 
+      let result;
+      try {
+        result = await ejecutarTransaccion();
+      } catch (error) {
+        if (error instanceof SaldoInsuficienteError) {
+          return badRequestResponse(
+            error.message,
+            {
+              saldoDisponible: error.saldoDisponible,
+              diasSolicitados: Number(ausencia.diasSolicitados),
+            }
+          );
+        }
+        throw error;
+      }
+
       // Crear notificación usando el servicio centralizado
       if (accion === 'aprobar') {
-        await crearNotificacionAusenciaAprobada(prisma, {
-          ausenciaId: result.id,
-          empresaId: session.user.empresaId,
-          empleadoId: ausencia.empleadoId,
-          empleadoNombre: `${result.empleado.nombre} ${result.empleado.apellidos}`,
-          tipo: ausencia.tipo,
-          fechaInicio: ausencia.fechaInicio,
-          fechaFin: ausencia.fechaFin,
-        });
+        try {
+          await crearNotificacionAusenciaAprobada(prisma, {
+            ausenciaId: result.id,
+            empresaId: session.user.empresaId,
+            empleadoId: ausencia.empleadoId,
+            empleadoNombre: `${result.empleado.nombre} ${result.empleado.apellidos}`,
+            tipo: ausencia.tipo,
+            fechaInicio: ausencia.fechaInicio,
+            fechaFin: ausencia.fechaFin,
+          });
+        } catch (error) {
+          console.error('[Ausencias] Error creando notificación de aprobación:', error);
+        }
 
         // Sincronizar con calendarios conectados (Google Calendar, etc.)
         try {
@@ -259,16 +284,20 @@ export async function PATCH(
           // No fallar la aprobación si falla la sincronización con calendario
         }
       } else {
-        await crearNotificacionAusenciaRechazada(prisma, {
-          ausenciaId: result.id,
-          empresaId: session.user.empresaId,
-          empleadoId: ausencia.empleadoId,
-          empleadoNombre: `${result.empleado.nombre} ${result.empleado.apellidos}`,
-          tipo: ausencia.tipo,
-          fechaInicio: ausencia.fechaInicio,
-          fechaFin: ausencia.fechaFin,
-          motivoRechazo,
-        });
+        try {
+          await crearNotificacionAusenciaRechazada(prisma, {
+            ausenciaId: result.id,
+            empresaId: session.user.empresaId,
+            empleadoId: ausencia.empleadoId,
+            empleadoNombre: `${result.empleado.nombre} ${result.empleado.apellidos}`,
+            tipo: ausencia.tipo,
+            fechaInicio: ausencia.fechaInicio,
+            fechaFin: ausencia.fechaFin,
+            motivoRechazo,
+          });
+        } catch (error) {
+          console.error('[Ausencias] Error creando notificación de rechazo:', error);
+        }
 
         // Eliminar evento de calendarios si existe
         try {
@@ -293,7 +322,6 @@ export async function PATCH(
         fechaFin: z.string().optional(),
         medioDia: z.boolean().optional(),
         motivo: z.string().nullable().optional(),
-        descripcion: z.string().nullable().optional(),
         justificanteUrl: z.string().nullable().optional(),
         documentoId: z.string().uuid().nullable().optional(),
         estado: z.enum(['pendiente', 'confirmada', 'completada', 'rechazada']).optional(),
@@ -312,6 +340,14 @@ export async function PATCH(
 
       const dataEdicion = validationResult.data;
 
+      if (
+        dataEdicion.tipo &&
+        dataEdicion.tipo !== ausencia.tipo &&
+        ausencia.estado !== EstadoAusencia.pendiente
+      ) {
+        return badRequestResponse('Solo puedes cambiar el tipo cuando la ausencia está pendiente');
+      }
+
       // Determinar fechas a usar (nuevas o existentes)
       const nuevaFechaInicio = dataEdicion.fechaInicio 
         ? new Date(dataEdicion.fechaInicio)
@@ -321,12 +357,29 @@ export async function PATCH(
         : new Date(ausencia.fechaFin);
 
       // Recalcular días si cambiaron las fechas o medioDia
-      const recalcularDias = dataEdicion.fechaInicio || dataEdicion.fechaFin || dataEdicion.medioDia !== undefined;
+      const recalcularDias =
+        dataEdicion.fechaInicio ||
+        dataEdicion.fechaFin ||
+        dataEdicion.medioDia !== undefined;
       
       let diasNaturales = ausencia.diasNaturales;
       let diasLaborables = ausencia.diasLaborables;
       let nuevosDiasSolicitados = Number(ausencia.diasSolicitados);
-      const nuevoMedioDia = dataEdicion.medioDia !== undefined ? dataEdicion.medioDia : ausencia.medioDia;
+      const nuevoMedioDia =
+        dataEdicion.medioDia !== undefined ? dataEdicion.medioDia : ausencia.medioDia;
+      const nuevoPeriodo =
+        nuevoMedioDia ? dataEdicion.periodo || ausencia.periodo : null;
+      const debeActualizarPeriodo = dataEdicion.medioDia !== undefined || dataEdicion.periodo !== undefined;
+
+      if (nuevoMedioDia) {
+        const esMismoDia = nuevaFechaInicio.toDateString() === nuevaFechaFin.toDateString();
+        if (!esMismoDia) {
+          return badRequestResponse('El medio día solo se puede aplicar a ausencias de un solo día');
+        }
+        if (!nuevoPeriodo) {
+          return badRequestResponse('Debes especificar el periodo (mañana o tarde) para el medio día');
+        }
+      }
 
       if (recalcularDias) {
         const calculoDias = await calcularDias(
@@ -348,6 +401,15 @@ export async function PATCH(
       const cambioTipo = ausencia.descuentaSaldo !== nuevoDescuentaSaldo;
       const diferenciaDias = nuevosDiasSolicitados - Number(ausencia.diasSolicitados);
       const año = nuevaFechaInicio.getFullYear();
+
+      const motivoResultante =
+        dataEdicion.motivo !== undefined ? dataEdicion.motivo : ausencia.motivo;
+      if (
+        nuevoTipo === TipoAusencia.otro &&
+        !(typeof motivoResultante === 'string' && motivoResultante.trim().length > 0)
+      ) {
+        return badRequestResponse('El motivo es obligatorio para ausencias de tipo "Otro"');
+      }
 
       // Manejar cambios en el tipo (vacaciones ↔ otro tipo)
       if (cambioTipo) {
@@ -444,8 +506,10 @@ export async function PATCH(
           ...(dataEdicion.documentoId !== undefined && { documentoId: dataEdicion.documentoId || null }),
           ...(dataEdicion.fechaFin && { fechaFin: nuevaFechaFin }),
           ...(dataEdicion.medioDia !== undefined && { medioDia: nuevoMedioDia }),
+          ...(debeActualizarPeriodo && {
+            periodo: nuevoMedioDia ? nuevoPeriodo : null,
+          }),
           ...(dataEdicion.motivo !== undefined && { motivo: dataEdicion.motivo }),
-          ...(dataEdicion.descripcion !== undefined && { descripcion: dataEdicion.descripcion }),
           ...(dataEdicion.estado && { estado: dataEdicion.estado }),
           ...(recalcularDias && {
             diasNaturales,
@@ -530,15 +594,19 @@ export async function DELETE(
 
     // Crear notificación de cancelación
     if (empleado) {
-      await crearNotificacionAusenciaCancelada(prisma, {
-        ausenciaId: ausencia.id,
-        empresaId: session.user.empresaId,
-        empleadoId: ausencia.empleadoId,
-        empleadoNombre: `${empleado.nombre} ${empleado.apellidos}`,
-        tipo: ausencia.tipo,
-        fechaInicio: ausencia.fechaInicio,
-        fechaFin: ausencia.fechaFin,
-      });
+      try {
+        await crearNotificacionAusenciaCancelada(prisma, {
+          ausenciaId: ausencia.id,
+          empresaId: session.user.empresaId,
+          empleadoId: ausencia.empleadoId,
+          empleadoNombre: `${empleado.nombre} ${empleado.apellidos}`,
+          tipo: ausencia.tipo,
+          fechaInicio: ausencia.fechaInicio,
+          fechaFin: ausencia.fechaFin,
+        });
+      } catch (error) {
+        console.error('[Ausencias] Error creando notificación de cancelación:', error);
+      }
     }
 
     return successResponse({ success: true });

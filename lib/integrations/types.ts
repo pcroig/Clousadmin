@@ -151,7 +151,7 @@ export function ausenciaToCalendarEvent(
 
   return {
     summary: `${tipoFormatted} - ${empleadoNombre}`,
-    description: `Tipo: ${tipoFormatted}\nDías: ${ausencia.diasSolicitados}\nID Ausencia: ${ausencia.id}\nEstado: ${estadoFormatted}${ausencia.descripcion ? `\n\nDescripción: ${ausencia.descripcion}` : ""}`,
+    description: `Tipo: ${tipoFormatted}\nDías: ${ausencia.diasSolicitados}\nID Ausencia: ${ausencia.id}\nEstado: ${estadoFormatted}${ausencia.motivo ? `\n\nMotivo/Detalles: ${ausencia.motivo}` : ""}`,
     start: {
       date: ausencia.fechaInicio.toISOString().split("T")[0],
     },
