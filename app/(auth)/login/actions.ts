@@ -124,6 +124,20 @@ export async function loginAction(email: string, password: string) {
       // Continuar aunque falle la invalidación (no bloquear el login)
     }
 
+    // Obtener avatar del empleado si existe
+    let avatarUrl: string | null = null;
+    if (empleadoId) {
+      try {
+        const empleado = await prisma.empleado.findUnique({
+          where: { id: empleadoId },
+          select: { fotoUrl: true },
+        });
+        avatarUrl = empleado?.fotoUrl || null;
+      } catch (avatarError) {
+        console.error('[Login] Error obteniendo avatar del empleado:', avatarError);
+      }
+    }
+
     // Crear sesión con valor actualizado de activo y metadata
     await createSession(
       {
@@ -135,7 +149,7 @@ export async function loginAction(email: string, password: string) {
           rol: usuario.rol,
           empresaId: usuario.empresaId,
           empleadoId,
-          avatar: usuario.avatar,
+          avatar: avatarUrl, // Usar empleado.fotoUrl como fuente de verdad
           activo: usuarioActualizado.activo, // Usar valor actualizado de BD
         },
       },

@@ -233,11 +233,77 @@ npm run dev
 
 ---
 
+## 🔐 7. Verificar Autenticación
+
+### Credenciales de Prueba
+
+Después del seed, deberías poder acceder con:
+
+| Rol       | Email                            | Contraseña    |
+|-----------|----------------------------------|---------------|
+| HR Admin  | admin@clousadmin.com             | Admin123!     |
+| Manager   | carlos.martinez@clousadmin.com   | Empleado123!  |
+| Empleado  | ana.garcia@clousadmin.com        | Empleado123!  |
+
+### Probar Login
+
+1. Visita `http://localhost:3000/login`
+2. Ingresa las credenciales de prueba
+3. Deberías ver el dashboard correspondiente a tu rol
+
+### Probar Invitaciones
+
+#### Desde API (Postman / curl)
+
+```bash
+# 1. Login como HR Admin para obtener sesión
+curl -X POST http://localhost:3000/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"admin@clousadmin.com","password":"Admin123!"}'
+
+# 2. Crear empleado (desde UI o API)
+
+# 3. Enviar invitación
+curl -X POST http://localhost:3000/api/empleados/invitar \
+  -H "Content-Type: application/json" \
+  -H "Cookie: clousadmin-session=TU_TOKEN" \
+  -d '{"empleadoId":"UUID","email":"nuevo@empresa.com"}'
+
+# 4. Copiar URL de respuesta y abrir en navegador
+# 5. Completar onboarding con contraseña
+```
+
+#### Desde UI
+
+1. Login como HR Admin
+2. Ir a `Organización > Personas`
+3. Crear nuevo empleado
+4. Click "Enviar invitación"
+
+### Troubleshooting de Autenticación
+
+#### Error "No tienes un empleado asignado"
+
+```bash
+npx tsx scripts/fix-usuarios-sin-empleado.ts
+```
+
+#### Reset completo de database
+
+```bash
+npx prisma migrate reset
+npm run seed
+```
+
+---
+
 ## 📚 Siguiente Paso
 
 Lee `docs/ARQUITECTURA.md` para entender la estructura del proyecto.
 
+Para documentación completa de autenticación, ver `docs/funcionalidades/autenticacion.md`.
+
 ---
 
-**Versión**: 1.1  
-**Última actualización**: 7 de noviembre 2025
+**Versión**: 1.2  
+**Última actualización**: 27 de enero 2025

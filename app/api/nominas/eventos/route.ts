@@ -10,6 +10,7 @@ import { z } from 'zod';
 import { Decimal } from '@prisma/client/runtime/library';
 
 import { UsuarioRol } from '@/lib/constants/enums';
+import { crearNotificacionComplementosPendientes } from '@/lib/notificaciones';
 
 const GenerarEventoSchema = z.object({
   mes: z.number().int().min(1).max(12),
@@ -331,35 +332,40 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Enviar notificaciones a TODOS los managers
-    const managers = await prisma.usuario.findMany({
+    // Enviar notificaciones a los managers para completar complementos
+    const managers = await prisma.empleado.findMany({
       where: {
         empresaId: session.user.empresaId,
-        rol: UsuarioRol.manager,
-        activo: true,
+        usuario: {
+          rol: UsuarioRol.manager,
+          activo: true,
+        },
+      },
+      select: {
+        id: true,
       },
     });
 
-    const notificaciones = await Promise.all(
-      managers.map((manager) =>
-        prisma.notificacion.create({
-          data: {
+    if (empleadosConComplementos > 0) {
+      await Promise.all(
+        managers.map((manager) =>
+          crearNotificacionComplementosPendientes(prisma, {
+            nominaId: evento.id,
             empresaId: session.user.empresaId,
-            usuarioId: manager.id,
-            tipo: 'nomina_generada',
-            titulo: `Nóminas ${data.mes}/${data.anio} generadas`,
-            mensaje: `Se han generado ${nominasGeneradas} pre-nóminas. Por favor, revisa y asigna complementos antes del ${fechaLimite.toLocaleDateString()}.`,
-            eventoNominaId: evento.id,
-          },
-        })
-      )
-    );
+            managerId: manager.id,
+            empleadosCount: empleadosConComplementos,
+            mes: data.mes,
+            año: data.anio,
+          })
+        )
+      );
+    }
 
     return NextResponse.json(
       {
         evento,
         nominasGeneradas,
-        notificacionesEnviadas: notificaciones.length,
+        notificacionesEnviadas: empleadosConComplementos > 0 ? managers.length : 0,
       },
       { status: 201 }
     );

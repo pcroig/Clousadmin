@@ -10,6 +10,7 @@ import { generarDocumentoDesdePlantilla } from './generar-documento';
 import { generarDocumentoDesdePDFRellenable } from './pdf-rellenable';
 import { prisma } from '@/lib/prisma';
 import { Prisma } from '@prisma/client';
+import { crearNotificacionDocumentoGeneracionLote } from '@/lib/notificaciones';
 
 // Configuración de conexión Redis para BullMQ
 // Parsear REDIS_URL si está disponible, sino usar configuración por defecto
@@ -156,20 +157,13 @@ async function procesarJobSinCola(jobId: string, config: JobConfig) {
       },
     });
 
-    await prisma.notificacion.create({
-      data: {
-        empresaId: config.empresaId,
-        usuarioId: config.solicitadoPor,
-        tipo: exitosos === total ? 'success' : fallidos > 0 ? 'warning' : 'info',
-        titulo: 'Generación de documentos completada',
-        mensaje: `Se generaron ${exitosos} documentos exitosamente${fallidos > 0 ? `, ${fallidos} fallidos` : ''}.`,
-        metadata: {
-          jobId,
-          totalEmpleados: total,
-          exitosos,
-          fallidos,
-        },
-      },
+    await crearNotificacionDocumentoGeneracionLote(prisma, {
+      empresaId: config.empresaId,
+      usuarioId: config.solicitadoPor,
+      total,
+      exitosos,
+      fallidos,
+      jobId,
     });
   } catch (error) {
     await prisma.jobGeneracionDocumentos.update({
@@ -181,20 +175,17 @@ async function procesarJobSinCola(jobId: string, config: JobConfig) {
       },
     });
 
-    await prisma.notificacion.create({
-      data: {
-        empresaId: config.empresaId,
-        usuarioId: config.solicitadoPor,
-        tipo: 'error',
-        titulo: 'Error en generación de documentos',
-        mensaje:
-          error instanceof Error
-            ? `Ocurrió un error al generar los documentos: ${error.message}`
-            : 'Ocurrió un error al generar los documentos.',
-        metadata: {
-          jobId,
-        },
-      },
+    await crearNotificacionDocumentoGeneracionLote(prisma, {
+      empresaId: config.empresaId,
+      usuarioId: config.solicitadoPor,
+      total,
+      exitosos,
+      fallidos: fallidos || total,
+      jobId,
+      mensajePersonalizado:
+        error instanceof Error
+          ? `Ocurrió un error al generar los documentos: ${error.message}`
+          : 'Ocurrió un error al generar los documentos.',
     });
 
     throw error;

@@ -268,6 +268,8 @@ const diasPendientes = ausencias
    - Valida saldo si cambia número de días
    - Permite subir/actualizar justificante después de crear la ausencia
 
+> ℹ️ **Integración con bolsa de horas**: Cuando HR compensa horas extra desde `/hr/horario/fichajes` o desde nóminas, las ausencias generadas se crean automáticamente con tipo `otro`, `descuentaSaldo = false` y se actualiza `EmpleadoSaldoAusencias`, manteniendo el saldo sincronizado sin intervención manual.
+
 ---
 
 ## 🔍 EJEMPLOS DE USO
@@ -311,6 +313,16 @@ FormData:
 | **Enfermedad familiar** | ❌ No | ❌ No | Directo (sin aprobación) |
 | **Maternidad/Paternidad** | ❌ No | ❌ No | Directo (sin aprobación) |
 | **Otro** | ✅ Sí | ❌ No | Solo después de 2 días sin aprobar |
+
+### Diferencia clave
+
+| Caso | ¿Pasa por `auto_completados`? | Notificación |
+|------|-------------------------------|--------------|
+| **No requiere aprobación** | ❌ (no hay aprobación, solo registro directo) | `ausencia_aprobada` a HR/Manager con `autoAprobada: true` |
+| **Auto-aprobada** (por IA o batch) | ✅ `autoCompletado.tipo = 'ausencia_auto_aprobada'` | `ausencia_aprobada` al empleado + registro histórico |
+
+- Usa `lib/auto-completado.ts` únicamente cuando una ausencia **estaba pendiente** y el sistema la aprueba automáticamente.
+- Las ausencias que nunca necesitaron aprobación solo actualizan saldo y disparan la notificación informativa para HR/Manager.
 
 **Nota sobre auto-aprobación**: Solo aplica a tipos que necesitan aprobación (`vacaciones`, `otro`). Después de 2 días sin aprobar/rechazar, el sistema IA clasifica y puede auto-aprobar según criterios.
 

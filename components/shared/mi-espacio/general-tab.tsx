@@ -199,6 +199,7 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado', onFieldUpdate,
       id,
       label,
       value,
+      hasStoredValue,
       placeholder = 'No especificado',
       onChange,
       onBlur,
@@ -206,12 +207,29 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado', onFieldUpdate,
       id: string;
       label: string;
       value: string;
+      hasStoredValue: boolean;
       placeholder?: string;
       onChange: (value: string) => void;
       onBlur?: (value: string) => void;
     }
   ) => {
-    const unlocked = isUnlocked(field);
+    const unlocked = isUnlocked();
+
+    if (!hasStoredValue) {
+      return (
+        <div>
+          <Label htmlFor={id}>{label}</Label>
+          <Input
+            id={id}
+            value={value}
+            onChange={(event) => onChange(event.target.value)}
+            onBlur={(event) => onBlur?.(event.target.value)}
+            placeholder={placeholder}
+          />
+          <p className="mt-1 text-xs text-gray-500">Aún no hay datos guardados para este campo.</p>
+        </div>
+      );
+    }
 
     return (
       <div>
@@ -367,6 +385,7 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado', onFieldUpdate,
               id: 'nif',
               label: 'DNI/NIE',
               value: formData.nif,
+              hasStoredValue: Boolean(empleado.nif),
               onChange: (value) => setFieldValue('nif', value),
               onBlur: (value) => {
                   if (isHrAdmin && onFieldUpdate) {
@@ -381,6 +400,7 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado', onFieldUpdate,
               id: 'nss',
               label: 'Número de Seguridad Social',
               value: formData.nss,
+              hasStoredValue: Boolean(empleado.nss),
               onChange: (value) => setFieldValue('nss', value),
               onBlur: (value) => {
                   if (isHrAdmin && onFieldUpdate) {
@@ -633,6 +653,7 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado', onFieldUpdate,
               id: 'iban',
               label: 'IBAN',
               value: formData.iban,
+              hasStoredValue: Boolean(empleado.iban),
               placeholder: 'ES00 0000 0000 0000 0000 0000',
               onChange: (value) => setFieldValue('iban', value),
               onBlur: (value) => {

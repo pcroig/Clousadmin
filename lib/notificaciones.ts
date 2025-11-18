@@ -8,56 +8,47 @@ import { PrismaClient, Prisma } from '@prisma/client';
 import { UsuarioRol } from '@/lib/constants/enums';
 
 // ========================================
-// TIPOS Y CATEGORÍAS
+// TIPOS
 // ========================================
 
-/**
- * Categorías de notificaciones para organización y UI
- */
-export type CategoriaNotificacion =
-  | 'ausencias' // Solicitudes, aprobaciones, rechazos de ausencias
-  | 'fichajes' // Fichajes, autocompletados, revisiones
-  | 'nominas' // Nóminas, complementos, errores de payroll
-  | 'fichas' // Datos personales, documentos, fichas de empleado
-  | 'generales'; // Cambios de equipo, manager, jornadas, etc.
-
-/**
- * Tipos de notificaciones específicos
- */
 export type TipoNotificacion =
   // Ausencias
   | 'ausencia_solicitada'
   | 'ausencia_aprobada'
   | 'ausencia_rechazada'
   | 'ausencia_cancelada'
-  | 'campana_vacaciones_creada' // 🎯 Especial: requiere selección de días
+  | 'campana_vacaciones_creada'
   | 'campana_vacaciones_cuadrada'
   | 'campana_vacaciones_completada'
-  // Empleados/Fichas
+  // Empleados
   | 'empleado_creado'
+  // Fichajes
+  | 'fichaje_autocompletado'
+  | 'fichaje_requiere_revision'
+  | 'fichaje_resuelto'
+  // Equipos
   | 'cambio_manager'
   | 'asignado_equipo'
   | 'nuevo_empleado_equipo'
   | 'cambio_puesto'
   | 'jornada_asignada'
-  // Fichajes
-  | 'fichaje_autocompletado'
-  | 'fichaje_requiere_revision'
-  | 'fichaje_resuelto'
-  // Solicitudes generales
+  // Solicitudes
   | 'solicitud_creada'
   | 'solicitud_aprobada'
   | 'solicitud_rechazada'
   // Payroll/Nóminas
   | 'nomina_disponible'
   | 'nomina_error'
-  | 'complementos_pendientes' // 🎯 Especial: requiere completar complementos (managers)
+  | 'nomina_validada'
+  | 'complementos_pendientes'
   // Documentos
   | 'documento_solicitado'
   | 'documento_subido'
   | 'documento_rechazado'
+  | 'documento_generado'
+  | 'documento_pendiente_rellenar'
   // Firmas digitales
-  | 'firma_pendiente' // 🎯 Especial: requiere firma digital
+  | 'firma_pendiente'
   | 'firma_completada'
   // Denuncias
   | 'denuncia_recibida'
@@ -65,24 +56,23 @@ export type TipoNotificacion =
   // Onboarding
   | 'onboarding_completado';
 
+export type CategoriaNotificacion = 'ausencias' | 'fichajes' | 'nominas' | 'fichas' | 'generales';
+
 export type PrioridadNotificacion = 'baja' | 'normal' | 'alta' | 'critica';
 
-/**
- * Metadata base para todas las notificaciones
- */
 type NotificacionMetadataBase = {
   prioridad?: PrioridadNotificacion;
   accionUrl?: string;
   accionTexto?: string;
-  // Flags especiales para acciones
-  requiresModal?: boolean; // Si requiere abrir un modal al hacer clic
-  requiresSignature?: boolean; // Si requiere firma digital
-  requiresSelection?: boolean; // Si requiere selección (ej: días de vacaciones)
 };
 
 export type NotificacionMetadata = NotificacionMetadataBase & {
   [key: string]: Prisma.JsonValue | undefined;
 };
+
+// ========================================
+// FUNCIONES PÚBLICAS DE UTILIDAD
+// ========================================
 
 /**
  * Obtiene la categoría de una notificación según su tipo
@@ -90,29 +80,45 @@ export type NotificacionMetadata = NotificacionMetadataBase & {
 export function obtenerCategoria(tipo: TipoNotificacion): CategoriaNotificacion {
   // Ausencias
   if (
-    tipo.startsWith('ausencia_') ||
-    tipo.startsWith('campana_vacaciones')
+    tipo === 'ausencia_solicitada' ||
+    tipo === 'ausencia_aprobada' ||
+    tipo === 'ausencia_rechazada' ||
+    tipo === 'ausencia_cancelada' ||
+    tipo === 'campana_vacaciones_creada' ||
+    tipo === 'campana_vacaciones_cuadrada' ||
+    tipo === 'campana_vacaciones_completada'
   ) {
     return 'ausencias';
   }
 
   // Fichajes
-  if (tipo.startsWith('fichaje_')) {
+  if (
+    tipo === 'fichaje_autocompletado' ||
+    tipo === 'fichaje_requiere_revision' ||
+    tipo === 'fichaje_resuelto'
+  ) {
     return 'fichajes';
   }
 
   // Nóminas
   if (
-    tipo.startsWith('nomina_') ||
+    tipo === 'nomina_disponible' ||
+    tipo === 'nomina_error' ||
+    tipo === 'nomina_validada' ||
     tipo === 'complementos_pendientes'
   ) {
     return 'nominas';
   }
 
-  // Fichas (datos personales, documentos, cambios de equipo/puesto)
+  // Fichas (documentos, firmas, empleados, equipos)
   if (
-    tipo.startsWith('documento_') ||
-    tipo.startsWith('firma_') ||
+    tipo === 'documento_solicitado' ||
+    tipo === 'documento_subido' ||
+    tipo === 'documento_rechazado' ||
+    tipo === 'documento_generado' ||
+    tipo === 'documento_pendiente_rellenar' ||
+    tipo === 'firma_pendiente' ||
+    tipo === 'firma_completada' ||
     tipo === 'empleado_creado' ||
     tipo === 'cambio_puesto' ||
     tipo === 'jornada_asignada'
@@ -120,23 +126,8 @@ export function obtenerCategoria(tipo: TipoNotificacion): CategoriaNotificacion 
     return 'fichas';
   }
 
-  // Generales (resto de tipos)
+  // Generales (solicitudes, equipos, denuncias, onboarding)
   return 'generales';
-}
-
-/**
- * Verifica si una notificación requiere una acción especial
- */
-export function requiereAccionEspecial(tipo: TipoNotificacion): boolean {
-  const tiposEspeciales: TipoNotificacion[] = [
-    'firma_pendiente',
-    'campana_vacaciones_creada',
-    'campana_vacaciones_cuadrada',
-    'complementos_pendientes',
-    'documento_solicitado',
-  ];
-
-  return tiposEspeciales.includes(tipo);
 }
 
 // ========================================
@@ -323,7 +314,7 @@ export async function crearNotificacionAusenciaAprobada(
       fechaInicio: fechaInicio.toISOString(),
       fechaFin: fechaFin.toISOString(),
       prioridad: 'normal',
-      accionUrl: '/empleado/mi-espacio/ausencias',
+      accionUrl: '/empleado/horario/ausencias',
       accionTexto: 'Ver ausencia',
     },
   });
@@ -361,7 +352,7 @@ export async function crearNotificacionAusenciaRechazada(
       fechaFin: fechaFin.toISOString(),
       ...(motivoRechazo && { motivoRechazo }),
       prioridad: 'normal',
-      accionUrl: '/empleado/mi-espacio/ausencias',
+      accionUrl: '/empleado/horario/ausencias',
       accionTexto: 'Ver detalles',
     },
   });
@@ -408,6 +399,11 @@ export async function crearNotificacionAusenciaCancelada(
   });
 }
 
+/**
+ * Notifica a HR/Admin y Manager cuando una ausencia es auto-aprobada
+ * (tipos que no requieren aprobación: enfermedad, enfermedad_familiar, maternidad_paternidad)
+ * NO notifica al empleado - el auto-aprobado se registra en AutoCompletado
+ */
 export async function crearNotificacionAusenciaAutoAprobada(
   prisma: PrismaClient,
   params: {
@@ -421,70 +417,32 @@ export async function crearNotificacionAusenciaAutoAprobada(
     fechaFin: Date;
   }
 ) {
-  const {
-    ausenciaId,
-    empresaId,
-    empleadoId,
-    empleadoNombre,
-    managerId,
-    tipo,
-    fechaInicio,
-    fechaFin,
-  } = params;
+  const { ausenciaId, empresaId, empleadoId, empleadoNombre, managerId, tipo, fechaInicio, fechaFin } = params;
 
-  const usuarioIdsEmpleado = await obtenerUsuariosANotificar(prisma, empresaId, {
-    empleado: empleadoId,
-  });
-
-  if (usuarioIdsEmpleado.length) {
-    await crearNotificaciones(prisma, {
-      empresaId,
-      usuarioIds: usuarioIdsEmpleado,
-      tipo: 'ausencia_aprobada',
-      titulo: `${formatLabel(tipo)} aprobada automáticamente`,
-      mensaje: `Tu solicitud (${formatRange(fechaInicio, fechaFin)}) ha sido aprobada automáticamente.`,
-      metadata: {
-        ausenciaId,
-        tipo,
-        fechaInicio: fechaInicio.toISOString(),
-        fechaFin: fechaFin.toISOString(),
-        autoAprobada: true,
-        prioridad: 'normal',
-        accionUrl: '/empleado/mi-espacio/ausencias',
-        accionTexto: 'Ver ausencia',
-      },
-    });
-  }
-
-  const usuarioIdsGestion = await obtenerUsuariosANotificar(prisma, empresaId, {
+  // Notificar a HR/Admin y Manager (NO al empleado)
+  const usuarioIds = await obtenerUsuariosANotificar(prisma, empresaId, {
     hrAdmin: true,
-    manager: managerId ?? undefined,
+    manager: managerId,
   });
 
-  if (usuarioIdsGestion.length) {
-    await crearNotificaciones(prisma, {
-      empresaId,
-      usuarioIds: usuarioIdsGestion,
-      tipo: 'ausencia_aprobada',
-      titulo: `${formatLabel(tipo)} aprobada automáticamente`,
-      mensaje: `${empleadoNombre} ha tenido su ${formatLabel(tipo)} auto-aprobada (${formatRange(
-        fechaInicio,
-        fechaFin
-      )}).`,
-      metadata: {
-        ausenciaId,
-        tipo,
-        fechaInicio: fechaInicio.toISOString(),
-        fechaFin: fechaFin.toISOString(),
-        empleadoId,
-        empleadoNombre,
-        autoAprobada: true,
-        prioridad: 'normal',
-        accionUrl: '/hr/horario/ausencias',
-        accionTexto: 'Ver ausencias',
-      },
-    });
-  }
+  await crearNotificaciones(prisma, {
+    empresaId,
+    usuarioIds,
+    tipo: 'ausencia_aprobada',
+    titulo: `${formatLabel(tipo)} auto-aprobada`,
+    mensaje: `${empleadoNombre} registró ${formatLabel(tipo)} (${formatRange(fechaInicio, fechaFin)}) que fue aprobada automáticamente.`,
+    metadata: {
+      ausenciaId,
+      empleadoId,
+      tipo,
+      fechaInicio: fechaInicio.toISOString(),
+      fechaFin: fechaFin.toISOString(),
+      autoAprobada: true,
+      prioridad: 'normal',
+      accionUrl: `/hr/horario/ausencias`,
+      accionTexto: 'Ver ausencia',
+    },
+  });
 }
 
 // ========================================
@@ -524,7 +482,6 @@ export async function crearNotificacionFirmaPendiente(
       accionTexto: 'Firmar documento',
       accionUrl: '/empleado/mi-espacio/documentos?tab=firmas',
       url: '/empleado/mi-espacio/documentos?tab=firmas',
-      requiresSignature: true, // ✅ Acción especial: firma digital
     },
   });
 }
@@ -603,7 +560,7 @@ export async function crearNotificacionFichajeAutocompletado(
       salidaSugerida: salidaSugerida.toISOString(),
       razon,
       prioridad: 'normal',
-      accionUrl: '/empleado/mi-espacio/fichajes',
+      accionUrl: '/empleado/horario/fichajes',
       accionTexto: 'Ver fichaje',
     },
   });
@@ -670,7 +627,7 @@ export async function crearNotificacionFichajeResuelto(
       fichajeId,
       fecha: fecha.toISOString(),
       prioridad: 'normal',
-      accionUrl: '/empleado/mi-espacio/fichajes',
+      accionUrl: '/empleado/horario/fichajes',
       accionTexto: 'Ver fichaje',
     },
   });
@@ -1081,7 +1038,7 @@ export async function crearNotificacionSolicitudCreada(
       solicitudId,
       tipo,
       prioridad: 'alta',
-      accionUrl: '/hr/bandeja-entrada?tab=solicitudes',
+      accionUrl: '/hr/solicitudes',
       accionTexto: 'Revisar solicitud',
     },
   });
@@ -1205,7 +1162,7 @@ export async function crearNotificacionSolicitudRequiereRevision(
       tipo,
       requiereRevision: true,
       prioridad: 'critica',
-      accionUrl: '/hr/bandeja-entrada?tab=solicitudes',
+      accionUrl: '/hr/bandeja-entrada',
       accionTexto: 'Revisar ahora',
     },
   });
@@ -1276,7 +1233,7 @@ export async function crearNotificacionNominaError(
       nominaId,
       error,
       prioridad: 'critica',
-      accionUrl: `/hr/payroll/nominas/${nominaId}`,
+      accionUrl: '/hr/nominas',
       accionTexto: 'Revisar',
     },
   });
@@ -1388,6 +1345,68 @@ export async function crearNotificacionDocumentoRechazado(
   });
 }
 
+/**
+ * Notifica cuando se completa la generación masiva de documentos (lote)
+ */
+export async function crearNotificacionDocumentoGeneracionLote(
+  prisma: PrismaClient,
+  params: {
+    empresaId: string;
+    usuarioId: string;
+    total: number;
+    exitosos: number;
+    fallidos: number;
+    jobId: string;
+    mensajePersonalizado?: string;
+  }
+) {
+  const { empresaId, usuarioId, total, exitosos, fallidos, jobId, mensajePersonalizado } = params;
+
+  // Determinar tipo de notificación según resultado
+  let titulo: string;
+  let mensaje: string;
+  let tipo: TipoNotificacion;
+  let prioridad: PrioridadNotificacion;
+
+  if (fallidos === 0) {
+    // Todo exitoso
+    tipo = 'documento_generado';
+    titulo = 'Documentos generados exitosamente';
+    mensaje = `Se han generado ${exitosos} documento${exitosos !== 1 ? 's' : ''} correctamente.`;
+    prioridad = 'normal';
+  } else if (exitosos === 0) {
+    // Todo falló
+    tipo = 'documento_generado';
+    titulo = 'Error en generación de documentos';
+    mensaje = mensajePersonalizado || `No se pudo generar ninguno de los ${total} documentos solicitados.`;
+    prioridad = 'alta';
+  } else {
+    // Parcialmente exitoso
+    tipo = 'documento_generado';
+    titulo = 'Documentos generados parcialmente';
+    mensaje = `Se generaron ${exitosos} de ${total} documentos. ${fallidos} fallaron.`;
+    prioridad = 'alta';
+  }
+
+  await crearNotificaciones(prisma, {
+    empresaId,
+    usuarioIds: [usuarioId],
+    tipo,
+    titulo,
+    mensaje,
+    metadata: {
+      jobId,
+      total,
+      exitosos,
+      fallidos,
+      estado: fallidos === 0 ? 'completado' : exitosos === 0 ? 'fallido' : 'parcial',
+      prioridad,
+      accionUrl: '/hr/organizacion/personas?panel=documentos',
+      accionTexto: 'Ver documentos',
+    },
+  });
+}
+
 // ========================================
 // CAMPAÑAS DE VACACIONES
 // ========================================
@@ -1415,7 +1434,7 @@ export async function crearNotificacionCampanaCreada(
       await crearNotificaciones(prisma, {
         empresaId,
         usuarioIds,
-        tipo: 'campana_vacaciones_creada', // 🎯 Tipo específico para campañas
+        tipo: 'solicitud_creada', // Reutilizamos tipo genérico
         titulo: 'Nueva campaña de vacaciones',
         mensaje: `Se ha iniciado la campaña "${titulo}" para planificar tus vacaciones del ${fechaInicio.toLocaleDateString('es-ES')} al ${fechaFin.toLocaleDateString('es-ES')}. Por favor, indica tus preferencias.`,
         metadata: {
@@ -1423,9 +1442,8 @@ export async function crearNotificacionCampanaCreada(
           fechaInicio: fechaInicio.toISOString(),
           fechaFin: fechaFin.toISOString(),
           prioridad: 'alta',
-          accionUrl: `/empleado/dashboard?campana=${campanaId}`,
-          accionTexto: 'Seleccionar días preferidos',
-          requiresSelection: true, // ✅ Acción especial: selección de días
+          accionUrl: `/empleado/vacaciones/campanas/${campanaId}`,
+          accionTexto: 'Ver campaña',
         },
       });
     }
@@ -1443,7 +1461,7 @@ export async function crearNotificacionCampanaCompletada(
 ) {
   const { campanaId, empresaId, titulo, totalEmpleados } = params;
 
-  // Notificar a HR Admin
+  // Notificar a HR Admin y Managers
   const usuarioIds = await obtenerUsuariosANotificar(prisma, empresaId, {
     hrAdmin: true,
   });
@@ -1458,38 +1476,50 @@ export async function crearNotificacionCampanaCompletada(
       campanaId,
       totalEmpleados,
       prioridad: 'alta',
-      accionUrl: `/hr/horario/ausencias?panel=campanas&campanaId=${campanaId}`,
+      accionUrl: `/hr/vacaciones/campanas/${campanaId}`,
       accionTexto: 'Cuadrar vacaciones',
     },
   });
 }
 
+/**
+ * Notifica a empleados cuando su campaña de vacaciones ha sido cuadrada
+ * y ya pueden ver las fechas asignadas
+ */
 export async function crearNotificacionCampanaCuadrada(
   prisma: PrismaClient,
   params: {
     campanaId: string;
     empresaId: string;
+    empleadosIds: string[];
     titulo: string;
-    usuarioIds: string[];
   }
 ) {
-  const { campanaId, empresaId, titulo, usuarioIds } = params;
+  const { campanaId, empresaId, empleadosIds, titulo } = params;
 
-  if (usuarioIds.length === 0) {
-    return;
-  }
+  // Obtener IDs de usuarios de los empleados
+  const empleados = await prisma.empleado.findMany({
+    where: {
+      id: { in: empleadosIds },
+    },
+    select: {
+      usuarioId: true,
+    },
+  });
+
+  const usuarioIds = empleados.map(e => e.usuarioId);
 
   await crearNotificaciones(prisma, {
     empresaId,
     usuarioIds,
     tipo: 'campana_vacaciones_cuadrada',
-    titulo: 'Tu propuesta de vacaciones está lista',
-    mensaje: `La campaña "${titulo}" ya tiene una propuesta asignada. Revísala y confirma tus vacaciones.`,
+    titulo: 'Vacaciones asignadas',
+    mensaje: `Las vacaciones de la campaña "${titulo}" han sido cuadradas. Ya puedes ver tus fechas asignadas.`,
     metadata: {
       campanaId,
       prioridad: 'alta',
-      accionUrl: `/empleado/dashboard?campana=${campanaId}`,
-      accionTexto: 'Revisar propuesta',
+      accionUrl: `/empleado/horario/ausencias?campana=${campanaId}`,
+      accionTexto: 'Ver vacaciones',
       requiresModal: true,
     },
   });
@@ -1524,14 +1554,14 @@ export async function crearNotificacionOnboardingCompletado(
   await crearNotificaciones(prisma, {
     empresaId,
     usuarioIds,
-    tipo: 'onboarding_completado',
+    tipo: 'solicitud_creada',
     titulo: 'Onboarding completado',
     mensaje: `${empleadoNombre} ha completado su proceso de onboarding y está listo para comenzar.`,
     metadata: {
       empleadoId,
       empleadoNombre,
       prioridad: 'normal',
-      accionUrl: `/hr/organizacion/personas/${empleadoId}`,
+      accionUrl: `/hr/empleados/${empleadoId}`,
       accionTexto: 'Ver empleado',
     },
   });
@@ -1554,6 +1584,10 @@ export async function crearNotificacionComplementosPendientes(
 ) {
   const { nominaId, empresaId, managerId, empleadosCount, mes, año } = params;
 
+  if (empleadosCount === 0) {
+    return;
+  }
+
   const usuarioIds = await obtenerUsuariosANotificar(prisma, empresaId, {
     manager: managerId,
   });
@@ -1563,7 +1597,7 @@ export async function crearNotificacionComplementosPendientes(
   await crearNotificaciones(prisma, {
     empresaId,
     usuarioIds,
-    tipo: 'complementos_pendientes', // 🎯 Tipo específico para complementos
+    tipo: 'complementos_pendientes',
     titulo: 'Complementos de nómina pendientes',
     mensaje: `Tienes ${empleadosCount} empleado(s) en tu equipo que requieren complementos de nómina para ${meses[mes - 1]} ${año}. Por favor, completa la información.`,
     metadata: {
@@ -1572,9 +1606,9 @@ export async function crearNotificacionComplementosPendientes(
       año,
       empleadosCount,
       prioridad: 'alta',
-      accionUrl: '/manager/bandeja-entrada',
+      accionUrl: '/manager/bandeja-entrada?tab=solicitudes',
       accionTexto: 'Completar complementos',
-      requiresModal: true, // ✅ Acción especial: abrir modal
+      requiresModal: true, // Flag especial para abrir modal
     },
   });
 }
@@ -1648,7 +1682,7 @@ export async function crearNotificacionDenunciaActualizada(
       nuevoEstado,
       prioridad: 'alta',
       accionUrl: `/empleado/mi-perfil?modal=denuncias`,
-      accionTexto: 'Ver canal de denuncias',
+      accionTexto: 'Ver denuncia',
     },
   });
 }

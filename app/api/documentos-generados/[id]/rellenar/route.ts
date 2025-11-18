@@ -8,6 +8,7 @@ import { prisma } from '@/lib/prisma';
 import { descargarDocumento, subirDocumento } from '@/lib/s3';
 import { rellenarPDFFormulario } from '@/lib/plantillas/pdf-rellenable';
 import { crearSolicitudFirma } from '@/lib/firma-digital/db-helpers';
+import { crearNotificacionFirmaPendiente } from '@/lib/notificaciones';
 
 export async function POST(
   request: NextRequest,
@@ -162,19 +163,13 @@ export async function POST(
         solicitudFirmaId = solicitud.id;
 
         if (documentoGenerado.empleado.usuarioId) {
-          await prisma.notificacion.create({
-            data: {
-              empresaId: documentoGenerado.empresaId,
-              usuarioId: documentoGenerado.empleado.usuarioId,
-              tipo: 'warning',
-              titulo: 'Documento listo para firma',
-              mensaje: `Firma el documento ${documentoGenerado.documento.nombre}`,
-              metadata: {
-                tipo: 'pendiente_firma',
-                firmaId: solicitud.id,
-                documentoId: documentoGenerado.documentoId,
-              },
-            },
+          await crearNotificacionFirmaPendiente(prisma, {
+            empresaId: documentoGenerado.empresaId,
+            empleadoId: documentoGenerado.empleadoId,
+            firmaId: solicitud.id,
+            solicitudId: solicitud.id,
+            documentoId: documentoGenerado.documentoId,
+            documentoNombre: documentoGenerado.documento.nombre,
           });
         }
       }

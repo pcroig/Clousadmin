@@ -252,18 +252,17 @@ export async function guardarCredenciales(
       avatarUrl = await uploadToS3(avatarFile.buffer, s3Key, avatarFile.mimeType);
     }
 
-    // Actualizar usuario con contraseña y avatar
+    // Actualizar usuario con contraseña (avatar se almacena solo en empleado.fotoUrl)
     await prisma.usuario.update({
       where: { id: onboarding.empleado.usuarioId },
       data: {
         password: hashedPassword,
-        avatar: avatarUrl,
         emailVerificado: true,
         activo: true,
       },
     });
 
-    // Guardar avatar también en el registro del empleado para reutilizarlo en la app
+    // Guardar avatar en empleado.fotoUrl como fuente única de verdad
     if (avatarUrl) {
       await prisma.empleado.update({
         where: { id: onboarding.empleadoId },
@@ -792,39 +791,11 @@ export async function crearNotificacionOnboarding(
       return;
     }
 
-    // Obtener usuarios HR de la empresa
-    const usuariosHR = await prisma.usuario.findMany({
-      where: {
-        empresaId,
-        rol: UsuarioRol.hr_admin,
-        activo: true,
-      },
-      select: {
-        id: true,
-      },
-    });
-
-    // Crear notificaciones para todos los HR admins
-    const notificaciones = usuariosHR.map((usuario) => ({
+    await crearNotificacionOnboardingCompletado(prisma, {
+      empleadoId,
       empresaId,
-      usuarioId: usuario.id,
-      tipo: 'onboarding_completado',
-      titulo: 'Onboarding completado',
-      mensaje: `${empleado.nombre} ${empleado.apellidos} ha completado su onboarding`,
-      metadata: {
-        empleadoId,
-        accionUrl: `/hr/organizacion/personas/${empleadoId}`,
-      },
-      leida: false,
-    }));
-
-    await prisma.notificacion.createMany({
-      data: notificaciones,
+      empleadoNombre: `${empleado.nombre} ${empleado.apellidos}`,
     });
-
-    console.log(
-      `[crearNotificacionOnboarding] Notificaciones creadas para ${usuariosHR.length} HR admins`
-    );
   } catch (error) {
     console.error('[crearNotificacionOnboarding] Error:', error);
   }

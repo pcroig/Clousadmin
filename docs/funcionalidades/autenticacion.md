@@ -226,7 +226,7 @@ model Usuario {
   rol             String   @default("empleado") // 'hr_admin', 'manager', 'empleado'
   nombre          String
   apellidos       String
-  avatar          String?
+  avatar          String?  // DEPRECADO: Usar empleado.fotoUrl como fuente única de verdad
   activo          Boolean  @default(true)
   emailVerificado Boolean  @default(false)
   createdAt       DateTime @default(now())
@@ -417,14 +417,18 @@ model Waitlist {
 ### POST /api/empleados/[id]/avatar
 **Auth:** HR Admin o propio empleado
 
-**Body:** FormData con archivo imagen
+**Body:** FormData con archivo imagen (JPG, PNG, WEBP, máx. 2MB)
 
 **Respuesta:**
 ```json
 {
-  "avatarUrl": "string (URL del avatar)"
+  "success": true,
+  "url": "string (URL del avatar)",
+  "message": "Avatar actualizado correctamente"
 }
 ```
+
+**Nota:** Este endpoint actualiza solo `empleado.fotoUrl` como fuente única de verdad. El campo `usuario.avatar` está deprecado y no se actualiza. La sesión JWT copia el avatar desde `empleado.fotoUrl` al hacer login.
 
 ---
 

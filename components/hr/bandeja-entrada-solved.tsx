@@ -15,7 +15,7 @@ interface SolvedStats {
 
 interface SolvedItem {
   id: string;
-  tipo: 'fichaje' | 'ausencia' | 'nomina' | 'contrato';
+  tipo: 'fichaje' | 'ausencia' | 'nomina' | 'contrato' | 'solicitud';
   descripcion: string;
   empleado: string;
   fecha: Date;
@@ -38,6 +38,8 @@ export function BandejaEntradaSolved({ stats, items }: BandejaEntradaSolvedProps
       case 'nomina':
       case 'contrato':
         return <FileCheck className="w-5 h-5 text-gray-600" />;
+      case 'solicitud':
+        return <CheckCircle2 className="w-5 h-5 text-gray-600" />;
       default:
         return <CheckCircle2 className="w-5 h-5 text-gray-600" />;
     }

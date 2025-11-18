@@ -37,7 +37,9 @@ npm run dev
 Toda la documentación está en `docs/`:
 
 - **[docs/README.md](docs/README.md)** - Índice de toda la documentación
-- **[docs/SETUP.md](docs/SETUP.md)** - Guía de configuración completa
+- **[docs/SETUP.md](docs/SETUP.md)** - Guía de configuración completa (incluye autenticación)
+- **[docs/SETUP_GOOGLE_OAUTH.md](docs/SETUP_GOOGLE_OAUTH.md)** - Configuración de Google OAuth y Calendar
+- **[docs/SETUP_PLANTILLAS.md](docs/SETUP_PLANTILLAS.md)** - Configuración del sistema de plantillas
 - **[docs/ARQUITECTURA.md](docs/ARQUITECTURA.md)** - Decisiones técnicas y estructura
 - **[docs/DESIGN_SYSTEM.md](docs/DESIGN_SYSTEM.md)** - Guías de diseño UI/UX y patrones de componentes
 - **[docs/funcionalidades/](docs/funcionalidades/)** - Documentación de cada feature
@@ -191,5 +193,5 @@ Para preguntas o soporte: [info@clousadmin.com](mailto:info@clousadmin.com)
 
 ---
 
-**Versión**: 1.2.0
+**Versión**: 1.3.0
 **Última actualización**: 27 de enero de 2025

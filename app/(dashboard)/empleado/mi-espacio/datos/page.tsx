@@ -10,7 +10,11 @@ import { MiEspacioDatosClient } from './datos-client';
 
 import { UsuarioRol } from '@/lib/constants/enums';
 
-export default async function MiEspacioDatosPage() {
+export default async function MiEspacioDatosPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ modal?: string }>;
+}) {
   const session = await getSession();
 
   if (!session || session.user.rol === UsuarioRol.hr_admin) {
@@ -41,5 +45,24 @@ export default async function MiEspacioDatosPage() {
   // Serializar campos Decimal para Client Component
   const empleadoSerializado = serializeEmpleadoSeguro(empleado);
 
-  return <MiEspacioDatosClient empleado={empleadoSerializado} />;
+  const usuarioSafe = {
+    id: empleado.usuario.id,
+    nombre: empleado.usuario.nombre,
+    apellidos: empleado.usuario.apellidos,
+    email: empleado.usuario.email,
+    rol: empleado.usuario.rol,
+    avatar: empleado.fotoUrl, // Usar empleado.fotoUrl como fuente única de verdad
+    empresaId: empleado.usuario.empresaId,
+  };
+
+  const params = await searchParams;
+  const openDenunciaDialog = params?.modal === 'denuncias';
+
+  return (
+    <MiEspacioDatosClient
+      empleado={empleadoSerializado}
+      usuario={usuarioSafe}
+      openDenunciaDialog={openDenunciaDialog}
+    />
+  );
 }

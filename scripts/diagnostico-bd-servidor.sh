@@ -169,3 +169,4 @@ echo "      GRANT ALL PRIVILEGES ON DATABASE clousadmin TO clousadmin_user;"
 echo "   4. Verifica el .env tiene la DATABASE_URL correcta"
 echo ""
 
+

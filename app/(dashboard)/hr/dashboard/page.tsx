@@ -151,8 +151,9 @@ export default async function HRDashboardPage() {
     },
   });
 
-  // Auto-completed stats - Widget muestra lo auto-completado automáticamente (sin intervención HR)
-  // Fichajes auto-completados (tipo: fichaje_completado, estado: aprobado)
+  // Auto-completed stats - Widget muestra lo aprobado automáticamente por el sistema
+  // NOTA: Las ausencias que NO requieren aprobación (enfermedad, etc.) NO se registran aquí
+  // porque no hubo "aprobación automática", simplemente no necesitaban aprobación
   const fichajesAutoCompletados = await prisma.autoCompletado.count({
     where: {
       empresaId: session.user.empresaId,
@@ -161,20 +162,18 @@ export default async function HRDashboardPage() {
     },
   });
 
-  // Ausencias auto-completadas (aún por implementar - placeholder)
   const ausenciasAutoCompletadas = await prisma.autoCompletado.count({
     where: {
       empresaId: session.user.empresaId,
-      tipo: 'ausencia_completada', // TODO: Implementar cuando se cree esta funcionalidad
+      tipo: 'ausencia_auto_aprobada',
       estado: 'aprobado',
     },
   });
 
-  // Solicitudes auto-completadas (aún por implementar - placeholder)
   const solicitudesAutoCompletadas = await prisma.autoCompletado.count({
     where: {
       empresaId: session.user.empresaId,
-      tipo: 'solicitud_completada', // TODO: Implementar cuando se cree esta funcionalidad
+      tipo: 'solicitud_auto_aprobada',
       estado: 'aprobado',
     },
   });

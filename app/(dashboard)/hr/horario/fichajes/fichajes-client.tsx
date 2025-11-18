@@ -27,6 +27,7 @@ import { EditarFichajeModal } from './editar-fichaje-modal';
 import { RevisionModal } from './revision-modal';
 import { toast } from 'sonner';
 import { EstadoFichaje } from '@/lib/constants/enums';
+import { CompensarHorasDialog } from '@/components/shared/compensar-horas-dialog';
 
 // NUEVO MODELO: Fichaje tiene eventos dentro
 interface FichajeEvento {
@@ -85,6 +86,10 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
   const [jornadasModal, setJornadasModal] = useState(false);
   const [revisionModal, setRevisionModal] = useState(false);
   const [cuadrandoFichajes, setCuadrandoFichajes] = useState(false);
+  const [showCompensarHorasDialog, setShowCompensarHorasDialog] = useState(false);
+  const [periodoCompensar, setPeriodoCompensar] = useState<{ mes: number; anio: number }>(() =>
+    obtenerPeriodoDesdeFecha(new Date())
+  );
   const [editarFichajeModal, setEditarFichajeModal] = useState<{
     open: boolean;
     fichaje: FichajeEventoParaEditar | null;
@@ -355,6 +360,11 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
     }
   }
 
+  const handleAbrirCompensacion = () => {
+    setPeriodoCompensar(obtenerPeriodoDesdeFecha(fechaBase));
+    setShowCompensarHorasDialog(true);
+  };
+
   function getFichajeBadge(estado: string) {
     const variants: Record<string, { label: string; className: string }> = {
       en_curso: { label: 'En curso', className: 'bg-yellow-100 text-yellow-800' },
@@ -415,9 +425,16 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
             Gestionar Jornadas
           </Button>
           <Button
-            onClick={handleCuadrarFichajes}
             variant="outline"
-            className="border-gray-300"
+            className="border-gray-200"
+            onClick={handleAbrirCompensacion}
+          >
+            <Clock className="w-4 h-4 mr-2" />
+            Compensar horas
+          </Button>
+          <Button
+            onClick={handleCuadrarFichajes}
+            className="bg-gray-900 text-white hover:bg-gray-800"
           >
             + Cuadrar fichajes
           </Button>
@@ -676,6 +693,24 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
         }}
         onEditFichaje={handleEditarFichajeDesdeRevision}
       />
+
+      {showCompensarHorasDialog && (
+        <CompensarHorasDialog
+          context="fichajes"
+          mesInicial={periodoCompensar.mes}
+          anioInicial={periodoCompensar.anio}
+          isOpen={showCompensarHorasDialog}
+          onClose={() => setShowCompensarHorasDialog(false)}
+        />
+      )}
     </div>
   );
+}
+
+function obtenerPeriodoDesdeFecha(fecha: Date) {
+  const referencia = new Date(fecha);
+  return {
+    mes: referencia.getMonth() + 1,
+    anio: referencia.getFullYear(),
+  };
 }

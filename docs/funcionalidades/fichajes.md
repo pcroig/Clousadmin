@@ -273,6 +273,16 @@ enum PeriodoMedioDia {
 
 **Nota importante**: Los EVENTOS de fichaje (`FichajeEvento`) NO tienen estado. Solo el fichaje completo (`Fichaje`) tiene estado. `aprobado` y `rechazado` NO son estados, son resultados del workflow que se registran en campos de aprobación (`aprobadoPor`, `fechaAprobacion`, `motivoRechazo`).
 
+### Compensación de Horas Extra desde Fichajes ⭐ NUEVO
+
+- **Botón dedicado en `/hr/horario/fichajes`**: desde la vista admin se puede abrir el diálogo "Compensar horas" sin depender de un evento de nómina.
+- **Selector de período**: HR selecciona mes/año para consultar la bolsa de horas disponible (por defecto el mes mostrado en la tabla).
+- **Fuente de datos**: `GET /api/fichajes/bolsa-horas?mes=X&anio=Y` calcula balances mensuales vía `calcularBalanceMensual` y solo devuelve empleados con saldo positivo.
+- **Acción masiva**: `POST /api/fichajes/compensar-horas` replica la lógica de nóminas:
+  - `tipoCompensacion = 'ausencia'` → crea ausencia auto-aprobada, incrementa saldo (`EmpleadoSaldoAusencias`) y registra `CompensacionHoraExtra`.
+  - `tipoCompensacion = 'nomina'` → crea registro `CompensacionHoraExtra` aprobado para incluirlo en la próxima nómina.
+- **Reutilización**: comparte el mismo servicio `procesarCompensacionHorasExtra` usado por `POST /api/nominas/eventos/[id]/compensar-horas-masivo`, garantizando reglas idénticas (validaciones, auditoría, logs).
+
 ---
 
 ## 5. Edición de fichajes (HR)

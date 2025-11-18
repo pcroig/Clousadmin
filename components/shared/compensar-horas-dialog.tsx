@@ -16,6 +16,21 @@ import { Badge } from '@/components/ui/badge';
 import { AlertCircle, Clock, Search } from 'lucide-react';
 import { toast } from 'sonner';
 
+const MESES = [
+  'Enero',
+  'Febrero',
+  'Marzo',
+  'Abril',
+  'Mayo',
+  'Junio',
+  'Julio',
+  'Agosto',
+  'Septiembre',
+  'Octubre',
+  'Noviembre',
+  'Diciembre',
+];
+
 interface BalanceEmpleado {
   empleado: {
     id: string;
@@ -34,21 +49,29 @@ interface BalanceEmpleado {
   };
 }
 
-interface CompensarHorasDialogProps {
-  eventoId: string;
-  mes: number;
-  anio: number;
-  isOpen: boolean;
-  onClose: () => void;
-}
+type CompensarHorasDialogProps =
+  | {
+      context: 'nominas';
+      eventoId: string;
+      mes: number;
+      anio: number;
+      isOpen: boolean;
+      onClose: () => void;
+    }
+  | {
+    context: 'fichajes';
+    mesInicial: number;
+    anioInicial: number;
+    isOpen: boolean;
+    onClose: () => void;
+  };
 
-export function CompensarHorasDialog({
-  eventoId,
-  mes,
-  anio,
-  isOpen,
-  onClose,
-}: CompensarHorasDialogProps) {
+export function CompensarHorasDialog(props: CompensarHorasDialogProps) {
+  const isContextNominas = props.context === 'nominas';
+  const eventoId = props.context === 'nominas' ? props.eventoId : null;
+  const defaultMes = props.context === 'nominas' ? props.mes : props.mesInicial;
+  const defaultAnio = props.context === 'nominas' ? props.anio : props.anioInicial;
+
   const [balances, setBalances] = useState<BalanceEmpleado[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -57,25 +80,61 @@ export function CompensarHorasDialog({
   const [horasPersonalizadas, setHorasPersonalizadas] = useState<Record<string, string>>({});
   const [searchTerm, setSearchTerm] = useState('');
   const [procesando, setProcesando] = useState(false);
+  const [mesSeleccionado, setMesSeleccionado] = useState(defaultMes);
+  const [anioSeleccionado, setAnioSeleccionado] = useState(defaultAnio);
+
+  // Sync periodo con props segun contexto
+  useEffect(() => {
+    if (props.context === 'nominas') {
+      setMesSeleccionado(props.mes);
+      setAnioSeleccionado(props.anio);
+    }
+  }, [props.context, props.context === 'nominas' ? props.mes : null, props.context === 'nominas' ? props.anio : null]);
 
   useEffect(() => {
-    if (isOpen) {
-      fetchBalances();
+    if (props.context === 'fichajes' && props.isOpen) {
+      setMesSeleccionado(props.mesInicial);
+      setAnioSeleccionado(props.anioInicial);
     }
-  }, [isOpen, eventoId]);
+  }, [
+    props.context,
+    props.isOpen,
+    props.context === 'fichajes' ? props.mesInicial : null,
+    props.context === 'fichajes' ? props.anioInicial : null,
+  ]);
+
+  useEffect(() => {
+    if (!props.isOpen) return;
+    fetchBalances();
+  }, [
+    props.isOpen,
+    props.context,
+    eventoId,
+    mesSeleccionado,
+    anioSeleccionado,
+  ]);
 
   const fetchBalances = async () => {
     setLoading(true);
     try {
-      const response = await fetch(
-        `/api/nominas/eventos/${eventoId}/balance-horas?mes=${mes}&anio=${anio}`
-      );
+      const query = new URLSearchParams({
+        mes: String(mesSeleccionado),
+        anio: String(anioSeleccionado),
+      });
+
+      const endpoint =
+        props.context === 'nominas' && eventoId
+          ? `/api/nominas/eventos/${eventoId}/balance-horas?${query.toString()}`
+          : `/api/fichajes/bolsa-horas?${query.toString()}`;
+
+      const response = await fetch(endpoint);
       const data = await response.json();
       if (response.ok) {
         const positivos = (data.balances || []).filter(
           (item: BalanceEmpleado) => item.balance.balanceTotal > 0
         );
         setBalances(positivos);
+        setSelectedIds(new Set());
       } else {
         toast.error(data.error || 'Error al obtener balances');
       }
@@ -128,7 +187,7 @@ export function CompensarHorasDialog({
 
     setProcesando(true);
     try {
-      const body = {
+      const baseBody = {
         empleadoIds: Array.from(selectedIds),
         tipoCompensacion,
         usarTodasLasHoras,
@@ -142,14 +201,25 @@ export function CompensarHorasDialog({
             ),
       };
 
-      const response = await fetch(
-        `/api/nominas/eventos/${eventoId}/compensar-horas-masivo`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(body),
-        }
-      );
+      const endpoint =
+        props.context === 'nominas' && eventoId
+          ? `/api/nominas/eventos/${eventoId}/compensar-horas-masivo`
+          : `/api/fichajes/compensar-horas`;
+
+      const body =
+        props.context === 'nominas'
+          ? baseBody
+          : {
+              ...baseBody,
+              mes: mesSeleccionado,
+              anio: anioSeleccionado,
+            };
+
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
 
       const data = await response.json();
 
@@ -158,7 +228,7 @@ export function CompensarHorasDialog({
           `Compensación aplicada. Éxitos: ${data.compensacionesCreadas}, Errores: ${data.errores}`
         );
         setSelectedIds(new Set());
-        onClose();
+        props.onClose();
       } else {
         toast.error(data.error || 'Error al compensar horas');
       }
@@ -170,15 +240,45 @@ export function CompensarHorasDialog({
     }
   };
 
+  const periodoLabel = `${MESES[mesSeleccionado - 1]} ${anioSeleccionado}`;
+
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={props.isOpen} onOpenChange={props.onClose}>
       <DialogContent className="max-w-4xl">
         <DialogHeader>
           <DialogTitle>Compensar Horas Extra</DialogTitle>
           <DialogDescription>
-            Selecciona los empleados y define cómo compensar las horas extra de {mes}/{anio}
+            Selecciona los empleados y define cómo compensar las horas extra de {periodoLabel}
           </DialogDescription>
         </DialogHeader>
+
+        {props.context === 'fichajes' && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
+            <Select
+              value={String(mesSeleccionado)}
+              onValueChange={(value) => setMesSeleccionado(Number(value))}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Mes" />
+              </SelectTrigger>
+              <SelectContent>
+                {MESES.map((mes, index) => (
+                  <SelectItem key={mes} value={String(index + 1)}>
+                    {mes}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Input
+              type="number"
+              min={2020}
+              max={2100}
+              value={anioSeleccionado}
+              onChange={(e) => setAnioSeleccionado(Number(e.target.value) || anioSeleccionado)}
+              placeholder="Año"
+            />
+          </div>
+        )}
 
         <div className="space-y-4 mt-4">
           {/* Configuración */}
@@ -304,11 +404,11 @@ export function CompensarHorasDialog({
           </div>
 
           <div className="flex justify-end gap-3 pt-4 border-t">
-            <Button variant="outline" onClick={onClose}>
+            <Button variant="outline" onClick={props.onClose}>
               Cancelar
             </Button>
             <Button onClick={handleCompensar} disabled={procesando || selectedIds.size === 0}>
-              Aplicar compensación
+              {procesando ? 'Procesando...' : 'Aplicar compensación'}
             </Button>
           </div>
         </div>
@@ -316,5 +416,4 @@ export function CompensarHorasDialog({
     </Dialog>
   );
 }
-
 

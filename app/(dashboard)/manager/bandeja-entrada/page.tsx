@@ -310,10 +310,12 @@ export default async function ManagerBandejaEntradaPage({
     tipo: item.tipo.includes('fichaje')
       ? ('fichaje' as const)
       : item.tipo.includes('nomina')
-      ? ('nomina' as const)
-      : item.tipo.includes('contrato')
-      ? ('contrato' as const)
-      : ('ausencia' as const),
+        ? ('nomina' as const)
+        : item.tipo.includes('contrato')
+          ? ('contrato' as const)
+          : item.tipo.includes('solicitud')
+            ? ('solicitud' as const)
+            : ('ausencia' as const),
     descripcion: item.tipo,
     empleado: `${item.empleado.nombre} ${item.empleado.apellidos}`,
     fecha: item.aprobadoEn || item.createdAt,

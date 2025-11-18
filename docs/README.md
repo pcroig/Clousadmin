@@ -25,8 +25,10 @@ docs/
 ├── TROUBLESHOOTING_PROD.md           # Troubleshooting en producción
 ├── MIGRACION_DOCUMENTOS_S3.md        # Migración de documentos a S3
 ├── RESUMEN_SEGURIDAD_IMPLEMENTADA.md # Estado de medidas de seguridad
-├── SETUP.md                          # Guía de configuración inicial
-├── SETUP_AUTENTICACION.md            # Configuración de autenticación (JWT)
+├── SETUP.md                          # Guía de configuración inicial (incluye autenticación)
+├── SETUP_GOOGLE_OAUTH.md            # Configuración de Google OAuth y Calendar
+├── SETUP_PLANTILLAS.md              # Configuración del sistema de plantillas
+├── MOBILE_OPTIMIZACION.md           # Sistema de diseño mobile + plan de mejoras + guía rápida
 ├── TROUBLESHOOTING.md                # Resolución de problemas recurrentes
 │
 ├── daily/                            # Logs diarios y consolidado por mes
@@ -75,10 +77,13 @@ docs/
 ## 📖 Guías rápidas
 
 ### Para empezar
-1. Lee `SETUP.md` para configurar el proyecto
+1. Lee `SETUP.md` para configurar el proyecto (incluye autenticación)
 2. Revisa `ARQUITECTURA.md` para entender la estructura vigente
 3. Consulta `DESIGN_SYSTEM.md` para UI/UX y patrones de componentes
 4. Revisa `PATRONES_CODIGO.md` para convenciones de TypeScript/Next.js
+5. Para Google OAuth: `SETUP_GOOGLE_OAUTH.md`
+6. Para plantillas: `SETUP_PLANTILLAS.md`
+7. Para optimizaciones mobile: `MOBILE_OPTIMIZACION.md`
 
 ### Para desarrollar
 1. Las **máximas de desarrollo** están en `.cursorrules`
@@ -86,12 +91,13 @@ docs/
 3. Los **patrones de API** están en `API_REFACTORING.md` (refactorización 2025-01-27)
 4. La **documentación de funcionalidades** está en `funcionalidades/`
 5. Los **logs diarios** y consolidado mensual están en `daily/`
-6. El **análisis completo de rendimiento** está en `ANALISIS_RENDIMIENTO_COMPLETO.md` (132 problemas identificados)
-7. Las **optimizaciones en curso** están en `OPTIMIZACION_PENDIENTE.md` y `PLAN_OPTIMIZACION_UNIFICADO.md`
+6. El **análisis completo de rendimiento** está en `historial/ANALISIS_RENDIMIENTO_COMPLETO.md` (referencia histórica)
 
 ### Para desplegar
 1. Sigue `SETUP.md` sección "Despliegue"
 2. Verifica las variables de entorno en `.env.example` y `ia/ENV_VARIABLES.md` si aplica
+3. Consulta `DEPLOY_HETZNER.md` para despliegue en producción
+4. Revisa `PRODUCCION_CHECKLIST.md` antes de desplegar
 
 ---
 

@@ -77,6 +77,7 @@ Algunos tipos requieren **acciones específicas** del usuario:
 | `campana_vacaciones_creada` | Selección de días | `requiresSelection: true` | "Seleccionar días preferidos" |
 | `campana_vacaciones_cuadrada` | Revisar propuesta | `requiresModal: true` | "Revisar propuesta" |
 | `complementos_pendientes` | Completar complementos | `requiresModal: true` | "Completar complementos" |
+| `documento_pendiente_rellenar` | Completar formulario | `requiresModal: true` | "Completar ahora" |
 | `documento_solicitado` | Subir documento | - | "Subir documento" |
 
 ---
@@ -102,6 +103,7 @@ Algunos tipos requieren **acciones específicas** del usuario:
 | `cambio_manager` | Generales | Empleado + Managers | Alta | `/app/api/empleados/[id]/route.ts` |
 | `asignado_equipo` | Generales | Empleado + Manager | Normal | `/app/api/empleados/[id]/route.ts` |
 | `solicitud_creada` | Generales | HR Admin | Alta | `/app/api/solicitudes/route.ts` |
+| `nomina_validada` | Nóminas | HR Admin | Normal | `/app/api/nominas/eventos/[id]/validar-complementos/route.ts` |
 
 ### Fase 2.5 - Tipos Especiales (✅ COMPLETADO)
 
@@ -116,9 +118,9 @@ Algunos tipos requieren **acciones específicas** del usuario:
 
 ## 📊 Estadísticas
 
-- **Total Implementado**: 15 tipos de notificaciones
+- **Total Implementado**: 25 tipos de notificaciones activas
 - **Categorías**: 5 (Ausencias, Fichajes, Nóminas, Fichas, Generales)
-- **Tipos Especiales**: 3 (con acciones requeridas)
+- **Tipos Especiales**: 5 (con acciones requeridas)
 - **Prioridades**:
   - Alta: 4 tipos
   - Normal: 11 tipos
@@ -141,10 +143,13 @@ Algunos tipos requieren **acciones específicas** del usuario:
 | `fichaje_resuelto` | Fichajes | ❌ | `Clock` |
 | `nomina_disponible` | Nóminas | ❌ | `DollarSign` |
 | `nomina_error` | Nóminas | ❌ | `AlertCircle` |
+| `nomina_validada` | Nóminas | ❌ | `DollarSign` |
 | `complementos_pendientes` | Nóminas | ✅ Modal | `DollarSign` |
 | `documento_solicitado` | Fichas | ✅ Subir | `FileText` |
 | `documento_subido` | Fichas | ❌ | `FileText` |
 | `documento_rechazado` | Fichas | ❌ | `FileText` |
+| `documento_generado` | Fichas | ❌ | `FileText` |
+| `documento_pendiente_rellenar` | Fichas | ✅ Modal | `FileText` |
 | `firma_pendiente` | Fichas | ✅ Firma | `FileSignature` |
 | `firma_completada` | Fichas | ❌ | `FileSignature` |
 | `empleado_creado` | Fichas | ❌ | `FileText` |
@@ -159,6 +164,22 @@ Algunos tipos requieren **acciones específicas** del usuario:
 | `denuncia_recibida` | Generales | ❌ | `AlertCircle` |
 | `denuncia_actualizada` | Generales | ❌ | `AlertCircle` |
 | `onboarding_completado` | Generales | ❌ | `Bell` |
+
+---
+
+## 🔁 Auto-aprobado vs. Eventos sin aprobación
+
+El servicio distingue dos casuísticas para mantener consistencia en UI y auditoría:
+
+| Caso | Ejemplos | ¿Va al widget "Auto-completed"? | ¿Genera notificación? | ¿Destinatarios? |
+|------|----------|---------------------------------|------------------------|-----------------|
+| **No requiere aprobación** | `enfermedad`, `enfermedad_familiar`, `maternidad_paternidad` | ❌ (no hubo una aprobación) | ✅ (`ausencia_aprobada` con `autoAprobada: true`) | HR + Manager |
+| **Auto-aprobado** | Solicitudes y ausencias que estaban `pendiente` y se aprobaron automáticamente (IA, batch, cron) | ✅ (`autoCompletado.tipo` = `ausencia_auto_aprobada`, `solicitud_auto_aprobada`, `fichaje_completado`) | ✅ (empleado afectado) | Empleado (y HR/Manager cuando aplique) |
+
+### Reglas prácticas
+- Registrar en `auto_completados` **solo** cuando el sistema toma una decisión de aprobación en nombre de HR/Manager.
+- Las ausencias que nunca requirieron aprobación se notifican a HR/Manager pero no se registran como auto-completadas.
+- Los widgets consumen `auto_completados`, por lo que cualquier nueva feature de auto-aprobación debe utilizar `lib/auto-completado.ts`.
 
 ---
 
@@ -294,6 +315,23 @@ const IconComponent = obtenerIconoPorTipo(tipo); // Calendar
 // Renderizar
 <IconComponent className="w-5 h-5 text-tertiary" />
 ```
+
+### 4. Notificar generación masiva de documentos
+
+```typescript
+import { crearNotificacionDocumentoGeneracionLote } from '@/lib/notificaciones';
+
+await crearNotificacionDocumentoGeneracionLote(prisma, {
+  empresaId: empresa.id,
+  usuarioId: session.user.id,
+  jobId: job.id,
+  total,
+  exitosos,
+  fallidos,
+});
+```
+
+El helper determina automáticamente si el lote fue completado, fallido o parcial y envía la notificación correspondiente (tipo `documento_generado`) al usuario que lanzó el proceso.
 
 ---
 

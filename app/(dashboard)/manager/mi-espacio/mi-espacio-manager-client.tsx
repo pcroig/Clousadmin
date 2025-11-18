@@ -6,16 +6,14 @@
 
 import { useState } from 'react';
 import { Flag } from 'lucide-react';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { AvatarEditButton } from '@/components/shared/avatar-edit-button';
 import { Button } from '@/components/ui/button';
 import { GeneralTab } from '@/components/shared/mi-espacio/general-tab';
 import { FichajesTab } from '@/components/shared/mi-espacio/fichajes-tab';
 import { ContratosTab } from '@/components/shared/mi-espacio/contratos-tab';
 import { DocumentosTab } from '@/components/shared/mi-espacio/documentos-tab';
 import { AusenciasTab } from '@/components/shared/mi-espacio/ausencias-tab';
-import { getAvatarStyle } from '@/lib/design-system';
 import { DenunciaDialog } from '@/components/empleado/denuncia-dialog';
+import { ProfileAvatar } from '@/components/shared/profile-avatar';
 import type { MiEspacioEmpleado, Usuario } from '@/types/empleado';
 
 interface MiEspacioManagerClientProps {
@@ -26,14 +24,6 @@ interface MiEspacioManagerClientProps {
 export function MiEspacioManagerClient({ empleado, usuario }: MiEspacioManagerClientProps) {
   const [activeTab, setActiveTab] = useState('general');
   const [denunciaDialogOpen, setDenunciaDialogOpen] = useState(false);
-
-  const getInitials = () => {
-    const nombreInicial = empleado.nombre?.charAt(0) ?? '';
-    const apellidoInicial = empleado.apellidos?.charAt(0) ?? '';
-    return `${nombreInicial}${apellidoInicial}`.toUpperCase() || '??';
-  };
-
-  const avatarStyle = getAvatarStyle(`${empleado.nombre} ${empleado.apellidos}`);
 
   const tabs = [
     { id: 'general', label: 'General' },
@@ -48,27 +38,14 @@ export function MiEspacioManagerClient({ empleado, usuario }: MiEspacioManagerCl
       {/* Header con avatar y nombre */}
       <div className="mb-6">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div className="relative">
-              <Avatar className="h-16 w-16">
-                {empleado.fotoUrl && <AvatarImage src={empleado.fotoUrl} />}
-                <AvatarFallback
-                  className="text-lg font-semibold uppercase"
-                  style={avatarStyle}
-                >
-                  {getInitials()}
-                </AvatarFallback>
-              </Avatar>
-              <AvatarEditButton empleadoId={empleado.id} />
-            </div>
-
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">
-                {empleado.nombre} {empleado.apellidos}
-              </h1>
-              <p className="text-sm text-gray-500">{usuario.email}</p>
-            </div>
-          </div>
+          <ProfileAvatar
+            empleadoId={empleado.id}
+            nombre={empleado.nombre ?? ''}
+            apellidos={empleado.apellidos}
+            email={usuario.email}
+            fotoUrl={empleado.fotoUrl}
+            showEditButton
+          />
 
           <div className="flex items-center gap-2">
             {/* Botón Guardar - visible en General */}

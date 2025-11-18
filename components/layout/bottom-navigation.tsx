@@ -50,11 +50,11 @@ export function BottomNavigation({ rol }: BottomNavigationProps) {
       isActive: (path) => path.includes('/empleado/mi-espacio/fichajes'),
     },
     {
-      name: 'Perfil',
-      href: '/empleado/mi-perfil',
+      name: 'Mi espacio',
+      href: '/empleado/mi-espacio/datos',
       icon: User,
       isActive: (path) =>
-        path.startsWith('/empleado/mi-perfil') ||
+        path.startsWith('/empleado/mi-espacio/datos') ||
         path.includes('/empleado/mi-espacio/contratos') ||
         path.includes('/empleado/mi-espacio/documentos'),
     },

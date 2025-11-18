@@ -80,24 +80,11 @@ export async function POST(
     const initials = `${empleado.nombre.charAt(0)}${empleado.apellidos.charAt(0)}`;
     const placeholderUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(initials)}&background=random&size=256`;
 
-    // Actualizar fotoUrl y mantener el avatar del usuario sincronizado
-    const updates = [
-      prisma.empleado.update({
-        where: { id },
-        data: { fotoUrl: placeholderUrl },
-      }),
-    ];
-
-    if (empleado.usuarioId) {
-      updates.push(
-        prisma.usuario.update({
-          where: { id: empleado.usuarioId },
-          data: { avatar: placeholderUrl },
-        })
-      );
-    }
-
-    await prisma.$transaction(updates);
+    // Actualizar solo empleado.fotoUrl como fuente única de verdad
+    await prisma.empleado.update({
+      where: { id },
+      data: { fotoUrl: placeholderUrl },
+    });
 
     return successResponse({
       success: true,

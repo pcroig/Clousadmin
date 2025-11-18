@@ -153,7 +153,7 @@ export async function signupEmpresaAction(
         rol: result.usuario.rol,
         empresaId: result.usuario.empresaId,
         empleadoId: result.empleado.id,
-        avatar: result.usuario.avatar,
+        avatar: result.empleado.fotoUrl, // Usar empleado.fotoUrl como fuente de verdad
         activo: result.usuario.activo,
       },
     });

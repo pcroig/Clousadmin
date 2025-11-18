@@ -11,6 +11,11 @@ import { descargarDocumento, subirDocumento } from '@/lib/s3';
 import { prisma } from '@/lib/prisma';
 import { format } from 'date-fns';
 import { convertDocxFromS3ToPdf } from './docx-to-pdf';
+import {
+  crearNotificacionDocumentoGeneradoEmpleado,
+  crearNotificacionDocumentoPendienteRellenar,
+  crearNotificacionFirmaPendiente,
+} from '@/lib/notificaciones';
 
 const DOCX_MIME_TYPE = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 
@@ -318,37 +323,24 @@ export async function generarDocumentoDesdePlantilla(
 
     // 12. Notificar al empleado (si configurado)
     if (configuracion.notificarEmpleado && !permiteRellenar) {
-      await prisma.notificacion.create({
-        data: {
-          empresaId: empleado.empresaId,
-          usuarioId: empleado.usuarioId,
-          tipo: 'info',
-          titulo: 'Nuevo documento generado',
-          mensaje: `Se ha generado un nuevo documento: ${nombreDocumentoPdf}`,
-          metadata: {
-            documentoId: documento.id,
-            plantillaId: plantilla.id,
-          },
-        },
+      await crearNotificacionDocumentoGeneradoEmpleado(prisma, {
+        empresaId: empleado.empresaId,
+        empleadoId,
+        documentoId: documento.id,
+        documentoNombre: nombreDocumentoPdf,
+        plantillaId: plantilla.id,
+        documentoGeneradoId: documentoGenerado.id,
       });
     }
 
     // Notificación especial si el documento requiere ser rellenado por el empleado
     if (permiteRellenar && empleado.usuarioId) {
-      await prisma.notificacion.create({
-        data: {
-          empresaId: empleado.empresaId,
-          usuarioId: empleado.usuarioId,
-          tipo: 'pendiente',
-          titulo: 'Documento pendiente de completar',
-          mensaje: `Completa los campos del documento ${nombreDocumentoPdf} antes de firmarlo.`,
-          metadata: {
-            tipo: 'pendiente_rellenar',
-            documentoGeneradoId: documentoGenerado.id,
-            documentoId: documento.id,
-            url: `/empleado/documentos/pendientes/${documentoGenerado.id}`,
-          },
-        },
+      await crearNotificacionDocumentoPendienteRellenar(prisma, {
+        empresaId: empleado.empresaId,
+        empleadoId,
+        documentoGeneradoId: documentoGenerado.id,
+        documentoId: documento.id,
+        documentoNombre: nombreDocumentoPdf,
       });
     }
 
@@ -375,18 +367,13 @@ export async function generarDocumentoDesdePlantilla(
       });
 
       // Notificar sobre firma pendiente
-      await prisma.notificacion.create({
-        data: {
-          empresaId: empleado.empresaId,
-          usuarioId: empleado.usuarioId,
-          tipo: 'warning',
-          titulo: 'Documento pendiente de firma',
-          mensaje: configuracion.mensajeFirma || `Por favor firma el documento: ${nombreDocumentoPdf}`,
-          metadata: {
-            firmaId: solicitudFirma.id,
-            documentoId: documento.id,
-          },
-        },
+      await crearNotificacionFirmaPendiente(prisma, {
+        empresaId: empleado.empresaId,
+        empleadoId,
+        firmaId: solicitudFirma.id,
+        solicitudId: solicitudFirma.id,
+        documentoId: documento.id,
+        documentoNombre: nombreDocumentoPdf,
       });
     }
 

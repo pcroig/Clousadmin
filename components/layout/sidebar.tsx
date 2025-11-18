@@ -208,8 +208,8 @@ export function Sidebar({ rol, usuario }: SidebarProps) {
       icon: Inbox,
     },
     {
-      name: 'Mi perfil',
-      href: '/empleado/mi-perfil',
+      name: 'Mi espacio',
+      href: '/empleado/mi-espacio/datos',
       icon: User,
     },
     {

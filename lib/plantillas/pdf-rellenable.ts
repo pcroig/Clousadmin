@@ -11,6 +11,11 @@ import { resolverVariables } from './ia-resolver';
 import { descargarDocumento, subirDocumento } from '@/lib/s3';
 import { prisma } from '@/lib/prisma';
 import { sanitizarNombreArchivo } from './sanitizar';
+import {
+  crearNotificacionDocumentoGeneradoEmpleado,
+  crearNotificacionDocumentoPendienteRellenar,
+  crearNotificacionFirmaPendiente,
+} from '@/lib/notificaciones';
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -522,36 +527,23 @@ export async function generarDocumentoDesdePDFRellenable(
 
     // 11. Notificaciones y firma (igual que DOCX)
     if (configuracion.notificarEmpleado && !permiteRellenar) {
-      await prisma.notificacion.create({
-        data: {
-          empresaId: empleado.empresaId,
-          usuarioId: empleado.usuarioId,
-          tipo: 'info',
-          titulo: 'Nuevo documento generado',
-          mensaje: `Se ha generado un nuevo documento: ${nombreDocumento}`,
-          metadata: {
-            documentoId: documento.id,
-            plantillaId: plantilla.id,
-          },
-        },
+      await crearNotificacionDocumentoGeneradoEmpleado(prisma, {
+        empresaId: empleado.empresaId,
+        empleadoId,
+        documentoId: documento.id,
+        documentoNombre: nombreDocumento,
+        plantillaId: plantilla.id,
+        documentoGeneradoId: documentoGenerado.id,
       });
     }
 
     if (permiteRellenar && empleado.usuarioId) {
-      await prisma.notificacion.create({
-        data: {
-          empresaId: empleado.empresaId,
-          usuarioId: empleado.usuarioId,
-          tipo: 'pendiente',
-          titulo: 'Completa el formulario pendiente',
-          mensaje: `Rellena los campos del documento ${nombreDocumento} para continuar.`,
-          metadata: {
-            tipo: 'pendiente_rellenar',
-            documentoGeneradoId: documentoGenerado.id,
-            documentoId: documento.id,
-            url: `/empleado/documentos/pendientes/${documentoGenerado.id}`,
-          },
-        },
+      await crearNotificacionDocumentoPendienteRellenar(prisma, {
+        empresaId: empleado.empresaId,
+        empleadoId,
+        documentoGeneradoId: documentoGenerado.id,
+        documentoId: documento.id,
+        documentoNombre: nombreDocumento,
       });
     }
 
@@ -575,18 +567,13 @@ export async function generarDocumentoDesdePDFRellenable(
         },
       });
 
-      await prisma.notificacion.create({
-        data: {
-          empresaId: empleado.empresaId,
-          usuarioId: empleado.usuarioId,
-          tipo: 'warning',
-          titulo: 'Documento pendiente de firma',
-          mensaje: configuracion.mensajeFirma || `Por favor firma el documento: ${nombreDocumento}`,
-          metadata: {
-            firmaId: solicitudFirma.id,
-            documentoId: documento.id,
-          },
-        },
+      await crearNotificacionFirmaPendiente(prisma, {
+        empresaId: empleado.empresaId,
+        empleadoId,
+        firmaId: solicitudFirma.id,
+        solicitudId: solicitudFirma.id,
+        documentoId: documento.id,
+        documentoNombre: nombreDocumento,
       });
     }
 

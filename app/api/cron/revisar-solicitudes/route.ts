@@ -19,12 +19,11 @@ import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { EstadoSolicitud } from '@/lib/constants/enums';
 import { clasificarSolicitud } from '@/lib/ia';
-import {
-  crearNotificacionSolicitudAprobada,
-  crearNotificacionSolicitudRequiereRevision,
-} from '@/lib/notificaciones';
+import { crearNotificacionSolicitudRequiereRevision } from '@/lib/notificaciones';
 import { initCronLogger } from '@/lib/cron/logger';
 import { aplicarCambiosSolicitud } from '@/lib/solicitudes/aplicar-cambios';
+import { registrarAutoCompletadoSolicitud } from '@/lib/auto-completado';
+import { Prisma } from '@prisma/client';
 
 // Configuración: periodo en horas para considerar solicitudes elegibles
 const PERIODO_REVISION_HORAS = parseInt(process.env.SOLICITUDES_PERIODO_REVISION_HORAS || '48');
@@ -161,13 +160,14 @@ export async function POST(request: NextRequest) {
             }
           });
 
-          // Crear notificación al empleado
-          await crearNotificacionSolicitudAprobada(prisma, {
-            solicitudId: solicitud.id,
+          await registrarAutoCompletadoSolicitud(prisma, {
             empresaId: solicitud.empresaId,
+            solicitudId: solicitud.id,
             empleadoId: solicitud.empleadoId,
-            tipo: solicitud.tipo,
-            aprobadoPor: 'ia',
+            tipoSolicitud: solicitud.tipo,
+            camposCambiados: solicitud.camposCambiados as Prisma.JsonValue,
+            aprobadoPor: 'cron_revisar_solicitudes',
+            origen: 'cron_revisar_solicitudes',
           });
 
           console.log(`[CRON Revisar Solicitudes] Solicitud ${solicitud.id} auto-aprobada`);

@@ -22,3 +22,4 @@ export function serializeEmpleadoSeguro<T extends Partial<Empleado>>(empleado: T
 }
 
 
+

@@ -10,6 +10,7 @@ import {
   sincronizarEstadoEvento,
 } from '@/lib/calculos/sync-estados-nominas';
 import { NOMINA_ESTADOS, EVENTO_ESTADOS } from '@/lib/constants/nomina-estados';
+import { crearNotificacionNominaDisponible } from '@/lib/notificaciones';
 
 // ========================================
 // POST /api/nominas/eventos/[id]/publicar
@@ -83,14 +84,6 @@ export async function POST(
       );
     }
 
-    const empleadosIds = nominasPublicables.map((n) => n.empleadoId);
-    const usuarios = await prisma.usuario.findMany({
-      where: {
-        empleadoId: { in: empleadosIds },
-        activo: true,
-      },
-    });
-
     const ahora = new Date();
 
     await prisma.nomina.updateMany({
@@ -107,16 +100,14 @@ export async function POST(
       },
     });
 
-    const notificaciones = await Promise.all(
-      usuarios.map((usuario) =>
-        prisma.notificacion.create({
-          data: {
-            usuarioId: usuario.id,
-            tipo: 'nomina_publicada',
-            titulo: `Nómina ${evento.mes}/${evento.anio} disponible`,
-            mensaje: `Tu nómina de ${getNombreMes(evento.mes)} ${evento.anio} ya está disponible en tu carpeta de documentos.`,
-            eventoNominaId: evento.id,
-          },
+    await Promise.all(
+      nominasPublicables.map((nomina) =>
+        crearNotificacionNominaDisponible(prisma, {
+          nominaId: nomina.id,
+          empresaId: session.user.empresaId,
+          empleadoId: nomina.empleadoId,
+          mes: evento.mes,
+          año: evento.anio,
         })
       )
     );
@@ -125,7 +116,7 @@ export async function POST(
 
     return NextResponse.json({
       nominasPublicadas: nominasPublicables.length,
-      empleadosNotificados: notificaciones.length,
+      empleadosNotificados: nominasPublicables.length,
       mes: evento.mes,
       anio: evento.anio,
     });
@@ -138,11 +129,3 @@ export async function POST(
   }
 }
 
-// Helper: Obtener nombre del mes en español
-function getNombreMes(mes: number): string {
-  const meses = [
-    'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
-    'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
-  ];
-  return meses[mes - 1] || 'Mes desconocido';
-}

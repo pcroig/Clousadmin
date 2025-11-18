@@ -19,10 +19,8 @@ import {
   createdResponse,
   badRequestResponse,
 } from '@/lib/api-handler';
-import {
-  crearNotificacionAusenciaSolicitada,
-  crearNotificacionAusenciaAutoAprobada,
-} from '@/lib/notificaciones';
+import { crearNotificacionAusenciaSolicitada, crearNotificacionAusenciaAutoAprobada } from '@/lib/notificaciones';
+import { registrarAutoCompletadoAusencia } from '@/lib/auto-completado';
 
 import { EstadoAusencia, UsuarioRol, TipoAusencia } from '@/lib/constants/enums';
 import { determinarEstadoTrasAprobacion } from '@/lib/calculos/ausencias';
@@ -314,18 +312,22 @@ export async function POST(req: NextRequest) {
 
     // Actualizar saldo y crear notificaciones según si fue auto-aprobada o requiere aprobación
     if (esAutoAprobable) {
-      // Si es auto-aprobable y descuenta saldo, actualizar saldo como "aprobar" (pendientes -> usados)
+      // Ausencias que NO requieren aprobación (enfermedad, etc.)
+      // NO se registran en AutoCompletado porque no hubo "aprobación automática"
+      // Solo se notifica a HR/Manager para información
+      
+      // Si descuenta saldo, actualizar saldo como "aprobar" (pendientes -> usados)
       if (descuentaSaldo) {
         const año = fechaInicio.getFullYear();
         await actualizarSaldo(
           session.user.empleadoId,
           año,
-          'aprobar', // ✅ Auto-aprobada: pasar directamente a usados
+          'aprobar', // ✅ Directo a usados porque no requiere aprobación
           diasSolicitadosFinal
         );
       }
 
-      // Notificar al empleado que su ausencia fue auto-aprobada
+      // Notificar a HR/Manager que se registró una ausencia (NO al empleado)
       await crearNotificacionAusenciaAutoAprobada(prisma, {
         ausenciaId: ausencia.id,
         empresaId: session.user.empresaId,

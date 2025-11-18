@@ -25,7 +25,7 @@ import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { UploadNominasModal } from '@/components/payroll/upload-nominas-modal';
 import { ValidarComplementosDialog } from '@/components/payroll/validar-complementos-dialog';
-import { CompensarHorasDialog } from '@/components/payroll/compensar-horas-dialog';
+import { CompensarHorasDialog } from '@/components/shared/compensar-horas-dialog';
 import { AlertasSummary } from '@/components/payroll/alertas-summary';
 import { Checkbox } from '@/components/ui/checkbox';
 import { DetailsPanel } from '@/components/shared/details-panel';
@@ -864,6 +864,7 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
       {/* Compensar Horas Dialog */}
       {eventoCompensarContext && (
         <CompensarHorasDialog
+          context="nominas"
           eventoId={eventoCompensarContext.eventoId}
           mes={eventoCompensarContext.mes}
           anio={eventoCompensarContext.anio}

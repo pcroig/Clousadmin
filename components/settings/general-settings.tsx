@@ -10,8 +10,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Switch } from '@/components/ui/switch';
+import { LoadingButton } from '@/components/shared/loading-button';
 import { toast } from 'sonner';
-import { BellRing, CalendarClock, ShieldAlert, ShieldCheck } from 'lucide-react';
+import { BellRing, CalendarClock, FileSpreadsheet, ShieldAlert, ShieldCheck } from 'lucide-react';
 
 interface GeneralSettingsProps {
   usuario: {
@@ -27,6 +28,7 @@ export function GeneralSettings({ usuario }: GeneralSettingsProps) {
   const [incidentAlerts, setIncidentAlerts] = useState(false);
   const [showDerechoDialog, setShowDerechoDialog] = useState(false);
   const [isRequestingDerecho, setIsRequestingDerecho] = useState(false);
+  const [isExportingDatos, setIsExportingDatos] = useState(false);
 
   const formattedLastAccess = useMemo(() => {
     if (!usuario.ultimoAcceso) {
@@ -58,6 +60,39 @@ export function GeneralSettings({ usuario }: GeneralSettingsProps) {
         return 'Administrador de Plataforma';
       default:
         return rol;
+    }
+  };
+
+  const handleExportDatos = async () => {
+    setIsExportingDatos(true);
+    try {
+      const response = await fetch('/api/empleados/export/me');
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null);
+        throw new Error(payload?.error || 'No se pudo generar la exportación');
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `datos-personales-${new Date().toISOString().split('T')[0]}.xlsx`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      toast.success('Exportación generada correctamente');
+    } catch (error) {
+      console.error('Exportación datos personales:', error);
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : 'Hubo un error generando la exportación de datos'
+      );
+    } finally {
+      setIsExportingDatos(false);
     }
   };
 
@@ -151,6 +186,35 @@ export function GeneralSettings({ usuario }: GeneralSettingsProps) {
 
       <Card>
         <CardHeader className="flex items-start gap-3">
+          <div className="rounded-md bg-emerald-50 p-2">
+            <FileSpreadsheet className="h-5 w-5 text-emerald-600" />
+          </div>
+          <div>
+            <CardTitle>Exportar tus datos</CardTitle>
+            <CardDescription>
+              Descarga un Excel con tu información personal, fichajes, ausencias y contratos vinculados.
+            </CardDescription>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-gray-600">
+            El archivo incluye todas las tablas relevantes para el cumplimiento del derecho de acceso (GDPR).
+            Guárdalo en un lugar seguro: contiene información sensible.
+          </p>
+          <div className="flex justify-end">
+            <LoadingButton
+              variant="outline"
+              loading={isExportingDatos}
+              onClick={handleExportDatos}
+            >
+              Descargar Excel
+            </LoadingButton>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="flex items-start gap-3">
           <div className="rounded-md bg-red-50 p-2">
             <ShieldAlert className="h-5 w-5 text-red-600" />
           </div>
@@ -164,7 +228,7 @@ export function GeneralSettings({ usuario }: GeneralSettingsProps) {
         <CardContent className="space-y-4">
           <p className="text-sm text-gray-600">
             Registramos tu petición y avisamos automáticamente a RR.HH. para que analice la solicitud.
-            Mientras tanto, puedes exportar tus datos desde la sección de privacidad si lo deseas.
+            Te recomendamos descargar antes una copia de tus datos con la exportación anterior.
           </p>
           <div className="flex justify-end">
             <Button variant="destructive" onClick={() => setShowDerechoDialog(true)}>

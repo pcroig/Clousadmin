@@ -5,14 +5,15 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { Prisma } from '@prisma/client';
 import {
   requireAuth,
   handleApiError,
   successResponse,
 } from '@/lib/api-handler';
 import { actualizarCalculosFichaje } from '@/lib/calculos/fichajes';
-import { crearNotificacionSolicitudAprobada } from '@/lib/notificaciones';
 import { EstadoFichaje, EstadoSolicitud } from '@/lib/constants/enums';
+import { registrarAutoCompletadoSolicitud } from '@/lib/auto-completado';
 
 // POST /api/solicitudes/procesar-fichajes - Procesar solicitudes de fichaje manual
 export async function POST(request: NextRequest) {
@@ -20,6 +21,7 @@ export async function POST(request: NextRequest) {
     // Verificar autenticación (puede ser ejecutado por cron o por HR admin)
     const authResult = await requireAuth(request);
     if (authResult instanceof NextResponse) return authResult;
+    const { session } = authResult;
 
     console.info('[Procesar Fichajes] Iniciando procesamiento de solicitudes pendientes');
 
@@ -157,12 +159,14 @@ export async function POST(request: NextRequest) {
           },
         });
 
-        // 5. Crear notificación al empleado
-        await crearNotificacionSolicitudAprobada({
+        await registrarAutoCompletadoSolicitud(prisma, {
+          empresaId: solicitud.empleado.empresaId,
           solicitudId: solicitud.id,
           empleadoId: solicitud.empleadoId,
-          empresaId: solicitud.empleado.empresaId,
-          aprobadoPor: 'ia', // Auto-aprobada por el sistema
+          tipoSolicitud: solicitud.tipo,
+          camposCambiados: solicitud.camposCambiados as Prisma.JsonValue,
+          aprobadoPor: authResult.session.user.id,
+          origen: 'procesar_fichajes',
         });
 
         procesadas++;

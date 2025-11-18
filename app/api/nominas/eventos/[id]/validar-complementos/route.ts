@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { z } from 'zod';
+import { crearNotificacionNominaValidada } from '@/lib/notificaciones';
 
 const ValidarComplementosSchema = z.object({
   complementoIds: z.array(z.string()),
@@ -117,6 +118,19 @@ export async function POST(
         },
       });
     }
+
+    const validadorNombre = [session.user.nombre, session.user.apellidos]
+      .filter(Boolean)
+      .join(' ')
+      .trim() || session.user.email;
+
+    await crearNotificacionNominaValidada(prisma, {
+      empresaId: session.user.empresaId,
+      eventoNominaId: eventoId,
+      validadorNombre,
+      complementosCount: data.complementoIds.length,
+      accion: data.accion,
+    });
 
     return NextResponse.json({
       success: true,

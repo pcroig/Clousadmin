@@ -324,6 +324,8 @@ Permite validar o rechazar complementos de empleados de un evento de forma masiv
 
 Permite compensar horas extra de múltiples empleados de un evento. Las horas pueden compensarse como ausencias (días de vacaciones) o como complemento en nómina.
 
+> 🆕 **Compartido con Fichajes**: El flujo reutiliza el servicio `procesarCompensacionHorasExtra`, también expuesto en `POST /api/fichajes/compensar-horas`, garantizando que todas las compensaciones (sin evento o ligadas a nómina) sigan las mismas validaciones y actualizaciones de saldo.
+
 **Request:**
 ```typescript
 {

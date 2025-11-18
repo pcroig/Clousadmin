@@ -23,6 +23,46 @@ export default async function MiEspacioContratosPage() {
           fechaInicio: 'desc',
         },
       },
+      complementos: {
+        include: {
+          tipoComplemento: {
+            select: {
+              id: true,
+              nombre: true,
+            },
+          },
+        },
+      },
+      jornada: {
+        select: {
+          id: true,
+          nombre: true,
+          horasSemanales: true,
+        },
+      },
+      puestoRelacion: {
+        select: {
+          id: true,
+          nombre: true,
+        },
+      },
+      equipos: {
+        include: {
+          equipo: {
+            select: {
+              id: true,
+              nombre: true,
+            },
+          },
+        },
+      },
+      manager: {
+        select: {
+          id: true,
+          nombre: true,
+          apellidos: true,
+        },
+      },
     },
   });
 

@@ -5,12 +5,17 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { Prisma } from '@prisma/client';
 import { requireAuthAsHROrManager, handleApiError } from '@/lib/api-handler';
 
 import { EstadoAusencia, EstadoSolicitud } from '@/lib/constants/enums';
-import { crearNotificacionSolicitudAprobada } from '@/lib/notificaciones';
+import { registrarAutoCompletadoAusencia, registrarAutoCompletadoSolicitud } from '@/lib/auto-completado';
 import { resolveAprobadorEmpleadoId } from '@/lib/solicitudes/aprobador';
 import { aplicarCambiosSolicitud } from '@/lib/solicitudes/aplicar-cambios';
+import { 
+  crearNotificacionSolicitudAprobada,
+  crearNotificacionAusenciaAprobada 
+} from '@/lib/notificaciones';
 
 export async function POST(req: NextRequest) {
   try {
@@ -90,7 +95,7 @@ export async function POST(req: NextRequest) {
             fechaFin < hoy ? EstadoAusencia.completada : EstadoAusencia.confirmada;
 
           // Actualizar ausencia
-          await tx.ausencia.update({
+          const updatedAusencia = await tx.ausencia.update({
             where: { id: ausencia.id },
             data: {
               estado: nuevoEstado,
@@ -145,28 +150,29 @@ export async function POST(req: NextRequest) {
             });
           }
 
-          // Crear notificación
-          if (ausencia.empleado.usuario?.id) {
-            await tx.notificacion.create({
-              data: {
-                empresaId: session.user.empresaId,
-                usuarioId: ausencia.empleado.usuario.id,
-                tipo: 'success',
-                titulo: 'Ausencia auto-aprobada',
-                mensaje: `Tu solicitud de ${ausencia.tipo} del ${ausencia.fechaInicio.toLocaleDateString('es-ES')} al ${ausencia.fechaFin.toLocaleDateString('es-ES')} ha sido aprobada automáticamente`,
-                metadata: {
-                  ausenciaId: ausencia.id,
-                  tipo: ausencia.tipo,
-                  fechaInicio: ausencia.fechaInicio.toISOString(),
-                  fechaFin: ausencia.fechaFin.toISOString(),
-                  autoAprobado: true,
-                },
-                leida: false,
-              },
-            });
-          } else {
-            console.warn(`[AUTOAPROBAR] No se pudo crear notificación para ausencia ${ausencia.id}: empleado sin usuario asociado`);
-          }
+          await registrarAutoCompletadoAusencia(tx, {
+            empresaId: session.user.empresaId,
+            ausenciaId: ausencia.id,
+            empleadoId: ausencia.empleadoId,
+            tipoAusencia: ausencia.tipo,
+            fechaInicio: ausencia.fechaInicio,
+            fechaFin: ausencia.fechaFin,
+            aprobadoPor: session.user.id,
+            origen: 'auto_aprobar_batch',
+          });
+
+          return updatedAusencia;
+        });
+
+        // Notificar al empleado que su ausencia fue aprobada
+        await crearNotificacionAusenciaAprobada(prisma, {
+          ausenciaId: ausencia.id,
+          empresaId: session.user.empresaId,
+          empleadoId: ausencia.empleadoId,
+          empleadoNombre: `${ausencia.empleado.nombre} ${ausencia.empleado.apellidos}`,
+          tipo: ausencia.tipo,
+          fechaInicio: ausencia.fechaInicio,
+          fechaFin: ausencia.fechaFin,
         });
 
         ausenciasAprobadas++;
@@ -182,7 +188,7 @@ export async function POST(req: NextRequest) {
       try {
         await prisma.$transaction(async (tx) => {
           // Actualizar solicitud
-          await tx.solicitudCambio.update({
+          const updatedSolicitud = await tx.solicitudCambio.update({
             where: { id: solicitud.id },
             data: {
               estado: EstadoSolicitud.auto_aprobada,
@@ -200,16 +206,26 @@ export async function POST(req: NextRequest) {
               solicitud.camposCambiados as Record<string, unknown>
             );
           }
+          await registrarAutoCompletadoSolicitud(tx, {
+            empresaId: session.user.empresaId,
+            solicitudId: solicitud.id,
+            empleadoId: solicitud.empleadoId,
+            tipoSolicitud: solicitud.tipo,
+            camposCambiados: solicitud.camposCambiados as Prisma.JsonValue,
+            aprobadoPor: session.user.id,
+            origen: 'auto_aprobar_batch',
+          });
 
+          return updatedSolicitud;
         });
 
-        // Crear notificación fuera de la transacción
+        // Notificar al empleado que su solicitud fue aprobada
         await crearNotificacionSolicitudAprobada(prisma, {
           solicitudId: solicitud.id,
           empresaId: session.user.empresaId,
           empleadoId: solicitud.empleadoId,
           tipo: solicitud.tipo,
-          aprobadoPor: 'ia',
+          aprobadoPor: 'manual', // Aprobada por HR/Admin manualmente
         });
 
         solicitudesAprobadas++;

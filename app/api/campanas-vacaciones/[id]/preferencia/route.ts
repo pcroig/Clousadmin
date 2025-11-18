@@ -4,12 +4,8 @@
 
 import { NextRequest } from 'next/server';
 import { prisma, Prisma } from '@/lib/prisma';
-import {
-  requireAuth,
-  handleApiError,
-  successResponse,
-  badRequestResponse,
-} from '@/lib/api-handler';
+import { requireAuth, handleApiError, successResponse, badRequestResponse } from '@/lib/api-handler';
+import { crearNotificacionCampanaCompletada } from '@/lib/notificaciones';
 
 export const dynamic = 'force-dynamic';
 
@@ -112,14 +108,31 @@ export async function PATCH(
 
     // Si se marcó como completada, actualizar contador de la campaña
     if (body.completada === true && !preferenciaExistente.completada) {
-      await prisma.campanaVacaciones.update({
+      const campanaActualizada = await prisma.campanaVacaciones.update({
         where: { id: campanaId },
         data: {
           empleadosCompletados: {
             increment: 1,
           },
         },
+        select: {
+          empleadosCompletados: true,
+          totalEmpleadosAsignados: true,
+          titulo: true,
+        },
       });
+
+      if (
+        campanaActualizada.totalEmpleadosAsignados > 0 &&
+        campanaActualizada.empleadosCompletados >= campanaActualizada.totalEmpleadosAsignados
+      ) {
+        await crearNotificacionCampanaCompletada(prisma, {
+          campanaId,
+          empresaId: session.user.empresaId,
+          titulo: campanaActualizada.titulo,
+          totalEmpleados: campanaActualizada.totalEmpleadosAsignados,
+        });
+      }
     } else if (body.completada === false && preferenciaExistente.completada) {
       await prisma.campanaVacaciones.update({
         where: { id: campanaId },

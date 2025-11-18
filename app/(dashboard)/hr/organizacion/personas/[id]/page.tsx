@@ -9,8 +9,7 @@ import { EmpleadoDetailClient } from './empleado-detail-client';
 import { notFound } from 'next/navigation';
 import { decryptEmpleadoData } from '@/lib/empleado-crypto';
 import { asegurarCarpetasSistemaParaEmpleado } from '@/lib/documentos';
-import { serializeEmpleado, decimalToNumber } from '@/lib/utils';
-
+import { decimalToNumber } from '@/lib/utils';
 import { UsuarioRol } from '@/lib/constants/enums';
 
 interface EmpleadoDetailPageProps {
@@ -18,6 +17,43 @@ interface EmpleadoDetailPageProps {
     id: string;
   }>;
 }
+
+const serializeForClient = <T,>(value: T): T => {
+  if (value === null || value === undefined) {
+    return value;
+  }
+
+  if (typeof value === 'bigint') {
+    return Number(value) as T;
+  }
+
+  if (typeof value === 'object') {
+    if (typeof (value as any).toNumber === 'function') {
+      try {
+        return (value as any).toNumber() as T;
+      } catch {
+        return Number(String(value)) as T;
+      }
+    }
+
+    if (value instanceof Date) {
+      return value.toISOString() as T;
+    }
+
+    if (Array.isArray(value)) {
+      return value.map((item) => serializeForClient(item)) as T;
+    }
+
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>).map(([key, currentValue]) => [
+        key,
+        serializeForClient(currentValue),
+      ]),
+    ) as T;
+  }
+
+  return value;
+};
 
 export default async function EmpleadoDetailPage({ params }: EmpleadoDetailPageProps) {
   const session = await getSession();
@@ -210,11 +246,6 @@ export default async function EmpleadoDetailPage({ params }: EmpleadoDetailPageP
   // Desencriptar campos sensibles antes de pasar al componente
   const empleadoDesencriptado = decryptEmpleadoData(empleadoActualizado);
 
-  const empleadoMiEspacio = serializeEmpleado({
-    ...empleadoActualizado,
-    ...empleadoDesencriptado,
-  });
-
   const empleadoData = {
     ...empleadoDesencriptado,
     // Convertir campos Decimal a números para Client Components
@@ -283,11 +314,7 @@ export default async function EmpleadoDetailPage({ params }: EmpleadoDetailPageP
     })),
   };
 
-  return (
-    <EmpleadoDetailClient
-      empleado={empleadoData}
-      empleadoMiEspacio={empleadoMiEspacio}
-      usuario={empleado.usuario}
-    />
-  );
+  const empleadoSafe = serializeForClient(empleadoData);
+
+  return <EmpleadoDetailClient empleado={empleadoSafe} usuario={serializeForClient(empleado.usuario)} />;
 }

@@ -47,10 +47,15 @@ export function obtenerIconoPorTipo(tipo: TipoNotificacion): LucideIcon {
     documento_solicitado: FileText,
     documento_subido: FileText,
     documento_rechazado: FileText,
+  documento_generado: FileText,
+  documento_pendiente_rellenar: FileText,
     ausencia_aprobada: CheckCircle,
     ausencia_rechazada: XCircle,
     nomina_error: AlertCircle,
+  nomina_validada: DollarSign,
+  complementos_pendientes: DollarSign,
     denuncia_recibida: AlertCircle,
+  denuncia_actualizada: AlertCircle,
     nuevo_empleado_equipo: Users,
     asignado_equipo: Users,
   };
@@ -95,11 +100,14 @@ export function formatearTipoNotificacion(tipo: TipoNotificacion): string {
     documento_solicitado: 'Documento solicitado',
     documento_subido: 'Documento subido',
     documento_rechazado: 'Documento rechazado',
+    documento_generado: 'Documento generado',
+    documento_pendiente_rellenar: 'Documento pendiente de completar',
     firma_pendiente: 'Firma pendiente',
     firma_completada: 'Firma completada',
     denuncia_recibida: 'Denuncia recibida',
     denuncia_actualizada: 'Denuncia actualizada',
     onboarding_completado: 'Onboarding completado',
+    nomina_validada: 'Nómina validada',
   };
 
   return labels[tipo] || tipo.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase());

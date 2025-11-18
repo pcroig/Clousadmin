@@ -144,3 +144,4 @@ echo "  - CRONs: ./scripts/hetzner/setup-cron.sh"
 echo "  - Nginx: ./scripts/hetzner/setup-nginx.sh"
 echo ""
 
+

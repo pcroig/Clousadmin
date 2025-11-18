@@ -122,6 +122,20 @@ export async function GET(req: NextRequest) {
       tokens
     );
 
+    // Obtener avatar del empleado si existe
+    let avatarUrl: string | null = null;
+    if (usuario.empleadoId) {
+      try {
+        const empleado = await prisma.empleado.findUnique({
+          where: { id: usuario.empleadoId },
+          select: { fotoUrl: true },
+        });
+        avatarUrl = empleado?.fotoUrl || null;
+      } catch (avatarError) {
+        console.error('[Google OAuth] Error obteniendo avatar del empleado:', avatarError);
+      }
+    }
+
     // Crear sesión JWT (reutilizando el sistema actual)
     const sessionData: SessionData = {
       user: {
@@ -132,7 +146,7 @@ export async function GET(req: NextRequest) {
         rol: usuario.rol,
         empresaId: usuario.empresaId,
         empleadoId: usuario.empleadoId || null,
-        avatar: usuario.avatar || null,
+        avatar: avatarUrl, // Usar empleado.fotoUrl como fuente de verdad
         activo: usuario.activo,
       },
     };

@@ -7,6 +7,7 @@ import { getSession } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 
 import { UsuarioRol } from '@/lib/constants/enums';
+import { crearNotificacionNominaDisponible } from '@/lib/notificaciones';
 
 // POST /api/nominas/publicar?mes=X&anio=Y
 export async function POST(req: NextRequest) {
@@ -91,27 +92,20 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // Crear notificaciones para empleados
-    const notificaciones = nominasBorrador.map((nomina) => ({
-      empresaId: session.user.empresaId,
-      usuarioId: nomina.empleado.usuarioId,
-      tipo: 'info',
-      titulo: 'Nómina disponible',
-      mensaje: `Tu nómina de ${getMesNombre(mes)} ${anio} ya está disponible`,
-      metadata: {
-        nominaId: nomina.id,
-        mes,
-        anio,
-      },
-      leida: false,
-    }));
-
-    await prisma.notificacion.createMany({
-      data: notificaciones,
-    });
+    await Promise.all(
+      nominasBorrador.map((nomina) =>
+        crearNotificacionNominaDisponible(prisma, {
+          nominaId: nomina.id,
+          empresaId: session.user.empresaId,
+          empleadoId: nomina.empleadoId,
+          mes,
+          año: anio,
+        })
+      )
+    );
 
     console.log(
-      `[API nominas/publicar] ${notificaciones.length} notificación(es) creada(s)`
+      `[API nominas/publicar] ${nominasBorrador.length} notificación(es) creada(s)`
     );
 
     return NextResponse.json({
@@ -134,21 +128,4 @@ export async function POST(req: NextRequest) {
 /**
  * Helper: Obtener nombre del mes
  */
-function getMesNombre(mes: number): string {
-  const meses = [
-    'Enero',
-    'Febrero',
-    'Marzo',
-    'Abril',
-    'Mayo',
-    'Junio',
-    'Julio',
-    'Agosto',
-    'Septiembre',
-    'Octubre',
-    'Noviembre',
-    'Diciembre',
-  ];
-  return meses[mes - 1] || `Mes ${mes}`;
-}
 

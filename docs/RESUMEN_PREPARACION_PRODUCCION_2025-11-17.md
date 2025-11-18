@@ -268,3 +268,4 @@ La plataforma ahora cumple con:
 **Aprobado para deploy** siguiendo `docs/PRODUCCION_CHECKLIST.md`
 
 
+
