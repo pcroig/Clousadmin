@@ -333,6 +333,23 @@ await crearNotificacionDocumentoGeneracionLote(prisma, {
 
 El helper determina automáticamente si el lote fue completado, fallido o parcial y envía la notificación correspondiente (tipo `documento_generado`) al usuario que lanzó el proceso.
 
+### 5. Notificar documento generado para un empleado
+
+```typescript
+import { crearNotificacionDocumentoGeneradoEmpleado } from '@/lib/notificaciones';
+
+await crearNotificacionDocumentoGeneradoEmpleado(prisma, {
+  empresaId,
+  empleadoId,
+  documentoId: documento.id,
+  documentoNombre: documento.nombre,
+  documentoGeneradoId: documentoGenerado.id,
+  plantillaId: plantilla.id,
+});
+```
+
+Este helper envía la notificación al empleado para que descargue el documento generado automáticamente desde su área personal.
+
 ---
 
 ## 🎨 UI - Características Visuales

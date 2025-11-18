@@ -1346,6 +1346,43 @@ export async function crearNotificacionDocumentoRechazado(
 }
 
 /**
+ * Notifica al empleado cuando se le ha generado un documento automáticamente
+ */
+export async function crearNotificacionDocumentoGeneradoEmpleado(
+  prisma: PrismaClient,
+  params: {
+    empresaId: string;
+    empleadoId: string;
+    documentoId: string;
+    documentoNombre: string;
+    documentoGeneradoId: string;
+    plantillaId?: string;
+  }
+) {
+  const { empresaId, empleadoId, documentoId, documentoNombre, documentoGeneradoId, plantillaId } = params;
+
+  const usuarioIds = await obtenerUsuariosANotificar(prisma, empresaId, {
+    empleado: empleadoId,
+  });
+
+  await crearNotificaciones(prisma, {
+    empresaId,
+    usuarioIds,
+    tipo: 'documento_generado',
+    titulo: 'Documento disponible',
+    mensaje: `Se ha generado el documento "${documentoNombre}".`,
+    metadata: {
+      documentoId,
+      documentoGeneradoId,
+      plantillaId,
+      prioridad: 'normal',
+      accionUrl: '/empleado/mi-espacio/documentos',
+      accionTexto: 'Ver documento',
+    },
+  });
+}
+
+/**
  * Notifica cuando se completa la generación masiva de documentos (lote)
  */
 export async function crearNotificacionDocumentoGeneracionLote(
