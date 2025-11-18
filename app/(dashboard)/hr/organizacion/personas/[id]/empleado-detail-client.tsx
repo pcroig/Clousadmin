@@ -23,6 +23,7 @@ import { GeneralTab as GeneralTabShared } from '../../../mi-espacio/tabs/general
 import { FichajesTab as FichajesTabShared } from '../../../mi-espacio/tabs/fichajes-tab';
 import { ContratosTab as ContratosTabShared } from '../../../mi-espacio/tabs/contratos-tab';
 import { DocumentosTab as DocumentosTabShared } from '../../../mi-espacio/tabs/documentos-tab';
+import { CrearAusenciaHRModal } from '@/components/hr/crear-ausencia-hr-modal';
 
 interface EmpleadoDetailClientProps {
   empleado: Empleado;
@@ -151,6 +152,9 @@ interface AusenciasTabProps {
 }
 
 function AusenciasTab({ empleado }: AusenciasTabProps) {
+  const router = useRouter();
+  const [crearAusenciaModalOpen, setCrearAusenciaModalOpen] = useState(false);
+
   // Calcular saldo de ausencias
   const calcularSaldo = () => {
     const totalDias = empleado.diasVacaciones || 22;
@@ -215,6 +219,14 @@ function AusenciasTab({ empleado }: AusenciasTabProps) {
 
   return (
     <div className="space-y-6">
+      {/* Header con botón crear ausencia */}
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-semibold text-gray-900">Gestión de Ausencias</h2>
+        <Button onClick={() => setCrearAusenciaModalOpen(true)}>
+          + Añadir Ausencia
+        </Button>
+      </div>
+
       {/* Card de saldo - una sola altura */}
       <div className="bg-white rounded-lg border border-gray-200 p-6">
         <div className="flex items-center gap-2 mb-4">
@@ -293,6 +305,17 @@ function AusenciasTab({ empleado }: AusenciasTabProps) {
           </TableBody>
         </Table>
       </div>
+
+      {/* Modal crear ausencia */}
+      <CrearAusenciaHRModal
+        open={crearAusenciaModalOpen}
+        onClose={() => setCrearAusenciaModalOpen(false)}
+        onSuccess={() => {
+          setCrearAusenciaModalOpen(false);
+          router.refresh();
+        }}
+        empleadoIdPrefilled={empleado.id}
+      />
     </div>
   );
 }
