@@ -137,3 +137,4 @@ testMiFuncionalidad();
 **Última actualización**: 2025-11-17
 **Responsable**: Equipo de desarrollo
 
+

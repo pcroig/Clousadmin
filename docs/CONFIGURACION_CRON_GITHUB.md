@@ -36,13 +36,19 @@ Guarda el resultado, lo necesitarás en el siguiente paso.
 - **Importante**: SIN barra final (/)
 - Click **Add secret**
 
+> ℹ️ Si vas a delegar los crons al servidor Hetzner (crontab), crea además un **Repository Variable**
+> llamado `ENABLE_GITHUB_CRONS` con valor `false`.  
+> Los workflows `cron-*` sólo se ejecutarán cuando esta variable **no** sea `false`, de modo que
+> puedes alternar entre GitHub Actions y el crontab sin editar los YAML.
+
 ### 3. Agregar variables de entorno a tu hosting
 
-En tu servidor Hetzner (o plataforma de hosting), agrega a `.env`:
+En tu plataforma de hosting (Vercel, Netlify, AWS Amplify, etc.), agrega:
 
 ```bash
 CRON_SECRET=tu-secret-generado-aqui
 SOLICITUDES_PERIODO_REVISION_HORAS=48  # Opcional, default 48
+CRON_ALERT_WEBHOOK=https://hooks.slack.com/services/tu/webhook  # Opcional
 ```
 
 ---
@@ -194,7 +200,7 @@ openssl rand -base64 32
 2. Actualiza en GitHub:
    - Settings → Secrets → CRON_SECRET → Update
 
-3. Actualiza en tu servidor Hetzner (archivo `.env`)
+3. Actualiza en tu hosting (Vercel, etc.)
 
 4. El cambio es inmediato, no requiere redeploy del código
 
@@ -267,7 +273,7 @@ openssl rand -base64 32
 
 Los logs del cron se guardan en:
 - **GitHub Actions**: Actions → Workflow → Ver run
-- **Tu servidor Hetzner**: Logs de PM2 (`pm2 logs clousadmin`) o logs del sistema (`journalctl`)
+- **Tu servidor**: Depende del hosting (Vercel Logs, CloudWatch, etc.)
 
 Busca líneas como:
 ```

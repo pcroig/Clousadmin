@@ -4,7 +4,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { TableHeader } from '@/components/shared/table-header';
 import { TableFilters } from '@/components/shared/table-filters';
@@ -44,14 +44,16 @@ interface Empleado {
 
 interface PersonasClientProps {
   empleados: Empleado[];
+  initialPanel?: 'denuncias';
+  initialDenunciaId?: string;
 }
 
-export function PersonasClient({ empleados }: PersonasClientProps) {
+export function PersonasClient({ empleados, initialPanel, initialDenunciaId }: PersonasClientProps) {
   const router = useRouter();
   const [searchTerm, setSearchTerm] = useState('');
   const [addPersonaDialogOpen, setAddPersonaDialogOpen] = useState(false);
   const [gestionarOnboardingOpen, setGestionarOnboardingOpen] = useState(false);
-  const [denunciasDetailsOpen, setDenunciasDetailsOpen] = useState(false);
+  const [denunciasDetailsOpen, setDenunciasDetailsOpen] = useState(initialPanel === 'denuncias');
 
   // Filtrar empleados por búsqueda
   const empleadosFiltrados = empleados.filter((emp) =>
@@ -174,7 +176,10 @@ export function PersonasClient({ empleados }: PersonasClientProps) {
         onClose={() => setDenunciasDetailsOpen(false)}
         title="Canal de Denuncias"
       >
-        <DenunciasDetails onClose={() => setDenunciasDetailsOpen(false)} />
+        <DenunciasDetails
+          onClose={() => setDenunciasDetailsOpen(false)}
+          initialDenunciaId={initialDenunciaId}
+        />
       </DetailsPanel>
     </div>
   );

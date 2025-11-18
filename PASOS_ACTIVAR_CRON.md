@@ -35,6 +35,8 @@ Copia el resultado, lo necesitas en los siguientes pasos.
 - Name: `APP_URL`
 - Value: `https://tu-app.com` (SIN barra final)
 
+**Opcional:** si los cron jobs se ejecutan desde Hetzner, crea un **repository variable** `ENABLE_GITHUB_CRONS=false` para evitar ejecuciones duplicadas desde GitHub Actions.
+
 ---
 
 ### 3. Configurar en tu hosting (Vercel/AWS/etc.)
@@ -44,6 +46,7 @@ En el dashboard de tu hosting, agrega estas variables de entorno:
 ```bash
 CRON_SECRET=tu-secret-del-paso-1
 SOLICITUDES_PERIODO_REVISION_HORAS=48
+CRON_ALERT_WEBHOOK=https://hooks.slack.com/services/...  # Opcional
 ```
 
 **Importante**: Usa el MISMO secret que pusiste en GitHub.

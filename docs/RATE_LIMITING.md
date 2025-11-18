@@ -217,3 +217,4 @@ const RATE_LIMITS = {
 **Última actualización**: 2025-11-17
 **Responsable**: Equipo de desarrollo
 
+

@@ -9,7 +9,7 @@ import { EmpleadoDetailClient } from './empleado-detail-client';
 import { notFound } from 'next/navigation';
 import { decryptEmpleadoData } from '@/lib/empleado-crypto';
 import { asegurarCarpetasSistemaParaEmpleado } from '@/lib/documentos';
-import { serializeEmpleado } from '@/lib/utils';
+import { serializeEmpleado, decimalToNumber } from '@/lib/utils';
 
 import { UsuarioRol } from '@/lib/constants/enums';
 
@@ -217,6 +217,9 @@ export default async function EmpleadoDetailPage({ params }: EmpleadoDetailPageP
 
   const empleadoData = {
     ...empleadoDesencriptado,
+    // Convertir campos Decimal a números para Client Components
+    salarioBrutoAnual: decimalToNumber(empleadoDesencriptado.salarioBrutoAnual),
+    salarioBrutoMensual: decimalToNumber(empleadoDesencriptado.salarioBrutoMensual),
     ausencias: empleadoActualizado.ausencias.map((a) => ({
       id: a.id,
       tipo: a.tipo,

@@ -15,3 +15,4 @@ export default async function EmpleadoAusenciasPage() {
   return <MiEspacioAusenciasClient empleadoId={session.user.empleadoId} />;
 }
 
+

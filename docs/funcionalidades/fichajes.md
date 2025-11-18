@@ -228,12 +228,12 @@ enum PeriodoMedioDia {
 
 **Ejecución**: Todas las noches a las 23:30 UTC (00:30 España invierno)
 
-**Estado**: ✅ Implementado con GitHub Actions
+**Estado**: ✅ Implementado en servidor Hetzner (crontab)
 
 **Configuración requerida**:
-- Secret `CRON_SECRET` en GitHub Actions
-- Secret `APP_URL` en GitHub Actions (URL de producción)
 - Variable de entorno `CRON_SECRET` en el servidor
+- Variable de entorno `APP_URL` en el servidor (URL de producción)
+- Ejecutar `scripts/hetzner/setup-cron.sh` para instalar el cron job
 
 **Proceso:**
 1. Para cada empresa activa, procesa el día anterior
@@ -244,7 +244,10 @@ enum PeriodoMedioDia {
      - Si completo → estado `finalizado`
      - Si incompleto → estado `pendiente`
 
-**Archivo**: `.github/workflows/cron-clasificar-fichajes.yml`
+**Archivos**:
+- Endpoint: `app/api/cron/clasificar-fichajes/route.ts`
+- Script de instalación: `scripts/hetzner/setup-cron.sh`
+- Logs: `/var/log/clousadmin-cron.log` en el servidor
 
 ### Cuadrar Fichajes (HR)
 

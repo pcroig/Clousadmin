@@ -1,40 +1,46 @@
 name: Cron - Clasificar Fichajes
 
+# Ejecutar cada noche a las 23:30 UTC (00:30 CET en invierno, 01:30 CEST en verano)
 on:
-  # Schedule deshabilitado - Los crons se ejecutan desde el servidor Hetzner (crontab)
-  # schedule:
-  #   - cron: '30 23 * * *'  # Diario a las 23:30 UTC (00:30 España invierno, 01:30 verano)
-  workflow_dispatch:  # Ejecución manual (para testing o ejecución bajo demanda)
+  schedule:
+    - cron: '30 23 * * *'
+  workflow_dispatch:
 
 jobs:
   clasificar-fichajes:
     name: Cerrar jornadas del día anterior
     runs-on: ubuntu-latest
-    
+    if: ${{ vars.ENABLE_GITHUB_CRONS != 'false' }}
+
     steps:
       - name: Ejecutar cierre de jornadas
         run: |
-          response=$(curl -X POST ${{ secrets.APP_URL }}/api/cron/clasificar-fichajes \
+          echo "⏰ Lanzando cron de clasificar fichajes..."
+
+          response=$(curl -s -w "\n%{http_code}" -X POST ${{ secrets.APP_URL }}/api/cron/clasificar-fichajes \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
-            -w "\n%{http_code}" -s)
-          
+            -H "Content-Type: application/json")
+
           http_code=$(echo "$response" | tail -n1)
           body=$(echo "$response" | sed '$d')
-          
-          echo "Status Code: $http_code"
-          echo "Response: $body"
-          
+
+          echo "📊 Status Code: $http_code"
+          echo "📝 Response:"
+          echo "$body" | jq '.' || echo "$body"
+
           if [ "$http_code" != "200" ]; then
-            echo "❌ Error: El cron falló con código $http_code"
+            echo "❌ Error: El cron job falló con código $http_code"
             exit 1
           fi
-          
-          echo "✅ Cron ejecutado correctamente"
 
+          echo "✅ Cron job ejecutado correctamente"
 
-
-
-
-
-
+      - name: Notificar resultado
+        if: always()
+        run: |
+          if [ "${{ job.status }}" == "success" ]; then
+            echo "✅ Cierre de jornadas completado"
+          else
+            echo "❌ Cron de jornadas falló - revisa los logs"
+          fi
 

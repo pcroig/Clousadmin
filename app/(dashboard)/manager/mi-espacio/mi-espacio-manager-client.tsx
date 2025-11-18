@@ -5,8 +5,9 @@
 'use client';
 
 import { useState } from 'react';
-import { Edit2, Flag } from 'lucide-react';
+import { Flag } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { AvatarEditButton } from '@/components/shared/avatar-edit-button';
 import { Button } from '@/components/ui/button';
 import { GeneralTab } from '@/components/shared/mi-espacio/general-tab';
 import { FichajesTab } from '@/components/shared/mi-espacio/fichajes-tab';
@@ -24,7 +25,6 @@ interface MiEspacioManagerClientProps {
 
 export function MiEspacioManagerClient({ empleado, usuario }: MiEspacioManagerClientProps) {
   const [activeTab, setActiveTab] = useState('general');
-  const [editingProfile, setEditingProfile] = useState(false);
   const [denunciaDialogOpen, setDenunciaDialogOpen] = useState(false);
 
   const getInitials = () => {
@@ -59,13 +59,7 @@ export function MiEspacioManagerClient({ empleado, usuario }: MiEspacioManagerCl
                   {getInitials()}
                 </AvatarFallback>
               </Avatar>
-              <button
-                onClick={() => setEditingProfile(!editingProfile)}
-                className="absolute -bottom-1 -right-1 bg-gray-900 text-white rounded-full p-1.5 hover:bg-gray-800 transition-colors"
-                title="Editar foto de perfil"
-              >
-                <Edit2 className="w-3 h-3" />
-              </button>
+              <AvatarEditButton empleadoId={empleado.id} />
             </div>
 
             <div>

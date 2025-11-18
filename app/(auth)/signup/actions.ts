@@ -4,10 +4,12 @@
 // Signup Server Actions
 // ========================================
 
+import { headers } from 'next/headers';
 import { prisma } from '@/lib/prisma';
 import { hashPassword, createSession } from '@/lib/auth';
 import { signupSchema } from '@/lib/validaciones/schemas';
 import { verificarInvitacionSignup, usarInvitacionSignup } from '@/lib/invitaciones-signup';
+import { getClientIP } from '@/lib/rate-limit';
 import { z } from 'zod';
 
 import { UsuarioRol } from '@/lib/constants/enums';
@@ -22,6 +24,10 @@ export async function signupEmpresaAction(
   data: z.infer<typeof signupSchema> & { token?: string }
 ) {
   try {
+    const headersList = headers();
+    const clientIP = getClientIP(headersList);
+    const ipAddress = clientIP === 'unknown-ip' ? undefined : clientIP;
+
     // Validar datos
     const validatedData = signupSchema.parse(data);
 
@@ -114,6 +120,22 @@ export async function signupEmpresaAction(
         where: { id: usuario.id },
         data: { empleadoId: empleado.id },
       });
+
+      if (validatedData.consentimientoTratamiento) {
+        await tx.consentimiento.create({
+          data: {
+            empresaId: empresa.id,
+            empleadoId: empleado.id,
+            tipo: 'tratamiento_datos',
+            descripcion:
+              'Consentimiento para el tratamiento de datos personales necesarios para el onboarding de Clousadmin.',
+            otorgado: true,
+            otorgadoEn: new Date(),
+            version: '1.0',
+            ipAddress,
+          },
+        });
+      }
 
       return { usuario, empresa, empleado, jornadaPorDefecto };
     });

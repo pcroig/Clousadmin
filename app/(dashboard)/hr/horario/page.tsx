@@ -11,6 +11,8 @@ import { DataTable, Column, AvatarCell } from '@/components/shared/data-table';
 import { DetailsPanel } from '@/components/shared/details-panel';
 
 import { EstadoAusencia } from '@/lib/constants/enums';
+import { addMonths, format, subMonths } from 'date-fns';
+import { es } from 'date-fns/locale';
 
 // Tipos de datos
 interface Fichaje {
@@ -40,7 +42,8 @@ interface Ausencia {
 export default function HorarioPage() {
   const [activeTab, setActiveTab] = useState('fichajes');
   const [selectedItem, setSelectedItem] = useState<Ausencia | null>(null);
-  const [currentMonth, setCurrentMonth] = useState('jun 2025');
+  const [visibleMonth, setVisibleMonth] = useState(() => new Date());
+  const currentMonth = format(visibleMonth, 'MMM yyyy', { locale: es });
 
   // Datos de ejemplo - Fichajes
   const fichajesData: Fichaje[] = [
@@ -173,11 +176,11 @@ export default function HorarioPage() {
   ];
 
   const handlePreviousMonth = () => {
-    // TODO: Implementar navegación de mes
+    setVisibleMonth((prev) => subMonths(prev, 1));
   };
 
   const handleNextMonth = () => {
-    // TODO: Implementar navegación de mes
+    setVisibleMonth((prev) => addMonths(prev, 1));
   };
 
   return (

@@ -81,6 +81,7 @@ const envSchema = z.object({
     .string()
     .min(32, 'CRON_SECRET debe tener al menos 32 caracteres para seguridad')
     .optional(),
+  CRON_ALERT_WEBHOOK: z.string().url().optional(),
   SOLICITUDES_PERIODO_REVISION_HORAS: z
     .union([z.string(), z.number(), z.undefined()])
     .transform((value) => {

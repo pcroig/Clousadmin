@@ -99,13 +99,17 @@ const createEmptyEditForm = (): EditFormState => ({
   documentoId: null,
 });
 
-export function AusenciasClient() {
+interface AusenciasClientProps {
+  initialCampanasExpanded?: boolean;
+}
+
+export function AusenciasClient({ initialCampanasExpanded = false }: AusenciasClientProps) {
   const [ausencias, setAusencias] = useState<Ausencia[]>([]);
   const [campanas, setCampanas] = useState<Campana[]>([]);
   const [loading, setLoading] = useState(true);
   const [filtroEstado, setFiltroEstado] = useState('todas');
   const [busquedaEmpleado, setBusquedaEmpleado] = useState('');
-  const [campanasExpandidas, setCampanasExpandidas] = useState(false);
+  const [campanasExpandidas, setCampanasExpandidas] = useState(initialCampanasExpanded);
   
   const [gestionarModal, setGestionarModal] = useState(false);
   const [crearCampanaModal, setCrearCampanaModal] = useState(false);
@@ -341,7 +345,7 @@ const fetchCampanas = useCallback(async () => {
 
     try {
       let justificanteUrl = editForm.justificanteUrl;
-      let documentoIdToSend: string | null | undefined;
+      let documentoIdToSend: string | null | undefined = editForm.documentoId;
 
       // Subir justificante si hay archivo nuevo
       if (editJustificanteFile) {
@@ -363,10 +367,13 @@ const fetchCampanas = useCallback(async () => {
         estado: editForm.estado,
       };
 
-      if (justificanteUrl !== null) {
+      // Incluir justificanteUrl si existe (nuevo o existente)
+      if (justificanteUrl !== null && justificanteUrl !== undefined) {
         payload.justificanteUrl = justificanteUrl;
       }
-      if (documentoIdToSend !== undefined) {
+      
+      // Incluir documentoId si existe (nuevo o existente)
+      if (documentoIdToSend !== null && documentoIdToSend !== undefined) {
         payload.documentoId = documentoIdToSend;
       }
 

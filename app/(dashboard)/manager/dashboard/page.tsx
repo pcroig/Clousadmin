@@ -200,7 +200,7 @@ export default async function ManagerDashboardPage() {
             <SolicitudesWidget
               solicitudes={solicitudes}
               maxItems={8}
-              dashboardHref="/manager/bandeja-entrada"
+            dashboardHref="/manager/bandeja-entrada?tab=solicitudes"
             />
           </div>
 

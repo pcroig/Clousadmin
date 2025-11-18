@@ -1,0 +1,102 @@
+#cloud-config
+# Configuración inicial del servidor Hetzner para Clousadmin
+# Copia y pega este contenido completo en el campo "Cloud config" al crear el servidor
+
+package_update: true
+package_upgrade: true
+
+# Crear usuario administrativo
+users:
+  - name: clousadmin
+    groups: sudo
+    shell: /bin/bash
+    sudo: ['ALL=(ALL) NOPASSWD:ALL']
+    lock_passwd: false
+
+# Establecer contraseñas (formato: usuario:contraseña)
+# CONTRASEÑAS CONFIGURADAS:
+# - root: Clousadmin2025!Secure
+# - clousadmin: Clousadmin2025!Secure
+chpasswd:
+  list: |
+    root:Clousadmin2025!Secure
+    clousadmin:Clousadmin2025!Secure
+  expire: False
+
+# Instalar herramientas básicas
+packages:
+  - curl
+  - wget
+  - git
+  - build-essential
+  - ufw
+  - ca-certificates
+  - gnupg
+  - lsb-release
+  - software-properties-common
+  - apt-transport-https
+
+# Scripts de inicialización
+runcmd:
+  # Habilitar autenticación por contraseña en SSH
+  - sed -i 's/#PasswordAuthentication yes/PasswordAuthentication yes/' /etc/ssh/sshd_config
+  - sed -i 's/PasswordAuthentication no/PasswordAuthentication yes/' /etc/ssh/sshd_config
+  - sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config
+  - sed -i 's/PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config
+  - systemctl restart sshd
+  
+  # Configurar firewall
+  - ufw --force enable
+  - ufw allow 22/tcp comment 'SSH'
+  - ufw allow 80/tcp comment 'HTTP'
+  - ufw allow 443/tcp comment 'HTTPS'
+  - ufw --force reload
+  
+  # Instalar Node.js 20.x LTS
+  - curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+  - apt-get install -y nodejs
+  
+  # Instalar PM2 globalmente
+  - npm install -g pm2
+  
+  # Crear directorio para la aplicación
+  - mkdir -p /opt/clousadmin
+  - chown clousadmin:clousadmin /opt/clousadmin
+  
+  # Configurar rotación de logs PM2
+  - pm2 install pm2-logrotate || true
+  - pm2 set pm2-logrotate:max_size 10M || true
+  - pm2 set pm2-logrotate:retain 10 || true
+  - pm2 set pm2-logrotate:compress true || true
+  
+  # Mensaje de bienvenida
+  - echo "✅ Servidor configurado correctamente" > /opt/clousadmin/setup-complete.txt
+  - echo "📝 Usuario: clousadmin" >> /opt/clousadmin/setup-complete.txt
+  - echo "🔑 Contraseña: Clousadmin2025!Secure" >> /opt/clousadmin/setup-complete.txt
+  - echo "📦 Node.js: $(node --version)" >> /opt/clousadmin/setup-complete.txt
+  - echo "📦 npm: $(npm --version)" >> /opt/clousadmin/setup-complete.txt
+
+# Mensaje final
+final_message: |
+  ✅ Configuración del servidor completada
+  
+  📋 Credenciales de acceso:
+     Usuario: clousadmin
+     Contraseña: Clousadmin2025!Secure
+     (También puedes usar root con la misma contraseña)
+  
+  📦 Software instalado:
+     - Node.js 20.x LTS
+     - npm
+     - PM2
+     - UFW (firewall configurado)
+  
+  🚀 Próximos pasos:
+     1. Conectarte por SSH: ssh clousadmin@IP_DEL_SERVIDOR
+     2. Clonar el repositorio en /opt/clousadmin
+     3. Ejecutar: ./scripts/hetzner/setup-server.sh (si necesitas PostgreSQL local)
+     4. Configurar variables de entorno
+     5. Desplegar la aplicación
+  
+  📚 Ver documentación en: docs/DEPLOY_HETZNER.md
+
