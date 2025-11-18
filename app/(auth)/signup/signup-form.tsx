@@ -7,6 +7,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { signupEmpresaAction } from './actions';
@@ -34,6 +35,7 @@ export function SignupForm({ token, emailInvitacion }: SignupFormProps) {
     apellidos: '',
     email: emailInvitacion, // Pre-rellenar con email de la invitación
     password: '',
+    consentimientoTratamiento: false,
   });
   
   const [error, setError] = useState('');
@@ -47,6 +49,13 @@ export function SignupForm({ token, emailInvitacion }: SignupFormProps) {
       ...formData,
       [e.target.name]: e.target.value,
     });
+  };
+
+  const handleCheckboxChange = (checked: boolean) => {
+    setFormData((prev) => ({
+      ...prev,
+      consentimientoTratamiento: checked,
+    }));
   };
 
   const handleSubmitPaso0 = async (e: React.FormEvent) => {
@@ -243,13 +252,39 @@ export function SignupForm({ token, emailInvitacion }: SignupFormProps) {
           />
         </div>
 
+        <div className="flex items-start gap-2">
+          <Checkbox
+            id="consentimientoTratamiento"
+            checked={formData.consentimientoTratamiento}
+            onCheckedChange={(checked) => handleCheckboxChange(Boolean(checked))}
+            required
+            aria-describedby="consentimiento-help-text"
+          />
+          <div className="text-sm">
+            <Label
+              htmlFor="consentimientoTratamiento"
+              className="text-sm font-medium text-gray-900"
+            >
+              Acepto el tratamiento de mis datos conforme a la política de privacidad de Clousadmin.
+            </Label>
+            <p id="consentimiento-help-text" className="text-xs text-gray-500">
+              Esta autorización es necesaria para poder crear tu cuenta y gestionar tus datos como
+              responsable del servicio.
+            </p>
+          </div>
+        </div>
+
         {error && (
           <div className="rounded-md bg-red-50 p-3">
             <p className="text-sm text-red-600">{error}</p>
           </div>
         )}
 
-        <Button type="submit" className="w-full" disabled={loading}>
+        <Button
+          type="submit"
+          className="w-full"
+          disabled={!formData.consentimientoTratamiento || loading}
+        >
           {loading ? 'Creando cuenta...' : 'Crear cuenta y continuar'}
         </Button>
 

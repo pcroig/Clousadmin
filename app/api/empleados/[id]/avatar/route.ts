@@ -66,7 +66,11 @@ export async function POST(
     // Por ahora, generar URL de placeholder con las iniciales
     const empleado = await prisma.empleado.findUnique({
       where: { id },
-      select: { nombre: true, apellidos: true },
+      select: {
+        nombre: true,
+        apellidos: true,
+        usuarioId: true,
+      },
     });
 
     if (!empleado) {
@@ -76,11 +80,24 @@ export async function POST(
     const initials = `${empleado.nombre.charAt(0)}${empleado.apellidos.charAt(0)}`;
     const placeholderUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(initials)}&background=random&size=256`;
 
-    // Actualizar fotoUrl en la base de datos
-    await prisma.empleado.update({
-      where: { id },
-      data: { fotoUrl: placeholderUrl },
-    });
+    // Actualizar fotoUrl y mantener el avatar del usuario sincronizado
+    const updates = [
+      prisma.empleado.update({
+        where: { id },
+        data: { fotoUrl: placeholderUrl },
+      }),
+    ];
+
+    if (empleado.usuarioId) {
+      updates.push(
+        prisma.usuario.update({
+          where: { id: empleado.usuarioId },
+          data: { avatar: placeholderUrl },
+        })
+      );
+    }
+
+    await prisma.$transaction(updates);
 
     return successResponse({
       success: true,

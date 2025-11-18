@@ -75,6 +75,7 @@ export function formatearTipoNotificacion(tipo: TipoNotificacion): string {
     ausencia_rechazada: 'Ausencia rechazada',
     ausencia_cancelada: 'Ausencia cancelada',
     campana_vacaciones_creada: 'Campaña de vacaciones',
+    campana_vacaciones_cuadrada: 'Campaña cuadrada',
     campana_vacaciones_completada: 'Campaña completada',
     empleado_creado: 'Nuevo empleado',
     fichaje_autocompletado: 'Fichaje autocompletado',

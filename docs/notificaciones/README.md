@@ -75,6 +75,7 @@ Algunos tipos requieren **acciones específicas** del usuario:
 |------|--------|------|-----|
 | `firma_pendiente` | Firma digital | `requiresSignature: true` | "Firmar documento" |
 | `campana_vacaciones_creada` | Selección de días | `requiresSelection: true` | "Seleccionar días preferidos" |
+| `campana_vacaciones_cuadrada` | Revisar propuesta | `requiresModal: true` | "Revisar propuesta" |
 | `complementos_pendientes` | Completar complementos | `requiresModal: true` | "Completar complementos" |
 | `documento_solicitado` | Subir documento | - | "Subir documento" |
 
@@ -107,6 +108,7 @@ Algunos tipos requieren **acciones específicas** del usuario:
 | Tipo | Categoría | Acción Especial | Flag |
 |------|-----------|-----------------|------|
 | `campana_vacaciones_creada` | Ausencias | Selección de días | `requiresSelection: true` |
+| `campana_vacaciones_cuadrada` | Ausencias | Revisar propuesta | `requiresModal: true` |
 | `complementos_pendientes` | Nóminas | Completar complementos | `requiresModal: true` |
 | `firma_pendiente` | Fichas | Firma digital | `requiresSignature: true` |
 | `firma_completada` | Fichas | - | - |
@@ -132,6 +134,7 @@ Algunos tipos requieren **acciones específicas** del usuario:
 | `ausencia_rechazada` | Ausencias | ❌ | `XCircle` |
 | `ausencia_cancelada` | Ausencias | ❌ | `Calendar` |
 | `campana_vacaciones_creada` | Ausencias | ✅ Selección | `Calendar` |
+| `campana_vacaciones_cuadrada` | Ausencias | ✅ Modal | `Calendar` |
 | `campana_vacaciones_completada` | Ausencias | ❌ | `Calendar` |
 | `fichaje_autocompletado` | Fichajes | ❌ | `Clock` |
 | `fichaje_requiere_revision` | Fichajes | ❌ | `Clock` |
@@ -189,7 +192,7 @@ interface NotificacionMetadata {
   fechaInicio: '2025-07-01',
   fechaFin: '2025-08-31',
   prioridad: 'alta',
-  accionUrl: '/empleado/vacaciones/campanas/uuid',
+  accionUrl: '/empleado/dashboard?campana=uuid',
   accionTexto: 'Seleccionar días preferidos',
   requiresSelection: true
 }

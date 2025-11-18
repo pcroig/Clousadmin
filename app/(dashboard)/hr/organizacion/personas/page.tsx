@@ -11,7 +11,11 @@ import { decryptEmpleadoList } from '@/lib/empleado-crypto';
 import { UsuarioRol } from '@/lib/constants/enums';
 
 // Server Component
-export default async function PersonasPage() {
+export default async function PersonasPage({
+  searchParams,
+}: {
+  searchParams?: { panel?: string; denunciaId?: string };
+}) {
   const session = await getSession();
 
   if (!session || session.user.rol !== UsuarioRol.hr_admin) {
@@ -97,5 +101,14 @@ export default async function PersonasPage() {
     },
   }));
 
-  return <PersonasClient empleados={empleadosData} />;
+  const panelParam = searchParams?.panel === 'denuncias' ? 'denuncias' : undefined;
+  const denunciaId = searchParams?.denunciaId;
+
+  return (
+    <PersonasClient
+      empleados={empleadosData}
+      initialPanel={panelParam}
+      initialDenunciaId={denunciaId}
+    />
+  );
 }

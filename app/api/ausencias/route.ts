@@ -306,8 +306,9 @@ export async function POST(req: NextRequest) {
             apellidos: true,
             puesto: true,
             fotoUrl: true,
-          }
-        }
+            managerId: true,
+          },
+        },
       }
     });
 
@@ -329,6 +330,8 @@ export async function POST(req: NextRequest) {
         ausenciaId: ausencia.id,
         empresaId: session.user.empresaId,
         empleadoId: session.user.empleadoId,
+        empleadoNombre: `${ausencia.empleado.nombre} ${ausencia.empleado.apellidos}`,
+        managerId: ausencia.empleado.managerId,
         tipo: ausencia.tipo,
         fechaInicio: ausencia.fechaInicio,
         fechaFin: ausencia.fechaFin,

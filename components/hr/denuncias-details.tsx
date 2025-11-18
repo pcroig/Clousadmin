@@ -37,12 +37,14 @@ interface Denuncia {
 
 interface DenunciasDetailsProps {
   onClose: () => void;
+  initialDenunciaId?: string;
 }
 
-export function DenunciasDetails({ onClose }: DenunciasDetailsProps) {
+export function DenunciasDetails({ onClose, initialDenunciaId }: DenunciasDetailsProps) {
   const [denuncias, setDenuncias] = useState<Denuncia[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedDenuncia, setSelectedDenuncia] = useState<Denuncia | null>(null);
+  const [initialSelectionApplied, setInitialSelectionApplied] = useState(false);
 
   useEffect(() => {
     fetchDenuncias();
@@ -66,6 +68,21 @@ export function DenunciasDetails({ onClose }: DenunciasDetailsProps) {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (
+      !loading &&
+      initialDenunciaId &&
+      !initialSelectionApplied &&
+      denuncias.length > 0
+    ) {
+      const target = denuncias.find((denuncia) => denuncia.id === initialDenunciaId);
+      if (target) {
+        setSelectedDenuncia(target);
+        setInitialSelectionApplied(true);
+      }
+    }
+  }, [denuncias, initialDenunciaId, initialSelectionApplied, loading]);
 
   if (loading) {
     return (

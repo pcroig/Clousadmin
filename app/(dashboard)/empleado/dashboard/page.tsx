@@ -11,13 +11,6 @@ import type { Ausencia } from '@prisma/client';
 
 import { EstadoAusencia, UsuarioRol } from '@/lib/constants/enums';
 
-const ESTADOS_NOTIFICACIONES: EstadoAusencia[] = [
-  EstadoAusencia.confirmada,
-  EstadoAusencia.completada,
-  EstadoAusencia.rechazada,
-  EstadoAusencia.pendiente,
-];
-
 const ESTADOS_AUSENCIAS_ABIERTAS: EstadoAusencia[] = [
   EstadoAusencia.pendiente,
   EstadoAusencia.confirmada,
@@ -67,18 +60,16 @@ async function obtenerDatosDashboard(session: { user: { id: string; empresaId: s
     throw new Error('Empleado no encontrado');
   }
 
-  // Notificaciones del empleado (ausencias + campañas de vacaciones)
-  const ausenciasNotificaciones = await prisma.ausencia.findMany({
+  // Notificaciones del empleado
+  const notificacionesDb = await prisma.notificacion.findMany({
     where: {
-      empleadoId: empleado.id,
-      estado: {
-        in: ESTADOS_NOTIFICACIONES,
-      },
+      empresaId: session.user.empresaId,
+      usuarioId: session.user.id,
     },
     orderBy: {
       createdAt: 'desc',
     },
-    take: 8,
+    take: 15,
   });
 
   // Buscar campaña activa con preferencia pendiente del empleado
@@ -124,21 +115,15 @@ async function obtenerDatosDashboard(session: { user: { id: string; empresaId: s
     }
   }
 
-  const notificaciones: Notificacion[] = ausenciasNotificaciones.map((aus: Ausencia) => {
-    const tipo =
-      aus.estado === EstadoAusencia.confirmada || aus.estado === EstadoAusencia.completada
-        ? 'aprobada'
-        : aus.estado === EstadoAusencia.rechazada
-        ? 'rechazada'
-        : 'pendiente';
-
-    return {
-      id: aus.id,
-      tipo,
-      mensaje: `Tu solicitud de ${aus.tipo} está ${aus.estado}`,
-      fecha: aus.createdAt,
-    };
-  });
+  const notificaciones: Notificacion[] = notificacionesDb.map((notif) => ({
+    id: notif.id,
+    tipo: notif.tipo as Notificacion['tipo'],
+    titulo: notif.titulo,
+    mensaje: notif.mensaje,
+    fecha: notif.createdAt,
+    leida: notif.leida,
+    metadata: (notif.metadata as Record<string, unknown>) ?? undefined,
+  }));
 
   // Ausencias del empleado - con manejo de errores
   const añoActual = new Date().getFullYear();

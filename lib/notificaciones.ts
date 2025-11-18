@@ -31,6 +31,7 @@ export type TipoNotificacion =
   | 'ausencia_rechazada'
   | 'ausencia_cancelada'
   | 'campana_vacaciones_creada' // 🎯 Especial: requiere selección de días
+  | 'campana_vacaciones_cuadrada'
   | 'campana_vacaciones_completada'
   // Empleados/Fichas
   | 'empleado_creado'
@@ -130,6 +131,7 @@ export function requiereAccionEspecial(tipo: TipoNotificacion): boolean {
   const tiposEspeciales: TipoNotificacion[] = [
     'firma_pendiente',
     'campana_vacaciones_creada',
+    'campana_vacaciones_cuadrada',
     'complementos_pendientes',
     'documento_solicitado',
   ];
@@ -412,34 +414,77 @@ export async function crearNotificacionAusenciaAutoAprobada(
     ausenciaId: string;
     empresaId: string;
     empleadoId: string;
+    empleadoNombre: string;
+    managerId?: string | null;
     tipo: string;
     fechaInicio: Date;
     fechaFin: Date;
   }
 ) {
-  const { ausenciaId, empresaId, empleadoId, tipo, fechaInicio, fechaFin } = params;
+  const {
+    ausenciaId,
+    empresaId,
+    empleadoId,
+    empleadoNombre,
+    managerId,
+    tipo,
+    fechaInicio,
+    fechaFin,
+  } = params;
 
-  const usuarioIds = await obtenerUsuariosANotificar(prisma, empresaId, {
+  const usuarioIdsEmpleado = await obtenerUsuariosANotificar(prisma, empresaId, {
     empleado: empleadoId,
   });
 
-  await crearNotificaciones(prisma, {
-    empresaId,
-    usuarioIds,
-    tipo: 'ausencia_aprobada',
-    titulo: `${formatLabel(tipo)} aprobada automáticamente`,
-    mensaje: `Tu solicitud (${formatRange(fechaInicio, fechaFin)}) ha sido aprobada automáticamente.`,
-    metadata: {
-      ausenciaId,
-      tipo,
-      fechaInicio: fechaInicio.toISOString(),
-      fechaFin: fechaFin.toISOString(),
-      autoAprobada: true,
-      prioridad: 'normal',
-      accionUrl: '/empleado/mi-espacio/ausencias',
-      accionTexto: 'Ver ausencia',
-    },
+  if (usuarioIdsEmpleado.length) {
+    await crearNotificaciones(prisma, {
+      empresaId,
+      usuarioIds: usuarioIdsEmpleado,
+      tipo: 'ausencia_aprobada',
+      titulo: `${formatLabel(tipo)} aprobada automáticamente`,
+      mensaje: `Tu solicitud (${formatRange(fechaInicio, fechaFin)}) ha sido aprobada automáticamente.`,
+      metadata: {
+        ausenciaId,
+        tipo,
+        fechaInicio: fechaInicio.toISOString(),
+        fechaFin: fechaFin.toISOString(),
+        autoAprobada: true,
+        prioridad: 'normal',
+        accionUrl: '/empleado/mi-espacio/ausencias',
+        accionTexto: 'Ver ausencia',
+      },
+    });
+  }
+
+  const usuarioIdsGestion = await obtenerUsuariosANotificar(prisma, empresaId, {
+    hrAdmin: true,
+    manager: managerId ?? undefined,
   });
+
+  if (usuarioIdsGestion.length) {
+    await crearNotificaciones(prisma, {
+      empresaId,
+      usuarioIds: usuarioIdsGestion,
+      tipo: 'ausencia_aprobada',
+      titulo: `${formatLabel(tipo)} aprobada automáticamente`,
+      mensaje: `${empleadoNombre} ha tenido su ${formatLabel(tipo)} auto-aprobada (${formatRange(
+        fechaInicio,
+        fechaFin
+      )}).`,
+      metadata: {
+        ausenciaId,
+        tipo,
+        fechaInicio: fechaInicio.toISOString(),
+        fechaFin: fechaFin.toISOString(),
+        empleadoId,
+        empleadoNombre,
+        autoAprobada: true,
+        prioridad: 'normal',
+        accionUrl: '/hr/horario/ausencias',
+        accionTexto: 'Ver ausencias',
+      },
+    });
+  }
 }
 
 // ========================================
@@ -1036,7 +1081,7 @@ export async function crearNotificacionSolicitudCreada(
       solicitudId,
       tipo,
       prioridad: 'alta',
-      accionUrl: '/hr/solicitudes',
+      accionUrl: '/hr/bandeja-entrada?tab=solicitudes',
       accionTexto: 'Revisar solicitud',
     },
   });
@@ -1160,7 +1205,7 @@ export async function crearNotificacionSolicitudRequiereRevision(
       tipo,
       requiereRevision: true,
       prioridad: 'critica',
-      accionUrl: '/hr/bandeja-entrada',
+      accionUrl: '/hr/bandeja-entrada?tab=solicitudes',
       accionTexto: 'Revisar ahora',
     },
   });
@@ -1231,7 +1276,7 @@ export async function crearNotificacionNominaError(
       nominaId,
       error,
       prioridad: 'critica',
-      accionUrl: '/hr/nominas',
+      accionUrl: `/hr/payroll/nominas/${nominaId}`,
       accionTexto: 'Revisar',
     },
   });
@@ -1378,7 +1423,7 @@ export async function crearNotificacionCampanaCreada(
           fechaInicio: fechaInicio.toISOString(),
           fechaFin: fechaFin.toISOString(),
           prioridad: 'alta',
-          accionUrl: `/empleado/vacaciones/campanas/${campanaId}`,
+          accionUrl: `/empleado/dashboard?campana=${campanaId}`,
           accionTexto: 'Seleccionar días preferidos',
           requiresSelection: true, // ✅ Acción especial: selección de días
         },
@@ -1413,8 +1458,39 @@ export async function crearNotificacionCampanaCompletada(
       campanaId,
       totalEmpleados,
       prioridad: 'alta',
-      accionUrl: `/hr/vacaciones/campanas/${campanaId}`,
+      accionUrl: `/hr/horario/ausencias?panel=campanas&campanaId=${campanaId}`,
       accionTexto: 'Cuadrar vacaciones',
+    },
+  });
+}
+
+export async function crearNotificacionCampanaCuadrada(
+  prisma: PrismaClient,
+  params: {
+    campanaId: string;
+    empresaId: string;
+    titulo: string;
+    usuarioIds: string[];
+  }
+) {
+  const { campanaId, empresaId, titulo, usuarioIds } = params;
+
+  if (usuarioIds.length === 0) {
+    return;
+  }
+
+  await crearNotificaciones(prisma, {
+    empresaId,
+    usuarioIds,
+    tipo: 'campana_vacaciones_cuadrada',
+    titulo: 'Tu propuesta de vacaciones está lista',
+    mensaje: `La campaña "${titulo}" ya tiene una propuesta asignada. Revísala y confirma tus vacaciones.`,
+    metadata: {
+      campanaId,
+      prioridad: 'alta',
+      accionUrl: `/empleado/dashboard?campana=${campanaId}`,
+      accionTexto: 'Revisar propuesta',
+      requiresModal: true,
     },
   });
 }
@@ -1455,7 +1531,7 @@ export async function crearNotificacionOnboardingCompletado(
       empleadoId,
       empleadoNombre,
       prioridad: 'normal',
-      accionUrl: `/hr/empleados/${empleadoId}`,
+      accionUrl: `/hr/organizacion/personas/${empleadoId}`,
       accionTexto: 'Ver empleado',
     },
   });
@@ -1536,7 +1612,7 @@ export async function crearNotificacionDenunciaRecibida(
       denunciaId,
       esAnonima,
       prioridad: 'critica',
-      accionUrl: `/hr/denuncias/${denunciaId}`,
+      accionUrl: `/hr/organizacion/personas?panel=denuncias&denunciaId=${denunciaId}`,
       accionTexto: 'Revisar denuncia',
     },
   });
@@ -1571,8 +1647,8 @@ export async function crearNotificacionDenunciaActualizada(
       denunciaId,
       nuevoEstado,
       prioridad: 'alta',
-      accionUrl: `/empleado/denuncias/${denunciaId}`,
-      accionTexto: 'Ver denuncia',
+      accionUrl: `/empleado/mi-perfil?modal=denuncias`,
+      accionTexto: 'Ver canal de denuncias',
     },
   });
 }

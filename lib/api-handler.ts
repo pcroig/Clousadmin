@@ -214,7 +214,7 @@ export function handleApiError(
 /**
  * Respuesta exitosa genérica
  */
-export function successResponse<T>(data: T, status: number = 200): NextResponse {
+export function successResponse<T>(data: T, status: number = 200): NextResponse {                                                                               
   return NextResponse.json(data, { status });
 }
 
@@ -228,14 +228,14 @@ export function createdResponse<T>(data: T): NextResponse {
 /**
  * Respuesta de no encontrado
  */
-export function notFoundResponse(message: string = 'Recurso no encontrado'): NextResponse {
+export function notFoundResponse(message: string = 'Recurso no encontrado'): NextResponse {                                                                     
   return NextResponse.json({ error: message }, { status: 404 });
 }
 
 /**
  * Respuesta de bad request
  */
-export function badRequestResponse(message: string, details?: unknown): NextResponse {
+export function badRequestResponse(message: string, details?: unknown): NextResponse {                                                                          
   const payload: { error: string; details?: unknown } = { error: message };
   if (typeof details !== 'undefined') {
     payload.details = details;
@@ -247,7 +247,7 @@ export function badRequestResponse(message: string, details?: unknown): NextResp
 /**
  * Respuesta de forbidden (403)
  */
-export function forbiddenResponse(message: string = 'No autorizado'): NextResponse {
+export function forbiddenResponse(message: string = 'No autorizado'): NextResponse {                                                                            
   return NextResponse.json({ error: message }, { status: 403 });
 }
 
@@ -259,7 +259,7 @@ export function forbiddenResponse(message: string = 'No autorizado'): NextRespon
  * Verifica rate limit para el request actual
  * Retorna 429 si se excede el límite
  * @param req - Request de Next.js
- * @param isWrite - true para POST/PATCH/DELETE (límite más estricto), false para GET
+ * @param isWrite - true para POST/PATCH/DELETE (límite más estricto), false para GET                                                                           
  */
 export async function requireRateLimit(
   req: NextRequest,
@@ -284,7 +284,7 @@ export async function requireRateLimit(
         {
           error: 'Demasiadas solicitudes',
           retryAfter: result.retryAfter,
-          message: `Has excedido el límite de solicitudes. Por favor, espera ${result.retryAfter} segundos.`,
+          message: `Has excedido el límite de solicitudes. Por favor, espera ${result.retryAfter} segundos.`,                                                   
         },
         { status: 429, headers }
       );

@@ -5,11 +5,15 @@
 import { getSession } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
-import { BandejaEntradaTabs } from '@/components/hr/bandeja-entrada-tabs';
+import { BandejaEntradaTabs, type BandejaEntradaTab } from '@/components/hr/bandeja-entrada-tabs';
 
 import { EstadoAusencia, EstadoSolicitud, UsuarioRol } from '@/lib/constants/enums';
 
-export default async function ManagerBandejaEntradaPage() {
+export default async function ManagerBandejaEntradaPage({
+  searchParams,
+}: {
+  searchParams?: { tab?: string };
+}) {
   const session = await getSession();
 
   if (!session || session.user.rol !== UsuarioRol.manager) {
@@ -338,6 +342,12 @@ export default async function ManagerBandejaEntradaPage() {
     leida: n.leida,
   }));
 
+  const tabParam = searchParams?.tab;
+  const initialTab: BandejaEntradaTab | undefined =
+    tabParam && ['solicitudes', 'auto-completed', 'notificaciones'].includes(tabParam as BandejaEntradaTab)
+      ? (tabParam as BandejaEntradaTab)
+      : undefined;
+
   return (
     <div className="p-8">
       <BandejaEntradaTabs
@@ -351,6 +361,7 @@ export default async function ManagerBandejaEntradaPage() {
         solvedStats={solvedStats}
         solvedItems={solvedItems}
         notificaciones={notificaciones}
+        initialTab={initialTab}
       />
     </div>
   );

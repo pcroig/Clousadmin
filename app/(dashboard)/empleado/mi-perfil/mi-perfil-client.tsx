@@ -4,6 +4,7 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import { Flag } from 'lucide-react';
 
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { AvatarEditButton } from '@/components/shared/avatar-edit-button';
 import { Button } from '@/components/ui/button';
 import { GeneralTab } from '@/components/shared/mi-espacio/general-tab';
 import { DenunciaDialog } from '@/components/empleado/denuncia-dialog';
@@ -14,10 +15,11 @@ import type { MiEspacioEmpleado, Usuario } from '@/types/empleado';
 interface MiPerfilClientProps {
   empleado: MiEspacioEmpleado;
   usuario: Usuario;
+  openDenunciaDialog?: boolean;
 }
 
-export function MiPerfilClient({ empleado, usuario }: MiPerfilClientProps) {
-  const [denunciaDialogOpen, setDenunciaDialogOpen] = useState(false);
+export function MiPerfilClient({ empleado, usuario, openDenunciaDialog = false }: MiPerfilClientProps) {
+  const [denunciaDialogOpen, setDenunciaDialogOpen] = useState(openDenunciaDialog);
   const [hasPendingChanges, setHasPendingChanges] = useState(false);
   const [saving, setSaving] = useState(false);
   const saveActionRef = useRef<(() => Promise<void>) | null>(null);
@@ -55,7 +57,7 @@ export function MiPerfilClient({ empleado, usuario }: MiPerfilClientProps) {
     <div className="space-y-8">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex items-center gap-4">
-          <div>
+          <div className="relative">
             <Avatar className="h-16 w-16">
               {empleado.fotoUrl && <AvatarImage src={empleado.fotoUrl} alt={empleado.nombre ?? 'Avatar'} />}
               <AvatarFallback
@@ -65,6 +67,7 @@ export function MiPerfilClient({ empleado, usuario }: MiPerfilClientProps) {
                 {initials}
               </AvatarFallback>
             </Avatar>
+            <AvatarEditButton empleadoId={empleado.id} />
           </div>
           <div>
             <p className="text-sm uppercase tracking-wide text-gray-500">Mi perfil</p>

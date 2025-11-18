@@ -15,6 +15,10 @@ CRON_ALERT_WEBHOOK=  # Opcional. Webhook HTTPS (Slack/Teams) para alertas de fal
 
 > ⚠️ `.env.example` no puede modificarse desde este entorno (archivo bloqueado). Añade manualmente `CRON_ALERT_WEBHOOK` en tu `.env` cuando quieras activar alertas.
 
+### Repository variables (GitHub)
+
+- `ENABLE_GITHUB_CRONS` → si vale `false`, los workflows `cron-*` quedan desactivados y se delega la ejecución al crontab de Hetzner. Manténla vacía o en `true` para que GitHub programe las tareas.
+
 ## Ejecución en Hetzner (crontab)
 
 ```
@@ -34,6 +38,7 @@ CRON_ALERT_WEBHOOK=  # Opcional. Webhook HTTPS (Slack/Teams) para alertas de fal
   - Si `CRON_ALERT_WEBHOOK` está definido y el cron falla, envía `POST` con `{ cron, durationMs, errors }`.
 - Para GitHub Actions, habilita notificaciones de workflow fallidos.
 - En Hetzner, redirige la salida de `curl` a `/var/log/clousadmin-cron.log` para revisión rápida.
+- Ejecuta `npx tsx scripts/verificar-crons.ts` para obtener un estado consolidado (fichajes procesados, solicitudes revisadas y variables configuradas).
 
 ## Checklist después de deploy
 

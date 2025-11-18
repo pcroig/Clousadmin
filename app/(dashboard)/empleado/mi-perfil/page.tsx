@@ -8,7 +8,11 @@ import { UsuarioRol } from '@/lib/constants/enums';
 
 import { MiPerfilClient } from './mi-perfil-client';
 
-export default async function MiPerfilPage() {
+export default async function MiPerfilPage({
+  searchParams,
+}: {
+  searchParams?: { modal?: string };
+}) {
   const session = await getSession();
 
   if (!session || session.user.rol !== UsuarioRol.empleado || !session.user.empleadoId) {
@@ -67,9 +71,15 @@ export default async function MiPerfilPage() {
 
   const empleadoSerializado = serializeEmpleadoSeguro(empleado);
 
+  const openDenunciaDialog = searchParams?.modal === 'denuncias';
+
   return (
     <Suspense fallback={<div className="p-6">Cargando...</div>}>
-      <MiPerfilClient empleado={empleadoSerializado} usuario={usuario} />
+      <MiPerfilClient
+        empleado={empleadoSerializado}
+        usuario={usuario}
+        openDenunciaDialog={openDenunciaDialog}
+      />
     </Suspense>
   );
 }

@@ -6,7 +6,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Calendar, Download, Shield, Trash2 } from 'lucide-react';
+import { ArrowLeft, Edit2, Calendar, ChevronRight } from 'lucide-react';
 import Link from 'next/link';
 import { toast } from 'sonner';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -18,49 +18,23 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { LoadingButton } from '@/components/shared/loading-button';
 import { CompensacionModal } from '@/components/hr/compensacion-modal';
 import { getAvatarStyle } from '@/lib/design-system';
-import type { Usuario, MiEspacioEmpleado } from '@/types/empleado';
-import { GeneralTab as GeneralTabShared } from '@/components/shared/mi-espacio/general-tab';
-import { FichajesTab as FichajesTabShared } from '@/components/shared/mi-espacio/fichajes-tab';
-import { ContratosTab as ContratosTabShared } from '@/components/shared/mi-espacio/contratos-tab';
-import { DocumentosTab as DocumentosTabShared } from '@/components/shared/mi-espacio/documentos-tab';
-import { getAusenciaEstadoLabel } from '@/lib/utils/formatters';
-import { EstadoAusencia } from '@/lib/constants/enums';
-
-interface AusenciaResumen {
-  id: string;
-  tipo: string;
-  fechaInicio: string;
-  fechaFin: string;
-  diasLaborables: number | null;
-  estado: string;
-  motivo: string | null;
-}
-
-interface EmpleadoDetalle {
-  id: string;
-  nombre: string;
-  apellidos: string;
-  email: string;
-  fotoUrl?: string | null;
-  diasVacaciones?: number | null;
-  ausencias?: AusenciaResumen[];
-}
+import type { Empleado, Usuario } from '@/types/empleado';
+import { GeneralTab as GeneralTabShared } from '../../../mi-espacio/tabs/general-tab';
+import { FichajesTab as FichajesTabShared } from '../../../mi-espacio/tabs/fichajes-tab';
+import { ContratosTab as ContratosTabShared } from '../../../mi-espacio/tabs/contratos-tab';
+import { DocumentosTab as DocumentosTabShared } from '../../../mi-espacio/tabs/documentos-tab';
 
 interface EmpleadoDetailClientProps {
-  empleado: EmpleadoDetalle;
-  empleadoMiEspacio: MiEspacioEmpleado;
+  empleado: Empleado;
   usuario: Usuario;
 }
 
-export function EmpleadoDetailClient({ empleado, empleadoMiEspacio, usuario }: EmpleadoDetailClientProps) {
+export function EmpleadoDetailClient({ empleado, usuario }: EmpleadoDetailClientProps) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState('general');
-  const [isExporting, setIsExporting] = useState(false);
-  const [showAnonymizeDialog, setShowAnonymizeDialog] = useState(false);
-  const [isAnonymizing, setIsAnonymizing] = useState(false);
 
   // Función helper para actualizar campos del empleado
-  const handleFieldUpdate = async (field: string, value: unknown) => {
+  const handleFieldUpdate = async (field: string, value: any) => {
     try {
       const response = await fetch(`/api/empleados/${empleado.id}`, {
         method: 'PATCH',
@@ -87,58 +61,6 @@ export function EmpleadoDetailClient({ empleado, empleadoMiEspacio, usuario }: E
 
   const avatarStyle = getAvatarStyle(`${empleado.nombre} ${empleado.apellidos || ''}`);
 
-  const handleExport = async () => {
-    setIsExporting(true);
-    try {
-      const response = await fetch(`/api/empleados/${empleado.id}/export`);
-      if (!response.ok) {
-        const error = await response.json().catch(() => ({}));
-        throw new Error(error.error || 'No se pudo exportar los datos');
-      }
-
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const filename = `empleado-${empleado.id}-export.json`;
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = filename;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-
-      toast.success('Exportación generada correctamente');
-    } catch (error) {
-      console.error('Error exportando datos:', error);
-      toast.error(error instanceof Error ? error.message : 'Error al exportar datos');
-    } finally {
-      setIsExporting(false);
-    }
-  };
-
-  const handleAnonymize = async () => {
-    setIsAnonymizing(true);
-    try {
-      const response = await fetch(`/api/empleados/${empleado.id}/anonymize`, {
-        method: 'POST',
-      });
-
-      if (!response.ok) {
-        const error = await response.json().catch(() => ({}));
-        throw new Error(error.error || 'No se pudo anonimizar el empleado');
-      }
-
-      toast.success('Empleado anonimizado correctamente');
-      setShowAnonymizeDialog(false);
-      router.push('/hr/organizacion/personas');
-    } catch (error) {
-      console.error('Error anonimizado empleado:', error);
-      toast.error(error instanceof Error ? error.message : 'Error al anonimizar empleado');
-    } finally {
-      setIsAnonymizing(false);
-    }
-  };
-
   const tabs = [
     { id: 'general', label: 'General' },
     { id: 'fichajes', label: 'Fichajes' },
@@ -159,44 +81,22 @@ export function EmpleadoDetailClient({ empleado, empleadoMiEspacio, usuario }: E
           <span className="text-sm">Volver</span>
         </Link>
 
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div className="flex items-center gap-4">
-            <Avatar className="h-16 w-16">
-              {empleado.fotoUrl && <AvatarImage src={empleado.fotoUrl} />}
-              <AvatarFallback
-                className="text-lg font-semibold uppercase"
-                style={avatarStyle}
-              >
-                {getInitials()}
-              </AvatarFallback>
-            </Avatar>
-
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">
-                {empleado.nombre} {empleado.apellidos}
-              </h1>
-              <p className="text-sm text-gray-500">{empleado.email}</p>
-            </div>
-          </div>
-
-          <div className="flex flex-wrap gap-3">
-            <LoadingButton
-              variant="outline"
-              onClick={handleExport}
-              loading={isExporting}
-              className="inline-flex items-center gap-2"
+        <div className="flex items-center gap-4">
+          <Avatar className="h-16 w-16">
+            {empleado.fotoUrl && <AvatarImage src={empleado.fotoUrl} />}
+            <AvatarFallback
+              className="text-lg font-semibold uppercase"
+              style={avatarStyle}
             >
-              <Download className="h-4 w-4" />
-              Exportar datos
-            </LoadingButton>
-            <Button
-              variant="destructive"
-              className="inline-flex items-center gap-2"
-              onClick={() => setShowAnonymizeDialog(true)}
-            >
-              <Shield className="h-4 w-4" />
-              Derecho al olvido
-            </Button>
+              {getInitials()}
+            </AvatarFallback>
+          </Avatar>
+
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">
+              {empleado.nombre} {empleado.apellidos}
+            </h1>
+            <p className="text-sm text-gray-500">{empleado.email}</p>
           </div>
         </div>
       </div>
@@ -222,61 +122,23 @@ export function EmpleadoDetailClient({ empleado, empleadoMiEspacio, usuario }: E
       <div className="flex-1 min-h-0 overflow-y-auto">
         {activeTab === 'general' && (
           <GeneralTabShared
-            empleado={empleadoMiEspacio}
+            empleado={empleado}
             usuario={usuario}
             rol="hr_admin"
             onFieldUpdate={handleFieldUpdate}
           />
         )}
-        {activeTab === 'fichajes' && (
-          <FichajesTabShared 
-            empleadoId={empleado.id}
-            empleado={empleadoMiEspacio}
-            contexto="hr_admin"
-          />
-        )}
+        {activeTab === 'fichajes' && <FichajesTabShared empleadoId={empleado.id} />}
         {activeTab === 'ausencias' && <AusenciasTab empleado={empleado} />}
         {activeTab === 'contratos' && (
           <ContratosTabShared
-            empleado={empleadoMiEspacio}
+            empleado={empleado}
             rol="hr_admin"
+            onFieldUpdate={handleFieldUpdate}
           />
         )}
-        {activeTab === 'documentos' && <DocumentosTabShared empleado={empleadoMiEspacio} />}
+        {activeTab === 'documentos' && <DocumentosTabShared empleado={empleado} />}
       </div>
-
-      <Dialog open={showAnonymizeDialog} onOpenChange={setShowAnonymizeDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-red-600">
-              <Trash2 className="h-4 w-4" />
-              Anonimizar empleado
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3 text-sm text-gray-600">
-            <p>
-              Esta acción elimina de forma irreversible los datos personales del empleado para cumplir con el derecho al olvido.
-            </p>
-            <ul className="list-disc pl-5 space-y-1">
-              <li>Se limpian datos personales, bancarios y de contacto.</li>
-              <li>Se desactiva la cuenta y se rompe el acceso al portal.</li>
-              <li>Los registros históricos permanecen sin información identificativa.</li>
-            </ul>
-          </div>
-          <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setShowAnonymizeDialog(false)}>
-              Cancelar
-            </Button>
-            <LoadingButton
-              variant="destructive"
-              loading={isAnonymizing}
-              onClick={handleAnonymize}
-            >
-              Confirmar anonimización
-            </LoadingButton>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
@@ -285,22 +147,22 @@ export function EmpleadoDetailClient({ empleado, empleadoMiEspacio, usuario }: E
 // AusenciasTab Component
 // ========================================
 interface AusenciasTabProps {
-  empleado: EmpleadoDetalle;
+  empleado: Empleado;
 }
 
 function AusenciasTab({ empleado }: AusenciasTabProps) {
   // Calcular saldo de ausencias
   const calcularSaldo = () => {
     const totalDias = empleado.diasVacaciones || 22;
-    const ausencias = empleado.ausencias ?? [];
+    const ausencias = empleado.ausencias || [];
 
     const diasUsados = ausencias
-      .filter((a) => a.estado === 'approved')
-      .reduce((sum, a) => sum + (a.diasLaborables ?? 0), 0);
+      .filter((a: any) => a.estado === 'approved')
+      .reduce((sum: number, a: any) => sum + (a.diasLaborables || 0), 0);
 
     const diasPendientes = ausencias
-      .filter((a) => a.estado === 'pending')
-      .reduce((sum, a) => sum + (a.diasLaborables ?? 0), 0);
+      .filter((a: any) => a.estado === 'pending')
+      .reduce((sum: number, a: any) => sum + (a.diasLaborables || 0), 0);
 
     const diasDisponibles = totalDias - diasUsados - diasPendientes;
 
@@ -313,28 +175,30 @@ function AusenciasTab({ empleado }: AusenciasTabProps) {
   };
 
   const saldo = calcularSaldo();
-  const ausencias = empleado.ausencias ?? [];
+  const ausencias = empleado.ausencias || [];
 
   // Ordenar ausencias por fecha (más recientes primero)
-  const ausenciasOrdenadas = [...ausencias].sort(
-    (a, b) =>
-      new Date(b.fechaInicio).getTime() - new Date(a.fechaInicio).getTime()
+  const ausenciasOrdenadas = ausencias.sort((a: any, b: any) => 
+    new Date(b.fechaInicio).getTime() - new Date(a.fechaInicio).getTime()
   );
 
   const getEstadoBadge = (estado: string) => {
-    const label = getAusenciaEstadoLabel(estado);
-
     switch (estado) {
-      case EstadoAusencia.confirmada:
-        return <Badge className="bg-green-100 text-green-800">{label}</Badge>;
-      case EstadoAusencia.rechazada:
-        return <Badge className="bg-red-100 text-red-800">{label}</Badge>;
-      case EstadoAusencia.pendiente:
-        return <Badge className="bg-yellow-100 text-yellow-800">{label}</Badge>;
-      case EstadoAusencia.completada:
-        return <Badge className="bg-gray-100 text-gray-800">{label}</Badge>;
+      case 'approved':
+      case 'auto_aprobada':
+      case 'en_curso':
+        return <Badge className="bg-green-100 text-green-800">Aprobado</Badge>;
+      case 'rejected':
+        return <Badge className="bg-red-100 text-red-800">Rechazado</Badge>;
+      case 'pending':
+      case 'pendiente_aprobacion':
+        return <Badge className="bg-yellow-100 text-yellow-800">Pendiente</Badge>;
+      case 'completada':
+        return <Badge className="bg-gray-100 text-gray-800">Completada</Badge>;
+      case 'cancelada':
+        return <Badge className="bg-gray-100 text-gray-800">Cancelada</Badge>;
       default:
-        return <Badge variant="secondary">{label}</Badge>;
+        return <Badge variant="secondary">{estado}</Badge>;
     }
   };
 
@@ -384,52 +248,50 @@ function AusenciasTab({ empleado }: AusenciasTabProps) {
           <h3 className="text-sm font-semibold text-gray-900">Historial de Ausencias</h3>
         </div>
 
-        <div className="overflow-x-auto px-4 pb-4">
-          <Table className="min-w-full">
-            <TableHeader>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Tipo</TableHead>
+              <TableHead>Fecha Inicio</TableHead>
+              <TableHead>Fecha Fin</TableHead>
+              <TableHead>Días</TableHead>
+              <TableHead>Estado</TableHead>
+              <TableHead>Motivo</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {ausenciasOrdenadas.length === 0 ? (
               <TableRow>
-                <TableHead>Tipo</TableHead>
-                <TableHead>Fecha Inicio</TableHead>
-                <TableHead>Fecha Fin</TableHead>
-                <TableHead>Días</TableHead>
-                <TableHead>Estado</TableHead>
-                <TableHead>Motivo</TableHead>
+                <TableCell colSpan={6} className="text-center py-8 text-gray-500">
+                  No hay ausencias registradas
+                </TableCell>
               </TableRow>
-            </TableHeader>
-            <TableBody>
-              {ausenciasOrdenadas.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8 text-gray-500">
-                    No hay ausencias registradas
+            ) : (
+              ausenciasOrdenadas.map((ausencia: any) => (
+                <TableRow key={ausencia.id}>
+                  <TableCell className="font-medium">
+                    {getTipoLabel(ausencia.tipo)}
+                  </TableCell>
+                  <TableCell>
+                    {new Date(ausencia.fechaInicio).toLocaleDateString('es-ES')}
+                  </TableCell>
+                  <TableCell>
+                    {new Date(ausencia.fechaFin).toLocaleDateString('es-ES')}
+                  </TableCell>
+                  <TableCell>
+                    {ausencia.diasLaborables || 0} {ausencia.diasLaborables === 1 ? 'día' : 'días'}
+                  </TableCell>
+                  <TableCell>
+                    {getEstadoBadge(ausencia.estado)}
+                  </TableCell>
+                  <TableCell className="text-sm text-gray-600">
+                    {ausencia.motivo || '-'}
                   </TableCell>
                 </TableRow>
-              ) : (
-                ausenciasOrdenadas.map((ausencia) => (
-                  <TableRow key={ausencia.id}>
-                    <TableCell className="font-medium">
-                      {getTipoLabel(ausencia.tipo)}
-                    </TableCell>
-                    <TableCell>
-                      {new Date(ausencia.fechaInicio).toLocaleDateString('es-ES')}
-                    </TableCell>
-                    <TableCell>
-                      {new Date(ausencia.fechaFin).toLocaleDateString('es-ES')}
-                    </TableCell>
-                    <TableCell>
-                      {ausencia.diasLaborables || 0} {ausencia.diasLaborables === 1 ? 'día' : 'días'}
-                    </TableCell>
-                    <TableCell>
-                      {getEstadoBadge(ausencia.estado)}
-                    </TableCell>
-                    <TableCell className="text-sm text-gray-600">
-                      {ausencia.motivo || '-'}
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
+              ))
+            )}
+          </TableBody>
+        </Table>
       </div>
     </div>
   );

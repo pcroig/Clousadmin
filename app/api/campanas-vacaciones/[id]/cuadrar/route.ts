@@ -6,6 +6,7 @@ import { NextRequest } from 'next/server';
 import { prisma, Prisma } from '@/lib/prisma';
 import { cuadrarVacacionesIA } from '@/lib/ia/cuadrar-vacaciones';
 import { UsuarioRol, EstadoAusencia } from '@/lib/constants/enums';
+import { crearNotificacionCampanaCuadrada } from '@/lib/notificaciones';
 
 import {
   requireAuth,
@@ -120,26 +121,16 @@ export async function POST(
     }
 
     // Enviar notificaciones a los empleados (solo los que tienen usuarioId)
-    const notificaciones = campana.preferencias
-      .filter(pref => pref.empleado.usuarioId) // Solo empleados con usuario asociado
-      .map(pref => ({
-        empresaId: session.user.empresaId,
-        usuarioId: pref.empleado.usuarioId!,
-        tipo: 'success',
-        titulo: 'Vacaciones cuadradas',
-        mensaje: `Tu campaña de vacaciones "${campana.titulo}" ha sido cuadrada. Revisa la propuesta.`,
-        metadata: {
-          campanaId,
-          tipo: 'campana_vacaciones_cuadrada',
-        },
-        leida: false,
-      }));
+    const usuarioIds = campana.preferencias
+      .filter(pref => pref.empleado.usuarioId)
+      .map(pref => pref.empleado.usuarioId!) ;
 
-    if (notificaciones.length > 0) {
-      await prisma.notificacion.createMany({
-        data: notificaciones,
-      });
-    }
+    await crearNotificacionCampanaCuadrada(prisma, {
+      campanaId,
+      empresaId: session.user.empresaId,
+      titulo: campana.titulo,
+      usuarioIds,
+    });
 
     console.info(`[Cuadrar] Campaña ${campanaId} cuadrada exitosamente`);
 

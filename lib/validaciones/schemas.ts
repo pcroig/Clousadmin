@@ -24,6 +24,11 @@ export const signupSchema = z.object({
   apellidos: z.string().min(1, 'Apellidos requeridos'),
   email: z.string().email('Email inválido'),
   password: z.string().min(8, 'La contraseña debe tener al menos 8 caracteres'),
+  consentimientoTratamiento: z
+    .boolean()
+    .refine((value) => value === true, {
+      message: 'Debes aceptar el tratamiento de datos para continuar',
+    }),
 });
 
 export type SignupInput = z.infer<typeof signupSchema>;

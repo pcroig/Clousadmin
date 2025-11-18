@@ -8,9 +8,10 @@ import { useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
-import { CalendarClock, ShieldCheck, BellRing } from 'lucide-react';
+import { BellRing, CalendarClock, ShieldAlert, ShieldCheck } from 'lucide-react';
 
 interface GeneralSettingsProps {
   usuario: {
@@ -24,6 +25,8 @@ interface GeneralSettingsProps {
 export function GeneralSettings({ usuario }: GeneralSettingsProps) {
   const [weeklySummary, setWeeklySummary] = useState(true);
   const [incidentAlerts, setIncidentAlerts] = useState(false);
+  const [showDerechoDialog, setShowDerechoDialog] = useState(false);
+  const [isRequestingDerecho, setIsRequestingDerecho] = useState(false);
 
   const formattedLastAccess = useMemo(() => {
     if (!usuario.ultimoAcceso) {
@@ -148,6 +151,31 @@ export function GeneralSettings({ usuario }: GeneralSettingsProps) {
 
       <Card>
         <CardHeader className="flex items-start gap-3">
+          <div className="rounded-md bg-red-50 p-2">
+            <ShieldAlert className="h-5 w-5 text-red-600" />
+          </div>
+          <div>
+            <CardTitle>Derecho al olvido</CardTitle>
+            <CardDescription>
+              Solicita la eliminación/anónimización de tus datos personales ante el equipo de RR.HH.
+            </CardDescription>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-gray-600">
+            Registramos tu petición y avisamos automáticamente a RR.HH. para que analice la solicitud.
+            Mientras tanto, puedes exportar tus datos desde la sección de privacidad si lo deseas.
+          </p>
+          <div className="flex justify-end">
+            <Button variant="destructive" onClick={() => setShowDerechoDialog(true)}>
+              Solicitar derecho al olvido
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="flex items-start gap-3">
           <div className="rounded-md bg-amber-50 p-2">
             <BellRing className="h-5 w-5 text-amber-600" />
           </div>
@@ -213,6 +241,56 @@ export function GeneralSettings({ usuario }: GeneralSettingsProps) {
           </ul>
         </CardContent>
       </Card>
+
+      <Dialog open={showDerechoDialog} onOpenChange={setShowDerechoDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-600">
+              <ShieldAlert className="h-5 w-5" />
+              Confirmar solicitud
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-gray-600">
+            Al confirmar registramos tu petición de derecho al olvido y notificamos a RR.HH. para que
+            revise el caso. La respuesta puede tardar varios días y no eliminará los datos de forma
+            inmediata hasta que se procese la aprobación.
+          </p>
+          <DialogFooter className="gap-2 mt-6">
+            <Button variant="outline" onClick={() => setShowDerechoDialog(false)}>
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={async () => {
+                setIsRequestingDerecho(true);
+                try {
+                  const response = await fetch('/api/empleados/derecho-olvido', {
+                    method: 'POST',
+                  });
+                  const payload = await response.json().catch(() => null);
+                  if (!response.ok) {
+                    throw new Error(payload?.error || 'No se pudo registrar la solicitud');
+                  }
+                  toast.success('Solicitud de derecho al olvido registrada');
+                  setShowDerechoDialog(false);
+                } catch (error) {
+                  console.error('Solicitud derecho al olvido:', error);
+                  toast.error(
+                    error instanceof Error
+                      ? error.message
+                      : 'Hubo un error registrando la solicitud'
+                  );
+                } finally {
+                  setIsRequestingDerecho(false);
+                }
+              }}
+              disabled={isRequestingDerecho}
+            >
+              {isRequestingDerecho ? 'Registrando...' : 'Confirmar solicitud'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

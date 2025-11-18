@@ -39,7 +39,7 @@ interface SolicitudesWidgetProps {
 export const SolicitudesWidget = memo(function SolicitudesWidget({
   solicitudes,
   maxItems = 8,
-  dashboardHref = '/hr/bandeja-entrada',
+  dashboardHref = '/hr/bandeja-entrada?tab=solicitudes',
 }: SolicitudesWidgetProps) {
   const router = useRouter();
   const [accionEnCurso, setAccionEnCurso] = useState<{

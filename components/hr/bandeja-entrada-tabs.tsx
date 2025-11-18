@@ -37,6 +37,8 @@ type NotificacionItem = Parameters<
   typeof BandejaEntradaNotificaciones
 >[0]['notificaciones'][number];
 
+export type BandejaEntradaTab = 'solicitudes' | 'auto-completed' | 'notificaciones';
+
 interface BandejaEntradaTabsProps {
   solicitudesPendientes: SolicitudPendiente[];
   solicitudesResueltas: SolicitudResuelta[];
@@ -51,9 +53,8 @@ interface BandejaEntradaTabsProps {
     title: string;
     description?: string;
   };
+  initialTab?: BandejaEntradaTab;
 }
-
-type TabType = 'solicitudes' | 'auto-completed' | 'notificaciones';
 
 export function BandejaEntradaTabs({
   solicitudesPendientes,
@@ -62,8 +63,11 @@ export function BandejaEntradaTabs({
   solvedItems,
   notificaciones,
   header,
+  initialTab,
 }: BandejaEntradaTabsProps) {
-  const [activeTab, setActiveTab] = useState<TabType>('solicitudes');
+  const tabs: BandejaEntradaTab[] = ['solicitudes', 'auto-completed', 'notificaciones'];
+  const normalizedInitialTab = initialTab && tabs.includes(initialTab) ? initialTab : 'solicitudes';
+  const [activeTab, setActiveTab] = useState<BandejaEntradaTab>(normalizedInitialTab);
   const router = useRouter();
   const [autoApproveLoading, setAutoApproveLoading] = useState(false);
 

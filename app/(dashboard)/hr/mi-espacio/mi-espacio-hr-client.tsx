@@ -6,9 +6,10 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Edit2, Flag } from 'lucide-react';
+import { Flag } from 'lucide-react';
 import { toast } from 'sonner';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { AvatarEditButton } from '@/components/shared/avatar-edit-button';
 import { Button } from '@/components/ui/button';
 import { GeneralTab } from '@/components/shared/mi-espacio/general-tab';
 import { FichajesTab } from '@/components/shared/mi-espacio/fichajes-tab';
@@ -27,7 +28,6 @@ interface MiEspacioHRClientProps {
 export function MiEspacioHRClient({ empleado, usuario }: MiEspacioHRClientProps) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState('general');
-  const [editingProfile, setEditingProfile] = useState(false);
   const [denunciaDialogOpen, setDenunciaDialogOpen] = useState(false);
 
   const getInitials = () => {
@@ -83,13 +83,7 @@ export function MiEspacioHRClient({ empleado, usuario }: MiEspacioHRClientProps)
                   {getInitials()}
                 </AvatarFallback>
               </Avatar>
-              <button
-                onClick={() => setEditingProfile(!editingProfile)}
-                className="absolute -bottom-1 -right-1 text-gray-600 hover:text-[#c6613f] transition-colors p-1"
-                title="Editar foto de perfil"
-              >
-                <Edit2 className="w-4 h-4" />
-              </button>
+              <AvatarEditButton empleadoId={empleado.id} />
             </div>
 
             <div>
