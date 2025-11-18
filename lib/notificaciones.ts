@@ -1383,6 +1383,44 @@ export async function crearNotificacionDocumentoGeneradoEmpleado(
 }
 
 /**
+ * Notifica al empleado que tiene un documento pendiente de completar
+ * (documento con campos que el empleado debe rellenar)
+ */
+export async function crearNotificacionDocumentoPendienteRellenar(
+  prisma: PrismaClient,
+  params: {
+    empresaId: string;
+    empleadoId: string;
+    documentoGeneradoId: string;
+    documentoId: string;
+    documentoNombre: string;
+  }
+) {
+  const { empresaId, empleadoId, documentoGeneradoId, documentoId, documentoNombre } = params;
+
+  const usuarioIds = await obtenerUsuariosANotificar(prisma, empresaId, {
+    empleado: empleadoId,
+  });
+
+  await crearNotificaciones(prisma, {
+    empresaId,
+    usuarioIds,
+    tipo: 'documento_pendiente_rellenar',
+    titulo: 'Documento pendiente de completar',
+    mensaje: `Tienes que completar los campos del documento "${documentoNombre}".`,
+    metadata: {
+      documentoId,
+      documentoNombre,
+      documentoGeneradoId,
+      prioridad: 'alta',
+      accionUrl: `/empleado/mi-espacio/documentos?documento=${documentoGeneradoId}`,
+      accionTexto: 'Completar documento',
+      requiresModal: true,
+    },
+  });
+}
+
+/**
  * Notifica cuando se completa la generación masiva de documentos (lote)
  */
 export async function crearNotificacionDocumentoGeneracionLote(
