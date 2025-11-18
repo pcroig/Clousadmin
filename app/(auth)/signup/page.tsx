@@ -62,12 +62,14 @@ export default async function SignupPage({ searchParams }: SignupPageProps) {
       {/* Columna derecha: Imagen */}
       <div className="bg-muted relative hidden lg:block">
         <Image
-          src="/login-hero.png"
-          alt="HR Management"
+          src="/login-hero.webp"
+          alt="HR Management - Plataforma moderna de gestión de recursos humanos"
           fill
           priority
           className="object-cover dark:brightness-[0.2] dark:grayscale"
           sizes="50vw"
+          placeholder="blur"
+          blurDataURL="data:image/webp;base64,UklGRswAAABXRUJQVlA4IMAAAADQBQCdASoUAB4APzmEuFOvKCUisAgB4CcJaACdMxsz6sAw3hp6Ev+tcb4kC1isuJnlUtNq/03gAP7gqk6rPC+I5tr7pMod2TP9HBNGwhhOTpVccvn5R/iBD0x59C9o9m3pGiNMV0vQ36ROW6loL8Kb1XnrkDWDtxOn+Yk1WYtxUuMMBeM6QsX9lojSsSBfcv/ztZIguvIx8sfpLBeuXHIerSA3AW+8EjzriG06hv3dUzJq/6FFf19JbIlAdUo5oAA="
         />
       </div>
     </div>

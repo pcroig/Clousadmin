@@ -21,12 +21,18 @@ const buttonVariants = cva(
         link: "text-gray-900 underline-offset-4 hover:underline",
       },
       size: {
-        default: "h-9 px-4 py-2 has-[>svg]:px-3 rounded-md",
-        sm: "h-8 rounded-md gap-1.5 px-3 has-[>svg]:px-2.5",
-        lg: "h-10 rounded-lg px-6 has-[>svg]:px-4",
-        icon: "size-9 rounded-md",
-        "icon-sm": "size-8 rounded-md",
-        "icon-lg": "size-10 rounded-lg",
+        // ✅ WCAG 2.5.5: 44px mínimo en mobile, 36px en desktop
+        default: "h-11 px-4 py-2 has-[>svg]:px-3 rounded-md sm:h-9",
+        // ✅ WCAG 2.5.5: 40px mínimo en mobile, 32px en desktop
+        sm: "h-10 rounded-md gap-1.5 px-3 has-[>svg]:px-2.5 sm:h-8",
+        // ✅ WCAG 2.5.5: 48px en mobile, 40px en desktop
+        lg: "h-12 rounded-lg px-6 has-[>svg]:px-4 sm:h-10",
+        // ✅ WCAG 2.5.5: 44x44 en mobile, 36x36 en desktop
+        icon: "size-11 rounded-md sm:size-9",
+        // ✅ WCAG 2.5.5: 40x40 en mobile, 32x32 en desktop
+        "icon-sm": "size-10 rounded-md sm:size-8",
+        // ✅ WCAG 2.5.5: 48x48 en mobile, 40x40 en desktop
+        "icon-lg": "size-12 rounded-lg sm:size-10",
       },
     },
     defaultVariants: {

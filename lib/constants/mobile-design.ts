@@ -6,39 +6,57 @@
 
 export const MOBILE_DESIGN = {
   /**
-   * Tamaños de texto - Compactos para mobile
+   * Tamaños de texto - Responsive mobile-first
    */
   text: {
     // Títulos
-    pageTitle: 'text-lg font-bold', // Buenos días (solo desktop)
-    widgetTitle: 'text-sm font-semibold', // Título de widget
+    pageTitle: 'text-lg font-bold sm:text-xl', // Responsive
+    widgetTitle: 'text-sm font-semibold sm:text-base', // Responsive
     sectionTitle: 'text-sm font-semibold', // Próximas ausencias
 
     // Contenido
-    display: 'text-xl font-bold', // Cronómetro principal - compacto para mobile
-    body: 'text-xs', // Texto del cuerpo más pequeño
+    display: 'text-xl font-bold sm:text-2xl', // Responsive
+    body: 'text-sm sm:text-xs', // Mobile first (más grande en mobile)
     caption: 'text-[11px] text-gray-500',
     tiny: 'text-[10px] text-gray-500',
   },
 
   /**
-   * Botones - Más compactos pero táctiles
+   * Botones - ✅ WCAG 2.5.5 compliant (44px mínimo en mobile)
    */
   button: {
-    // Altura mínima para touch targets
-    primary: 'min-h-[40px] text-xs font-semibold py-2.5',
-    secondary: 'min-h-[38px] text-[11px] py-2',
-    compact: 'min-h-[36px] text-[10px] py-1.5',
+    // ✅ Touch targets correctos: 44px mobile, 40px desktop
+    primary: 'min-h-[44px] sm:min-h-[40px] text-sm font-semibold py-2.5',
+    secondary: 'min-h-[44px] sm:min-h-[38px] text-xs py-2',
+    compact: 'min-h-[40px] sm:min-h-[36px] text-[11px] py-1.5',
   },
 
   /**
-   * Espaciado - Reducido para mobile
+   * Espaciado - Responsive
    */
   spacing: {
-    widget: 'p-3',
-    card: 'p-2.5',
-    section: 'space-y-2',
-    items: 'space-y-1.5',
+    widget: 'p-4 sm:p-3', // Más padding en mobile
+    card: 'p-3 sm:p-2.5', // Más padding en mobile
+    section: 'space-y-3 sm:space-y-2', // Más espacio en mobile
+    items: 'space-y-2 sm:space-y-1.5', // Más espacio en mobile
+  },
+
+  /**
+   * Touch Targets - WCAG 2.5.5
+   */
+  touchTarget: {
+    minimum: 'min-h-[44px] min-w-[44px]', // Mínimo WCAG
+    comfortable: 'min-h-[48px] min-w-[48px]', // Cómodo
+    large: 'min-h-[56px] min-w-[56px]', // Grande
+  },
+
+  /**
+   * Safe Areas - Para dispositivos con notch
+   */
+  safeArea: {
+    top: 'pt-safe',
+    bottom: 'pb-safe',
+    paddingBottom: 'pb-20 sm:pb-0', // Para bottom nav
   },
 
   /**

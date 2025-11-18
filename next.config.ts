@@ -16,6 +16,18 @@ const nextConfig: NextConfig = {
 
   // Configuración de imágenes (para Hetzner Object Storage y avatares)
   images: {
+    // ✅ Formatos modernos optimizados (AVIF mejor compresión, WebP fallback)
+    formats: ['image/avif', 'image/webp'],
+
+    // ✅ Tamaños de dispositivos para responsive images
+    deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048, 3840],
+
+    // ✅ Tamaños de imágenes para diferentes usos (iconos, thumbnails, etc.)
+    imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
+
+    // ✅ Minimizar imágenes automáticamente (caché de 1 año)
+    minimumCacheTTL: 31536000,
+
     remotePatterns: [
       {
         protocol: 'https',
@@ -35,6 +47,12 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+
+  // ✅ Compresión habilitada
+  compress: true,
+
+  // ✅ Ocultar header "Powered by Next.js" (seguridad)
+  poweredByHeader: false,
 
   // Headers de seguridad
   async headers() {
