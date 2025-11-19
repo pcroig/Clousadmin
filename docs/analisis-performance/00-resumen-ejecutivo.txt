@@ -1,0 +1,209 @@
+╔════════════════════════════════════════════════════════════════════════════╗
+║                 ANÁLISIS EXHAUSTIVO DE MODELOS DE DATOS                    ║
+║                    Clousadmin - Problemas de Performance                   ║
+╚════════════════════════════════════════════════════════════════════════════╝
+
+HALLAZGOS PRINCIPALES:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📊 PROBLEMAS N+1 CRÍTICOS DETECTADOS:
+
+1. 🔴 BOLSA DE HORAS (app/api/fichajes/bolsa-horas/route.ts)
+   Impacto: ~16,500 queries innecesarias
+   └─ Loop sobre 500 empleados × 33 queries/empleado
+   Solución: Usar batch calcularBalanceMensualBatch()
+   Mejora: 99.7% reducción (16,500 → ~50 queries)
+
+2. 🔴 REVISIÓN DE FICHAJES (app/api/fichajes/revision/route.ts)
+   Impacto: ~100 queries N+1
+   └─ Promise.all().map() con findUnique dentro
+   Solución: Precarguar fichajes con findMany
+   Mejora: 95% reducción (100 → ~5 queries)
+
+3. 🔴 EVENTOS DE NÓMINA (app/api/nominas/eventos/route.ts)
+   Impacto: ~12 queries N+1
+   └─ Loop sobre eventos consultando compensaciones
+   Solución: Query agregada única
+   Mejora: 85% reducción (12 → 1 query)
+
+4. 🟡 BALANCE DE HORAS (lib/calculos/balance-horas.ts)
+   Impacto: 30 queries por empleado por período
+   └─ Loop sobre diasDelPeriodo con esDiaLaborable()
+   Solución: Batch processing o cacheo
+   Mejora: 50% reducción (30+ → 5-10 queries)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📈 QUERIES MÁS COMUNES Y SU ESTADO:
+
+✅ API FICHAJES (/api/fichajes)
+   └─ Query principal bien optimizada con SELECT
+   └─ Carga 500 max, eventos incluidos
+   └─ Relaciones: empleado (con select), eventos
+
+✅ API AUSENCIAS (/api/ausencias)
+   └─ Bien optimizado con SELECT
+   └─ Carga empleado con datos parciales
+   └─ Relaciones: empleado, documento (opcional)
+
+⚠️ API NÓMINAS - ANALYTICS (/api/nominas/analytics)
+   └─ Carga masiva de complementos y equipos
+   └─ Bien optimizado pero puede simplificarse
+   └─ Relaciones: empleado, equipo, complementos
+
+✅ API EMPLEADOS (/api/empleados)
+   └─ Bien optimizado con SELECT
+   └─ Carga usuario, manager, puesto, equipos
+   └─ Estado: Optimización buena
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📊 CAMPOS JSONB IDENTIFICADOS:
+
+Campo              Modelo                  Frecuencia  Problema
+─────────────────────────────────────────────────────────────────────────────
+config             Jornada                 ALTA        Sin índice, muy usado
+config             Empresa                 MEDIA       Sin índice
+config             Integracion             MEDIA       Contiene credentials
+datosExtraidos     Documento               BAJA        IA extraction
+revisionIA         Ausencia                MEDIA       Análisis IA
+datosTemporales    OnboardingEmpleado      BAJA        Temporal
+camposCompletados  DocumentoGenerado       BAJA        Tracking
+
+🔧 SOLUCIÓN: Jornada.config se carga en CADA fichaje
+   └─ Usar SELECT explícito o precachear en Redis
+   └─ O agregar índice JSONB en Postgres
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🏗️ ÍNDICES FALTANTES:
+
+Modelo                    Índice Faltante
+─────────────────────────────────────────────────────────────────────────────
+Empleado                  @@index([empresaId, activo])
+FichajeEvento             @@index([fichajeId, tipo])
+FichajeEvento             @@index([tipo, hora])
+Nomina                    @@index([empresaId, estado])
+Nomina                    @@index([mes, anio, estado])
+EventoNomina              @@index([estado])
+AutoCompletado            @@index([createdAt])
+CompensacionHoraExtra     @@index([createdAt, estado]) 🔴 CRÍTICO
+CompensacionHoraExtra     @@index([empresaId, estado])
+
+Impacto estimado: 15% mejora en queries de filtrado
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🔄 CAMPOS CALCULADOS SIN CACHEO:
+
+1. Balance de Horas
+   └─ Se recalcula cada vez (30+ queries)
+   └─ Solución: Tabla ResumenBalanceMensualFichaje
+   └─ Invalidar on fichaje.create/update
+
+2. Resumen Mensual de Nómina
+   └─ Modelo ResumenMensualNomina existe
+   └─ ¿Se usa? Verificar si se calcula automáticamente
+
+3. Saldo de Ausencias (EmpleadoSaldoAusencias)
+   └─ ✅ Ya cacheado y bien optimizado
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🚀 MODELO EMPLEADO (Análisis de Relaciones):
+
+Empleado tiene 28+ RELACIONES:
+
+Core (✅ Necesarias):
+  - usuario (1:1)
+  - manager (1:1 self-ref)
+  - empleadosACargo (1:N self-ref)
+  - jornada, puesto, equipos
+
+Time Tracking (✅):
+  - ausencias, fichajes
+
+Payroll (✅):
+  - contratos, nominas, complementos
+
+Documents (✅):
+  - documentos, carpetas
+
+Workflow (⚠️ Muchas):
+  - solicitudesCambio, autoCompletados, firmas
+  - invitacion, onboarding
+  - preferenciasVacaciones
+  - alertasNomina, resumenesNomina, compensacionesHoras
+  - consentimientos, denuncias
+  - documentosGenerados
+  - solicitudesCorreccionFichaje
+
+⚠️ RECOMENDACIÓN: SIEMPRE usar SELECT cuando queries Empleado
+   ❌ const emp = prisma.empleado.findUnique({where: {id}})
+   ✅ const emp = prisma.empleado.findUnique({
+        where: {id}, 
+        select: {id, nombre, email, ...}
+      })
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📋 PLAN DE ACCIÓN:
+
+SEMANA 1 - CRÍTICO (3 problemas N+1):
+├─ [3h] Implementar calcularBalanceMensualBatch()
+├─ [2h] Optimizar revisión de fichajes (precarga)
+├─ [1.5h] Resolver eventos de nómina (query agregada)
+└─ Impacto esperado: 95% reducción en queries críticas
+
+SEMANA 2 - ÍNDICES Y CACHEO:
+├─ [0.5h] Agregar índices faltantes
+├─ [4h] Implementar cache balance horas
+├─ [2h] Optimizar jornada.config (Redis/índice)
+└─ Impacto esperado: 15-50% mejora adicional
+
+SEMANA 3 - MEJORAS ARQUITECTÓNICAS:
+├─ Considerar split Empleado en múltiples modelos
+├─ Implementar lazy loading
+└─ Performance testing y validación
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📊 RESUMEN DE IMPACTO:
+
+ESCENARIO ACTUAL (PEOR CASO):
+  Empleados:        500
+  Período:          1 mes
+  Bolsa de horas:   ~16,500 queries ❌
+  Total potencial:  ~20,000 queries
+
+DESPUÉS DE FIXES (CRÍTICAS):
+  Bolsa de horas:   ~50 queries ✅
+  Total potencial:  ~4,000 queries (80% reducción)
+
+DESPUÉS DE TODAS LAS MEJORAS:
+  Total potencial:  ~500-1,000 queries (95%+ reducción)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+ARCHIVOS CRÍTICOS A REVISAR:
+
+✓ app/api/fichajes/bolsa-horas/route.ts        (Línea 68-77)
+✓ app/api/fichajes/revision/route.ts           (Línea 69-130)
+✓ app/api/nominas/eventos/route.ts             (Línea 69-128)
+✓ lib/calculos/balance-horas.ts                (Línea 200-208)
+✓ prisma/schema.prisma                         (Agregar índices)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+DOCUMENTACIÓN GENERADA:
+
+📄 1. analisis_datos_models.md
+   └─ Análisis exhaustivo (7,000+ palabras)
+   └─ Patrones de queries, N+1, JSONB, índices, relaciones, cacheo
+
+📄 2. soluciones_codigo.md
+   └─ Ejemplos de código implementables
+   └─ Soluciones para cada problema
+   └─ Scripts de migración
+
+═════════════════════════════════════════════════════════════════════════════════
