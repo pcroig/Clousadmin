@@ -106,6 +106,42 @@ enum EstadoSolicitudCorreccionFichaje {
   rechazada
 }
 
+/// Estado de las integraciones
+enum IntegracionEstado {
+  conectada // Integración activa y funcionando
+  desconectada // Desconectada manualmente
+  error // Error de conexión
+  token_expirado // Token expirado, necesita reconexión
+  pendiente // En proceso de configuración
+}
+
+/// Tipos de integración
+enum TipoIntegracion {
+  comunicacion // Slack, Teams, etc.
+  calendario // Google Calendar, Outlook, etc.
+  almacenamiento // Drive, OneDrive, etc.
+  nominas // Payfit, Factorial, etc.
+  hr // BambooHR, Personio, etc.
+  email // Gmail, Outlook, etc.
+}
+
+/// Estado de sincronización
+enum EstadoSync {
+  pendiente
+  en_progreso
+  completada
+  fallida
+  parcial // Completada parcialmente con algunos errores
+}
+
+/// Tipo de sincronización
+enum TipoSync {
+  manual // Iniciada manualmente por usuario
+  automatica // Programada automáticamente
+  webhook // Disparada por webhook
+  inicial // Primera sincronización completa
+}
+
 // ========================================
 // 1. CORE ENTITIES (Empresa, Usuario, Empleado)
 // ========================================
@@ -441,34 +477,185 @@ model Sede {
 
 /// Integracion - External integrations configuration
 /// Stores integration settings for calendar, communication, and payroll systems
+/// Integracion - External service integrations
+/// Manages connections to third-party services (Slack, Google, Microsoft, etc.)
 model Integracion {
-  id        String  @id @default(uuid())
+  id        String             @id @default(uuid())
   empresaId String
-  usuarioId String? // NULL = integración a nivel de empresa, NOT NULL = integración personal
+  usuarioId String?            // NULL = integración a nivel de empresa, NOT NULL = integración personal
 
-  tipo      String @db.VarChar(50) // 'calendario', 'comunicacion', 'nominas'
-  proveedor String @db.VarChar(100) // 'google_calendar', 'outlook', 'slack', 'teams', etc.
+  tipo      TipoIntegracion    // Enum: calendario, comunicacion, almacenamiento, nominas, hr, email
+  proveedor String             @db.VarChar(100) // 'google_calendar', 'outlook', 'slack', 'teams', etc.
+  estado    IntegracionEstado  @default(pendiente) // Estado actual de la integración
 
-  // Configuration (JSONB for flexibility - credentials, API keys, etc.)
+  // Configuration (JSONB for flexibility)
   // For calendar: { "accessToken": "...", "refreshToken": "...", "expiresAt": 123456, "scope": "...", "channelId": "...", "resourceId": "..." }
-  config Json? // e.g., { "apiKey": "...", "webhookUrl": "...", "enabled_features": [...] }
+  config    Json?              // Configuración específica del proveedor
 
-  // Calendar-specific fields
-  calendarId String? @db.VarChar(255) // ID del calendario en Google/Outlook
+  // Provider-specific fields
+  calendarId String?           @db.VarChar(255) // ID del calendario en Google/Outlook
 
-  activa Boolean @default(true)
+  activa    Boolean            @default(true)
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  // Metadata de uso
+  ultimaSync DateTime?         // Última vez que se sincronizó
+  totalSyncs Int               @default(0) // Contador de sincronizaciones
+
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
 
   // Relations
-  empresa Empresa @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  empresa  Empresa              @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  token    IntegracionToken?
+  webhooks IntegracionWebhook[]
+  syncLogs IntegracionSyncLog[]
+  eventos  IntegracionEvento[]
 
   @@unique([empresaId, tipo, proveedor, usuarioId]) // Only one integration per type, provider, and user
   @@index([empresaId])
   @@index([usuarioId])
   @@index([tipo])
+  @@index([estado])
   @@map("integraciones")
+}
+
+/// IntegracionToken - OAuth token management
+/// Stores and manages OAuth tokens with automatic refresh
+model IntegracionToken {
+  id            String   @id @default(uuid())
+  integracionId String   @unique
+
+  // OAuth tokens (encrypted in application layer)
+  accessToken   String   @db.Text  // Access token (encrypted)
+  refreshToken  String?  @db.Text  // Refresh token (encrypted)
+  tokenType     String   @default("Bearer") @db.VarChar(50)
+  expiresAt     DateTime
+
+  // Scopes y permisos
+  scopes        String[] // Array de scopes otorgados
+
+  // Metadata
+  lastRefreshed DateTime @default(now())
+  refreshCount  Int      @default(0)
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  integracion   Integracion @relation(fields: [integracionId], references: [id], onDelete: Cascade)
+
+  @@index([integracionId])
+  @@index([expiresAt]) // Para encontrar tokens próximos a expirar
+  @@map("integracion_tokens")
+}
+
+/// IntegracionWebhook - Webhook management
+/// Manages webhooks from external providers
+model IntegracionWebhook {
+  id            String   @id @default(uuid())
+  integracionId String
+
+  // Webhook config
+  webhookId     String?  @db.VarChar(255) // ID del webhook en el proveedor
+  webhookUrl    String   @db.Text         // URL del webhook en nuestro sistema
+  secret        String?  @db.Text         // Secret para validar firma (encrypted)
+
+  // Eventos suscritos
+  eventos       String[] // Array de eventos: ['message.created', 'user.updated']
+
+  // Estado
+  activo        Boolean  @default(true)
+  ultimoEvento  DateTime?
+  totalEventos  Int      @default(0)
+
+  // Expiración (para webhooks que expiran como Google Calendar)
+  expiresAt     DateTime?
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  integracion   Integracion         @relation(fields: [integracionId], references: [id], onDelete: Cascade)
+  eventos_      IntegracionEvento[]
+
+  @@index([integracionId])
+  @@index([activo])
+  @@index([expiresAt])
+  @@map("integracion_webhooks")
+}
+
+/// IntegracionSyncLog - Synchronization history
+/// Tracks all synchronization attempts and their results
+model IntegracionSyncLog {
+  id                String      @id @default(uuid())
+  integracionId     String
+
+  tipo              TipoSync
+  estado            EstadoSync  @default(pendiente)
+
+  // Timing
+  iniciadaEn        DateTime    @default(now())
+  finalizadaEn      DateTime?
+  duracion          Int?        // Duración en milisegundos
+
+  // Resultados
+  itemsProcesados   Int         @default(0)
+  itemsCreados      Int         @default(0)
+  itemsActualizados Int         @default(0)
+  itemsEliminados   Int         @default(0)
+  itemsFallidos     Int         @default(0)
+
+  // Error info
+  error             String?     @db.Text
+  errorStack        String?     @db.Text
+
+  // Metadata
+  metadata          Json?       // Info adicional específica del proveedor
+
+  createdAt         DateTime    @default(now())
+
+  // Relations
+  integracion       Integracion @relation(fields: [integracionId], references: [id], onDelete: Cascade)
+
+  @@index([integracionId])
+  @@index([estado])
+  @@index([iniciadaEn])
+  @@map("integracion_sync_logs")
+}
+
+/// IntegracionEvento - Incoming integration events
+/// Stores events received from webhooks for processing
+model IntegracionEvento {
+  id            String   @id @default(uuid())
+  integracionId String
+  webhookId     String?  // Si vino de un webhook
+
+  // Evento info
+  tipoEvento    String   @db.VarChar(100) // 'message.created', 'calendar.event.updated'
+  proveedor     String   @db.VarChar(50)  // 'slack', 'google', 'microsoft'
+
+  // Payload
+  payload       Json     // Payload completo del evento
+
+  // Processing
+  procesado     Boolean  @default(false)
+  procesadoEn   DateTime?
+  error         String?  @db.Text
+
+  // Metadata
+  metadata      Json?    // Info adicional
+
+  createdAt     DateTime @default(now())
+
+  // Relations
+  integracion   Integracion         @relation(fields: [integracionId], references: [id], onDelete: Cascade)
+  webhook       IntegracionWebhook? @relation(fields: [webhookId], references: [id], onDelete: SetNull)
+
+  @@index([integracionId])
+  @@index([procesado])
+  @@index([tipoEvento])
+  @@index([createdAt])
+  @@map("integracion_eventos")
 }
 
 // ========================================
