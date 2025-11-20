@@ -475,10 +475,9 @@ model Sede {
   @@map("sedes")
 }
 
-/// Integracion - External integrations configuration
-/// Stores integration settings for calendar, communication, and payroll systems
 /// Integracion - External service integrations
 /// Manages connections to third-party services (Slack, Google, Microsoft, etc.)
+/// Stores integration settings for calendar, communication, payroll and HR systems
 model Integracion {
   id        String             @id @default(uuid())
   empresaId String
