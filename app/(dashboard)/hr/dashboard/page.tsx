@@ -1,16 +1,16 @@
 // ========================================
-// HR Dashboard Page - 3 Column Layout (Fits in screen)
+// HR Dashboard Page - Adaptive Mobile/Desktop
 // ========================================
+//
+// Mobile: Fichaje compacto (1 fila) + Plantilla
+// Desktop: Grid 3x2 completo
 
 import { getSession } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import { EstadoAusencia, TipoFichajeEvento, UsuarioRol } from '@/lib/constants/enums';
-import { FichajeWidget } from '@/components/shared/fichaje-widget';
-import { SolicitudesWidget } from '@/components/shared/solicitudes-widget';
-import { NotificacionesWidget, Notificacion } from '@/components/shared/notificaciones-widget';
-import { PlantillaWidget } from '@/components/dashboard/plantilla-widget';
-import { AutoCompletadoWidget } from '@/components/shared/auto-completado-widget';
+import { HRAdminDashboard } from '@/components/adaptive/HRAdminDashboard';
+import type { Notificacion } from '@/components/shared/notificaciones-widget';
 import { obtenerResumenPlantilla } from '@/lib/calculos/plantilla';
 
 export default async function HRDashboardPage() {
@@ -180,53 +180,16 @@ export default async function HRDashboardPage() {
   });
 
   return (
-    <div className="h-full w-full flex flex-col overflow-hidden">
-      {/* Header */}
-      <div className="flex-shrink-0 mb-3 sm:mb-4">
-        <h1 className="text-xl sm:text-2xl font-bold text-gray-900">
-          Buenos Días, {session.user.nombre}
-        </h1>
-      </div>
-
-      {/* Responsive Grid Layout */}
-      <div className="flex-1 min-h-0 pb-4 sm:pb-6 overflow-auto">
-        <div className="h-full grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 lg:grid-rows-[1fr_1fr] gap-3 sm:gap-4">
-          {/* Fichaje Widget - Fila 1 */}
-          <div className="h-full min-h-[220px]">
-            <FichajeWidget href="/hr/horario/fichajes" />
-          </div>
-
-          {/* Solicitudes Widget - Ocupa 2 filas en desktop */}
-          <div className="row-span-1 lg:row-span-2 h-full min-h-[440px]">
-            <SolicitudesWidget solicitudes={solicitudes} maxItems={8} />
-          </div>
-
-          {/* Notificaciones Widget - Fila 1 */}
-          <div className="h-full min-h-[220px]">
-            <NotificacionesWidget notificaciones={notificaciones} maxItems={3} href="/hr/bandeja-entrada" />
-          </div>
-
-          {/* Plantilla Widget - Fila 2 (debajo de fichajes) */}
-          <div className="h-full min-h-[220px]">
-            <PlantillaWidget
-              trabajando={plantillaResumen.trabajando}
-              ausentes={plantillaResumen.ausentes}
-              sinFichar={plantillaResumen.sinFichar}
-            />
-          </div>
-
-          {/* Auto-completed Widget - Fila 2 */}
-          <div className="h-full min-h-[220px]">
-            <AutoCompletadoWidget
-              stats={{
-                fichajesCompletados: fichajesAutoCompletados,
-                ausenciasCompletadas: ausenciasAutoCompletadas,
-                solicitudesCompletadas: solicitudesAutoCompletadas,
-              }}
-            />
-          </div>
-        </div>
-      </div>
-    </div>
+    <HRAdminDashboard
+      userName={session.user.nombre}
+      solicitudes={solicitudes}
+      notificaciones={notificaciones}
+      plantillaResumen={plantillaResumen}
+      autoCompletadoStats={{
+        fichajesCompletados: fichajesAutoCompletados,
+        ausenciasCompletadas: ausenciasAutoCompletadas,
+        solicitudesCompletadas: solicitudesAutoCompletadas,
+      }}
+    />
   );
 }
