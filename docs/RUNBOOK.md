@@ -45,6 +45,20 @@ crontab -l
 tail -f /var/log/clousadmin-cron.log
 ```
 
+### 2.5 Normalizar documentos legacy
+- **Objetivo**: fusionar carpetas antiguas (Personales/Médicos) y limitar `tipoDocumento` a `contrato|nomina|justificante|otro`.
+- **Pre-requisitos**: definir `DATABASE_URL` apuntando al entorno donde se ejecutará la migración.
+- **Comandos**:
+  ```bash
+  # Producción / staging (usar la URL real del entorno)
+  DATABASE_URL="postgresql://<user>:<pass>@<host>:5432/<db>" \
+  npx tsx scripts/normalize-document-storage.ts
+
+  # Desarrollo local (toma .env.local automáticamente)
+  npx tsx scripts/normalize-document-storage.ts
+  ```
+- El script valida qué URL está usando y corta si no hay credenciales. Revisa la salida: deberá mostrar cuántas carpetas/documentos se ajustaron y terminar con `✅ Normalización completada`.
+
 ---
 
 ## 3. Backups y Restauración

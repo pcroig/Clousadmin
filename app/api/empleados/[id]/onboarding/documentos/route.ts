@@ -65,6 +65,9 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
     const nombreDocumento = formData.get('nombreDocumento') as string;
     const tipoDocumento = formData.get('tipoDocumento') as string;
     const carpetaId = formData.get('carpetaId') as string | null; // Carpeta destino (opcional)
+    const carpetaDestinoNombreRaw = formData.get('carpetaDestino');
+    const carpetaDestinoNombre =
+      typeof carpetaDestinoNombreRaw === 'string' ? carpetaDestinoNombreRaw.trim() : null;
     const esCompartida = formData.get('esCompartida') === 'true'; // Si debe ir a carpeta compartida
 
     if (!file || !nombreDocumento || !tipoDocumento) {
@@ -118,7 +121,8 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
       file.type,
       file.size,
       carpetaId || undefined, // Carpeta destino (opcional)
-      esCompartida // Si debe ir a carpeta compartida
+      esCompartida, // Si debe ir a carpeta compartida
+      carpetaDestinoNombre || undefined
     );
 
     if (!resultado.success) {

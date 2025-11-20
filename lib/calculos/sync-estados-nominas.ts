@@ -55,7 +55,7 @@ export async function sincronizarEstadoEvento(
     (n) => n.estado === NOMINA_ESTADOS.PUBLICADA
   );
   const estadoCalculado = todasPublicadas
-    ? EVENTO_ESTADOS.CERRADO
+    ? EVENTO_ESTADOS.PUBLICADO
     : EVENTO_ESTADOS.ABIERTO;
 
   // 4. Actualizar evento si hay cambio
@@ -137,18 +137,20 @@ export async function actualizarEstadosNominasLote(
     });
 
     // 2. Sincronizar el estado del evento
+    const estadoEvento =
+      nuevoEstado === NOMINA_ESTADOS.PUBLICADA
+        ? EVENTO_ESTADOS.PUBLICADO
+        : EVENTO_ESTADOS.ABIERTO;
+
     await tx.eventoNomina.update({
       where: { id: eventoNominaId },
       data: {
-        estado:
-          nuevoEstado === NOMINA_ESTADOS.PUBLICADA
-            ? EVENTO_ESTADOS.CERRADO
-            : EVENTO_ESTADOS.ABIERTO,
+        estado: estadoEvento,
       },
     });
 
     console.log(
-      `[SyncEstados] Lote actualizado: ${result.count} nóminas, evento → '${estadoCalculado}'`
+      `[SyncEstados] Lote actualizado: ${result.count} nóminas, evento → '${estadoEvento}'`
     );
 
     return result.count;

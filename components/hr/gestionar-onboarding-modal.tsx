@@ -13,6 +13,13 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Spinner } from '@/components/ui/spinner';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Settings, FileText, FolderOpen, Plus, Trash2 } from 'lucide-react';
 import { PlantillasTab } from './plantillas-tab';
 import type {
@@ -21,6 +28,8 @@ import type {
   PlantillaDocumento,
   OnboardingConfigData,
 } from '@/lib/onboarding-config';
+
+const DESTINOS_SUGERIDOS = ['Contratos', 'Nóminas', 'Justificantes', 'Otros'] as const;
 
 interface GestionarOnboardingModalProps {
   open: boolean;
@@ -78,7 +87,12 @@ export function GestionarOnboardingModal({
 
       if (data.success && data.config) {
         setCamposRequeridos(data.config.camposRequeridos);
-        setDocumentosRequeridos(data.config.documentosRequeridos || []);
+        setDocumentosRequeridos(
+          (data.config.documentosRequeridos || []).map((doc) => ({
+            ...doc,
+            carpetaDestino: doc.carpetaDestino ?? 'Otros',
+          }))
+        );
         setPlantillasDocumentos(data.config.plantillasDocumentos || []);
       }
     } catch (err) {
@@ -126,12 +140,17 @@ export function GestionarOnboardingModal({
     setSuccess('');
 
     try {
+      const payload = documentosRequeridos.map((doc) => ({
+        ...doc,
+        carpetaDestino: doc.carpetaDestino?.trim() || 'Otros',
+      }));
+
       const res = await fetch('/api/hr/onboarding-config', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           tipo: 'documentos_requeridos',
-          data: documentosRequeridos,
+          data: payload,
         }),
       });
 
@@ -158,6 +177,7 @@ export function GestionarOnboardingModal({
       requerido: true,
       requiereVisualizacion: false,
       requiereFirma: false,
+      carpetaDestino: 'Otros',
     };
     setDocumentosRequeridos([...documentosRequeridos, nuevoDoc]);
   };
@@ -290,64 +310,139 @@ export function GestionarOnboardingModal({
                   </div>
 
                   <div className="space-y-4">
-                    {documentosRequeridos.map((doc) => (
-                      <div key={doc.id} className="border rounded-lg p-4 space-y-3">
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1 space-y-3">
-                            <div>
-                              <Label>Nombre del documento</Label>
-                              <Input
-                                value={doc.nombre}
-                                onChange={(e) =>
-                                  actualizarDocumentoRequerido(doc.id, 'nombre', e.target.value)
-                                }
-                                placeholder="ej: DNI/NIE, Certificado de estudios, etc."
-                              />
+                    {documentosRequeridos.map((doc) => {
+                      const carpetaDestinoActual = doc.carpetaDestino?.trim() || 'Otros';
+                      const esDestinoPersonalizado =
+                        !!carpetaDestinoActual &&
+                        !DESTINOS_SUGERIDOS.includes(
+                          carpetaDestinoActual as (typeof DESTINOS_SUGERIDOS)[number]
+                        );
+                      const valorSelect = esDestinoPersonalizado
+                        ? 'personalizada'
+                        : carpetaDestinoActual;
+
+                      return (
+                        <div key={doc.id} className="border rounded-lg p-4 space-y-3">
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1 space-y-3">
+                              <div>
+                                <Label>Nombre del documento</Label>
+                                <Input
+                                  value={doc.nombre}
+                                  onChange={(e) =>
+                                    actualizarDocumentoRequerido(doc.id, 'nombre', e.target.value)
+                                  }
+                                  placeholder="ej: DNI/NIE, Certificado de estudios, etc."
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <div className="flex items-center space-x-2">
+                                  <Checkbox
+                                    id={`req-${doc.id}`}
+                                    checked={doc.requerido}
+                                    onCheckedChange={(checked) =>
+                                      actualizarDocumentoRequerido(
+                                        doc.id,
+                                        'requerido',
+                                        checked === true
+                                      )
+                                    }
+                                  />
+                                  <Label htmlFor={`req-${doc.id}`}>Requerido</Label>
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                  <Checkbox
+                                    id={`ver-${doc.id}`}
+                                    checked={doc.requiereVisualizacion || false}
+                                    onCheckedChange={(checked) =>
+                                      actualizarDocumentoRequerido(
+                                        doc.id,
+                                        'requiereVisualizacion',
+                                        checked === true
+                                      )
+                                    }
+                                  />
+                                  <Label htmlFor={`ver-${doc.id}`}>Requiere visualización</Label>
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                  <Checkbox
+                                    id={`firmar-${doc.id}`}
+                                    checked={doc.requiereFirma || false}
+                                    onCheckedChange={(checked) =>
+                                      actualizarDocumentoRequerido(
+                                        doc.id,
+                                        'requiereFirma',
+                                        checked === true
+                                      )
+                                    }
+                                  />
+                                  <Label htmlFor={`firmar-${doc.id}`}>Requiere firma digital</Label>
+                                </div>
+                              </div>
+                              <div className="space-y-2">
+                                <Label>Carpeta de destino</Label>
+                                <Select
+                                  value={valorSelect}
+                                  onValueChange={(value) => {
+                                    if (value === 'personalizada') {
+                                      actualizarDocumentoRequerido(
+                                        doc.id,
+                                        'carpetaDestino',
+                                        esDestinoPersonalizado ? carpetaDestinoActual : ''
+                                      );
+                                    } else {
+                                      actualizarDocumentoRequerido(
+                                        doc.id,
+                                        'carpetaDestino',
+                                        value
+                                      );
+                                    }
+                                  }}
+                                >
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Seleccionar carpeta" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {DESTINOS_SUGERIDOS.map((destino) => (
+                                      <SelectItem key={destino} value={destino}>
+                                        {destino}
+                                      </SelectItem>
+                                    ))}
+                                    <SelectItem value="personalizada">
+                                      Personalizada...
+                                    </SelectItem>
+                                  </SelectContent>
+                                </Select>
+                                {(esDestinoPersonalizado || valorSelect === 'personalizada') && (
+                                  <Input
+                                    value={carpetaDestinoActual}
+                                    onChange={(e) =>
+                                      actualizarDocumentoRequerido(
+                                        doc.id,
+                                        'carpetaDestino',
+                                        e.target.value
+                                      )
+                                    }
+                                    placeholder="Nombre de la carpeta personalizada"
+                                  />
+                                )}
+                                <p className="text-xs text-gray-500">
+                                  Si no eliges carpeta, el documento se guardará en &quot;Otros&quot;.
+                                </p>
+                              </div>
                             </div>
-                            <div className="space-y-2">
-                              <div className="flex items-center space-x-2">
-                                <Checkbox
-                                  id={`req-${doc.id}`}
-                                  checked={doc.requerido}
-                                  onCheckedChange={(checked) =>
-                                    actualizarDocumentoRequerido(doc.id, 'requerido', checked === true)
-                                  }
-                                />
-                                <Label htmlFor={`req-${doc.id}`}>Requerido</Label>
-                              </div>
-                              <div className="flex items-center space-x-2">
-                                <Checkbox
-                                  id={`ver-${doc.id}`}
-                                  checked={doc.requiereVisualizacion || false}
-                                  onCheckedChange={(checked) =>
-                                    actualizarDocumentoRequerido(doc.id, 'requiereVisualizacion', checked === true)
-                                  }
-                                />
-                                <Label htmlFor={`ver-${doc.id}`}>Requiere visualización</Label>
-                              </div>
-                              <div className="flex items-center space-x-2">
-                                <Checkbox
-                                  id={`firmar-${doc.id}`}
-                                  checked={doc.requiereFirma || false}
-                                  onCheckedChange={(checked) =>
-                                    actualizarDocumentoRequerido(doc.id, 'requiereFirma', checked === true)
-                                  }
-                                />
-                                <Label htmlFor={`firmar-${doc.id}`}>Requiere firma digital</Label>
-                              </div>
-                            </div>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => eliminarDocumentoRequerido(doc.id)}
+                              className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
                           </div>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => eliminarDocumentoRequerido(doc.id)}
-                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
 
                     {documentosRequeridos.length === 0 && (
                       <div className="text-center py-8 text-gray-500">

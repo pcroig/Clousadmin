@@ -6,7 +6,7 @@ import { NextRequest } from 'next/server';
 import { requireAuth, handleApiError, successResponse, badRequestResponse } from '@/lib/api-handler';
 import { uploadToS3 } from '@/lib/s3';
 import { prisma } from '@/lib/prisma';
-import { obtenerOCrearCarpetaSistema, TIPOS_DOCUMENTO } from '@/lib/documentos';
+import { obtenerOCrearCarpetaSistema, inferirTipoDocumento } from '@/lib/documentos';
 
 // Configuración de Next.js para manejar uploads
 export const runtime = 'nodejs';
@@ -60,11 +60,19 @@ export async function POST(req: NextRequest) {
 
     // Si se solicita crear documento en BD (para justificantes, etc.)
     if (crearDocumento && empleadoId) {
-      // Determinar la carpeta según el tipo
-      let carpetaNombre: 'Justificantes' | 'Médicos' = 'Justificantes';
-      if (tipo === TIPOS_DOCUMENTO.MEDICO || tipo === 'medico') {
-        carpetaNombre = 'Médicos';
-      }
+      const tipoNormalizado = (tipo || '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase();
+
+      const esJustificante =
+        tipoNormalizado === 'justificante' ||
+        tipoNormalizado === 'justificantes' ||
+        tipoNormalizado === 'medico' ||
+        tipoNormalizado === 'medicos';
+
+      // Determinar la carpeta según el tipo solicitado
+      const carpetaNombre: 'Justificantes' | 'Otros' = esJustificante ? 'Justificantes' : 'Otros';
 
       // Obtener o crear carpeta correspondiente
       const carpeta = await obtenerOCrearCarpetaSistema(
@@ -73,6 +81,8 @@ export async function POST(req: NextRequest) {
         carpetaNombre
       );
 
+      const tipoDocumentoBD = inferirTipoDocumento(carpetaNombre, tipo);
+
       // Crear documento en BD
       documento = await prisma.documento.create({
         data: {
@@ -80,7 +90,7 @@ export async function POST(req: NextRequest) {
           empleadoId,
           carpetaId: carpeta.id,
           nombre: file.name,
-          tipoDocumento: tipo || 'otro',
+          tipoDocumento: tipoDocumentoBD,
           mimeType: file.type,
           tamano: file.size,
           s3Key,

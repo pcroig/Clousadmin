@@ -672,6 +672,7 @@ export function ContratosTab({ empleado, rol = 'empleado' }: ContratosTabProps) 
           onClose={() => setDarDeBajaModalOpen(false)}
           contratoId={contratoActualId}
           empleadoNombre={`${empleado.nombre} ${empleado.apellidos}`}
+          empleadoId={empleado.id}
           onSuccess={() => {
             // Recargar la página para mostrar los cambios
             router.refresh();

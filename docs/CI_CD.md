@@ -38,15 +38,14 @@ DATABASE_URL                # PostgreSQL connection string
 NEXTAUTH_SECRET            # NextAuth secret key (min 32 chars)
 ENCRYPTION_KEY             # AES-256 encryption key (64 hex chars)
 
-# AWS Cognito
-AWS_COGNITO_USER_POOL_ID   # Cognito User Pool ID
-AWS_COGNITO_CLIENT_ID      # Cognito Client ID
-
-# AWS S3
-AWS_ACCESS_KEY_ID          # AWS access key
-AWS_SECRET_ACCESS_KEY      # AWS secret key
-AWS_S3_BUCKET              # S3 bucket name
-AWS_REGION                 # AWS region (eu-west-1)
+# Hetzner Object Storage
+STORAGE_ENDPOINT           # https://fsn1.your-objectstorage.com
+STORAGE_REGION             # ej. eu-central-1
+STORAGE_ACCESS_KEY         # Access key ID
+STORAGE_SECRET_KEY         # Secret key
+STORAGE_BUCKET             # Bucket principal (clousadmin, etc.)
+BACKUP_BUCKET              # Bucket para backups (opcional)
+ENABLE_CLOUD_STORAGE       # "true" para usar Hetzner en producción
 
 # Redis (opcional)
 REDIS_URL                  # Redis connection string
@@ -254,6 +253,8 @@ Ver en GitHub: `Actions` tab
 
 **Última actualización**: 2025-11-17
 **Responsable**: Equipo de desarrollo
+
+
 
 
 

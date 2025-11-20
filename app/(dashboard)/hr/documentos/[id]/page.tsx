@@ -8,6 +8,7 @@ import { redirect } from 'next/navigation';
 import { CarpetaDetailClient } from './carpeta-detail-client';
 
 import { UsuarioRol } from '@/lib/constants/enums';
+import { obtenerTipoDocumentoDesdeCarpeta } from '@/lib/documentos';
 
 export default async function HRCarpetaDetailPage({
   params,
@@ -64,30 +65,53 @@ export default async function HRCarpetaDetailPage({
   if (!carpeta.empleadoId && carpeta.compartida && carpeta.esSistema) {
     esGlobal = true;
     // Buscar todos los documentos del mismo tipo en carpetas de empleados
-    const tipoDocumento = carpeta.nombre === 'Nóminas' ? 'nomina' : 
-                         carpeta.nombre === 'Contratos' ? 'contrato' :
-                         carpeta.nombre === 'Justificantes' ? 'justificante' : null;
+    const tipoDocumento = obtenerTipoDocumentoDesdeCarpeta(carpeta.nombre);
 
     if (tipoDocumento) {
-      documentosAgregados = await prisma.documento.findMany({
-        where: {
-          empresaId: session.user.empresaId,
-          tipoDocumento: tipoDocumento,
-          empleadoId: { not: null },
-        },
-        include: {
-          empleado: {
-            select: {
-              id: true,
-              nombre: true,
-              apellidos: true,
+      // Obtener documentos de carpetas de empleados Y documentos directamente en esta carpeta global
+      const [documentosEmpleados, documentosCarpetaGlobal] = await Promise.all([
+        prisma.documento.findMany({
+          where: {
+            empresaId: session.user.empresaId,
+            tipoDocumento: tipoDocumento,
+            empleadoId: { not: null },
+          },
+          include: {
+            empleado: {
+              select: {
+                id: true,
+                nombre: true,
+                apellidos: true,
+              },
             },
           },
-        },
-        orderBy: {
-          createdAt: 'desc',
-        },
+        }),
+        prisma.documento.findMany({
+          where: {
+            carpetaId: carpeta.id,
+            empresaId: session.user.empresaId,
+          },
+          include: {
+            empleado: {
+              select: {
+                id: true,
+                nombre: true,
+                apellidos: true,
+              },
+            },
+          },
+        }),
+      ]);
+
+      // Combinar y eliminar duplicados por ID
+      const documentosMap = new Map();
+      [...documentosEmpleados, ...documentosCarpetaGlobal].forEach((doc) => {
+        documentosMap.set(doc.id, doc);
       });
+      
+      documentosAgregados = Array.from(documentosMap.values()).sort(
+        (a, b) => b.createdAt.getTime() - a.createdAt.getTime()
+      );
     }
   }
 

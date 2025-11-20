@@ -114,6 +114,9 @@ export async function POST(
     const file = formData.get('file') as File;
     const nombreDocumento = formData.get('nombreDocumento') as string;
     const tipoDocumento = formData.get('tipoDocumento') as string;
+    const carpetaDestinoNombreRaw = formData.get('carpetaDestino');
+    const carpetaDestinoNombre =
+      typeof carpetaDestinoNombreRaw === 'string' ? carpetaDestinoNombreRaw.trim() : null;
 
     if (!file || !nombreDocumento || !tipoDocumento) {
       return NextResponse.json(
@@ -178,7 +181,10 @@ export async function POST(
       s3Key,
       s3Bucket,
       file.type,
-      file.size
+      file.size,
+      undefined,
+      false,
+      carpetaDestinoNombre || undefined
     );
 
     if (!resultado.success) {

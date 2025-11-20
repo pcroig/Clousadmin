@@ -16,6 +16,7 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useMutation } from '@/lib/hooks';
 import { InfoTooltip } from '@/components/shared/info-tooltip';
+import { toDateOnlyString } from '@/lib/utils';
 
 const MIN_ALTERNATIVOS_RATIO = 0.5;
 
@@ -87,12 +88,12 @@ export function PreferenciasVacacionesModal({
   const fechaFin = new Date(fechaFinObjetivo);
 
   const toggleFecha = (fecha: Date, modo: 'ideales' | 'prioritarios' | 'alternativos') => {
-    const fechaStr = fecha.toISOString().split('T')[0];
+    const fechaStr = toDateOnlyString(fecha);
     
     const toggle = (lista: Date[], setLista: (value: Date[]) => void) => {
-      const existe = lista.some(d => d.toISOString().split('T')[0] === fechaStr);
+      const existe = lista.some(d => toDateOnlyString(d) === fechaStr);
       if (existe) {
-        setLista(lista.filter(d => d.toISOString().split('T')[0] !== fechaStr));
+        setLista(lista.filter(d => toDateOnlyString(d) !== fechaStr));
       } else {
         setLista([...lista, fecha]);
       }
@@ -120,9 +121,9 @@ export function PreferenciasVacacionesModal({
     guardarPreferencias(
       `/api/campanas-vacaciones/${campanaId}/preferencia`,
       {
-        diasIdeales: diasIdeales.map(d => d.toISOString().split('T')[0]),
-        diasPrioritarios: diasPrioritarios.map(d => d.toISOString().split('T')[0]),
-        diasAlternativos: diasAlternativos.map(d => d.toISOString().split('T')[0]),
+        diasIdeales: diasIdeales.map(toDateOnlyString),
+        diasPrioritarios: diasPrioritarios.map(toDateOnlyString),
+        diasAlternativos: diasAlternativos.map(toDateOnlyString),
         completada: true,
       },
       { method: 'PATCH' }
@@ -130,13 +131,13 @@ export function PreferenciasVacacionesModal({
   };
 
   const esFechaSeleccionada = (fecha: Date, modo: 'ideales' | 'prioritarios' | 'alternativos') => {
-    const fechaStr = fecha.toISOString().split('T')[0];
+    const fechaStr = toDateOnlyString(fecha);
     if (modo === 'ideales') {
-      return diasIdeales.some(d => d.toISOString().split('T')[0] === fechaStr);
+      return diasIdeales.some(d => toDateOnlyString(d) === fechaStr);
     } else if (modo === 'prioritarios') {
-      return diasPrioritarios.some(d => d.toISOString().split('T')[0] === fechaStr);
+      return diasPrioritarios.some(d => toDateOnlyString(d) === fechaStr);
     } else {
-      return diasAlternativos.some(d => d.toISOString().split('T')[0] === fechaStr);
+      return diasAlternativos.some(d => toDateOnlyString(d) === fechaStr);
     }
   };
 
@@ -220,9 +221,9 @@ export function PreferenciasVacacionesModal({
                 }
               }}
               disabled={(date) => {
-                const fechaStr = date.toISOString().split('T')[0];
-                const fechaInicioStr = fechaInicio.toISOString().split('T')[0];
-                const fechaFinStr = fechaFin.toISOString().split('T')[0];
+                const fechaStr = toDateOnlyString(date);
+                const fechaInicioStr = toDateOnlyString(fechaInicio);
+                const fechaFinStr = toDateOnlyString(fechaFin);
                 return fechaStr < fechaInicioStr || fechaStr > fechaFinStr;
               }}
               modifiers={{

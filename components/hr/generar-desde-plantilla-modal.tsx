@@ -79,7 +79,7 @@ export function GenerarDesdePlantillaModal({
 
   // Estados de configuración
   const [nombreDocumento, setNombreDocumento] = useState('');
-  const [carpetaDestino, setCarpetaDestino] = useState('');
+  const [carpetaDestino, setCarpetaDestino] = useState('Otros');
   const [notificarEmpleado, setNotificarEmpleado] = useState(true);
   const [requiereFirma, setRequiereFirma] = useState(false);
   const [fechaLimiteFirma, setFechaLimiteFirma] = useState('');
@@ -189,7 +189,7 @@ export function GenerarDesdePlantillaModal({
         const plantilla = data.plantilla;
         setPlantillaSeleccionada(plantilla);
         setNombreDocumento(plantilla.nombre);
-        setCarpetaDestino(plantilla.carpetaDestinoDefault || '');
+        setCarpetaDestino(plantilla.carpetaDestinoDefault || 'Otros');
         setRequiereFirma(plantilla.requiereFirma);
         setPaso('empleados');
       }
@@ -202,7 +202,7 @@ export function GenerarDesdePlantillaModal({
   const handleSeleccionarPlantilla = (plantilla: Plantilla) => {
     setPlantillaSeleccionada(plantilla);
     setNombreDocumento(plantilla.nombre);
-    setCarpetaDestino(plantilla.carpetaDestinoDefault || '');
+    setCarpetaDestino(plantilla.carpetaDestinoDefault || 'Otros');
     setRequiereFirma(plantilla.requiereFirma);
     setPaso('empleados');
   };
@@ -388,11 +388,11 @@ export function GenerarDesdePlantillaModal({
         </div>
 
         <div>
-          <Label>Carpeta destino (opcional)</Label>
+          <Label>Carpeta destino</Label>
           <Input
             value={carpetaDestino}
             onChange={(e) => setCarpetaDestino(e.target.value)}
-            placeholder="ej: Contratos"
+            placeholder="Ej: Contratos (por defecto 'Otros')"
           />
         </div>
 

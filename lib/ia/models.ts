@@ -22,12 +22,11 @@
  * Referencia: https://platform.openai.com/docs/agents/models
  */
 export const MODELS = {
-  // Modelos OpenAI Agents SDK
-  GPT_4_1: 'gpt-4.1', // Default del SDK - balance óptimo
-  GPT_4_1_MINI: 'gpt-4.1-mini-2025-04-14', // Rápido y económico
-  GPT_5: 'gpt-5', // Razonamiento avanzado
+  // Modelos recomendados
+  GPT_5_1: 'gpt-5.1', // Alto razonamiento + visión
+  GPT_5_1_MINI: 'gpt-5.1-mini', // Versión ligera
   
-  // Modelos legacy (mantener para compatibilidad)
+  // Legacy (compatibilidad)
   GPT_4O_MINI: 'gpt-4o-mini',
   GPT_4O: 'gpt-4o',
 } as const;
@@ -61,35 +60,56 @@ export interface ModelConfig {
  */
 export const FUNCTION_CONFIGS: Record<string, ModelConfig> = {
   'cuadrar-vacaciones': {
-    model: MODELS.GPT_4_1,
+    model: MODELS.GPT_5_1,
     temperature: 0.3,
     responseFormat: 'json_object',
     systemMessage: 'Eres un asistente experto en optimización de recursos humanos, especializado en planificación de vacaciones.',
   },
   'procesar-excel-empleados': {
-    model: MODELS.GPT_4_1,
+    model: MODELS.GPT_5_1,
     temperature: 0.2,
     responseFormat: 'json_object',
     maxTokens: 4000,
     systemMessage: 'Eres un asistente experto en análisis de datos de recursos humanos y mapeo de información de empleados desde hojas de cálculo.',
   },
   'clasificador-nominas': {
-    model: MODELS.GPT_4_1_MINI,
+    model: MODELS.GPT_5_1_MINI,
     temperature: 0.2,
     responseFormat: 'json_object',
     systemMessage: 'Eres un asistente experto en análisis de nóminas y matching de documentos con empleados.',
   },
   'extraer-documentos': {
-    model: MODELS.GPT_4_1,
+    model: MODELS.GPT_5_1,
     temperature: 0.2,
     responseFormat: 'json_object',
     systemMessage: 'Eres un asistente experto en extracción de información de documentos legales y administrativos.',
   },
   'analisis-sentimientos': {
-    model: MODELS.GPT_4_1,
+    model: MODELS.GPT_5_1_MINI,
     temperature: 0.4,
     responseFormat: 'json_object',
     systemMessage: 'Eres un asistente experto en análisis de sentimientos y feedback de empleados.',
+  },
+  'plantillas-resolver-variable': {
+    model: MODELS.GPT_5_1_MINI,
+    temperature: 0,
+    responseFormat: 'json_object',
+    maxTokens: 1200,
+    systemMessage: 'Eres un experto en mapeo de datos estructurados. Respondes SOLO en JSON válido.',
+  },
+  'plantillas-mapear-campos-pdf': {
+    model: MODELS.GPT_5_1_MINI,
+    temperature: 0.1,
+    responseFormat: 'json_object',
+    maxTokens: 1500,
+    systemMessage: 'Eres un asistente experto en mapeo de campos de formularios PDF a variables internas del sistema. Siempre devuelve JSON válido.',
+  },
+  'plantillas-escanear-pdf': {
+    model: MODELS.GPT_5_1,
+    temperature: 0.1,
+    responseFormat: 'json_object',
+    maxTokens: 2000,
+    systemMessage: 'Eres un asistente experto en análisis de documentos PDF. Detectas campos rellenables y devuelves resultados estructurados en JSON.',
   },
 } as const;
 

@@ -23,8 +23,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Field, FieldLabel } from '@/components/ui/field';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Calendar } from '@/components/ui/calendar';
-import { Equipo, PoliticaAusencia, TipoAusenciaEnum } from './types';
-import { editarCalendarioEmpresa, getAusenciasSettings } from '@/app/(dashboard)/hr/horario/ausencias/actions';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { InfoTooltip } from '@/components/shared/info-tooltip';
@@ -50,17 +48,15 @@ interface PoliticaEquipo {
 
 export function GestionarAusenciasModal({ open, onClose, onSaved }: GestionarAusenciasModalProps) {
   const [cargando, setCargando] = useState(false);
-  const [tab, setTab] = useState<'saldo' | 'calendario' | 'politicas'>('saldo');
+  const [tab, setTab] = useState<'politicas' | 'calendario'>('politicas');
 
-  // Saldo
+  // Saldo y Políticas (ahora juntos)
   const [nivel, setNivel] = useState<'empresa' | 'equipo'>('empresa');
   const [diasTotales, setDiasTotales] = useState('22');
   const [equipos, setEquipos] = useState<Equipo[]>([]);
   const [equiposSeleccionados, setEquiposSeleccionados] = useState<string[]>([]);
   
-  // Políticas de Ausencia
-  const [equipoSeleccionado, setEquipoSeleccionado] = useState<string>('');
-  const [politicas, setPoliticas] = useState<Record<string, PoliticaEquipo>>({});
+  // Políticas de Ausencia - Para toda la empresa
   const [solapamientoPct, setSolapamientoPct] = useState('50');
   const [antelacionDias, setAntelacionDias] = useState('5');
   
@@ -76,23 +72,6 @@ export function GestionarAusenciasModal({ open, onClose, onSaved }: GestionarAus
   });
   const [verCalendario, setVerCalendario] = useState(false);
 
-  const cargarPoliticaEquipo = useCallback(async (equipoId: string) => {
-    try {
-      const res = await fetch(`/api/organizacion/equipos/${equipoId}/politica`);
-      if (res.ok) {
-        const data = await res.json();
-        setPoliticas((prev) => ({
-          ...prev,
-          [equipoId]: data,
-        }));
-        setSolapamientoPct(data.maxSolapamientoPct.toString());
-        setAntelacionDias(data.requiereAntelacionDias.toString());
-      }
-    } catch (e) {
-      console.error('Error cargando política de equipo:', e);
-    }
-  }, []);
-
   const cargarDatos = useCallback(async () => {
     try {
       // Cargar equipos
@@ -100,13 +79,6 @@ export function GestionarAusenciasModal({ open, onClose, onSaved }: GestionarAus
       if (resEquipos.ok) {
         const dataEquipos = await resEquipos.json();
         setEquipos(dataEquipos);
-        
-        // Si hay equipos y no hay uno seleccionado, seleccionar el primero
-        if (dataEquipos.length > 0) {
-          const primerEquipo = dataEquipos[0].id;
-          setEquipoSeleccionado(primerEquipo);
-          await cargarPoliticaEquipo(primerEquipo);
-        }
       }
       
       // Cargar configuración de calendario laboral
@@ -117,40 +89,67 @@ export function GestionarAusenciasModal({ open, onClose, onSaved }: GestionarAus
           setDiasLaborables(dataCalendario.diasLaborables);
         }
       }
+      
+      // Cargar políticas de ausencias de la empresa
+      const resPoliticas = await fetch('/api/empresa/politica-ausencias');
+      if (resPoliticas.ok) {
+        const dataPoliticas = await resPoliticas.json();
+        if (dataPoliticas.maxSolapamientoPct !== undefined) {
+          setSolapamientoPct(dataPoliticas.maxSolapamientoPct.toString());
+        }
+        if (dataPoliticas.requiereAntelacionDias !== undefined) {
+          setAntelacionDias(dataPoliticas.requiereAntelacionDias.toString());
+        }
+      }
     } catch (e) {
       console.error('Error cargando datos:', e);
     }
-  }, [cargarPoliticaEquipo]);
+  }, []);
 
   useEffect(() => {
     if (open) {
       cargarDatos();
-    } else {
-      // Resetear al cerrar
-      setEquipoSeleccionado('');
-      setPoliticas({});
-      setSolapamientoPct('50');
-      setAntelacionDias('5');
     }
   }, [open, cargarDatos]);
 
-  async function handleCambiarEquipo(equipoId: string) {
-    setEquipoSeleccionado(equipoId);
-    
-    // Si ya tenemos la política en cache, cargarla
-    if (politicas[equipoId]) {
-      setSolapamientoPct(politicas[equipoId].maxSolapamientoPct.toString());
-      setAntelacionDias(politicas[equipoId].requiereAntelacionDias.toString());
-    } else {
-      // Cargar la política
-      await cargarPoliticaEquipo(equipoId);
-    }
-  }
-
-  async function handleGuardarSaldo() {
+  async function handleGuardarPoliticaYSaldo() {
     setCargando(true);
     try {
-      const res = await fetch('/api/ausencias/saldo', {
+      // Validar datos de política
+      const pct = parseInt(solapamientoPct);
+      const dias = parseInt(antelacionDias);
+      
+      if (isNaN(pct) || pct < 0 || pct > 100) {
+        toast.error('El porcentaje de solapamiento debe estar entre 0 y 100');
+        setCargando(false);
+        return;
+      }
+      
+      if (isNaN(dias) || dias < 0 || dias > 365) {
+        toast.error('Los días de antelación deben estar entre 0 y 365');
+        setCargando(false);
+        return;
+      }
+
+      // Guardar política de ausencias (nivel empresa)
+      const resPolitica = await fetch('/api/empresa/politica-ausencias', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          maxSolapamientoPct: pct,
+          requiereAntelacionDias: dias,
+        }),
+      });
+
+      if (!resPolitica.ok) {
+        const error = await resPolitica.json();
+        toast.error(error.error || 'Error al guardar política');
+        setCargando(false);
+        return;
+      }
+
+      // Guardar saldo
+      const resSaldo = await fetch('/api/ausencias/saldo', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -160,67 +159,18 @@ export function GestionarAusenciasModal({ open, onClose, onSaved }: GestionarAus
         }),
       });
 
-      if (res.ok) {
-        toast.success('Saldo guardado correctamente');
-        if (onSaved) onSaved();
-      } else {
-        const error = await res.json();
+      if (!resSaldo.ok) {
+        const error = await resSaldo.json();
         toast.error(error.error || 'Error al guardar saldo');
-      }
-    } catch (e) {
-      console.error('Error guardando saldo:', e);
-      toast.error('Error al guardar saldo');
-    } finally {
-      setCargando(false);
-    }
-  }
-  
-  async function handleGuardarPolitica() {
-    if (!equipoSeleccionado) {
-      toast.error('Selecciona un equipo');
-      return;
-    }
-
-    setCargando(true);
-    try {
-      // Validar datos
-      const pct = parseInt(solapamientoPct);
-      const dias = parseInt(antelacionDias);
-      
-      if (isNaN(pct) || pct < 0 || pct > 100) {
-        toast.error('El porcentaje de solapamiento debe estar entre 0 y 100');
-        return;
-      }
-      
-      if (isNaN(dias) || dias < 0 || dias > 365) {
-        toast.error('Los días de antelación deben estar entre 0 y 365');
+        setCargando(false);
         return;
       }
 
-      const res = await fetch(`/api/organizacion/equipos/${equipoSeleccionado}/politica`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          maxSolapamientoPct: pct,
-          requiereAntelacionDias: dias,
-        }),
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        setPoliticas({
-          ...politicas,
-          [equipoSeleccionado]: data,
-        });
-        toast.success('Política de ausencias guardada correctamente');
-        if (onSaved) onSaved();
-      } else {
-        const error = await res.json();
-        toast.error(error.error || 'Error al guardar política');
-      }
+      toast.success('Política de ausencias y saldo guardados correctamente');
+      if (onSaved) onSaved();
     } catch (e) {
-      console.error('Error guardando política:', e);
-      toast.error('Error al guardar política de ausencias');
+      console.error('Error guardando configuración:', e);
+      toast.error('Error al guardar la configuración');
     } finally {
       setCargando(false);
     }
@@ -287,286 +237,253 @@ export function GestionarAusenciasModal({ open, onClose, onSaved }: GestionarAus
         <Tabs
           value={tab}
           onValueChange={(value) => {
-            if (value === 'saldo' || value === 'calendario' || value === 'politicas') {
+            if (value === 'politicas' || value === 'calendario') {
               setTab(value);
             }
           }}
         >
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="saldo">Saldo Anual</TabsTrigger>
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="politicas">Política de ausencias</TabsTrigger>
             <TabsTrigger value="calendario">Calendario Laboral</TabsTrigger>
-            <TabsTrigger value="politicas">Políticas de Ausencia</TabsTrigger>
           </TabsList>
 
-          {/* Tab: Saldo */}
-          <TabsContent value="saldo" className="space-y-4">
-            <Field>
-              <FieldLabel>Nivel de asignación</FieldLabel>
-              <Select
-                value={nivel}
-                onValueChange={(value) => {
-                  if (value === 'empresa' || value === 'equipo' || value === 'empleado') {
-                    setNivel(value);
-                  }
-                }}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="empresa">Toda la empresa</SelectItem>
-                  <SelectItem value="equipo">Por equipos</SelectItem>
-                </SelectContent>
-              </Select>
-            </Field>
-
-            {nivel === 'equipo' && (
+          {/* Tab: Política de ausencias (Saldo + Políticas) */}
+          <TabsContent value="politicas" className="space-y-6">
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold text-gray-900">Saldo Anual de Vacaciones</h3>
+              
               <Field>
-                <FieldLabel>Equipos</FieldLabel>
-                <div className="space-y-2 max-h-48 overflow-y-auto border border-gray-200 rounded-lg p-3">
-                  {equipos.length === 0 ? (
-                    <p className="text-sm text-gray-500">No hay equipos disponibles</p>
-                  ) : (
-                    equipos.map((equipo) => (
-                      <div key={equipo.id} className="flex items-center gap-2">
-                        <input
-                          type="checkbox"
-                          id={`equipo-${equipo.id}`}
-                          checked={equiposSeleccionados.includes(equipo.id)}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setEquiposSeleccionados([...equiposSeleccionados, equipo.id]);
-                            } else {
-                              setEquiposSeleccionados(equiposSeleccionados.filter((id) => id !== equipo.id));
-                            }
-                          }}
-                          className="w-4 h-4"
-                        />
-                        <label htmlFor={`equipo-${equipo.id}`} className="text-sm text-gray-900 cursor-pointer">
-                          {equipo.nombre}
-                        </label>
+                <FieldLabel>Nivel de asignación</FieldLabel>
+                <Select
+                  value={nivel}
+                  onValueChange={(value) => {
+                    if (value === 'empresa' || value === 'equipo') {
+                      setNivel(value);
+                    }
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="empresa">Toda la empresa</SelectItem>
+                    <SelectItem value="equipo">Por equipos</SelectItem>
+                  </SelectContent>
+                </Select>
+              </Field>
+
+              {nivel === 'equipo' && (
+                <Field>
+                  <FieldLabel>Equipos</FieldLabel>
+                  <div className="space-y-2 max-h-48 overflow-y-auto border border-gray-200 rounded-lg p-3">
+                    {equipos.length === 0 ? (
+                      <p className="text-sm text-gray-500">No hay equipos disponibles</p>
+                    ) : (
+                      equipos.map((equipo) => (
+                        <div key={equipo.id} className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            id={`equipo-${equipo.id}`}
+                            checked={equiposSeleccionados.includes(equipo.id)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setEquiposSeleccionados([...equiposSeleccionados, equipo.id]);
+                              } else {
+                                setEquiposSeleccionados(equiposSeleccionados.filter((id) => id !== equipo.id));
+                              }
+                            }}
+                            className="w-4 h-4"
+                          />
+                          <label htmlFor={`equipo-${equipo.id}`} className="text-sm text-gray-900 cursor-pointer">
+                            {equipo.nombre}
+                          </label>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </Field>
+              )}
+
+              <Field>
+                <FieldLabel>Días totales anuales</FieldLabel>
+                <Input
+                  type="number"
+                  value={diasTotales}
+                  onChange={(e) => setDiasTotales(e.target.value)}
+                  min="0"
+                  max="365"
+                  placeholder="22"
+                />
+              </Field>
+            </div>
+
+            <div className="border-t pt-6 space-y-4">
+              <div className="flex items-start gap-2">
+                <h3 className="text-lg font-semibold text-gray-900 flex-1">Políticas de Ausencia</h3>
+                <InfoTooltip
+                  content="Estas políticas se aplican a toda la empresa. La antelación sólo afecta a vacaciones y ausencias 'otro', y el solapamiento se aplica únicamente a vacaciones."
+                  side="left"
+                />
+              </div>
+
+              <Field>
+                <div className="flex items-center gap-2">
+                  <FieldLabel>Días de antelación mínima</FieldLabel>
+                  <InfoTooltip
+                    content={(
+                      <div className="space-y-2 text-sm">
+                        <p className="font-medium">¿Qué es la antelación mínima?</p>
+                        <p className="text-xs">
+                          Número mínimo de días que deben pasar entre la solicitud de ausencia y la fecha de inicio.
+                          Solo aplica a ausencias que requieren aprobación (vacaciones y "otro").
+                        </p>
+                        <p className="text-xs mt-2">
+                          Ejemplo: Con 5 días de antelación, una ausencia que empieza el 15 de enero debe solicitarse antes del 10 de enero.
+                        </p>
                       </div>
-                    ))
-                  )}
+                    )}
+                  />
+                </div>
+                
+                <div className="flex items-center gap-4 mt-4">
+                  <Input
+                    type="number"
+                    value={antelacionDias}
+                    onChange={(e) => setAntelacionDias(e.target.value)}
+                    min="0"
+                    max="365"
+                    className="w-32"
+                  />
+                  <span className="text-sm text-gray-600">días</span>
                 </div>
               </Field>
-            )}
 
-            <Field>
-              <FieldLabel>Días totales anuales</FieldLabel>
-              <Input
-                type="number"
-                value={diasTotales}
-                onChange={(e) => setDiasTotales(e.target.value)}
-                min="0"
-                max="365"
-                placeholder="22"
-              />
-            </Field>
+              <Field>
+                <div className="flex items-center gap-2">
+                  <FieldLabel>Solapamiento máximo permitido</FieldLabel>
+                  <InfoTooltip
+                    content={(
+                      <div className="space-y-2 text-sm">
+                        <p className="font-medium">¿Qué significa el solapamiento?</p>
+                        <p className="text-xs">
+                          Porcentaje máximo de empleados que pueden estar de vacaciones al mismo tiempo.
+                          Controla la capacidad de la empresa durante los periodos con más ausencias.
+                        </p>
+                        <p className="text-xs mt-2">
+                          Ejemplo: Con un 50%, si la empresa tiene 10 empleados, máximo 5 podrán estar de vacaciones simultáneamente.
+                        </p>
+                      </div>
+                    )}
+                  />
+                </div>
+                
+                <div className="flex items-center gap-4 mt-4">
+                  <Input
+                    type="number"
+                    value={solapamientoPct}
+                    onChange={(e) => setSolapamientoPct(e.target.value)}
+                    min="0"
+                    max="100"
+                    className="w-32"
+                  />
+                  <span className="text-sm text-gray-600">%</span>
+                </div>
+              </Field>
+            </div>
 
             <DialogFooter>
               <Button variant="outline" onClick={onClose}>
                 Cancelar
               </Button>
-              <LoadingButton onClick={handleGuardarSaldo} loading={cargando} disabled={cargando}>
-                {cargando ? 'Guardando...' : 'Guardar Saldo'}
+              <LoadingButton onClick={handleGuardarPoliticaYSaldo} loading={cargando} disabled={cargando}>
+                {cargando ? 'Guardando...' : 'Guardar Configuración'}
               </LoadingButton>
             </DialogFooter>
           </TabsContent>
 
           {/* Tab: Calendario */}
-          <TabsContent value="calendario" className="space-y-4">
-            <div className="flex justify-between items-center">
-              <h3 className="font-semibold">Configuración del Calendario Laboral</h3>
-              <LoadingButton
-                size="sm"
-                variant="outline"
-                onClick={handleImportarFestivos}
-                loading={cargando}
-                disabled={cargando}
-              >
-                {cargando ? 'Importando...' : 'Importar Calendario Nacional'}
-              </LoadingButton>
-            </div>
-
+          <TabsContent value="calendario" className="space-y-6">
             <Field>
-              <FieldLabel>Días laborables de la empresa</FieldLabel>
+              <FieldLabel>Días laborables de la semana</FieldLabel>
               
-              <div className="grid grid-cols-2 gap-3 mt-4">
+              <div className="flex gap-2 mt-3">
                 {[
-                  { key: 'lunes', label: 'Lunes' },
-                  { key: 'martes', label: 'Martes' },
-                  { key: 'miercoles', label: 'Miércoles' },
-                  { key: 'jueves', label: 'Jueves' },
-                  { key: 'viernes', label: 'Viernes' },
-                  { key: 'sabado', label: 'Sábado' },
-                  { key: 'domingo', label: 'Domingo' },
-                ].map((dia) => (
-                  <div key={dia.key} className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      id={`dia-${dia.key}`}
-                      checked={diasLaborables[dia.key as keyof typeof diasLaborables]}
-                      onChange={(e) => {
+                  { key: 'lunes', label: 'Lun' },
+                  { key: 'martes', label: 'Mar' },
+                  { key: 'miercoles', label: 'Mié' },
+                  { key: 'jueves', label: 'Jue' },
+                  { key: 'viernes', label: 'Vie' },
+                  { key: 'sabado', label: 'Sáb' },
+                  { key: 'domingo', label: 'Dom' },
+                ].map((dia) => {
+                  const activo = diasLaborables[dia.key as keyof typeof diasLaborables];
+                  
+                  return (
+                    <button
+                      key={dia.key}
+                      type="button"
+                      onClick={() => {
                         setDiasLaborables({
                           ...diasLaborables,
-                          [dia.key]: e.target.checked,
+                          [dia.key]: !activo,
                         });
                       }}
-                      className="w-4 h-4 rounded border-gray-300"
-                    />
-                    <label htmlFor={`dia-${dia.key}`} className="text-sm text-gray-900 cursor-pointer">
+                      className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                        activo
+                          ? 'bg-gray-900 text-white'
+                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      } cursor-pointer`}
+                    >
                       {dia.label}
-                    </label>
-                  </div>
-                ))}
+                    </button>
+                  );
+                })}
               </div>
             </Field>
 
-            <div className="flex flex-col gap-2 mb-4 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex items-center gap-2">
-                <h4 className="font-medium">Festivos y Días No Laborables</h4>
-                <InfoTooltip
-                  content="Esta configuración se usa para calcular los días de ausencia. Los cambios se aplican a todas las solicitudes futuras."
-                  variant="subtle"
-                />
+            <div className="border-t pt-6">
+              <div className="flex flex-col gap-3 mb-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-center gap-2">
+                  <h4 className="font-semibold">Calendario de Festivos</h4>
+                  <InfoTooltip
+                    content="Los festivos se excluyen automáticamente del cálculo de días laborables en las solicitudes de ausencia."
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <LoadingButton
+                    size="sm"
+                    variant="outline"
+                    onClick={handleImportarFestivos}
+                    loading={cargando}
+                    disabled={cargando}
+                  >
+                    {cargando ? 'Importando...' : 'Importar Calendario'}
+                  </LoadingButton>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setVerCalendario(!verCalendario)}
+                  >
+                    {verCalendario ? 'Ver Lista' : 'Ver Calendario'}
+                  </Button>
+                </div>
               </div>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => setVerCalendario(!verCalendario)}
-              >
-                {verCalendario ? 'Ver Lista' : 'Ver Calendario'}
-              </Button>
-            </div>
 
-            {verCalendario ? (
-              <CalendarioFestivos onUpdate={cargarDatos} />
-            ) : (
-              <ListaFestivos onUpdate={cargarDatos} />
-            )}
-          </TabsContent>
-
-          {/* Tab: Políticas de Ausencia */}
-          <TabsContent value="politicas" className="space-y-4">
-            <div className="space-y-4">
-              <div className="flex items-start gap-2">
-                <h3 className="text-lg font-semibold text-gray-900 flex-1">Configuración de Políticas de Ausencia por Equipo</h3>
-                <InfoTooltip
-                  content="Estas políticas se aplican automáticamente al validar solicitudes. La antelación sólo afecta a vacaciones y ausencias 'otro', y el solapamiento se aplica únicamente a vacaciones."
-                  variant="subtle"
-                  side="left"
-                />
-              </div>
-              
-              <Field>
-                <FieldLabel>Seleccionar Equipo</FieldLabel>
-                <Select 
-                  value={equipoSeleccionado} 
-                  onValueChange={handleCambiarEquipo}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecciona un equipo" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {equipos.length === 0 ? (
-                      <SelectItem value="" disabled>No hay equipos disponibles</SelectItem>
-                    ) : (
-                      equipos.map((equipo) => (
-                        <SelectItem key={equipo.id} value={equipo.id}>
-                          {equipo.nombre}
-                        </SelectItem>
-                      ))
-                    )}
-                  </SelectContent>
-                </Select>
-              </Field>
-
-              {equipoSeleccionado && (
-                <>
-                  <div className="border-t pt-4 space-y-4">
-                    <Field>
-                      <div className="flex items-center gap-2">
-                        <FieldLabel>Días de antelación mínima</FieldLabel>
-                        <InfoTooltip
-                          content={(
-                            <div className="space-y-2 text-sm">
-                              <p className="font-medium">¿Qué es la antelación mínima?</p>
-                              <p className="text-xs">
-                                Número mínimo de días que deben pasar entre la solicitud de ausencia y la fecha de inicio.
-                                Solo aplica a ausencias que requieren aprobación (vacaciones y "otro").
-                              </p>
-                              <p className="text-xs mt-2">
-                                Ejemplo: Con 5 días de antelación, una ausencia que empieza el 15 de enero debe solicitarse antes del 10 de enero.
-                              </p>
-                            </div>
-                          )}
-                          variant="subtle"
-                        />
-                      </div>
-                      
-                      <div className="flex items-center gap-4 mt-4">
-                        <Input
-                          type="number"
-                          value={antelacionDias}
-                          onChange={(e) => setAntelacionDias(e.target.value)}
-                          min="0"
-                          max="365"
-                          className="w-32"
-                        />
-                        <span className="text-sm text-gray-600">días</span>
-                      </div>
-                    </Field>
-
-                    <Field>
-                      <div className="flex items-center gap-2">
-                        <FieldLabel>Solapamiento máximo permitido</FieldLabel>
-                        <InfoTooltip
-                          content={(
-                            <div className="space-y-2 text-sm">
-                              <p className="font-medium">¿Qué significa el solapamiento?</p>
-                              <p className="text-xs">
-                                Número máximo de personas del equipo que pueden coincidir de vacaciones al mismo tiempo.
-                                Controla la capacidad del equipo durante los periodos con más ausencias.
-                              </p>
-                              <p className="text-xs mt-2">
-                                Ejemplo: Con un solapamiento máximo de 2 personas, si ya hay 2 miembros en vacaciones
-                                durante una semana, una tercera solicitud para esa misma semana se rechazará automáticamente.
-                              </p>
-                            </div>
-                          )}
-                          variant="subtle"
-                        />
-                      </div>
-                      
-                      <div className="flex items-center gap-4 mt-4">
-                        <Input
-                          type="number"
-                          value={solapamientoPct}
-                          onChange={(e) => setSolapamientoPct(e.target.value)}
-                          min="0"
-                          max="100"
-                          className="w-32"
-                        />
-                        <span className="text-sm text-gray-600">%</span>
-                      </div>
-                    </Field>
-                  </div>
-                </>
+              {verCalendario ? (
+                <CalendarioFestivos onUpdate={cargarDatos} />
+              ) : (
+                <ListaFestivos onUpdate={cargarDatos} />
               )}
-
-              <DialogFooter>
-                <Button variant="outline" onClick={onClose}>
-                  Cancelar
-                </Button>
-                <Button 
-                  onClick={handleGuardarPolitica}
-                  disabled={cargando || !equipoSeleccionado}
-                >
-                  {cargando ? 'Guardando...' : 'Guardar Política'}
-                </Button>
-              </DialogFooter>
             </div>
+
+            <DialogFooter className="border-t pt-4">
+              <Button variant="outline" onClick={onClose}>
+                Cancelar
+              </Button>
+              <LoadingButton onClick={handleGuardarCalendario} loading={cargando} disabled={cargando}>
+                {cargando ? 'Guardando...' : 'Guardar Calendario'}
+              </LoadingButton>
+            </DialogFooter>
           </TabsContent>
         </Tabs>
       </DialogContent>

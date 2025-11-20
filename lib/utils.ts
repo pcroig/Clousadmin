@@ -75,6 +75,17 @@ const toISODateString = (value: unknown): string | null => {
   }
 };
 
+/**
+ * Convierte una fecha a formato ISO solo fecha (YYYY-MM-DD)
+ * Útil para comparar fechas sin considerar la hora
+ */
+export function toDateOnlyString(date: Date | string): string {
+  if (typeof date === 'string') {
+    date = new Date(date);
+  }
+  return date.toISOString().split('T')[0];
+}
+
 const mapManager = (input: unknown): MiEspacioManager | null => {
   if (!isRecord(input)) return null;
   const nombre = typeof input.nombre === 'string' ? input.nombre : '';

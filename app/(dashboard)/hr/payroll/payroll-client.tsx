@@ -20,6 +20,7 @@ import {
   AlertTriangle,
   Info,
   ListChecks,
+  Calendar,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
@@ -144,16 +145,16 @@ const workflowSteps = [
 ];
 
 const getStepIndexFromState = (evento: EventoNomina): number => {
-  if (evento.estado === EVENTO_ESTADOS.CERRADO) {
+  if (evento.estado === EVENTO_ESTADOS.CERRADO || evento.fechaPublicacion) {
     return 3;
   }
 
-  const tienePendientes = (evento.nominasConComplementosPendientes ?? 0) > 0;
-  if (!tienePendientes) {
-    return 2;
+  if (!evento.fechaGeneracion) {
+    return 1;
   }
 
-  return 1;
+  const tienePendientes = (evento.nominasConComplementosPendientes ?? 0) > 0;
+  return tienePendientes ? 1 : 2;
 };
 
 export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
@@ -247,6 +248,43 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
       toast.error(error instanceof Error ? error.message : 'Error al generar evento');
     } finally {
       setIsGenerating(false);
+    }
+  };
+
+  const handleGenerarPrenominas = async (eventoId: string) => {
+    const actionKey = `${eventoId}:generar`;
+    try {
+      setActionLoading(actionKey);
+
+      const response = await fetch(
+        `/api/nominas/eventos/${eventoId}/generar-prenominas`,
+        {
+          method: 'POST',
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Error al generar pre-nóminas');
+      }
+
+      const nuevasPrenominas = data.resultado?.prenominasCreadas ?? 0;
+      toast.success('Pre-nóminas generadas correctamente', {
+        description:
+          nuevasPrenominas > 0
+            ? `${nuevasPrenominas} pre-nómina(s) creadas`
+            : 'Se sincronizaron las pre-nóminas existentes',
+      });
+
+      fetchEventos();
+    } catch (error) {
+      console.error('Error generando pre-nóminas:', error);
+      toast.error(
+        error instanceof Error ? error.message : 'Error al generar pre-nóminas'
+      );
+    } finally {
+      setActionLoading(null);
     }
   };
 
@@ -489,8 +527,10 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
           /* Lista de Eventos */
           <div className="space-y-4">
             {eventos.map((evento) => {
-              const stepIndex = getStepIndexFromState(evento.estado, evento);
+              const stepIndex = getStepIndexFromState(evento);
               const isProcessing = actionLoading?.startsWith(`${evento.id}:`) ?? false;
+              const generarActionKey = `${evento.id}:generar`;
+              const isGenerarLoading = actionLoading === generarActionKey;
               const complementosPendientesNominas = evento.nominasConComplementosPendientes ?? 0;
               const horasExtraInfo = evento.horasExtra ?? {
                 pendientes: 0,
@@ -498,10 +538,13 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
                 total: 0,
                 horasPendientes: 0,
               };
+              const totalNominasEvento = evento._count?.nominas ?? 0;
               const tieneComplementos =
                 evento.tieneComplementos ?? evento.empleadosConComplementos > 0;
 
               const eventoAbierto = evento.estado !== EVENTO_ESTADOS.CERRADO;
+              const debeGenerarPrenominas =
+                !evento.fechaGeneracion || totalNominasEvento === 0;
 
               const mostrarRevisarComplementos = eventoAbierto && tieneComplementos;
               const puedeRevisarComplementos = mostrarRevisarComplementos;
@@ -663,6 +706,31 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
 
                     {eventoAbierto && (
                       <div className="mt-4 flex flex-wrap gap-3">
+                        {debeGenerarPrenominas && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleGenerarPrenominas(evento.id);
+                            }}
+                            disabled={isProcessing}
+                            className="flex-1 min-w-[200px] justify-center"
+                          >
+                            {isGenerarLoading ? (
+                              <>
+                                <Clock className="w-4 h-4 mr-2 animate-spin" />
+                                Generando...
+                              </>
+                            ) : (
+                              <>
+                                <Plus className="w-4 h-4 mr-2" />
+                                Generar Pre-nóminas
+                              </>
+                            )}
+                          </Button>
+                        )}
+
                         {mostrarRevisarComplementos && (
                         <Button
                           size="sm"
@@ -1335,8 +1403,8 @@ function EventoDetailsPanel({
                           <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center flex-shrink-0">
                             <User className="w-4 h-4 text-gray-600" />
                                     </div>
-                          <div className="min-w-0">
-                                      <div className="flex items-center gap-2">
+                          <div className="min-w-0 flex-1">
+                                      <div className="flex items-center gap-2 mb-1">
                               <h4 className="font-medium text-gray-900 text-sm truncate">
                                           {nomina.empleado.nombre} {nomina.empleado.apellidos}
                                         </h4>
@@ -1344,12 +1412,48 @@ function EventoDetailsPanel({
                                           {estadoNominaInfo.label}
                                         </span>
                                       </div>
-                            <p className="text-xs text-gray-600 truncate">{nomina.empleado.email}</p>
+                            
+                            {/* Información descriptiva */}
+                            <div className="flex flex-wrap gap-2 text-xs">
+                              {/* Complementos pendientes */}
+                              {nomina.complementosPendientes && (
+                                <span className="inline-flex items-center gap-1 text-orange-600">
+                                  <AlertTriangle className="w-3 h-3" />
+                                  Complementos pendientes
+                                </span>
+                              )}
+                              
+                              {/* Alertas */}
+                              {nomina.alertas && nomina.alertas.length > 0 && (
+                                <span className={`inline-flex items-center gap-1 ${
+                                  nomina.alertas.some((a: any) => a.tipo === 'critico') 
+                                    ? 'text-red-600' 
+                                    : 'text-orange-600'
+                                }`}>
+                                  <AlertTriangle className="w-3 h-3" />
+                                  {nomina.alertas.length} alerta{nomina.alertas.length > 1 ? 's' : ''}
+                                </span>
+                              )}
+                              
+                              {/* Ausencias */}
+                              {nomina.diasAusencias > 0 && (
+                                <span className="inline-flex items-center gap-1 text-blue-600">
+                                  <Calendar className="w-3 h-3" />
+                                  {nomina.diasAusencias} día{nomina.diasAusencias > 1 ? 's' : ''} ausencia
+                                </span>
+                              )}
+                              
+                              {/* Si no hay nada que destacar */}
+                              {!nomina.complementosPendientes && 
+                               (!nomina.alertas || nomina.alertas.length === 0) && 
+                               nomina.diasAusencias === 0 && (
+                                <span className="text-gray-500">
+                                  Sin incidencias
+                                </span>
+                              )}
+                            </div>
                                     </div>
                                         </div>
-                        <div className="text-sm font-medium text-gray-900 ml-2">
-                          €{Number(nomina.totalNeto).toLocaleString('es-ES')}
-                                      </div>
                                         </div>
                     </button>
               );

@@ -7,3 +7,5 @@ WHERE (motivo IS NULL OR btrim(motivo) = '')
 ALTER TABLE "ausencias"
 DROP COLUMN "descripcion";
 
+
+

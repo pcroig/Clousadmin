@@ -52,11 +52,17 @@ El sistema crea automáticamente carpetas organizadas:
 
 ### Tipos de Documentos Soportados
 
+El sistema utiliza **4 tipos de documentos** unificados:
+
 - **contrato** - Contratos laborales
-- **dni** - DNI/NIE
 - **nomina** - Nóminas
-- **medico** - Certificados médicos
-- **otro** - Otros documentos
+- **justificante** - Justificantes de ausencias y documentos médicos (comparte tipo con "Médicos")
+- **otro** - Otros documentos (incluye Personales, DNI, y cualquier carpeta personalizada)
+
+> ℹ️ **Nota importante**: 
+> - Las carpetas "Médicos" y "Justificantes" comparten el mismo tipo `justificante` a nivel de datos
+> - Las carpetas "Personales" y cualquier carpeta personalizada se mapean automáticamente a `otro`
+> - El tipo se infiere automáticamente desde el nombre de la carpeta si no se especifica
 
 > ℹ️ **Integración con Mi Espacio**  
 > Los documentos compartidos apuntan al mismo datastore que `Mi Espacio`.  
@@ -84,7 +90,8 @@ El sistema crea automáticamente carpetas organizadas:
 FormData {
   file: File;
   nombreDocumento: string; // Ej: "Contrato laboral"
-  tipoDocumento: string;  // Ej: "contrato", "dni", "nomina", "medico", "otro"
+  tipoDocumento: string;  // Ej: "contrato", "nomina", "justificante", "otro" (se infiere automáticamente desde la carpeta si no se especifica)
+  carpetaDestino?: string; // Opcional: carpeta donde se guardará (por defecto "Otros")
 }
 ```
 

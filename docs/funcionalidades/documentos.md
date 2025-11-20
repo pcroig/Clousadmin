@@ -40,7 +40,7 @@ Documento {
   empleadoId: UUID? // NULL = documento compartido
   carpetaId: UUID?
   nombre: String
-  tipoDocumento: String // 'contrato' | 'nomina' | 'medico' | 'personal' | 'otro'
+  tipoDocumento: String // 'contrato' | 'nomina' | 'justificante' | 'otro'
   mimeType: String
   tamano: Int
   s3Key: String // Ruta del archivo (local en MVP, S3 en futuro)
@@ -68,18 +68,22 @@ Se crean automáticamente para cada empleado, conectadas a funcionalidades de la
   - Se reasignan automáticamente a cada empleado
 
 - **📋 Justificantes** (`esSistema: true`, `empleadoId: <id>`)
-  - Justificantes de ausencias
+  - Justificantes de ausencias y documentos médicos
   - Se crean automáticamente desde el módulo de ausencias
   - Vinculados a registros de ausencia (campo `documentoId`)
+  - **Tipo de documento**: `justificante` (compartido con Médicos)
 
-- **👤 Personales** (`esSistema: true`, `empleadoId: <id>`)
-  - DNI/NIE/Pasaporte, certificado bancario, certificado SS, títulos académicos
-  - Empleados pueden subir archivos libremente
-
-- **🏥 Médicos** (`esSistema: true`, `empleadoId: <id>`)
+- **🏥 Médicos** (`esSistema: true`, `empleadoId: <id>`, opcional)
   - Partes de baja, justificantes médicos
   - Se vinculan a ausencias médicas
   - Empleados pueden subir archivos
+  - **Tipo de documento**: `justificante` (compartido con Justificantes)
+  - **Nota**: A nivel de datos, "Médicos" y "Justificantes" comparten el mismo tipo `justificante`
+
+- **👤 Personales** (`esSistema: true`, `empleadoId: <id>`, opcional)
+  - DNI/NIE/Pasaporte, certificado bancario, certificado SS, títulos académicos
+  - Empleados pueden subir archivos libremente
+  - **Tipo de documento**: `otro` (cualquier carpeta no estándar se mapea a `otro`)
 
 #### 2. **Carpetas Globales HR** (agregación con filtros)
 Una carpeta por empresa, agregan documentos de TODOS los empleados:
@@ -164,7 +168,7 @@ Upload de documentos (multipart/form-data)
   "file": File,
   "carpetaId": "uuid",
   "empleadoId": "uuid",
-  "tipoDocumento": "contrato|nomina|justificante|medico|personal|otro"
+  "tipoDocumento": "contrato|nomina|justificante|otro"
 }
 ```
 
@@ -343,8 +347,8 @@ Navegar a: /empleado/mi-espacio/documentos
 **Tamaños máximos:**
 - Contratos: 10MB
 - Nóminas: 2MB
-- Personales: 5MB
-- Médicos: 5MB
+- Justificantes (incluye médicos): 5MB
+- Otros (incluye Personales y carpetas personalizadas): 10MB
 
 **Nombre archivo:**
 - Sin caracteres especiales: `/ \ < > : " | ? *`
@@ -525,21 +529,27 @@ POST /api/empleados/[id]/onboarding/documentos
 FormData:
   - file: File
   - nombreDocumento: string
-  - tipoDocumento: string
-  - carpetaId?: string (opcional - si se elige carpeta específica)
+  - tipoDocumento?: string (opcional - se infiere automáticamente desde la carpeta)
+  - carpetaId?: string (opcional - si se elige carpeta específica, por defecto "Otros")
   - esCompartida?: boolean (opcional - si debe ir a carpeta compartida)
 ```
 
+> ℹ️ **Nota**: El `tipoDocumento` se infiere automáticamente desde el nombre de la carpeta si no se especifica:
+> - Carpeta "Contratos" → `contrato`
+> - Carpeta "Nóminas" → `nomina`
+> - Carpeta "Justificantes" o "Médicos" → `justificante`
+> - Cualquier otra carpeta → `otro`
+
 **Flujo completo**:
 ```typescript
-// 1. HR selecciona carpeta o crea una nueva
+// 1. HR selecciona carpeta o crea una nueva (por defecto "Otros")
 const carpetaId = await CarpetaSelector.getValue();
 
-// 2. Sube documento con carpetaId
+// 2. Sube documento con carpetaId (tipo se infiere automáticamente)
 const formData = new FormData();
 formData.append('file', file);
 formData.append('nombreDocumento', 'Contrato Indefinido');
-formData.append('tipoDocumento', 'contrato');
+// tipoDocumento es opcional - se infiere desde la carpeta
 if (carpetaId) {
   formData.append('carpetaId', carpetaId);
 }
@@ -793,13 +803,29 @@ Para dudas o mejoras:
 
 ---
 
-**Última actualización**: 2025-11-12  
-**Versión**: 1.2.0 MVP  
+**Última actualización**: 2025-01-27  
+**Versión**: 1.3.0 MVP  
 **Status**: ✅ COMPLETADO Y FUNCIONAL
 
 ---
 
 ## 🆕 Changelog
+
+### v1.3.0 (2025-01-27)
+
+#### 🔄 Refactorización de Tipos de Documentos
+- ✨ **Simplificación de tipos**: Reducidos a 4 tipos unificados (`contrato`, `nomina`, `justificante`, `otro`)
+- 🔗 **Unificación Médicos/Justificantes**: Las carpetas "Médicos" y "Justificantes" comparten el tipo `justificante` a nivel de datos
+- 📁 **Mapeo automático**: Cualquier carpeta personalizada (incluyendo "Personales") se mapea automáticamente a `otro`
+- 🎯 **Inferencia automática**: El tipo de documento se infiere automáticamente desde el nombre de la carpeta si no se especifica
+- 🛠️ **Funciones helper**: `inferirTipoDocumento()` y `obtenerTipoDocumentoDesdeCarpeta()` centralizan la lógica de mapeo
+- 📊 **Límites de tamaño actualizados**: Justificantes (5MB), Otros (10MB), manteniendo Contratos (10MB) y Nóminas (2MB)
+
+#### 🔧 Mejoras Técnicas
+- ✅ Validación consistente en todos los endpoints de upload
+- ✅ Normalización automática de tipos en `POST /api/documentos` y `POST /api/upload`
+- ✅ Carpetas globales mejoradas para incluir documentos subidos directamente a la carpeta global
+- ✅ Revalidación automática de páginas después de subir documentos
 
 ### v1.2.0 (2025-11-12)
 
@@ -814,7 +840,7 @@ Para dudas o mejoras:
   - Carpetas Compartidas Manuales (sin filtros especiales)
 
 #### 🔧 Mejoras Técnicas
-- 🔄 `subirDocumentoOnboarding()` acepta `carpetaId` opcional
+- 🔄 `subirDocumentoOnboarding()` acepta `carpetaId` o `carpetaDestino` (nombre) opcional
 - 🎯 Endpoint `/api/empleados/[id]/onboarding/documentos` soporta selección de carpeta
 - 🧩 Componente `CarpetaSelector` integrado en formularios de onboarding
 - 📖 Documentación actualizada con ejemplos de flujos completos

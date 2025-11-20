@@ -107,7 +107,20 @@ export async function PATCH(
     }
 
     // Actualizar solo campos permitidos
-    const { nombre, descripcion, categoria, activa, carpetaDestinoDefault, requiereFirma, configuracionIA } = body;
+    const {
+      nombre,
+      descripcion,
+      categoria,
+      activa,
+      carpetaDestinoDefault,
+      requiereFirma,
+      configuracionIA,
+    } = body;
+
+    const carpetaDestinoSanitizada =
+      carpetaDestinoDefault === undefined
+        ? undefined
+        : (carpetaDestinoDefault?.toString().trim() || 'Otros');
 
     const plantillaActualizada = await prisma.plantillaDocumento.update({
       where: { id },
@@ -116,7 +129,9 @@ export async function PATCH(
         ...(descripcion !== undefined && { descripcion }),
         ...(categoria !== undefined && { categoria }),
         ...(activa !== undefined && { activa }),
-        ...(carpetaDestinoDefault !== undefined && { carpetaDestinoDefault }),
+        ...(carpetaDestinoSanitizada !== undefined && {
+          carpetaDestinoDefault: carpetaDestinoSanitizada,
+        }),
         ...(requiereFirma !== undefined && { requiereFirma }),
         ...(configuracionIA !== undefined && { 
           configuracionIA: {

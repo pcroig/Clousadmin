@@ -15,16 +15,21 @@ import { AIProvider, ModelConfig } from './types';
  * Referencia: https://platform.openai.com/docs/agents/models
  */
 export const OPENAI_MODELS = {
-  GPT_4_1: 'gpt-4.1', // Default del Agents SDK - balance entre predictibilidad y baja latencia
-  GPT_4_1_MINI: 'gpt-4.1-mini-2025-04-14', // Versión mini más rápida
-  GPT_5: 'gpt-5', // Modelo de razonamiento
-  GPT_5_MINI: 'gpt-5-mini', // Razonamiento rápido
-  GPT_5_NANO: 'gpt-5-nano', // Razonamiento ultra-rápido
-  GPT_4O: 'gpt-4o', // Con visión
-  GPT_4O_MINI: 'gpt-4o-mini', // Económico
-  GPT_4_TURBO: 'gpt-4-turbo-preview', // Legacy
-  GPT_4: 'gpt-4', // Legacy
-  GPT_3_5_TURBO: 'gpt-3.5-turbo', // Legacy
+  // Modelos recomendados (Responses API)
+  GPT_5_1: 'gpt-5.1', // Modelo principal - reasoning + visión
+  GPT_5_1_MINI: 'gpt-5.1-mini', // Versión mini - bajo costo
+
+  // Alias legacy (mantener para compatibilidad con código antiguo)
+  GPT_4_1: 'gpt-4.1',
+  GPT_4_1_MINI: 'gpt-4.1-mini-2025-04-14',
+  GPT_5: 'gpt-5',
+  GPT_5_MINI: 'gpt-5-mini',
+  GPT_5_NANO: 'gpt-5-nano',
+  GPT_4O: 'gpt-4o',
+  GPT_4O_MINI: 'gpt-4o-mini',
+  GPT_4_TURBO: 'gpt-4-turbo-preview',
+  GPT_4: 'gpt-4',
+  GPT_3_5_TURBO: 'gpt-3.5-turbo',
 } as const;
 
 /**
@@ -70,6 +75,9 @@ export enum AIUseCase {
   
   // Clasificación y matching
   CLASSIFICATION = 'classification',
+  
+  // Planificación y optimización
+  PLANNING = 'planning',
   
   // Análisis de documentos con visión
   VISION = 'vision',
@@ -145,6 +153,16 @@ const REASONING_CONFIG: Partial<ModelConfig> = {
 };
 
 /**
+ * Configuración para planificación y optimización
+ * - Similar a reasoning pero con más tokens
+ */
+const PLANNING_CONFIG: Partial<ModelConfig> = {
+  temperature: 0.25,
+  responseFormat: 'json_object',
+  maxTokens: 5000,
+};
+
+/**
  * Configuración base para tareas simples
  * - Rápido y económico
  * - Temperatura media
@@ -164,32 +182,37 @@ const SIMPLE_CONFIG: Partial<ModelConfig> = {
 export function getModelForUseCase(useCase: AIUseCase, provider: AIProvider): string {
   const modelMap: Record<AIUseCase, Record<AIProvider, string>> = {
     [AIUseCase.EXTRACTION]: {
-      [AIProvider.OPENAI]: OPENAI_MODELS.GPT_4_1, // Balance entre calidad y velocidad
+      [AIProvider.OPENAI]: OPENAI_MODELS.GPT_5_1,
       [AIProvider.ANTHROPIC]: ANTHROPIC_MODELS.CLAUDE_SONNET_4_5, // Mejor para agentes
       [AIProvider.GOOGLE]: GOOGLE_MODELS.GEMINI_1_5_PRO,
     },
     [AIUseCase.CLASSIFICATION]: {
-      [AIProvider.OPENAI]: OPENAI_MODELS.GPT_4_1_MINI, // Rápido y económico
+      [AIProvider.OPENAI]: OPENAI_MODELS.GPT_5_1_MINI,
       [AIProvider.ANTHROPIC]: ANTHROPIC_MODELS.CLAUDE_HAIKU_4_5, // Near-frontier intelligence
       [AIProvider.GOOGLE]: GOOGLE_MODELS.GEMINI_1_5_FLASH,
     },
+    [AIUseCase.PLANNING]: {
+      [AIProvider.OPENAI]: OPENAI_MODELS.GPT_5_1,
+      [AIProvider.ANTHROPIC]: ANTHROPIC_MODELS.CLAUDE_SONNET_4_5,
+      [AIProvider.GOOGLE]: GOOGLE_MODELS.GEMINI_1_5_PRO,
+    },
     [AIUseCase.VISION]: {
-      [AIProvider.OPENAI]: OPENAI_MODELS.GPT_4O, // GPT-4o tiene las mejores capacidades de visión
+      [AIProvider.OPENAI]: OPENAI_MODELS.GPT_5_1, // GPT-5.1 soporta visión completa
       [AIProvider.ANTHROPIC]: ANTHROPIC_MODELS.CLAUDE_SONNET_4_5, // Claude 4.5 tiene visión
       [AIProvider.GOOGLE]: GOOGLE_MODELS.GEMINI_1_5_PRO, // Gemini tiene visión
     },
     [AIUseCase.GENERATION]: {
-      [AIProvider.OPENAI]: OPENAI_MODELS.GPT_4_1,
+      [AIProvider.OPENAI]: OPENAI_MODELS.GPT_5_1,
       [AIProvider.ANTHROPIC]: ANTHROPIC_MODELS.CLAUDE_SONNET_4_5,
       [AIProvider.GOOGLE]: GOOGLE_MODELS.GEMINI_1_5_PRO,
     },
     [AIUseCase.REASONING]: {
-      [AIProvider.OPENAI]: OPENAI_MODELS.GPT_5, // GPT-5 es el mejor para razonamiento
+      [AIProvider.OPENAI]: OPENAI_MODELS.GPT_5_1,
       [AIProvider.ANTHROPIC]: ANTHROPIC_MODELS.CLAUDE_OPUS_4_1, // Opus para razonamiento especializado
       [AIProvider.GOOGLE]: GOOGLE_MODELS.GEMINI_1_5_PRO,
     },
     [AIUseCase.SIMPLE]: {
-      [AIProvider.OPENAI]: OPENAI_MODELS.GPT_4_1_MINI,
+      [AIProvider.OPENAI]: OPENAI_MODELS.GPT_5_1_MINI,
       [AIProvider.ANTHROPIC]: ANTHROPIC_MODELS.CLAUDE_HAIKU_4_5,
       [AIProvider.GOOGLE]: GOOGLE_MODELS.GEMINI_1_5_FLASH,
     },
@@ -205,6 +228,7 @@ export function getConfigForUseCase(useCase: AIUseCase): Partial<ModelConfig> {
   const configMap: Record<AIUseCase, Partial<ModelConfig>> = {
     [AIUseCase.EXTRACTION]: EXTRACTION_CONFIG,
     [AIUseCase.CLASSIFICATION]: CLASSIFICATION_CONFIG,
+    [AIUseCase.PLANNING]: PLANNING_CONFIG,
     [AIUseCase.VISION]: VISION_CONFIG,
     [AIUseCase.GENERATION]: GENERATION_CONFIG,
     [AIUseCase.REASONING]: REASONING_CONFIG,
@@ -332,6 +356,8 @@ export function getApproximateCost(provider: AIProvider, model: string): {
   // Precios aproximados (actualizar según precios reales)
   const pricing: Record<AIProvider, Record<string, { input: number; output: number }>> = {
     [AIProvider.OPENAI]: {
+      [OPENAI_MODELS.GPT_5_1]: { input: 10, output: 30 },
+      [OPENAI_MODELS.GPT_5_1_MINI]: { input: 0.3, output: 1.2 },
       [OPENAI_MODELS.GPT_4O]: { input: 5, output: 15 },
       [OPENAI_MODELS.GPT_4O_MINI]: { input: 0.15, output: 0.6 },
       [OPENAI_MODELS.GPT_4]: { input: 30, output: 60 },

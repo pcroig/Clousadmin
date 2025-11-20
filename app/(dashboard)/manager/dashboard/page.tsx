@@ -13,8 +13,9 @@ import { PlantillaWidget } from '@/components/dashboard/plantilla-widget';
 
 import { EstadoAusencia, UsuarioRol } from '@/lib/constants/enums';
 import { obtenerResumenPlantillaEquipo } from '@/lib/calculos/plantilla';
-import { obtenerCampanaPendiente } from '@/lib/services/campanas-vacaciones';
+import { obtenerCampanaPendiente, obtenerPropuestaPendiente } from '@/lib/services/campanas-vacaciones';
 import { CampanaVacacionesReminder } from '@/components/vacaciones/campana-vacaciones-reminder';
+import { CampanaPropuestaReminder } from '@/components/vacaciones/campana-propuesta-reminder';
 
 export default async function ManagerDashboardPage() {
   const session = await getSession();
@@ -38,6 +39,24 @@ export default async function ManagerDashboardPage() {
   }
 
   const campanaPendiente = await obtenerCampanaPendiente(manager.id, session.user.empresaId);
+  const campanaPropuesta = await obtenerPropuestaPendiente(manager.id, session.user.empresaId);
+  const reminderData = campanaPendiente
+    ? {
+        id: campanaPendiente.id,
+        titulo: campanaPendiente.titulo,
+        fechaInicioObjetivo: campanaPendiente.fechaInicioObjetivo.toISOString().split('T')[0],
+        fechaFinObjetivo: campanaPendiente.fechaFinObjetivo.toISOString().split('T')[0],
+      }
+    : null;
+  const propuestaData = campanaPropuesta
+    ? {
+        id: campanaPropuesta.id,
+        titulo: campanaPropuesta.titulo,
+        fechaInicioObjetivo: campanaPropuesta.fechaInicioObjetivo.toISOString().split('T')[0],
+        fechaFinObjetivo: campanaPropuesta.fechaFinObjetivo.toISOString().split('T')[0],
+        propuesta: campanaPropuesta.propuesta,
+      }
+    : null;
 
   // Obtener solicitudes pendientes del equipo del manager
   const ausenciasPendientes = await prisma.ausencia.findMany({
@@ -237,18 +256,15 @@ export default async function ManagerDashboardPage() {
         </div>
       </div>
       </div>
-      <CampanaVacacionesReminder
-        campanaPendiente={
-          campanaPendiente
-            ? {
-                id: campanaPendiente.id,
-                titulo: campanaPendiente.titulo,
-                fechaInicioObjetivo: campanaPendiente.fechaInicioObjetivo.toISOString().split('T')[0],
-                fechaFinObjetivo: campanaPendiente.fechaFinObjetivo.toISOString().split('T')[0],
-              }
-            : null
-        }
-        autoOpen={true}
+      {!propuestaData && (
+        <CampanaVacacionesReminder
+          campanaPendiente={reminderData}
+          onCompleted={() => window.location.reload()}
+        />
+      )}
+      <CampanaPropuestaReminder
+        propuestaPendiente={propuestaData}
+        onResponded={() => window.location.reload()}
       />
     </>
   );

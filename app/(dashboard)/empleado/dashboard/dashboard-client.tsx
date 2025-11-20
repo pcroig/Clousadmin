@@ -11,6 +11,7 @@ import { NotificacionesWidget, Notificacion } from '@/components/shared/notifica
 import { AusenciasWidget, AusenciaItem } from '@/components/shared/ausencias-widget';
 import { SolicitarAusenciaModal } from '@/components/empleado/solicitar-ausencia-modal';
 import { CampanaVacacionesReminder } from '@/components/vacaciones/campana-vacaciones-reminder';
+import { CampanaPropuestaReminder } from '@/components/vacaciones/campana-propuesta-reminder';
 
 interface DashboardClientProps {
   userName: string;
@@ -27,6 +28,19 @@ interface DashboardClientProps {
     fechaInicioObjetivo: Date;
     fechaFinObjetivo: Date;
   } | null;
+  campanaPropuesta?: {
+    id: string;
+    titulo: string;
+    fechaInicioObjetivo: Date;
+    fechaFinObjetivo: Date;
+    propuesta: {
+      fechaInicio: string;
+      fechaFin: string;
+      dias: number;
+      tipo: 'ideal' | 'alternativo' | 'ajustado';
+      motivo: string;
+    };
+  } | null;
 }
 
 export function EmpleadoDashboardClient({
@@ -36,6 +50,7 @@ export function EmpleadoDashboardClient({
   ausenciasProximas,
   ausenciasPasadas,
   campanaPendiente,
+  campanaPropuesta,
 }: DashboardClientProps) {
   const [modalAusencia, setModalAusencia] = useState(false);
   const router = useRouter();
@@ -49,6 +64,17 @@ export function EmpleadoDashboardClient({
       fechaFinObjetivo: campanaPendiente.fechaFinObjetivo.toISOString().split('T')[0],
     };
   }, [campanaPendiente]);
+
+  const propuestaData = useMemo(() => {
+    if (!campanaPropuesta) return null;
+    return {
+      id: campanaPropuesta.id,
+      titulo: campanaPropuesta.titulo,
+      fechaInicioObjetivo: campanaPropuesta.fechaInicioObjetivo.toISOString().split('T')[0],
+      fechaFinObjetivo: campanaPropuesta.fechaFinObjetivo.toISOString().split('T')[0],
+      propuesta: campanaPropuesta.propuesta,
+    };
+  }, [campanaPropuesta]);
 
   const handleClickAusencia = (ausenciaId: string) => {
     // Por ahora navegar a la página de ausencias
@@ -110,9 +136,16 @@ export function EmpleadoDashboardClient({
         }}
       />
 
-      <CampanaVacacionesReminder
-        campanaPendiente={reminderData}
-        onCompleted={() => window.location.reload()}
+      {!propuestaData && (
+        <CampanaVacacionesReminder
+          campanaPendiente={reminderData}
+          onCompleted={() => window.location.reload()}
+        />
+      )}
+
+      <CampanaPropuestaReminder
+        propuestaPendiente={propuestaData}
+        onResponded={() => window.location.reload()}
       />
     </>
   );

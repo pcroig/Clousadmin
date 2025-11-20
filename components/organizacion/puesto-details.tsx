@@ -42,7 +42,7 @@ interface PuestoDetailsProps {
       mimeType: string;
       tamano: number;
       createdAt: string;
-      s3Key: string;
+      downloadUrl: string;
     }[];
   };
   onUpdate: () => void;
@@ -267,7 +267,9 @@ export function PuestoDetails({ puesto, onUpdate, onDelete }: PuestoDetailsProps
                     <Button
                       size="sm"
                       variant="ghost"
-                      onClick={() => window.open(doc.s3Key, '_blank')}
+                      onClick={() =>
+                        window.open(doc.downloadUrl || `/api/documentos/${doc.id}?inline=1`, '_blank')
+                      }
                       className="h-8 w-8 p-0"
                     >
                       <Download className="h-4 w-4 text-blue-600" />

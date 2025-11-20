@@ -91,11 +91,16 @@ enum EstadoSolicitudCorreccionFichaje {
 - ✅ **HR Admin**: Puede aprobar cualquier corrección de la empresa
 - ✅ **Bloqueado**: Empleados ya NO pueden editar fichajes directamente
 
-#### e) Notificaciones Integradas
+#### e) UI y Gestión
+- ✅ **Empleados**: Solicitan correcciones desde `/empleado/horario/fichajes`
+- ✅ **HR/Manager**: Revisan y aprueban solicitudes desde la **bandeja de entrada** (no desde card en vista de fichajes)
+- ✅ Las solicitudes aparecen como notificaciones en la bandeja de entrada para mantener el flujo centralizado
+
+#### f) Notificaciones Integradas
 - ✅ `crearNotificacionFichajeRequiereRevision`: Al crear solicitud → notifica HR
 - ✅ `crearNotificacionFichajeResuelto`: Al aprobar → notifica empleado
 
-#### f) Tests
+#### g) Tests
 - ✅ `tests/correcciones-fichaje.test.ts`: Tests de normalización de fecha/hora
 
 ---

@@ -30,9 +30,9 @@ import { es } from 'date-fns/locale';
 import { useApi } from '@/lib/hooks';
 import { getAvatarStyle } from '@/lib/design-system';
 import { toast } from 'sonner';
-import { CuadrarVacacionesResultadoModal } from '@/components/vacaciones/cuadrar-resultado-modal';
+import { CuadrarCalendarioModal } from '@/components/vacaciones/cuadrar-calendario-modal';
 import type { PropuestaVacacionEmpleado } from '@/lib/ia/cuadrar-vacaciones';
-import type { VacacionesAjustePayload } from '@/components/vacaciones/cuadrar-resultado-modal';
+import type { VacacionesAjustePayload } from '@/components/vacaciones/types';
 
 interface Preferencia {
   id: string;
@@ -47,6 +47,13 @@ interface Preferencia {
     apellidos: string;
     fotoUrl: string | null;
     email: string;
+    equipos?: Array<{
+      equipoId: string;
+      equipo?: {
+        id: string;
+        nombre: string | null;
+      } | null;
+    }>;
   };
 }
 
@@ -83,6 +90,7 @@ export function PopoverMonitoreoCampana({
   const [resultadoModalOpen, setResultadoModalOpen] = useState(false);
   const [resultadoPropuestas, setResultadoPropuestas] = useState<PropuestaVacacionEmpleado[] | null>(null);
   const [guardandoResultado, setGuardandoResultado] = useState(false);
+  const [accionLoading, setAccionLoading] = useState(false);
 
   useEffect(() => {
     if (open && campanaId) {
@@ -170,8 +178,56 @@ export function PopoverMonitoreoCampana({
     }
   };
 
+  const handleEnviarPropuesta = async () => {
+    if (!campanaId) return;
+    setAccionLoading(true);
+    try {
+      const response = await fetch(`/api/campanas-vacaciones/${campanaId}/enviar-propuesta`, {
+        method: 'POST',
+      });
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ error: 'Error desconocido' }));
+        throw new Error(error.error || 'No se pudo enviar la propuesta');
+      }
+
+      toast.success('Propuesta enviada a los empleados');
+      await refreshCampana();
+    } catch (error) {
+      console.error('[Monitoreo] Error al enviar propuesta:', error);
+      toast.error(error instanceof Error ? error.message : 'Error enviando propuesta');
+    } finally {
+      setAccionLoading(false);
+    }
+  };
+
+  const handleFinalizarCampana = async () => {
+    if (!campanaId) return;
+    setAccionLoading(true);
+    try {
+      const response = await fetch(`/api/campanas-vacaciones/${campanaId}/finalizar`, {
+        method: 'POST',
+      });
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ error: 'Error desconocido' }));
+        throw new Error(error.error || 'No se pudo finalizar la campaña');
+      }
+
+      toast.success('Campaña finalizada y ausencias creadas');
+      await refreshCampana();
+      setResultadoModalOpen(false);
+    } catch (error) {
+      console.error('[Monitoreo] Error al finalizar campaña:', error);
+      toast.error(error instanceof Error ? error.message : 'Error finalizando campaña');
+    } finally {
+      setAccionLoading(false);
+    }
+  };
+
   const preferenciasCompletadas = campana?.preferencias.filter(p => p.completada) || [];
   const preferenciasPendientes = campana?.preferencias.filter(p => !p.completada) || [];
+  const cambiosSolicitados = campana?.preferencias.filter(p => p.cambioSolicitado) || [];
 
   const formatFecha = (fechaStr: string) => {
     try {
@@ -194,6 +250,21 @@ export function PopoverMonitoreoCampana({
     
     return `${dias.slice(0, 3).map(f => formatFecha(f)).join(', ')} (+${dias.length - 3} más)`;
   };
+
+  const estadoBadgeMap: Record<string, { label: string; className: string }> = {
+    abierta: { label: 'En curso', className: 'bg-blue-100 text-blue-800 border-0' },
+    borrador_generado: { label: 'Borrador listo', className: 'bg-amber-100 text-amber-800 border-0' },
+    propuesta_enviada: {
+      label: 'Esperando respuestas',
+      className: 'bg-orange-100 text-orange-800 border-0',
+    },
+    finalizada: { label: 'Finalizada', className: 'bg-green-100 text-green-800 border-0' },
+  };
+
+  const getEstadoBadgeClass = (estado: string) =>
+    estadoBadgeMap[estado]?.className || 'bg-gray-100 text-gray-800 border-0';
+
+  const getEstadoEtiqueta = (estado: string) => estadoBadgeMap[estado]?.label || estado;
 
   return (
     <>
@@ -227,16 +298,8 @@ export function PopoverMonitoreoCampana({
                     {formatFecha(campana.fechaInicioObjetivo)} - {formatFecha(campana.fechaFinObjetivo)}
                   </p>
                 </div>
-                <Badge 
-                  className={
-                    campana.estado === 'abierta' 
-                      ? 'bg-blue-100 text-blue-800 border-0'
-                      : campana.estado === 'cuadrada'
-                      ? 'bg-green-100 text-green-800 border-0'
-                      : 'bg-gray-100 text-gray-800 border-0'
-                  }
-                >
-                  {campana.estado === 'abierta' ? 'En curso' : campana.estado}
+                <Badge className={getEstadoBadgeClass(campana.estado)}>
+                  {getEstadoEtiqueta(campana.estado)}
                 </Badge>
               </div>
 
@@ -346,6 +409,43 @@ export function PopoverMonitoreoCampana({
                   </div>
                 )}
 
+                {cambiosSolicitados.length > 0 && (
+                  <div>
+                    <div className="flex items-center gap-2 mb-3">
+                      <AlertCircle className="w-4 h-4 text-red-600" />
+                      <h4 className="font-medium text-sm text-gray-900">
+                        Cambios solicitados ({cambiosSolicitados.length})
+                      </h4>
+                    </div>
+                    <div className="space-y-2.5">
+                      {cambiosSolicitados.map(pref => (
+                        <div
+                          key={`${pref.id}-cambio`}
+                          className="flex items-center gap-3 p-3 rounded-lg bg-red-50 border border-red-200"
+                        >
+                          <Avatar className="w-8 h-8">
+                            <AvatarImage src={pref.empleado.fotoUrl || undefined} />
+                            <AvatarFallback
+                              className="text-xs font-semibold uppercase"
+                              style={getAvatarStyle(`${pref.empleado.nombre} ${pref.empleado.apellidos}`)}
+                            >
+                              {getIniciales(pref.empleado.nombre, pref.empleado.apellidos)}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-gray-900 truncate">
+                              {pref.empleado.nombre} {pref.empleado.apellidos}
+                            </p>
+                            <p className="text-xs text-red-700 mt-0.5">
+                              Propuesta alternativa pendiente de revisar
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {/* Pendientes */}
                 {preferenciasPendientes.length > 0 && (
                     <div>
@@ -417,16 +517,22 @@ export function PopoverMonitoreoCampana({
                   Cuadrar Manual
                 </Button>
               </div>
-              {preferenciasPendientes.length > 0 ? (
+              {preferenciasPendientes.length > 0 && (
                 <p className="text-xs text-gray-500 mt-3 text-center">
-                  ⚠️ Algunos empleados siguen pendientes. Puedes cuadrar: sólo se usarán las preferencias completadas.
+                  ⚠️ Algunos empleados siguen pendientes. Puedes cuadrar con las preferencias actuales.
                 </p>
-              ) : campana.estado === 'abierta' ? (
+              )}
+              {campana.estado === 'propuesta_enviada' && (
+                <p className="text-xs text-orange-600 mt-3 text-center font-medium">
+                  Esperando respuestas de empleados. Puedes finalizar cuando lo estimes.
+                </p>
+              )}
+              {campana.estado === 'finalizada' && (
                 <p className="text-xs text-green-600 mt-3 text-center font-medium">
-                  ✓ Todos completaron. Ya puedes cuadrar las vacaciones
+                  Campaña finalizada. Todas las ausencias fueron creadas.
                 </p>
-              ) : null}
-              {campana.estado === 'cuadrada' && (
+              )}
+              {campana.estado !== 'finalizada' && (
                 <Button
                   variant="ghost"
                   size="sm"
@@ -436,7 +542,7 @@ export function PopoverMonitoreoCampana({
                     setResultadoModalOpen(true);
                   }}
                 >
-                  Ver y ajustar cuadrado existente
+                  Ver y ajustar propuesta actual
                 </Button>
               )}
             </div>
@@ -446,7 +552,7 @@ export function PopoverMonitoreoCampana({
       </Popover>
 
       {campana && (
-        <CuadrarVacacionesResultadoModal
+        <CuadrarCalendarioModal
           open={resultadoModalOpen}
           onClose={() => setResultadoModalOpen(false)}
           campana={{
@@ -455,10 +561,23 @@ export function PopoverMonitoreoCampana({
             fechaInicioObjetivo: campana.fechaInicioObjetivo,
             fechaFinObjetivo: campana.fechaFinObjetivo,
           }}
-          preferencias={campana.preferencias}
+          preferencias={campana.preferencias.map((pref) => ({
+            ...pref,
+            empleado: {
+              ...pref.empleado,
+              equipos:
+                pref.empleado.equipos?.map((equipo) => ({
+                  equipoId: equipo.equipoId,
+                  nombre: equipo.equipo?.nombre ?? null,
+                })) ?? [],
+            },
+          }))}
           propuestas={resultadoPropuestas}
-          onGuardarAjustes={handleGuardarAjustes}
+          onGuardar={handleGuardarAjustes}
+          onEnviar={handleEnviarPropuesta}
+          onFinalizar={handleFinalizarCampana}
           guardando={guardandoResultado}
+          actionLoading={accionLoading}
         />
       )}
     </>

@@ -261,7 +261,7 @@ model PlantillaDocumento {
   requiereFirma    Boolean @default(false) // Requiere firma digital (Fase 2)
   
   // Folder destination default
-  carpetaDestinoDefault String? @db.VarChar(50) // 'Contratos', 'Personales', etc.
+  carpetaDestinoDefault String? @db.VarChar(50) // 'Contratos', 'Nóminas', 'Justificantes', 'Otros' (por defecto)
   
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

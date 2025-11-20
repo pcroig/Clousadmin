@@ -14,8 +14,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Edit2, Trash2, Power, PowerOff } from 'lucide-react';
+import { Trash2 } from 'lucide-react';
 import { EditarFestivoModal } from './editar-festivo-modal';
 import { toast } from 'sonner';
 
@@ -89,28 +88,6 @@ export function ListaFestivos({ año, onUpdate }: ListaFestivosProps) {
     }
   }
 
-  async function handleToggleActivo(festivo: Festivo) {
-    try {
-      const response = await fetch(`/api/festivos/${festivo.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ activo: !festivo.activo }),
-      });
-
-      if (response.ok) {
-        toast.success(`Festivo ${!festivo.activo ? 'activado' : 'desactivado'} exitosamente`);
-        cargarFestivos();
-        if (onUpdate) onUpdate();
-      } else {
-        const error = await response.json();
-        toast.error(error.error || 'Error al actualizar festivo');
-      }
-    } catch (error) {
-      console.error('Error:', error);
-      toast.error('Error al actualizar festivo');
-    }
-  }
-
   function formatFecha(fechaStr: string): string {
     const fecha = new Date(fechaStr + 'T00:00:00');
     return fecha.toLocaleDateString('es-ES', {
@@ -135,14 +112,12 @@ export function ListaFestivos({ año, onUpdate }: ListaFestivosProps) {
 
   return (
     <>
-      <div className="rounded-md border">
+      <div className="rounded-md border max-h-80 overflow-y-auto">
         <Table>
-          <TableHeader>
+          <TableHeader className="sticky top-0 bg-white">
             <TableRow>
               <TableHead>Fecha</TableHead>
-              <TableHead>Nombre</TableHead>
-              <TableHead>Tipo</TableHead>
-              <TableHead>Estado</TableHead>
+              <TableHead>Nombre del festivo</TableHead>
               <TableHead className="text-right">Acciones</TableHead>
             </TableRow>
           </TableHeader>
@@ -153,58 +128,16 @@ export function ListaFestivos({ año, onUpdate }: ListaFestivosProps) {
                   {formatFecha(festivo.fecha)}
                 </TableCell>
                 <TableCell>{festivo.nombre}</TableCell>
-                <TableCell>
-                  <Badge variant={festivo.tipo === 'nacional' ? 'default' : 'secondary'}>
-                    {festivo.tipo === 'nacional' ? 'Nacional' : 'Empresa'}
-                  </Badge>
-                </TableCell>
-                <TableCell>
-                  {festivo.activo ? (
-                    <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                      Activo
-                    </Badge>
-                  ) : (
-                    <Badge variant="outline" className="bg-gray-50 text-gray-700 border-gray-200">
-                      Inactivo
-                    </Badge>
-                  )}
-                </TableCell>
                 <TableCell className="text-right">
                   <div className="flex justify-end gap-2">
-                    {festivo.tipo === 'empresa' && (
-                      <>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() =>
-                            setModalEditar({ open: true, festivo, modo: 'editar' })
-                          }
-                          title="Editar"
-                        >
-                          <Edit2 className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => handleEliminar(festivo)}
-                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                          title="Eliminar"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </>
-                    )}
                     <Button
                       size="sm"
                       variant="ghost"
-                      onClick={() => handleToggleActivo(festivo)}
-                      title={festivo.activo ? 'Desactivar' : 'Activar'}
+                      onClick={() => handleEliminar(festivo)}
+                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                      title="Quitar festivo"
                     >
-                      {festivo.activo ? (
-                        <PowerOff className="w-4 h-4" />
-                      ) : (
-                        <Power className="w-4 h-4" />
-                      )}
+                      <Trash2 className="w-4 h-4" />
                     </Button>
                   </div>
                 </TableCell>

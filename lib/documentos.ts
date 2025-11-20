@@ -18,13 +18,25 @@ export const CARPETAS_SISTEMA = [
   'Contratos',
   'Nóminas',
   'Justificantes',
-  'Personales',
-  'Médicos',
+  'Otros',
 ] as const;
 
 export type CarpetaSistema = typeof CARPETAS_SISTEMA[number];
 
-const CARPETAS_GLOBALES: CarpetaSistema[] = ['Contratos', 'Nóminas', 'Justificantes'];
+const CARPETAS_GLOBALES: CarpetaSistema[] = [
+  'Contratos',
+  'Nóminas',
+  'Justificantes',
+  'Otros',
+];
+
+const EMPLOYEE_UPLOAD_FOLDERS = new Set([
+  'Justificantes',
+  'Otros',
+  // Compatibilidad con nombres legados
+  'Personales',
+  'Médicos',
+]);
 
 /**
  * Tipos de documentos permitidos
@@ -33,13 +45,67 @@ export const TIPOS_DOCUMENTO = {
   CONTRATO: 'contrato',
   NOMINA: 'nomina',
   JUSTIFICANTE: 'justificante',
-  MEDICO: 'medico',
-  PERSONAL: 'personal',
-  DNI: 'dni',
-  ONBOARDING: 'onboarding',
-  OFFBOARDING: 'offboarding',
   OTRO: 'otro',
 } as const;
+
+const normalizarTexto = (texto: string) =>
+  texto
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+
+const TIPO_DOCUMENTO_ALIAS_MAP: Record<string, string> = {
+  contrato: TIPOS_DOCUMENTO.CONTRATO,
+  contratos: TIPOS_DOCUMENTO.CONTRATO,
+  nomina: TIPOS_DOCUMENTO.NOMINA,
+  nominas: TIPOS_DOCUMENTO.NOMINA,
+  justificante: TIPOS_DOCUMENTO.JUSTIFICANTE,
+  justificantes: TIPOS_DOCUMENTO.JUSTIFICANTE,
+  medico: TIPOS_DOCUMENTO.JUSTIFICANTE,
+  medicos: TIPOS_DOCUMENTO.JUSTIFICANTE,
+  personal: TIPOS_DOCUMENTO.OTRO,
+  personales: TIPOS_DOCUMENTO.OTRO,
+  general: TIPOS_DOCUMENTO.OTRO,
+  documento: TIPOS_DOCUMENTO.OTRO,
+  documentos: TIPOS_DOCUMENTO.OTRO,
+  dni: TIPOS_DOCUMENTO.OTRO,
+  nie: TIPOS_DOCUMENTO.OTRO,
+  identificacion: TIPOS_DOCUMENTO.OTRO,
+  otro: TIPOS_DOCUMENTO.OTRO,
+  otros: TIPOS_DOCUMENTO.OTRO,
+};
+
+function normalizarTipoDocumento(tipo?: string | null): string | null {
+  if (!tipo) {
+    return null;
+  }
+
+  const normalizado = normalizarTexto(tipo);
+
+  return TIPO_DOCUMENTO_ALIAS_MAP[normalizado] ?? null;
+}
+
+export function obtenerTipoDocumentoDesdeCarpeta(
+  nombreCarpeta?: string | null
+): string | null {
+  if (!nombreCarpeta) {
+    return null;
+  }
+
+  return normalizarTipoDocumento(nombreCarpeta);
+}
+
+export function inferirTipoDocumento(
+  nombreCarpeta: string,
+  tipoDocumento?: string | null
+): string {
+  return (
+    normalizarTipoDocumento(tipoDocumento) ||
+    obtenerTipoDocumentoDesdeCarpeta(nombreCarpeta) ||
+    TIPOS_DOCUMENTO.OTRO
+  );
+}
 
 /**
  * Límites de tamaño por tipo de documento (en bytes)
@@ -47,12 +113,7 @@ export const TIPOS_DOCUMENTO = {
 export const LIMITES_TAMANO = {
   [TIPOS_DOCUMENTO.CONTRATO]: 10 * 1024 * 1024, // 10MB
   [TIPOS_DOCUMENTO.NOMINA]: 2 * 1024 * 1024, // 2MB
-  [TIPOS_DOCUMENTO.JUSTIFICANTE]: 5 * 1024 * 1024, // 5MB
-  [TIPOS_DOCUMENTO.MEDICO]: 5 * 1024 * 1024, // 5MB
-  [TIPOS_DOCUMENTO.PERSONAL]: 5 * 1024 * 1024, // 5MB
-  [TIPOS_DOCUMENTO.DNI]: 5 * 1024 * 1024, // 5MB
-  [TIPOS_DOCUMENTO.ONBOARDING]: 5 * 1024 * 1024, // 5MB
-  [TIPOS_DOCUMENTO.OFFBOARDING]: 5 * 1024 * 1024, // 5MB
+  [TIPOS_DOCUMENTO.JUSTIFICANTE]: 5 * 1024 * 1024, // 5MB (incluye médicos)
   [TIPOS_DOCUMENTO.OTRO]: 10 * 1024 * 1024, // 10MB
 };
 
@@ -241,11 +302,8 @@ export async function puedeSubirACarpeta(
     return false;
   }
 
-  // Los empleados solo pueden subir a carpetas Personales y Médicos
   if (carpeta.empleado?.usuarioId === usuarioId) {
-    return (
-      carpeta.nombre === 'Personales' || carpeta.nombre === 'Médicos'
-    );
+    return EMPLOYEE_UPLOAD_FOLDERS.has(carpeta.nombre);
   }
 
   return false;

@@ -3,7 +3,14 @@
 // ========================================
 
 import { prisma } from '@/lib/prisma';
-import { randomBytes } from 'crypto';
+import {
+  CARPETAS_SISTEMA,
+  CarpetaSistema,
+  TIPOS_DOCUMENTO,
+  inferirTipoDocumento,
+  obtenerOCrearCarpetaGlobal,
+  obtenerOCrearCarpetaSistema,
+} from '@/lib/documentos';
 
 /**
  * Crear carpetas automáticas para documentos de onboarding
@@ -207,6 +214,56 @@ export async function listarDocumentosOnboarding(
  * @param carpetaId - ID de carpeta destino (opcional). Si no se provee, se crea automáticamente.
  * @param esCompartida - Si true, también crea referencia en carpeta compartida de HR
  */
+const CARPETA_SISTEMA_POR_TIPO: Record<string, CarpetaSistema> = {
+  [TIPOS_DOCUMENTO.CONTRATO]: 'Contratos',
+  [TIPOS_DOCUMENTO.NOMINA]: 'Nóminas',
+  [TIPOS_DOCUMENTO.JUSTIFICANTE]: 'Justificantes',
+  [TIPOS_DOCUMENTO.OTRO]: 'Otros',
+};
+
+const NORMALIZED_CARPETAS_SISTEMA = new Map<string, CarpetaSistema>(
+  CARPETAS_SISTEMA.map((nombre) => [
+    nombre
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase(),
+    nombre,
+  ])
+);
+
+function normalizarNombreCarpeta(nombre?: string | null): string | null {
+  if (!nombre) return null;
+  const trimmed = nombre.trim();
+  if (!trimmed) return null;
+  return trimmed
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+}
+
+function resolverCarpetaSistema(nombre?: string | null): CarpetaSistema | null {
+  const normalizado = normalizarNombreCarpeta(nombre);
+  if (!normalizado) return null;
+
+  if (NORMALIZED_CARPETAS_SISTEMA.has(normalizado)) {
+    return NORMALIZED_CARPETAS_SISTEMA.get(normalizado)!;
+  }
+
+  if (normalizado === 'medicos' || normalizado === 'medico') {
+    return 'Justificantes';
+  }
+
+  if (normalizado === 'personales' || normalizado === 'personal') {
+    return 'Otros';
+  }
+
+  return null;
+}
+
+function obtenerCarpetaPorTipo(tipoNormalizado: string): CarpetaSistema {
+  return CARPETA_SISTEMA_POR_TIPO[tipoNormalizado] ?? 'Otros';
+}
+
 export async function subirDocumentoOnboarding(
   empresaId: string,
   empleadoId: string,
@@ -217,11 +274,13 @@ export async function subirDocumentoOnboarding(
   mimeType: string,
   tamano: number,
   carpetaId?: string,
-  esCompartida?: boolean
+  esCompartida?: boolean,
+  carpetaNombreDestino?: string
 ) {
   try {
     let carpetaDestino;
     let carpetaHR;
+    const carpetaNombreNormalizado = carpetaNombreDestino?.trim();
 
     if (carpetaId) {
       // Verificar que la carpeta existe y pertenece al empleado o es compartida
@@ -242,24 +301,62 @@ export async function subirDocumentoOnboarding(
           error: 'Carpeta no encontrada o no autorizada',
         };
       }
+    } else if (carpetaNombreNormalizado) {
+      const carpetaSistema = resolverCarpetaSistema(carpetaNombreNormalizado);
+      if (carpetaSistema) {
+        carpetaDestino = await obtenerOCrearCarpetaSistema(
+          empleadoId,
+          empresaId,
+          carpetaSistema
+        );
+      } else {
+        carpetaDestino = await prisma.carpeta.findFirst({
+          where: {
+            empresaId,
+            empleadoId,
+            nombre: carpetaNombreNormalizado,
+          },
+        });
+
+        if (!carpetaDestino) {
+          carpetaDestino = await prisma.carpeta.create({
+            data: {
+              empresaId,
+              empleadoId,
+              nombre: carpetaNombreNormalizado,
+              esSistema: false,
+              compartida: false,
+            },
+          });
+        }
+      }
     } else {
-      // Crear carpetas automáticamente (comportamiento anterior)
-    const carpetasResult = await crearCarpetasOnboardingDocumento(
-      empresaId,
-      empleadoId,
-      nombreDocumento,
+      // Usar carpeta del sistema "Otros" por defecto
+      carpetaDestino = await obtenerOCrearCarpetaSistema(
+        empleadoId,
+        empresaId,
+        'Otros'
+      );
+    }
+
+    if (!carpetaDestino) {
+      return {
+        success: false,
+        error: 'No se pudo determinar la carpeta destino',
+      };
+    }
+
+    const tipoNormalizado = inferirTipoDocumento(
+      carpetaDestino.nombre,
       tipoDocumento
     );
 
-    if (!carpetasResult.success) {
-      return {
-        success: false,
-        error: carpetasResult.error,
-      };
-      }
-
-      carpetaDestino = carpetasResult.carpetaEmpleado;
-      carpetaHR = carpetasResult.carpetaHR;
+    if (esCompartida) {
+      const nombreCarpetaHR = obtenerCarpetaPorTipo(tipoNormalizado);
+      carpetaHR = await obtenerOCrearCarpetaGlobal(
+        empresaId,
+        nombreCarpetaHR
+      );
     }
 
     // Crear documento en carpeta del empleado
@@ -269,7 +366,7 @@ export async function subirDocumentoOnboarding(
         empleadoId,
         carpetaId: carpetaDestino!.id,
         nombre: nombreDocumento,
-        tipoDocumento,
+        tipoDocumento: tipoNormalizado,
         s3Key,
         s3Bucket,
         mimeType,
@@ -311,10 +408,26 @@ export async function validarDocumentosRequeridosCompletos(
     }
 
     const documentosSubidos = documentosResult.documentos || [];
-    // Crear un Set con los tipos de documentos subidos (puede ser tipoDocumento o nombre del documento)
-    const tiposSubidos = new Set(
-      documentosSubidos.map((d) => d.tipoDocumento?.toLowerCase() || d.nombre?.toLowerCase())
-    );
+    // Crear un Set con los identificadores disponibles (tipoDocumento, nombre o slug del archivo)
+    const identificadoresSubidos = new Set<string>();
+
+    for (const documento of documentosSubidos) {
+      if (documento.tipoDocumento) {
+        identificadoresSubidos.add(documento.tipoDocumento.toLowerCase());
+      }
+
+      if (documento.nombre) {
+        identificadoresSubidos.add(documento.nombre.toLowerCase());
+      }
+
+      if (documento.s3Key) {
+        const keySegment = documento.s3Key.split('/').pop() || '';
+        const slug = keySegment.split('-')[0]?.toLowerCase();
+        if (slug) {
+          identificadoresSubidos.add(slug);
+        }
+      }
+    }
 
     // Validar documentos requeridos: comparar por id (que coincide con tipoDocumento) o por nombre
     const documentosFaltantes = documentosRequeridos.filter((doc) => {
@@ -324,7 +437,9 @@ export async function validarDocumentosRequeridosCompletos(
       const docNombreLower = doc.nombre?.toLowerCase() || '';
       
       // Verificar si existe un documento con el mismo tipo o nombre
-      return !tiposSubidos.has(docIdLower) && !tiposSubidos.has(docNombreLower);
+      return (
+        !identificadoresSubidos.has(docIdLower) && !identificadoresSubidos.has(docNombreLower)
+      );
     });
 
     return {

@@ -15,8 +15,8 @@ interface AjustePayload {
   preferenciaId: string;
   fechaInicio: string;
   fechaFin: string;
-  tipo: 'ideal' | 'alternativo' | 'ajustado';
-  motivo: string;
+  tipo?: 'ideal' | 'alternativo' | 'ajustado'; // Optional - for internal use
+  motivo?: string; // Optional - not displayed in UI
 }
 
 export async function PATCH(
@@ -120,7 +120,7 @@ export async function PATCH(
           fechaInicio: ajuste.fechaInicio,
           fechaFin: ajuste.fechaFin,
           dias: diasCalculados,
-          tipo: ajuste.tipo,
+          tipo: ajuste.tipo || 'ajustado',
           motivo: ajuste.motivo || 'Ajuste manual',
           prioridad: ajuste.tipo === 'ideal' ? 9 : ajuste.tipo === 'alternativo' ? 7 : 5,
         },
@@ -137,8 +137,8 @@ export async function PATCH(
         });
       }
 
-      const propuestaCampana = (campana.propuestaIA as any) || {};
-      const propuestasExistentes: any[] = Array.isArray(propuestaCampana.propuestas)
+      const propuestaCampana = (campana.propuestaIA as Record<string, unknown>) || {};
+      const propuestasExistentes: Array<Record<string, unknown>> = Array.isArray(propuestaCampana.propuestas)
         ? propuestaCampana.propuestas
         : [];
 

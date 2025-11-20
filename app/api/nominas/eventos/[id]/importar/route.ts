@@ -181,7 +181,17 @@ export async function POST(
         const s3Key = `empresas/${session.user.empresaId}/empleados/${nomina.empleadoId}/nominas/${evento.mes}_${evento.anio}_${nomina.id}.pdf`;
 
         // Subir a S3
-        const s3Url = await uploadToS3(buffer, s3Key, 'application/pdf');
+        let s3Url: string;
+        try {
+          s3Url = await uploadToS3(buffer, s3Key, 'application/pdf');
+        } catch (s3Error: any) {
+          console.error(`[Importar Nóminas] Error S3 para ${file.name}:`, s3Error.message);
+          errores.push({
+            archivo: file.name,
+            error: `Error al subir archivo: ${s3Error.message || 'Error desconocido'}`,
+          });
+          continue; // Pasar al siguiente archivo
+        }
 
         // Crear documento
         const documento = await prisma.documento.create({
@@ -198,22 +208,13 @@ export async function POST(
           },
         });
 
-        // Vincular documento a nómina
+        // Vincular documento a nómina y actualizar a estado 'completada'
         await prisma.nomina.update({
           where: { id: nomina.id },
           data: {
             documentoId: documento.id,
             subidoPor: session.user.id,
-          },
-        });
-
-        // Actualizar nómina a estado 'publicada' al importar el PDF
-        await prisma.nomina.update({
-          where: { id: nomina.id },
-          data: {
-            estado: NOMINA_ESTADOS.PUBLICADA,
-            fechaPublicacion: new Date(),
-            empleadoNotificado: false,
+            estado: NOMINA_ESTADOS.COMPLETADA,
           },
         });
 

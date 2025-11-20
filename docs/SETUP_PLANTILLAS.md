@@ -57,11 +57,13 @@ REDIS_TLS="false"
 # OpenAI (Resolución IA de variables)
 OPENAI_API_KEY="sk-your-openai-api-key-here"
 
-# AWS S3 (opcional - si no está configurado usa almacenamiento local)
-AWS_REGION="eu-west-1"
-AWS_ACCESS_KEY_ID="your-key"
-AWS_SECRET_ACCESS_KEY="your-secret"
-S3_BUCKET="your-bucket-name"
+# Hetzner Object Storage
+STORAGE_ENDPOINT="https://fsn1.your-objectstorage.com"
+STORAGE_REGION="eu-central-1"
+STORAGE_ACCESS_KEY="your-access-key"
+STORAGE_SECRET_KEY="your-secret-key"
+STORAGE_BUCKET="clousadmin"
+ENABLE_CLOUD_STORAGE="true"
 ```
 
 ### 2. Migraciones de Base de Datos

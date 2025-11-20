@@ -1558,7 +1558,7 @@ model CampanaVacaciones {
   equipoIds Json? // Array de equipo IDs si alcance='equipos'
 
   // Estado de la campaña
-  estado String @default("abierta") @db.VarChar(50) // 'abierta', 'cerrada', 'cuadrada'
+  estado String @default("abierta") @db.VarChar(50) // 'abierta', 'borrador_generado', 'propuesta_enviada', 'finalizada'
 
   // Configuración de solapamiento (opcional por equipo)
   solapamientoMaximoPct Int? // % máximo de miembros de un equipo de vacaciones simultáneamente
@@ -1579,6 +1579,7 @@ model CampanaVacaciones {
   updatedAt  DateTime  @updatedAt
   cerradaEn  DateTime?
   cuadradaEn DateTime?
+  finalizadaEn DateTime?
 
   // Relations
   empresa      Empresa                 @relation(fields: [empresaId], references: [id], onDelete: Cascade)
@@ -1604,6 +1605,9 @@ model PreferenciaVacaciones {
   // Estado
   completada Boolean @default(false)
   aceptada   Boolean @default(false) // Si aceptó la propuesta de la IA
+  propuestaEnviada Boolean @default(false)
+  cambioSolicitado Boolean @default(false)
+  propuestaEmpleado Json?
 
   // Propuesta individual de la IA para este empleado
   propuestaIA Json? // { fechaInicio, fechaFin, tipo, motivo }

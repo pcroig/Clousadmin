@@ -1,5 +1,42 @@
 import type { NextConfig } from "next";
 
+const storageEndpointHostname = (() => {
+  const endpoint = process.env.STORAGE_ENDPOINT;
+  if (!endpoint) {
+    return undefined;
+  }
+  try {
+    const url = new URL(endpoint);
+    return url.hostname;
+  } catch (error) {
+    console.warn('[next.config] STORAGE_ENDPOINT no es una URL válida:', error);
+    return undefined;
+  }
+})();
+
+const remotePatterns = [
+  storageEndpointHostname && {
+    protocol: 'https',
+    hostname: storageEndpointHostname,
+  },
+  {
+    protocol: 'https',
+    hostname: '**.your-objectstorage.com', // Hetzner Object Storage (wildcard)
+  },
+  {
+    protocol: 'https',
+    hostname: '**.fsn1.your-objectstorage.com', // Hetzner Falkenstein
+  },
+  {
+    protocol: 'https',
+    hostname: '**.nbg1.your-objectstorage.com', // Hetzner Nuremberg
+  },
+  {
+    protocol: 'https',
+    hostname: '**.hel1.your-objectstorage.com', // Hetzner Helsinki
+  },
+].filter(Boolean) as NonNullable<NextConfig['images']>['remotePatterns'];
+
 const nextConfig: NextConfig = {
   // TypeScript check - Activado para garantizar calidad del código
   typescript: {
@@ -16,24 +53,7 @@ const nextConfig: NextConfig = {
 
   // Configuración de imágenes (para Hetzner Object Storage y avatares)
   images: {
-    remotePatterns: [
-      {
-        protocol: 'https',
-        hostname: '**.your-objectstorage.com', // Hetzner Object Storage
-      },
-      {
-        protocol: 'https',
-        hostname: '**.fsn1.your-objectstorage.com', // Hetzner Falkenstein
-      },
-      {
-        protocol: 'https',
-        hostname: '**.nbg1.your-objectstorage.com', // Hetzner Nuremberg
-      },
-      {
-        protocol: 'https',
-        hostname: '**.hel1.your-objectstorage.com', // Hetzner Helsinki
-      },
-    ],
+    remotePatterns,
   },
 
   // Headers de seguridad

@@ -44,7 +44,9 @@ const documentoRequeridoSchema = z.object({
   nombre: z.string(),
   descripcion: z.string().optional(),
   requerido: z.boolean(),
-  tipoDocumento: z.string(),
+  requiereVisualizacion: z.boolean().optional().default(false),
+  requiereFirma: z.boolean().optional().default(false),
+  carpetaDestino: z.string().optional().nullable(),
 });
 
 // Schema de validación para plantilla de documento
@@ -222,6 +224,8 @@ export async function PATCH(req: NextRequest) {
     );
   }
 }
+
+
 
 
 

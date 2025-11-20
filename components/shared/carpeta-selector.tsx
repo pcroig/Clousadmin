@@ -26,6 +26,7 @@ interface CarpetaSelectorProps {
   label?: string;
   placeholder?: string;
   disabled?: boolean;
+  defaultNombre?: string;
 }
 
 export function CarpetaSelector({
@@ -36,6 +37,7 @@ export function CarpetaSelector({
   label = 'Carpeta de destino',
   placeholder = 'Seleccionar carpeta',
   disabled = false,
+  defaultNombre,
 }: CarpetaSelectorProps) {
   const [carpetas, setCarpetas] = useState<Carpeta[]>([]);
   const [loading, setLoading] = useState(false);
@@ -64,6 +66,18 @@ export function CarpetaSelector({
       cargarCarpetas();
     }
   }, [empleadoId, cargarCarpetas]);
+
+  useEffect(() => {
+    if (!value && defaultNombre) {
+      const encontrada = carpetas.find(
+        (carpeta) =>
+          carpeta.nombre.toLowerCase() === defaultNombre.toLowerCase()
+      );
+      if (encontrada) {
+        onChange(encontrada.id);
+      }
+    }
+  }, [value, defaultNombre, carpetas, onChange]);
 
   const handleCrearCarpeta = async () => {
     if (!nombreNuevaCarpeta.trim() || !onNuevaCarpeta) return;

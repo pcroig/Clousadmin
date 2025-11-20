@@ -14,6 +14,8 @@ import {
   AICallOptions,
   hasImageContent,
   AICallMetadata,
+  ContentType,
+  type MessageContent,
 } from '../types';
 
 type FilesCreateParams = Parameters<OpenAI['files']['create']>;
@@ -310,6 +312,169 @@ function convertOpenAIResponse(response: OpenAI.Chat.ChatCompletion): AIResponse
   };
 }
 
+type ResponsesContentPart =
+  | { type: 'input_text'; text: string }
+  | { type: 'input_image'; image_url?: string; file_id?: string; detail?: 'low' | 'high' | 'auto' }
+  | { type: 'input_file'; file_id?: string | null; file_data?: string; filename?: string };
+
+function contentToResponsesParts(content: MessageContent): ResponsesContentPart[] {
+  if (typeof content === 'string') {
+    return [{ type: 'input_text', text: content }];
+  }
+
+  if (Array.isArray(content)) {
+    return content.flatMap((item) => contentToResponsesParts(item as MessageContent));
+  }
+
+  if (content.type === ContentType.TEXT) {
+    return [{ type: 'input_text', text: content.text }];
+  }
+
+  const url = content.image_url.url;
+
+  if (url.startsWith('file-')) {
+    return [{ type: 'input_file', file_id: url }];
+  }
+
+  if (url.startsWith('data:application/pdf;base64,')) {
+    return [
+      {
+        type: 'input_file',
+        file_data: url,
+        filename: (content.image_url as any).filename || 'document.pdf',
+      },
+    ];
+  }
+
+  return [
+    {
+      type: 'input_image',
+      image_url: url,
+      detail: content.image_url.detail || 'auto',
+      file_id: undefined,
+    },
+  ];
+}
+
+function convertMessagesToResponsesPayload(messages: AIMessage[]): {
+  instructions?: string;
+  input: Array<{ role: 'user' | 'assistant'; content: ResponsesContentPart[] }>;
+} {
+  const systemMessages = messages.filter((m) => m.role === MessageRole.SYSTEM);
+  const conversationMessages = messages.filter((m) => m.role !== MessageRole.SYSTEM);
+
+  const instructions = systemMessages
+    .map((msg) => {
+      if (typeof msg.content === 'string') return msg.content;
+      if (Array.isArray(msg.content)) {
+        return msg.content
+          .map((item) => {
+            if (typeof item === 'string') return item;
+            if (item.type === ContentType.TEXT) return item.text;
+            return '';
+          })
+          .filter(Boolean)
+          .join('\n');
+      }
+      if (msg.content.type === ContentType.TEXT) return msg.content.text;
+      return '';
+    })
+    .filter(Boolean)
+    .join('\n')
+    .trim() || undefined;
+
+  const input = conversationMessages.map((msg) => {
+    const role = msg.role === MessageRole.ASSISTANT ? 'assistant' : 'user';
+    const parts = contentToResponsesParts(msg.content);
+    return {
+      role,
+      content: parts,
+    };
+  });
+
+  if (input.length === 0) {
+    input.push({
+      role: 'user',
+      content: [{ type: 'input_text', text: 'Sigue las instrucciones proporcionadas.' }],
+    });
+  }
+
+  return { instructions, input };
+}
+
+function extractResponsesText(response: any): string {
+  if (typeof response.output_text === 'string' && response.output_text.trim()) {
+    return response.output_text.trim();
+  }
+
+  if (Array.isArray(response.output_text) && response.output_text.length > 0) {
+    const joined = response.output_text.filter(Boolean).join('\n').trim();
+    if (joined) return joined;
+  }
+
+  const contentItems =
+    Array.isArray(response.output) && response.output.length > 0
+      ? response.output.flatMap((item: any) => item?.content ?? [])
+      : [];
+
+  for (const contentItem of contentItems) {
+    if (!contentItem) continue;
+
+    if (contentItem.type === 'output_text' && typeof contentItem.text === 'string') {
+      return contentItem.text;
+    }
+
+    if (contentItem.type === 'message' && Array.isArray(contentItem.content)) {
+      const textPart = contentItem.content.find((part: any) => typeof part.text === 'string');
+      if (textPart?.text) {
+        return textPart.text;
+      }
+    }
+
+    if (typeof contentItem.text === 'string') {
+      return contentItem.text;
+    }
+  }
+
+  return '';
+}
+
+function convertResponsesToAIResponse(response: any): AIResponse {
+  const text = extractResponsesText(response);
+  const usage = response.usage
+    ? {
+        promptTokens: response.usage.input_tokens ?? 0,
+        completionTokens: response.usage.output_tokens ?? 0,
+        totalTokens:
+          response.usage.total_tokens ??
+          (response.usage.input_tokens ?? 0) + (response.usage.output_tokens ?? 0),
+      }
+    : undefined;
+
+  return {
+    id: response.id,
+    provider: AIProvider.OPENAI,
+    model: response.model,
+    choices: [
+      {
+        index: 0,
+        message: {
+          role: MessageRole.ASSISTANT,
+          content: text,
+        },
+        finishReason: 'stop',
+      },
+    ],
+    usage,
+    created: response.created_at ?? Math.floor(Date.now() / 1000),
+    metadata: {
+      api: 'responses',
+      responseId: response.id,
+      ...response.metadata,
+    },
+  };
+}
+
 /**
  * Realiza una llamada a OpenAI con la configuración especificada
  */
@@ -320,8 +485,55 @@ export async function callOpenAI(
 ): Promise<AIResponse> {
   const client = getOpenAIClient();
   const metadata = serializeMetadata(config.metadata, options?.metadata);
-  
-  // Construir parámetros de la llamada
+  const temperature = options?.temperature ?? config.temperature ?? 0.7;
+  const maxTokens = options?.maxTokens ?? config.maxTokens;
+  const responseFormat = options?.responseFormat ?? config.responseFormat;
+
+  const canUseResponsesAPI =
+    typeof (client as any).responses !== 'undefined' &&
+    typeof (client as any).responses?.create === 'function';
+
+  if (canUseResponsesAPI) {
+    try {
+      console.info(`[OpenAI Provider] Intentando Responses API (modelo ${config.model})`);
+      const payload = convertMessagesToResponsesPayload(messages);
+      const response = await (client as any).responses.create({
+        model: config.model,
+        instructions: payload.instructions,
+        input: payload.input,
+        temperature,
+        top_p: config.topP,
+        max_output_tokens: maxTokens,
+        metadata: Object.keys(metadata.openAIMetadata).length ? metadata.openAIMetadata : undefined,
+        response_format: responseFormat === 'json_object' ? { type: 'json_object' } : undefined,
+      });
+
+      console.info(
+        `[OpenAI Provider] ✅ Responses API (${response.id}) - ${response.usage?.total_tokens ?? 0} tokens`
+      );
+      return convertResponsesToAIResponse(response);
+    } catch (error) {
+      console.warn(
+        `[OpenAI Provider] Responses API fallida (${getErrorMessage(error)}). Fallback a Chat Completions.`
+      );
+    }
+  } else {
+    console.info('[OpenAI Provider] Responses API no disponible en este SDK, usando Chat Completions');
+  }
+
+  return callOpenAIChatCompletions(messages, config, options, metadata);
+}
+
+/**
+ * Llamada a Chat Completions (fallback)
+ */
+async function callOpenAIChatCompletions(
+  messages: AIMessage[],
+  config: ModelConfig,
+  options: AICallOptions | undefined,
+  metadata: ReturnType<typeof serializeMetadata>
+): Promise<AIResponse> {
+  const client = getOpenAIClient();
   const params: OpenAI.Chat.ChatCompletionCreateParams = {
     model: config.model,
     messages: convertMessagesToOpenAI(messages),
@@ -338,43 +550,45 @@ export async function callOpenAI(
   if (metadata.user) {
     params.user = metadata.user;
   }
-  
-  // Formato de respuesta
+
   const responseFormat = options?.responseFormat ?? config.responseFormat;
   if (responseFormat === 'json_object') {
     params.response_format = { type: 'json_object' };
   }
-  
+
   try {
-    console.info(`[OpenAI Provider] Llamando a modelo ${config.model}`);
+    console.info(`[OpenAI Provider] Llamando Chat Completions (${config.model})`);
     const response = await client.chat.completions.create(params);
-    
-    console.info(`[OpenAI Provider] Respuesta recibida (${response.usage?.total_tokens || 0} tokens)`);
+    console.info(
+      `[OpenAI Provider] Respuesta Chat Completions (${response.usage?.total_tokens || 0} tokens)`
+    );
     return convertOpenAIResponse(response);
   } catch (error) {
     const status = getErrorStatus(error);
     const message = getErrorMessage(error);
     console.error('[OpenAI Provider] Error:', message);
-    
+
     if (status === 401) {
       if (message.includes('insufficient permissions') || message.includes('Missing scopes')) {
         throw new Error(
           'OpenAI API key no tiene permisos suficientes. ' +
-          'La key necesita el scope "model.request". ' +
-          'Crea una nueva API key en https://platform.openai.com/api-keys con permisos completos.'
+            'La key necesita el scope "model.request". ' +
+            'Crea una nueva API key en https://platform.openai.com/api-keys con permisos completos.'
         );
       }
-      throw new Error('OpenAI API key inválida o expirada. Verifica tu key en https://platform.openai.com/api-keys');
+      throw new Error(
+        'OpenAI API key inválida o expirada. Verifica tu key en https://platform.openai.com/api-keys'
+      );
     }
-    
+
     if (status === 429) {
       throw new Error('OpenAI: Límite de rate limit alcanzado. Espera unos minutos e intenta de nuevo.');
     }
-    
+
     if (status === 500 || status === 503) {
       throw new Error('OpenAI: Error del servidor. Intenta de nuevo en unos momentos.');
     }
-    
+
     throw new Error(`OpenAI error: ${message}`);
   }
 }
@@ -392,11 +606,10 @@ export function requiresVision(messages: AIMessage[]): boolean {
 export function getAppropriateModel(messages: AIMessage[], defaultModel: string): string {
   // Si hay imágenes, necesitamos un modelo con visión
   if (requiresVision(messages)) {
-    // Mapear a modelos con visión
-    if (defaultModel.includes('gpt-4')) {
-      return 'gpt-4o'; // GPT-4o tiene capacidades de visión
+    if (defaultModel.includes('gpt-5.1')) {
+      return defaultModel;
     }
-    return 'gpt-4o'; // Fallback a GPT-4o para visión
+    return 'gpt-5.1'; // Fallback a GPT-5.1 para visión
   }
   
   return defaultModel;

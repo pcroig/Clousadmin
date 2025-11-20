@@ -29,12 +29,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { TableHeader as PageHeader } from '@/components/shared/table-header';
 import { TableFilters } from '@/components/shared/table-filters';
-import { Check, X, Calendar, Filter, Edit2, CheckCircle, Search, Settings, ChevronDown, ChevronUp, Paperclip } from 'lucide-react';
+import { Check, X, Calendar, Filter, Edit2, CheckCircle, Search, Settings, Paperclip, Eye } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { GestionarAusenciasModal } from './gestionar-ausencias-modal';
 import { CrearCampanaModal } from './crear-campana-modal';
-import { PopoverMonitoreoCampana } from '@/components/hr/popover-monitoreo-campana';
 import { toast } from 'sonner';
 import { EstadoAusencia } from '@/lib/constants/enums';
 import { getAusenciaEstadoLabel } from '@/lib/utils/formatters';
@@ -102,11 +101,10 @@ interface AusenciasClientProps {
 
 export function AusenciasClient({ initialCampanasExpanded = false }: AusenciasClientProps) {
   const [ausencias, setAusencias] = useState<Ausencia[]>([]);
-  const [campanas, setCampanas] = useState<Campana[]>([]);
+  const [campanaActiva, setCampanaActiva] = useState<Campana | null>(null);
   const [loading, setLoading] = useState(true);
   const [filtroEstado, setFiltroEstado] = useState('todas');
   const [busquedaEmpleado, setBusquedaEmpleado] = useState('');
-  const [campanasExpandidas, setCampanasExpandidas] = useState(initialCampanasExpanded);
   
   const [gestionarModal, setGestionarModal] = useState(false);
   const [crearCampanaModal, setCrearCampanaModal] = useState(false);
@@ -150,15 +148,15 @@ export function AusenciasClient({ initialCampanasExpanded = false }: AusenciasCl
     }
   }, [filtroEstado]);
 
-const fetchCampanas = useCallback(async () => {
+const fetchCampanaActiva = useCallback(async () => {
     try {
-      const response = await fetch('/api/campanas-vacaciones?estado=abierta');
+      const response = await fetch('/api/campanas-vacaciones');
       if (response.ok) {
         const data = await response.json();
-        setCampanas(data);
+        setCampanaActiva(data); // API now returns single campaign or null
       }
     } catch (error) {
-      console.error('Error fetching campañas:', error);
+      console.error('Error fetching campaña activa:', error);
     }
   }, []);
 
@@ -191,8 +189,8 @@ const fetchCampanas = useCallback(async () => {
 
   useEffect(() => {
     fetchAusencias();
-    fetchCampanas();
-  }, [fetchAusencias, fetchCampanas]);
+    fetchCampanaActiva();
+  }, [fetchAusencias, fetchCampanaActiva]);
 
   async function handleAprobar(id: string) {
     try {
@@ -246,13 +244,13 @@ const fetchCampanas = useCallback(async () => {
   }
 
   function handleCuadrarIA(campanaId: string) {
-    // Refrescar campañas después de cuadrar con IA
-    fetchCampanas();
+    // Refrescar campaña después de cuadrar con IA
+    fetchCampanaActiva();
   }
 
   function handleCuadrarManual(campanaId: string) {
-    // TODO: Implementar modal de cuadrado manual
-    toast.info('Funcionalidad de cuadrado manual próximamente');
+    // Refrescar campaña
+    fetchCampanaActiva();
   }
 
   const estadoOptions = [
@@ -449,65 +447,42 @@ const fetchCampanas = useCallback(async () => {
         }}
       />
 
-      {/* Panel de Campañas Activas */}
-      {campanas.length > 0 && (
-        <Card className="mb-6">
-          <div
-            className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-50 transition-colors"
-            onClick={() => setCampanasExpandidas(!campanasExpandidas)}
-          >
-            <div className="flex items-center gap-3">
+      {/* Panel de Campaña Activa */}
+      {campanaActiva && (
+        <Card className="mb-6 p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3 flex-1">
               <Calendar className="w-5 h-5 text-gray-600" />
-              <div>
-                <h3 className="font-semibold text-gray-900">
-                  Campañas de Vacaciones en Curso
+              <div className="flex-1">
+                <h3 className="font-semibold text-gray-900 mb-1">
+                  {campanaActiva.titulo}
                 </h3>
-                <p className="text-sm text-gray-500">
-                  {campanas.length} campaña{campanas.length !== 1 ? 's' : ''} activa{campanas.length !== 1 ? 's' : ''}
-                </p>
+                <div className="flex items-center gap-4 text-sm text-gray-600">
+                  <span>
+                    <Calendar className="w-3.5 h-3.5 inline mr-1" />
+                    {format(new Date(campanaActiva.fechaInicioObjetivo), 'dd MMM', { locale: es })} -{' '}
+                    {format(new Date(campanaActiva.fechaFinObjetivo), 'dd MMM yyyy', { locale: es })}
+                  </span>
+                  <span>
+                    {campanaActiva.empleadosCompletados}/{campanaActiva.totalEmpleadosAsignados} completados
+                  </span>
+                </div>
               </div>
             </div>
             <div className="flex items-center gap-3">
               <Badge className="bg-yellow-100 text-yellow-800 border-0">
                 En curso
               </Badge>
-              {campanasExpandidas ? (
-                <ChevronUp className="w-5 h-5 text-gray-400" />
-              ) : (
-                <ChevronDown className="w-5 h-5 text-gray-400" />
-              )}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => window.location.href = '/hr/horario/ausencias/campana'}
+              >
+                <Eye className="w-4 h-4 mr-2" />
+                Ver campaña
+              </Button>
             </div>
           </div>
-
-          {campanasExpandidas && (
-            <div className="border-t border-gray-200 p-4 space-y-3">
-              {campanas.map((campana) => (
-                <div
-                  key={campana.id}
-                  className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200 hover:border-blue-300 transition-colors"
-                >
-                  <div className="flex-1">
-                    <h4 className="font-medium text-gray-900 mb-1">{campana.titulo}</h4>
-                    <div className="flex items-center gap-4 text-sm text-gray-600">
-                      <span>
-                        <Calendar className="w-3.5 h-3.5 inline mr-1" />
-                        {format(new Date(campana.fechaInicioObjetivo), 'dd MMM', { locale: es })} -{' '}
-                        {format(new Date(campana.fechaFinObjetivo), 'dd MMM yyyy', { locale: es })}
-                      </span>
-                      <span>
-                        {campana.empleadosCompletados}/{campana.totalEmpleadosAsignados} completados
-                      </span>
-                    </div>
-                  </div>
-                  <PopoverMonitoreoCampana
-                    campanaId={campana.id}
-                    onCuadrarIA={handleCuadrarIA}
-                    onCuadrarManual={handleCuadrarManual}
-                  />
-                </div>
-              ))}
-            </div>
-          )}
         </Card>
       )}
 

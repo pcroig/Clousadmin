@@ -1,0 +1,443 @@
+'use client';
+
+import { useEffect, useMemo, useState } from 'react';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { cn, toDateOnlyString } from '@/lib/utils';
+import { TipoPropuesta, VacacionesAjustePayload } from '@/components/vacaciones/types';
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
+import { Calendar } from 'lucide-react';
+
+interface EmpleadoInfo {
+  id: string;
+  nombre: string;
+  apellidos: string;
+  fotoUrl: string | null;
+  email: string;
+  equipos?: Array<{
+    equipoId: string;
+    nombre?: string | null;
+  }>;
+}
+
+interface PreferenciaCalendario {
+  id: string;
+  completada: boolean;
+  diasIdeales: string[] | null;
+  diasPrioritarios: string[] | null;
+  diasAlternativos: string[] | null;
+  propuestaIA?: {
+    fechaInicio: string;
+    fechaFin: string;
+    tipo?: TipoPropuesta;
+    motivo?: string;
+  } | null;
+  empleado: EmpleadoInfo;
+}
+
+interface CuadrarCalendarioModalProps {
+  open: boolean;
+  onClose: () => void;
+  campana: {
+    id: string;
+    titulo: string;
+    fechaInicioObjetivo: string;
+    fechaFinObjetivo: string;
+  };
+  preferencias: PreferenciaCalendario[];
+  propuestas?: Array<{
+    empleadoId: string;
+    fechaInicio: string;
+    fechaFin: string;
+    tipo: TipoPropuesta;
+    motivo: string;
+  }> | null;
+  onGuardar?: (ajustes: VacacionesAjustePayload[]) => Promise<void>;
+  onEnviar?: () => Promise<void>;
+  onFinalizar?: () => Promise<void>;
+  guardando?: boolean;
+  actionLoading?: boolean;
+}
+
+interface AjusteFormState {
+  fechaInicio: string;
+  fechaFin: string;
+  tipo: TipoPropuesta;
+  motivo: string;
+}
+
+const TIPO_OPTIONS: { value: TipoPropuesta; label: string }[] = [
+  { value: 'ideal', label: 'Fechas ideales' },
+  { value: 'alternativo', label: 'Fechas alternativas' },
+  { value: 'ajustado', label: 'Fechas ajustadas' },
+];
+
+const tipoDotClass: Record<TipoPropuesta, string> = {
+  ideal: 'bg-blue-600',
+  alternativo: 'bg-orange-500',
+  ajustado: 'bg-gray-500',
+};
+
+const parseDate = (value: string) => new Date(value);
+
+const generateDateRange = (inicio: string, fin: string) => {
+  const dates: string[] = [];
+  const start = parseDate(inicio);
+  const end = parseDate(fin);
+  const current = new Date(start);
+
+  while (current <= end) {
+    dates.push(toDateOnlyString(current));
+    current.setDate(current.getDate() + 1);
+  }
+
+  return dates;
+};
+
+export function CuadrarCalendarioModal({
+  open,
+  onClose,
+  campana,
+  preferencias,
+  propuestas,
+  onGuardar,
+  onEnviar,
+  onFinalizar,
+  guardando = false,
+  actionLoading = false,
+}: CuadrarCalendarioModalProps) {
+  const [formularios, setFormularios] = useState<Record<string, AjusteFormState>>({});
+  const [expanded, setExpanded] = useState<string | null>(null);
+
+  const propuestasPorEmpleado = useMemo(() => {
+    if (!propuestas) return {};
+    return propuestas.reduce<Record<string, typeof propuestas[number]>>((acc, propuesta) => {
+      acc[propuesta.empleadoId] = propuesta;
+      return acc;
+    }, {});
+  }, [propuestas]);
+
+  useEffect(() => {
+    if (!campana || !preferencias) return;
+
+    const initialForms: Record<string, AjusteFormState> = {};
+    preferencias.forEach((pref) => {
+      const propuesta = propuestasPorEmpleado[pref.empleado.id] || pref.propuestaIA;
+      const fechaInicio = propuesta?.fechaInicio || campana.fechaInicioObjetivo;
+      const fechaFin = propuesta?.fechaFin || campana.fechaFinObjetivo;
+
+      initialForms[pref.id] = {
+        fechaInicio: toDateOnlyString(fechaInicio),
+        fechaFin: toDateOnlyString(fechaFin),
+        tipo: (propuesta?.tipo as TipoPropuesta) || 'ajustado',
+        motivo: propuesta?.motivo || 'Ajustado por IA para cumplimiento de equipo',
+      };
+    });
+
+    setFormularios(initialForms);
+  }, [campana, preferencias, propuestasPorEmpleado]);
+
+  const dateRange = useMemo(
+    () => generateDateRange(campana.fechaInicioObjetivo, campana.fechaFinObjetivo),
+    [campana.fechaInicioObjetivo, campana.fechaFinObjetivo]
+  );
+
+  const columnTemplate = useMemo(
+    () => `260px repeat(${dateRange.length}, minmax(48px,1fr))`,
+    [dateRange.length]
+  );
+
+  const equiposAgrupados = useMemo(() => {
+    const map = new Map<
+      string,
+      { nombre: string; preferencias: PreferenciaCalendario[] }
+    >();
+
+    preferencias.forEach((pref) => {
+      const equipoId = pref.empleado.equipos?.[0]?.equipoId || 'sin-equipo';
+      const equipoNombre = pref.empleado.equipos?.[0]?.nombre || 'Sin equipo';
+
+      if (!map.has(equipoId)) {
+        map.set(equipoId, { nombre: equipoNombre, preferencias: [] });
+      }
+
+      map.get(equipoId)!.preferencias.push(pref);
+    });
+
+    return Array.from(map, ([id, data]) => ({ id, ...data }));
+  }, [preferencias]);
+
+  const stats = useMemo(() => {
+    const total = preferencias.length;
+    const conPropuesta = Object.keys(formularios).length;
+    const pendientesCambio = preferencias.filter((pref) => pref.propuestaIA == null).length;
+
+    return { total, conPropuesta, pendientesCambio };
+  }, [preferencias.length, formularios]);
+
+  const handleFormChange = (
+    preferenciaId: string,
+    campo: keyof AjusteFormState,
+    valor: string
+  ) => {
+    setFormularios((prev) => ({
+      ...prev,
+      [preferenciaId]: {
+        ...prev[preferenciaId],
+        [campo]: valor,
+      },
+    }));
+  };
+
+  const buildAjustes = (): VacacionesAjustePayload[] =>
+    Object.entries(formularios).map(([preferenciaId, form]) => ({
+      preferenciaId,
+      fechaInicio: form.fechaInicio,
+      fechaFin: form.fechaFin,
+      tipo: form.tipo,
+      motivo: form.motivo,
+    }));
+
+  const handleGuardar = async () => {
+    if (!onGuardar) return;
+    await onGuardar(buildAjustes());
+  };
+
+  const isDateAssigned = (form: AjusteFormState | undefined, date: string) => {
+    if (!form) return false;
+    return date >= form.fechaInicio && date <= form.fechaFin;
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Cuadrar campaña · {campana.titulo}</DialogTitle>
+          <DialogDescription className="text-sm text-gray-600">
+            <Calendar className="inline h-3.5 w-3.5 mr-1.5 text-gray-500" />
+            {format(parseDate(campana.fechaInicioObjetivo), 'PPP', { locale: es })} —
+            {format(parseDate(campana.fechaFinObjetivo), 'PPP', { locale: es })}
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-5">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="rounded-lg border border-blue-100 bg-blue-50 p-4">
+              <p className="text-xs uppercase text-blue-600 font-semibold">Empleados</p>
+              <p className="text-2xl font-bold text-blue-900">{stats.total}</p>
+            </div>
+            <div className="rounded-lg border border-green-100 bg-green-50 p-4">
+              <p className="text-xs uppercase text-green-600 font-semibold">Con propuesta</p>
+              <p className="text-2xl font-bold text-green-900">{stats.conPropuesta}</p>
+            </div>
+            <div className="rounded-lg border border-amber-100 bg-amber-50 p-4">
+              <p className="text-xs uppercase text-amber-600 font-semibold">Pendientes</p>
+              <p className="text-2xl font-bold text-amber-900">{stats.pendientesCambio}</p>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-2 justify-end">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleGuardar}
+              disabled={guardando}
+            >
+              {guardando ? 'Guardando...' : 'Guardar ajustes'}
+            </Button>
+          </div>
+
+          {equiposAgrupados.map((grupo) => (
+            <div key={grupo.id} className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-gray-800">
+                  Equipo: {grupo.nombre}
+                </h3>
+                <Badge variant="outline">{grupo.preferencias.length} personas</Badge>
+              </div>
+
+              <div className="overflow-x-auto rounded-lg border border-gray-200">
+                <div
+                  className="min-w-full"
+                  style={{ gridTemplateColumns: columnTemplate }}
+                >
+                  <div
+                    className="grid bg-gray-50 text-xs font-medium uppercase text-gray-500 sticky top-0"
+                    style={{ gridTemplateColumns: columnTemplate }}
+                  >
+                    <div className="px-4 py-3 text-left">Empleado</div>
+                    {dateRange.map((date) => (
+                      <div key={date} className="px-2 py-3 text-center">
+                        {format(parseDate(date), 'dd MMM', { locale: es })}
+                      </div>
+                    ))}
+                  </div>
+
+                  {grupo.preferencias.map((pref) => {
+                    const form = formularios[pref.id];
+                    const expandedRow = expanded === pref.id;
+                    const initials = `${pref.empleado.nombre.charAt(0)}${pref.empleado.apellidos.charAt(0)}`.toUpperCase();
+
+                    return (
+                      <div key={pref.id} className="border-t border-gray-100">
+                        <div
+                          className="grid items-center hover:bg-gray-50 transition-colors"
+                          style={{ gridTemplateColumns: columnTemplate }}
+                        >
+                          <div className="flex items-center gap-3 px-4 py-3">
+                            <Avatar className="h-9 w-9">
+                              <AvatarImage src={pref.empleado.fotoUrl ?? undefined} />
+                              <AvatarFallback>{initials}</AvatarFallback>
+                            </Avatar>
+                            <div>
+                              <p className="text-sm font-medium text-gray-900">
+                                {pref.empleado.nombre} {pref.empleado.apellidos}
+                              </p>
+                              <p className="text-xs text-gray-500">
+                                {pref.completada ? 'Preferencias completas' : 'Pendiente'}
+                              </p>
+                            </div>
+                          </div>
+                          {dateRange.map((date) => (
+                            <div key={date} className="flex justify-center">
+                              <span
+                                className={cn(
+                                  'h-2.5 w-2.5 rounded-full',
+                                  isDateAssigned(form, date)
+                                    ? tipoDotClass[form?.tipo ?? 'ajustado']
+                                    : 'bg-gray-200'
+                                )}
+                              />
+                            </div>
+                          ))}
+                        </div>
+
+                        <div className="px-4 pb-4">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-xs text-gray-600"
+                            onClick={() => setExpanded(expandedRow ? null : pref.id)}
+                          >
+                            {expandedRow ? 'Ocultar ajustes' : 'Editar asignación'}
+                          </Button>
+
+                          {expandedRow && form && (
+                            <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3 rounded-lg border border-gray-200 bg-white p-4">
+                              <div>
+                                <label className="text-xs font-medium text-gray-600">
+                                  Fecha inicio
+                                </label>
+                                <Input
+                                  type="date"
+                                  value={form.fechaInicio}
+                                  onChange={(e) =>
+                                    handleFormChange(pref.id, 'fechaInicio', e.target.value)
+                                  }
+                                />
+                              </div>
+                              <div>
+                                <label className="text-xs font-medium text-gray-600">
+                                  Fecha fin
+                                </label>
+                                <Input
+                                  type="date"
+                                  value={form.fechaFin}
+                                  onChange={(e) =>
+                                    handleFormChange(pref.id, 'fechaFin', e.target.value)
+                                  }
+                                />
+                              </div>
+                              <div>
+                                <label className="text-xs font-medium text-gray-600">
+                                  Tipo de propuesta
+                                </label>
+                                <Select
+                                  value={form.tipo}
+                                  onValueChange={(value) =>
+                                    handleFormChange(pref.id, 'tipo', value as TipoPropuesta)
+                                  }
+                                >
+                                  <SelectTrigger>
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {TIPO_OPTIONS.map((option) => (
+                                      <SelectItem key={option.value} value={option.value}>
+                                        {option.label}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              <div>
+                                <label className="text-xs font-medium text-gray-600">
+                                  Motivo / comentarios
+                                </label>
+                                <Textarea
+                                  value={form.motivo}
+                                  onChange={(e) =>
+                                    handleFormChange(pref.id, 'motivo', e.target.value)
+                                  }
+                                  rows={3}
+                                />
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="flex flex-col gap-3 border-t border-gray-200 pt-4">
+          <div className="flex flex-col md:flex-row gap-2 md:justify-end">
+            {onEnviar && (
+              <Button
+                variant="outline"
+                disabled={actionLoading}
+                onClick={onEnviar}
+              >
+                {actionLoading ? 'Procesando...' : 'Enviar propuesta'}
+              </Button>
+            )}
+            {onFinalizar && (
+              <Button
+                disabled={actionLoading}
+                onClick={onFinalizar}
+              >
+                {actionLoading ? 'Procesando...' : 'Finalizar campaña'}
+              </Button>
+            )}
+          </div>
+          <p className="text-xs text-gray-500 text-center">
+            Puedes seguir editando las asignaciones antes de enviar o finalizar.
+          </p>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+

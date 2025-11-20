@@ -10,7 +10,7 @@ import { EmpleadoDashboardClient } from './dashboard-client';
 import type { Ausencia } from '@prisma/client';
 
 import { EstadoAusencia, UsuarioRol } from '@/lib/constants/enums';
-import { obtenerCampanaPendiente } from '@/lib/services/campanas-vacaciones';
+import { obtenerCampanaPendiente, obtenerPropuestaPendiente } from '@/lib/services/campanas-vacaciones';
 
 const ESTADOS_AUSENCIAS_ABIERTAS: EstadoAusencia[] = [
   EstadoAusencia.pendiente,
@@ -37,6 +37,19 @@ interface DashboardData {
     titulo: string;
     fechaInicioObjetivo: Date;
     fechaFinObjetivo: Date;
+  } | null;
+  campanaPropuesta: {
+    id: string;
+    titulo: string;
+    fechaInicioObjetivo: Date;
+    fechaFinObjetivo: Date;
+    propuesta: {
+      fechaInicio: string;
+      fechaFin: string;
+      dias: number;
+      tipo: 'ideal' | 'alternativo' | 'ajustado';
+      motivo: string;
+    };
   } | null;
 }
 
@@ -75,6 +88,7 @@ async function obtenerDatosDashboard(session: { user: { id: string; empresaId: s
 
   // Buscar campaña activa con preferencia pendiente del empleado
   const campanaPendiente = await obtenerCampanaPendiente(empleado.id, session.user.empresaId);
+  const campanaPropuesta = await obtenerPropuestaPendiente(empleado.id, session.user.empresaId);
 
   const notificaciones: Notificacion[] = notificacionesDb.map((notif) => ({
     id: notif.id,
@@ -176,6 +190,7 @@ async function obtenerDatosDashboard(session: { user: { id: string; empresaId: s
     ausenciasProximas,
     ausenciasPasadasItems,
     campanaPendiente,
+    campanaPropuesta,
   };
 }
 
@@ -223,6 +238,7 @@ export default async function EmpleadoDashboardPage() {
       ausenciasProximas={dashboardData.ausenciasProximas}
       ausenciasPasadas={dashboardData.ausenciasPasadasItems}
       campanaPendiente={dashboardData.campanaPendiente}
+      campanaPropuesta={dashboardData.campanaPropuesta}
     />
   );
 }

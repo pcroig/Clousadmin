@@ -62,9 +62,16 @@ export default async function EmpleadoCarpetaDetailPage({
   }
 
   // Determinar si puede subir archivos
+  const allowedUploadFolders = new Set([
+    'Justificantes',
+    'Otros',
+    // Compatibilidad con carpetas antiguas
+    'Personales',
+    'Médicos',
+  ]);
+
   const puedeSubir =
-    carpeta.empleadoId === empleado.id &&
-    (carpeta.nombre === 'Personales' || carpeta.nombre === 'Médicos');
+    carpeta.empleadoId === empleado.id && allowedUploadFolders.has(carpeta.nombre);
 
   // Serializar datos para evitar problemas con Date
   const carpetaData = {

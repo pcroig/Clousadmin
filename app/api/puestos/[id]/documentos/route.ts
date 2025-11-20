@@ -47,12 +47,26 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         puestoId: id,
         empresaId: session.user.empresaId,
       },
+      select: {
+        id: true,
+        nombre: true,
+        tipoDocumento: true,
+        mimeType: true,
+        tamano: true,
+        createdAt: true,
+      },
       orderBy: {
         createdAt: 'desc',
       },
     });
 
-    return NextResponse.json(documentos);
+    const documentosConUrl = documentos.map((doc) => ({
+      ...doc,
+      createdAt: doc.createdAt.toISOString(),
+      downloadUrl: `/api/documentos/${doc.id}?inline=1`,
+    }));
+
+    return NextResponse.json(documentosConUrl);
   } catch (error) {
     console.error('Error loading documents:', error);
     return NextResponse.json(

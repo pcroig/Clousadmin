@@ -18,7 +18,7 @@ import {
   badRequestResponse,
 } from '@/lib/api-handler';
 
-// GET /api/campanas-vacaciones - Listar campañas
+// GET /api/campanas-vacaciones - Obtener campaña activa (single active campaign)
 export async function GET(req: NextRequest) {
   try {
     // Verificar autenticación
@@ -26,26 +26,12 @@ export async function GET(req: NextRequest) {
     if (authResult instanceof Response) return authResult;
     const { session } = authResult;
 
-    const { searchParams } = new URL(req.url);
-    const estado = searchParams.get('estado');
-
-    // Filtros base
-    interface CampanaWhereClause {
-      empresaId: string;
-      estado?: string;
-    }
-    
-    const where: CampanaWhereClause = {
-      empresaId: session.user.empresaId,
-    };
-
-    // Filtrar por estado si se proporciona
-    if (estado && estado !== 'todas') {
-      where.estado = estado;
-    }
-
-    const campanas = await prisma.campanaVacaciones.findMany({
-      where,
+    // Solo retornar la campaña activa (estado='abierta')
+    const campana = await prisma.campanaVacaciones.findFirst({
+      where: {
+        empresaId: session.user.empresaId,
+        estado: 'abierta',
+      },
       include: {
         preferencias: {
           include: {
@@ -69,7 +55,8 @@ export async function GET(req: NextRequest) {
       }
     });
 
-    return successResponse(campanas);
+    // Retornar null si no hay campaña activa, o la campaña
+    return successResponse(campana);
   } catch (error) {
     return handleApiError(error, 'API GET /api/campanas-vacaciones');
   }
@@ -239,6 +226,28 @@ interface EmpleadoAsignado {
       fechaInicioRaw: data.fechaInicioObjetivo,
       fechaFinRaw: data.fechaFinObjetivo,
     });
+
+    // Enforce single active campaign: Close any existing "abierta" campaigns
+    const campanasAbiertas = await prisma.campanaVacaciones.findMany({
+      where: {
+        empresaId: session.user.empresaId,
+        estado: 'abierta',
+      },
+      select: { id: true, titulo: true },
+    });
+
+    if (campanasAbiertas.length > 0) {
+      console.info(`[Campaña] Cerrando ${campanasAbiertas.length} campaña(s) abierta(s) existente(s)`);
+      await prisma.campanaVacaciones.updateMany({
+        where: {
+          empresaId: session.user.empresaId,
+          estado: 'abierta',
+        },
+        data: {
+          estado: 'cerrada',
+        },
+      });
+    }
 
     // Crear campaña
     const campana = await prisma.campanaVacaciones.create({

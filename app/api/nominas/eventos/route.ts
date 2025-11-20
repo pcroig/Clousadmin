@@ -7,10 +7,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { z } from 'zod';
-import { Decimal } from '@prisma/client/runtime/library';
-
 import { UsuarioRol } from '@/lib/constants/enums';
 import { crearNotificacionComplementosPendientes } from '@/lib/notificaciones';
+import { generarPrenominasEvento } from '@/lib/calculos/generar-prenominas';
 
 const GenerarEventoSchema = z.object({
   mes: z.number().int().min(1).max(12),
@@ -183,57 +182,6 @@ export async function POST(req: NextRequest) {
       ? new Date(data.fechaLimiteComplementos)
       : new Date(data.anio, data.mes, 0, 23, 59, 59); // Último día del mes
 
-    // Obtener todos los empleados activos con sus contratos vigentes
-    const empleados = await prisma.empleado.findMany({
-      where: {
-        empresaId: session.user.empresaId,
-        activo: true,
-      },
-      include: {
-        contratos: {
-          where: {
-            // Contratos que están vigentes en el mes de la nómina
-            OR: [
-              {
-                fechaFin: null, // Contratos indefinidos
-              },
-              {
-                fechaFin: {
-                  gte: new Date(data.anio, data.mes - 1, 1), // Fin después del inicio del mes
-                },
-              },
-            ],
-            fechaInicio: {
-              lte: new Date(data.anio, data.mes, 0), // Inicio antes del fin del mes
-            },
-          },
-          orderBy: {
-            fechaInicio: 'desc',
-          },
-          take: 1, // Solo el contrato más reciente
-        },
-        complementos: {
-          where: {
-            activo: true,
-          },
-          include: {
-            tipoComplemento: true,
-          },
-        },
-        ausencias: {
-          where: {
-            // Ausencias que coinciden con el mes de la nómina
-            fechaInicio: {
-              lte: new Date(data.anio, data.mes, 0),
-            },
-            fechaFin: {
-              gte: new Date(data.anio, data.mes - 1, 1),
-            },
-          },
-        },
-      },
-    });
-
     // Crear el evento de nómina (estado: abierto)
     const evento = await prisma.eventoNomina.create({
       data: {
@@ -242,94 +190,31 @@ export async function POST(req: NextRequest) {
         anio: data.anio,
         estado: 'abierto',
         fechaLimiteComplementos: fechaLimite,
-        fechaGeneracion: new Date(),
-        totalEmpleados: empleados.length,
+        totalEmpleados: 0,
       },
     });
 
-    let nominasGeneradas = 0;
-    let empleadosConComplementos = 0;
-    let totalComplementosAsignados = 0;
-
-    // SIEMPRE generar pre-nóminas para todos los empleados activos
-    {
-      for (const empleado of empleados) {
-        const contratoVigente = empleado.contratos[0];
-
-        if (!contratoVigente) {
-          console.warn(`[Nómina] Empleado ${empleado.id} sin contrato vigente`);
-          continue;
-        }
-
-        const totalDiasMes = new Date(data.anio, data.mes, 0).getDate();
-        let diasTrabajados = totalDiasMes;
-        let totalDiasAusencias = 0;
-
-        for (const ausencia of empleado.ausencias) {
-          const inicioAusencia = new Date(Math.max(
-            ausencia.fechaInicio.getTime(),
-            new Date(data.anio, data.mes - 1, 1).getTime()
-          ));
-          const finAusencia = new Date(Math.min(
-            ausencia.fechaFin.getTime(),
-            new Date(data.anio, data.mes, 0).getTime()
-          ));
-
-          const dias = Math.ceil(
-            (finAusencia.getTime() - inicioAusencia.getTime()) / (1000 * 60 * 60 * 24)
-          ) + 1;
-
-          totalDiasAusencias += dias;
-        }
-
-        diasTrabajados = Math.max(0, totalDiasMes - totalDiasAusencias);
-
-        const salarioMensual = contratoVigente.salarioBrutoAnual
-          ? contratoVigente.salarioBrutoAnual.dividedBy(12)
-          : new Decimal(0);
-        const salarioBase = salarioMensual
-          .mul(diasTrabajados)
-          .div(totalDiasMes);
-
-        const tieneComplementosVariables = empleado.complementos.some(
-          (comp) => !comp.importePersonalizado && !comp.tipoComplemento.importeFijo
-        );
-
-        await prisma.nomina.create({
-          data: {
-            empleadoId: empleado.id,
-            contratoId: contratoVigente.id,
-            eventoNominaId: evento.id,
-            mes: data.mes,
-            anio: data.anio,
-            estado: 'pendiente', // Estado inicial: pendiente
-            salarioBase: salarioBase,
-            totalComplementos: new Decimal(0),
-            totalDeducciones: new Decimal(0),
-            totalBruto: salarioBase,
-            totalNeto: salarioBase,
-            diasTrabajados: diasTrabajados,
-            diasAusencias: totalDiasAusencias,
-            complementosPendientes: tieneComplementosVariables,
-          },
-        });
-
-        nominasGeneradas += 1;
-
-        if (empleado.complementos.length > 0) {
-          empleadosConComplementos++;
-          totalComplementosAsignados += empleado.complementos.length;
-        }
-      }
-
-      // Actualizar estadísticas del evento
-      await prisma.eventoNomina.update({
-        where: { id: evento.id },
-        data: {
-          empleadosConComplementos,
-          complementosAsignados: totalComplementosAsignados,
-        },
+    let resultadoGeneracion: Awaited<
+      ReturnType<typeof generarPrenominasEvento>
+    >;
+    try {
+      resultadoGeneracion = await generarPrenominasEvento({
+        eventoId: evento.id,
+        empresaId: session.user.empresaId,
+        mes: data.mes,
+        anio: data.anio,
       });
+    } catch (error) {
+      await prisma.eventoNomina.delete({ where: { id: evento.id } }).catch(() => {});
+      throw error;
+    }
+
+    const eventoActualizado = await prisma.eventoNomina.findUnique({
+      where: { id: evento.id },
+    });
+
+    if (!eventoActualizado) {
+      throw new Error('No se pudo recuperar el evento generado');
     }
 
     // Enviar notificaciones a los managers para completar complementos
@@ -346,14 +231,14 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    if (empleadosConComplementos > 0) {
+    if (resultadoGeneracion.empleadosConComplementos > 0) {
       await Promise.all(
         managers.map((manager) =>
           crearNotificacionComplementosPendientes(prisma, {
             nominaId: evento.id,
             empresaId: session.user.empresaId,
             managerId: manager.id,
-            empleadosCount: empleadosConComplementos,
+            empleadosCount: resultadoGeneracion.empleadosConComplementos,
             mes: data.mes,
             año: data.anio,
           })
@@ -363,9 +248,11 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json(
       {
-        evento,
-        nominasGeneradas,
-        notificacionesEnviadas: empleadosConComplementos > 0 ? managers.length : 0,
+        evento: eventoActualizado,
+        nominasGeneradas: resultadoGeneracion.prenominasCreadas,
+        prenominasVinculadas: resultadoGeneracion.prenominasVinculadas,
+        notificacionesEnviadas:
+          resultadoGeneracion.empleadosConComplementos > 0 ? managers.length : 0,
       },
       { status: 201 }
     );

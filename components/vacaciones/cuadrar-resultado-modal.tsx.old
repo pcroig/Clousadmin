@@ -23,16 +23,7 @@ import {
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
-
-type TipoPropuesta = 'ideal' | 'alternativo' | 'ajustado';
-
-export interface VacacionesAjustePayload {
-  preferenciaId: string;
-  fechaInicio: string;
-  fechaFin: string;
-  tipo: TipoPropuesta;
-  motivo: string;
-}
+import { TipoPropuesta, VacacionesAjustePayload } from '@/components/vacaciones/types';
 
 interface EmpleadoInfo {
   id: string;

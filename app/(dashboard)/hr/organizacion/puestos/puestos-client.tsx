@@ -30,7 +30,7 @@ interface Puesto {
     mimeType: string;
     tamano: number;
     createdAt: string;
-    s3Key: string;
+    downloadUrl: string;
   }[];
 }
 
@@ -83,7 +83,7 @@ export function PuestosClient({ puestos: initialPuestos }: PuestosClientProps) {
           mimeType: string;
           tamano: number;
           createdAt: string;
-          s3Key: string;
+          downloadUrl?: string | null;
         }>;
       }
 
@@ -99,7 +99,10 @@ export function PuestosClient({ puestos: initialPuestos }: PuestosClientProps) {
           nombre: `${emp.nombre} ${emp.apellidos}`,
           avatar: emp.fotoUrl || undefined,
         })),
-        documentos: puesto.documentos || [],
+        documentos: (puesto.documentos || []).map((doc) => ({
+          ...doc,
+          downloadUrl: doc.downloadUrl || `/api/documentos/${doc.id}?inline=1`,
+        })),
       }));
 
       setPuestos(transformedData);

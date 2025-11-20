@@ -4,7 +4,6 @@
  */
 
 import { get } from 'lodash';
-import OpenAI from 'openai';
 import { cache as redisCache } from '@/lib/redis';
 import { QUICK_MAPPINGS, CAMPOS_ENCRIPTADOS } from './constantes';
 import { DatosEmpleado, VariableMapping } from './tipos';
@@ -21,11 +20,8 @@ import {
 } from './sanitizar';
 import { decrypt } from '@/lib/crypto';
 import { prisma } from '@/lib/prisma';
-
-// Cliente OpenAI
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+import { callAIWithConfig } from '@/lib/ia';
+import type OpenAI from 'openai';
 
 // Cache en memoria (rápido, se resetea con el servidor)
 const memoryCache = new Map<string, VariableMapping>();
@@ -135,21 +131,16 @@ Responde SOLO en JSON:
 }`;
 
   try {
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4o-mini', // Más barato y rápido para tareas estructuradas
-      messages: [
-        {
-          role: 'system',
-          content:
-            'Eres un experto en mapeo de datos estructurados. Respondes SOLO en JSON válido.',
-        },
-        { role: 'user', content: prompt },
-      ],
-      response_format: { type: 'json_object' },
-      temperature: 0, // Determinístico
-    });
+    const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
+      {
+        role: 'user',
+        content: prompt,
+      },
+    ];
 
-    const content = response.choices[0].message.content;
+    const completion = await callAIWithConfig('plantillas-resolver-variable', messages);
+
+    const content = completion.choices[0]?.message?.content;
     if (!content) {
       throw new Error('No se recibió respuesta de la IA');
     }

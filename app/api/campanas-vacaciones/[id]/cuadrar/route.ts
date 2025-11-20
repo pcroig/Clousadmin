@@ -6,7 +6,6 @@ import { NextRequest } from 'next/server';
 import { prisma, Prisma } from '@/lib/prisma';
 import { cuadrarVacacionesIA } from '@/lib/ia/cuadrar-vacaciones';
 import { UsuarioRol, EstadoAusencia } from '@/lib/constants/enums';
-import { crearNotificacionCampanaCuadrada } from '@/lib/notificaciones';
 
 import {
   requireAuth,
@@ -76,8 +75,8 @@ export async function POST(
       return badRequestResponse('Campaña no encontrada');
     }
 
-    if (campana.estado === 'cuadrada') {
-      return badRequestResponse('La campaña ya ha sido cuadrada');
+    if (campana.estado === 'finalizada') {
+      return badRequestResponse('La campaña ya fue finalizada');
     }
 
     if (campana.preferencias.length === 0) {
@@ -107,13 +106,12 @@ export async function POST(
       fechaFinObjetivo: campana.fechaFinObjetivo,
     });
 
-    // Guardar resultado en la campaña
+    // Guardar resultado en la campaña sin cerrar aún
     await prisma.campanaVacaciones.update({
       where: { id: campanaId },
       data: {
         propuestaIA: resultado as Prisma.JsonValue,
-        estado: 'cuadrada',
-        cuadradaEn: new Date(),
+        estado: 'borrador_generado',
       },
     });
 
@@ -130,22 +128,10 @@ export async function POST(
       });
     }
 
-    // Enviar notificaciones a los empleados (solo los que tienen usuarioId)
-    const usuarioIds = campana.preferencias
-      .filter(pref => pref.empleado.usuarioId)
-      .map(pref => pref.empleado.usuarioId!) ;
-
-    await crearNotificacionCampanaCuadrada(prisma, {
-      campanaId,
-      empresaId: session.user.empresaId,
-      titulo: campana.titulo,
-      usuarioIds,
-    });
-
-    console.info(`[Cuadrar] Campaña ${campanaId} cuadrada exitosamente`);
+    console.info(`[Cuadrar] Campaña ${campanaId} - borrador generado con ${resultado.propuestas.length} propuestas`);
 
     return successResponse({
-      message: 'Vacaciones cuadradas exitosamente',
+      message: 'Borrador generado. Revisa y decide siguiente paso.',
       resultado,
     });
   } catch (error) {

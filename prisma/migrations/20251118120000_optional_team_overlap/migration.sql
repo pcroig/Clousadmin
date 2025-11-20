@@ -5,3 +5,5 @@ ALTER TABLE "campanas_vacaciones"
 ALTER TABLE "campanas_vacaciones"
   ALTER COLUMN "solapamientoMaximoPct" DROP DEFAULT;
 
+
+

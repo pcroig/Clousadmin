@@ -245,7 +245,8 @@ export async function generarDocumentoDesdePlantilla(
     console.log(`[Generar] Nombre del documento: ${nombreDocumentoFinal}`);
 
     // 8. Subir a S3
-    const carpetaDestino = configuracion.carpetaDestino || plantilla.carpetaDestinoDefault || 'Personales';
+    const carpetaDestino =
+      configuracion.carpetaDestino || plantilla.carpetaDestinoDefault || 'Otros';
     const s3Key = `documentos/${empleado.empresaId}/${empleadoId}/${carpetaDestino}/${nombreDocumentoFinal}`;
 
     await subirDocumento(documentoBuffer, s3Key, DOCX_MIME_TYPE);
@@ -289,7 +290,7 @@ export async function generarDocumentoDesdePlantilla(
         mimeType: 'application/pdf',
         tamano: pdfSize,
         s3Key: pdfS3Key,
-        s3Bucket: process.env.AWS_S3_BUCKET || 'clousadmin-documents',
+        s3Bucket: process.env.STORAGE_BUCKET || 'clousadmin-documents',
         requiereFirma: configuracion.requiereFirma || plantilla.requiereFirma,
         datosExtraidos: {
           origenDocx: {

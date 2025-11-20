@@ -7,7 +7,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import * as XLSX from 'xlsx';
-import { actualizarEstadosNominasLote } from '@/lib/calculos/sync-estados-nominas';
 
 // ========================================
 // GET /api/nominas/eventos/[id]/exportar
@@ -46,14 +45,22 @@ export async function GET(
                 apellidos: true,
                 email: true,
                 nif: true,
-                numeroSeguridadSocial: true,
+                nss: true,
                 telefono: true,
-                direccion: true,
+                direccionCalle: true,
+                direccionNumero: true,
+                direccionPiso: true,
                 codigoPostal: true,
                 ciudad: true,
-                provincia: true,
-                pais: true,
+                direccionProvincia: true,
                 fechaNacimiento: true,
+                iban: true,
+                titularCuenta: true,
+                jornada: {
+                  select: {
+                    horasSemanales: true,
+                  },
+                },
               },
             },
             contrato: {
@@ -62,10 +69,7 @@ export async function GET(
                 tipoContrato: true,
                 fechaInicio: true,
                 fechaFin: true,
-                salarioBruto: true,
-                horasSemana: true,
-                prorrataPagas: true,
-                numeroPagas: true,
+                salarioBrutoAnual: true,
               },
             },
             complementosAsignados: {
@@ -103,6 +107,18 @@ export async function GET(
     const datosEmpleados = evento.nominas.map((nomina) => {
       const empleado = nomina.empleado;
       const contrato = nomina.contrato;
+      const direccionCompleta = [
+        empleado.direccionCalle,
+        empleado.direccionNumero,
+        empleado.direccionPiso,
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .trim();
+
+      const horasSemana = empleado.jornada?.horasSemanales
+        ? Number(empleado.jornada.horasSemanales)
+        : null;
 
       // Construir columnas de complementos
       const complementos: Record<string, number> = {};
@@ -121,27 +137,28 @@ export async function GET(
         'Fecha Nacimiento': empleado.fechaNacimiento
           ? empleado.fechaNacimiento.toLocaleDateString('es-ES')
           : '',
-        'NSS': empleado.numeroSeguridadSocial || '',
+        'NSS': empleado.nss || '',
+        'IBAN': empleado.iban || '',
+        'Titular Cuenta': empleado.titularCuenta || '',
 
         // Dirección
-        'Dirección': empleado.direccion || '',
+        'Dirección': direccionCompleta,
         'CP': empleado.codigoPostal || '',
         'Ciudad': empleado.ciudad || '',
-        'Provincia': empleado.provincia || '',
-        'País': empleado.pais || '',
+        'Provincia': empleado.direccionProvincia || '',
 
         // Datos del contrato
-        'Tipo Contrato': contrato.tipoContrato || '',
-        'Fecha Inicio': contrato.fechaInicio
+        'Tipo Contrato': contrato?.tipoContrato || '',
+        'Fecha Inicio': contrato?.fechaInicio
           ? contrato.fechaInicio.toLocaleDateString('es-ES')
           : '',
-        'Fecha Fin': contrato.fechaFin
+        'Fecha Fin': contrato?.fechaFin
           ? contrato.fechaFin.toLocaleDateString('es-ES')
           : 'Indefinido',
-        'Salario Bruto': parseFloat(contrato.salarioBruto?.toString() || '0'),
-        'Horas/Semana': contrato.horasSemana || 40,
-        'Num. Pagas': contrato.numeroPagas || 12,
-        'Prorrata': contrato.prorrataPagas ? 'Sí' : 'No',
+        'Salario Bruto Anual': parseFloat(
+          contrato?.salarioBrutoAnual?.toString() || '0'
+        ),
+        'Horas/Semana': horasSemana ?? '',
 
         // Datos de la nómina
         'Mes': evento.mes,
@@ -196,14 +213,19 @@ export async function GET(
     // Generar buffer del archivo Excel
     const excelBuffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
 
-    // Actualizar estados usando función centralizadora (garantiza sincronización)
-    await actualizarEstadosNominasLote(id, 'exportada');
+    const fechaExportacion = new Date();
 
-    // Actualizar fecha de exportación del evento
+    await prisma.nomina.updateMany({
+      where: { eventoNominaId: id },
+      data: {
+        exportadaEn: fechaExportacion,
+      },
+    });
+
     await prisma.eventoNomina.update({
       where: { id },
       data: {
-        fechaExportacion: new Date(),
+        fechaExportacion,
       },
     });
 

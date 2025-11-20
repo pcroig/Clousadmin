@@ -9,7 +9,7 @@ El sistema de fichajes permite a los empleados registrar su jornada laboral comp
 - **Horas extra**: ya existe el flujo completo (`GET /api/fichajes/bolsa-horas`, `POST /api/fichajes/compensar-horas`, `lib/services/compensacion-horas.ts`). No se requiere implementar nada nuevo, solo optimizaciones puntuales.
 - **Array duplicado de días**: el literal incorrecto en `app/api/fichajes/revision/route.ts` no se usa; el sistema emplea constantemente la constante correcta `dias`, por lo que no impacta cálculos.
 - **Finalizar desde pausa**: la validación (`lib/calculos/fichajes.ts`) permite cerrar jornada estando en pausa para garantizar que el tiempo en descanso no compute como trabajado. Cualquier cambio exigiría decisión de negocio.
-- **Correcciones de fichaje**: hay UI/endpoint para que empleados soliciten correcciones, pero el roadmap contempla evolucionar hacia un workflow con cola/aprobación formal y notificaciones automáticas antes de tocar datos reales.
+- **Correcciones de fichaje**: ✅ Implementado workflow formal con solicitud/aprobación. Empleados solicitan desde `/empleado/horario/fichajes`, HR/Manager aprueban desde la bandeja de entrada. Incluye notificaciones automáticas y auditoría completa.
 - **`autoCompletado`**: sigue alimentando dashboards, auditoría y la pantalla de revisión; no se debe eliminar hasta migrar todos los consumidores a los campos de cuadre masivo.
 - **Slack y geolocalización**: mantienen estado “roadmap” (documentadas en esta guía), no hay código en producción que debamos retirar o activar.
 - **Entrada/salida múltiples**: `validarEvento` impide reabrir entradas mientras el estado no vuelva a `sin_fichar`, por lo que no se generan múltiples ciclos el mismo día.
@@ -305,7 +305,7 @@ enum PeriodoMedioDia {
 
 ### Solicitudes de corrección (flujo formal)
 - **Empleados**: desde `/empleado/horario/fichajes` envían una solicitud indicando motivo y nuevos valores. Endpoint: `POST /api/fichajes/correcciones`.
-- **HR / Manager**: revisan en `/hr/horario/fichajes` el listado de pendientes y deciden aprobar/rechazar (`PATCH /api/fichajes/correcciones/[id]`).
+- **HR / Manager**: revisan las solicitudes pendientes desde la **bandeja de entrada** y deciden aprobar/rechazar (`PATCH /api/fichajes/correcciones/[id]`).
 - **Aplicación automática**: al aprobar se actualiza el evento correspondiente, se recalculan horas y se notifica al empleado (`fichaje_resuelto`). Las solicitudes rechazadas guardan motivo histórico.
 - **Auditoría**: el modelo `SolicitudCorreccionFichaje` conserva estado, payload y quién revisó (`revisadaPor`, `revisadaEn`).
 

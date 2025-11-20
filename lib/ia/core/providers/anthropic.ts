@@ -246,6 +246,8 @@ export function mapToAnthropicModel(genericModel: string): string {
   // Mapeo de modelos genéricos a Claude
   const modelMap: Record<string, string> = {
     // Modelos OpenAI recientes
+    'gpt-5.1': 'claude-opus-4-1',
+    'gpt-5.1-mini': 'claude-sonnet-4-5',
     'gpt-4.1': 'claude-sonnet-4-5',
     'gpt-4.1-mini-2025-04-14': 'claude-haiku-4-5',
     'gpt-4.1-mini': 'claude-haiku-4-5', // Legacy - mantener para compatibilidad

@@ -9,12 +9,14 @@ import { Textarea } from '@/components/ui/textarea';
 import { LoadingButton } from '@/components/shared/loading-button';
 import { toast } from 'sonner';
 import { Upload, FileText, X } from 'lucide-react';
+import { CarpetaSelector } from '@/components/shared/carpeta-selector';
 
 interface DarDeBajaModalProps {
   isOpen: boolean;
   onClose: () => void;
   contratoId: string;
   empleadoNombre: string;
+  empleadoId: string;
   onSuccess?: () => void;
 }
 
@@ -22,6 +24,7 @@ interface DocumentoSubir {
   file: File;
   nombre: string;
   tipo: 'lectura' | 'firma';
+  carpetaId?: string;
 }
 
 export function DarDeBajaModal({
@@ -29,12 +32,14 @@ export function DarDeBajaModal({
   onClose,
   contratoId,
   empleadoNombre,
+  empleadoId,
   onSuccess,
 }: DarDeBajaModalProps) {
   const [fechaFin, setFechaFin] = useState('');
   const [motivo, setMotivo] = useState('');
   const [documentos, setDocumentos] = useState<DocumentoSubir[]>([]);
   const [loading, setLoading] = useState(false);
+  const [carpetaIdSeleccionada, setCarpetaIdSeleccionada] = useState<string | null>(null);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, tipo: 'lectura' | 'firma') => {
     const files = e.target.files;
@@ -47,7 +52,12 @@ export function DarDeBajaModal({
         toast.error(`El archivo ${file.name} es muy grande (máximo 10MB)`);
         continue;
       }
-      newDocumentos.push({ file, nombre: file.name, tipo });
+      newDocumentos.push({
+        file,
+        nombre: file.name,
+        tipo,
+        carpetaId: carpetaIdSeleccionada || undefined,
+      });
     }
 
     setDocumentos([...documentos, ...newDocumentos]);
@@ -74,6 +84,11 @@ export function DarDeBajaModal({
           formData.append('nombre', doc.nombre);
           formData.append('categoria', 'offboarding');
           formData.append('tipo', doc.tipo);
+          formData.append('tipoDocumento', doc.tipo);
+          const carpetaDestino = doc.carpetaId || carpetaIdSeleccionada;
+          if (carpetaDestino) {
+            formData.append('carpetaId', carpetaDestino);
+          }
 
           const uploadResponse = await fetch('/api/documentos', {
             method: 'POST',
@@ -122,6 +137,7 @@ export function DarDeBajaModal({
       setFechaFin('');
       setMotivo('');
       setDocumentos([]);
+      setCarpetaIdSeleccionada(null);
       onClose();
     }
   };
@@ -134,6 +150,40 @@ export function DarDeBajaModal({
         </DialogHeader>
 
         <div className="space-y-6 py-4">
+          {/* Carpeta destino */}
+          <CarpetaSelector
+            empleadoId={empleadoId}
+            value={carpetaIdSeleccionada}
+            onChange={setCarpetaIdSeleccionada}
+            defaultNombre="Otros"
+            label="Carpeta de destino para los documentos"
+            placeholder="Selecciona la carpeta donde guardar los documentos"
+            onNuevaCarpeta={async (nombre) => {
+              try {
+                const response = await fetch('/api/carpetas', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    nombre,
+                    empleadoId,
+                    compartida: false,
+                  }),
+                });
+                if (!response.ok) {
+                  toast.error('Error al crear carpeta');
+                  return null;
+                }
+                const { carpeta } = await response.json();
+                toast.success('Carpeta creada correctamente');
+                return carpeta.id;
+              } catch (error) {
+                console.error('[DarDeBajaModal] Error creando carpeta:', error);
+                toast.error('Error al crear carpeta');
+                return null;
+              }
+            }}
+          />
+
           {/* Fecha de finalización */}
           <div>
             <Label htmlFor="fechaFin" className="required">
@@ -228,6 +278,11 @@ export function DarDeBajaModal({
                           <p className="text-sm font-medium text-gray-900 truncate">{doc.nombre}</p>
                           <p className="text-xs text-gray-500">
                             {doc.tipo === 'lectura' ? 'Ver/Descargar' : 'Requiere firma'}
+                          </p>
+                          <p className="text-xs text-gray-400">
+                            {doc.carpetaId
+                              ? 'Se guardará en la carpeta seleccionada'
+                              : 'Se guardará en la carpeta "Otros"'}
                           </p>
                         </div>
                       </div>

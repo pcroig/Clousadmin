@@ -39,7 +39,6 @@ export default async function PuestosPage() {
           mimeType: true,
           tamano: true,
           createdAt: true,
-          s3Key: true,
         },
         orderBy: {
           createdAt: 'desc',
@@ -76,7 +75,7 @@ export default async function PuestosPage() {
       mimeType: doc.mimeType,
       tamano: doc.tamano,
       createdAt: doc.createdAt.toISOString(),
-      s3Key: doc.s3Key,
+      downloadUrl: `/api/documentos/${doc.id}?inline=1`,
     })),
   }));
 

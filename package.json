@@ -11,6 +11,8 @@
     "seed": "tsx prisma/seed.ts",
     "seed:plantillas": "tsx prisma/seed-plantillas.ts",
     "diagnostico": "tsx scripts/diagnostico-prisma.ts",
+    "test-storage": "tsx scripts/test-hetzner-storage.ts",
+    "check-production": "tsx scripts/check-production-ready.ts",
     "db:generate": "prisma generate",
     "db:studio": "prisma studio",
     "db:migrate": "prisma migrate dev",

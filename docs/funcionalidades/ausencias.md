@@ -10,26 +10,26 @@
 
 ### v3.2.2 - Campo Único de Motivo/Detalle (18 Nov 2025)
 
-**✔ Cambios**:
-1. Se elimina `descripcion` del modelo `Ausencia`; `motivo` es el único campo semántico (obligatorio solo para tipo `otro`)
-2. Migración automática que fusiona datos existentes (si solo había descripción se conserva en motivo)
-3. Formularios de empleado y HR muestran un único campo “Motivo o detalles”
-4. API/validaciones/documentación y calendarios actualizados
+**Cambios**:
+- Se elimina `descripcion` del modelo `Ausencia`; `motivo` es el único campo semántico (obligatorio solo para tipo `otro`)
+- Migración automática que fusiona datos existentes (si solo había descripción se conserva en motivo)
+- Formularios de empleado y HR muestran un único campo "Motivo o detalles"
+- API, validaciones, integraciones (calendario) y documentación actualizados
 
-**📄 Ver**: `docs/funcionalidades/MEJORA_AUSENCIAS_v3.2.2.md` para el desglose completo
+**Archivos afectados**: `prisma/schema.prisma`, `lib/validaciones/schemas.ts`, `app/api/ausencias/**`, `components/**/solicitar-ausencia-modal.tsx`, `app/(dashboard)/hr/horario/ausencias/ausencias-client.tsx`, `lib/integrations/types.ts`
 
 ---
 
 ### v3.2.1 - Bugfixes Críticos (18 Nov 2025)
 
-**🐛 Correcciones**:
+**Correcciones**:
 1. **Race Condition Real**: `calcularSaldoDisponible()` ahora usa valores de tabla cuando se ejecuta en transacción, evitando recalcular desde ausencias (causa de race condition)
 2. **Tests**: Corregidos imports inexistentes (`validarSaldoSuficienteConTransaccion` → `validarSaldoSuficiente`)
 3. **Documentación**: Alineada con código real (eliminadas referencias a funciones que no existen)
 4. **Cleanup Justificantes**: Limpieza de documentos huérfanos ahora ocurre en TODOS los paths de error, no solo en `SaldoInsuficienteError`
 5. **Código Muerto**: Eliminado schema duplicado (`ausenciaEditarSchema`) y función helper redundante (`failWithCleanup`)
 
-**📄 Ver**: `docs/funcionalidades/BUGFIX_AUSENCIAS_v3.2.1.md` para detalles completos
+**Archivos afectados**: `lib/calculos/ausencias.ts`, `app/api/ausencias/route.ts`, `app/api/ausencias/[id]/route.ts`, `lib/calculos/__tests__/ausencias.test.ts`
 
 ---
 
@@ -83,7 +83,7 @@
 3. **Lógica de Negocio**: Todos los cálculos de días, saldo, festivos, días laborables implementados
 4. **Páginas HR**: Vista completa con filtros, búsqueda, modales de edición
 5. **Páginas Empleado**: Vista en Mi Espacio con diseño visual (FechaCalendar, tabs Próximas/Pasadas)
-6. **Modal Gestionar Ausencias**: Implementado con tabs (Saldo, Calendario Laboral, Gestionar Vacaciones)
+6. **Modal Gestionar Ausencias**: Reorganizado en dos tabs (Política de ausencias + Calendario laboral) con políticas centralizadas a nivel empresa
 7. **Estados Unificados**: Sistema de estados claro (pendiente/aprobada/rechazada/auto_aprobada)
 8. **Sistema de Festivos**: CRUD completo, importación automática de festivos nacionales
 9. **Calendario Laboral**: Configuración de días laborables por empresa, integrado en cálculos
@@ -226,8 +226,8 @@
 - ✅ Subida a S3 antes de crear la ausencia
 
 #### ✅ `GestionarAusenciasModal`
-- ✅ **RECIÉN CREADO** - Tab Saldo funcional
-- ⚠️ Tab Calendario: placeholder (funcionalidad en desarrollo)
+- ✅ Tab **Política de ausencias**: saldo anual y reglas (solapamiento, antelación) para toda la empresa
+- ✅ Tab **Calendario Laboral**: días laborables + gestión de festivos (importación y lista simplificada)
 
 #### ✅ `FechaCalendar`
 - ✅ Componente reutilizable
@@ -329,9 +329,9 @@ const diasPendientes = ausencias
    - Útil para días de gran volumen
 
 4. **Gestionar Ausencias**
-   - Modal con tabs:
-     - **Saldo**: Asignar saldo anual por equipo o empresa
-     - **Calendario**: (En desarrollo) Configurar calendario laboral
+   - Modal con dos tabs:
+     - **Política de ausencias**: Configura días totales anuales (empresa o equipos), límite de solapamiento y días de antelación mínimos (todo a nivel empresa, sin selector adicional por equipo)
+     - **Calendario Laboral**: Define días laborables y gestiona festivos (importación nacional + listado scrollable)
 
 5. **Editar Ausencia**
    - Desde tabla o desde perfil de empleado
@@ -754,10 +754,21 @@ Todas las funciones de cálculo de días usan la configuración:
 
 ## 🔒 NOTAS DE SEGURIDAD
 
-1. **Race Conditions**: Siempre pasar `tx` (transacción) a `validarSaldoSuficiente()` y `calcularSaldoDisponible()` para que usen valores atómicos de la tabla en lugar de recalcular desde ausencias
+1. **Race Conditions**: Siempre pasar `tx` (transacción) a `validarSaldoSuficiente()` y `calcularSaldoDisponible()` para que usen valores atómicos de la tabla en lugar de recalcular desde ausencias:
+   ```typescript
+   // ✅ CORRECTO: Pasar tx en transacción
+   await prisma.$transaction(async (tx) => {
+     const validacion = await validarSaldoSuficiente(empleadoId, año, diasSolicitados, tx);
+     // ... actualizar saldo y crear ausencia
+   });
+   
+   // ❌ INCORRECTO: Sin tx recalcula desde ausencias (race condition)
+   const validacion = await validarSaldoSuficiente(empleadoId, año, diasSolicitados);
+   ```
 2. **Validación de Entrada**: Todos los endpoints validan con Zod antes de procesar
 3. **Autorización**: HR Admin/Manager required para aprobar/rechazar/editar
 4. **Cleanup**: Documentos huérfanos se eliminan en caso de error de validación y tras 7 días sin referencia (cron job)
+5. **Campo Motivo**: Obligatorio solo para tipo `otro`, opcional para el resto
 
 ---
 

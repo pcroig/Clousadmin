@@ -34,7 +34,7 @@ export async function GET(
             nombre: true,
             apellidos: true,
             email: true,
-            numeroSeguroSocial: true,
+            nss: true,
             iban: true,
             equipos: {
               select: {

@@ -324,7 +324,7 @@ function validarYNormalizarResultado(
     warnings,
     metadata: {
       timestamp: new Date().toISOString(),
-      model: 'gpt-4o-mini',
+      model: 'gpt-5.1',
     },
   };
 }

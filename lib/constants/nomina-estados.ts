@@ -11,6 +11,7 @@ export const NOMINA_ESTADOS = {
 export const EVENTO_ESTADOS = {
   ABIERTO: 'abierto',
   CERRADO: 'cerrado',
+  PUBLICADO: 'publicado',
 } as const;
 
 export type NominaEstado = typeof NOMINA_ESTADOS[keyof typeof NOMINA_ESTADOS];
@@ -40,6 +41,10 @@ export const EVENTO_ESTADO_LABELS: Record<string, { label: string; color: string
   [EVENTO_ESTADOS.CERRADO]: { 
     label: 'Cerrado', 
     color: 'text-gray-600' 
+  },
+  [EVENTO_ESTADOS.PUBLICADO]: { 
+    label: 'Publicado', 
+    color: 'text-green-600' 
   },
 };
 

@@ -45,10 +45,12 @@ interface DocumentoOnboarding {
   url?: string;
   downloadUrl?: string | null;
   createdAt?: string;
+  s3Key?: string;
 }
 
 type DocumentoRequeridoUI = ConfigDocumentoRequerido & {
   descripcion?: string | null;
+  carpetaDestino?: string | null;
 };
 
 // Mapeo de nombres de campos a etiquetas en español
@@ -81,10 +83,12 @@ function mapDocumentosConfig(
   return docs.map((doc) => {
     const descriptor = doc as ConfigDocumentoRequerido & {
       descripcion?: string | null;
+      carpetaDestino?: string | null;
     };
     return {
       ...doc,
       descripcion: descriptor.descripcion ?? null,
+      carpetaDestino: descriptor.carpetaDestino ?? 'Otros',
     };
   });
 }
@@ -94,6 +98,30 @@ function shouldShowDocumentStep(
   docsSubidos?: DocumentoOnboarding[]
 ) {
   return docsRequeridos.length > 0 || (docsSubidos && docsSubidos.length > 0);
+}
+
+function documentoCumpleRequerimiento(
+  documento: DocumentoOnboarding,
+  requerimiento: DocumentoRequeridoUI
+) {
+  const reqId = requerimiento.id.toLowerCase();
+  if (documento.tipoDocumento && documento.tipoDocumento.toLowerCase() === reqId) {
+    return true;
+  }
+
+  if (documento.nombre && documento.nombre.toLowerCase() === requerimiento.nombre.toLowerCase()) {
+    return true;
+  }
+
+  if (documento.s3Key) {
+    const keySegment = documento.s3Key.split('/').pop() || '';
+    const slug = keySegment.split('-')[0]?.toLowerCase();
+    if (slug === reqId) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 export function OnboardingForm({
@@ -491,12 +519,20 @@ export function OnboardingForm({
       }
   };
 
-  const handleUploadDocumento = async (file: File, tipoDocumento: string, nombreDocumento: string) => {
+  const handleUploadDocumento = async (
+    file: File,
+    tipoDocumento: string,
+    nombreDocumento: string,
+    carpetaDestino?: string | null
+  ) => {
     try {
       const formData = new FormData();
       formData.append('file', file);
       formData.append('tipoDocumento', tipoDocumento);
       formData.append('nombreDocumento', nombreDocumento);
+      if (carpetaDestino) {
+        formData.append('carpetaDestino', carpetaDestino);
+      }
 
       const res = await fetch(`/api/onboarding/${token}/documentos`, {
         method: 'POST',
@@ -1197,8 +1233,8 @@ export function OnboardingForm({
                 <div className="space-y-4">
                   <h3 className="font-medium">Documentos requeridos:</h3>
                   {documentosRequeridos.map((docReq: DocumentoRequerido) => {
-                    const docSubido = documentos.find(
-                      (d) => d.tipoDocumento === docReq.id
+                    const docSubido = documentos.find((d) =>
+                      documentoCumpleRequerimiento(d, docReq)
                     );
                     
                     return (
@@ -1227,11 +1263,25 @@ export function OnboardingForm({
                         </div>
                         
                         {!docSubido ? (
-                          <DocumentUploader
-                            onUpload={(file) => handleUploadDocumento(file, docReq.id, docReq.nombre)}
-                            label=""
-                            description="PDF, JPG o PNG (máx. 5MB)"
-                          />
+                          <>
+                            <DocumentUploader
+                              onUpload={(file) =>
+                                handleUploadDocumento(
+                                  file,
+                                  docReq.id,
+                                  docReq.nombre,
+                                  docReq.carpetaDestino
+                                )
+                              }
+                              label=""
+                              description="PDF, JPG o PNG (máx. 5MB)"
+                            />
+                            {docReq.carpetaDestino && (
+                              <p className="text-xs text-gray-500 mt-2">
+                                Se guardará en la carpeta &quot;{docReq.carpetaDestino}&quot;.
+                              </p>
+                            )}
+                          </>
                         ) : (
                           <div className="bg-green-50 border border-green-200 rounded p-3">
                             <p className="text-sm text-green-800">

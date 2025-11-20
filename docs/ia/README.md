@@ -15,13 +15,13 @@
 
 ### Requisitos Previos
 
-El sistema de IA soporta **dos proveedores** con fallback automático:
+El sistema de IA soporta **múltiples proveedores** con fallback automático:
 
 #### Opción 1: OpenAI (Recomendado)
 
 1. **Paquete OpenAI instalado** (ya incluido en `package.json`):
    ```bash
-   npm install openai  # v6.7.0
+   npm install openai  # v6.7.0+
    ```
 
 2. **Variable de entorno configurada** en `.env.local`:
@@ -30,24 +30,34 @@ El sistema de IA soporta **dos proveedores** con fallback automático:
    ```
    ⚠️ La API key debe comenzar con `sk-` para ser válida.
 
-#### Opción 2: Replicate (Fallback Open Source)
+**Características:**
+- ✅ Usa **OpenAI Responses API** por defecto (con fallback a Chat Completions)
+- ✅ Modelos: GPT-5.1, GPT-5.1-mini, GPT-4o, GPT-4o-mini
+- ✅ Logging mejorado en dashboard de Responses
+- ✅ Structured Outputs nativos
 
-Si OpenAI no está disponible, el sistema usa automáticamente **Llama 3.1 70B** vía Replicate:
+#### Opción 2: Anthropic (Claude)
 
-1. **Registrarse en Replicate**: https://replicate.com/
-2. **Obtener API Token**: https://replicate.com/account/api-tokens
-3. **Configurar en `.env.local`**:
+1. **Variable de entorno configurada** en `.env.local`:
    ```bash
-   REPLICATE_API_TOKEN="r8_..."
+   ANTHROPIC_API_KEY="sk-ant-..."
+   ```
+
+#### Opción 3: Google AI (Gemini)
+
+1. **Variable de entorno configurada** en `.env.local`:
+   ```bash
+   GOOGLE_AI_API_KEY="..."
    ```
 
 ### Prioridad de Proveedores
 
 El sistema usa esta prioridad automáticamente:
 
-1. **OpenAI (GPT-4.1)** - Si `OPENAI_API_KEY` está configurado
-2. **Replicate (Llama 3.1 70B)** - Si OpenAI no disponible pero `REPLICATE_API_TOKEN` sí
-3. **Error** - Si ninguno está configurado
+1. **OpenAI (GPT-5.1)** - Si `OPENAI_API_KEY` está configurado
+2. **Anthropic (Claude)** - Si OpenAI falla/no disponible
+3. **Google AI (Gemini)** - Último fallback
+4. **Error** - Si ninguno está configurado
 
 ### Import Centralizado
 
@@ -172,7 +182,7 @@ lib/ia/
 
 ### 1. Cuadrar Vacaciones
 
-**Modelo**: `GPT-4.1` (fallback: Llama 3.1 70B)
+**Modelo**: `GPT-5.1` (fallback: Anthropic/Google AI)
 **Archivo**: `lib/ia/cuadrar-vacaciones.ts`
 
 ```typescript
@@ -187,7 +197,7 @@ const resultado = await cuadrarVacacionesIA({
   fechaInicioObjetivo,
   fechaFinObjetivo,
 });
-// Usa automáticamente GPT-4.1 o Llama 3.1 70B según disponibilidad
+// Usa automáticamente GPT-5.1 o fallback según disponibilidad
 ```
 
 ### 2. Usar Cliente Base Directamente
@@ -355,8 +365,10 @@ Cada funcionalidad tiene su propio archivo con:
 
 ## 📚 Referencias
 
-- [Documentación Completa de OpenAI](./integracion-openai.md)
+- [Arquitectura IA Completa](./ARQUITECTURA_IA.md) - Documentación técnica detallada
+- [Variables de Entorno](./ENV_VARIABLES.md) - Configuración de API keys
 - [OpenAI SDK](https://github.com/openai/openai-node)
+- [OpenAI Responses API](https://platform.openai.com/docs/guides/responses)
 - [Modelos Disponibles](https://platform.openai.com/docs/models)
 
 

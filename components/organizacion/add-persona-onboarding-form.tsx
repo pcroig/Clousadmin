@@ -213,7 +213,7 @@ export function AddPersonaOnboardingForm({ onSuccess, onCancel, tipoOnboarding =
             body: JSON.stringify({
               empleadoIds: [empleadoGeneradoId],
               nombreDocumento: undefined,
-              carpetaDestino: plantilla.carpetaDestinoDefault || undefined,
+              carpetaDestino: plantilla.carpetaDestinoDefault || 'Otros',
               notificarEmpleado: false,
               requiereFirma: plantilla.requiereFirma,
             }),
@@ -410,6 +410,9 @@ export function AddPersonaOnboardingForm({ onSuccess, onCancel, tipoOnboarding =
             formDataDoc.append('file', doc.file);
             formDataDoc.append('nombreDocumento', doc.nombre);
             formDataDoc.append('tipoDocumento', doc.tipoDocumento);
+            if (doc.carpetaId) {
+              formDataDoc.append('carpetaId', doc.carpetaId);
+            }
 
             const responseDoc = await fetch(`/api/empleados/${dataEmpleado.id}/onboarding/documentos`, {
               method: 'POST',
@@ -609,10 +612,9 @@ export function AddPersonaOnboardingForm({ onSuccess, onCancel, tipoOnboarding =
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="contrato">Contrato</SelectItem>
-                    <SelectItem value="dni">DNI/NIE</SelectItem>
                     <SelectItem value="nomina">Nómina</SelectItem>
-                    <SelectItem value="medico">Certificado Médico</SelectItem>
-                    <SelectItem value="otro">Otro</SelectItem>
+                    <SelectItem value="justificante">Justificante (ausencias / médicos)</SelectItem>
+                    <SelectItem value="otro">Otros documentos</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -635,6 +637,7 @@ export function AddPersonaOnboardingForm({ onSuccess, onCancel, tipoOnboarding =
                 empleadoId={empleadoId}
                 value={carpetaIdSeleccionada}
                 onChange={setCarpetaIdSeleccionada}
+                defaultNombre="Otros"
                 label="Carpeta de destino (opcional)"
                 placeholder="Seleccionar carpeta o crear automáticamente"
                 onNuevaCarpeta={async (nombre) => {
@@ -711,10 +714,9 @@ export function AddPersonaOnboardingForm({ onSuccess, onCancel, tipoOnboarding =
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="contrato">Contrato</SelectItem>
-                    <SelectItem value="dni">DNI/NIE</SelectItem>
                     <SelectItem value="nomina">Nómina</SelectItem>
-                    <SelectItem value="medico">Certificado Médico</SelectItem>
-                    <SelectItem value="otro">Otro</SelectItem>
+                    <SelectItem value="justificante">Justificante (ausencias / médicos)</SelectItem>
+                    <SelectItem value="otro">Otros documentos</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -736,6 +738,7 @@ export function AddPersonaOnboardingForm({ onSuccess, onCancel, tipoOnboarding =
               empleadoId={empleadoId}
               value={carpetaIdSeleccionada}
               onChange={setCarpetaIdSeleccionada}
+              defaultNombre="Otros"
               label="Carpeta de destino (opcional)"
               placeholder="Seleccionar carpeta o crear automáticamente"
               onNuevaCarpeta={async (nombre) => {

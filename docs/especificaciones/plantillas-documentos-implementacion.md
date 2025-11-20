@@ -1252,8 +1252,8 @@ export async function POST(
         const s3KeyDocumento = `documentos/${session.user.empresaId}/${empleadoId}/${Date.now()}_${nombreFinal}`;
         await uploadToS3(bufferDocumento, s3KeyDocumento, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
 
-        // 6. Buscar o crear carpeta destino
-        const carpetaNombre = configuracion.carpetaDestino || plantilla.carpetaDestinoDefault || 'Personales';
+        // 6. Buscar o crear carpeta destino (por defecto "Otros")
+        const carpetaNombre = configuracion.carpetaDestino || plantilla.carpetaDestinoDefault || 'Otros';
         let carpeta = await prisma.carpeta.findFirst({
           where: {
             empresaId: session.user.empresaId,
@@ -1280,7 +1280,8 @@ export async function POST(
             empleadoId: empleadoId,
             carpetaId: carpeta.id,
             nombre: nombreFinal,
-            tipoDocumento: plantilla.categoria,
+            // El tipo de documento se infiere automáticamente desde la carpeta
+            tipoDocumento: inferirTipoDocumento(carpetaNombre, plantilla.categoria),
             mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
             tamano: bufferDocumento.length,
             s3Key: s3KeyDocumento,
@@ -1632,7 +1633,7 @@ export async function seedPlantillasOficiales() {
         'empresa_cif',
         'fecha_actual',
       ],
-      carpetaDestinoDefault: 'Personales',
+      carpetaDestinoDefault: 'Otros', // Se mapea automáticamente a tipoDocumento: 'otro'
     },
     {
       nombre: 'Justificante de Vacaciones',
@@ -1666,7 +1667,7 @@ export async function seedPlantillasOficiales() {
         'empresa_nombre',
         'fecha_actual',
       ],
-      carpetaDestinoDefault: 'Personales',
+      carpetaDestinoDefault: 'Otros', // Se mapea automáticamente a tipoDocumento: 'otro'
     },
   ];
 

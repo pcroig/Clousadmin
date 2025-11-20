@@ -76,29 +76,6 @@ interface FichajeEventoParaEditar {
   editado?: boolean;
 }
 
-interface CorreccionDetallesPayload {
-  nuevaFecha?: string | null;
-  nuevaHora?: string | null;
-}
-
-interface SolicitudCorreccionPendiente {
-  id: string;
-  motivo: string;
-  estado: string;
-  detalles: CorreccionDetallesPayload;
-  empleado: {
-    id: string;
-    nombre: string;
-    apellidos: string;
-  };
-  fichaje: {
-    id: string;
-    fecha: string;
-    estado: string;
-  };
-  createdAt: string;
-}
-
 export function FichajesClient({ initialState }: { initialState?: string }) {
   const [jornadas, setJornadas] = useState<JornadaDia[]>([]);
   const [loading, setLoading] = useState(true);
@@ -120,8 +97,6 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
     open: false,
     fichaje: null,
   });
-  const [correccionesPendientes, setCorreccionesPendientes] = useState<SolicitudCorreccionPendiente[]>([]);
-  const [cargandoCorrecciones, setCargandoCorrecciones] = useState(false);
 
   const calcularHorasTrabajadas = useCallback((eventos: FichajeEvento[]): number => {
     let horasTotales = 0;
@@ -256,29 +231,9 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
     }
   }, [agruparPorJornada, fechaBase, rangoFechas, filtroEstadoFichaje]);
 
-  const fetchCorrecciones = useCallback(async () => {
-    setCargandoCorrecciones(true);
-    try {
-      const response = await fetch('/api/fichajes/correcciones?estado=pendiente');
-      if (!response.ok) {
-        return;
-      }
-      const data: SolicitudCorreccionPendiente[] = await response.json();
-      setCorreccionesPendientes(data);
-    } catch (error) {
-      console.error('Error fetching correcciones:', error);
-    } finally {
-      setCargandoCorrecciones(false);
-    }
-  }, []);
-
   useEffect(() => {
     fetchFichajes();
   }, [fetchFichajes]);
-
-  useEffect(() => {
-    fetchCorrecciones();
-  }, [fetchCorrecciones]);
 
   function calcularRangoFechas(fecha: Date, rango: 'dia' | 'semana' | 'mes') {
     const inicio = new Date(fecha);
@@ -405,41 +360,6 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
     }
   }
 
-  async function handleCorreccionAccion(id: string, accion: 'aprobar' | 'rechazar') {
-    let motivoRespuesta: string | undefined;
-    if (accion === 'rechazar') {
-      motivoRespuesta = window.prompt('Motivo del rechazo (opcional)') || undefined;
-    }
-
-    try {
-      const response = await fetch(`/api/fichajes/correcciones/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          accion,
-          motivoRespuesta,
-        }),
-      });
-
-      if (!response.ok) {
-        const error = await response.json().catch(() => null);
-        toast.error(error?.error ?? 'Error al procesar la corrección');
-        return;
-      }
-
-      toast.success(
-        accion === 'aprobar'
-          ? 'Corrección aplicada correctamente'
-          : 'Corrección rechazada'
-      );
-      fetchCorrecciones();
-      fetchFichajes();
-    } catch (error) {
-      console.error('[Correcciones] Error procesando acción:', error);
-      toast.error('Error al procesar la corrección');
-    }
-  }
-
   const handleAbrirCompensacion = () => {
     setPeriodoCompensar(obtenerPeriodoDesdeFecha(fechaBase));
     setShowCompensarHorasDialog(true);
@@ -519,78 +439,6 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
             + Cuadrar fichajes
           </Button>
         </div>
-      </div>
-
-      <div className="mb-6">
-        <Card className="p-4">
-          <div className="flex items-center justify-between mb-3 flex-wrap gap-3">
-            <div>
-              <h3 className="text-base font-semibold text-gray-900">
-                Solicitudes de corrección pendientes
-              </h3>
-              <p className="text-sm text-gray-500">
-                Revisa los cambios solicitados por los empleados antes de modificarlos.
-              </p>
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={fetchCorrecciones}
-              disabled={cargandoCorrecciones}
-            >
-              {cargandoCorrecciones ? 'Actualizando…' : 'Refrescar'}
-            </Button>
-          </div>
-
-          {cargandoCorrecciones && correccionesPendientes.length === 0 ? (
-            <p className="text-sm text-gray-500">Cargando solicitudes…</p>
-          ) : correccionesPendientes.length === 0 ? (
-            <p className="text-sm text-gray-500">No hay solicitudes pendientes.</p>
-          ) : (
-            <div className="space-y-3">
-              {correccionesPendientes.map((correccion) => (
-                <div
-                  key={correccion.id}
-                  className="flex flex-col sm:flex-row sm:items-center gap-3 border border-gray-200 rounded-lg p-3 bg-white"
-                >
-                  <div className="flex-1">
-                    <p className="text-sm font-semibold text-gray-900">
-                      {correccion.empleado.nombre} {correccion.empleado.apellidos}
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      {format(new Date(correccion.fichaje.fecha), 'dd MMM yyyy', { locale: es })}{' '}
-                      · {correccion.motivo}
-                    </p>
-                    <p className="text-xs text-gray-400 mt-1">
-                      {correccion.detalles.nuevaFecha
-                        ? `Nueva fecha: ${correccion.detalles.nuevaFecha}`
-                        : 'Fecha sin cambios'}
-                      {' • '}
-                      {correccion.detalles.nuevaHora
-                        ? `Nueva hora: ${format(new Date(correccion.detalles.nuevaHora), 'HH:mm')}`
-                        : 'Hora sin cambios'}
-                    </p>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleCorreccionAccion(correccion.id, 'rechazar')}
-                    >
-                      Rechazar
-                    </Button>
-                    <Button
-                      size="sm"
-                      onClick={() => handleCorreccionAccion(correccion.id, 'aprobar')}
-                    >
-                      Aprobar
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </Card>
       </div>
 
       {/* Filtros */}

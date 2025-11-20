@@ -3,6 +3,7 @@
 // ========================================
 
 import { NextRequest, NextResponse } from 'next/server';
+import { revalidatePath } from 'next/cache';
 import { getSession } from '@/lib/auth';
 import { prisma, Prisma } from '@/lib/prisma';
 import { writeFile, mkdir } from 'fs/promises';
@@ -18,6 +19,7 @@ import {
   generarNombreUnico,
   generarRutaStorage,
   puedeSubirACarpeta,
+  inferirTipoDocumento,
 } from '@/lib/documentos';
 
 // GET /api/documentos - Listar documentos
@@ -140,6 +142,8 @@ export async function POST(request: NextRequest) {
       empleadoId = carpeta.empleadoId;
     }
 
+    const tipoDocumentoFinal = inferirTipoDocumento(carpeta.nombre, tipoDocumento);
+
     // Validaciones del archivo
     const validacionNombre = validarNombreArchivo(file.name);
     if (!validacionNombre.valido) {
@@ -156,7 +160,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!validarTamanoArchivo(file.size, tipoDocumento)) {
+    if (!validarTamanoArchivo(file.size, tipoDocumentoFinal)) {
       return NextResponse.json(
         { error: 'Archivo demasiado grande para este tipo de documento' },
         { status: 400 }
@@ -209,7 +213,7 @@ export async function POST(request: NextRequest) {
         empleadoId,
         carpetaId,
         nombre: nombreUnico,
-        tipoDocumento: tipoDocumento || 'otro',
+        tipoDocumento: tipoDocumentoFinal,
         mimeType: file.type,
         tamano: file.size,
         s3Key: storageKey,
@@ -226,6 +230,9 @@ export async function POST(request: NextRequest) {
         },
       },
     });
+
+    // Revalidar la página de la carpeta para mostrar el nuevo documento
+    revalidatePath(`/hr/documentos/${carpetaId}`);
 
     return NextResponse.json({
       success: true,

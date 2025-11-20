@@ -43,15 +43,28 @@ function getS3Client(): S3Client | null {
     return null;
   }
 
+  const endpoint = process.env.STORAGE_ENDPOINT!.trim();
+  const region = process.env.STORAGE_REGION!.trim();
+
+  // Validar formato del endpoint
+  if (!endpoint.startsWith('http://') && !endpoint.startsWith('https://')) {
+    console.error('[Storage] STORAGE_ENDPOINT debe incluir el protocolo (https://)');
+    throw new Error('STORAGE_ENDPOINT debe incluir el protocolo (https://)');
+  }
+
+  // Normalizar endpoint (remover trailing slash)
+  const normalizedEndpoint = endpoint.replace(/\/$/, '');
+
   return new S3Client({
-    region: process.env.STORAGE_REGION!,
-    endpoint: process.env.STORAGE_ENDPOINT!,
+    region: region,
+    endpoint: normalizedEndpoint,
     credentials: {
-      accessKeyId: process.env.STORAGE_ACCESS_KEY!,
-      secretAccessKey: process.env.STORAGE_SECRET_KEY!,
+      accessKeyId: process.env.STORAGE_ACCESS_KEY!.trim(),
+      secretAccessKey: process.env.STORAGE_SECRET_KEY!.trim(),
     },
-    // Force path style for Hetzner compatibility
-    forcePathStyle: false,
+    // Force path style for Hetzner compatibility (required for custom endpoints)
+    // Hetzner Object Storage requiere path style: https://endpoint.com/bucket/key
+    forcePathStyle: true,
     // Retry configuration for production reliability
     maxAttempts: 3,
   });
@@ -173,10 +186,18 @@ export async function uploadToS3(
       })
     );
 
-    // Return the Object Storage URL (Hetzner format)
-    // Format: https://{bucket}.{endpoint}/{key}
-    const endpoint = process.env.STORAGE_ENDPOINT!.replace('https://', '');
-    return `https://${BUCKET_NAME}.${endpoint}/${key}`;
+    // Return the Object Storage URL (Hetzner format with path style)
+    // Format: https://{endpoint}/{bucket}/{key}
+    // IMPORTANTE: Con forcePathStyle: true, Hetzner requiere este formato
+    const endpoint = process.env.STORAGE_ENDPOINT!.trim().replace(/\/$/, ''); // Remove trailing slash if present
+    const url = `${endpoint}/${BUCKET_NAME}/${key}`;
+    
+    // Log para debugging (solo en desarrollo)
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`[Storage] Archivo subido: ${url}`);
+    }
+    
+    return url;
   } catch (error) {
     const errorMessage = getS3ErrorMessage(error);
     console.error('[Storage Upload Error]', errorMessage, error);

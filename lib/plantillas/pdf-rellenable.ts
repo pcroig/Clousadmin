@@ -4,8 +4,6 @@
  */
 
 import { PDFDocument, PDFForm, PDFTextField, PDFCheckBox, PDFDropdown } from 'pdf-lib';
-import OpenAI from 'openai';
-import { toFile } from 'openai/uploads';
 import { DatosEmpleado, ConfiguracionGeneracion, ResultadoGeneracion } from './tipos';
 import { resolverVariables } from './ia-resolver';
 import { descargarDocumento, subirDocumento } from '@/lib/s3';
@@ -16,10 +14,9 @@ import {
   crearNotificacionDocumentoPendienteRellenar,
   crearNotificacionFirmaPendiente,
 } from '@/lib/notificaciones';
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+import { callAIWithConfig } from '@/lib/ia';
+import { uploadPDFToOpenAI, deleteOpenAIFile } from '@/lib/ia/core/providers/openai';
+import type OpenAI from 'openai';
 
 /**
  * Extraer campos de formulario de un PDF
@@ -80,20 +77,16 @@ Responde SOLO en JSON:
 }`;
 
   try {
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [
-        {
-          role: 'system',
-          content: 'Eres un experto en mapeo de formularios. Respondes SOLO en JSON válido.',
-        },
-        { role: 'user', content: prompt },
-      ],
-      response_format: { type: 'json_object' },
-      temperature: 0,
-    });
+    const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
+      {
+        role: 'user',
+        content: prompt,
+      },
+    ];
 
-    const content = response.choices[0].message.content;
+    const completion = await callAIWithConfig('plantillas-mapear-campos-pdf', messages);
+
+    const content = completion.choices[0]?.message?.content;
     if (!content) {
       throw new Error('No se recibió respuesta de la IA');
     }
@@ -165,6 +158,7 @@ export async function escanearPDFConVision(
 ): Promise<Array<{ nombre: string; tipo: string; confianza: number; descripcion?: string }>> {
   console.log(`[PDF-Vision] Escaneando PDF con Vision: ${s3Key}`);
 
+  let openaiFileId: string | null = null;
   try {
     const pdfBuffer = await descargarDocumento(s3Key);
     const pdfDoc = await PDFDocument.load(pdfBuffer);
@@ -172,11 +166,7 @@ export async function escanearPDFConVision(
 
     console.log(`[PDF-Vision] PDF tiene ${pageCount} páginas`);
 
-    // Obtener primera página para análisis
-    // En una implementación completa, convertirías el PDF a imagen con pdf2pic
-    // Por ahora, usamos una aproximación que analiza la estructura del PDF
-
-    const prompt = `Analiza el PDF adjunto y detecta todos los campos que parecen ser rellenables.
+    const promptBase = `Analiza el PDF adjunto y detecta todos los campos que parecen ser rellenables.
 
 Por cada campo detectado, determina:
 1. Nombre del campo (inferido del texto cercano o etiqueta)
@@ -211,50 +201,25 @@ Responde SOLO en JSON con este formato:
     }
   ]
 }`;
+    const prompt = `${promptBase}
 
-    const pdfFile = await toFile(pdfBuffer, 'plantilla.pdf', { type: 'application/pdf' });
-    const uploadedFile = await openai.files.create({
-      file: pdfFile,
-      purpose: 'vision',
-    });
+NOTA: Este PDF tiene ${pageCount} páginas. Analiza especialmente la primera página para encontrar campos comunes de formularios.`;
 
-    const response = await openai.responses.create({
-      model: 'gpt-4o-mini',
-      input: [
-        {
-          role: 'user',
-          content: [
-            {
-              type: 'input_text',
-              text:
-                prompt +
-                '\n\nNOTA: Este PDF tiene ' +
-                pageCount +
-                ' páginas. Analiza especialmente la primera página para encontrar campos comunes de formularios.',
-            },
-            {
-              type: 'input_file',
-              file_id: uploadedFile.id,
-            },
-          ],
-        },
-      ],
-      response_format: { type: 'json_object' },
-      temperature: 0,
-    });
+    openaiFileId = await uploadPDFToOpenAI(pdfBuffer, 'plantilla.pdf');
 
-    // Limpiar archivo subido lo antes posible
-    try {
-      await openai.files.del(uploadedFile.id);
-    } catch (cleanupError) {
-      console.warn('[PDF-Vision] No se pudo eliminar archivo temporal en OpenAI:', cleanupError);
-    }
+    const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
+      {
+        role: 'user',
+        content: [
+          { type: 'text', text: prompt },
+          { type: 'image_url', image_url: { url: openaiFileId, detail: 'high' } },
+        ],
+      },
+    ];
 
-    const outputContent = (response.output?.flatMap((item: any) => item.content ?? []) ?? []).find(
-      (contentItem: any) => contentItem.type === 'output_text'
-    );
+    const completion = await callAIWithConfig('plantillas-escanear-pdf', messages);
 
-    const content = outputContent?.text;
+    const content = completion.choices[0]?.message?.content;
     if (!content) {
       throw new Error('La IA no devolvió contenido interpretable');
     }
@@ -268,6 +233,12 @@ Responde SOLO en JSON con este formato:
   } catch (error) {
     console.error('[PDF-Vision] Error al escanear PDF:', error);
     return [];
+  } finally {
+    if (openaiFileId) {
+      deleteOpenAIFile(openaiFileId).catch((cleanupError) => {
+        console.warn('[PDF-Vision] No se pudo eliminar archivo temporal en OpenAI:', cleanupError);
+      });
+    }
   }
 }
 
@@ -464,7 +435,8 @@ export async function generarDocumentoDesdePDFRellenable(
     const pdfRellenado = await rellenarPDFFormulario(plantillaBuffer, valoresCampos);
 
     // 9. Subir PDF rellenado a S3
-    const carpetaDestino = configuracion.carpetaDestino || plantilla.carpetaDestinoDefault || 'Personales';
+    const carpetaDestino =
+      configuracion.carpetaDestino || plantilla.carpetaDestinoDefault || 'Otros';
     const nombreDocumento = sanitizarNombreArchivo(`${plantilla.nombre}_${empleado.apellidos}.pdf`);
     const s3Key = `documentos/${empleado.empresaId}/${empleadoId}/${carpetaDestino}/${nombreDocumento}`;
 
@@ -504,7 +476,7 @@ export async function generarDocumentoDesdePDFRellenable(
         mimeType: 'application/pdf',
         tamano: pdfRellenado.length,
         s3Key,
-        s3Bucket: process.env.AWS_S3_BUCKET || 'clousadmin-documents',
+        s3Bucket: process.env.STORAGE_BUCKET || 'clousadmin-documents',
         requiereFirma: configuracion.requiereFirma || plantilla.requiereFirma,
       },
     });

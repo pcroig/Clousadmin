@@ -131,7 +131,9 @@ export async function POST(request: NextRequest) {
     const nombre = formData.get('nombre') as string;
     const descripcion = formData.get('descripcion') as string | null;
     const categoria = (formData.get('categoria') as string) || 'general'; // Default a 'general'
-    const carpetaDestinoDefault = formData.get('carpetaDestinoDefault') as string | null;
+    const carpetaDestinoDefaultInput = formData.get('carpetaDestinoDefault') as string | null;
+    const carpetaDestinoDefault =
+      (carpetaDestinoDefaultInput?.toString().trim() || 'Otros');
     const requiereContrato = formData.get('requiereContrato') === 'true';
     const requiereFirma = formData.get('requiereFirma') === 'true';
     const autoGenerarOnboarding = formData.get('autoGenerarOnboarding') === 'true';
@@ -191,7 +193,7 @@ export async function POST(request: NextRequest) {
         tipo: 'personalizada',
         formato,
         s3Key,
-        s3Bucket: process.env.AWS_S3_BUCKET || 'clousadmin-documents',
+        s3Bucket: process.env.STORAGE_BUCKET || 'clousadmin-documents',
         variablesUsadas: variablesUsadas as Prisma.InputJsonValue,
         carpetaDestinoDefault,
         requiereContrato,

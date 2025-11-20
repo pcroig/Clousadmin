@@ -159,13 +159,6 @@ export function CalendarioFestivos({ onUpdate }: CalendarioFestivosProps) {
         )}
       </div>
 
-      <div className="flex gap-4 text-sm">
-        <div className="flex items-center gap-2">
-          <div className="w-4 h-4 bg-red-100 border border-red-200 rounded"></div>
-          <span className="text-gray-600">Festivo activo</span>
-        </div>
-      </div>
-
       <EditarFestivoModal
         open={modalCrear}
         festivo={

@@ -22,7 +22,7 @@ lib/ia/
 │   ├── client.ts                   # Cliente con fallback automático
 │   ├── config.ts                   # Configuración de modelos
 │   └── providers/                  # Proveedores específicos
-│       ├── openai.ts              # Wrapper de OpenAI SDK
+│       ├── openai.ts              # Wrapper de OpenAI SDK (Responses API + fallback)
 │       ├── anthropic.ts           # Wrapper de Anthropic SDK
 │       └── google.ts              # Wrapper de Google AI SDK
 │
@@ -32,13 +32,13 @@ lib/ia/
 │   ├── vision.ts                  # Análisis de documentos/imágenes
 │   └── generation.ts              # Generación de texto
 │
-├── features/                       # Funcionalidades específicas (migradas)
-│   ├── clasificador-nominas.ts    # Usa Classification Pattern
-│   └── ...                         # Otras funcionalidades
+├── clasificador-nominas.ts         # Matching de nóminas (usa Classification Pattern)
+├── procesar-excel-empleados.ts    # Mapeo de Excel a empleados
+├── cuadrar-vacaciones.ts          # Optimización de vacaciones
+├── clasificador-solicitudes.ts    # Clasificación de solicitudes
 │
 ├── index.ts                        # Punto de entrada centralizado
-├── client.ts                       # DEPRECATED - re-exports para compatibilidad
-└── models.ts                       # DEPRECATED - migrado a core/config.ts
+└── models.ts                       # Configuraciones legacy (compatibilidad)
 ```
 
 ## Core - Sistema Base
@@ -285,14 +285,54 @@ const result = await classify(
 
 ### OpenAI (Recomendado)
 
-- **Modelos**: GPT-4o, GPT-4o-mini
-- **Fortalezas**: Mejor calidad, visión excelente
+- **Modelos**: GPT-5.1, GPT-5.1-mini, GPT-4o, GPT-4o-mini
+- **Fortalezas**: Mejor calidad, visión excelente, Responses API con logging mejorado
 - **Costo**: Medio-alto ($0.15-15 por 1M tokens)
+- **API**: Usa Responses API por defecto (con fallback a Chat Completions)
 
 ```typescript
 // No requiere configuración especial, es el proveedor por defecto
 const config = createConfigForUseCase(AIUseCase.VISION, AIProvider.OPENAI);
 ```
+
+#### OpenAI Responses API
+
+El sistema usa **OpenAI Responses API** por defecto para todas las llamadas, con fallback automático a Chat Completions si es necesario.
+
+**Ventajas de Responses API:**
+- ✅ **Logging mejorado**: Todas las llamadas aparecen en el dashboard de Responses
+- ✅ **Trazabilidad**: Cada respuesta tiene un ID único (`resp_xxx`)
+- ✅ **Structured Outputs nativos**: JSON garantizado sin ajustes en prompts
+- ✅ **Compatibilidad total**: Fallback automático garantiza continuidad
+
+**Flujo de integración:**
+```
+Usuario ejecuta funcionalidad IA
+         ↓
+callAIWithConfig('feature-name', messages)  [models.ts]
+         ↓
+callAI(messages, config, options)  [core/client.ts]
+         ↓
+callOpenAI(messages, config, options)  [core/providers/openai.ts]
+         ↓
+   ¿SDK expone responses.create()?
+         ↓
+    SÍ → client.responses.create()  ✅ LOGS EN DASHBOARD
+         ↓
+    NO → client.chat.completions.create()  (fallback)
+```
+
+**Verificación:**
+- Buscar en logs: `[OpenAI Provider] Intentando Responses API (modelo gpt-5.1)`
+- Dashboard: https://platform.openai.com/logs?api=responses
+
+**Configuración de modelos:**
+Todas las funcionalidades están configuradas con modelos que soportan Responses API:
+- `procesar-excel-empleados`: `gpt-5.1` ✅
+- `cuadrar-vacaciones`: `gpt-5.1` ✅
+- `clasificador-nominas`: `gpt-5.1-mini` ✅
+- `extraer-documentos`: `gpt-5.1` ✅
+- `analisis-sentimientos`: `gpt-5.1-mini` ✅
 
 ### Anthropic (Claude)
 
@@ -470,6 +510,9 @@ const result = await extractStructuredData(
 - Patrones reutilizables
 - Migración de extracción de documentos
 - Migración de clasificador de nóminas
+- **OpenAI Responses API integrada** (con fallback automático)
+- **Modelos actualizados a GPT-5.1/GPT-5.1-mini**
+- **Centralización completa de funcionalidades IA**
 
 ### 🚧 Pendiente
 
@@ -487,6 +530,8 @@ const result = await extractStructuredData(
 - [OpenAI Platform](https://platform.openai.com/)
 - [Anthropic Console](https://console.anthropic.com/)
 - [Google AI Studio](https://makersuite.google.com/)
+
+
 
 
 

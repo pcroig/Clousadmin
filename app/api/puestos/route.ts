@@ -44,13 +44,35 @@ export async function GET(request: NextRequest) {
             fotoUrl: true,
           },
         },
+        documentos: {
+          select: {
+            id: true,
+            nombre: true,
+            tipoDocumento: true,
+            mimeType: true,
+            tamano: true,
+            createdAt: true,
+          },
+          orderBy: {
+            createdAt: 'desc',
+          },
+        },
       },
       orderBy: {
         nombre: 'asc',
       },
     });
 
-    return NextResponse.json(puestos);
+    const response = puestos.map((puesto) => ({
+      ...puesto,
+      documentos: puesto.documentos.map((doc) => ({
+        ...doc,
+        createdAt: doc.createdAt.toISOString(),
+        downloadUrl: `/api/documentos/${doc.id}?inline=1`,
+      })),
+    }));
+
+    return NextResponse.json(response);
   } catch (error) {
     console.error('Error loading puestos:', error);
     return NextResponse.json(

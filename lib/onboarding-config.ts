@@ -34,9 +34,11 @@ export interface CamposRequeridos {
 export interface DocumentoRequerido {
   id: string;
   nombre: string;
+  descripcion?: string;
   requerido: boolean;
   requiereVisualizacion: boolean;
   requiereFirma: boolean;
+  carpetaDestino?: string | null;
 }
 
 /**
