@@ -145,6 +145,7 @@ export function calcularMinutosEntre(inicio: Date, fin: Date): number {
 
 /**
  * Calcula la diferencia en días entre dos fechas
+ * IMPORTANTE: Normaliza las fechas a medianoche para contar días naturales correctamente
  * @param inicio - Fecha de inicio
  * @param fin - Fecha de fin
  * @param incluirAmbos - Si true, incluye tanto el día de inicio como el de fin en el conteo
@@ -154,14 +155,24 @@ export function calcularMinutosEntre(inicio: Date, fin: Date): number {
  * const fin = new Date('2025-01-25');
  * calcularDiasEntre(inicio, fin, false) // 5
  * calcularDiasEntre(inicio, fin, true)  // 6 (incluye ambos días)
+ *
+ * // Con horas (se normalizan automáticamente):
+ * const inicio2 = new Date('2025-01-20T08:00');
+ * const fin2 = new Date('2025-01-20T17:00');
+ * calcularDiasEntre(inicio2, fin2, true) // 1 (mismo día)
  */
 export function calcularDiasEntre(
   inicio: Date,
   fin: Date,
   incluirAmbos: boolean = true
 ): number {
-  const ms = Math.abs(fin.getTime() - inicio.getTime());
-  const dias = Math.ceil(ms / (1000 * 60 * 60 * 24));
+  // Normalizar a medianoche para contar días naturales correctamente
+  const inicioNormalizado = obtenerFechaBase(inicio);
+  const finNormalizado = obtenerFechaBase(fin);
+
+  const ms = Math.abs(finNormalizado.getTime() - inicioNormalizado.getTime());
+  const dias = Math.floor(ms / (1000 * 60 * 60 * 24));
+
   return incluirAmbos ? dias + 1 : dias;
 }
 
@@ -292,24 +303,26 @@ export function esFechaValida(fecha: Date): boolean {
 /**
  * Verifica si una fecha está en el pasado
  * @param fecha - Fecha a verificar
- * @returns true si la fecha es anterior a ahora
+ * @returns true si la fecha es anterior a ahora, false si es inválida o futura
  * @example
  * esFechaPasada(new Date('2024-01-01')) // true
  * esFechaPasada(new Date('2026-01-01')) // false
  */
-export function esFechaPasada(fecha: Date): boolean {
+export function esFechaPasada(fecha: Date | null | undefined): boolean {
+  if (!fecha || !esFechaValida(fecha)) return false;
   return fecha < new Date();
 }
 
 /**
  * Verifica si una fecha está en el futuro
  * @param fecha - Fecha a verificar
- * @returns true si la fecha es posterior a ahora
+ * @returns true si la fecha es posterior a ahora, false si es inválida o pasada
  * @example
  * esFechaFutura(new Date('2026-01-01')) // true
  * esFechaFutura(new Date('2024-01-01')) // false
  */
-export function esFechaFutura(fecha: Date): boolean {
+export function esFechaFutura(fecha: Date | null | undefined): boolean {
+  if (!fecha || !esFechaValida(fecha)) return false;
   return fecha > new Date();
 }
 
@@ -317,12 +330,19 @@ export function esFechaFutura(fecha: Date): boolean {
  * Verifica si dos fechas son el mismo día (ignorando hora)
  * @param fecha1 - Primera fecha
  * @param fecha2 - Segunda fecha
- * @returns true si son el mismo día
+ * @returns true si son el mismo día, false si alguna es inválida
  * @example
  * esMismoDia(new Date('2025-01-20T08:00'), new Date('2025-01-20T17:00')) // true
  * esMismoDia(new Date('2025-01-20'), new Date('2025-01-21')) // false
  */
-export function esMismoDia(fecha1: Date, fecha2: Date): boolean {
+export function esMismoDia(
+  fecha1: Date | null | undefined,
+  fecha2: Date | null | undefined
+): boolean {
+  if (!fecha1 || !fecha2 || !esFechaValida(fecha1) || !esFechaValida(fecha2)) {
+    return false;
+  }
+
   return (
     fecha1.getFullYear() === fecha2.getFullYear() &&
     fecha1.getMonth() === fecha2.getMonth() &&

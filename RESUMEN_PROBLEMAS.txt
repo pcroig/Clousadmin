@@ -1,0 +1,146 @@
+═══════════════════════════════════════════════════════════════════════════════
+  RESUMEN EJECUTIVO - VERIFICACIÓN lib/utils/fechas.ts
+═══════════════════════════════════════════════════════════════════════════════
+
+CRÍTICO: 1 | IMPORTANTE: 3 | ADVERTENCIA: 5 | OK: 15
+
+═══════════════════════════════════════════════════════════════════════════════
+  🔴 CRÍTICO (Debe repararse inmediatamente)
+═══════════════════════════════════════════════════════════════════════════════
+
+[C1] Array duplicado 'miercoles' → martes se ignora
+   Archivo: /home/user/Clousadmin/app/api/fichajes/revision/route.ts
+   Línea: 221
+   Problema: ['domingo', 'lunes', 'miercoles','miercoles','jueves','viernes','sabado']
+             Índice 2 devuelve 'miercoles' en lugar de 'martes'
+   Impacto: Los fichajes de martes se procesan con config de miércoles
+   Fix: Reemplazar por ['domingo','lunes','martes','miercoles','jueves','viernes','sabado']
+
+═══════════════════════════════════════════════════════════════════════════════
+  ⚠️ IMPORTANTE (Mejoras antes de producción)
+═══════════════════════════════════════════════════════════════════════════════
+
+[I1] Función calcularDiasEntre produce off-by-one con horas
+   Archivo: /home/user/Clousadmin/lib/utils/fechas.ts
+   Línea: 158-166
+   Problema: Math.ceil(5.166) + 1 = 7 días (debería ser 6)
+   Causa: No normaliza fechas antes de calcular
+   Solución: Normalizar ambas fechas a inicio de día primero
+   Fix recomendado:
+     const inicioNormalizado = normalizarFecha(inicio);
+     const finNormalizado = normalizarFecha(fin);
+     const ms = Math.abs(finNormalizado.getTime() - inicioNormalizado.getTime());
+     const dias = Math.floor(ms / (1000 * 60 * 60 * 24));
+     return incluirAmbos ? dias + 1 : dias;
+
+[I2] Funciones de validación sin check de null/undefined
+   Archivo: /home/user/Clousadmin/lib/utils/fechas.ts
+   Línea: 300-314
+   Funciones: esFechaPasada(), esFechaFutura(), esMismoDia()
+   Problema: Lanzan error si reciben null en lugar de retornar false
+   Solución: Añadir validación inicial
+   Ejemplo:
+     export function esFechaPasada(fecha: Date | null | undefined): boolean {
+       if (!fecha || !(fecha instanceof Date)) return false;
+       return fecha < new Date();
+     }
+
+[I3] Duplicación de función formatearFechaRelativa
+   Archivos: 
+     - /home/user/Clousadmin/lib/utils/fechas.ts (línea 243-262)
+     - /home/user/Clousadmin/lib/utils/formatters.ts (línea 238-257)
+   Problema: Dos implementaciones idénticas
+   Solución: Usar solo la de fechas.ts, deprecar la de formatters.ts
+
+═══════════════════════════════════════════════════════════════════════════════
+  📋 CONFLICTOS (Inconsistencias con código existente)
+═══════════════════════════════════════════════════════════════════════════════
+
+[CF1] Formato de fecha largo usa 'd' vs 'dd'
+   Helper nuevo: "1 de enero de 2025" (sin padding)
+   Plantillas existentes: "01 de enero de 2025" (con padding)
+   Ubicación: /home/user/Clousadmin/lib/plantillas/sanitizar.ts:48 vs fechas.ts:195
+   Recomendación: Unificar usando 'd' (más natural en español)
+
+[CF2] Duplicación de normalizarFecha en tres lugares
+   - /home/user/Clousadmin/lib/utils/fechas.ts:94 (nuevo)
+   - /home/user/Clousadmin/lib/calculos/plantilla.ts:25 (existente)
+   - /home/user/Clousadmin/lib/utils/fichajesHistorial.ts:117 (existente, diferente)
+   Solución: Centralizar en fechas.ts
+
+[CF3] DIAS_SEMANA sin tildes ('miercoles', 'sabado')
+   Causa: Compatibilidad con código existente (18 archivos usan mismo formato)
+   Decisión: MANTENER sin cambios para compatibilidad
+
+═══════════════════════════════════════════════════════════════════════════════
+  ⚠️ ADVERTENCIAS (Comportamiento a documentar)
+═══════════════════════════════════════════════════════════════════════════════
+
+[A1] Funciones operan en timezone LOCAL, no UTC
+   Afectadas: obtenerNombreDia, normalizarFecha, obtenerFechaBase, esMismoDia
+   Riesgo: Si se usan con fechas UTC, pueden cambiar de día
+   Documentación: Añadir nota en JSDoc sobre timezone local
+
+[A2] DIAS_SEMANA: domingo = 0 (compatibilidad con getDay())
+   Verificación: ✅ Correcto - coincide con JavaScript getDay()
+   Orden correcto: domingo(0), lunes(1), martes(2), miércoles(3), etc.
+
+[A3] date-fns ya está en el proyecto
+   Verificación: ✅ Compatible - mismo package, mismos imports
+   Versión: (verificar en package.json)
+
+[A4] Verificación de fechas válidas funciona correctamente
+   Función: esFechaValida()
+   Verificación: ✅ Implementada correctamente con instanceof y isNaN()
+
+[A5] Cálculo de diferencias en horas y minutos es correcto
+   Funciones: calcularHorasEntre(), calcularMinutosEntre()
+   Fórmula: (fin - inicio) / (1000 * 60 * 60) o (1000 * 60)
+   Verificación: ✅ Coincide con usos existentes
+
+═══════════════════════════════════════════════════════════════════════════════
+  ✅ VERIFICACIONES PASADAS
+═══════════════════════════════════════════════════════════════════════════════
+
+[V1] orden de DIAS_SEMANA coincide con getDay()
+   - getDay() devuelve 0-6 donde 0 = domingo ✅
+   - DIAS_SEMANA está en el mismo orden ✅
+   - 18 archivos usan la función obtenerNombreDia correctamente ✅
+
+[V2] Formateo date-fns compatible
+   - format() disponible ✅
+   - locale 'es' disponible ✅
+   - Patterns correctos ✅
+
+[V3] Funciones de manipulación (agregarDias, agregarMeses, etc.)
+   - agregarDias: ✅ Correcto
+   - agregarMeses: ✅ Correcto
+   - obtenerPrimerDiaMes: ✅ Correcto
+   - obtenerUltimoDiaMes: ✅ Correcto
+
+[V4] Edge cases base
+   - Fechas sin horas: ✅ Funcionan
+   - Fechas con horas: ✅ Funcionan
+   - Mismo día: ✅ Funciona
+   - Años bisiestos: ✅ Manejados por Date nativo
+
+═══════════════════════════════════════════════════════════════════════════════
+  PLAN DE ACCIÓN RECOMENDADO
+═══════════════════════════════════════════════════════════════════════════════
+
+INMEDIATO (Hoy):
+  [ ] Reparar array 'miercoles' duplicado en revision/route.ts:221
+      git commit -m "fix: corregir array de días con martes duplicado"
+
+ANTES DE USAR HELPERS (Esta semana):
+  [ ] Mejorar calcularDiasEntre con normalización
+  [ ] Añadir validación null/undefined a funciones de validación
+  [ ] Consolidar normalizarFecha en un solo lugar
+  [ ] Escribir tests unitarios para edge cases
+
+OPCIONAL (Próximas semanas):
+  [ ] Unificar formato de fecha largo (d vs dd)
+  [ ] Documentar timezone local en JSDoc
+  [ ] Crear helper para UTC si es necesario
+
+═══════════════════════════════════════════════════════════════════════════════

@@ -137,15 +137,28 @@ export function formatearPorcentaje(
 /**
  * Formatea horas en formato HH:MM
  * @param horas - Número de horas (puede tener decimales)
- * @returns Horas formateadas como "HH:MM"
+ * @returns Horas formateadas como "HH:MM", o "00:00" si el valor no es válido
  * @example
- * formatearHoras(8.5) // '08:30'
- * formatearHoras(1.75) // '01:45'
- * formatearHoras(0.25) // '00:15'
+ * formatearHorasComoTiempo(8.5) // '08:30'
+ * formatearHorasComoTiempo(1.75) // '01:45'
+ * formatearHorasComoTiempo(0.25) // '00:15'
+ * formatearHorasComoTiempo(-2.5) // '-02:30'
+ * formatearHorasComoTiempo(NaN) // '00:00'
  */
 export function formatearHorasComoTiempo(horas: number): string {
+  // Validar entrada
+  if (!Number.isFinite(horas)) {
+    return '00:00';
+  }
+
   const horasEnteras = Math.floor(Math.abs(horas));
-  const minutos = Math.round((Math.abs(horas) % 1) * 60);
+  let minutos = Math.round((Math.abs(horas) % 1) * 60);
+
+  // Edge case: redondeo puede dar 60 minutos
+  if (minutos >= 60) {
+    minutos = 59;
+  }
+
   const signo = horas < 0 ? '-' : '';
 
   return `${signo}${String(horasEnteras).padStart(2, '0')}:${String(minutos).padStart(2, '0')}`;

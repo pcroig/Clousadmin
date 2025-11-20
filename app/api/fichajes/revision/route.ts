@@ -217,10 +217,8 @@ export async function POST(request: NextRequest) {
             return d;
           };
 
-          // Mapear nombre de día
-          const diasSemana = ['domingo', 'lunes', 'miercoles','miercoles','jueves','viernes','sabado'];
-          // Nota: above array seems wrong: fix mapping properly
-          const dias = ['domingo','lunes','martes','miercoles','jueves','viernes','sabado'];
+          // Mapear nombre de día (domingo = 0, lunes = 1, ..., sabado = 6)
+          const dias = ['domingo', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado'];
           const nombreDia = dias[fechaDia.getDay()];
 
           let eventosAcrear: { tipo: 'entrada'|'pausa_inicio'|'pausa_fin'|'salida'; hora: Date }[] = [];

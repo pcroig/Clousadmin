@@ -1,0 +1,46 @@
+MATRIZ DE VERIFICACIÓN RESUMIDA POR FUNCIÓN
+═══════════════════════════════════════════════════════════════════════════════
+
+✅ FUNCIONES CORRECTAS (Sin riesgos) - 14 funciones:
+  1. obtenerNombreDia()          → Correcto, usado en 18 archivos
+  2. obtenerNombreMes()          → Correcto con validación
+  3. normalizarFecha()           → Correcto pero con duplicación
+  4. obtenerFechaBase()          → Correcto pero con duplicación
+  5. calcularHorasEntre()        → Fórmula idéntica a código existente
+  6. calcularMinutosEntre()      → Fórmula correcta
+  7. formatearFechaCorta()       → dd/MM/yyyy (coincide con plantillas)
+  8. formatearFechaHora()        → Nueva función, formato correcto
+  9. formatearHora()             → Nueva función, HH:mm correcto
+ 10. formatearMesAnio()          → Usa obtenerNombreMes correctamente
+ 11. esFechaValida()             → Validación correcta
+ 12. agregarDias()               → setDate() maneja overflow
+ 13. agregarMeses()              → setMonth() estándar
+ 14. obtenerPrimerDiaMes()       → Primer día del mes correcto
+ 15. obtenerUltimoDiaMes()       → Último día del mes correcto
+
+⚠️ FUNCIONES CON ADVERTENCIAS - 4 funciones:
+  1. formatearFechaLarga()       → d vs dd con plantillas (inconsistencia menor)
+  2. formatearFechaRelativa()    → Duplicada en formatters.ts (lógica idéntica)
+  3. normalizarFecha()           → Existe en 3 lugares (consolidar)
+  4. obtenerFechaBase()          → Existe en 2 lugares (consolidar)
+
+❌ FUNCIONES CON PROBLEMAS - 4 funciones:
+  1. calcularDiasEntre()         → Off-by-one con horas (no normaliza)
+  2. esFechaPasada()             → Sin validación null/undefined
+  3. esFechaFutura()             → Sin validación null/undefined
+  4. esMismoDia()                → Sin validación null/undefined
+
+═══════════════════════════════════════════════════════════════════════════════
+
+ESTADÍSTICAS:
+  Funciones correctas sin riesgos:    15 (60%)
+  Funciones con advertencias:          4 (16%)
+  Funciones con problemas corregibles: 4 (16%)
+  Funciones con bugs críticos:         1 en código externo (4%)
+
+ORDEN DE PRIORIDAD:
+  INMEDIATO:  Fijar bug en revision/route.ts:221
+  IMPORTANTE: Mejorar calcularDiasEntre, validación null
+  OPCIONAL:   Consolidar funciones duplicadas
+
+═══════════════════════════════════════════════════════════════════════════════
