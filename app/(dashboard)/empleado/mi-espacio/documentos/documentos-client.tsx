@@ -1,7 +1,8 @@
 'use client';
 
-import type { MiEspacioEmpleado } from '@/types/empleado';
 import { DocumentosTab } from '@/components/shared/mi-espacio/documentos-tab';
+
+import type { MiEspacioEmpleado } from '@/types/empleado';
 
 interface MiEspacioDocumentosClientProps {
   empleado: MiEspacioEmpleado;

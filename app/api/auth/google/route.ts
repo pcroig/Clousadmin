@@ -1,59 +1,34 @@
 /**
- * Google OAuth - Iniciar flujo de autenticación
- * GET /api/auth/google
+ * Google OAuth entrypoint
+ * Redirects to NextAuth sign-in handler to centralize OAuth logic
  */
 
-import { NextRequest, NextResponse } from "next/server";
-import { createOAuthProvider } from "@/lib/oauth/providers";
-import {
-  getGoogleOAuthConfig,
-  GOOGLE_LOGIN_SCOPES,
-  isGoogleOAuthConfigured,
-} from "@/lib/oauth/config";
-import { randomBytes } from "crypto";
+import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(req: NextRequest) {
   try {
-    // Verificar que Google OAuth esté configurado
-    if (!isGoogleOAuthConfigured()) {
+    if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
       return NextResponse.json(
         {
           error:
-            "Google OAuth not configured. Please set up GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET.",
+            'Google OAuth not configured. Please set up GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET.',
         },
         { status: 500 }
       );
     }
 
-    // Generar state para CSRF protection
-    const state = randomBytes(32).toString("hex");
+    const nextAuthUrl = new URL('/api/auth/signin/google', req.url);
 
-    // Crear proveedor de Google OAuth
-    const config = getGoogleOAuthConfig();
-    const googleProvider = createOAuthProvider("google", config);
+    const callbackUrl = req.nextUrl.searchParams.get('callbackUrl');
+    if (callbackUrl) {
+      nextAuthUrl.searchParams.set('callbackUrl', callbackUrl);
+    }
 
-    // Generar URL de autorización
-    const authUrl = googleProvider.getAuthorizationUrl(
-      state,
-      GOOGLE_LOGIN_SCOPES
-    );
-
-    // Guardar state en cookie para verificación posterior
-    const response = NextResponse.redirect(authUrl);
-    response.cookies.set("oauth_state", state, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      maxAge: 600, // 10 minutos
-      path: "/",
-    });
-
-    return response;
+    return NextResponse.redirect(nextAuthUrl);
   } catch (error) {
-    console.error("Error iniciando Google OAuth:", error);
-
+    console.error('[Google OAuth] Error redirecting to NextAuth:', error);
     return NextResponse.json(
-      { error: "Failed to initiate Google OAuth" },
+      { error: 'Failed to initiate Google OAuth' },
       { status: 500 }
     );
   }

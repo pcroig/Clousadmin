@@ -59,12 +59,13 @@ export async function GET(
     }
 
     return NextResponse.json({ solicitud: estado });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[GET /api/firma/solicitudes/:id] Error:', error);
 
     // Manejar error de solicitud no encontrada
-    if (error.message.includes('no encontrada')) {
-      return NextResponse.json({ error: error.message }, { status: 404 });
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    if (errorMessage.includes('no encontrada')) {
+      return NextResponse.json({ error: errorMessage }, { status: 404 });
     }
 
     return NextResponse.json(

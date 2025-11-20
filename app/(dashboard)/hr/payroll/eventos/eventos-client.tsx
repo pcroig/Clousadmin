@@ -1,20 +1,21 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
 import {
-  Calendar,
-  Download,
-  Upload,
-  Send,
+  AlertCircle,
   ArrowLeft,
+  Calendar,
   CheckCircle,
   Clock,
-  AlertCircle,
+  Download,
+  Send,
+  Upload,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
+
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 
 interface EventoNomina {
   id: string;

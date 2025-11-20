@@ -2,12 +2,14 @@
 // HR Puestos Page - Job Positions Management
 // ========================================
 
-import { getSession } from '@/lib/auth';
 import { redirect } from 'next/navigation';
+
+import { getSession } from '@/lib/auth';
+import { UsuarioRol } from '@/lib/constants/enums';
 import { prisma } from '@/lib/prisma';
+
 import { PuestosClient } from './puestos-client';
 
-import { UsuarioRol } from '@/lib/constants/enums';
 
 export default async function PuestosPage() {
   const session = await getSession();

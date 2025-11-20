@@ -4,17 +4,20 @@
 // Signup Form Component - Multi-Step with Onboarding
 // ========================================
 
-import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useState } from 'react';
+
+import { ImportarEmpleados } from '@/components/onboarding/importar-empleados';
+import { IntegracionesForm } from '@/components/onboarding/integraciones-form';
+import { InvitarHRAdmins } from '@/components/onboarding/invitar-hr-admins';
+import { SedesForm } from '@/components/onboarding/sedes-form';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+
 import { signupEmpresaAction } from './actions';
-import { SedesForm } from '@/components/onboarding/sedes-form';
-import { ImportarEmpleados } from '@/components/onboarding/importar-empleados';
-import { IntegracionesForm } from '@/components/onboarding/integraciones-form';
-import { InvitarHRAdmins } from '@/components/onboarding/invitar-hr-admins';
+
 
 interface SignupFormProps {
   token: string;

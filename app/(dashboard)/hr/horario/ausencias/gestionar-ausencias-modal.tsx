@@ -1,15 +1,23 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import { toast } from 'sonner';
+
+import { CalendarioFestivos } from '@/components/hr/calendario-festivos';
+import { ListaFestivos } from '@/components/hr/lista-festivos';
+import { InfoTooltip } from '@/components/shared/info-tooltip';
+import { LoadingButton } from '@/components/shared/loading-button';
+import { Button } from '@/components/ui/button';
+import { Calendar } from '@/components/ui/calendar';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Dialog,
   DialogContent,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogFooter,
 } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { LoadingButton } from '@/components/shared/loading-button';
+import { Field, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -20,14 +28,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Field, FieldLabel } from '@/components/ui/field';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Calendar } from '@/components/ui/calendar';
-import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import { InfoTooltip } from '@/components/shared/info-tooltip';
-import { CalendarioFestivos } from '@/components/hr/calendario-festivos';
-import { ListaFestivos } from '@/components/hr/lista-festivos';
 
 interface GestionarAusenciasModalProps {
   open: boolean;

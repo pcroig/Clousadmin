@@ -8,13 +8,15 @@
 
 'use client';
 
-import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useState } from 'react';
 import { toast } from 'sonner';
-import type { ProgresoOnboardingSimplificado, DatosTemporales } from '@/lib/onboarding';
+
 import { CredencialesForm, type OnboardingEmpleado } from '@/components/onboarding/credenciales-form';
 import { IntegracionesForm } from '@/components/onboarding/integraciones-form';
 import { PWAExplicacion } from '@/components/onboarding/pwa-explicacion';
+
+import type { DatosTemporales, ProgresoOnboardingSimplificado } from '@/lib/onboarding';
 
 interface OnboardingSimplificadoFormProps {
   token: string;

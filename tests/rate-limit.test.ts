@@ -20,6 +20,14 @@ async function testRateLimitWindow() {
   assert.equal(trasReset.success, true, 'Después del reset debe permitirse');
 }
 
-await testRateLimitWindow();
+void (async () => {
+  try {
+    await testRateLimitWindow();
+    console.log('  ✓ Rate limit window');
+  } catch (error) {
+    console.error('❌ Error en rate-limit.test:', error);
+    throw error;
+  }
+})();
 
 

@@ -3,8 +3,8 @@
 // ========================================
 // Matching inteligente de archivos PDF de nóminas con empleados usando Classification Pattern
 
-import { classify, matchBasic, Candidate, ClassificationResult } from './patterns/classification';
 import { isAnyProviderAvailable } from './core/client';
+import { Candidate, ClassificationResult, classify, matchBasic } from './patterns/classification';
 
 /**
  * Empleado candidato para matching
@@ -113,11 +113,12 @@ export async function clasificarNomina(
 
     // Convertir resultado
     return toMatchingResult(result);
-  } catch (error: any) {
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
     console.error('[Clasificador Nóminas] Error en IA, usando fallback:', {
       filename,
       totalEmpleados: empleados.length,
-      error: error.message,
+      error: message,
     });
     return matchingBasico(filename, empleados);
   }

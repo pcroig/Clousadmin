@@ -4,9 +4,26 @@
 // Ausencias Client Component
 // ========================================
 
-import { useState, useEffect, useCallback } from 'react';
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
+import { Calendar, Eye, Filter, Paperclip, Search } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
+import { toast } from 'sonner';
+
+import { TableHeader as PageHeader } from '@/components/shared/table-header';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   Table,
   TableBody,
@@ -15,28 +32,12 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { TableHeader as PageHeader } from '@/components/shared/table-header';
-import { TableFilters } from '@/components/shared/table-filters';
-import { Check, X, Calendar, Filter, Edit2, CheckCircle, Search, Settings, Paperclip, Eye } from 'lucide-react';
-import { format } from 'date-fns';
-import { es } from 'date-fns/locale';
-import { GestionarAusenciasModal } from './gestionar-ausencias-modal';
-import { CrearCampanaModal } from './crear-campana-modal';
-import { toast } from 'sonner';
 import { EstadoAusencia } from '@/lib/constants/enums';
 import { getAusenciaEstadoLabel } from '@/lib/utils/formatters';
+
+import { CrearCampanaModal } from './crear-campana-modal';
+import { GestionarAusenciasModal } from './gestionar-ausencias-modal';
 
 interface Ausencia {
   id: string;
@@ -99,7 +100,7 @@ interface AusenciasClientProps {
   initialCampanasExpanded?: boolean;
 }
 
-export function AusenciasClient({ initialCampanasExpanded = false }: AusenciasClientProps) {
+export function AusenciasClient({}: AusenciasClientProps) {
   const [ausencias, setAusencias] = useState<Ausencia[]>([]);
   const [campanaActiva, setCampanaActiva] = useState<Campana | null>(null);
   const [loading, setLoading] = useState(true);
@@ -137,8 +138,8 @@ export function AusenciasClient({ initialCampanasExpanded = false }: AusenciasCl
         throw new Error('Error al cargar las ausencias');
       }
       
-      const data = await response.json();
-      setAusencias(Array.isArray(data) ? data : []);
+      const data = (await response.json()) as Ausencia[] | unknown;
+      setAusencias(Array.isArray(data) ? (data as Ausencia[]) : []);
     } catch (error) {
       console.error('[fetchAusencias] Error:', error);
       toast.error('No se pudieron cargar las ausencias');
@@ -148,11 +149,11 @@ export function AusenciasClient({ initialCampanasExpanded = false }: AusenciasCl
     }
   }, [filtroEstado]);
 
-const fetchCampanaActiva = useCallback(async () => {
+  const fetchCampanaActiva = useCallback(async () => {
     try {
       const response = await fetch('/api/campanas-vacaciones');
       if (response.ok) {
-        const data = await response.json();
+        const data = await response.json() as Campana | null;
         setCampanaActiva(data); // API now returns single campaign or null
       }
     } catch (error) {
@@ -192,7 +193,7 @@ const fetchCampanaActiva = useCallback(async () => {
     fetchCampanaActiva();
   }, [fetchAusencias, fetchCampanaActiva]);
 
-  async function handleAprobar(id: string) {
+  async function _handleAprobar(id: string) {
     try {
       const response = await fetch(`/api/ausencias/${id}`, {
         method: 'PATCH',
@@ -200,13 +201,14 @@ const fetchCampanaActiva = useCallback(async () => {
         body: JSON.stringify({ accion: 'aprobar' }),
       });
 
-      const data = await response.json();
+      const data = await response.json() as { error?: string } | unknown;
       
       if (response.ok) {
         toast.success('Ausencia aprobada correctamente');
         fetchAusencias();
       } else {
-        toast.error(data.error || 'Error al aprobar la ausencia');
+        const errorData = data as { error?: string };
+        toast.error(errorData.error || 'Error al aprobar la ausencia');
       }
     } catch (error) {
       console.error('[handleAprobar] Error:', error);
@@ -227,7 +229,7 @@ const fetchCampanaActiva = useCallback(async () => {
         }),
       });
 
-      const data = await response.json();
+      const data = await response.json() as { error?: string } | unknown;
 
       if (response.ok) {
         toast.success('Ausencia rechazada correctamente');
@@ -235,7 +237,8 @@ const fetchCampanaActiva = useCallback(async () => {
         setMotivoRechazo('');
         fetchAusencias();
       } else {
-        toast.error(data.error || 'Error al rechazar la ausencia');
+        const errorData = data as { error?: string };
+        toast.error(errorData.error || 'Error al rechazar la ausencia');
       }
     } catch (error) {
       console.error('[handleRechazar] Error:', error);
@@ -243,12 +246,12 @@ const fetchCampanaActiva = useCallback(async () => {
     }
   }
 
-  function handleCuadrarIA(campanaId: string) {
+  function _handleCuadrarIA(_campanaId: string) {
     // Refrescar campaña después de cuadrar con IA
     fetchCampanaActiva();
   }
 
-  function handleCuadrarManual(campanaId: string) {
+  function _handleCuadrarManual(_campanaId: string) {
     // Refrescar campaña
     fetchCampanaActiva();
   }
@@ -297,15 +300,21 @@ const fetchCampanaActiva = useCallback(async () => {
         body: formData,
       });
       
-      const uploadData = await uploadResponse.json();
+      const uploadData = await uploadResponse.json() as { 
+        url: string; 
+        error?: string; 
+        documento?: { id: string } | null;
+      } | unknown;
       
       if (!uploadResponse.ok) {
-        throw new Error(uploadData.error || 'Error al subir justificante');
+        const errorData = uploadData as { error?: string };
+        throw new Error(errorData.error || 'Error al subir justificante');
       }
 
+      const successData = uploadData as { url: string; documento?: { id: string } | null };
       return {
-        url: uploadData.url,
-        documentoId: uploadData.documento?.id || null,
+        url: successData.url,
+        documentoId: successData.documento?.id || null,
       };
     } finally {
       setUploadingEditJustificante(false);
@@ -351,7 +360,7 @@ const fetchCampanaActiva = useCallback(async () => {
         documentoIdToSend = uploadResult.documentoId;
       }
 
-      const payload: Record<string, any> = {
+      const payload: Record<string, unknown> = {
         tipo: editForm.tipo,
         fechaInicio: editForm.fechaInicio,
         fechaFin: editForm.fechaFin,
@@ -376,17 +385,18 @@ const fetchCampanaActiva = useCallback(async () => {
         body: JSON.stringify(payload),
       });
 
-      const data = await response.json();
+      const data = await response.json() as { error?: string } | unknown;
       if (!response.ok) {
-        throw new Error(data.error || 'Error al actualizar la ausencia');
+        const errorData = data as { error?: string };
+        throw new Error(errorData.error || 'Error al actualizar la ausencia');
       }
 
       toast.success('Ausencia actualizada correctamente');
       closeEditarModal();
       fetchAusencias();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('[handleGuardarEdicion] Error:', error);
-      const errorMessage = error.message || 'Error al actualizar la ausencia';
+      const errorMessage = error instanceof Error ? error.message : 'Error al actualizar la ausencia';
       setEditError(errorMessage);
       toast.error(errorMessage);
     } finally {
@@ -790,7 +800,7 @@ const fetchCampanaActiva = useCallback(async () => {
         open={crearCampanaModal}
         onClose={() => setCrearCampanaModal(false)}
         onCreated={() => {
-          fetchCampanas();
+          fetchCampanaActiva();
           setCrearCampanaModal(false);
         }}
       />

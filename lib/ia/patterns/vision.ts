@@ -5,9 +5,16 @@
 // Soporta OCR, extracción estructurada, y análisis semántico
 
 import { z } from 'zod';
+
 import { callAI, getPrimaryProvider } from '../core/client';
-import { AIMessage, MessageRole, AIProvider, ContentType } from '../core/types';
-import { createConfigForUseCase, AIUseCase } from '../core/config';
+import { AIUseCase, createConfigForUseCase } from '../core/config';
+import { AIMessage, AIProvider, ContentType, MessageRole } from '../core/types';
+
+type ImageUrlWithFilename = {
+  url: string;
+  detail?: 'low' | 'auto' | 'high';
+  filename?: string;
+};
 
 // ========================================
 // TIPOS
@@ -45,7 +52,7 @@ export interface DocumentAnalysisOptions {
 /**
  * Resultado de análisis de documento
  */
-export interface DocumentAnalysisResult<T = any> {
+export interface DocumentAnalysisResult<T = unknown> {
   success: boolean;
   data?: T;
   error?: string;
@@ -133,13 +140,11 @@ Ejemplo de respuesta:
   "campo2": "valor2"
 }`;
   
-  // Determinar si es un file_id de OpenAI (formato: "file-xxx")
-  const isFileId = documentUrl.startsWith('file-');
   // Determinar si es un PDF en base64
   const isPDFBase64 = documentUrl.startsWith('data:application/pdf;base64,');
   
   // Construir el objeto image_url con filename si es PDF
-  const imageUrlContent = {
+  const imageUrlContent: ImageUrlWithFilename = {
     url: documentUrl,
     detail: options?.imageDetail || 'high',
     ...(isPDFBase64 && { filename: options?.filename || 'document.pdf' }), // Agregar filename para PDFs
@@ -155,7 +160,7 @@ Ejemplo de respuesta:
         },
         {
           type: ContentType.IMAGE_URL,
-          image_url: imageUrlContent as any, // Type assertion para incluir filename opcional
+          image_url: imageUrlContent,
         },
       ],
     },
@@ -187,13 +192,14 @@ Ejemplo de respuesta:
         provider: response.provider,
         usage: response.usage,
       };
-    } catch (error: any) {
-      console.error(`[Vision Pattern] Error (intento ${attempt + 1}):`, error.message);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(`[Vision Pattern] Error (intento ${attempt + 1}):`, message);
       
       if (attempt === maxRetries) {
         return {
           success: false,
-          error: `Error después de ${maxRetries + 1} intentos: ${error.message}`,
+          error: `Error después de ${maxRetries + 1} intentos: ${message}`,
           provider,
         };
       }
@@ -201,7 +207,7 @@ Ejemplo de respuesta:
       // Agregar feedback para el siguiente intento
       messages.push({
         role: MessageRole.ASSISTANT,
-        content: JSON.stringify(error.message),
+        content: JSON.stringify(message),
       });
       messages.push({
         role: MessageRole.USER,
@@ -290,10 +296,11 @@ export async function extractTextFromDocument(
       provider: response.provider,
       usage: response.usage,
     };
-  } catch (error: any) {
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
     return {
       success: false,
-      error: error.message,
+      error: message,
       provider,
     };
   }
@@ -353,10 +360,11 @@ export async function describeDocument(
       provider: response.provider,
       usage: response.usage,
     };
-  } catch (error: any) {
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
     return {
       success: false,
-      error: error.message,
+      error: message,
       provider,
     };
   }
@@ -435,10 +443,11 @@ Responde con JSON:
       provider: response.provider,
       usage: response.usage,
     };
-  } catch (error: any) {
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
     return {
       success: false,
-      error: error.message,
+      error: message,
       provider,
     };
   }
@@ -513,10 +522,11 @@ Responde con JSON:
       provider: response.provider,
       usage: response.usage,
     };
-  } catch (error: any) {
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
     return {
       success: false,
-      error: error.message,
+      error: message,
       provider,
     };
   }

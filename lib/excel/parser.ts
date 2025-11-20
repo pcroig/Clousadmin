@@ -11,7 +11,7 @@ import * as XLSX from 'xlsx';
  * @param buffer - Buffer del archivo Excel
  * @returns Array de objetos con los datos del Excel
  */
-export function parseExcelToJSON(buffer: Buffer): Record<string, any>[] {
+export function parseExcelToJSON(buffer: Buffer): Record<string, unknown>[] {
   try {
     // Leer el archivo Excel desde el buffer
     const workbook = XLSX.read(buffer, { type: 'buffer' });
@@ -28,7 +28,7 @@ export function parseExcelToJSON(buffer: Buffer): Record<string, any>[] {
 
     // Convertir la hoja a JSON
     // header: 1 = array de arrays, sin header: objeto con headers
-    const jsonData: Record<string, any>[] = XLSX.utils.sheet_to_json(worksheet);
+    const jsonData: Record<string, unknown>[] = XLSX.utils.sheet_to_json(worksheet);
 
     return jsonData;
   } catch (error) {
@@ -49,9 +49,9 @@ export function parseExcelToJSONWithOptions(
   options: {
     sheetIndex?: number; // Índice de la hoja (por defecto 0)
     range?: string; // Rango de celdas (ej: 'A1:D10')
-    defval?: any; // Valor por defecto para celdas vacías
+    defval?: unknown; // Valor por defecto para celdas vacías
   } = {}
-): Record<string, any>[] {
+): Record<string, unknown>[] {
   try {
     const workbook = XLSX.read(buffer, { type: 'buffer' });
 
@@ -76,7 +76,7 @@ export function parseExcelToJSONWithOptions(
       sheetToJsonOptions.defval = options.defval;
     }
 
-    const jsonData: Record<string, any>[] = XLSX.utils.sheet_to_json(worksheet, sheetToJsonOptions);
+    const jsonData: Record<string, unknown>[] = XLSX.utils.sheet_to_json(worksheet, sheetToJsonOptions);
 
     return jsonData;
   } catch (error) {

@@ -8,6 +8,12 @@ import type { NextRequest } from 'next/server';
 import { verifyToken } from '@/lib/auth-edge';
 
 import { UsuarioRol } from '@/lib/constants/enums';
+import {
+  EMPLEADO_ID_HEADER,
+  TENANT_HEADER,
+  USER_ID_HEADER,
+  USER_ROLE_HEADER,
+} from '@/lib/constants/tenant';
 
 // Rutas públicas (no requieren autenticación)
 const publicPaths = ['/login', '/signup', '/waitlist', '/onboarding'];
@@ -119,7 +125,23 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL('/empleado/dashboard', request.url));
   }
 
-  return NextResponse.next();
+  // Inyectar contexto multi-tenant en headers para Server Components / acciones
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set(TENANT_HEADER, session.user.empresaId);
+  requestHeaders.set(USER_ID_HEADER, session.user.id);
+  requestHeaders.set(USER_ROLE_HEADER, session.user.rol);
+
+  if (session.user.empleadoId) {
+    requestHeaders.set(EMPLEADO_ID_HEADER, session.user.empleadoId);
+  } else {
+    requestHeaders.delete(EMPLEADO_ID_HEADER);
+  }
+
+  return NextResponse.next({
+    request: {
+      headers: requestHeaders,
+    },
+  });
 }
 
 // Configurar en qué rutas se ejecuta el middleware

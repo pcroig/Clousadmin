@@ -3,12 +3,14 @@
 // ========================================
 
 import { redirect } from 'next/navigation';
-import { getSession } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
-import { IntegrationsClient } from './integrations-client';
-import { isGoogleOAuthConfigured } from '@/lib/oauth/config';
 
+import { getSession } from '@/lib/auth';
 import { UsuarioRol } from '@/lib/constants/enums';
+import { isGoogleOAuthConfigured } from '@/lib/oauth/config';
+import { prisma } from '@/lib/prisma';
+
+import { IntegrationsClient } from './integrations-client';
+
 
 export default async function IntegrationsPage() {
   const session = await getSession();

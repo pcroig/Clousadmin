@@ -187,27 +187,63 @@ Desde `Organización > Personas > + Crear persona`
 
 ---
 
-### 5. Google OAuth (Preparado para futuro)
+### 5. Google OAuth (NextAuth)
 
-**Estado:** Placeholder implementado
+**Estado:** ✅ En producción
 
-**Configuración necesaria:**
-1. Crear proyecto en Google Cloud Console
-2. Habilitar Google+ API
-3. Crear credenciales OAuth 2.0
-4. Configurar en `.env.local`:
-   ```env
-   GOOGLE_CLIENT_ID=tu-client-id.apps.googleusercontent.com
-   GOOGLE_CLIENT_SECRET=tu-client-secret
-   ```
-5. Instalar dependencias:
-   ```bash
-   npm install next-auth @auth/prisma-adapter
-   ```
-6. Configurar adaptador NextAuth (ver `/lib/auth-config.ts`)
-7. Ejecutar migración para modelos NextAuth
+- Flujo implementado con `app/api/auth/[...nextauth]/route.ts` usando NextAuth v5 + proveedor de Google.
+- El endpoint legado `/api/auth/google/callback` redirige al callback de NextAuth para mantener compatibilidad con redirect URIs existentes.
+- Al completar el callback se crea sesión JWT propia (`lib/auth.ts`) y se persisten los tokens OAuth en `Account`.
 
-**Actualmente:** Botón "Continuar con Google" muestra alert informativo.
+**Configuración obligatoria (.env.local):**
+```env
+GOOGLE_CLIENT_ID=tu-client-id.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=tu-client-secret
+NEXTAUTH_URL=https://tudominio.com
+NEXTAUTH_SECRET=clave-super-secreta
+```
+
+**Notas:**
+- Solo usuarios existentes pueden autenticarse con Google (no se crean cuentas nuevas sin invitación).
+- Los roles se respetan igual que en login local (redirect automático según dashboard).
+- Si Google devuelve un email no verificado se rechaza el login (`/login?error=email_not_verified`).
+
+---
+
+### 6. Recuperación de contraseña (Password Recovery)
+
+**Estado:** ✅ En producción
+
+**Endpoints:**
+- `POST /api/auth/recovery/request` → recibe email, aplica rate limiting y envía enlace firmado (válido 1h) usando Resend.
+- `POST /api/auth/recovery/reset` → valida token y actualiza la contraseña (invalidando todas las sesiones activas).
+
+**UI:**
+- `/forgot-password` formulario público para solicitar el email.
+- `/reset-password/[token]` formulario protegido que valida el token antes de permitir el cambio.
+
+**Plantillas de email:** `lib/emails/password-recovery.ts`
+
+---
+
+### 7. Autenticación en dos pasos (2FA TOTP + Backup Codes)
+
+**Estado:** ✅ En producción
+
+**Características:**
+- Configuración disponible en `/configuracion/seguridad`.
+- Flujo guiado con QR + código de verificación inicial.
+- 10 códigos de respaldo generados y almacenados con hash.
+- Desactivación requiere contraseña del usuario.
+
+**Login flow:**
+1. Credenciales válidas + `totpEnabled=true` ⇒ se genera challenge temporal y se guarda en cookie `clousadmin-2fa`.
+2. Usuario es redirigido a `/verify-otp` donde debe introducir TOTP o un backup code.
+3. Tras verificar se crea sesión completa y se borra el challenge.
+
+**Helpers clave:**
+- `lib/auth/two-factor.ts` → generación/verificación de secretos, QR y backup codes.
+- `createTwoFactorChallenge / validateTwoFactorChallenge` en `lib/auth.ts`.
 
 ---
 
@@ -573,16 +609,13 @@ console.log('[loginAction] Password válida:', isValid)
 
 ---
 
-### Google OAuth no funciona
+### Google OAuth - troubleshooting
 
-**Estado actual:** Placeholder, no implementado
-
-**Pasos para activar:**
-1. Instalar `next-auth @auth/prisma-adapter`
-2. Configurar Google Cloud Console
-3. Añadir variables de entorno
-4. Ejecutar migración NextAuth
-5. Descomentar lógica en `login-form.tsx`
+- Verifica que `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `NEXTAUTH_SECRET` y `NEXTAUTH_URL` estén definidos.
+- Asegúrate de que la URI de redirección incluya **ambas** rutas:
+  - `https://tu-dominio.com/api/auth/callback/google` (NextAuth)
+  - `https://tu-dominio.com/api/auth/google/callback` (legacy, redirige al callback anterior)
+- Si Google devuelve `access_denied`, revisa que el usuario pertenezca a la organización permitida en Google Cloud.
 
 ---
 
@@ -599,22 +632,22 @@ console.log('[loginAction] Password válida:', isValid)
 - [x] UI moderna para login/onboarding/signup
 
 ### Fase 2 (Pendiente)
-- [ ] Google OAuth completamente funcional
+- [x] Google OAuth completamente funcional
 - [x] Envío de emails de invitación (Resend) - Ver `docs/CONFIGURACION_RESEND.md`
 - [ ] Botón "Reenviar invitación" en UI
-- [ ] Recuperación de contraseña
+- [x] Recuperación de contraseña
 - [ ] Verificación de email adicional
 
 ### Fase 3 (Futuro)
 - [ ] Microsoft Azure AD / Outlook OAuth
-- [ ] 2FA (Two-Factor Authentication)
+- [x] 2FA (Two-Factor Authentication)
 - [ ] SSO empresarial
 - [ ] Audit log de sesiones
 - [ ] Política de expiración de contraseñas
 
 ---
 
-**Última actualización:** 27 de enero 2025  
+**Última actualización:** 20 de noviembre 2025  
 **Autor:** Clousadmin Dev Team
 
 

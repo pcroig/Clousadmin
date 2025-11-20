@@ -3,11 +3,13 @@
 // ========================================
 
 import { redirect } from 'next/navigation';
+
 import { getSession } from '@/lib/auth';
+import { UsuarioRol } from '@/lib/constants/enums';
 import { prisma } from '@/lib/prisma';
+
 import { SettingsClient } from './settings-client';
 
-import { UsuarioRol } from '@/lib/constants/enums';
 
 export default async function SettingsPage() {
   const session = await getSession();

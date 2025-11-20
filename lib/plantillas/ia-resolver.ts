@@ -29,7 +29,7 @@ const memoryCache = new Map<string, VariableMapping>();
 /**
  * Obtener estructura del schema para IA (simplificado)
  */
-function getSchemaStructure(empleadoData: DatosEmpleado): Record<string, any> {
+function getSchemaStructure(empleadoData: DatosEmpleado): Record<string, string | Record<string, string | string[]>> {
   return {
     nombre: 'string',
     apellidos: 'string',

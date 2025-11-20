@@ -76,7 +76,7 @@ async function agregarHojaResumen(
   );
 
   // Crear datos para la hoja
-  const data: any[] = [];
+  const data: (string | number)[][] = [];
 
   // Header
   data.push([
@@ -207,7 +207,7 @@ async function agregarHojaAusencias(
   });
 
   // Crear datos para la hoja
-  const data: any[] = [];
+  const data: (string | number)[][] = [];
 
   // Header
   data.push([
@@ -290,7 +290,7 @@ async function agregarHojaCambios(
   const fechaFin = new Date(anio, mes, 0, 23, 59, 59);
 
   // Crear datos para la hoja
-  const data: any[] = [];
+  const data: (string | number)[][] = [];
 
   // Header
   data.push(['Tipo', 'Empleado', 'Fecha', 'Detalle']);

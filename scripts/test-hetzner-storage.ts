@@ -7,6 +7,7 @@ import * as dotenv from 'dotenv';
 import * as path from 'path';
 import { existsSync } from 'fs';
 import { S3Client, PutObjectCommand, GetObjectCommand, ListBucketsCommand, HeadBucketCommand } from '@aws-sdk/client-s3';
+import type { AwsCredentialIdentity } from '@aws-sdk/types';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
 // Cargar .env (buscar en el raíz del proyecto)
@@ -90,7 +91,7 @@ async function main() {
       credentials: {
         accessKeyId: STORAGE_ACCESS_KEY!,
         secretAccessKey: STORAGE_SECRET_KEY!,
-      },
+      } as Credentials,
       forcePathStyle: true, // Requerido para Hetzner
       maxAttempts: 3,
     });
@@ -116,17 +117,18 @@ async function main() {
         console.log(`        - ${bucket.Name} (creado: ${bucket.CreationDate})`);
       });
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const errorObj = error as { name?: string; message?: string } | null;
     console.log('   ❌ Error verificando credenciales:');
-    if (error.name === 'InvalidAccessKeyId') {
+    if (errorObj?.name === 'InvalidAccessKeyId') {
       console.log('      ERROR: Access Key inválido');
-    } else if (error.name === 'SignatureDoesNotMatch') {
+    } else if (errorObj?.name === 'SignatureDoesNotMatch') {
       console.log('      ERROR: Secret Key incorrecto o firma no coincide');
-    } else if (error.name === 'NetworkingError') {
+    } else if (errorObj?.name === 'NetworkingError') {
       console.log('      ERROR: No se puede conectar al endpoint');
       console.log(`      Verifica que ${STORAGE_ENDPOINT} sea accesible`);
     } else {
-      console.log(`      ${error.name}: ${error.message}`);
+      console.log(`      ${errorObj?.name ?? 'Unknown'}: ${errorObj?.message ?? 'Unknown error'}`);
     }
     process.exit(1);
   }
@@ -137,16 +139,17 @@ async function main() {
     const headCommand = new HeadBucketCommand({ Bucket: STORAGE_BUCKET! });
     await s3Client.send(headCommand);
     console.log(`   ✅ Bucket "${STORAGE_BUCKET}" existe y es accesible`);
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const errorObj = error as { name?: string; message?: string } | null;
     console.log(`   ❌ Error accediendo al bucket "${STORAGE_BUCKET}":`);
-    if (error.name === 'NoSuchBucket') {
+    if (errorObj?.name === 'NoSuchBucket') {
       console.log('      ERROR: El bucket no existe');
       console.log(`      Verifica que el bucket "${STORAGE_BUCKET}" exista en Hetzner Cloud Console`);
-    } else if (error.name === 'AccessDenied') {
+    } else if (errorObj?.name === 'AccessDenied') {
       console.log('      ERROR: Acceso denegado al bucket');
       console.log('      Verifica los permisos del Access Key');
     } else {
-      console.log(`      ${error.name}: ${error.message}`);
+      console.log(`      ${errorObj?.name ?? 'Unknown'}: ${errorObj?.message ?? 'Unknown error'}`);
     }
     process.exit(1);
   }
@@ -183,7 +186,7 @@ async function main() {
     const getResponse = await s3Client.send(getCommand);
     if (getResponse.Body) {
       const chunks: Uint8Array[] = [];
-      const body = getResponse.Body as any;
+      const body = getResponse.Body as { [Symbol.asyncIterator]?: () => AsyncIterable<Uint8Array> } | null;
       if (body[Symbol.asyncIterator]) {
         for await (const chunk of body) {
           chunks.push(chunk);
@@ -207,11 +210,12 @@ async function main() {
     console.log(`   ℹ️  Archivo de test dejado en: ${testKey}`);
     console.log(`      Puedes eliminarlo manualmente desde Hetzner Cloud Console`);
     
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const errorObj = error as { name?: string; message?: string; $metadata?: { httpStatusCode?: number } } | null;
     console.log('   ❌ Error en test de upload/download:');
-    console.log(`      ${error.name}: ${error.message}`);
-    if (error.$metadata) {
-      console.log(`      Status Code: ${error.$metadata.httpStatusCode}`);
+    console.log(`      ${errorObj?.name ?? 'Unknown'}: ${errorObj?.message ?? 'Unknown error'}`);
+    if (errorObj?.$metadata) {
+      console.log(`      Status Code: ${errorObj.$metadata.httpStatusCode}`);
     }
     process.exit(1);
   }

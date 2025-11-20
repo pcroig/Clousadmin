@@ -197,7 +197,7 @@ const schema = z.object({
 });
 
 const result = await analyzeDocument(
-  'https://bucket.s3.amazonaws.com/dni.jpg',
+  'https://fsn1.your-objectstorage.com/bucket/dni.jpg',
   schema,
   {
     nombre: 'Nombre completo',

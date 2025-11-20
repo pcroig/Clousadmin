@@ -1,5 +1,7 @@
-import { getSession } from '@/lib/auth';
 import { redirect } from 'next/navigation';
+
+import { getSession } from '@/lib/auth';
+
 import { MiEspacioNominasClient } from './nominas-client';
 
 export default async function MiEspacioNominasPage() {

@@ -1,6 +1,6 @@
 # 🚀 Optimizaciones - Estado y Planes
 
-**Última actualización**: 2025-01-27
+**Última actualización**: 2025-11-20
 
 ---
 
@@ -22,6 +22,14 @@
 - ✅ Patrones para evitar N+1 queries
 - ✅ Uso correcto de `include` y `select`
 
+### 4. Sistema de Uploads Optimizado (2025-11-20)
+- ✅ Streaming uploads con `Readable.fromWeb` para archivos grandes
+- ✅ Rate limiting contextual por usuario + empresa + IP
+- ✅ Upload secuencial para evitar saturar el servidor
+- ✅ Progress tracking eficiente con XMLHttpRequest
+- ✅ Validación temprana (tipo, tamaño, magic numbers) antes de upload
+- ✅ Memoria optimizada con streaming en lugar de buffers completos
+
 ---
 
 ## 🎯 Optimizaciones Pendientes
@@ -41,6 +49,14 @@
 - [ ] Optimizar imágenes y assets
 - [ ] Code splitting avanzado
 
+### Uploads y Storage
+- ✅ Streaming uploads implementado (completado)
+- ✅ Rate limiting contextual implementado (completado)
+- ✅ Progress tracking optimizado (completado)
+- [ ] Implementar chunked uploads para archivos muy grandes (>50MB)
+- [ ] Optimizar previsualizaciones de imágenes (lazy loading)
+- [ ] Implementar compresión de imágenes antes de subir
+
 ---
 
 ## 📚 Documentación Relacionada
@@ -56,6 +72,7 @@
 - `PLAN_OPTIMIZACION_UNIFICADO.md`
 - `OPTIMIZACION_PRISMA.md`
 - `OPTIMIZACION_SCHEMA.md`
+
 
 
 

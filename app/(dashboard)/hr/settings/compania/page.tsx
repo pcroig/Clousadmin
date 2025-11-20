@@ -5,11 +5,11 @@
 import { redirect } from 'next/navigation';
 
 import { getSession } from '@/lib/auth';
+import { UsuarioRol } from '@/lib/constants/enums';
 import { prisma } from '@/lib/prisma';
 
 import { CompanyClient } from './company-client';
 
-import { UsuarioRol } from '@/lib/constants/enums';
 
 export default async function CompanySettingsPage() {
   const session = await getSession();

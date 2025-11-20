@@ -1,7 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useApi } from '@/lib/hooks';
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
+import { Clock } from 'lucide-react';
+import { useEffect, useState } from 'react';
+
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -13,12 +16,10 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Clock } from 'lucide-react';
-import { EditarFichajeModal } from '../../../hr/horario/fichajes/editar-fichaje-modal';
-import { format } from 'date-fns';
-import { es } from 'date-fns/locale';
-
 import { EstadoAusencia } from '@/lib/constants/enums';
+import { useApi } from '@/lib/hooks';
+
+import { EditarFichajeModal } from '../../../hr/horario/fichajes/editar-fichaje-modal';
 
 interface FichajeEvento {
   id: string;

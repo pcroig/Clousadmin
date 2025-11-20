@@ -3,6 +3,8 @@
 // ========================================
 // Detecta anomalías y datos faltantes antes del cierre de nómina
 
+import { Prisma } from '@prisma/client';
+
 import { prisma } from '@/lib/prisma';
 import { obtenerHorasEsperadas } from '../calculos/fichajes';
 import { EstadoAusencia } from '@/lib/constants/enums';
@@ -24,7 +26,7 @@ export interface Alerta {
   categoria: CategoriaAlerta;
   codigo: string;
   mensaje: string;
-  detalles?: any;
+  detalles?: Record<string, unknown>;
   accionUrl?: string;
 }
 
@@ -725,8 +727,20 @@ export async function obtenerAlertas(
   mes: number,
   anio: number,
   tipo?: TipoAlerta
-): Promise<any[]> {
-  const where: any = {
+): Promise<Array<{
+  id: string;
+  tipo: string;
+  categoria: string;
+  codigo: string;
+  mensaje: string;
+  detalles?: unknown;
+  empleado: {
+    id: string;
+    nombre: string;
+    apellidos: string;
+  };
+}>> {
+  const where: Prisma.AlertaNominaWhereInput = {
     empresaId,
     createdAt: {
       gte: new Date(anio, mes - 1, 1),

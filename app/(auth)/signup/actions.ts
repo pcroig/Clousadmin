@@ -5,15 +5,15 @@
 // ========================================
 
 import { headers } from 'next/headers';
-import { prisma } from '@/lib/prisma';
-import { hashPassword, createSession } from '@/lib/auth';
-import { signupSchema } from '@/lib/validaciones/schemas';
-import { verificarInvitacionSignup, usarInvitacionSignup } from '@/lib/invitaciones-signup';
-import { getClientIP } from '@/lib/rate-limit';
 import { z } from 'zod';
 
+import { createSession, hashPassword } from '@/lib/auth';
 import { UsuarioRol } from '@/lib/constants/enums';
+import { usarInvitacionSignup, verificarInvitacionSignup } from '@/lib/invitaciones-signup';
 import { getOrCreateDefaultJornada } from '@/lib/jornadas/get-or-create-default';
+import { prisma } from '@/lib/prisma';
+import { getClientIP } from '@/lib/rate-limit';
+import { signupSchema } from '@/lib/validaciones/schemas';
 
 /**
  * Registrar nueva empresa + primer usuario HR Admin

@@ -1,3 +1,5 @@
+// eslint-disable-next-line import/order
+import type { AIMessage } from './core/types';
 // ========================================
 // OpenAI Modelos - Configuraciones de Modelos
 // ========================================
@@ -173,7 +175,7 @@ export async function callAIWithConfig(
   const { AIProvider, MessageRole: MsgRole } = await import('./core/types');
   
   // Convertir mensajes de formato OpenAI a formato unificado
-  const aiMessages: any[] = [];
+  const aiMessages: AIMessage[] = [];
   
   // Agregar system message si existe
   if (config.systemMessage) {

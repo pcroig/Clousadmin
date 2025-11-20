@@ -11,7 +11,7 @@ type FichajeWithEventos = {
   id: string;
   fecha: Date;
   estado: string;
-  horasTrabajadas: any;
+  horasTrabajadas: number | null;
   eventos: Array<{
     id: string;
     tipo: string;
@@ -25,8 +25,8 @@ type ContratoResumen = {
   fechaInicio: Date | string | null;
   fechaFin: Date | string | null;
   tipoContrato: string;
-  salarioBrutoAnual: any;
-  salarioBrutoMensual?: any;
+  salarioBrutoAnual: number | null;
+  salarioBrutoMensual?: number | null;
 };
 
 export interface EmpleadoExportData {
@@ -89,11 +89,13 @@ function normalizeValue(value: unknown): unknown {
     return '';
   }
 
-  if (typeof value === 'object' && value !== null && 'toNumber' in (value as any)) {
+  // Type guard para objetos con método toNumber (ej. Decimal de Prisma)
+  const valueWithToNumber = value as { toNumber?: () => number } | null;
+  if (valueWithToNumber && typeof valueWithToNumber.toNumber === 'function') {
     try {
-      return (value as any).toNumber();
+      return valueWithToNumber.toNumber();
     } catch {
-      return Number(value as any);
+      return Number(String(value));
     }
   }
 
@@ -114,12 +116,13 @@ function sanitizeRecord<T extends Record<string, unknown>>(record: T): Record<st
       continue;
     }
 
-    if (typeof value === 'object' && 'toNumber' in (value as any)) {
-      // Prisma.Decimal
+    // Type guard para objetos con método toNumber (ej. Decimal de Prisma)
+    const valueWithToNumber = value as { toNumber?: () => number } | null;
+    if (valueWithToNumber && typeof valueWithToNumber.toNumber === 'function') {
       try {
-        result[key] = (value as any).toNumber();
+        result[key] = valueWithToNumber.toNumber();
       } catch {
-        result[key] = Number(value as any);
+        result[key] = Number(String(value));
       }
       continue;
     }
@@ -265,26 +268,27 @@ export function buildEmpleadoExcelBuffer(data: EmpleadoExportData): Buffer {
   const workbook = XLSX.utils.book_new();
 
   // Perfil Sheet
-  const perfilEntries = [
-    ['ID', (data.empleado as any).id],
-    ['Nombre', (data.empleado as any).nombre],
-    ['Apellidos', (data.empleado as any).apellidos],
-    ['Email', (data.empleado as any).email],
-    ['Empresa ID', (data.empleado as any).empresaId],
-    ['Fecha Alta', formatDate((data.empleado as any).fechaAlta)],
-    ['Fecha Baja', formatDate((data.empleado as any).fechaBaja)],
-    ['Puesto', (data.empleado as any).puesto],
-    ['Estado empleado', (data.empleado as any).estadoEmpleado],
-    ['IBAN', (data.empleado as any).iban || ''],
-    ['NIF', (data.empleado as any).nif || ''],
-    ['NSS', (data.empleado as any).nss || ''],
-    ['Salario bruto anual', normalizeValue((data.empleado as any).salarioBrutoAnual)],
-    ['Salario bruto mensual', normalizeValue((data.empleado as any).salarioBrutoMensual)],
-    ['Teléfono', (data.empleado as any).telefono || ''],
-    ['Dirección', `${(data.empleado as any).direccionCalle ?? ''} ${(data.empleado as any).direccionNumero ?? ''}`.trim()],
-    ['Ciudad', (data.empleado as any).ciudad ?? ''],
-    ['Provincia', (data.empleado as any).direccionProvincia ?? ''],
-    ['Código Postal', (data.empleado as any).codigoPostal ?? ''],
+  const empleado = data.empleado as Partial<import('@prisma/client').Empleado>;
+  const perfilEntries: (string | number | null | undefined)[][] = [
+    ['ID', empleado.id],
+    ['Nombre', empleado.nombre],
+    ['Apellidos', empleado.apellidos],
+    ['Email', empleado.email],
+    ['Empresa ID', empleado.empresaId],
+    ['Fecha Alta', formatDate(empleado.fechaAlta as Date | string | null | undefined)],
+    ['Fecha Baja', formatDate(empleado.fechaBaja as Date | string | null | undefined)],
+    ['Puesto', empleado.puesto],
+    ['Estado empleado', empleado.estadoEmpleado],
+    ['IBAN', empleado.iban || ''],
+    ['NIF', empleado.nif || ''],
+    ['NSS', empleado.nss || ''],
+    ['Salario bruto anual', normalizeValue(empleado.salarioBrutoAnual)],
+    ['Salario bruto mensual', normalizeValue(empleado.salarioBrutoMensual)],
+    ['Teléfono', empleado.telefono || ''],
+    ['Dirección', `${empleado.direccionCalle ?? ''} ${empleado.direccionNumero ?? ''}`.trim()],
+    ['Ciudad', empleado.ciudad ?? ''],
+    ['Provincia', empleado.direccionProvincia ?? ''],
+    ['Código Postal', empleado.codigoPostal ?? ''],
   ];
   const perfilSheet = XLSX.utils.aoa_to_sheet([['Campo', 'Valor'], ...perfilEntries]);
   XLSX.utils.book_append_sheet(workbook, perfilSheet, 'Perfil');

@@ -1,11 +1,13 @@
-import { getSession } from '@/lib/auth';
 import { redirect } from 'next/navigation';
-import { prisma } from '@/lib/prisma';
-import { serializeEmpleadoSeguro } from '@/lib/empleados/serialize';
-import { MiEspacioDocumentosClient } from './documentos-client';
-import { asegurarCarpetasSistemaParaEmpleado } from '@/lib/documentos';
 
+import { getSession } from '@/lib/auth';
 import { UsuarioRol } from '@/lib/constants/enums';
+import { asegurarCarpetasSistemaParaEmpleado } from '@/lib/documentos';
+import { serializeEmpleadoSeguro } from '@/lib/empleados/serialize';
+import { prisma } from '@/lib/prisma';
+
+import { MiEspacioDocumentosClient } from './documentos-client';
+
 
 export default async function MiEspacioDocumentosPage() {
   const session = await getSession();

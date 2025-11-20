@@ -66,15 +66,25 @@ Clousadmin/
 ├── lib/                          # Utilidades y lógica de negocio
 │   ├── auth.ts                   # Autenticación (JWT)
 │   ├── prisma.ts                 # Cliente Prisma (singleton)
+│   ├── s3.ts                     # Object Storage (Hetzner S3-compatible)
+│   ├── rate-limit.ts             # Rate limiting (Redis + fallback)
 │   ├── calculos/                 # Lógica de negocio
 │   │   ├── ausencias.ts
 │   │   ├── fichajes.ts
 │   │   └── balance-horas.ts
 │   ├── validaciones/             # Validaciones
 │   │   ├── schemas.ts            # Zod schemas
+│   │   ├── file-upload.ts        # Validaciones de archivos
 │   │   ├── nif.ts
 │   │   └── iban.ts
-│   └── ia/                       # Lógica IA (futuro)
+│   ├── hooks/                    # React hooks reutilizables
+│   │   ├── use-api.ts            # Hook para GET requests
+│   │   ├── use-mutation.ts       # Hook para POST/PATCH/DELETE
+│   │   └── use-file-upload.ts    # Hook para uploads avanzados
+│   ├── utils/                    # Utilidades generales
+│   │   ├── file-helpers.ts       # Helpers de archivos (formato, tipos)
+│   │   └── ...
+│   └── ia/                       # Lógica IA
 │
 ├── prisma/                       # Prisma ORM
 │   ├── schema.prisma             # Schema de base de datos
@@ -203,6 +213,23 @@ const datos = await prisma.tabla.findMany({
     empresaId: session.user.empresaId,  // SIEMPRE
   },
 });
+```
+
+#### 5.1 Contexto multi-tenant vía headers
+
+- El `middleware.ts` inyecta los headers `x-empresa-id`, `x-user-id`, `x-user-role` y `x-empleado-id` en todas las requests autenticadas. Esto permite que componentes anidados y utilidades lean el tenant actual sin volver a consultar Prisma.
+- Puedes acceder a esos datos con `getTenantContextFromHeaders()` (en `lib/multi-tenant.ts`). Usa este helper **solo** cuando la request ya pasó por un `getSession()` validado (por ejemplo, subcomponentes de una página que ya hizo el check de sesión).
+- `getSession()` sigue siendo la fuente de verdad para autenticación porque valida contra `sesionActiva` en la base de datos. No sustituyas `getSession()` por los headers en layouts/páginas/server actions que necesiten comprobar que la sesión sigue vigente o aplicar control de acceso.
+- Patrón recomendado:
+
+```tsx
+// Page / server action
+const session = await getSession(); // autentica y valida contra BD
+if (!session) redirect('/login');
+
+// Componentes o helpers que se montan después del redirect/guardado
+const tenant = await getTenantContextFromHeaders();
+// tenant nunca debe usarse para saltarse la validación anterior
 ```
 
 ---
@@ -419,15 +446,121 @@ model Ausencia {
 
 ---
 
+## 📁 Sistema de Uploads Avanzado
+
+### Arquitectura
+
+El sistema de uploads está diseñado para ser **escalable, eficiente y reutilizable**:
+
+**Componentes principales**:
+- `lib/hooks/use-file-upload.ts` - Hook principal con gestión de cola, progreso, reintentos y cancelación
+- `components/shared/file-upload-advanced.tsx` - Componente UI con drag & drop
+- `lib/utils/file-helpers.ts` - Utilidades de formateo, tipos y previews
+- `lib/validaciones/file-upload.ts` - Validaciones centralizadas (tipo, tamaño, magic numbers)
+
+### Flujo de Upload
+
+```
+1. [UI] Usuario selecciona archivos (drag & drop o click)
+   ↓
+2. [Hook] useFileUpload valida archivos (tipo, tamaño, magic numbers)
+   ↓
+3. [Hook] Agrega archivos a cola y genera previews (si es imagen)
+   ↓
+4. [Hook] Procesa cola secuencialmente (uno por uno)
+   ↓
+5. [Handler] UploadHandler ejecuta XMLHttpRequest con tracking de progreso
+   ↓
+6. [API] /api/upload o /api/documentos procesa con streaming
+   ↓
+7. [Storage] Upload a Hetzner S3 (o local en desarrollo)
+   ↓
+8. [Hook] Actualiza estado (success/error) y permite reintentos
+```
+
+### Características
+
+**Performance**:
+- ✅ Streaming uploads con `Readable.fromWeb` para archivos grandes
+- ✅ Upload secuencial para evitar saturar el servidor
+- ✅ Progress tracking en tiempo real con XMLHttpRequest
+- ✅ Rate limiting contextual (usuario + empresa + IP)
+
+**UX**:
+- ✅ Drag & drop nativo
+- ✅ Previsualización de imágenes antes de subir
+- ✅ Barra de progreso con ETA y velocidad de subida
+- ✅ Reintentos automáticos (configurable, default: 3)
+- ✅ Cancelación de uploads en progreso
+- ✅ Validación inmediata de tipo y tamaño
+- ✅ Indicadores de estado visuales (queued, uploading, success, error, cancelled)
+
+**Validación**:
+- ✅ Tipo MIME (configurable)
+- ✅ Tamaño máximo (configurable, default: 5MB)
+- ✅ Magic numbers para detectar archivos corruptos
+- ✅ Límite de archivos en cola (configurable, default: 10)
+- ✅ Validación centralizada reutilizable (cliente + servidor)
+
+**Integración**:
+- ✅ APIs modernizadas: `/api/upload` y `/api/documentos` con streaming
+- ✅ Integrado en HR documentos y Empleado documentos
+- ✅ Integrado en onboarding individual (extracción IA)
+- ✅ Preparado para reutilización en cualquier contexto
+
+### Uso en Componentes
+
+```tsx
+import { FileUploadAdvanced } from '@/components/shared/file-upload-advanced';
+import { useFileUpload, type UploadHandler } from '@/lib/hooks/use-file-upload';
+
+function MiComponente() {
+  const handleUpload: UploadHandler = useCallback(
+    ({ file, signal, onProgress }) => {
+      // Implementación con XMLHttpRequest para progress tracking
+      const xhr = new XMLHttpRequest();
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable) {
+          onProgress?.(event.loaded, event.total);
+        }
+      };
+      // ... configuración y manejo de abort signal
+      return new Promise((resolve) => { /* ... */ });
+    },
+    [/* dependencies */]
+  );
+
+  return (
+    <FileUploadAdvanced
+      onUpload={handleUpload}
+      acceptedTypes={['application/pdf', 'image/jpeg', 'image/png']}
+      maxSizeMB={10}
+      allowMultiple
+      autoUpload
+    />
+  );
+}
+```
+
+### Componentes UI Relacionados
+
+- `components/shared/file-upload-advanced.tsx` - Componente principal con drag & drop
+- `components/ui/file-preview.tsx` - Preview de archivo con indicadores de estado
+- `components/ui/upload-progress.tsx` - Barra de progreso con ETA y velocidad
+- `components/ui/upload-error-alert.tsx` - Alertas de error con botón de retry
+
+---
+
 ## 📝 Próximos Pasos
 
 - Implementar auto-completado de fichajes
 - ✅ Integrar Hetzner Object Storage para documentos (completado)
+- ✅ Sistema de uploads avanzado con progress tracking (completado)
 - Implementar IA para extracción de datos
 - Tests unitarios e integración
 
 ---
 
-**Versión**: 1.2
-**Última actualización**: 8 de noviembre 2025
-**Cambios**: Agregado Canal de Denuncias, Header global, sistema de notificaciones
+**Versión**: 1.3
+**Última actualización**: 20 de noviembre 2025
+**Cambios**: Agregado sistema de uploads avanzado con progress tracking, streaming, rate limiting y componentes reutilizables

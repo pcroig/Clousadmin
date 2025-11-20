@@ -141,7 +141,19 @@ export function AddPersonaOnboardingForm({ onSuccess, onCancel, tipoOnboarding =
         return;
       }
 
-      const plantillas: PlantillaAutoOnboarding[] = (data.plantillas || []).map((plantilla: any) => ({
+      const plantillas: PlantillaAutoOnboarding[] = (data.plantillas || []).map((plantilla: {
+        id: string;
+        nombre: string;
+        descripcion?: string | null;
+        categoria?: string | null;
+        formato: 'docx' | 'pdf_rellenable';
+        requiereFirma?: boolean;
+        carpetaDestinoDefault?: string | null;
+        esOficial?: boolean;
+        autoGenerarOnboarding?: boolean;
+        permiteRellenar?: boolean;
+        requiereRevision?: boolean;
+      }) => ({
         id: plantilla.id,
         nombre: plantilla.nombre,
         descripcion: plantilla.descripcion,

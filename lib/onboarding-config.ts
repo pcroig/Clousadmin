@@ -91,7 +91,7 @@ const DEFAULT_CONFIG: OnboardingConfigData = {
 /**
  * Helper para convertir a JSON válido de Prisma
  */
-function toJsonValue<T extends Record<string, any>>(value: T): Prisma.InputJsonValue {
+function toJsonValue<T extends Record<string, unknown>>(value: T): Prisma.InputJsonValue {
   return value as unknown as Prisma.InputJsonValue;
 }
 
@@ -255,7 +255,7 @@ export async function actualizarPlantillasDocumentos(
  * Validar que campos requeridos estén completos
  */
 export function validarCamposRequeridos(
-  datos: any,
+  datos: Record<string, unknown>,
   camposRequeridos: Record<string, boolean>
 ): { valido: boolean; camposFaltantes: string[] } {
   const camposFaltantes: string[] = [];

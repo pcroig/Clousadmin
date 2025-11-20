@@ -44,17 +44,25 @@ export interface BalancePeriodo {
 
 export function generarDiasDelPeriodo(fechaInicio: Date, fechaFin: Date): DiaCalculo[] {
   const dias: DiaCalculo[] = [];
-  const cursor = new Date(fechaInicio.getFullYear(), fechaInicio.getMonth(), fechaInicio.getDate());
-  const finNormalizado = new Date(fechaFin.getFullYear(), fechaFin.getMonth(), fechaFin.getDate());
+  const cursor = new Date(Date.UTC(
+    fechaInicio.getUTCFullYear(),
+    fechaInicio.getUTCMonth(),
+    fechaInicio.getUTCDate()
+  ));
+  const finNormalizado = new Date(Date.UTC(
+    fechaFin.getUTCFullYear(),
+    fechaFin.getUTCMonth(),
+    fechaFin.getUTCDate()
+  ));
 
-  while (cursor <= finNormalizado) {
+  while (cursor.getTime() <= finNormalizado.getTime()) {
     const fecha = new Date(cursor);
-    fecha.setHours(0, 0, 0, 0);
+    fecha.setUTCHours(0, 0, 0, 0);
     dias.push({
       fecha,
       key: formatearClaveFecha(fecha),
     });
-    cursor.setDate(cursor.getDate() + 1);
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
   }
 
   return dias;

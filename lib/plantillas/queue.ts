@@ -15,7 +15,14 @@ import { crearNotificacionDocumentoGeneracionLote } from '@/lib/notificaciones';
 // Configuración de conexión Redis para BullMQ
 // Parsear REDIS_URL si está disponible, sino usar configuración por defecto
 const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
-let connection: any;
+let connection: {
+  host: string;
+  port: number;
+  password?: string;
+  maxRetriesPerRequest: null;
+  enableOfflineQueue: boolean;
+  retryStrategy: (times: number) => number | null;
+} | undefined;
 
 try {
   const url = new URL(REDIS_URL);
@@ -295,11 +302,12 @@ export async function agregarJobGeneracion(config: JobConfig): Promise<string> {
   try {
     await agregarEnCola();
     return jobRecord.id;
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const errorObj = error as { code?: string; message?: string } | null;
     const isConexion =
-      error?.code === 'ECONNREFUSED' ||
-      error?.message?.includes('ECONNREFUSED') ||
-      error?.message?.includes('connect');
+      errorObj?.code === 'ECONNREFUSED' ||
+      errorObj?.message?.includes('ECONNREFUSED') ||
+      errorObj?.message?.includes('connect');
 
     if (isConexion) {
       console.warn('[Queue] Redis no disponible durante el encolado. Ejecutando en modo inmediato.');

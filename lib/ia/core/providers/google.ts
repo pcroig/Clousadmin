@@ -3,15 +3,29 @@
 // ========================================
 // Wrapper del SDK de Google AI (Gemini) con interfaz unificada
 
-import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from '@google/generative-ai';
+import { GoogleGenerativeAI, HarmBlockThreshold, HarmCategory } from '@google/generative-ai';
+
 import {
-  AIProvider,
+  AICallOptions,
   AIMessage,
+  AIProvider,
   AIResponse,
   MessageRole,
   ModelConfig,
-  AICallOptions,
 } from '../types';
+
+type GoogleContentPart =
+  | { text: string }
+  | { inlineData: { mimeType: string; data: string } };
+
+interface GoogleContent {
+  role: 'user' | 'model';
+  parts: GoogleContentPart[];
+}
+
+type GoogleGenerateContentResponse = Awaited<
+  ReturnType<ReturnType<GoogleGenerativeAI['getGenerativeModel']>['generateContent']>
+>;
 
 /**
  * Cliente de Google AI (singleton)
@@ -55,18 +69,18 @@ export function resetGoogleAIClient(): void {
  */
 function convertMessagesToGoogle(messages: AIMessage[]): {
   systemInstruction?: string;
-  contents: any[];
+  contents: GoogleContent[];
 } {
   // Google AI maneja system instruction por separado
   const systemMessage = messages.find((m) => m.role === MessageRole.SYSTEM);
   const conversationMessages = messages.filter((m) => m.role !== MessageRole.SYSTEM);
   
-  const contents = conversationMessages.map((msg) => {
+  const contents: GoogleContent[] = conversationMessages.map((msg) => {
     // Convertir rol
     const role = msg.role === MessageRole.ASSISTANT ? 'model' : 'user';
     
     // Convertir contenido
-    let parts: any[];
+    let parts: GoogleContentPart[];
     
     if (typeof msg.content === 'string') {
       parts = [{ text: msg.content }];
@@ -113,9 +127,12 @@ function convertMessagesToGoogle(messages: AIMessage[]): {
 /**
  * Convierte respuesta de Google AI a formato unificado
  */
-function convertGoogleResponse(response: any, model: string): AIResponse {
+function convertGoogleResponse(response: GoogleGenerateContentResponse, model: string): AIResponse {
   const candidate = response.response.candidates?.[0];
-  const text = candidate?.content?.parts?.map((p: any) => p.text).join('') || '';
+  const text =
+    candidate?.content?.parts
+      ?.map((part) => ('text' in part && typeof part.text === 'string' ? part.text : ''))
+      .join('') || '';
   
   return {
     id: `google-${Date.now()}`,
@@ -191,7 +208,10 @@ export async function callGoogleAI(
       if (contents.length > 0) {
         const lastContent = contents[contents.length - 1];
         if (lastContent.parts && lastContent.parts.length > 0) {
-          lastContent.parts[0].text += '\n\nResponde SOLO con un objeto JSON válido, sin markdown ni explicaciones adicionales.';
+          const firstPart = lastContent.parts[0];
+          if ('text' in firstPart) {
+            firstPart.text += '\n\nResponde SOLO con un objeto JSON válido, sin markdown ni explicaciones adicionales.';
+          }
         }
       }
     }
@@ -202,9 +222,10 @@ export async function callGoogleAI(
     
     console.info(`[Google AI Provider] Respuesta recibida`);
     return convertGoogleResponse(result, config.model);
-  } catch (error: any) {
-    console.error('[Google AI Provider] Error:', error.message);
-    throw new Error(`Google AI error: ${error.message}`);
+  } catch (error) {
+    const normalizedError = error instanceof Error ? error : new Error('Unknown Google AI error');
+    console.error('[Google AI Provider] Error:', normalizedError.message);
+    throw new Error(`Google AI error: ${normalizedError.message}`);
   }
 }
 

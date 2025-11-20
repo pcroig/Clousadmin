@@ -4,14 +4,15 @@
 
 'use client';
 
-import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { FichajeWidget } from '@/components/shared/fichaje-widget';
-import { NotificacionesWidget, Notificacion } from '@/components/shared/notificaciones-widget';
-import { AusenciasWidget, AusenciaItem } from '@/components/shared/ausencias-widget';
+import { useMemo, useState } from 'react';
+
 import { SolicitarAusenciaModal } from '@/components/empleado/solicitar-ausencia-modal';
-import { CampanaVacacionesReminder } from '@/components/vacaciones/campana-vacaciones-reminder';
+import { AusenciaItem, AusenciasWidget } from '@/components/shared/ausencias-widget';
+import { FichajeWidget } from '@/components/shared/fichaje-widget';
+import { Notificacion, NotificacionesWidget } from '@/components/shared/notificaciones-widget';
 import { CampanaPropuestaReminder } from '@/components/vacaciones/campana-propuesta-reminder';
+import { CampanaVacacionesReminder } from '@/components/vacaciones/campana-vacaciones-reminder';
 
 interface DashboardClientProps {
   userName: string;

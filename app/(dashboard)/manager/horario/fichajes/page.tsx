@@ -2,10 +2,10 @@
 // Manager Fichajes Page
 // ========================================
 
-import { getSession } from '@/lib/auth';
 import { redirect } from 'next/navigation';
-import { FichajesClient } from '@/app/(dashboard)/hr/horario/fichajes/fichajes-client';
 
+import { FichajesClient } from '@/app/(dashboard)/hr/horario/fichajes/fichajes-client';
+import { getSession } from '@/lib/auth';
 import { UsuarioRol } from '@/lib/constants/enums';
 
 export default async function ManagerFichajesPage({

@@ -51,7 +51,7 @@ interface AlertaData {
   categoria: string;
   codigo: string;
   mensaje: string;
-  detalles?: any;
+  detalles?: Record<string, unknown>;
   accionUrl?: string;
 }
 
@@ -348,6 +348,7 @@ export async function recalcularAlertasEvento(eventoNominaId: string): Promise<n
   console.log(`[Alertas] Recalculadas ${totalAlertas} alertas para evento ${eventoNominaId}`);
   return totalAlertas;
 }
+
 
 
 

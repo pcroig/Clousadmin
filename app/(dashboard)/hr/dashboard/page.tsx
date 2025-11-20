@@ -2,16 +2,17 @@
 // HR Dashboard Page - 3 Column Layout (Fits in screen)
 // ========================================
 
-import { getSession } from '@/lib/auth';
 import { redirect } from 'next/navigation';
-import { prisma } from '@/lib/prisma';
-import { EstadoAusencia, TipoFichajeEvento, UsuarioRol } from '@/lib/constants/enums';
-import { FichajeWidget } from '@/components/shared/fichaje-widget';
-import { SolicitudesWidget } from '@/components/shared/solicitudes-widget';
-import { NotificacionesWidget, Notificacion } from '@/components/shared/notificaciones-widget';
+
 import { PlantillaWidget } from '@/components/dashboard/plantilla-widget';
 import { AutoCompletadoWidget } from '@/components/shared/auto-completado-widget';
+import { FichajeWidget } from '@/components/shared/fichaje-widget';
+import { Notificacion, NotificacionesWidget } from '@/components/shared/notificaciones-widget';
+import { SolicitudesWidget } from '@/components/shared/solicitudes-widget';
+import { getSession } from '@/lib/auth';
 import { obtenerResumenPlantilla } from '@/lib/calculos/plantilla';
+import { EstadoAusencia, TipoFichajeEvento, UsuarioRol } from '@/lib/constants/enums';
+import { prisma } from '@/lib/prisma';
 
 export default async function HRDashboardPage() {
   const session = await getSession();

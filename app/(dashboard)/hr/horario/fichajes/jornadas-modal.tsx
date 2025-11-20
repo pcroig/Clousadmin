@@ -4,14 +4,17 @@
 // Modal de Gestión de Jornadas (Simplificado)
 // ========================================
 
-import { useState, useEffect } from 'react';
+import { Clock, Edit2, Plus } from 'lucide-react';
+import { useEffect, useState } from 'react';
+
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import {
   DialogLarge as Dialog,
   DialogLargeContent as DialogContent,
   DialogLargeHeader as DialogHeader,
   DialogLargeTitle as DialogTitle,
 } from '@/components/ui/dialog-large';
-import { Button } from '@/components/ui/button';
 import {
   Table,
   TableBody,
@@ -20,10 +23,10 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
-import { Clock, Edit2, Plus } from 'lucide-react';
+
 import { EditarJornadaModal, type JornadaDetalle } from './editar-jornada-modal';
-import type { JornadaConfig, DiaConfig } from '@/lib/calculos/fichajes-helpers';
+
+import type { DiaConfig, JornadaConfig } from '@/lib/calculos/fichajes-helpers';
 
 type DiaKey = 'lunes' | 'martes' | 'miercoles' | 'jueves' | 'viernes' | 'sabado' | 'domingo';
 

@@ -2,9 +2,11 @@
 // Empleado - Carpeta Detail View (Server Component)
 // ========================================
 
+import { redirect } from 'next/navigation';
+
 import { getSession } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { redirect } from 'next/navigation';
+
 import { CarpetaDetailClientEmpleado } from './carpeta-detail-client';
 
 export default async function EmpleadoCarpetaDetailPage({

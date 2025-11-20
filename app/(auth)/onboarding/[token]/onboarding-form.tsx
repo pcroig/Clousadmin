@@ -4,7 +4,14 @@
 // Onboarding Form - Multi-Step Employee Data Collection
 // ========================================
 
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { Empleado } from '@prisma/client';
+import { ChevronLeft, ChevronRight, Upload, User } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+
+import { PWAExplicacion } from '@/components/onboarding/pwa-explicacion';
+import { DocumentList } from '@/components/shared/document-list';
+import { DocumentUploader } from '@/components/shared/document-uploader';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -15,16 +22,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
-import { Empleado } from '@prisma/client';
-import { ChevronLeft, ChevronRight, Upload, User } from 'lucide-react';
-import type { DatosTemporales, ProgresoOnboarding } from '@/lib/onboarding';
-import { DocumentUploader } from '@/components/shared/document-uploader';
-import { DocumentList } from '@/components/shared/document-list';
-import { validarIBAN } from '@/lib/validaciones/iban';
-import { PWAExplicacion } from '@/components/onboarding/pwa-explicacion';
 import { getAvatarStyle } from '@/lib/design-system';
-import type { OnboardingConfigData, DocumentoRequerido as ConfigDocumentoRequerido } from '@/lib/onboarding-config';
+import { validarIBAN } from '@/lib/validaciones/iban';
+
+import type { DatosTemporales, ProgresoOnboarding } from '@/lib/onboarding';
+import type { DocumentoRequerido as ConfigDocumentoRequerido, OnboardingConfigData } from '@/lib/onboarding-config';
 
 interface OnboardingFormProps {
   token: string;

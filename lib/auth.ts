@@ -3,15 +3,29 @@
 // ========================================
 // Core authentication functions using bcrypt and JWT
 
+import { randomBytes } from 'crypto';
+
 import { compare, hash } from 'bcryptjs';
 import { cookies } from 'next/headers';
-import { prisma } from '@/lib/prisma';
-import type { SessionData, UsuarioAutenticado } from '@/types/auth';
+
 import { createToken, verifyToken } from '@/lib/auth-edge';
+import { prisma } from '@/lib/prisma';
+
+import type { SessionData, UsuarioAutenticado } from '@/types/auth';
 
 // Configuración
 const SESSION_COOKIE_NAME = 'clousadmin-session';
 const SESSION_DURATION = 7 * 24 * 60 * 60 * 1000; // 7 días
+const PASSWORD_RECOVERY_PREFIX = 'password-recovery:';
+const TWO_FACTOR_CHALLENGE_PREFIX = 'two-factor-challenge:';
+const RECOVERY_TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hora
+const TWO_FACTOR_TOKEN_TTL_MS = 5 * 60 * 1000; // 5 minutos
+
+interface ValidatedTokenPayload {
+  usuarioId: string;
+  expires: Date;
+  tokenHash: string;
+}
 
 /**
  * Hash de contraseña con bcrypt
@@ -38,7 +52,7 @@ export { verifyToken, createToken } from '@/lib/auth-edge';
  * Usado para almacenar tokens en BD sin exponer el JWT completo
  * Compatible con Edge Runtime y Node.js Runtime
  */
-async function hashToken(token: string): Promise<string> {
+export async function hashToken(token: string): Promise<string> {
   const encoder = new TextEncoder();
   const data = encoder.encode(token);
   const hashBuffer = await crypto.subtle.digest('SHA-256', data);
@@ -209,6 +223,155 @@ export async function cleanupExpiredSessions(): Promise<number> {
     console.error('[Auth] Error limpiando sesiones expiradas:', error);
     return 0;
   }
+}
+
+/**
+ * Generar token de recuperación de contraseña
+ */
+export async function generateRecoveryToken(
+  usuarioId: string
+): Promise<{ token: string; expires: Date }> {
+  const token = randomBytes(32).toString('hex');
+  const tokenHash = await hashToken(token);
+  const identifier = `${PASSWORD_RECOVERY_PREFIX}${usuarioId}`;
+  const expires = new Date(Date.now() + RECOVERY_TOKEN_TTL_MS);
+
+  await prisma.verificationToken.deleteMany({
+    where: { identifier },
+  });
+
+  await prisma.verificationToken.create({
+    data: {
+      identifier,
+      token: tokenHash,
+      expires,
+    },
+  });
+
+  return { token, expires };
+}
+
+/**
+ * Validar token de recuperación de contraseña sin consumirlo
+ */
+export async function validateRecoveryToken(
+  rawToken: string
+): Promise<ValidatedTokenPayload | null> {
+  const tokenHash = await hashToken(rawToken);
+  const tokenRecord = await prisma.verificationToken.findUnique({
+    where: { token: tokenHash },
+  });
+
+  if (!tokenRecord || !tokenRecord.identifier.startsWith(PASSWORD_RECOVERY_PREFIX)) {
+    return null;
+  }
+
+  if (tokenRecord.expires < new Date()) {
+    await prisma.verificationToken.delete({ where: { token: tokenHash } });
+    return null;
+  }
+
+  const usuarioId = tokenRecord.identifier.replace(PASSWORD_RECOVERY_PREFIX, '');
+
+  return {
+    usuarioId,
+    expires: tokenRecord.expires,
+    tokenHash,
+  };
+}
+
+/**
+ * Consumir token de recuperación (lo elimina tras validarlo)
+ */
+export async function consumeRecoveryToken(
+  rawToken: string
+): Promise<{ usuarioId: string } | null> {
+  const validation = await validateRecoveryToken(rawToken);
+  if (!validation) {
+    return null;
+  }
+
+  await prisma.verificationToken.delete({
+    where: { token: validation.tokenHash },
+  });
+
+  return { usuarioId: validation.usuarioId };
+}
+
+/**
+ * Crear challenge temporal para verificación de 2FA
+ */
+export async function createTwoFactorChallenge(
+  usuarioId: string
+): Promise<{ token: string; expires: Date }> {
+  const token = randomBytes(32).toString('hex');
+  const tokenHash = await hashToken(token);
+  const identifier = `${TWO_FACTOR_CHALLENGE_PREFIX}${usuarioId}`;
+  const expires = new Date(Date.now() + TWO_FACTOR_TOKEN_TTL_MS);
+
+  await prisma.verificationToken.deleteMany({
+    where: { identifier },
+  });
+
+  await prisma.verificationToken.create({
+    data: {
+      identifier,
+      token: tokenHash,
+      expires,
+    },
+  });
+
+  return { token, expires };
+}
+
+/**
+ * Validar challenge 2FA
+ */
+export async function validateTwoFactorChallenge(
+  rawToken: string
+): Promise<ValidatedTokenPayload | null> {
+  const tokenHash = await hashToken(rawToken);
+  const tokenRecord = await prisma.verificationToken.findUnique({
+    where: { token: tokenHash },
+  });
+
+  if (!tokenRecord || !tokenRecord.identifier.startsWith(TWO_FACTOR_CHALLENGE_PREFIX)) {
+    return null;
+  }
+
+  if (tokenRecord.expires < new Date()) {
+    await prisma.verificationToken.delete({ where: { token: tokenHash } });
+    return null;
+  }
+
+  const usuarioId = tokenRecord.identifier.replace(
+    TWO_FACTOR_CHALLENGE_PREFIX,
+    ''
+  );
+
+  return {
+    usuarioId,
+    expires: tokenRecord.expires,
+    tokenHash,
+  };
+}
+
+/**
+ * Consumir challenge 2FA
+ */
+export async function consumeTwoFactorChallenge(
+  rawToken: string
+): Promise<{ usuarioId: string } | null> {
+  const validation = await validateTwoFactorChallenge(rawToken);
+  if (!validation) {
+    return null;
+  }
+
+  await prisma.verificationToken.delete({
+    where: { token: validation.tokenHash },
+  });
+
+  return { usuarioId: validation.usuarioId };
 }
 
 /**

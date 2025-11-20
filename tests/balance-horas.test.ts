@@ -67,9 +67,9 @@ function testGenerarDiasDelPeriodo() {
 
   for (const dia of dias) {
     assert.strictEqual(
-      dia.fecha.getHours(),
+      dia.fecha.getUTCHours(),
       0,
-      'Cada fecha debe normalizarse al inicio del día'
+      'Cada fecha debe normalizarse al inicio del día (UTC)'
     );
   }
 }

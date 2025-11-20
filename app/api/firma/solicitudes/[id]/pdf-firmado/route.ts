@@ -68,7 +68,7 @@ export async function GET(
         );
       }
 
-      const esFirmante = solicitud.firmas.some((f: any) => f.empleadoId === empleado.id);
+      const esFirmante = solicitud.firmas.some((f: { empleadoId: string }) => f.empleadoId === empleado.id);
 
       if (!esFirmante) {
         return NextResponse.json(
@@ -117,11 +117,12 @@ export async function GET(
         'Content-Length': pdfBuffer.length.toString(),
       },
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[GET /api/firma/solicitudes/:id/pdf-firmado] Error:', error);
 
     // Manejar error de archivo no encontrado en S3
-    if (error.message?.includes('no existe') || error.message?.includes('not found')) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    if (errorMessage.includes('no existe') || errorMessage.includes('not found')) {
       return NextResponse.json(
         { error: 'No se encontró el PDF firmado en el almacenamiento' },
         { status: 404 }

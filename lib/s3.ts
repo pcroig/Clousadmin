@@ -5,10 +5,13 @@
 // Optimized for production with better error handling
 // Fallback to local filesystem in development when Object Storage is not configured
 
-import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
-import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { promises as fs } from 'fs';
+import { Readable } from 'node:stream';
 import path from 'path';
+
+import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+
 
 const BUCKET_NAME = process.env.STORAGE_BUCKET;
 
@@ -108,6 +111,26 @@ async function ensureUploadDir(): Promise<void> {
   }
 }
 
+type UploadBody = Buffer | Uint8Array | string | Readable;
+
+function isReadable(body: UploadBody): body is Readable {
+  return typeof (body as Readable).pipe === 'function';
+}
+
+async function ensureBuffer(body: UploadBody): Promise<Buffer> {
+  if (Buffer.isBuffer(body)) return body;
+  if (typeof body === 'string') return Buffer.from(body);
+  if (body instanceof Uint8Array) return Buffer.from(body);
+  if (isReadable(body)) {
+    const chunks: Buffer[] = [];
+    for await (const chunk of body) {
+      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    }
+    return Buffer.concat(chunks);
+  }
+  return Buffer.alloc(0);
+}
+
 /**
  * Upload file to local filesystem (development fallback)
  */
@@ -161,14 +184,15 @@ async function deleteFromLocal(key: string): Promise<void> {
  * @returns The full URL of the uploaded file (Object Storage or local)
  */
 export async function uploadToS3(
-  file: Buffer,
+  file: UploadBody,
   key: string,
   contentType: string
 ): Promise<string> {
   // Fallback to local storage in development
   if (!isS3Configured()) {
     console.warn('[Storage] Object Storage no configurado. Usando almacenamiento local (desarrollo):', key);
-    return uploadToLocal(file, key);
+    const buffer = await ensureBuffer(file);
+    return uploadToLocal(buffer, key);
   }
 
   const s3Client = getS3Client();

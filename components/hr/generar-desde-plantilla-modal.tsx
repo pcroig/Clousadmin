@@ -167,7 +167,20 @@ export function GenerarDesdePlantillaModal({
 
       // La API retorna el array directamente, no envuelto en {success, empleados}
       if (Array.isArray(data)) {
-        setEmpleados(data.map((emp: any) => ({
+        setEmpleados(data.map((emp: {
+          id: string;
+          nombre?: string;
+          apellidos?: string;
+          email?: string;
+          usuario?: {
+            nombre?: string;
+            apellidos?: string;
+            email?: string;
+          };
+          puestoRelacion?: {
+            nombre?: string;
+          } | null;
+        }) => ({
           id: emp.id,
           nombre: emp.usuario?.nombre || emp.nombre,
           apellidos: emp.usuario?.apellidos || emp.apellidos,

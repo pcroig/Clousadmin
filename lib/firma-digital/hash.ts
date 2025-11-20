@@ -52,7 +52,7 @@ export function generarHashString(contenido: string): string {
  * const hash = generarHashObjeto(certificado);
  * ```
  */
-export function generarHashObjeto(objeto: any): string {
+export function generarHashObjeto(objeto: Record<string, unknown>): string {
   const jsonString = JSON.stringify(objeto, Object.keys(objeto).sort());
   return generarHashString(jsonString);
 }

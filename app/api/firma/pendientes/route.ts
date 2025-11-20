@@ -40,7 +40,7 @@ export async function GET(request: NextRequest) {
     );
 
     // Formatear respuesta con información útil
-    const firmasFormateadas = firmasPendientes.map((firma: any) => ({
+    const firmasFormateadas = firmasPendientes.map((firma) => ({
       id: firma.id,
       solicitudFirmaId: firma.solicitudFirmaId,
       orden: firma.orden,

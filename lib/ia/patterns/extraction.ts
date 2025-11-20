@@ -5,9 +5,10 @@
 // Usa Zod para validación de schema y retry automático
 
 import { z } from 'zod';
-import { callAI, getPrimaryProvider, callAIForJSON } from '../core/client';
-import { AIMessage, MessageRole, AIProvider } from '../core/types';
-import { createConfigForUseCase, AIUseCase } from '../core/config';
+
+import { callAI, getPrimaryProvider } from '../core/client';
+import { AIUseCase, createConfigForUseCase } from '../core/config';
+import { AIMessage, AIProvider, MessageRole } from '../core/types';
 
 // ========================================
 // TIPOS
@@ -155,13 +156,14 @@ Ejemplo de respuesta:
         provider: response.provider,
         usage: response.usage,
       };
-    } catch (error: any) {
-      console.error(`[Extraction Pattern] Error (intento ${attempt + 1}):`, error.message);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(`[Extraction Pattern] Error (intento ${attempt + 1}):`, message);
       
       if (attempt === maxRetries) {
         return {
           success: false,
-          error: `Error después de ${maxRetries + 1} intentos: ${error.message}`,
+          error: `Error después de ${maxRetries + 1} intentos: ${message}`,
           provider,
         };
       }
@@ -169,7 +171,7 @@ Ejemplo de respuesta:
       // Agregar feedback para el siguiente intento
       messages.push({
         role: MessageRole.ASSISTANT,
-        content: JSON.stringify(error.message),
+        content: JSON.stringify(message),
       });
       messages.push({
         role: MessageRole.USER,
@@ -278,10 +280,11 @@ Si no encuentras ningún item, retorna un array vacío: { "items": [] }`;
       provider: response.provider,
       usage: response.usage,
     };
-  } catch (error: any) {
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
     return {
       success: false,
-      error: error.message,
+      error: message,
       provider,
     };
   }

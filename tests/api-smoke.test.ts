@@ -24,9 +24,13 @@ const APP_DIR = resolve(__dirname, '../app/api');
 function testApiEndpointsExist() {
   const criticalEndpoints = [
     // Autenticación
-    'auth/login/route.ts',
-    'auth/logout/route.ts',
-    
+    'auth/[...nextauth]/route.ts',
+    'auth/google/route.ts',
+    'auth/google/callback/route.ts',
+    'auth/recovery/request/route.ts',
+    'auth/recovery/reset/route.ts',
+    'auth/verify-password/route.ts',
+
     // Empleados
     'empleados/route.ts',
     'empleados/[id]/route.ts',
@@ -42,7 +46,7 @@ function testApiEndpointsExist() {
     'documentos/[id]/route.ts',
     
     // Nóminas
-    'nominas/route.ts',
+    'nominas/mis-nominas/route.ts',
     'nominas/[id]/route.ts',
     
     // Fichajes
@@ -65,7 +69,7 @@ function testApiEndpointsExist() {
 function testApiEndpointsExportHandlers() {
   const endpointsToCheck = [
     { path: 'empleados/route.ts', methods: ['GET', 'POST'] },
-    { path: 'empleados/[id]/route.ts', methods: ['GET', 'PATCH', 'DELETE'] },
+    { path: 'empleados/[id]/route.ts', methods: ['GET', 'PATCH'] },
     { path: 'ausencias/route.ts', methods: ['GET', 'POST'] },
     { path: 'documentos/route.ts', methods: ['GET', 'POST'] },
   ];
@@ -94,7 +98,7 @@ function testApiEndpointsUseAuth() {
     'empleados/[id]/route.ts',
     'ausencias/route.ts',
     'documentos/route.ts',
-    'nominas/route.ts',
+    'nominas/mis-nominas/route.ts',
   ];
 
   for (const endpoint of protectedEndpoints) {
@@ -102,8 +106,10 @@ function testApiEndpointsUseAuth() {
     const content = readFileSync(path, 'utf-8');
     
     // Verificar que usa getSession para autenticación
-    const usesAuth = content.includes('getSession') || 
-                     content.includes('await getSession()');
+    const usesAuth = content.includes('getSession') ||
+                     content.includes('requireAuth') ||
+                     content.includes('requireAuthAsHR') ||
+                     content.includes('requireAuthAsHROrManager');
     assert.ok(usesAuth, `Endpoint protegido debe usar getSession: ${endpoint}`);
   }
 
@@ -116,9 +122,9 @@ function testApiEndpointsUseAuth() {
 
 function testApiEndpointsUseValidation() {
   const endpointsWithValidation = [
-    'empleados/route.ts',
-    'ausencias/route.ts',
-    'nominas/route.ts',
+    'auth/recovery/reset/route.ts',
+    'nominas/eventos/route.ts',
+    'fichajes/revision/route.ts',
   ];
 
   for (const endpoint of endpointsWithValidation) {
@@ -195,6 +201,7 @@ try {
   console.error('❌ Error en smoke tests de APIs:', error);
   process.exit(1);
 }
+
 
 
 

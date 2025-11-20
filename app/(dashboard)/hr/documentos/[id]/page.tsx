@@ -2,13 +2,15 @@
 // HR - Carpeta Detail View (Server Component)
 // ========================================
 
-import { getSession } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
 import { redirect } from 'next/navigation';
-import { CarpetaDetailClient } from './carpeta-detail-client';
 
+import { getSession } from '@/lib/auth';
 import { UsuarioRol } from '@/lib/constants/enums';
 import { obtenerTipoDocumentoDesdeCarpeta } from '@/lib/documentos';
+import { prisma } from '@/lib/prisma';
+
+import { CarpetaDetailClient } from './carpeta-detail-client';
+
 
 export default async function HRCarpetaDetailPage({
   params,

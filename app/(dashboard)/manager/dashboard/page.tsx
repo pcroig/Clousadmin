@@ -2,20 +2,20 @@
 // Manager Dashboard Page - 3 Column Layout
 // ========================================
 
-import { getSession } from '@/lib/auth';
 import { redirect } from 'next/navigation';
-import { prisma } from '@/lib/prisma';
-import { FichajeWidget } from '@/components/shared/fichaje-widget';
-import { SolicitudesWidget } from '@/components/shared/solicitudes-widget';
-import { NotificacionesWidget, Notificacion } from '@/components/shared/notificaciones-widget';
-import { AutoCompletadoWidget } from '@/components/shared/auto-completado-widget';
-import { PlantillaWidget } from '@/components/dashboard/plantilla-widget';
 
-import { EstadoAusencia, UsuarioRol } from '@/lib/constants/enums';
-import { obtenerResumenPlantillaEquipo } from '@/lib/calculos/plantilla';
-import { obtenerCampanaPendiente, obtenerPropuestaPendiente } from '@/lib/services/campanas-vacaciones';
-import { CampanaVacacionesReminder } from '@/components/vacaciones/campana-vacaciones-reminder';
+import { PlantillaWidget } from '@/components/dashboard/plantilla-widget';
+import { AutoCompletadoWidget } from '@/components/shared/auto-completado-widget';
+import { FichajeWidget } from '@/components/shared/fichaje-widget';
+import { Notificacion, NotificacionesWidget } from '@/components/shared/notificaciones-widget';
+import { SolicitudesWidget } from '@/components/shared/solicitudes-widget';
 import { CampanaPropuestaReminder } from '@/components/vacaciones/campana-propuesta-reminder';
+import { CampanaVacacionesReminder } from '@/components/vacaciones/campana-vacaciones-reminder';
+import { getSession } from '@/lib/auth';
+import { obtenerResumenPlantillaEquipo } from '@/lib/calculos/plantilla';
+import { EstadoAusencia, UsuarioRol } from '@/lib/constants/enums';
+import { prisma } from '@/lib/prisma';
+import { obtenerCampanaPendiente, obtenerPropuestaPendiente } from '@/lib/services/campanas-vacaciones';
 
 export default async function ManagerDashboardPage() {
   const session = await getSession();

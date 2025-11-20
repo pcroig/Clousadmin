@@ -5,10 +5,41 @@
 // POST: Aprobar/rechazar fichajes en revisión
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getSession } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+
 import { z } from 'zod';
+
+import { getSession } from '@/lib/auth';
 import { crearNotificacionFichajeResuelto } from '@/lib/notificaciones';
+import { prisma } from '@/lib/prisma';
+
+// ========================================
+// Types para datos JSON de Prisma
+// ========================================
+
+interface DatosOriginales {
+  fichajeId?: string;
+  fecha?: string;
+  eventosExistentes?: Array<{ tipo: string; hora: string | Date }>;
+  fichajesExistentes?: Array<{ tipo: string; hora: string | Date }>;
+}
+
+interface Sugerencias {
+  razon?: string;
+  confianza?: number;
+  salidaSugerida?: string;
+}
+
+interface ConfigDiaJornada {
+  activo?: boolean;
+  entrada?: string;
+  salida?: string;
+  pausa_inicio?: string;
+  pausa_fin?: string;
+}
+
+interface ConfigJornada {
+  [key: string]: ConfigDiaJornada | unknown;
+}
 
 const revisionSchema = z.object({
   revisiones: z.array(
@@ -67,8 +98,8 @@ export async function GET(request: NextRequest) {
 
     // Formatear datos para el modal
     const fichajes = await Promise.all(autoCompletados.map(async (ac) => {
-      const datosOriginales = ac.datosOriginales as any;
-      const sugerencias = ac.sugerencias as any;
+      const datosOriginales = (ac.datosOriginales as unknown) as DatosOriginales | null;
+      const sugerencias = (ac.sugerencias as unknown) as Sugerencias | null;
 
       const eventosExistentesRaw = Array.isArray(datosOriginales?.eventosExistentes)
         ? datosOriginales.eventosExistentes
@@ -76,7 +107,7 @@ export async function GET(request: NextRequest) {
           ? datosOriginales.fichajesExistentes
           : [];
 
-      const eventosRegistrados = eventosExistentesRaw.map((evento: any) => ({
+      const eventosRegistrados = eventosExistentesRaw.map((evento: { tipo: string; hora: string | Date }) => ({
         tipo: evento.tipo,
         hora: evento.hora,
         origen: 'registrado' as const,
@@ -96,7 +127,8 @@ export async function GET(request: NextRequest) {
           if (jornada?.config) {
             const dias = ['domingo','lunes','martes','miercoles','jueves','viernes','sabado'];
             const nombreDia = dias[fechaBase.getDay()];
-            const confDia: any = (jornada.config as any)[nombreDia];
+            const configJornada = (jornada.config as unknown) as ConfigJornada;
+            const confDia = configJornada[nombreDia] as ConfigDiaJornada | undefined;
             if (confDia?.activo && confDia.entrada && confDia.salida) {
               const setHora = (base: Date, hhmm: string) => {
                 const [h, m] = hhmm.split(':').map(Number);
@@ -123,7 +155,7 @@ export async function GET(request: NextRequest) {
         empleadoId: ac.empleadoId,
         empleadoNombre: `${ac.empleado.nombre} ${ac.empleado.apellidos}`,
         fecha: datosOriginales?.fecha || new Date().toISOString(),
-        eventos: previewEventos.length > 0 ? previewEventos : eventosRegistrados.map((e: any) => ({ ...e, origen: 'registrado' as const })),
+        eventos: previewEventos.length > 0 ? previewEventos : eventosRegistrados.map((e) => ({ ...e, origen: 'registrado' as const })),
         razon: sugerencias?.razon || 'Requiere revisión manual',
         confianza: sugerencias?.confianza || 0,
       };
@@ -182,8 +214,8 @@ export async function POST(request: NextRequest) {
           continue;
         }
 
-          const datos = autoCompletado.datosOriginales as any;
-          const sugerencias = autoCompletado.sugerencias as any;
+          const datos = (autoCompletado.datosOriginales as unknown) as DatosOriginales | null;
+          const sugerencias = (autoCompletado.sugerencias as unknown) as Sugerencias | null;
         const fichajeId = datos.fichajeId;
 
         if (accion === 'actualizar') {
@@ -225,8 +257,9 @@ export async function POST(request: NextRequest) {
 
           let eventosAcrear: { tipo: 'entrada'|'pausa_inicio'|'pausa_fin'|'salida'; hora: Date }[] = [];
 
-          if (jornadaEmpleado?.config && (jornadaEmpleado.config as any)[nombreDia]?.activo) {
-            const confDia = (jornadaEmpleado.config as any)[nombreDia];
+          const configJornadaEmpleado = jornadaEmpleado?.config ? (jornadaEmpleado.config as unknown) as ConfigJornada : null;
+          if (configJornadaEmpleado && configJornadaEmpleado[nombreDia]) {
+            const confDia = configJornadaEmpleado[nombreDia] as ConfigDiaJornada;
             if (confDia.entrada && confDia.salida) {
               eventosAcrear.push({ tipo: 'entrada', hora: setHora(fechaDia, confDia.entrada) });
               // Pausa opcional si está definida

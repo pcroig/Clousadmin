@@ -4,16 +4,18 @@
 
 'use client';
 
-import { useState } from 'react';
 import { Flag } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { GeneralTab } from '@/components/shared/mi-espacio/general-tab';
-import { FichajesTab } from '@/components/shared/mi-espacio/fichajes-tab';
+import { useState } from 'react';
+
+import { DenunciaDialog } from '@/components/empleado/denuncia-dialog';
+import { AusenciasTab } from '@/components/shared/mi-espacio/ausencias-tab';
 import { ContratosTab } from '@/components/shared/mi-espacio/contratos-tab';
 import { DocumentosTab } from '@/components/shared/mi-espacio/documentos-tab';
-import { AusenciasTab } from '@/components/shared/mi-espacio/ausencias-tab';
-import { DenunciaDialog } from '@/components/empleado/denuncia-dialog';
+import { FichajesTab } from '@/components/shared/mi-espacio/fichajes-tab';
+import { GeneralTab } from '@/components/shared/mi-espacio/general-tab';
 import { ProfileAvatar } from '@/components/shared/profile-avatar';
+import { Button } from '@/components/ui/button';
+
 import type { MiEspacioEmpleado, Usuario } from '@/types/empleado';
 
 interface MiEspacioManagerClientProps {

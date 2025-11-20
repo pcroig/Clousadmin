@@ -106,21 +106,22 @@ export async function POST(
         ? 'Documento firmado correctamente. Todas las firmas han sido completadas.'
         : 'Documento firmado correctamente.',
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[POST /api/firma/solicitudes/:id/firmar] Error:', error);
 
     // Manejar errores de validación de negocio
+    const errorMessage = error instanceof Error ? error.message : String(error);
     if (
-      error.message.includes('no encontrada') ||
-      error.message.includes('no pertenece') ||
-      error.message.includes('ya ha sido firmado') ||
-      error.message.includes('cancelada') ||
-      error.message.includes('esperar a que') ||
-      error.message.includes('modificado')
+      errorMessage.includes('no encontrada') ||
+      errorMessage.includes('no pertenece') ||
+      errorMessage.includes('ya ha sido firmado') ||
+      errorMessage.includes('cancelada') ||
+      errorMessage.includes('esperar a que') ||
+      errorMessage.includes('modificado')
     ) {
       return NextResponse.json(
-        { error: error.message },
-        { status: error.message.includes('no encontrada') ? 404 : 400 }
+        { error: errorMessage },
+        { status: errorMessage.includes('no encontrada') ? 404 : 400 }
       );
     }
 

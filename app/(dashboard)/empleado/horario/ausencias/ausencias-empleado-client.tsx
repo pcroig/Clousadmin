@@ -4,7 +4,14 @@
 // Ausencias Empleado Client Component
 // ========================================
 
-import { useState, useEffect } from 'react';
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
+import { Calendar, ChevronDown, ChevronUp, Paperclip } from 'lucide-react';
+import { useEffect, useState } from 'react';
+
+import { SolicitarAusenciaModal } from '@/components/empleado/solicitar-ausencia-modal';
+import { TableHeader as PageHeader } from '@/components/shared/table-header';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -15,13 +22,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
-import { TableHeader as PageHeader } from '@/components/shared/table-header';
-import { SolicitarAusenciaModal } from '@/components/empleado/solicitar-ausencia-modal';
-import { Calendar, ChevronDown, ChevronUp, Paperclip } from 'lucide-react';
-import { format } from 'date-fns';
-import { es } from 'date-fns/locale';
-
 import { EstadoAusencia } from '@/lib/constants/enums';
 
 interface Ausencia {

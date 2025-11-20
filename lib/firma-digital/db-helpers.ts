@@ -3,6 +3,8 @@
  * Funciones para crear solicitudes, firmar documentos, y consultar estados
  */
 
+import { Prisma } from '@prisma/client';
+
 import { prisma } from '@/lib/prisma';
 import { downloadFromS3, uploadToS3 } from '@/lib/s3';
 import {
@@ -257,10 +259,10 @@ export async function firmarDocumento(
   // 3. Si hay orden de firma, validar que sea el turno de este empleado
   if (firma.solicitudFirma.ordenFirma && firma.orden > 0) {
     const firmasAnteriores = firma.solicitudFirma.firmas.filter(
-      (f: any) => f.orden < firma.orden && f.orden > 0
+      (f) => f.orden < firma.orden && f.orden > 0
     );
 
-    const todasFirmadasAnteriormente = firmasAnteriores.every((f: any) => f.firmado);
+    const todasFirmadasAnteriormente = firmasAnteriores.every((f) => f.firmado);
 
     if (!todasFirmadasAnteriormente) {
       throw new Error(
@@ -549,7 +551,7 @@ export async function obtenerEstadoSolicitud(
 
   const estadoComplecion = validarComplecionFirmas(solicitud.firmas);
 
-  const firmasResult: ResultadoFirma[] = solicitud.firmas.map((f: any) => ({
+  const firmasResult: ResultadoFirma[] = solicitud.firmas.map((f) => ({
     firmaId: f.id,
     empleadoId: f.empleadoId,
     empleadoNombre: `${f.empleado.nombre} ${f.empleado.apellidos}`,
@@ -589,7 +591,7 @@ export async function listarSolicitudesFirma(
     empleadoId?: string;
   }
 ) {
-  const where: any = { empresaId };
+  const where: Prisma.SolicitudFirmaWhereInput = { empresaId };
 
   if (filtros?.estado) {
     where.estado = filtros.estado;
@@ -631,7 +633,7 @@ export async function listarSolicitudesFirma(
     },
   });
 
-  return solicitudes.map((s: any) => {
+  return solicitudes.map((s) => {
     const estadoComplecion = validarComplecionFirmas(s.firmas);
     return {
       ...s,

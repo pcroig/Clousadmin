@@ -4,13 +4,14 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
-import { TableHeader } from '@/components/shared/table-header';
-import { TableFilters } from '@/components/shared/table-filters';
-import { DataTable, Column } from '@/components/shared/data-table';
-import { DetailsPanel } from '@/components/shared/details-panel';
+import { useEffect, useState } from 'react';
+
 import { PuestoDetails } from '@/components/organizacion/puesto-details';
 import { PuestoFormModal } from '@/components/organizacion/puesto-form-modal';
+import { Column, DataTable } from '@/components/shared/data-table';
+import { DetailsPanel } from '@/components/shared/details-panel';
+import { TableFilters } from '@/components/shared/table-filters';
+import { TableHeader } from '@/components/shared/table-header';
 
 interface Puesto {
   id: string;

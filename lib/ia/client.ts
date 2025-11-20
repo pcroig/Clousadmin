@@ -9,8 +9,6 @@
 // Este archivo solo re-exporta las funciones del nuevo sistema para
 // mantener compatibilidad con código existente.
 
-import OpenAI from 'openai';
-
 /**
  * @deprecated Usar callAI del nuevo sistema
  * Re-exporta desde core/client para compatibilidad

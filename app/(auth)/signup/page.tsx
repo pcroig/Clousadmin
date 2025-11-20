@@ -1,8 +1,11 @@
-import { redirect } from 'next/navigation';
 import Image from 'next/image';
-import { obtenerInvitacionSignupPorToken, verificarInvitacionSignup } from '@/lib/invitaciones-signup';
-import { SignupForm } from './signup-form';
+import { redirect } from 'next/navigation';
+
 import { getSession } from '@/lib/auth';
+import { obtenerInvitacionSignupPorToken, verificarInvitacionSignup } from '@/lib/invitaciones-signup';
+
+import { SignupForm } from './signup-form';
+
 
 interface SignupPageProps {
   searchParams: Promise<{ token?: string }>;

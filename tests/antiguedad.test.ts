@@ -11,7 +11,7 @@ function testRangos() {
   assert.ok(rango, 'Debe existir rango para 6_12_meses');
   assertDate(rango.gte);
   assertDate(rango.lt);
-  assert.ok(rango.gte!.getTime() > rango.lt!.getTime(), 'gte debe ser más reciente que lt');
+  assert.ok(rango.gte!.getTime() < rango.lt!.getTime(), 'gte debe ser más antiguo que lt');
 
   const mas5 = obtenerRangoFechaAntiguedad('mas_5_años');
   assert.ok(mas5);

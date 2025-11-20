@@ -3,10 +3,13 @@
 // ========================================
 
 import { GalleryVerticalEnd } from 'lucide-react';
+import Image from 'next/image';
 import Link from 'next/link';
-import { verificarTokenOnboarding, type ProgresoOnboarding, type DatosTemporales } from '@/lib/onboarding';
-import { OnboardingForm } from './onboarding-form';
+
+import { type DatosTemporales, type ProgresoOnboarding, verificarTokenOnboarding } from '@/lib/onboarding';
 import { obtenerOnboardingConfig, type OnboardingConfigData } from '@/lib/onboarding-config';
+
+import { OnboardingForm } from './onboarding-form';
 
 export default async function OnboardingPage({
   params,
@@ -65,10 +68,12 @@ export default async function OnboardingPage({
         </div>
       </div>
       <div className="bg-muted relative hidden lg:block">
-        <img
+        <Image
           src="/login-hero.jpg"
           alt="HR Management"
-          className="absolute inset-0 h-full w-full object-cover dark:brightness-[0.2] dark:grayscale"
+          fill
+          className="object-cover dark:brightness-[0.2] dark:grayscale"
+          priority
         />
       </div>
     </div>

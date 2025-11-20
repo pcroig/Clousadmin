@@ -2,10 +2,12 @@
 // Campaña de Vacaciones - Page
 // ========================================
 
-import { getSession } from '@/lib/auth';
 import { redirect } from 'next/navigation';
-import { prisma } from '@/lib/prisma';
+
+import { getSession } from '@/lib/auth';
 import { UsuarioRol } from '@/lib/constants/enums';
+import { prisma } from '@/lib/prisma';
+
 import { CampanaClient } from './campana-client';
 
 export default async function CampanaVacacionesPage() {

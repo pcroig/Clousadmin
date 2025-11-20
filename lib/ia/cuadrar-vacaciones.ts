@@ -4,9 +4,11 @@
 // Usa OpenAI para optimizar distribución de vacaciones en campañas
 
 // Importar desde punto de entrada centralizado (base común)
+import { z } from 'zod';
+
 import { callAIWithConfig } from './models';
-import { prisma } from '@/lib/prisma';
-import type { PreferenciaVacaciones, Empleado, Ausencia } from '@prisma/client';
+
+import type { Ausencia, Empleado, PreferenciaVacaciones } from '@prisma/client';
 
 /**
  * Propuesta de vacaciones para un empleado
@@ -67,33 +69,51 @@ interface CuadrarVacacionesInput {
   fechaFinObjetivo: Date;
 }
 
+type PreferenciaFormateada = {
+  empleadoId: string;
+  empleadoNombre: string;
+  diasDisponibles: number | null;
+  diasIdeales: string[];
+  diasPrioritarios: string[];
+  diasAlternativos: string[];
+  equipos: Array<{ id: string | null; nombre: string }>;
+};
+
+type AusenciaFormateada = {
+  empleadoId: string | null;
+  fechaInicio: string;
+  fechaFin: string;
+  dias: number;
+};
+
+type EquipoResumen = { id: string; nombre: string; miembros: string[] };
+
 /**
  * Cuadrar vacaciones usando OpenAI
  */
 export async function cuadrarVacacionesIA(
   input: CuadrarVacacionesInput
 ): Promise<ResultadoCuadrado> {
-  const { empresaId, campanaId, solapamientoMaximoPct, preferencias, ausenciasAprobadas, fechaInicioObjetivo, fechaFinObjetivo } = input;
+  const { campanaId, solapamientoMaximoPct, preferencias, ausenciasAprobadas, fechaInicioObjetivo, fechaFinObjetivo } =
+    input;
 
   console.info(`[Cuadrar Vacaciones] Iniciando para campaña ${campanaId} con ${preferencias.length} empleados`);
 
   // 1. Preparar datos para la IA
-  const preferenciasFormateadas = preferencias.map(pref => ({
+  const preferenciasFormateadas: PreferenciaFormateada[] = preferencias.map((pref) => ({
     empleadoId: pref.empleado.id,
     empleadoNombre: `${pref.empleado.nombre} ${pref.empleado.apellidos}`,
     diasDisponibles: pref.empleado.diasVacaciones,
-    diasIdeales: pref.diasIdeales as string[],
-    diasPrioritarios: (pref.diasPrioritarios as string[] | null) || [],
-    diasAlternativos: (pref.diasAlternativos as string[] | null) || [],
+    diasIdeales: Array.isArray(pref.diasIdeales) ? (pref.diasIdeales as string[]) : [],
+    diasPrioritarios: Array.isArray(pref.diasPrioritarios) ? (pref.diasPrioritarios as string[]) : [],
+    diasAlternativos: Array.isArray(pref.diasAlternativos) ? (pref.diasAlternativos as string[]) : [],
     equipos: pref.empleado.equipos.map((e) => ({
-      id: e.equipo?.id || e.equipoId,
+      id: e.equipo?.id || e.equipoId || null,
       nombre: e.equipo?.nombre || 'Equipo sin nombre',
     })),
   }));
 
-  const equiposResumen = preferenciasFormateadas.reduce<
-    Array<{ id: string; nombre: string; miembros: string[] }>
-  >((acc, pref) => {
+  const equiposResumen = preferenciasFormateadas.reduce<EquipoResumen[]>((acc, pref) => {
     if (!pref.equipos.length) {
       return acc;
     }
@@ -117,7 +137,7 @@ export async function cuadrarVacacionesIA(
     return acc;
   }, []);
 
-  const ausenciasFormateadas = ausenciasAprobadas.map(ausencia => ({
+  const ausenciasFormateadas: AusenciaFormateada[] = ausenciasAprobadas.map((ausencia) => ({
     empleadoId: ausencia.empleadoId,
     fechaInicio: ausencia.fechaInicio.toISOString().split('T')[0],
     fechaFin: ausencia.fechaFin.toISOString().split('T')[0],
@@ -178,10 +198,10 @@ export async function cuadrarVacacionesIA(
  * Construir prompt para OpenAI
  */
 function construirPrompt(data: {
-  preferencias: any[];
-  ausenciasAprobadas: any[];
+  preferencias: PreferenciaFormateada[];
+  ausenciasAprobadas: AusenciaFormateada[];
   solapamientoMaximoPct?: number;
-  equipos?: Array<{ id: string; nombre: string; miembros: string[] }>;
+  equipos?: EquipoResumen[];
   totalEmpleados: number;
   fechaInicioObjetivo: string;
   fechaFinObjetivo: string;
@@ -270,47 +290,54 @@ Genera SOLO el JSON sin texto adicional.
 /**
  * Validar y normalizar resultado de OpenAI
  */
-function validarYNormalizarResultado(
-  resultado: any,
-  preferencias: any[]
-): ResultadoCuadrado {
-  const warnings: string[] = [];
+const propuestaSchema = z.object({
+  empleadoId: z.string(),
+  empleadoNombre: z.string(),
+  fechaInicio: z.string(),
+  fechaFin: z.string(),
+  dias: z.number(),
+  tipo: z.enum(['ideal', 'alternativo', 'ajustado']).optional(),
+  motivo: z.string().optional(),
+  prioridad: z.number().optional(),
+});
 
-  // Validar estructura básica
-  if (!resultado.propuestas || !Array.isArray(resultado.propuestas)) {
-    console.warn('[Cuadrar Vacaciones] Respuesta sin propuestas válidas');
+const resultadoSchema = z.object({
+  propuestas: z.array(propuestaSchema),
+  resumen: z
+    .object({
+      solapamientoMaximo: z.number().optional(),
+      solapamientoPorDia: z.record(z.number()).optional(),
+    })
+    .optional(),
+  warnings: z.array(z.string()).optional(),
+});
+
+function validarYNormalizarResultado(
+  resultado: unknown,
+  preferencias: CuadrarVacacionesInput['preferencias']
+): ResultadoCuadrado {
+  const parsed = resultadoSchema.safeParse(resultado);
+
+  if (!parsed.success) {
+    console.warn('[Cuadrar Vacaciones] Respuesta inválida, usando fallback:', parsed.error.message);
     return generarPropuestasFallback(preferencias, 30);
   }
 
-  // Validar que todas las propuestas son válidas
-  const propuestasValidas: PropuestaVacacionEmpleado[] = [];
-  
-  for (const propuesta of resultado.propuestas) {
-    if (
-      propuesta.empleadoId &&
-      propuesta.empleadoNombre &&
-      propuesta.fechaInicio &&
-      propuesta.fechaFin &&
-      typeof propuesta.dias === 'number'
-    ) {
-      propuestasValidas.push({
-        empleadoId: propuesta.empleadoId,
-        empleadoNombre: propuesta.empleadoNombre,
-        fechaInicio: propuesta.fechaInicio,
-        fechaFin: propuesta.fechaFin,
-        dias: propuesta.dias,
-        tipo: propuesta.tipo || 'ajustado',
-        motivo: propuesta.motivo || 'Propuesta generada por IA',
-        prioridad: propuesta.prioridad || 5,
-      });
-    } else {
-      warnings.push(`Propuesta inválida ignorada para empleado ${propuesta.empleadoNombre || 'desconocido'}`);
-    }
-  }
+  const warnings: string[] = [...(parsed.data.warnings ?? [])];
 
-  // Calcular resumen
-  const empleadosConIdeal = propuestasValidas.filter(p => p.tipo === 'ideal').length;
-  const empleadosAjustados = propuestasValidas.filter(p => p.tipo === 'ajustado').length;
+  const propuestasValidas: PropuestaVacacionEmpleado[] = parsed.data.propuestas.map((propuesta) => ({
+    empleadoId: propuesta.empleadoId,
+    empleadoNombre: propuesta.empleadoNombre,
+    fechaInicio: propuesta.fechaInicio,
+    fechaFin: propuesta.fechaFin,
+    dias: propuesta.dias,
+    tipo: propuesta.tipo || 'ajustado',
+    motivo: propuesta.motivo || 'Propuesta generada por IA',
+    prioridad: propuesta.prioridad ?? 5,
+  }));
+
+  const empleadosConIdeal = propuestasValidas.filter((p) => p.tipo === 'ideal').length;
+  const empleadosAjustados = propuestasValidas.filter((p) => p.tipo === 'ajustado').length;
 
   return {
     propuestas: propuestasValidas,
@@ -318,8 +345,8 @@ function validarYNormalizarResultado(
       totalEmpleados: preferencias.length,
       empleadosConIdeal,
       empleadosAjustados,
-      solapamientoMaximo: resultado.resumen?.solapamientoMaximo || 0,
-      solapamientoPorDia: resultado.resumen?.solapamientoPorDia || {},
+      solapamientoMaximo: parsed.data.resumen?.solapamientoMaximo ?? 0,
+      solapamientoPorDia: parsed.data.resumen?.solapamientoPorDia ?? {},
     },
     warnings,
     metadata: {
@@ -333,12 +360,13 @@ function validarYNormalizarResultado(
  * Generar propuestas fallback si la IA falla
  */
 function generarPropuestasFallback(
-  preferencias: any[],
-  solapamientoMaximoPct: number
+  preferencias: CuadrarVacacionesInput['preferencias'],
+  solapamientoMaximoPct: number | null | undefined
 ): ResultadoCuadrado {
   console.warn('[Cuadrar Vacaciones] Generando propuestas fallback:', {
     totalEmpleados: preferencias.length,
-    solapamientoMaximo: solapamientoMaximoPct,
+    solapamientoMaximo: solapamientoMaximoPct ?? 0,
+      solapamientoMaximo: solapamientoMaximoPct ?? 0,
   });
 
   const propuestas: PropuestaVacacionEmpleado[] = [];

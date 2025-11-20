@@ -2,13 +2,15 @@
 // HR Documentos Page - Document Management
 // ========================================
 
-import { getSession } from '@/lib/auth';
 import { redirect } from 'next/navigation';
-import { prisma } from '@/lib/prisma';
-import { DocumentosClient } from './documentos-client';
-import { asegurarCarpetasGlobales } from '@/lib/documentos';
 
+import { getSession } from '@/lib/auth';
 import { UsuarioRol } from '@/lib/constants/enums';
+import { asegurarCarpetasGlobales } from '@/lib/documentos';
+import { prisma } from '@/lib/prisma';
+
+import { DocumentosClient } from './documentos-client';
+
 
 export default async function DocumentosPage() {
   const session = await getSession();

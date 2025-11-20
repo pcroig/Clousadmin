@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+
 import { PreferenciasVacacionesModal } from './preferencias-vacaciones-modal';
 
 interface CampanaPendiente {
@@ -21,34 +22,48 @@ export function CampanaVacacionesReminder({
   autoOpen = true,
   onCompleted,
 }: CampanaVacacionesReminderProps) {
-  const [open, setOpen] = useState(false);
-  const [autoOpened, setAutoOpened] = useState(false);
-
-  useEffect(() => {
-    if (!campanaPendiente) {
-      setOpen(false);
-      setAutoOpened(false);
-      return;
-    }
-
-    if (autoOpen && !autoOpened) {
-      setOpen(true);
-      setAutoOpened(true);
-    }
-  }, [campanaPendiente, autoOpen, autoOpened]);
-
   if (!campanaPendiente) {
     return null;
   }
 
   return (
+    <CampanaVacacionesReminderContent
+      key={`${campanaPendiente.id}-${autoOpen ? 'auto' : 'manual'}`}
+      campanaPendiente={campanaPendiente}
+      autoOpen={autoOpen}
+      onCompleted={onCompleted}
+    />
+  );
+}
+
+interface CampanaVacacionesReminderContentProps {
+  campanaPendiente: CampanaPendiente;
+  autoOpen: boolean;
+  onCompleted?: () => void;
+}
+
+function CampanaVacacionesReminderContent({
+  campanaPendiente,
+  autoOpen,
+  onCompleted,
+}: CampanaVacacionesReminderContentProps) {
+  const [open, setOpen] = useState(autoOpen);
+
+  const handleClose = () => setOpen(false);
+  const handleSuccess = () => {
+    setOpen(false);
+    if (onCompleted) {
+      onCompleted();
+    } else {
+      window.location.reload();
+    }
+  };
+
+  return (
     <PreferenciasVacacionesModal
       open={open}
-      onClose={() => setOpen(false)}
-      onSuccess={() => {
-        setOpen(false);
-        onCompleted ? onCompleted() : window.location.reload();
-      }}
+      onClose={handleClose}
+      onSuccess={handleSuccess}
       campanaId={campanaPendiente.id}
       campanaTitulo={campanaPendiente.titulo}
       fechaInicioObjetivo={campanaPendiente.fechaInicioObjetivo}
@@ -56,6 +71,7 @@ export function CampanaVacacionesReminder({
     />
   );
 }
+
 
 
 

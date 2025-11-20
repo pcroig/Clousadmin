@@ -4,14 +4,22 @@
 // Wrapper del SDK de Anthropic (Claude) con interfaz unificada
 
 import Anthropic from '@anthropic-ai/sdk';
+
 import {
-  AIProvider,
+  AICallOptions,
   AIMessage,
+  AIProvider,
   AIResponse,
   MessageRole,
   ModelConfig,
-  AICallOptions,
 } from '../types';
+
+type AnthropicImageBlock = {
+  type: 'image';
+  source:
+    | { type: 'base64'; media_type: string; data: string }
+    | { type: 'url'; url: string };
+};
 
 /**
  * Cliente de Anthropic (singleton)
@@ -86,24 +94,26 @@ function convertMessagesToAnthropic(messages: AIMessage[]): {
             if (match) {
               const mimeType = match[1];
               const base64Data = match[2];
-              return {
-                type: 'image' as const,
+              const imageBlock: AnthropicImageBlock = {
+                type: 'image',
                 source: {
-                  type: 'base64' as const,
+                  type: 'base64',
                   media_type: mimeType,
                   data: base64Data,
                 },
-              } as any; // Type assertion para compatibilidad con SDK
+              };
+              return imageBlock;
             }
           }
           // URL normal
-          return {
-            type: 'image' as const,
+          const imageBlock: AnthropicImageBlock = {
+            type: 'image',
             source: {
-              type: 'url' as const,
+              type: 'url',
               url: url,
             },
-          } as any; // Type assertion para compatibilidad con SDK
+          };
+          return imageBlock;
         }
       });
     } else if (msg.content.type === 'text') {
@@ -119,13 +129,13 @@ function convertMessagesToAnthropic(messages: AIMessage[]): {
           const base64Data = match[2];
           content = [
             {
-              type: 'image' as const,
+              type: 'image',
               source: {
-                type: 'base64' as const,
+                type: 'base64',
                 media_type: mimeType,
                 data: base64Data,
               },
-            } as any, // Type assertion para compatibilidad con SDK
+            } as AnthropicImageBlock,
           ];
         } else {
           content = msg.content.image_url.url; // Fallback a texto
@@ -134,12 +144,12 @@ function convertMessagesToAnthropic(messages: AIMessage[]): {
         // URL normal
         content = [
           {
-            type: 'image' as const,
+            type: 'image',
             source: {
-              type: 'url' as const,
+              type: 'url',
               url: url,
             },
-          } as any, // Type assertion para compatibilidad con SDK
+          } as AnthropicImageBlock,
         ];
       }
     }
@@ -233,9 +243,10 @@ export async function callAnthropic(
     
     console.info(`[Anthropic Provider] Respuesta recibida (${response.usage.input_tokens + response.usage.output_tokens} tokens)`);
     return convertAnthropicResponse(response, config.model);
-  } catch (error: any) {
-    console.error('[Anthropic Provider] Error:', error.message);
-    throw new Error(`Anthropic error: ${error.message}`);
+  } catch (error) {
+    const normalizedError = error instanceof Error ? error : new Error('Unknown Anthropic error');
+    console.error('[Anthropic Provider] Error:', normalizedError.message);
+    throw new Error(`Anthropic error: ${normalizedError.message}`);
   }
 }
 

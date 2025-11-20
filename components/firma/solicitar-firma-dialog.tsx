@@ -58,7 +58,17 @@ export function SolicitarFirmaDialog({
         .then((data) => {
           const lista = Array.isArray(data?.empleados) ? data.empleados : Array.isArray(data) ? data : [];
           setEmpleados(
-            lista.map((empleado: any) => ({
+            lista.map((empleado: {
+              id: string;
+              nombre?: string;
+              apellidos?: string;
+              email?: string;
+              usuario?: {
+                nombre?: string;
+                apellidos?: string;
+                email?: string;
+              };
+            }) => ({
               id: empleado.id,
               nombre: empleado?.nombre || empleado?.usuario?.nombre || '',
               apellidos: empleado?.apellidos || empleado?.usuario?.apellidos || '',

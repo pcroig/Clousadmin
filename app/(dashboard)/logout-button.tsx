@@ -5,7 +5,9 @@
 // ========================================
 
 import { useState } from 'react';
+
 import { Button } from '@/components/ui/button';
+
 import { logoutAction } from '../(auth)/login/actions';
 
 export function LogoutButton() {

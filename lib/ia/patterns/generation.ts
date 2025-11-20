@@ -5,8 +5,8 @@
 // Soporta diferentes estilos, formatos y casos de uso
 
 import { callAI, getPrimaryProvider } from '../core/client';
-import { AIMessage, MessageRole, AIProvider } from '../core/types';
-import { createConfigForUseCase, AIUseCase } from '../core/config';
+import { AIUseCase, createConfigForUseCase } from '../core/config';
+import { AIMessage, AIProvider, MessageRole } from '../core/types';
 
 // ========================================
 // TIPOS
@@ -156,11 +156,12 @@ export async function generateText(
       provider: response.provider,
       usage: response.usage,
     };
-  } catch (error: any) {
-    console.error('[Generation Pattern] Error:', error.message);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error('[Generation Pattern] Error:', message);
     return {
       success: false,
-      error: error.message,
+      error: message,
       provider,
     };
   }

@@ -5,35 +5,32 @@
 // ========================================
 // Vista consolidada: Eventos expandibles con sus nóminas
 
-import { useState, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
 import {
-  FileText,
-  Upload,
-  Download,
-  Plus,
-  CheckCircle,
-  Clock,
-  User,
   AlertCircle,
   AlertTriangle,
+  Calendar,
+  CheckCircle,
+  Clock,
+  Download,
+  FileText,
   Info,
   ListChecks,
-  Calendar,
+  Plus,
+  Upload,
+  User,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
+
+import { AlertasSummary } from '@/components/payroll/alertas-summary';
 import { UploadNominasModal } from '@/components/payroll/upload-nominas-modal';
 import { ValidarComplementosDialog } from '@/components/payroll/validar-complementos-dialog';
 import { CompensarHorasDialog } from '@/components/shared/compensar-horas-dialog';
-import { AlertasSummary } from '@/components/payroll/alertas-summary';
-import { Checkbox } from '@/components/ui/checkbox';
 import { DetailsPanel } from '@/components/shared/details-panel';
-import {
-  EVENTO_ESTADOS,
-  NOMINA_ESTADO_LABELS,
-} from '@/lib/constants/nomina-estados';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Dialog,
   DialogContent,
@@ -58,6 +55,27 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import {
+  EVENTO_ESTADOS,
+  NOMINA_ESTADO_LABELS,
+} from '@/lib/constants/nomina-estados';
+
+interface ComplementoAsignado {
+  id: string;
+  importe: number;
+  empleadoComplemento: {
+    tipoComplemento: {
+      nombre: string;
+    };
+  };
+}
+
+interface AlertaNomina {
+  id: string;
+  tipo: 'critico' | 'advertencia' | 'info';
+  mensaje: string;
+  detalles?: unknown;
+}
 
 interface Nomina {
   id: string;
@@ -75,15 +93,12 @@ interface Nomina {
   totalBruto: number;
   totalNeto: number;
   diasTrabajados: number;
-  complementosAsignados: Array<{
+  complementosAsignados: ComplementoAsignado[];
+  alertas?: AlertaNomina[];
+  documento?: {
     id: string;
-    importe: number;
-    empleadoComplemento: {
-      tipoComplemento: {
-        nombre: string;
-      };
-    };
-  }>;
+    nombre: string | null;
+  } | null;
 }
 
 interface EventoNomina {
@@ -978,7 +993,7 @@ function NominaDetailsPanel({
   onClose: () => void;
 }) {
   const router = useRouter();
-  const [nomina, setNomina] = useState<any>(null);
+  const [nomina, setNomina] = useState<Nomina | null>(null);
   const [loading, setLoading] = useState(false);
   const [incidencias, setIncidencias] = useState<{
     ausencias: Array<{
@@ -1110,7 +1125,7 @@ function NominaDetailsPanel({
                           <div>
               <h3 className="text-sm font-medium text-gray-700 mb-3">Complementos</h3>
               <div className="space-y-2">
-                {nomina.complementosAsignados.map((comp: any) => (
+                {nomina.complementosAsignados.map((comp) => (
                   <div key={comp.id} className="flex justify-between items-center p-2 bg-gray-50 rounded text-sm">
                     <span className="text-gray-700">{comp.empleadoComplemento.tipoComplemento.nombre}</span>
                     <span className="font-medium text-gray-900">
@@ -1148,7 +1163,7 @@ function NominaDetailsPanel({
                                       <div>
               <h3 className="text-sm font-medium text-gray-700 mb-3">Alertas</h3>
               <div className="space-y-2">
-                {nomina.alertas.map((alerta: any) => (
+                {nomina.alertas.map((alerta) => (
                   <div key={alerta.id} className="p-3 bg-red-50 rounded text-sm">
                     <div className="flex items-start gap-2">
                       <AlertCircle className="w-4 h-4 text-red-600 mt-0.5" />
@@ -1288,7 +1303,7 @@ function EventoDetailsPanel({
   onClose: () => void;
   onSelectNomina: (nominaId: string) => void;
 }) {
-  const [evento, setEvento] = useState<any>(null);
+  const [evento, setEvento] = useState<EventoNomina | null>(null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -1307,11 +1322,11 @@ function EventoDetailsPanel({
         const eventoData = data.evento || data;
         // Calcular alertas agregadas desde las nóminas si no vienen en el formato esperado
         if (eventoData.nominas && !eventoData.alertas) {
-          const alertas = eventoData.nominas.flatMap((n: any) => n.alertas || []);
+          const alertas = eventoData.nominas.flatMap((n: Nomina) => n.alertas || []) as AlertaNomina[];
           eventoData.alertas = {
-            criticas: alertas.filter((a: any) => a.tipo === 'critico').length,
-            advertencias: alertas.filter((a: any) => a.tipo === 'advertencia').length,
-            informativas: alertas.filter((a: any) => a.tipo === 'info').length,
+            criticas: alertas.filter((a) => a.tipo === 'critico').length,
+            advertencias: alertas.filter((a) => a.tipo === 'advertencia').length,
+            informativas: alertas.filter((a) => a.tipo === 'info').length,
             total: alertas.length,
           };
         }
@@ -1386,7 +1401,7 @@ function EventoDetailsPanel({
             <div>
               <h3 className="text-sm font-medium text-gray-700 mb-3">Nóminas ({evento.nominas.length})</h3>
               <div className="space-y-2">
-                {evento.nominas.map((nomina: any) => {
+                {evento.nominas.map((nomina) => {
                             const estadoNominaInfo = NOMINA_ESTADO_LABELS[nomina.estado] || {
                               label: nomina.estado,
                     color: 'text-gray-700',
@@ -1426,7 +1441,7 @@ function EventoDetailsPanel({
                               {/* Alertas */}
                               {nomina.alertas && nomina.alertas.length > 0 && (
                                 <span className={`inline-flex items-center gap-1 ${
-                                  nomina.alertas.some((a: any) => a.tipo === 'critico') 
+                                  nomina.alertas?.some((a) => a.tipo === 'critico') 
                                     ? 'text-red-600' 
                                     : 'text-orange-600'
                                 }`}>

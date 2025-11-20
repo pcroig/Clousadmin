@@ -5,12 +5,31 @@
 // ========================================
 
 import { revalidatePath } from 'next/cache';
-import { authenticate, createSession } from '@/lib/auth';
-import { rateLimitLogin, getClientIP } from '@/lib/rate-limit';
-import { headers } from 'next/headers';
+import { cookies, headers } from 'next/headers';
 
-export async function loginAction(email: string, password: string) {
+import {
+  authenticate,
+  createSession,
+  createTwoFactorChallenge,
+} from '@/lib/auth';
+import { getClientIP, rateLimitLogin } from '@/lib/rate-limit';
+
+const TWO_FACTOR_COOKIE = 'clousadmin-2fa';
+
+interface LoginActionResult {
+  success: boolean;
+  error?: string;
+  rol?: string;
+  rateLimited?: boolean;
+  retryAfter?: number;
+  twoFactorRequired?: boolean;
+}
+
+export async function loginAction(email: string, password: string): Promise<LoginActionResult> {
   try {
+    const cookieStore = await cookies();
+    cookieStore.delete(TWO_FACTOR_COOKIE);
+
     // 1. Rate limiting ANTES de cualquier verificación
     // Usar email + IP para identificar (prevenir ataques distribuidos)
     const headersList = await headers();
@@ -105,6 +124,31 @@ export async function loginAction(email: string, password: string) {
       } catch (linkError) {
         console.error('[Login] Error sincronizando empleadoId del usuario:', linkError);
       }
+    }
+
+    // Si tiene 2FA habilitado, crear challenge y redirigir a OTP
+    if (usuario.totpEnabled) {
+      try {
+        const { token, expires } = await createTwoFactorChallenge(usuario.id);
+        cookieStore.set(TWO_FACTOR_COOKIE, token, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'lax',
+          maxAge: Math.floor((expires.getTime() - Date.now()) / 1000),
+          path: '/',
+        });
+      } catch (challengeError) {
+        console.error('[Login] Error generando challenge 2FA:', challengeError);
+        return {
+          success: false,
+          error: 'No pudimos iniciar tu verificación en dos pasos. Inténtalo de nuevo.',
+        };
+      }
+
+      return {
+        success: false,
+        twoFactorRequired: true,
+      };
     }
 
     // CRÍTICO: Invalidar todas las sesiones antiguas del usuario antes de crear una nueva

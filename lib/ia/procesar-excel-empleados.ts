@@ -2,10 +2,11 @@
 // IA - Procesar Excel de Empleados
 // ========================================
 
-import { isAnyProviderAvailable } from './core/client';
-import { callAIWithConfig } from './models';
 import * as XLSX from 'xlsx';
 import { z } from 'zod';
+
+import { isAnyProviderAvailable } from './core/client';
+import { callAIWithConfig } from './models';
 
 /**
  * Estructura de un empleado detectado por la IA
@@ -93,7 +94,7 @@ export const RespuestaProcesamientoExcelSchema = z.object({
 /**
  * Convertir fecha de Excel (número serial o string) a formato ISO (YYYY-MM-DD)
  */
-function convertirFechaExcelAISO(valor: any): string | null {
+function convertirFechaExcelAISO(valor: unknown): string | null {
   if (!valor) return null;
 
   // Si es un número, es una fecha serial de Excel
@@ -105,7 +106,7 @@ function convertirFechaExcelAISO(valor: any): string | null {
       if (fecha) {
         return `${fecha.y}-${String(fecha.m).padStart(2, '0')}-${String(fecha.d).padStart(2, '0')}`;
       }
-    } catch (error) {
+    } catch {
       // Si falla el parseo, intentar como timestamp
       try {
         const fecha = new Date((valor - 25569) * 86400 * 1000);
@@ -170,7 +171,7 @@ function dividirNombreCompleto(nombreCompleto: string): { nombre: string; apelli
 /**
  * Convertir valor a número (maneja strings con símbolos de moneda, comas, etc.)
  */
-function convertirANumero(valor: any): number | null {
+function convertirANumero(valor: unknown): number | null {
   if (valor === null || valor === undefined || valor === '') {
     return null;
   }
@@ -259,7 +260,7 @@ function obtenerMapeoBasicoColumnas(): Record<string, keyof EmpleadoDetectado> {
  * @returns Array de empleados procesados con equipos y managers detectados
  */
 function procesarEmpleadosConMapeo(
-  excelData: Record<string, any>[],
+  excelData: Array<Record<string, unknown>>,
   mapeoColumnas: Record<string, string>
 ): {
   empleados: EmpleadoDetectado[];
@@ -391,7 +392,7 @@ function procesarEmpleadosConMapeo(
  * @returns Respuesta con empleados mapeados y metadatos
  */
 export async function mapearEmpleadosConIA(
-  excelData: Record<string, any>[]
+  excelData: Array<Record<string, unknown>>
 ): Promise<RespuestaProcesamientoExcel> {
   // Si no hay IA disponible, usar mapeo básico directamente
   if (!isAnyProviderAvailable()) {

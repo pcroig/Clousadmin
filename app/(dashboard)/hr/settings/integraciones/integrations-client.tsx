@@ -4,11 +4,15 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { AlertCircle, Building2, Calendar, Check, ExternalLink, Plug, User, X } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Calendar, Check, Plug, X, AlertCircle, ExternalLink, Building2, User } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { useEffect, useState } from 'react';
+import { toast } from 'sonner';
+
+import { SettingsLayout } from '@/components/settings/settings-layout';
 import { LoadingButton } from '@/components/shared/loading-button';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import {
   Card,
   CardContent,
@@ -16,9 +20,9 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { toast } from 'sonner';
-import { SettingsLayout } from '@/components/settings/settings-layout';
+
+
+
 import type { Integracion } from '@prisma/client';
 
 interface IntegrationsClientProps {

@@ -4,10 +4,12 @@
 
 'use client';
 
-import { useState } from 'react';
+import { CheckCircle2, Clock, FileSignature, Info, XCircle } from 'lucide-react';
 import Link from 'next/link';
+import { useState } from 'react';
+
 import { Button } from '@/components/ui/button';
-import { CheckCircle2, XCircle, Clock, Info, FileSignature } from 'lucide-react';
+
 
 interface Notificacion {
   id: string;

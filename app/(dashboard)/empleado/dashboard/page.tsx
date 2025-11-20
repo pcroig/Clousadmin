@@ -2,15 +2,17 @@
 // Empleado Dashboard Page - Clean Architecture
 // ========================================
 
-import { getSession } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
-import { Notificacion } from '@/components/shared/notificaciones-widget';
 import { AusenciaItem } from '@/components/shared/ausencias-widget';
+import { Notificacion } from '@/components/shared/notificaciones-widget';
+import { getSession } from '@/lib/auth';
+import { EstadoAusencia, UsuarioRol } from '@/lib/constants/enums';
+import { prisma } from '@/lib/prisma';
+import { obtenerCampanaPendiente, obtenerPropuestaPendiente } from '@/lib/services/campanas-vacaciones';
+
 import { EmpleadoDashboardClient } from './dashboard-client';
+
 import type { Ausencia } from '@prisma/client';
 
-import { EstadoAusencia, UsuarioRol } from '@/lib/constants/enums';
-import { obtenerCampanaPendiente, obtenerPropuestaPendiente } from '@/lib/services/campanas-vacaciones';
 
 const ESTADOS_AUSENCIAS_ABIERTAS: EstadoAusencia[] = [
   EstadoAusencia.pendiente,

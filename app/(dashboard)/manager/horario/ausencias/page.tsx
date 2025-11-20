@@ -2,10 +2,10 @@
 // Manager Ausencias Page
 // ========================================
 
-import { getSession } from '@/lib/auth';
 import { redirect } from 'next/navigation';
-import { AusenciasClient } from '@/app/(dashboard)/hr/horario/ausencias/ausencias-client';
 
+import { AusenciasClient } from '@/app/(dashboard)/hr/horario/ausencias/ausencias-client';
+import { getSession } from '@/lib/auth';
 import { UsuarioRol } from '@/lib/constants/enums';
 
 export default async function ManagerAusenciasPage() {

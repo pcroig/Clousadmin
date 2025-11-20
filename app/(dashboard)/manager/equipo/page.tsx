@@ -2,20 +2,20 @@
 // Manager - Equipo Page
 // ========================================
 
-import { getSession } from '@/lib/auth';
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
+import { Briefcase, Calendar, Mail, MapPin, Phone, Users } from 'lucide-react';
+import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { prisma } from '@/lib/prisma';
-import { Card } from '@/components/ui/card';
+
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Mail, Phone, Calendar, MapPin, Briefcase, Users } from 'lucide-react';
-import Link from 'next/link';
-import { format } from 'date-fns';
-import { es } from 'date-fns/locale';
-import { getAvatarStyle } from '@/lib/design-system';
-
+import { Card } from '@/components/ui/card';
+import { getSession } from '@/lib/auth';
 import { UsuarioRol } from '@/lib/constants/enums';
+import { getAvatarStyle } from '@/lib/design-system';
+import { prisma } from '@/lib/prisma';
 
 export default async function ManagerEquipoPage() {
   const session = await getSession();

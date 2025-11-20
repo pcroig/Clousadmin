@@ -160,6 +160,10 @@ export interface AIChoice {
 /**
  * Respuesta unificada de IA
  */
+export type JsonPrimitive = string | number | boolean | null;
+export type JsonValue = JsonPrimitive | JsonValue[] | { [key: string]: JsonValue };
+export type MetadataRecord = Record<string, JsonValue>;
+
 export interface AIResponse {
   id: string;
   provider: AIProvider;
@@ -167,7 +171,7 @@ export interface AIResponse {
   choices: AIChoice[];
   usage?: TokenUsage;
   created: number;
-  metadata?: Record<string, any>;
+  metadata?: MetadataRecord;
 }
 
 // ========================================
@@ -210,12 +214,12 @@ export interface AICallOptions {
 /**
  * Resultado exitoso de una operación de IA
  */
-export interface AISuccess<T = any> {
+export interface AISuccess<T = JsonValue> {
   success: true;
   data: T;
   provider: AIProvider;
   usage?: TokenUsage;
-  metadata?: Record<string, any>;
+  metadata?: MetadataRecord;
 }
 
 /**
@@ -226,13 +230,13 @@ export interface AIError {
   error: string;
   provider?: AIProvider;
   code?: string;
-  metadata?: Record<string, any>;
+  metadata?: MetadataRecord;
 }
 
 /**
  * Resultado de operación de IA (success o error)
  */
-export type AIResult<T = any> = AISuccess<T> | AIError;
+export type AIResult<T = JsonValue> = AISuccess<T> | AIError;
 
 // ========================================
 // SCHEMAS ZOD

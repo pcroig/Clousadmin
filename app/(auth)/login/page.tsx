@@ -3,19 +3,25 @@
 // ========================================
 
 import { GalleryVerticalEnd } from 'lucide-react';
-import Link from 'next/link';
 import Image from 'next/image';
-import { LoginForm } from './login-form';
-import { getSession } from '@/lib/auth';
+import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { Suspense } from 'react';
 
+import { getSession } from '@/lib/auth';
 import { UsuarioRol } from '@/lib/constants/enums';
+
+import { LoginForm } from './login-form';
 
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ callbackUrl?: string; onboarding?: string }>;
+  searchParams: Promise<{
+    callbackUrl?: string;
+    onboarding?: string;
+    reset?: string;
+    error?: string;
+  }>;
 }) {
   // Si el usuario ya está autenticado, redirigir
   const session = await getSession();
@@ -46,6 +52,13 @@ export default async function LoginPage({
               <div className="mb-4 rounded-md bg-green-50 p-3">
                 <p className="text-sm text-green-600">
                   ¡Cuenta creada! Ya puedes iniciar sesión.
+                </p>
+              </div>
+            )}
+            {params.reset === 'success' && (
+              <div className="mb-4 rounded-md bg-green-50 p-3">
+                <p className="text-sm text-green-600">
+                  Contraseña actualizada correctamente. Inicia sesión para continuar.
                 </p>
               </div>
             )}

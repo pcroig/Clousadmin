@@ -4,9 +4,25 @@
 // Fichajes Empleado Client Component - Vista por Jornadas
 // ========================================
 
-import { useState, useEffect, useCallback } from 'react';
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
+import { AlertCircle, ChevronDown, ChevronUp, Clock } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
+import { toast } from 'sonner';
+
+import { TableHeader as PageHeader } from '@/components/shared/table-header';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
   Table,
   TableBody,
@@ -15,23 +31,9 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { TableHeader as PageHeader } from '@/components/shared/table-header';
-import { Clock, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react';
-import { format } from 'date-fns';
-import { es } from 'date-fns/locale';
-import { formatearHorasMinutos } from '@/lib/utils/formatters';
-import { toast } from 'sonner';
 import { EstadoFichaje } from '@/lib/constants/enums';
+import { formatearHorasMinutos } from '@/lib/utils/formatters';
+
 
 interface FichajeEvento {
   id: string;

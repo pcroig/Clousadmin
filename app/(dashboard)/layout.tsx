@@ -2,10 +2,11 @@
 // Dashboard Layout - No Header, Only Sidebar
 // ========================================
 
-import { getSession } from '@/lib/auth';
 import { redirect } from 'next/navigation';
-import { Sidebar } from '@/components/layout/sidebar';
+
 import { BottomNavigation } from '@/components/layout/bottom-navigation';
+import { Sidebar } from '@/components/layout/sidebar';
+import { getSession } from '@/lib/auth';
 
 export default async function DashboardLayout({
   children,

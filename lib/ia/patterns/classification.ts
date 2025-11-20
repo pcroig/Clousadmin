@@ -5,9 +5,10 @@
 // Soporta matching con confianza, top-K candidatos, y auto-asignación
 
 import { z } from 'zod';
+
 import { callAI, getPrimaryProvider } from '../core/client';
-import { AIMessage, MessageRole, AIProvider, AICallMetadata } from '../core/types';
-import { createConfigForUseCase, AIUseCase } from '../core/config';
+import { AIUseCase, createConfigForUseCase } from '../core/config';
+import { AICallMetadata, AIMessage, AIProvider, MessageRole } from '../core/types';
 
 // ========================================
 // TIPOS
@@ -16,7 +17,7 @@ import { createConfigForUseCase, AIUseCase } from '../core/config';
 /**
  * Candidato para clasificación
  */
-export interface Candidate<T = any> {
+export interface Candidate<T = unknown> {
   id: string;
   label: string;
   metadata?: T;
@@ -25,7 +26,7 @@ export interface Candidate<T = any> {
 /**
  * Resultado de clasificación individual
  */
-export interface ClassificationMatch<T = any> {
+export interface ClassificationMatch<T = unknown> {
   id: string;
   label: string;
   confidence: number; // 0-100
@@ -35,7 +36,7 @@ export interface ClassificationMatch<T = any> {
 /**
  * Resultado de clasificación completo
  */
-export interface ClassificationResult<T = any> {
+export interface ClassificationResult<T = unknown> {
   success: boolean;
   match?: ClassificationMatch<T>;
   candidates: ClassificationMatch<T>[];
@@ -101,7 +102,7 @@ export interface ClassificationOptions {
  * );
  * ```
  */
-export async function classify<T = any>(
+export async function classify<T = unknown>(
   input: string,
   candidates: Candidate<T>[],
   description: string,
@@ -245,11 +246,12 @@ RESPUESTA (JSON estricto, sin markdown):
       provider: response.provider,
       usage: response.usage,
     };
-  } catch (error: any) {
-    console.error('[Classification Pattern] Error:', error.message);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error('[Classification Pattern] Error:', message);
     return {
       success: false,
-      error: error.message,
+      error: message,
       candidates: [],
       autoAssigned: false,
       provider,
@@ -260,7 +262,7 @@ RESPUESTA (JSON estricto, sin markdown):
 /**
  * Versión simplificada que retorna solo el mejor match (o null)
  */
-export async function classifySimple<T = any>(
+export async function classifySimple<T = unknown>(
   input: string,
   candidates: Candidate<T>[],
   description: string,
@@ -273,7 +275,7 @@ export async function classifySimple<T = any>(
 /**
  * Clasificación multi-clase (input puede pertenecer a múltiples categorías)
  */
-export async function classifyMulti<T = any>(
+export async function classifyMulti<T = unknown>(
   input: string,
   candidates: Candidate<T>[],
   description: string,
@@ -340,15 +342,30 @@ RESPUESTA (JSON):
     const content = response.choices[0]?.message?.content || '{"matches":[]}';
     const cleaned = content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
     const parsed = JSON.parse(cleaned);
-    
-    const matches = (parsed.matches || [])
-      .filter((m: any) => m.confidence >= threshold)
-      .map((m: any) => {
-        const candidate = candidates.find((c) => c.id === m.id);
+
+    const schema = z.object({
+      matches: z
+        .array(
+          z.object({
+            id: z.string(),
+            label: z.string().optional(),
+            confidence: z.number().min(0).max(100),
+          })
+        )
+        .default([]),
+      reasoning: z.string().optional(),
+    });
+
+    const validated = schema.parse(parsed);
+
+    const matches = validated.matches
+      .filter((match) => match.confidence >= threshold)
+      .map((match) => {
+        const candidate = candidates.find((c) => c.id === match.id);
         return {
-          id: m.id,
-          label: candidate?.label || m.label,
-          confidence: m.confidence,
+          id: match.id,
+          label: candidate?.label || match.label || match.id,
+          confidence: match.confidence,
           metadata: candidate?.metadata,
         };
       });
@@ -358,14 +375,15 @@ RESPUESTA (JSON):
       match: matches[0],
       candidates: matches,
       autoAssigned: matches.length > 0,
-      reasoning: parsed.reasoning,
+      reasoning: validated.reasoning,
       provider: response.provider,
       usage: response.usage,
     };
-  } catch (error: any) {
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
     return {
       success: false,
-      error: error.message,
+      error: message,
       candidates: [],
       autoAssigned: false,
       provider,
@@ -381,7 +399,7 @@ RESPUESTA (JSON):
  * Matching básico sin IA (fallback)
  * Usa similitud de strings simple
  */
-export function matchBasic<T = any>(
+export function matchBasic<T = unknown>(
   input: string,
   candidates: Candidate<T>[],
   confidenceThreshold: number = 75

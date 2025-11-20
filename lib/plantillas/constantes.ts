@@ -12,12 +12,12 @@ export const QUICK_MAPPINGS: Record<string, { path: string; encrypted?: boolean;
   // Empleado (12 variables)
   'empleado_nombre': { path: 'nombre' },
   'empleado_apellidos': { path: 'apellidos' },
-  'empleado_nombre_completo': { path: null as any }, // Computed
+  'empleado_nombre_completo': { path: null }, // Computed
   'empleado_email': { path: 'email' },
   'empleado_nif': { path: 'nif', encrypted: true },
   'empleado_nss': { path: 'nss', encrypted: true },
   'empleado_telefono': { path: 'telefono' },
-  'empleado_direccion_completa': { path: null as any }, // Computed
+  'empleado_direccion_completa': { path: null }, // Computed
   'empleado_ciudad': { path: 'ciudad' },
   'empleado_codigo_postal': { path: 'codigoPostal' },
   'empleado_iban': { path: 'iban', encrypted: true },
@@ -32,8 +32,8 @@ export const QUICK_MAPPINGS: Record<string, { path: string; encrypted?: boolean;
   'empresa_web': { path: 'empresa.web' },
 
   // Sistema (2 variables)
-  'fecha_hoy': { path: null as any }, // Computed
-  'ano_actual': { path: null as any }, // Computed
+  'fecha_hoy': { path: null }, // Computed
+  'ano_actual': { path: null }, // Computed
 };
 
 /**

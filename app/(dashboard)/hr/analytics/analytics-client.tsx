@@ -4,14 +4,16 @@
 // Analytics - Client Component con Diseño Consistente
 // ========================================
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
-import { Button } from '@/components/ui/button';
-import { AnalyticsFilters, FilterValues } from '@/components/analytics/filters';
-import { BarChartComponent } from '@/components/analytics/bar-chart';
-import { AreaChartComponent } from '@/components/analytics/area-chart';
-import { PieChartComponent } from '@/components/analytics/pie-chart';
-import { KpiCard } from '@/components/analytics/kpi-card';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
+
+import { AreaChartComponent } from '@/components/analytics/area-chart';
+import { BarChartComponent } from '@/components/analytics/bar-chart';
+import { AnalyticsFilters, FilterValues } from '@/components/analytics/filters';
+import { KpiCard } from '@/components/analytics/kpi-card';
+import { PieChartComponent } from '@/components/analytics/pie-chart';
+import { Button } from '@/components/ui/button';
+
 
 interface PlantillaData {
   totalEmpleados: number;

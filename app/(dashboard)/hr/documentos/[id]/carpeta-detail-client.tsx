@@ -4,21 +4,29 @@
 
 'use client';
 
-import { useState, useRef, useEffect, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
 import {
   ArrowLeft,
-  Upload,
-  FileText,
   Download,
-  Trash2,
+  Eye,
+  FileSignature,
+  FileText,
   Folder,
   Settings,
-  FileSignature,
-  Eye,
+  Trash2,
+  Upload,
 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { useRouter } from 'next/navigation';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
+
+import { SolicitarFirmaDialog } from '@/components/firma/solicitar-firma-dialog';
+import { EmptyState } from '@/components/shared/empty-state';
+import { FileUploadAdvanced } from '@/components/shared/file-upload-advanced';
+import { InfoTooltip } from '@/components/shared/info-tooltip';
+import { LoadingButton } from '@/components/shared/loading-button';
+import { SearchableMultiSelect } from '@/components/shared/searchable-multi-select';
+import { SearchableSelect } from '@/components/shared/searchable-select';
+import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
@@ -36,12 +44,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { EmptyState } from '@/components/shared/empty-state';
-import { LoadingButton } from '@/components/shared/loading-button';
-import { SearchableSelect } from '@/components/shared/searchable-select';
-import { SearchableMultiSelect } from '@/components/shared/searchable-multi-select';
-import { InfoTooltip } from '@/components/shared/info-tooltip';
-import { SolicitarFirmaDialog } from '@/components/firma/solicitar-firma-dialog';
+import { UploadHandler } from '@/lib/hooks/use-file-upload';
 
 interface Documento {
   id: string;
@@ -90,8 +93,8 @@ interface CarpetaDetailClientProps {
 
 export function CarpetaDetailClient({ carpeta, empleados = [] }: CarpetaDetailClientProps) {
   const router = useRouter();
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [uploading, setUploading] = useState(false);
+  const maxUploadMB = Number(process.env.NEXT_PUBLIC_MAX_UPLOAD_MB ?? '10');
+  const uploadSectionRef = useRef<HTMLDivElement>(null);
   const [modalEliminar, setModalEliminar] = useState(false);
   const [eliminando, setEliminando] = useState(false);
   const [documentoAEliminar, setDocumentoAEliminar] = useState<string | null>(
@@ -220,48 +223,61 @@ export function CarpetaDetailClient({ carpeta, empleados = [] }: CarpetaDetailCl
     }
   };
 
-  const handleSubirArchivo = async (
-    event: React.ChangeEvent<HTMLInputElement>
-  ) => {
-    const files = event.target.files;
-    if (!files || files.length === 0) return;
-
-    setUploading(true);
-
-    try {
-      for (const file of Array.from(files)) {
+  const handleUpload: UploadHandler = useCallback(
+    ({ file, signal, onProgress }) =>
+      new Promise((resolve) => {
         const formData = new FormData();
         formData.append('file', file);
         formData.append('carpetaId', carpeta.id);
 
-        const response = await fetch('/api/documentos', {
-          method: 'POST',
-          body: formData,
-        });
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', '/api/documentos');
 
-        if (!response.ok) {
-          const error = await response.json();
-          throw new Error(error.error || 'Error al subir archivo');
+        xhr.upload.onprogress = (event) => {
+          if (event.lengthComputable) {
+            onProgress?.(event.loaded, event.total);
+          }
+        };
+
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            toast.success('Documento subido correctamente');
+            router.refresh();
+            resolve({ success: true });
+          } else {
+            let errorMessage = 'Error al subir archivo';
+            try {
+              const response = JSON.parse(xhr.responseText);
+              if (response?.error) errorMessage = response.error;
+            } catch {
+              // ignore
+            }
+            resolve({ success: false, error: errorMessage });
+          }
+        };
+
+        xhr.onerror = () => {
+          resolve({ success: false, error: 'Error de red durante la subida' });
+        };
+
+        xhr.onabort = () => {
+          resolve({ success: false, error: 'Subida cancelada' });
+        };
+
+        if (signal.aborted) {
+          xhr.abort();
+        } else {
+          signal.addEventListener('abort', () => xhr.abort());
         }
-      }
 
-      // Mostrar notificación de éxito
-      toast.success(
-        `${files.length === 1 ? 'Documento subido' : `${files.length} documentos subidos`} correctamente`                                                       
-      );
+        xhr.send(formData);
+      }),
+    [carpeta.id, router]
+  );
 
-      // Recargar página para mostrar nuevos documentos
-      router.refresh();
-    } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : 'Error al subir archivos';
-      toast.error(message);
-    } finally {
-      setUploading(false);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
-    }
-  };
+  const scrollToUploader = useCallback(() => {
+    uploadSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, []);
 
   const handleDescargar = async (documentoId: string, nombre: string) => {
     try {
@@ -426,23 +442,21 @@ export function CarpetaDetailClient({ carpeta, empleados = [] }: CarpetaDetailCl
                   Editar Asignación
                 </Button>
               )}
-              <input
-                ref={fileInputRef}
-                type="file"
-                multiple
-                className="hidden"
-                onChange={handleSubirArchivo}
-                disabled={uploading}
-              />
-              <LoadingButton
-                onClick={() => fileInputRef.current?.click()}
-                loading={uploading}
-              >
+              <Button onClick={scrollToUploader}>
                 <Upload className="w-4 h-4 mr-2" />
                 Subir Documentos
-              </LoadingButton>
+              </Button>
             </div>
           </div>
+        </div>
+
+        <div ref={uploadSectionRef} className="mb-6">
+          <FileUploadAdvanced
+            onUpload={handleUpload}
+            allowMultiple
+            maxSizeMB={maxUploadMB}
+            className="bg-white/80 p-4 rounded-2xl border border-gray-100"
+          />
         </div>
 
         {/* Filtros (solo para carpetas globales) */}
@@ -499,10 +513,7 @@ export function CarpetaDetailClient({ carpeta, empleados = [] }: CarpetaDetailCl
                 title="No hay documentos en esta carpeta"
                 description="Haz clic en 'Subir Documentos' para añadir archivos"
                 action={
-                  <Button
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={uploading}
-                  >
+                  <Button onClick={scrollToUploader}>
                     <Upload className="w-4 h-4 mr-2" />
                     Subir Documento
                   </Button>

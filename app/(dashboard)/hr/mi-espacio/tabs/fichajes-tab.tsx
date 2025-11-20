@@ -1,6 +1,11 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { format, isSameDay, isSameMonth, isSameWeek } from 'date-fns';
+import { es } from 'date-fns/locale';
+import { ChevronDown, ChevronUp, Clock } from 'lucide-react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+
+import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import {
   Table,
@@ -10,11 +15,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
-import { Clock, ChevronDown, ChevronUp } from 'lucide-react';
-import { format, isSameDay, isSameWeek, isSameMonth } from 'date-fns';
-import { es } from 'date-fns/locale';
-
 import { EstadoFichaje } from '@/lib/constants/enums';
 
 interface FichajeEvento {

@@ -2,9 +2,11 @@
 // HR Payroll - Detalles de Nómina Individual
 // ========================================
 
-import { getSession } from '@/lib/auth';
 import { redirect } from 'next/navigation';
+
+import { getSession } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+
 import { NominaDetailsClient } from './nomina-details-client';
 
 export default async function NominaDetailsPage({

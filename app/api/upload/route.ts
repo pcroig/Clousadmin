@@ -2,15 +2,31 @@
 // API Route: Upload Files to S3
 // ========================================
 
+import { Readable } from 'node:stream';
+
 import { NextRequest } from 'next/server';
-import { requireAuth, handleApiError, successResponse, badRequestResponse } from '@/lib/api-handler';
-import { uploadToS3 } from '@/lib/s3';
+
+import { badRequestResponse, handleApiError, requireAuth, successResponse } from '@/lib/api-handler';
+import { inferirTipoDocumento, obtenerOCrearCarpetaSistema } from '@/lib/documentos';
 import { prisma } from '@/lib/prisma';
-import { obtenerOCrearCarpetaSistema, inferirTipoDocumento } from '@/lib/documentos';
+import { getClientIP, rateLimitApiWrite } from '@/lib/rate-limit';
+import { isS3Configured, uploadToS3 } from '@/lib/s3';
+import { sanitizeFileName } from '@/lib/utils/file-helpers';
 
 // Configuración de Next.js para manejar uploads
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+
+const DEFAULT_MAX_UPLOAD_MB = Number(process.env.NEXT_PUBLIC_MAX_UPLOAD_MB ?? '10');
+
+async function getUploadBody(file: File) {
+  if (isS3Configured()) {
+    const webStream = file.stream() as unknown as ReadableStream;
+    return Readable.fromWeb(webStream);
+  }
+  const arrayBuffer = await file.arrayBuffer();
+  return Buffer.from(arrayBuffer);
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -18,6 +34,26 @@ export async function POST(req: NextRequest) {
     const authResult = await requireAuth(req);
     if (authResult instanceof Response) return authResult;
     const { session } = authResult;
+
+    // Rate limiting por usuario + empresa + IP
+    const clientIP = getClientIP(req.headers);
+    const rateIdentifier = `${session.user.empresaId}:${session.user.id}:${clientIP}`;
+    const rateResult = await rateLimitApiWrite(rateIdentifier);
+    if (!rateResult.success) {
+      return new Response(
+        JSON.stringify({
+          error: 'Demasiadas subidas seguidas. Intenta nuevamente en unos segundos.',
+          retryAfter: rateResult.retryAfter,
+        }),
+        {
+          status: 429,
+          headers: {
+            'Content-Type': 'application/json',
+            'Retry-After': String(rateResult.retryAfter ?? 1),
+          },
+        }
+      );
+    }
 
     // Obtener el archivo del FormData
     const formData = await req.formData();
@@ -30,10 +66,10 @@ export async function POST(req: NextRequest) {
       return badRequestResponse('No se proporcionó ningún archivo');
     }
 
-    // Validar tamaño (máximo 5MB)
-    const MAX_SIZE = 5 * 1024 * 1024; // 5MB
-    if (file.size > MAX_SIZE) {
-      return badRequestResponse('El archivo es demasiado grande. Máximo 5MB');
+    // Validar tamaño dinámico
+    const maxBytes = DEFAULT_MAX_UPLOAD_MB * 1024 * 1024;
+    if (file.size > maxBytes) {
+      return badRequestResponse(`El archivo es demasiado grande. Máximo ${DEFAULT_MAX_UPLOAD_MB}MB`);
     }
 
     // Validar tipo de archivo
@@ -46,15 +82,15 @@ export async function POST(req: NextRequest) {
     const timestamp = Date.now();
     const randomStr = Math.random().toString(36).substring(2, 15);
     const extension = file.name.split('.').pop();
-    const fileName = `${tipo || 'archivo'}_${session.user.empresaId}_${timestamp}_${randomStr}.${extension}`;
+    const safeBaseName = sanitizeFileName(file.name.replace(/\.[^/.]+$/, '') || 'archivo');
+    const fileName = `${tipo || 'archivo'}_${session.user.empresaId}_${safeBaseName}_${timestamp}_${randomStr}.${extension}`;
     
-    // Convertir File a Buffer
-    const arrayBuffer = await file.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
+    // Determinar cuerpo para storage (stream si S3, buffer si local)
+    const storageBody = await getUploadBody(file);
 
-    // Subir a S3
+    // Subir a S3/local
     const s3Key = `uploads/${session.user.empresaId}/${tipo || 'general'}/${fileName}`;
-    const url = await uploadToS3(buffer, s3Key, file.type);
+    const url = await uploadToS3(storageBody, s3Key, file.type);
 
     let documento = null;
 
@@ -104,11 +140,14 @@ export async function POST(req: NextRequest) {
       fileName,
       size: file.size,
       type: file.type,
-      documento: documento ? {
-        id: documento.id,
-        nombre: documento.nombre,
-        carpetaId: documento.carpetaId,
-      } : null,
+      createdAt: new Date().toISOString(),
+      documento: documento
+        ? {
+            id: documento.id,
+            nombre: documento.nombre,
+            carpetaId: documento.carpetaId,
+          }
+        : null,
     });
   } catch (error) {
     return handleApiError(error, 'API POST /api/upload');

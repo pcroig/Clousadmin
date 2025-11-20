@@ -4,8 +4,12 @@
 // Jornadas Client Component
 // ========================================
 
-import { useState, useEffect } from 'react';
-import { useApi, useMutation } from '@/lib/hooks';
+import { CalendarX, Edit2, Trash2, Users } from 'lucide-react';
+import { useEffect, useState } from 'react';
+
+import { EmptyState } from '@/components/shared/empty-state';
+import { TableHeader as PageHeader } from '@/components/shared/table-header';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import {
@@ -16,13 +20,11 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
+import { useApi, useMutation } from '@/lib/hooks';
 
-import { TableHeader as PageHeader } from '@/components/shared/table-header';
-import { EmptyState } from '@/components/shared/empty-state';
-import { Edit2, Trash2, Users, CalendarX } from 'lucide-react';
 import { EditarJornadaModal } from '../fichajes/editar-jornada-modal';
-import type { JornadaConfig, DiaConfig } from '@/lib/calculos/fichajes-helpers';
+
+import type { DiaConfig, JornadaConfig } from '@/lib/calculos/fichajes-helpers';
 
 type DiaKey = 'lunes' | 'martes' | 'miercoles' | 'jueves' | 'viernes' | 'sabado' | 'domingo';
 

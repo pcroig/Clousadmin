@@ -124,7 +124,7 @@ export async function POST(request: NextRequest) {
     // Si hay orden de firma, validar que todos tengan orden
     if (body.ordenFirma) {
       const todosConOrden = body.firmantes.every(
-        (f: any) => typeof f.orden === 'number' && f.orden > 0
+        (f: { empleadoId: string; orden?: number; tipo?: string }) => typeof f.orden === 'number' && f.orden > 0
       );
 
       if (!todosConOrden) {
@@ -135,7 +135,7 @@ export async function POST(request: NextRequest) {
       }
 
       // Validar que no haya órdenes duplicados
-      const ordenes = body.firmantes.map((f: any) => f.orden);
+      const ordenes = body.firmantes.map((f: { empleadoId: string; orden?: number; tipo?: string }) => f.orden);
       const ordenesUnicos = new Set(ordenes);
 
       if (ordenes.length !== ordenesUnicos.size) {
@@ -189,12 +189,13 @@ export async function POST(request: NextRequest) {
       success: true,
       solicitud,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[POST /api/firma/solicitudes] Error:', error);
 
     // Errores de validación de negocio
-    if (error.message.includes('no encontrado') || error.message.includes('no pertenece')) {
-      return NextResponse.json({ error: error.message }, { status: 404 });
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    if (errorMessage.includes('no encontrado') || errorMessage.includes('no pertenece')) {
+      return NextResponse.json({ error: errorMessage }, { status: 404 });
     }
 
     return NextResponse.json(

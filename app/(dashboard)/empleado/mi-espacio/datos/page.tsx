@@ -2,13 +2,15 @@
 // Mi Espacio - Datos Page
 // ========================================
 
-import { getSession } from '@/lib/auth';
 import { redirect } from 'next/navigation';
-import { prisma } from '@/lib/prisma';
+
+import { getSession } from '@/lib/auth';
+import { UsuarioRol } from '@/lib/constants/enums';
 import { serializeEmpleadoSeguro } from '@/lib/empleados/serialize';
+import { prisma } from '@/lib/prisma';
+
 import { MiEspacioDatosClient } from './datos-client';
 
-import { UsuarioRol } from '@/lib/constants/enums';
 
 export default async function MiEspacioDatosPage({
   searchParams,

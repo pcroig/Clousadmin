@@ -2,12 +2,12 @@
 // Manager - Bandeja de Entrada Page
 // ========================================
 
-import { getSession } from '@/lib/auth';
 import { redirect } from 'next/navigation';
-import { prisma } from '@/lib/prisma';
-import { BandejaEntradaTabs, type BandejaEntradaTab } from '@/components/hr/bandeja-entrada-tabs';
 
+import { type BandejaEntradaTab, BandejaEntradaTabs } from '@/components/hr/bandeja-entrada-tabs';
+import { getSession } from '@/lib/auth';
 import { EstadoAusencia, EstadoSolicitud, UsuarioRol } from '@/lib/constants/enums';
+import { prisma } from '@/lib/prisma';
 
 export default async function ManagerBandejaEntradaPage({
   searchParams,

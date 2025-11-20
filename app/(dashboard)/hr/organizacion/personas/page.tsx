@@ -2,13 +2,15 @@
 // HR Personas Page - Employee Management
 // ========================================
 
-import { getSession } from '@/lib/auth';
 import { redirect } from 'next/navigation';
-import { prisma } from '@/lib/prisma';
-import { PersonasClient } from './personas-client';
-import { decryptEmpleadoList } from '@/lib/empleado-crypto';
 
+import { getSession } from '@/lib/auth';
 import { UsuarioRol } from '@/lib/constants/enums';
+import { decryptEmpleadoList } from '@/lib/empleado-crypto';
+import { prisma } from '@/lib/prisma';
+
+import { PersonasClient } from './personas-client';
+
 
 // Server Component
 export default async function PersonasPage({

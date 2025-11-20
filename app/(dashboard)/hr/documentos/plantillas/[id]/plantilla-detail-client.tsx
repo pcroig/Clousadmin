@@ -4,25 +4,27 @@
 // Plantilla Detail Client - Vista de detalle de plantilla
 // ========================================
 
-import { useState, useEffect, useMemo, useRef } from 'react';
-import { useRouter } from 'next/navigation';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Spinner } from '@/components/ui/spinner';
-import {
-  CheckCircle2,
-  FileText,
-  Send,
-  Loader2,
-  AlertCircle,
-  ArrowLeft,
-  AlertTriangle,
-  Download,
-} from 'lucide-react';
-import { toast } from 'sonner';
-import PizZip from 'pizzip';
-import { VARIABLES_DISPONIBLES } from '@/lib/plantillas/constantes';
 import { Prisma } from '@prisma/client';
+import {
+  AlertCircle,
+  AlertTriangle,
+  ArrowLeft,
+  CheckCircle2,
+  Download,
+  FileText,
+  Loader2,
+  Send,
+} from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import PizZip from 'pizzip';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { toast } from 'sonner';
+
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Spinner } from '@/components/ui/spinner';
+import { VARIABLES_DISPONIBLES } from '@/lib/plantillas/constantes';
+
 
 interface ConfiguracionIA {
   esHibrida?: boolean;

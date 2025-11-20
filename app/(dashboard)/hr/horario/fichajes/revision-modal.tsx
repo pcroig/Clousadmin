@@ -5,17 +5,24 @@
 // ========================================
 // Permite a HR revisar fichajes pendientes y actualizarlos en bloque
 
-import { useState, useEffect } from 'react';
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
+import { AlertCircle, AlertTriangle, CheckCircle2, ChevronDown, ChevronRight, Clock, Edit2, Filter, X } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { toast } from 'sonner';
+
+import { InfoTooltip } from '@/components/shared/info-tooltip';
+import { LoadingButton } from '@/components/shared/loading-button';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogDescription,
 } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Checkbox } from '@/components/ui/checkbox';
 import {
   Table,
   TableBody,
@@ -24,13 +31,11 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { AlertCircle, CheckCircle2, Clock, Edit2, ChevronDown, ChevronRight, Filter, X, AlertTriangle } from 'lucide-react';
-import { format } from 'date-fns';
-import { es } from 'date-fns/locale';
-import { toast } from 'sonner';
-import { LoadingButton } from '@/components/shared/loading-button';
+
+
+
 import { EditarFichajeModal } from './editar-fichaje-modal';
-import { InfoTooltip } from '@/components/shared/info-tooltip';
+
 
 interface EventoPropuesto {
   tipo: string;

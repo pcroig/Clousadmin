@@ -2,15 +2,17 @@
 // Empleado Detail Page - Employee Profile
 // ========================================
 
-import { getSession } from '@/lib/auth';
 import { redirect } from 'next/navigation';
-import { prisma } from '@/lib/prisma';
-import { EmpleadoDetailClient } from './empleado-detail-client';
 import { notFound } from 'next/navigation';
-import { decryptEmpleadoData } from '@/lib/empleado-crypto';
-import { asegurarCarpetasSistemaParaEmpleado } from '@/lib/documentos';
-import { decimalToNumber } from '@/lib/utils';
+
+import { getSession } from '@/lib/auth';
 import { UsuarioRol } from '@/lib/constants/enums';
+import { asegurarCarpetasSistemaParaEmpleado } from '@/lib/documentos';
+import { decryptEmpleadoData } from '@/lib/empleado-crypto';
+import { prisma } from '@/lib/prisma';
+import { decimalToNumber } from '@/lib/utils';
+
+import { EmpleadoDetailClient } from './empleado-detail-client';
 
 interface EmpleadoDetailPageProps {
   params: Promise<{
@@ -28,9 +30,11 @@ const serializeForClient = <T,>(value: T): T => {
   }
 
   if (typeof value === 'object') {
-    if (typeof (value as any).toNumber === 'function') {
+    // Type guard para objetos con método toNumber (ej. Decimal de Prisma)
+    const valueWithToNumber = value as { toNumber?: () => number } | null;
+    if (valueWithToNumber && typeof valueWithToNumber.toNumber === 'function') {
       try {
-        return (value as any).toNumber() as T;
+        return valueWithToNumber.toNumber() as T;
       } catch {
         return Number(String(value)) as T;
       }

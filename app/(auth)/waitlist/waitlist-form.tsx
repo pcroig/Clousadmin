@@ -4,11 +4,13 @@
 // Waitlist Form Component
 // ========================================
 
-import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useState } from 'react';
+
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+
 // Note: agregarAWaitlist es una función server, necesitamos crear una server action
 import { agregarAWaitlistAction } from './actions';
 

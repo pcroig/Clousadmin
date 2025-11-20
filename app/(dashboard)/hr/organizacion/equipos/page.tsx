@@ -2,12 +2,14 @@
 // HR Equipos Page - Teams Management
 // ========================================
 
-import { getSession } from '@/lib/auth';
 import { redirect } from 'next/navigation';
+
+import { getSession } from '@/lib/auth';
+import { UsuarioRol } from '@/lib/constants/enums';
 import { prisma } from '@/lib/prisma';
+
 import { EquiposClient } from './equipos-client';
 
-import { UsuarioRol } from '@/lib/constants/enums';
 
 export default async function EquiposPage() {
   const session = await getSession();

@@ -1,6 +1,7 @@
 'use client';
 
 import { ContratosTab } from '@/components/shared/mi-espacio/contratos-tab';
+
 import type { MiEspacioEmpleado } from '@/types/empleado';
 
 interface MiEspacioContratosClientProps {

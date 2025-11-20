@@ -4,14 +4,16 @@
 // Analytics - Client Component con Datos Reales
 // ========================================
 
-import { useEffect, useState, useCallback } from 'react';
-import { AnalyticsFilters, FilterValues } from '@/components/analytics/filters';
-import { BarChartComponent } from '@/components/analytics/bar-chart';
-import { AreaChartComponent } from '@/components/analytics/area-chart';
-import { PieChartComponent } from '@/components/analytics/pie-chart';
-import { KpiCard } from '@/components/analytics/kpi-card';
-import { TrendingUp, TrendingDown } from 'lucide-react';
+import { TrendingDown, TrendingUp } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
+
+import { AreaChartComponent } from '@/components/analytics/area-chart';
+import { BarChartComponent } from '@/components/analytics/bar-chart';
+import { AnalyticsFilters, FilterValues } from '@/components/analytics/filters';
+import { KpiCard } from '@/components/analytics/kpi-card';
+import { PieChartComponent } from '@/components/analytics/pie-chart';
+
 
 interface PlantillaData {
   totalEmpleados: number;

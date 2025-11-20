@@ -1,4 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
+
+import { Prisma } from '@prisma/client';
+
 import { getSession } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 
@@ -15,7 +18,7 @@ export async function GET(request: NextRequest) {
     const proceso = searchParams.get('proceso'); // 'onboarding', 'offboarding'
 
     // Construir where clause
-    const where: any = {
+    const where: Prisma.CarpetaWhereInput = {
       empresaId: session.user.empresaId,
     };
 

@@ -1,12 +1,13 @@
 'use client';
 
-import { useCallback, useRef, useState } from 'react';
 import { Flag } from 'lucide-react';
+import { useCallback, useRef, useState } from 'react';
 
-import { Button } from '@/components/ui/button';
-import { GeneralTab } from '@/components/shared/mi-espacio/general-tab';
 import { DenunciaDialog } from '@/components/empleado/denuncia-dialog';
+import { GeneralTab } from '@/components/shared/mi-espacio/general-tab';
 import { ProfileAvatar } from '@/components/shared/profile-avatar';
+import { Button } from '@/components/ui/button';
+
 import type { MiEspacioEmpleado, Usuario } from '@/types/empleado';
 
 interface MiEspacioDatosClientProps {

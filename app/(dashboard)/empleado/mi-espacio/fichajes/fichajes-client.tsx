@@ -1,6 +1,7 @@
 'use client';
 
 import { FichajesTab } from '@/components/shared/mi-espacio/fichajes-tab';
+
 import type { MiEspacioEmpleado } from '@/types/empleado';
 
 interface MiEspacioFichajesClientProps {

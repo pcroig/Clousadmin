@@ -1,7 +1,7 @@
 # Clousadmin - Cursor Rules
 
 ## Project Overview
-Clousadmin is an HR management platform for Spanish companies built with Next.js 14, Prisma, AWS, and AI-powered document processing.
+Clousadmin is an HR management platform for Spanish companies built with Next.js 16, Prisma, Hetzner, and AI-powered document processing.
 
 ---
 
@@ -141,8 +141,8 @@ components/
 
 lib/
 ├── prisma.ts         # Prisma client singleton
-├── auth.ts           # AWS Cognito authentication
-├── s3.ts             # S3 file storage utilities
+├── auth.ts           # JWT authentication
+├── s3.ts             # Hetzner Object Storage utilities (S3-compatible)
 ├── openai.ts         # OpenAI API client
 ├── ia/               # AI processing logic (extract contracts, nominas, matching)
 ├── calculos/         # Business logic (ausencias, fichajes, balance-horas)
@@ -303,7 +303,7 @@ When helping with this project:
 5. **Think multi-tenant** - consider `empresaId` filtering in queries
 6. **Spanish context** - use Spanish for user-facing text, English for code
 7. **Prisma best practices** - avoid N+1, use transactions for multi-step ops
-8. **AWS-native** - prefer AWS services over third-party alternatives
+8. **Hetzner-native** - prefer Hetzner services (Object Storage, VPS) over third-party alternatives
 9. **Security-first** - never expose credentials, validate all inputs
 10. **Document as you go** - update daily logs after significant changes
 11. **⚠️ MANDATORY SYSTEM-WIDE REVIEW** - BEFORE any change:

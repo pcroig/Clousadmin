@@ -4,17 +4,21 @@
 // Onboarding Client Component
 // ========================================
 
-import { useState } from 'react';
+import { Building2, CheckCircle, Plug, UserPlus, Users } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { Button } from '@/components/ui/button';
-import { Tabs, TabsContent } from '@/components/ui/tabs';
-import { SedesForm } from '@/components/onboarding/sedes-form';
+import { useState } from 'react';
+import { toast } from 'sonner';
+
 import { ImportarEmpleados } from '@/components/onboarding/importar-empleados';
 import { IntegracionesForm } from '@/components/onboarding/integraciones-form';
 import { InvitarHRAdmins } from '@/components/onboarding/invitar-hr-admins';
+import { SedesForm } from '@/components/onboarding/sedes-form';
+import { Button } from '@/components/ui/button';
+import { Tabs, TabsContent } from '@/components/ui/tabs';
+
 import { completarOnboardingAction } from './actions';
-import { Building2, Users, Plug, UserPlus, CheckCircle } from 'lucide-react';
-import { toast } from 'sonner';
+
+
 import type { Prisma } from '@prisma/client';
 
 interface Sede {

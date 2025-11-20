@@ -4,8 +4,8 @@
 // Determina si una solicitud requiere revisión manual o puede auto-aprobarse
 // Usa Classification Pattern para decisiones inteligentes
 
-import { classify, Candidate, ClassificationResult } from './patterns/classification';
 import { isAnyProviderAvailable } from './core/client';
+import { Candidate, classify } from './patterns/classification';
 
 /**
  * Resultado de la clasificación de una solicitud
@@ -22,7 +22,7 @@ export interface SolicitudClasificacion {
 export interface SolicitudInput {
   id: string;
   tipo: string;
-  camposCambiados: any;
+  camposCambiados: Record<string, unknown>;
   motivo?: string;
   empleado: { nombre: string; apellidos: string };
 }
@@ -150,14 +150,15 @@ Si la confianza es <80%, selecciona "manual".
       confianza: result.match.confidence,
       razonamiento: result.reasoning || 'Clasificación exitosa',
     };
-  } catch (error: any) {
-    console.error('[Clasificador Solicitudes] Error en IA:', error.message);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error('[Clasificador Solicitudes] Error en IA:', message);
 
     // En caso de error, defaultear a revisión manual (fail-safe)
     return {
       requiereRevisionManual: true,
       confianza: 0,
-      razonamiento: `Error en clasificación: ${error.message}. Se requiere revisión manual por seguridad.`,
+      razonamiento: `Error en clasificación: ${message}. Se requiere revisión manual por seguridad.`,
     };
   }
 }
@@ -265,13 +266,14 @@ REGLA: Si la ausencia es por vacaciones y >5 días, siempre requiere revisión m
       confianza: result.match.confidence,
       razonamiento: result.reasoning || 'Clasificación exitosa',
     };
-  } catch (error: any) {
-    console.error('[Clasificador Ausencias] Error en IA:', error.message);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error('[Clasificador Ausencias] Error en IA:', message);
 
     return {
       requiereRevisionManual: true,
       confianza: 0,
-      razonamiento: `Error en clasificación: ${error.message}. Se requiere revisión manual por seguridad.`,
+      razonamiento: `Error en clasificación: ${message}. Se requiere revisión manual por seguridad.`,
     };
   }
 }

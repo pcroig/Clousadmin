@@ -4,8 +4,8 @@
 
 'use client';
 
-import { SettingsLayout } from '@/components/settings/settings-layout';
 import { CompanySettings } from '@/components/settings/company-settings';
+import { SettingsLayout } from '@/components/settings/settings-layout';
 
 interface CompanyClientProps {
   empresa: {
@@ -41,6 +41,7 @@ export function CompanyClient({ empresa }: CompanyClientProps) {
     </SettingsLayout>
   );
 }
+
 
 
 

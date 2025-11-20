@@ -1,10 +1,12 @@
-import { getSession } from '@/lib/auth';
 import { redirect } from 'next/navigation';
-import { prisma } from '@/lib/prisma';
+
+import { getSession } from '@/lib/auth';
+import { UsuarioRol } from '@/lib/constants/enums';
 import { serializeEmpleadoSeguro } from '@/lib/empleados/serialize';
+import { prisma } from '@/lib/prisma';
+
 import { MiEspacioHRClient } from './mi-espacio-hr-client';
 
-import { UsuarioRol } from '@/lib/constants/enums';
 
 export default async function MiEspacioHRPage() {
   const session = await getSession();

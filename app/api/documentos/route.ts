@@ -2,25 +2,30 @@
 // API: Documentos - Upload y Listado
 // ========================================
 
-import { NextRequest, NextResponse } from 'next/server';
-import { revalidatePath } from 'next/cache';
-import { getSession } from '@/lib/auth';
-import { prisma, Prisma } from '@/lib/prisma';
-import { writeFile, mkdir } from 'fs/promises';
-import { join } from 'path';
 import { existsSync } from 'fs';
-import { UsuarioRol } from '@/lib/constants/enums';
-import { uploadToS3, shouldUseCloudStorage } from '@/lib/s3';
+import { mkdir, writeFile } from 'fs/promises';
+import { Readable } from 'node:stream';
+import { join } from 'path';
 
+import { revalidatePath } from 'next/cache';
+import { NextRequest, NextResponse } from 'next/server';
+
+import { getSession } from '@/lib/auth';
+import { UsuarioRol } from '@/lib/constants/enums';
 import {
-  validarMimeType,
-  validarTamanoArchivo,
-  validarNombreArchivo,
   generarNombreUnico,
   generarRutaStorage,
-  puedeSubirACarpeta,
   inferirTipoDocumento,
+  puedeSubirACarpeta,
+  validarMimeType,
+  validarNombreArchivo,
+  validarTamanoArchivo,
 } from '@/lib/documentos';
+import { prisma, Prisma } from '@/lib/prisma';
+import { getClientIP, rateLimitApiWrite } from '@/lib/rate-limit';
+import { shouldUseCloudStorage, uploadToS3 } from '@/lib/s3';
+import { sanitizeFileName } from '@/lib/utils/file-helpers';
+
 
 // GET /api/documentos - Listar documentos
 export async function GET(request: NextRequest) {
@@ -29,6 +34,25 @@ export async function GET(request: NextRequest) {
 
     if (!session) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+    }
+
+    const clientIP = getClientIP(request.headers);
+    const rateIdentifier = `${session.user.empresaId}:${session.user.id}:${clientIP}:documentos`;
+    const rateResult = await rateLimitApiWrite(rateIdentifier);
+
+    if (!rateResult.success) {
+      return NextResponse.json(
+        {
+          error: 'Has alcanzado el límite de subidas. Intenta más tarde.',
+          retryAfter: rateResult.retryAfter,
+        },
+        {
+          status: 429,
+          headers: {
+            'Retry-After': String(rateResult.retryAfter ?? 1),
+          },
+        }
+      );
     }
 
     const { searchParams } = new URL(request.url);
@@ -168,11 +192,14 @@ export async function POST(request: NextRequest) {
     }
 
     // Generar nombre único
-    const nombreUnico = await generarNombreUnico(file.name, carpetaId);
+    const baseName = sanitizeFileName(file.name.replace(/\.[^/.]+$/, '') || 'documento');
+    const nombreUnico = await generarNombreUnico(baseName, carpetaId);
 
     // Convertir File a Buffer
-    const bytes = await file.arrayBuffer();
-    const buffer = Buffer.from(bytes);
+    const useCloudStorage = shouldUseCloudStorage();
+    const bodyForStorage = useCloudStorage
+      ? Readable.fromWeb(file.stream() as unknown as ReadableStream)
+      : Buffer.from(await file.arrayBuffer());
 
     // Generar ruta de storage
     const rutaStorage = generarRutaStorage(
@@ -182,7 +209,6 @@ export async function POST(request: NextRequest) {
       nombreUnico
     );
 
-    const useCloudStorage = shouldUseCloudStorage();
     let storageKey = rutaStorage;
     let storageBucket = 'local';
 
@@ -192,18 +218,18 @@ export async function POST(request: NextRequest) {
         throw new Error('STORAGE_BUCKET no configurado');
       }
       storageKey = `documentos/${rutaStorage}`;
-      await uploadToS3(buffer, storageKey, file.type);
+      await uploadToS3(bodyForStorage, storageKey, file.type);
       storageBucket = bucketName;
     } else {
       // Guardar archivo en filesystem local
-    const fullPath = join(process.cwd(), 'uploads', rutaStorage);
-    const dirPath = fullPath.substring(0, fullPath.lastIndexOf('/'));
+      const fullPath = join(process.cwd(), 'uploads', rutaStorage);
+      const dirPath = fullPath.substring(0, fullPath.lastIndexOf('/'));
 
-    if (!existsSync(dirPath)) {
-      await mkdir(dirPath, { recursive: true });
-    }
+      if (!existsSync(dirPath)) {
+        await mkdir(dirPath, { recursive: true });
+      }
 
-    await writeFile(fullPath, buffer);
+      await writeFile(fullPath, bodyForStorage as Buffer);
     }
 
     // Crear registro en DB

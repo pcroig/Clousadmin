@@ -289,9 +289,18 @@ Navegar a: /hr/documentos
 #### Subir Documentos
 ```
 1. Navegar a la carpeta destino
-2. Click en "Subir Documentos"
-3. Seleccionar archivos
-4. Documentos se suben con validaciones automáticas
+2. Click en "Subir Documentos" o arrastra archivos al área de drop
+3. Seleccionar archivos (múltiples archivos permitidos)
+4. Sistema muestra:
+   - Preview de archivos antes de subir
+   - Progreso de subida en tiempo real (porcentaje, velocidad, ETA)
+   - Estado de cada archivo (en cola, subiendo, completado, error)
+5. Validaciones automáticas:
+   - Tipo de archivo (PDF, JPG, PNG)
+   - Tamaño máximo (configurable, default: 10MB)
+   - Magic numbers (detección de archivos corruptos)
+6. Reintentos automáticos en caso de error (hasta 3 intentos)
+7. Cancelación de uploads en progreso disponible
 ```
 
 ### Para Empleados
@@ -329,8 +338,14 @@ Navegar a: /empleado/mi-espacio/documentos
 #### Subir Documentos Personales
 ```
 1. Click en carpeta "Personales" o "Médicos"
-2. Click en "Subir Archivo"
-3. Seleccionar archivo (validación automática)
+2. Click en "Subir Documentos" o arrastra archivos al área de drop
+3. Seleccionar archivo(s) - múltiples archivos permitidos
+4. Sistema muestra progreso en tiempo real con:
+   - Barra de progreso por archivo
+   - Velocidad de subida y tiempo restante (ETA)
+   - Previsualización de imágenes antes de subir
+5. Validaciones automáticas antes y durante la subida
+6. Reintentos automáticos si hay error de red
 ```
 
 ---
@@ -340,13 +355,21 @@ Navegar a: /empleado/mi-espacio/documentos
 ### Archivos
 
 **Formatos permitidos:**
-- PDF (principal)
-- Imágenes: JPG, PNG, HEIC
-- Office: DOCX, XLSX
+- PDF (principal): `application/pdf`
+- Imágenes: JPG (`image/jpeg`), PNG (`image/png`)
+- Office: DOCX, XLSX (si se habilita en futuro)
 
 **Tamaños máximos:**
+- Default: 10MB (configurable vía `NEXT_PUBLIC_MAX_UPLOAD_MB`)
 - Contratos: 10MB
 - Nóminas: 2MB
+- Documentos generales: 10MB
+
+**Validaciones adicionales:**
+- ✅ Magic numbers (verificación de firma de archivo)
+- ✅ Validación de tipo MIME vs extensión
+- ✅ Límite de archivos en cola (default: 10)
+- ✅ Rate limiting por usuario + empresa + IP
 - Justificantes (incluye médicos): 5MB
 - Otros (incluye Personales y carpetas personalizadas): 10MB
 
@@ -826,6 +849,60 @@ Para dudas o mejoras:
 - ✅ Normalización automática de tipos en `POST /api/documentos` y `POST /api/upload`
 - ✅ Carpetas globales mejoradas para incluir documentos subidos directamente a la carpeta global
 - ✅ Revalidación automática de páginas después de subir documentos
+
+### v1.3.0 (2025-11-20)
+
+#### ✨ Nuevas Funcionalidades
+- 📤 **Sistema de Uploads Avanzado**: Nueva infraestructura para uploads con progress tracking, cola de archivos, reintentos y cancelación
+  - Drag & drop nativo para selección de archivos
+  - Cola de uploads secuencial con gestión automática
+  - Progress tracking en tiempo real con ETA y velocidad de subida
+  - Reintentos automáticos (configurable, default: 3 intentos)
+  - Cancelación de uploads en progreso
+  - Previsualización de imágenes antes de subir
+  - Validación robusta con magic numbers para detectar archivos corruptos
+
+#### 🔧 Mejoras Técnicas
+- 🎣 **Hook Reutilizable**: `useFileUpload` en `lib/hooks/use-file-upload.ts`
+  - Gestión de cola, progreso, errores, reintentos y cancelaciones
+  - Validación centralizada de tipo, tamaño y magic numbers
+  - Preview automático de imágenes
+  - Callbacks configurables para eventos de cola
+  
+- 🧩 **Componentes UI Mejorados**:
+  - `FileUploadAdvanced`: Componente principal con drag & drop
+  - `FilePreview`: Preview de archivo con indicadores de estado visuales
+  - `UploadProgress`: Barra de progreso con ETA y velocidad
+  - `UploadErrorAlert`: Alertas de error con botón de retry
+  
+- ⚡ **APIs Modernizadas**:
+  - `/api/upload` y `/api/documentos` soportan streaming con `Readable.fromWeb`
+  - Rate limiting contextual (usuario + empresa + IP)
+  - Nombres de archivo sanitizados automáticamente
+  - Optimización de memoria para archivos grandes
+  
+- 🔐 **Validaciones Centralizadas**:
+  - `lib/validaciones/file-upload.ts`: Validaciones reutilizables
+  - `lib/utils/file-helpers.ts`: Utilidades de formateo, tipos y previews
+  - Validación de magic numbers para detectar archivos corruptos
+  - Validación de tipo MIME vs extensión
+  
+- 📦 **Integración Completa**:
+  - ✅ HR Documentos: `app/(dashboard)/hr/documentos/[id]/carpeta-detail-client.tsx`
+  - ✅ Empleado Documentos: `app/(dashboard)/empleado/mi-espacio/documentos/[id]/carpeta-detail-client.tsx`
+  - ✅ Onboarding Individual: `components/documentos/subir-documento-individual.tsx`
+
+#### 🎯 Beneficios
+- ✅ Mejor UX: Feedback inmediato, progreso visible, errores claros
+- ✅ Mayor confiabilidad: Reintentos automáticos, validación robusta
+- ✅ Performance: Streaming para archivos grandes, rate limiting
+- ✅ Escalabilidad: Sistema reutilizable en cualquier contexto
+- ✅ Mantenibilidad: Código centralizado y bien tipado
+
+#### 📚 Documentación
+- 📖 Documentación actualizada en `docs/HOOKS_REUTILIZABLES.md`
+- 🏗️ Arquitectura documentada en `docs/ARQUITECTURA.md`
+- 🚀 Optimizaciones documentadas en `docs/OPTIMIZACION.md`
 
 ### v1.2.0 (2025-11-12)
 

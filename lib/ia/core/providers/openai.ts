@@ -3,19 +3,21 @@
 // ========================================
 // Wrapper del SDK de OpenAI con interfaz unificada
 
-import OpenAI from 'openai';
 import { File } from 'node:buffer';
+
+import OpenAI from 'openai';
+
 import {
-  AIProvider,
+  AICallMetadata,
+  AICallOptions,
   AIMessage,
+  AIProvider,
   AIResponse,
+  ContentType,
+  hasImageContent,
+  type MessageContent,
   MessageRole,
   ModelConfig,
-  AICallOptions,
-  hasImageContent,
-  AICallMetadata,
-  ContentType,
-  type MessageContent,
 } from '../types';
 
 type FilesCreateParams = Parameters<OpenAI['files']['create']>;
@@ -317,6 +319,46 @@ type ResponsesContentPart =
   | { type: 'input_image'; image_url?: string; file_id?: string; detail?: 'low' | 'high' | 'auto' }
   | { type: 'input_file'; file_id?: string | null; file_data?: string; filename?: string };
 
+type ResponsesUsage = {
+  total_tokens?: number;
+  input_tokens?: number;
+  output_tokens?: number;
+};
+
+type ResponsesOutputContent = {
+  type?: string;
+  text?: string;
+  content?: Array<{ text?: string }>;
+};
+
+interface ResponsesAPIResponse {
+  id: string;
+  model: string;
+  created_at?: number;
+  created?: number;
+  usage?: ResponsesUsage;
+  metadata?: Record<string, unknown>;
+  output_text?: string | string[];
+  output?: ResponsesOutputContent[];
+}
+
+type ResponsesCreateParams = {
+  model: string;
+  instructions?: string;
+  input: Array<{ role: 'user' | 'assistant'; content: ResponsesContentPart[] }>;
+  temperature: number;
+  top_p?: number;
+  max_output_tokens?: number;
+  metadata?: Record<string, unknown>;
+  response_format?: { type: 'json_object' };
+};
+
+type OpenAIClientWithResponses = OpenAI & {
+  responses?: {
+    create?: (params: ResponsesCreateParams) => Promise<ResponsesAPIResponse>;
+  };
+};
+
 function contentToResponsesParts(content: MessageContent): ResponsesContentPart[] {
   if (typeof content === 'string') {
     return [{ type: 'input_text', text: content }];
@@ -337,11 +379,12 @@ function contentToResponsesParts(content: MessageContent): ResponsesContentPart[
   }
 
   if (url.startsWith('data:application/pdf;base64,')) {
+    const imageUrlWithFilename = content.image_url as typeof content.image_url & { filename?: string };
     return [
       {
         type: 'input_file',
         file_data: url,
-        filename: (content.image_url as any).filename || 'document.pdf',
+        filename: imageUrlWithFilename.filename ?? 'document.pdf',
       },
     ];
   }
@@ -402,7 +445,7 @@ function convertMessagesToResponsesPayload(messages: AIMessage[]): {
   return { instructions, input };
 }
 
-function extractResponsesText(response: any): string {
+function extractResponsesText(response: ResponsesAPIResponse): string {
   if (typeof response.output_text === 'string' && response.output_text.trim()) {
     return response.output_text.trim();
   }
@@ -414,7 +457,7 @@ function extractResponsesText(response: any): string {
 
   const contentItems =
     Array.isArray(response.output) && response.output.length > 0
-      ? response.output.flatMap((item: any) => item?.content ?? [])
+      ? response.output.flatMap((item) => item?.content ?? [])
       : [];
 
   for (const contentItem of contentItems) {
@@ -425,7 +468,9 @@ function extractResponsesText(response: any): string {
     }
 
     if (contentItem.type === 'message' && Array.isArray(contentItem.content)) {
-      const textPart = contentItem.content.find((part: any) => typeof part.text === 'string');
+      const textPart = contentItem.content.find(
+        (part): part is { text: string } => typeof part?.text === 'string'
+      );
       if (textPart?.text) {
         return textPart.text;
       }
@@ -439,7 +484,7 @@ function extractResponsesText(response: any): string {
   return '';
 }
 
-function convertResponsesToAIResponse(response: any): AIResponse {
+function convertResponsesToAIResponse(response: ResponsesAPIResponse): AIResponse {
   const text = extractResponsesText(response);
   const usage = response.usage
     ? {
@@ -489,15 +534,14 @@ export async function callOpenAI(
   const maxTokens = options?.maxTokens ?? config.maxTokens;
   const responseFormat = options?.responseFormat ?? config.responseFormat;
 
-  const canUseResponsesAPI =
-    typeof (client as any).responses !== 'undefined' &&
-    typeof (client as any).responses?.create === 'function';
+  const responsesCapableClient = client as OpenAIClientWithResponses;
+  const canUseResponsesAPI = typeof responsesCapableClient.responses?.create === 'function';
 
   if (canUseResponsesAPI) {
     try {
       console.info(`[OpenAI Provider] Intentando Responses API (modelo ${config.model})`);
       const payload = convertMessagesToResponsesPayload(messages);
-      const response = await (client as any).responses.create({
+      const response = await responsesCapableClient.responses!.create!({
         model: config.model,
         instructions: payload.instructions,
         input: payload.input,

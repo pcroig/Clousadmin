@@ -4,18 +4,19 @@
 // Modal de Preferencias de Vacaciones (General)
 // ========================================
 
-import { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { LoadingButton } from '@/components/shared/loading-button';
-import { Calendar } from '@/components/ui/calendar';
-import { Badge } from '@/components/ui/badge';
-import { Label } from '@/components/ui/label';
-import { Calendar as CalendarIcon } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { useMutation } from '@/lib/hooks';
+import { Calendar as CalendarIcon } from 'lucide-react';
+import { useEffect, useState } from 'react';
+
 import { InfoTooltip } from '@/components/shared/info-tooltip';
+import { LoadingButton } from '@/components/shared/loading-button';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Calendar } from '@/components/ui/calendar';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { useMutation } from '@/lib/hooks';
 import { toDateOnlyString } from '@/lib/utils';
 
 const MIN_ALTERNATIVOS_RATIO = 0.5;
@@ -61,27 +62,34 @@ export function PreferenciasVacacionesModal({
 
   // Obtener preferencia existente al abrir
   useEffect(() => {
-    if (open && campanaId) {
-      fetch(`/api/campanas-vacaciones/${campanaId}/preferencia`)
-        .then(res => res.json())
-        .then(data => {
-          if (data.success && data.data) {
-            const pref = data.data;
-            if (pref.diasIdeales) {
-              setDiasIdeales((pref.diasIdeales as string[]).map(d => new Date(d)));
-            }
-            if (pref.diasPrioritarios) {
-              setDiasPrioritarios((pref.diasPrioritarios as string[]).map(d => new Date(d)));
-            }
-            if (pref.diasAlternativos) {
-              setDiasAlternativos((pref.diasAlternativos as string[]).map(d => new Date(d)));
-            }
-          }
-        })
-        .catch(err => console.error('Error cargando preferencia:', err));
-    } else if (!open) {
-      setErrorMessage(null);
+    if (!open || !campanaId) {
+      return;
     }
+
+    let isMounted = true;
+
+    fetch(`/api/campanas-vacaciones/${campanaId}/preferencia`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (!isMounted || !data?.success || !data.data) {
+          return;
+        }
+
+        const pref = data.data;
+        setErrorMessage(null);
+        setDiasIdeales(Array.isArray(pref.diasIdeales) ? pref.diasIdeales.map((d: string) => new Date(d)) : []);
+        setDiasPrioritarios(
+          Array.isArray(pref.diasPrioritarios) ? pref.diasPrioritarios.map((d: string) => new Date(d)) : []
+        );
+        setDiasAlternativos(
+          Array.isArray(pref.diasAlternativos) ? pref.diasAlternativos.map((d: string) => new Date(d)) : []
+        );
+      })
+      .catch((err) => console.error('Error cargando preferencia:', err));
+
+    return () => {
+      isMounted = false;
+    };
   }, [open, campanaId]);
 
   const fechaInicio = new Date(fechaInicioObjetivo);
@@ -143,8 +151,15 @@ export function PreferenciasVacacionesModal({
 
   const puedeGuardar = (diasIdeales.length > 0 || diasPrioritarios.length > 0 || diasAlternativos.length > 0) && cumpleAlternativos;
 
+  const handleDialogChange = (nextOpen: boolean) => {
+    if (!nextOpen) {
+      setErrorMessage(null);
+      onClose();
+    }
+  };
+
   return (
-    <Dialog open={open} onOpenChange={onClose}>
+    <Dialog open={open} onOpenChange={handleDialogChange}>
       <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">

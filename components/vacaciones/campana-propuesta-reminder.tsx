@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+
 import { ResponderPropuestaModal } from '@/components/empleado/responder-propuesta-modal';
 
 interface CampanaPropuestaInfo {
@@ -26,32 +27,50 @@ export function CampanaPropuestaReminder({
   propuestaPendiente,
   onResponded,
 }: CampanaPropuestaReminderProps) {
-  const [open, setOpen] = useState(!!propuestaPendiente);
-
-  useEffect(() => {
-    setOpen(!!propuestaPendiente);
-  }, [propuestaPendiente]);
-
   if (!propuestaPendiente) {
     return null;
   }
 
   return (
+    <CampanaPropuestaReminderContent
+      key={propuestaPendiente.id}
+      propuestaPendiente={propuestaPendiente}
+      onResponded={onResponded}
+    />
+  );
+}
+
+interface CampanaPropuestaReminderContentProps {
+  propuestaPendiente: CampanaPropuestaInfo;
+  onResponded?: () => void;
+}
+
+function CampanaPropuestaReminderContent({
+  propuestaPendiente,
+  onResponded,
+}: CampanaPropuestaReminderContentProps) {
+  const [open, setOpen] = useState(true);
+
+  const handleClose = () => setOpen(false);
+  const handleResponded = () => {
+    onResponded?.();
+    setOpen(false);
+  };
+
+  return (
     <ResponderPropuestaModal
       open={open}
-      onClose={() => setOpen(false)}
+      onClose={handleClose}
       campanaId={propuestaPendiente.id}
       campanaTitulo={propuestaPendiente.titulo}
       fechaInicioObjetivo={propuestaPendiente.fechaInicioObjetivo}
       fechaFinObjetivo={propuestaPendiente.fechaFinObjetivo}
       propuesta={propuestaPendiente.propuesta}
-      onResponded={() => {
-        onResponded?.();
-        setOpen(false);
-      }}
+      onResponded={handleResponded}
     />
   );
 }
+
 
 
 

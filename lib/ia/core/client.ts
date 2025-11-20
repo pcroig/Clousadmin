@@ -5,32 +5,32 @@
 // con fallback transparente y selección automática
 
 import {
-  AIProvider,
-  AIMessage,
-  AIResponse,
-  ModelConfig,
-  AICallOptions,
-  AIResult,
-  AISuccess,
-  AIError,
-  AICallMetadata,
-  MessageRole,
-} from './types';
-import {
-  isOpenAIAvailable,
-  callOpenAI,
-  getAppropriateModel as getOpenAIModel,
-} from './providers/openai';
-import {
-  isAnthropicAvailable,
   callAnthropic,
+  isAnthropicAvailable,
   mapToAnthropicModel,
 } from './providers/anthropic';
 import {
-  isGoogleAIAvailable,
   callGoogleAI,
+  isGoogleAIAvailable,
   mapToGoogleModel,
 } from './providers/google';
+import {
+  callOpenAI,
+  getAppropriateModel as getOpenAIModel,
+  isOpenAIAvailable,
+} from './providers/openai';
+import {
+  AICallMetadata,
+  AICallOptions,
+  AIMessage,
+  AIProvider,
+  AIResponse,
+  AIResult,
+  JsonValue,
+  MessageContent,
+  MessageRole,
+  ModelConfig,
+} from './types';
 
 // ========================================
 // CONFIGURACIÓN DE PRIORIDADES
@@ -259,11 +259,12 @@ export async function callAI(
       }
       
       return response;
-    } catch (error: any) {
-      console.error(`[AI Client] Error con ${provider}:`, error.message);
+    } catch (error) {
+      const normalizedError = toError(error);
+      console.error(`[AI Client] Error con ${provider}:`, normalizedError.message);
       errors.push({
         provider,
-        error: error.message,
+        error: normalizedError.message,
       });
       
       // Si este era el último proveedor disponible, lanzar error
@@ -308,11 +309,11 @@ export async function callAISafe(
       usage: response.usage,
       metadata: response.metadata,
     };
-  } catch (error: any) {
+  } catch (error) {
+    const normalizedError = toError(error);
     return {
       success: false,
-      error: error.message,
-      code: error.code,
+      error: normalizedError.message,
     };
   }
 }
@@ -335,8 +336,8 @@ export async function callAIWithRetry(
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
       return await callAI(messages, config, options);
-    } catch (error: any) {
-      lastError = error;
+    } catch (error) {
+      lastError = toError(error);
       
       if (attempt < maxRetries) {
         const delay = Math.min(1000 * Math.pow(2, attempt), 5000); // Exponential backoff
@@ -356,7 +357,7 @@ export async function callAIWithRetry(
 /**
  * Parsea respuesta JSON con validación y retry automático si falla
  */
-export async function callAIForJSON<T = any>(
+export async function callAIForJSON<T = JsonValue>(
   messages: AIMessage[],
   config: ModelConfig,
   options?: AICallOptions
@@ -418,7 +419,7 @@ export const getAIClient = {
     completions: {
       create: async (params: {
         model: string;
-        messages: any[];
+        messages: Array<{ role: MessageRole; content: MessageContent }>;
         temperature?: number;
         max_tokens?: number;
         response_format?: { type: string };
@@ -442,4 +443,20 @@ export const getAIClient = {
     },
   },
 };
+
+function toError(error: unknown): Error {
+  if (error instanceof Error) {
+    return error;
+  }
+
+  if (typeof error === 'string') {
+    return new Error(error);
+  }
+
+  try {
+    return new Error(JSON.stringify(error));
+  } catch {
+    return new Error('Unknown error');
+  }
+}
 

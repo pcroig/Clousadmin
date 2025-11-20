@@ -5,22 +5,23 @@
 // ========================================
 // Detalles completos de una nómina individual
 
-import { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
 import {
-  ArrowLeft,
-  Download,
-  Upload,
-  FileText,
-  User,
-  Calendar,
-  CreditCard,
   AlertCircle,
+  ArrowLeft,
+  Calendar,
   CheckCircle,
+  CreditCard,
+  Download,
+  FileText,
+  Upload,
+  User,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { useState } from 'react';
 import { toast } from 'sonner';
+
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { NOMINA_ESTADO_LABELS, NOMINA_ESTADOS } from '@/lib/constants/nomina-estados';
 
 interface NominaDetailsClientProps {

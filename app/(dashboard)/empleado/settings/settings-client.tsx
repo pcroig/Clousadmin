@@ -4,8 +4,8 @@
 
 'use client';
 
-import { SettingsLayout } from '@/components/settings/settings-layout';
 import { GeneralSettings } from '@/components/settings/general-settings';
+import { SettingsLayout } from '@/components/settings/settings-layout';
 
 interface SettingsClientProps {
   usuario: {

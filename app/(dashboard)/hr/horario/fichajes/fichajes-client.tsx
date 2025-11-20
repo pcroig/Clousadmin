@@ -4,9 +4,18 @@
 // Fichajes Client Component - Vista por Jornadas
 // ========================================
 
-import React, { useState, useEffect, useCallback } from 'react';
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
+import { Calendar, Clock } from 'lucide-react';
+import React, { useCallback, useEffect, useState } from 'react';
+import { toast } from 'sonner';
+
+import { CompensarHorasDialog } from '@/components/shared/compensar-horas-dialog';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   Table,
   TableBody,
@@ -15,19 +24,14 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Clock, Calendar } from 'lucide-react';
-import { format } from 'date-fns';
-import { es } from 'date-fns/locale';
-import { formatearHorasMinutos } from '@/lib/utils/formatters';
-import { JornadasModal } from './jornadas-modal';
-import { EditarFichajeModal } from './editar-fichaje-modal';
-import { RevisionModal } from './revision-modal';
-import { toast } from 'sonner';
 import { EstadoFichaje } from '@/lib/constants/enums';
-import { CompensarHorasDialog } from '@/components/shared/compensar-horas-dialog';
+import { formatearHorasMinutos } from '@/lib/utils/formatters';
+
+import { EditarFichajeModal } from './editar-fichaje-modal';
+import { JornadasModal } from './jornadas-modal';
+import { RevisionModal } from './revision-modal';
+
+
 
 // NUEVO MODELO: Fichaje tiene eventos dentro
 interface FichajeEvento {

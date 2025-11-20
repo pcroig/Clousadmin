@@ -1,17 +1,18 @@
 'use client';
 
-import { useState } from 'react';
+import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft } from 'lucide-react';
+import { useState } from 'react';
 
-import { Button } from '@/components/ui/button';
-import { GeneralTab as GeneralTabShared } from '@/components/shared/mi-espacio/general-tab';
-import { FichajesTab as FichajesTabShared } from '@/components/shared/mi-espacio/fichajes-tab';
 import { AusenciasTab as AusenciasTabShared } from '@/components/shared/mi-espacio/ausencias-tab';
 import { ContratosTab as ContratosTabShared } from '@/components/shared/mi-espacio/contratos-tab';
 import { DocumentosTab as DocumentosTabShared } from '@/components/shared/mi-espacio/documentos-tab';
+import { FichajesTab as FichajesTabShared } from '@/components/shared/mi-espacio/fichajes-tab';
+import { GeneralTab as GeneralTabShared } from '@/components/shared/mi-espacio/general-tab';
 import { ProfileAvatar } from '@/components/shared/profile-avatar';
+import { Button } from '@/components/ui/button';
+
 import type { MiEspacioEmpleado, Usuario } from '@/types/empleado';
 
 interface EmpleadoDetailClientProps {

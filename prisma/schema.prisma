@@ -181,7 +181,7 @@ model Usuario {
 
   email     String  @unique @db.VarChar(255)
   password  String? @db.VarChar(255) // Bcrypt hash (local auth)
-  cognitoId String? @unique @db.VarChar(255) // AWS Cognito sub (cloud auth)
+  cognitoId String? @unique @db.VarChar(255) // DEPRECADO: Campo legacy, nunca se usó (solo JWT)
   googleId  String? @unique @db.VarChar(255) // Google OAuth sub
 
   // Role-based access control
@@ -195,6 +195,10 @@ model Usuario {
   // Status
   activo          Boolean @default(true)
   emailVerificado Boolean @default(false)
+  totpEnabled     Boolean @default(false)
+  totpEnabledAt   DateTime?
+  totpSecret      String?  @db.Text
+  backupCodes     Json?
 
   // Timestamps
   createdAt    DateTime  @default(now())

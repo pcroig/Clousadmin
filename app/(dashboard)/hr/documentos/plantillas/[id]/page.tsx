@@ -2,11 +2,14 @@
 // Plantilla Detail Page - Server Component
 // ========================================
 
-import { getSession } from '@/lib/auth';
 import { redirect } from 'next/navigation';
-import { prisma } from '@/lib/prisma';
-import { PlantillaDetailClient } from './plantilla-detail-client';
+
+import { getSession } from '@/lib/auth';
 import { UsuarioRol } from '@/lib/constants/enums';
+import { prisma } from '@/lib/prisma';
+
+import { PlantillaDetailClient } from './plantilla-detail-client';
+
 
 export default async function PlantillaDetailPage({
   params,

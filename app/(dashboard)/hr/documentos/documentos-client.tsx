@@ -4,15 +4,16 @@
 
 'use client';
 
-import { useCallback, useState } from 'react';
+import { FileText, Folder, FolderPlus, Upload } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { Folder, Upload, FolderPlus, FileText } from 'lucide-react';
+import { useCallback, useState } from 'react';
+
+import { CrearCarpetaConDocumentosModal } from '@/components/hr/crear-carpeta-con-documentos-modal';
+import { PlantillasList } from '@/components/hr/plantillas-list';
+import { SubirPlantillaModal } from '@/components/hr/subir-plantilla-modal';
+import { type CarpetaCardData, CarpetasGrid } from '@/components/shared/carpetas-grid';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { CrearCarpetaConDocumentosModal } from '@/components/hr/crear-carpeta-con-documentos-modal';
-import { SubirPlantillaModal } from '@/components/hr/subir-plantilla-modal';
-import { PlantillasList } from '@/components/hr/plantillas-list';
-import { CarpetasGrid, type CarpetaCardData } from '@/components/shared/carpetas-grid';
 
 interface Carpeta {
   id: string;

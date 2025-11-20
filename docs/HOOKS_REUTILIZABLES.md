@@ -128,6 +128,136 @@ const handleSubmit = async () => {
 
 ---
 
+### 3. `useFileUpload` - Para Uploads de Archivos Avanzados
+
+Hook especializado para subida de archivos con cola, progreso, reintentos y cancelación.
+
+**Ubicación**: `lib/hooks/use-file-upload.ts`
+
+**Características**:
+- ✅ Cola de uploads secuenciales
+- ✅ Tracking de progreso en tiempo real
+- ✅ Reintentos automáticos (configurable)
+- ✅ Cancelación de uploads en progreso
+- ✅ Validación de tipo, tamaño y magic numbers
+- ✅ Previsualización de imágenes
+- ✅ Drag & drop nativo
+
+**Uso básico**:
+```tsx
+import { useFileUpload, type UploadHandler } from '@/lib/hooks/use-file-upload';
+import { FileUploadAdvanced } from '@/components/shared/file-upload-advanced';
+
+function SubirDocumentos() {
+  const router = useRouter();
+
+  const handleUpload: UploadHandler = useCallback(
+    ({ file, signal, onProgress }) =>
+      new Promise((resolve) => {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('carpetaId', carpetaId);
+
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', '/api/documentos');
+        xhr.upload.onprogress = (event) => {
+          if (event.lengthComputable) {
+            onProgress?.(event.loaded, event.total);
+          }
+        };
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            router.refresh();
+            resolve({ success: true });
+          } else {
+            resolve({ success: false, error: 'Error al subir' });
+          }
+        };
+        xhr.onerror = () => resolve({ success: false, error: 'Error de red' });
+        
+        if (signal.aborted) {
+          xhr.abort();
+        } else {
+          signal.addEventListener('abort', () => xhr.abort());
+        }
+        xhr.send(formData);
+      }),
+    [carpetaId, router]
+  );
+
+  return (
+    <FileUploadAdvanced
+      onUpload={handleUpload}
+      acceptedTypes={['application/pdf', 'image/jpeg', 'image/png']}
+      maxSizeMB={10}
+      maxFiles={10}
+      allowMultiple
+      autoUpload
+    />
+  );
+}
+```
+
+**Props del hook**:
+- `items: UploadItem[]` - Lista de archivos en cola con estado y progreso
+- `queueProgress: number` - Progreso total de la cola (0-100)
+- `isUploading: boolean` - Si hay uploads en progreso
+- `addFiles(files: FileList | File[])` - Agregar archivos a la cola
+- `removeFile(id: string)` - Quitar archivo de la cola
+- `retryFile(id: string)` - Reintentar upload fallido
+- `cancelUpload(id: string)` - Cancelar upload en progreso
+- `clearCompleted()` - Limpiar archivos completados/cancelados
+- `startUploads()` - Iniciar uploads manualmente (si `autoUpload: false`)
+
+**Opciones**:
+- `onUpload: UploadHandler` - Función que ejecuta el upload (requerido)
+- `acceptedTypes?: string[]` - Tipos MIME permitidos
+- `maxSizeMB?: number` - Tamaño máximo por archivo (default: 5MB)
+- `maxFiles?: number` - Máximo de archivos en cola (default: 10)
+- `allowMultiple?: boolean` - Permitir múltiples archivos (default: true)
+- `autoUpload?: boolean` - Subir automáticamente al agregar (default: true)
+- `maxRetries?: number` - Reintentos automáticos (default: 3)
+
+**Ejemplo completo con componente**:
+```tsx
+import { FileUploadAdvanced } from '@/components/shared/file-upload-advanced';
+import { useFileUpload, type UploadHandler } from '@/lib/hooks/use-file-upload';
+
+function CarpetaDetailClient({ carpetaId }: { carpetaId: string }) {
+  const handleUpload: UploadHandler = useCallback(
+    ({ file, signal, onProgress }) => {
+      // Implementación con XMLHttpRequest para tracking de progreso
+      // Ver ejemplo completo arriba
+    },
+    [carpetaId]
+  );
+
+  return (
+    <FileUploadAdvanced
+      onUpload={handleUpload}
+      acceptedTypes={['application/pdf', 'image/jpeg', 'image/png']}
+      maxSizeMB={10}
+      allowMultiple
+      autoUpload
+      buttonText="Seleccionar documentos"
+    />
+  );
+}
+```
+
+**Integración**:
+- ✅ HR Documentos: `app/(dashboard)/hr/documentos/[id]/carpeta-detail-client.tsx`
+- ✅ Empleado Documentos: `app/(dashboard)/empleado/mi-espacio/documentos/[id]/carpeta-detail-client.tsx`
+- ✅ Onboarding Individual: `components/documentos/subir-documento-individual.tsx`
+
+**Componentes relacionados**:
+- `components/shared/file-upload-advanced.tsx` - Componente principal con drag & drop
+- `components/ui/file-preview.tsx` - Previsualización de archivos con estado
+- `components/ui/upload-progress.tsx` - Barra de progreso con ETA y velocidad
+- `components/ui/upload-error-alert.tsx` - Alertas de error con retry
+
+---
+
 ## 📊 Comparación Antes/Después
 
 ### ❌ Antes (15-20 líneas duplicadas por archivo):
@@ -377,6 +507,7 @@ useEffect(() => {
 
 **Última actualización**: 27 de enero 2025  
 **Mantenido por**: Equipo de Desarrollo Clousadmin
+
 
 
 

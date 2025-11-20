@@ -2,11 +2,14 @@
 // Mi Espacio - Horario (Fichajes y Ausencias)
 // ========================================
 
-import { getSession } from '@/lib/auth';
 import { redirect } from 'next/navigation';
-import { HorarioMiEspacioClient } from './horario-mi-espacio-client';
+
+import { getSession } from '@/lib/auth';
 import { obtenerResumenBalance } from '@/lib/calculos/balance-horas';
 import { prisma } from '@/lib/prisma';
+
+import { HorarioMiEspacioClient } from './horario-mi-espacio-client';
+
 import type { Ausencia } from '@prisma/client';
 
 export default async function HorarioMiEspacioPage() {

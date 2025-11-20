@@ -4,14 +4,17 @@
 // Subir Documento Individual - Con Extracción IA
 // ========================================
 
-import { useState, useRef } from 'react';
+import { AlertCircle, CheckCircle } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { Upload, FileText, CheckCircle, AlertCircle } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { LoadingButton } from '@/components/shared/loading-button';
-import { Label } from '@/components/ui/label';
-import { Input } from '@/components/ui/input';
+import { useCallback, useState } from 'react';
 import { toast } from 'sonner';
+
+import { FileUploadAdvanced } from '@/components/shared/file-upload-advanced';
+import { LoadingButton } from '@/components/shared/loading-button';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { UploadHandler } from '@/lib/hooks/use-file-upload';
 
 interface DatosExtraidos {
   nombre?: string;
@@ -46,62 +49,50 @@ export function SubirDocumentoIndividual({ onSuccess, onCancel }: SubirDocumento
   const [guardando, setGuardando] = useState(false);
   const [datosExtraidos, setDatosExtraidos] = useState<DatosExtraidos | null>(null);
   const [error, setError] = useState('');
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      // Validar tipo
-      const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg'];
-      if (!allowedTypes.includes(file.type)) {
-        setError('Tipo de archivo no soportado. Solo PDF o imágenes (JPG/PNG).');
-        return;
-      }
-
-      // Validar tamaño (max 5MB)
-      if (file.size > 5 * 1024 * 1024) {
-        setError('El archivo no puede superar 5MB.');
-        return;
-      }
-
+  const handleUploadAndExtract: UploadHandler = useCallback(
+    async ({ file, signal }) => {
+      setError('');
+      setProcesando(true);
       setArchivo(file);
       setDatosExtraidos(null);
-      setError('');
-    }
-  };
 
-  const handleExtraerDatos = async () => {
-    if (!archivo) return;
+      try {
+        const formData = new FormData();
+        formData.append('file', file);
 
-    setError('');
-    setProcesando(true);
+        const response = await fetch('/api/documentos/extraer', {
+          method: 'POST',
+          body: formData,
+          signal,
+        });
 
-    try {
-      const formData = new FormData();
-      formData.append('file', archivo);
+        const result = await response.json();
 
-      const response = await fetch('/api/documentos/extraer', {
-        method: 'POST',
-        body: formData,
-      });
+        if (result.success) {
+          setDatosExtraidos(result.datosExtraidos);
+          toast.success('Datos extraídos correctamente');
+          return { success: true };
+        }
 
-      const result = await response.json();
-
-      if (result.success) {
-        setDatosExtraidos(result.datosExtraidos);
-        toast.success('Datos extraídos correctamente');
-      } else {
-        setError(result.error || 'Error al extraer datos del documento');
-        toast.error('Error al extraer datos');
+        const errorMessage = result.error || 'Error al extraer datos del documento';
+        setError(errorMessage);
+        toast.error(errorMessage);
+        return { success: false, error: errorMessage };
+      } catch (err) {
+        if ((err as Error).name === 'AbortError') {
+          return { success: false, error: 'Procesamiento cancelado' };
+        }
+        setError('Error al procesar el documento');
+        toast.error('Error al procesar el documento');
+        console.error('Error:', err);
+        return { success: false, error: 'Error al procesar el documento' };
+      } finally {
+        setProcesando(false);
       }
-    } catch (err) {
-      setError('Error al procesar el documento');
-      toast.error('Error al procesar el documento');
-      console.error('Error:', err);
-    } finally {
-      setProcesando(false);
-    }
-  };
+    },
+    []
+  );
 
   const handleGuardarEmpleado = async () => {
     if (!datosExtraidos) return;
@@ -124,9 +115,6 @@ export function SubirDocumentoIndividual({ onSuccess, onCancel }: SubirDocumento
         // Resetear formulario
         setArchivo(null);
         setDatosExtraidos(null);
-        if (fileInputRef.current) {
-          fileInputRef.current.value = '';
-        }
 
         // Llamar onSuccess si existe
         if (onSuccess) {
@@ -175,44 +163,16 @@ export function SubirDocumentoIndividual({ onSuccess, onCancel }: SubirDocumento
 
       {/* Área de carga de archivo */}
       {!datosExtraidos && (
-        <div className="space-y-4">
-          <div
-            className="rounded-lg border-2 border-dashed p-8 text-center cursor-pointer hover:border-primary transition-colors"
-            onClick={() => fileInputRef.current?.click()}
-          >
-            <Upload className="mx-auto h-12 w-12 text-gray-400" />
-            <p className="mt-4 text-sm font-medium">
-              {archivo ? archivo.name : 'Arrastra un archivo o haz clic para seleccionar'}
-            </p>
-            <p className="mt-1 text-xs text-gray-500">
-              PDF, JPG o PNG (máx. 5MB)
-            </p>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".pdf,.jpg,.jpeg,.png"
-              onChange={handleFileChange}
-              className="hidden"
-            />
-          </div>
-
-          {archivo && (
-            <div className="flex items-center justify-between rounded-lg border p-4">
-              <div className="flex items-center gap-3">
-                <FileText className="h-5 w-5 text-primary" />
-                <div>
-                  <p className="text-sm font-medium">{archivo.name}</p>
-                  <p className="text-xs text-gray-500">
-                    {(archivo.size / 1024).toFixed(2)} KB • {archivo.type}
-                  </p>
-                </div>
-              </div>
-              <LoadingButton onClick={handleExtraerDatos} loading={procesando}>
-                {procesando ? 'Extrayendo datos...' : 'Extraer con IA'}
-              </LoadingButton>
-            </div>
-          )}
-        </div>
+        <FileUploadAdvanced
+          onUpload={handleUploadAndExtract}
+          acceptedTypes={['application/pdf', 'image/jpeg', 'image/png', 'image/jpg']}
+          maxSizeMB={5}
+          maxFiles={1}
+          allowMultiple={false}
+          disabled={procesando}
+          buttonText="Seleccionar documento"
+          className="bg-white p-4 rounded-xl border border-gray-100"
+        />
       )}
 
       {/* Vista previa de datos extraídos */}
@@ -390,9 +350,6 @@ export function SubirDocumentoIndividual({ onSuccess, onCancel }: SubirDocumento
                 } else {
                   setDatosExtraidos(null);
                   setArchivo(null);
-                  if (fileInputRef.current) {
-                    fileInputRef.current.value = '';
-                  }
                 }
               }}
             >

@@ -264,7 +264,7 @@ export function ValidarComplementosDialog({
                 className="pl-10"
               />
             </div>
-            <Select value={filtroEstado} onValueChange={(value: any) => setFiltroEstado(value)}>
+            <Select value={filtroEstado} onValueChange={(value: string) => setFiltroEstado(value)}>
               <SelectTrigger className="w-48">
                 <SelectValue />
               </SelectTrigger>

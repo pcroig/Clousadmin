@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
     const autoOffboarding = searchParams.get('autoOffboarding');
 
     // Filtros
-    const where: any = {
+    const where: Prisma.PlantillaWhereInput = {
       OR: [
         { empresaId: session.user.empresaId }, // Plantillas de la empresa
         { empresaId: null }, // Plantillas oficiales

@@ -5,15 +5,16 @@
 // Calendar table with direct editing for vacation campaign
 // ========================================
 
-import React, { useState, useMemo, useEffect } from 'react';
+import { eachDayOfInterval, format } from 'date-fns';
+import { es } from 'date-fns/locale';
+import React, { useEffect, useMemo, useState } from 'react';
+
+import { LoadingButton } from '@/components/shared/loading-button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { LoadingButton } from '@/components/shared/loading-button';
 import { cn, toDateOnlyString } from '@/lib/utils';
-import { format, eachDayOfInterval } from 'date-fns';
-import { es } from 'date-fns/locale';
 
 interface EmpleadoEquipo {
   equipoId: string;

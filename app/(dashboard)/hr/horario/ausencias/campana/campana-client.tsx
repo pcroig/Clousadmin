@@ -4,16 +4,17 @@
 // Campaña de Vacaciones - Client Component
 // ========================================
 
-import { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
-import { Calendar, Sparkles, Send, X, RefreshCw } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { Calendar, RefreshCw, Send, Sparkles, X } from 'lucide-react';
+import { useState } from 'react';
 import { toast } from 'sonner';
-import { TablaCuadrajeCampana } from '@/components/vacaciones/tabla-cuadraje-campana';
+
 import { LoadingButton } from '@/components/shared/loading-button';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Separator } from '@/components/ui/separator';
+import { TablaCuadrajeCampana } from '@/components/vacaciones/tabla-cuadraje-campana';
 
 interface EmpleadoEquipo {
   equipoId: string;

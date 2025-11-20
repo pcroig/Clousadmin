@@ -4,14 +4,15 @@
 // Login Form Component
 // ========================================
 
-import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { useEffect, useState } from 'react';
+
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { loginAction } from './actions';
-import { toast } from 'sonner';
 import { UsuarioRol } from '@/lib/constants/enums';
+
+import { loginAction } from './actions';
 
 interface LoginFormProps {
   callbackUrl?: string;
@@ -79,6 +80,11 @@ export function LoginForm({ callbackUrl }: LoginFormProps) {
     try {
       const result = await loginAction(email, password);
 
+      if (result.twoFactorRequired) {
+        router.push('/verify-otp');
+        return;
+      }
+
       if (result.success) {
         // Reset rate limit states
         setRateLimited(false);
@@ -87,8 +93,10 @@ export function LoginForm({ callbackUrl }: LoginFormProps) {
         // Redirigir según el callback URL o el rol del usuario
         if (callbackUrl) {
           router.push(callbackUrl);
-        } else if (result.rol === UsuarioRol.hr_admin) {
+        } else if (result.rol === UsuarioRol.hr_admin || result.rol === UsuarioRol.platform_admin) {
           router.push('/hr/dashboard');
+        } else if (result.rol === UsuarioRol.manager) {
+          router.push('/manager/dashboard');
         } else {
           router.push('/empleado/dashboard');
         }
@@ -202,18 +210,13 @@ export function LoginForm({ callbackUrl }: LoginFormProps) {
       </Button>
 
       <div className="text-center space-y-2">
-        <a
-          href="#"
-          className="text-sm text-primary hover:underline block"
-          onClick={(e) => {
-            e.preventDefault();
-            toast.info(
-              'Contacta con tu administrador de RRHH para recuperar tu contraseña'
-            );
-          }}
+        <button
+          type="button"
+          className="text-sm text-primary hover:underline"
+          onClick={() => router.push('/forgot-password')}
         >
           ¿Olvidaste tu contraseña?
-        </a>
+        </button>
         <div>
           <span className="text-sm text-gray-500">
             ¿No tienes cuenta? Necesitas una invitación para crear una cuenta.

@@ -184,11 +184,12 @@ export async function POST(
         let s3Url: string;
         try {
           s3Url = await uploadToS3(buffer, s3Key, 'application/pdf');
-        } catch (s3Error: any) {
-          console.error(`[Importar Nóminas] Error S3 para ${file.name}:`, s3Error.message);
+        } catch (s3Error: unknown) {
+          const errorMessage = s3Error instanceof Error ? s3Error.message : 'Error desconocido';
+          console.error(`[Importar Nóminas] Error S3 para ${file.name}:`, errorMessage);
           errores.push({
             archivo: file.name,
-            error: `Error al subir archivo: ${s3Error.message || 'Error desconocido'}`,
+            error: `Error al subir archivo: ${errorMessage}`,
           });
           continue; // Pasar al siguiente archivo
         }

@@ -4,15 +4,25 @@
 // Modal Editar Fichaje - Estilo Editar Ausencia
 // ========================================
 
-import { useState, useEffect } from 'react';
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
+import { Plus, Trash2 } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { toast } from 'sonner';
+
+import { LoadingButton } from '@/components/shared/loading-button';
+import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogFooter,
 } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
+import {
+  Field,
+  FieldLabel,
+} from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import {
   Select,
@@ -21,15 +31,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  Field,
-  FieldLabel,
-} from '@/components/ui/field';
-import { format } from 'date-fns';
-import { es } from 'date-fns/locale';
-import { Trash2, Plus } from 'lucide-react';
-import { toast } from 'sonner';
-import { LoadingButton } from '@/components/shared/loading-button';
 
 interface FichajeEvento {
   id: string;

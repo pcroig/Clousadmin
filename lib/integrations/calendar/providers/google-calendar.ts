@@ -214,8 +214,9 @@ export class GoogleCalendarProvider implements CalendarProvider {
       });
 
       return this.googleEventToCalendarEvent(response.data);
-    } catch (error: any) {
-      if (error.code === 404) {
+    } catch (error: unknown) {
+      const errorObj = error as { code?: number } | null;
+      if (errorObj?.code === 404) {
         return null;
       }
       console.error("Error getting Google Calendar event:", error);
@@ -297,7 +298,22 @@ export class GoogleCalendarProvider implements CalendarProvider {
     return oauth2Client;
   }
 
-  private googleEventToCalendarEvent(googleEvent: any): CalendarEvent {
+  private googleEventToCalendarEvent(googleEvent: {
+    id?: string | null;
+    summary?: string | null;
+    description?: string | null;
+    start?: {
+      date?: string | null;
+      dateTime?: string | null;
+      timeZone?: string | null;
+    } | null;
+    end?: {
+      date?: string | null;
+      dateTime?: string | null;
+      timeZone?: string | null;
+    } | null;
+    location?: string | null;
+  }): CalendarEvent {
     return {
       id: googleEvent.id,
       summary: googleEvent.summary || "",

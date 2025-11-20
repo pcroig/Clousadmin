@@ -4,13 +4,16 @@
 
 'use client';
 
-import { useState, useRef } from 'react';
+import { ArrowLeft, Download, FileText, Folder, Upload } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Upload, FileText, Download, Folder } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { useCallback, useRef } from 'react';
 import { toast } from 'sonner';
+
 import { EmptyState } from '@/components/shared/empty-state';
-import { LoadingButton } from '@/components/shared/loading-button';
+import { FileUploadAdvanced } from '@/components/shared/file-upload-advanced';
+import { Button } from '@/components/ui/button';
+import { UploadHandler } from '@/lib/hooks/use-file-upload';
+
 import type { MiEspacioCarpeta, MiEspacioDocumento } from '@/types/empleado';
 
 type CarpetaDocumento = MiEspacioDocumento & {
@@ -36,49 +39,64 @@ export function CarpetaDetailClientEmpleado({
   puedeSubir,
 }: CarpetaDetailClientEmpleadoProps) {
   const router = useRouter();
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [uploading, setUploading] = useState(false);
+  const uploadSectionRef = useRef<HTMLDivElement>(null);
+  const maxUploadMB = Number(process.env.NEXT_PUBLIC_MAX_UPLOAD_MB ?? '10');
 
-  const handleSubirArchivo = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = event.target.files;
-    if (!files || files.length === 0) return;
-
-    setUploading(true);
-
-    try {
-      for (const file of Array.from(files)) {
+  const handleUpload: UploadHandler = useCallback(
+    ({ file, signal, onProgress }) =>
+      new Promise((resolve) => {
         const formData = new FormData();
         formData.append('file', file);
         formData.append('carpetaId', carpeta.id);
 
-        const response = await fetch('/api/documentos', {
-          method: 'POST',
-          body: formData,
-        });
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', '/api/documentos');
 
-        if (!response.ok) {
-          const error = await response.json();
-          throw new Error(error.error || 'Error al subir archivo');
+        xhr.upload.onprogress = (event) => {
+          if (event.lengthComputable) {
+            onProgress?.(event.loaded, event.total);
+          }
+        };
+
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            toast.success('Documento subido correctamente');
+            router.refresh();
+            resolve({ success: true });
+          } else {
+            let errorMessage = 'Error al subir archivo';
+            try {
+              const response = JSON.parse(xhr.responseText);
+              if (response?.error) errorMessage = response.error;
+            } catch {
+              // ignore
+            }
+            resolve({ success: false, error: errorMessage });
+          }
+        };
+
+        xhr.onerror = () => {
+          resolve({ success: false, error: 'Error de red durante la subida' });
+        };
+
+        xhr.onabort = () => {
+          resolve({ success: false, error: 'Subida cancelada' });
+        };
+
+        if (signal.aborted) {
+          xhr.abort();
+        } else {
+          signal.addEventListener('abort', () => xhr.abort());
         }
-      }
 
-      // Mostrar notificación de éxito
-      toast.success(
-        `${files.length === 1 ? 'Documento subido' : `${files.length} documentos subidos`} correctamente`
-      );
+        xhr.send(formData);
+      }),
+    [carpeta.id, router]
+  );
 
-      // Recargar página para mostrar nuevos documentos
-      router.refresh();
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Error al subir archivos';
-      toast.error(message);
-    } finally {
-      setUploading(false);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
-    }
-  };
+  const scrollToUploader = useCallback(() => {
+    uploadSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, []);
 
   const handleDescargar = async (documentoId: string, nombre: string) => {
     try {
@@ -99,7 +117,7 @@ export function CarpetaDetailClientEmpleado({
       document.body.removeChild(a);
 
       toast.success('Documento descargado correctamente');
-    } catch (error) {
+    } catch {
       toast.error('Error al descargar documento');
     }
   };
@@ -164,26 +182,24 @@ export function CarpetaDetailClientEmpleado({
           </div>
 
           {puedeSubir && (
-            <div>
-              <input
-                ref={fileInputRef}
-                type="file"
-                multiple
-                className="hidden"
-                onChange={handleSubirArchivo}
-                disabled={uploading}
-              />
-              <LoadingButton
-                onClick={() => fileInputRef.current?.click()}
-                loading={uploading}
-              >
-                <Upload className="w-4 h-4 mr-2" />
-                Subir Documentos
-              </LoadingButton>
-            </div>
+          <Button onClick={scrollToUploader}>
+            <Upload className="w-4 h-4 mr-2" />
+            Subir Documentos
+          </Button>
           )}
         </div>
       </div>
+
+      {puedeSubir && (
+        <div ref={uploadSectionRef} className="mb-6">
+          <FileUploadAdvanced
+            onUpload={handleUpload}
+            allowMultiple
+            maxSizeMB={maxUploadMB}
+            className="bg-white/80 p-4 rounded-2xl border border-gray-100"
+          />
+        </div>
+      )}
 
       {/* Contador de documentos */}
       <div className="mb-4 flex-shrink-0">
@@ -208,11 +224,7 @@ export function CarpetaDetailClientEmpleado({
               }
               action={
                 puedeSubir ? (
-                  <Button
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={uploading}
-                    className="mt-4"
-                  >
+                  <Button onClick={scrollToUploader} className="mt-4">
                     <Upload className="w-4 h-4 mr-2" />
                     Subir Documento
                   </Button>

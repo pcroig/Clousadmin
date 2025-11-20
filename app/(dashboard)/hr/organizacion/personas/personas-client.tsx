@@ -4,17 +4,19 @@
 
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Flag, Settings } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { TableHeader } from '@/components/shared/table-header';
-import { TableFilters } from '@/components/shared/table-filters';
-import { DataTable, Column, AvatarCell } from '@/components/shared/data-table';
-import { AddPersonaDialog } from '@/components/organizacion/add-persona-dialog';
-import { GestionarOnboardingModal } from '@/components/hr/gestionar-onboarding-modal';
-import { DetailsPanel } from '@/components/shared/details-panel';
+import { useEffect, useState } from 'react';
+
 import { DenunciasDetails } from '@/components/hr/denuncias-details';
+import { GestionarOnboardingModal } from '@/components/hr/gestionar-onboarding-modal';
+import { AddPersonaDialog } from '@/components/organizacion/add-persona-dialog';
+import { AvatarCell, Column, DataTable } from '@/components/shared/data-table';
+import { DetailsPanel } from '@/components/shared/details-panel';
+import { TableFilters } from '@/components/shared/table-filters';
+import { TableHeader } from '@/components/shared/table-header';
 import { Button } from '@/components/ui/button';
-import { Settings, Flag } from 'lucide-react';
+
 
 interface Empleado {
   id: string;

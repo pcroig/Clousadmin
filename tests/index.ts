@@ -3,14 +3,27 @@
  * Usa tsx para compilar TypeScript al vuelo.
  */
 
-import './auth.test';
-import './empleado-crypto.test';
-import './antiguedad.test';
-import './procesar-excel-validaciones.test';
-import './rate-limit.test';
-import './api-smoke.test';
-import './balance-horas.test';
-import './correcciones-fichaje.test';
+process.env.NODE_ENV = 'test';
+process.env.FORCE_REDIS = 'false';
 
-console.log('\n✅ Todos los tests ejecutados con éxito');
+async function runTests() {
+  await import('./auth.test');
+  await import('./empleado-crypto.test');
+  await import('./antiguedad.test');
+  await import('./procesar-excel-validaciones.test');
+  await import('./rate-limit.test');
+  await import('./api-smoke.test');
+  await import('./balance-horas.test');
+  await import('./correcciones-fichaje.test');
+  await import('./two-factor.test');
+}
+
+runTests()
+  .then(() => {
+    console.log('\n✅ Todos los tests ejecutados con éxito');
+  })
+  .catch((error) => {
+    console.error('❌ Error ejecutando tests:', error);
+    process.exit(1);
+  });
 

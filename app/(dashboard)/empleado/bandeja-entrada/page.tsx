@@ -2,12 +2,14 @@
 // Empleado - Bandeja de Entrada Page
 // ========================================
 
-import { getSession } from '@/lib/auth';
 import { redirect } from 'next/navigation';
+
+import { getSession } from '@/lib/auth';
+import { UsuarioRol } from '@/lib/constants/enums';
 import { prisma, Prisma } from '@/lib/prisma';
+
 import { BandejaEntradaEmpleadoClient } from './bandeja-entrada-client';
 
-import { UsuarioRol } from '@/lib/constants/enums';
 
 export default async function EmpleadoBandejaEntradaPage() {
   const session = await getSession();

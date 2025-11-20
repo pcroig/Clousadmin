@@ -4,11 +4,12 @@
 
 import { GalleryVerticalEnd } from 'lucide-react';
 import Link from 'next/link';
-import { WaitlistForm } from './waitlist-form';
-import { getSession } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 
+import { getSession } from '@/lib/auth';
 import { UsuarioRol } from '@/lib/constants/enums';
+
+import { WaitlistForm } from './waitlist-form';
 
 export default async function WaitlistPage() {
   // Si el usuario ya está autenticado, redirigir
