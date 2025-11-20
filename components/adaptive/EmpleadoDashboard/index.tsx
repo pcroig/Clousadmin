@@ -11,7 +11,7 @@
 import dynamic from 'next/dynamic'
 import { AdaptiveContainer } from '@/components/adaptive/AdaptiveContainer'
 import type { Notificacion } from '@/components/shared/notificaciones-widget'
-import type { AusenciaItem } from '@/components/shared/ausencias-widget'
+import type { AusenciaItem } from '@/components/adaptive/AusenciasWidget'
 
 // Dynamic imports para code splitting
 const EmpleadoDashboardMobile = dynamic(

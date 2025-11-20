@@ -11,7 +11,7 @@
 import { useRouter } from 'next/navigation'
 import { EmpleadoDashboard } from '@/components/adaptive/EmpleadoDashboard'
 import type { Notificacion } from '@/components/shared/notificaciones-widget'
-import type { AusenciaItem } from '@/components/shared/ausencias-widget'
+import type { AusenciaItem } from '@/components/adaptive/AusenciasWidget'
 
 interface DashboardClientProps {
   userName: string

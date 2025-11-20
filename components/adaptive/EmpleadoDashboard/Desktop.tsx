@@ -12,7 +12,7 @@
 import { useState } from 'react'
 import { FichajeWidget } from '@/components/adaptive/FichajeWidget'
 import { NotificacionesWidget, Notificacion } from '@/components/shared/notificaciones-widget'
-import { AusenciasWidget, AusenciaItem } from '@/components/shared/ausencias-widget'
+import { AusenciasWidget, AusenciaItem } from '@/components/adaptive/AusenciasWidget'
 import { SolicitarAusenciaModal } from '@/components/empleado/solicitar-ausencia-modal'
 import { PreferenciasVacacionesModal } from '@/components/empleado/preferencias-vacaciones-modal'
 
