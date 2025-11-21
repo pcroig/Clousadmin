@@ -7,6 +7,7 @@
 import { Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
+import { extractArrayFromResponse } from '@/lib/utils/api-response';
 
 import { LoadingButton } from '@/components/shared/loading-button';
 import {
@@ -209,7 +210,11 @@ export function EditarJornadaModal({ open, modo, jornada, onClose }: EditarJorna
       const response = await fetch('/api/empleados');
       if (response.ok) {
         const data = await response.json();
-        setEmpleados(data);
+        setEmpleados(
+          extractArrayFromResponse<{ id: string; nombre: string; apellidos: string }>(data, {
+            key: 'empleados',
+          })
+        );
       }
     } catch (error: unknown) {
       console.error('Error cargando empleados:', error);

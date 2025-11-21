@@ -35,6 +35,7 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { EstadoAusencia } from '@/lib/constants/enums';
 import { getAusenciaEstadoLabel } from '@/lib/utils/formatters';
+import { extractArrayFromResponse } from '@/lib/utils/api-response';
 
 import { CrearCampanaModal } from './crear-campana-modal';
 import { GestionarAusenciasModal } from './gestionar-ausencias-modal';
@@ -138,8 +139,10 @@ export function AusenciasClient({}: AusenciasClientProps) {
         throw new Error('Error al cargar las ausencias');
       }
       
-      const data = (await response.json()) as Ausencia[] | unknown;
-      setAusencias(Array.isArray(data) ? (data as Ausencia[]) : []);
+      const data = await response.json();
+      setAusencias(
+        extractArrayFromResponse<Ausencia>(data, { key: 'ausencias' })
+      );
     } catch (error) {
       console.error('[fetchAusencias] Error:', error);
       toast.error('No se pudieron cargar las ausencias');

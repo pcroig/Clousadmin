@@ -40,7 +40,7 @@ export default async function ForgotPasswordPage() {
       </div>
       <div className="bg-muted relative hidden lg:block">
         <Image
-          src="/login-hero.png"
+          src="/login-hero.webp"
           alt="Restablecer contraseña"
           fill
           priority

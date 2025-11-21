@@ -2,8 +2,10 @@
 
 import { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Apple, Smartphone, Share2, PlusCircle } from 'lucide-react';
+import { Apple, Smartphone, Share2, PlusCircle, DownloadCloud } from 'lucide-react';
 import { LoadingButton } from '@/components/shared/loading-button';
+import { Button } from '@/components/ui/button';
+import { usePWAInstallPrompt } from '@/lib/hooks/use-pwa-install';
 
 interface PWAExplicacionProps {
   onComplete?: () => void;
@@ -13,6 +15,17 @@ interface PWAExplicacionProps {
 
 export function PWAExplicacion({ onComplete, showCompleteButton = false, loading = false }: PWAExplicacionProps) {
   const [activeTab, setActiveTab] = useState('ios');
+  const [installing, setInstalling] = useState(false);
+  const { canInstall, promptInstall } = usePWAInstallPrompt();
+
+  const handleInstall = async () => {
+    try {
+      setInstalling(true);
+      await promptInstall();
+    } finally {
+      setInstalling(false);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -73,6 +86,19 @@ export function PWAExplicacion({ onComplete, showCompleteButton = false, loading
           </TabsContent>
         </div>
       </Tabs>
+
+      {canInstall && (
+        <div className="flex items-center gap-3 rounded-xl bg-gray-50 p-4 text-sm text-gray-700">
+          <DownloadCloud className="h-5 w-5 text-[#d97757]" />
+          <div className="flex-1">
+            <p className="font-medium text-gray-900">Listo para instalar</p>
+            <p>Clousadmin está optimizado como app. Pulsa instalar para añadirlo a tu móvil.</p>
+          </div>
+          <Button size="sm" onClick={handleInstall} disabled={installing}>
+            {installing ? 'Instalando...' : 'Instalar'}
+          </Button>
+        </div>
+      )}
 
       {showCompleteButton && (
         <div className="flex justify-center pt-4 border-t">

@@ -27,6 +27,15 @@ export interface FormatRelativeTimeOptions {
 }
 
 const DEFAULT_MINIMAL_UNIT: TimeUnit = 'second';
+const SHORT_SUFFIX: Record<TimeUnit, string> = {
+  year: 'a',
+  month: 'mes',
+  week: 'sem',
+  day: 'd',
+  hour: 'h',
+  minute: 'min',
+  second: 's',
+};
 
 const isValidDate = (value: Date) => !Number.isNaN(value.getTime());
 
@@ -82,5 +91,41 @@ export function formatRelativeTime(
   }
 
   return formatValue(0, minimalUnit);
+}
+
+/**
+ * Versión compacta para UI: 5min, 3h, 1d, 2sem, 4mes, 1a
+ */
+export function formatRelativeTimeShort(
+  input: Date | number | string,
+  { now = new Date(), minimalUnit = 'second' as TimeUnit }: Pick<FormatRelativeTimeOptions, 'now' | 'minimalUnit'> = {},
+): string {
+  const target = new Date(input);
+  const reference = new Date(now);
+  if (!isValidDate(target) || !isValidDate(reference)) {
+    return '';
+  }
+
+  const diff = reference.getTime() - target.getTime();
+  const absDiff = Math.abs(diff);
+
+  for (const { unit, ms } of UNITS) {
+    if (
+      absDiff >= ms ||
+      unit === minimalUnit ||
+      UNITS.every((item) => absDiff < item.ms)
+    ) {
+      const value = Math.max(1, Math.round(absDiff / ms));
+      const suffix = SHORT_SUFFIX[unit] ?? unit.charAt(0);
+      return `${value}${suffix}`;
+    }
+
+    if (unit === minimalUnit) {
+      break;
+    }
+  }
+
+  const fallbackSuffix = SHORT_SUFFIX[minimalUnit] ?? minimalUnit.charAt(0);
+  return `0${fallbackSuffix}`;
 }
 

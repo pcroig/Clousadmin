@@ -14,6 +14,10 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { formatRelativeTime } from '@/lib/utils/formatRelativeTime';
+import { EmptyState } from '@/components/shared/empty-state';
+import { getAvatarStyle } from '@/lib/design-system';
+import { getInitials } from '@/components/shared/utils';
 
 type SolicitudEstado =
   | 'pendiente'
@@ -30,7 +34,8 @@ interface SolicitudItem {
   empleado: {
     nombre: string;
     apellidos: string;
-    avatar?: string;
+    avatar?: string | null;
+    fotoUrl?: string | null;
   };
   tipo: 'ausencia' | 'cambio_datos';
   detalles: string;
@@ -54,9 +59,6 @@ interface BandejaEntradaSolicitudesProps {
 }
 
 type VistaType = 'pendientes' | 'resueltas';
-
-import { formatRelativeTime } from '@/lib/utils/formatRelativeTime';
-import { EmptyState } from '@/components/shared/empty-state';
 
 const DATE_FORMATTER = new Intl.DateTimeFormat('es-ES', {
   day: 'numeric',
@@ -249,10 +251,6 @@ export function BandejaEntradaSolicitudes({
   onRechazar,
 }: BandejaEntradaSolicitudesProps) {
   const [vista, setVista] = useState<VistaType>('pendientes');
-  const getInitials = (nombre: string, apellidos: string) => {
-    return `${nombre.charAt(0)}${apellidos.charAt(0)}`.toUpperCase();
-  };
-
   // Determinar qué solicitudes mostrar
   const solicitudesActuales = vista === 'pendientes' ? solicitudesPendientes : solicitudesResueltas;
   const emptyStateCopy = vista === 'pendientes'
@@ -304,14 +302,21 @@ export function BandejaEntradaSolicitudes({
           {solicitudesActuales.map((solicitud) => {
             const titulo = getSolicitudTitulo(solicitud);
             const descripcion = getSolicitudDescripcion(solicitud);
+            const fullName = `${solicitud.empleado.nombre} ${solicitud.empleado.apellidos}`.trim();
+            const initials = getInitials(fullName || solicitud.empleado.nombre);
+            const avatarStyle = getAvatarStyle(fullName || solicitud.empleado.nombre);
+            const fotoUrl = solicitud.empleado.fotoUrl ?? solicitud.empleado.avatar ?? undefined;
 
             return (
               <div key={solicitud.id} className="bg-white rounded-lg border border-gray-200 p-5 hover:shadow-sm transition-shadow">
                 <div className="flex items-start gap-4">
                   <Avatar className="h-12 w-12">
-                    <AvatarImage src={solicitud.empleado.avatar} />
-                    <AvatarFallback className="bg-stone-200 text-stone-700">
-                      {getInitials(solicitud.empleado.nombre, solicitud.empleado.apellidos)}
+                    {fotoUrl && <AvatarImage src={fotoUrl} alt={fullName || 'Avatar'} />}
+                    <AvatarFallback
+                      className="text-base font-semibold uppercase"
+                      style={avatarStyle}
+                    >
+                      {initials}
                     </AvatarFallback>
                   </Avatar>
 

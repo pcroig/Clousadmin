@@ -6,6 +6,7 @@
 // Custom hooks para gestionar notificaciones con React Query
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { extractArrayFromResponse } from '@/lib/utils/api-response';
 
 // ========================================
 // TYPES
@@ -28,6 +29,7 @@ export interface NotificacionesFiltros {
   leida?: boolean;
   tipo?: string;
   limit?: number;
+  page?: number;
 }
 
 // ========================================
@@ -57,10 +59,12 @@ export function useNotificaciones(filtros?: NotificacionesFiltros) {
       if (filtros?.leida !== undefined) params.set('leida', String(filtros.leida));
       if (filtros?.tipo) params.set('tipo', filtros.tipo);
       if (filtros?.limit) params.set('limit', String(filtros.limit));
+      if (filtros?.page) params.set('page', String(filtros.page));
 
       const res = await fetch(`/api/notificaciones?${params}`);
       if (!res.ok) throw new Error('Error al cargar notificaciones');
-      return res.json() as Promise<Notificacion[]>;
+      const payload = await res.json();
+      return extractArrayFromResponse<Notificacion>(payload, { key: 'notificaciones' });
     },
   });
 }
@@ -75,7 +79,16 @@ export function useNotificacionesNoLeidas() {
       const res = await fetch('/api/notificaciones?count=true');
       if (!res.ok) throw new Error('Error al cargar conteo');
       const data = await res.json();
-      return data.count as number;
+      if (typeof data.count === 'number') {
+        return data.count;
+      }
+      if (typeof data?.metrics?.noLeidas === 'number') {
+        return data.metrics.noLeidas as number;
+      }
+      if (typeof data?.noLeidas === 'number') {
+        return data.noLeidas as number;
+      }
+      return 0;
     },
     refetchInterval: 30000, // Refetch cada 30 segundos
   });

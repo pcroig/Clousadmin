@@ -20,6 +20,7 @@ import { toast } from 'sonner';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Check, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { extractArrayFromResponse } from '@/lib/utils/api-response';
 
 interface Empleado {
   id: string;
@@ -64,7 +65,16 @@ export function PuestoFormModal({
       const response = await fetch('/api/empleados');
       if (response.ok) {
         const data = await response.json();
-        setEmpleados(data || []);
+        setEmpleados(
+          extractArrayFromResponse<{ id: string; nombre?: string; apellidos?: string; usuario?: { nombre?: string; apellidos?: string } }>(
+            data,
+            { key: 'empleados' }
+          ).map((empleado) => ({
+            id: empleado.id,
+            nombre: empleado.nombre || empleado.usuario?.nombre || '',
+            apellidos: empleado.apellidos || empleado.usuario?.apellidos || '',
+          }))
+        );
       }
     } catch (error) {
       console.error('Error fetching empleados:', error);

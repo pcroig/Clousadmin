@@ -3,7 +3,7 @@
 // ========================================
 
 import { AusenciaItem } from '@/components/shared/ausencias-widget';
-import { Notificacion } from '@/components/shared/notificaciones-widget';
+import type { NotificacionUI } from '@/types/Notificacion';
 import { getSession } from '@/lib/auth';
 import { EstadoAusencia, UsuarioRol } from '@/lib/constants/enums';
 import { prisma } from '@/lib/prisma';
@@ -26,7 +26,7 @@ interface DashboardData {
     id: string;
     empresaId: string;
   };
-  notificaciones: Notificacion[];
+  notificaciones: NotificacionUI[];
   saldoFinal: {
     diasTotales: number;
     diasUsados: number;
@@ -92,14 +92,14 @@ async function obtenerDatosDashboard(session: { user: { id: string; empresaId: s
   const campanaPendiente = await obtenerCampanaPendiente(empleado.id, session.user.empresaId);
   const campanaPropuesta = await obtenerPropuestaPendiente(empleado.id, session.user.empresaId);
 
-  const notificaciones: Notificacion[] = notificacionesDb.map((notif) => ({
+  const notificaciones: NotificacionUI[] = notificacionesDb.map((notif) => ({
     id: notif.id,
-    tipo: notif.tipo as Notificacion['tipo'],
+    tipo: notif.tipo as NotificacionUI['tipo'],
     titulo: notif.titulo,
     mensaje: notif.mensaje,
     fecha: notif.createdAt,
     leida: notif.leida,
-    metadata: (notif.metadata as Record<string, unknown>) ?? undefined,
+    metadata: (notif.metadata as NotificacionUI['metadata']) ?? undefined,
   }));
 
   // Ausencias del empleado - con manejo de errores

@@ -230,6 +230,50 @@ export async function GET(req: NextRequest) {
 
 ---
 
+## 📄 Paginación en APIs (2025-01-27)
+
+### Implementación
+
+Todas las APIs de listado ahora implementan paginación estándar:
+
+**Utilidades**:
+- `lib/utils/pagination.ts` - Funciones para extraer parámetros de paginación
+- `lib/utils/api-response.ts` - Helpers para respuestas paginadas
+
+**APIs actualizadas**:
+- ✅ `GET /api/empleados` - Paginación con límite por defecto de 50
+- ✅ `GET /api/ausencias` - Paginación con límite por defecto de 50
+- ✅ `GET /api/documentos` - Paginación con límite por defecto de 50
+- ✅ `GET /api/fichajes` - Paginación con límite por defecto de 50
+- ✅ `GET /api/notificaciones` - Paginación con métricas de no leídas
+
+**Formato de respuesta**:
+```json
+{
+  "data": [...],
+  "pagination": {
+    "page": 1,
+    "limit": 50,
+    "total": 150,
+    "pages": 3
+  }
+}
+```
+
+**Uso en frontend**:
+```tsx
+import { extractArrayFromResponse } from '@/lib/utils/api-response';
+
+const response = await fetch('/api/empleados?page=1&limit=50');
+const json = await response.json();
+const empleados = extractArrayFromResponse(json.data);
+const { page, total, pages } = json.pagination;
+```
+
+Ver [ARQUITECTURA.md](ARQUITECTURA.md#3-paginación-en-apis-2025-01-27) para más detalles.
+
+---
+
 ## 🚀 Siguientes Pasos Recomendados
 
 ### 1. **Testing** (Prioridad Alta)
@@ -238,6 +282,7 @@ export async function GET(req: NextRequest) {
 - [ ] Tests E2E para flujos completos
 
 ### 2. **Optimizaciones Adicionales**
+- [x] ✅ Implementar paginación en APIs de listado (completado 2025-01-27)
 - [ ] Revisar y optimizar queries Prisma (N+1)
 - [ ] Implementar rate limiting en APIs críticas
 - [ ] Cache para endpoints frecuentes (`unstable_cache`)

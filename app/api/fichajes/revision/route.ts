@@ -11,6 +11,8 @@ import { z } from 'zod';
 import { getSession } from '@/lib/auth';
 import { crearNotificacionFichajeResuelto } from '@/lib/notificaciones';
 import { prisma } from '@/lib/prisma';
+import { jornadaSelectCompleta } from '@/lib/prisma/selects';
+import { obtenerNombreDia } from '@/lib/utils/fechas';
 
 // ========================================
 // Types para datos JSON de Prisma
@@ -96,8 +98,47 @@ export async function GET(request: NextRequest) {
 
     console.log('[API Revisión] Encontrados:', autoCompletados.length, 'fichajes');
 
-    // Formatear datos para el modal
-    const fichajes = await Promise.all(autoCompletados.map(async (ac) => {
+    const fichajeIds = Array.from(
+      new Set(
+        autoCompletados
+          .map((ac) => {
+            const datosOriginales = ac.datosOriginales as DatosOriginales | null;
+            return typeof datosOriginales?.fichajeId === 'string' ? datosOriginales.fichajeId : null;
+          })
+          .filter((id): id is string => Boolean(id))
+      )
+    );
+
+    const fichajesBatch = fichajeIds.length
+      ? await prisma.fichaje.findMany({
+          where: { id: { in: fichajeIds } },
+          select: {
+            id: true,
+            fecha: true,
+            empleado: {
+              select: {
+                id: true,
+                jornada: {
+                  select: jornadaSelectCompleta,
+                },
+              },
+            },
+            eventos: {
+              orderBy: { hora: 'asc' },
+              select: {
+                id: true,
+                tipo: true,
+                hora: true,
+              },
+            },
+          },
+        })
+      : [];
+
+    const fichajesMap = new Map(fichajesBatch.map((fichaje) => [fichaje.id, fichaje]));
+
+    // Formatear datos para el modal (síncronamente, ya no hay queries dentro)
+    const fichajes = autoCompletados.map((ac) => {
       const datosOriginales = (ac.datosOriginales as unknown) as DatosOriginales | null;
       const sugerencias = (ac.sugerencias as unknown) as Sugerencias | null;
 
@@ -116,12 +157,9 @@ export async function GET(request: NextRequest) {
       // Calcular vista previa propuesta basándose en la jornada asignada del empleado
       let previewEventos: { tipo: string; hora: string; origen: 'propuesto' }[] = [];
       try {
-        const fichajeId = datosOriginales?.fichajeId as string | undefined;
+        const fichajeId = typeof datosOriginales?.fichajeId === 'string' ? datosOriginales.fichajeId : undefined;
         if (fichajeId) {
-          const fichaje = await prisma.fichaje.findUnique({
-            where: { id: fichajeId },
-            include: { empleado: { include: { jornada: true } } },
-          });
+          const fichaje = fichajesMap.get(fichajeId);
           const fechaBase = datosOriginales?.fecha ? new Date(datosOriginales.fecha) : new Date();
           const jornada = fichaje?.empleado?.jornada;
           if (jornada?.config) {
@@ -159,7 +197,7 @@ export async function GET(request: NextRequest) {
         razon: sugerencias?.razon || 'Requiere revisión manual',
         confianza: sugerencias?.confianza || 0,
       };
-    }));
+    });
 
     console.log('[API Revisión] Fichajes formateados:', fichajes.length);
 
@@ -250,10 +288,7 @@ export async function POST(request: NextRequest) {
           };
 
           // Mapear nombre de día
-          const diasSemana = ['domingo', 'lunes', 'miercoles','miercoles','jueves','viernes','sabado'];
-          // Nota: above array seems wrong: fix mapping properly
-          const dias = ['domingo','lunes','martes','miercoles','jueves','viernes','sabado'];
-          const nombreDia = dias[fechaDia.getDay()];
+          const nombreDia = obtenerNombreDia(fechaDia);
 
           let eventosAcrear: { tipo: 'entrada'|'pausa_inicio'|'pausa_fin'|'salida'; hora: Date }[] = [];
 

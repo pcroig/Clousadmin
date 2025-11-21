@@ -28,6 +28,10 @@ import { TIPOS_AUTO_APROBABLES, TIPOS_DESCUENTAN_SALDO } from '@/lib/constants/a
 import { EstadoAusencia, UsuarioRol } from '@/lib/constants/enums';
 import { determinarEstadoTrasAprobacion } from '@/lib/calculos/ausencias';
 import type { Prisma } from '@prisma/client';
+import {
+  parsePaginationParams,
+  buildPaginationMeta,
+} from '@/lib/utils/pagination';
 
 // GET /api/ausencias - Listar ausencias
 export async function GET(req: NextRequest) {
@@ -91,24 +95,34 @@ export async function GET(req: NextRequest) {
       };
     }
 
-    const ausencias = await prisma.ausencia.findMany({
-      where,
-      include: {
-        empleado: {
-          select: {
-            nombre: true,
-            apellidos: true,
-            puesto: true,
-            fotoUrl: true,
-          }
-        },
-      },
-      orderBy: {
-        createdAt: 'desc'
-      }
-    });
+    const { page, limit, skip } = parsePaginationParams(searchParams);
 
-    return successResponse(ausencias);
+    const [ausencias, total] = await Promise.all([
+      prisma.ausencia.findMany({
+        where,
+        include: {
+          empleado: {
+            select: {
+              nombre: true,
+              apellidos: true,
+              puesto: true,
+              fotoUrl: true,
+            }
+          },
+        },
+        orderBy: {
+          createdAt: 'desc'
+        },
+        skip,
+        take: limit,
+      }),
+      prisma.ausencia.count({ where }),
+    ]);
+
+    return successResponse({
+      data: ausencias,
+      pagination: buildPaginationMeta(page, limit, total),
+    });
   } catch (error) {
     return handleApiError(error, 'API GET /api/ausencias');
   }

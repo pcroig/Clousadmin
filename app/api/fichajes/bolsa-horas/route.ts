@@ -13,7 +13,7 @@ import {
   successResponse,
   badRequestResponse,
 } from '@/lib/api-handler';
-import { calcularBalanceMensual } from '@/lib/calculos/balance-horas';
+import { calcularBalanceMensualBatch } from '@/lib/calculos/balance-horas';
 
 const empleadoSelect = Prisma.validator<Prisma.EmpleadoSelect>()({
   id: true,
@@ -63,10 +63,30 @@ export async function GET(request: NextRequest) {
       },
     });
 
+    if (empleados.length === 0) {
+      return successResponse({
+        mes,
+        anio,
+        balances: [],
+      });
+    }
+
+    const empleadoIds = empleados.map((empleado) => empleado.id);
+    const balancesPorEmpleado = await calcularBalanceMensualBatch(
+      session.user.empresaId,
+      empleadoIds,
+      mes,
+      anio
+    );
+
     const balances = [];
 
     for (const empleado of empleados) {
-      const balanceMensual = await calcularBalanceMensual(empleado.id, mes, anio);
+      const balanceMensual = balancesPorEmpleado.get(empleado.id);
+      if (!balanceMensual) {
+        continue;
+      }
+
       const balanceTotal = Math.round(balanceMensual.balanceTotal * 100) / 100;
       if (balanceTotal > 0) {
         balances.push({

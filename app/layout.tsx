@@ -14,6 +14,23 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: "Clousadmin - HR Management Platform",
   description: "Modern HR management platform for Spanish companies",
+  applicationName: "Clousadmin",
+  manifest: "/manifest.webmanifest",
+  themeColor: "#d97757",
+  icons: {
+    icon: [
+      { url: "/icons/pwa-192x192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icons/pwa-512x512.png", sizes: "512x512", type: "image/png" },
+    ],
+    apple: [
+      { url: "/icons/pwa-192x192.png", sizes: "192x192", type: "image/png" },
+    ],
+  },
+  appleWebApp: {
+    capable: true,
+    title: "Clousadmin",
+    statusBarStyle: "default",
+  },
 };
 
 export default function RootLayout({

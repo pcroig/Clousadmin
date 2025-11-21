@@ -70,7 +70,7 @@ export default async function LoginPage({
       </div>
       <div className="bg-muted relative hidden lg:block">
         <Image
-          src="/login-hero.png"
+          src="/login-hero.webp"
           alt="HR Management"
           fill
           priority

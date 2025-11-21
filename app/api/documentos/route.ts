@@ -25,6 +25,10 @@ import { prisma, Prisma } from '@/lib/prisma';
 import { getClientIP, rateLimitApiWrite } from '@/lib/rate-limit';
 import { shouldUseCloudStorage, uploadToS3 } from '@/lib/s3';
 import { sanitizeFileName } from '@/lib/utils/file-helpers';
+import {
+  parsePaginationParams,
+  buildPaginationMeta,
+} from '@/lib/utils/pagination';
 
 
 // GET /api/documentos - Listar documentos
@@ -89,22 +93,32 @@ export async function GET(request: NextRequest) {
       where.tipoDocumento = tipoDocumento;
     }
 
-    const documentos = await prisma.documento.findMany({
-      where,
-      include: {
-        carpeta: true,
-        empleado: {
-          select: {
-            id: true,
-            nombre: true,
-            apellidos: true,
+    const { page, limit, skip } = parsePaginationParams(searchParams);
+
+    const [documentos, total] = await Promise.all([
+      prisma.documento.findMany({
+        where,
+        include: {
+          carpeta: true,
+          empleado: {
+            select: {
+              id: true,
+              nombre: true,
+              apellidos: true,
+            },
           },
         },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+      prisma.documento.count({ where }),
+    ]);
 
-    return NextResponse.json({ documentos });
+    return NextResponse.json({
+      data: documentos,
+      pagination: buildPaginationMeta(page, limit, total),
+    });
   } catch (error) {
     console.error('Error listando documentos:', error);
     return NextResponse.json(
@@ -211,59 +225,87 @@ export async function POST(request: NextRequest) {
 
     let storageKey = rutaStorage;
     let storageBucket = 'local';
+    let localPath: string | null = null;
+    let cleanupUpload: (() => Promise<void>) | null = null;
 
-    if (useCloudStorage) {
-      const bucketName = process.env.STORAGE_BUCKET;
-      if (!bucketName) {
-        throw new Error('STORAGE_BUCKET no configurado');
+    try {
+      if (useCloudStorage) {
+        const bucketName = process.env.STORAGE_BUCKET;
+        if (!bucketName) {
+          throw new Error('STORAGE_BUCKET no configurado');
+        }
+        storageKey = `documentos/${rutaStorage}`;
+        await uploadToS3(bodyForStorage, storageKey, file.type);
+        storageBucket = bucketName;
+        cleanupUpload = async () => {
+          await deleteFromS3(storageKey);
+        };
+      } else {
+        // Guardar archivo en filesystem local
+        localPath = join(process.cwd(), 'uploads', rutaStorage);
+        const dirPath = localPath.substring(0, localPath.lastIndexOf('/'));
+
+        if (!existsSync(dirPath)) {
+          await mkdir(dirPath, { recursive: true });
+        }
+
+        await writeFile(localPath, bodyForStorage as Buffer);
+        cleanupUpload = async () => {
+          if (!localPath) return;
+          try {
+            await unlink(localPath);
+          } catch (cleanupError) {
+            console.error('[Documentos] Error eliminando archivo local tras rollback:', cleanupError);
+          }
+        };
       }
-      storageKey = `documentos/${rutaStorage}`;
-      await uploadToS3(bodyForStorage, storageKey, file.type);
-      storageBucket = bucketName;
-    } else {
-      // Guardar archivo en filesystem local
-      const fullPath = join(process.cwd(), 'uploads', rutaStorage);
-      const dirPath = fullPath.substring(0, fullPath.lastIndexOf('/'));
 
-      if (!existsSync(dirPath)) {
-        await mkdir(dirPath, { recursive: true });
-      }
-
-      await writeFile(fullPath, bodyForStorage as Buffer);
-    }
-
-    // Crear registro en DB
-    const documento = await prisma.documento.create({
-      data: {
-        empresaId: session.user.empresaId,
-        empleadoId,
-        carpetaId,
-        nombre: nombreUnico,
-        tipoDocumento: tipoDocumentoFinal,
-        mimeType: file.type,
-        tamano: file.size,
-        s3Key: storageKey,
-        s3Bucket: storageBucket,
-      },
-      include: {
-        carpeta: true,
-        empleado: {
-          select: {
-            id: true,
-            nombre: true,
-            apellidos: true,
+      // Crear registro en DB
+      const documento = await prisma.$transaction(async (tx) => {
+        return tx.documento.create({
+          data: {
+            empresaId: session.user.empresaId,
+            empleadoId,
+            carpetaId,
+            nombre: nombreUnico,
+            tipoDocumento: tipoDocumentoFinal,
+            mimeType: file.type,
+            tamano: file.size,
+            s3Key: storageKey,
+            s3Bucket: storageBucket,
           },
-        },
-      },
-    });
+          include: {
+            carpeta: true,
+            empleado: {
+              select: {
+                id: true,
+                nombre: true,
+                apellidos: true,
+              },
+            },
+          },
+        });
+      });
 
-    // Revalidar la página de la carpeta para mostrar el nuevo documento
-    revalidatePath(`/hr/documentos/${carpetaId}`);
+      cleanupUpload = null;
 
-    return NextResponse.json({
-      success: true,
-      documento,
-    });
+      // Revalidar la página de la carpeta para mostrar el nuevo documento
+      revalidatePath(`/hr/documentos/${carpetaId}`);
+
+      return NextResponse.json({
+        success: true,
+        documento,
+      });
+    } catch (error) {
+      if (cleanupUpload) {
+        try {
+          await cleanupUpload();
+        } catch (cleanupError) {
+          console.error('[Documentos] Error durante rollback de archivo:', cleanupError);
+        }
+      }
+      throw error;
+    }
   } catch (error) {
     console.error('Error subiendo documento:', error);
     return NextResponse.json(

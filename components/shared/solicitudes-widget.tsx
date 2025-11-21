@@ -10,6 +10,7 @@ import { CheckCircle, XCircle, ClipboardList } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { WidgetCard } from './widget-card';
 import {
   ejecutarAccionSolicitud,
@@ -17,13 +18,16 @@ import {
   type SolicitudTipo,
 } from '@/lib/services/solicitudes-actions';
 import { EmptyState } from './empty-state';
+import { getAvatarStyle } from '@/lib/design-system';
+import { getInitials } from '@/components/shared/utils';
 
 export interface Solicitud {
   id: string;
   tipo: SolicitudTipo;
   empleado: {
     nombre: string;
-    avatar?: string;
+    fotoUrl?: string | null;
+    avatar?: string | null;
   };
   descripcion: string;
   fecha: Date;
@@ -136,6 +140,10 @@ export const SolicitudesWidget = memo(function SolicitudesWidget({
         ) : (
           solicitudesMostradas.map((solicitud) => {
             const estaProcesando = accionEnCurso?.id === solicitud.id;
+            const fullName = solicitud.empleado.nombre || 'Empleado';
+            const initials = getInitials(fullName);
+            const avatarStyle = getAvatarStyle(fullName);
+            const fotoUrl = solicitud.empleado.fotoUrl ?? solicitud.empleado.avatar ?? undefined;
 
             return (
               <div
@@ -144,13 +152,15 @@ export const SolicitudesWidget = memo(function SolicitudesWidget({
                 className="py-3 border-b border-gray-200 last:border-0 hover:bg-gray-50 transition-colors px-2 -mx-2 cursor-pointer"
               >
                 <div className="flex items-start gap-3">
-                  <div className="w-10 h-10 rounded-full bg-stone-200 flex items-center justify-center text-[13px] font-semibold text-stone-700 flex-shrink-0">
-                    {solicitud.empleado.nombre
-                      .split(' ')
-                      .map((n) => n[0])
-                      .join('')
-                      .slice(0, 2)}
-                  </div>
+                  <Avatar className="h-10 w-10 flex-shrink-0">
+                    {fotoUrl && <AvatarImage src={fotoUrl} alt={fullName} />}
+                    <AvatarFallback
+                      className="text-xs font-semibold uppercase"
+                      style={avatarStyle}
+                    >
+                      {initials}
+                    </AvatarFallback>
+                  </Avatar>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-2 mb-1">
                       <p className="text-[13px] text-gray-900 leading-tight">

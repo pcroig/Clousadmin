@@ -65,91 +65,132 @@ export async function POST(req: NextRequest) {
       return notFoundResponse('No se encontraron ausencias pendientes');
     }
 
-    // 4. Procesar en lote
+    // 4. Preparar validaciones y datos intermedios
     const resultados = {
       exitosas: 0,
       fallidas: 0,
       errores: [] as string[],
     };
 
+    const ausenciasProcesables: typeof ausencias = [];
+
     for (const ausencia of ausencias) {
-      try {
-        // Verificar permisos si es manager (solo su equipo)
-        if (session.user.rol === UsuarioRol.manager && empleadoManager) {
-          const equiposManager = empleadoManager.equipos.map(e => e.equipo.id);
-          if (ausencia.equipoId && !equiposManager.includes(ausencia.equipoId)) {
-            resultados.errores.push(
-              `No tienes permiso para gestionar la ausencia de ${ausencia.empleado.nombre}`
-            );
-            resultados.fallidas++;
-            continue;
-          }
+      if (session.user.rol === UsuarioRol.manager && empleadoManager) {
+        const equiposManager = empleadoManager.equipos.map((e) => e.equipo.id);
+        if (ausencia.equipoId && !equiposManager.includes(ausencia.equipoId)) {
+          resultados.errores.push(
+            `No tienes permiso para gestionar la ausencia de ${ausencia.empleado.nombre}`
+          );
+          resultados.fallidas++;
+          continue;
         }
+      }
 
-        // Actualizar ausencia
+      ausenciasProcesables.push(ausencia);
+    }
+
+    if (ausenciasProcesables.length === 0) {
+      return successResponse({
+        success: true,
+        mensaje: 'No se procesó ninguna ausencia',
+        resultados,
+      });
+    }
+
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0);
+    const aprobadaEn = new Date();
+
+    try {
+      await prisma.$transaction(async (tx) => {
         if (validatedData.accion === 'aprobar') {
-          // Determinar estado: confirmada si aún no pasó, completada si ya pasó
-          const hoy = new Date();
-          hoy.setHours(0, 0, 0, 0);
-          const fechaFin = new Date(ausencia.fechaFin);
-          fechaFin.setHours(0, 0, 0, 0);
-          const estadoAprobado = fechaFin < hoy ? EstadoAusencia.completada : EstadoAusencia.confirmada;
+          const idsConfirmadas: string[] = [];
+          const idsCompletadas: string[] = [];
 
-          await prisma.ausencia.update({
-            where: { id: ausencia.id },
-            data: {
-              estado: estadoAprobado,
-              aprobadaPor: session.user.id,
-              aprobadaEn: new Date(),
-            },
+          ausenciasProcesables.forEach((ausencia) => {
+            const fechaFin = new Date(ausencia.fechaFin);
+            fechaFin.setHours(0, 0, 0, 0);
+            if (fechaFin < hoy) {
+              idsCompletadas.push(ausencia.id);
+            } else {
+              idsConfirmadas.push(ausencia.id);
+            }
           });
 
-          // Actualizar saldo: diasPendientes -> diasUsados
-          if (ausencia.descuentaSaldo) {
-            const año = new Date(ausencia.fechaInicio).getFullYear();
-            await actualizarSaldo(
-              ausencia.empleadoId,
-              año,
-              'aprobar',
-              Number(ausencia.diasSolicitados)
-            );
+          if (idsConfirmadas.length > 0) {
+            await tx.ausencia.updateMany({
+              where: { id: { in: idsConfirmadas } },
+              data: {
+                estado: EstadoAusencia.confirmada,
+                aprobadaPor: session.user.id,
+                aprobadaEn,
+                motivoRechazo: null,
+              },
+            });
           }
 
-          resultados.exitosas++;
-        } else if (validatedData.accion === 'rechazar') {
-          await prisma.ausencia.update({
-            where: { id: ausencia.id },
+          if (idsCompletadas.length > 0) {
+            await tx.ausencia.updateMany({
+              where: { id: { in: idsCompletadas } },
+              data: {
+                estado: EstadoAusencia.completada,
+                aprobadaPor: session.user.id,
+                aprobadaEn,
+                motivoRechazo: null,
+              },
+            });
+          }
+
+          for (const ausencia of ausenciasProcesables) {
+            if (ausencia.descuentaSaldo) {
+              const año = new Date(ausencia.fechaInicio).getFullYear();
+              await actualizarSaldo(
+                ausencia.empleadoId,
+                año,
+                'aprobar',
+                Number(ausencia.diasSolicitados),
+                tx
+              );
+            }
+          }
+        } else {
+          await tx.ausencia.updateMany({
+            where: { id: { in: ausenciasProcesables.map((a) => a.id) } },
             data: {
               estado: EstadoAusencia.rechazada,
               aprobadaPor: session.user.id,
-              aprobadaEn: new Date(),
+              aprobadaEn,
               motivoRechazo: validatedData.motivoRechazo,
             },
           });
 
-          // Actualizar saldo: diasPendientes -> liberar
-          if (ausencia.descuentaSaldo) {
-            const año = new Date(ausencia.fechaInicio).getFullYear();
-            await actualizarSaldo(
-              ausencia.empleadoId,
-              año,
-              'rechazar',
-              Number(ausencia.diasSolicitados)
-            );
+          for (const ausencia of ausenciasProcesables) {
+            if (ausencia.descuentaSaldo) {
+              const año = new Date(ausencia.fechaInicio).getFullYear();
+              await actualizarSaldo(
+                ausencia.empleadoId,
+                año,
+                'rechazar',
+                Number(ausencia.diasSolicitados),
+                tx
+              );
+            }
           }
-
-          resultados.exitosas++;
         }
-      } catch (error) {
-        console.error(`Error procesando ausencia ${ausencia.id}:`, error);
-        resultados.errores.push(
-          `Error al procesar ausencia de ${ausencia.empleado.nombre}`
-        );
-        resultados.fallidas++;
-      }
+      });
+
+      resultados.exitosas += ausenciasProcesables.length;
+    } catch (error) {
+      console.error('[Actualizar Ausencias Masivo] Error en transacción:', error);
+      resultados.errores.push('Error al procesar las ausencias seleccionadas');
+      resultados.fallidas += ausenciasProcesables.length;
+      return successResponse({
+        success: false,
+        mensaje: 'No se pudieron procesar las ausencias seleccionadas',
+        resultados,
+      });
     }
 
-    // Retornar resumen
     return successResponse({
       success: true,
       mensaje: `Procesadas ${resultados.exitosas} ausencias correctamente`,

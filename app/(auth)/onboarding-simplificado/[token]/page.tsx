@@ -66,7 +66,7 @@ export default async function OnboardingSimplificadoPage({
       </div>
       <div className="bg-muted relative hidden lg:block">
         <Image
-          src="/login-hero.jpg"
+          src="/login-hero.webp"
           alt="HR Management"
           fill
           className="object-cover dark:brightness-[0.2] dark:grayscale"

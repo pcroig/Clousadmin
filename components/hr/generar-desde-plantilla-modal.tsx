@@ -22,6 +22,7 @@ import {
   Loader2,
   CheckCheck,
 } from 'lucide-react';
+import { extractArrayFromResponse } from '@/lib/utils/api-response';
 
 interface Plantilla {
   id: string;
@@ -164,10 +165,8 @@ export function GenerarDesdePlantillaModal({
     try {
       const res = await fetch('/api/empleados');
       const data = await res.json();
-
-      // La API retorna el array directamente, no envuelto en {success, empleados}
-      if (Array.isArray(data)) {
-        setEmpleados(data.map((emp: {
+      const lista = extractArrayFromResponse<
+        {
           id: string;
           nombre?: string;
           apellidos?: string;
@@ -180,14 +179,18 @@ export function GenerarDesdePlantillaModal({
           puestoRelacion?: {
             nombre?: string;
           } | null;
-        }) => ({
+        }
+      >(data, { key: 'empleados' });
+
+      setEmpleados(
+        lista.map((emp) => ({
           id: emp.id,
           nombre: emp.usuario?.nombre || emp.nombre,
           apellidos: emp.usuario?.apellidos || emp.apellidos,
           email: emp.usuario?.email || emp.email,
           departamento: emp.puestoRelacion?.nombre,
-        })));
-      }
+        }))
+      );
     } catch (err) {
       console.error('[cargarEmpleados] Error:', err);
     }

@@ -6,6 +6,7 @@ import { redirect } from 'next/navigation';
 
 import { BottomNavigation } from '@/components/layout/bottom-navigation';
 import { Sidebar } from '@/components/layout/sidebar';
+import { PWAInstallBanner } from '@/components/shared/pwa-install-banner';
 import { getSession } from '@/lib/auth';
 
 export default async function DashboardLayout({
@@ -44,6 +45,7 @@ export default async function DashboardLayout({
 
       {/* Bottom Navigation - Only on mobile */}
       <BottomNavigation rol={session.user.rol as 'hr_admin' | 'manager' | 'empleado'} />
+      <PWAInstallBanner />
     </div>
   );
 }

@@ -26,6 +26,7 @@ import {
 } from '@/components/ui/table';
 import { EstadoFichaje } from '@/lib/constants/enums';
 import { formatearHorasMinutos } from '@/lib/utils/formatters';
+import { extractArrayFromResponse } from '@/lib/utils/api-response';
 
 import { EditarFichajeModal } from './editar-fichaje-modal';
 import { JornadasModal } from './jornadas-modal';
@@ -223,10 +224,20 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
       }
 
       const response = await fetch(`/api/fichajes?${params}`);
-      const data = await response.json();
-      
-      // Agrupar fichajes en jornadas
-      const jornadasAgrupadas = agruparPorJornada(data);
+      const payload = await response.json();
+
+      if (!response.ok) {
+        const errorMessage =
+          (payload && typeof payload === 'object' && 'error' in payload && typeof payload.error === 'string')
+            ? payload.error
+            : 'No se pudieron cargar los fichajes';
+        toast.error(errorMessage);
+        setJornadas([]);
+        return;
+      }
+
+      const fichajes = extractArrayFromResponse<Fichaje>(payload, { key: 'fichajes' });
+      const jornadasAgrupadas = agruparPorJornada(fichajes);
       setJornadas(jornadasAgrupadas);
     } catch (error) {
       console.error('Error fetching fichajes:', error);

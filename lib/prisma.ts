@@ -6,10 +6,12 @@
 // Optimized for production with connection pooling
 // Lazy initialization to avoid environment variable timing issues
 
+import { performance } from 'node:perf_hooks';
 import { PrismaClient, Prisma } from '@prisma/client';
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
+  prismaLoggerAttached?: boolean;
 };
 
 // Production optimization: connection pooling
@@ -78,6 +80,24 @@ const prismaClientSingleton =
 
 if (process.env.NODE_ENV !== 'production') {
   globalForPrisma.prisma = prismaClientSingleton;
+}
+
+if (
+  process.env.PRISMA_PERF_LOG === 'true' &&
+  !globalForPrisma.prismaLoggerAttached
+) {
+  let queryCounter = 0;
+  prismaClientSingleton.$use(async (params, next) => {
+    const start = performance.now();
+    const result = await next(params);
+    const duration = performance.now() - start;
+    queryCounter += 1;
+    console.log(
+      `[Prisma][${queryCounter}] ${params.model ?? 'raw'}.${params.action} - ${duration.toFixed(2)}ms`
+    );
+    return result;
+  });
+  globalForPrisma.prismaLoggerAttached = true;
 }
 
 export const prisma = prismaClientSingleton;

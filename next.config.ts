@@ -1,4 +1,6 @@
 import type { NextConfig } from "next";
+import withPWAInit from "next-pwa";
+import runtimeCaching from "next-pwa/cache";
 
 const storageEndpointHostname = (() => {
   const endpoint = process.env.STORAGE_ENDPOINT;
@@ -37,6 +39,19 @@ const remotePatterns = [
   },
 ].filter(Boolean) as NonNullable<NextConfig['images']>['remotePatterns'];
 
+const withPWA = withPWAInit({
+  dest: "public",
+  disable: process.env.NODE_ENV === "development",
+  register: true,
+  skipWaiting: true,
+  runtimeCaching,
+  buildExcludes: [/middleware-manifest\.json$/],
+  fallbacks: {
+    document: "/offline",
+  },
+  // Nota: en desarrollo el SW se desactiva para evitar inconsistencias de cache.
+});
+
 const nextConfig: NextConfig = {
   // TypeScript check - Activado para garantizar calidad del código
   typescript: {
@@ -54,6 +69,7 @@ const nextConfig: NextConfig = {
   // Configuración de imágenes (para Hetzner Object Storage y avatares)
   images: {
     remotePatterns,
+    formats: ['image/avif', 'image/webp'],
   },
 
   // Headers de seguridad
@@ -104,6 +120,7 @@ const nextConfig: NextConfig = {
               "img-src 'self' data: https:",
               "font-src 'self' data:",
               "connect-src 'self'",
+              "worker-src 'self'",
               "frame-ancestors 'none'",
             ].join('; '),
           },
@@ -113,4 +130,4 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+export default withPWA(nextConfig);

@@ -19,6 +19,11 @@ import { getOrCreateDefaultJornada } from '@/lib/jornadas/get-or-create-default'
 import { CARPETAS_SISTEMA } from '@/lib/documentos';
 import { invitarEmpleado } from '@/lib/invitaciones';
 import { UsuarioRol } from '@/lib/constants/enums';
+import { empleadoSelectListado } from '@/lib/prisma/selects';
+import {
+  parsePaginationParams,
+  buildPaginationMeta,
+} from '@/lib/utils/pagination';
 
 // GET /api/empleados - Listar todos los empleados (solo HR Admin)
 export async function GET(request: NextRequest) {
@@ -28,49 +33,32 @@ export async function GET(request: NextRequest) {
     if (authResult instanceof Response) return authResult;
     const { session } = authResult;
 
-    const empleados = await prisma.empleado.findMany({
-      where: {
-        empresaId: session.user.empresaId,
-        activo: true,
-      },
-      include: {
-        usuario: {
-          select: {
-            id: true,
-            email: true,
-            rol: true,
-            nombre: true,
-            apellidos: true,
-          },
+    const { searchParams } = new URL(request.url);
+    const { page, limit, skip } = parsePaginationParams(searchParams);
+
+    const where: Prisma.EmpleadoWhereInput = {
+      empresaId: session.user.empresaId,
+    };
+
+    const activosParam = searchParams.get('activos');
+    if (!activosParam || activosParam === 'true') {
+      where.activo = true;
+    } else if (activosParam === 'false') {
+      where.activo = false;
+    }
+
+    const [empleados, total] = await Promise.all([
+      prisma.empleado.findMany({
+        where,
+        select: empleadoSelectListado,
+        orderBy: {
+          apellidos: 'asc',
         },
-        manager: {
-          select: {
-            id: true,
-            nombre: true,
-            apellidos: true,
-          },
-        },
-        puestoRelacion: {
-          select: {
-            id: true,
-            nombre: true,
-          },
-        },
-        equipos: {
-          include: {
-            equipo: {
-              select: {
-                id: true,
-                nombre: true,
-              },
-            },
-          },
-        },
-      },
-      orderBy: {
-        apellidos: 'asc',
-      },
-    });
+        skip,
+        take: limit,
+      }),
+      prisma.empleado.count({ where }),
+    ]);
 
     const empleadosDesencriptados = decryptEmpleadoList(empleados);
 
@@ -81,7 +69,10 @@ export async function GET(request: NextRequest) {
       camposAccedidos: ['listado'],
     });
 
-    return successResponse(empleadosDesencriptados);
+    return successResponse({
+      data: empleadosDesencriptados,
+      pagination: buildPaginationMeta(page, limit, total),
+    });
   } catch (error) {
     return handleApiError(error, 'API GET /api/empleados');
   }

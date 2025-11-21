@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { SearchableMultiSelect } from '@/components/shared/searchable-multi-select';
 import { Spinner } from '@/components/ui/spinner';
 import { toast } from 'sonner';
+import { extractArrayFromResponse } from '@/lib/utils/api-response';
 
 interface EmpleadoItem {
   id: string;
@@ -56,9 +57,8 @@ export function SolicitarFirmaDialog({
       fetch('/api/empleados?activos=true')
         .then((res) => (res.ok ? res.json() : Promise.reject()))
         .then((data) => {
-          const lista = Array.isArray(data?.empleados) ? data.empleados : Array.isArray(data) ? data : [];
-          setEmpleados(
-            lista.map((empleado: {
+          const lista = extractArrayFromResponse<
+            {
               id: string;
               nombre?: string;
               apellidos?: string;
@@ -68,7 +68,10 @@ export function SolicitarFirmaDialog({
                 apellidos?: string;
                 email?: string;
               };
-            }) => ({
+            }
+          >(data, { key: 'empleados' });
+          setEmpleados(
+            lista.map((empleado) => ({
               id: empleado.id,
               nombre: empleado?.nombre || empleado?.usuario?.nombre || '',
               apellidos: empleado?.apellidos || empleado?.usuario?.apellidos || '',

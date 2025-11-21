@@ -18,6 +18,7 @@ import {
   obtenerAusenciaMedioDia,
 } from '@/lib/calculos/fichajes';
 import type { JornadaConfig, DiaConfig } from '@/lib/calculos/fichajes-helpers';
+import { obtenerNombreDia } from '@/lib/utils/fechas';
 
 const cuadrarSchema = z.object({
   fichajeIds: z.array(z.string()).min(1, 'Debe proporcionar al menos un fichaje'),
@@ -109,8 +110,7 @@ export async function POST(request: NextRequest) {
         const fechaBase = new Date(fichaje.fecha);
         fechaBase.setHours(0, 0, 0, 0);
 
-        const diasSemana = ['domingo', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado'];
-        const nombreDia = diasSemana[fichaje.fecha.getDay()];
+        const nombreDia = obtenerNombreDia(fichaje.fecha);
         const configDia = config[nombreDia] as DiaConfig | undefined;
 
         const tiposEventos = fichaje.eventos.map((e) => e.tipo);

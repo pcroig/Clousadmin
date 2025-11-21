@@ -47,7 +47,7 @@ export default async function ResetPasswordPage({ params }: ResetPasswordPagePro
       </div>
       <div className="bg-muted relative hidden lg:block">
         <Image
-          src="/login-hero2.png"
+          src="/login-hero2.webp"
           alt="Actualizar contraseña"
           fill
           priority

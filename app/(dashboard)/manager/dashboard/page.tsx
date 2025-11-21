@@ -7,7 +7,7 @@ import { redirect } from 'next/navigation';
 import { PlantillaWidget } from '@/components/dashboard/plantilla-widget';
 import { AutoCompletadoWidget } from '@/components/shared/auto-completado-widget';
 import { FichajeWidget } from '@/components/shared/fichaje-widget';
-import { Notificacion, NotificacionesWidget } from '@/components/shared/notificaciones-widget';
+import { NotificacionesWidget } from '@/components/shared/notificaciones-widget';
 import { SolicitudesWidget } from '@/components/shared/solicitudes-widget';
 import { CampanaPropuestaReminder } from '@/components/vacaciones/campana-propuesta-reminder';
 import { CampanaVacacionesReminder } from '@/components/vacaciones/campana-vacaciones-reminder';
@@ -16,6 +16,8 @@ import { obtenerResumenPlantillaEquipo } from '@/lib/calculos/plantilla';
 import { EstadoAusencia, UsuarioRol } from '@/lib/constants/enums';
 import { prisma } from '@/lib/prisma';
 import { obtenerCampanaPendiente, obtenerPropuestaPendiente } from '@/lib/services/campanas-vacaciones';
+import type { NotificacionUI } from '@/types/Notificacion';
+import type { TipoNotificacion } from '@/lib/notificaciones';
 
 export default async function ManagerDashboardPage() {
   const session = await getSession();
@@ -87,7 +89,7 @@ export default async function ManagerDashboardPage() {
     id: aus.id,
     empleado: {
       nombre: `${aus.empleado.nombre} ${aus.empleado.apellidos}`,
-      avatar: aus.empleado.fotoUrl || undefined,
+      fotoUrl: aus.empleado.fotoUrl || undefined,
     },
     tipo: 'ausencia' as const,
     descripcion: `${aus.tipo}`,
@@ -107,14 +109,14 @@ export default async function ManagerDashboardPage() {
     take: 10,
   });
 
-  const notificaciones: Notificacion[] = notificacionesDb.map((notif) => ({
+  const notificaciones: NotificacionUI[] = notificacionesDb.map((notif) => ({
     id: notif.id,
-    tipo: notif.tipo as Notificacion['tipo'],
+    tipo: notif.tipo as TipoNotificacion,
     titulo: notif.titulo,
     mensaje: notif.mensaje,
     fecha: notif.createdAt,
     leida: notif.leida,
-    metadata: (notif.metadata as Record<string, unknown>) ?? undefined,
+    metadata: (notif.metadata as NotificacionUI['metadata']) ?? undefined,
   }));
 
   // Estadísticas de fichaje

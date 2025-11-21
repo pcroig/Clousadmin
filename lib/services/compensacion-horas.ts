@@ -8,6 +8,7 @@ import { Decimal } from '@prisma/client/runtime/library';
 import { prisma } from '@/lib/prisma';
 import { calcularBalanceMensual } from '@/lib/calculos/balance-horas';
 import { determinarEstadoTrasAprobacion } from '@/lib/calculos/ausencias';
+import { redondearHoras } from '@/lib/utils/numeros';
 
 export const empleadoCompensacionSelect = Prisma.validator<Prisma.EmpleadoSelect>()({
   id: true,
@@ -86,7 +87,7 @@ export async function procesarCompensacionHorasExtra(
   for (const empleado of empleados) {
     try {
       const balanceMensual = await calcularBalanceMensual(empleado.id, mes, anio);
-      const balanceDisponible = Math.round(balanceMensual.balanceTotal * 100) / 100;
+      const balanceDisponible = redondearHoras(balanceMensual.balanceTotal);
 
       if (balanceDisponible <= 0) {
         errores.push({

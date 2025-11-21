@@ -5,37 +5,19 @@
 
 'use client';
 
-import { memo } from 'react';
+import { memo, type MouseEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { Bell } from 'lucide-react';
 import { WidgetCard } from './widget-card';
 import { EmptyState } from './empty-state';
 import { obtenerIconoPorTipo } from '@/lib/notificaciones/helpers';
-import { obtenerCategoria, type TipoNotificacion } from '@/lib/notificaciones';
+import { formatRelativeTimeShort } from '@/lib/utils/formatRelativeTime';
 import { cn } from '@/lib/utils';
-
-/**
- * Notificación para mostrar en el widget
- */
-export interface Notificacion {
-  id: string;
-  tipo: TipoNotificacion; // Tipo específico de notificación
-  titulo?: string; // Título opcional (si no se proporciona, se usa el mensaje)
-  mensaje: string;
-  fecha: Date;
-  leida?: boolean;
-  metadata?: {
-    accionUrl?: string;
-    accionTexto?: string;
-    requiresModal?: boolean;
-    requiresSignature?: boolean;
-    requiresSelection?: boolean;
-    prioridad?: 'baja' | 'normal' | 'alta' | 'critica';
-  };
-}
+import { Button } from '@/components/ui/button';
+import type { NotificacionUI } from '@/types/Notificacion';
 
 interface NotificacionesWidgetProps {
-  notificaciones: Notificacion[];
+  notificaciones: NotificacionUI[];
   maxItems?: number;
   altura?: 'normal' | 'doble'; // 'normal' = 280px (1 fila), 'doble' = 580px (2 filas)
   href?: string; // URL de redirección personalizable
@@ -50,7 +32,7 @@ export const NotificacionesWidget = memo(function NotificacionesWidget({
   const router = useRouter();
   const notificacionesMostradas = notificaciones.slice(0, maxItems);
 
-  const handleClick = (notif: Notificacion) => {
+  const handleClick = (notif: NotificacionUI) => {
     // Si tiene URL de acción, navegar allí
     if (notif.metadata?.accionUrl) {
       router.push(notif.metadata.accionUrl);
@@ -60,7 +42,7 @@ export const NotificacionesWidget = memo(function NotificacionesWidget({
     }
   };
 
-  const renderNotificacion = (notif: Notificacion) => {
+  const renderNotificacion = (notif: NotificacionUI) => {
     const IconComponent = obtenerIconoPorTipo(notif.tipo);
 
     // Determinar si tiene acción especial
@@ -72,61 +54,56 @@ export const NotificacionesWidget = memo(function NotificacionesWidget({
     const accionUrl = notif.metadata?.accionUrl;
     const accionTexto = notif.metadata?.accionTexto;
 
+    const renderAccion = () => {
+      if (!tieneAccionEspecial || !accionUrl || !accionTexto) {
+        return null;
+      }
+
+      const handleAccion = (event: MouseEvent<HTMLButtonElement>) => {
+        event.stopPropagation();
+        router.push(accionUrl);
+      };
+
+      return (
+        <Button
+          type="button"
+          size="sm"
+          variant="default"
+          className="mt-1 h-7 px-2 text-[11px]"
+          onClick={handleAccion}
+        >
+          {accionTexto}
+        </Button>
+      );
+    };
+
     return (
       <div
         key={notif.id}
         onClick={() => handleClick(notif)}
         className="flex items-start gap-3 py-3 border-b border-gray-200 last:border-0 transition-colors px-2 -mx-2 hover:bg-gray-50 cursor-pointer"
       >
-        {/* Icono según categoría/tipo */}
-        <div className="flex items-center justify-center flex-shrink-0 pt-1">
+        <div className="flex items-center justify-center flex-shrink-0 pt-0.5">
           <IconComponent className="w-4 h-4 text-tertiary" />
         </div>
 
-        {/* Contenido */}
-        <div className="flex-1 min-w-0">
-          {/* Título (opcional) */}
-          {notif.titulo && (
-            <p className="text-[13px] text-gray-900 font-semibold line-clamp-1 mb-0.5">
-              {notif.titulo}
+        <div className="flex-1 min-w-0 space-y-1">
+          <div className="flex items-start justify-between gap-2">
+            <p className="text-[13px] text-gray-900 font-semibold line-clamp-1">
+              {notif.titulo || 'Notificación'}
             </p>
-          )}
+            <div className="flex items-center gap-1 text-[11px] text-gray-500 shrink-0">
+              <span>{formatRelativeTimeShort(notif.fecha)}</span>
+              {!notif.leida && <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />}
+            </div>
+          </div>
 
-          {/* Mensaje */}
-          <p className="text-[13px] text-gray-700 font-medium line-clamp-2 mb-0.5">
+          <p className="text-[13px] text-gray-700 line-clamp-2">
             {notif.mensaje}
           </p>
 
-          {/* Fecha */}
-          <p className="text-[11px] text-gray-500">
-            {notif.fecha.toLocaleDateString('es-ES', {
-              day: 'numeric',
-              month: 'short',
-              year: 'numeric',
-            })}
-          </p>
-
-          {/* CTA / Acción especial */}
-          {accionUrl && accionTexto && (
-            <a
-              href={accionUrl}
-              className={cn(
-                'text-[11px] hover:underline mt-1 inline-flex items-center gap-1 font-medium',
-                tieneAccionEspecial
-                  ? 'text-blue-700 bg-blue-100 px-2 py-0.5 rounded'
-                  : 'text-blue-600'
-              )}
-            >
-              {accionTexto}
-              {tieneAccionEspecial && ' →'}
-            </a>
-          )}
+          {renderAccion()}
         </div>
-
-        {/* Indicador de no leída */}
-        {!notif.leida && (
-          <div className="w-2 h-2 rounded-full flex-shrink-0 mt-2" style={{ backgroundColor: '#d97757' }} />
-        )}
       </div>
     );
   };

@@ -36,7 +36,7 @@ export default async function VerifyOtpPage() {
       </div>
       <div className="relative hidden w-1/2 lg:block">
         <Image
-          src="/login-hero2.png"
+          src="/login-hero2.webp"
           alt="Autenticación"
           fill
           className="object-cover dark:brightness-[0.4] dark:grayscale"

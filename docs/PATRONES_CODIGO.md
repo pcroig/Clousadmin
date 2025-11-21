@@ -254,6 +254,88 @@ const empleados = await prisma.empleado.findMany({
   }
 });
 
+// ✅ GOOD: Use selects reutilizables from lib/prisma/selects.ts
+import { empleadoSelectListado } from '@/lib/prisma/selects';
+
+const empleados = await prisma.empleado.findMany({
+  where: { empresaId, activo: true },
+  select: empleadoSelectListado, // Evita cargar relaciones innecesarias
+  orderBy: { apellidos: 'asc' }
+});
+
+// ✅ GOOD: Batch processing instead of loops with queries
+// ❌ BAD: N+1 query problem
+const empleados = await prisma.empleado.findMany();
+for (const emp of empleados) {
+  const ausencias = await prisma.ausencia.findMany({
+    where: { empleadoId: emp.id }
+  });
+}
+
+// ✅ GOOD: Precarga con findMany + Map para lookups O(1)
+const fichajeIds = autoCompletados.map(ac => ac.fichajeId).filter(Boolean);
+const fichajesBatch = await prisma.fichaje.findMany({
+  where: { id: { in: fichajeIds } },
+  include: { empleado: { include: { jornada: true } } }
+});
+const fichajesMap = new Map(fichajesBatch.map(f => [f.id, f]));
+
+// Ahora lookup O(1) sin queries adicionales
+for (const ac of autoCompletados) {
+  const fichaje = fichajesMap.get(ac.fichajeId); // ✅ Sin query adicional
+}
+
+// ✅ GOOD: Batch processing para cálculos complejos
+import { calcularBalanceMensualBatch } from '@/lib/calculos/balance-horas';
+
+// ❌ BAD: Loop con queries N+1
+for (const empleado of empleados) {
+  const balance = await calcularBalanceMensual(empleado.id, mes, anio); // Query x empleado
+}
+
+// ✅ GOOD: Batch processing una sola vez
+const empleadoIds = empleados.map(e => e.id);
+const balancesBatch = await calcularBalanceMensualBatch(
+  empresaId,
+  empleadoIds,
+  mes,
+  anio
+);
+// Ahora acceso O(1) sin queries adicionales
+for (const empleado of empleados) {
+  const balance = balancesBatch.get(empleado.id); // ✅ Sin query adicional
+}
+
+// ✅ GOOD: Query única por rango + agrupación en memoria
+// ❌ BAD: Query por cada evento
+const eventos = await prisma.eventoNomina.findMany();
+for (const evento of eventos) {
+  const compensaciones = await prisma.compensacionHoraExtra.findMany({
+    where: { 
+      empresaId,
+      createdAt: { gte: inicioMes, lt: finMes } // Query x evento
+    }
+  });
+}
+
+// ✅ GOOD: Una query con rango completo + agrupación
+const rangoInicio = eventos[0] ? calcularInicioPrimerEvento() : null;
+const rangoFin = eventos[eventos.length - 1] ? calcularFinUltimoEvento() : null;
+const compensacionesBatch = await prisma.compensacionHoraExtra.findMany({
+  where: {
+    empresaId,
+    createdAt: { gte: rangoInicio, lt: rangoFin } // ✅ Una sola query
+  }
+});
+
+// Agrupar en memoria por mes
+const compensacionesPorMes = compensacionesBatch.reduce((acc, comp) => {
+  const key = `${comp.createdAt.getFullYear()}-${comp.createdAt.getMonth() + 1}`;
+  if (!acc[key]) acc[key] = [];
+  acc[key].push(comp);
+  return acc;
+}, {} as Record<string, typeof compensacionesBatch>);
+
 // ✅ GOOD: Use transactions for multi-step operations
 await prisma.$transaction(async (tx) => {
   const empleado = await tx.empleado.create({ data: empleadoData });
@@ -265,14 +347,6 @@ await prisma.$transaction(async (tx) => {
     }))
   });
 });
-
-// ❌ BAD: N+1 query problem
-const empleados = await prisma.empleado.findMany();
-for (const emp of empleados) {
-  const ausencias = await prisma.ausencia.findMany({
-    where: { empleadoId: emp.id }
-  });
-}
 ```
 
 ---

@@ -4,6 +4,7 @@
 // Funciones reutilizables para generar eventos propuestos y cálculos comunes
 
 import { Jornada } from '@prisma/client';
+import { obtenerNombreDia } from '@/lib/utils/fechas';
 
 export type JornadaConfig = {
   tipo?: 'fija' | 'flexible';
@@ -43,8 +44,7 @@ export function generarEventosPropuestos(
   const fechaBase = new Date(fecha);
   fechaBase.setHours(0, 0, 0, 0);
 
-  const diasSemana = ['domingo', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado'];
-  const nombreDia = diasSemana[fecha.getDay()];
+  const nombreDia = obtenerNombreDia(fecha);
   const configDia = config[nombreDia] as DiaConfig | undefined;
 
   const eventos: EventoPropuesto[] = [];
@@ -157,8 +157,7 @@ export function generarEventosPropuestos(
  */
 export function obtenerConfigDia(jornada: Jornada, fecha: Date): DiaConfig | undefined {
   const config = jornada.config as JornadaConfig;
-  const diasSemana = ['domingo', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado'];
-  const nombreDia = diasSemana[fecha.getDay()];
+  const nombreDia = obtenerNombreDia(fecha);
   return config[nombreDia] as DiaConfig | undefined;
 }
 

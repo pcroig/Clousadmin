@@ -17,7 +17,10 @@ import {
   formatearClaveFecha,
   getDiasLaborablesEmpresa,
   getFestivosActivosEnRango,
+  type DiasLaborables,
+  type FestivosSet,
 } from './dias-laborables';
+import { obtenerNombreDia } from '@/lib/utils/fechas';
 
 const prismaClient = prisma as PrismaClient;
 
@@ -40,6 +43,23 @@ export interface BalancePeriodo {
   totalHorasEsperadas: number;
   balanceTotal: number;
   dias: BalanceDia[];
+}
+
+function calcularCalendarioLaboralMensual(
+  diasDelPeriodo: DiaCalculo[],
+  diasLaborablesConfig: DiasLaborables,
+  festivosSet: FestivosSet
+): Map<string, boolean> {
+  const calendario = new Map<string, boolean>();
+
+  for (const dia of diasDelPeriodo) {
+    const nombreDia = obtenerNombreDia(dia.fecha);
+    const esDiaSemanaLaborable = diasLaborablesConfig[nombreDia] ?? true;
+    const esFestivo = festivosSet.has(dia.key);
+    calendario.set(dia.key, esDiaSemanaLaborable && !esFestivo);
+  }
+
+  return calendario;
 }
 
 export function generarDiasDelPeriodo(fechaInicio: Date, fechaFin: Date): DiaCalculo[] {
@@ -148,6 +168,128 @@ export async function calcularBalanceMensual(
   fechaFin.setHours(23, 59, 59, 999);
 
   return calcularBalancePeriodo(empleadoId, fechaInicio, fechaFin);
+}
+
+export async function calcularBalanceMensualBatch(
+  empresaId: string,
+  empleadoIds: string[],
+  mes: number,
+  año: number
+): Promise<Map<string, BalancePeriodo>> {
+  const uniqueEmpleadoIds = Array.from(new Set(empleadoIds));
+
+  if (uniqueEmpleadoIds.length === 0) {
+    return new Map();
+  }
+
+  if (!Number.isInteger(mes) || mes < 1 || mes > 12) {
+    throw new Error(`[BalanceHorasBatch] Mes inválido: ${mes}`);
+  }
+
+  if (!Number.isInteger(año) || año < 2000 || año > 2100) {
+    throw new Error(`[BalanceHorasBatch] Año inválido: ${año}`);
+  }
+
+  const fechaInicio = new Date(año, mes - 1, 1);
+  fechaInicio.setHours(0, 0, 0, 0);
+  const fechaFin = new Date(año, mes, 0);
+  fechaFin.setHours(23, 59, 59, 999);
+
+  const diasDelPeriodo = generarDiasDelPeriodo(fechaInicio, fechaFin);
+
+  const [fichajes, festivos, diasLaborablesConfig] = await Promise.all([
+    prismaClient.fichaje.findMany({
+      where: {
+        empleadoId: { in: uniqueEmpleadoIds },
+        fecha: {
+          gte: fechaInicio,
+          lte: fechaFin,
+        },
+      },
+      orderBy: [
+        { fecha: 'asc' },
+      ],
+      include: {
+        eventos: {
+          orderBy: {
+            hora: 'asc',
+          },
+        },
+      },
+    }),
+    getFestivosActivosEnRango(empresaId, fechaInicio, fechaFin),
+    getDiasLaborablesEmpresa(empresaId),
+  ]);
+
+  const festivosSet = crearSetFestivos(festivos);
+  const calendarioLaboralMap = calcularCalendarioLaboralMensual(
+    diasDelPeriodo,
+    diasLaborablesConfig,
+    festivosSet
+  );
+
+  const fichajesPorEmpleado = new Map<string, FichajeConEventos[]>();
+  for (const fichaje of fichajes) {
+    const lista = fichajesPorEmpleado.get(fichaje.empleadoId) ?? [];
+    lista.push({
+      ...fichaje,
+      eventos: [...fichaje.eventos],
+    });
+    fichajesPorEmpleado.set(fichaje.empleadoId, lista);
+  }
+
+  const horasEsperadasEntradas = diasDelPeriodo.flatMap((dia) =>
+    uniqueEmpleadoIds.map((empleadoId) => ({
+      empleadoId,
+      fecha: dia.fecha,
+    }))
+  );
+
+  const horasEsperadasMap = await obtenerHorasEsperadasBatch(horasEsperadasEntradas);
+  const resultados = new Map<string, BalancePeriodo>();
+
+  for (const empleadoId of uniqueEmpleadoIds) {
+    const fichajesEmpleado = fichajesPorEmpleado.get(empleadoId) ?? [];
+    const fichajesAgrupados = agruparFichajesPorDia(fichajesEmpleado);
+
+    const dias: BalanceDia[] = [];
+    let totalHorasTrabajadas = 0;
+    let totalHorasEsperadas = 0;
+
+    for (const dia of diasDelPeriodo) {
+      const fichajeDia = fichajesAgrupados[dia.key] as FichajeConEventos | undefined;
+      const eventosDia: FichajeEvento[] = fichajeDia?.eventos ?? [];
+      const horasTrabajadas = calcularHorasTrabajadasDelDia(
+        fichajeDia ? { ...fichajeDia, eventos: eventosDia } : undefined
+      );
+      const horasEsperadas = horasEsperadasMap[`${empleadoId}_${dia.key}`] ?? 0;
+      const balance = horasTrabajadas - horasEsperadas;
+
+      const esFestivo = festivosSet.has(dia.key);
+      const esLaborable = calendarioLaboralMap.get(dia.key) ?? true;
+
+      dias.push({
+        fecha: new Date(dia.fecha),
+        horasTrabajadas,
+        horasEsperadas,
+        balance,
+        esFestivo,
+        esNoLaborable: !esLaborable,
+      });
+
+      totalHorasTrabajadas += horasTrabajadas;
+      totalHorasEsperadas += horasEsperadas;
+    }
+
+    resultados.set(empleadoId, {
+      totalHorasTrabajadas: Math.round(totalHorasTrabajadas * 100) / 100,
+      totalHorasEsperadas: Math.round(totalHorasEsperadas * 100) / 100,
+      balanceTotal: Math.round((totalHorasTrabajadas - totalHorasEsperadas) * 100) / 100,
+      dias,
+    });
+  }
+
+  return resultados;
 }
 
 /**

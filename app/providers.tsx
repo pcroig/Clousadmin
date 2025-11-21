@@ -9,6 +9,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { useState } from 'react';
 
+import { ViewportProvider } from '@/components/providers/viewport-provider';
+
 export function Providers({ children }: { children: React.ReactNode }) {
   // Crear QueryClient en estado para evitar recreación en cada render
   const [queryClient] = useState(
@@ -32,7 +34,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
 
   return (
     <QueryClientProvider client={queryClient}>
-      {children}
+      <ViewportProvider>{children}</ViewportProvider>
       {/* Devtools solo en desarrollo */}
       {process.env.NODE_ENV === 'development' && (
         <ReactQueryDevtools initialIsOpen={false} />

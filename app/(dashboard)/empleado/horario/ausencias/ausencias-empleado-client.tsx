@@ -23,6 +23,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { EstadoAusencia } from '@/lib/constants/enums';
+import { extractArrayFromResponse } from '@/lib/utils/api-response';
 
 interface Ausencia {
   id: string;
@@ -81,7 +82,9 @@ export function AusenciasEmpleadoClient({ saldo, campanas = [] }: Props) {
     try {
       const response = await fetch('/api/ausencias');
       const data = await response.json();
-      setAusencias(data);
+      setAusencias(
+        extractArrayFromResponse<Ausencia>(data, { key: 'ausencias' })
+      );
     } catch (error) {
       console.error('Error fetching ausencias:', error);
     } finally {

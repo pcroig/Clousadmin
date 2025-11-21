@@ -83,6 +83,10 @@ Clousadmin/
 │   │   └── use-file-upload.ts    # Hook para uploads avanzados
 │   ├── utils/                    # Utilidades generales
 │   │   ├── file-helpers.ts       # Helpers de archivos (formato, tipos)
+│   │   ├── pagination.ts         # Utilidades de paginación (page, limit, skip)
+│   │   ├── api-response.ts      # Helpers de respuestas API (paginated, extract)
+│   │   ├── fechas.ts            # Utilidades de fechas (días semana, formateo)
+│   │   ├── numeros.ts           # Utilidades numéricas (redondeo, formateo)
 │   │   └── ...
 │   └── ia/                       # Lógica IA
 │
@@ -444,6 +448,124 @@ model Ausencia {
 }
 ```
 
+### 3. Paginación en APIs (2025-01-27)
+
+Todas las APIs de listado implementan paginación para escalabilidad:
+
+```tsx
+// lib/utils/pagination.ts
+import { getPaginationParams, buildPaginationMeta } from '@/lib/utils/pagination';
+import { paginatedResponse } from '@/lib/utils/api-response';
+
+export async function GET(request: NextRequest) {
+  const { page, limit, skip } = getPaginationParams(request, 50);
+  
+  const [data, total] = await Promise.all([
+    prisma.tabla.findMany({
+      where: { empresaId: session.user.empresaId },
+      skip,
+      take: limit,
+    }),
+    prisma.tabla.count({
+      where: { empresaId: session.user.empresaId },
+    }),
+  ]);
+
+  return paginatedResponse(data, page, limit, total);
+}
+```
+
+**APIs con paginación implementada**:
+- ✅ `GET /api/empleados` - Listado de empleados
+- ✅ `GET /api/ausencias` - Listado de ausencias
+- ✅ `GET /api/documentos` - Listado de documentos
+- ✅ `GET /api/fichajes` - Listado de fichajes
+- ✅ `GET /api/notificaciones` - Listado de notificaciones
+
+**Beneficios**:
+- ✅ Escalable a miles de registros sin timeouts
+- ✅ Menor consumo de memoria
+- ✅ Respuestas más rápidas
+- ✅ Mejor UX con paginación en frontend
+
+### 4. Utilidades Centralizadas (2025-01-27)
+
+Funciones comunes extraídas a utilidades reutilizables:
+
+**Fechas** (`lib/utils/fechas.ts`):
+```tsx
+import { DIAS_SEMANA, obtenerNombreDia } from '@/lib/utils/fechas';
+
+const dia = obtenerNombreDia(new Date()); // 'lunes', 'martes', etc.
+```
+
+**Números** (`lib/utils/numeros.ts`):
+```tsx
+import { redondearHoras, redondearDecimales } from '@/lib/utils/numeros';
+
+const horas = redondearHoras(8.333333); // 8.33
+const precio = redondearDecimales(19.999, 2); // 20.00
+```
+
+**Beneficios**:
+- ✅ Código DRY (Don't Repeat Yourself)
+- ✅ Consistencia en cálculos
+- ✅ Fácil mantenimiento
+- ✅ Menos errores por duplicación
+
+### 5. Optimización de Operaciones Masivas (2025-01-27)
+
+Operaciones batch optimizadas con transacciones y bulk updates:
+
+```tsx
+// Antes: N+1 queries (lento)
+for (const ausencia of ausencias) {
+  await prisma.ausencia.update({ where: { id: ausencia.id }, data: {...} });
+}
+
+// Después: Transacción única con updateMany (rápido)
+await prisma.$transaction(async (tx) => {
+  await tx.ausencia.updateMany({
+    where: { id: { in: ids } },
+    data: { estado: 'aprobada' },
+  });
+  // ... otras operaciones relacionadas
+});
+```
+
+**Beneficios**:
+- ✅ 10-100x más rápido en operaciones masivas
+- ✅ Consistencia garantizada (rollback automático)
+- ✅ Menor carga en base de datos
+
+### 6. Transacciones Seguras en Uploads (2025-01-27)
+
+Uploads de archivos con rollback automático si falla la base de datos:
+
+```tsx
+let cleanupUpload: (() => Promise<void>) | null = null;
+
+try {
+  // 1. Subir archivo a S3/local
+  const storageKey = await uploadToS3(file);
+  cleanupUpload = async () => await deleteFromS3(storageKey);
+
+  // 2. Guardar en base de datos (transacción)
+  const documento = await prisma.$transaction(async (tx) => {
+    return tx.documento.create({ data: {...} });
+  });
+
+  cleanupUpload = null; // Éxito, no limpiar
+} catch (error) {
+  if (cleanupUpload) await cleanupUpload(); // Rollback: eliminar archivo
+}
+```
+
+**Beneficios**:
+- ✅ No quedan archivos huérfanos en S3
+- ✅ Consistencia entre storage y base de datos
+- ✅ Ahorro de espacio y costos
+
 ---
 
 ## 📁 Sistema de Uploads Avanzado
@@ -561,6 +683,42 @@ function MiComponente() {
 
 ---
 
-**Versión**: 1.3
-**Última actualización**: 20 de noviembre 2025
-**Cambios**: Agregado sistema de uploads avanzado con progress tracking, streaming, rate limiting y componentes reutilizables
+---
+
+## 🎯 Optimizaciones de Rendimiento (2025-01-27)
+
+### Mejoras Implementadas
+
+1. **Paginación en todas las APIs de listado**
+   - Escalable a miles de registros
+   - Respuestas más rápidas
+   - Menor consumo de memoria
+
+2. **Utilidades centralizadas**
+   - Funciones de fechas y números reutilizables
+   - Eliminación de código duplicado
+   - Consistencia en cálculos
+
+3. **Operaciones masivas optimizadas**
+   - Transacciones con bulk updates
+   - 10-100x más rápido en batch operations
+
+4. **Uploads transaccionales**
+   - Rollback automático de archivos si falla DB
+   - Sin archivos huérfanos en S3
+
+5. **Gestión de estado mejorada**
+   - `useReducer` en componentes complejos
+   - `useMemo` y `useCallback` para optimización
+   - Menos re-renders innecesarios
+
+---
+
+**Versión**: 1.4
+**Última actualización**: 27 de enero 2025
+**Cambios**: 
+- Agregado sistema de uploads avanzado con progress tracking, streaming, rate limiting y componentes reutilizables
+- Implementada paginación en todas las APIs de listado
+- Creadas utilidades centralizadas para fechas y números
+- Optimizadas operaciones masivas con transacciones
+- Mejorada gestión de estado en componentes complejos

@@ -14,6 +14,8 @@ import {
 import type { JornadaConfig, DiaConfig } from './fichajes-helpers';
 
 import { EstadoAusencia } from '@/lib/constants/enums';
+import { obtenerNombreDia, normalizarFecha } from '@/lib/utils/fechas';
+import { redondearHoras } from '@/lib/utils/numeros';
 
 /**
  * Estados posibles del fichaje (del día completo)
@@ -346,18 +348,13 @@ function parseHorasValor(valor: number | string | null | undefined): number {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-function redondearHoras(horas: number): number {
-  return Math.round(horas * 100) / 100;
-}
-
 export function calcularHorasEsperadasDesdeConfig(
   config: JornadaConfig,
   fecha: Date,
   horasSemanales?: number | string | null
 ): number {
   const fechaBase = new Date(fecha.getFullYear(), fecha.getMonth(), fecha.getDate());
-  const diasSemana = ['domingo', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado'];
-  const nombreDia = diasSemana[fechaBase.getDay()];
+  const nombreDia = obtenerNombreDia(fechaBase);
   const diaConfig = config[nombreDia] as DiaConfig | undefined;
 
   const tipoJornada = config.tipo ?? (diaConfig?.entrada && diaConfig?.salida ? 'fija' : 'flexible');
@@ -567,8 +564,7 @@ export async function esDiaLaboral(empleadoId: string, fecha: Date): Promise<boo
 
   // 5. Verificar configuración de JORNADA del empleado para ese día específico
   // (El empleado puede tener días específicos no activos aunque la empresa trabaje)
-  const diasSemana = ['domingo', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado'];
-  const nombreDia = diasSemana[fechaSinHora.getDay()];
+  const nombreDia = obtenerNombreDia(fechaSinHora);
   const config = empleado.jornada.config as JornadaConfig;
   const diaConfig = config[nombreDia] as DiaConfig | undefined;
 
@@ -792,8 +788,7 @@ export async function validarFichajeCompleto(
   const config = jornada.config as JornadaConfig;
   const fechaFichaje = fichaje.fecha;
   
-  const diasSemana = ['domingo', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado'];
-  const nombreDia = diasSemana[fechaFichaje.getDay()];
+    const nombreDia = obtenerNombreDia(fechaFichaje);
   const configDia = config[nombreDia] as DiaConfig | undefined;
 
   // Obtener información de ausencia de medio día

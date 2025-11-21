@@ -45,6 +45,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { UploadHandler } from '@/lib/hooks/use-file-upload';
+import { extractArrayFromResponse } from '@/lib/utils/api-response';
 
 interface Documento {
   id: string;
@@ -150,13 +151,33 @@ export function CarpetaDetailClient({ carpeta, empleados = [] }: CarpetaDetailCl
       ]);
 
       if (equiposRes.ok) {
-        const { equipos } = await equiposRes.json();
-        setEquipos(equipos || []);
+        const payload = await equiposRes.json();
+        const listaEquipos = extractArrayFromResponse<
+          { id: string; nombre: string }
+        >(payload, { key: 'equipos' });
+        setEquipos(listaEquipos || []);
       }
 
       if (empleadosRes.ok) {
-        const { empleados } = await empleadosRes.json();
-        setEmpleadosList(empleados || []);
+        const payload = await empleadosRes.json();
+        const lista = extractArrayFromResponse<
+          {
+            id: string;
+            nombre?: string;
+            apellidos?: string;
+            usuario?: {
+              nombre?: string;
+              apellidos?: string;
+            };
+          }
+        >(payload, { key: 'empleados' });
+        setEmpleadosList(
+          lista.map((empleado) => ({
+            id: empleado.id,
+            nombre: empleado.nombre || empleado.usuario?.nombre || '',
+            apellidos: empleado.apellidos || empleado.usuario?.apellidos || '',
+          }))
+        );
       }
     } catch (error: unknown) {
       console.error('Error cargando datos:', error);

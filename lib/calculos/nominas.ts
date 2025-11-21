@@ -11,6 +11,7 @@ import {
   getFestivosActivosEnRango,
 } from './dias-laborables';
 import { EstadoAusencia, EstadoFichaje } from '@/lib/constants/enums';
+import { redondearHoras } from '@/lib/utils/numeros';
 
 /**
  * Tipo de retorno para el resumen mensual
@@ -250,8 +251,8 @@ export async function calcularHorasMensuales(
   }
 
   return {
-    horasTrabajadas: Math.round(horasTrabajadas * 100) / 100,
-    horasExtras: Math.round(horasExtras * 100) / 100,
+    horasTrabajadas: redondearHoras(horasTrabajadas),
+    horasExtras: redondearHoras(horasExtras),
   };
 }
 

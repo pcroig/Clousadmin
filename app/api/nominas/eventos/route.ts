@@ -64,67 +64,91 @@ export async function GET(req: NextRequest) {
       },
     });
 
-    // Calcular conteo de alertas por evento
-    const eventosConAlertas = await Promise.all(
-      eventos.map(async (evento) => {
-        const alertas = evento.nominas.flatMap((n) => n.alertas);
+    let rangoInicio: Date | null = null;
+    let rangoFin: Date | null = null;
 
-        const conteoAlertas = {
-          criticas: alertas.filter((a) => a.tipo === 'critico').length,
-          advertencias: alertas.filter((a) => a.tipo === 'advertencia').length,
-          informativas: alertas.filter((a) => a.tipo === 'info').length,
-          total: alertas.length,
-        };
+    for (const evento of eventos) {
+      const inicio = new Date(evento.anio, evento.mes - 1, 1);
+      const fin = new Date(evento.anio, evento.mes, 1); // primer día del mes siguiente
 
-        const nominasConComplementosPendientes = evento.nominas.filter(
-          (n) => n.complementosPendientes
-        ).length;
+      if (!rangoInicio || inicio < rangoInicio) {
+        rangoInicio = inicio;
+      }
+      if (!rangoFin || fin > rangoFin) {
+        rangoFin = fin;
+      }
+    }
 
-        // Calcular estado de bolsa de horas para el mes del evento
-        const inicioMes = new Date(evento.anio, evento.mes - 1, 1);
-        const siguienteMes = new Date(evento.anio, evento.mes, 1);
-
-        const compensaciones = await prisma.compensacionHoraExtra.findMany({
+    const compensaciones = rangoInicio && rangoFin
+      ? await prisma.compensacionHoraExtra.findMany({
           where: {
             empresaId: session.user.empresaId,
             createdAt: {
-              gte: inicioMes,
-              lt: siguienteMes,
+              gte: rangoInicio,
+              lt: rangoFin,
             },
           },
           select: {
             estado: true,
             horasBalance: true,
+            createdAt: true,
           },
-        });
+        })
+      : [];
 
-        const horasExtra = compensaciones.reduce(
-          (acc, item) => {
-            const horas = Number(item.horasBalance);
-            if (item.estado === 'pendiente') {
-              acc.pendientes += 1;
-              acc.horasPendientes += horas;
-            } else if (item.estado === 'aprobada') {
-              acc.aprobadas += 1;
-            }
-            acc.total += 1;
-            return acc;
-          },
-          { pendientes: 0, aprobadas: 0, total: 0, horasPendientes: 0 }
-        );
-
-        // Eliminar el array de nóminas del response (solo queremos el conteo)
-        const { nominas, ...eventoSinNominas } = evento;
-
-        return {
-          ...eventoSinNominas,
-          alertas: conteoAlertas,
-          nominasConComplementosPendientes,
-          tieneComplementos: evento.empleadosConComplementos > 0,
-          horasExtra,
-        };
-      })
+    const compensacionesPorMes = compensaciones.reduce<Record<string, typeof compensaciones>>(
+      (acc, comp) => {
+        const fecha = comp.createdAt;
+        const key = `${fecha.getFullYear()}-${fecha.getMonth() + 1}`;
+        if (!acc[key]) acc[key] = [];
+        acc[key].push(comp);
+        return acc;
+      },
+      {}
     );
+
+    const eventosConAlertas = eventos.map((evento) => {
+      const alertas = evento.nominas.flatMap((n) => n.alertas);
+
+      const conteoAlertas = {
+        criticas: alertas.filter((a) => a.tipo === 'critico').length,
+        advertencias: alertas.filter((a) => a.tipo === 'advertencia').length,
+        informativas: alertas.filter((a) => a.tipo === 'info').length,
+        total: alertas.length,
+      };
+
+      const nominasConComplementosPendientes = evento.nominas.filter(
+        (n) => n.complementosPendientes
+      ).length;
+
+      const key = `${evento.anio}-${evento.mes}`;
+      const compensacionesDelMes = compensacionesPorMes[key] ?? [];
+
+      const horasExtra = compensacionesDelMes.reduce(
+        (acc, item) => {
+          const horas = Number(item.horasBalance);
+          if (item.estado === 'pendiente') {
+            acc.pendientes += 1;
+            acc.horasPendientes += horas;
+          } else if (item.estado === 'aprobada') {
+            acc.aprobadas += 1;
+          }
+          acc.total += 1;
+          return acc;
+        },
+        { pendientes: 0, aprobadas: 0, total: 0, horasPendientes: 0 }
+      );
+
+      const { nominas, ...eventoSinNominas } = evento;
+
+      return {
+        ...eventoSinNominas,
+        alertas: conteoAlertas,
+        nominasConComplementosPendientes,
+        tieneComplementos: evento.empleadosConComplementos > 0,
+        horasExtra,
+      };
+    });
 
     return NextResponse.json({ eventos: eventosConAlertas });
   } catch (error) {

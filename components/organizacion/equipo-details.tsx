@@ -37,7 +37,8 @@ interface EquipoDetailsProps {
     empleados: {
       id: string;
       nombre: string;
-      avatar?: string;
+      avatar?: string | null;
+      fotoUrl?: string | null;
     }[];
     sede?: {
       id: string;
@@ -170,6 +171,7 @@ export function EquipoDetails({ equipo, onUpdate, onDelete }: EquipoDetailsProps
             ) : (
               equipo.empleados.map((empleado) => {
                 const avatarStyle = getAvatarStyle(empleado.nombre);
+                const fotoUrl = empleado.fotoUrl ?? empleado.avatar ?? undefined;
 
                 return (
                   <div
@@ -177,7 +179,7 @@ export function EquipoDetails({ equipo, onUpdate, onDelete }: EquipoDetailsProps
                     className="flex items-center gap-3 p-3 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
                   >
                     <Avatar className="h-9 w-9">
-                      {empleado.avatar && <AvatarImage src={empleado.avatar} />}
+                      {fotoUrl && <AvatarImage src={fotoUrl} />}
                       <AvatarFallback
                         className="text-xs font-semibold uppercase"
                         style={avatarStyle}

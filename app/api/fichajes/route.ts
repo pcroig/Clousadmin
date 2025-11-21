@@ -26,6 +26,10 @@ import {
 import { z } from 'zod';
 
 import { EstadoFichaje, UsuarioRol } from '@/lib/constants/enums';
+import {
+  parsePaginationParams,
+  buildPaginationMeta,
+} from '@/lib/utils/pagination';
 
 const fichajeEventoCreateSchema = z.object({
   tipo: z.enum(['entrada', 'pausa_inicio', 'pausa_fin', 'salida']),
@@ -52,6 +56,7 @@ export async function GET(req: NextRequest) {
 
     // 2. Obtener parámetros de query
     const searchParams = req.nextUrl.searchParams;
+    const { page, limit, skip } = parsePaginationParams(searchParams);
     const empleadoId = searchParams.get('empleadoId');
     const fecha = searchParams.get('fecha');
     const fechaInicio = searchParams.get('fechaInicio');
@@ -148,31 +153,38 @@ export async function GET(req: NextRequest) {
     }
 
     // 4. Obtener fichajes con sus eventos
-    const fichajes = await prisma.fichaje.findMany({
-      where,
-      include: {
-        empleado: {
-          select: {
-            id: true,
-            nombre: true,
-            apellidos: true,
-            puesto: true,
+    const [fichajes, total] = await Promise.all([
+      prisma.fichaje.findMany({
+        where,
+        include: {
+          empleado: {
+            select: {
+              id: true,
+              nombre: true,
+              apellidos: true,
+              puesto: true,
+            },
+          },
+          eventos: {
+            orderBy: {
+              hora: 'asc',
+            },
           },
         },
-        eventos: {
-          orderBy: {
-            hora: 'asc',
-          },
-        },
-      },
-      orderBy: [
-        { fecha: 'desc' },
-      ],
-      take: 500, // Límite para performance
-    });
+        orderBy: [
+          { fecha: 'desc' },
+        ],
+        skip,
+        take: limit,
+      }),
+      prisma.fichaje.count({ where }),
+    ]);
 
     if (fichajes.length === 0) {
-      return successResponse(fichajes);
+      return successResponse({
+        data: [],
+        pagination: buildPaginationMeta(page, limit, total),
+      });
     }
 
     const horasEsperadasMap = await obtenerHorasEsperadasBatch(
@@ -209,7 +221,10 @@ export async function GET(req: NextRequest) {
       };
     });
 
-    return successResponse(fichajesConBalance);
+    return successResponse({
+      data: fichajesConBalance,
+      pagination: buildPaginationMeta(page, limit, total),
+    });
   } catch (error) {
     return handleApiError(error, 'API GET /api/fichajes');
   }

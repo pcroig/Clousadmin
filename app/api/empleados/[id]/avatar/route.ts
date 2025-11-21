@@ -2,9 +2,12 @@
 // API Empleados Avatar - POST
 // ========================================
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
+import { randomUUID } from 'node:crypto';
+
 import { prisma } from '@/lib/prisma';
 import { UsuarioRol } from '@/lib/constants/enums';
+import { uploadToS3 } from '@/lib/s3';
 
 import {
   requireAuth,
@@ -15,11 +18,18 @@ import {
   badRequestResponse,
 } from '@/lib/api-handler';
 
-// Nota: S3 upload se implementará cuando esté configurado
-// Por ahora retornamos una URL de placeholder
-
 const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2MB
 const ALLOWED_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+const MIME_EXTENSION_MAP: Record<string, string> = {
+  'image/jpeg': 'jpg',
+  'image/jpg': 'jpg',
+  'image/png': 'png',
+  'image/webp': 'webp',
+};
+
+function getFileExtension(mimeType: string) {
+  return MIME_EXTENSION_MAP[mimeType] || 'jpg';
+}
 
 // POST /api/empleados/[id]/avatar - Subir avatar
 export async function POST(
@@ -59,17 +69,14 @@ export async function POST(
       return badRequestResponse('El archivo es demasiado grande. Máximo 2MB');
     }
 
-    // TODO: Implementar subida a S3
-    // const s3Key = `avatars/${session.empresaId}/${params.id}.${file.name.split('.').pop()}`;
-    // const avatarUrl = await uploadToS3(file, s3Key);
-
-    // Por ahora, generar URL de placeholder con las iniciales
     const empleado = await prisma.empleado.findUnique({
       where: { id },
       select: {
         nombre: true,
         apellidos: true,
         usuarioId: true,
+        empresaId: true,
+        fotoUrl: true,
       },
     });
 
@@ -77,19 +84,33 @@ export async function POST(
       return notFoundResponse('Empleado no encontrado');
     }
 
-    const initials = `${empleado.nombre.charAt(0)}${empleado.apellidos.charAt(0)}`;
-    const placeholderUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(initials)}&background=random&size=256`;
+    if (
+      session.user.rol === UsuarioRol.hr_admin &&
+      session.user.empresaId &&
+      empleado.empresaId !== session.user.empresaId
+    ) {
+      return forbiddenResponse('No puedes actualizar avatares de otra empresa');
+    }
+
+    const empresaFolder = empleado.empresaId || session.user.empresaId || 'global';
+    const extension = getFileExtension(file.type);
+    const objectKey = `avatars/${empresaFolder}/${id}-${Date.now()}-${randomUUID()}.${extension}`;
+    const fileBuffer = Buffer.from(await file.arrayBuffer());
+    const avatarUrl = await uploadToS3(fileBuffer, objectKey, file.type, {
+      acl: 'public-read',
+      cacheControl: 'public,max-age=31536000,immutable',
+    });
 
     // Actualizar solo empleado.fotoUrl como fuente única de verdad
     await prisma.empleado.update({
       where: { id },
-      data: { fotoUrl: placeholderUrl },
+      data: { fotoUrl: avatarUrl },
     });
 
     return successResponse({
       success: true,
-      url: placeholderUrl,
-      message: 'Avatar actualizado correctamente (usando placeholder hasta que S3 esté configurado)',
+      url: avatarUrl,
+      message: 'Avatar actualizado correctamente',
     });
   } catch (error) {
     return handleApiError(error, 'API POST /api/empleados/[id]/avatar');

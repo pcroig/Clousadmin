@@ -183,10 +183,17 @@ async function deleteFromLocal(key: string): Promise<void> {
  * @param contentType MIME type of the file
  * @returns The full URL of the uploaded file (Object Storage or local)
  */
+type UploadOptions = {
+  acl?: 'private' | 'public-read';
+  cacheControl?: string;
+  contentDisposition?: string;
+};
+
 export async function uploadToS3(
   file: UploadBody,
   key: string,
-  contentType: string
+  contentType: string,
+  options?: UploadOptions
 ): Promise<string> {
   // Fallback to local storage in development
   if (!isS3Configured()) {
@@ -207,6 +214,9 @@ export async function uploadToS3(
         Key: key,
         Body: file,
         ContentType: contentType,
+        ACL: options?.acl ?? process.env.STORAGE_DEFAULT_ACL ?? 'private',
+        CacheControl: options?.cacheControl,
+        ContentDisposition: options?.contentDisposition,
       })
     );
 

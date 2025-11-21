@@ -8,6 +8,8 @@ import { type BandejaEntradaTab, BandejaEntradaTabs } from '@/components/hr/band
 import { getSession } from '@/lib/auth';
 import { EstadoAusencia, EstadoSolicitud, UsuarioRol } from '@/lib/constants/enums';
 import { prisma } from '@/lib/prisma';
+import type { NotificacionUI } from '@/types/Notificacion';
+import type { TipoNotificacion } from '@/lib/notificaciones';
 
 export default async function ManagerBandejaEntradaPage({
   searchParams,
@@ -155,7 +157,7 @@ export default async function ManagerBandejaEntradaPage({
       empleado: {
         nombre: aus.empleado.nombre,
         apellidos: aus.empleado.apellidos,
-        avatar: aus.empleado.fotoUrl || undefined,
+        fotoUrl: aus.empleado.fotoUrl || undefined,
       },
       tipo: 'ausencia' as const,
       detalles: `Solicitud de ${aus.tipo}`,
@@ -172,7 +174,7 @@ export default async function ManagerBandejaEntradaPage({
       empleado: {
         nombre: sol.empleado.nombre,
         apellidos: sol.empleado.apellidos,
-        avatar: sol.empleado.fotoUrl || undefined,
+        fotoUrl: sol.empleado.fotoUrl || undefined,
       },
       tipo: 'cambio_datos' as const,
       detalles: `Solicitud de cambio de ${sol.tipo}`,
@@ -192,7 +194,7 @@ export default async function ManagerBandejaEntradaPage({
       empleado: {
         nombre: aus.empleado.nombre,
         apellidos: aus.empleado.apellidos,
-        avatar: aus.empleado.fotoUrl || undefined,
+        fotoUrl: aus.empleado.fotoUrl || undefined,
       },
       tipo: 'ausencia' as const,
       detalles: `Solicitud de ${aus.tipo}`,
@@ -210,7 +212,7 @@ export default async function ManagerBandejaEntradaPage({
       empleado: {
         nombre: sol.empleado.nombre,
         apellidos: sol.empleado.apellidos,
-        avatar: sol.empleado.fotoUrl || undefined,
+        fotoUrl: sol.empleado.fotoUrl || undefined,
       },
       tipo: 'cambio_datos' as const,
       detalles: `Solicitud de cambio de ${sol.tipo}`,
@@ -335,13 +337,14 @@ export default async function ManagerBandejaEntradaPage({
     take: 50,
   });
 
-  const notificaciones = notificacionesRaw.map((n) => ({
+  const notificaciones: NotificacionUI[] = notificacionesRaw.map((n) => ({
     id: n.id,
-    tipo: n.tipo as 'success' | 'error' | 'warning' | 'info',
+    tipo: n.tipo as TipoNotificacion,
     titulo: n.titulo,
     mensaje: n.mensaje,
     fecha: n.createdAt,
     leida: n.leida,
+    metadata: (n.metadata as NotificacionUI['metadata']) || undefined,
   }));
 
   const tabParam = searchParams?.tab;

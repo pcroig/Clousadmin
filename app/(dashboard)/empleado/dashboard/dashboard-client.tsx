@@ -10,13 +10,14 @@ import { useMemo, useState } from 'react';
 import { SolicitarAusenciaModal } from '@/components/empleado/solicitar-ausencia-modal';
 import { AusenciaItem, AusenciasWidget } from '@/components/shared/ausencias-widget';
 import { FichajeWidget } from '@/components/shared/fichaje-widget';
-import { Notificacion, NotificacionesWidget } from '@/components/shared/notificaciones-widget';
+import { NotificacionesWidget } from '@/components/shared/notificaciones-widget';
 import { CampanaPropuestaReminder } from '@/components/vacaciones/campana-propuesta-reminder';
 import { CampanaVacacionesReminder } from '@/components/vacaciones/campana-vacaciones-reminder';
+import type { NotificacionUI } from '@/types/Notificacion';
 
 interface DashboardClientProps {
   userName: string;
-  notificaciones: Notificacion[];
+  notificaciones: NotificacionUI[];
   saldoFinal: {
     diasTotales: number;
     diasUsados: number;
@@ -133,20 +134,20 @@ export function EmpleadoDashboardClient({
         onClose={() => setModalAusencia(false)}
         onSuccess={() => {
           setModalAusencia(false);
-          window.location.reload(); // Recargar para actualizar los datos
+          router.refresh();
         }}
       />
 
       {!propuestaData && (
         <CampanaVacacionesReminder
           campanaPendiente={reminderData}
-          onCompleted={() => window.location.reload()}
+          onCompleted={() => router.refresh()}
         />
       )}
 
       <CampanaPropuestaReminder
         propuestaPendiente={propuestaData}
-        onResponded={() => window.location.reload()}
+        onResponded={() => router.refresh()}
       />
     </>
   );

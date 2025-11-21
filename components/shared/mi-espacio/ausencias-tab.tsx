@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { SolicitarAusenciaModal } from '@/components/empleado/solicitar-ausencia-modal';
 import { FechaCalendar } from '@/components/shared/fecha-calendar';
+import { obtenerNombreDia } from '@/lib/utils/fechas';
 
 interface Ausencia {
   id: string;
@@ -199,9 +200,7 @@ export function AusenciasTab({ empleadoId, contexto = 'empleado' }: MiEspacioAus
 
   // Función para verificar si un día es laborable
   const esDiaLaborable = (date: Date) => {
-    const dayOfWeek = date.getDay();
-    const diasSemana = ['domingo', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado'];
-    const nombreDia = diasSemana[dayOfWeek] as keyof typeof diasLaborables;
+    const nombreDia = obtenerNombreDia(date) as keyof typeof diasLaborables;
     return diasLaborables[nombreDia];
   };
 

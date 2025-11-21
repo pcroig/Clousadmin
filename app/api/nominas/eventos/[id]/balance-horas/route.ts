@@ -8,7 +8,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getSession } from '@/lib/auth';
-import { calcularBalanceMensual } from '@/lib/calculos/balance-horas';
+import { calcularBalanceMensualBatch } from '@/lib/calculos/balance-horas';
 
 async function balanceHorasHandler(
   req: NextRequest,
@@ -62,14 +62,21 @@ async function balanceHorasHandler(
       return NextResponse.json({ error: 'Acceso denegado' }, { status: 403 });
     }
 
+    const empleadoIds = evento.nominas.map((nomina) => nomina.empleado.id);
+    const balancesPorEmpleado = await calcularBalanceMensualBatch(
+      session.user.empresaId,
+      empleadoIds,
+      evento.mes,
+      evento.anio
+    );
+
     const balances = [];
 
     for (const nomina of evento.nominas) {
-      const balance = await calcularBalanceMensual(
-        nomina.empleado.id,
-        evento.mes,
-        evento.anio
-      );
+      const balance = balancesPorEmpleado.get(nomina.empleado.id);
+      if (!balance) {
+        continue;
+      }
 
       balances.push({
         empleado: nomina.empleado,

@@ -19,7 +19,8 @@ interface PersonaDetailsProps {
     equipo: string;
     puesto: string;
     activo: boolean;
-    avatar?: string;
+    avatar?: string | null;
+    fotoUrl?: string | null;
     detalles: {
       dni: string;
       numeroSS: string | null;
@@ -38,6 +39,7 @@ interface PersonaDetailsProps {
 export function PersonaDetails({ empleado }: PersonaDetailsProps) {
 
   const avatarStyle = getAvatarStyle(empleado.nombre);
+  const fotoUrl = empleado.fotoUrl ?? empleado.avatar ?? undefined;
 
   const formatDate = (date: Date | null) => {
     if (!date) return 'No especificado';
@@ -61,7 +63,7 @@ export function PersonaDetails({ empleado }: PersonaDetailsProps) {
       {/* Header con Avatar */}
       <div className="flex flex-col items-center text-center pb-6 border-b border-gray-200">
         <Avatar className="h-20 w-20 mb-3">
-          {empleado.avatar && <AvatarImage src={empleado.avatar} />}
+          {fotoUrl && <AvatarImage src={fotoUrl} />}
           <AvatarFallback
             className="text-lg font-semibold uppercase"
             style={avatarStyle}

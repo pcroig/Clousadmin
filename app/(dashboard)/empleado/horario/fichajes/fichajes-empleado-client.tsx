@@ -33,6 +33,7 @@ import {
 } from '@/components/ui/table';
 import { EstadoFichaje } from '@/lib/constants/enums';
 import { formatearHorasMinutos } from '@/lib/utils/formatters';
+import { extractArrayFromResponse } from '@/lib/utils/api-response';
 
 
 interface FichajeEvento {
@@ -173,7 +174,9 @@ export function FichajesEmpleadoClient({ balanceInicial }: Props) {
       const data = await response.json();
       
       // Agrupar fichajes en jornadas
-      const jornadasAgrupadas = agruparPorJornada(data);
+      const jornadasAgrupadas = agruparPorJornada(
+        extractArrayFromResponse<FichajeDia>(data, { key: 'fichajes' })
+      );
       setJornadas(jornadasAgrupadas);
     } catch (error) {
       console.error('Error fetching fichajes:', error);

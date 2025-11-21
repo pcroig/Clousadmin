@@ -65,7 +65,7 @@ export default async function SignupPage({ searchParams }: SignupPageProps) {
       {/* Columna derecha: Imagen */}
       <div className="bg-muted relative hidden lg:block">
         <Image
-          src="/login-hero.png"
+          src="/login-hero.webp"
           alt="HR Management"
           fill
           priority
