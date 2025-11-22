@@ -1,7 +1,7 @@
 'use client';
 
 import { AlertCircle, CheckCircle, Clock, Search, XCircle } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 import { Badge } from '@/components/ui/badge';
@@ -73,18 +73,12 @@ export function ValidarComplementosDialog({
   const [motivoRechazo, setMotivoRechazo] = useState('');
   const [procesando, setProcesando] = useState(false);
 
-  useEffect(() => {
-    if (isOpen && eventoId) {
-      fetchComplementos();
-    }
-  }, [isOpen, eventoId]);
-
-  const fetchComplementos = async () => {
+  const fetchComplementos = useCallback(async () => {
     setLoading(true);
     try {
       const response = await fetch(`/api/nominas/eventos/${eventoId}/complementos-pendientes`);
       const data = await response.json();
-      
+
       if (response.ok) {
         setComplementos(data.complementos || []);
         setStats(data.stats || null);
@@ -97,7 +91,13 @@ export function ValidarComplementosDialog({
     } finally {
       setLoading(false);
     }
-  };
+  }, [eventoId]);
+
+  useEffect(() => {
+    if (isOpen && eventoId) {
+      fetchComplementos();
+    }
+  }, [isOpen, eventoId, fetchComplementos]);
 
   const complementosFiltrados = useMemo(() => {
     return complementos.filter((comp) => {

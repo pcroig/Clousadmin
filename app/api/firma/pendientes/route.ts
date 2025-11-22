@@ -13,7 +13,7 @@ import { prisma } from '@/lib/prisma';
  *
  * Retorna todas las firmas que el empleado debe completar
  */
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     const session = await getSession();
 

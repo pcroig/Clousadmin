@@ -4,7 +4,7 @@
 // Jornadas Client Component
 // ========================================
 
-import { CalendarX, Edit2, Trash2, Users } from 'lucide-react';
+import { CalendarX, Edit2, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 import { EmptyState } from '@/components/shared/empty-state';

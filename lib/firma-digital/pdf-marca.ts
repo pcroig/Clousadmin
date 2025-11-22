@@ -43,7 +43,7 @@ export async function anadirMarcaFirmaPDF(
         : Math.min(paginaSolicitada - 1, paginas.length - 1);
 
     const pagina = paginas[paginaIndex];
-    const { width, height } = pagina.getSize();
+    const { width, height: _height } = pagina.getSize();
 
     // Cargar fuente
     const font = await pdfDoc.embedFont(StandardFonts.Helvetica);

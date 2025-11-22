@@ -6,7 +6,6 @@
 import { randomBytes } from 'crypto';
 
 import { hashPassword } from '@/lib/auth';
-import { UsuarioRol } from '@/lib/constants/enums';
 import { validarDocumentosRequeridosCompletos } from '@/lib/documentos/onboarding';
 import { encryptEmpleadoData } from '@/lib/empleado-crypto';
 import { crearNotificacionOnboardingCompletado } from '@/lib/notificaciones';

@@ -21,7 +21,7 @@ export async function crearCarpetasOnboardingDocumento(
   empresaId: string,
   empleadoId: string,
   nombreDocumento: string,
-  tipoDocumento: string
+  _tipoDocumento: string
 ) {
   try {
     // 1. Crear/obtener carpeta generalizada para HR

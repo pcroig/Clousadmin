@@ -12,7 +12,7 @@ import { prisma } from '@/lib/prisma';
  * GET /api/empresa/politica-ausencias
  * Obtener política de ausencias de la empresa
  */
-export async function GET(req: NextRequest) {
+export async function GET(_req: NextRequest) {
   try {
     const session = await getSession();
 

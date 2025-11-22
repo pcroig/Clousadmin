@@ -121,9 +121,9 @@ function normalizarFecha(fecha: string | Date): { fechaISO: string; fechaDate: D
   if (Number.isNaN(iso.getTime())) {
     const hoy = new Date();
     const fallback = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
-    const fallbackISO = fallback.toISOString().split('T')[0];
+    const _fallbackISO = fallback.toISOString().split('T')[0];
     return {
-      fechaISO: fallbackISO,
+      fechaISO: _fallbackISO,
       fechaDate: fallback,
     };
   }
@@ -174,7 +174,7 @@ export function agruparFichajesEnJornadas(
   });
 
   return Object.entries(grupos)
-    .map(([fechaISO, fichajesDelDia]) => {
+    .map(([_fechaISO, fichajesDelDia]) => {
       const fichajeBase = fichajesDelDia.find((f) => (f.eventos ?? []).length > 0) ?? fichajesDelDia[0];
 
       const eventosOrdenados = fichajesDelDia

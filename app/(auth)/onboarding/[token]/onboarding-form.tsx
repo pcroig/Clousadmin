@@ -277,7 +277,7 @@ export function OnboardingForm({
     });
   }, [pasosSecuencia]);
 
-  const irAPaso = useCallback(
+  const _irAPaso = useCallback(
     (destino: PasoClave) => {
       if (!pasosSecuencia.includes(destino)) {
         return;

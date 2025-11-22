@@ -4,13 +4,12 @@
 
 'use client';
 
-import { Filter, Flag, Plus, Settings } from 'lucide-react';
+import { Flag, Plus, Settings } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 
 import { CompactFilterBar } from '@/components/adaptive/CompactFilterBar';
 import { MobileActionBar } from '@/components/adaptive/MobileActionBar';
-import { MobilePageHeader } from '@/components/adaptive/MobilePageHeader';
 import { ResponsiveContainer } from '@/components/adaptive/ResponsiveContainer';
 import { DenunciasDetails } from '@/components/hr/denuncias-details';
 import { GestionarOnboardingModal } from '@/components/hr/gestionar-onboarding-modal';
@@ -20,12 +19,6 @@ import { DetailsPanel } from '@/components/shared/details-panel';
 import { TableHeader } from '@/components/shared/table-header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet';
 import { useIsMobile } from '@/lib/hooks/use-viewport';
 
 
@@ -67,7 +60,7 @@ export function PersonasClient({ empleados, initialPanel, initialDenunciaId }: P
   const [addPersonaDialogOpen, setAddPersonaDialogOpen] = useState(false);
   const [gestionarOnboardingOpen, setGestionarOnboardingOpen] = useState(false);
   const [denunciasDetailsOpen, setDenunciasDetailsOpen] = useState(initialPanel === 'denuncias');
-  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [_filtersOpen, _setFiltersOpen] = useState(false);
   const isMobile = useIsMobile();
 
   // Filtrar empleados por búsqueda
@@ -132,17 +125,6 @@ export function PersonasClient({ empleados, initialPanel, initialDenunciaId }: P
     },
   ];
 
-  const FiltersForm = ({ layout }: { layout: 'desktop' | 'mobile' }) => (
-    <div className={layout === 'desktop' ? 'flex items-center gap-3 flex-1' : 'space-y-3'}>
-      <Input
-        placeholder="Buscar persona..."
-        value={searchTerm}
-        onChange={(e) => setSearchTerm(e.target.value)}
-        className={layout === 'desktop' ? 'w-[240px]' : 'w-full'}
-      />
-    </div>
-  );
-
   return (
     <ResponsiveContainer variant="page" className="h-full w-full flex flex-col overflow-hidden">
       {isMobile ? (
@@ -196,7 +178,14 @@ export function PersonasClient({ empleados, initialPanel, initialDenunciaId }: P
             }}
           />
           <div className="flex items-center justify-between mb-6 gap-4">
-            <FiltersForm layout="desktop" />
+            <div className="flex items-center gap-3 flex-1">
+              <Input
+                placeholder="Buscar persona..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-[240px]"
+              />
+            </div>
             <Button
               variant="ghost"
               size="icon"

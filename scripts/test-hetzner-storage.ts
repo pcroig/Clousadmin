@@ -10,7 +10,6 @@ import { GetObjectCommand, HeadBucketCommand, ListBucketsCommand, PutObjectComma
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import * as dotenv from 'dotenv';
 
-import type { AwsCredentialIdentity } from '@aws-sdk/types';
 
 // Cargar .env (buscar en el raíz del proyecto)
 const envPath = path.join(process.cwd(), '.env');
@@ -93,7 +92,7 @@ async function main() {
       credentials: {
         accessKeyId: STORAGE_ACCESS_KEY!,
         secretAccessKey: STORAGE_SECRET_KEY!,
-      } as Credentials,
+      },
       forcePathStyle: true, // Requerido para Hetzner
       maxAttempts: 3,
     });

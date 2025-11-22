@@ -425,7 +425,7 @@ export async function GET(request: NextRequest) {
     };
     const nominasEquiposPromise = prisma.nomina.findMany(nominasEquiposArgs) as Promise<NominaConEquipos[]>;
 
-    const complementosAsignadosArgs: Prisma.AsignacionComplementoFindManyArgs = {
+    const _complementosAsignadosArgs: Prisma.AsignacionComplementoFindManyArgs = {
       where: {
         nomina: {
           is: {

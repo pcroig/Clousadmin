@@ -7,7 +7,6 @@ import { useState } from 'react';
 import { DocumentUploaderInline } from '@/components/shared/document-uploader-inline';
 import { InfoTooltip } from '@/components/shared/info-tooltip';
 import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
 import {
   Dialog,
   DialogContent,

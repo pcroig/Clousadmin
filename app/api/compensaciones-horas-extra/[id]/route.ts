@@ -15,7 +15,6 @@ import {
   validateRequest,
 } from '@/lib/api-handler';
 import { determinarEstadoTrasAprobacion } from '@/lib/calculos/ausencias';
-import { EstadoAusencia } from '@/lib/constants/enums';
 import { prisma } from '@/lib/prisma';
 
 const aprobarRechazarSchema = z.object({

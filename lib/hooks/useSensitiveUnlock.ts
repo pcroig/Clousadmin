@@ -1,9 +1,9 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
-const SENSITIVE_FIELDS = ['nif', 'nss', 'iban'] as const;
-export type SensitiveFieldKey = (typeof SENSITIVE_FIELDS)[number];
+const _SENSITIVE_FIELDS = ['nif', 'nss', 'iban'] as const;
+export type SensitiveFieldKey = (typeof _SENSITIVE_FIELDS)[number];
 
 const UNLOCK_DURATION_MS = 5 * 60 * 1000; // 5 minutos
 

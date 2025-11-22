@@ -11,7 +11,7 @@ import { EstadoAusencia } from '@/lib/constants/enums';
 import { CalendarManager } from "@/lib/integrations/calendar/calendar-manager";
 import { prisma } from "@/lib/prisma";
 
-export async function GET(req: NextRequest) {
+export async function GET(_req: NextRequest) {
   try {
     // Verificar sesión
     const session = await getSession();

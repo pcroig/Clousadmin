@@ -17,7 +17,7 @@ const puestoCreateSchema = z.object({
 });
 
 // GET /api/puestos - Listar todos los puestos activos
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     const session = await getSession();
     if (!session) {

@@ -10,7 +10,7 @@ import { prisma } from '@/lib/prisma';
 
 
 // GET /api/admin/invitaciones - Listar todas las invitaciones de signup
-export async function GET(req: NextRequest) {
+export async function GET(_req: NextRequest) {
   try {
     // Verificar autenticación y rol platform_admin
     const session = await getSession();

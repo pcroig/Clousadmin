@@ -12,7 +12,6 @@ import { AreaChartComponent } from '@/components/analytics/area-chart';
 import { BarChartComponent } from '@/components/analytics/bar-chart';
 import { AnalyticsFilters, FilterValues } from '@/components/analytics/filters';
 import { KpiCard } from '@/components/analytics/kpi-card';
-import { PieChartComponent } from '@/components/analytics/pie-chart';
 
 
 interface PlantillaData {

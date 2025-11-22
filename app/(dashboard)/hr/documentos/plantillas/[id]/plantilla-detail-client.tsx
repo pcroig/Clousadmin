@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import PizZip from 'pizzip';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 import { Badge } from '@/components/ui/badge';
@@ -216,7 +216,7 @@ export function PlantillaDetailClient({ plantilla }: PlantillaDetailClientProps)
     setVariablesValores({});
     setEmpleadosSeleccionados(new Set());
     cargarDatosIniciales();
-  }, [plantilla.id]);
+  }, [plantilla.id, cargarDatosIniciales]);
 
   useEffect(() => {
     if (!previewUrl) return;
@@ -280,40 +280,7 @@ export function PlantillaDetailClient({ plantilla }: PlantillaDetailClientProps)
     email: empleado?.usuario?.email || empleado?.email || '',
   });
 
-  const cargarDatosIniciales = async () => {
-    setLoadingEmpleados(true);
-    setLoadingPreview(true);
-    setPreviewRenderState('idle');
-    setPreviewError(null);
-    setPreviewUrl(null);
-    setEmpleadoPreviewId(null);
-
-    try {
-      const res = await fetch('/api/empleados?activos=true');
-      const data = await res.json();
-
-      const listaEmpleados = normalizarRespuestaEmpleados(data).map(mapearEmpleado);
-      setEmpleados(listaEmpleados);
-
-      if (listaEmpleados.length > 0) {
-        setEmpleadoPreviewId(listaEmpleados[0].id);
-        await cargarPrevisualizacion(listaEmpleados[0].id);
-      } else {
-        setLoadingPreview(false);
-        setPreviewRenderState('error');
-        setPreviewError('Necesitas al menos un empleado activo para generar la previsualización.');
-      }
-    } catch (error) {
-      console.error('Error cargando empleados:', error);
-      setLoadingPreview(false);
-      setPreviewRenderState('error');
-      setPreviewError('No se pudieron cargar los empleados para la previsualización.');
-    } finally {
-      setLoadingEmpleados(false);
-    }
-  };
-
-  const cargarPrevisualizacion = async (empleadoId: string) => {
+  const cargarPrevisualizacion = useCallback(async (empleadoId: string) => {
     if (!empleadoId) return;
 
     try {
@@ -361,7 +328,40 @@ export function PlantillaDetailClient({ plantilla }: PlantillaDetailClientProps)
     } finally {
       setLoadingPreview(false);
     }
-  };
+  }, [plantilla.id, variablesDetectadas]);
+
+  const cargarDatosIniciales = useCallback(async () => {
+    setLoadingEmpleados(true);
+    setLoadingPreview(true);
+    setPreviewRenderState('idle');
+    setPreviewError(null);
+    setPreviewUrl(null);
+    setEmpleadoPreviewId(null);
+
+    try {
+      const res = await fetch('/api/empleados?activos=true');
+      const data = await res.json();
+
+      const listaEmpleados = normalizarRespuestaEmpleados(data).map(mapearEmpleado);
+      setEmpleados(listaEmpleados);
+
+      if (listaEmpleados.length > 0) {
+        setEmpleadoPreviewId(listaEmpleados[0].id);
+        await cargarPrevisualizacion(listaEmpleados[0].id);
+      } else {
+        setLoadingPreview(false);
+        setPreviewRenderState('error');
+        setPreviewError('Necesitas al menos un empleado activo para generar la previsualización.');
+      }
+    } catch (error) {
+      console.error('Error cargando empleados:', error);
+      setLoadingPreview(false);
+      setPreviewRenderState('error');
+      setPreviewError('No se pudieron cargar los empleados para la previsualización.');
+    } finally {
+      setLoadingEmpleados(false);
+    }
+  }, [cargarPrevisualizacion]);
 
   const handleToggleEmpleado = (empleadoId: string) => {
     const nuevos = new Set(empleadosSeleccionados);

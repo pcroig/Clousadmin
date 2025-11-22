@@ -6,7 +6,6 @@ import { Clock } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Table,
@@ -51,7 +50,7 @@ export function FichajesTab({ empleadoId }: { empleadoId: string }) {
   const [fichajeEditando, setFichajeEditando] = useState<Fichaje | null>(null);
 
   // Hook para cargar fichajes
-  const { data: fichajes = [], loading, execute: refetchFichajes } = useApi<Fichaje[]>({
+  const { data: _fichajes = [], loading, execute: refetchFichajes } = useApi<Fichaje[]>({
     onSuccess: (data) => {
       // Agrupar fichajes en jornadas cuando se cargan
       const jornadasAgrupadas = agruparPorJornada(data);

@@ -154,12 +154,16 @@ export function FichajeWidget({
     return () => clearInterval(interval);
   }, [state.status, state.horaEntrada]);
 
+  // tick se incluye intencionalmente para forzar la recalculacion del tiempo
+  // trabajado cada segundo mientras el usuario esta fichado (calcularHorasTrabajadas
+  // usa Date.now() internamente para calcular la diferencia con la hora actual)
   const horasTotales = useMemo(() => {
     if (state.eventos.length === 0) {
       return 0;
     }
 
     return calcularHorasTrabajadas(state.eventos);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.eventos, tick]);
 
   const horasHechas = useMemo(() => Math.round(horasTotales * 10) / 10, [horasTotales]);

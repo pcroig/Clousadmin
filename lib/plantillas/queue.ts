@@ -8,10 +8,9 @@ import { Job, Queue, QueueEvents, Worker } from 'bullmq';
 
 import { crearNotificacionDocumentoGeneracionLote } from '@/lib/notificaciones';
 import { prisma } from '@/lib/prisma';
-import { cache, redis, redisSubscriber } from '@/lib/redis';
+import { cache } from '@/lib/redis';
 
 import { generarDocumentoDesdePlantilla } from './generar-documento';
-import { generarDocumentoDesdePDFRellenable } from './pdf-rellenable';
 import { JobConfig, JobProgress, ResultadoGeneracion } from './tipos';
 
 // Configuración de conexión Redis para BullMQ

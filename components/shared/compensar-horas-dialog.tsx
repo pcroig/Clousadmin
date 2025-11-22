@@ -1,7 +1,7 @@
 'use client';
 
 import { AlertCircle, Clock, Search } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 import { Badge } from '@/components/ui/badge';
@@ -69,10 +69,18 @@ type CompensarHorasDialogProps =
   };
 
 export function CompensarHorasDialog(props: CompensarHorasDialogProps) {
-  const isContextNominas = props.context === 'nominas';
+  const _isContextNominas = props.context === 'nominas';
   const eventoId = props.context === 'nominas' ? props.eventoId : null;
   const defaultMes = props.context === 'nominas' ? props.mes : props.mesInicial;
   const defaultAnio = props.context === 'nominas' ? props.anio : props.anioInicial;
+
+  // Extraer valores de props para evitar expresiones complejas en dependencias
+  const propsContext = props.context;
+  const propsIsOpen = props.isOpen;
+  const propsMes = props.context === 'nominas' ? props.mes : undefined;
+  const propsAnio = props.context === 'nominas' ? props.anio : undefined;
+  const propsMesInicial = props.context === 'fichajes' ? props.mesInicial : undefined;
+  const propsAnioInicial = props.context === 'fichajes' ? props.anioInicial : undefined;
 
   const [balances, setBalances] = useState<BalanceEmpleado[]>([]);
   const [loading, setLoading] = useState(false);
@@ -87,36 +95,20 @@ export function CompensarHorasDialog(props: CompensarHorasDialogProps) {
 
   // Sync periodo con props segun contexto
   useEffect(() => {
-    if (props.context === 'nominas') {
-      setMesSeleccionado(props.mes);
-      setAnioSeleccionado(props.anio);
+    if (propsContext === 'nominas' && propsMes !== undefined && propsAnio !== undefined) {
+      setMesSeleccionado(propsMes);
+      setAnioSeleccionado(propsAnio);
     }
-  }, [props.context, props.context === 'nominas' ? props.mes : null, props.context === 'nominas' ? props.anio : null]);
+  }, [propsContext, propsMes, propsAnio]);
 
   useEffect(() => {
-    if (props.context === 'fichajes' && props.isOpen) {
-      setMesSeleccionado(props.mesInicial);
-      setAnioSeleccionado(props.anioInicial);
+    if (propsContext === 'fichajes' && propsIsOpen && propsMesInicial !== undefined && propsAnioInicial !== undefined) {
+      setMesSeleccionado(propsMesInicial);
+      setAnioSeleccionado(propsAnioInicial);
     }
-  }, [
-    props.context,
-    props.isOpen,
-    props.context === 'fichajes' ? props.mesInicial : null,
-    props.context === 'fichajes' ? props.anioInicial : null,
-  ]);
+  }, [propsContext, propsIsOpen, propsMesInicial, propsAnioInicial]);
 
-  useEffect(() => {
-    if (!props.isOpen) return;
-    fetchBalances();
-  }, [
-    props.isOpen,
-    props.context,
-    eventoId,
-    mesSeleccionado,
-    anioSeleccionado,
-  ]);
-
-  const fetchBalances = async () => {
+  const fetchBalances = useCallback(async () => {
     setLoading(true);
     try {
       const query = new URLSearchParams({
@@ -125,7 +117,7 @@ export function CompensarHorasDialog(props: CompensarHorasDialogProps) {
       });
 
       const endpoint =
-        props.context === 'nominas' && eventoId
+        propsContext === 'nominas' && eventoId
           ? `/api/nominas/eventos/${eventoId}/balance-horas?${query.toString()}`
           : `/api/fichajes/bolsa-horas?${query.toString()}`;
 
@@ -146,7 +138,12 @@ export function CompensarHorasDialog(props: CompensarHorasDialogProps) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [propsContext, eventoId, mesSeleccionado, anioSeleccionado]);
+
+  useEffect(() => {
+    if (!propsIsOpen) return;
+    fetchBalances();
+  }, [propsIsOpen, propsContext, eventoId, mesSeleccionado, anioSeleccionado, fetchBalances]);
 
   const balancesFiltrados = useMemo(() => {
     return balances.filter((item) => {

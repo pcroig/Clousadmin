@@ -135,7 +135,7 @@ function sanitizeRecord<T extends Record<string, unknown>>(record: T): Record<st
   return result;
 }
 
-function sheetFromJson(data: Record<string, unknown>[], sheetName: string): XLSX.WorkSheet {
+function sheetFromJson(data: Record<string, unknown>[], _sheetName: string): XLSX.WorkSheet {
   if (!data.length) {
     return XLSX.utils.aoa_to_sheet([
       ['Mensaje'],

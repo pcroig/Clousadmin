@@ -7,7 +7,7 @@
 
 import { useCallback, useState } from 'react';
 
-export interface UseMutationOptions<TData, TVariables> {
+export interface UseMutationOptions<TData, _TVariables> {
   onSuccess?: (data: TData) => void;
   onError?: (error: Error) => void;
 }

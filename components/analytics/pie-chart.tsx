@@ -45,7 +45,7 @@ export function PieChartComponent({
   centerLabel,
   centerValue,
 }: PieChartComponentProps) {
-  const totalValue = React.useMemo(() => {
+  const _totalValue = React.useMemo(() => {
     if (!data || data.length === 0) return 0;
     return data.reduce((acc, curr) => acc + (Number(curr[dataKey]) || 0), 0)
   }, [data, dataKey])

@@ -6,13 +6,12 @@
 
 'use client';
 
-import { CheckCircle2, Eye, FileText, FileType, Mail, Upload, X } from 'lucide-react';
+import { Eye, FileText, FileType, Mail, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 import { CarpetaSelector } from '@/components/shared/carpeta-selector';
 import { Combobox, type ComboboxOption } from '@/components/shared/combobox';
-import { DocumentList } from '@/components/shared/document-list';
 import { DocumentUploader } from '@/components/shared/document-uploader';
 import { LoadingButton } from '@/components/shared/loading-button';
 import { Badge } from '@/components/ui/badge';
@@ -673,7 +672,7 @@ export function AddPersonaOnboardingForm({ onSuccess, onCancel, tipoOnboarding =
                     const { carpeta } = await response.json();
                     toast.success('Carpeta creada correctamente');
                     return carpeta.id;
-                  } catch (error) {
+                  } catch {
                     toast.error('Error al crear carpeta');
                     return null;
                   }
@@ -774,7 +773,7 @@ export function AddPersonaOnboardingForm({ onSuccess, onCancel, tipoOnboarding =
                   const { carpeta } = await response.json();
                   toast.success('Carpeta creada correctamente');
                   return carpeta.id;
-                } catch (error) {
+                } catch {
                   toast.error('Error al crear carpeta');
                   return null;
                 }

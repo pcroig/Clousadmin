@@ -18,7 +18,7 @@ import {
   crearNotificacionSolicitudAprobada,
   crearNotificacionSolicitudRechazada,
 } from '@/lib/notificaciones';
-import { prisma, Prisma } from '@/lib/prisma';
+import { prisma } from '@/lib/prisma';
 import { aplicarCambiosSolicitud } from '@/lib/solicitudes/aplicar-cambios';
 import { resolveAprobadorEmpleadoId } from '@/lib/solicitudes/aprobador';
 

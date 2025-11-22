@@ -79,7 +79,7 @@ export function EmpleadoDashboardClient({
     };
   }, [campanaPropuesta]);
 
-  const handleClickAusencia = (ausenciaId: string) => {
+  const handleClickAusencia = (_ausenciaId: string) => {
     // Por ahora navegar a la página de ausencias
     router.push('/empleado/mi-espacio/ausencias');
   };

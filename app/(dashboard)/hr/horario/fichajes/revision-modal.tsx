@@ -7,7 +7,7 @@
 
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { AlertCircle, AlertTriangle, CheckCircle2, ChevronDown, ChevronRight, Clock, Edit2, Filter, X } from 'lucide-react';
+import { AlertCircle, CheckCircle2, ChevronDown, ChevronRight, Clock, Edit2, Filter, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -79,7 +79,7 @@ const toDate = (value: string): Date => {
   return Number.isNaN(date.getTime()) ? new Date() : date;
 };
 
-export function RevisionModal({ open, onClose, onReviewed, onEditFichaje }: RevisionModalProps) {
+export function RevisionModal({ open, onClose, onReviewed, onEditFichaje: _onEditFichaje }: RevisionModalProps) {
   const [loading, setLoading] = useState(true);
   const [fichajesRevision, setFichajesRevision] = useState<FichajeRevision[]>([]);
   const [processing, setProcessing] = useState(false);
@@ -457,7 +457,7 @@ export function RevisionModal({ open, onClose, onReviewed, onEditFichaje }: Revi
           // Recargar fichajes después de editar
           fetchFichajesRevision();
         }}
-        onSave={async (fichajeId, hora, tipo) => {
+        onSave={async (_fichajeId, _hora, _tipo) => {
           // El modal ya guarda los cambios, solo necesitamos recargar
           await fetchFichajesRevision();
           if (onReviewed) onReviewed();

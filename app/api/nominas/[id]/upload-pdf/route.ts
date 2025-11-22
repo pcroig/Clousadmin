@@ -59,7 +59,7 @@ export async function POST(
     const s3Key = `nominas/${session.user.empresaId}/${nomina.empleadoId}/${file.name}`;
 
     // Subir a S3
-    const s3Url = await uploadToS3(buffer, s3Key, 'application/pdf');
+    const _s3Url = await uploadToS3(buffer, s3Key, 'application/pdf');
 
     // Si ya existe un documento, actualizarlo; si no, crear uno nuevo
     let documento;

@@ -4,7 +4,7 @@
 // Uso:
 // <EmptyState variant="primary" icon={FolderIcon} title="..." description="..." action={<Button>...</Button>} />
 
-import { Inbox, LucideIcon } from 'lucide-react';
+import { LucideIcon } from 'lucide-react';
 
 import {
   Empty,

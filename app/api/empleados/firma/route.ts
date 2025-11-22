@@ -13,7 +13,7 @@ import { deleteFromS3, getSignedDownloadUrl, uploadToS3 } from '@/lib/s3';
  *
  * Retorna la firma guardada si existe
  */
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     const session = await getSession();
 
@@ -149,7 +149,7 @@ export async function POST(request: NextRequest) {
     if (dataStr) {
       try {
         firmaGuardadaData = JSON.parse(dataStr);
-      } catch (error) {
+      } catch {
         return NextResponse.json(
           { error: 'Datos de firma inválidos. Debe ser JSON válido' },
           { status: 400 }
@@ -192,7 +192,7 @@ export async function POST(request: NextRequest) {
  *
  * Elimina la firma guardada del empleado autenticado
  */
-export async function DELETE(request: NextRequest) {
+export async function DELETE(_request: NextRequest) {
   try {
     const session = await getSession();
 

@@ -8,7 +8,6 @@ import { NextResponse } from 'next/server';
 import * as XLSX from 'xlsx';
 
 import {
-  handleApiError,
   requireAuthAsHR,
 } from '@/lib/api-handler';
 import { calcularAntiguedad, obtenerRangoFechaAntiguedad } from '@/lib/calculos/antiguedad';
@@ -256,7 +255,7 @@ export async function GET(request: NextRequest) {
         }.xlsx"`,
       },
     });
-  } catch (error) {
+  } catch {
     // Para exportación de archivos, devolver error JSON
     return NextResponse.json(
       { error: 'Error al exportar datos' },

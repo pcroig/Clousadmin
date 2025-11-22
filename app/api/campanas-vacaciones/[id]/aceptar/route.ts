@@ -9,7 +9,6 @@ import {
   createdResponse,
   handleApiError,
   requireAuth,
-  successResponse,
 } from '@/lib/api-handler';
 import { calcularDias } from '@/lib/calculos/ausencias';
 import { EstadoAusencia } from '@/lib/constants/enums';

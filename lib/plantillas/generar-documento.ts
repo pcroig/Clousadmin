@@ -2,7 +2,6 @@
  * Generación de documentos DOCX desde plantillas usando docxtemplater
  */
 
-import { format } from 'date-fns';
 import Docxtemplater from 'docxtemplater';
 import PizZip from 'pizzip';
 

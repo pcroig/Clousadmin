@@ -11,7 +11,7 @@ import { prisma } from '@/lib/prisma';
 
 
 // GET /api/admin/waitlist - Obtener lista de espera
-export async function GET(req: NextRequest) {
+export async function GET(_req: NextRequest) {
   try {
     // Verificar autenticación y rol platform_admin
     const session = await getSession();

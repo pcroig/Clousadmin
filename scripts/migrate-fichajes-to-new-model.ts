@@ -105,11 +105,11 @@ async function migrateFichajes() {
       const ultimoEvento = eventosOrdenados[eventosOrdenados.length - 1];
       const empresaId = ultimoEvento.empresaId;
       const autoCompletado = tieneAutocompletado;
-      const scoreAlerta = eventosOrdenados.find(e => e.scoreAlerta)?.scoreAlerta || null;
-      const motivoAlerta = eventosOrdenados.find(e => e.motivoAlerta)?.motivoAlerta || null;
-      const aprobadoPor = ultimoEvento.aprobadoPor;
-      const fechaAprobacion = ultimoEvento.fechaAprobacion;
-      const notas = eventosOrdenados.find(e => e.notas)?.notas || null;
+      const _scoreAlerta = eventosOrdenados.find(e => e.scoreAlerta)?.scoreAlerta || null;
+      const _motivoAlerta = eventosOrdenados.find(e => e.motivoAlerta)?.motivoAlerta || null;
+      const _aprobadoPor = ultimoEvento.aprobadoPor;
+      const _fechaAprobacion = ultimoEvento.fechaAprobacion;
+      const _notas = eventosOrdenados.find(e => e.notas)?.notas || null;
 
       try {
         // Crear Fichaje nuevo

@@ -49,7 +49,7 @@ redis.on('ready', () => {
   redisConnected = true;
 });
 
-redis.on('error', (error) => {
+redis.on('error', (_error) => {
   redisConnected = false;
   const now = Date.now();
   

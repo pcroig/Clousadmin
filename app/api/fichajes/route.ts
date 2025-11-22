@@ -325,7 +325,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 7. Crear evento dentro del fichaje
-    const evento = await prisma.fichajeEvento.create({
+    const _evento = await prisma.fichajeEvento.create({
       data: {
         fichajeId: fichaje.id,
         tipo: validatedData.tipo,

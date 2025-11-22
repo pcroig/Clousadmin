@@ -165,7 +165,7 @@ export async function getSaldoEmpleado(
   empleadoId: string,
   año: number,
   tx?: PrismaTx,
-  options?: { lock?: boolean }
+  _options?: { lock?: boolean }
 ) {
   const executor = tx ?? prisma;
 

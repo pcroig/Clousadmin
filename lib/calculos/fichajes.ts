@@ -14,7 +14,7 @@ import {
 
 import { EstadoAusencia } from '@/lib/constants/enums';
 import { prisma } from '@/lib/prisma';
-import { normalizarFecha, obtenerNombreDia } from '@/lib/utils/fechas';
+import { obtenerNombreDia } from '@/lib/utils/fechas';
 import { redondearHoras } from '@/lib/utils/numeros';
 
 import type { DiaConfig, JornadaConfig } from './fichajes-helpers';

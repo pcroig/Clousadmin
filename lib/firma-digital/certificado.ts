@@ -3,7 +3,7 @@
  * Fase 1: Certificado interno con hash y metadata
  */
 
-import { generarHashObjeto, generarIdUnico } from './hash';
+import { generarHashObjeto } from './hash';
 
 import type { CertificadoFirmaSimple, DatosCapturadosFirma } from './tipos';
 

@@ -205,6 +205,7 @@ export function FirmarDocumentoDialog({
                     />
                   </div>
                   {firmaGuardadaUrl && (
+                    // eslint-disable-next-line @next/next/no-img-element -- Imagen dinámica (data URL de firma) no compatible con next/image
                     <img
                       src={firmaGuardadaUrl}
                       alt="Firma guardada"

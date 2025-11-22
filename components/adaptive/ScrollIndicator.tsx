@@ -44,14 +44,14 @@ export function ScrollIndicator({
   const [isVisible, setIsVisible] = useState(true);
 
   useEffect(() => {
-    const container = containerRef?.current || window;
-    
+    // Capturar el valor del ref al inicio del effect para usar en cleanup
+    const container = containerRef?.current;
+
     const handleScroll = () => {
-      if (containerRef?.current) {
+      if (container) {
         // Contenedor específico
-        const element = containerRef.current;
         const isNearBottom =
-          element.scrollHeight - element.scrollTop - element.clientHeight < 100;
+          container.scrollHeight - container.scrollTop - container.clientHeight < 100;
         setIsVisible(!isNearBottom);
       } else {
         // Window global
@@ -67,15 +67,15 @@ export function ScrollIndicator({
     handleScroll();
 
     // Listen to scroll
-    if (containerRef?.current) {
-      containerRef.current.addEventListener('scroll', handleScroll);
+    if (container) {
+      container.addEventListener('scroll', handleScroll);
     } else {
       window.addEventListener('scroll', handleScroll);
     }
 
     return () => {
-      if (containerRef?.current) {
-        containerRef.current.removeEventListener('scroll', handleScroll);
+      if (container) {
+        container.removeEventListener('scroll', handleScroll);
       } else {
         window.removeEventListener('scroll', handleScroll);
       }

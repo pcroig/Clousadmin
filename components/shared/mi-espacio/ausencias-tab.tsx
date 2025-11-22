@@ -157,8 +157,8 @@ export function AusenciasTab({ empleadoId, contexto = 'empleado' }: MiEspacioAus
   }, []);
 
   // Calcular saldo de ausencias
-  const calcularSaldo = () => {
-    const diasTotales = 22; // Ejemplo: podría venir de la API
+  const calcularSaldo = useCallback(() => {
+    const diasTotales = 22; // Ejemplo: podria venir de la API
     const diasUsados = ausencias
       .filter((a) => a.estado === 'approved' || a.estado === 'auto_aprobada')
       .reduce((sum, a) => sum + (a.diasLaborables || 0), 0);
@@ -168,9 +168,9 @@ export function AusenciasTab({ empleadoId, contexto = 'empleado' }: MiEspacioAus
     const diasDisponibles = diasTotales - diasUsados - diasPendientes;
 
     return { diasTotales, diasUsados, diasPendientes, diasDisponibles };
-  };
+  }, [ausencias]);
 
-  const saldoResumen = useMemo(() => saldo ?? calcularSaldo(), [saldo, ausencias]);
+  const saldoResumen = useMemo(() => saldo ?? calcularSaldo(), [saldo, calcularSaldo]);
 
   // Próximas ausencias
   const proximasAusencias = ausencias

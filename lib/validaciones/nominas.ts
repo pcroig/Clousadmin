@@ -39,7 +39,7 @@ async function detectarAlertasCriticas(
   empleadoId: string,
   mes: number,
   anio: number,
-  empresaId: string
+  _empresaId: string
 ): Promise<Alerta[]> {
   const alertas: Alerta[] = [];
 
@@ -505,7 +505,7 @@ async function detectarAlertasInformativas(
   empleadoId: string,
   mes: number,
   anio: number,
-  empresaId: string
+  _empresaId: string
 ): Promise<Alerta[]> {
   const alertas: Alerta[] = [];
 

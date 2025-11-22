@@ -54,7 +54,7 @@ export function AutoCompletadoWidget({ stats }: AutoCompletadoWidgetProps) {
       } else {
         toast.error('Error al limpiar');
       }
-    } catch (e) {
+    } catch {
       toast.error('Error al limpiar');
     }
   };

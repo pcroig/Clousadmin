@@ -8,8 +8,6 @@ import { ListaFestivos } from '@/components/hr/lista-festivos';
 import { InfoTooltip } from '@/components/shared/info-tooltip';
 import { LoadingButton } from '@/components/shared/loading-button';
 import { Button } from '@/components/ui/button';
-import { Calendar } from '@/components/ui/calendar';
-import { Checkbox } from '@/components/ui/checkbox';
 import {
   Dialog,
   DialogContent,
@@ -19,7 +17,6 @@ import {
 } from '@/components/ui/dialog';
 import { Field, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
@@ -28,7 +25,6 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { cn } from '@/lib/utils';
 
 interface GestionarAusenciasModalProps {
   open: boolean;
@@ -41,7 +37,7 @@ interface Equipo {
   nombre: string;
 }
 
-interface PoliticaEquipo {
+interface _PoliticaEquipo {
   equipoId: string;
   maxSolapamientoPct: number;
   requiereAntelacionDias: number;

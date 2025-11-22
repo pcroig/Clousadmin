@@ -12,7 +12,6 @@ import { toast } from 'sonner';
 import { SettingsLayout } from '@/components/settings/settings-layout';
 import { LoadingButton } from '@/components/shared/loading-button';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import {
   Card,
   CardContent,

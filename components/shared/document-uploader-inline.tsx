@@ -1,6 +1,6 @@
 'use client';
 
-import { FileText, Loader2, Upload, X } from 'lucide-react';
+import { FileText, Upload, X } from 'lucide-react';
 import { useState } from 'react';
 
 import { Button } from '@/components/ui/button';
@@ -28,10 +28,10 @@ export function DocumentUploaderInline({
   maxFiles = 10,
   acceptedTypes = '.pdf,.doc,.docx,.jpg,.jpeg,.png',
   disabled = false,
-  carpetaId,
+  carpetaId: _carpetaId,
 }: DocumentUploaderInlineProps) {
   const [files, setFiles] = useState<UploadedFile[]>([]);
-  const [uploading, setUploading] = useState(false);
+  const [_uploading, _setUploading] = useState(false);
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFiles = Array.from(event.target.files || []);

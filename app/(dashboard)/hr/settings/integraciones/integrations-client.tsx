@@ -12,7 +12,6 @@ import { toast } from 'sonner';
 import { SettingsLayout } from '@/components/settings/settings-layout';
 import { LoadingButton } from '@/components/shared/loading-button';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import {
   Card,
   CardContent,
@@ -36,6 +35,7 @@ export function IntegrationsClient({
   googleConfigured,
   empresaIntegrations,
   personalIntegrations,
+  userRole: _userRole,
 }: IntegrationsClientProps) {
   const router = useRouter();
   const searchParams = useSearchParams();

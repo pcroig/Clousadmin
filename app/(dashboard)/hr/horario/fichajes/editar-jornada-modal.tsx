@@ -31,7 +31,6 @@ import {
 } from '@/components/ui/dialog';
 import {
   Field,
-  FieldContent,
   FieldDescription,
   FieldError,
   FieldGroup,
@@ -268,7 +267,7 @@ export function EditarJornadaModal({ open, modo, jornada, onClose }: EditarJorna
     return Object.keys(newErrors).length === 0;
   }
 
-    async function verificarJornadasPrevias(jornadaId: string) {
+    async function verificarJornadasPrevias(_jornadaId: string) {
     try {
       let url = `/api/jornadas/verificar-previas?nivel=${nivelAsignacion}`;
       

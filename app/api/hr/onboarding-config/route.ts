@@ -60,7 +60,7 @@ const plantillaDocumentoSchema = z.object({
 });
 
 // GET /api/hr/onboarding-config - Obtener configuración de onboarding
-export async function GET(req: NextRequest) {
+export async function GET(_req: NextRequest) {
   try {
     const session = await getSession();
 

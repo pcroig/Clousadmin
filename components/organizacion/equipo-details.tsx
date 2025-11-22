@@ -8,7 +8,6 @@ import { MapPin, Pencil, Trash2, User, Users } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
-import { LoadingButton } from '@/components/shared/loading-button';
 import { getInitials } from '@/components/shared/utils';
 import {
   AlertDialog,

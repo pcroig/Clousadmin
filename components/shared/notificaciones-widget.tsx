@@ -11,7 +11,6 @@ import { memo, type MouseEvent } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { obtenerIconoPorTipo } from '@/lib/notificaciones/helpers';
-import { cn } from '@/lib/utils';
 import { formatRelativeTimeShort } from '@/lib/utils/formatRelativeTime';
 
 import { EmptyState } from './empty-state';
@@ -30,7 +29,7 @@ interface NotificacionesWidgetProps {
 export const NotificacionesWidget = memo(function NotificacionesWidget({
   notificaciones,
   maxItems = 5,
-  altura = 'normal',
+  altura: _altura = 'normal',
   href = '/empleado/bandeja-entrada',
 }: NotificacionesWidgetProps) {
   const router = useRouter();

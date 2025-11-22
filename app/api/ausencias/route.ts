@@ -12,7 +12,6 @@ import {
   successResponse,
   validateRequest,
 } from '@/lib/api-handler';
-import { registrarAutoCompletadoAusencia } from '@/lib/auto-completado';
 import {
   actualizarSaldo,
   calcularDias,

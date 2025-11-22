@@ -10,7 +10,7 @@ import { callAIWithConfig } from '@/lib/ia';
 import { prisma } from '@/lib/prisma';
 import { cache as redisCache } from '@/lib/redis';
 
-import { CAMPOS_ENCRIPTADOS, QUICK_MAPPINGS } from './constantes';
+import { QUICK_MAPPINGS } from './constantes';
 import {
   calcularDuracionMeses,
   calcularEdad,
@@ -32,7 +32,7 @@ const memoryCache = new Map<string, VariableMapping>();
 /**
  * Obtener estructura del schema para IA (simplificado)
  */
-function getSchemaStructure(empleadoData: DatosEmpleado): Record<string, string | Record<string, string | string[]>> {
+function getSchemaStructure(_empleadoData: DatosEmpleado): Record<string, string | Record<string, string | string[]>> {
   return {
     nombre: 'string',
     apellidos: 'string',

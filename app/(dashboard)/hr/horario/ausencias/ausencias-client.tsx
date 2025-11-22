@@ -12,7 +12,6 @@ import { toast } from 'sonner';
 
 import { CompactFilterBar } from '@/components/adaptive/CompactFilterBar';
 import { MobileActionBar } from '@/components/adaptive/MobileActionBar';
-import { MobilePageHeader } from '@/components/adaptive/MobilePageHeader';
 import { ResponsiveContainer } from '@/components/adaptive/ResponsiveContainer';
 import { TableHeader as PageHeader } from '@/components/shared/table-header';
 import { Badge } from '@/components/ui/badge';
@@ -28,12 +27,6 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet';
 import {
   Table,
   TableBody,
@@ -114,7 +107,7 @@ interface AusenciasClientProps {
 
 export function AusenciasClient({}: AusenciasClientProps) {
   const isMobile = useIsMobile();
-  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [_filtersOpen, _setFiltersOpen] = useState(false);
   const [ausencias, setAusencias] = useState<Ausencia[]>([]);
   const [campanaActiva, setCampanaActiva] = useState<Campana | null>(null);
   const [loading, setLoading] = useState(true);
@@ -272,7 +265,7 @@ export function AusenciasClient({}: AusenciasClientProps) {
     fetchCampanaActiva();
   }
 
-  const hasActiveFilters = filtroEstado !== 'todas' || Boolean(busquedaEmpleado);
+  const _hasActiveFilters = filtroEstado !== 'todas' || Boolean(busquedaEmpleado);
 
   const estadoOptions = [
     EstadoAusencia.pendiente,

@@ -20,11 +20,10 @@ import {
   User,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
 import { MobilePageHeader } from '@/components/adaptive/MobilePageHeader';
-import { ResponsiveContainer } from '@/components/adaptive/ResponsiveContainer';
 import { AlertasSummary } from '@/components/payroll/alertas-summary';
 import { UploadNominasModal } from '@/components/payroll/upload-nominas-modal';
 import { ValidarComplementosDialog } from '@/components/payroll/validar-complementos-dialog';
@@ -43,11 +42,9 @@ import {
 } from '@/components/ui/dialog';
 import {
   Stepper,
-  StepperContent,
   StepperIndicator,
   StepperItem,
   StepperNav,
-  StepperPanel,
   StepperTitle,
   StepperTrigger,
 } from '@/components/ui/stepper';
@@ -178,7 +175,7 @@ const getStepIndexFromState = (evento: EventoNomina): number => {
 };
 
 export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
-  const router = useRouter();
+  const _router = useRouter();
   const isMobile = useIsMobile();
   const [eventos, setEventos] = useState<EventoNomina[]>([]);
   const [loading, setLoading] = useState(true);
@@ -1039,14 +1036,7 @@ function NominaDetailsPanel({
   } | null>(null);
   const [loadingIncidencias, setLoadingIncidencias] = useState(false);
 
-  useEffect(() => {
-    if (nominaId && isOpen) {
-      fetchNomina();
-      fetchIncidencias();
-    }
-  }, [nominaId, isOpen]);
-
-  const fetchNomina = async () => {
+  const fetchNomina = useCallback(async () => {
     setLoading(true);
     try {
       const response = await fetch(`/api/nominas/${nominaId}`);
@@ -1059,9 +1049,9 @@ function NominaDetailsPanel({
     } finally {
       setLoading(false);
     }
-  };
+  }, [nominaId]);
 
-  const fetchIncidencias = async () => {
+  const fetchIncidencias = useCallback(async () => {
     setLoadingIncidencias(true);
     try {
       const response = await fetch(`/api/nominas/${nominaId}/incidencias`);
@@ -1074,7 +1064,14 @@ function NominaDetailsPanel({
     } finally {
       setLoadingIncidencias(false);
     }
-  };
+  }, [nominaId]);
+
+  useEffect(() => {
+    if (nominaId && isOpen) {
+      fetchNomina();
+      fetchIncidencias();
+    }
+  }, [nominaId, isOpen, fetchNomina, fetchIncidencias]);
 
   const handleDescargarPdf = () => {
     window.open(`/api/nominas/${nominaId}/pdf`, '_blank');
@@ -1327,13 +1324,7 @@ function EventoDetailsPanel({
   const [evento, setEvento] = useState<EventoNomina | null>(null);
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    if (eventoId && isOpen) {
-      fetchEvento();
-    }
-  }, [eventoId, isOpen]);
-
-  const fetchEvento = async () => {
+  const fetchEvento = useCallback(async () => {
     setLoading(true);
     try {
       const response = await fetch(`/api/nominas/eventos/${eventoId}`);
@@ -1358,7 +1349,13 @@ function EventoDetailsPanel({
     } finally {
       setLoading(false);
     }
-  };
+  }, [eventoId]);
+
+  useEffect(() => {
+    if (eventoId && isOpen) {
+      fetchEvento();
+    }
+  }, [eventoId, isOpen, fetchEvento]);
 
   if (!evento && !loading) return null;
 

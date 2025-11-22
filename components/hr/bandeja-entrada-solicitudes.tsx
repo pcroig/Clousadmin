@@ -84,7 +84,7 @@ const DEADLINE_RELATIVE_OPTIONS = {
   style: 'short' as const,
 };
 
-const capitalize = (value: string) => {
+const _capitalize = (value: string) => {
   if (!value) return value;
   return value.charAt(0).toLocaleUpperCase('es-ES') + value.slice(1);
 };

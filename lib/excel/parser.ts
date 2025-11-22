@@ -111,7 +111,7 @@ export function isValidExcelFile(buffer: Buffer): boolean {
   try {
     const workbook = XLSX.read(buffer, { type: 'buffer' });
     return workbook.SheetNames.length > 0;
-  } catch (error) {
+  } catch {
     return false;
   }
 }

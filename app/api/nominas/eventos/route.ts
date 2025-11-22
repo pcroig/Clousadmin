@@ -140,7 +140,7 @@ export async function GET(req: NextRequest) {
         { pendientes: 0, aprobadas: 0, total: 0, horasPendientes: 0 }
       );
 
-      const { nominas, ...eventoSinNominas } = evento;
+      const { nominas: _nominas, ...eventoSinNominas } = evento;
 
       return {
         ...eventoSinNominas,

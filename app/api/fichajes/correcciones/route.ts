@@ -10,11 +10,10 @@ import {
   createdResponse,
   handleApiError,
   requireAuth,
-  requireAuthAsHROrManager,
   successResponse,
   validateRequest,
 } from '@/lib/api-handler';
-import { EstadoSolicitudCorreccionFichaje, UsuarioRol } from '@/lib/constants/enums';
+import { UsuarioRol } from '@/lib/constants/enums';
 import { crearNotificacionFichajeRequiereRevision } from '@/lib/notificaciones';
 import { prisma, Prisma } from '@/lib/prisma';
 

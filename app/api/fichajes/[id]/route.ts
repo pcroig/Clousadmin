@@ -12,7 +12,6 @@ import {
   notFoundResponse,
   requireAuth,
   requireAuthAsHR,
-  requireAuthAsHROrManager,
   successResponse,
   validateRequest,
 } from '@/lib/api-handler';

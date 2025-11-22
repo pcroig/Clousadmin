@@ -182,9 +182,9 @@ export async function POST(
         const s3Key = `empresas/${session.user.empresaId}/empleados/${nomina.empleadoId}/nominas/${evento.mes}_${evento.anio}_${nomina.id}.pdf`;
 
         // Subir a S3
-        let s3Url: string;
+        let _s3Url: string;
         try {
-          s3Url = await uploadToS3(buffer, s3Key, 'application/pdf');
+          _s3Url = await uploadToS3(buffer, s3Key, 'application/pdf');
         } catch (s3Error: unknown) {
           const errorMessage = s3Error instanceof Error ? s3Error.message : 'Error desconocido';
           console.error(`[Importar Nóminas] Error S3 para ${file.name}:`, errorMessage);

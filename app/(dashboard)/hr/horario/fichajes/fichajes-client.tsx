@@ -6,13 +6,12 @@
 
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Calendar, Check, ChevronLeft, ChevronRight, Clock, Filter, Plus } from 'lucide-react';
+import { Calendar, Check, ChevronLeft, ChevronRight, Clock, Plus } from 'lucide-react';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 import { CompactFilterBar } from '@/components/adaptive/CompactFilterBar';
 import { MobileActionBar } from '@/components/adaptive/MobileActionBar';
-import { MobilePageHeader } from '@/components/adaptive/MobilePageHeader';
 import { ResponsiveContainer } from '@/components/adaptive/ResponsiveContainer';
 import { CompensarHorasDialog } from '@/components/shared/compensar-horas-dialog';
 import { Badge } from '@/components/ui/badge';
@@ -20,12 +19,6 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet';
 import {
   Table,
   TableBody,
@@ -113,7 +106,7 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
     open: false,
     fichaje: null,
   });
-  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [_filtersOpen, _setFiltersOpen] = useState(false);
   const isMobile = useIsMobile();
 
   const calcularHorasTrabajadas = useCallback((eventos: FichajeEvento[]): number => {
@@ -483,7 +476,7 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
     [jornadasFiltradas]
   );
 
-  const hasActiveFilters = useMemo(() => 
+  const _hasActiveFilters = useMemo(() =>
     filtroEstadoFichaje !== 'todos' || Boolean(busquedaEmpleado),
     [filtroEstadoFichaje, busquedaEmpleado]
   );
@@ -554,7 +547,7 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
     </div>
   );
 
-  const MobileDateControls = (
+  const _MobileDateControls = (
     <div className="space-y-3">
       <Select value={rangoFechas} onValueChange={(v) => setRangoFechas(v as 'dia' | 'semana' | 'mes')}>
         <SelectTrigger className="w-full">

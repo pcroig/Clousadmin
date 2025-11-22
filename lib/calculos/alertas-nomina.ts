@@ -3,8 +3,6 @@
 // ========================================
 // Genera alertas automáticas para detectar anomalías en pre-nóminas
 
-import { Decimal } from '@prisma/client/runtime/library';
-
 import { prisma } from '@/lib/prisma';
 
 /**

@@ -12,6 +12,7 @@
  */
 
 // Cargar variables de entorno desde .env.local primero, luego .env
+// eslint-disable-next-line import/order -- dotenv debe cargarse antes de cualquier otro módulo
 import { config } from 'dotenv';
 
 import { existsSync } from 'fs';

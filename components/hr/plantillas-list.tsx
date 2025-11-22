@@ -4,7 +4,7 @@
 // Plantillas List Component - Lista de plantillas con filtros
 // ========================================
 
-import { FileText, FileType, Filter, Plus, Search } from 'lucide-react';
+import { FileText, FileType, Filter, Search } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 

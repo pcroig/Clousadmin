@@ -5,7 +5,7 @@
 
 'use client';
 
-import { Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { memo } from 'react';
 
 import { FechaCalendar } from '@/components/shared/fecha-calendar';
@@ -15,10 +15,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { EstadoAusencia } from '@/lib/constants/enums';
 import { MOBILE_DESIGN } from '@/lib/constants/mobile-design';
 import {
-  formatFechaParaDisplay,
   getAusenciaBadgeVariant,
   getAusenciaEstadoLabel,
-  getAusenciaTipoColor,
 } from '@/lib/utils/formatters';
 
 import { WidgetCard } from './widget-card';

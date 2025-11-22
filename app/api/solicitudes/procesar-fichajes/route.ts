@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
     // Verificar autenticación (puede ser ejecutado por cron o por HR admin)
     const authResult = await requireAuth(request);
     if (authResult instanceof NextResponse) return authResult;
-    const { session } = authResult;
+    const { session: _session } = authResult;
 
     console.info('[Procesar Fichajes] Iniciando procesamiento de solicitudes pendientes');
 

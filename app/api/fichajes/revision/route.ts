@@ -51,7 +51,7 @@ const revisionSchema = z.object({
   ).min(1, 'Debe proporcionar al menos una revisión'),
 });
 
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     console.log('[API Revisión GET] Iniciando...');
     const session = await getSession();

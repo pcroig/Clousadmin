@@ -9,7 +9,6 @@ import { useState } from 'react';
 
 import { configurarIntegracionAction } from '@/app/(dashboard)/onboarding/cargar-datos/actions';
 import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
@@ -31,13 +30,13 @@ interface IntegracionesFormProps {
   simplified?: boolean;
 }
 
-export function IntegracionesForm({ 
-  integracionesIniciales = [],
+export function IntegracionesForm({
+  integracionesIniciales: _integracionesIniciales = [],
   token,
-  empresaId,
+  empresaId: _empresaId,
   onComplete,
   onSkip,
-  simplified = false 
+  simplified = false
 }: IntegracionesFormProps) {
   const [calendarioSeleccionado, setCalendarioSeleccionado] = useState<string>('');
   const [comunicacionSeleccionada, setComunicacionSeleccionada] = useState<string>('');

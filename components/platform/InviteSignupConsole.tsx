@@ -88,7 +88,7 @@ export function InviteSignupConsole({
       expiradas,
       waitlistPendiente: waitlist.filter((entry) => !entry.invitado).length,
     };
-  }, [invitaciones, waitlist]);
+  }, [invitaciones, waitlist, now]);
 
   const copyInvitationUrl = async (token: string) => {
     const origin = typeof window !== 'undefined' ? window.location.origin : '';

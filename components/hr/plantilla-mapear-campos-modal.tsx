@@ -5,13 +5,12 @@
 // ========================================
 
 import {
-  AlertCircle,
   CheckCircle2,
   FileText,
   Search,
   Wand2,
 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
 import { LoadingButton } from '@/components/shared/loading-button';
@@ -60,14 +59,7 @@ export function MapearCamposModal({
   const [mapeos, setMapeos] = useState<Record<string, string>>({});
   const [busqueda, setBusqueda] = useState('');
 
-  useEffect(() => {
-    if (open) {
-      cargarVariablesDisponibles();
-      cargarCamposActuales();
-    }
-  }, [open, plantillaId]);
-
-  const cargarVariablesDisponibles = async () => {
+  const cargarVariablesDisponibles = useCallback(async () => {
     try {
       const res = await fetch('/api/plantillas/variables');
       const data = await res.json();
@@ -77,9 +69,9 @@ export function MapearCamposModal({
     } catch (error) {
       console.error('[MapearCampos] Error al cargar variables:', error);
     }
-  };
+  }, []);
 
-  const cargarCamposActuales = async () => {
+  const cargarCamposActuales = useCallback(async () => {
     setLoading(true);
     try {
       const res = await fetch(`/api/plantillas/${plantillaId}`);
@@ -87,7 +79,7 @@ export function MapearCamposModal({
 
       if (data.success && data.plantilla) {
         const plantilla = data.plantilla;
-        
+
         // Si hay configuración IA con campos fusionados, usarlos
         if (plantilla.configuracionIA?.camposFusionados) {
           setCampos(plantilla.configuracionIA.camposFusionados);
@@ -112,7 +104,14 @@ export function MapearCamposModal({
     } finally {
       setLoading(false);
     }
-  };
+  }, [plantillaId]);
+
+  useEffect(() => {
+    if (open) {
+      cargarVariablesDisponibles();
+      cargarCamposActuales();
+    }
+  }, [open, plantillaId, cargarVariablesDisponibles, cargarCamposActuales]);
 
   const handleEscanearCampos = async () => {
     setScanning(true);
@@ -217,7 +216,7 @@ export function MapearCamposModal({
 
     const resultado: string[] = [nombre];
 
-    for (const [clave, valores] of Object.entries(sinonimos)) {
+    for (const [_clave, valores] of Object.entries(sinonimos)) {
       if (valores.includes(nombre)) {
         resultado.push(...valores);
       }

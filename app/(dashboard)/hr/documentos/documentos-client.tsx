@@ -4,11 +4,10 @@
 
 'use client';
 
-import { FileText, Folder, FolderPlus, Plus, Upload } from 'lucide-react';
+import { FileText, Folder, FolderPlus, Upload } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useCallback, useState } from 'react';
 
-import { MobileActionBar } from '@/components/adaptive/MobileActionBar';
 import { MobilePageHeader } from '@/components/adaptive/MobilePageHeader';
 import { ResponsiveContainer } from '@/components/adaptive/ResponsiveContainer';
 import { CrearCarpetaConDocumentosModal } from '@/components/hr/crear-carpeta-con-documentos-modal';
@@ -234,7 +233,7 @@ export function DocumentosClient({ carpetas }: DocumentosClientProps) {
       <CrearCarpetaConDocumentosModal
         open={modalCrearCarpeta}
         onClose={() => setModalCrearCarpeta(false)}
-        onSuccess={(carpetaId) => {
+        onSuccess={(_carpetaId) => {
           // Recargar página para mostrar nueva carpeta
           router.refresh();
         }}

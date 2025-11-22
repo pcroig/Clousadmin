@@ -4,26 +4,18 @@
 
 'use client';
 
-import { Filter, Plus } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 import { CompactFilterBar } from '@/components/adaptive/CompactFilterBar';
 import { MobileActionBar } from '@/components/adaptive/MobileActionBar';
-import { MobilePageHeader } from '@/components/adaptive/MobilePageHeader';
 import { ResponsiveContainer } from '@/components/adaptive/ResponsiveContainer';
 import { PuestoDetails } from '@/components/organizacion/puesto-details';
 import { PuestoFormModal } from '@/components/organizacion/puesto-form-modal';
 import { Column, DataTable } from '@/components/shared/data-table';
 import { DetailsPanel } from '@/components/shared/details-panel';
 import { TableHeader } from '@/components/shared/table-header';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet';
 import { useIsMobile } from '@/lib/hooks/use-viewport';
 
 interface Puesto {
@@ -57,7 +49,7 @@ export function PuestosClient({ puestos: initialPuestos }: PuestosClientProps) {
   const [selectedPuesto, setSelectedPuesto] = useState<Puesto | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [_filtersOpen, _setFiltersOpen] = useState(false);
   const isMobile = useIsMobile();
 
   // Update selected puesto when puestos list changes

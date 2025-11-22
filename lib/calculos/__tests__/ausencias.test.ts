@@ -8,10 +8,7 @@ import { TipoAusencia } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 
 import {
-  calcularDias,
-  calcularSaldoDisponible,
   validarAntelacion,
-  validarSaldoSuficiente,
 } from '../ausencias';
 
 /**
@@ -24,8 +21,8 @@ import {
  */
 
 describe('Ausencias - Validaciones', () => {
-  let empresaId: string;
-  let empleadoId: string;
+  let _empresaId: string;
+  let _empleadoId: string;
 
   beforeAll(async () => {
     // Setup: crear empresa y empleado de prueba

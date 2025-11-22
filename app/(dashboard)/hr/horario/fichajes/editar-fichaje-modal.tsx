@@ -55,7 +55,7 @@ interface EditarFichajeModalProps {
   onSave: (fichajeId: string, hora: string, tipo: string) => void;
 }
 
-export function EditarFichajeModal({ open, fichaje, fichajeDiaId, onClose, onSave }: EditarFichajeModalProps) {
+export function EditarFichajeModal({ open, fichaje: _fichaje, fichajeDiaId, onClose, onSave: _onSave }: EditarFichajeModalProps) {
   const [cargando, setCargando] = useState(false);
   const [fichajeDia, setFichajeDia] = useState<FichajeDia | null>(null);
   const [eventos, setEventos] = useState<Array<{ id: string; tipo: string; hora: string; editado?: boolean }>>([]);
@@ -132,7 +132,7 @@ export function EditarFichajeModal({ open, fichaje, fichajeDiaId, onClose, onSav
       } else {
         toast.error('No se pudo eliminar el evento');
       }
-    } catch (e) {
+    } catch {
       toast.error('Error al eliminar el evento');
     } finally {
       setCargando(false);
@@ -173,7 +173,7 @@ export function EditarFichajeModal({ open, fichaje, fichajeDiaId, onClose, onSav
       } else {
         toast.error('No se pudo añadir el evento');
       }
-    } catch (e) {
+    } catch {
       toast.error('Error al añadir el evento');
     } finally {
       setCargando(false);

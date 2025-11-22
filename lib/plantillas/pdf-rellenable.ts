@@ -3,7 +3,7 @@
  * Incluye: PDFs con campos de formulario y extracción con IA Vision
  */
 
-import { PDFCheckBox, PDFDocument, PDFDropdown, PDFForm, PDFTextField } from 'pdf-lib';
+import { PDFCheckBox, PDFDocument, PDFDropdown, PDFTextField } from 'pdf-lib';
 
 import { callAIWithConfig } from '@/lib/ia';
 import { deleteOpenAIFile, uploadPDFToOpenAI } from '@/lib/ia/core/providers/openai';

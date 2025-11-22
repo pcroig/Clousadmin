@@ -28,7 +28,6 @@ import { PlantillasTab } from './plantillas-tab';
 import type {
   CamposRequeridos,
   DocumentoRequerido,
-  OnboardingConfigData,
   PlantillaDocumento,
 } from '@/lib/onboarding-config';
 

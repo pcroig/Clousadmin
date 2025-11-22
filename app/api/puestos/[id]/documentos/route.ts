@@ -3,7 +3,6 @@
 // ========================================
 
 import { NextRequest, NextResponse } from 'next/server';
-import { z } from 'zod';
 
 import { getSession } from '@/lib/auth';
 import { UsuarioRol } from '@/lib/constants/enums';
@@ -144,7 +143,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     // Subir a S3
     const buffer = Buffer.from(await file.arrayBuffer());
     const s3Key = `puestos/${puestoId}/${Date.now()}-${file.name}`;
-    const s3Url = await uploadToS3(buffer, s3Key, file.type);
+    const _s3Url = await uploadToS3(buffer, s3Key, file.type);
 
     // Guardar metadata en la base de datos
     const documento = await prisma.documento.create({

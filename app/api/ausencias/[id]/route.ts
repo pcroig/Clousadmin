@@ -13,7 +13,6 @@ import {
   requireAuth,
   requireAuthAsHROrManager,
   successResponse,
-  validateRequest,
 } from '@/lib/api-handler';
 import { actualizarSaldo, calcularDias, validarPoliticasEquipo, validarSaldoSuficiente } from '@/lib/calculos/ausencias';
 import { EstadoAusencia, TipoAusencia, UsuarioRol } from '@/lib/constants/enums';
