@@ -55,6 +55,7 @@ Toda la documentación está en `docs/`:
 
 ### Funcionalidades
 - **[docs/funcionalidades/](docs/funcionalidades/)** - Documentación detallada de cada feature
+- **[docs/funcionalidades/billing.md](docs/funcionalidades/billing.md)** - Pasarela de pago con Stripe y flujo de facturación
 - **[docs/historial/](docs/historial/)** - Documentación histórica y migración
 
 ---
@@ -103,6 +104,9 @@ Clousadmin/
 - Jornadas laborales configurables
 - Analytics HR con filtros avanzados y reporting (plantilla, compensación, fichajes)
 - Balance de horas acumulado en analytics
+- **Billing con Stripe** (checkout, portal del cliente y sincronización vía webhooks)
+- **Gestión documental avanzada** (plantillas, carpetas globales y mobile-first UI)
+- **Motor de nóminas** con importación inteligente y sincronización de eventos/nóminas
 - **📱 Adaptación Mobile Completa** (93.75% completado)
   - Sistema de diseño mobile con touch targets >=44px (WCAG 2.1)
   - Componentes responsive (containers, grids, headers)
@@ -114,8 +118,8 @@ Clousadmin/
 
 ### 🚧 En Desarrollo
 - Auto-completado de fichajes con IA
-- Módulo de nóminas (estructura creada, en refinamiento)
-- Módulo de documentos con firma digital
+- Motor de facturación avanzada (prorrateo, límites por plan, métricas en tiempo real)
+- Firma digital sobre documentos y campañas de onboarding
 - Testing exhaustivo mobile en dispositivos reales (última fase)
 
 ### 📋 Roadmap
@@ -156,6 +160,9 @@ npm start
 - `REDIS_URL` - Redis connection (generado automáticamente)
 - `NEXTAUTH_SECRET` - JWT secret (generar con `openssl rand -base64 32`)
 - `NEXT_PUBLIC_APP_URL` - URL pública de la app
+- `NEXT_PUBLIC_BILLING_ENABLED` - Activa/desactiva la UI de facturación
+- `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` / `STRIPE_SECRET_KEY` - Credenciales Stripe
+- `STRIPE_WEBHOOK_SECRET` - Firma del webhook `/api/webhooks/stripe`
 
 ---
 

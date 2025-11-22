@@ -15,6 +15,14 @@ Sistema completo de gestión documental con:
 - ✅ Vista jerárquica de carpetas y documentos
 - ✅ Carpetas compartidas (HR Admin)
 - ✅ Preparado para IA en Fase 2
+- ✅ UI mobile-first con tabs, action bars y métricas contextuales (Nov 2025)
+
+### 🆕 Novedades 2025-11
+
+- **Cabecera mobile unificada**: `MobilePageHeader` + `MobileActionBar` sustituyen layouts ad-hoc y aseguran consistencia con ausencias/fichajes.
+- **Tabs Documentos/Plantillas** renovados: botones contextuales (Crear carpeta / Subir plantilla) se actualizan dinámicamente por tab.
+- **Plantillas gestionadas**: `PlantillasList` y `SubirPlantillaModal` permiten uploads rápidos y refrescan la vista automáticamente.
+- **Compatibilidad responsive**: `CarpetasGrid` reutilizable en móvil y desktop, con contadores y estados vacíos coherentes.
 
 ---
 
