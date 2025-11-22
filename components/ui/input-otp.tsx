@@ -1,7 +1,7 @@
 'use client';
 
+import { OTPInput, OTPInputContext, type OTPInputProps } from 'input-otp';
 import * as React from 'react';
-import { OTPInput, type OTPInputProps, OTPInputContext } from 'input-otp';
 
 import { cn } from '@/lib/utils';
 

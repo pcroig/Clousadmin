@@ -3,25 +3,25 @@
 // ========================================
 
 import { NextRequest } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { z } from 'zod';
+
+import {
+  badRequestResponse,
+  forbiddenResponse,
+  handleApiError,
+  notFoundResponse,
+  requireAuth,
+  requireAuthAsHR,
+  requireAuthAsHROrManager,
+  successResponse,
+  validateRequest,
+} from '@/lib/api-handler';
 import {
   actualizarCalculosFichaje,
   validarFichajeCompleto,
 } from '@/lib/calculos/fichajes';
-import {
-  requireAuth,
-  requireAuthAsHROrManager,
-  requireAuthAsHR,
-  validateRequest,
-  handleApiError,
-  successResponse,
-  notFoundResponse,
-  forbiddenResponse,
-  badRequestResponse,
-} from '@/lib/api-handler';
-import { z } from 'zod';
-
 import { EstadoFichaje, UsuarioRol } from '@/lib/constants/enums';
+import { prisma } from '@/lib/prisma';
 
 const fichajeApprovalSchema = z.object({
   accion: z.enum(['aprobar', 'rechazar']),

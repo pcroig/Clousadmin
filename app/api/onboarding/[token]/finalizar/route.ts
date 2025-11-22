@@ -3,6 +3,7 @@
 // ========================================
 
 import { NextRequest, NextResponse } from 'next/server';
+
 import { finalizarOnboarding } from '@/lib/onboarding';
 
 // POST /api/onboarding/[token]/finalizar - Finalizar onboarding

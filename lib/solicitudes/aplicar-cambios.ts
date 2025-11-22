@@ -4,9 +4,10 @@
 // Helper centralizado para aplicar cambios de solicitudes al empleado
 // Garantiza que campos sensibles (iban) se cifran antes de guardar
 
-import { encryptEmpleadoData } from '@/lib/empleado-crypto';
+import { type Empleado, Prisma, PrismaClient } from '@prisma/client';
+
 import { esCampoPermitido } from '@/lib/constants/whitelist-campos';
-import { Prisma, PrismaClient, type Empleado } from '@prisma/client';
+import { encryptEmpleadoData } from '@/lib/empleado-crypto';
 
 type TransactionClient = Omit<
   PrismaClient,

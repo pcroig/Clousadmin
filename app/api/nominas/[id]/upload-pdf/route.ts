@@ -3,10 +3,11 @@
 // ========================================
 
 import { NextRequest, NextResponse } from 'next/server';
+
 import { getSession } from '@/lib/auth';
+import { NOMINA_ESTADOS } from '@/lib/constants/nomina-estados';
 import { prisma } from '@/lib/prisma';
 import { uploadToS3 } from '@/lib/s3';
-import { NOMINA_ESTADOS } from '@/lib/constants/nomina-estados';
 
 export async function POST(
   req: NextRequest,

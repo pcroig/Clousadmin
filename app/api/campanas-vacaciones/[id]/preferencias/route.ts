@@ -3,14 +3,15 @@
 // ========================================
 
 import { NextRequest } from 'next/server';
+
+import {
+  badRequestResponse,
+  handleApiError,
+  requireAuth,
+  successResponse,
+} from '@/lib/api-handler';
 import { prisma } from '@/lib/prisma';
 import { preferenciaVacacionesCreateSchema } from '@/lib/validaciones/schemas';
-import {
-  requireAuth,
-  handleApiError,
-  successResponse,
-  badRequestResponse,
-} from '@/lib/api-handler';
 
 // POST /api/campanas-vacaciones/[id]/preferencias - Guardar preferencias del empleado
 export async function POST(

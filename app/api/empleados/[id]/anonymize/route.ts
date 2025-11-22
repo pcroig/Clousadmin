@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
+
 import { handleApiError, requireAuthAsHR } from '@/lib/api-handler';
-import { prisma } from '@/lib/prisma';
-import { anonymizeEmpleado } from '@/lib/empleados/anonymize';
 import { logAccesoSensibles } from '@/lib/auditoria';
+import { anonymizeEmpleado } from '@/lib/empleados/anonymize';
+import { prisma } from '@/lib/prisma';
 
 export async function POST(
   request: NextRequest,

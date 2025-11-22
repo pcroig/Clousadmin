@@ -1,15 +1,15 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Calendar as CalendarIcon, ChevronRight } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
+import { SolicitarAusenciaModal } from '@/components/empleado/solicitar-ausencia-modal';
+import { FechaCalendar } from '@/components/shared/fecha-calendar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
-import { SolicitarAusenciaModal } from '@/components/empleado/solicitar-ausencia-modal';
-import { FechaCalendar } from '@/components/shared/fecha-calendar';
 import { obtenerNombreDia } from '@/lib/utils/fechas';
 
 interface Ausencia {

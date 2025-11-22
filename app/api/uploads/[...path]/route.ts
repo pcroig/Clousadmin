@@ -1,9 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { getSession } from '@/lib/auth';
-import { shouldUseCloudStorage } from '@/lib/s3';
-import { UsuarioRol } from '@/lib/constants/enums';
-import path from 'path';
 import { promises as fs } from 'fs';
+import path from 'path';
+
+import { NextRequest, NextResponse } from 'next/server';
+
+import { getSession } from '@/lib/auth';
+import { UsuarioRol } from '@/lib/constants/enums';
+import { shouldUseCloudStorage } from '@/lib/s3';
 
 export const runtime = 'nodejs';
 

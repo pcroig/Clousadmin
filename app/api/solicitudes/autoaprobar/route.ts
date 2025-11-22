@@ -3,19 +3,19 @@
 // ========================================
 // POST: Aprobar automáticamente todas las solicitudes pendientes
 
-import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
 import { Prisma } from '@prisma/client';
-import { requireAuthAsHROrManager, handleApiError } from '@/lib/api-handler';
+import { NextRequest, NextResponse } from 'next/server';
 
-import { EstadoAusencia, EstadoSolicitud } from '@/lib/constants/enums';
+import { handleApiError, requireAuthAsHROrManager } from '@/lib/api-handler';
 import { registrarAutoCompletadoAusencia, registrarAutoCompletadoSolicitud } from '@/lib/auto-completado';
-import { resolveAprobadorEmpleadoId } from '@/lib/solicitudes/aprobador';
-import { aplicarCambiosSolicitud } from '@/lib/solicitudes/aplicar-cambios';
+import { EstadoAusencia, EstadoSolicitud } from '@/lib/constants/enums';
 import { 
-  crearNotificacionSolicitudAprobada,
-  crearNotificacionAusenciaAprobada 
+  crearNotificacionAusenciaAprobada,
+  crearNotificacionSolicitudAprobada 
 } from '@/lib/notificaciones';
+import { prisma } from '@/lib/prisma';
+import { aplicarCambiosSolicitud } from '@/lib/solicitudes/aplicar-cambios';
+import { resolveAprobadorEmpleadoId } from '@/lib/solicitudes/aprobador';
 
 export async function POST(req: NextRequest) {
   try {

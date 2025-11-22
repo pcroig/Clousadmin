@@ -4,30 +4,33 @@
 // Plantillas Tab - Gestión de plantillas de documentos
 // ========================================
 
-import { useState, useEffect, useMemo } from 'react';
-import { Button } from '@/components/ui/button';
-import { LoadingButton } from '@/components/shared/loading-button';
-import { Label } from '@/components/ui/label';
-import { Input } from '@/components/ui/input';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Spinner } from '@/components/ui/spinner';
 import {
-  FileText,
-  Upload,
-  Trash2,
-  Plus,
-  CheckCircle2,
   AlertCircle,
+  CheckCircle2,
+  FileText,
   FileType,
+  Plus,
+  Trash2,
+  Upload,
 } from 'lucide-react';
-import type {
-  PlantillaDocumento as ConfigPlantilla,
-  CamposRequeridos,
-} from '@/lib/onboarding-config';
+import { useEffect, useMemo, useState } from 'react';
+
+import { LoadingButton } from '@/components/shared/loading-button';
+import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Spinner } from '@/components/ui/spinner';
 import {
   obtenerCamposFaltantesDePlantilla,
   validarPlantillasContraCampos,
 } from '@/lib/validaciones/plantillas-campos';
+
+import type {
+  CamposRequeridos,
+  PlantillaDocumento as ConfigPlantilla,
+} from '@/lib/onboarding-config';
+
 
 interface Plantilla {
   id: string;
@@ -492,7 +495,7 @@ export function PlantillasTab({
         <div className="text-center py-12 text-gray-500">
           <FileText className="h-12 w-12 mx-auto mb-3 text-gray-400" />
           <p>No hay plantillas disponibles</p>
-          <p className="text-sm">Haz clic en "Subir Plantilla" para crear una</p>
+          <p className="text-sm">Haz clic en «Subir Plantilla» para crear una</p>
         </div>
       )}
 

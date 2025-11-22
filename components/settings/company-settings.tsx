@@ -4,13 +4,13 @@
 
 'use client';
 
-import { useMemo } from 'react';
 import { Building2, Mail, Phone, ShieldAlert, Users } from 'lucide-react';
+import { useMemo } from 'react';
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { InvitarHRAdmins } from '@/components/onboarding/invitar-hr-admins';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { InvitarHRAdmins } from '@/components/onboarding/invitar-hr-admins';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
 interface HRAdmin {
   id: string;

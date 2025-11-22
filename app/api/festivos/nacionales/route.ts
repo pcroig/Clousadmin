@@ -3,7 +3,8 @@
 // ========================================
 
 import { NextRequest } from 'next/server';
-import { requireAuth, handleApiError, successResponse } from '@/lib/api-handler';
+
+import { handleApiError, requireAuth, successResponse } from '@/lib/api-handler';
 
 // GET /api/festivos/nacionales - Obtener festivos nacionales de España
 export async function GET(req: NextRequest) {

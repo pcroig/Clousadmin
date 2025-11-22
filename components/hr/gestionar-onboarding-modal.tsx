@@ -4,15 +4,15 @@
 // Gestionar Onboarding Modal - Configuración de onboarding para HR
 // ========================================
 
-import { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
+import { FileText, FolderOpen, Plus, Settings, Trash2 } from 'lucide-react';
+import { useEffect, useState } from 'react';
+
 import { LoadingButton } from '@/components/shared/loading-button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Label } from '@/components/ui/label';
-import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Spinner } from '@/components/ui/spinner';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
@@ -20,13 +20,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Settings, FileText, FolderOpen, Plus, Trash2 } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+
 import { PlantillasTab } from './plantillas-tab';
+
 import type {
   CamposRequeridos,
   DocumentoRequerido,
-  PlantillaDocumento,
   OnboardingConfigData,
+  PlantillaDocumento,
 } from '@/lib/onboarding-config';
 
 const DESTINOS_SUGERIDOS = ['Contratos', 'Nóminas', 'Justificantes', 'Otros'] as const;
@@ -448,7 +451,7 @@ export function GestionarOnboardingModal({
                       <div className="text-center py-8 text-gray-500">
                         <FileText className="h-12 w-12 mx-auto mb-3 text-gray-400" />
                         <p>No hay documentos requeridos configurados</p>
-                        <p className="text-sm">Haz clic en "Añadir" para crear uno</p>
+                        <p className="text-sm">Haz clic en «Añadir» para crear uno</p>
                       </div>
                     )}
                   </div>

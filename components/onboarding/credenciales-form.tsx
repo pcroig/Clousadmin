@@ -1,13 +1,14 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { ChevronRight, Upload, User } from 'lucide-react';
+import { useRef, useState } from 'react';
+import { toast } from 'sonner';
+
+import { LoadingButton } from '@/components/shared/loading-button';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Upload, User, ChevronRight } from 'lucide-react';
-import { LoadingButton } from '@/components/shared/loading-button';
-import { toast } from 'sonner';
 import { getAvatarStyle } from '@/lib/design-system';
 
 export interface OnboardingEmpleado {

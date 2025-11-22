@@ -6,11 +6,12 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
+
+import { handleApiError, requireAuthAsHR } from '@/lib/api-handler';
+import { deleteOpenAIFile, uploadPDFToOpenAI } from '@/lib/ia/core/providers/openai';
+import { AIProvider } from '@/lib/ia/core/types';
 import { analyzeDocument } from '@/lib/ia/patterns/vision';
 import { uploadToS3 } from '@/lib/s3';
-import { requireAuthAsHR, handleApiError } from '@/lib/api-handler';
-import { uploadPDFToOpenAI, deleteOpenAIFile } from '@/lib/ia/core/providers/openai';
-import { AIProvider } from '@/lib/ia/core/types';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60; // 60 segundos para procesamiento de IA

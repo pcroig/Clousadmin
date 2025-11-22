@@ -6,6 +6,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+
 import { getSession } from '@/lib/auth';
 import { prisma, Prisma } from '@/lib/prisma';
 

@@ -5,21 +5,23 @@
 
 'use client';
 
-import { memo, useCallback, useMemo, useState } from 'react';
-import { CheckCircle, XCircle, ClipboardList } from 'lucide-react';
+import { CheckCircle, ClipboardList, XCircle } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { memo, useCallback, useMemo, useState } from 'react';
 import { toast } from 'sonner';
+
+import { getInitials } from '@/components/shared/utils';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { WidgetCard } from './widget-card';
+import { getAvatarStyle } from '@/lib/design-system';
 import {
   ejecutarAccionSolicitud,
   type SolicitudAccion,
   type SolicitudTipo,
 } from '@/lib/services/solicitudes-actions';
+
 import { EmptyState } from './empty-state';
-import { getAvatarStyle } from '@/lib/design-system';
-import { getInitials } from '@/components/shared/utils';
+import { WidgetCard } from './widget-card';
 
 export interface Solicitud {
   id: string;

@@ -4,17 +4,12 @@
 
 'use client';
 
+import { MapPin, Pencil, Trash2, User, Users } from 'lucide-react';
 import { useState } from 'react';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Button } from '@/components/ui/button';
-import { LoadingButton } from '@/components/shared/loading-button';
-import { Users, User, Pencil, Trash2, MapPin } from 'lucide-react';
-import { getInitials } from '@/components/shared/utils';
-import { getAvatarStyle } from '@/lib/design-system';
-import { EquipoFormModal } from './equipo-form-modal';
-import { ManageMembersModal } from './manage-members-modal';
-import { ChangeManagerModal } from './change-manager-modal';
 import { toast } from 'sonner';
+
+import { LoadingButton } from '@/components/shared/loading-button';
+import { getInitials } from '@/components/shared/utils';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -25,6 +20,15 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Button } from '@/components/ui/button';
+import { getAvatarStyle } from '@/lib/design-system';
+
+import { ChangeManagerModal } from './change-manager-modal';
+import { EquipoFormModal } from './equipo-form-modal';
+import { ManageMembersModal } from './manage-members-modal';
+
+
 
 interface EquipoDetailsProps {
   equipo: {
@@ -251,7 +255,7 @@ export function EquipoDetails({ equipo, onUpdate, onDelete }: EquipoDetailsProps
           <AlertDialogHeader>
             <AlertDialogTitle>¿Eliminar equipo?</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta acción no se puede deshacer. Se eliminará el equipo "{equipo.nombre}" y se
+              Esta acción no se puede deshacer. Se eliminará el equipo «{equipo.nombre}» y se
               removerá la relación con todos sus miembros. Los empleados no serán eliminados.
             </AlertDialogDescription>
           </AlertDialogHeader>

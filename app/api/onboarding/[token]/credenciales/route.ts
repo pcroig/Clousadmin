@@ -3,8 +3,9 @@
 // ========================================
 
 import { NextRequest, NextResponse } from 'next/server';
-import { guardarCredenciales } from '@/lib/onboarding';
 import { z } from 'zod';
+
+import { guardarCredenciales } from '@/lib/onboarding';
 
 // Schema de validación
 const credencialesSchema = z.object({

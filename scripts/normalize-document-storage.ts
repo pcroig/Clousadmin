@@ -13,8 +13,9 @@
 
 // Cargar variables de entorno desde .env.local primero, luego .env
 import { config } from 'dotenv';
-import { resolve } from 'path';
+
 import { existsSync } from 'fs';
+import { resolve } from 'path';
 
 // Paso 1: Cargar .env.local primero (tiene prioridad absoluta)
 const envLocalPath = resolve(process.cwd(), '.env.local');
@@ -51,10 +52,11 @@ if (!process.env.DATABASE_URL) {
 console.log(`📊 Usando base de datos: ${process.env.DATABASE_URL.replace(/:[^:@]+@/, ':****@')}`);
 
 import { PrismaClient } from '@prisma/client';
+
 import {
-  TIPOS_DOCUMENTO,
-  inferirTipoDocumento,
   CarpetaSistema,
+  inferirTipoDocumento,
+  TIPOS_DOCUMENTO,
 } from '../lib/documentos';
 
 const prisma = new PrismaClient({

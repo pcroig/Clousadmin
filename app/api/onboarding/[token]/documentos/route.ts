@@ -2,16 +2,18 @@
 // API Route: Onboarding Documentos - Subir y listar documentos durante onboarding
 // ========================================
 
+import { randomBytes } from 'crypto';
+
 import { NextRequest, NextResponse } from 'next/server';
-import { verificarTokenOnboarding, guardarProgresoDocumentos } from '@/lib/onboarding';
+
 import {
   listarDocumentosOnboarding,
   subirDocumentoOnboarding,
   validarDocumentosRequeridosCompletos,
 } from '@/lib/documentos/onboarding';
+import { guardarProgresoDocumentos, verificarTokenOnboarding } from '@/lib/onboarding';
 import { obtenerOnboardingConfig } from '@/lib/onboarding-config';
-import { uploadToS3, getSignedDownloadUrl } from '@/lib/s3';
-import { randomBytes } from 'crypto';
+import { getSignedDownloadUrl, uploadToS3 } from '@/lib/s3';
 
 // GET /api/onboarding/[token]/documentos - Listar documentos subidos
 export async function GET(

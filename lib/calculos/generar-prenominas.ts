@@ -7,6 +7,7 @@ import { Prisma } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 
 import { prisma } from '@/lib/prisma';
+
 import { generarAlertasParaNomina } from './alertas-nomina';
 
 const SEMANAS_POR_MES = 52 / 12;

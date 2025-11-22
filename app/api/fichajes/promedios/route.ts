@@ -4,14 +4,15 @@
 // Calcula hora media de entrada, salida y jornada promedio
 
 import { NextRequest } from 'next/server';
-import { prisma } from '@/lib/prisma';
+
 import {
-  requireAuth,
-  handleApiError,
-  successResponse,
   badRequestResponse,
+  handleApiError,
+  requireAuth,
+  successResponse,
 } from '@/lib/api-handler';
-import { UsuarioRol, EstadoFichaje } from '@/lib/constants/enums';
+import { EstadoFichaje, UsuarioRol } from '@/lib/constants/enums';
+import { prisma } from '@/lib/prisma';
 
 // GET /api/fichajes/promedios - Obtener promedios de fichajes
 export async function GET(request: NextRequest) {

@@ -5,9 +5,10 @@
 
 import { Prisma } from '@prisma/client';
 
-import { prisma } from '@/lib/prisma';
-import { obtenerHorasEsperadas } from '../calculos/fichajes';
 import { EstadoAusencia } from '@/lib/constants/enums';
+import { prisma } from '@/lib/prisma';
+
+import { obtenerHorasEsperadas } from '../calculos/fichajes';
 
 /**
  * Tipos de alertas

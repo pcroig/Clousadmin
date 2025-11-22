@@ -8,15 +8,16 @@
 // 4. Opcionalmente procesa documentos de offboarding
 
 import { NextRequest } from 'next/server';
-import { prisma } from '@/lib/prisma';
-import {
-  requireAuthAsHR,
-  handleApiError,
-  successResponse,
-  notFoundResponse,
-} from '@/lib/api-handler';
 import { z } from 'zod';
+
+import {
+  handleApiError,
+  notFoundResponse,
+  requireAuthAsHR,
+  successResponse,
+} from '@/lib/api-handler';
 import { autoGenerarDocumentosOffboarding } from '@/lib/plantillas';
+import { prisma } from '@/lib/prisma';
 
 // Schema de validación - Fecha de finalización es obligatoria
 const finalizarContratoSchema = z.object({

@@ -4,11 +4,12 @@
  */
 
 import { OAuth2Client } from "google-auth-library";
+
 import type {
+  OAuthConfig,
   OAuthProvider,
   OAuthTokens,
   OAuthUserInfo,
-  OAuthConfig,
 } from "../types";
 
 export class GoogleOAuthProvider implements OAuthProvider {

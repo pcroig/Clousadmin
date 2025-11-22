@@ -7,12 +7,12 @@
 import { Filter, Plus } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
-import { PuestoDetails } from '@/components/organizacion/puesto-details';
-import { PuestoFormModal } from '@/components/organizacion/puesto-form-modal';
 import { CompactFilterBar } from '@/components/adaptive/CompactFilterBar';
 import { MobileActionBar } from '@/components/adaptive/MobileActionBar';
 import { MobilePageHeader } from '@/components/adaptive/MobilePageHeader';
 import { ResponsiveContainer } from '@/components/adaptive/ResponsiveContainer';
+import { PuestoDetails } from '@/components/organizacion/puesto-details';
+import { PuestoFormModal } from '@/components/organizacion/puesto-form-modal';
 import { Column, DataTable } from '@/components/shared/data-table';
 import { DetailsPanel } from '@/components/shared/details-panel';
 import { TableHeader } from '@/components/shared/table-header';
@@ -249,7 +249,7 @@ export function PuestosClient({ puestos: initialPuestos }: PuestosClientProps) {
             />
           )}
         </DetailsPanel>
-      </div>
+      </ResponsiveContainer>
 
       {/* Create Puesto Modal */}
       <PuestoFormModal
@@ -260,7 +260,6 @@ export function PuestosClient({ puestos: initialPuestos }: PuestosClientProps) {
           reloadPuestos();
         }}
       />
-      </ResponsiveContainer>
     </>
   );
 }

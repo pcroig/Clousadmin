@@ -3,11 +3,12 @@
 // ========================================
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getSession } from '@/lib/auth';
-import { prisma, Prisma } from '@/lib/prisma';
-import { puedeAccederACarpeta } from '@/lib/documentos';
 
+import { getSession } from '@/lib/auth';
 import { UsuarioRol } from '@/lib/constants/enums';
+import { puedeAccederACarpeta } from '@/lib/documentos';
+import { prisma, Prisma } from '@/lib/prisma';
+
 
 // GET /api/carpetas/[id] - Ver contenido de carpeta
 export async function GET(

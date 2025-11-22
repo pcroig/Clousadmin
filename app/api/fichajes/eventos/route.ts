@@ -3,15 +3,16 @@
 // ========================================
 
 import { NextRequest } from 'next/server';
-import { prisma } from '@/lib/prisma';
-import {
-  requireAuth,
-  validateRequest,
-  handleApiError,
-  successResponse,
-  notFoundResponse,
-} from '@/lib/api-handler';
 import { z } from 'zod';
+
+import {
+  handleApiError,
+  notFoundResponse,
+  requireAuth,
+  successResponse,
+  validateRequest,
+} from '@/lib/api-handler';
+import { prisma } from '@/lib/prisma';
 
 const fichajeEventoSchema = z.object({
   fichajeId: z.string().uuid(),

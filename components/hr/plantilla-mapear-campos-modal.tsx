@@ -4,21 +4,22 @@
 // Plantilla Mapear Campos Modal - Mapeo de campos PDF a variables del sistema
 // ========================================
 
-import { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { LoadingButton } from '@/components/shared/loading-button';
-import { Label } from '@/components/ui/label';
-import { Input } from '@/components/ui/input';
-import { Spinner } from '@/components/ui/spinner';
-import { Badge } from '@/components/ui/badge';
 import {
-  FileText,
-  CheckCircle2,
   AlertCircle,
-  Wand2,
+  CheckCircle2,
+  FileText,
   Search,
+  Wand2,
 } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { toast } from 'sonner';
+
+import { LoadingButton } from '@/components/shared/loading-button';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
@@ -26,7 +27,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { toast } from 'sonner';
+import { Spinner } from '@/components/ui/spinner';
+
 
 interface Campo {
   nombre: string;

@@ -4,15 +4,17 @@
 
 'use client';
 
-import type { MouseEvent } from 'react';
 import { Bell } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { formatRelativeTimeShort } from '@/lib/utils/formatRelativeTime';
+
 import { EmptyState } from '@/components/shared/empty-state';
-import { obtenerIconoPorTipo } from '@/lib/notificaciones/helpers';
 import { Button } from '@/components/ui/button';
+import { obtenerIconoPorTipo } from '@/lib/notificaciones/helpers';
 import { cn } from '@/lib/utils';
+import { formatRelativeTimeShort } from '@/lib/utils/formatRelativeTime';
+
 import type { NotificacionUI } from '@/types/Notificacion';
+import type { MouseEvent } from 'react';
 
 interface BandejaEntradaNotificacionesProps {
   notificaciones: NotificacionUI[];

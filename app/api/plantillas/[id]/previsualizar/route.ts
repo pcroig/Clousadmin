@@ -4,13 +4,14 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+
 import { getSession } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
 import {
+  type DatosEmpleado,
   extraerVariablesDePlantilla,
   resolverVariables,
-  type DatosEmpleado,
 } from '@/lib/plantillas';
+import { prisma } from '@/lib/prisma';
 import { getSignedDownloadUrl } from '@/lib/s3';
 
 const PREVIEW_TTL_SECONDS = 60 * 10; // 10 minutos

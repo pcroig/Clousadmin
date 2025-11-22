@@ -3,7 +3,7 @@
 // ========================================
 // Servicio eficiente y escalable para gestionar notificaciones
 
-import { PrismaClient, Prisma } from '@prisma/client';
+import { Prisma, PrismaClient } from '@prisma/client';
 
 import { UsuarioRol } from '@/lib/constants/enums';
 

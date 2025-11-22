@@ -1,21 +1,13 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Clock } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
 
-import { useApi } from '@/lib/hooks';
-import {
-  agruparFichajesEnJornadas,
-  calcularResumenJornadas,
-  getEstadoBadgeConfig,
-  type FichajeDTO,
-  type FichajeNormalizado,
-  type JornadaUI,
-} from '@/lib/utils/fichajesHistorial';
-import type { MiEspacioEmpleado } from '@/types/empleado';
 
+import { EditarFichajeModal } from '@/app/(dashboard)/hr/horario/fichajes/editar-fichaje-modal';
+import { FichajeManualModal } from '@/components/shared/fichaje-manual-modal';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -27,9 +19,17 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { useApi } from '@/lib/hooks';
+import {
+  agruparFichajesEnJornadas,
+  calcularResumenJornadas,
+  type FichajeDTO,
+  type FichajeNormalizado,
+  getEstadoBadgeConfig,
+  type JornadaUI,
+} from '@/lib/utils/fichajesHistorial';
 
-import { EditarFichajeModal } from '@/app/(dashboard)/hr/horario/fichajes/editar-fichaje-modal';
-import { FichajeManualModal } from '@/components/shared/fichaje-manual-modal';
+import type { MiEspacioEmpleado } from '@/types/empleado';
 
 const MAX_FILAS = 30;
 

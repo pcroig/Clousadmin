@@ -6,20 +6,21 @@
 
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { CheckCircle2, Eye, FileText, FileType, Mail, Upload, X } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
-import { Mail, CheckCircle2, Upload, X, FileText, Eye, FileType } from 'lucide-react';
+
+import { CarpetaSelector } from '@/components/shared/carpeta-selector';
+import { Combobox, type ComboboxOption } from '@/components/shared/combobox';
+import { DocumentList } from '@/components/shared/document-list';
+import { DocumentUploader } from '@/components/shared/document-uploader';
+import { LoadingButton } from '@/components/shared/loading-button';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { LoadingButton } from '@/components/shared/loading-button';
-import { Combobox, type ComboboxOption } from '@/components/shared/combobox';
-import { DocumentUploader } from '@/components/shared/document-uploader';
-import { DocumentList } from '@/components/shared/document-list';
-import { CarpetaSelector } from '@/components/shared/carpeta-selector';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Badge } from '@/components/ui/badge';
 import { Spinner } from '@/components/ui/spinner';
 
 interface DocumentoSubido {

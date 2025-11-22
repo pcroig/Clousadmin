@@ -4,24 +4,25 @@
 // Generar desde Plantilla Modal - Generación de documentos desde plantillas
 // ========================================
 
-import { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { LoadingButton } from '@/components/shared/loading-button';
-import { Label } from '@/components/ui/label';
-import { Input } from '@/components/ui/input';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Spinner } from '@/components/ui/spinner';
 import {
-  FileText,
-  Users,
-  FolderOpen,
-  CheckCircle2,
   AlertCircle,
-  FileType,
-  Loader2,
   CheckCheck,
+  CheckCircle2,
+  FileText,
+  FileType,
+  FolderOpen,
+  Loader2,
+  Users,
 } from 'lucide-react';
+import { useEffect, useState } from 'react';
+
+import { LoadingButton } from '@/components/shared/loading-button';
+import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Spinner } from '@/components/ui/spinner';
 import { extractArrayFromResponse } from '@/lib/utils/api-response';
 
 interface Plantilla {
@@ -88,7 +89,13 @@ export function GenerarDesdePlantillaModal({
 
   // Estado de procesamiento
   const [jobId, setJobId] = useState<string | null>(null);
-  const [jobStatus, setJobStatus] = useState<any>(null);
+  const [jobStatus, setJobStatus] = useState<{
+    estado: string;
+    documentosGenerados?: number;
+    totalEmpleados?: number;
+    porcentaje?: number;
+    mensajeError?: string;
+  } | null>(null);
 
   useEffect(() => {
     if (open) {

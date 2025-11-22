@@ -336,7 +336,7 @@ export function GestionarAusenciasModal({ open, onClose, onSaved }: GestionarAus
                         <p className="font-medium">¿Qué es la antelación mínima?</p>
                         <p className="text-xs">
                           Número mínimo de días que deben pasar entre la solicitud de ausencia y la fecha de inicio.
-                          Solo aplica a ausencias que requieren aprobación (vacaciones y "otro").
+                          Solo aplica a ausencias que requieren aprobación (vacaciones y «otro»).
                         </p>
                         <p className="text-xs mt-2">
                           Ejemplo: Con 5 días de antelación, una ausencia que empieza el 15 de enero debe solicitarse antes del 10 de enero.

@@ -3,9 +3,10 @@
 // ========================================
 
 import { NextRequest, NextResponse } from 'next/server';
+
 import { getSession } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { uploadToS3, deleteFromS3, getSignedDownloadUrl } from '@/lib/s3';
+import { deleteFromS3, getSignedDownloadUrl, uploadToS3 } from '@/lib/s3';
 
 /**
  * GET /api/empleados/firma - Obtener firma guardada del empleado autenticado

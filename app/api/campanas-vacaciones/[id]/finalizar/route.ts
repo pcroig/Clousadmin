@@ -3,16 +3,17 @@
 // ========================================
 
 import { NextRequest } from 'next/server';
-import { prisma, Prisma } from '@/lib/prisma';
+
+import {
+  badRequestResponse,
+  handleApiError,
+  requireAuth,
+  successResponse,
+} from '@/lib/api-handler';
 import { calcularDias } from '@/lib/calculos/ausencias';
 import { EstadoAusencia, UsuarioRol } from '@/lib/constants/enums';
-import {
-  requireAuth,
-  handleApiError,
-  successResponse,
-  badRequestResponse,
-} from '@/lib/api-handler';
 import { crearNotificacionCampanaCuadrada } from '@/lib/notificaciones';
+import { prisma, Prisma } from '@/lib/prisma';
 
 export const dynamic = 'force-dynamic';
 

@@ -8,13 +8,13 @@ import { Filter, Flag, Plus, Settings } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
-import { DenunciasDetails } from '@/components/hr/denuncias-details';
-import { GestionarOnboardingModal } from '@/components/hr/gestionar-onboarding-modal';
-import { AddPersonaDialog } from '@/components/organizacion/add-persona-dialog';
 import { CompactFilterBar } from '@/components/adaptive/CompactFilterBar';
 import { MobileActionBar } from '@/components/adaptive/MobileActionBar';
 import { MobilePageHeader } from '@/components/adaptive/MobilePageHeader';
 import { ResponsiveContainer } from '@/components/adaptive/ResponsiveContainer';
+import { DenunciasDetails } from '@/components/hr/denuncias-details';
+import { GestionarOnboardingModal } from '@/components/hr/gestionar-onboarding-modal';
+import { AddPersonaDialog } from '@/components/organizacion/add-persona-dialog';
 import { AvatarCell, Column, DataTable } from '@/components/shared/data-table';
 import { DetailsPanel } from '@/components/shared/details-panel';
 import { TableHeader } from '@/components/shared/table-header';
@@ -248,6 +248,6 @@ export function PersonasClient({ empleados, initialPanel, initialDenunciaId }: P
           initialDenunciaId={initialDenunciaId}
         />
       </DetailsPanel>
-    </div>
+    </ResponsiveContainer>
   );
 }

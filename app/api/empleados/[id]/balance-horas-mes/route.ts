@@ -4,9 +4,10 @@
 // Calcula el balance de horas extra de un empleado en un mes específico
 
 import { NextRequest, NextResponse } from 'next/server';
+
 import { getSession } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
 import { calcularBalanceMensual } from '@/lib/calculos/balance-horas';
+import { prisma } from '@/lib/prisma';
 
 export async function GET(
   req: NextRequest,

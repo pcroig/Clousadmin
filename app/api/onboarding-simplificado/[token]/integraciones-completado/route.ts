@@ -3,7 +3,8 @@
 // ========================================
 
 import { NextRequest, NextResponse } from 'next/server';
-import { verificarTokenOnboarding, guardarProgresoIntegraciones } from '@/lib/onboarding';
+
+import { guardarProgresoIntegraciones, verificarTokenOnboarding } from '@/lib/onboarding';
 
 // POST /api/onboarding-simplificado/[token]/integraciones-completado - Marcar integraciones como completadas
 export async function POST(

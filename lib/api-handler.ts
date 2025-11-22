@@ -4,12 +4,14 @@
 // Helpers reutilizables para API routes - manejo de auth, errores, validación
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getSession } from '@/lib/auth';
 import { z } from 'zod';
-import type { SessionData } from '@/types/auth';
-import { rateLimitApi, rateLimitApiWrite, getClientIP } from '@/lib/rate-limit';
 
+import { getSession } from '@/lib/auth';
 import { UsuarioRol } from '@/lib/constants/enums';
+import { getClientIP, rateLimitApi, rateLimitApiWrite } from '@/lib/rate-limit';
+
+import type { SessionData } from '@/types/auth';
+
 
 // ========================================
 // Types

@@ -3,10 +3,11 @@
 // ========================================
 
 import { NextRequest, NextResponse } from 'next/server';
+
 import { getSession } from '@/lib/auth';
+import { UsuarioRol } from '@/lib/constants/enums';
 import { procesarNominas } from '@/lib/imports/nominas-upload';
 
-import { UsuarioRol } from '@/lib/constants/enums';
 
 const MAX_NOMINA_FILE_BYTES = parseInt(
   process.env.NOMINAS_MAX_UPLOAD_BYTES || `${15 * 1024 * 1024}`

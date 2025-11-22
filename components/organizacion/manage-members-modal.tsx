@@ -4,20 +4,21 @@
 
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { Search, UserPlus, X } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
+import { toast } from 'sonner';
+
+import { LoadingButton } from '@/components/shared/loading-button';
+import { getInitials } from '@/components/shared/utils';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { LoadingButton } from '@/components/shared/loading-button';
-import { toast } from 'sonner';
-import { Search, UserPlus, X } from 'lucide-react';
-import { getInitials } from '@/components/shared/utils';
 import { getAvatarStyle } from '@/lib/design-system';
 
 interface Employee {

@@ -5,14 +5,16 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+
 import { getSession } from "@/lib/auth";
-import { createOAuthProvider } from "@/lib/oauth/providers";
+import { UsuarioRol } from '@/lib/constants/enums';
 import { getGoogleCalendarOAuthConfig } from "@/lib/oauth/config";
 import { OAuthManager } from "@/lib/oauth/oauth-manager";
+import { createOAuthProvider } from "@/lib/oauth/providers";
 import { prisma, Prisma } from "@/lib/prisma";
+
 import type { CalendarIntegrationConfig } from "@/lib/integrations/types";
 
-import { UsuarioRol } from '@/lib/constants/enums';
 
 export async function GET(req: NextRequest) {
   try {

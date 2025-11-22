@@ -3,7 +3,6 @@
 // ========================================
 
 import { AusenciaItem } from '@/components/shared/ausencias-widget';
-import type { NotificacionUI } from '@/types/Notificacion';
 import { getSession } from '@/lib/auth';
 import { EstadoAusencia, UsuarioRol } from '@/lib/constants/enums';
 import { prisma } from '@/lib/prisma';
@@ -11,6 +10,7 @@ import { obtenerCampanaPendiente, obtenerPropuestaPendiente } from '@/lib/servic
 
 import { EmpleadoDashboardClient } from './dashboard-client';
 
+import type { NotificacionUI } from '@/types/Notificacion';
 import type { Ausencia } from '@prisma/client';
 
 

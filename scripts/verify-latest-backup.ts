@@ -5,11 +5,12 @@
 // Este script usa el SDK de AWS ya instalado en el proyecto
 // para verificar el último backup en Hetzner Object Storage
 
-import { S3Client, ListObjectsV2Command, GetObjectCommand } from '@aws-sdk/client-s3';
-import { createWriteStream, unlinkSync, existsSync } from 'fs';
+import { createWriteStream, existsSync, unlinkSync } from 'fs';
 import { join } from 'path';
-import { createGunzip } from 'zlib';
 import { pipeline } from 'stream/promises';
+import { createGunzip } from 'zlib';
+
+import { GetObjectCommand, ListObjectsV2Command, S3Client } from '@aws-sdk/client-s3';
 
 const STORAGE_ENDPOINT = process.env.STORAGE_ENDPOINT;
 const STORAGE_REGION = process.env.STORAGE_REGION;

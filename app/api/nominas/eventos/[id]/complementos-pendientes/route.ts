@@ -4,6 +4,7 @@
 // Devuelve todos los complementos del evento con su estado de validación
 
 import { NextRequest, NextResponse } from 'next/server';
+
 import { getSession } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 

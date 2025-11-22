@@ -3,11 +3,11 @@
 // ========================================
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getSession } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
 
+import { getSession } from '@/lib/auth';
 import { UsuarioRol } from '@/lib/constants/enums';
 import { crearNotificacionNominaDisponible } from '@/lib/notificaciones';
+import { prisma } from '@/lib/prisma';
 
 // POST /api/nominas/publicar?mes=X&anio=Y
 export async function POST(req: NextRequest) {

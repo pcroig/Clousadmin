@@ -4,12 +4,13 @@
 // Permite compensar horas extra de múltiples empleados de un evento
 
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
+
 import { getSession } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { z } from 'zod';
 import {
-  procesarCompensacionHorasExtra,
   empleadoCompensacionSelect,
+  procesarCompensacionHorasExtra,
 } from '@/lib/services/compensacion-horas';
 
 const CompensarHorasMasivoSchema = z.object({

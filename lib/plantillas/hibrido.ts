@@ -7,10 +7,11 @@
  * 3. El PDF resultante puede tener campos rellenables adicionales
  */
 
+import { prisma } from '@/lib/prisma';
+
+import { convertDocxFromS3ToPdf } from './docx-to-pdf';
 import { generarDocumentoDesdePlantilla } from './generar-documento';
 import { escanearPDFConVision, fusionarCamposDetectados } from './pdf-rellenable';
-import { convertDocxFromS3ToPdf } from './docx-to-pdf';
-import { prisma } from '@/lib/prisma';
 
 export interface ConfiguracionHibrido {
   plantillaId: string;

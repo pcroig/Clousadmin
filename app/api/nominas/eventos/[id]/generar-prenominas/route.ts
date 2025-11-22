@@ -6,8 +6,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 import { getSession } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
 import { generarPrenominasEvento } from '@/lib/calculos/generar-prenominas';
+import { prisma } from '@/lib/prisma';
 
 export async function POST(
   _req: NextRequest,

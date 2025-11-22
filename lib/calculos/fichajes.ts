@@ -3,19 +3,21 @@
 // ========================================
 // NUEVO MODELO: Fichaje = día completo, FichajeEvento = eventos individuales
 
-import { prisma } from '@/lib/prisma';
 import {
+  Ausencia,
+  Empleado,
   Fichaje,
   FichajeEvento,
-  Empleado,
-  Ausencia,
   EstadoFichaje as PrismaEstadoFichaje,
 } from '@prisma/client';
-import type { JornadaConfig, DiaConfig } from './fichajes-helpers';
+
 
 import { EstadoAusencia } from '@/lib/constants/enums';
-import { obtenerNombreDia, normalizarFecha } from '@/lib/utils/fechas';
+import { prisma } from '@/lib/prisma';
+import { normalizarFecha, obtenerNombreDia } from '@/lib/utils/fechas';
 import { redondearHoras } from '@/lib/utils/numeros';
+
+import type { DiaConfig, JornadaConfig } from './fichajes-helpers';
 
 /**
  * Estados posibles del fichaje (del día completo)

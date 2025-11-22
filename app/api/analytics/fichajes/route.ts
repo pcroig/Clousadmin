@@ -4,16 +4,18 @@
 // GET: Obtener métricas de fichajes (horas trabajadas, tendencias, absentismo)
 
 import { NextRequest } from 'next/server';
-import type { Prisma } from '@prisma/client';
-import { prisma } from '@/lib/prisma';
+
+import { FICHAJES_METRICS } from '@/lib/analytics/metrics';
 import {
-  requireAuthAsHR,
   handleApiError,
+  requireAuthAsHR,
   successResponse,
 } from '@/lib/api-handler';
-import { EstadoAusencia, EstadoFichaje } from '@/lib/constants/enums';
 import { obtenerRangoFechaAntiguedad } from '@/lib/calculos/antiguedad';
-import { FICHAJES_METRICS } from '@/lib/analytics/metrics';
+import { EstadoAusencia, EstadoFichaje } from '@/lib/constants/enums';
+import { prisma } from '@/lib/prisma';
+
+import type { Prisma } from '@prisma/client';
 
 const toNumber = (value: Prisma.Decimal | number | null | undefined): number =>
   value ? Number(value) : 0;

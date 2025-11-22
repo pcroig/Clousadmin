@@ -7,13 +7,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 
 import {
-  requireAuthAsHR,
   handleApiError,
+  requireAuthAsHR,
 } from '@/lib/api-handler';
 import { prisma } from '@/lib/prisma';
 import {
-  procesarCompensacionHorasExtra,
   empleadoCompensacionSelect,
+  procesarCompensacionHorasExtra,
 } from '@/lib/services/compensacion-horas';
 
 const CompensarHorasSchema = z.object({

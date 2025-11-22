@@ -4,12 +4,14 @@
  */
 
 import { prisma } from "@/lib/prisma";
+
 import { createOAuthProvider } from "./providers";
+
 import type {
+  OAuthConfig,
   OAuthProviderName,
   OAuthTokens,
   StoredOAuthData,
-  OAuthConfig,
 } from "./types";
 
 export class OAuthManager {

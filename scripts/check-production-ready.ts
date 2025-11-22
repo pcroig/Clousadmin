@@ -5,9 +5,10 @@
 // Verifica que el código esté listo para producción
 // NO requiere conexión al servidor
 
-import * as dotenv from 'dotenv';
-import * as path from 'path';
 import { existsSync, readFileSync } from 'fs';
+import * as path from 'path';
+
+import * as dotenv from 'dotenv';
 
 // Cargar .env
 const envPath = path.join(process.cwd(), '.env');

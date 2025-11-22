@@ -13,6 +13,7 @@ import { FichajeWidget } from '@/components/shared/fichaje-widget';
 import { NotificacionesWidget } from '@/components/shared/notificaciones-widget';
 import { CampanaPropuestaReminder } from '@/components/vacaciones/campana-propuesta-reminder';
 import { CampanaVacacionesReminder } from '@/components/vacaciones/campana-vacaciones-reminder';
+
 import type { NotificacionUI } from '@/types/Notificacion';
 
 interface DashboardClientProps {

@@ -1,6 +1,7 @@
-import type { NextConfig } from "next";
 import withPWAInit from "next-pwa";
 import runtimeCaching from "next-pwa/cache";
+
+import type { NextConfig } from "next";
 
 const storageEndpointHostname = (() => {
   const endpoint = process.env.STORAGE_ENDPOINT;

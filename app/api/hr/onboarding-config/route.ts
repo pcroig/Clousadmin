@@ -3,19 +3,20 @@
 // ========================================
 
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
+
 import { getSession } from '@/lib/auth';
+import { UsuarioRol } from '@/lib/constants/enums';
 import {
-  obtenerOnboardingConfig,
   actualizarCamposRequeridos,
   actualizarDocumentosRequeridos,
   actualizarPlantillasDocumentos,
   type CamposRequeridos,
   type DocumentoRequerido,
+  obtenerOnboardingConfig,
   type PlantillaDocumento,
 } from '@/lib/onboarding-config';
-import { z } from 'zod';
 
-import { UsuarioRol } from '@/lib/constants/enums';
 
 // Schema de validación para campos requeridos
 const camposRequeridosSchema = z.object({

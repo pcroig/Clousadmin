@@ -2,17 +2,18 @@
 // API: Documentos - Descarga y Eliminación
 // ========================================
 
-import { NextRequest, NextResponse } from 'next/server';
-import { getSession } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { existsSync } from 'fs';
 import { readFile, unlink } from 'fs/promises';
 import { join } from 'path';
-import { existsSync } from 'fs';
-import { puedeAccederACarpeta } from '@/lib/documentos';
 
-import { UsuarioRol } from '@/lib/constants/enums';
-import { deleteFromS3, getSignedDownloadUrl } from '@/lib/s3';
+import { NextRequest, NextResponse } from 'next/server';
+
 import { logAccesoSensibles } from '@/lib/auditoria';
+import { getSession } from '@/lib/auth';
+import { UsuarioRol } from '@/lib/constants/enums';
+import { puedeAccederACarpeta } from '@/lib/documentos';
+import { prisma } from '@/lib/prisma';
+import { deleteFromS3, getSignedDownloadUrl } from '@/lib/s3';
 
 // GET /api/documentos/[id] - Descargar documento
 export async function GET(

@@ -4,16 +4,18 @@
 // GET: Exportar datos de analytics a archivo Excel
 
 import { NextRequest } from 'next/server';
-import type { Prisma } from '@prisma/client';
-import { prisma } from '@/lib/prisma';
-import {
-  requireAuthAsHR,
-  handleApiError,
-} from '@/lib/api-handler';
 import { NextResponse } from 'next/server';
 import * as XLSX from 'xlsx';
+
+import {
+  handleApiError,
+  requireAuthAsHR,
+} from '@/lib/api-handler';
 import { calcularAntiguedad, obtenerRangoFechaAntiguedad } from '@/lib/calculos/antiguedad';
 import { EstadoFichaje } from '@/lib/constants/enums';
+import { prisma } from '@/lib/prisma';
+
+import type { Prisma } from '@prisma/client';
 
 // Función helper para formatear antigüedad a label
 function formatearAntiguedad(fechaAlta: Date): string {

@@ -1,7 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { FolderPlus, Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { useState } from 'react';
+
+import { DocumentUploaderInline } from '@/components/shared/document-uploader-inline';
+import { InfoTooltip } from '@/components/shared/info-tooltip';
+import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Dialog,
   DialogContent,
@@ -10,7 +16,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -20,10 +25,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Checkbox } from '@/components/ui/checkbox';
-import { DocumentUploaderInline } from '@/components/shared/document-uploader-inline';
-import { Loader2, FolderPlus } from 'lucide-react';
-import { InfoTooltip } from '@/components/shared/info-tooltip';
 
 interface UploadedFile {
   file: File;

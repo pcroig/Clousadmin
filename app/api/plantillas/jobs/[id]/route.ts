@@ -5,8 +5,9 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+
 import { getSession } from '@/lib/auth';
-import { obtenerEstadoJob, cancelarJob } from '@/lib/plantillas';
+import { cancelarJob, obtenerEstadoJob } from '@/lib/plantillas';
 import { prisma } from '@/lib/prisma';
 
 /**

@@ -4,15 +4,12 @@
 
 'use client';
 
+import { Briefcase, Download, FileText, Pencil, Trash2, Upload } from 'lucide-react';
 import { useState } from 'react';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Button } from '@/components/ui/button';
-import { LoadingButton } from '@/components/shared/loading-button';
-import { Briefcase, Pencil, Trash2, Upload, FileText, Download } from 'lucide-react';
-import { getInitials } from '@/components/shared/utils';
-import { getAvatarStyle } from '@/lib/design-system';
-import { PuestoFormModal } from './puesto-form-modal';
 import { toast } from 'sonner';
+
+import { LoadingButton } from '@/components/shared/loading-button';
+import { getInitials } from '@/components/shared/utils';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -23,6 +20,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Button } from '@/components/ui/button';
+import { getAvatarStyle } from '@/lib/design-system';
+
+import { PuestoFormModal } from './puesto-form-modal';
+
+
 
 interface PuestoDetailsProps {
   puesto: {
@@ -323,7 +327,7 @@ export function PuestoDetails({ puesto, onUpdate, onDelete }: PuestoDetailsProps
           <AlertDialogHeader>
             <AlertDialogTitle>¿Eliminar puesto?</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta acción no se puede deshacer. Se eliminará el puesto "{puesto.nombre}".
+              Esta acción no se puede deshacer. Se eliminará el puesto «{puesto.nombre}».
               {puesto.numeroEmpleados > 0 &&
                 ` Los ${puesto.numeroEmpleados} empleado(s) con este puesto perderán la asignación.`}
             </AlertDialogDescription>

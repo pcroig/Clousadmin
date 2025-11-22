@@ -3,17 +3,17 @@
 // ========================================
 
 import { NextRequest } from 'next/server';
-import { prisma, Prisma } from '@/lib/prisma';
-import { calcularDias } from '@/lib/calculos/ausencias';
-import { EstadoAusencia } from '@/lib/constants/enums';
 
 import {
-  requireAuth,
-  handleApiError,
-  successResponse,
-  createdResponse,
   badRequestResponse,
+  createdResponse,
+  handleApiError,
+  requireAuth,
+  successResponse,
 } from '@/lib/api-handler';
+import { calcularDias } from '@/lib/calculos/ausencias';
+import { EstadoAusencia } from '@/lib/constants/enums';
+import { prisma, Prisma } from '@/lib/prisma';
 
 // POST /api/campanas-vacaciones/[id]/aceptar - Empleado acepta propuesta de vacaciones
 export async function POST(

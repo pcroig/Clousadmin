@@ -3,16 +3,17 @@
 // ========================================
 
 import { NextRequest } from 'next/server';
-import { prisma } from '@/lib/prisma';
-import {
-  requireAuthAsHR,
-  validateRequest,
-  handleApiError,
-  successResponse,
-  notFoundResponse,
-  badRequestResponse,
-} from '@/lib/api-handler';
 import { z } from 'zod';
+
+import {
+  badRequestResponse,
+  handleApiError,
+  notFoundResponse,
+  requireAuthAsHR,
+  successResponse,
+  validateRequest,
+} from '@/lib/api-handler';
+import { prisma } from '@/lib/prisma';
 
 const asignarSchema = z.object({
   empleadoIds: z.array(z.string().uuid()).optional(),

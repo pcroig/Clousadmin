@@ -2,15 +2,17 @@
 // API: Firma Digital - Firmar Documento
 // ========================================
 
+import { randomUUID } from 'crypto';
+
 import { NextRequest, NextResponse } from 'next/server';
+
 import { getSession } from '@/lib/auth';
+import {
+  type DatosCapturadosFirma,
+  firmarDocumento,
+} from '@/lib/firma-digital/db-helpers';
 import { prisma } from '@/lib/prisma';
 import { uploadToS3 } from '@/lib/s3';
-import {
-  firmarDocumento,
-  type DatosCapturadosFirma,
-} from '@/lib/firma-digital/db-helpers';
-import { randomUUID } from 'crypto';
 
 /**
  * POST /api/firma/solicitudes/[id]/firmar - Firmar documento

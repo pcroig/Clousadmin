@@ -4,10 +4,11 @@
 // Document Uploader Component - Reusable file upload component
 // ========================================
 
-import { useState, useRef } from 'react';
-import { Button } from '@/components/ui/button';
+import { FileText, Upload, X } from 'lucide-react';
+import { useRef, useState } from 'react';
+
 import { LoadingButton } from '@/components/shared/loading-button';
-import { Upload, X, FileText } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 
 interface DocumentUploaderProps {

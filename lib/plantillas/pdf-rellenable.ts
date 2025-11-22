@@ -3,19 +3,22 @@
  * Incluye: PDFs con campos de formulario y extracción con IA Vision
  */
 
-import { PDFDocument, PDFForm, PDFTextField, PDFCheckBox, PDFDropdown } from 'pdf-lib';
-import { DatosEmpleado, ConfiguracionGeneracion, ResultadoGeneracion } from './tipos';
-import { resolverVariables } from './ia-resolver';
-import { descargarDocumento, subirDocumento } from '@/lib/s3';
-import { prisma } from '@/lib/prisma';
-import { sanitizarNombreArchivo } from './sanitizar';
+import { PDFCheckBox, PDFDocument, PDFDropdown, PDFForm, PDFTextField } from 'pdf-lib';
+
+import { callAIWithConfig } from '@/lib/ia';
+import { deleteOpenAIFile, uploadPDFToOpenAI } from '@/lib/ia/core/providers/openai';
 import {
   crearNotificacionDocumentoGeneradoEmpleado,
   crearNotificacionDocumentoPendienteRellenar,
   crearNotificacionFirmaPendiente,
 } from '@/lib/notificaciones';
-import { callAIWithConfig } from '@/lib/ia';
-import { uploadPDFToOpenAI, deleteOpenAIFile } from '@/lib/ia/core/providers/openai';
+import { prisma } from '@/lib/prisma';
+import { descargarDocumento, subirDocumento } from '@/lib/s3';
+
+import { resolverVariables } from './ia-resolver';
+import { sanitizarNombreArchivo } from './sanitizar';
+import { ConfiguracionGeneracion, DatosEmpleado, ResultadoGeneracion } from './tipos';
+
 import type OpenAI from 'openai';
 
 /**

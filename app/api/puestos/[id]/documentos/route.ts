@@ -3,12 +3,14 @@
 // ========================================
 
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
-import { getSession } from '@/lib/auth';
-import { uploadToS3 } from '@/lib/s3';
 import { z } from 'zod';
 
+import { getSession } from '@/lib/auth';
 import { UsuarioRol } from '@/lib/constants/enums';
+import { prisma } from '@/lib/prisma';
+import { uploadToS3 } from '@/lib/s3';
+
+
 
 interface RouteParams {
   params: Promise<{

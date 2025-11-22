@@ -4,23 +4,26 @@
  */
 
 import { get } from 'lodash';
+
+import { decrypt } from '@/lib/crypto';
+import { callAIWithConfig } from '@/lib/ia';
+import { prisma } from '@/lib/prisma';
 import { cache as redisCache } from '@/lib/redis';
-import { QUICK_MAPPINGS, CAMPOS_ENCRIPTADOS } from './constantes';
-import { DatosEmpleado, VariableMapping } from './tipos';
+
+import { CAMPOS_ENCRIPTADOS, QUICK_MAPPINGS } from './constantes';
 import {
+  calcularDuracionMeses,
+  calcularEdad,
+  construirDireccionCompleta,
   formatearFecha,
   formatearMoneda,
   formatearNumero,
-  construirDireccionCompleta,
-  calcularEdad,
-  calcularDuracionMeses,
-  formatearTipoContrato,
   formatearTipoAusencia,
+  formatearTipoContrato,
   numeroAPalabras,
 } from './sanitizar';
-import { decrypt } from '@/lib/crypto';
-import { prisma } from '@/lib/prisma';
-import { callAIWithConfig } from '@/lib/ia';
+import { DatosEmpleado, VariableMapping } from './tipos';
+
 import type OpenAI from 'openai';
 
 // Cache en memoria (rápido, se resetea con el servidor)

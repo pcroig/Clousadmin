@@ -7,10 +7,12 @@
 
 'use client';
 
+import { UserPlus, Users } from 'lucide-react';
 import { useState } from 'react';
-import { Users, UserPlus } from 'lucide-react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+
 import { AddPersonaManualForm } from './add-persona-manual-form';
 import { AddPersonaOnboardingForm } from './add-persona-onboarding-form';
 

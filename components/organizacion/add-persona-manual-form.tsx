@@ -6,16 +6,18 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { ChevronDown, ChevronUp, Upload } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
+
+import { Combobox, type ComboboxOption } from '@/components/shared/combobox';
+import { LoadingButton } from '@/components/shared/loading-button';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { LoadingButton } from '@/components/shared/loading-button';
-import { Combobox, type ComboboxOption } from '@/components/shared/combobox';
+
 import { AddPersonaDocumentForm } from './add-persona-document-form';
-import { ChevronDown, ChevronUp, Upload } from 'lucide-react';
 
 interface AddPersonaManualFormProps {
   onSuccess: () => void;

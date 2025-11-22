@@ -3,15 +3,17 @@
 // ========================================
 
 import { NextRequest } from 'next/server';
+
+import {
+  createdResponse,
+  handleApiError,
+  requireAuthAsHR,
+  successResponse,
+  validateRequest,
+} from '@/lib/api-handler';
 import { prisma } from '@/lib/prisma';
 import { jornadaCreateSchema } from '@/lib/validaciones/schemas';
-import {
-  requireAuthAsHR,
-  validateRequest,
-  handleApiError,
-  successResponse,
-  createdResponse,
-} from '@/lib/api-handler';
+
 import type { JornadaConfig } from '@/lib/calculos/fichajes-helpers';
 
 // GET /api/jornadas - Listar jornadas (solo HR Admin)

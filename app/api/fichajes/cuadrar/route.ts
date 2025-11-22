@@ -4,21 +4,24 @@
 // POST: Cuadrar fichajes pendientes creando eventos según jornada
 
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
-import {
-  requireAuthAsHR,
-  validateRequest,
-  handleApiError,
-  successResponse
-} from '@/lib/api-handler';
 import { z } from 'zod';
+
 import {
-  validarFichajeCompleto,
+  handleApiError,
+  requireAuthAsHR,
+  successResponse,
+  validateRequest
+} from '@/lib/api-handler';
+import {
   actualizarCalculosFichaje,
   obtenerAusenciaMedioDia,
+  validarFichajeCompleto,
 } from '@/lib/calculos/fichajes';
-import type { JornadaConfig, DiaConfig } from '@/lib/calculos/fichajes-helpers';
+import { prisma } from '@/lib/prisma';
 import { obtenerNombreDia } from '@/lib/utils/fechas';
+
+import type { DiaConfig, JornadaConfig } from '@/lib/calculos/fichajes-helpers';
+
 
 const cuadrarSchema = z.object({
   fichajeIds: z.array(z.string()).min(1, 'Debe proporcionar al menos un fichaje'),

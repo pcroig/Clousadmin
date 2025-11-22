@@ -3,15 +3,16 @@
 // ========================================
 // Funciones para calcular resúmenes mensuales pre-nómina
 
+import { EstadoAusencia, EstadoFichaje } from '@/lib/constants/enums';
 import { prisma } from '@/lib/prisma';
+import { redondearHoras } from '@/lib/utils/numeros';
+
 import {
   crearSetFestivos,
   esDiaLaborable,
   getDiasLaborablesEmpresa,
   getFestivosActivosEnRango,
 } from './dias-laborables';
-import { EstadoAusencia, EstadoFichaje } from '@/lib/constants/enums';
-import { redondearHoras } from '@/lib/utils/numeros';
 
 /**
  * Tipo de retorno para el resumen mensual

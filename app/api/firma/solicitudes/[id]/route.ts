@@ -3,10 +3,11 @@
 // ========================================
 
 import { NextRequest, NextResponse } from 'next/server';
+
 import { getSession } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
 import { UsuarioRol } from '@/lib/constants/enums';
 import { obtenerEstadoSolicitud } from '@/lib/firma-digital/db-helpers';
+import { prisma } from '@/lib/prisma';
 
 /**
  * GET /api/firma/solicitudes/[id] - Obtener estado detallado de solicitud

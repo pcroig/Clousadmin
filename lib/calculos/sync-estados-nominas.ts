@@ -4,13 +4,13 @@
 // Función centralizadora para mantener EventoNomina y Nomina individuales sincronizadas
 // PRINCIPIO: El estado del evento debe reflejar el estado AGREGADO de todas sus nóminas
 
-import { prisma } from '@/lib/prisma';
 import {
   EVENTO_ESTADOS,
-  NOMINA_ESTADOS,
   type EventoEstado,
+  NOMINA_ESTADOS,
   type NominaEstado,
 } from '@/lib/constants/nomina-estados';
+import { prisma } from '@/lib/prisma';
 
 export type EstadoEventoNomina = EventoEstado;
 export type EstadoNomina = NominaEstado;

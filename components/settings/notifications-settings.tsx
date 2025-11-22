@@ -4,12 +4,13 @@
 
 'use client';
 
+import { Bell, Mail, MessageSquare } from 'lucide-react';
 import { useState } from 'react';
+import { toast } from 'sonner';
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { toast } from 'sonner';
-import { Bell, Mail, MessageSquare } from 'lucide-react';
 
 interface NotificationPreferences {
   emailAusencias: boolean;

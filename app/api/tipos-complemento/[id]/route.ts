@@ -4,9 +4,10 @@
 // Editar/eliminar un tipo de complemento específico
 
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
+
 import { getSession } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { z } from 'zod';
 
 const UpdateSchema = z.object({
   nombre: z.string().min(1).max(200).optional(),

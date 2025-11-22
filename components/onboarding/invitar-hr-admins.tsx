@@ -4,12 +4,13 @@
 // Invitar HR Admins Component - Onboarding
 // ========================================
 
+import { Check, Copy, UserPlus } from 'lucide-react';
 import { useState } from 'react';
+
+import { invitarHRAdminAction } from '@/app/(dashboard)/onboarding/cargar-datos/actions';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { UserPlus, Check, Copy } from 'lucide-react';
-import { invitarHRAdminAction } from '@/app/(dashboard)/onboarding/cargar-datos/actions';
 
 interface Invitacion {
   email: string;

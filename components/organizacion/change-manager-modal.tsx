@@ -4,19 +4,20 @@
 
 'use client';
 
+import { Check } from 'lucide-react';
 import { useState } from 'react';
+import { toast } from 'sonner';
+
+import { LoadingButton } from '@/components/shared/loading-button';
+import { getInitials } from '@/components/shared/utils';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Button } from '@/components/ui/button';
-import { LoadingButton } from '@/components/shared/loading-button';
-import { toast } from 'sonner';
-import { Check } from 'lucide-react';
-import { getInitials } from '@/components/shared/utils';
 import { getAvatarStyle } from '@/lib/design-system';
 
 interface TeamMember {

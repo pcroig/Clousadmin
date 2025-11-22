@@ -4,9 +4,10 @@
 // CRUD para gestionar el catálogo de tipos de complementos
 
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
+
 import { getSession } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { z } from 'zod';
 
 // Validation schema
 const TipoComplementoSchema = z.object({

@@ -12,14 +12,16 @@
 //
 // @see docs/funcionalidades/importacion-empleados-excel.md
 
-import { useState, useRef } from 'react';
+import { AlertCircle, CheckCircle, ChevronDown, ChevronRight, FileText, Upload, XCircle } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { useRef, useState } from 'react';
+import { toast } from 'sonner';
+
 import { Button } from '@/components/ui/button';
-import { Spinner } from '@/components/ui/spinner';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
-import { Upload, FileText, CheckCircle, XCircle, AlertCircle, ChevronDown, ChevronRight } from 'lucide-react';
-import { toast } from 'sonner';
+import { Spinner } from '@/components/ui/spinner';
+
 
 interface EmpleadoDetectado {
   nombre: string | null;

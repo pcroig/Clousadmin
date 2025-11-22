@@ -4,8 +4,9 @@
 // Validación de datos del onboarding de empleados
 
 import { z } from 'zod';
-import { normalizarIdentificacion } from './nif';
+
 import { validarIBAN } from './iban';
+import { normalizarIdentificacion } from './nif';
 
 /**
  * Validar NSS (Número de Seguridad Social) español

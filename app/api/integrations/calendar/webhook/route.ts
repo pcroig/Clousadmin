@@ -5,13 +5,15 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { prisma, Prisma } from "@/lib/prisma";
-import { OAuthManager } from "@/lib/oauth/oauth-manager";
-import { getGoogleOAuthConfig } from "@/lib/oauth/config";
-import { createCalendarProvider } from "@/lib/integrations/calendar/providers";
-import type { CalendarIntegrationConfig } from "@/lib/integrations/types";
 
 import { EstadoAusencia, UsuarioRol } from '@/lib/constants/enums';
+import { createCalendarProvider } from "@/lib/integrations/calendar/providers";
+import { getGoogleOAuthConfig } from "@/lib/oauth/config";
+import { OAuthManager } from "@/lib/oauth/oauth-manager";
+import { prisma, Prisma } from "@/lib/prisma";
+
+import type { CalendarIntegrationConfig } from "@/lib/integrations/types";
+
 
 export async function POST(req: NextRequest) {
   try {

@@ -2,7 +2,7 @@
 // Authentication Types
 // ========================================
 
-import { Usuario, Empleado } from '@prisma/client';
+import { Empleado, Usuario } from '@prisma/client';
 
 /**
  * Roles de usuario en el sistema

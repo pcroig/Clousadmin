@@ -2,20 +2,25 @@
  * Generación de documentos DOCX desde plantillas usando docxtemplater
  */
 
+import { format } from 'date-fns';
 import Docxtemplater from 'docxtemplater';
 import PizZip from 'pizzip';
-import { DatosEmpleado, ConfiguracionGeneracion, ResultadoGeneracion } from './tipos';
-import { resolverVariables } from './ia-resolver';
-import { extraerVariablesDeTexto, sanitizarNombreArchivo } from './sanitizar';
-import { descargarDocumento, subirDocumento } from '@/lib/s3';
-import { prisma } from '@/lib/prisma';
-import { format } from 'date-fns';
-import { convertDocxFromS3ToPdf } from './docx-to-pdf';
+
 import {
   crearNotificacionDocumentoGeneradoEmpleado,
   crearNotificacionDocumentoPendienteRellenar,
   crearNotificacionFirmaPendiente,
 } from '@/lib/notificaciones';
+import { prisma } from '@/lib/prisma';
+import { descargarDocumento, subirDocumento } from '@/lib/s3';
+
+import { convertDocxFromS3ToPdf } from './docx-to-pdf';
+import { resolverVariables } from './ia-resolver';
+import { extraerVariablesDeTexto, sanitizarNombreArchivo } from './sanitizar';
+import { ConfiguracionGeneracion, DatosEmpleado, ResultadoGeneracion } from './tipos';
+
+
+
 
 const DOCX_MIME_TYPE = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 

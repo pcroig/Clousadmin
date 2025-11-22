@@ -3,9 +3,10 @@
 // ========================================
 
 import { NextRequest, NextResponse } from 'next/server';
+
 import { getSession } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
 import { obtenerFirmasPendientes } from '@/lib/firma-digital/db-helpers';
+import { prisma } from '@/lib/prisma';
 
 /**
  * GET /api/firma/pendientes - Obtener firmas pendientes del empleado autenticado

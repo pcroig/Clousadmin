@@ -1,10 +1,13 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import type { MiEspacioCarpeta, MiEspacioEmpleado } from '@/types/empleado';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+
+
 import { FirmasTab } from '@/components/firma/firmas-tab';
-import { CarpetasGrid, type CarpetaCardData } from '@/components/shared/carpetas-grid';
+import { type CarpetaCardData, CarpetasGrid } from '@/components/shared/carpetas-grid';
+
+import type { MiEspacioCarpeta, MiEspacioEmpleado } from '@/types/empleado';
 
 interface DocumentosTabProps {
   empleado: MiEspacioEmpleado;

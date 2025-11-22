@@ -3,15 +3,16 @@
 // ========================================
 
 import { NextRequest } from 'next/server';
-import { prisma } from '@/lib/prisma';
+
 import {
-  requireAuth,
-  handleApiError,
-  successResponse,
-  notFoundResponse,
   forbiddenResponse,
+  handleApiError,
+  notFoundResponse,
+  requireAuth,
+  successResponse,
 } from '@/lib/api-handler';
 import { UsuarioRol } from '@/lib/constants/enums';
+import { prisma } from '@/lib/prisma';
 
 // GET /api/denuncias/[id] - Obtener detalle de una denuncia
 export async function GET(

@@ -4,23 +4,23 @@
 // PATCH: Aprobar o rechazar solicitud de cambio
 
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma, Prisma } from '@/lib/prisma';
-import {
-  requireAuthAsHROrManager,
-  validateRequest,
-  handleApiError,
-  successResponse,
-  notFoundResponse,
-} from '@/lib/api-handler';
 import { z } from 'zod';
 
+import {
+  handleApiError,
+  notFoundResponse,
+  requireAuthAsHROrManager,
+  successResponse,
+  validateRequest,
+} from '@/lib/api-handler';
 import { EstadoSolicitud } from '@/lib/constants/enums';
 import {
   crearNotificacionSolicitudAprobada,
   crearNotificacionSolicitudRechazada,
 } from '@/lib/notificaciones';
-import { resolveAprobadorEmpleadoId } from '@/lib/solicitudes/aprobador';
+import { prisma, Prisma } from '@/lib/prisma';
 import { aplicarCambiosSolicitud } from '@/lib/solicitudes/aplicar-cambios';
+import { resolveAprobadorEmpleadoId } from '@/lib/solicitudes/aprobador';
 
 const solicitudAccionSchema = z.object({
   accion: z.enum(['aprobar', 'rechazar']),

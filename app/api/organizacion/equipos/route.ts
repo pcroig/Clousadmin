@@ -3,16 +3,17 @@
 // ========================================
 
 import { NextRequest } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { z } from 'zod';
+
 import {
+  createdResponse,
+  handleApiError,
   requireAuth,
   requireAuthAsHR,
-  validateRequest,
-  handleApiError,
   successResponse,
-  createdResponse,
+  validateRequest,
 } from '@/lib/api-handler';
-import { z } from 'zod';
+import { prisma } from '@/lib/prisma';
 
 // Schema de validación
 const equipoCreateSchema = z.object({

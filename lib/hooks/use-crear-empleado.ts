@@ -3,8 +3,8 @@
 // ========================================
 // Para usar cuando se implemente la funcionalidad de crear empleados
 
-import { prisma, Prisma } from '../prisma';
 import { asegurarCarpetasSistemaParaEmpleado } from '../documentos';
+import { prisma, Prisma } from '../prisma';
 
 /**
  * Crea un empleado y sus carpetas del sistema automáticamente

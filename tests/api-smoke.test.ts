@@ -10,7 +10,7 @@
  */
 
 import { strict as assert } from 'node:assert';
-import { readFileSync, existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 console.log('🧪 Ejecutando smoke tests de APIs...');

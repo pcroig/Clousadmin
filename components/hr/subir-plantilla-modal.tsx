@@ -5,13 +5,14 @@
 // ========================================
 // Modal reutilizable para subir plantillas DOCX con detección automática de variables
 
+import { AlertCircle, CheckCircle2, FileText, Upload } from 'lucide-react';
 import { useState } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
-import { Upload, FileText, CheckCircle2, AlertCircle } from 'lucide-react';
 
 interface SubirPlantillaModalProps {
   open: boolean;

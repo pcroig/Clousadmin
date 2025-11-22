@@ -3,14 +3,15 @@
 // ========================================
 
 import { NextRequest } from 'next/server';
-import { prisma } from '@/lib/prisma';
+
 import {
-  requireAuth,
-  handleApiError,
-  successResponse,
-  notFoundResponse,
   forbiddenResponse,
+  handleApiError,
+  notFoundResponse,
+  requireAuth,
+  successResponse,
 } from '@/lib/api-handler';
+import { prisma } from '@/lib/prisma';
 
 // PATCH /api/notificaciones/[id]/marcar-leida
 export async function PATCH(

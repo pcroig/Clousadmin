@@ -3,6 +3,7 @@
 // ========================================
 
 import { NextRequest, NextResponse } from 'next/server';
+
 import { guardarDatosBancarios } from '@/lib/onboarding';
 import { datosBancariosSchema } from '@/lib/validaciones/onboarding';
 

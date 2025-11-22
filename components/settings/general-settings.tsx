@@ -4,15 +4,17 @@
 
 'use client';
 
+import { BellRing, CalendarClock, FileSpreadsheet, ShieldAlert, ShieldCheck } from 'lucide-react';
 import { useMemo, useState } from 'react';
+import { toast } from 'sonner';
+
+import { LoadingButton } from '@/components/shared/loading-button';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Switch } from '@/components/ui/switch';
-import { LoadingButton } from '@/components/shared/loading-button';
-import { toast } from 'sonner';
-import { BellRing, CalendarClock, FileSpreadsheet, ShieldAlert, ShieldCheck } from 'lucide-react';
+
 
 interface GeneralSettingsProps {
   usuario: {

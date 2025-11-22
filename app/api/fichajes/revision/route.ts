@@ -5,7 +5,6 @@
 // POST: Aprobar/rechazar fichajes en revisión
 
 import { NextRequest, NextResponse } from 'next/server';
-
 import { z } from 'zod';
 
 import { getSession } from '@/lib/auth';
@@ -155,7 +154,7 @@ export async function GET(request: NextRequest) {
       }));
 
       // Calcular vista previa propuesta basándose en la jornada asignada del empleado
-      let previewEventos: { tipo: string; hora: string; origen: 'propuesto' }[] = [];
+      const previewEventos: { tipo: string; hora: string; origen: 'propuesto' }[] = [];
       try {
         const fichajeId = typeof datosOriginales?.fichajeId === 'string' ? datosOriginales.fichajeId : undefined;
         if (fichajeId) {
@@ -290,7 +289,7 @@ export async function POST(request: NextRequest) {
           // Mapear nombre de día
           const nombreDia = obtenerNombreDia(fechaDia);
 
-          let eventosAcrear: { tipo: 'entrada'|'pausa_inicio'|'pausa_fin'|'salida'; hora: Date }[] = [];
+          const eventosAcrear: { tipo: 'entrada'|'pausa_inicio'|'pausa_fin'|'salida'; hora: Date }[] = [];
 
           const configJornadaEmpleado = jornadaEmpleado?.config ? (jornadaEmpleado.config as unknown) as ConfigJornada : null;
           if (configJornadaEmpleado && configJornadaEmpleado[nombreDia]) {

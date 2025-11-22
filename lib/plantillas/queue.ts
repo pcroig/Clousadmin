@@ -3,14 +3,16 @@
  * Permite generar documentos en background con tracking de progreso
  */
 
-import { Queue, Worker, Job, QueueEvents } from 'bullmq';
-import { redis, redisSubscriber, cache } from '@/lib/redis';
-import { JobConfig, ResultadoGeneracion, JobProgress } from './tipos';
+import { Prisma } from '@prisma/client';
+import { Job, Queue, QueueEvents, Worker } from 'bullmq';
+
+import { crearNotificacionDocumentoGeneracionLote } from '@/lib/notificaciones';
+import { prisma } from '@/lib/prisma';
+import { cache, redis, redisSubscriber } from '@/lib/redis';
+
 import { generarDocumentoDesdePlantilla } from './generar-documento';
 import { generarDocumentoDesdePDFRellenable } from './pdf-rellenable';
-import { prisma } from '@/lib/prisma';
-import { Prisma } from '@prisma/client';
-import { crearNotificacionDocumentoGeneracionLote } from '@/lib/notificaciones';
+import { JobConfig, JobProgress, ResultadoGeneracion } from './tipos';
 
 // Configuración de conexión Redis para BullMQ
 // Parsear REDIS_URL si está disponible, sino usar configuración por defecto

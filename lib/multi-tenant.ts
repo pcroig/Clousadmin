@@ -4,6 +4,7 @@
 // Provides utilities to access tenant and user data injected via middleware
 
 import { headers } from 'next/headers';
+
 import { UsuarioRol } from '@/lib/constants/enums';
 import {
   EMPLEADO_ID_HEADER,

@@ -4,7 +4,17 @@
 // NUEVO MODELO: Fichaje = día completo, POST crea eventos dentro del fichaje
 
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { z } from 'zod';
+
+import {
+  badRequestResponse,
+  createdResponse,
+  forbiddenResponse,
+  handleApiError,
+  requireAuth,
+  successResponse,
+  validateRequest,
+} from '@/lib/api-handler';
 import {
   calcularHorasTrabajadas,
   calcularTiempoEnPausa,
@@ -14,21 +24,11 @@ import {
   validarFichajeCompleto,
   validarLimitesJornada,
 } from '@/lib/calculos/fichajes';
-import {
-  requireAuth,
-  validateRequest,
-  handleApiError,
-  successResponse,
-  createdResponse,
-  badRequestResponse,
-  forbiddenResponse,
-} from '@/lib/api-handler';
-import { z } from 'zod';
-
 import { EstadoFichaje, UsuarioRol } from '@/lib/constants/enums';
+import { prisma } from '@/lib/prisma';
 import {
-  parsePaginationParams,
   buildPaginationMeta,
+  parsePaginationParams,
 } from '@/lib/utils/pagination';
 
 const fichajeEventoCreateSchema = z.object({

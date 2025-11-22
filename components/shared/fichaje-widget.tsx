@@ -6,17 +6,20 @@
 
 'use client';
 
-import { useState, useEffect, useCallback, useReducer, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useReducer, useState } from 'react';
+import { toast } from 'sonner';
+
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { WidgetCard } from './widget-card';
-import { FichajeManualModal } from './fichaje-manual-modal';
 import { calcularHorasTrabajadas } from '@/lib/calculos/fichajes-cliente';
-import { formatTiempoTrabajado, formatearHorasMinutos } from '@/lib/utils/formatters';
 import { MOBILE_DESIGN } from '@/lib/constants/mobile-design';
-import type { FichajeEvento } from '@prisma/client';
-import { toast } from 'sonner';
 import { extractArrayFromResponse } from '@/lib/utils/api-response';
+import { formatearHorasMinutos, formatTiempoTrabajado } from '@/lib/utils/formatters';
+
+import { FichajeManualModal } from './fichaje-manual-modal';
+import { WidgetCard } from './widget-card';
+
+import type { FichajeEvento } from '@prisma/client';
 
 interface FichajeWidgetProps {
   href?: string;

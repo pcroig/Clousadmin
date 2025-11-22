@@ -4,20 +4,21 @@
 
 'use client';
 
+import { Check, ClipboardList, MoreVertical, X } from 'lucide-react';
 import { useState } from 'react';
-import { Button } from '@/components/ui/button';
+
+import { EmptyState } from '@/components/shared/empty-state';
+import { getInitials } from '@/components/shared/utils';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { MoreVertical, Check, X, ClipboardList } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { formatRelativeTime } from '@/lib/utils/formatRelativeTime';
-import { EmptyState } from '@/components/shared/empty-state';
 import { getAvatarStyle } from '@/lib/design-system';
-import { getInitials } from '@/components/shared/utils';
+import { formatRelativeTime } from '@/lib/utils/formatRelativeTime';
 
 type SolicitudEstado =
   | 'pendiente'

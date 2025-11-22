@@ -4,17 +4,18 @@
 // Sedes Form Component - Onboarding
 // ========================================
 
+import { MapPin, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { toast } from 'sonner';
+
+import {
+  asignarSedeAction,
+  crearSedeAction,
+  eliminarSedeAction,
+} from '@/app/(dashboard)/onboarding/cargar-datos/actions';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { X, MapPin } from 'lucide-react';
-import {
-  crearSedeAction,
-  eliminarSedeAction,
-  asignarSedeAction,
-} from '@/app/(dashboard)/onboarding/cargar-datos/actions';
-import { toast } from 'sonner';
 import {
   RadioGroup,
   RadioGroupItem,

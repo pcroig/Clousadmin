@@ -3,7 +3,8 @@
 // ========================================
 // Helpers para encriptar/desencriptar campos sensibles de empleados
 
-import { encrypt, decrypt } from '@/lib/crypto';
+import { decrypt, encrypt } from '@/lib/crypto';
+
 import type { Empleado } from '@prisma/client';
 
 // Campos sensibles que se encriptan

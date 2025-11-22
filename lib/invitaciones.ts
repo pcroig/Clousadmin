@@ -3,10 +3,10 @@
 // ========================================
 // Utilities for creating, verifying, and accepting employee invitations
 
-import { prisma } from '@/lib/prisma';
 import { hashPassword } from '@/lib/auth';
-import { crearOnboarding, type TipoOnboarding } from '@/lib/onboarding';
 import { sendOnboardingEmail } from '@/lib/email';
+import { crearOnboarding, type TipoOnboarding } from '@/lib/onboarding';
+import { prisma } from '@/lib/prisma';
 
 /**
  * Crear invitación para un empleado

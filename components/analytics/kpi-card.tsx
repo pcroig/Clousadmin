@@ -1,7 +1,8 @@
 "use client"
 
-import { Card } from "@/components/ui/card"
 import { ArrowDown, ArrowUp } from "lucide-react"
+
+import { Card } from "@/components/ui/card"
 
 interface KpiCardProps {
   title: string

@@ -3,9 +3,11 @@
 // ========================================
 
 import * as XLSX from 'xlsx';
-import type { PrismaClient } from '@prisma/client';
-import { decryptEmpleadoData } from '@/lib/empleado-crypto';
+
 import { obtenerLogAuditoria } from '@/lib/auditoria';
+import { decryptEmpleadoData } from '@/lib/empleado-crypto';
+
+import type { PrismaClient } from '@prisma/client';
 
 type FichajeWithEventos = {
   id: string;

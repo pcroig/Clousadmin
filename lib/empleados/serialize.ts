@@ -2,11 +2,12 @@
 // Serializadores de Empleados con datos sensibles
 // ========================================
 
-import type { Empleado } from '@prisma/client';
 
 import { decryptEmpleadoData } from '@/lib/empleado-crypto';
 import { serializeEmpleado } from '@/lib/utils';
+
 import type { MiEspacioEmpleado } from '@/types/empleado';
+import type { Empleado } from '@prisma/client';
 
 /**
  * Serializa un empleado para consumo en Client Components asegurando

@@ -3,14 +3,15 @@
 // ========================================
 
 import { NextRequest, NextResponse } from 'next/server';
+
 import { getSession } from '@/lib/auth';
 import {
-  obtenerResumenesMensuales,
   calcularResumenMensualEmpresa,
+  obtenerResumenesMensuales,
 } from '@/lib/calculos/nominas';
+import { UsuarioRol } from '@/lib/constants/enums';
 import { prisma } from '@/lib/prisma';
 
-import { UsuarioRol } from '@/lib/constants/enums';
 
 // GET /api/nominas/resumen-mensual?mes=X&anio=Y&recalcular=true
 export async function GET(req: NextRequest) {

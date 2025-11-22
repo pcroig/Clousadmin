@@ -4,15 +4,16 @@
 // GET: Obtener notificaciones del usuario autenticado
 
 import { NextRequest } from 'next/server';
-import { prisma, Prisma } from '@/lib/prisma';
+
 import {
-  requireAuth,
   handleApiError,
+  requireAuth,
   successResponse,
 } from '@/lib/api-handler';
+import { prisma, Prisma } from '@/lib/prisma';
 import {
-  parsePaginationParams,
   buildPaginationMeta,
+  parsePaginationParams,
 } from '@/lib/utils/pagination';
 
 // GET /api/notificaciones - Obtener notificaciones del usuario autenticado

@@ -4,13 +4,13 @@
 // Plantillas List Component - Lista de plantillas con filtros
 // ========================================
 
-import { useState, useEffect } from 'react';
+import { FileText, FileType, Filter, Plus, Search } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { FileText, Filter, Plus, Search, FileType } from 'lucide-react';
+import { useEffect, useState } from 'react';
+
+import { EmptyState } from '@/components/shared/empty-state';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { EmptyState } from '@/components/shared/empty-state';
-import { Spinner } from '@/components/ui/spinner';
 import {
   Select,
   SelectContent,
@@ -18,6 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Spinner } from '@/components/ui/spinner';
 
 interface Plantilla {
   id: string;

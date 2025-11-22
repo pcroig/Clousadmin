@@ -4,6 +4,7 @@
  */
 
 import { GoogleCalendarProvider } from "./google-calendar";
+
 import type { CalendarProvider } from "@/lib/integrations/types";
 
 export type CalendarProviderName = "google_calendar" | "outlook_calendar";

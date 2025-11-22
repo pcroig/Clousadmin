@@ -1,22 +1,24 @@
 'use client';
 
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
+import { Calendar, Check, Edit } from 'lucide-react';
 import { useState } from 'react';
+import { toast } from 'sonner';
+
+import { InfoTooltip } from '@/components/shared/info-tooltip';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogFooter,
-  DialogDescription,
 } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Field, FieldLabel, FieldDescription } from '@/components/ui/field';
-import { Badge } from '@/components/ui/badge';
-import { Calendar, Check, Edit } from 'lucide-react';
-import { format } from 'date-fns';
-import { es } from 'date-fns/locale';
-import { InfoTooltip } from '@/components/shared/info-tooltip';
-import { toast } from 'sonner';
+import { Field, FieldDescription, FieldLabel } from '@/components/ui/field';
+
 
 interface PropuestaVacacion {
   fechaInicio: string;

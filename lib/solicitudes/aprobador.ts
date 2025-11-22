@@ -1,6 +1,6 @@
+import type { SessionData } from '@/types/auth';
 import type { Prisma, PrismaClient } from '@prisma/client';
 
-import type { SessionData } from '@/types/auth';
 
 type PrismaClientOrTransaction = PrismaClient | Prisma.TransactionClient;
 

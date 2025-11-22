@@ -3,7 +3,8 @@
 // ========================================
 
 import { NextRequest } from 'next/server';
-import { requireAuth, handleApiError, successResponse, notFoundResponse } from '@/lib/api-handler';
+
+import { handleApiError, notFoundResponse, requireAuth, successResponse } from '@/lib/api-handler';
 import { prisma } from '@/lib/prisma';
 
 export async function GET(req: NextRequest) {

@@ -4,15 +4,11 @@
 
 'use client';
 
-import { useMemo, useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Settings } from 'lucide-react';
-import { toast } from 'sonner';
-import { BandejaEntradaSolicitudes } from './bandeja-entrada-solicitudes';
-import { BandejaEntradaSolved } from './bandeja-entrada-solved';
-import { BandejaEntradaNotificaciones } from './bandeja-entrada-notificaciones';
 import { useQueryClient } from '@tanstack/react-query';
-import { ejecutarAccionSolicitud } from '@/lib/services/solicitudes-actions';
+import { Settings } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { toast } from 'sonner';
+
 import {
   AlertDialog,
   AlertDialogAction,
@@ -24,6 +20,13 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
+import { Button } from '@/components/ui/button';
+import { ejecutarAccionSolicitud } from '@/lib/services/solicitudes-actions';
+
+import { BandejaEntradaNotificaciones } from './bandeja-entrada-notificaciones';
+import { BandejaEntradaSolicitudes } from './bandeja-entrada-solicitudes';
+import { BandejaEntradaSolved } from './bandeja-entrada-solved';
+
 
 // Reutilizar tipos de componentes hijos
 type SolicitudItem = Parameters<typeof BandejaEntradaSolicitudes>[0]['solicitudesPendientes'][0];

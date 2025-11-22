@@ -4,7 +4,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { verificarTokenOnboarding, guardarCredenciales } from '@/lib/onboarding';
+
+import { guardarCredenciales, verificarTokenOnboarding } from '@/lib/onboarding';
 
 const credencialesSchema = z.object({
   password: z.string().min(8, 'La contraseña debe tener al menos 8 caracteres'),

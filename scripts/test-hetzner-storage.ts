@@ -3,12 +3,14 @@
 // Uso: npx tsx scripts/test-hetzner-storage.ts
 
 // Cargar variables de entorno desde .env
-import * as dotenv from 'dotenv';
-import * as path from 'path';
 import { existsSync } from 'fs';
-import { S3Client, PutObjectCommand, GetObjectCommand, ListBucketsCommand, HeadBucketCommand } from '@aws-sdk/client-s3';
-import type { AwsCredentialIdentity } from '@aws-sdk/types';
+import * as path from 'path';
+
+import { GetObjectCommand, HeadBucketCommand, ListBucketsCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import * as dotenv from 'dotenv';
+
+import type { AwsCredentialIdentity } from '@aws-sdk/types';
 
 // Cargar .env (buscar en el raíz del proyecto)
 const envPath = path.join(process.cwd(), '.env');

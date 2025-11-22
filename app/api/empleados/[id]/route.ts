@@ -1,23 +1,24 @@
 import { NextRequest, NextResponse as Response } from 'next/server';
-import { prisma, Prisma } from '@/lib/prisma';
+import { z } from 'zod';
+
 import {
+  badRequestResponse,
+  handleApiError,
+  notFoundResponse,
   requireAuth,
   requireAuthAsHROrManager,
-  validateRequest,
-  handleApiError,
   successResponse,
-  notFoundResponse,
-  badRequestResponse,
+  validateRequest,
 } from '@/lib/api-handler';
+import { logAccesoSensibles } from '@/lib/auditoria';
+import { decryptEmpleadoData, encryptEmpleadoData } from '@/lib/empleado-crypto';
 import {
   crearNotificacionAsignadoEquipo,
   crearNotificacionCambioManager,
   crearNotificacionCambioPuesto,
   crearNotificacionJornadaAsignada,
 } from '@/lib/notificaciones';
-import { z } from 'zod';
-import { encryptEmpleadoData, decryptEmpleadoData } from '@/lib/empleado-crypto';
-import { logAccesoSensibles } from '@/lib/auditoria';
+import { prisma, Prisma } from '@/lib/prisma';
 
 // Schema de validación para actualizar empleado
 const empleadoUpdateSchema = z.object({

@@ -5,15 +5,19 @@
 
 'use client';
 
-import { memo, type MouseEvent } from 'react';
-import { useRouter } from 'next/navigation';
 import { Bell } from 'lucide-react';
-import { WidgetCard } from './widget-card';
-import { EmptyState } from './empty-state';
-import { obtenerIconoPorTipo } from '@/lib/notificaciones/helpers';
-import { formatRelativeTimeShort } from '@/lib/utils/formatRelativeTime';
-import { cn } from '@/lib/utils';
+import { useRouter } from 'next/navigation';
+import { memo, type MouseEvent } from 'react';
+
 import { Button } from '@/components/ui/button';
+import { obtenerIconoPorTipo } from '@/lib/notificaciones/helpers';
+import { cn } from '@/lib/utils';
+import { formatRelativeTimeShort } from '@/lib/utils/formatRelativeTime';
+
+import { EmptyState } from './empty-state';
+import { WidgetCard } from './widget-card';
+
+
 import type { NotificacionUI } from '@/types/Notificacion';
 
 interface NotificacionesWidgetProps {

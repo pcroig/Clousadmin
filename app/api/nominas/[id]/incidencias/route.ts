@@ -4,6 +4,7 @@
 // Devuelve ausencias, cambios de contrato y resumen de fichajes del mes de la nómina
 
 import { NextRequest, NextResponse } from 'next/server';
+
 import { getSession } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 

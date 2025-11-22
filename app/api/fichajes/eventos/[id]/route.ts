@@ -3,15 +3,16 @@
 // ========================================
 
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma, Prisma } from '@/lib/prisma';
-import {
-  requireAuth,
-  validateRequest,
-  handleApiError,
-  successResponse,
-  notFoundResponse,
-} from '@/lib/api-handler';
 import { z } from 'zod';
+
+import {
+  handleApiError,
+  notFoundResponse,
+  requireAuth,
+  successResponse,
+  validateRequest,
+} from '@/lib/api-handler';
+import { prisma, Prisma } from '@/lib/prisma';
 
 const fichajeEventoUpdateSchema = z.object({
   tipo: z.enum(['entrada', 'pausa_inicio', 'pausa_fin', 'salida']).optional(),

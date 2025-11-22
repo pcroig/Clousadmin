@@ -1,12 +1,14 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
-import { Card } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Spinner } from '@/components/ui/spinner';
 import { AlertCircle } from 'lucide-react';
-import { FirmarDocumentoDialog, FirmaPendiente } from './firmar-documento-dialog';
+import { useCallback, useEffect, useState } from 'react';
+
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Spinner } from '@/components/ui/spinner';
+
+import { FirmaPendiente, FirmarDocumentoDialog } from './firmar-documento-dialog';
 
 interface ApiFirmaPendiente {
   id: string;

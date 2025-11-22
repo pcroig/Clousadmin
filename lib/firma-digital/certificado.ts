@@ -4,6 +4,7 @@
  */
 
 import { generarHashObjeto, generarIdUnico } from './hash';
+
 import type { CertificadoFirmaSimple, DatosCapturadosFirma } from './tipos';
 
 /**

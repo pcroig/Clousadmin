@@ -4,13 +4,14 @@
 // Marca las nóminas como publicadas y notifica a los empleados
 
 import { NextRequest, NextResponse } from 'next/server';
+
 import { getSession } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
 import {
   sincronizarEstadoEvento,
 } from '@/lib/calculos/sync-estados-nominas';
-import { NOMINA_ESTADOS, EVENTO_ESTADOS } from '@/lib/constants/nomina-estados';
+import { EVENTO_ESTADOS, NOMINA_ESTADOS } from '@/lib/constants/nomina-estados';
 import { crearNotificacionNominaDisponible } from '@/lib/notificaciones';
+import { prisma } from '@/lib/prisma';
 
 // ========================================
 // POST /api/nominas/eventos/[id]/publicar

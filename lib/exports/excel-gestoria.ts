@@ -4,10 +4,12 @@
 // Genera archivo Excel con 3 hojas: Resumen, Ausencias, Cambios
 
 import * as XLSX from 'xlsx';
-import { prisma } from '@/lib/prisma';
-import { obtenerResumenesMensuales } from '../calculos/nominas';
 
 import { EstadoAusencia } from '@/lib/constants/enums';
+import { prisma } from '@/lib/prisma';
+
+import { obtenerResumenesMensuales } from '../calculos/nominas';
+
 
 /**
  * Genera Excel para gestoría con datos del mes

@@ -4,17 +4,19 @@
  * Iniciar flujo OAuth para conectar Google Calendar
  */
 
+import { randomBytes } from "crypto";
+
 import { NextRequest, NextResponse } from "next/server";
+
 import { getSession } from "@/lib/auth";
-import { createOAuthProvider } from "@/lib/oauth/providers";
+import { UsuarioRol } from '@/lib/constants/enums';
 import {
   getGoogleCalendarOAuthConfig,
   GOOGLE_CALENDAR_SCOPES,
   GOOGLE_LOGIN_SCOPES,
 } from "@/lib/oauth/config";
-import { randomBytes } from "crypto";
+import { createOAuthProvider } from "@/lib/oauth/providers";
 
-import { UsuarioRol } from '@/lib/constants/enums';
 
 export async function GET(req: NextRequest) {
   try {

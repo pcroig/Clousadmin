@@ -5,13 +5,14 @@
 export const dynamic = 'force-dynamic';
 
 import { NextRequest } from 'next/server';
-import { prisma } from '@/lib/prisma';
+
 import {
-  requireAuth,
-  handleApiError,
-  successResponse,
   badRequestResponse,
+  handleApiError,
+  requireAuth,
+  successResponse,
 } from '@/lib/api-handler';
+import { prisma } from '@/lib/prisma';
 
 // GET /api/campanas-vacaciones/[id] - Obtener campaña específica
 export async function GET(

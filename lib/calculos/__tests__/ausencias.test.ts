@@ -2,15 +2,17 @@
 // Tests Unitarios: Ausencias
 // ========================================
 
-import { describe, it, expect, beforeAll, afterAll } from '@jest/globals';
-import { prisma } from '@/lib/prisma';
-import {
-  validarSaldoSuficiente,
-  calcularSaldoDisponible,
-  calcularDias,
-  validarAntelacion,
-} from '../ausencias';
+import { afterAll, beforeAll, describe, expect, it } from '@jest/globals';
 import { TipoAusencia } from '@prisma/client';
+
+import { prisma } from '@/lib/prisma';
+
+import {
+  calcularDias,
+  calcularSaldoDisponible,
+  validarAntelacion,
+  validarSaldoSuficiente,
+} from '../ausencias';
 
 /**
  * NOTA: Estos son tests de ejemplo para la estructura básica.

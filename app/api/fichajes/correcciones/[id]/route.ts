@@ -3,22 +3,23 @@
 // ========================================
 
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
-import {
-  handleApiError,
-  requireAuthAsHROrManager,
-  validateRequest,
-  forbiddenResponse,
-  notFoundResponse,
-  successResponse,
-} from '@/lib/api-handler';
 import { z } from 'zod';
-import { UsuarioRol, EstadoSolicitudCorreccionFichaje } from '@/lib/constants/enums';
+
+import {
+  forbiddenResponse,
+  handleApiError,
+  notFoundResponse,
+  requireAuthAsHROrManager,
+  successResponse,
+  validateRequest,
+} from '@/lib/api-handler';
+import { EstadoSolicitudCorreccionFichaje, UsuarioRol } from '@/lib/constants/enums';
 import {
   aplicarCorreccionFichaje,
   type CorreccionFichajePayload,
 } from '@/lib/fichajes/correcciones';
 import { crearNotificacionFichajeResuelto } from '@/lib/notificaciones';
+import { prisma } from '@/lib/prisma';
 
 const accionSchema = z.object({
   accion: z.enum(['aprobar', 'rechazar']),

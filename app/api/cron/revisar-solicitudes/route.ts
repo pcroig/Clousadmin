@@ -15,15 +15,16 @@
 //
 // Se ejecuta diariamente (frecuencia configurable)
 
+import { Prisma } from '@prisma/client';
 import { NextRequest } from 'next/server';
-import { prisma } from '@/lib/prisma';
+
+import { registrarAutoCompletadoSolicitud } from '@/lib/auto-completado';
 import { EstadoSolicitud } from '@/lib/constants/enums';
+import { initCronLogger } from '@/lib/cron/logger';
 import { clasificarSolicitud } from '@/lib/ia';
 import { crearNotificacionSolicitudRequiereRevision } from '@/lib/notificaciones';
-import { initCronLogger } from '@/lib/cron/logger';
+import { prisma } from '@/lib/prisma';
 import { aplicarCambiosSolicitud } from '@/lib/solicitudes/aplicar-cambios';
-import { registrarAutoCompletadoSolicitud } from '@/lib/auto-completado';
-import { Prisma } from '@prisma/client';
 
 // Configuración: periodo en horas para considerar solicitudes elegibles
 const PERIODO_REVISION_HORAS = parseInt(process.env.SOLICITUDES_PERIODO_REVISION_HORAS || '48');

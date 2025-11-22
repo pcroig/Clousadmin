@@ -3,11 +3,12 @@
 // ========================================
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getSession } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
-import { convertirWaitlistEnInvitacion } from '@/lib/invitaciones-signup';
 
+import { getSession } from '@/lib/auth';
 import { UsuarioRol } from '@/lib/constants/enums';
+import { convertirWaitlistEnInvitacion } from '@/lib/invitaciones-signup';
+import { prisma } from '@/lib/prisma';
+
 
 // GET /api/admin/waitlist - Obtener lista de espera
 export async function GET(req: NextRequest) {

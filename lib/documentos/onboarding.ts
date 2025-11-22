@@ -2,15 +2,15 @@
 // Documentos Onboarding - Gestión de carpetas y documentos para onboarding
 // ========================================
 
-import { prisma } from '@/lib/prisma';
 import {
   CARPETAS_SISTEMA,
   CarpetaSistema,
-  TIPOS_DOCUMENTO,
   inferirTipoDocumento,
   obtenerOCrearCarpetaGlobal,
   obtenerOCrearCarpetaSistema,
+  TIPOS_DOCUMENTO,
 } from '@/lib/documentos';
+import { prisma } from '@/lib/prisma';
 
 /**
  * Crear carpetas automáticas para documentos de onboarding

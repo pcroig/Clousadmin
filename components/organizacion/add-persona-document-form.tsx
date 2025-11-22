@@ -7,11 +7,12 @@
 
 'use client';
 
-import { useState } from 'react';
 import { FileText, Users } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { useState } from 'react';
+
 import { SubirDocumentoIndividual } from '@/components/documentos/subir-documento-individual';
 import { ImportarEmpleadosExcel } from '@/components/shared/importar-empleados-excel';
+import { Button } from '@/components/ui/button';
 
 interface AddPersonaDocumentFormProps {
   onSuccess: () => void;

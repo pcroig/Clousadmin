@@ -5,11 +5,12 @@
 // Vincula los PDFs a las nóminas correspondientes
 
 import { NextRequest, NextResponse } from 'next/server';
+
 import { getSession } from '@/lib/auth';
+import { EVENTO_ESTADOS, NOMINA_ESTADOS } from '@/lib/constants/nomina-estados';
+import { clasificarNomina } from '@/lib/ia/clasificador-nominas';
 import { prisma } from '@/lib/prisma';
 import { uploadToS3 } from '@/lib/s3';
-import { clasificarNomina } from '@/lib/ia/clasificador-nominas';
-import { NOMINA_ESTADOS, EVENTO_ESTADOS } from '@/lib/constants/nomina-estados';
 
 // ========================================
 // POST /api/nominas/eventos/[id]/importar

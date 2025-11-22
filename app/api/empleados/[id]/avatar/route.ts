@@ -2,21 +2,21 @@
 // API Empleados Avatar - POST
 // ========================================
 
-import { NextRequest } from 'next/server';
 import { randomUUID } from 'node:crypto';
 
-import { prisma } from '@/lib/prisma';
-import { UsuarioRol } from '@/lib/constants/enums';
-import { uploadToS3 } from '@/lib/s3';
+import { NextRequest } from 'next/server';
 
 import {
-  requireAuth,
-  handleApiError,
-  successResponse,
-  notFoundResponse,
-  forbiddenResponse,
   badRequestResponse,
+  forbiddenResponse,
+  handleApiError,
+  notFoundResponse,
+  requireAuth,
+  successResponse,
 } from '@/lib/api-handler';
+import { UsuarioRol } from '@/lib/constants/enums';
+import { prisma } from '@/lib/prisma';
+import { uploadToS3 } from '@/lib/s3';
 
 const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2MB
 const ALLOWED_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];

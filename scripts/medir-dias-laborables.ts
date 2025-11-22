@@ -7,12 +7,13 @@
 // El objetivo es contar cuántas queries ejecutan las funciones actuales
 // de cálculo de ausencias al evaluar un rango de fechas.
 
-import path from 'path';
-import { config } from 'dotenv';
 import { performance } from 'node:perf_hooks';
+import path from 'path';
 
-import { prisma } from '@/lib/prisma';
+import { config } from 'dotenv';
+
 import { calcularDias, calcularDiasSolicitados } from '@/lib/calculos/ausencias';
+import { prisma } from '@/lib/prisma';
 
 // Cargar variables de entorno estándar
 config({ path: path.resolve(__dirname, '../.env') });

@@ -5,12 +5,15 @@
 
 'use client';
 
-import { useState } from 'react';
-import { Button } from '@/components/ui/button';
 import { Check } from 'lucide-react';
 import Link from 'next/link';
-import { WidgetCard } from './widget-card';
+import { useState } from 'react';
 import { toast } from 'sonner';
+
+import { Button } from '@/components/ui/button';
+
+import { WidgetCard } from './widget-card';
+
 
 export interface AutoCompletadStats {
   fichajesCompletados: number;

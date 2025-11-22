@@ -4,14 +4,14 @@
 // Widget de Campañas de Vacaciones para Empleado
 // ========================================
 
-import { memo } from 'react';
-import { Calendar, Clock } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { WidgetCard } from '@/components/shared/widget-card';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { Calendar, Clock } from 'lucide-react';
+import { memo } from 'react';
 
+import { WidgetCard } from '@/components/shared/widget-card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { EstadoAusencia } from '@/lib/constants/enums';
 
 interface CampanaInfo {

@@ -3,24 +3,26 @@
 // ========================================
 
 import { prisma } from '@/lib/prisma';
-import {
-  calcularHorasTrabajadas,
-  obtenerHorasEsperadas,
-  obtenerHorasEsperadasBatch,
-  agruparFichajesPorDia,
-  type FichajeConEventos,
-} from './fichajes';
-import type { FichajeEvento, PrismaClient } from '@prisma/client';
+import { obtenerNombreDia } from '@/lib/utils/fechas';
+
 import {
   crearSetFestivos,
+  type DiasLaborables,
   esDiaLaborable,
+  type FestivosSet,
   formatearClaveFecha,
   getDiasLaborablesEmpresa,
   getFestivosActivosEnRango,
-  type DiasLaborables,
-  type FestivosSet,
 } from './dias-laborables';
-import { obtenerNombreDia } from '@/lib/utils/fechas';
+import {
+  agruparFichajesPorDia,
+  calcularHorasTrabajadas,
+  type FichajeConEventos,
+  obtenerHorasEsperadas,
+  obtenerHorasEsperadasBatch,
+} from './fichajes';
+
+import type { FichajeEvento, PrismaClient } from '@prisma/client';
 
 const prismaClient = prisma as PrismaClient;
 

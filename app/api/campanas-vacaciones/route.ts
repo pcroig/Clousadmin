@@ -5,18 +5,18 @@
 export const dynamic = 'force-dynamic';
 
 import { NextRequest } from 'next/server';
-import { prisma, Prisma } from '@/lib/prisma';
-import { campanaVacacionesCreateSchema } from '@/lib/validaciones/schemas';
-import { UsuarioRol } from '@/lib/constants/enums';
-import { crearNotificacionCampanaCreada } from '@/lib/notificaciones';
 
 import {
-  requireAuth,
-  handleApiError,
-  successResponse,
-  createdResponse,
   badRequestResponse,
+  createdResponse,
+  handleApiError,
+  requireAuth,
+  successResponse,
 } from '@/lib/api-handler';
+import { UsuarioRol } from '@/lib/constants/enums';
+import { crearNotificacionCampanaCreada } from '@/lib/notificaciones';
+import { prisma, Prisma } from '@/lib/prisma';
+import { campanaVacacionesCreateSchema } from '@/lib/validaciones/schemas';
 
 // GET /api/campanas-vacaciones - Obtener campaña activa (single active campaign)
 export async function GET(req: NextRequest) {

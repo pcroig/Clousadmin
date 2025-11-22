@@ -4,15 +4,17 @@
 // GET: Obtener métricas de plantilla (headcount, evolución, distribución)
 
 import { NextRequest } from 'next/server';
-import type { Prisma } from '@prisma/client';
-import { prisma } from '@/lib/prisma';
+
+import { PLANTILLA_METRICS } from '@/lib/analytics/metrics';
 import {
-  requireAuthAsHR,
   handleApiError,
+  requireAuthAsHR,
   successResponse,
 } from '@/lib/api-handler';
 import { obtenerRangoFechaAntiguedad } from '@/lib/calculos/antiguedad';
-import { PLANTILLA_METRICS } from '@/lib/analytics/metrics';
+import { prisma } from '@/lib/prisma';
+
+import type { Prisma } from '@prisma/client';
 
 // GET /api/analytics/plantilla - Obtener métricas de plantilla (solo HR Admin)
 export async function GET(request: NextRequest) {

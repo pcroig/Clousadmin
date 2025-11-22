@@ -5,7 +5,7 @@
 // donde cada Fichaje representa un día completo con sus eventos
 
 import { PrismaClient } from '@prisma/client';
-import { parseISO, format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 
 const prisma = new PrismaClient();
 

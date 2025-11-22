@@ -11,16 +11,19 @@
 // El script recorre todos los empleados y cifra los campos sensibles (iban, nif, nss)
 // que aún estén en texto plano.
 
-import { config } from 'dotenv';
 import path from 'path';
-import type { Empleado } from '@prisma/client';
 
-import { prisma } from '@/lib/prisma';
+import { config } from 'dotenv';
+
 import {
   encryptEmpleadoData,
   getSensitiveFields,
   isFieldEncrypted,
 } from '@/lib/empleado-crypto';
+import { prisma } from '@/lib/prisma';
+
+import type { Empleado } from '@prisma/client';
+
 
 // Cargar .env y .env.local si existen
 config({ path: path.resolve(process.cwd(), '.env') });

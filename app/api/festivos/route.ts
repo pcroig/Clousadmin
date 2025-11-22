@@ -5,17 +5,17 @@
 // ========================================
 
 import { NextRequest } from 'next/server';
-import { prisma, Prisma } from '@/lib/prisma';
+
 import {
+  badRequestResponse,
+  createdResponse,
+  handleApiError,
   requireAuth,
   successResponse,
-  createdResponse,
-  badRequestResponse,
-  handleApiError,
 } from '@/lib/api-handler';
-import { festivoCreateSchema } from '@/lib/validaciones/schemas';
-
 import { UsuarioRol } from '@/lib/constants/enums';
+import { prisma, Prisma } from '@/lib/prisma';
+import { festivoCreateSchema } from '@/lib/validaciones/schemas';
 
 // Force dynamic rendering
 export const dynamic = 'force-dynamic';

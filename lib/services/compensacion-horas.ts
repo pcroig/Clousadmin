@@ -5,9 +5,9 @@
 import { Prisma } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 
-import { prisma } from '@/lib/prisma';
-import { calcularBalanceMensual } from '@/lib/calculos/balance-horas';
 import { determinarEstadoTrasAprobacion } from '@/lib/calculos/ausencias';
+import { calcularBalanceMensual } from '@/lib/calculos/balance-horas';
+import { prisma } from '@/lib/prisma';
 import { redondearHoras } from '@/lib/utils/numeros';
 
 export const empleadoCompensacionSelect = Prisma.validator<Prisma.EmpleadoSelect>()({
@@ -97,7 +97,7 @@ export async function procesarCompensacionHorasExtra(
         continue;
       }
 
-      let horasACompensar = usarTodasLasHoras
+      const horasACompensar = usarTodasLasHoras
         ? balanceDisponible
         : Number(horasPorEmpleado?.[empleado.id] ?? 0);
 

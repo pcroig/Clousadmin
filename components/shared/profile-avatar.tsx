@@ -1,10 +1,11 @@
 'use client';
 
-import type { ReactNode } from 'react';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { AvatarEditButton } from '@/components/shared/avatar-edit-button';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { getAvatarStyle } from '@/lib/design-system';
 import { cn } from '@/lib/utils';
+
+import type { ReactNode } from 'react';
 
 interface ProfileAvatarProps {
   empleadoId: string;

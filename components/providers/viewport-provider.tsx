@@ -4,8 +4,8 @@ import { ReactNode, useEffect, useMemo, useState } from 'react';
 
 import { useMediaQuery } from '@/lib/hooks/use-media-query';
 import {
-  ViewportContext,
   type ViewportBreakpoint,
+  ViewportContext,
   type ViewportContextValue,
 } from '@/lib/hooks/use-viewport';
 

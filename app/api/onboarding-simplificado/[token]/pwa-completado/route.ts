@@ -3,7 +3,8 @@
 // ========================================
 
 import { NextRequest, NextResponse } from 'next/server';
-import { verificarTokenOnboarding, guardarProgresoPWA } from '@/lib/onboarding';
+
+import { guardarProgresoPWA, verificarTokenOnboarding } from '@/lib/onboarding';
 
 // POST /api/onboarding-simplificado/[token]/pwa-completado - Marcar PWA como completado
 export async function POST(

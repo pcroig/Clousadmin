@@ -3,9 +3,10 @@
  * Verifica integridad de documentos y firmas
  */
 
-import { generarHashDocumento, verificarHash } from './hash';
 import { verificarCertificado } from './certificado';
-import type { ResultadoValidacionFirma, CertificadoFirmaSimple } from './tipos';
+import { generarHashDocumento, verificarHash } from './hash';
+
+import type { CertificadoFirmaSimple, ResultadoValidacionFirma } from './tipos';
 
 /**
  * Valida que un documento no ha sido modificado después de firmado

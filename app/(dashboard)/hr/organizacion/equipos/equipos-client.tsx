@@ -7,12 +7,12 @@
 import { Filter, Plus } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
-import { EquipoDetails } from '@/components/organizacion/equipo-details';
-import { EquipoFormModal } from '@/components/organizacion/equipo-form-modal';
 import { CompactFilterBar } from '@/components/adaptive/CompactFilterBar';
 import { MobileActionBar } from '@/components/adaptive/MobileActionBar';
 import { MobilePageHeader } from '@/components/adaptive/MobilePageHeader';
 import { ResponsiveContainer } from '@/components/adaptive/ResponsiveContainer';
+import { EquipoDetails } from '@/components/organizacion/equipo-details';
+import { EquipoFormModal } from '@/components/organizacion/equipo-form-modal';
 import { Column, DataTable } from '@/components/shared/data-table';
 import { DetailsPanel } from '@/components/shared/details-panel';
 import { TableHeader } from '@/components/shared/table-header';
@@ -258,7 +258,7 @@ export function EquiposClient({ equipos: initialEquipos }: EquiposClientProps) {
             />
           )}
         </DetailsPanel>
-      </div>
+      </ResponsiveContainer>
 
       {/* Create Team Modal */}
       <EquipoFormModal
@@ -269,7 +269,6 @@ export function EquiposClient({ equipos: initialEquipos }: EquiposClientProps) {
           reloadEquipos();
         }}
       />
-      </ResponsiveContainer>
     </>
   );
 }

@@ -3,19 +3,19 @@
 // ========================================
 
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma, Prisma } from '@/lib/prisma';
-import {
-  requireAuth,
-  validateRequest,
-  handleApiError,
-  successResponse,
-  createdResponse,
-  forbiddenResponse,
-} from '@/lib/api-handler';
-import { crearNotificacionSolicitudCreada } from '@/lib/notificaciones';
 import { z } from 'zod';
 
+import {
+  createdResponse,
+  forbiddenResponse,
+  handleApiError,
+  requireAuth,
+  successResponse,
+  validateRequest,
+} from '@/lib/api-handler';
 import { EstadoSolicitud, UsuarioRol } from '@/lib/constants/enums';
+import { crearNotificacionSolicitudCreada } from '@/lib/notificaciones';
+import { prisma, Prisma } from '@/lib/prisma';
 
 // Schema de validación
 const solicitudCreateSchema = z.object({

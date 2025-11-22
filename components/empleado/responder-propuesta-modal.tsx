@@ -1,23 +1,25 @@
 'use client';
 
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
+import { Calendar as CalendarIcon, Check, Edit } from 'lucide-react';
 import { useMemo, useState } from 'react';
+import { toast } from 'sonner';
+
+import { LoadingButton } from '@/components/shared/loading-button';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Calendar } from '@/components/ui/calendar';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogDescription,
 } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { LoadingButton } from '@/components/shared/loading-button';
-import { Badge } from '@/components/ui/badge';
-import { Calendar as CalendarIcon, Check, Edit } from 'lucide-react';
-import { format } from 'date-fns';
-import { es } from 'date-fns/locale';
-import { Calendar } from '@/components/ui/calendar';
 import { Label } from '@/components/ui/label';
 import { cn, toDateOnlyString } from '@/lib/utils';
-import { toast } from 'sonner';
+
 
 const MIN_ALTERNATIVOS_RATIO = 0.5;
 

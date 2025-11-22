@@ -4,7 +4,8 @@
 
 'use client';
 
-import { Filter, ChevronLeft, ChevronRight, MoreHorizontal } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Filter, MoreHorizontal } from 'lucide-react';
+
 import { Button } from '@/components/ui/button';
 
 interface TableFiltersProps {

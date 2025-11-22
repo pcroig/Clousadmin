@@ -6,9 +6,10 @@
 // para subir el backup a Hetzner Object Storage
 // Configuración consistente con lib/s3.ts
 
-import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
-import { readFileSync, statSync, existsSync } from 'fs';
+import { existsSync, readFileSync, statSync } from 'fs';
 import { basename } from 'path';
+
+import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 
 const STORAGE_ENDPOINT = process.env.STORAGE_ENDPOINT;
 const STORAGE_REGION = process.env.STORAGE_REGION;

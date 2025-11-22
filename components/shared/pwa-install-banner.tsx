@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
 import { DownloadCloud, X } from 'lucide-react';
+import { useState } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { usePWAInstallPrompt } from '@/lib/hooks/use-pwa-install';

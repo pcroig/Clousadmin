@@ -6,9 +6,10 @@
 // Devuelve los empleados del evento con su balance mensual de horas
 
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+
 import { getSession } from '@/lib/auth';
 import { calcularBalanceMensualBatch } from '@/lib/calculos/balance-horas';
+import { prisma } from '@/lib/prisma';
 
 async function balanceHorasHandler(
   req: NextRequest,

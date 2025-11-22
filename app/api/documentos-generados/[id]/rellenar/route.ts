@@ -3,12 +3,13 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+
 import { getSession } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
-import { descargarDocumento, subirDocumento } from '@/lib/s3';
-import { rellenarPDFFormulario } from '@/lib/plantillas/pdf-rellenable';
 import { crearSolicitudFirma } from '@/lib/firma-digital/db-helpers';
 import { crearNotificacionFirmaPendiente } from '@/lib/notificaciones';
+import { rellenarPDFFormulario } from '@/lib/plantillas/pdf-rellenable';
+import { prisma } from '@/lib/prisma';
+import { descargarDocumento, subirDocumento } from '@/lib/s3';
 
 export async function POST(
   request: NextRequest,

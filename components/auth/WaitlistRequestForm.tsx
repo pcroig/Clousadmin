@@ -5,6 +5,7 @@
 // ========================================
 
 import { useState } from 'react';
+
 import { agregarAWaitlistAction } from '@/app/(auth)/waitlist/actions';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';

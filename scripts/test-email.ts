@@ -1,9 +1,10 @@
 // Script de prueba para verificar envío de emails con Resend
 // Ejecutar con: npx tsx scripts/test-email.ts
 
-import { config } from 'dotenv';
-import { resolve } from 'path';
 import { existsSync } from 'fs';
+import { resolve } from 'path';
+
+import { config } from 'dotenv';
 
 // Cargar variables de entorno desde .env.local (desarrollo) o .env (producción)
 const envLocalPath = resolve(process.cwd(), '.env.local');

@@ -15,16 +15,16 @@
 // Se ejecuta todas las noches a las 23:30
 
 import { NextRequest } from 'next/server';
-import { prisma } from '@/lib/prisma';
-import { EstadoFichaje } from '@/lib/constants/enums';
 
 import {
-  validarFichajeCompleto,
   actualizarCalculosFichaje,
   obtenerEmpleadosDisponibles,
+  validarFichajeCompleto,
 } from '@/lib/calculos/fichajes';
+import { EstadoFichaje } from '@/lib/constants/enums';
 import { initCronLogger } from '@/lib/cron/logger';
 import { crearNotificacionFichajeRequiereRevision } from '@/lib/notificaciones';
+import { prisma } from '@/lib/prisma';
 
 export async function POST(request: NextRequest) {
   let cronLogger: ReturnType<typeof initCronLogger> | null = null;

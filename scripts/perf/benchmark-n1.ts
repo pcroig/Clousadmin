@@ -1,4 +1,5 @@
 import { performance } from 'node:perf_hooks';
+
 import { PrismaClient } from '@prisma/client';
 
 import { calcularBalanceMensualBatch } from '../../lib/calculos/balance-horas';

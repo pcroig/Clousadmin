@@ -1,8 +1,8 @@
 import { strict as assert } from 'node:assert';
 
 import {
-  validarEmpleado,
   type EmpleadoDetectado,
+  validarEmpleado,
 } from '@/lib/ia/procesar-excel-empleados';
 
 const baseEmpleado: EmpleadoDetectado = {

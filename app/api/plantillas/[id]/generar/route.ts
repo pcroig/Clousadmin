@@ -4,9 +4,10 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+
 import { getSession } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
 import { agregarJobGeneracion } from '@/lib/plantillas';
+import { prisma } from '@/lib/prisma';
 
 /**
  * POST /api/plantillas/[id]/generar

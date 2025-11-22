@@ -5,16 +5,16 @@
 // Exporta los enums directamente desde @prisma/client para mantener type safety
 
 import {
-  UsuarioRol,
-  EstadoEmpleado,
-  TipoContrato,
-  TipoEquipo,
-  EstadoFichaje,
-  TipoFichajeEvento,
-  TipoAusencia,
   EstadoAusencia,
+  EstadoEmpleado,
+  EstadoFichaje,
   EstadoSolicitud,
   EstadoSolicitudCorreccionFichaje,
+  TipoAusencia,
+  TipoContrato,
+  TipoEquipo,
+  TipoFichajeEvento,
+  UsuarioRol,
 } from '@prisma/client';
 
 // ========================================

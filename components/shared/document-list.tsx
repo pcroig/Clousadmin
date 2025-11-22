@@ -4,9 +4,10 @@
 // Document List Component - Display and manage documents
 // ========================================
 
-import { FileText, Download, Eye, Trash2, Calendar } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { Calendar, Download, Eye, FileText, Trash2 } from 'lucide-react';
+
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 
 interface Documento {
   id: string;

@@ -4,10 +4,11 @@
 
 'use client';
 
+import { Calendar, CreditCard, DollarSign, Mail, MapPin, Phone } from 'lucide-react';
+
+import { getInitials } from '@/components/shared/utils';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { Mail, Phone, Calendar, MapPin, CreditCard, DollarSign } from 'lucide-react';
-import { getInitials } from '@/components/shared/utils';
 import { getAvatarStyle } from '@/lib/design-system';
 
 interface PersonaDetailsProps {

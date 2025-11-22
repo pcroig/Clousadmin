@@ -2,8 +2,9 @@
 // Lógica de cálculo para Ausencias
 // ========================================
 
+import { EstadoAusencia } from '@/lib/constants/enums';
 import { prisma } from '@/lib/prisma';
-import type { Prisma } from '@prisma/client';
+
 import {
   crearSetFestivos,
   esDiaLaborable,
@@ -12,7 +13,8 @@ import {
   getFestivosActivosEnRango,
 } from './dias-laborables';
 
-import { EstadoAusencia } from '@/lib/constants/enums';
+import type { Prisma } from '@prisma/client';
+
 
 /**
  * Determina el estado aprobado para una ausencia en función de la fecha fin.

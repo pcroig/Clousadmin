@@ -4,30 +4,32 @@
 
 'use client';
 
-import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
 import {
-  Home,
-  Inbox,
-  Clock,
-  Building2,
-  FolderOpen,
-  DollarSign,
   BarChart3,
+  Building2,
   Calendar,
-  FileText,
   ChevronDown,
-  User,
   ChevronLeft,
   ChevronRight,
+  Clock,
+  DollarSign,
+  FileText,
+  FolderOpen,
+  HeadphonesIcon,
+  Home,
+  Inbox,
+  ListChecks,
   LogOut,
   Settings,
-  HeadphonesIcon,
   ShieldCheck,
+  User,
   UserPlus,
-  ListChecks,
 } from 'lucide-react';
+import Link from 'next/link';
+import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import { toast } from 'sonner';
+
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
   DropdownMenu,
@@ -36,10 +38,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { getAvatarStyle } from '@/lib/design-system';
-import { toast } from 'sonner';
-
 import { UsuarioRol } from '@/lib/constants/enums';
+import { getAvatarStyle } from '@/lib/design-system';
+
 
 interface SidebarProps {
   rol: UsuarioRol;

@@ -3,17 +3,18 @@
 // ========================================
 // Procesa solicitudes de fichaje manual pendientes y crea los eventos correspondientes
 
-import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
 import { Prisma } from '@prisma/client';
+import { NextRequest, NextResponse } from 'next/server';
+
 import {
-  requireAuth,
   handleApiError,
+  requireAuth,
   successResponse,
 } from '@/lib/api-handler';
+import { registrarAutoCompletadoSolicitud } from '@/lib/auto-completado';
 import { actualizarCalculosFichaje } from '@/lib/calculos/fichajes';
 import { EstadoFichaje, EstadoSolicitud } from '@/lib/constants/enums';
-import { registrarAutoCompletadoSolicitud } from '@/lib/auto-completado';
+import { prisma } from '@/lib/prisma';
 
 // POST /api/solicitudes/procesar-fichajes - Procesar solicitudes de fichaje manual
 export async function POST(request: NextRequest) {

@@ -16,13 +16,15 @@
 //   - No elimina archivos locales a menos que --delete-after esté activo
 //   - Idempotente: puede ejecutarse múltiples veces sin problemas
 
-import { config } from 'dotenv';
-import { resolve } from 'path';
 import { existsSync } from 'fs';
 import { promises as fs } from 'fs';
+import { resolve } from 'path';
 import path from 'path';
+
+import { config } from 'dotenv';
+
 import { prisma } from '../lib/prisma';
-import { uploadToS3, shouldUseCloudStorage, isS3Configured } from '../lib/s3';
+import { isS3Configured, shouldUseCloudStorage, uploadToS3 } from '../lib/s3';
 
 // Cargar variables de entorno
 const envLocalPath = resolve(process.cwd(), '.env.local');

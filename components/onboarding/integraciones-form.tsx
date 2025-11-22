@@ -4,11 +4,12 @@
 // Integraciones Form Component - Onboarding
 // ========================================
 
+import { Calendar, Check, DollarSign, MessageSquare } from 'lucide-react';
 import { useState } from 'react';
+
+import { configurarIntegracionAction } from '@/app/(dashboard)/onboarding/cargar-datos/actions';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { Calendar, MessageSquare, DollarSign, Check } from 'lucide-react';
-import { configurarIntegracionAction } from '@/app/(dashboard)/onboarding/cargar-datos/actions';
 import {
   Select,
   SelectContent,

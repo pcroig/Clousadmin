@@ -4,15 +4,16 @@
 // Calcula balance de horas trabajadas vs esperadas en un rango de fechas
 
 import { NextRequest } from 'next/server';
-import { prisma } from '@/lib/prisma';
+
 import {
-  requireAuth,
-  handleApiError,
-  successResponse,
   badRequestResponse,
+  handleApiError,
+  requireAuth,
+  successResponse,
 } from '@/lib/api-handler';
 import { calcularBalancePeriodo } from '@/lib/calculos/balance-horas';
 import { UsuarioRol } from '@/lib/constants/enums';
+import { prisma } from '@/lib/prisma';
 
 // GET /api/fichajes/balance - Obtener balance acumulado
 export async function GET(request: NextRequest) {

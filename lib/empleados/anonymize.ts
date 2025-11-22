@@ -4,6 +4,7 @@
 // Helpers reutilizables para anonimizar empleados manteniendo integridad referencial
 
 import { Prisma, PrismaClient } from '@prisma/client';
+
 import { EstadoEmpleado } from '@/lib/constants/enums';
 
 type TransactionClient = Omit<

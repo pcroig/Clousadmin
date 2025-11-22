@@ -3,9 +3,10 @@
 // ========================================
 // Utilities for creating, verifying, and using signup invitations
 
-import { prisma } from '@/lib/prisma';
 import { randomBytes } from 'crypto';
-import { sendSignupInvitationEmail, sendWaitlistInvitationEmail, getBaseUrl } from '@/lib/email';
+
+import { getBaseUrl, sendSignupInvitationEmail, sendWaitlistInvitationEmail } from '@/lib/email';
+import { prisma } from '@/lib/prisma';
 
 /**
  * Crear invitación para signup (crear empresa y cuenta)

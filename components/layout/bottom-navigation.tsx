@@ -4,9 +4,10 @@
 
 'use client';
 
+import { Calendar, Clock, Home, Inbox, Settings, User } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, Inbox, Clock, User, Settings, Calendar } from 'lucide-react';
+
 import { cn } from '@/lib/utils';
 
 interface BottomNavigationProps {

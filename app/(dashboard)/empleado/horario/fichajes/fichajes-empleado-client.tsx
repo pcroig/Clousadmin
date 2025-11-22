@@ -32,8 +32,8 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { EstadoFichaje } from '@/lib/constants/enums';
-import { formatearHorasMinutos } from '@/lib/utils/formatters';
 import { extractArrayFromResponse } from '@/lib/utils/api-response';
+import { formatearHorasMinutos } from '@/lib/utils/formatters';
 
 
 interface FichajeEvento {

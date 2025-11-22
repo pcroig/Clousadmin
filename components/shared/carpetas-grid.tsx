@@ -5,8 +5,9 @@
 
 'use client';
 
-import { memo } from 'react';
 import { Folder } from 'lucide-react';
+import { memo } from 'react';
+
 import { CarpetaCard, type CarpetaCardData } from './carpeta-card';
 
 interface CarpetasGridProps {

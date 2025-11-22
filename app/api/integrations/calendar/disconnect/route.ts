@@ -5,12 +5,12 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuth } from "@/lib/api-handler";
-import { prisma } from "@/lib/prisma";
-import { OAuthManager } from "@/lib/oauth/oauth-manager";
-import { getGoogleOAuthConfig } from "@/lib/oauth/config";
 
+import { requireAuth } from "@/lib/api-handler";
 import { UsuarioRol } from '@/lib/constants/enums';
+import { getGoogleOAuthConfig } from "@/lib/oauth/config";
+import { OAuthManager } from "@/lib/oauth/oauth-manager";
+import { prisma } from "@/lib/prisma";
 
 export async function DELETE(req: NextRequest) {
   try {

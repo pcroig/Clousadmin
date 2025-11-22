@@ -4,9 +4,10 @@
 // Editar/eliminar un complemento específico de un empleado
 
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
+
 import { getSession } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { z } from 'zod';
 
 const UpdateComplementoSchema = z.object({
   importePersonalizado: z.number().optional(),

@@ -4,19 +4,20 @@
 // Utilidades para iconos, colores y estilos de notificaciones
 
 import {
-  Calendar,
-  Clock,
-  FileText,
-  Users,
+  AlertCircle,
   Bell,
+  Calendar,
+  CheckCircle,
+  Clock,
   DollarSign,
   FileSignature,
-  AlertCircle,
-  CheckCircle,
-  XCircle,
+  FileText,
   type LucideIcon,
+  Users,
+  XCircle,
 } from 'lucide-react';
-import { CategoriaNotificacion, TipoNotificacion, obtenerCategoria } from '@/lib/notificaciones';
+
+import { CategoriaNotificacion, obtenerCategoria, TipoNotificacion } from '@/lib/notificaciones';
 
 /**
  * Obtiene el icono de Lucide según la categoría de notificación

@@ -3,16 +3,16 @@
 // ========================================
 
 import { NextRequest } from 'next/server';
-import { prisma, Prisma } from '@/lib/prisma';
-import { cuadrarVacacionesIA } from '@/lib/ia/cuadrar-vacaciones';
-import { UsuarioRol, EstadoAusencia } from '@/lib/constants/enums';
 
 import {
-  requireAuth,
-  handleApiError,
-  successResponse,
   badRequestResponse,
+  handleApiError,
+  requireAuth,
+  successResponse,
 } from '@/lib/api-handler';
+import { EstadoAusencia, UsuarioRol } from '@/lib/constants/enums';
+import { cuadrarVacacionesIA } from '@/lib/ia/cuadrar-vacaciones';
+import { prisma, Prisma } from '@/lib/prisma';
 
 // Force dynamic rendering
 export const dynamic = 'force-dynamic';

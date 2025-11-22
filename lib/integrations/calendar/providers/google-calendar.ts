@@ -4,9 +4,10 @@
  */
 
 import { google } from "googleapis";
+
 import type {
-  CalendarProvider,
   CalendarEvent,
+  CalendarProvider,
 } from "@/lib/integrations/types";
 
 export class GoogleCalendarProvider implements CalendarProvider {

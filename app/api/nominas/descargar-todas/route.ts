@@ -2,13 +2,15 @@
 // API: Descargar Todas las Nóminas (ZIP)
 // ========================================
 
-import { NextRequest, NextResponse } from 'next/server';
-import { getSession } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
 import { readFile } from 'fs/promises';
 import { join } from 'path';
+
 import AdmZip from 'adm-zip';
+import { NextRequest, NextResponse } from 'next/server';
+
 import { logAccesoSensibles } from '@/lib/auditoria';
+import { getSession } from '@/lib/auth';
+import { prisma } from '@/lib/prisma';
 
 // GET /api/nominas/descargar-todas?anio=2025
 export async function GET(req: NextRequest) {

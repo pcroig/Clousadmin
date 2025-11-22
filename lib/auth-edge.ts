@@ -4,7 +4,8 @@
 // Funciones de autenticación compatibles con Edge Runtime
 // NO importar Prisma ni módulos de Node.js aquí
 
-import { SignJWT, jwtVerify } from 'jose';
+import { jwtVerify, SignJWT } from 'jose';
+
 import type { SessionData } from '@/types/auth';
 
 // Configuración

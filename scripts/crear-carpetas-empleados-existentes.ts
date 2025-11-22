@@ -4,8 +4,8 @@
 // Ejecutar una vez para crear carpetas del sistema
 // para todos los empleados que no las tienen
 
-import { prisma } from '../lib/prisma';
 import { CARPETAS_SISTEMA } from '../lib/documentos';
+import { prisma } from '../lib/prisma';
 
 async function crearCarpetasParaEmpleadosExistentes() {
   console.log('🚀 Iniciando creación de carpetas para empleados existentes...\n');

@@ -4,9 +4,10 @@
 // Exporta todas las nóminas de un evento a formato Excel para gestoría
 
 import { NextRequest, NextResponse } from 'next/server';
+import * as XLSX from 'xlsx';
+
 import { getSession } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import * as XLSX from 'xlsx';
 
 // ========================================
 // GET /api/nominas/eventos/[id]/exportar

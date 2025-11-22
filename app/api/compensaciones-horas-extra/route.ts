@@ -5,17 +5,18 @@
 // POST: Crear nueva solicitud de compensación
 
 import { NextRequest } from 'next/server';
-import { prisma, Prisma } from '@/lib/prisma';
-import {
-  requireAuth,
-  validateRequest,
-  handleApiError,
-  successResponse,
-  createdResponse,
-  badRequestResponse,
-} from '@/lib/api-handler';
 import { z } from 'zod';
+
+import {
+  badRequestResponse,
+  createdResponse,
+  handleApiError,
+  requireAuth,
+  successResponse,
+  validateRequest,
+} from '@/lib/api-handler';
 import { UsuarioRol } from '@/lib/constants/enums';
+import { prisma, Prisma } from '@/lib/prisma';
 
 const crearCompensacionSchema = z.object({
   tipoCompensacion: z.enum(['nomina', 'ausencia']),

@@ -2,27 +2,27 @@
 // API Empleados - GET (Listar) y POST (Crear)
 // ========================================
 
-import { NextRequest } from 'next/server';
-import { hash } from 'bcryptjs';
 import { Prisma } from '@prisma/client';
+import { hash } from 'bcryptjs';
+import { NextRequest } from 'next/server';
 
 import {
   handleApiError,
   requireAuthAsHR,
   successResponse,
 } from '@/lib/api-handler';
-import { encryptEmpleadoData, decryptEmpleadoList } from '@/lib/empleado-crypto';
 import { logAccesoSensibles } from '@/lib/auditoria';
-import { prisma } from '@/lib/prisma';
-import { crearNotificacionEmpleadoCreado } from '@/lib/notificaciones';
-import { getOrCreateDefaultJornada } from '@/lib/jornadas/get-or-create-default';
-import { CARPETAS_SISTEMA } from '@/lib/documentos';
-import { invitarEmpleado } from '@/lib/invitaciones';
 import { UsuarioRol } from '@/lib/constants/enums';
+import { CARPETAS_SISTEMA } from '@/lib/documentos';
+import { decryptEmpleadoList, encryptEmpleadoData } from '@/lib/empleado-crypto';
+import { invitarEmpleado } from '@/lib/invitaciones';
+import { getOrCreateDefaultJornada } from '@/lib/jornadas/get-or-create-default';
+import { crearNotificacionEmpleadoCreado } from '@/lib/notificaciones';
+import { prisma } from '@/lib/prisma';
 import { empleadoSelectListado } from '@/lib/prisma/selects';
 import {
-  parsePaginationParams,
   buildPaginationMeta,
+  parsePaginationParams,
 } from '@/lib/utils/pagination';
 
 // GET /api/empleados - Listar todos los empleados (solo HR Admin)

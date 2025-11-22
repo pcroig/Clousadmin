@@ -4,6 +4,7 @@
  */
 
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
+
 import type { OpcionesMarcaFirma } from './tipos';
 
 /**

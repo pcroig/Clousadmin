@@ -3,35 +3,36 @@
 // ========================================
 
 import { NextRequest } from 'next/server';
-import { prisma } from '@/lib/prisma';
-import { ausenciaCreateSchema } from '@/lib/validaciones/schemas';
-import {
-  calcularDias,
-  validarSaldoSuficiente,
-  actualizarSaldo,
-  validarPoliticasEquipo,
-} from '@/lib/calculos/ausencias';
-import {
-  requireAuth,
-  validateRequest,
-  handleApiError,
-  successResponse,
-  createdResponse,
-  badRequestResponse,
-} from '@/lib/api-handler';
-import { crearNotificacionAusenciaSolicitada, crearNotificacionAusenciaAutoAprobada } from '@/lib/notificaciones';
-import { registrarAutoCompletadoAusencia } from '@/lib/auto-completado';
-import { CalendarManager } from '@/lib/integrations/calendar/calendar-manager';
-import { eliminarDocumentoPorId } from '@/lib/documentos';
-import { TIPOS_AUTO_APROBABLES, TIPOS_DESCUENTAN_SALDO } from '@/lib/constants/ausencias';
 
-import { EstadoAusencia, UsuarioRol } from '@/lib/constants/enums';
-import { determinarEstadoTrasAprobacion } from '@/lib/calculos/ausencias';
-import type { Prisma } from '@prisma/client';
 import {
-  parsePaginationParams,
+  badRequestResponse,
+  createdResponse,
+  handleApiError,
+  requireAuth,
+  successResponse,
+  validateRequest,
+} from '@/lib/api-handler';
+import { registrarAutoCompletadoAusencia } from '@/lib/auto-completado';
+import {
+  actualizarSaldo,
+  calcularDias,
+  validarPoliticasEquipo,
+  validarSaldoSuficiente,
+} from '@/lib/calculos/ausencias';
+import { determinarEstadoTrasAprobacion } from '@/lib/calculos/ausencias';
+import { TIPOS_AUTO_APROBABLES, TIPOS_DESCUENTAN_SALDO } from '@/lib/constants/ausencias';
+import { EstadoAusencia, UsuarioRol } from '@/lib/constants/enums';
+import { eliminarDocumentoPorId } from '@/lib/documentos';
+import { CalendarManager } from '@/lib/integrations/calendar/calendar-manager';
+import { crearNotificacionAusenciaAutoAprobada, crearNotificacionAusenciaSolicitada } from '@/lib/notificaciones';
+import { prisma } from '@/lib/prisma';
+import {
   buildPaginationMeta,
+  parsePaginationParams,
 } from '@/lib/utils/pagination';
+import { ausenciaCreateSchema } from '@/lib/validaciones/schemas';
+
+import type { Prisma } from '@prisma/client';
 
 // GET /api/ausencias - Listar ausencias
 export async function GET(req: NextRequest) {

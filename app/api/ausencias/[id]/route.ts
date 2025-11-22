@@ -3,27 +3,27 @@
 // ========================================
 
 import { NextRequest } from 'next/server';
-import { prisma } from '@/lib/prisma';
-import { actualizarSaldo, calcularDias, validarSaldoSuficiente, validarPoliticasEquipo } from '@/lib/calculos/ausencias';
-import {
-  requireAuth,
-  requireAuthAsHROrManager,
-  validateRequest,
-  handleApiError,
-  successResponse,
-  notFoundResponse,
-  forbiddenResponse,
-  badRequestResponse,
-} from '@/lib/api-handler';
-import {
-  crearNotificacionAusenciaAprobada,
-  crearNotificacionAusenciaRechazada,
-  crearNotificacionAusenciaCancelada,
-} from '@/lib/notificaciones';
-import { CalendarManager } from '@/lib/integrations/calendar/calendar-manager';
 import { z } from 'zod';
 
+import {
+  badRequestResponse,
+  forbiddenResponse,
+  handleApiError,
+  notFoundResponse,
+  requireAuth,
+  requireAuthAsHROrManager,
+  successResponse,
+  validateRequest,
+} from '@/lib/api-handler';
+import { actualizarSaldo, calcularDias, validarPoliticasEquipo, validarSaldoSuficiente } from '@/lib/calculos/ausencias';
 import { EstadoAusencia, TipoAusencia, UsuarioRol } from '@/lib/constants/enums';
+import { CalendarManager } from '@/lib/integrations/calendar/calendar-manager';
+import {
+  crearNotificacionAusenciaAprobada,
+  crearNotificacionAusenciaCancelada,
+  crearNotificacionAusenciaRechazada,
+} from '@/lib/notificaciones';
+import { prisma } from '@/lib/prisma';
 
 class SaldoInsuficienteError extends Error {
   saldoDisponible: number;

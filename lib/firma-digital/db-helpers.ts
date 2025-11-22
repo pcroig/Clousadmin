@@ -5,25 +5,27 @@
 
 import { Prisma } from '@prisma/client';
 
-import { prisma } from '@/lib/prisma';
-import { downloadFromS3, uploadToS3 } from '@/lib/s3';
 import {
-  generarHashDocumento,
-  generarCertificadoFirmaSimple,
-  validarIntegridadDocumento,
-  validarComplecionFirmas,
   anadirMarcasFirmasPDF,
   esPDFValido,
+  generarCertificadoFirmaSimple,
+  generarHashDocumento,
+  validarComplecionFirmas,
+  validarIntegridadDocumento,
 } from '@/lib/firma-digital';
+import { crearNotificacionFirmaCompletada, crearNotificacionFirmaPendiente } from '@/lib/notificaciones';
+import { prisma } from '@/lib/prisma';
+import { downloadFromS3, uploadToS3 } from '@/lib/s3';
+
 import type {
   CrearSolicitudFirmaInput,
   DatosCapturadosFirma,
-  EstadoSolicitudFirmaDetallado,
   EstadoSolicitudFirma,
+  EstadoSolicitudFirmaDetallado,
   PosicionFirma,
   ResultadoFirma,
 } from '@/lib/firma-digital';
-import { crearNotificacionFirmaPendiente, crearNotificacionFirmaCompletada } from '@/lib/notificaciones';
+
 
 // Re-export types for API convenience
 export type {

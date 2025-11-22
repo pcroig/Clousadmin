@@ -3,18 +3,18 @@
 // ========================================
 
 import { NextRequest } from 'next/server';
-import { prisma } from '@/lib/prisma';
-import {
-  requireAuth,
-  requireAuthAsHROrManager,
-  validateRequest,
-  handleApiError,
-  successResponse,
-  badRequestResponse,
-} from '@/lib/api-handler';
 import { z } from 'zod';
 
+import {
+  badRequestResponse,
+  handleApiError,
+  requireAuth,
+  requireAuthAsHROrManager,
+  successResponse,
+  validateRequest,
+} from '@/lib/api-handler';
 import { EstadoAusencia, UsuarioRol } from '@/lib/constants/enums';
+import { prisma } from '@/lib/prisma';
 
 const saldoSchema = z.object({
   nivel: z.enum(['empresa', 'equipo']),

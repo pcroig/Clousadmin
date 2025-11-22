@@ -4,9 +4,10 @@
 // Ejecutar con: tsx scripts/diagnostico-prisma.ts
 // Verifica conexión a BD, Prisma Client, y variables de entorno
 
+import path from 'path';
+
 import { PrismaClient } from '@prisma/client';
 import { config } from 'dotenv';
-import path from 'path';
 
 // Cargar .env
 config({ path: path.resolve(__dirname, '../.env') });

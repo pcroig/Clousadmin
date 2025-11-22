@@ -4,8 +4,9 @@
 
 'use client';
 
+import { Calendar, CheckCircle2, Clock, FileCheck } from 'lucide-react';
+
 import { Card, CardContent } from '@/components/ui/card';
-import { CheckCircle2, Clock, Calendar, FileCheck } from 'lucide-react';
 
 interface SolvedStats {
   fichajesActualizados: number;

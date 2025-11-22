@@ -4,15 +4,11 @@
 
 'use client';
 
-import { useMemo, useState } from 'react';
-import { Button } from '@/components/ui/button';
 import { Settings } from 'lucide-react';
-import { BandejaEntradaSolicitudes } from './bandeja-entrada-solicitudes';
-import { BandejaEntradaSolved } from './bandeja-entrada-solved';
-import { BandejaEntradaNotificaciones } from './bandeja-entrada-notificaciones';
-import { ejecutarAccionSolicitud } from '@/lib/services/solicitudes-actions';
-import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
+import { useMemo, useState } from 'react';
+import { toast } from 'sonner';
+
 import {
   AlertDialog,
   AlertDialogAction,
@@ -24,7 +20,14 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
+import { Button } from '@/components/ui/button';
 import { iconButtonClasses } from '@/lib/design-system';
+import { ejecutarAccionSolicitud } from '@/lib/services/solicitudes-actions';
+
+import { BandejaEntradaNotificaciones } from './bandeja-entrada-notificaciones';
+import { BandejaEntradaSolicitudes } from './bandeja-entrada-solicitudes';
+import { BandejaEntradaSolved } from './bandeja-entrada-solved';
+
 
 type SolicitudPendiente = Parameters<
   typeof BandejaEntradaSolicitudes

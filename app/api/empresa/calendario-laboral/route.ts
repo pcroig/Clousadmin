@@ -4,16 +4,16 @@
 // ========================================
 
 import { NextRequest } from 'next/server';
-import { prisma, Prisma } from '@/lib/prisma';
+
 import {
-  requireAuth,
-  successResponse,
   badRequestResponse,
   handleApiError,
+  requireAuth,
+  successResponse,
 } from '@/lib/api-handler';
-import { calendarioLaboralUpdateSchema } from '@/lib/validaciones/schemas';
-
 import { UsuarioRol } from '@/lib/constants/enums';
+import { prisma, Prisma } from '@/lib/prisma';
+import { calendarioLaboralUpdateSchema } from '@/lib/validaciones/schemas';
 
 // Force dynamic rendering
 export const dynamic = 'force-dynamic';

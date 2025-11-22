@@ -3,21 +3,22 @@
 // ========================================
 // GET: Obtener métricas de compensación (costes, salarios, distribución)
 
-import { NextRequest } from 'next/server';
 import { Prisma } from '@prisma/client';
-import { prisma } from '@/lib/prisma';
+import { NextRequest } from 'next/server';
+
+import { COMPENSACION_METRICS } from '@/lib/analytics/metrics';
 import {
-  requireAuthAsHR,
   handleApiError,
+  requireAuthAsHR,
   successResponse,
 } from '@/lib/api-handler';
 import { obtenerRangoFechaAntiguedad } from '@/lib/calculos/antiguedad';
+import { prisma } from '@/lib/prisma';
 import {
-  toNumber,
   calcularVariacion,
   MESES,
+  toNumber,
 } from '@/lib/utils/analytics-helpers';
-import { COMPENSACION_METRICS } from '@/lib/analytics/metrics';
 
 const empleadoConEquiposSelect = Prisma.validator<Prisma.EmpleadoSelect>()({
   id: true,

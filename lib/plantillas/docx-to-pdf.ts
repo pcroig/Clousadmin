@@ -10,12 +10,13 @@
  * - Puedes especificar la ruta mediante la variable de entorno LIBREOFFICE_PATH.
  */
 
+import { execFile } from 'child_process';
+import { randomUUID } from 'crypto';
 import { promises as fs } from 'fs';
 import os from 'os';
 import path from 'path';
-import { randomUUID } from 'crypto';
-import { execFile } from 'child_process';
 import { promisify } from 'util';
+
 import { descargarDocumento, subirDocumento } from '@/lib/s3';
 
 const execFileAsync = promisify(execFile);

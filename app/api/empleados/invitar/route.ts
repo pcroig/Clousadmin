@@ -3,18 +3,20 @@
 // ========================================
 
 import { NextRequest } from 'next/server';
-import { crearOnboarding } from '@/lib/onboarding';
-import { sendOnboardingEmail } from '@/lib/email';
-import {
-  requireAuthAsHR,
-  validateRequest,
-  handleApiError,
-  successResponse,
-  notFoundResponse,
-  forbiddenResponse,
-  badRequestResponse,
-} from '@/lib/api-handler';
 import { z } from 'zod';
+
+import {
+  badRequestResponse,
+  forbiddenResponse,
+  handleApiError,
+  notFoundResponse,
+  requireAuthAsHR,
+  successResponse,
+  validateRequest,
+} from '@/lib/api-handler';
+import { sendOnboardingEmail } from '@/lib/email';
+import { crearOnboarding } from '@/lib/onboarding';
+
 
 const invitacionSchema = z.object({
   empleadoId: z.string().uuid(),

@@ -4,7 +4,11 @@
 // Lista de Festivos
 // ========================================
 
-import { useEffect, useState, useCallback } from 'react';
+import { Trash2 } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
+import { toast } from 'sonner';
+
+import { Button } from '@/components/ui/button';
 import {
   Table,
   TableBody,
@@ -13,10 +17,9 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Button } from '@/components/ui/button';
-import { Trash2 } from 'lucide-react';
+
 import { EditarFestivoModal } from './editar-festivo-modal';
-import { toast } from 'sonner';
+
 
 interface Festivo {
   id: string;

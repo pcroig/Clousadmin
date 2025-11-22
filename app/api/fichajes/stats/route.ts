@@ -4,14 +4,15 @@
 // GET: Obtener estadísticas para el widget del dashboard HR
 
 import { NextRequest } from 'next/server';
-import { prisma } from '@/lib/prisma';
-import { EstadoFichaje } from '@/lib/constants/enums';
 
 import {
-  requireAuthAsHR,
   handleApiError,
+  requireAuthAsHR,
   successResponse,
 } from '@/lib/api-handler';
+import { EstadoFichaje } from '@/lib/constants/enums';
+import { prisma } from '@/lib/prisma';
+
 
 // GET /api/fichajes/stats - Obtener estadísticas de fichajes (solo HR Admin)
 export async function GET(request: NextRequest) {

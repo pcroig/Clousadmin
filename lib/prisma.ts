@@ -7,7 +7,8 @@
 // Lazy initialization to avoid environment variable timing issues
 
 import { performance } from 'node:perf_hooks';
-import { PrismaClient, Prisma } from '@prisma/client';
+
+import { Prisma, PrismaClient } from '@prisma/client';
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;

@@ -1,10 +1,11 @@
 import { strict as assert } from 'node:assert';
 
-import type { FichajeConEventos } from '@/lib/calculos/fichajes';
 import {
-  generarDiasDelPeriodo,
   calcularHorasTrabajadasDelDia,
+  generarDiasDelPeriodo,
 } from '@/lib/calculos/balance-horas';
+
+import type { FichajeConEventos } from '@/lib/calculos/fichajes';
 
 function crearFichaje(
   fechaISO: string,

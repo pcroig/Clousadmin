@@ -3,19 +3,20 @@
 // ========================================
 
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma, Prisma } from '@/lib/prisma';
+import { z } from 'zod';
+
 import {
+  badRequestResponse,
   createdResponse,
   handleApiError,
   requireAuth,
   requireAuthAsHROrManager,
   successResponse,
   validateRequest,
-  badRequestResponse,
 } from '@/lib/api-handler';
-import { z } from 'zod';
-import { UsuarioRol, EstadoSolicitudCorreccionFichaje } from '@/lib/constants/enums';
+import { EstadoSolicitudCorreccionFichaje, UsuarioRol } from '@/lib/constants/enums';
 import { crearNotificacionFichajeRequiereRevision } from '@/lib/notificaciones';
+import { prisma, Prisma } from '@/lib/prisma';
 
 const crearCorreccionSchema = z.object({
   fichajeId: z.string().uuid(),

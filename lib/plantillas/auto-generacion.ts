@@ -3,6 +3,7 @@
  */
 
 import { prisma } from '@/lib/prisma';
+
 import { agregarJobGeneracion } from './queue';
 
 interface AutoGenerarArgs {

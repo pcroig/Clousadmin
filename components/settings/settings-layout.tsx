@@ -4,12 +4,12 @@
 
 'use client';
 
-import { useMemo } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { cn } from '@/lib/utils';
+import { useMemo } from 'react';
 
 import { UsuarioRol } from '@/lib/constants/enums';
+import { cn } from '@/lib/utils';
 
 interface SettingsSection {
   id: string;

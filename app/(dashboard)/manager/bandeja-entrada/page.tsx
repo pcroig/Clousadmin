@@ -8,8 +8,9 @@ import { type BandejaEntradaTab, BandejaEntradaTabs } from '@/components/hr/band
 import { getSession } from '@/lib/auth';
 import { EstadoAusencia, EstadoSolicitud, UsuarioRol } from '@/lib/constants/enums';
 import { prisma } from '@/lib/prisma';
-import type { NotificacionUI } from '@/types/Notificacion';
+
 import type { TipoNotificacion } from '@/lib/notificaciones';
+import type { NotificacionUI } from '@/types/Notificacion';
 
 export default async function ManagerBandejaEntradaPage({
   searchParams,

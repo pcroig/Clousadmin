@@ -3,11 +3,11 @@
 // ========================================
 
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
-import { getSession } from '@/lib/auth';
 import { z } from 'zod';
 
+import { getSession } from '@/lib/auth';
 import { UsuarioRol } from '@/lib/constants/enums';
+import { prisma } from '@/lib/prisma';
 
 // Schema de validación
 const puestoCreateSchema = z.object({

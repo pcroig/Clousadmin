@@ -6,10 +6,11 @@
 
 "use client";
 
+import { type VariantProps } from "class-variance-authority";
 import * as React from "react";
+
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
-import { type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 interface ReactElementWithDisplayName {

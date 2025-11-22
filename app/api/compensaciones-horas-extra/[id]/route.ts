@@ -4,18 +4,19 @@
 // PATCH: Aprobar o rechazar compensación
 
 import { NextRequest } from 'next/server';
-import { prisma } from '@/lib/prisma';
-import {
-  requireAuthAsHR,
-  validateRequest,
-  handleApiError,
-  successResponse,
-  badRequestResponse,
-  notFoundResponse,
-} from '@/lib/api-handler';
 import { z } from 'zod';
-import { EstadoAusencia } from '@/lib/constants/enums';
+
+import {
+  badRequestResponse,
+  handleApiError,
+  notFoundResponse,
+  requireAuthAsHR,
+  successResponse,
+  validateRequest,
+} from '@/lib/api-handler';
 import { determinarEstadoTrasAprobacion } from '@/lib/calculos/ausencias';
+import { EstadoAusencia } from '@/lib/constants/enums';
+import { prisma } from '@/lib/prisma';
 
 const aprobarRechazarSchema = z.object({
   accion: z.enum(['aprobar', 'rechazar']),

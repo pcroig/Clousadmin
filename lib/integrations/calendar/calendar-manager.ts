@@ -3,17 +3,20 @@
  * Gestión de sincronización entre Clousadmin y calendarios externos
  */
 
-import { prisma, Prisma } from "@/lib/prisma";
-import { OAuthManager } from "@/lib/oauth/oauth-manager";
 import { getGoogleCalendarOAuthConfig } from "@/lib/oauth/config";
-import { createCalendarProvider } from "./providers";
-import type {
-  CalendarProviderName} from "./providers";
+import { OAuthManager } from "@/lib/oauth/oauth-manager";
+import { prisma, Prisma } from "@/lib/prisma";
+
 import {
   ausenciaToCalendarEvent,
-  type SyncResult,
   type CalendarIntegrationConfig,
+  type SyncResult,
 } from "../types";
+
+import { createCalendarProvider } from "./providers";
+
+import type {
+  CalendarProviderName} from "./providers";
 import type { Ausencia } from "@prisma/client";
 
 export class CalendarManager {

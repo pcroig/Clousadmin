@@ -5,8 +5,9 @@
 // Permite al creador de la plataforma invitar usuarios sin necesidad de autenticación
 
 import { NextRequest, NextResponse } from 'next/server';
-import { crearInvitacionSignup } from '@/lib/invitaciones-signup';
 import { z } from 'zod';
+
+import { crearInvitacionSignup } from '@/lib/invitaciones-signup';
 
 const invitacionSignupSchema = z.object({
   email: z.string().email('Email inválido'),

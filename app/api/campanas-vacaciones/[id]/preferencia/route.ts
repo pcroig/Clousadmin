@@ -3,9 +3,10 @@
 // ========================================
 
 import { NextRequest } from 'next/server';
-import { prisma, Prisma } from '@/lib/prisma';
-import { requireAuth, handleApiError, successResponse, badRequestResponse } from '@/lib/api-handler';
+
+import { badRequestResponse, handleApiError, requireAuth, successResponse } from '@/lib/api-handler';
 import { crearNotificacionCampanaCompletada } from '@/lib/notificaciones';
+import { prisma, Prisma } from '@/lib/prisma';
 
 export const dynamic = 'force-dynamic';
 

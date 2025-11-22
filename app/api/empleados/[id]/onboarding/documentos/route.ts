@@ -4,22 +4,24 @@
 // Permite a HR subir documentos de onboarding para un empleado
 // después de crear el empleado y activar el onboarding
 
-import { NextRequest, NextResponse } from 'next/server';
-import {
-  requireAuthAsHR,
-  handleApiError,
-  successResponse,
-  notFoundResponse,
-  forbiddenResponse,
-  badRequestResponse,
-} from '@/lib/api-handler';
-import { prisma } from '@/lib/prisma';
-import { subirDocumentoOnboarding } from '@/lib/documentos/onboarding';
-import { uploadToS3, getSignedDownloadUrl } from '@/lib/s3';
 import { randomBytes } from 'crypto';
-import { obtenerOnboardingConfig } from '@/lib/onboarding-config';
+
+import { NextRequest, NextResponse } from 'next/server';
+
+import {
+  badRequestResponse,
+  forbiddenResponse,
+  handleApiError,
+  notFoundResponse,
+  requireAuthAsHR,
+  successResponse,
+} from '@/lib/api-handler';
+import { subirDocumentoOnboarding } from '@/lib/documentos/onboarding';
 import { validarDocumentosRequeridosCompletos } from '@/lib/documentos/onboarding';
 import { guardarProgresoDocumentos } from '@/lib/onboarding';
+import { obtenerOnboardingConfig } from '@/lib/onboarding-config';
+import { prisma } from '@/lib/prisma';
+import { getSignedDownloadUrl, uploadToS3 } from '@/lib/s3';
 
 interface RouteParams {
   params: Promise<{ id: string }>;

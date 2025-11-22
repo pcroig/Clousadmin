@@ -4,13 +4,14 @@
 // Gestionar un evento específico (actualizar estado, exportar, etc.)
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getSession } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
 import { z } from 'zod';
+
+import { getSession } from '@/lib/auth';
 import {
   EVENTO_ESTADOS,
   NOMINA_ESTADOS,
 } from '@/lib/constants/nomina-estados';
+import { prisma } from '@/lib/prisma';
 
 const UpdateEventoSchema = z.object({
   estado: z.enum([EVENTO_ESTADOS.ABIERTO, EVENTO_ESTADOS.CERRADO]).optional(),

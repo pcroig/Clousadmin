@@ -2,16 +2,18 @@
 // API: Empleados - Confirmar Importación desde Excel
 // ========================================
 
-import { NextRequest, NextResponse } from 'next/server';
 import { Prisma } from '@prisma/client';
+import { NextRequest, NextResponse } from 'next/server';
+
 import { getSession } from '@/lib/auth';
+import { UsuarioRol } from '@/lib/constants/enums';
 import { encryptEmpleadoData } from '@/lib/empleado-crypto';
-import { prisma } from '@/lib/prisma';
 import { invitarEmpleado } from '@/lib/invitaciones';
+import { getOrCreateDefaultJornada } from '@/lib/jornadas/get-or-create-default';
+import { prisma } from '@/lib/prisma';
+
 import type { EmpleadoDetectado } from '@/lib/ia/procesar-excel-empleados';
 
-import { UsuarioRol } from '@/lib/constants/enums';
-import { getOrCreateDefaultJornada } from '@/lib/jornadas/get-or-create-default';
 
 interface ConfirmarImportacionBody {
   empleados: (EmpleadoDetectado & { valido: boolean; errores: string[] })[];

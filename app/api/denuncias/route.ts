@@ -4,17 +4,18 @@
 
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
-import { prisma, Prisma } from '@/lib/prisma';
+
 import {
-  requireAuth,
-  validateRequest,
-  handleApiError,
-  successResponse,
   createdResponse,
   forbiddenResponse,
+  handleApiError,
+  requireAuth,
+  successResponse,
+  validateRequest,
 } from '@/lib/api-handler';
-import { crearNotificacionDenunciaRecibida } from '@/lib/notificaciones';
 import { UsuarioRol } from '@/lib/constants/enums';
+import { crearNotificacionDenunciaRecibida } from '@/lib/notificaciones';
+import { prisma, Prisma } from '@/lib/prisma';
 
 // Schema de validación para crear denuncia
 const denunciaCreateSchema = z.object({

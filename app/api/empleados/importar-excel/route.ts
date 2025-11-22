@@ -3,11 +3,12 @@
 // ========================================
 
 import { NextRequest, NextResponse } from 'next/server';
+
 import { getSession } from '@/lib/auth';
-import { parseExcelToJSON, isValidExcelFile } from '@/lib/excel/parser';
+import { UsuarioRol } from '@/lib/constants/enums';
+import { isValidExcelFile, parseExcelToJSON } from '@/lib/excel/parser';
 import { mapearEmpleadosConIA, validarEmpleado } from '@/lib/ia/procesar-excel-empleados';
 
-import { UsuarioRol } from '@/lib/constants/enums';
 
 const MAX_EXCEL_BYTES = parseInt(process.env.IMPORT_EXCEL_MAX_BYTES || `${5 * 1024 * 1024}`);
 

@@ -1,6 +1,6 @@
+import { Prisma } from '@prisma/client';
 import { NextRequest, NextResponse } from 'next/server';
 
-import { Prisma } from '@prisma/client';
 
 import { getSession } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';

@@ -4,10 +4,12 @@
 // Genera reportes avanzados (PDF, comparativas, análisis)
 
 import { NextRequest, NextResponse } from 'next/server';
+import * as XLSX from 'xlsx';
+
 import { getSession } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+
 import type { Prisma } from '@prisma/client';
-import * as XLSX from 'xlsx';
 
 type FormatoReporte = 'json' | 'excel';
 

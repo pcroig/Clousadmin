@@ -1,8 +1,8 @@
 'use client';
 
-import { useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { Edit2 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 interface AvatarEditButtonProps {

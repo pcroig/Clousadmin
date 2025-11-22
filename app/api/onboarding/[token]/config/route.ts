@@ -3,6 +3,7 @@
 // ========================================
 
 import { NextRequest, NextResponse } from 'next/server';
+
 import { verificarTokenOnboarding } from '@/lib/onboarding';
 import { obtenerOnboardingConfig } from '@/lib/onboarding-config';
 

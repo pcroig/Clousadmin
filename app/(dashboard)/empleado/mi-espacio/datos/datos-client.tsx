@@ -3,8 +3,8 @@
 import { Flag } from 'lucide-react';
 import { useCallback, useRef, useState } from 'react';
 
-import { DenunciaDialog } from '@/components/empleado/denuncia-dialog';
 import { ResponsiveContainer } from '@/components/adaptive/ResponsiveContainer';
+import { DenunciaDialog } from '@/components/empleado/denuncia-dialog';
 import { GeneralTab } from '@/components/shared/mi-espacio/general-tab';
 import { ProfileAvatar } from '@/components/shared/profile-avatar';
 import { Button } from '@/components/ui/button';

@@ -1,8 +1,9 @@
 "use client"
 
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Building2, Calendar as CalendarIcon, Download, Users } from "lucide-react"
+
 import { Button } from "@/components/ui/button"
-import { Users, Building2, Calendar as CalendarIcon, Download } from "lucide-react"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 export interface FilterValues {
   genero: string

@@ -1,10 +1,11 @@
 'use client';
 
+import { Apple, DownloadCloud, PlusCircle, Share2, Smartphone } from 'lucide-react';
 import { useState } from 'react';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Apple, Smartphone, Share2, PlusCircle, DownloadCloud } from 'lucide-react';
+
 import { LoadingButton } from '@/components/shared/loading-button';
 import { Button } from '@/components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { usePWAInstallPrompt } from '@/lib/hooks/use-pwa-install';
 
 interface PWAExplicacionProps {
@@ -59,7 +60,7 @@ export function PWAExplicacion({ onComplete, showCompleteButton = false, loading
                 Toca el icono de <Share2 className="inline-block h-4 w-4 mx-1" /> (Compartir) en la barra inferior de Safari.
               </li>
               <li>
-                Desplázate hacia abajo y selecciona "Añadir a pantalla de inicio" <PlusCircle className="inline-block h-4 w-4 mx-1" />.
+                Desplázate hacia abajo y selecciona «Añadir a pantalla de inicio» <PlusCircle className="inline-block h-4 w-4 mx-1" />.
               </li>
               <li>
                 Confirma la adición y Clousadmin aparecerá como una aplicación en tu pantalla de inicio.
@@ -77,7 +78,7 @@ export function PWAExplicacion({ onComplete, showCompleteButton = false, loading
                 Toca el icono de menú <span className="font-bold">⋮</span> (tres puntos) en la esquina superior derecha.
               </li>
               <li>
-                Selecciona "Añadir a pantalla de inicio" o "Instalar aplicación".
+                Selecciona «Añadir a pantalla de inicio» o «Instalar aplicación».
               </li>
               <li>
                 Confirma la instalación y Clousadmin aparecerá como una aplicación en tu pantalla de inicio.

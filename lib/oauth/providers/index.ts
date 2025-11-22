@@ -4,7 +4,8 @@
  */
 
 import { GoogleOAuthProvider } from "./google";
-import type { OAuthProvider, OAuthConfig, OAuthProviderName } from "../types";
+
+import type { OAuthConfig, OAuthProvider, OAuthProviderName } from "../types";
 
 /**
  * Factory para crear un proveedor OAuth

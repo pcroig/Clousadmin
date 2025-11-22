@@ -3,10 +3,11 @@
 // ========================================
 
 import { NextRequest, NextResponse } from 'next/server';
+
+import { logAccesoSensibles } from '@/lib/auditoria';
 import { getSession } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { getSignedDownloadUrl } from '@/lib/s3';
-import { logAccesoSensibles } from '@/lib/auditoria';
 
 export async function GET(
   req: NextRequest,

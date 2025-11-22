@@ -3,8 +3,9 @@
 // ========================================
 
 import { NextRequest } from 'next/server';
+
+import { handleApiError, requireAuth, successResponse } from '@/lib/api-handler';
 import { prisma } from '@/lib/prisma';
-import { requireAuth, handleApiError, successResponse } from '@/lib/api-handler';
 
 // POST /api/notificaciones/marcar-todas-leidas
 export async function POST(req: NextRequest) {

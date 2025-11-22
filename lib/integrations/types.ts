@@ -3,8 +3,9 @@
  * Tipos compartidos para el sistema de integraciones
  */
 
-import type { Ausencia } from "@prisma/client";
 import { getAusenciaEstadoLabel } from "@/lib/utils/formatters";
+
+import type { Ausencia } from "@prisma/client";
 
 /**
  * Evento de calendario

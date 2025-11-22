@@ -3,16 +3,16 @@
 // ========================================
 // Manages the multi-step onboarding process for new employees
 
-import { prisma, Prisma } from '@/lib/prisma';
 import { randomBytes } from 'crypto';
-import { encryptEmpleadoData } from '@/lib/empleado-crypto';
-import { validarDocumentosRequeridosCompletos } from '@/lib/documentos/onboarding';
-import { obtenerOnboardingConfig } from '@/lib/onboarding-config';
-import { hashPassword } from '@/lib/auth';
-import { uploadToS3 } from '@/lib/s3';
-import { crearNotificacionOnboardingCompletado } from '@/lib/notificaciones';
 
+import { hashPassword } from '@/lib/auth';
 import { UsuarioRol } from '@/lib/constants/enums';
+import { validarDocumentosRequeridosCompletos } from '@/lib/documentos/onboarding';
+import { encryptEmpleadoData } from '@/lib/empleado-crypto';
+import { crearNotificacionOnboardingCompletado } from '@/lib/notificaciones';
+import { obtenerOnboardingConfig } from '@/lib/onboarding-config';
+import { prisma, Prisma } from '@/lib/prisma';
+import { uploadToS3 } from '@/lib/s3';
 
 /**
  * Helper function to safely convert values to Prisma JSON input

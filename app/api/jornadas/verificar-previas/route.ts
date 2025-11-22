@@ -3,13 +3,14 @@
 // ========================================
 
 import { NextRequest } from 'next/server';
-import { prisma } from '@/lib/prisma';
+
 import {
-  requireAuthAsHR,
-  handleApiError,
-  successResponse,
   badRequestResponse,
+  handleApiError,
+  requireAuthAsHR,
+  successResponse,
 } from '@/lib/api-handler';
+import { prisma } from '@/lib/prisma';
 
 interface EmpleadoConJornadaResumen {
   id: string;

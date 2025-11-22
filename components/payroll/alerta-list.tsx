@@ -5,12 +5,14 @@
 
 'use client';
 
-import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
-import { AlertaBadge } from './alerta-badge';
-import { ExternalLink, CheckCircle } from 'lucide-react';
+import { CheckCircle, ExternalLink } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
+
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+
+import { AlertaBadge } from './alerta-badge';
 
 interface Alerta {
   id: string;

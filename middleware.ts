@@ -4,9 +4,8 @@
 // Protege rutas que requieren autenticación
 
 import { NextResponse } from 'next/server';
-import type { NextRequest } from 'next/server';
-import { verifyToken } from '@/lib/auth-edge';
 
+import { verifyToken } from '@/lib/auth-edge';
 import { UsuarioRol } from '@/lib/constants/enums';
 import {
   EMPLEADO_ID_HEADER,
@@ -14,6 +13,8 @@ import {
   USER_ID_HEADER,
   USER_ROLE_HEADER,
 } from '@/lib/constants/tenant';
+
+import type { NextRequest } from 'next/server';
 
 // Rutas públicas (no requieren autenticación)
 const publicPaths = ['/login', '/signup', '/waitlist', '/onboarding'];

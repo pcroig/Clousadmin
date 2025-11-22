@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAuthAsHR, handleApiError } from '@/lib/api-handler';
-import { prisma } from '@/lib/prisma';
+
+import { handleApiError, requireAuthAsHR } from '@/lib/api-handler';
 import { logAccesoSensibles } from '@/lib/auditoria';
 import { buildEmpleadoExcelBuffer, loadEmpleadoExportData } from '@/lib/empleados/export-data';
+import { prisma } from '@/lib/prisma';
 
 export async function GET(
   request: NextRequest,

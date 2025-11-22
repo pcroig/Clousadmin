@@ -5,22 +5,23 @@
 
 'use client';
 
+import { Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
 import { memo } from 'react';
-import { Calendar, ChevronRight, ChevronLeft } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Card, CardContent } from '@/components/ui/card';
+
 import { FechaCalendar } from '@/components/shared/fecha-calendar';
-import { WidgetCard } from './widget-card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
 import { EstadoAusencia } from '@/lib/constants/enums';
 import { MOBILE_DESIGN } from '@/lib/constants/mobile-design';
-
 import {
+  formatFechaParaDisplay,
   getAusenciaBadgeVariant,
   getAusenciaEstadoLabel,
   getAusenciaTipoColor,
-  formatFechaParaDisplay,
 } from '@/lib/utils/formatters';
+
+import { WidgetCard } from './widget-card';
 
 export interface AusenciaItem {
   id: string;

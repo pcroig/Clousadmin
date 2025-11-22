@@ -4,11 +4,14 @@
 // Platform Admin Console - Invitaciones & Waitlist
 // ========================================
 
-import { useMemo, useState, useTransition } from 'react';
-import { useRouter } from 'next/navigation';
 import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { Check, Copy, Loader2, RefreshCcw, Send, UserPlus2 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { useMemo, useState, useTransition } from 'react';
 import { toast } from 'sonner';
+
+import { convertirWaitlistEntryAction, generarInvitacionSignupAction } from '@/app/(dashboard)/platform/invitaciones/actions';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -28,8 +31,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { convertirWaitlistEntryAction, generarInvitacionSignupAction } from '@/app/(dashboard)/platform/invitaciones/actions';
-import { Check, Copy, Loader2, RefreshCcw, Send, UserPlus2 } from 'lucide-react';
+
 
 type SerializedInvitation = {
   id: string;
@@ -74,9 +76,12 @@ export function InviteSignupConsole({
   const [creatingInvitation, startCreatingInvitation] = useTransition();
   const [convertingWaitlist, startConvertingWaitlist] = useTransition();
 
+  // Capturar timestamp una vez para comparaciones de expiración
+  const [now] = useState(() => Date.now());
+
   const stats = useMemo(() => {
-    const activas = invitaciones.filter((inv) => !inv.usada && new Date(inv.expiraEn).getTime() > Date.now()).length;
-    const expiradas = invitaciones.filter((inv) => inv.usada || new Date(inv.expiraEn).getTime() <= Date.now()).length;
+    const activas = invitaciones.filter((inv) => !inv.usada && new Date(inv.expiraEn).getTime() > now).length;
+    const expiradas = invitaciones.filter((inv) => inv.usada || new Date(inv.expiraEn).getTime() <= now).length;
 
     return {
       activas,
@@ -133,7 +138,7 @@ export function InviteSignupConsole({
   };
 
   const renderInvitationStatus = (invitation: SerializedInvitation) => {
-    const expired = new Date(invitation.expiraEn).getTime() <= Date.now();
+    const expired = new Date(invitation.expiraEn).getTime() <= now;
 
     if (invitation.usada) {
       return <Badge variant="secondary">Usada</Badge>;

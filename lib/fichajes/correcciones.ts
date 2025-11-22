@@ -2,9 +2,9 @@
 // Helpers para solicitudes de corrección de fichajes
 // ========================================
 
-import { prisma } from '@/lib/prisma';
 import { actualizarCalculosFichaje } from '@/lib/calculos/fichajes';
 import { EstadoSolicitudCorreccionFichaje } from '@/lib/constants/enums';
+import { prisma } from '@/lib/prisma';
 
 export interface CorreccionFichajePayload {
   nuevaFecha?: string | null;

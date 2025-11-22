@@ -4,13 +4,14 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+
 import { getSession } from '@/lib/auth';
-import { prisma, Prisma } from '@/lib/prisma';
 import {
-  extraerCamposPDF,
   escanearPDFConVision,
+  extraerCamposPDF,
   fusionarCamposDetectados,
 } from '@/lib/plantillas';
+import { prisma, Prisma } from '@/lib/prisma';
 
 /**
  * POST /api/plantillas/[id]/escanear-campos

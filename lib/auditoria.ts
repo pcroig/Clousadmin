@@ -5,8 +5,9 @@
 
 import { prisma } from '@/lib/prisma';
 import { getClientIP } from '@/lib/rate-limit';
-import type { NextRequest } from 'next/server';
+
 import type { SessionData } from '@/types/auth';
+import type { NextRequest } from 'next/server';
 
 interface RegistrarAccesoParams {
   empresaId: string;

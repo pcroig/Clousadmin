@@ -4,12 +4,13 @@
 // Gestionar el ciclo mensual de nóminas (EventoNomina)
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getSession } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
 import { z } from 'zod';
+
+import { getSession } from '@/lib/auth';
+import { generarPrenominasEvento } from '@/lib/calculos/generar-prenominas';
 import { UsuarioRol } from '@/lib/constants/enums';
 import { crearNotificacionComplementosPendientes } from '@/lib/notificaciones';
-import { generarPrenominasEvento } from '@/lib/calculos/generar-prenominas';
+import { prisma } from '@/lib/prisma';
 
 const GenerarEventoSchema = z.object({
   mes: z.number().int().min(1).max(12),

@@ -3,6 +3,7 @@
 // ========================================
 
 import { NextRequest, NextResponse } from 'next/server';
+
 import { aceptarInvitacion } from '@/lib/invitaciones';
 
 export async function POST(req: NextRequest) {

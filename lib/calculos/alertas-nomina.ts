@@ -3,8 +3,9 @@
 // ========================================
 // Genera alertas automáticas para detectar anomalías en pre-nóminas
 
-import { prisma } from '@/lib/prisma';
 import { Decimal } from '@prisma/client/runtime/library';
+
+import { prisma } from '@/lib/prisma';
 
 /**
  * Tipos de alertas según severidad

@@ -4,12 +4,13 @@
 // GET: Lista de equipos activos de la empresa
 
 import { NextRequest } from 'next/server';
-import { prisma } from '@/lib/prisma';
+
 import {
-  requireAuthAsHR,
   handleApiError,
+  requireAuthAsHR,
   successResponse,
 } from '@/lib/api-handler';
+import { prisma } from '@/lib/prisma';
 
 // GET /api/analytics/equipos - Obtener lista de equipos (solo HR Admin)
 export async function GET(request: NextRequest) {

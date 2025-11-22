@@ -216,7 +216,7 @@ export function IntegrationsClient({
                       <div className="flex items-center gap-2">
                         <Check className="w-4 h-4 text-green-600" />
                         <span className="text-sm font-medium">
-                          Calendario "Clousadmin - Ausencias"
+                          Calendario «Clousadmin - Ausencias»
                         </span>
                       </div>
                       {empresaIntegrations.map((integration) => (
@@ -289,7 +289,7 @@ export function IntegrationsClient({
                       <div className="flex items-center gap-2">
                         <Check className="w-4 h-4 text-green-600" />
                         <span className="text-sm font-medium">
-                          Calendario "Clousadmin - Ausencias"
+                          Calendario «Clousadmin - Ausencias»
                         </span>
                       </div>
                       {personalIntegrations.map((integration) => (

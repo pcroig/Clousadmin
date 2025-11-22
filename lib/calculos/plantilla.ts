@@ -2,8 +2,9 @@
 // Resumen de Plantilla - Estados diarios
 // ========================================
 
-import { prisma } from '@/lib/prisma';
 import { EstadoAusencia, TipoFichajeEvento } from '@/lib/constants/enums';
+import { prisma } from '@/lib/prisma';
+
 import { obtenerEmpleadosDisponibles } from './fichajes';
 
 interface EmpleadoResumen {

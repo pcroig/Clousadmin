@@ -3,12 +3,12 @@
 // ========================================
 
 import { NextRequest, NextResponse } from 'next/server';
+
 import { getSession } from '@/lib/auth';
 import { UsuarioRol } from '@/lib/constants/enums';
-
 import {
-  obtenerAlertas,
   detectarAlertas,
+  obtenerAlertas,
   TipoAlerta,
 } from '@/lib/validaciones/nominas';
 

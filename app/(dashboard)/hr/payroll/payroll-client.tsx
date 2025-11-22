@@ -25,7 +25,6 @@ import { toast } from 'sonner';
 
 import { MobilePageHeader } from '@/components/adaptive/MobilePageHeader';
 import { ResponsiveContainer } from '@/components/adaptive/ResponsiveContainer';
-
 import { AlertasSummary } from '@/components/payroll/alertas-summary';
 import { UploadNominasModal } from '@/components/payroll/upload-nominas-modal';
 import { ValidarComplementosDialog } from '@/components/payroll/validar-complementos-dialog';
@@ -58,11 +57,11 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { MOBILE_DESIGN } from '@/lib/constants/mobile-design';
 import {
   EVENTO_ESTADOS,
   NOMINA_ESTADO_LABELS,
 } from '@/lib/constants/nomina-estados';
-import { MOBILE_DESIGN } from '@/lib/constants/mobile-design';
 import { useIsMobile } from '@/lib/hooks/use-viewport';
 import { cn } from '@/lib/utils';
 

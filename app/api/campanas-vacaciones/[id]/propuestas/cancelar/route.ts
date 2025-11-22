@@ -3,14 +3,15 @@
 // ========================================
 
 import { NextRequest } from 'next/server';
-import { prisma } from '@/lib/prisma';
-import { UsuarioRol } from '@/lib/constants/enums';
+
 import {
-  requireAuth,
-  handleApiError,
-  successResponse,
   badRequestResponse,
+  handleApiError,
+  requireAuth,
+  successResponse,
 } from '@/lib/api-handler';
+import { UsuarioRol } from '@/lib/constants/enums';
+import { prisma } from '@/lib/prisma';
 
 export const dynamic = 'force-dynamic';
 

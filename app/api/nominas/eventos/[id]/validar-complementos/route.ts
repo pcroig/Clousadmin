@@ -4,10 +4,11 @@
 // Permite validar o rechazar complementos de empleados de un evento
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getSession } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
 import { z } from 'zod';
+
+import { getSession } from '@/lib/auth';
 import { crearNotificacionNominaValidada } from '@/lib/notificaciones';
+import { prisma } from '@/lib/prisma';
 
 const ValidarComplementosSchema = z.object({
   complementoIds: z.array(z.string()),
