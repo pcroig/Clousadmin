@@ -10,6 +10,7 @@ import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 
 import { UsuarioRol } from '@/lib/constants/enums';
+import { BILLING_ENABLED } from '@/lib/stripe/config';
 
 interface SettingsSection {
   id: string;
@@ -48,9 +49,17 @@ export const SettingsLayout = ({ rol, children }: SettingsLayoutProps) => {
     if (rol === UsuarioRol.hr_admin) {
       items.splice(1, 0, {
         id: 'company',
-        label: 'Compañía',
+        label: 'Compan\u00eda',
         href: `${basePath}/settings/compania`,
       });
+      // Facturacion solo visible si billing esta habilitado
+      if (BILLING_ENABLED) {
+        items.push({
+          id: 'billing',
+          label: 'Facturaci\u00f3n',
+          href: `${basePath}/settings/facturacion`,
+        });
+      }
       items.push({
         id: 'integrations',
         label: 'Integraciones',
