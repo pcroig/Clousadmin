@@ -65,6 +65,7 @@ export async function crearSolicitudFirma(input: CrearSolicitudFirmaInput) {
     recordatorioAutomatico = true,
     diasRecordatorio = 3,
     creadoPor,
+    posicionFirma,
   } = input;
 
   // 1. Obtener documento y generar hash
