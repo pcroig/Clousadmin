@@ -6,7 +6,7 @@
 import { NextResponse } from 'next/server';
 
 import { verifyToken } from '@/lib/auth-edge';
-import { UsuarioRol } from '@/lib/constants/enums';
+import { EDGE_USUARIO_ROLES } from '@/lib/constants/roles';
 import {
   EMPLEADO_ID_HEADER,
   TENANT_HEADER,
@@ -15,6 +15,13 @@ import {
 } from '@/lib/constants/tenant';
 
 import type { NextRequest } from 'next/server';
+
+const {
+  PLATFORM_ADMIN,
+  HR_ADMIN,
+  MANAGER,
+  EMPLEADO,
+} = EDGE_USUARIO_ROLES;
 
 // Rutas públicas (no requieren autenticación)
 const publicPaths = ['/login', '/signup', '/waitlist', '/onboarding'];
@@ -80,12 +87,12 @@ export async function middleware(request: NextRequest) {
 
   // Verificar acceso a rutas de HR Admin
   if (hrAdminPaths.some((path) => pathname.startsWith(path))) {
-    if (session.user.rol !== UsuarioRol.hr_admin) {
+    if (session.user.rol !== HR_ADMIN) {
       // Redirigir al dashboard apropiado según el rol
       const dashboardUrl =
-        session.user.rol === UsuarioRol.platform_admin
+        session.user.rol === PLATFORM_ADMIN
           ? '/platform/invitaciones'
-          : session.user.rol === UsuarioRol.manager
+          : session.user.rol === MANAGER
             ? '/manager/dashboard'
             : '/empleado/dashboard';
       return NextResponse.redirect(new URL(dashboardUrl, request.url));
@@ -94,12 +101,12 @@ export async function middleware(request: NextRequest) {
 
   // Verificar acceso a rutas de Manager
   if (managerPaths.some((path) => pathname.startsWith(path))) {
-    if (session.user.rol !== UsuarioRol.manager) {
+    if (session.user.rol !== MANAGER) {
       // Redirigir al dashboard apropiado según el rol
       const dashboardUrl =
-        session.user.rol === UsuarioRol.platform_admin
+        session.user.rol === PLATFORM_ADMIN
           ? '/platform/invitaciones'
-          : session.user.rol === UsuarioRol.hr_admin
+          : session.user.rol === HR_ADMIN
             ? '/hr/dashboard'
             : '/empleado/dashboard';
       return NextResponse.redirect(new URL(dashboardUrl, request.url));
@@ -108,12 +115,12 @@ export async function middleware(request: NextRequest) {
 
   // Verificar acceso a rutas de Empleado
   if (empleadoPaths.some((path) => pathname.startsWith(path))) {
-    if (session.user.rol !== UsuarioRol.empleado) {
+    if (session.user.rol !== EMPLEADO) {
       // Redirigir al dashboard apropiado según el rol
       const dashboardUrl =
-        session.user.rol === UsuarioRol.platform_admin
+        session.user.rol === PLATFORM_ADMIN
           ? '/platform/invitaciones'
-          : session.user.rol === UsuarioRol.hr_admin
+          : session.user.rol === HR_ADMIN
             ? '/hr/dashboard'
             : '/manager/dashboard';
       return NextResponse.redirect(new URL(dashboardUrl, request.url));
@@ -122,12 +129,12 @@ export async function middleware(request: NextRequest) {
 
   // Verificar acceso a rutas de Platform Admin
   if (platformAdminPaths.some((path) => pathname.startsWith(path))) {
-    if (session.user.rol !== UsuarioRol.platform_admin) {
+    if (session.user.rol !== PLATFORM_ADMIN) {
       // Redirigir al dashboard apropiado según el rol
       const dashboardUrl =
-        session.user.rol === UsuarioRol.hr_admin
+        session.user.rol === HR_ADMIN
           ? '/hr/dashboard'
-          : session.user.rol === UsuarioRol.manager
+          : session.user.rol === MANAGER
             ? '/manager/dashboard'
             : '/empleado/dashboard';
       return NextResponse.redirect(new URL(dashboardUrl, request.url));
@@ -135,22 +142,22 @@ export async function middleware(request: NextRequest) {
   }
 
   // Si el usuario es Platform Admin y está en la raíz, redirigir a su dashboard
-  if (pathname === '/' && session.user.rol === UsuarioRol.platform_admin) {
+  if (pathname === '/' && session.user.rol === PLATFORM_ADMIN) {
     return NextResponse.redirect(new URL('/platform/invitaciones', request.url));
   }
 
   // Si el usuario es HR Admin y está en la raíz, redirigir a su dashboard
-  if (pathname === '/' && session.user.rol === UsuarioRol.hr_admin) {
+  if (pathname === '/' && session.user.rol === HR_ADMIN) {
     return NextResponse.redirect(new URL('/hr/dashboard', request.url));
   }
 
   // Si el usuario es manager y está en la raíz, redirigir a su dashboard
-  if (pathname === '/' && session.user.rol === UsuarioRol.manager) {
+  if (pathname === '/' && session.user.rol === MANAGER) {
     return NextResponse.redirect(new URL('/manager/dashboard', request.url));
   }
 
   // Si el usuario es empleado y está en la raíz, redirigir a su dashboard
-  if (pathname === '/' && session.user.rol === UsuarioRol.empleado) {
+  if (pathname === '/' && session.user.rol === EMPLEADO) {
     return NextResponse.redirect(new URL('/empleado/dashboard', request.url));
   }
 
