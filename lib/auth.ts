@@ -141,10 +141,15 @@ export async function getSession(): Promise<SessionData | null> {
     // Verificar que usuario sigue activo (cada request)
     const usuario = await prisma.usuario.findUnique({
       where: { id: sessionData.user.id },
-      select: { activo: true },
+      select: {
+        activo: true,
+        empresa: {
+          select: { activo: true },
+        },
+      },
     });
 
-    if (!usuario || !usuario.activo) {
+    if (!usuario || !usuario.activo || usuario.empresa?.activo === false) {
       // Usuario desactivado, invalidar sesión
       await prisma.sesionActiva.delete({ where: { tokenHash } });
       return null;
@@ -402,6 +407,19 @@ export async function authenticate(
   const isValid = await verifyPassword(password, usuario.password);
 
   if (!isValid) {
+    return null;
+  }
+
+  if (!usuario.activo) {
+    return null;
+  }
+
+  const empresa = await prisma.empresa.findUnique({
+    where: { id: usuario.empresaId },
+    select: { activo: true },
+  });
+
+  if (!empresa?.activo) {
     return null;
   }
 

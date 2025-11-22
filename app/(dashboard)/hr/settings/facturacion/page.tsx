@@ -5,7 +5,7 @@
  * Solo visible si BILLING_ENABLED está activado.
  */
 
-import { redirect, notFound } from 'next/navigation';
+import { redirect } from 'next/navigation';
 import { Suspense } from 'react';
 
 import { getSession } from '@/lib/auth';
@@ -14,13 +14,9 @@ import { BILLING_ENABLED, getSubscriptionStatus, getActiveProducts } from '@/lib
 
 import { BillingClient } from './billing-client';
 import { BillingLoading } from './billing-loading';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
 export default async function BillingSettingsPage() {
-  // Si billing no está habilitado, mostrar 404
-  if (!BILLING_ENABLED) {
-    notFound();
-  }
-
   const session = await getSession();
 
   if (!session || session.user.rol !== UsuarioRol.hr_admin) {
@@ -29,6 +25,25 @@ export default async function BillingSettingsPage() {
 
   if (!session.user.empresaId) {
     redirect('/hr/dashboard');
+  }
+
+  if (!BILLING_ENABLED) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Facturación desactivada</CardTitle>
+          <CardDescription>
+            Activa la pasarela de pago para gestionar planes y métodos de cobro desde Clousadmin.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground">
+            Añade las claves de Stripe y establece <code className="rounded bg-muted px-1 py-0.5">NEXT_PUBLIC_BILLING_ENABLED=true</code>{' '}
+            para habilitar esta sección. Mientras tanto, puedes gestionar cobros directamente desde tu panel de Stripe.
+          </p>
+        </CardContent>
+      </Card>
+    );
   }
 
   // Obtener estado de suscripción y productos en paralelo

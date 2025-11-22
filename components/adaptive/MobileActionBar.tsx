@@ -89,7 +89,7 @@ export function MobileActionBar({
             className="gap-2"
           >
             {primaryAction.icon && (
-              <primaryAction.icon className="h-4 w-4" />
+            <primaryAction.icon className="h-4 w-4" />
             )}
             {primaryAction.label}
           </Button>

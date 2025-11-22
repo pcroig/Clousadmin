@@ -125,6 +125,9 @@ model Empresa {
   // Configuration (JSONB for flexibility)
   config Json @default("{\"hora_cierre_fichaje_default\":\"18:00\",\"auto_completado_fichajes_dias\":7,\"auto_completado_nominas_dias\":7,\"auto_completado_contratos_dias\":14,\"umbral_ia_nominas\":0.8,\"umbral_ia_contratos\":0.85,\"permitir_saldo_vacaciones_negativo\":true,\"empleado_puede_ver_salario\":false}")
 
+  // Estado
+  activo Boolean @default(true)
+
   // Timestamps
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

@@ -52,14 +52,11 @@ export const SettingsLayout = ({ rol, children }: SettingsLayoutProps) => {
         label: 'Compan\u00eda',
         href: `${basePath}/settings/compania`,
       });
-      // Facturacion solo visible si billing esta habilitado
-      if (BILLING_ENABLED) {
-        items.push({
-          id: 'billing',
-          label: 'Facturaci\u00f3n',
-          href: `${basePath}/settings/facturacion`,
-        });
-      }
+      items.push({
+        id: 'billing',
+        label: BILLING_ENABLED ? 'Facturaci\u00f3n' : 'Facturaci\u00f3n (configurar)',
+        href: `${basePath}/settings/facturacion`,
+      });
       items.push({
         id: 'integrations',
         label: 'Integraciones',
