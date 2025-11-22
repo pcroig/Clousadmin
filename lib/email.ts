@@ -62,6 +62,8 @@ function isResendConfigured(): boolean {
   );
 }
 
+const INTERNAL_WAITLIST_EMAIL = process.env.WAITLIST_NOTIFY_EMAIL || 'pabloroigburgui@gmail.com';
+
 // Singleton para Resend client (eficiencia)
 let resendClientInstance: Resend | null = null;
 
@@ -294,6 +296,71 @@ export async function sendWaitlistInvitationEmail(
     'Tu invitación para Clousadmin está lista',
     template.html,
     template.text
+  );
+}
+
+type WaitlistInternalNotification = {
+  email: string;
+  nombre?: string;
+  empresa?: string;
+  mensaje?: string;
+};
+
+/**
+ * Notifica internamente que llegó una nueva solicitud de waitlist
+ */
+export async function sendWaitlistInternalNotificationEmail(
+  payload: WaitlistInternalNotification
+): Promise<void> {
+  const { email, nombre, empresa, mensaje } = payload;
+  const destinatario = INTERNAL_WAITLIST_EMAIL;
+
+  const safeNombre = nombre ? sanitizeHtml(nombre) : 'Sin nombre';
+  const safeEmpresa = empresa ? sanitizeHtml(empresa) : 'Sin empresa';
+  const safeMensaje = mensaje ? sanitizeHtml(mensaje) : 'Sin mensaje adicional';
+
+  const htmlBody = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      </head>
+      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+        <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+          <h1 style="color: #2563eb;">Nueva solicitud de waitlist</h1>
+          <p>Se ha registrado una nueva empresa interesada en Clousadmin:</p>
+          <ul>
+            <li><strong>Email:</strong> ${sanitizeHtml(email)}</li>
+            <li><strong>Nombre:</strong> ${safeNombre}</li>
+            <li><strong>Empresa:</strong> ${safeEmpresa}</li>
+          </ul>
+          <p><strong>Mensaje:</strong></p>
+          <p style="background-color: #f3f4f6; padding: 12px; border-radius: 6px;">${safeMensaje}</p>
+          <p style="font-size: 12px; color: #999; margin-top: 30px;">
+            Puedes gestionar esta solicitud desde el panel de invitaciones del platform admin.
+          </p>
+        </div>
+      </body>
+    </html>
+  `;
+
+  const textBody = `
+Nueva solicitud de waitlist
+
+Email: ${email}
+Nombre: ${nombre || 'Sin nombre'}
+Empresa: ${empresa || 'Sin empresa'}
+
+Mensaje:
+${mensaje || 'Sin mensaje adicional'}
+  `.trim();
+
+  await sendEmail(
+    destinatario,
+    `Nueva solicitud de waitlist: ${empresa || email}`,
+    htmlBody,
+    textBody
   );
 }
 

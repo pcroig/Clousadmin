@@ -5,18 +5,12 @@ import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
 import { LoadingButton } from '@/components/shared/loading-button';
+import { ResponsiveDatePicker } from '@/components/shared/responsive-date-picker';
+import { ResponsiveDialog } from '@/components/shared/responsive-dialog';
 import { SearchableMultiSelect } from '@/components/shared/searchable-multi-select';
 import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
 import { Field, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
@@ -49,8 +43,8 @@ export function CrearCampanaModal({
   const [alcance, setAlcance] = useState<'todos' | 'equipos'>('todos');
   const [equipos, setEquipos] = useState<Equipo[]>([]);
   const [equiposSeleccionados, setEquiposSeleccionados] = useState<string[]>([]);
-  const [fechaInicio, setFechaInicio] = useState('');
-  const [fechaFin, setFechaFin] = useState('');
+  const [fechaInicio, setFechaInicio] = useState<Date | undefined>();
+  const [fechaFin, setFechaFin] = useState<Date | undefined>();
   const [limitarSolapamiento, setLimitarSolapamiento] = useState(false);
   const [solapamientoPct, setSolapamientoPct] = useState('30');
 
@@ -61,8 +55,8 @@ export function CrearCampanaModal({
       setTitulo('');
       setAlcance('todos');
       setEquiposSeleccionados([]);
-      setFechaInicio('');
-      setFechaFin('');
+      setFechaInicio(undefined);
+      setFechaFin(undefined);
       setLimitarSolapamiento(false);
       setSolapamientoPct('30');
     }
@@ -106,15 +100,7 @@ export function CrearCampanaModal({
       solapamientoMaximoPct = pct;
     }
 
-    const fechaInicioDate = new Date(fechaInicio);
-    const fechaFinDate = new Date(fechaFin);
-
-    if (isNaN(fechaInicioDate.getTime()) || isNaN(fechaFinDate.getTime())) {
-      toast.error('Las fechas no son válidas');
-      return;
-    }
-
-    if (fechaFinDate < fechaInicioDate) {
+    if (fechaFin < fechaInicio) {
       toast.error('La fecha de fin debe ser posterior o igual a la fecha de inicio');
       return;
     }
@@ -129,8 +115,8 @@ export function CrearCampanaModal({
           alcance,
           equipoIds: alcance === 'equipos' ? equiposSeleccionados : undefined,
           solapamientoMaximoPct,
-          fechaInicioObjetivo: fechaInicio,
-          fechaFinObjetivo: fechaFin,
+          fechaInicioObjetivo: fechaInicio.toISOString().split('T')[0],
+          fechaFinObjetivo: fechaFin.toISOString().split('T')[0],
         }),
       });
 
@@ -150,14 +136,35 @@ export function CrearCampanaModal({
     }
   }
 
-  return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>Crear Campaña de Vacaciones</DialogTitle>
-        </DialogHeader>
+  const today = new Date();
 
-        <div className="space-y-4">
+  return (
+    <ResponsiveDialog
+      open={open}
+      onOpenChange={(isOpen) => !isOpen && onClose()}
+      title="Crear Campaña de Vacaciones"
+      complexity="complex"
+      footer={
+        <div className="flex gap-2 w-full">
+          <Button
+            variant="outline"
+            onClick={onClose}
+            disabled={cargando}
+            className="flex-1"
+          >
+            Cancelar
+          </Button>
+          <LoadingButton
+            onClick={handleCrear}
+            loading={cargando}
+            className="flex-1"
+          >
+            Crear Campaña
+          </LoadingButton>
+        </div>
+      }
+    >
+      <div className="space-y-4">
           <Field>
             <FieldLabel>Título de la campaña</FieldLabel>
             <Input
@@ -235,21 +242,24 @@ export function CrearCampanaModal({
 
           <Field>
             <FieldLabel>Fecha inicio objetivo</FieldLabel>
-            <Input
-              type="date"
-              value={fechaInicio}
-              onChange={(e) => setFechaInicio(e.target.value)}
-              required
+            <ResponsiveDatePicker
+              date={fechaInicio}
+              onSelect={setFechaInicio}
+              placeholder="Seleccionar fecha"
+              label="Fecha inicio objetivo"
+              fromDate={today}
             />
           </Field>
 
           <Field>
             <FieldLabel>Fecha fin objetivo</FieldLabel>
-            <Input
-              type="date"
-              value={fechaFin}
-              onChange={(e) => setFechaFin(e.target.value)}
-              required
+            <ResponsiveDatePicker
+              date={fechaFin}
+              onSelect={setFechaFin}
+              placeholder="Seleccionar fecha"
+              label="Fecha fin objetivo"
+              fromDate={fechaInicio || today}
+              disabled={(date) => fechaInicio ? date < fechaInicio : false}
             />
           </Field>
 
@@ -280,17 +290,7 @@ export function CrearCampanaModal({
             </TooltipProvider>
           </div>
         </div>
-
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose} disabled={cargando}>
-            Cancelar
-          </Button>
-          <LoadingButton onClick={handleCrear} loading={cargando}>
-            Crear Campaña
-          </LoadingButton>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    </ResponsiveDialog>
   );
 }
 

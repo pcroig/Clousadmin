@@ -77,3 +77,4 @@ export function calcularHorasTrabajadas(eventos: FichajeEvento[]): number {
 
 
 
+

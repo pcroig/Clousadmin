@@ -1,4 +1,4 @@
-import { prisma } from '@/lib/prisma';
+import { prisma, Prisma } from '@/lib/prisma';
 
 interface CampanaPendiente {
   id: string;
@@ -21,6 +21,32 @@ interface CampanaPropuestaPendiente {
   };
 }
 
+const CAMPANAS_MIGRATION_ID = '20251120093000_update_campanas_propuestas';
+
+let missingColumnLogged = false;
+const missingColumnMessage = `[CampanasVacaciones] Falta aplicar la migración ${CAMPANAS_MIGRATION_ID}. Ejecuta "npm run db:deploy" o aplica el SQL correspondiente.`;
+
+const isMissingPreferenciaColumnError = (error: unknown): boolean => {
+  if (!(error instanceof Prisma.PrismaClientKnownRequestError)) {
+    return false;
+  }
+
+  if (error.code !== 'P2022') {
+    return false;
+  }
+
+  const column = (error.meta?.column_name as string | undefined) ?? error.message;
+  return column?.includes('propuestaEnviada');
+};
+
+const handleMissingColumn = () => {
+  if (missingColumnLogged) {
+    return;
+  }
+  missingColumnLogged = true;
+  console.error(missingColumnMessage);
+};
+
 export async function obtenerCampanaPendiente(
   empleadoId: string,
   empresaId: string
@@ -31,7 +57,8 @@ export async function obtenerCampanaPendiente(
       empresaId,
       completada: false,
     },
-    include: {
+    select: {
+      id: true,
       campana: {
         select: {
           id: true,
@@ -67,40 +94,50 @@ export async function obtenerPropuestaPendiente(
   empleadoId: string,
   empresaId: string
 ): Promise<CampanaPropuestaPendiente | null> {
-  const preferencia = await prisma.preferenciaVacaciones.findFirst({
-    where: {
-      empleadoId,
-      empresaId,
-      propuestaEnviada: true,
-      aceptada: false,
-    },
-    include: {
-      campana: {
-        select: {
-          id: true,
-          titulo: true,
-          fechaInicioObjetivo: true,
-          fechaFinObjetivo: true,
+  try {
+    const preferencia = await prisma.preferenciaVacaciones.findFirst({
+      where: {
+        empleadoId,
+        empresaId,
+        propuestaEnviada: true,
+        aceptada: false,
+      },
+      select: {
+        id: true,
+        propuestaIA: true,
+        campana: {
+          select: {
+            id: true,
+            titulo: true,
+            fechaInicioObjetivo: true,
+            fechaFinObjetivo: true,
+          },
         },
       },
-    },
-    orderBy: {
-      updatedAt: 'desc',
-    },
-  });
+      orderBy: {
+        updatedAt: 'desc',
+      },
+    });
 
-  if (!preferencia?.campana || !preferencia.propuestaIA) {
-    return null;
+    if (!preferencia?.campana || !preferencia.propuestaIA) {
+      return null;
+    }
+
+    const propuesta = preferencia.propuestaIA as CampanaPropuestaPendiente['propuesta'];
+
+    return {
+      id: preferencia.campana.id,
+      titulo: preferencia.campana.titulo,
+      fechaInicioObjetivo: preferencia.campana.fechaInicioObjetivo,
+      fechaFinObjetivo: preferencia.campana.fechaFinObjetivo,
+      propuesta,
+    };
+  } catch (error) {
+    if (isMissingPreferenciaColumnError(error)) {
+      handleMissingColumn();
+      return null;
+    }
+    throw error;
   }
-
-  const propuesta = preferencia.propuestaIA as CampanaPropuestaPendiente['propuesta'];
-
-  return {
-    id: preferencia.campana.id,
-    titulo: preferencia.campana.titulo,
-    fechaInicioObjetivo: preferencia.campana.fechaInicioObjetivo,
-    fechaFinObjetivo: preferencia.campana.fechaFinObjetivo,
-    propuesta,
-  };
 }
 

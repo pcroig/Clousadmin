@@ -5,11 +5,21 @@
 // ========================================
 
 import { useRouter, useSearchParams } from 'next/navigation';
+import { signIn } from 'next-auth/react';
 import { useEffect, useState } from 'react';
 
+import { WaitlistRequestForm } from '@/components/auth/WaitlistRequestForm';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
 import { UsuarioRol } from '@/lib/constants/enums';
 
 import { loginAction } from './actions';
@@ -25,8 +35,10 @@ export function LoginForm({ callbackUrl }: LoginFormProps) {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [rateLimited, setRateLimited] = useState(false);
   const [retryAfter, setRetryAfter] = useState(0);
+  const [waitlistOpen, setWaitlistOpen] = useState(false);
 
   // Detectar errores en la URL (cuenta inactiva, OAuth, etc.)
   useEffect(() => {
@@ -93,7 +105,9 @@ export function LoginForm({ callbackUrl }: LoginFormProps) {
         // Redirigir según el callback URL o el rol del usuario
         if (callbackUrl) {
           router.push(callbackUrl);
-        } else if (result.rol === UsuarioRol.hr_admin || result.rol === UsuarioRol.platform_admin) {
+        } else if (result.rol === UsuarioRol.platform_admin) {
+          router.push('/platform/invitaciones');
+        } else if (result.rol === UsuarioRol.hr_admin) {
           router.push('/hr/dashboard');
         } else if (result.rol === UsuarioRol.manager) {
           router.push('/manager/dashboard');
@@ -123,8 +137,18 @@ export function LoginForm({ callbackUrl }: LoginFormProps) {
   };
 
   // Función para login con Google OAuth
-  const handleGoogleLogin = () => {
-    window.location.href = '/api/auth/google';
+  const handleGoogleLogin = async () => {
+    try {
+      setError('');
+      setGoogleLoading(true);
+
+      const options = callbackUrl ? { callbackUrl } : undefined;
+      await signIn('google', options);
+    } catch (err) {
+      console.error('Google login error:', err);
+      setError('Error al conectar con Google. Por favor, intenta de nuevo.');
+      setGoogleLoading(false);
+    }
   };
 
   return (
@@ -186,7 +210,8 @@ export function LoginForm({ callbackUrl }: LoginFormProps) {
         type="button"
         variant="outline"
         className="w-full"
-        onClick={handleGoogleLogin}
+        disabled={googleLoading}
+        onClick={() => void handleGoogleLogin()}
       >
         <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24">
           <path
@@ -206,7 +231,7 @@ export function LoginForm({ callbackUrl }: LoginFormProps) {
             fill="#EA4335"
           />
         </svg>
-        Continuar con Google
+        {googleLoading ? 'Conectando con Google...' : 'Continuar con Google'}
       </Button>
 
       <div className="text-center space-y-2">
@@ -218,9 +243,32 @@ export function LoginForm({ callbackUrl }: LoginFormProps) {
           ¿Olvidaste tu contraseña?
         </button>
         <div>
-          <span className="text-sm text-gray-500">
+          <p className="text-sm text-gray-500">
             ¿No tienes cuenta? Necesitas una invitación para crear una cuenta.
-          </span>
+          </p>
+          <Dialog open={waitlistOpen} onOpenChange={setWaitlistOpen}>
+            <DialogTrigger asChild>
+              <button
+                type="button"
+                className="text-sm text-primary hover:underline focus:outline-none"
+              >
+                Solicitar invitación
+              </button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-lg">
+              <DialogHeader>
+                <DialogTitle>Solicitar invitación</DialogTitle>
+                <DialogDescription>
+                  Déjanos tus datos y te avisaremos en cuanto habilitemos tu cuenta corporativa.
+                </DialogDescription>
+              </DialogHeader>
+              <WaitlistRequestForm
+                variant="dialog"
+                backLinkHref={undefined}
+                className="pt-2"
+              />
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
     </div>

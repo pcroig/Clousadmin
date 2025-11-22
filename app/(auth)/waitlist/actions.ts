@@ -9,10 +9,11 @@ import { agregarAWaitlist } from '@/lib/invitaciones-signup';
 export async function agregarAWaitlistAction(
   email: string,
   nombre?: string,
-  empresa?: string
+  empresa?: string,
+  mensaje?: string
 ) {
   try {
-    const result = await agregarAWaitlist(email, nombre, empresa);
+    const result = await agregarAWaitlist(email, nombre, empresa, mensaje);
     return result;
   } catch (error) {
     console.error('[agregarAWaitlistAction] Error:', error);

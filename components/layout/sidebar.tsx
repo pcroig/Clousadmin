@@ -23,6 +23,9 @@ import {
   LogOut,
   Settings,
   HeadphonesIcon,
+  ShieldCheck,
+  UserPlus,
+  ListChecks,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -39,7 +42,7 @@ import { toast } from 'sonner';
 import { UsuarioRol } from '@/lib/constants/enums';
 
 interface SidebarProps {
-  rol: 'hr_admin' | 'manager' | 'empleado';
+  rol: UsuarioRol;
   usuario: {
     nombre: string;
     apellidos: string;
@@ -101,8 +104,22 @@ export function Sidebar({ rol, usuario }: SidebarProps) {
   };
 
   const handleSettings = () => {
-    const settingsPath = `/${rol === UsuarioRol.hr_admin ? 'hr' : rol === UsuarioRol.manager ? 'manager' : 'empleado'}/settings`;
-    router.push(settingsPath);
+    if (rol === UsuarioRol.hr_admin) {
+      router.push('/hr/settings');
+      return;
+    }
+
+    if (rol === UsuarioRol.manager) {
+      router.push('/manager/settings');
+      return;
+    }
+
+    if (rol === UsuarioRol.empleado) {
+      router.push('/empleado/mi-espacio/datos');
+      return;
+    }
+
+    router.push('/platform/invitaciones');
   };
 
   const handleSupport = () => {
@@ -234,9 +251,34 @@ export function Sidebar({ rol, usuario }: SidebarProps) {
     },
   ];
 
+  // Navegación para Platform Admin
+  const platformNavigation = [
+    {
+      name: 'Panel de invitaciones',
+      href: '/platform/invitaciones',
+      icon: ShieldCheck,
+    },
+    {
+      name: 'Invitar empresas',
+      href: '/platform/invitaciones',
+      icon: UserPlus,
+    },
+    {
+      name: 'Waitlist',
+      href: '/platform/invitaciones#waitlist',
+      icon: ListChecks,
+    },
+  ];
+
   // Seleccionar navegación según rol
   const navigation =
-    rol === UsuarioRol.hr_admin ? hrNavigation : rol === UsuarioRol.manager ? managerNavigation : empleadoNavigation;
+    rol === UsuarioRol.hr_admin
+      ? hrNavigation
+      : rol === UsuarioRol.manager
+        ? managerNavigation
+        : rol === UsuarioRol.empleado
+          ? empleadoNavigation
+          : platformNavigation;
 
   return (
     <aside
@@ -340,7 +382,13 @@ export function Sidebar({ rol, usuario }: SidebarProps) {
                       {usuario.nombre} {usuario.apellidos}
                     </p>
                     <p className="text-xs text-gray-500">
-                      {rol === UsuarioRol.hr_admin ? 'HR Admin' : rol === UsuarioRol.manager ? 'Manager' : 'Empleado'}
+                      {rol === UsuarioRol.hr_admin
+                        ? 'HR Admin'
+                        : rol === UsuarioRol.manager
+                          ? 'Manager'
+                          : rol === UsuarioRol.empleado
+                            ? 'Empleado'
+                            : 'Platform Admin'}
                     </p>
                   </div>
                   <ChevronDown className="h-4 w-4 text-gray-400 flex-shrink-0" />

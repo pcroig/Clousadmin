@@ -23,6 +23,9 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
+import { MobilePageHeader } from '@/components/adaptive/MobilePageHeader';
+import { ResponsiveContainer } from '@/components/adaptive/ResponsiveContainer';
+
 import { AlertasSummary } from '@/components/payroll/alertas-summary';
 import { UploadNominasModal } from '@/components/payroll/upload-nominas-modal';
 import { ValidarComplementosDialog } from '@/components/payroll/validar-complementos-dialog';
@@ -59,6 +62,9 @@ import {
   EVENTO_ESTADOS,
   NOMINA_ESTADO_LABELS,
 } from '@/lib/constants/nomina-estados';
+import { MOBILE_DESIGN } from '@/lib/constants/mobile-design';
+import { useIsMobile } from '@/lib/hooks/use-viewport';
+import { cn } from '@/lib/utils';
 
 interface ComplementoAsignado {
   id: string;
@@ -174,6 +180,7 @@ const getStepIndexFromState = (evento: EventoNomina): number => {
 
 export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
   const router = useRouter();
+  const isMobile = useIsMobile();
   const [eventos, setEventos] = useState<EventoNomina[]>([]);
   const [loading, setLoading] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -468,37 +475,50 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
     );
   }
 
-  return (
-    <div className="h-full w-full flex flex-col">
-      {/* Header */}
-      <div className="flex-shrink-0 mb-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Nóminas</h1>
-            <p className="text-sm text-gray-600 mt-1">
-              Gestiona el ciclo completo de nóminas mensuales
-            </p>
-          </div>
+  const headerDesktop = (
+    <div className="flex-shrink-0 mb-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Nóminas</h1>
+          <p className="text-sm text-gray-600 mt-1">
+            Gestiona el ciclo completo de nóminas mensuales
+          </p>
+        </div>
 
-          <div className="flex gap-3">
-            <Button
-              variant="outline"
-              onClick={() => setShowUploadModal(true)}
-            >
-              <Upload className="w-4 h-4 mr-2" />
-              Subir Nóminas
-            </Button>
-            <Button
-              className="btn-primary"
-              onClick={() => setShowCreateEventDialog(true)}
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              Generar Evento Mensual
-            </Button>
-          </div>
+        <div className="flex gap-3">
+          <Button variant="outline" onClick={() => setShowUploadModal(true)}>
+            <Upload className="w-4 h-4 mr-2" />
+            Subir Nóminas
+          </Button>
+          <Button className="btn-primary" onClick={() => setShowCreateEventDialog(true)}>
+            <Plus className="w-4 h-4 mr-2" />
+            Generar Evento Mensual
+          </Button>
         </div>
       </div>
+    </div>
+  );
 
+  const headerMobile = (
+    <MobilePageHeader
+      title="Nóminas"
+      subtitle={`${eventos.length} ${eventos.length === 1 ? 'evento' : 'eventos'}`}
+      actions={
+        <Button
+          onClick={() => setShowCreateEventDialog(true)}
+          size="sm"
+          className={cn(MOBILE_DESIGN.button.secondary)}
+        >
+          <Plus className={cn(MOBILE_DESIGN.components.icon.small, 'mr-2')} />
+          Evento
+        </Button>
+      }
+    />
+  );
+
+  const content = (
+    <div className="h-full w-full flex flex-col">
+      {isMobile ? headerMobile : headerDesktop}
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto pb-6">
@@ -978,8 +998,10 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
           onClose={() => setSelectedNominaId(null)}
         />
       )}
-                        </div>
+    </div>
   );
+
+  return content;
 }
 
 // Componente de panel de detalles de nómina

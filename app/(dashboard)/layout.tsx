@@ -8,6 +8,7 @@ import { BottomNavigation } from '@/components/layout/bottom-navigation';
 import { Sidebar } from '@/components/layout/sidebar';
 import { PWAInstallBanner } from '@/components/shared/pwa-install-banner';
 import { getSession } from '@/lib/auth';
+import { UsuarioRol } from '@/lib/constants/enums';
 
 export default async function DashboardLayout({
   children,
@@ -20,12 +21,15 @@ export default async function DashboardLayout({
     redirect('/login');
   }
 
+  const rol = session.user.rol as UsuarioRol;
+  const showMobileNav = rol !== UsuarioRol.platform_admin;
+
   return (
     <div className="flex h-screen bg-[#FAF9F5] overflow-hidden">
       {/* Sidebar - Hidden on mobile, visible on desktop */}
       <div className="hidden sm:flex">
         <Sidebar
-          rol={session.user.rol as 'hr_admin' | 'manager' | 'empleado'}
+          rol={rol}
           usuario={{
             nombre: session.user.nombre,
             apellidos: session.user.apellidos,
@@ -44,7 +48,9 @@ export default async function DashboardLayout({
       </div>
 
       {/* Bottom Navigation - Only on mobile */}
-      <BottomNavigation rol={session.user.rol as 'hr_admin' | 'manager' | 'empleado'} />
+      {showMobileNav && (
+        <BottomNavigation rol={rol as 'hr_admin' | 'manager' | 'empleado'} />
+      )}
       <PWAInstallBanner />
     </div>
   );

@@ -10,6 +10,8 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 
 import { UsuarioRol } from '@/lib/constants/enums';
+import { MOBILE_DESIGN } from '@/lib/constants/mobile-design';
+import { cn } from '@/lib/utils';
 import type { MiEspacioEmpleado, Usuario } from '@/types/empleado';
 import { useSensitiveUnlock, type SensitiveFieldKey } from '@/lib/hooks/useSensitiveUnlock';
 import { SensitiveUnlockDialog } from '@/components/shared/sensitive-unlock-dialog';
@@ -133,6 +135,10 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado', onFieldUpdate,
   const isHrAdmin = rol === UsuarioRol.hr_admin;
   const requiresSolicitud = isEmpleado || isManager; // Empleados y managers crean solicitudes
 
+  const labelClass = MOBILE_DESIGN.components.form.label;
+  const inputClass = MOBILE_DESIGN.components.form.input;
+  const selectTriggerClass = MOBILE_DESIGN.components.form.select;
+
   const {
     isUnlocked,
     requestUnlock,
@@ -218,13 +224,16 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado', onFieldUpdate,
     if (!hasStoredValue) {
       return (
         <div>
-          <Label htmlFor={id}>{label}</Label>
+          <Label htmlFor={id} className={labelClass}>
+            {label}
+          </Label>
           <Input
             id={id}
             value={value}
             onChange={(event) => onChange(event.target.value)}
             onBlur={(event) => onBlur?.(event.target.value)}
             placeholder={placeholder}
+            className={inputClass}
           />
           <p className="mt-1 text-xs text-gray-500">Aún no hay datos guardados para este campo.</p>
         </div>
@@ -233,7 +242,9 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado', onFieldUpdate,
 
     return (
       <div>
-        <Label htmlFor={id}>{label}</Label>
+        <Label htmlFor={id} className={labelClass}>
+          {label}
+        </Label>
         <div className="relative">
           <Input
             id={id}
@@ -249,6 +260,7 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado', onFieldUpdate,
             }}
             readOnly={!unlocked}
             placeholder={unlocked ? placeholder : 'Desbloquea para ver'}
+            className={cn(inputClass, 'pr-24')}
           />
           {unlocked ? (
             <div className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs text-emerald-600">
@@ -412,7 +424,9 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado', onFieldUpdate,
               },
             })}
             <div>
-              <Label htmlFor="fechaNacimiento">Fecha de Nacimiento</Label>
+              <Label htmlFor="fechaNacimiento" className={labelClass}>
+                Fecha de Nacimiento
+              </Label>
               <Input
                 id="fechaNacimiento"
                 type="date"
@@ -429,10 +443,13 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado', onFieldUpdate,
                     }
                   }
                 }}
+                className={inputClass}
               />
             </div>
             <div>
-              <Label htmlFor="estadoCivil">Estado Civil</Label>
+              <Label htmlFor="estadoCivil" className={labelClass}>
+                Estado Civil
+              </Label>
               <Select
                 value={formData.estadoCivil}
                 onValueChange={(value) => {
@@ -445,7 +462,7 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado', onFieldUpdate,
                   }
                 }}
               >
-                <SelectTrigger>
+                <SelectTrigger className={selectTriggerClass}>
                   <SelectValue placeholder="Seleccionar" />
                 </SelectTrigger>
                 <SelectContent>
@@ -458,7 +475,9 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado', onFieldUpdate,
               </Select>
             </div>
             <div>
-              <Label htmlFor="numeroHijos">Número de Hijos</Label>
+              <Label htmlFor="numeroHijos" className={labelClass}>
+                Número de Hijos
+              </Label>
               <Input
                 id="numeroHijos"
                 type="number"
@@ -474,10 +493,13 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado', onFieldUpdate,
                   }
                 }}
                 min="0"
+                className={inputClass}
               />
             </div>
             <div>
-              <Label htmlFor="genero">Género</Label>
+              <Label htmlFor="genero" className={labelClass}>
+                Género
+              </Label>
               <Select
                 value={formData.genero}
                 onValueChange={(value) => {
@@ -490,7 +512,7 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado', onFieldUpdate,
                   }
                 }}
               >
-                <SelectTrigger>
+                <SelectTrigger className={selectTriggerClass}>
                   <SelectValue placeholder="Seleccionar" />
                 </SelectTrigger>
                 <SelectContent>
@@ -509,16 +531,21 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado', onFieldUpdate,
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Información de Contacto</h3>
           <div className="space-y-4">
             <div>
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email" className={labelClass}>
+                Email
+              </Label>
               <Input
                 id="email"
                 type="email"
                 value={formData.email}
                 onChange={(e) => setFieldValue('email', e.target.value)}
+                className={inputClass}
               />
             </div>
             <div>
-              <Label htmlFor="telefono">Teléfono</Label>
+              <Label htmlFor="telefono" className={labelClass}>
+                Teléfono
+              </Label>
               <Input
                 id="telefono"
                 type="tel"
@@ -533,10 +560,13 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado', onFieldUpdate,
                   }
                 }}
                 placeholder="No especificado"
+                className={inputClass}
               />
             </div>
             <div>
-              <Label htmlFor="direccionCalle">Calle</Label>
+              <Label htmlFor="direccionCalle" className={labelClass}>
+                Calle
+              </Label>
               <Input
                 id="direccionCalle"
                 value={formData.direccionCalle}
@@ -550,11 +580,14 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado', onFieldUpdate,
                   }
                 }}
                 placeholder="No especificada"
+                className={inputClass}
               />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="direccionNumero">Número</Label>
+                <Label htmlFor="direccionNumero" className={labelClass}>
+                  Número
+                </Label>
                 <Input
                   id="direccionNumero"
                   value={formData.direccionNumero}
@@ -568,10 +601,13 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado', onFieldUpdate,
                     }
                   }}
                   placeholder="No especificado"
+                  className={inputClass}
                 />
               </div>
               <div>
-                <Label htmlFor="direccionPiso">Piso/Puerta</Label>
+                <Label htmlFor="direccionPiso" className={labelClass}>
+                  Piso/Puerta
+                </Label>
                 <Input
                   id="direccionPiso"
                   value={formData.direccionPiso}
@@ -585,12 +621,15 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado', onFieldUpdate,
                     }
                   }}
                   placeholder="Opcional"
+                  className={inputClass}
                 />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="codigoPostal">Código Postal</Label>
+                <Label htmlFor="codigoPostal" className={labelClass}>
+                  Código Postal
+                </Label>
                 <Input
                   id="codigoPostal"
                   value={formData.codigoPostal}
@@ -605,10 +644,13 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado', onFieldUpdate,
                   }}
                   placeholder="No especificado"
                   maxLength={5}
+                  className={inputClass}
                 />
               </div>
               <div>
-                <Label htmlFor="ciudad">Ciudad</Label>
+                <Label htmlFor="ciudad" className={labelClass}>
+                  Ciudad
+                </Label>
                 <Input
                   id="ciudad"
                   value={formData.ciudad}
@@ -622,11 +664,14 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado', onFieldUpdate,
                     }
                   }}
                   placeholder="No especificada"
+                  className={inputClass}
                 />
               </div>
             </div>
             <div>
-              <Label htmlFor="direccionProvincia">Provincia</Label>
+              <Label htmlFor="direccionProvincia" className={labelClass}>
+                Provincia
+              </Label>
               <Input
                 id="direccionProvincia"
                 value={formData.direccionProvincia}
@@ -640,6 +685,7 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado', onFieldUpdate,
                   }
                 }}
                 placeholder="No especificada"
+                className={inputClass}
               />
             </div>
           </div>
@@ -666,7 +712,9 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado', onFieldUpdate,
               },
             })}
             <div>
-              <Label htmlFor="titularCuenta">Titular de la Cuenta</Label>
+              <Label htmlFor="titularCuenta" className={labelClass}>
+                Titular de la Cuenta
+              </Label>
               <Input
                 id="titularCuenta"
                 value={formData.titularCuenta}
@@ -680,6 +728,7 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado', onFieldUpdate,
                   }
                 }}
                 placeholder="Nombre del titular"
+                className={inputClass}
               />
             </div>
           </div>

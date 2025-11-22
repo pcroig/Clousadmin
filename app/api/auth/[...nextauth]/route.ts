@@ -35,7 +35,7 @@ function getDashboardRedirect(rol: UsuarioRol): string {
   }
 }
 
-const handler = NextAuth({
+const authHandler = NextAuth({
   session: {
     strategy: 'jwt',
   },
@@ -164,5 +164,5 @@ const handler = NextAuth({
   },
 });
 
-export { handler as GET, handler as POST };
+export const { GET, POST } = authHandler.handlers;
 

@@ -115,9 +115,9 @@ model Integracion {
 **Flujo:**
 ```
 Usuario → /login → Click "Google"
-  → /api/auth/google (genera URL OAuth)
+  → /api/auth/google (entrypoint opcional)
   → Google (autoriza)
-  → /api/auth/google/callback (intercambia code por tokens)
+  → /api/auth/callback/google (callback oficial NextAuth v5)
   → Crea/actualiza usuario.googleId
   → Guarda tokens en Account
   → Redirige a /[rol]/dashboard
@@ -246,8 +246,9 @@ Ver `SETUP_GOOGLE_OAUTH.md` para instrucciones detalladas.
 3. Configurar OAuth Consent Screen
 4. Crear credenciales OAuth 2.0
 5. Añadir Authorized redirect URIs:
-   - `http://localhost:3000/api/auth/google/callback`
+   - `http://localhost:3000/api/auth/callback/google` (obligatorio)
    - `http://localhost:3000/api/integrations/calendar/callback`
+   - *(Opcional)* `http://localhost:3000/api/auth/google/callback` si necesitas mantener compatibilidad con enlaces antiguos.
 6. Añadir scopes:
    - `openid`, `userinfo.email`, `userinfo.profile`
    - `calendar`

@@ -33,3 +33,4 @@ export function AdaptiveContainer({
   return <>{target === 'mobile' ? renderChild(mobile) : renderChild(desktop)}</>;
 }
 
+

@@ -1,25 +1,21 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
+
+import { InfoTooltip } from '@/components/shared/info-tooltip';
 import { LoadingButton } from '@/components/shared/loading-button';
+import { ResponsiveDatePicker } from '@/components/shared/responsive-date-picker';
+import { ResponsiveDialog } from '@/components/shared/responsive-dialog';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Calendar } from '@/components/ui/calendar';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { CalendarIcon } from 'lucide-react';
-import { format } from 'date-fns';
-import { es } from 'date-fns/locale';
-import { InfoTooltip } from '@/components/shared/info-tooltip';
 import { Spinner } from '@/components/ui/spinner';
-import {
-  PERIODO_MEDIO_DIA_LABELS,
-  PERIODOS_MEDIO_DIA_OPTIONS,
-  PeriodoMedioDiaValue,
-} from '@/lib/constants/enums';
 import { TIPOS_DESCUENTAN_SALDO } from '@/lib/constants/ausencias';
+import {
+  PeriodoMedioDiaValue,
+  PERIODOS_MEDIO_DIA_OPTIONS,
+} from '@/lib/constants/enums';
 
 interface ErrorDetail {
   field?: string;
@@ -261,13 +257,35 @@ export function SolicitarAusenciaModal({
   };
 
   return (
-    <Dialog open={open} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle>Solicitar Ausencia</DialogTitle>
-        </DialogHeader>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
+    <ResponsiveDialog
+      open={open}
+      onOpenChange={(isOpen) => !isOpen && onClose()}
+      title="Solicitar Ausencia"
+      complexity="complex"
+      footer={
+        <div className="flex gap-2 w-full">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onClose}
+            disabled={loading || uploadingJustificante}
+            className="flex-1"
+          >
+            Cancelar
+          </Button>
+          <LoadingButton
+            type="submit"
+            form="solicitar-ausencia-form"
+            loading={loading || uploadingJustificante}
+            disabled={loading || uploadingJustificante || (tipo === 'otro' && !motivoValido)}
+            className="flex-1"
+          >
+            {uploadingJustificante ? 'Subiendo...' : loading ? 'Enviando...' : 'Solicitar'}
+          </LoadingButton>
+        </div>
+      }
+    >
+      <form id="solicitar-ausencia-form" onSubmit={handleSubmit} className="space-y-4">
           {/* Tipo de Ausencia */}
           <div>
             <Label htmlFor="tipo">Tipo de ausencia *</Label>
@@ -314,50 +332,28 @@ export function SolicitarAusenciaModal({
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <Label>Fecha de inicio *</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className="w-full justify-start text-left font-normal"
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {fechaInicio ? format(fechaInicio, 'PPP', { locale: es }) : 'Seleccionar fecha'}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={fechaInicio}
-                    onSelect={setFechaInicio}
-                    disabled={(date) => date < today}
-                  />
-                </PopoverContent>
-              </Popover>
+              <ResponsiveDatePicker
+                date={fechaInicio}
+                onSelect={setFechaInicio}
+                placeholder="Seleccionar fecha"
+                label="Fecha de inicio"
+                disabled={(date) => date < today}
+                fromDate={today}
+              />
             </div>
 
             <div>
               <Label>Fecha de fin *</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className="w-full justify-start text-left font-normal"
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {fechaFin ? format(fechaFin, 'PPP', { locale: es }) : 'Seleccionar fecha'}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={fechaFin}
-                    onSelect={setFechaFin}
-                    disabled={(date) => {
-                      return date < today || (fechaInicio ? date < fechaInicio : false);
-                    }}
-                  />
-                </PopoverContent>
-              </Popover>
+              <ResponsiveDatePicker
+                date={fechaFin}
+                onSelect={setFechaFin}
+                placeholder="Seleccionar fecha"
+                label="Fecha de fin"
+                disabled={(date) => {
+                  return date < today || (fechaInicio ? date < fechaInicio : false);
+                }}
+                fromDate={fechaInicio || today}
+              />
             </div>
           </div>
 
@@ -467,28 +463,8 @@ export function SolicitarAusenciaModal({
               <p className="text-sm text-red-800">{error}</p>
             </div>
           )}
-
-          {/* Buttons */}
-          <div className="flex gap-2 justify-end pt-4">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={onClose}
-              disabled={loading}
-            >
-              Cancelar
-            </Button>
-            <LoadingButton
-              type="submit"
-              loading={loading || uploadingJustificante}
-              disabled={loading || uploadingJustificante || (tipo === 'otro' && !motivoValido)}
-            >
-              {uploadingJustificante ? 'Subiendo justificante...' : loading ? 'Enviando...' : 'Solicitar'}
-            </LoadingButton>
-          </div>
         </form>
-      </DialogContent>
-    </Dialog>
+    </ResponsiveDialog>
   );
 }
 

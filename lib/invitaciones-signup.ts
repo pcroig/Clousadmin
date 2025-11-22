@@ -256,6 +256,19 @@ export async function agregarAWaitlist(
       // No fallar si el email no se puede enviar
     }
 
+    // Notificar internamente al equipo
+    try {
+      const { sendWaitlistInternalNotificationEmail } = await import('@/lib/email');
+      await sendWaitlistInternalNotificationEmail({
+        email,
+        nombre: nombre || undefined,
+        empresa: empresa || undefined,
+        mensaje: mensaje || undefined,
+      });
+    } catch (error) {
+      console.error('[agregarAWaitlist] Error enviando notificación interna:', error);
+    }
+
     return {
       success: true,
       waitlist,

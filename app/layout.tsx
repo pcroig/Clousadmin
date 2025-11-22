@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
@@ -16,7 +16,6 @@ export const metadata: Metadata = {
   description: "Modern HR management platform for Spanish companies",
   applicationName: "Clousadmin",
   manifest: "/manifest.webmanifest",
-  themeColor: "#d97757",
   icons: {
     icon: [
       { url: "/icons/pwa-192x192.png", sizes: "192x192", type: "image/png" },
@@ -31,6 +30,10 @@ export const metadata: Metadata = {
     title: "Clousadmin",
     statusBarStyle: "default",
   },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#d97757",
 };
 
 export default function RootLayout({

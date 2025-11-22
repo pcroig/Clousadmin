@@ -10,3 +10,4 @@ export function redondearDecimales(valor: number, decimales: number = 2): number
 export const redondearHoras = (horas: number): number =>
   redondearDecimales(horas, 2);
 
+

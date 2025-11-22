@@ -4,9 +4,12 @@ import { Flag } from 'lucide-react';
 import { useCallback, useRef, useState } from 'react';
 
 import { DenunciaDialog } from '@/components/empleado/denuncia-dialog';
+import { ResponsiveContainer } from '@/components/adaptive/ResponsiveContainer';
 import { GeneralTab } from '@/components/shared/mi-espacio/general-tab';
 import { ProfileAvatar } from '@/components/shared/profile-avatar';
 import { Button } from '@/components/ui/button';
+import { MOBILE_DESIGN } from '@/lib/constants/mobile-design';
+import { cn } from '@/lib/utils';
 
 import type { MiEspacioEmpleado, Usuario } from '@/types/empleado';
 
@@ -35,8 +38,8 @@ export function MiEspacioDatosClient({
   }, []);
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+    <ResponsiveContainer variant="page" className="h-full w-full space-y-6">
+      <div className="flex flex-col gap-3 sm:gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div className="space-y-2">
           <ProfileAvatar
             empleadoId={empleado.id}
@@ -53,6 +56,7 @@ export function MiEspacioDatosClient({
             type="button"
             disabled={!canSave}
             onClick={handleGuardarCambios}
+            className={cn(MOBILE_DESIGN.button.primary)}
           >
             Guardar cambios
           </Button>
@@ -60,11 +64,12 @@ export function MiEspacioDatosClient({
             type="button"
             variant="outline"
             size="sm"
-            className="flex items-center gap-2"
+            className={cn('flex items-center gap-2', MOBILE_DESIGN.button.secondary)}
             onClick={() => setDenunciaDialogOpen(true)}
           >
-            <Flag className="h-4 w-4" />
-            Canal de denuncias
+            <Flag className={cn(MOBILE_DESIGN.components.icon.small)} />
+            <span className="hidden sm:inline">Canal de denuncias</span>
+            <span className="sm:hidden">Denuncias</span>
           </Button>
         </div>
       </div>
@@ -80,6 +85,6 @@ export function MiEspacioDatosClient({
         isOpen={denunciaDialogOpen}
         onClose={() => setDenunciaDialogOpen(false)}
       />
-    </div>
+    </ResponsiveContainer>
   );
 }
