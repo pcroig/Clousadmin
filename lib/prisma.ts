@@ -6,14 +6,17 @@
 // Optimized for production with connection pooling
 // Lazy initialization to avoid environment variable timing issues
 
-import { performance } from 'perf_hooks';
-
 import { Prisma, PrismaClient } from '@prisma/client';
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
   prismaLoggerAttached?: boolean;
 };
+
+const perf =
+  typeof performance !== 'undefined'
+    ? performance
+    : { now: () => Date.now() };
 
 // Production optimization: connection pooling
 // RDS PostgreSQL recommended: connection_limit=10 for serverless
@@ -89,9 +92,9 @@ if (
 ) {
   let queryCounter = 0;
   prismaClientSingleton.$use(async (params, next) => {
-    const start = performance.now();
+    const start = perf.now();
     const result = await next(params);
-    const duration = performance.now() - start;
+    const duration = perf.now() - start;
     queryCounter += 1;
     console.log(
       `[Prisma][${queryCounter}] ${params.model ?? 'raw'}.${params.action} - ${duration.toFixed(2)}ms`
