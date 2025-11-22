@@ -1239,6 +1239,52 @@ export async function crearNotificacionNominaError(
   });
 }
 
+export async function crearNotificacionNominaValidada(
+  prisma: PrismaClient,
+  params: {
+    empresaId: string;
+    eventoNominaId: string;
+    validadorNombre: string;
+    complementosCount: number;
+    accion: 'validar' | 'rechazar';
+  }
+) {
+  const { empresaId, eventoNominaId, validadorNombre, complementosCount, accion } = params;
+
+  const usuarioIds = await obtenerUsuariosANotificar(prisma, empresaId, {
+    hrAdmin: true,
+  });
+
+  if (!usuarioIds.length) {
+    return;
+  }
+
+  const titulo =
+    accion === 'validar'
+      ? 'Complementos validados'
+      : 'Complementos rechazados';
+  const mensaje =
+    accion === 'validar'
+      ? `${validadorNombre} ha validado ${complementosCount} complemento(s) en el evento de nómina.`
+      : `${validadorNombre} ha rechazado ${complementosCount} complemento(s) en el evento de nómina.`;
+
+  await crearNotificaciones(prisma, {
+    empresaId,
+    usuarioIds,
+    tipo: 'nomina_validada',
+    titulo,
+    mensaje,
+    metadata: {
+      eventoNominaId,
+      complementosCount,
+      accion,
+      prioridad: 'normal',
+      accionUrl: '/hr/payroll/eventos',
+      accionTexto: 'Revisar evento',
+    },
+  });
+}
+
 // ========================================
 // DOCUMENTOS
 // ========================================
