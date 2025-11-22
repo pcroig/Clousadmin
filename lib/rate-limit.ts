@@ -239,8 +239,9 @@ export async function rateLimitApi(identifier: string): Promise<RateLimitResult>
 /**
  * Obtener IP del request (helper)
  * Soporta x-forwarded-for, x-real-ip, etc.
+ * Acepta Headers o ReadonlyHeaders (Next.js 16)
  */
-export function getClientIP(headers: Headers): string {
+export function getClientIP(headers: Pick<Headers, 'get'>): string {
   // Prioridad: x-forwarded-for > x-real-ip > x-client-ip > fallback
   const forwarded = headers.get('x-forwarded-for');
   if (forwarded) {

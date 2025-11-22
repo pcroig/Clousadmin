@@ -12,8 +12,37 @@ import { Resend } from 'resend';
  * Obtiene la URL base de la aplicación
  * Exportada para uso en otros módulos
  */
-export function getBaseUrl(): string {
-  return process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+export function getBaseUrl(preferredOrigin?: string): string {
+  if (preferredOrigin) {
+    try {
+      const parsed = new URL(preferredOrigin);
+      return parsed.origin;
+    } catch {
+      // Ignorar si no es una URL válida
+    }
+  }
+
+  if (process.env.NEXTAUTH_URL) {
+    return process.env.NEXTAUTH_URL;
+  }
+
+  if (process.env.NEXT_PUBLIC_APP_URL) {
+    return process.env.NEXT_PUBLIC_APP_URL;
+  }
+
+  if (process.env.VERCEL_URL) {
+    const vercelUrl = process.env.VERCEL_URL.startsWith('http')
+      ? process.env.VERCEL_URL
+      : `https://${process.env.VERCEL_URL}`;
+    try {
+      const parsed = new URL(vercelUrl);
+      return parsed.origin;
+    } catch {
+      // continuar con fallback
+    }
+  }
+
+  return 'http://localhost:3000';
 }
 
 /**

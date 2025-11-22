@@ -11,11 +11,18 @@ import { prisma } from '@/lib/prisma';
 /**
  * Crear invitación para signup (crear empresa y cuenta)
  */
+type CrearInvitacionOptions = {
+  enviarEmail?: boolean;
+};
+
 export async function crearInvitacionSignup(
   email: string,
-  invitadoPor?: string
+  invitadoPor?: string,
+  options?: CrearInvitacionOptions
 ) {
   try {
+    const shouldSendEmail = options?.enviarEmail ?? true;
+
     // Verificar si ya existe una invitación activa
     const invitacionExistente = await prisma.invitacionSignup.findUnique({
       where: { email: email.toLowerCase() },
@@ -37,12 +44,13 @@ export async function crearInvitacionSignup(
 
       const url = `${getBaseUrl()}/signup?token=${token}`;
 
-      // Enviar email
-      try {
-        await sendSignupInvitationEmail(email, url);
-      } catch (error) {
-        console.error('[crearInvitacionSignup] Error enviando email:', error);
-        // No fallar si el email no se puede enviar, solo loguear
+      if (shouldSendEmail) {
+        try {
+          await sendSignupInvitationEmail(email, url);
+        } catch (error) {
+          console.error('[crearInvitacionSignup] Error enviando email:', error);
+          // No fallar si el email no se puede enviar, solo loguear
+        }
       }
 
       return {
@@ -69,12 +77,13 @@ export async function crearInvitacionSignup(
     const baseUrl = process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
     const url = `${baseUrl}/signup?token=${token}`;
 
-    // Enviar email
-    try {
-      await sendSignupInvitationEmail(email, url);
-    } catch (error) {
-      console.error('[crearInvitacionSignup] Error enviando email:', error);
-      // No fallar si el email no se puede enviar, solo loguear
+    if (shouldSendEmail) {
+      try {
+        await sendSignupInvitationEmail(email, url);
+      } catch (error) {
+        console.error('[crearInvitacionSignup] Error enviando email:', error);
+        // No fallar si el email no se puede enviar, solo loguear
+      }
     }
 
     return {
@@ -310,7 +319,7 @@ export async function convertirWaitlistEnInvitacion(
     }
 
     // Crear invitación
-    const result = await crearInvitacionSignup(email, invitadoPor);
+    const result = await crearInvitacionSignup(email, invitadoPor, { enviarEmail: false });
 
     if (!result.success) {
       return result;

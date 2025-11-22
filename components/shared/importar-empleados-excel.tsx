@@ -6,9 +6,9 @@
 // Componente reutilizable para importación masiva de empleados desde Excel
 // Usado en: Onboarding y HR/Organización/Añadir Personas
 //
-// FLUJO DE DOS FASES:
+// FLUJO DE DOS FASES (con soporte para auto-confirmación):
 // 1. Análisis: Procesa Excel con IA y muestra preview (NO guarda en BD)
-// 2. Confirmación: Usuario revisa y confirma, entonces SÍ guarda en BD
+// 2. Confirmación: Usuario confirma manualmente o se ejecuta automáticamente según el contexto
 //
 // @see docs/funcionalidades/importacion-empleados-excel.md
 
@@ -78,6 +78,37 @@ interface ResultadoImportacion {
   empleadosImportados: EmpleadoImportado[];
 }
 
+type ResumenStat = {
+  label: string;
+  value: number;
+  tone?: 'warning';
+};
+
+const buildResumenStats = (data: PreviewData | null): ResumenStat[] => {
+  if (!data) {
+    return [];
+  }
+
+  const stats: ResumenStat[] = [
+    { label: 'Empleados detectados', value: data.resumen.total },
+    { label: 'Listos para importar', value: data.resumen.validos },
+  ];
+
+  if (data.resumen.invalidos > 0) {
+    stats.push({ label: 'Con errores', value: data.resumen.invalidos, tone: 'warning' });
+  }
+
+  if (data.equiposDetectados.length > 0) {
+    stats.push({ label: 'Equipos detectados', value: data.equiposDetectados.length });
+  }
+
+  if (data.managersDetectados.length > 0) {
+    stats.push({ label: 'Managers detectados', value: data.managersDetectados.length });
+  }
+
+  return stats;
+};
+
 interface ImportarEmpleadosExcelProps {
   /** Callback ejecutado después de una importación exitosa */
   onSuccess?: () => void;
@@ -99,6 +130,12 @@ interface ImportarEmpleadosExcelProps {
   
   /** Mostrar botón "Guardar y volver" después de importar (true por defecto si onSuccess definido) */
   showFinishButton?: boolean;
+
+  /** Mostrar cabecera con título y descripción */
+  showHeader?: boolean;
+
+  /** Confirmar automáticamente tras procesar el Excel */
+  autoConfirmAfterAnalysis?: boolean;
 }
 
 export function ImportarEmpleadosExcel({
@@ -109,6 +146,8 @@ export function ImportarEmpleadosExcel({
   description = 'Sube un archivo Excel con los datos de múltiples empleados. La IA procesará automáticamente la estructura.',
   showCancelButton,
   showFinishButton,
+  showHeader = true,
+  autoConfirmAfterAnalysis = false,
 }: ImportarEmpleadosExcelProps) {
   const router = useRouter();
   const [archivo, setArchivo] = useState<File | null>(null);
@@ -120,6 +159,7 @@ export function ImportarEmpleadosExcel({
   const [error, setError] = useState('');
   const [empleadosExpandidos, setEmpleadosExpandidos] = useState<Set<string>>(new Set());
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const resumenStats = buildResumenStats(previewData);
 
   const shouldShowCancelButton = showCancelButton ?? (onCancel !== undefined);
   const shouldShowFinishButton = showFinishButton ?? (onSuccess !== undefined);
@@ -162,15 +202,23 @@ export function ImportarEmpleadosExcel({
       }
 
       // Guardar datos para preview
-      setPreviewData({
+      const previewPayload: PreviewData = {
         empleados: analyzeResult.data.empleados,
         equiposDetectados: analyzeResult.data.equiposDetectados,
         managersDetectados: analyzeResult.data.managersDetectados || [],
         resumen: analyzeResult.data.resumen,
-      });
+      };
+
+      setPreviewData(previewPayload);
 
       if (showToast) {
         toast.success('Archivo procesado correctamente');
+      }
+
+      if (autoConfirmAfterAnalysis && previewPayload.resumen.validos > 0) {
+        setAnalizando(false);
+        await handleConfirmarImportacion(previewPayload);
+        return;
       }
     } catch (err) {
       setError('Error al procesar el archivo');
@@ -182,8 +230,9 @@ export function ImportarEmpleadosExcel({
   };
 
   // PASO 2: Confirmar y guardar en BD
-  const handleConfirmarImportacion = async () => {
-    if (!previewData) return;
+  const handleConfirmarImportacion = async (dataOverride?: PreviewData) => {
+    const data = dataOverride ?? previewData;
+    if (!data) return;
 
     setError('');
     setConfirmando(true);
@@ -195,9 +244,9 @@ export function ImportarEmpleadosExcel({
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          empleados: previewData.empleados,
-          equiposDetectados: previewData.equiposDetectados,
-          managersDetectados: previewData.managersDetectados,
+          empleados: data.empleados,
+          equiposDetectados: data.equiposDetectados,
+          managersDetectados: data.managersDetectados,
           invitarEmpleados,
         }),
       });
@@ -271,9 +320,22 @@ export function ImportarEmpleadosExcel({
 
   return (
     <div className="space-y-6 max-w-4xl">
-      <div>
-        <h3 className="text-lg font-medium">{title}</h3>
-        <p className="text-sm text-gray-500">{description}</p>
+      {showHeader && (
+        <div>
+          <h3 className="text-lg font-medium">{title}</h3>
+          <p className="text-sm text-gray-500">{description}</p>
+        </div>
+      )}
+
+      <div className="flex flex-wrap items-center gap-2 text-sm text-gray-700">
+        <Checkbox
+          id="invitar-empleados"
+          checked={invitarEmpleados}
+          onCheckedChange={(checked) => setInvitarEmpleados(Boolean(checked))}
+        />
+        <Label htmlFor="invitar-empleados" className="cursor-pointer text-sm text-gray-700">
+          Enviar invitaciones automáticamente a todos los empleados importados
+        </Label>
       </div>
 
       {/* Loader durante análisis */}
@@ -310,44 +372,65 @@ export function ImportarEmpleadosExcel({
       {!analizando && !confirmando && previewData && !resultadoImportacion && (
         <div className="space-y-4">
           {/* Resumen del análisis */}
-          <div className="rounded-lg bg-blue-50 border border-blue-200 p-4">
-            <div className="flex items-start gap-3">
-              <AlertCircle className="h-6 w-6 text-blue-500 mt-0.5" />
-              <div className="flex-1">
-                <h4 className="font-semibold text-blue-900">Archivo analizado correctamente</h4>
-                <div className="mt-2 space-y-1 text-sm text-blue-800">
-                  <p>📋 {previewData.resumen.total} empleados detectados</p>
-                  <p>✓ {previewData.resumen.validos} empleados válidos</p>
-                  {previewData.resumen.invalidos > 0 && (
-                    <p>⚠️ {previewData.resumen.invalidos} empleados con errores (no se importarán)</p>
-                  )}
-                  <p>🏢 {previewData.equiposDetectados.length} equipos detectados</p>
-                  {previewData.managersDetectados.length > 0 && (
-                    <p>👔 {previewData.managersDetectados.length} managers detectados</p>
-                  )}
+          <div className="rounded-xl border bg-white p-4 shadow-sm">
+            <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h4 className="font-semibold text-gray-900">Resumen de la importación</h4>
+                <p className="text-sm text-gray-500">
+                  Datos detectados durante el análisis del archivo.
+                </p>
+              </div>
+              <span className="text-xs font-medium text-gray-500">
+                Último análisis: {new Date().toLocaleTimeString('es-ES')}
+              </span>
+            </div>
+
+            <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              {resumenStats.length > 0 ? (
+                resumenStats.map((stat) => (
+                  <div
+                    key={stat.label}
+                    className={`rounded-lg border px-3 py-3 ${
+                      stat.tone === 'warning'
+                        ? 'border-amber-200 bg-amber-50'
+                        : 'border-gray-100 bg-gray-50'
+                    }`}
+                  >
+                    <p className="text-xs uppercase tracking-wide text-gray-500">{stat.label}</p>
+                    <p
+                      className={`text-2xl font-semibold ${
+                        stat.tone === 'warning' ? 'text-amber-600' : 'text-gray-900'
+                      }`}
+                    >
+                      {stat.value}
+                    </p>
+                  </div>
+                ))
+              ) : (
+                <div className="rounded-lg border border-dashed px-3 py-6 text-center text-sm text-gray-500">
+                  No hay datos para mostrar todavía.
+                </div>
+              )}
+            </div>
+
+            {previewData.equiposDetectados.length > 0 && (
+              <div className="mt-4">
+                <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                  Equipos detectados
+                </p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {previewData.equiposDetectados.map((equipo, idx) => (
+                    <span
+                      key={idx}
+                      className="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-gray-700"
+                    >
+                      {equipo}
+                    </span>
+                  ))}
                 </div>
               </div>
-            </div>
+            )}
           </div>
-
-          {/* Lista de equipos detectados */}
-          {previewData.equiposDetectados.length > 0 && (
-            <div className="rounded-lg border bg-white p-4">
-              <h4 className="text-sm font-medium text-gray-900 mb-2">
-                Equipos a crear ({previewData.equiposDetectados.length})
-              </h4>
-              <div className="flex flex-wrap gap-2">
-                {previewData.equiposDetectados.map((equipo, idx) => (
-                  <span
-                    key={idx}
-                    className="inline-flex items-center px-2 py-1 rounded-md bg-blue-100 text-blue-800 text-xs font-medium"
-                  >
-                    {equipo}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
 
           {/* Lista de empleados válidos (colapsados) */}
           {previewData.empleados.filter(e => e.valido).length > 0 && (
@@ -461,18 +544,6 @@ export function ImportarEmpleadosExcel({
               </div>
             </div>
           )}
-
-          {/* Opción de invitar */}
-          <div className="flex items-center space-x-2 rounded-lg border p-4">
-            <Checkbox
-              id="invitar-preview"
-              checked={invitarEmpleados}
-              onCheckedChange={(checked) => setInvitarEmpleados(checked as boolean)}
-            />
-            <Label htmlFor="invitar-preview" className="text-sm cursor-pointer">
-              Enviar invitaciones automáticamente a todos los empleados
-            </Label>
-          </div>
 
           {/* Botones de confirmación */}
           <div className={actionButtonsClass}>

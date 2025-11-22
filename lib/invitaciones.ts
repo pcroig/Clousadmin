@@ -15,7 +15,8 @@ export async function crearInvitacion(
   empleadoId: string,
   empresaId: string,
   email: string,
-  tipoOnboarding: TipoOnboarding = 'completo'
+  tipoOnboarding: TipoOnboarding = 'completo',
+  options?: { baseUrl?: string }
 ) {
   try {
     // Verificar si ya existe una invitación activa
@@ -30,7 +31,7 @@ export async function crearInvitacion(
       });
     }
 
-    const onboarding = await crearOnboarding(empleadoId, empresaId, tipoOnboarding);
+    const onboarding = await crearOnboarding(empleadoId, empresaId, tipoOnboarding, options);
 
     if (!onboarding.success) {
       return {

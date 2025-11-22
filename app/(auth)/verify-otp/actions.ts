@@ -104,7 +104,7 @@ export async function verifyOtpAction(
       data: { ultimoAcceso: new Date() },
     });
 
-    const headersList = headers();
+    const headersList = await headers();
     const ipAddress = headersList.get('x-forwarded-for') || undefined;
     const userAgent = headersList.get('user-agent') || undefined;
 

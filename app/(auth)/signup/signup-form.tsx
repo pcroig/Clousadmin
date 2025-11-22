@@ -4,9 +4,15 @@
 // Signup Form Component - Multi-Step with Onboarding
 // ========================================
 
+import { Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
+import { toast } from 'sonner';
 
+import {
+  CalendarioJornadaForm,
+  type CalendarioJornadaFormHandle,
+} from '@/components/onboarding/calendario-jornada-form';
 import { ImportarEmpleados } from '@/components/onboarding/importar-empleados';
 import { IntegracionesForm } from '@/components/onboarding/integraciones-form';
 import { InvitarHRAdmins } from '@/components/onboarding/invitar-hr-admins';
@@ -27,8 +33,11 @@ interface SignupFormProps {
 export function SignupForm({ token, emailInvitacion }: SignupFormProps) {
   const router = useRouter();
   
-  // Estado del paso actual (0-4)
+  // Estado del paso actual (0-5)
   const [pasoActual, setPasoActual] = useState(0);
+  const calendarioFormRef = useRef<CalendarioJornadaFormHandle>(null);
+  const [guardandoCalendario, setGuardandoCalendario] = useState(false);
+  const [finalizando, setFinalizando] = useState(false);
   
   // Estado del formulario inicial (paso 0)
   const [formData, setFormData] = useState({
@@ -45,7 +54,7 @@ export function SignupForm({ token, emailInvitacion }: SignupFormProps) {
   const [loading, setLoading] = useState(false);
   
   // Total de pasos
-  const totalPasos = 5;
+  const totalPasos = 6;
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({
@@ -95,8 +104,36 @@ export function SignupForm({ token, emailInvitacion }: SignupFormProps) {
   };
 
   const handleFinalizarOnboarding = () => {
-    router.push('/hr/dashboard');
-    router.refresh();
+    if (finalizando) {
+      return;
+    }
+
+    setFinalizando(true);
+
+    try {
+      toast.success('Cuenta creada con éxito. Te llevamos a tu panel.');
+      router.push('/hr/dashboard');
+      router.refresh();
+    } catch (err) {
+      console.error('Finalizar onboarding error:', err);
+      toast.error('No hemos podido redirigirte. Inténtalo de nuevo.');
+      setFinalizando(false);
+    }
+  };
+
+  const handleGuardarCalendarioYJornada = async () => {
+    if (!calendarioFormRef.current) {
+      handleSiguiente();
+      return;
+    }
+
+    setGuardandoCalendario(true);
+    const success = await calendarioFormRef.current.guardar();
+    setGuardandoCalendario(false);
+
+    if (success) {
+      handleSiguiente();
+    }
   };
 
   const handleSiguiente = () => {
@@ -124,6 +161,10 @@ export function SignupForm({ token, emailInvitacion }: SignupFormProps) {
     {
       titulo: 'Configura las sedes',
       descripcion: 'Añade las oficinas o centros de trabajo y decide a quién se asignan',
+    },
+    {
+      titulo: 'Calendario y jornada base',
+      descripcion: 'Define los días laborables y la jornada predeterminada de tu equipo',
     },
     {
       titulo: 'Integraciones (opcional)',
@@ -168,57 +209,59 @@ export function SignupForm({ token, emailInvitacion }: SignupFormProps) {
       {/* Paso 0: Datos de empresa y usuario */}
       {pasoActual === 0 && (
         <form onSubmit={handleSubmitPaso0} className="space-y-4">
-        <div className="space-y-2">
-          <Label htmlFor="nombreEmpresa">Nombre de la empresa *</Label>
-          <Input
-            id="nombreEmpresa"
-            name="nombreEmpresa"
-            type="text"
-            placeholder="Acme Inc."
-            value={formData.nombreEmpresa}
-            onChange={handleChange}
-            required
-          />
-        </div>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div className="space-y-2">
+            <Label htmlFor="nombreEmpresa">Nombre de la empresa *</Label>
+            <Input
+              id="nombreEmpresa"
+              name="nombreEmpresa"
+              type="text"
+              placeholder="Acme Inc."
+              value={formData.nombreEmpresa}
+              onChange={handleChange}
+              required
+            />
+          </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="webEmpresa">Sitio web (opcional)</Label>
-          <Input
-            id="webEmpresa"
-            name="webEmpresa"
-            type="url"
-            placeholder="https://www.tuempresa.com"
-            value={formData.webEmpresa}
-            onChange={handleChange}
-          />
-        </div>
+          <div className="space-y-2">
+            <Label htmlFor="webEmpresa">Sitio web (opcional)</Label>
+            <Input
+              id="webEmpresa"
+              name="webEmpresa"
+              type="url"
+              placeholder="https://www.tuempresa.com"
+              value={formData.webEmpresa}
+              onChange={handleChange}
+            />
+          </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="nombre">Tu nombre *</Label>
-          <Input
-            id="nombre"
-            name="nombre"
-            type="text"
-            placeholder="Juan"
-            value={formData.nombre}
-            onChange={handleChange}
-            required
-            autoComplete="given-name"
-          />
-        </div>
+          <div className="space-y-2">
+            <Label htmlFor="nombre">Tu nombre *</Label>
+            <Input
+              id="nombre"
+              name="nombre"
+              type="text"
+              placeholder="Juan"
+              value={formData.nombre}
+              onChange={handleChange}
+              required
+              autoComplete="given-name"
+            />
+          </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="apellidos">Tus apellidos *</Label>
-          <Input
-            id="apellidos"
-            name="apellidos"
-            type="text"
-            placeholder="García López"
-            value={formData.apellidos}
-            onChange={handleChange}
-            required
-            autoComplete="family-name"
-          />
+          <div className="space-y-2">
+            <Label htmlFor="apellidos">Tus apellidos *</Label>
+            <Input
+              id="apellidos"
+              name="apellidos"
+              type="text"
+              placeholder="García López"
+              value={formData.apellidos}
+              onChange={handleChange}
+              required
+              autoComplete="family-name"
+            />
+          </div>
         </div>
 
         <div className="space-y-2">
@@ -330,8 +373,30 @@ export function SignupForm({ token, emailInvitacion }: SignupFormProps) {
         </div>
       )}
 
-      {/* Paso 3: Integraciones */}
+      {/* Paso 3: Calendario y jornada */}
       {pasoActual === 3 && (
+        <div className="space-y-6">
+          <CalendarioJornadaForm ref={calendarioFormRef} />
+          <div className="flex justify-between pt-4 border-t">
+            <Button variant="outline" onClick={handleAnterior}>
+              Anterior
+            </Button>
+            <Button onClick={handleGuardarCalendarioYJornada} disabled={guardandoCalendario}>
+              {guardandoCalendario ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Guardando...
+                </>
+              ) : (
+                'Guardar y continuar'
+              )}
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Paso 4: Integraciones */}
+      {pasoActual === 4 && (
         <div className="space-y-6">
           <IntegracionesForm integracionesIniciales={[]} />
           <div className="flex justify-between pt-4 border-t">
@@ -345,16 +410,23 @@ export function SignupForm({ token, emailInvitacion }: SignupFormProps) {
         </div>
       )}
 
-      {/* Paso 4: Invitar HR Admins */}
-      {pasoActual === 4 && (
+      {/* Paso 5: Invitar HR Admins */}
+      {pasoActual === 5 && (
         <div className="space-y-6">
           <InvitarHRAdmins />
           <div className="flex justify-between pt-4 border-t">
             <Button variant="outline" onClick={handleAnterior}>
               Anterior
             </Button>
-            <Button onClick={handleFinalizarOnboarding}>
-              Finalizar y empezar
+            <Button onClick={handleFinalizarOnboarding} disabled={finalizando}>
+              {finalizando ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Entrando en tu panel...
+                </>
+              ) : (
+                'Finalizar y empezar'
+              )}
             </Button>
           </div>
         </div>

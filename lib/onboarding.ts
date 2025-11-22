@@ -7,6 +7,7 @@ import { randomBytes } from 'crypto';
 
 import { hashPassword } from '@/lib/auth';
 import { validarDocumentosRequeridosCompletos } from '@/lib/documentos/onboarding';
+import { getBaseUrl } from '@/lib/email';
 import { encryptEmpleadoData } from '@/lib/empleado-crypto';
 import { crearNotificacionOnboardingCompletado } from '@/lib/notificaciones';
 import { obtenerOnboardingConfig } from '@/lib/onboarding-config';
@@ -100,10 +101,15 @@ export type CrearOnboardingResult = CrearOnboardingSuccess | CrearOnboardingErro
 /**
  * Crear registro de onboarding para un empleado
  */
+export interface CrearOnboardingOptions {
+  baseUrl?: string;
+}
+
 export async function crearOnboarding(
   empleadoId: string,
   empresaId: string,
-  tipoOnboarding: TipoOnboarding = 'completo'
+  tipoOnboarding: TipoOnboarding = 'completo',
+  options?: CrearOnboardingOptions
 ): Promise<CrearOnboardingResult> {
   try {
     // Generar token único antes de la transacción
@@ -151,7 +157,7 @@ export async function crearOnboarding(
       });
     });
 
-    const baseUrl = process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+    const baseUrl = getBaseUrl(options?.baseUrl);
     const path = tipoOnboarding === 'completo' ? 'onboarding' : 'onboarding-simplificado';
     const url = `${baseUrl}/${path}/${token}`;
 

@@ -4,6 +4,8 @@
 
 import { z } from 'zod';
 
+const HORA_24H_REGEX = /^([01]\d|2[0-3]):([0-5]\d)$/;
+
 // ========================================
 // SIGNUP & ONBOARDING
 // ========================================
@@ -312,6 +314,59 @@ export const calendarioLaboralUpdateSchema = z.object({
 );
 
 export type CalendarioLaboralUpdateInput = z.infer<typeof calendarioLaboralUpdateSchema>;
+
+export const calendarioJornadaOnboardingSchema = z
+  .object({
+    diasLaborables: calendarioLaboralUpdateSchema,
+    jornada: z.object({
+      nombre: z.string().min(3, 'El nombre de la jornada es obligatorio').max(100),
+      tipo: z.enum(['flexible', 'fija']),
+      horasSemanales: z
+        .number({
+          required_error: 'Las horas semanales son obligatorias',
+          invalid_type_error: 'Las horas semanales deben ser un número',
+        })
+        .min(1, 'Las horas semanales deben ser mayores que 0')
+        .max(168, 'Las horas semanales no pueden superar las 168 horas'),
+      limiteInferior: z
+        .string()
+        .regex(HORA_24H_REGEX, 'Hora inválida (formato HH:MM)')
+        .optional(),
+      limiteSuperior: z
+        .string()
+        .regex(HORA_24H_REGEX, 'Hora inválida (formato HH:MM)')
+        .optional(),
+      horaEntrada: z
+        .string()
+        .regex(HORA_24H_REGEX, 'Hora inválida (formato HH:MM)')
+        .optional(),
+      horaSalida: z
+        .string()
+        .regex(HORA_24H_REGEX, 'Hora inválida (formato HH:MM)')
+        .optional(),
+    }),
+  })
+  .superRefine((data, ctx) => {
+    if (data.jornada.tipo === 'flexible') {
+      if (!data.jornada.limiteInferior || !data.jornada.limiteSuperior) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Define un rango horario para la jornada flexible',
+          path: ['jornada', 'limites'],
+        });
+      }
+    } else {
+      if (!data.jornada.horaEntrada || !data.jornada.horaSalida) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Define hora de entrada y salida para la jornada fija',
+          path: ['jornada', 'horario'],
+        });
+      }
+    }
+  });
+
+export type CalendarioJornadaOnboardingInput = z.infer<typeof calendarioJornadaOnboardingSchema>;
 
 // ========================================
 // SALDO AUSENCIAS

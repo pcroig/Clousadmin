@@ -14,7 +14,7 @@ import {
   successResponse,
   validateRequest,
 } from '@/lib/api-handler';
-import { sendOnboardingEmail } from '@/lib/email';
+import { getBaseUrl, sendOnboardingEmail } from '@/lib/email';
 import { crearOnboarding } from '@/lib/onboarding';
 
 
@@ -38,6 +38,8 @@ export async function POST(req: NextRequest) {
     const { data: validatedData } = validationResult;
 
     const { empleadoId, tipoOnboarding = 'completo' } = validatedData;
+    const origin = req.headers.get('origin') ?? undefined;
+    const baseUrl = getBaseUrl(origin);
 
     // Verificar que el empleado existe y pertenece a la misma empresa
     const { prisma } = await import('@/lib/prisma');
@@ -75,7 +77,6 @@ export async function POST(req: NextRequest) {
 
       if (tiempoDesdeCreacion < TIEMPO_MINIMO_SEGUNDOS) {
         // Ya existe un onboarding activo creado recientemente, devolver el existente
-        const baseUrl = process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
         const path = onboardingExistente.tipoOnboarding === 'completo' ? 'onboarding' : 'onboarding-simplificado';
         const url = `${baseUrl}/${path}/${onboardingExistente.token}`;
 
@@ -93,7 +94,8 @@ export async function POST(req: NextRequest) {
     const result = await crearOnboarding(
       empleadoId,
       session.user.empresaId,
-      tipoOnboarding
+      tipoOnboarding,
+      { baseUrl }
     );
 
     if (!result.success) {

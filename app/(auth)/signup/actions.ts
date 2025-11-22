@@ -10,7 +10,6 @@ import { z } from 'zod';
 import { createSession, hashPassword } from '@/lib/auth';
 import { UsuarioRol } from '@/lib/constants/enums';
 import { usarInvitacionSignup, verificarInvitacionSignup } from '@/lib/invitaciones-signup';
-import { getOrCreateDefaultJornada } from '@/lib/jornadas/get-or-create-default';
 import { prisma } from '@/lib/prisma';
 import { getClientIP } from '@/lib/rate-limit';
 import { signupSchema } from '@/lib/validaciones/schemas';
@@ -24,7 +23,7 @@ export async function signupEmpresaAction(
   data: z.infer<typeof signupSchema> & { token?: string }
 ) {
   try {
-    const headersList = headers();
+    const headersList = await headers();
     const clientIP = getClientIP(headersList);
     const ipAddress = clientIP === 'unknown-ip' ? undefined : clientIP;
 
@@ -83,10 +82,7 @@ export async function signupEmpresaAction(
         },
       });
 
-      // 2. Crear jornada por defecto (40 horas, flexible, límites 7:00-21:00)
-      const jornadaPorDefecto = await getOrCreateDefaultJornada(tx, empresa.id);
-
-      // 3. Crear usuario HR Admin
+      // 2. Crear usuario HR Admin
       const usuario = await tx.usuario.create({
         data: {
           email: validatedData.email.toLowerCase(),
@@ -100,7 +96,7 @@ export async function signupEmpresaAction(
         },
       });
 
-      // 4. Crear empleado asociado al usuario con jornada por defecto asignada
+      // 3. Crear empleado asociado al usuario
       const empleado = await tx.empleado.create({
         data: {
           usuarioId: usuario.id,
@@ -109,13 +105,12 @@ export async function signupEmpresaAction(
           apellidos: validatedData.apellidos,
           email: validatedData.email.toLowerCase(),
           fechaAlta: new Date(),
-          jornadaId: jornadaPorDefecto.id, // Asignar jornada por defecto
           onboardingCompletado: false, // Se completará en /onboarding/cargar-datos
           activo: true,
         },
       });
 
-      // 5. Vincular empleado al usuario
+      // 4. Vincular empleado al usuario
       await tx.usuario.update({
         where: { id: usuario.id },
         data: { empleadoId: empleado.id },
@@ -137,7 +132,7 @@ export async function signupEmpresaAction(
         });
       }
 
-      return { usuario, empresa, empleado, jornadaPorDefecto };
+      return { usuario, empresa, empleado };
     });
 
     // 5. Marcar invitación como usada

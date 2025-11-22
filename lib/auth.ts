@@ -10,6 +10,7 @@ import { cookies } from 'next/headers';
 
 import { createToken, verifyToken } from '@/lib/auth-edge';
 import { prisma } from '@/lib/prisma';
+import { ensureEmpresaActivoColumn } from '@/lib/prisma/patches';
 
 import type { SessionData, UsuarioAutenticado } from '@/types/auth';
 
@@ -139,6 +140,7 @@ export async function getSession(): Promise<SessionData | null> {
     });
 
     // Verificar que usuario sigue activo (cada request)
+    await ensureEmpresaActivoColumn();
     const usuario = await prisma.usuario.findUnique({
       where: { id: sessionData.user.id },
       select: {
@@ -414,6 +416,7 @@ export async function authenticate(
     return null;
   }
 
+  await ensureEmpresaActivoColumn();
   const empresa = await prisma.empresa.findUnique({
     where: { id: usuario.empresaId },
     select: { activo: true },

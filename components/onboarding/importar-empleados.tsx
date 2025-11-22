@@ -10,8 +10,10 @@ import { ImportarEmpleadosExcel } from '@/components/shared/importar-empleados-e
 export function ImportarEmpleados() {
   return (
     <ImportarEmpleadosExcel
-      title="Importar empleados"
-      description="Sube un archivo Excel con los datos de tus empleados. La IA procesará automáticamente la estructura."
+      showHeader={false}
+      showCancelButton={false}
+      showFinishButton={false}
+      autoConfirmAfterAnalysis
     />
   );
 }

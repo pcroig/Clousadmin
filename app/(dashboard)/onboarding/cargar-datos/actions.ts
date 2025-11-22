@@ -5,13 +5,19 @@
 // ========================================
 
 import { revalidatePath } from 'next/cache';
+import { headers } from 'next/headers';
 import { z } from 'zod';
 
 import { getSession } from '@/lib/auth';
 import { UsuarioRol } from '@/lib/constants/enums';
+import { getBaseUrl } from '@/lib/email';
 import { crearInvitacion } from '@/lib/invitaciones';
 import { prisma, Prisma } from '@/lib/prisma';
-import { integracionCreateSchema, sedeCreateSchema } from '@/lib/validaciones/schemas';
+import {
+  calendarioJornadaOnboardingSchema,
+  integracionCreateSchema,
+  sedeCreateSchema,
+} from '@/lib/validaciones/schemas';
 
 
 
@@ -20,6 +26,59 @@ import { integracionCreateSchema, sedeCreateSchema } from '@/lib/validaciones/sc
  */
 function toJsonValue<T extends Record<string, unknown>>(value: T): Prisma.InputJsonValue {
   return value as unknown as Prisma.InputJsonValue;
+}
+
+type DiaKey = 'lunes' | 'martes' | 'miercoles' | 'jueves' | 'viernes' | 'sabado' | 'domingo';
+
+function buildJornadaConfig(
+  tipo: 'flexible' | 'fija',
+  diasLaborables: Record<DiaKey, boolean>,
+  {
+    horaEntrada,
+    horaSalida,
+    limiteInferior,
+    limiteSuperior,
+  }: {
+    horaEntrada?: string;
+    horaSalida?: string;
+    limiteInferior?: string;
+    limiteSuperior?: string;
+  }
+) {
+  const config: Record<string, unknown> = {
+    tipo,
+  };
+
+  const dayEntries = Object.entries(diasLaborables) as Array<[DiaKey, boolean]>;
+
+  dayEntries.forEach(([dia, activo]) => {
+    config[dia] =
+      tipo === 'fija'
+        ? {
+            activo,
+            entrada: horaEntrada,
+            salida: horaSalida,
+          }
+        : { activo };
+  });
+
+  if (tipo === 'flexible') {
+    if (limiteInferior) {
+      config.limiteInferior = limiteInferior;
+    }
+    if (limiteSuperior) {
+      config.limiteSuperior = limiteSuperior;
+    }
+  } else {
+    if (horaEntrada) {
+      config.limiteInferior = horaEntrada;
+    }
+    if (horaSalida) {
+      config.limiteSuperior = horaSalida;
+    }
+  }
+
+  return config;
 }
 
 /**
@@ -295,6 +354,108 @@ export async function eliminarSedeAction(sedeId: string) {
   }
 }
 
+export async function configurarCalendarioYJornadaAction(input: z.infer<typeof calendarioJornadaOnboardingSchema>) {
+  try {
+    const session = await getSession();
+    if (!session) {
+      return {
+        success: false,
+        error: 'No autenticado',
+      };
+    }
+
+    const validatedData = calendarioJornadaOnboardingSchema.parse(input);
+    const { diasLaborables, jornada } = validatedData;
+
+    const jornadaCreada = await prisma.$transaction(async (tx) => {
+      const empresa = await tx.empresa.findUnique({
+        where: { id: session.user.empresaId },
+        select: { config: true },
+      });
+
+      const configActual = empresa?.config as Prisma.JsonValue;
+      const nuevaConfig: Prisma.JsonValue = {
+        ...(typeof configActual === 'object' && configActual !== null ? configActual : {}),
+        diasLaborables,
+      };
+
+      await tx.empresa.update({
+        where: { id: session.user.empresaId },
+        data: {
+          config: nuevaConfig as Prisma.InputJsonValue,
+        },
+      });
+
+      const configJornada = buildJornadaConfig(jornada.tipo, diasLaborables, {
+        horaEntrada: jornada.horaEntrada,
+        horaSalida: jornada.horaSalida,
+        limiteInferior: jornada.limiteInferior,
+        limiteSuperior: jornada.limiteSuperior,
+      });
+
+      const jornadaExistente = await tx.jornada.findFirst({
+        where: {
+          empresaId: session.user.empresaId,
+          esPredefinida: true,
+        },
+      });
+
+      const dataJornada = {
+        nombre: jornada.nombre,
+        horasSemanales: jornada.horasSemanales,
+        config: toJsonValue(configJornada),
+        esPredefinida: true,
+        activa: true,
+      };
+
+      const registro = jornadaExistente
+        ? await tx.jornada.update({
+            where: { id: jornadaExistente.id },
+            data: dataJornada,
+          })
+        : await tx.jornada.create({
+            data: {
+              ...dataJornada,
+              empresaId: session.user.empresaId,
+            },
+          });
+
+      await tx.empleado.updateMany({
+        where: {
+          empresaId: session.user.empresaId,
+          jornadaId: null,
+        },
+        data: {
+          jornadaId: registro.id,
+        },
+      });
+
+      return registro;
+    });
+
+    revalidatePath('/onboarding/cargar-datos');
+
+    return {
+      success: true,
+      jornadaId: jornadaCreada.id,
+    };
+  } catch (error) {
+    console.error('[configurarCalendarioYJornadaAction] Error:', error);
+
+    if (error instanceof z.ZodError) {
+      return {
+        success: false,
+        error: error.issues[0]?.message || 'Datos inválidos',
+      };
+    }
+
+    return {
+      success: false,
+      error: 'Error al guardar calendario y jornada',
+    };
+  }
+}
+
 /**
  * Configurar una integración
  */
@@ -374,7 +535,19 @@ export async function configurarIntegracionAction(
 /**
  * Invitar a un HR Admin adicional
  */
-export async function invitarHRAdminAction(email: string, nombre: string, apellidos: string) {
+interface InvitarHRAdminInput {
+  email: string;
+  nombre: string;
+  apellidos: string;
+  empleadoId?: string;
+}
+
+export async function invitarHRAdminAction({
+  email,
+  nombre,
+  apellidos,
+  empleadoId,
+}: InvitarHRAdminInput) {
   try {
     const session = await getSession();
     if (!session || session.user.rol !== UsuarioRol.hr_admin) {
@@ -384,9 +557,104 @@ export async function invitarHRAdminAction(email: string, nombre: string, apelli
       };
     }
 
+    const headersList = headers();
+    const origin = headersList.get('origin') ?? undefined;
+    const baseUrl = getBaseUrl(origin);
+
+    const emailLower = email.trim().toLowerCase();
+
+    const empleadoExistente = empleadoId
+      ? await prisma.empleado.findFirst({
+          where: {
+            id: empleadoId,
+            empresaId: session.user.empresaId,
+          },
+          include: {
+            usuario: true,
+          },
+        })
+      : await prisma.empleado.findFirst({
+          where: {
+            email: emailLower,
+            empresaId: session.user.empresaId,
+          },
+          include: {
+            usuario: true,
+          },
+        });
+
+    if (empleadoExistente) {
+      if (empleadoExistente.usuario?.rol === UsuarioRol.hr_admin) {
+        return {
+          success: false,
+          error: 'Este empleado ya tiene rol de HR admin',
+        };
+      }
+
+      const usuarioActualizado = empleadoExistente.usuario
+        ? await prisma.usuario.update({
+            where: { id: empleadoExistente.usuario.id },
+            data: {
+              nombre,
+              apellidos,
+              email: emailLower,
+              rol: UsuarioRol.hr_admin,
+            },
+          })
+        : await prisma.usuario.create({
+            data: {
+              email: emailLower,
+              nombre,
+              apellidos,
+              empresaId: session.user.empresaId,
+              rol: UsuarioRol.hr_admin,
+              emailVerificado: false,
+              activo: false,
+            },
+          });
+
+      if (!empleadoExistente.usuario) {
+        await prisma.empleado.update({
+          where: { id: empleadoExistente.id },
+          data: { usuarioId: usuarioActualizado.id },
+        });
+      }
+
+      await prisma.empleado.update({
+        where: { id: empleadoExistente.id },
+        data: {
+          nombre,
+          apellidos,
+          email: emailLower,
+        },
+      });
+
+      const invitacion = await crearInvitacion(
+        empleadoExistente.id,
+        session.user.empresaId,
+        emailLower,
+        'completo',
+        { baseUrl }
+      );
+
+      if (!invitacion.success || !invitacion.url) {
+        return {
+          success: false,
+          error: invitacion.error || 'No se pudo generar la invitación',
+        };
+      }
+
+      revalidatePath('/onboarding/cargar-datos');
+
+      return {
+        success: true,
+        invitacionUrl: invitacion.url,
+      };
+    }
+
     // Verificar que el email no exista
     const existingUser = await prisma.usuario.findUnique({
-      where: { email: email.toLowerCase() },
+      where: { email: emailLower },
     });
 
     if (existingUser) {
@@ -401,7 +669,7 @@ export async function invitarHRAdminAction(email: string, nombre: string, apelli
       // 1. Crear usuario sin password (será establecida en el onboarding)
       const usuario = await tx.usuario.create({
         data: {
-          email: email.toLowerCase(),
+          email: emailLower,
           nombre,
           apellidos,
           empresaId: session.user.empresaId,
@@ -418,7 +686,7 @@ export async function invitarHRAdminAction(email: string, nombre: string, apelli
           empresaId: session.user.empresaId,
           nombre,
           apellidos,
-          email: email.toLowerCase(),
+          email: emailLower,
           fechaAlta: new Date(),
           onboardingCompletado: false,
           activo: false,
@@ -438,8 +706,17 @@ export async function invitarHRAdminAction(email: string, nombre: string, apelli
     const invitacion = await crearInvitacion(
       result.empleado.id,
       session.user.empresaId,
-      email.toLowerCase()
+      emailLower,
+      'completo',
+      { baseUrl }
     );
+
+    if (!invitacion.success || !invitacion.url) {
+      return {
+        success: false,
+        error: invitacion.error || 'No se pudo generar la invitación',
+      };
+    }
 
     revalidatePath('/onboarding/cargar-datos');
 

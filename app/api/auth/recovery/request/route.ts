@@ -17,7 +17,7 @@ export async function POST(req: NextRequest) {
     const { email } = requestSchema.parse(body);
     const normalizedEmail = email.toLowerCase();
 
-    const headersList = headers();
+    const headersList = await headers();
     const clientIP = getClientIP(headersList);
     const rateIdentifier = `pwd-recovery:${normalizedEmail}:${clientIP}`;
     const rateResult = await rateLimitLogin(rateIdentifier);

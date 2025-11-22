@@ -5,17 +5,42 @@
 // ========================================
 
 import { Check, Copy, UserPlus } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { invitarHRAdminAction } from '@/app/(dashboard)/onboarding/cargar-datos/actions';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 interface Invitacion {
   email: string;
   nombre: string;
   url: string;
+}
+
+interface EmpleadoCandidato {
+  id: string;
+  nombre: string;
+  apellidos: string;
+  email: string;
+  rol?: string;
+}
+
+interface ApiEmpleado {
+  id: string;
+  nombre?: string | null;
+  apellidos?: string | null;
+  email?: string | null;
+  usuario?: {
+    rol?: string | null;
+  } | null;
 }
 
 export function InvitarHRAdmins() {
@@ -26,6 +51,60 @@ export function InvitarHRAdmins() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+  const [empleados, setEmpleados] = useState<EmpleadoCandidato[]>([]);
+  const [empleadoSeleccionado, setEmpleadoSeleccionado] = useState('');
+  const [cargandoEmpleados, setCargandoEmpleados] = useState(false);
+
+  useEffect(() => {
+    const loadEmpleados = async () => {
+      setCargandoEmpleados(true);
+      try {
+        const response = await fetch('/api/empleados?limit=100&activos=true');
+        if (!response.ok) {
+          throw new Error('No se pudieron cargar los empleados');
+        }
+        const data = await response.json();
+        const lista: ApiEmpleado[] = Array.isArray(data?.data) ? data.data : [];
+        const candidatos = lista.filter((emp) => emp?.usuario?.rol !== 'hr_admin');
+        setEmpleados(
+          candidatos.map((emp) => ({
+            id: emp.id,
+            nombre: emp?.nombre ?? '',
+            apellidos: emp?.apellidos ?? '',
+            email: emp?.email ?? '',
+            rol: emp?.usuario?.rol,
+          }))
+        );
+      } catch (err) {
+        console.warn('[InvitarHRAdmins] Error cargando empleados', err);
+      } finally {
+        setCargandoEmpleados(false);
+      }
+    };
+
+    loadEmpleados();
+  }, []);
+
+  const handleSelectEmpleado = (value: string) => {
+    setEmpleadoSeleccionado(value);
+    setError('');
+
+    if (!value) {
+      setNombre('');
+      setApellidos('');
+      setEmail('');
+      return;
+    }
+
+    const empleado = empleados.find((emp) => emp.id === value);
+    if (empleado) {
+      setNombre(empleado.nombre);
+      setApellidos(empleado.apellidos);
+      setEmail(empleado.email);
+    }
+  };
+
+  const inputsDisabled = Boolean(empleadoSeleccionado);
 
   const handleInvitar = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,7 +112,12 @@ export function InvitarHRAdmins() {
     setLoading(true);
 
     try {
-      const result = await invitarHRAdminAction(email, nombre, apellidos);
+      const result = await invitarHRAdminAction({
+        email,
+        nombre,
+        apellidos,
+        empleadoId: empleadoSeleccionado || undefined,
+      });
 
       if (result.success && result.invitacionUrl) {
         setInvitaciones([
@@ -47,6 +131,7 @@ export function InvitarHRAdmins() {
         setNombre('');
         setApellidos('');
         setEmail('');
+        setEmpleadoSeleccionado('');
       } else {
         setError(result.error || 'Error al enviar la invitación');
       }
@@ -68,15 +153,33 @@ export function InvitarHRAdmins() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h3 className="text-lg font-medium">Invitar administradores de RRHH</h3>
-        <p className="text-sm text-gray-500">
-          Invita a otros miembros del equipo de RRHH para que tengan acceso administrativo.
-        </p>
-      </div>
-
       {/* Formulario para invitar */}
       <form onSubmit={handleInvitar} className="space-y-4">
+        <div className="space-y-2">
+          <Label>Selecciona un empleado existente (opcional)</Label>
+          <Select
+            value={empleadoSeleccionado}
+            onValueChange={handleSelectEmpleado}
+            disabled={cargandoEmpleados || empleados.length === 0}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Introduce los datos manualmente" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">Introduce los datos manualmente</SelectItem>
+              {empleados.map((emp) => (
+                <SelectItem key={emp.id} value={emp.id}>
+                  {emp.nombre} {emp.apellidos} ({emp.email})
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-gray-500">
+            Usa los empleados importados para promoverlos a administradores sin volver a rellenar sus
+            datos.
+          </p>
+        </div>
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label htmlFor="nombre">Nombre</Label>
@@ -86,6 +189,7 @@ export function InvitarHRAdmins() {
               value={nombre}
               onChange={(e) => setNombre(e.target.value)}
               required
+              disabled={inputsDisabled}
             />
           </div>
 
@@ -97,6 +201,7 @@ export function InvitarHRAdmins() {
               value={apellidos}
               onChange={(e) => setApellidos(e.target.value)}
               required
+              disabled={inputsDisabled}
             />
           </div>
         </div>
@@ -110,6 +215,7 @@ export function InvitarHRAdmins() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
+            disabled={inputsDisabled}
           />
         </div>
 

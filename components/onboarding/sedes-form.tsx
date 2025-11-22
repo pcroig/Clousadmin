@@ -104,6 +104,61 @@ export function SedesForm({ sedesIniciales = [] }: SedesFormProps) {
     });
   }, [sedes]);
 
+  const persistAsignacion = async (sedeId: string, config: { tipo: TipoAsignacion; equipoId?: string }) => {
+    setAsignandoSedeId(sedeId);
+
+    try {
+      const result = await asignarSedeAction(sedeId, config);
+
+      if (result.success && result.sede) {
+        setSedes((prev) =>
+          prev.map((sede) => (sede.id === sedeId ? { ...sede, ...result.sede } : sede))
+        );
+        toast.success('Asignación actualizada');
+      } else {
+        toast.error(result.error || 'Error al asignar la sede');
+      }
+    } catch (err) {
+      console.error('Error:', err);
+      toast.error('Error al asignar la sede');
+    } finally {
+      setAsignandoSedeId(null);
+    }
+  };
+
+  const handleTipoAsignacionChange = (sedeId: string, tipo: TipoAsignacion) => {
+    setAsignaciones((prev) => {
+      const next = {
+        ...prev,
+        [sedeId]: {
+          tipo,
+          equipoId: tipo === 'empresa' ? undefined : prev[sedeId]?.equipoId,
+        },
+      };
+      return next;
+    });
+
+    if (tipo === 'empresa') {
+      void persistAsignacion(sedeId, { tipo: 'empresa' });
+    }
+  };
+
+  const handleEquipoAsignacionChange = (sedeId: string, value: string) => {
+    const equipoId = value === 'none' ? undefined : value;
+
+    setAsignaciones((prev) => ({
+      ...prev,
+      [sedeId]: {
+        tipo: 'equipo',
+        equipoId,
+      },
+    }));
+
+    if (equipoId) {
+      void persistAsignacion(sedeId, { tipo: 'equipo', equipoId });
+    }
+  };
+
   const handleAgregarSede = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -168,42 +223,6 @@ export function SedesForm({ sedesIniciales = [] }: SedesFormProps) {
     } catch (err) {
       setError('Error al eliminar la sede');
       console.error('Error:', err);
-    }
-  };
-
-  const handleAsignarSede = async (sedeId: string) => {
-    const config = asignaciones[sedeId];
-
-    if (!config) {
-      return;
-    }
-
-    if (config.tipo === 'equipo' && !config.equipoId) {
-      toast.error('Selecciona un equipo antes de guardar');
-      return;
-    }
-
-    setAsignandoSedeId(sedeId);
-
-    try {
-      const result = await asignarSedeAction(sedeId, {
-        tipo: config.tipo,
-        equipoId: config.equipoId,
-      });
-
-      if (result.success && result.sede) {
-        setSedes((prev) =>
-          prev.map((sede) => (sede.id === sedeId ? { ...sede, ...result.sede } : sede))
-        );
-        toast.success('Asignación actualizada');
-      } else {
-        toast.error(result.error || 'Error al asignar la sede');
-      }
-    } catch (err) {
-      console.error('Error:', err);
-      toast.error('Error al asignar la sede');
-    } finally {
-      setAsignandoSedeId(null);
     }
   };
 
@@ -314,19 +333,7 @@ export function SedesForm({ sedesIniciales = [] }: SedesFormProps) {
                   <div className="space-y-3">
                     <RadioGroup
                       value={asignacion.tipo}
-                      onValueChange={(value) =>
-                        setAsignaciones((prev) => {
-                          const tipo = value as TipoAsignacion;
-                          return {
-                            ...prev,
-                            [sede.id]: {
-                              tipo,
-                              equipoId:
-                                tipo === 'empresa' ? undefined : prev[sede.id]?.equipoId,
-                            },
-                          };
-                        })
-                      }
+                      onValueChange={(value) => handleTipoAsignacionChange(sede.id, value as TipoAsignacion)}
                       className="flex flex-col gap-2 sm:flex-row"
                     >
                       <div className="flex items-center space-x-2 rounded-md border p-3">
@@ -345,16 +352,12 @@ export function SedesForm({ sedesIniciales = [] }: SedesFormProps) {
                         {asignacion.tipo === 'equipo' && (
                           <Select
                             value={asignacion.equipoId || 'none'}
-                            onValueChange={(value) =>
-                              setAsignaciones((prev) => ({
-                                ...prev,
-                                [sede.id]: {
-                                  tipo: 'equipo',
-                                  equipoId: value === 'none' ? undefined : value,
-                                },
-                              }))
+                            onValueChange={(value) => handleEquipoAsignacionChange(sede.id, value)}
+                            disabled={
+                              cargandoEquipos ||
+                              equipos.length === 0 ||
+                              asignandoSedeId === sede.id
                             }
-                            disabled={cargandoEquipos || equipos.length === 0}
                           >
                             <SelectTrigger className="w-full sm:w-56">
                               <SelectValue placeholder="Selecciona un equipo" />
@@ -381,32 +384,18 @@ export function SedesForm({ sedesIniciales = [] }: SedesFormProps) {
                       </span>
                     </div>
 
-                    <div className="flex justify-end">
-                      <Button
-                        type="button"
-                        onClick={() => handleAsignarSede(sede.id)}
-                        disabled={
-                          asignandoSedeId === sede.id ||
-                          (asignacion.tipo === 'equipo' && !asignacion.equipoId)
-                        }
-                      >
-                        {asignandoSedeId === sede.id ? 'Guardando...' : 'Guardar asignación'}
-                      </Button>
+                    <div className="text-xs text-gray-500">
+                      {asignacion.tipo === 'equipo' && !asignacion.equipoId
+                        ? 'Selecciona un equipo para aplicar la asignación.'
+                        : asignandoSedeId === sede.id
+                        ? 'Aplicando cambios...'
+                        : 'Los cambios se guardan automáticamente.'}
                     </div>
                   </div>
                 </div>
               );
             })}
           </div>
-        </div>
-      )}
-
-      {sedes.length === 0 && (
-        <div className="rounded-lg border border-dashed p-8 text-center">
-          <MapPin className="mx-auto h-8 w-8 text-gray-400" />
-          <p className="mt-2 text-sm text-gray-500">
-            No hay sedes agregadas. Puedes omitir este paso si solo tienes una ubicación.
-          </p>
         </div>
       )}
     </div>
