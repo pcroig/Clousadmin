@@ -13,7 +13,7 @@ import { descargarDocumento, subirDocumento } from '@/lib/s3';
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getSession();
@@ -32,8 +32,10 @@ export async function POST(
       );
     }
 
+    const { id } = await context.params;
+
     const documentoGenerado = await prisma.documentoGenerado.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         documento: true,
         plantilla: true,
