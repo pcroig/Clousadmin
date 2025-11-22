@@ -17,14 +17,14 @@ import { prisma } from '@/lib/prisma';
 // GET /api/denuncias/[id] - Obtener detalle de una denuncia
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
     const authResult = await requireAuth(req);
     if (authResult instanceof Response) return authResult;
     const { session } = authResult;
 
-    const denunciaId = params.id;
+    const { id: denunciaId } = await context.params;
 
     // Buscar la denuncia
     const denuncia = await prisma.denuncia.findUnique({
