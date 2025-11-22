@@ -6,7 +6,7 @@
 // Optimized for production with connection pooling
 // Lazy initialization to avoid environment variable timing issues
 
-import { performance } from 'node:perf_hooks';
+import { performance } from 'perf_hooks';
 
 import { Prisma, PrismaClient } from '@prisma/client';
 
