@@ -73,6 +73,21 @@ const nextConfig: NextConfig = {
     formats: ['image/avif', 'image/webp'],
   },
 
+  // Excluir librerías de servidor del bundle del cliente
+  webpack: (config, { isServer }) => {
+    if (!isServer) {
+      // BullMQ y otras librerías de servidor no deben compilarse en el cliente
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        bullmq: false,
+        ioredis: false,
+        'node:perf_hooks': false,
+        perf_hooks: false,
+      };
+    }
+    return config;
+  },
+
   // Headers de seguridad
   async headers() {
     return [
