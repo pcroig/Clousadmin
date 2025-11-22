@@ -147,12 +147,11 @@ export function PersonasClient({ empleados, initialPanel, initialDenunciaId }: P
     <ResponsiveContainer variant="page" className="h-full w-full flex flex-col overflow-hidden">
       {isMobile ? (
         <>
-          {/* Action Bar - 48px */}
           <MobileActionBar
             title="Personas"
             primaryAction={{
               icon: Plus,
-              label: 'Añadir Persona',
+              label: 'Añadir persona',
               onClick: () => setAddPersonaDialogOpen(true),
             }}
             secondaryActions={[
@@ -161,18 +160,16 @@ export function PersonasClient({ empleados, initialPanel, initialDenunciaId }: P
                 label: 'Canal de denuncias',
                 onClick: () => setDenunciasDetailsOpen(true),
               },
-            ]}
-            overflowActions={[
               {
                 icon: Settings,
-                label: 'Gestionar on/offboarding',
+                label: 'Gestionar onboarding',
                 onClick: () => setGestionarOnboardingOpen(true),
               },
             ]}
             className="mb-3"
           />
 
-          {/* Search Bar - 44px */}
+          {/* Búsqueda */}
           <div className="flex-shrink-0 mb-3">
             <CompactFilterBar
               searchValue={filtros.busqueda}

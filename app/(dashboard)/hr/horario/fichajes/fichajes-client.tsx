@@ -776,13 +776,12 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
     <ResponsiveContainer variant="page" className="h-full w-full flex flex-col overflow-hidden">
       {isMobile ? (
         <>
-          {/* Action Bar - 48px */}
           <MobileActionBar
             title="Fichajes"
             primaryAction={{
-              icon: Plus,
-              label: 'Cuadrar fichajes',
+              label: 'Cuadrar',
               onClick: handleCuadrarFichajes,
+              display: 'label',
             }}
             secondaryActions={[
               {
@@ -790,8 +789,6 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
                 label: 'Gestionar jornadas',
                 onClick: () => setJornadasModal(true),
               },
-            ]}
-            overflowActions={[
               {
                 icon: Clock,
                 label: 'Compensar horas',
@@ -801,8 +798,45 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
             className="mb-3"
           />
 
-          {/* Filters Bar - 44px + Date Controls inline - 40px = 84px total */}
+          {/* Navegación de período + filtros en una línea */}
           <div className="flex-shrink-0 mb-3 space-y-2">
+            {/* Período de tiempo compacto */}
+            <div className="flex items-center gap-2">
+              <Select 
+                value={rangoFechas} 
+                onValueChange={(v) => setRangoFechas(v as 'dia' | 'semana' | 'mes')}
+              >
+                <SelectTrigger className="w-20 h-9 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="dia">Día</SelectItem>
+                  <SelectItem value="semana">Sem</SelectItem>
+                  <SelectItem value="mes">Mes</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={goToPreviousPeriod}
+                className="h-9 w-9 p-0"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <span className="text-sm font-medium text-gray-900 flex-1 text-center">
+                {periodLabel}
+              </span>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={goToNextPeriod}
+                className="h-9 w-9 p-0"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+
+            {/* Búsqueda y filtros */}
             <CompactFilterBar
               searchValue={busquedaEmpleado}
               onSearchChange={setBusquedaEmpleado}
@@ -847,56 +881,8 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
                   </div>
                 </>
               }
-              filtersTitle="Filtros de fichajes"
+              filtersTitle="Filtros"
             />
-
-            {/* Date Controls - Compact inline */}
-            <div className="flex items-center justify-between gap-2 px-2">
-              <div className="flex items-center gap-1">
-                <Select 
-                  value={rangoFechas} 
-                  onValueChange={(v) => setRangoFechas(v as 'dia' | 'semana' | 'mes')}
-                >
-                  <SelectTrigger className="w-24 h-9 text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="dia">Día</SelectItem>
-                    <SelectItem value="semana">Semana</SelectItem>
-                    <SelectItem value="mes">Mes</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex items-center gap-1">
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  onClick={goToPreviousPeriod}
-                  className="h-8 w-8 p-0"
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
-                <span className="text-xs font-medium text-gray-900 min-w-[120px] text-center">
-                  {periodLabel}
-                </span>
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  onClick={goToNextPeriod}
-                  className="h-8 w-8 p-0"
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-              </div>
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                onClick={resetToToday}
-                className="h-8 px-2 text-xs"
-              >
-                Hoy
-              </Button>
-            </div>
           </div>
 
           {/* Table - Ocupa el resto del viewport (70-80%) */}

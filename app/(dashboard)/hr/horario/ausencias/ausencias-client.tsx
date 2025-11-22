@@ -686,13 +686,12 @@ export function AusenciasClient({}: AusenciasClientProps) {
     <ResponsiveContainer variant="page" className="h-full w-full flex flex-col overflow-hidden">
       {isMobile ? (
         <>
-          {/* Action Bar - 48px */}
           <MobileActionBar
             title="Ausencias"
             primaryAction={{
-              icon: Plus,
-              label: 'Nueva Campaña',
+              label: 'Campaña',
               onClick: () => setCrearCampanaModal(true),
+              display: 'label',
             }}
             secondaryActions={[
               {
@@ -704,7 +703,7 @@ export function AusenciasClient({}: AusenciasClientProps) {
             className="mb-3"
           />
 
-          {/* Filters Bar - 44px */}
+          {/* Búsqueda y filtros */}
           <div className="flex-shrink-0 mb-3">
             <CompactFilterBar
               searchValue={busquedaEmpleado}
@@ -752,7 +751,7 @@ export function AusenciasClient({}: AusenciasClientProps) {
                   </div>
                 </>
               }
-              filtersTitle="Filtros de ausencias"
+              filtersTitle="Filtros"
             />
           </div>
 

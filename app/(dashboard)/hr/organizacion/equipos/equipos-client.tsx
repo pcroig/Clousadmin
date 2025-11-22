@@ -198,23 +198,22 @@ export function EquiposClient({ equipos: initialEquipos }: EquiposClientProps) {
       <ResponsiveContainer variant="page" className="h-full w-full flex flex-col overflow-hidden">
         {isMobile ? (
           <>
-            {/* Action Bar - 48px */}
             <MobileActionBar
               title="Equipos"
               primaryAction={{
                 icon: Plus,
-                label: 'Crear Equipo',
+                label: 'Crear equipo',
                 onClick: () => setShowCreateModal(true),
               }}
               className="mb-3"
             />
 
-            {/* Search Bar - 44px */}
+            {/* Búsqueda */}
             <div className="flex-shrink-0 mb-3">
               <CompactFilterBar
                 searchValue={filtros.busqueda}
                 onSearchChange={(value) => setFiltros((prev) => ({ ...prev, busqueda: value }))}
-                searchPlaceholder="Buscar equipo por nombre..."
+                searchPlaceholder="Buscar equipo..."
               />
             </div>
           </>
