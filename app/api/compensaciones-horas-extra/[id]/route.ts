@@ -25,14 +25,14 @@ const aprobarRechazarSchema = z.object({
 // PATCH /api/compensaciones-horas-extra/[id] - Aprobar/Rechazar compensación
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
     const authResult = await requireAuthAsHR(request);
     if (authResult instanceof Response) return authResult;
     const { session } = authResult;
 
-    const { id } = params;
+    const { id } = await context.params;
 
     const validationResult = await validateRequest(request, aprobarRechazarSchema);
     if (validationResult instanceof Response) return validationResult;
