@@ -39,10 +39,6 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    console.log(
-      `[API export-gestoria] GET ${mes}/${anio}, forzar=${forzar}`
-    );
-
     // Verificar alertas críticas (a menos que se fuerce el export)
     if (!forzar) {
       const hayAlertasCriticas = await tieneAlertasCriticas(

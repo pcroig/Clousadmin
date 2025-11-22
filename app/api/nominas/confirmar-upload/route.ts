@@ -22,8 +22,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    console.log('[API nominas/confirmar-upload] POST');
-
     // Obtener body
     const body = await req.json();
     const { sessionId, confirmaciones } = body;
@@ -41,10 +39,6 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
-
-    console.log(
-      `[API nominas/confirmar-upload] Confirmando ${confirmaciones.length} nómina(s)`
-    );
 
     // Verificar que la sesión existe y pertenece a la empresa correcta
     const uploadSession = obtenerSesion(sessionId);

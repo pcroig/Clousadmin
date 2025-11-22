@@ -46,10 +46,6 @@ export async function GET(req: NextRequest) {
       ? parseInt(searchParams.get('anio')!)
       : new Date().getFullYear();
 
-    console.log(
-      `[API descargar-todas] GET ${anio} para empleado ${empleado.id}`
-    );
-
     // Registrar acceso a datos sensibles (exportación masiva de nóminas)
     await logAccesoSensibles({
       request: req,

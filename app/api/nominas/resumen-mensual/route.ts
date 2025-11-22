@@ -39,10 +39,6 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    console.log(
-      `[API resumen-mensual] GET ${mes}/${anio}, recalcular=${recalcular}`
-    );
-
     // Si se pide recalcular, calcular para toda la empresa
     if (recalcular) {
       await calcularResumenMensualEmpresa(session.user.empresaId, mes, anio);
