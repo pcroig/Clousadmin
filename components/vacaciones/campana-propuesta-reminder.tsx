@@ -53,7 +53,11 @@ function CampanaPropuestaReminderContent({
 
   const handleClose = () => setOpen(false);
   const handleResponded = () => {
-    onResponded?.();
+    if (onResponded) {
+      onResponded();
+    } else {
+      window.location.reload();
+    }
     setOpen(false);
   };
 

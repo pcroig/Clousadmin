@@ -6,6 +6,7 @@ import { redirect } from 'next/navigation';
 
 import { PlantillaWidget } from '@/components/dashboard/plantilla-widget';
 import { AutoCompletadoWidget } from '@/components/shared/auto-completado-widget';
+import { FichajeBarMobile } from '@/components/shared/fichaje-bar-mobile';
 import { FichajeWidget } from '@/components/shared/fichaje-widget';
 import { NotificacionesWidget } from '@/components/shared/notificaciones-widget';
 import { SolicitudesWidget } from '@/components/shared/solicitudes-widget';
@@ -16,8 +17,9 @@ import { obtenerResumenPlantillaEquipo } from '@/lib/calculos/plantilla';
 import { EstadoAusencia, UsuarioRol } from '@/lib/constants/enums';
 import { prisma } from '@/lib/prisma';
 import { obtenerCampanaPendiente, obtenerPropuestaPendiente } from '@/lib/services/campanas-vacaciones';
-import type { NotificacionUI } from '@/types/Notificacion';
+
 import type { TipoNotificacion } from '@/lib/notificaciones';
+import type { NotificacionUI } from '@/types/Notificacion';
 
 export default async function ManagerDashboardPage() {
   const session = await getSession();
@@ -204,70 +206,87 @@ export default async function ManagerDashboardPage() {
 
   return (
     <>
-      <div className="h-full w-full flex flex-col overflow-hidden">
-      {/* Header */}
-      <div className="flex-shrink-0 mb-3 sm:mb-4">
-        <h1 className="text-xl sm:text-2xl font-bold text-gray-900">
-          Buenos Días, {session.user.nombre}
-        </h1>
-        <p className="text-xs sm:text-sm text-gray-600 mt-1">{resumenFichajes}</p>
+      {/* Mobile Layout */}
+      <div className="sm:hidden h-full w-full flex flex-col overflow-hidden">
+        {/* Sin header "Buenos días" en mobile */}
+        
+        {/* Barra de fichaje compacta - sticky top */}
+        <div className="flex-shrink-0 mb-3">
+          <FichajeBarMobile />
+        </div>
+
+        {/* Widget de plantilla compacto - sin card */}
+        <div className="flex-1 min-h-0 pb-4 overflow-auto">
+          <PlantillaWidget
+            trabajando={plantillaResumenEquipo.trabajando}
+            ausentes={plantillaResumenEquipo.ausentes}
+            sinFichar={plantillaResumenEquipo.sinFichar}
+            rol="manager"
+            variant="compact"
+          />
+        </div>
       </div>
 
-      {/* Responsive Layout: Stack on mobile, 3 columns on desktop */}
-      <div className="flex-1 min-h-0 pb-4 sm:pb-6 overflow-auto">
-        <div className="h-full grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 lg:grid-rows-[1fr_1fr] gap-3 sm:gap-4">
-          {/* Fichaje Widget - Fila 1 */}
-          <div className="h-full min-h-[220px]">
-            <FichajeWidget />
-          </div>
+      {/* Desktop Layout */}
+      <div className="hidden sm:flex h-full w-full flex-col overflow-hidden">
+        {/* Header */}
+        <div className="flex-shrink-0 mb-3 sm:mb-4">
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">
+            Buenos Días, {session.user.nombre}
+          </h1>
+          <p className="text-xs sm:text-sm text-gray-600 mt-1">{resumenFichajes}</p>
+        </div>
 
-          {/* Solicitudes Widget - Ocupa 2 filas */}
-          <div className="row-span-1 lg:row-span-2 h-full min-h-[440px]">
-            <SolicitudesWidget
-              solicitudes={solicitudes}
-              maxItems={8}
-            dashboardHref="/manager/bandeja-entrada?tab=solicitudes"
-            />
-          </div>
+        {/* Responsive Layout: Stack on mobile, 3 columns on desktop */}
+        <div className="flex-1 min-h-0 pb-4 sm:pb-6 overflow-auto">
+          <div className="h-full grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 lg:grid-rows-[1fr_1fr] gap-3 sm:gap-4">
+            {/* Fichaje Widget - Fila 1 */}
+            <div className="h-full min-h-[220px]">
+              <FichajeWidget />
+            </div>
 
-          {/* Notificaciones Widget - Fila 1 */}
-          <div className="h-full min-h-[220px]">
-            <NotificacionesWidget notificaciones={notificaciones} maxItems={3} />
-          </div>
+            {/* Solicitudes Widget - Ocupa 2 filas */}
+            <div className="row-span-1 lg:row-span-2 h-full min-h-[440px]">
+              <SolicitudesWidget
+                solicitudes={solicitudes}
+                maxItems={8}
+              dashboardHref="/manager/bandeja-entrada?tab=solicitudes"
+              />
+            </div>
 
-          {/* Plantilla Widget - Fila 2 (debajo de fichajes) */}
-          <div className="h-full min-h-[220px]">
-            <PlantillaWidget
-              trabajando={plantillaResumenEquipo.trabajando}
-              ausentes={plantillaResumenEquipo.ausentes}
-              sinFichar={plantillaResumenEquipo.sinFichar}
-              rol="manager"
-            />
-          </div>
+            {/* Notificaciones Widget - Fila 1 */}
+            <div className="h-full min-h-[220px]">
+              <NotificacionesWidget notificaciones={notificaciones} maxItems={3} />
+            </div>
 
-          {/* Auto-completed Widget - Fila 2 */}
-          <div className="h-full min-h-[220px]">
-            <AutoCompletadoWidget
-              stats={{
-                fichajesCompletados: aprobados,
-                ausenciasCompletadas: pendientes,
-                solicitudesCompletadas: 0,
-              }}
-            />
+            {/* Plantilla Widget - Fila 2 (debajo de fichajes) */}
+            <div className="h-full min-h-[220px]">
+              <PlantillaWidget
+                trabajando={plantillaResumenEquipo.trabajando}
+                ausentes={plantillaResumenEquipo.ausentes}
+                sinFichar={plantillaResumenEquipo.sinFichar}
+                rol="manager"
+                variant="card"
+              />
+            </div>
+
+            {/* Auto-completed Widget - Fila 2 */}
+            <div className="h-full min-h-[220px]">
+              <AutoCompletadoWidget
+                stats={{
+                  fichajesCompletados: aprobados,
+                  ausenciasCompletadas: pendientes,
+                  solicitudesCompletadas: 0,
+                }}
+              />
+            </div>
           </div>
         </div>
       </div>
-      </div>
       {!propuestaData && (
-        <CampanaVacacionesReminder
-          campanaPendiente={reminderData}
-          onCompleted={() => window.location.reload()}
-        />
+        <CampanaVacacionesReminder campanaPendiente={reminderData} />
       )}
-      <CampanaPropuestaReminder
-        propuestaPendiente={propuestaData}
-        onResponded={() => window.location.reload()}
-      />
+      <CampanaPropuestaReminder propuestaPendiente={propuestaData} />
     </>
   );
 }

@@ -88,22 +88,26 @@ curl -X POST http://localhost:3000/api/admin/invitar-signup \
 
 #### Acceso a waitlist
 
-1. Desde `/login`: Si un email no existe, se muestra opción "Únete a la waitlist"
+1. Desde `/login`: El banner “¿No tienes cuenta?” incluye un botón **Solicitar invitación** que abre un modal con el formulario de waitlist.
 2. Directamente: `/waitlist`
+3. Por mensajes de error: Si un email no existe, se mantiene el aviso y CTA hacia la espera.
 
 #### Formulario
 
-- Email *
-- Nombre (opcional)
-- Nombre de empresa (opcional)
-- Mensaje adicional (opcional)
+- Nombre completo *
+- Email corporativo *
+- Empresa *
+- Contexto/Mensaje adicional (opcional)
 
 #### Proceso
 
-1. Usuario completa formulario
-2. Entrada guardada en tabla `Waitlist`
-3. Administrador de plataforma puede revisar y convertir a invitación
-4. Usuario recibe invitación por email
+1. Usuario completa formulario (modal o página dedicada)
+2. Entrada guardada en tabla `waitlist`
+3. Se envían dos emails:
+   - Confirmación al usuario (`sendWaitlistConfirmationEmail`)
+   - Notificación interna a `WAITLIST_NOTIFY_EMAIL`
+4. Administrador de plataforma revisa `/platform/invitaciones` y convierte en invitación
+5. Usuario recibe invitación por email
 
 **Server Action:** `agregarAWaitlistAction` en `app/(auth)/waitlist/actions.ts`
 
@@ -192,7 +196,8 @@ Desde `Organización > Personas > + Crear persona`
 **Estado:** ✅ En producción
 
 - Flujo implementado con `app/api/auth/[...nextauth]/route.ts` usando NextAuth v5 + proveedor de Google.
-- El endpoint legado `/api/auth/google/callback` redirige al callback de NextAuth para mantener compatibilidad con redirect URIs existentes.
+- Callback oficial: `/api/auth/callback/google` (NextAuth v5) — debe estar registrado en Google Cloud.
+- El endpoint legado `/api/auth/google/callback` redirige al callback oficial para mantener compatibilidad con redirect URIs existentes.
 - Al completar el callback se crea sesión JWT propia (`lib/auth.ts`) y se persisten los tokens OAuth en `Account`.
 
 **Configuración obligatoria (.env.local):**

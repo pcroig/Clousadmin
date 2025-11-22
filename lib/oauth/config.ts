@@ -22,7 +22,8 @@ export function getGoogleOAuthConfig(): OAuthConfig {
   return {
     clientId,
     clientSecret,
-    redirectUri: `${appUrl}/api/auth/google/callback`,
+    // Debe coincidir con el callback real que usa NextAuth v5
+    redirectUri: `${appUrl}/api/auth/callback/google`,
   };
 }
 

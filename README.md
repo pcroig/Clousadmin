@@ -36,16 +36,26 @@ npm run dev
 
 Toda la documentación está en `docs/`:
 
+### Configuración y Arquitectura
 - **[docs/README.md](docs/README.md)** - Índice de toda la documentación
 - **[docs/SETUP.md](docs/SETUP.md)** - Guía de configuración completa (incluye autenticación)
 - **[docs/SETUP_GOOGLE_OAUTH.md](docs/SETUP_GOOGLE_OAUTH.md)** - Configuración de Google OAuth y Calendar
 - **[docs/SETUP_PLANTILLAS.md](docs/SETUP_PLANTILLAS.md)** - Configuración del sistema de plantillas
 - **[docs/ARQUITECTURA.md](docs/ARQUITECTURA.md)** - Decisiones técnicas y estructura
 - **[docs/DESIGN_SYSTEM.md](docs/DESIGN_SYSTEM.md)** - Guías de diseño UI/UX y patrones de componentes
-- **[docs/funcionalidades/](docs/funcionalidades/)** - Documentación de cada feature
 - **[.cursorrules](.cursorrules)** - Principios de desarrollo
 
-Para documentación histórica, ver [docs/historial/](docs/historial/)
+### 📱 Adaptación Mobile (NUEVO)
+- **[docs/MOBILE_ADAPTATION_SUMMARY.md](docs/MOBILE_ADAPTATION_SUMMARY.md)** - Resumen ejecutivo de la adaptación mobile completa
+- **[docs/MOBILE_COMPONENTS_GUIDE.md](docs/MOBILE_COMPONENTS_GUIDE.md)** - Guía de uso de componentes responsive
+- **[docs/MOBILE_FORM_COMPONENTS.md](docs/MOBILE_FORM_COMPONENTS.md)** - Formularios y inputs optimizados para touch
+- **[docs/MOBILE_PERFORMANCE_OPTIMIZATIONS.md](docs/MOBILE_PERFORMANCE_OPTIMIZATIONS.md)** - Estrategias de optimización mobile
+- **[docs/MOBILE_TESTING_PLAN.md](docs/MOBILE_TESTING_PLAN.md)** - Plan de testing en dispositivos reales
+- **[docs/MOBILE_FILES_CHANGED.md](docs/MOBILE_FILES_CHANGED.md)** - Inventario completo de archivos modificados
+
+### Funcionalidades
+- **[docs/funcionalidades/](docs/funcionalidades/)** - Documentación detallada de cada feature
+- **[docs/historial/](docs/historial/)** - Documentación histórica y migración
 
 ---
 
@@ -93,11 +103,20 @@ Clousadmin/
 - Jornadas laborales configurables
 - Analytics HR con filtros avanzados y reporting (plantilla, compensación, fichajes)
 - Balance de horas acumulado en analytics
+- **📱 Adaptación Mobile Completa** (93.75% completado)
+  - Sistema de diseño mobile con touch targets >=44px (WCAG 2.1)
+  - Componentes responsive (containers, grids, headers)
+  - Modales adaptativos (bottom sheets, full-screen)
+  - Formularios touch-optimized (selects, date pickers)
+  - DataTable responsive con prioridades de columnas
+  - Todas las páginas principales adaptadas
+  - Performance optimizado (lazy loading, memoization)
 
 ### 🚧 En Desarrollo
 - Auto-completado de fichajes con IA
-- Módulo de nóminas
+- Módulo de nóminas (estructura creada, en refinamiento)
 - Módulo de documentos con firma digital
+- Testing exhaustivo mobile en dispositivos reales (última fase)
 
 ### 📋 Roadmap
 - Extracción IA de contratos y nóminas con más proveedores

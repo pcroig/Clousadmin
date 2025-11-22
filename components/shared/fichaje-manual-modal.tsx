@@ -6,14 +6,15 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { toast } from 'sonner';
+
+import { LoadingButton } from '@/components/shared/loading-button';
+import { ResponsiveDialog } from '@/components/shared/responsive-dialog';
 import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { LoadingButton } from '@/components/shared/loading-button';
-import { toast } from 'sonner';
 
 interface FichajeManualModalProps {
   open: boolean;
@@ -93,16 +94,35 @@ export function FichajeManualModal({ open, onClose, onSuccess }: FichajeManualMo
   };
 
   return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[425px]">
-        <DialogHeader>
-          <DialogTitle>Añadir Fichaje Manual</DialogTitle>
-          <p className="text-sm text-gray-500 mt-1">
-            Crea una solicitud de fichaje indicando el día y la hora. Se procesará automáticamente tras enviarla.
-          </p>
-        </DialogHeader>
-
-        <form onSubmit={handleSubmit}>
+    <ResponsiveDialog
+      open={open}
+      onOpenChange={(isOpen) => !isOpen && onClose()}
+      title="Añadir Fichaje Manual"
+      description="Crea una solicitud de fichaje indicando el día y la hora. Se procesará automáticamente tras enviarla."
+      complexity="medium"
+      footer={
+        <div className="flex gap-2 w-full">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onClose}
+            disabled={guardando}
+            className="flex-1"
+          >
+            Cancelar
+          </Button>
+          <LoadingButton
+            type="submit"
+            form="fichaje-manual-form"
+            loading={guardando}
+            className="flex-1"
+          >
+            Crear Solicitud
+          </LoadingButton>
+        </div>
+      }
+    >
+      <form id="fichaje-manual-form" onSubmit={handleSubmit}>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label htmlFor="fecha">Fecha</Label>
@@ -152,18 +172,8 @@ export function FichajeManualModal({ open, onClose, onSuccess }: FichajeManualMo
               />
             </div>
           </div>
-
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={onClose} disabled={guardando}>
-              Cancelar
-            </Button>
-            <LoadingButton type="submit" loading={guardando}>
-              Crear Solicitud
-            </LoadingButton>
-          </DialogFooter>
         </form>
-      </DialogContent>
-    </Dialog>
+    </ResponsiveDialog>
   );
 }
 

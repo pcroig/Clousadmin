@@ -4,14 +4,27 @@
 
 'use client';
 
+import { Filter, Plus } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 import { PuestoDetails } from '@/components/organizacion/puesto-details';
 import { PuestoFormModal } from '@/components/organizacion/puesto-form-modal';
+import { CompactFilterBar } from '@/components/adaptive/CompactFilterBar';
+import { MobileActionBar } from '@/components/adaptive/MobileActionBar';
+import { MobilePageHeader } from '@/components/adaptive/MobilePageHeader';
+import { ResponsiveContainer } from '@/components/adaptive/ResponsiveContainer';
 import { Column, DataTable } from '@/components/shared/data-table';
 import { DetailsPanel } from '@/components/shared/details-panel';
-import { TableFilters } from '@/components/shared/table-filters';
 import { TableHeader } from '@/components/shared/table-header';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet';
+import { useIsMobile } from '@/lib/hooks/use-viewport';
 
 interface Puesto {
   id: string;
@@ -43,6 +56,9 @@ export function PuestosClient({ puestos: initialPuestos }: PuestosClientProps) {
   const [puestos, setPuestos] = useState<Puesto[]>(initialPuestos);
   const [selectedPuesto, setSelectedPuesto] = useState<Puesto | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const isMobile = useIsMobile();
 
   // Update selected puesto when puestos list changes
   useEffect(() => {
@@ -117,6 +133,10 @@ export function PuestosClient({ puestos: initialPuestos }: PuestosClientProps) {
     reloadPuestos();
   };
 
+  const puestosFiltrados = puestos.filter((puesto) =>
+    puesto.nombre.toLowerCase().includes(searchTerm.toLowerCase()),
+  );
+
   // Columnas de la tabla
   const columns: Column<Puesto>[] = [
     {
@@ -131,6 +151,8 @@ export function PuestosClient({ puestos: initialPuestos }: PuestosClientProps) {
         </div>
       ),
       width: '40%',
+      priority: 'high',
+      sticky: true,
     },
     {
       id: 'numeroEmpleados',
@@ -139,6 +161,7 @@ export function PuestosClient({ puestos: initialPuestos }: PuestosClientProps) {
         <span className="text-gray-900 font-medium">{row.numeroEmpleados}</span>
       ),
       width: '20%',
+      priority: 'high',
     },
     {
       id: 'numeroDocumentos',
@@ -147,32 +170,65 @@ export function PuestosClient({ puestos: initialPuestos }: PuestosClientProps) {
         <span className="text-gray-900">{row.numeroDocumentos}</span>
       ),
       width: '20%',
+      priority: 'medium',
     },
   ];
 
+  const FiltersForm = ({ layout }: { layout: 'desktop' | 'mobile' }) => (
+    <div className={layout === 'desktop' ? 'flex items-center gap-3 flex-1' : 'space-y-3'}>
+      <Input
+        placeholder="Buscar puesto..."
+        value={searchTerm}
+        onChange={(e) => setSearchTerm(e.target.value)}
+        className={layout === 'desktop' ? 'w-[240px]' : 'w-full'}
+      />
+    </div>
+  );
+
   return (
     <>
-      <div className="h-full w-full flex flex-col">
-        {/* Header */}
-        <TableHeader
-          title="Puestos de Trabajo"
-          actionButton={{
-            label: '+ Crear Puesto',
-            onClick: () => setShowCreateModal(true),
-          }}
-        />
+      <ResponsiveContainer variant="page" className="h-full w-full flex flex-col overflow-hidden">
+        {isMobile ? (
+          <>
+            {/* Action Bar - 48px */}
+            <MobileActionBar
+              title="Puestos"
+              primaryAction={{
+                icon: Plus,
+                label: 'Crear Puesto',
+                onClick: () => setShowCreateModal(true),
+              }}
+              className="mb-3"
+            />
 
-        {/* Filters */}
-        <TableFilters
-          onFilterClick={() => console.log('Filtro')}
-          showDateNavigation={false}
-        />
+            {/* Search Bar - 44px */}
+            <div className="flex-shrink-0 mb-3">
+              <CompactFilterBar
+                searchValue={filtros.busqueda}
+                onSearchChange={(value) => setFiltros((prev) => ({ ...prev, busqueda: value }))}
+                searchPlaceholder="Buscar puesto por nombre..."
+              />
+            </div>
+          </>
+        ) : (
+          <>
+            <TableHeader
+              title="Puestos de Trabajo"
+              actionButton={{
+                label: '+ Crear Puesto',
+                onClick: () => setShowCreateModal(true),
+              }}
+            />
+            <div className="flex items-center justify-between mb-6 gap-4">
+              <FiltersForm layout="desktop" />
+            </div>
+          </>
+        )}
 
-        {/* Content */}
         <div className="flex-1 min-h-0">
           <DataTable
             columns={columns}
-            data={puestos}
+            data={puestosFiltrados}
             onRowClick={(row) => setSelectedPuesto(row)}
             getRowId={(row) => row.id}
             emptyMessage="No hay puestos creados"
@@ -204,6 +260,7 @@ export function PuestosClient({ puestos: initialPuestos }: PuestosClientProps) {
           reloadPuestos();
         }}
       />
+      </ResponsiveContainer>
     </>
   );
 }

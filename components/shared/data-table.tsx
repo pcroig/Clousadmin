@@ -1,21 +1,47 @@
 // ========================================
-// Data Table - Generic reusable table component
+// Data Table - Generic reusable table component with responsive support
 // ========================================
 
 'use client';
 
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { getInitials } from './utils';
-import { getAvatarStyle } from '@/lib/design-system';
-import { EmptyState } from './empty-state';
 import { type LucideIcon } from 'lucide-react';
+
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { MOBILE_DESIGN } from '@/lib/constants/mobile-design';
+import { getAvatarStyle } from '@/lib/design-system';
+import { cn } from '@/lib/utils';
+
+import { EmptyState } from './empty-state';
+import { getInitials } from './utils';
+
+import type { ReactNode } from 'react';
+
+/**
+ * Prioridad de columna para responsive
+ * - high: Siempre visible (mobile + desktop)
+ * - medium: Oculta en mobile pequeño, visible en tablet+
+ * - low: Solo visible en desktop
+ */
+export type ColumnPriority = 'high' | 'medium' | 'low';
 
 export interface Column<T> {
   id: string;
   header: string;
   accessorKey?: keyof T;
-  cell?: (row: T) => React.ReactNode;
+  cell?: (row: T) => ReactNode;
   width?: string;
+  /**
+   * Prioridad para responsive (default: 'medium')
+   */
+  priority?: ColumnPriority;
+  /**
+   * Si la columna debe ser sticky (útil para primera columna en mobile)
+   */
+  sticky?: boolean;
+  /**
+   * Alineación del contenido
+   */
+  align?: 'left' | 'center' | 'right';
 }
 
 interface DataTableProps<T extends object> {
@@ -25,11 +51,26 @@ interface DataTableProps<T extends object> {
   getRowId?: (row: T) => string;
   emptyMessage?: string;
   emptyDescription?: string;
-  emptyAction?: React.ReactNode;
+  emptyAction?: ReactNode;
   emptyIcon?: LucideIcon;
-  emptyContent?: React.ReactNode;
+  emptyContent?: ReactNode;
+  /**
+   * Si debe usar modo compacto en mobile (padding reducido)
+   */
+  compactMobile?: boolean;
+  /**
+   * Clases adicionales para el contenedor
+   */
+  className?: string;
 }
 
+/**
+ * DataTable responsive con:
+ * - Scroll horizontal en mobile
+ * - Columnas priorizadas (high/medium/low)
+ * - Primera columna sticky opcional
+ * - Modo compacto en mobile
+ */
 export function DataTable<T extends object>({
   columns,
   data,
@@ -40,10 +81,41 @@ export function DataTable<T extends object>({
   emptyAction,
   emptyIcon,
   emptyContent,
+  compactMobile = true,
+  className,
 }: DataTableProps<T>) {
+  /**
+   * Obtener clases de visibilidad según prioridad
+   */
+  const getPriorityClasses = (priority: ColumnPriority = 'medium') => {
+    switch (priority) {
+      case 'high':
+        return ''; // Siempre visible
+      case 'medium':
+        return 'hidden sm:table-cell'; // Oculta en mobile, visible en tablet+
+      case 'low':
+        return 'hidden lg:table-cell'; // Solo desktop
+      default:
+        return '';
+    }
+  };
+
+  /**
+   * Obtener clases de alineación
+   */
+  const getAlignmentClasses = (align: Column<T>['align'] = 'left') => {
+    switch (align) {
+      case 'center':
+        return 'text-center';
+      case 'right':
+        return 'text-right';
+      default:
+        return 'text-left';
+    }
+  };
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+    <div className={cn('bg-white rounded-xl border border-gray-200 overflow-hidden', className)}>
       <div className="overflow-x-auto">
         <table className="w-full">
           <thead className="bg-gray-50 border-b border-gray-200">
@@ -51,7 +123,17 @@ export function DataTable<T extends object>({
               {columns.map((column) => (
                 <th
                   key={column.id}
-                  className="px-6 py-3 text-left text-sm font-semibold text-gray-900"
+                  className={cn(
+                    'py-3 text-sm font-semibold text-gray-900',
+                    // Padding responsive
+                    compactMobile ? 'px-3 sm:px-6' : 'px-6',
+                    // Alineación
+                    getAlignmentClasses(column.align),
+                    // Visibilidad según prioridad
+                    getPriorityClasses(column.priority),
+                    // Sticky
+                    column.sticky && 'sticky left-0 z-10 bg-gray-50'
+                  )}
                   style={{ width: column.width }}
                 >
                   {column.header}
@@ -79,9 +161,10 @@ export function DataTable<T extends object>({
                 <tr
                   key={getRowId?.(row) || idx}
                   onClick={() => onRowClick?.(row)}
-                  className={`${
-                    onRowClick ? 'cursor-pointer hover:bg-gray-50' : ''
-                  } transition-colors`}
+                  className={cn(
+                    onRowClick && 'cursor-pointer hover:bg-gray-50 active:bg-gray-100',
+                    'transition-colors'
+                  )}
                 >
                   {columns.map((column) => {
                     const renderedCell = column.cell
@@ -91,7 +174,23 @@ export function DataTable<T extends object>({
                       : '';
 
                     return (
-                      <td key={column.id} className="px-6 py-4 text-sm text-gray-900">
+                      <td
+                        key={column.id}
+                        className={cn(
+                          // Tamaño de texto responsive
+                          compactMobile ? 'text-xs sm:text-sm' : 'text-sm',
+                          // Padding responsive
+                          compactMobile ? 'px-3 py-3 sm:px-6 sm:py-4' : 'px-6 py-4',
+                          // Color
+                          'text-gray-900',
+                          // Alineación
+                          getAlignmentClasses(column.align),
+                          // Visibilidad según prioridad
+                          getPriorityClasses(column.priority),
+                          // Sticky
+                          column.sticky && 'sticky left-0 z-10 bg-white'
+                        )}
+                      >
                         {renderedCell}
                       </td>
                     );
@@ -106,23 +205,54 @@ export function DataTable<T extends object>({
   );
 }
 
-// Helper component for avatar cells
-export function AvatarCell({ nombre, avatar }: { nombre: string; avatar?: string }) {
-
+/**
+ * Helper component for avatar cells (responsive)
+ * - Mobile: avatar más pequeño, texto compacto
+ * - Desktop: tamaño normal
+ */
+export function AvatarCell({ 
+  nombre, 
+  avatar,
+  subtitle,
+  compact = false,
+}: { 
+  nombre: string; 
+  avatar?: string;
+  subtitle?: string;
+  compact?: boolean;
+}) {
   const avatarStyle = getAvatarStyle(nombre);
 
   return (
-    <div className="flex items-center gap-3">
-      <Avatar className="h-9 w-9">
+    <div className={cn('flex items-center', compact ? 'gap-2' : 'gap-2 sm:gap-3')}>
+      <Avatar className={cn(compact ? 'h-7 w-7 sm:h-9 sm:w-9' : 'h-9 w-9')}>
         {avatar && <AvatarImage src={avatar} />}
         <AvatarFallback
-          className="text-xs font-semibold uppercase"
+          className={cn(
+            'font-semibold uppercase',
+            compact ? 'text-[10px] sm:text-xs' : 'text-xs'
+          )}
           style={avatarStyle}
         >
           {getInitials(nombre)}
         </AvatarFallback>
       </Avatar>
-      <span className="font-medium">{nombre}</span>
+      <div className="min-w-0 flex-1">
+        <span className={cn(
+          'font-medium block truncate',
+          compact && 'text-xs sm:text-sm'
+        )}>
+          {nombre}
+        </span>
+        {subtitle && (
+          <span className={cn(
+            MOBILE_DESIGN.text.tiny,
+            'block truncate'
+          )}>
+            {subtitle}
+          </span>
+        )}
+      </div>
     </div>
   );
 }

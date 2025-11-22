@@ -46,3 +46,4 @@ export function calcularDiasEntre(
   return incluirAmbos ? dias + 1 : dias;
 }
 
+

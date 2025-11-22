@@ -27,6 +27,9 @@ const managerPaths = ['/manager'];
 // Rutas que solo pueden acceder Empleados
 const empleadoPaths = ['/empleado'];
 
+// Rutas que solo pueden acceder Platform Admin
+const platformAdminPaths = ['/platform'];
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
@@ -79,9 +82,11 @@ export async function middleware(request: NextRequest) {
     if (session.user.rol !== UsuarioRol.hr_admin) {
       // Redirigir al dashboard apropiado según el rol
       const dashboardUrl =
-        session.user.rol === UsuarioRol.manager
-          ? '/manager/dashboard'
-          : '/empleado/dashboard';
+        session.user.rol === UsuarioRol.platform_admin
+          ? '/platform/invitaciones'
+          : session.user.rol === UsuarioRol.manager
+            ? '/manager/dashboard'
+            : '/empleado/dashboard';
       return NextResponse.redirect(new URL(dashboardUrl, request.url));
     }
   }
@@ -91,9 +96,11 @@ export async function middleware(request: NextRequest) {
     if (session.user.rol !== UsuarioRol.manager) {
       // Redirigir al dashboard apropiado según el rol
       const dashboardUrl =
-        session.user.rol === UsuarioRol.hr_admin
-          ? '/hr/dashboard'
-          : '/empleado/dashboard';
+        session.user.rol === UsuarioRol.platform_admin
+          ? '/platform/invitaciones'
+          : session.user.rol === UsuarioRol.hr_admin
+            ? '/hr/dashboard'
+            : '/empleado/dashboard';
       return NextResponse.redirect(new URL(dashboardUrl, request.url));
     }
   }
@@ -103,11 +110,32 @@ export async function middleware(request: NextRequest) {
     if (session.user.rol !== UsuarioRol.empleado) {
       // Redirigir al dashboard apropiado según el rol
       const dashboardUrl =
-        session.user.rol === UsuarioRol.hr_admin
-          ? '/hr/dashboard'
-          : '/manager/dashboard';
+        session.user.rol === UsuarioRol.platform_admin
+          ? '/platform/invitaciones'
+          : session.user.rol === UsuarioRol.hr_admin
+            ? '/hr/dashboard'
+            : '/manager/dashboard';
       return NextResponse.redirect(new URL(dashboardUrl, request.url));
     }
+  }
+
+  // Verificar acceso a rutas de Platform Admin
+  if (platformAdminPaths.some((path) => pathname.startsWith(path))) {
+    if (session.user.rol !== UsuarioRol.platform_admin) {
+      // Redirigir al dashboard apropiado según el rol
+      const dashboardUrl =
+        session.user.rol === UsuarioRol.hr_admin
+          ? '/hr/dashboard'
+          : session.user.rol === UsuarioRol.manager
+            ? '/manager/dashboard'
+            : '/empleado/dashboard';
+      return NextResponse.redirect(new URL(dashboardUrl, request.url));
+    }
+  }
+
+  // Si el usuario es Platform Admin y está en la raíz, redirigir a su dashboard
+  if (pathname === '/' && session.user.rol === UsuarioRol.platform_admin) {
+    return NextResponse.redirect(new URL('/platform/invitaciones', request.url));
   }
 
   // Si el usuario es HR Admin y está en la raíz, redirigir a su dashboard

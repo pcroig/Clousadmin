@@ -98,6 +98,7 @@ En tu servidor (Hetzner), configura las variables de entorno:
 RESEND_API_KEY=re_xxxxxxxxxxxxxxxxxxxxxxxxxx
 RESEND_FROM_EMAIL=noreply@tudominio.com
 RESEND_FROM_NAME=Clousadmin
+WAITLIST_NOTIFY_EMAIL=alerts@clousadmin.com
 ```
 
 ## Funciones de Email Disponibles
@@ -144,6 +145,13 @@ Confirma que un usuario ha sido añadido a la lista de espera.
 ### `sendWaitlistInvitationEmail(email, invitationUrl)`
 
 Notifica a un usuario de waitlist que su invitación está lista.
+
+### `sendWaitlistInternalNotificationEmail({ email, nombre?, empresa?, mensaje? })`
+
+Envía una alerta interna cuando alguien se apunta a la waitlist.
+
+- Destinatario configurable mediante `WAITLIST_NOTIFY_EMAIL` (por defecto `pabloroigburgui@gmail.com`)
+- Incluye resumen (email, nombre, empresa y mensaje) para que el platform admin priorice solicitudes
 
 ## Límites y Planes
 

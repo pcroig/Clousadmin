@@ -5,10 +5,13 @@
 'use client';
 
 import Link from 'next/link';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+
 import { getInitials } from '@/components/shared/utils';
 import { WidgetCard } from '@/components/shared/widget-card';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { MOBILE_DESIGN } from '@/lib/constants/mobile-design';
 import { getAvatarStyle } from '@/lib/design-system';
+import { cn } from '@/lib/utils';
 
 interface EmpleadoResumen {
   nombre: string;
@@ -29,15 +32,98 @@ interface PlantillaWidgetProps {
     empleados: EmpleadoResumen[];
   };
   rol?: 'hr_admin' | 'manager' | 'empleado'; // Para personalizar URLs según rol
+  /**
+   * Variante de visualización
+   * - card: Widget con card (desktop)
+   * - compact: Sin card, más compacto (mobile)
+   */
+  variant?: 'card' | 'compact';
 }
 
-export function PlantillaWidget({ trabajando, ausentes, sinFichar, rol = 'hr_admin' }: PlantillaWidgetProps) {
+export function PlantillaWidget({ 
+  trabajando, 
+  ausentes, 
+  sinFichar, 
+  rol = 'hr_admin',
+  variant = 'card',
+}: PlantillaWidgetProps) {
   // URLs según rol
   const baseUrl = rol === 'manager' ? '/manager' : '/hr';
   const hrefPersonas = rol === 'manager' ? '/manager/horario/fichajes' : '/hr/organizacion/personas';
   const hrefFichajes = `${baseUrl}/horario/fichajes`;
   const hrefAusencias = `${baseUrl}/horario/ausencias?estado=confirmada`;
 
+  const items = [
+    {
+      label: 'Trabajando',
+      count: trabajando.count,
+      empleados: trabajando.empleados,
+      href: hrefFichajes,
+      color: 'accent',
+    },
+    {
+      label: 'Ausentes',
+      count: ausentes.count,
+      empleados: ausentes.empleados,
+      href: hrefAusencias,
+      color: 'warning',
+    },
+    {
+      label: 'Sin fichar',
+      count: sinFichar.count,
+      empleados: sinFichar.empleados,
+      href: hrefFichajes,
+      color: 'error',
+    },
+  ];
+
+  // Versión compacta para mobile (sin card)
+  if (variant === 'compact') {
+    return (
+      <div className="space-y-2">{items.map((item) => (
+          <Link key={item.label} href={item.href} className="block">
+            <div className="flex items-center justify-between p-2 rounded-lg border border-gray-200 bg-white transition-all hover:border-gray-300 hover:shadow-sm active:bg-gray-50">
+              <div className="flex-1 min-w-0">
+                <p className={cn(MOBILE_DESIGN.text.caption, 'font-semibold text-gray-900')}>
+                  {item.label}
+                </p>
+                <p className={cn(MOBILE_DESIGN.text.tiny)}>{item.count} personas</p>
+              </div>
+              <div className="flex -space-x-1.5 flex-shrink-0 ml-2">
+                {item.empleados.slice(0, 3).map((emp, idx) => {
+                  const avatarStyle = getAvatarStyle(emp.nombre);
+                  return (
+                    <Avatar
+                      key={idx}
+                      className={cn(MOBILE_DESIGN.components.avatar.small, 'border border-white')}
+                    >
+                      {emp.avatar && <AvatarImage src={emp.avatar} />}
+                      <AvatarFallback
+                        className="text-[9px] font-semibold uppercase"
+                        style={avatarStyle}
+                      >
+                        {getInitials(emp.nombre)}
+                      </AvatarFallback>
+                    </Avatar>
+                  );
+                })}
+                {item.count > 3 && (
+                  <div className={cn(
+                    MOBILE_DESIGN.components.avatar.small,
+                    'flex items-center justify-center rounded-full border border-white bg-gray-100 text-[9px] font-semibold text-gray-600'
+                  )}>
+                    +{item.count - 3}
+                  </div>
+                )}
+              </div>
+            </div>
+          </Link>
+        ))}
+      </div>
+    );
+  }
+
+  // Versión normal con card (desktop)
   return (
     <WidgetCard
       title="Plantilla"

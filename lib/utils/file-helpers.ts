@@ -172,3 +172,4 @@ export function calculateOverallProgress(items: Array<{ progress: number }>): nu
   return Math.round(total / items.length);
 }
 
+

@@ -4,17 +4,20 @@
 
 import { redirect } from 'next/navigation';
 
+import { ScrollIndicator } from '@/components/adaptive/ScrollIndicator';
 import { PlantillaWidget } from '@/components/dashboard/plantilla-widget';
 import { AutoCompletadoWidget } from '@/components/shared/auto-completado-widget';
+import { FichajeBarMobile } from '@/components/shared/fichaje-bar-mobile';
 import { FichajeWidget } from '@/components/shared/fichaje-widget';
 import { NotificacionesWidget } from '@/components/shared/notificaciones-widget';
 import { SolicitudesWidget } from '@/components/shared/solicitudes-widget';
 import { getSession } from '@/lib/auth';
 import { obtenerResumenPlantilla } from '@/lib/calculos/plantilla';
-import { EstadoAusencia, TipoFichajeEvento, UsuarioRol } from '@/lib/constants/enums';
+import { EstadoAusencia, UsuarioRol } from '@/lib/constants/enums';
 import { prisma } from '@/lib/prisma';
-import type { NotificacionUI } from '@/types/Notificacion';
+
 import type { TipoNotificacion } from '@/lib/notificaciones';
+import type { NotificacionUI } from '@/types/Notificacion';
 
 export default async function HRDashboardPage() {
   const session = await getSession();
@@ -115,45 +118,6 @@ export default async function HRDashboardPage() {
   // Resumen actual de la plantilla
   const plantillaResumen = await obtenerResumenPlantilla(session.user.empresaId);
 
-  // Estadísticas de fichaje
-  const hoyDate = new Date();
-  hoyDate.setHours(0, 0, 0, 0);
-
-  const ayerDate = new Date(hoyDate);
-  ayerDate.setDate(ayerDate.getDate() - 1);
-
-  // Empleados que han fichado entrada hoy (contar empleados únicos)
-  // NUEVO MODELO: Buscar fichajes que tengan un evento de tipo 'entrada'
-  const fichadosHoy = await prisma.fichaje.findMany({
-    where: {
-      empresaId: session.user.empresaId,
-      fecha: hoyDate,
-      eventos: {
-        some: {
-          tipo: TipoFichajeEvento.entrada,
-        },
-      },
-    },
-    select: {
-      empleadoId: true,
-    },
-    distinct: ['empleadoId'],
-  });
-
-  const fichajesHoy = await prisma.fichaje.count({
-    where: {
-      empresaId: session.user.empresaId,
-      fecha: hoyDate,
-    },
-  });
-
-  const fichajesAyer = await prisma.fichaje.count({
-    where: {
-      empresaId: session.user.empresaId,
-      fecha: ayerDate,
-    },
-  });
-
   // Auto-completed stats - Widget muestra lo aprobado automáticamente por el sistema
   // NOTA: Las ausencias que NO requieren aprobación (enfermedad, etc.) NO se registran aquí
   // porque no hubo "aprobación automática", simplemente no necesitaban aprobación
@@ -182,7 +146,30 @@ export default async function HRDashboardPage() {
   });
 
   return (
-    <div className="h-full w-full flex flex-col overflow-hidden">
+    <>
+      {/* Mobile Layout */}
+      <div className="sm:hidden h-full w-full flex flex-col overflow-hidden">
+        {/* Sin header "Buenos días" en mobile */}
+        
+        {/* Barra de fichaje compacta - sticky top */}
+        <div className="flex-shrink-0 mb-3">
+          <FichajeBarMobile />
+        </div>
+
+        {/* Widget de plantilla compacto - sin card */}
+        <div className="flex-1 min-h-0 pb-4 overflow-auto">
+          <PlantillaWidget
+            trabajando={plantillaResumen.trabajando}
+            ausentes={plantillaResumen.ausentes}
+            sinFichar={plantillaResumen.sinFichar}
+            variant="compact"
+          />
+          <ScrollIndicator />
+        </div>
+      </div>
+
+      {/* Desktop Layout */}
+      <div className="hidden sm:flex h-full w-full flex-col overflow-hidden">
       {/* Header */}
       <div className="flex-shrink-0 mb-3 sm:mb-4">
         <h1 className="text-xl sm:text-2xl font-bold text-gray-900">
@@ -214,6 +201,7 @@ export default async function HRDashboardPage() {
               trabajando={plantillaResumen.trabajando}
               ausentes={plantillaResumen.ausentes}
               sinFichar={plantillaResumen.sinFichar}
+                variant="card"
             />
           </div>
 
@@ -230,5 +218,6 @@ export default async function HRDashboardPage() {
         </div>
       </div>
     </div>
+    </>
   );
 }

@@ -72,6 +72,18 @@ Refactorización completa del sistema de fichajes para implementar workflow corr
 
 ---
 
+## ⚠️ Recordatorio de migraciones críticas
+
+### Campañas de vacaciones – 20 Nov 2025
+- **Migración**: `20251120093000_update_campanas_propuestas`
+- **Cambios**: Columnas `propuestaEnviada`, `cambioSolicitado`, `propuestaEmpleado` en `preferencias_vacaciones` y `finalizadaEn` en `campanas_vacaciones`.
+- **Impacto**: Cualquier consulta o API que gestione propuestas de vacaciones depende de estas columnas.  
+- **Acción**: Ejecutar `npm run db:deploy` (o aplicar manualmente el SQL de la migración) en cualquier entorno que aún no la tenga. Si faltan permisos de `ALTER TABLE`, coordinar con quien administre la base de datos: sin estas columnas las nuevas features fallan.
+
+> Hasta que la migración esté aplicada, Prisma puede lanzar `P2022 The column "propuestaEnviada" does not exist`. No ignores el error: indica que el esquema de la BD está desalineado.
+
+---
+
 ## 📝 Notas Técnicas
 
 ### Migración de Datos
@@ -88,6 +100,7 @@ Las migraciones de estados se aplicaron mediante:
 ---
 
 **Nota**: Este archivo consolida la información de tres migraciones relacionadas. Para detalles técnicos específicos, consultar el código actual o la documentación activa en `docs/funcionalidades/`.
+
 
 
 

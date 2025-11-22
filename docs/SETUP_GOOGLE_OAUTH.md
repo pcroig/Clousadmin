@@ -70,11 +70,12 @@ Esta guía te ayudará a configurar Google OAuth para permitir el login con Goog
    - **Authorized JavaScript origins**:
      - `http://localhost:3000` (desarrollo)
      - `https://tudominio.com` (producción)
-   - **Authorized redirect URIs**:
-     - `http://localhost:3000/api/auth/google/callback` (desarrollo)
-     - `http://localhost:3000/api/integrations/calendar/callback` (desarrollo)
-     - `https://tudominio.com/api/auth/google/callback` (producción)
-     - `https://tudominio.com/api/integrations/calendar/callback` (producción)
+  - **Authorized redirect URIs**:
+    - `http://localhost:3000/api/auth/callback/google` (desarrollo · NextAuth v5)
+    - `http://localhost:3000/api/integrations/calendar/callback` (desarrollo · Calendar)
+    - `https://tudominio.com/api/auth/callback/google` (producción · NextAuth v5)
+    - `https://tudominio.com/api/integrations/calendar/callback` (producción · Calendar)
+    - *(Opcional)* `http(s)://.../api/auth/google/callback` si todavía tienes integraciones antiguas y quieres mantener compatibilidad con enlaces viejos.
 5. Click en "Create"
 6. **¡Guarda el Client ID y Client Secret!** Los necesitarás en el siguiente paso
 

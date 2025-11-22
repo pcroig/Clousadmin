@@ -16,7 +16,31 @@ PLATFORM_ADMIN_SECRET_KEY=tu-clave-super-secreta-de-al-menos-32-caracteres-aqui
 
 # Email del administrador de la plataforma (opcional, para registro de quién invita)
 PLATFORM_ADMIN_EMAIL=tu-email@plataforma.com
+
+# Email interno que recibe alertas de nuevas solicitudes de waitlist
+WAITLIST_NOTIFY_EMAIL=pabloroigburgui@gmail.com
 ```
+
+### 2. Crear tu usuario `platform_admin`
+
+El panel `/platform/invitaciones` solo se desbloquea para usuarios con rol `platform_admin`. Para crearlo (o ascender una cuenta existente) ejecuta:
+
+```bash
+npm run create:platform-admin -- \
+  --email=proig@clous.app \
+  --password="TuPasswordSeguro123!" \
+  --nombre="Pablo" \
+  --apellidos="Roig"
+```
+
+Parámetros soportados:
+
+- `--email` (obligatorio al crear) – también puedes usar la variable `PLATFORM_ADMIN_EMAIL`
+- `--password` (obligatorio al crear) – opcional si solo vas a promover un usuario existente
+- `--nombre` y `--apellidos` – opcional, por defecto “Platform Admin”
+- `--reset-password` – fuerza el cambio de contraseña aunque ya exista una
+
+El script marca al usuario como activo, con email verificado y rol `platform_admin`. Si la cuenta ya existe y no pasas `--password`, mantiene su contraseña actual.
 
 **Generar una clave segura:**
 ```bash
@@ -179,7 +203,31 @@ npx prisma studio
 
 ---
 
-**Última actualización**: 2025-01-27
+**Última actualización**: 2025-11-21
+
+---
+
+## 🖥️ Consola para Platform Admin
+
+Además de la API, los super administradores pueden gestionar invitaciones desde la aplicación:
+
+- Ruta protegida: `/platform/invitaciones`
+- Requiere sesión con rol `platform_admin`
+- Incluye:
+  - Formulario para generar invitaciones directas (usa `crearInvitacionSignup`)
+  - Listado de las últimas 100 invitaciones con estado y enlace para copiar
+  - Panel de waitlist con acción “Invitar” que convierte la solicitud con `convertirWaitlistEnInvitacion`
+  - Botón para refrescar datos sin recargar toda la app
+
+### Flujo sugerido
+
+1. Abre sesión con la cuenta `platform_admin`.
+2. Accede a `/platform/invitaciones`.
+3. Genera invitaciones manualmente o revisa la waitlist.
+4. Usa el botón “Invitar” para cada empresa aprobada; el sistema enviará automáticamente el email.
+5. Copia el enlace si necesitas reenviarlo por otro canal.
+
+> Nota: el panel reutiliza los mismos permisos y lógica de la API, por lo que respetará expiraciones, tokens únicos y registros de quién invitó.
 
 
 

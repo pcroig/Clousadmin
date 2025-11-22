@@ -8,13 +8,14 @@
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Calendar, Clock, TrendingUp } from 'lucide-react';
-import { useState } from 'react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { EstadoAusencia } from '@/lib/constants/enums';
+import { MOBILE_DESIGN } from '@/lib/constants/mobile-design';
+import { cn } from '@/lib/utils';
 
 interface BalanceResumen {
   diario: number;
@@ -62,14 +63,18 @@ export function HorarioMiEspacioClient({
   ausenciasIniciales,
 }: HorarioMiEspacioClientProps) {
   return (
-    <div className="space-y-6 p-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Mi Horario</h1>
-        <p className="text-muted-foreground">Gestiona tus fichajes y ausencias</p>
+    <div className={cn(MOBILE_DESIGN.spacing.section, 'p-4 sm:p-6')}>
+      <div className="mb-4 sm:mb-6">
+        <h1 className={cn('font-bold tracking-tight', MOBILE_DESIGN.text.pageTitle, 'sm:text-3xl')}>
+          Mi Horario
+        </h1>
+        <p className={cn('text-muted-foreground', MOBILE_DESIGN.text.body, 'sm:text-base')}>
+          Gestiona tus fichajes y ausencias
+        </p>
       </div>
 
       {/* Balance Resumen */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 sm:gap-4 grid-cols-2 md:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Balance Diario</CardTitle>
@@ -113,9 +118,13 @@ export function HorarioMiEspacioClient({
 
       {/* Tabs de Fichajes y Ausencias */}
       <Tabs defaultValue="fichajes" className="w-full">
-        <TabsList>
-          <TabsTrigger value="fichajes">Fichajes</TabsTrigger>
-          <TabsTrigger value="ausencias">Ausencias</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="fichajes" className={cn(MOBILE_DESIGN.text.bodyMedium)}>
+            Fichajes
+          </TabsTrigger>
+          <TabsTrigger value="ausencias" className={cn(MOBILE_DESIGN.text.bodyMedium)}>
+            Ausencias
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="fichajes" className="space-y-4">
@@ -218,13 +227,17 @@ export function HorarioMiEspacioClient({
       </Tabs>
 
       {/* Acciones rápidas */}
-      <div className="flex gap-4">
-        <Button onClick={() => window.location.href = '/empleado/mi-espacio/fichajes'}>
+      <div className="flex flex-col sm:flex-row gap-2 sm:gap-4">
+        <Button
+          onClick={() => window.location.href = '/empleado/mi-espacio/fichajes'}
+          className={cn(MOBILE_DESIGN.button.primary, 'w-full sm:w-auto')}
+        >
           Ver fichajes completos
         </Button>
         <Button
           variant="outline"
           onClick={() => window.location.href = '/empleado/mi-espacio/ausencias'}
+          className={cn(MOBILE_DESIGN.button.secondary, 'w-full sm:w-auto')}
         >
           Ver ausencias completas
         </Button>

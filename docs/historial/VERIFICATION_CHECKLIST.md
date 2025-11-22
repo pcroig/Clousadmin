@@ -112,7 +112,7 @@
   - [x] Botón "Continuar con Google" funcional
   - [x] Manejo de errores OAuth específicos
   - [x] Mensajes de error personalizados
-  - [x] Redirect a `/api/auth/google`
+  - [x] Uso de `signIn('google')` → `/api/auth/callback/google`
 
 ## ⚙️ Configuración
 - [x] `.env.example` actualizado con:
