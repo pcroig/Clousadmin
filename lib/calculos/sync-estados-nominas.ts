@@ -25,7 +25,6 @@ export type EstadoNomina = NominaEstado;
 export async function sincronizarEstadoEvento(
   eventoNominaId: string
 ): Promise<{ previo: string; nuevo: string; cambio: boolean }> {
-  console.log(`[SyncEstados] Sincronizando evento ${eventoNominaId}`);
 
   // 1. Obtener el evento y todas sus nóminas
   const evento = await prisma.eventoNomina.findUnique({
@@ -46,7 +45,6 @@ export async function sincronizarEstadoEvento(
   }
 
   if (evento.nominas.length === 0) {
-    console.warn(`[SyncEstados] Evento ${eventoNominaId} no tiene nóminas`);
     return { previo: evento.estado, nuevo: evento.estado, cambio: false };
   }
 
@@ -60,10 +58,6 @@ export async function sincronizarEstadoEvento(
 
   // 4. Actualizar evento si hay cambio
   if (estadoCalculado !== estadoPrevio) {
-    console.log(
-      `[SyncEstados] Cambio de estado: ${estadoPrevio} → ${estadoCalculado}`
-    );
-
     await prisma.eventoNomina.update({
       where: { id: eventoNominaId },
       data: { estado: estadoCalculado },
@@ -72,7 +66,6 @@ export async function sincronizarEstadoEvento(
     return { previo: estadoPrevio, nuevo: estadoCalculado, cambio: true };
   }
 
-  console.log(`[SyncEstados] Sin cambios - Estado actual: ${estadoPrevio}`);
   return { previo: estadoPrevio, nuevo: estadoPrevio, cambio: false };
 }
 
@@ -88,7 +81,6 @@ export async function actualizarEstadoNomina(
     fechaNotificacion?: Date;
   }
 ): Promise<void> {
-  console.log(`[SyncEstados] Actualizando nómina ${nominaId} a '${nuevoEstado}'`);
 
   // 1. Actualizar la nómina
   const nomina = await prisma.nomina.update({
@@ -120,10 +112,6 @@ export async function actualizarEstadosNominasLote(
     fechaNotificacion?: Date;
   }
 ): Promise<number> {
-  console.log(
-    `[SyncEstados] Actualización en lote para evento ${eventoNominaId} a '${nuevoEstado}'`
-  );
-
   return await prisma.$transaction(async (tx) => {
     // 1. Actualizar todas las nóminas del evento
     const result = await tx.nomina.updateMany({
@@ -148,10 +136,6 @@ export async function actualizarEstadosNominasLote(
         estado: estadoEvento,
       },
     });
-
-    console.log(
-      `[SyncEstados] Lote actualizado: ${result.count} nóminas, evento → '${estadoEvento}'`
-    );
 
     return result.count;
   });
@@ -182,7 +166,6 @@ export function esTransicionValida(
 export async function recalcularEstadisticasEvento(
   eventoNominaId: string
 ): Promise<void> {
-  console.log(`[SyncEstados] Recalculando estadísticas para evento ${eventoNominaId}`);
 
   const nominas = await prisma.nomina.findMany({
     where: { eventoNominaId },
@@ -210,10 +193,6 @@ export async function recalcularEstadisticasEvento(
       complementosAsignados: totalComplementosAsignados,
     },
   });
-
-  console.log(
-    `[SyncEstados] Estadísticas actualizadas: ${nominas.length} nóminas, ${empleadosConComplementos} con complementos`
-  );
 }
 
 

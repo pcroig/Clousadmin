@@ -64,8 +64,6 @@ export function procesarZip(buffer: Buffer): Array<{
   filename: string;
   buffer: Buffer;
 }> {
-  console.log('[procesarZip] Extrayendo PDFs del ZIP');
-
   const zip = new AdmZip(buffer);
   const entries = zip.getEntries();
 
@@ -81,8 +79,6 @@ export function procesarZip(buffer: Buffer): Array<{
       filename: entry.entryName.split('/').pop() || entry.entryName, // Solo el nombre, sin path
       buffer: entry.getData(),
     }));
-
-  console.log(`[procesarZip] ${pdfs.length} PDFs extraídos`);
 
   return pdfs;
 }
@@ -100,10 +96,6 @@ export async function procesarNominas(
   stats: UploadStats;
   results: MatchingResult[];
 }> {
-  console.log(
-    `[procesarNominas] Procesando ${files.length} archivo(s) para ${mes}/${anio}`
-  );
-
   // Extraer PDFs de los archivos
   const allPdfs: Array<{ filename: string; buffer: Buffer }> = [];
 
@@ -118,8 +110,6 @@ export async function procesarNominas(
     }
   }
 
-  console.log(`[procesarNominas] Total PDFs a procesar: ${allPdfs.length}`);
-
   // Obtener empleados activos de la empresa
   const empleados = await prisma.empleado.findMany({
     where: {
@@ -132,8 +122,6 @@ export async function procesarNominas(
       apellidos: true,
     },
   });
-
-  console.log(`[procesarNominas] ${empleados.length} empleados activos`);
 
   // Preparar lista de empleados para el clasificador
   const empleadosCandidatos: EmpleadoCandidato[] = empleados.map((emp) => ({
@@ -148,8 +136,6 @@ export async function procesarNominas(
   let autoAssigned = 0;
 
   for (const pdf of allPdfs) {
-    console.log(`[procesarNominas] Clasificando: ${pdf.filename}`);
-    
     const match = await clasificarNomina(pdf.filename, empleadosCandidatos);
 
     results.push({
@@ -194,10 +180,6 @@ export async function procesarNominas(
     avgConfidence: results.length > 0 ? Math.round(totalConfidence / results.length) : 0,
   };
 
-  console.log(
-    `[procesarNominas] Stats: ${stats.total} total, ${stats.autoAssigned} auto-asignados, ${stats.needsReview} requieren revisión`
-  );
-
   return {
     sessionId,
     stats,
@@ -231,8 +213,6 @@ export async function confirmarUpload(
   imported: number;
   errors: string[];
 }> {
-  console.log(`[confirmarUpload] Confirmando sesión ${sessionId}`);
-
   const session = uploadSessions.get(sessionId);
   if (!session) {
     return {
@@ -344,15 +324,12 @@ export async function confirmarUpload(
           diasTrabajados: 0,
           diasAusencias: 0,
           documentoId: documento.id,
-          estado: 'definitiva', // Upload directo va a estado definitiva (listo para publicar)
+          estado: 'completada', // Upload directo va a estado completada (lista para publicar)
           subidoPor,
         },
       });
 
       imported++;
-      console.log(
-        `[confirmarUpload] Nómina importada: ${result.filename} → ${empleadoId}`
-      );
     } catch (error) {
       console.error(
         `[confirmarUpload] Error procesando ${result.filename}:`,
@@ -366,10 +343,6 @@ export async function confirmarUpload(
 
   // Limpiar sesión
   uploadSessions.delete(sessionId);
-
-  console.log(
-    `[confirmarUpload] Completado: ${imported} importadas, ${errors.length} errores`
-  );
 
   return {
     success: imported > 0,
