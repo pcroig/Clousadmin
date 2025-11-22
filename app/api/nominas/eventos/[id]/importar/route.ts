@@ -124,10 +124,6 @@ export async function POST(
             // Match automático con suficiente confianza
             empleadoId = matchResult.empleado.id;
             nomina = evento.nominas.find((n) => n.empleadoId === empleadoId);
-
-            console.log(
-              `[Importar Nóminas] Match automático: ${file.name} → ${matchResult.empleado.nombre} (${matchResult.confidence}% confianza)`
-            );
           } else {
             // No hay match claro, mostrar candidatos
             const candidatosInfo = matchResult.candidates

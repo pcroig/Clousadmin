@@ -40,10 +40,6 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    console.log(
-      `[API alertas] GET ${mes}/${anio}, tipo=${tipo}, recalcular=${recalcular}`
-    );
-
     // Si se pide recalcular, detectar nuevamente
     if (recalcular) {
       await detectarAlertas(session.user.empresaId, mes, anio);

@@ -38,10 +38,6 @@ export async function GET(req: NextRequest) {
       ? parseInt(searchParams.get('anio')!)
       : new Date().getFullYear();
 
-    console.log(
-      `[API mis-nominas] GET ${anio} para empleado ${empleado.id}`
-    );
-
     // Obtener nóminas publicadas
     const nominas = await prisma.nomina.findMany({
       where: {
