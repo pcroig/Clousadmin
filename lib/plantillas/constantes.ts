@@ -8,7 +8,7 @@ import { VariableDefinicion } from './tipos';
  * Quick Mappings - Top 20 variables más usadas (resolución instantánea <1ms)
  * Estas variables se resuelven sin llamar a IA ni cache
  */
-export const QUICK_MAPPINGS: Record<string, { path: string; encrypted?: boolean; format?: string }> = {
+export const QUICK_MAPPINGS: Record<string, { path: string | null; encrypted?: boolean; format?: string }> = {
   // Empleado (12 variables)
   'empleado_nombre': { path: 'nombre' },
   'empleado_apellidos': { path: 'apellidos' },

@@ -13,6 +13,93 @@ import { cache } from '@/lib/redis';
 import { generarDocumentoDesdePlantilla } from './generar-documento';
 import { JobConfig, JobProgress, ResultadoGeneracion } from './tipos';
 
+/**
+ * Interfaz para el callback de progreso
+ */
+interface ProgresoCallback {
+  (progreso: number): Promise<void> | void;
+}
+
+/**
+ * Procesa los empleados de un job de generación de documentos
+ * Esta función contiene la lógica común utilizada tanto por el worker como por el modo sin cola
+ */
+async function procesarEmpleadosJob(
+  jobId: string,
+  config: JobConfig,
+  onProgreso?: ProgresoCallback
+): Promise<{ exitosos: number; fallidos: number; resultados: ResultadoGeneracion[] }> {
+  const resultados: ResultadoGeneracion[] = [];
+  const total = config.empleadoIds.length;
+  let exitosos = 0;
+  let fallidos = 0;
+
+  // Verificar formato de plantilla
+  const plantilla = await prisma.plantillaDocumento.findUnique({
+    where: { id: config.plantillaId },
+    select: { formato: true },
+  });
+
+  if (!plantilla) {
+    throw new Error('Plantilla no encontrada');
+  }
+
+  // Procesar cada empleado
+  for (let i = 0; i < config.empleadoIds.length; i++) {
+    const empleadoId = config.empleadoIds[i];
+
+    try {
+      if (plantilla.formato === 'pdf_rellenable') {
+        throw new Error('La generación desde PDFs rellenables está desactivada. Solo se soportan plantillas DOCX con variables.');
+      }
+
+      const resultado = await generarDocumentoDesdePlantilla(
+        config.plantillaId,
+        empleadoId,
+        config.configuracion,
+        config.solicitadoPor
+      );
+
+      resultados.push(resultado);
+      if (resultado.success) {
+        exitosos++;
+      } else {
+        fallidos++;
+      }
+    } catch (error) {
+      console.error(`[Queue] Error procesando empleado ${empleadoId}:`, error);
+      resultados.push({
+        success: false,
+        empleadoId,
+        error: error instanceof Error ? error.message : 'Error desconocido',
+      });
+      fallidos++;
+    }
+
+    // Actualizar progreso en BD
+    const procesados = i + 1;
+    const progreso = Math.round((procesados / total) * 100);
+
+    await prisma.jobGeneracionDocumentos.update({
+      where: { id: jobId },
+      data: {
+        progreso,
+        procesados,
+        exitosos,
+        fallidos,
+        resultados: resultados as Prisma.InputJsonValue,
+      },
+    });
+
+    // Callback de progreso opcional (para workers)
+    if (onProgreso) {
+      await onProgreso(progreso);
+    }
+  }
+
+  return { exitosos, fallidos, resultados };
+}
+
 // Configuración de conexión Redis para BullMQ
 // Parsear REDIS_URL si está disponible, sino usar configuración por defecto
 const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
@@ -82,6 +169,9 @@ async function checkRedisAvailability(): Promise<boolean> {
 async function procesarJobSinCola(jobId: string, config: JobConfig) {
   console.warn('[Queue] Redis no disponible. Procesando job sin cola.');
 
+  const total = config.empleadoIds.length;
+  const inicio = Date.now();
+
   await prisma.jobGeneracionDocumentos.update({
     where: { id: jobId },
     data: {
@@ -90,66 +180,8 @@ async function procesarJobSinCola(jobId: string, config: JobConfig) {
     },
   });
 
-  const resultados: ResultadoGeneracion[] = [];
-  const total = config.empleadoIds.length;
-  let exitosos = 0;
-  let fallidos = 0;
-  const inicio = Date.now();
-
   try {
-    const plantilla = await prisma.plantillaDocumento.findUnique({
-      where: { id: config.plantillaId },
-      select: { formato: true },
-    });
-
-    if (!plantilla) {
-      throw new Error('Plantilla no encontrada');
-    }
-
-    for (let i = 0; i < config.empleadoIds.length; i++) {
-      const empleadoId = config.empleadoIds[i];
-      try {
-        if (plantilla.formato === 'pdf_rellenable') {
-          throw new Error('La generación desde PDFs rellenables está desactivada. Solo se soportan plantillas DOCX con variables.');
-        }
-
-        const resultado = await generarDocumentoDesdePlantilla(
-          config.plantillaId,
-          empleadoId,
-          config.configuracion,
-          config.solicitadoPor
-        );
-
-        resultados.push(resultado);
-        if (resultado.success) {
-          exitosos++;
-        } else {
-          fallidos++;
-        }
-      } catch (error) {
-        console.error(`[Queue] Error procesando empleado ${empleadoId}:`, error);
-        resultados.push({
-          success: false,
-          empleadoId,
-          error: error instanceof Error ? error.message : 'Error desconocido',
-        });
-        fallidos++;
-      }
-
-      const procesados = i + 1;
-      const progreso = Math.round((procesados / total) * 100);
-
-      await prisma.jobGeneracionDocumentos.update({
-        where: { id: jobId },
-        data: {
-          progreso,
-          procesados,
-          exitosos,
-          fallidos,
-          resultados: resultados as Prisma.InputJsonValue,
-        },
-      });
-    }
+    const { exitosos, fallidos, resultados } = await procesarEmpleadosJob(jobId, config);
 
     await prisma.jobGeneracionDocumentos.update({
       where: { id: jobId },
@@ -187,8 +219,8 @@ async function procesarJobSinCola(jobId: string, config: JobConfig) {
       empresaId: config.empresaId,
       usuarioId: config.solicitadoPor,
       total,
-      exitosos,
-      fallidos: fallidos || total,
+      exitosos: 0,
+      fallidos: total,
       jobId,
       mensajePersonalizado:
         error instanceof Error
@@ -396,8 +428,9 @@ export const documentosWorker = new Worker(
   async (job: Job) => {
     const config: JobConfig & { jobId: string } = job.data;
     const jobId = config.jobId;
+    const total = config.empleadoIds.length;
 
-    console.log(`[Worker] Procesando job ${jobId} - ${config.empleadoIds.length} empleados`);
+    console.log(`[Worker] Procesando job ${jobId} - ${total} empleados`);
 
     // Actualizar estado a "procesando"
     await prisma.jobGeneracionDocumentos.update({
@@ -408,81 +441,15 @@ export const documentosWorker = new Worker(
       },
     });
 
-    const resultados: ResultadoGeneracion[] = [];
-    const total = config.empleadoIds.length;
-    let exitosos = 0;
-    let fallidos = 0;
-
-    // Obtener formato de plantilla
-    const plantilla = await prisma.plantillaDocumento.findUnique({
-      where: { id: config.plantillaId },
-      select: { formato: true },
-    });
-
-    if (!plantilla) {
-      throw new Error('Plantilla no encontrada');
-    }
-
-    // Procesar cada empleado
-    for (let i = 0; i < config.empleadoIds.length; i++) {
-      const empleadoId = config.empleadoIds[i];
-
-      try {
-        // Generar documento según formato
-        let resultado: ResultadoGeneracion;
-
-        if (plantilla.formato === 'pdf_rellenable') {
-          // PDF rellenable desactivado en esta fase
-          throw new Error('La generación desde PDFs rellenables está desactivada. Solo se soportan plantillas DOCX con variables.');
-        } else {
-          // DOCX por defecto
-          resultado = await generarDocumentoDesdePlantilla(
-            config.plantillaId,
-            empleadoId,
-            config.configuracion,
-            config.solicitadoPor
-          );
-        }
-
-        resultados.push(resultado);
-
-        if (resultado.success) {
-          exitosos++;
-        } else {
-          fallidos++;
-        }
-      } catch (error) {
-        console.error(`[Worker] Error al procesar empleado ${empleadoId}:`, error);
-
-        resultados.push({
-          success: false,
-          empleadoId,
-          error: error instanceof Error ? error.message : 'Error desconocido',
-        });
-
-        fallidos++;
+    // Procesar empleados usando la función común
+    const { exitosos, fallidos, resultados } = await procesarEmpleadosJob(
+      jobId,
+      config,
+      async (progreso) => {
+        await job.updateProgress(progreso);
+        console.log(`[Worker] Progreso: ${progreso}%`);
       }
-
-      // Actualizar progreso
-      const procesados = i + 1;
-      const progreso = Math.round((procesados / total) * 100);
-
-      await prisma.jobGeneracionDocumentos.update({
-        where: { id: jobId },
-        data: {
-          progreso,
-          procesados,
-          exitosos,
-          fallidos,
-          resultados: resultados as Prisma.InputJsonValue,
-        },
-      });
-
-      // Reportar progreso al job
-      await job.updateProgress(progreso);
-
-      console.log(`[Worker] Progreso: ${progreso}% (${procesados}/${total})`);
-    }
+    );
 
     // Completar job
     const tiempoTotal = Date.now() - (job.processedOn || Date.now());

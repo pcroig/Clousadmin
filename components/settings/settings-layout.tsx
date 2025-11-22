@@ -9,6 +9,7 @@ import { usePathname } from 'next/navigation';
 import { useMemo } from 'react';
 
 import { UsuarioRol } from '@/lib/constants/enums';
+import { BILLING_ENABLED } from '@/lib/stripe/config';
 import { cn } from '@/lib/utils';
 
 interface SettingsSection {
@@ -48,8 +49,13 @@ export const SettingsLayout = ({ rol, children }: SettingsLayoutProps) => {
     if (rol === UsuarioRol.hr_admin) {
       items.splice(1, 0, {
         id: 'company',
-        label: 'Compañía',
+        label: 'Compan\u00eda',
         href: `${basePath}/settings/compania`,
+      });
+      items.push({
+        id: 'billing',
+        label: BILLING_ENABLED ? 'Facturaci\u00f3n' : 'Facturaci\u00f3n (configurar)',
+        href: `${basePath}/settings/facturacion`,
       });
       items.push({
         id: 'integrations',

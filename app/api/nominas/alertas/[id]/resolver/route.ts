@@ -31,8 +31,6 @@ export async function POST(
 
     const { id } = await params;
 
-    console.log(`[API resolver alerta] Resolviendo alerta ${id}`);
-
     // Resolver alerta
     await resolverAlerta(id);
 

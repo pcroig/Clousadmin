@@ -35,8 +35,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    console.log(`[API nominas/publicar] Publicando ${mes}/${anio}`);
-
     // Obtener nóminas en borrador
     const nominasBorrador = await prisma.nomina.findMany({
       where: {
@@ -69,10 +67,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    console.log(
-      `[API nominas/publicar] ${nominasBorrador.length} nómina(s) a publicar`
-    );
-
     // Obtener IDs de empleados de la empresa para el updateMany
     const empleadosIds = nominasBorrador.map((n) => n.empleadoId);
 
@@ -102,10 +96,6 @@ export async function POST(req: NextRequest) {
           año: anio,
         })
       )
-    );
-
-    console.log(
-      `[API nominas/publicar] ${nominasBorrador.length} notificación(es) creada(s)`
     );
 
     return NextResponse.json({

@@ -643,8 +643,6 @@ export async function detectarAlertas(
   informativas: number;
   alertas: Alerta[];
 }> {
-  console.log(`[detectarAlertas] Detectando alertas para ${mes}/${anio}`);
-
   // Obtener todos los empleados activos
   const empleados = await prisma.empleado.findMany({
     where: {
@@ -655,8 +653,6 @@ export async function detectarAlertas(
       id: true,
     },
   });
-
-  console.log(`[detectarAlertas] ${empleados.length} empleados activos`);
 
   // Limpiar alertas antiguas del mismo mes/año
   await prisma.alertaNomina.deleteMany({
@@ -706,10 +702,6 @@ export async function detectarAlertas(
     (a) => a.tipo === 'advertencia'
   ).length;
   const informativas = todasLasAlertas.filter((a) => a.tipo === 'info').length;
-
-  console.log(
-    `[detectarAlertas] Total: ${todasLasAlertas.length} (${criticas} críticas, ${advertencias} advertencias, ${informativas} info)`
-  );
 
   return {
     total: todasLasAlertas.length,

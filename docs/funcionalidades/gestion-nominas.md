@@ -29,6 +29,14 @@ abierto ↔ cerrado
 
 > ℹ️ Los estados se sincronizan automáticamente mediante `lib/calculos/sync-estados-nominas.ts`. El estado del evento se calcula a partir del estado agregado de todas sus nóminas.
 
+### 🔁 Optimización 2025-11
+
+- Se añadió `esDiaLaborableSync` en `lib/calculos/dias-laborables.ts` para evitar N+1 queries al contar días laborables en rangos mensuales.
+- `calcularDiasLaborablesMes` y `calcularResumenMensual` reutilizan sets de festivos en memoria, reduciendo llamadas a Prisma.
+- APIs `app/api/nominas/*` eliminaron logs de depuración y homogenizaron respuestas `{ success, error }`.
+- `lib/imports/nominas-upload.ts` centraliza la creación de carpetas “Nóminas” por empleado a través de `obtenerOCrearCarpetaSistema`.
+- `lib/calculos/sync-estados-nominas.ts` permanece como única fuente de verdad para sincronizar evento ↔ nómina tras publicar o revertir.
+
 ## Componentes Principales
 
 ### 1. Tipos de Complemento

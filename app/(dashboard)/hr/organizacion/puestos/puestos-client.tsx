@@ -182,23 +182,22 @@ export function PuestosClient({ puestos: initialPuestos }: PuestosClientProps) {
       <ResponsiveContainer variant="page" className="h-full w-full flex flex-col overflow-hidden">
         {isMobile ? (
           <>
-            {/* Action Bar - 48px */}
             <MobileActionBar
               title="Puestos"
               primaryAction={{
                 icon: Plus,
-                label: 'Crear Puesto',
+                label: 'Crear puesto',
                 onClick: () => setShowCreateModal(true),
               }}
               className="mb-3"
             />
 
-            {/* Search Bar - 44px */}
+            {/* Búsqueda */}
             <div className="flex-shrink-0 mb-3">
               <CompactFilterBar
                 searchValue={filtros.busqueda}
                 onSearchChange={(value) => setFiltros((prev) => ({ ...prev, busqueda: value }))}
-                searchPlaceholder="Buscar puesto por nombre..."
+                searchPlaceholder="Buscar puesto..."
               />
             </div>
           </>

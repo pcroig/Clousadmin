@@ -11,11 +11,21 @@ import { cn } from '@/lib/utils';
 import { OverflowMenu } from './OverflowMenu';
 
 export interface ActionItem {
-  icon: React.ComponentType<{ className?: string }>;
+  icon?: React.ComponentType<{ className?: string }>;
   label: string;
   onClick: () => void;
-  variant?: 'default' | 'destructive' | 'ghost';
+  variant?: 'default' | 'destructive' | 'ghost' | 'outline';
   disabled?: boolean;
+  /**
+   * Controla cómo se muestra la acción en mobile.
+   * - icon: solo icono (por defecto)
+   * - label: solo texto
+   * - icon-label: icono + texto
+   */
+  display?: 'icon' | 'label' | 'icon-label';
+  /** Tamaño del botón en mobile */
+  size?: 'sm' | 'default';
+  className?: string;
 }
 
 export interface MobileActionBarProps {
@@ -67,7 +77,9 @@ export function MobileActionBar({
   if (!isMobile) {
     return (
       <div className={cn('flex items-center gap-3 flex-wrap', className)}>
-        {title && <h2 className="text-lg font-semibold text-gray-900">{title}</h2>}
+        {title && (
+          <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
+        )}
         <div className="flex-1" />
         {primaryAction && (
           <Button
@@ -76,7 +88,9 @@ export function MobileActionBar({
             disabled={primaryAction.disabled}
             className="gap-2"
           >
+            {primaryAction.icon && (
             <primaryAction.icon className="h-4 w-4" />
+            )}
             {primaryAction.label}
           </Button>
         )}
@@ -88,7 +102,7 @@ export function MobileActionBar({
             disabled={action.disabled}
             className="gap-2"
           >
-            <action.icon className="h-4 w-4" />
+            {action.icon && <action.icon className="h-4 w-4" />}
             {action.label}
           </Button>
         ))}
@@ -103,56 +117,82 @@ export function MobileActionBar({
     );
   }
 
+  const renderActionButton = (
+    action: ActionItem,
+    {
+      isPrimary = false,
+    }: {
+      isPrimary?: boolean;
+    } = {}
+  ) => {
+    const displayMode = action.display ?? 'icon';
+    const showIcon = action.icon && displayMode !== 'label';
+    const showLabel = displayMode !== 'icon';
+    const size = action.size ?? 'sm';
+    const baseVariant =
+      action.variant || (isPrimary ? 'default' : displayMode === 'label' ? 'outline' : 'ghost');
+
+    return (
+      <Button
+        onClick={action.onClick}
+        variant={baseVariant}
+        size={size}
+        disabled={action.disabled}
+        className={cn(
+          displayMode === 'icon'
+            ? cn(MOBILE_DESIGN.actionBar.iconButton, 'p-0')
+            : 'h-9 px-3',
+          action.className
+        )}
+        title={action.label}
+      >
+        {showIcon && action.icon && (
+          <action.icon
+            className={cn(
+              MOBILE_DESIGN.actionBar.iconSize,
+              showLabel ? 'mr-2' : undefined
+            )}
+          />
+        )}
+        {showLabel ? (
+          <span className="text-sm font-medium">{action.label}</span>
+        ) : (
+          <span className="sr-only">{action.label}</span>
+        )}
+      </Button>
+    );
+  };
+
   // Mobile: Layout compacto con iconos
   return (
     <div
       className={cn(
         'flex items-center justify-between',
-        MOBILE_DESIGN.actionBar.height,
         MOBILE_DESIGN.actionBar.padding,
         MOBILE_DESIGN.actionBar.gap,
-        'border-b border-gray-200 bg-white',
+        'mb-2',
         className
       )}
     >
       {/* Título */}
       {title && (
-        <h2 className="text-base font-semibold text-gray-900 flex-1 truncate">
+        <h1 className="text-xl font-bold text-gray-900 flex-1 truncate">
           {title}
-        </h2>
+        </h1>
       )}
 
       {/* Acciones */}
       <div className={cn('flex items-center', MOBILE_DESIGN.actionBar.gap)}>
         {/* Primary Action */}
         {primaryAction && (
-          <Button
-            onClick={primaryAction.onClick}
-            variant={primaryAction.variant || 'default'}
-            size="sm"
-            disabled={primaryAction.disabled}
-            className={cn(MOBILE_DESIGN.actionBar.iconButton, 'p-0')}
-            title={primaryAction.label}
-          >
-            <primaryAction.icon className={MOBILE_DESIGN.actionBar.iconSize} />
-            <span className="sr-only">{primaryAction.label}</span>
-          </Button>
+          renderActionButton(primaryAction, { isPrimary: true })
         )}
 
         {/* Secondary Actions */}
         {secondaryActions.slice(0, 2).map((action, idx) => (
-          <Button
-            key={idx}
-            onClick={action.onClick}
-            variant={action.variant || 'ghost'}
-            size="sm"
-            disabled={action.disabled}
-            className={cn(MOBILE_DESIGN.actionBar.iconButton, 'p-0')}
-            title={action.label}
-          >
-            <action.icon className={MOBILE_DESIGN.actionBar.iconSize} />
-            <span className="sr-only">{action.label}</span>
-          </Button>
+          <React.Fragment key={idx}>
+            {renderActionButton(action)}
+          </React.Fragment>
         ))}
 
         {/* Overflow Menu */}

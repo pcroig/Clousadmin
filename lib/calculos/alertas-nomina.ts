@@ -64,7 +64,6 @@ export async function generarAlertasParaNomina(
   mes: number,
   anio: number
 ): Promise<number> {
-  console.log(`[Alertas] Generando alertas para nómina ${nominaId}`);
 
   // Obtener datos del empleado y contrato
   const empleado = await prisma.empleado.findUnique({
@@ -84,7 +83,6 @@ export async function generarAlertasParaNomina(
   });
 
   if (!empleado) {
-    console.error(`[Alertas] Empleado ${empleadoId} no encontrado`);
     return 0;
   }
 
@@ -276,10 +274,6 @@ export async function generarAlertasParaNomina(
       })),
       skipDuplicates: true,
     });
-
-    console.log(`[Alertas] Creadas ${alertas.length} alertas para nómina ${nominaId}`);
-  } else {
-    console.log(`[Alertas] No se detectaron anomalías para nómina ${nominaId}`);
   }
 
   return alertas.length;
@@ -304,7 +298,6 @@ export async function tieneAlertasCriticas(nominaId: string): Promise<boolean> {
  * Recalcula alertas para todas las nóminas de un evento
  */
 export async function recalcularAlertasEvento(eventoNominaId: string): Promise<number> {
-  console.log(`[Alertas] Recalculando alertas para evento ${eventoNominaId}`);
 
   const evento = await prisma.eventoNomina.findUnique({
     where: { id: eventoNominaId },
@@ -344,7 +337,6 @@ export async function recalcularAlertasEvento(eventoNominaId: string): Promise<n
     totalAlertas += alertasCreadas;
   }
 
-  console.log(`[Alertas] Recalculadas ${totalAlertas} alertas para evento ${eventoNominaId}`);
   return totalAlertas;
 }
 

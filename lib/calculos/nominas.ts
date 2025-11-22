@@ -9,7 +9,7 @@ import { redondearHoras } from '@/lib/utils/numeros';
 
 import {
   crearSetFestivos,
-  esDiaLaborable,
+  esDiaLaborableSync,
   getDiasLaborablesEmpresa,
   getFestivosActivosEnRango,
 } from './dias-laborables';
@@ -52,17 +52,14 @@ export async function calcularDiasLaborablesMes(
   const festivosSet = crearSetFestivos(festivos);
 
   let diasLaborables = 0;
-  
+
   const fecha = new Date(fechaInicio);
-  
+
   while (fecha <= fechaFin) {
-    // Verificar si el día es laborable
-    const esLaborable = await esDiaLaborable(fecha, empresaId, diasLaborablesConfig, festivosSet);
-    
-    if (esLaborable) {
+    // Verificar si el día es laborable (versión síncrona para evitar N+1 queries)
+    if (esDiaLaborableSync(fecha, diasLaborablesConfig, festivosSet)) {
       diasLaborables++;
     }
-    
     fecha.setDate(fecha.getDate() + 1);
   }
 
@@ -267,7 +264,6 @@ export async function calcularResumenMensual(
   mes: number,
   anio: number
 ): Promise<ResumenMensual> {
-  console.log(`[calcularResumenMensual] Calculando para empleado ${empleadoId}, ${mes}/${anio}`);
 
   // Obtener datos del empleado
   const empleado = await prisma.empleado.findUnique({
@@ -345,8 +341,6 @@ export async function calcularResumenMensual(
     },
   });
 
-  console.log(`[calcularResumenMensual] Resumen guardado: ${diasTrabajados}/${diasLaborables} días trabajados`);
-
   return resumen;
 }
 
@@ -358,7 +352,6 @@ export async function calcularResumenMensualEmpresa(
   mes: number,
   anio: number
 ): Promise<ResumenMensual[]> {
-  console.log(`[calcularResumenMensualEmpresa] Calculando para ${mes}/${anio}`);
 
   // Obtener todos los empleados activos
   const empleados = await prisma.empleado.findMany({
@@ -370,8 +363,6 @@ export async function calcularResumenMensualEmpresa(
       id: true,
     },
   });
-
-  console.log(`[calcularResumenMensualEmpresa] ${empleados.length} empleados activos`);
 
   // Calcular resumen para cada empleado
   const resumenes: ResumenMensual[] = [];

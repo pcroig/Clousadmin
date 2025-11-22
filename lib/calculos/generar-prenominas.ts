@@ -341,7 +341,7 @@ export async function generarPrenominasEvento(
     }
 
     // Generar alertas para la nómina
-    await generarAlertasParaNomina(nuevaNomina.id, empleado.id, eventoCompleto.empresaId, mes, anio);
+    await generarAlertasParaNomina(nuevaNomina.id, empleado.id, empresaId, mes, anio);
 
     // Determinar estado final: "completada" si no hay complementos pendientes NI alertas críticas
     const alertasCriticas = await prisma.alertaNomina.count({

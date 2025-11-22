@@ -122,9 +122,9 @@ export async function getDiasLaborablesEmpresa(empresaId: string): Promise<DiasL
 /**
  * Verifica si un día de la semana es laborable según la configuración de la empresa
  */
-function esDiaSemanaLaborable(fecha: Date, diasLaborables: DiasLaborables): boolean {
+export function esDiaSemanaLaborable(fecha: Date, diasLaborables: DiasLaborables): boolean {
   const diaSemana = fecha.getDay(); // 0 = domingo, 1 = lunes, ..., 6 = sábado
-  
+
   const mapaDias: { [key: number]: keyof DiasLaborables } = {
     0: 'domingo',
     1: 'lunes',
@@ -137,6 +137,22 @@ function esDiaSemanaLaborable(fecha: Date, diasLaborables: DiasLaborables): bool
 
   const nombreDia = mapaDias[diaSemana];
   return diasLaborables[nombreDia];
+}
+
+/**
+ * Versión síncrona de esDiaLaborable para uso interno cuando ya se tienen los datos cargados
+ * Evita N+1 queries en bucles
+ */
+export function esDiaLaborableSync(
+  fecha: Date,
+  diasLaborables: DiasLaborables,
+  festivosSet: FestivosSet
+): boolean {
+  const esDiaSemana = esDiaSemanaLaborable(fecha, diasLaborables);
+  if (!esDiaSemana) {
+    return false;
+  }
+  return !festivosSet.has(formatearClaveFecha(fecha));
 }
 
 /**

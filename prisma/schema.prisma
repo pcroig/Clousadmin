@@ -125,6 +125,9 @@ model Empresa {
   // Configuration (JSONB for flexibility)
   config Json @default("{\"hora_cierre_fichaje_default\":\"18:00\",\"auto_completado_fichajes_dias\":7,\"auto_completado_nominas_dias\":7,\"auto_completado_contratos_dias\":14,\"umbral_ia_nominas\":0.8,\"umbral_ia_contratos\":0.85,\"permitir_saldo_vacaciones_negativo\":true,\"empleado_puede_ver_salario\":false}")
 
+  // Estado
+  activo Boolean @default(true)
+
   // Timestamps
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -167,6 +170,10 @@ model Empresa {
   jobsGeneracionDocumentos JobGeneracionDocumentos[]
   solicitudesFirma         SolicitudFirma[]
   solicitudesCorreccionFichaje SolicitudCorreccionFichaje[]
+
+  // Billing & Subscriptions
+  billingCustomer          BillingCustomer?
+  subscriptions            Subscription[]
 
   @@index([cif])
   @@map("empresas")
@@ -2088,4 +2095,161 @@ model Firma {
   @@index([solicitudFirmaId, firmado])
   @@index([empleadoId, firmado])
   @@map("firmas")
+}
+
+// ========================================
+// 20. BILLING & SUBSCRIPTIONS (Stripe)
+// ========================================
+
+/// Estado de la suscripción
+enum SubscriptionStatus {
+  trialing // En periodo de prueba
+  active // Activa y pagando
+  canceled // Cancelada (sigue activa hasta fin de periodo)
+  incomplete // Pago inicial fallido
+  incomplete_expired // Pago inicial expirado
+  past_due // Pago vencido (reintentando)
+  unpaid // Impagada (sin acceso)
+  paused // Pausada
+}
+
+/// Intervalo de facturación
+enum BillingInterval {
+  month
+  year
+}
+
+/// BillingProduct - Productos/Planes sincronizados desde Stripe
+/// Los productos se crean en Stripe Dashboard y se sincronizan via webhook
+model BillingProduct {
+  id          String  @id // Stripe product ID (prod_xxx)
+  nombre      String  @db.VarChar(255)
+  descripcion String? @db.Text
+
+  // Metadata del producto
+  activo      Boolean @default(true)
+  imagen      String? @db.Text // URL de imagen del producto
+
+  // Features del plan (JSON array)
+  // Example: ["Hasta 50 empleados", "Soporte por email", "Firma digital"]
+  features    Json    @default("[]")
+
+  // Orden de visualización en pricing page
+  orden       Int     @default(0)
+
+  // Metadata adicional de Stripe
+  metadata    Json?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  precios     BillingPrice[]
+
+  @@index([activo])
+  @@index([orden])
+  @@map("billing_products")
+}
+
+/// BillingPrice - Precios de productos sincronizados desde Stripe
+/// Un producto puede tener múltiples precios (mensual, anual, etc.)
+model BillingPrice {
+  id          String          @id // Stripe price ID (price_xxx)
+  productoId  String
+
+  // Precio
+  unitAmount  Int             // Cantidad en céntimos (ej: 2900 = 29.00€)
+  currency    String          @default("eur") @db.VarChar(3)
+
+  // Recurrencia
+  intervalo   BillingInterval @default(month)
+  intervalCount Int           @default(1) // Cada cuántos intervalos (1 = cada mes/año)
+
+  // Periodo de prueba
+  trialDays   Int?            // Días de prueba (null = sin trial)
+
+  // Estado
+  activo      Boolean         @default(true)
+
+  // Metadata adicional de Stripe
+  metadata    Json?
+
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  // Relations
+  producto    BillingProduct  @relation(fields: [productoId], references: [id], onDelete: Cascade)
+  subscriptions Subscription[]
+
+  @@index([productoId])
+  @@index([activo])
+  @@map("billing_prices")
+}
+
+/// BillingCustomer - Cliente de Stripe vinculado a una Empresa
+/// Se crea cuando la empresa inicia el proceso de suscripción
+model BillingCustomer {
+  id              String  @id // Stripe customer ID (cus_xxx)
+  empresaId       String  @unique
+
+  // Información de facturación
+  email           String  @db.VarChar(255) // Email de facturación
+  nombre          String? @db.VarChar(255) // Nombre para facturas
+
+  // Dirección de facturación (opcional)
+  direccion       Json?   // { line1, line2, city, state, postal_code, country }
+
+  // Número de IVA/CIF para facturas
+  taxId           String? @db.VarChar(50)
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  empresa         Empresa @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  subscriptions   Subscription[]
+
+  @@index([empresaId])
+  @@map("billing_customers")
+}
+
+/// Subscription - Suscripciones de empresas
+/// Sincronizada con Stripe via webhooks
+model Subscription {
+  id                  String             @id // Stripe subscription ID (sub_xxx)
+  empresaId           String
+  customerId          String
+  priceId             String
+
+  // Estado de la suscripción
+  status              SubscriptionStatus @default(active)
+
+  // Fechas del ciclo
+  currentPeriodStart  DateTime
+  currentPeriodEnd    DateTime
+
+  // Periodo de prueba
+  trialStart          DateTime?
+  trialEnd            DateTime?
+
+  // Cancelación
+  cancelAtPeriodEnd   Boolean            @default(false) // Si se cancela al final del periodo
+  canceledAt          DateTime?
+
+  // Metadata
+  metadata            Json?
+
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+
+  // Relations
+  empresa             Empresa            @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  customer            BillingCustomer    @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  price               BillingPrice       @relation(fields: [priceId], references: [id], onDelete: Cascade)
+
+  @@index([empresaId])
+  @@index([customerId])
+  @@index([priceId])
+  @@index([status])
+  @@map("subscriptions")
 }

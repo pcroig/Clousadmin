@@ -3,7 +3,7 @@
  * Genera hashes SHA-256 para verificación de integridad de documentos
  */
 
-import { createHash } from 'crypto';
+import { createHash, randomBytes } from 'crypto';
 
 /**
  * Genera hash SHA-256 de un buffer (documento)
@@ -53,7 +53,13 @@ export function generarHashString(contenido: string): string {
  * ```
  */
 export function generarHashObjeto(objeto: Record<string, unknown>): string {
-  const jsonString = JSON.stringify(objeto, Object.keys(objeto).sort());
+  // Crear objeto ordenado determinísticamente para garantizar hash consistente
+  const sortedKeys = Object.keys(objeto).sort();
+  const sortedObj: Record<string, unknown> = {};
+  for (const key of sortedKeys) {
+    sortedObj[key] = objeto[key];
+  }
+  const jsonString = JSON.stringify(sortedObj);
   return generarHashString(jsonString);
 }
 
@@ -98,6 +104,7 @@ export function verificarHash(hash1: string, hash2: string): boolean {
  */
 export function generarIdUnico(): string {
   const timestamp = Date.now();
-  const random = Math.random().toString(36).substring(2, 15);
+  // Usar randomBytes para generación criptográficamente segura
+  const random = randomBytes(8).toString('hex');
   return `${timestamp}-${random}`;
 }

@@ -31,8 +31,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    console.log('[API nominas/upload] POST');
-
     // Obtener form data
     const formData = await req.formData();
     const files = formData.getAll('nominas') as File[];
@@ -53,10 +51,6 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
-
-    console.log(
-      `[API nominas/upload] ${files.length} archivo(s) para ${mes}/${anio}`
-    );
 
     // Validación de archivos
     for (const file of files) {
