@@ -203,10 +203,19 @@ export async function generarDocumentoDesdePlantilla(
     console.log(`[Generar] Variables encontradas: ${variablesEnPlantilla.length}`);
 
     // 5. Resolver todas las variables usando el sistema de IA
+    // Obtener salario del contrato más reciente
+    const contratoActual = empleado.contratos?.[0];
+    const salarioBrutoAnual = contratoActual?.salarioBrutoAnual
+      ? Number(contratoActual.salarioBrutoAnual)
+      : undefined;
+    const salarioBrutoMensual = salarioBrutoAnual
+      ? Math.round((salarioBrutoAnual / 12) * 100) / 100
+      : undefined;
+
     const empleadoData: DatosEmpleado = {
       ...empleado,
-      salarioBrutoAnual: empleado.salarioBrutoAnual ? Number(empleado.salarioBrutoAnual) : undefined,
-      salarioBrutoMensual: empleado.salarioBrutoMensual ? Number(empleado.salarioBrutoMensual) : undefined,
+      salarioBrutoAnual,
+      salarioBrutoMensual,
       empresa: empleado.empresa,
     };
 

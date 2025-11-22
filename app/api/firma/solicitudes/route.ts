@@ -10,6 +10,7 @@ import {
   listarSolicitudesFirma,
   type CrearSolicitudFirmaInput,
 } from '@/lib/firma-digital/db-helpers';
+import { getClientIP, rateLimitApiWrite } from '@/lib/rate-limit';
 
 /**
  * GET /api/firma/solicitudes - Listar solicitudes de firma
@@ -87,6 +88,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Rate limiting
+    const clientIP = getClientIP(request.headers);
+    const rateIdentifier = `${session.user.empresaId}:${session.user.id}:${clientIP}:firma-solicitudes`;
+    const rateResult = await rateLimitApiWrite(rateIdentifier);
+
+    if (!rateResult.success) {
+      return NextResponse.json(
+        {
+          error: 'Demasiadas solicitudes. Intente de nuevo más tarde.',
+          retryAfter: rateResult.retryAfter,
+        },
+        { status: 429 }
+      );
+    }
+
     const body = await request.json();
 
     // Validaciones
@@ -157,11 +173,29 @@ export async function POST(request: NextRequest) {
           { status: 400 }
         );
       }
-      const paginaNormalizada = pagina === -1 ? -1 : Math.max(1, Math.floor(pagina));
+
+      // Validar rangos razonables (PDF estándar A4: ~595x842 puntos)
+      // x, y deben estar entre 0 y 1000 (margen amplio para diferentes tamaños)
+      if (x < 0 || x > 1000 || y < 0 || y > 1000) {
+        return NextResponse.json(
+          { error: 'Las coordenadas x e y deben estar entre 0 y 1000' },
+          { status: 400 }
+        );
+      }
+
+      // Validar página: -1 (última página) o >= 1
+      if (pagina !== -1 && pagina < 1) {
+        return NextResponse.json(
+          { error: 'La página debe ser -1 (última) o un número mayor o igual a 1' },
+          { status: 400 }
+        );
+      }
+
+      const paginaNormalizada = pagina === -1 ? -1 : Math.floor(pagina);
       posicionFirma = {
         pagina: paginaNormalizada,
-        x,
-        y,
+        x: Math.round(x),
+        y: Math.round(y),
       };
     }
 

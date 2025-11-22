@@ -440,13 +440,10 @@ export async function resolverVariables(
 
 /**
  * Limpiar cache de variables (útil para testing o cuando se actualiza el schema)
+ * Nota: El cache de Redis se limpia automáticamente según TTL configurado
  */
 export async function limpiarCacheVariables(): Promise<void> {
+  const cacheSize = memoryCache.size;
   memoryCache.clear();
-  // Limpiar Redis (solo variables)
-  const keys = await redisCache.get<string[]>('variable:*');
-  if (keys && keys.length > 0) {
-    await Promise.all(keys.map((key) => redisCache.del(key)));
-  }
-  console.log('[Cache] Cache de variables limpiado');
+  console.log(`[Cache] Cache de variables limpiado (${cacheSize} entradas eliminadas)`);
 }
