@@ -8,11 +8,10 @@ import { FichajesClient } from '@/app/(dashboard)/hr/horario/fichajes/fichajes-c
 import { getSession } from '@/lib/auth';
 import { UsuarioRol } from '@/lib/constants/enums';
 
-export default async function ManagerFichajesPage({
-  searchParams,
-}: {
+export default async function ManagerFichajesPage(props: {
   searchParams: Promise<{ estado?: string }>;
 }) {
+  const searchParams = await props.searchParams;
   const session = await getSession();
 
   if (!session || session.user.rol !== UsuarioRol.manager) {

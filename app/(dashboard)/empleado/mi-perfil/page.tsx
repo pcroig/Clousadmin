@@ -1,10 +1,9 @@
 import { redirect } from 'next/navigation';
 
-export default function MiPerfilPage({
-  searchParams,
-}: {
-  searchParams?: { modal?: string };
+export default async function MiPerfilPage(props: {
+  searchParams: Promise<{ modal?: string }>;
 }) {
+  const searchParams = await props.searchParams;
   const modal = searchParams?.modal ? `?modal=${searchParams.modal}` : '';
   redirect(`/empleado/mi-espacio/datos${modal}`);
 }

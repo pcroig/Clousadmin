@@ -10,11 +10,10 @@ import { UsuarioRol } from '@/lib/constants/enums';
 import { FichajesClient } from './fichajes-client';
 
 
-export default async function FichajesPage({
-  searchParams,
-}: {
+export default async function FichajesPage(props: {
   searchParams: Promise<{ estado?: string }>;
 }) {
+  const searchParams = await props.searchParams;
   const session = await getSession();
 
   if (!session || session.user.rol !== UsuarioRol.hr_admin) {

@@ -12,11 +12,10 @@ import { prisma } from '@/lib/prisma';
 import { MiEspacioDatosClient } from './datos-client';
 
 
-export default async function MiEspacioDatosPage({
-  searchParams,
-}: {
-  searchParams?: Promise<{ modal?: string }>;
+export default async function MiEspacioDatosPage(props: {
+  searchParams: Promise<{ modal?: string }>;
 }) {
+  const searchParams = await props.searchParams;
   const session = await getSession();
 
   if (!session || session.user.rol === UsuarioRol.hr_admin) {

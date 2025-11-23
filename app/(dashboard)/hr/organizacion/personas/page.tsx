@@ -13,11 +13,10 @@ import { PersonasClient } from './personas-client';
 
 
 // Server Component
-export default async function PersonasPage({
-  searchParams,
-}: {
-  searchParams?: { panel?: string; denunciaId?: string };
+export default async function PersonasPage(props: {
+  searchParams: Promise<{ panel?: string; denunciaId?: string }>;
 }) {
+  const searchParams = await props.searchParams;
   const session = await getSession();
 
   if (!session || session.user.rol !== UsuarioRol.hr_admin) {

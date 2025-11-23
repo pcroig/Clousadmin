@@ -12,11 +12,10 @@ import { prisma } from '@/lib/prisma';
 import type { TipoNotificacion } from '@/lib/notificaciones';
 import type { NotificacionUI } from '@/types/Notificacion';
 
-export default async function ManagerBandejaEntradaPage({
-  searchParams,
-}: {
-  searchParams?: { tab?: string };
+export default async function ManagerBandejaEntradaPage(props: {
+  searchParams: Promise<{ tab?: string }>;
 }) {
+  const searchParams = await props.searchParams;
   const session = await getSession();
 
   if (!session || session.user.rol !== UsuarioRol.manager) {

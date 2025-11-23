@@ -10,11 +10,10 @@ import { UsuarioRol } from '@/lib/constants/enums';
 import { AusenciasClient } from './ausencias-client';
 
 
-export default async function AusenciasPage({
-  searchParams,
-}: {
-  searchParams?: { panel?: string };
+export default async function AusenciasPage(props: {
+  searchParams: Promise<{ panel?: string }>;
 }) {
+  const searchParams = await props.searchParams;
   const session = await getSession();
 
   if (!session || session.user.rol !== UsuarioRol.hr_admin) {

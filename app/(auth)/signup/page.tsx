@@ -11,8 +11,9 @@ interface SignupPageProps {
   searchParams: Promise<{ token?: string }>;
 }
 
-export default async function SignupPage({ searchParams }: SignupPageProps) {
-  const params = await searchParams;
+export default async function SignupPage(props: SignupPageProps) {
+  const searchParams = await props.searchParams;
+  const params = searchParams;
   const token = params.token;
 
   console.log('[SignupPage] Token recibido:', token?.slice(0, 20) + '...');
