@@ -9,11 +9,8 @@ import { prisma } from '@/lib/prisma';
 
 import { NominaDetailsClient } from './nomina-details-client';
 
-export default async function NominaDetailsPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
+export default async function NominaDetailsPage(context: { params: Promise<{ id: string }> }) {
+    const params = await context.params;
   const session = await getSession();
 
   if (!session || !['hr_admin', 'platform_admin'].includes(session.user.rol)) {

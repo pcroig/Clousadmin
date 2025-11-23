@@ -11,11 +11,8 @@ import { obtenerOnboardingConfig, type OnboardingConfigData } from '@/lib/onboar
 
 import { OnboardingForm } from './onboarding-form';
 
-export default async function OnboardingPage({
-  params,
-}: {
-  params: Promise<{ token: string }>;
-}) {
+export default async function OnboardingPage(context: { params: Promise<{ token: string }> }) {
+    const params = await context.params;
   const { token } = await params;
   const { valido, onboarding, error } = await verificarTokenOnboarding(token);
   let onboardingConfig: OnboardingConfigData | null = null;

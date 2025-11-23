@@ -60,7 +60,7 @@ export interface DiasLaborables {
   domingo: boolean;
 }
 
-const DIAS_LABORABLES_DEFAULT: DiasLaborables = {
+export const DIAS_LABORABLES_DEFAULT: DiasLaborables = {
   lunes: true,
   martes: true,
   miercoles: true,

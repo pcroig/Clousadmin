@@ -12,11 +12,8 @@ import { prisma } from '@/lib/prisma';
 import { CarpetaDetailClient } from './carpeta-detail-client';
 
 
-export default async function HRCarpetaDetailPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
+export default async function HRCarpetaDetailPage(context: { params: Promise<{ id: string }> }) {
+    const params = await context.params;
   const session = await getSession();
 
   if (!session || session.user.rol !== UsuarioRol.hr_admin) {
