@@ -58,3 +58,4 @@ export async function ensureEmpresaActivoColumn(): Promise<void> {
   await empresaActivoEnsuring;
 }
 
+

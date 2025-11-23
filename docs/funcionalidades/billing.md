@@ -141,3 +141,4 @@ Endpoint: `POST /api/webhooks/stripe`
 - Automatizar downgrade cuando se exceden límites (gracia configurable).
 - Reportes PDF de facturación mensual.
 
+

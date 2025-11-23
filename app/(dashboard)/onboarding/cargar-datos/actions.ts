@@ -10,8 +10,11 @@ import { z } from 'zod';
 
 import { getSession } from '@/lib/auth';
 import { UsuarioRol } from '@/lib/constants/enums';
+import { DIAS_LABORABLES_DEFAULT } from '@/lib/calculos/dias-laborables';
 import { getBaseUrl } from '@/lib/email';
 import { crearInvitacion } from '@/lib/invitaciones';
+import { persistDiasLaborables } from '@/lib/empresa/calendario-laboral';
+import { DEFAULT_JORNADA_FORM_VALUES } from '@/lib/jornadas/defaults';
 import { prisma, Prisma } from '@/lib/prisma';
 import {
   calendarioJornadaOnboardingSchema,
@@ -365,32 +368,37 @@ export async function configurarCalendarioYJornadaAction(input: z.infer<typeof c
     }
 
     const validatedData = calendarioJornadaOnboardingSchema.parse(input);
-    const { diasLaborables, jornada } = validatedData;
+    const normalizedDias = validatedData.diasLaborables ?? DIAS_LABORABLES_DEFAULT;
+    const normalizedJornada = {
+      nombre: validatedData.jornada.nombre?.trim() || DEFAULT_JORNADA_FORM_VALUES.nombre,
+      tipo: validatedData.jornada.tipo,
+      horasSemanales: validatedData.jornada.horasSemanales || DEFAULT_JORNADA_FORM_VALUES.horasSemanales,
+      limiteInferior:
+        validatedData.jornada.tipo === 'flexible'
+          ? validatedData.jornada.limiteInferior || DEFAULT_JORNADA_FORM_VALUES.limiteInferior
+          : undefined,
+      limiteSuperior:
+        validatedData.jornada.tipo === 'flexible'
+          ? validatedData.jornada.limiteSuperior || DEFAULT_JORNADA_FORM_VALUES.limiteSuperior
+          : undefined,
+      horaEntrada:
+        validatedData.jornada.tipo === 'fija'
+          ? validatedData.jornada.horaEntrada || DEFAULT_JORNADA_FORM_VALUES.horaEntrada
+          : validatedData.jornada.horaEntrada || DEFAULT_JORNADA_FORM_VALUES.horaEntrada,
+      horaSalida:
+        validatedData.jornada.tipo === 'fija'
+          ? validatedData.jornada.horaSalida || DEFAULT_JORNADA_FORM_VALUES.horaSalida
+          : validatedData.jornada.horaSalida || DEFAULT_JORNADA_FORM_VALUES.horaSalida,
+    };
 
     const jornadaCreada = await prisma.$transaction(async (tx) => {
-      const empresa = await tx.empresa.findUnique({
-        where: { id: session.user.empresaId },
-        select: { config: true },
-      });
+      await persistDiasLaborables(tx, session.user.empresaId, normalizedDias);
 
-      const configActual = empresa?.config as Prisma.JsonValue;
-      const nuevaConfig: Prisma.JsonValue = {
-        ...(typeof configActual === 'object' && configActual !== null ? configActual : {}),
-        diasLaborables,
-      };
-
-      await tx.empresa.update({
-        where: { id: session.user.empresaId },
-        data: {
-          config: nuevaConfig as Prisma.InputJsonValue,
-        },
-      });
-
-      const configJornada = buildJornadaConfig(jornada.tipo, diasLaborables, {
-        horaEntrada: jornada.horaEntrada,
-        horaSalida: jornada.horaSalida,
-        limiteInferior: jornada.limiteInferior,
-        limiteSuperior: jornada.limiteSuperior,
+      const configJornada = buildJornadaConfig(normalizedJornada.tipo, normalizedDias, {
+        horaEntrada: normalizedJornada.horaEntrada,
+        horaSalida: normalizedJornada.horaSalida,
+        limiteInferior: normalizedJornada.limiteInferior,
+        limiteSuperior: normalizedJornada.limiteSuperior,
       });
 
       const jornadaExistente = await tx.jornada.findFirst({
@@ -401,8 +409,8 @@ export async function configurarCalendarioYJornadaAction(input: z.infer<typeof c
       });
 
       const dataJornada = {
-        nombre: jornada.nombre,
-        horasSemanales: jornada.horasSemanales,
+        nombre: normalizedJornada.nombre,
+        horasSemanales: normalizedJornada.horasSemanales,
         config: toJsonValue(configJornada),
         esPredefinida: true,
         activa: true,

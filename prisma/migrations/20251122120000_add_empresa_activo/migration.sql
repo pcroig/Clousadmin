@@ -2,3 +2,4 @@
 ALTER TABLE "empresas"
 ADD COLUMN "activo" BOOLEAN NOT NULL DEFAULT TRUE;
 
+

@@ -6,3 +6,4 @@ UPDATE "empresas"
 SET "activo" = TRUE
 WHERE "activo" IS NULL;
 
+

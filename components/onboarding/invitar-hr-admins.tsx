@@ -39,6 +39,16 @@ interface ApiEmpleado {
   apellidos?: string | null;
   email?: string | null;
   usuario?: {
+    rol?: string;
+  } | null;
+}
+
+interface ApiEmpleado {
+  id: string;
+  nombre?: string | null;
+  apellidos?: string | null;
+  email?: string | null;
+  usuario?: {
     rol?: string | null;
   } | null;
 }

@@ -4,6 +4,7 @@ import { forwardRef, useEffect, useImperativeHandle, useState } from 'react';
 import { toast } from 'sonner';
 
 import { configurarCalendarioYJornadaAction } from '@/app/(dashboard)/onboarding/cargar-datos/actions';
+import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -16,6 +17,8 @@ import {
 } from '@/components/ui/select';
 
 import type { DiasLaborables } from '@/lib/calculos/dias-laborables';
+import { DIAS_LABORABLES_DEFAULT } from '@/lib/calculos/dias-laborables';
+import { DEFAULT_JORNADA_FORM_VALUES } from '@/lib/jornadas/defaults';
 import type { CalendarioJornadaOnboardingInput } from '@/lib/validaciones/schemas';
 
 type DiaKey = keyof DiasLaborables;
@@ -30,16 +33,6 @@ const DIA_LABELS: Array<{ key: DiaKey; label: string }> = [
   { key: 'domingo', label: 'Domingo' },
 ];
 
-const DEFAULT_DIAS: DiasLaborables = {
-  lunes: true,
-  martes: true,
-  miercoles: true,
-  jueves: true,
-  viernes: true,
-  sabado: false,
-  domingo: false,
-};
-
 interface CalendarioJornadaFormProps {
   onSuccess?: () => void;
 }
@@ -52,14 +45,21 @@ export const CalendarioJornadaForm = forwardRef<
   CalendarioJornadaFormHandle,
   CalendarioJornadaFormProps
 >(function CalendarioJornadaForm({ onSuccess }, ref) {
-  const [diasLaborables, setDiasLaborables] = useState<DiasLaborables>(DEFAULT_DIAS);
-  const [nombre, setNombre] = useState('Jornada estándar');
-  const [tipo, setTipo] = useState<'flexible' | 'fija'>('flexible');
-  const [horasSemanales, setHorasSemanales] = useState('40');
-  const [limiteInferior, setLimiteInferior] = useState('07:00');
-  const [limiteSuperior, setLimiteSuperior] = useState('21:00');
-  const [horaEntrada, setHoraEntrada] = useState('09:00');
-  const [horaSalida, setHoraSalida] = useState('18:00');
+  const createDefaultDias = () => ({ ...DIAS_LABORABLES_DEFAULT });
+  const [diasLaborables, setDiasLaborables] = useState<DiasLaborables>(createDefaultDias());
+  const [nombre, setNombre] = useState(DEFAULT_JORNADA_FORM_VALUES.nombre);
+  const [tipo, setTipo] = useState<'flexible' | 'fija'>(DEFAULT_JORNADA_FORM_VALUES.tipo);
+  const [horasSemanales, setHorasSemanales] = useState(
+    DEFAULT_JORNADA_FORM_VALUES.horasSemanales.toString()
+  );
+  const [limiteInferior, setLimiteInferior] = useState(
+    DEFAULT_JORNADA_FORM_VALUES.limiteInferior
+  );
+  const [limiteSuperior, setLimiteSuperior] = useState(
+    DEFAULT_JORNADA_FORM_VALUES.limiteSuperior
+  );
+  const [horaEntrada, setHoraEntrada] = useState(DEFAULT_JORNADA_FORM_VALUES.horaEntrada);
+  const [horaSalida, setHoraSalida] = useState(DEFAULT_JORNADA_FORM_VALUES.horaSalida);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -101,7 +101,7 @@ export const CalendarioJornadaForm = forwardRef<
             const nuevoTipo = config.tipo === 'fija' ? 'fija' : 'flexible';
             setTipo(nuevoTipo);
 
-            const updatedDias: DiasLaborables = { ...DEFAULT_DIAS };
+            const updatedDias: DiasLaborables = createDefaultDias();
             DIA_LABELS.forEach(({ key }) => {
               const diaConfig = config[key];
               if (diaConfig && typeof diaConfig === 'object' && 'activo' in (diaConfig as Record<string, unknown>)) {
@@ -145,6 +145,18 @@ export const CalendarioJornadaForm = forwardRef<
     };
   }, []);
 
+  const restaurarValores = () => {
+    if (loading) return;
+    setDiasLaborables(createDefaultDias());
+    setNombre(DEFAULT_JORNADA_FORM_VALUES.nombre);
+    setTipo(DEFAULT_JORNADA_FORM_VALUES.tipo);
+    setHorasSemanales(DEFAULT_JORNADA_FORM_VALUES.horasSemanales.toString());
+    setLimiteInferior(DEFAULT_JORNADA_FORM_VALUES.limiteInferior);
+    setLimiteSuperior(DEFAULT_JORNADA_FORM_VALUES.limiteSuperior);
+    setHoraEntrada(DEFAULT_JORNADA_FORM_VALUES.horaEntrada);
+    setHoraSalida(DEFAULT_JORNADA_FORM_VALUES.horaSalida);
+  };
+
   const guardarConfiguracion = async () => {
     if (saving) return false;
 
@@ -165,13 +177,19 @@ export const CalendarioJornadaForm = forwardRef<
       const payload: CalendarioJornadaOnboardingInput = {
         diasLaborables,
         jornada: {
-          nombre: nombre.trim() || 'Jornada estándar',
+          nombre: nombre.trim() || DEFAULT_JORNADA_FORM_VALUES.nombre,
           tipo,
-          horasSemanales: horas,
-          limiteInferior: tipo === 'flexible' ? limiteInferior : undefined,
-          limiteSuperior: tipo === 'flexible' ? limiteSuperior : undefined,
-          horaEntrada: tipo === 'fija' ? horaEntrada : horaEntrada,
-          horaSalida: tipo === 'fija' ? horaSalida : horaSalida,
+          horasSemanales: horas || DEFAULT_JORNADA_FORM_VALUES.horasSemanales,
+          limiteInferior:
+            tipo === 'flexible'
+              ? limiteInferior || DEFAULT_JORNADA_FORM_VALUES.limiteInferior
+              : undefined,
+          limiteSuperior:
+            tipo === 'flexible'
+              ? limiteSuperior || DEFAULT_JORNADA_FORM_VALUES.limiteSuperior
+              : undefined,
+          horaEntrada: horaEntrada || DEFAULT_JORNADA_FORM_VALUES.horaEntrada,
+          horaSalida: horaSalida || DEFAULT_JORNADA_FORM_VALUES.horaSalida,
         },
       };
 
@@ -195,12 +213,23 @@ export const CalendarioJornadaForm = forwardRef<
 
   return (
     <div className="space-y-6">
-      <div>
-        <h3 className="text-lg font-semibold text-gray-900">Calendario y jornada base</h3>
-        <p className="text-sm text-gray-500">
-          Te proponemos una configuración inicial para que no empieces desde cero. Puedes modificarla
-          ahora o más tarde desde el panel de RRHH.
-        </p>
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div>
+          <h3 className="text-lg font-semibold text-gray-900">Calendario y jornada base</h3>
+          <p className="text-sm text-gray-500">
+            Te proponemos una configuración inicial para que no empieces desde cero. Puedes
+            modificarla ahora o más tarde desde el panel de RRHH.
+          </p>
+        </div>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={restaurarValores}
+          disabled={loading}
+        >
+          Restaurar valores recomendados
+        </Button>
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">
