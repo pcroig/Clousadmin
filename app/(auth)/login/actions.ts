@@ -75,7 +75,6 @@ export async function loginAction(email: string, password: string): Promise<Logi
       return {
         success: false,
         error: 'Credenciales incorrectas',
-        emailNoExiste: false, // No revelar que el email no existe
       };
     }
 
