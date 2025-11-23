@@ -21,8 +21,9 @@ const AsignarComplementoSchema = z.object({
 // Lista todos los complementos asignados a un empleado
 export async function GET(
   req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  context: { params: Promise<{ id: string }> }
 ) {
+    const params = await context.params;
   try {
     const session = await getSession();
     if (!session) {
@@ -90,8 +91,9 @@ export async function GET(
 // Asigna un tipo de complemento a un empleado
 export async function POST(
   req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  context: { params: Promise<{ id: string }> }
 ) {
+    const params = await context.params;
   try {
     const session = await getSession();
     if (!session) {

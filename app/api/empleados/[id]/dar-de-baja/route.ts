@@ -29,8 +29,9 @@ const darDeBajaSchema = z.object({
 // POST /api/empleados/[id]/dar-de-baja - Dar de baja empleado (solo HR Admin)
 export async function POST(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  context: { params: Promise<{ id: string }> }
 ) {
+    const params = await context.params;
   try {
     // Verificar autenticación y rol HR Admin
     const authResult = await requireAuthAsHR(request);

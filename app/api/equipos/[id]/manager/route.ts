@@ -16,7 +16,8 @@ type RouteParams = {
 };
 
 // PATCH /api/equipos/[id]/manager - Change team manager
-export async function PATCH(request: NextRequest, { params }: RouteParams) {
+export async function PATCH(request: NextRequest, context: RouteParams) {
+  const params = await context.params;
   try {
     const session = await getSession();
 
@@ -24,7 +25,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
 
-    const { id: equipoId } = await params;
+    const { id: equipoId } = params;
     const body = await request.json();
     const { managerId } = body;
 

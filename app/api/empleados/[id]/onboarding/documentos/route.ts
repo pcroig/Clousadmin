@@ -28,14 +28,15 @@ interface RouteParams {
 }
 
 // POST /api/empleados/[id]/onboarding/documentos - Subir documento de onboarding (HR)
-export async function POST(req: NextRequest, { params }: RouteParams) {
+export async function POST(req: NextRequest, context: RouteParams) {
+  const params = await context.params;
   try {
     // Verificar autenticación y rol HR Admin
     const authResult = await requireAuthAsHR(req);
     if (authResult instanceof Response) return authResult;
     const { session } = authResult;
 
-    const { id: empleadoId } = await params;
+    const { id: empleadoId } = params;
 
     // Verificar que el empleado existe y pertenece a la misma empresa
     const empleado = await prisma.empleado.findUnique({
@@ -171,14 +172,15 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
 }
 
 // GET /api/empleados/[id]/onboarding/documentos - Listar documentos de onboarding (HR)
-export async function GET(req: NextRequest, { params }: RouteParams) {
+export async function GET(req: NextRequest, context: RouteParams) {
+  const params = await context.params;
   try {
     // Verificar autenticación y rol HR Admin
     const authResult = await requireAuthAsHR(req);
     if (authResult instanceof Response) return authResult;
     const { session } = authResult;
 
-    const { id: empleadoId } = await params;
+    const { id: empleadoId } = params;
 
     // Verificar que el empleado existe y pertenece a la misma empresa
     const empleado = await prisma.empleado.findUnique({

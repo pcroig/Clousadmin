@@ -16,7 +16,8 @@ type RouteParams = {
 };
 
 // PATCH /api/equipos/[id] - Update team
-export async function PATCH(request: NextRequest, { params }: RouteParams) {
+export async function PATCH(request: NextRequest, context: RouteParams) {
+  const params = await context.params;
   try {
     const session = await getSession();
 
@@ -24,7 +25,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
 
-    const { id } = await params;
+    const { id } = params;
     const body = await request.json();
     const { nombre, descripcion, sedeId } = body;
 
@@ -104,7 +105,8 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 }
 
 // DELETE /api/equipos/[id] - Delete team
-export async function DELETE(request: NextRequest, { params }: RouteParams) {
+export async function DELETE(request: NextRequest, context: RouteParams) {
+  const params = await context.params;
   try {
     const session = await getSession();
 
@@ -112,7 +114,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
 
-    const { id } = await params;
+    const { id } = params;
 
     // Verify team belongs to user's company
     const existingTeam = await prisma.equipo.findFirst({

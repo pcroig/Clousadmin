@@ -56,8 +56,9 @@ const empleadoUpdateSchema = z.object({
 // GET /api/empleados/[id] - Obtener empleado por ID
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  context: { params: Promise<{ id: string }> }
 ) {
+    const params = await context.params;
   try {
     // Verificar autenticación
     const authResult = await requireAuth(request);
@@ -120,8 +121,9 @@ export async function GET(
 // PATCH /api/empleados/[id] - Actualizar empleado (HR Admin o Manager)
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  context: { params: Promise<{ id: string }> }
 ) {
+    const params = await context.params;
   try {
     // Verificar autenticación y rol HR Admin o Manager
     const authResult = await requireAuthAsHROrManager(request);

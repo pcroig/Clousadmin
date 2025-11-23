@@ -18,14 +18,15 @@ interface RouteParams {
 }
 
 // GET /api/puestos/[id]/documentos - Listar documentos del puesto
-export async function GET(request: NextRequest, { params }: RouteParams) {
+export async function GET(request: NextRequest, context: RouteParams) {
+  const params = await context.params;
   try {
     const session = await getSession();
     if (!session) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
 
-    const { id } = await params;
+    const { id } = params;
 
     // Verificar que el puesto pertenece a la empresa
     const puesto = await prisma.puesto.findFirst({
@@ -78,14 +79,15 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 }
 
 // POST /api/puestos/[id]/documentos - Subir documento al puesto
-export async function POST(request: NextRequest, { params }: RouteParams) {
+export async function POST(request: NextRequest, context: RouteParams) {
+  const params = await context.params;
   try {
     const session = await getSession();
     if (!session || session.user.rol !== UsuarioRol.hr_admin) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
     }
 
-    const { id: puestoId } = await params;
+    const { id: puestoId } = params;
 
     // Verificar que el puesto pertenece a la empresa
     const puesto = await prisma.puesto.findFirst({
@@ -170,14 +172,15 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 }
 
 // DELETE /api/puestos/[id]/documentos - Eliminar documento del puesto
-export async function DELETE(request: NextRequest, { params }: RouteParams) {
+export async function DELETE(request: NextRequest, context: RouteParams) {
+  const params = await context.params;
   try {
     const session = await getSession();
     if (!session || session.user.rol !== UsuarioRol.hr_admin) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
     }
 
-    const { id: puestoId } = await params;
+    const { id: puestoId } = params;
     const { searchParams } = new URL(request.url);
     const documentoId = searchParams.get('documentoId');
 

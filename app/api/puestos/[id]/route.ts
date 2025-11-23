@@ -21,14 +21,15 @@ const puestoUpdateSchema = z.object({
 });
 
 // GET /api/puestos/[id] - Obtener detalles de un puesto
-export async function GET(request: NextRequest, { params }: RouteParams) {
+export async function GET(request: NextRequest, context: RouteParams) {
+  const params = await context.params;
   try {
     const session = await getSession();
     if (!session) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
 
-    const { id } = await params;
+    const { id } = params;
 
     const puesto = await prisma.puesto.findFirst({
       where: {
@@ -84,14 +85,15 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 }
 
 // PATCH /api/puestos/[id] - Actualizar un puesto
-export async function PATCH(request: NextRequest, { params }: RouteParams) {
+export async function PATCH(request: NextRequest, context: RouteParams) {
+  const params = await context.params;
   try {
     const session = await getSession();
     if (!session || session.user.rol !== UsuarioRol.hr_admin) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
     }
 
-    const { id } = await params;
+    const { id } = params;
     const body = await request.json();
     const validatedData = puestoUpdateSchema.parse(body);
 
@@ -155,14 +157,15 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 }
 
 // DELETE /api/puestos/[id] - Eliminar un puesto (soft delete)
-export async function DELETE(request: NextRequest, { params }: RouteParams) {
+export async function DELETE(request: NextRequest, context: RouteParams) {
+  const params = await context.params;
   try {
     const session = await getSession();
     if (!session || session.user.rol !== UsuarioRol.hr_admin) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
     }
 
-    const { id } = await params;
+    const { id } = params;
 
     // Verificar que el puesto existe y pertenece a la empresa
     const puesto = await prisma.puesto.findFirst({

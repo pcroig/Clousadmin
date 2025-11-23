@@ -16,7 +16,8 @@ type RouteParams = {
 };
 
 // GET /api/equipos/[id]/available-members - Get employees not in this team
-export async function GET(request: NextRequest, { params }: RouteParams) {
+export async function GET(request: NextRequest, context: RouteParams) {
+  const params = await context.params;
   try {
     const session = await getSession();
 
@@ -24,7 +25,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
 
-    const { id: equipoId } = await params;
+    const { id: equipoId } = params;
 
     // Verify team belongs to user's company
     const team = await prisma.equipo.findFirst({

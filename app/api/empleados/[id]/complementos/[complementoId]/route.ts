@@ -20,8 +20,9 @@ const UpdateComplementoSchema = z.object({
 // ========================================
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: Promise<{ id: string; complementoId: string }> }
+  context: { params: Promise<{ id: string; complementoId: string }> }
 ) {
+    const params = await context.params;
   try {
     const session = await getSession();
     if (!session || !['hr_admin', 'platform_admin'].includes(session.user.rol)) {
@@ -119,8 +120,9 @@ export async function PATCH(
 // Desactiva un complemento (no lo elimina físicamente si tiene asignaciones)
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: Promise<{ id: string; complementoId: string }> }
+  context: { params: Promise<{ id: string; complementoId: string }> }
 ) {
+    const params = await context.params;
   try {
     const session = await getSession();
     if (!session || !['hr_admin', 'platform_admin'].includes(session.user.rol)) {

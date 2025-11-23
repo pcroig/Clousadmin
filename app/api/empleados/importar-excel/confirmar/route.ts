@@ -9,7 +9,7 @@ import { getSession } from '@/lib/auth';
 import { UsuarioRol } from '@/lib/constants/enums';
 import { encryptEmpleadoData } from '@/lib/empleado-crypto';
 import { invitarEmpleado } from '@/lib/invitaciones';
-import { getOrCreateDefaultJornada } from '@/lib/jornadas/get-or-create-default';
+import { getPredefinedJornada } from '@/lib/jornadas/get-or-create-default';
 import { prisma } from '@/lib/prisma';
 
 import type { EmpleadoDetectado } from '@/lib/ia/procesar-excel-empleados';
@@ -190,10 +190,7 @@ export async function POST(req: NextRequest) {
 
     console.log(`[ConfirmarImportacion] Puestos creados: ${resultados.puestosCreados}`);
 
-    const jornadaPorDefecto = await getOrCreateDefaultJornada(
-      prisma,
-      session.user.empresaId
-    );
+    const jornadaPorDefecto = await getPredefinedJornada(prisma, session.user.empresaId);
 
     // 2. Crear empleados en batches con paralelismo controlado
     const CONCURRENCY = 8; // Procesamos 8 empleados en paralelo (balance entre velocidad y carga DB)
@@ -276,7 +273,7 @@ export async function POST(req: NextRequest) {
                 puestoId: empleadoData.puesto && puestosCreados.has(empleadoData.puesto.trim())
                   ? puestosCreados.get(empleadoData.puesto.trim())
                   : null,
-                jornadaId: jornadaPorDefecto.id, // Asignar jornada por defecto
+                jornadaId: jornadaPorDefecto?.id ?? null,
                 fechaAlta: empleadoData.fechaAlta
                   ? new Date(empleadoData.fechaAlta)
                   : new Date(),

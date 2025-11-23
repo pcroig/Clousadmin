@@ -16,7 +16,8 @@ type RouteParams = {
 };
 
 // POST /api/equipos/[id]/members - Add member to team
-export async function POST(request: NextRequest, { params }: RouteParams) {
+export async function POST(request: NextRequest, context: RouteParams) {
+  const params = await context.params;
   try {
     const session = await getSession();
 
@@ -24,7 +25,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
 
-    const { id: equipoId } = await params;
+    const { id: equipoId } = params;
     const body = await request.json();
     const { empleadoId } = body;
 
@@ -121,7 +122,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 }
 
 // DELETE /api/equipos/[id]/members - Remove member from team
-export async function DELETE(request: NextRequest, { params }: RouteParams) {
+export async function DELETE(request: NextRequest, context: RouteParams) {
+  const params = await context.params;
   try {
     const session = await getSession();
 
@@ -129,7 +131,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
 
-    const { id: equipoId } = await params;
+    const { id: equipoId } = params;
     const { searchParams } = new URL(request.url);
     const empleadoId = searchParams.get('empleadoId');
 

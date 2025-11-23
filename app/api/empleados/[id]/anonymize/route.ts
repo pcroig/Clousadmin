@@ -7,8 +7,9 @@ import { prisma } from '@/lib/prisma';
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
+    const params = await context.params;
   try {
     const authResult = await requireAuthAsHR(request);
     if (authResult instanceof NextResponse) {
@@ -40,6 +41,7 @@ export async function POST(
     return handleApiError(error, 'API POST /api/empleados/[id]/anonymize');
   }
 }
+
 
 
 
