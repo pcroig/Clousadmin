@@ -31,13 +31,13 @@ export function ForgotPasswordForm() {
       });
 
       if (response.status === 429) {
-        const data = await response.json();
+        const data = await response.json() as { retryAfter?: number };
         setRateLimited(Number(data.retryAfter ?? 60));
         return;
       }
 
       if (!response.ok) {
-        const data = await response.json().catch(() => ({ error: 'error' }));
+        const data = await response.json().catch(() => ({ error: 'error' })) as { error?: string };
         setError(
           data.error === 'rate_limit'
             ? 'Demasiadas solicitudes. Intenta más tarde.'
