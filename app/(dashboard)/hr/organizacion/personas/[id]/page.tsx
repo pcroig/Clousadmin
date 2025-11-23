@@ -59,7 +59,8 @@ const serializeForClient = <T,>(value: T): T => {
   return value;
 };
 
-export default async function EmpleadoDetailPage({ params }: EmpleadoDetailPageProps) {
+export default async function EmpleadoDetailPage(props: EmpleadoDetailPageProps) {
+  const params = await props.params;
   const session = await getSession();
 
   if (!session || session.user.rol !== UsuarioRol.hr_admin) {
@@ -67,7 +68,7 @@ export default async function EmpleadoDetailPage({ params }: EmpleadoDetailPageP
   }
 
   // Await params in Next.js 15+
-  const { id } = await params;
+  const { id } = params;
 
   // Obtener empleado con todas las relaciones
   const empleado = await prisma.empleado.findUnique({

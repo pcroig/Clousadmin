@@ -12,7 +12,8 @@ interface ResetPasswordPageProps {
   params: Promise<{ token: string }>;
 }
 
-export default async function ResetPasswordPage({ params }: ResetPasswordPageProps) {
+export default async function ResetPasswordPage(props: ResetPasswordPageProps) {
+  const params = await props.params;
   const session = await getSession();
   if (session) {
     if (session.user.rol === UsuarioRol.hr_admin || session.user.rol === UsuarioRol.platform_admin) {

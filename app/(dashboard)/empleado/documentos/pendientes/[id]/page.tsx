@@ -10,10 +10,11 @@ import { UsuarioRol } from '@/lib/constants/enums';
 import { prisma } from '@/lib/prisma';
 
 interface PageProps {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }
 
-export default async function RellenarDocumentoPage({ params }: PageProps) {
+export default async function RellenarDocumentoPage(props: PageProps) {
+  const params = await props.params;
   const session = await getSession();
 
   if (!session || session.user.rol === UsuarioRol.hr_admin) {
