@@ -53,7 +53,15 @@ export default async function OnboardingSimplificadoPage(context: { params: Prom
             ) : (
               <OnboardingSimplificadoForm
                 token={token}
-                empleado={onboarding!.empleado}
+                empleado={{
+                  id: onboarding!.empleado.id,
+                  nombre: onboarding!.empleado.nombre,
+                  apellidos: onboarding!.empleado.apellidos,
+                  empresaId: onboarding!.empleado.empresaId,
+                  usuario: onboarding!.empleado.usuario ? {
+                    image: onboarding!.empleado.usuario.fotoUrl || null
+                  } : null
+                }}
                 progreso={onboarding!.progreso as unknown as ProgresoOnboardingSimplificado}
                 datosTemporales={onboarding!.datosTemporales as unknown as DatosTemporales | null}
               />
