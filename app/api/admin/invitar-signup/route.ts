@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Validar request body
-    const body = await req.json();
+    const body = await req.json() as Record<string, any>;
     const validatedData = invitacionSignupSchema.parse(body);
 
     const { email } = validatedData;

@@ -74,14 +74,14 @@ export function GestionarAusenciasModal({ open, onClose, onSaved }: GestionarAus
       // Cargar equipos
       const resEquipos = await fetch('/api/organizacion/equipos');
       if (resEquipos.ok) {
-        const dataEquipos = await resEquipos.json();
+        const dataEquipos = await resEquipos.json() as Record<string, any>;
         setEquipos(dataEquipos);
       }
       
       // Cargar configuración de calendario laboral
       const resCalendario = await fetch('/api/empresa/calendario-laboral');
       if (resCalendario.ok) {
-        const dataCalendario = await resCalendario.json();
+        const dataCalendario = await resCalendario.json() as Record<string, any>;
         if (dataCalendario.diasLaborables) {
           setDiasLaborables(dataCalendario.diasLaborables);
         }
@@ -90,7 +90,7 @@ export function GestionarAusenciasModal({ open, onClose, onSaved }: GestionarAus
       // Cargar políticas de ausencias de la empresa
       const resPoliticas = await fetch('/api/empresa/politica-ausencias');
       if (resPoliticas.ok) {
-        const dataPoliticas = await resPoliticas.json();
+        const dataPoliticas = await resPoliticas.json() as Record<string, any>;
         if (dataPoliticas.maxSolapamientoPct !== undefined) {
           setSolapamientoPct(dataPoliticas.maxSolapamientoPct.toString());
         }
@@ -139,7 +139,7 @@ export function GestionarAusenciasModal({ open, onClose, onSaved }: GestionarAus
       });
 
       if (!resPolitica.ok) {
-        const error = await resPolitica.json();
+        const error = await resPolitica.json() as Record<string, any>;
         toast.error(error.error || 'Error al guardar política');
         setCargando(false);
         return;
@@ -157,7 +157,7 @@ export function GestionarAusenciasModal({ open, onClose, onSaved }: GestionarAus
       });
 
       if (!resSaldo.ok) {
-        const error = await resSaldo.json();
+        const error = await resSaldo.json() as Record<string, any>;
         toast.error(error.error || 'Error al guardar saldo');
         setCargando(false);
         return;
@@ -186,7 +186,7 @@ export function GestionarAusenciasModal({ open, onClose, onSaved }: GestionarAus
         toast.success('Calendario laboral guardado correctamente');
         if (onSaved) onSaved();
       } else {
-        const error = await response.json();
+        const error = await response.json() as Record<string, any>;
         toast.error(error.error || 'Error al guardar calendario');
       }
     } catch (e) {
@@ -209,11 +209,11 @@ export function GestionarAusenciasModal({ open, onClose, onSaved }: GestionarAus
       });
 
       if (response.ok) {
-        const data = await response.json();
+        const data = await response.json() as Record<string, any>;
         toast.success(data.message || 'Festivos importados exitosamente');
         if (onSaved) onSaved();
       } else {
-        const error = await response.json();
+        const error = await response.json() as Record<string, any>;
         toast.error(error.error || 'Error al importar festivos');
       }
     } catch (e) {

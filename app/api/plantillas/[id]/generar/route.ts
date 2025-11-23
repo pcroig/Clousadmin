@@ -28,7 +28,7 @@ export async function POST(
     // Await params en Next.js 15+
     const { id } = await params;
 
-    const body = await request.json();
+    const body = await request.json() as Record<string, any>;
     const {
       empleadoIds,
       empleadosIds,

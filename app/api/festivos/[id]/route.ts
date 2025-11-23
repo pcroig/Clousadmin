@@ -90,7 +90,7 @@ export async function PATCH(
       return notFoundResponse('Festivo no encontrado');
     }
 
-    const body = await req.json();
+    const body = await req.json() as Record<string, any>;
     const validationResult = festivoUpdateSchema.safeParse(body);
 
     if (!validationResult.success) {

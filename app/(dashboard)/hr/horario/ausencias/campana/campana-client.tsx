@@ -78,7 +78,7 @@ export function CampanaClient({ campana: initialCampana }: CampanaClientProps) {
       const error = await reloadResponse.json().catch(() => ({ error: 'Error desconocido' }));
       throw new Error(error.error || 'No se pudo recargar la campaña');
     }
-    const updatedCampana = await reloadResponse.json();
+    const updatedCampana = await reloadResponse.json() as Record<string, any>;
     setCampana(updatedCampana);
     const hayBorrador = Boolean(updatedCampana.propuestaIA);
     setMostrarPropuesta(hayBorrador);

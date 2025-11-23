@@ -38,7 +38,7 @@ export async function POST(
     }
 
     const { id: campanaId } = await params;
-    const body = await req.json();
+    const body = await req.json() as Record<string, any>;
     const accion = body?.accion;
 
     if (!accion || !['aceptar', 'solicitar_cambio'].includes(accion)) {

@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Obtener body
-    const body = await req.json();
+    const body = await req.json() as Record<string, any>;
     const { sessionId, confirmaciones } = body;
 
     if (!sessionId) {

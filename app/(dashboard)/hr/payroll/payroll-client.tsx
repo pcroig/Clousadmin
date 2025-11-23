@@ -205,7 +205,7 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
   const fetchEventos = async () => {
     try {
       const response = await fetch('/api/nominas/eventos');
-      const data = await response.json();
+      const data = await response.json() as Record<string, any>;
       setEventos(data.eventos || []);
     } catch (error) {
       console.error('Error fetching eventos:', error);
@@ -229,7 +229,7 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
         }),
       });
 
-      const data = await response.json();
+      const data = await response.json() as Record<string, any>;
 
       if (!response.ok) {
         throw new Error(data.error || 'Error al generar evento');
@@ -281,7 +281,7 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
         }
       );
 
-      const data = await response.json();
+      const data = await response.json() as Record<string, any>;
 
       if (!response.ok) {
         throw new Error(data.error || 'Error al generar pre-nóminas');
@@ -325,7 +325,7 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
       const response = await fetch(`/api/nominas/eventos/${evento.id}/exportar`);
 
       if (!response.ok) {
-        const data = await response.json();
+        const data = await response.json() as Record<string, any>;
         throw new Error(data.error || 'Error al exportar');
       }
 
@@ -380,7 +380,7 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
           body: formData,
         });
 
-        const data = await response.json();
+        const data = await response.json() as Record<string, any>;
 
         if (!response.ok) {
           throw new Error(data.error || 'Error al importar');
@@ -441,7 +441,7 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
         method: 'POST',
       });
 
-      const data = await response.json();
+      const data = await response.json() as Record<string, any>;
 
       if (!response.ok) {
         throw new Error(data.error || 'Error al publicar');
@@ -1040,7 +1040,7 @@ function NominaDetailsPanel({
     setLoading(true);
     try {
       const response = await fetch(`/api/nominas/${nominaId}`);
-      const data = await response.json();
+      const data = await response.json() as Record<string, any>;
       if (response.ok) {
         setNomina(data);
       }
@@ -1055,7 +1055,7 @@ function NominaDetailsPanel({
     setLoadingIncidencias(true);
     try {
       const response = await fetch(`/api/nominas/${nominaId}/incidencias`);
-      const data = await response.json();
+      const data = await response.json() as Record<string, any>;
       if (response.ok) {
         setIncidencias(data.incidencias || null);
       }
@@ -1328,7 +1328,7 @@ function EventoDetailsPanel({
     setLoading(true);
     try {
       const response = await fetch(`/api/nominas/eventos/${eventoId}`);
-      const data = await response.json();
+      const data = await response.json() as Record<string, any>;
       if (response.ok) {
         // El endpoint devuelve { evento, stats }
         const eventoData = data.evento || data;

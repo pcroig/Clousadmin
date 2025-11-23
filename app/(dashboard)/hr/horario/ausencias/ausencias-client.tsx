@@ -145,7 +145,7 @@ export function AusenciasClient({}: AusenciasClientProps) {
         throw new Error('Error al cargar las ausencias');
       }
       
-      const data = await response.json();
+      const data = await response.json() as Record<string, any>;
       setAusencias(
         extractArrayFromResponse<Ausencia>(data, { key: 'ausencias' })
       );

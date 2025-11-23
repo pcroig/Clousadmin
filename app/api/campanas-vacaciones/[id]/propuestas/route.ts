@@ -35,7 +35,7 @@ export async function PATCH(
     }
 
     const { id: campanaId } = await params;
-    const body = await req.json();
+    const body = await req.json() as Record<string, any>;
     const ajustes: AjustePayload[] = Array.isArray(body.ajustes) ? body.ajustes : [];
 
     if (ajustes.length === 0) {

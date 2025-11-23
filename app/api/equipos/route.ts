@@ -70,7 +70,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
 
-    const body = await request.json();
+    const body = await request.json() as Record<string, any>;
     const { nombre, descripcion, sedeId } = body;
 
     if (!nombre || nombre.trim() === '') {

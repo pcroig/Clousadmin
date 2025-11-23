@@ -16,7 +16,7 @@ export async function POST(
     const { token } = await context.params;
 
     // Parsear body
-    const body = await req.json();
+    const body = await req.json() as Record<string, any>;
 
     // Validar datos con Zod
     const validacion = datosBancariosSchema.safeParse(body);

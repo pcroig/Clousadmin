@@ -39,7 +39,7 @@ export function MiEspacioHRClient({ empleado, usuario }: MiEspacioHRClientProps)
       });
 
       if (!response.ok) {
-        const error = await response.json();
+        const error = await response.json() as Record<string, any>;
         throw new Error(error.error || 'Error al actualizar campo');
       }
 

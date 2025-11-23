@@ -193,7 +193,7 @@ export function AnalyticsClient() {
   const fetchEquipos = useCallback(async () => {
     try {
       const response = await fetch('/api/analytics/equipos');
-      const data = await response.json();
+      const data = await response.json() as Record<string, any>;
       setEquipos(data);
     } catch (error) {
       console.error('Error fetching equipos:', error);

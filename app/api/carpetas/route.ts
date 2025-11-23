@@ -82,7 +82,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
     }
 
-    const body = await request.json();
+    const body = await request.json() as Record<string, any>;
     const { 
       nombre, 
       parentId, 

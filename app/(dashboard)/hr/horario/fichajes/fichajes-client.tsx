@@ -230,7 +230,7 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
       }
 
       const response = await fetch(`/api/fichajes?${params}`);
-      const payload = await response.json();
+      const payload = await response.json() as Record<string, any>;
 
       if (!response.ok) {
         const errorMessage =
@@ -332,7 +332,7 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
         return;
       }
 
-      const data = await response.json();
+      const data = await response.json() as Record<string, any>;
       const eventos = Array.isArray(data.eventos) ? data.eventos : [];
       if (eventos.length === 0) {
         return;
@@ -372,7 +372,7 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
         toast.success('Fichaje actualizado correctamente');
         fetchFichajes(); // Recargar fichajes
       } else {
-        const error = await response.json();
+        const error = await response.json() as Record<string, any>;
         toast.error(error.error || 'Error al actualizar fichaje');
       }
     } catch (error) {

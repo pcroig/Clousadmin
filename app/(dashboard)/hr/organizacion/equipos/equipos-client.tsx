@@ -66,7 +66,7 @@ export function EquiposClient({ equipos: initialEquipos }: EquiposClientProps) {
       if (!response.ok) {
         throw new Error('Error al cargar equipos');
       }
-      const data = await response.json();
+      const data = await response.json() as Record<string, any>;
 
       // Transform data to match the expected format
       interface ApiEquipo {

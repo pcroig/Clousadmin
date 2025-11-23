@@ -171,7 +171,7 @@ export function FichajesEmpleadoClient({ balanceInicial }: Props) {
     setLoading(true);
     try {
       const response = await fetch('/api/fichajes');
-      const data = await response.json();
+      const data = await response.json() as Record<string, any>;
       
       // Agrupar fichajes en jornadas
       const jornadasAgrupadas = agruparPorJornada(

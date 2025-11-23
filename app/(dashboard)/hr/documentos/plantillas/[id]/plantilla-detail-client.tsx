@@ -291,7 +291,7 @@ export function PlantillaDetailClient({ plantilla }: PlantillaDetailClientProps)
       const res = await fetch(
         `/api/plantillas/${plantilla.id}/previsualizar?empleadoId=${empleadoId}`
       );
-      const data = await res.json();
+      const data = await res.json() as Record<string, any>;
 
       if (data.success && data.previewUrl) {
         setPreviewUrl(data.previewUrl);
@@ -340,7 +340,7 @@ export function PlantillaDetailClient({ plantilla }: PlantillaDetailClientProps)
 
     try {
       const res = await fetch('/api/empleados?activos=true');
-      const data = await res.json();
+      const data = await res.json() as Record<string, any>;
 
       const listaEmpleados = normalizarRespuestaEmpleados(data).map(mapearEmpleado);
       setEmpleados(listaEmpleados);
@@ -401,7 +401,7 @@ export function PlantillaDetailClient({ plantilla }: PlantillaDetailClientProps)
         }),
       });
 
-      const data = await res.json();
+      const data = await res.json() as Record<string, any>;
 
       if (data.success) {
         toast.success(

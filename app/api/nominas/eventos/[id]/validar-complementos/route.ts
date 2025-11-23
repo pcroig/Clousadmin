@@ -41,7 +41,7 @@ export async function POST(
       return NextResponse.json({ error: 'Evento no encontrado' }, { status: 404 });
     }
 
-    const body = await req.json();
+    const body = await req.json() as Record<string, any>;
     const data = ValidarComplementosSchema.parse(body);
 
     // Para managers, verificar que solo estén validando complementos de su equipo

@@ -68,7 +68,7 @@ export function PuestosClient({ puestos: initialPuestos }: PuestosClientProps) {
       if (!response.ok) {
         throw new Error('Error al cargar puestos');
       }
-      const data = await response.json();
+      const data = await response.json() as Record<string, any>;
 
       // Transform data to match the expected format
       interface ApiPuesto {

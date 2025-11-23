@@ -109,7 +109,7 @@ export async function PATCH(
     }
 
     const solicitudId = params.id;
-    const body = await request.json();
+    const body = await request.json() as Record<string, any>;
 
     // Validar acción
     if (body.accion !== 'cancelar') {

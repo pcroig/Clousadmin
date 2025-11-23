@@ -128,7 +128,7 @@ export async function PATCH(
 
     const { id } = await params;
 
-    const body = await req.json();
+    const body = await req.json() as Record<string, any>;
     const data = UpdateEventoSchema.parse(body);
 
     // Verificar que el evento pertenece a la empresa

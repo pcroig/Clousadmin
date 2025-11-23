@@ -186,7 +186,7 @@ export function NominaDetailsClient({ nomina, ausencias }: NominaDetailsClientPr
           body: formData,
         });
 
-        const data = await response.json();
+        const data = await response.json() as Record<string, any>;
 
         if (!response.ok) {
           throw new Error(data.error || 'Error al subir el PDF');

@@ -113,7 +113,7 @@ export async function POST(req: NextRequest) {
       return badRequestResponse('No tienes permisos para crear festivos');
     }
 
-    const body = await req.json();
+    const body = await req.json() as Record<string, any>;
     const validationResult = festivoCreateSchema.safeParse(body);
 
     if (!validationResult.success) {

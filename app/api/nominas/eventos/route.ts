@@ -180,7 +180,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Acceso denegado' }, { status: 403 });
     }
 
-    const body = await req.json();
+    const body = await req.json() as Record<string, any>;
     const data = GenerarEventoSchema.parse(body);
 
     // Verificar que no existe ya un evento para este mes/año

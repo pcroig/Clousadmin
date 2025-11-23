@@ -81,7 +81,7 @@ export function JornadasModal({ open, onClose }: JornadasModalProps) {
     try {
       const response = await fetch('/api/jornadas');
       if (response.ok) {
-        const data = await response.json();
+        const data = await response.json() as Record<string, any>;
         setJornadas(data);
       }
     } catch (error) {

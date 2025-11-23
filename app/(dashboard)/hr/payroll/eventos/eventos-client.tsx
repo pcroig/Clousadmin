@@ -56,7 +56,7 @@ export function EventosClient() {
   const fetchEventos = async () => {
     try {
       const response = await fetch('/api/nominas/eventos');
-      const data = await response.json();
+      const data = await response.json() as Record<string, any>;
       setEventos(data.eventos || []);
     } catch (error) {
       console.error('Error fetching eventos:', error);
@@ -73,7 +73,7 @@ export function EventosClient() {
       const response = await fetch(`/api/nominas/eventos/${eventoId}/exportar`);
 
       if (!response.ok) {
-        const data = await response.json();
+        const data = await response.json() as Record<string, any>;
         throw new Error(data.error || 'Error al exportar');
       }
 
@@ -129,7 +129,7 @@ export function EventosClient() {
           body: formData,
         });
 
-        const data = await response.json();
+        const data = await response.json() as Record<string, any>;
 
         if (!response.ok) {
           throw new Error(data.error || 'Error al importar');
@@ -167,7 +167,7 @@ export function EventosClient() {
         method: 'POST',
       });
 
-      const data = await response.json();
+      const data = await response.json() as Record<string, any>;
 
       if (!response.ok) {
         throw new Error(data.error || 'Error al publicar');

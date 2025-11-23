@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Permisos insuficientes' }, { status: 403 });
     }
 
-    const body = await request.json();
+    const body = await request.json() as Record<string, any>;
     const { priceId } = body;
 
     if (!priceId) {

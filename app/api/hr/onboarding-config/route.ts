@@ -105,7 +105,7 @@ export async function PATCH(req: NextRequest) {
       );
     }
 
-    const body = await req.json();
+    const body = await req.json() as Record<string, any>;
     const { tipo, data } = body;
 
     if (!tipo) {

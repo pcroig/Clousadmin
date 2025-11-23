@@ -71,7 +71,7 @@ export function BillingClient({ subscription, products }: BillingClientProps) {
         body: JSON.stringify({ priceId }),
       });
 
-      const data = await response.json();
+      const data = await response.json() as Record<string, any>;
 
       if (!response.ok) {
         throw new Error(data.error || 'Error al crear la sesi\u00f3n de pago');
@@ -93,7 +93,7 @@ export function BillingClient({ subscription, products }: BillingClientProps) {
         method: 'POST',
       });
 
-      const data = await response.json();
+      const data = await response.json() as Record<string, any>;
 
       if (!response.ok) {
         throw new Error(data.error || 'Error al acceder al portal');

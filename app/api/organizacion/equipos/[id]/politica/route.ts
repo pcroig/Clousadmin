@@ -94,7 +94,7 @@ export async function PUT(
       return notFoundResponse('Equipo no encontrado');
     }
 
-    const body = await req.json();
+    const body = await req.json() as Record<string, any>;
     const validationResult = politicaSchema.safeParse(body);
 
     if (!validationResult.success) {

@@ -36,7 +36,7 @@ export async function POST(
     }
 
     const { id: firmaId } = await context.params;
-    const body = await request.json();
+    const body = await request.json() as Record<string, any>;
 
     const firmaImagen: string | undefined = body.firmaImagen;
     const firmaImagenWidth: number | undefined = body.firmaImagenWidth;

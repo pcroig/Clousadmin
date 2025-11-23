@@ -222,7 +222,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const body = await request.json();
+    const body = await request.json() as Record<string, any>;
     const validation = revisionSchema.safeParse(body);
 
     if (!validation.success) {

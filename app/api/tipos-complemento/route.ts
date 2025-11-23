@@ -77,7 +77,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Acceso denegado' }, { status: 403 });
     }
 
-    const body = await req.json();
+    const body = await req.json() as Record<string, any>;
     const data = TipoComplementoSchema.parse(body);
 
     // Validación: Si es importe fijo, debe tener importeFijo

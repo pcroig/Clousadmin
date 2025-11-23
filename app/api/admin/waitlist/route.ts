@@ -51,7 +51,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const body = await req.json();
+    const body = await req.json() as Record<string, any>;
     const { email } = body;
 
     if (!email) {

@@ -86,7 +86,7 @@ export async function POST(request: NextRequest) {
     if (authResult instanceof Response) return authResult;
     const { session } = authResult;
 
-    const body = await request.json();
+    const body = await request.json() as Record<string, any>;
 
     const sanitizeOptionalString = (value: unknown): string | null => {
       if (typeof value !== 'string') return null;

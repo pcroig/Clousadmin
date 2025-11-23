@@ -31,7 +31,7 @@ export async function PATCH(
     }
 
     const { id, asignacionId } = await params;
-    const body = await req.json();
+    const body = await req.json() as Record<string, any>;
     const data = UpdateAsignacionSchema.parse(body);
 
     // Verificar que la asignación existe y pertenece a la nómina

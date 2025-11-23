@@ -66,7 +66,7 @@ export function CrearCampanaModal({
     try {
       const res = await fetch('/api/organizacion/equipos');
       if (res.ok) {
-        const data = await res.json();
+        const data = await res.json() as Record<string, any>;
         setEquipos(data);
       }
     } catch (e) {
@@ -125,7 +125,7 @@ export function CrearCampanaModal({
         onCreated();
         onClose();
       } else {
-        const error = await res.json();
+        const error = await res.json() as Record<string, any>;
         toast.error(error.error || 'Error al crear campaña');
       }
     } catch (e) {

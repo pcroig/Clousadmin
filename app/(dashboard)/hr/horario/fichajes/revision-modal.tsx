@@ -107,7 +107,7 @@ export function RevisionModal({ open, onClose, onReviewed, onEditFichaje: _onEdi
       const response = await fetch('/api/fichajes/revision');
       
       if (response.ok) {
-        const data = await response.json();
+        const data = await response.json() as Record<string, any>;
         const fichajes: FichajeRevision[] = data.fichajes || [];
         
         setFichajesRevision(fichajes);
@@ -174,7 +174,7 @@ export function RevisionModal({ open, onClose, onReviewed, onEditFichaje: _onEdi
       });
 
       if (response.ok) {
-        const resultado = await response.json();
+        const resultado = await response.json() as Record<string, any>;
         toast.success(
           `Fichajes cuadrados: ${resultado.cuadrados}` +
             (resultado.errores?.length ? `. Con incidencias: ${resultado.errores.length}` : '')
@@ -182,7 +182,7 @@ export function RevisionModal({ open, onClose, onReviewed, onEditFichaje: _onEdi
         onReviewed();
         onClose();
       } else {
-        const error = await response.json();
+        const error = await response.json() as Record<string, any>;
         toast.error(error.error || 'Error al actualizar fichajes');
       }
     } catch (error) {

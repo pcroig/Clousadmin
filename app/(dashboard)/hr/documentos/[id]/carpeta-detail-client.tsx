@@ -151,7 +151,7 @@ export function CarpetaDetailClient({ carpeta, empleados = [] }: CarpetaDetailCl
       ]);
 
       if (equiposRes.ok) {
-        const payload = await equiposRes.json();
+        const payload = await equiposRes.json() as Record<string, any>;
         const listaEquipos = extractArrayFromResponse<
           { id: string; nombre: string }
         >(payload, { key: 'equipos' });
@@ -159,7 +159,7 @@ export function CarpetaDetailClient({ carpeta, empleados = [] }: CarpetaDetailCl
       }
 
       if (empleadosRes.ok) {
-        const payload = await empleadosRes.json();
+        const payload = await empleadosRes.json() as Record<string, any>;
         const lista = extractArrayFromResponse<
           {
             id: string;
@@ -229,7 +229,7 @@ export function CarpetaDetailClient({ carpeta, empleados = [] }: CarpetaDetailCl
       });
 
       if (!response.ok) {
-        const error = await response.json();
+        const error = await response.json() as Record<string, any>;
         throw new Error(error.error || 'Error al actualizar asignación');
       }
 
@@ -352,7 +352,7 @@ export function CarpetaDetailClient({ carpeta, empleados = [] }: CarpetaDetailCl
       });
 
       if (!response.ok) {
-        const error = await response.json();
+        const error = await response.json() as Record<string, any>;
         throw new Error(error.error || 'Error al eliminar documento');
       }
 

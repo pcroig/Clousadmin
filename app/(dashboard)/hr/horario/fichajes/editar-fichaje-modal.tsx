@@ -68,7 +68,7 @@ export function EditarFichajeModal({ open, fichaje: _fichaje, fichajeDiaId, onCl
       try {
         const res = await fetch(`/api/fichajes/${fichajeDiaId}`);
         if (!res.ok) return;
-        const data = await res.json();
+        const data = await res.json() as Record<string, any>;
         
         setFichajeDia({
           id: data.id,
@@ -159,7 +159,7 @@ export function EditarFichajeModal({ open, fichaje: _fichaje, fichajeDiaId, onCl
       });
 
       if (res.ok) {
-        const data = await res.json();
+        const data = await res.json() as Record<string, any>;
         setEventos((prev) => [
           ...prev,
           {

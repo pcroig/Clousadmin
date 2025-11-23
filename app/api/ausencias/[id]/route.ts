@@ -83,7 +83,7 @@ export async function PATCH(
     }
 
     // Leer body para determinar el tipo de operación
-    const body = await req.json();
+    const body = await req.json() as Record<string, any>;
 
     // Detectar si es aprobar/rechazar o edición
     if (body.accion && (body.accion === 'aprobar' || body.accion === 'rechazar')) {

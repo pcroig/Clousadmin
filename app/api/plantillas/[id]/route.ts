@@ -85,7 +85,7 @@ export async function PATCH(
     }
 
     const { id } = await params;
-    const body = await request.json();
+    const body = await request.json() as Record<string, any>;
 
     // Verificar que la plantilla existe y pertenece a su empresa
     const plantillaExistente = await prisma.plantillaDocumento.findUnique({

@@ -26,7 +26,7 @@ export async function PATCH(request: NextRequest, context: RouteParams) {
     }
 
     const { id: equipoId } = params;
-    const body = await request.json();
+    const body = await request.json() as Record<string, any>;
     const { managerId } = body;
 
     // Verify team belongs to user's company

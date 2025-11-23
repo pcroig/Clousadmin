@@ -32,7 +32,7 @@ export async function PATCH(req: NextRequest) {
       return badRequestResponse('No tienes permisos para modificar el calendario laboral');
     }
 
-    const body = await req.json();
+    const body = await req.json() as Record<string, any>;
     const validationResult = calendarioLaboralUpdateSchema.safeParse(body);
 
     if (!validationResult.success) {

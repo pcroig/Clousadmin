@@ -19,7 +19,7 @@ const resetSchema = z.object({
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
+    const body = await req.json() as Record<string, any>;
     const { token, password } = resetSchema.parse(body);
 
     const validation = await validateRecoveryToken(token);

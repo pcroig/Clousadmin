@@ -108,7 +108,7 @@ export function FichajesTab({ empleadoId }: { empleadoId: string }) {
       if (!response.ok) {
         throw new Error('Error al obtener fichajes');
       }
-      const data = await response.json();
+      const data = await response.json() as Record<string, any>;
       const rawFichajes: ApiFichaje[] = Array.isArray(data) ? data : [];
 
       // Procesar fichajes con su nueva estructura (eventos separados)

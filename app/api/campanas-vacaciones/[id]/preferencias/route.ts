@@ -32,7 +32,7 @@ export async function POST(
       return badRequestResponse('Debes ser un empleado para indicar preferencias');
     }
 
-    const body = await req.json();
+    const body = await req.json() as Record<string, any>;
     
     // Forzar campanaId del parámetro
     body.campanaId = campanaId;

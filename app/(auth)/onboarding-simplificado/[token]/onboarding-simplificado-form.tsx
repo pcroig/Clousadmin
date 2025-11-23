@@ -78,7 +78,7 @@ export function OnboardingSimplificadoForm({
         method: 'POST',
       });
 
-      const pwaData = await pwaRes.json();
+      const pwaData = await pwaRes.json() as { success?: boolean; error?: string };
 
       if (!pwaRes.ok || !pwaData.success) {
         toast.error(pwaData.error || 'Error al marcar PWA como completado');
@@ -90,7 +90,7 @@ export function OnboardingSimplificadoForm({
         method: 'POST',
       });
 
-      const data = await res.json();
+      const data = await res.json() as { success?: boolean; error?: string; redirectUrl?: string };
 
       if (res.ok && data.success) {
         toast.success('¡Onboarding completado! Redirigiendo...');

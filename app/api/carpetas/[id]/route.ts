@@ -164,7 +164,7 @@ export async function PATCH(
     }
 
     const { id } = await params;
-    const body = await request.json();
+    const body = await request.json() as Record<string, any>;
     const { compartida, asignadoA } = body;
 
     // Buscar carpeta

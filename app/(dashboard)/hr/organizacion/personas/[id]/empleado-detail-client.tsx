@@ -41,7 +41,7 @@ export function EmpleadoDetailClient({ empleado, usuario }: EmpleadoDetailClient
       });
 
       if (!response.ok) {
-        const error = await response.json();
+        const error = await response.json() as Record<string, any>;
         throw new Error(error.error || 'Error al actualizar campo');
       }
 

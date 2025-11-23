@@ -33,7 +33,7 @@ export async function PATCH(
 
     const { id } = await params;
 
-    const body = await req.json();
+    const body = await req.json() as Record<string, any>;
     const data = UpdateSchema.parse(body);
 
     // Verificar que el tipo pertenece a la empresa

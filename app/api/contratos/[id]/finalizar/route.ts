@@ -44,7 +44,7 @@ export async function POST(
     const { id } = await params;
 
     // Parsear y validar request body
-    const body = await request.json();
+    const body = await request.json() as Record<string, any>;
     const validation = finalizarContratoSchema.safeParse(body);
     
     if (!validation.success) {

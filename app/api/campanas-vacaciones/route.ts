@@ -75,7 +75,7 @@ export async function POST(req: NextRequest) {
       return badRequestResponse('No tienes permisos para crear campañas de vacaciones');
     }
 
-    const body = await req.json();
+    const body = await req.json() as Record<string, any>;
     const validationResult = campanaVacacionesCreateSchema.safeParse(body);
 
     if (!validationResult.success) {

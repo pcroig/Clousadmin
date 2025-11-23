@@ -126,7 +126,7 @@ export async function POST(
       return NextResponse.json({ error: 'Acceso denegado' }, { status: 403 });
     }
 
-    const body = await req.json();
+    const body = await req.json() as Record<string, any>;
 
     // Soportar asignación única o múltiple
     let complementos: z.infer<typeof AsignarComplementoSchema>[];

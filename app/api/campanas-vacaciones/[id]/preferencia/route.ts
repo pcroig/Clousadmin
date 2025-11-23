@@ -66,7 +66,7 @@ export async function PATCH(
     const { session } = authResult;
 
     const { id: campanaId } = await params;
-    const body = await req.json();
+    const body = await req.json() as Record<string, any>;
 
     // Obtener empleado del usuario
     const empleado = await prisma.empleado.findFirst({

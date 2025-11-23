@@ -209,7 +209,7 @@ export function EditarJornadaModal({ open, modo, jornada, onClose }: EditarJorna
     try {
       const response = await fetch('/api/empleados');
       if (response.ok) {
-        const data = await response.json();
+        const data = await response.json() as Record<string, any>;
         setEmpleados(
           extractArrayFromResponse<{ id: string; nombre: string; apellidos: string }>(data, {
             key: 'empleados',
@@ -225,7 +225,7 @@ export function EditarJornadaModal({ open, modo, jornada, onClose }: EditarJorna
     try {
       const response = await fetch('/api/organizacion/equipos');
       if (response.ok) {
-        const data = await response.json();
+        const data = await response.json() as Record<string, any>;
         setEquipos(
           (data || []).map((equipo: { id: string; nombre: string; _count?: { miembros?: number } }) => ({
             id: equipo.id,
@@ -279,7 +279,7 @@ export function EditarJornadaModal({ open, modo, jornada, onClose }: EditarJorna
 
       const response = await fetch(url);
       if (response.ok) {
-        const data = await response.json();
+        const data = await response.json() as Record<string, any>;
         return data;
       }
       return null;
@@ -378,13 +378,13 @@ export function EditarJornadaModal({ open, modo, jornada, onClose }: EditarJorna
       });
 
       if (!response.ok) {
-        const error = await response.json();
+        const error = await response.json() as Record<string, any>;
         toast.error(error.error || `Error al ${modo === 'crear' ? 'crear' : 'actualizar'} jornada`);                                                            
         setCargando(false);
         return;
       }
 
-      const jornadaGuardada = await response.json();
+      const jornadaGuardada = await response.json() as Record<string, any>;
 
       // Verificar si hay asignación y si hay jornadas previas
       const debeAsignar = (nivelAsignacion === 'individual' && empleadosSeleccionados.length > 0) ||
@@ -462,7 +462,7 @@ export function EditarJornadaModal({ open, modo, jornada, onClose }: EditarJorna
         toast.success('Jornada eliminada exitosamente');
         onClose();
       } else {
-        const error = await response.json();
+        const error = await response.json() as Record<string, any>;
         toast.error(error.error || 'Error al eliminar jornada');
       }
     } catch (error) {
