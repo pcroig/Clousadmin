@@ -21,8 +21,9 @@ const UpdateAsignacionSchema = z.object({
 // ========================================
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: Promise<{ id: string; asignacionId: string }> }
+  context: { params: Promise<{ id: string; asignacionId: string }> }
 ) {
+    const params = await context.params;
   try {
     const session = await getSession();
     if (!session || !['hr_admin', 'platform_admin', 'manager'].includes(session.user.rol)) {
@@ -137,8 +138,9 @@ export async function PATCH(
 // ========================================
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: Promise<{ id: string; asignacionId: string }> }
+  context: { params: Promise<{ id: string; asignacionId: string }> }
 ) {
+    const params = await context.params;
   try {
     const session = await getSession();
     if (!session || !['hr_admin', 'platform_admin', 'manager'].includes(session.user.rol)) {

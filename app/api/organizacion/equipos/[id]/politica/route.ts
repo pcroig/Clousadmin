@@ -23,8 +23,9 @@ const politicaSchema = z.object({
 // GET /api/organizacion/equipos/[id]/politica - Obtener política del equipo
 export async function GET(
   req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  context: { params: Promise<{ id: string }> }
 ) {
+    const params = await context.params;
   try {
     const authResult = await requireAuthAsHR(req);
     if (authResult instanceof Response) return authResult;
@@ -71,8 +72,9 @@ export async function GET(
 // PUT /api/organizacion/equipos/[id]/politica - Crear o actualizar política
 export async function PUT(
   req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  context: { params: Promise<{ id: string }> }
 ) {
+    const params = await context.params;
   try {
     const authResult = await requireAuthAsHR(req);
     if (authResult instanceof Response) return authResult;
@@ -123,6 +125,7 @@ export async function PUT(
     return handleApiError(error, 'API PUT /api/organizacion/equipos/[id]/politica');
   }
 }
+
 
 
 

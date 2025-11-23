@@ -18,8 +18,9 @@ const PREVIEW_TTL_SECONDS = 60 * 10; // 10 minutos
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  context: { params: Promise<{ id: string }> }
 ) {
+    const params = await context.params;
   try {
     const session = await getSession();
 

@@ -24,8 +24,9 @@ export const dynamic = 'force-dynamic';
 // GET /api/festivos/[id] - Obtener festivo específico
 export async function GET(
   req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  context: { params: Promise<{ id: string }> }
 ) {
+    const params = await context.params;
   try {
     const authResult = await requireAuth(req);
     if (authResult instanceof Response) return authResult;
@@ -62,8 +63,9 @@ export async function GET(
 // PATCH /api/festivos/[id] - Editar festivo
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  context: { params: Promise<{ id: string }> }
 ) {
+    const params = await context.params;
   try {
     const authResult = await requireAuth(req);
     if (authResult instanceof Response) return authResult;
@@ -169,8 +171,9 @@ export async function PATCH(
 // DELETE /api/festivos/[id] - Eliminar festivo
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  context: { params: Promise<{ id: string }> }
 ) {
+    const params = await context.params;
   try {
     const authResult = await requireAuth(req);
     if (authResult instanceof Response) return authResult;

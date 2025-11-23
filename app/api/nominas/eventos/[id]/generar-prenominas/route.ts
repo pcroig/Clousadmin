@@ -11,8 +11,9 @@ import { prisma } from '@/lib/prisma';
 
 export async function POST(
   _req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  context: { params: Promise<{ id: string }> }
 ) {
+    const params = await context.params;
   try {
     const session = await getSession();
     if (!session || !['hr_admin', 'platform_admin'].includes(session.user.rol)) {
@@ -62,6 +63,7 @@ export async function POST(
     );
   }
 }
+
 
 
 

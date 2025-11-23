@@ -18,8 +18,9 @@ import { deleteFromS3, getSignedDownloadUrl } from '@/lib/s3';
 // GET /api/documentos/[id] - Descargar documento
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  context: { params: Promise<{ id: string }> }
 ) {
+    const params = await context.params;
   try {
     const session = await getSession();
 
@@ -133,8 +134,9 @@ export async function GET(
 // DELETE /api/documentos/[id] - Eliminar documento
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  context: { params: Promise<{ id: string }> }
 ) {
+    const params = await context.params;
   try {
     const session = await getSession();
 

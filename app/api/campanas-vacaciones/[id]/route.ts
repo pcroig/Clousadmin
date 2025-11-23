@@ -17,8 +17,9 @@ import { prisma } from '@/lib/prisma';
 // GET /api/campanas-vacaciones/[id] - Obtener campaña específica
 export async function GET(
   req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  context: { params: Promise<{ id: string }> }
 ) {
+    const params = await context.params;
   try {
     // Verificar autenticación
     const authResult = await requireAuth(req);

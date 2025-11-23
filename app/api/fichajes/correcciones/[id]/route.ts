@@ -54,8 +54,9 @@ async function ensureManagerAccess(
 
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
+    const params = await context.params;
   try {
     const authResult = await requireAuthAsHROrManager(req);
     if (authResult instanceof NextResponse) return authResult;

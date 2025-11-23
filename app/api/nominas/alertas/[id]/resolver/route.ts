@@ -16,8 +16,9 @@ interface Params {
 // POST /api/nominas/alertas/[id]/resolver
 export async function POST(
   req: NextRequest,
-  { params }: { params: Promise<Params> }
+  context: { params: Promise<Params> }
 ) {
+    const params = await context.params;
   try {
     const session = await getSession();
 
@@ -49,6 +50,7 @@ export async function POST(
     );
   }
 }
+
 
 
 

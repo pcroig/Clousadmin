@@ -17,8 +17,9 @@ import { downloadFromS3 } from '@/lib/s3';
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
+    const params = await context.params;
   try {
     const session = await getSession();
 

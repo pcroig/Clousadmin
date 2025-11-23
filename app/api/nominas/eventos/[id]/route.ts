@@ -25,8 +25,9 @@ const UpdateEventoSchema = z.object({
 // Obtiene detalles de un evento específico
 export async function GET(
   req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  context: { params: Promise<{ id: string }> }
 ) {
+    const params = await context.params;
   try {
     const session = await getSession();
     if (!session) {
@@ -116,8 +117,9 @@ export async function GET(
 // Actualiza el estado de un evento
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  context: { params: Promise<{ id: string }> }
 ) {
+    const params = await context.params;
   try {
     const session = await getSession();
     if (!session || !['hr_admin', 'platform_admin'].includes(session.user.rol)) {

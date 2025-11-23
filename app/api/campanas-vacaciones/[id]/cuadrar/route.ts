@@ -20,8 +20,9 @@ export const dynamic = 'force-dynamic';
 // POST /api/campanas-vacaciones/[id]/cuadrar - Ejecutar IA para cuadrar vacaciones
 export async function POST(
   req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  context: { params: Promise<{ id: string }> }
 ) {
+    const params = await context.params;
   try {
     // Verificar autenticación
     const authResult = await requireAuth(req);

@@ -8,17 +8,23 @@ import type { Prisma, PrismaClient } from '@prisma/client';
 
 type JornadaClient = PrismaClient | Prisma.TransactionClient;
 
+export async function getPredefinedJornada(
+  client: JornadaClient,
+  empresaId: string
+) {
+  return client.jornada.findFirst({
+    where: {
+      empresaId,
+      esPredefinida: true,
+    },
+  });
+}
+
 export async function getOrCreateDefaultJornada(
   client: JornadaClient,
   empresaId: string
 ) {
-  const jornadaExistente = await client.jornada.findFirst({
-    where: {
-      empresaId,
-      esPredefinida: true,
-      activa: true,
-    },
-  });
+  const jornadaExistente = await getPredefinedJornada(client, empresaId);
 
   if (jornadaExistente) {
     return jornadaExistente;

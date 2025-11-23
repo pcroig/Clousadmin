@@ -11,8 +11,9 @@ import { getSignedDownloadUrl } from '@/lib/s3';
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  context: { params: Promise<{ id: string }> }
 ) {
+    const params = await context.params;
   try {
     const session = await getSession();
     if (!session) {

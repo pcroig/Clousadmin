@@ -24,8 +24,9 @@ interface Params {
 // GET /api/jornadas/[id] - Obtener jornada por ID
 export async function GET(
   req: NextRequest,
-  { params }: { params: Promise<Params> }
+  context: { params: Promise<Params> }
 ) {
+    const params = await context.params;
   try {
     // Verificar autenticación y rol HR Admin
     const authResult = await requireAuthAsHR(req);
@@ -63,8 +64,9 @@ export async function GET(
 // PATCH /api/jornadas/[id] - Actualizar jornada
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: Promise<Params> }
+  context: { params: Promise<Params> }
 ) {
+    const params = await context.params;
   try {
     // Verificar autenticación y rol HR Admin
     const authResult = await requireAuthAsHR(req);
@@ -120,8 +122,9 @@ export async function PATCH(
 // DELETE /api/jornadas/[id] - Eliminar jornada (marcar como inactiva)
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: Promise<Params> }
+  context: { params: Promise<Params> }
 ) {
+    const params = await context.params;
   try {
     // Verificar autenticación y rol HR Admin
     const authResult = await requireAuthAsHR(req);

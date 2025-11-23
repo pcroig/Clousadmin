@@ -17,8 +17,9 @@ export const dynamic = 'force-dynamic';
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  context: { params: Promise<{ id: string }> }
 ) {
+    const params = await context.params;
   try {
     const authResult = await requireAuth(req);
     if (authResult instanceof Response) return authResult;
@@ -72,6 +73,7 @@ export async function POST(
     return handleApiError(error, 'API POST /api/campanas-vacaciones/[id]/propuestas/cancelar');
   }
 }
+
 
 
 

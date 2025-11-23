@@ -30,8 +30,9 @@ const solicitudAccionSchema = z.object({
 // PATCH /api/solicitudes/[id] - Aprobar o Rechazar solicitud (HR Admin o Manager)
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  context: { params: Promise<{ id: string }> }
 ) {
+    const params = await context.params;
   try {
     // Verificar autenticación y rol HR Admin o Manager
     const authResult = await requireAuthAsHROrManager(req);

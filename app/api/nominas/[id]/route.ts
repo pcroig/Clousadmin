@@ -9,8 +9,9 @@ import { prisma } from '@/lib/prisma';
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  context: { params: Promise<{ id: string }> }
 ) {
+    const params = await context.params;
   try {
     const session = await getSession();
     if (!session || !['hr_admin', 'platform_admin', 'manager', 'empleado'].includes(session.user.rol)) {

@@ -13,8 +13,9 @@ export const dynamic = 'force-dynamic';
 // GET /api/campanas-vacaciones/[id]/preferencia - Obtener preferencia del empleado
 export async function GET(
   req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  context: { params: Promise<{ id: string }> }
 ) {
+    const params = await context.params;
   try {
     const authResult = await requireAuth(req);
     if (authResult instanceof Response) return authResult;
@@ -56,8 +57,9 @@ export async function GET(
 // PATCH /api/campanas-vacaciones/[id]/preferencia - Actualizar preferencia
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  context: { params: Promise<{ id: string }> }
 ) {
+    const params = await context.params;
   try {
     const authResult = await requireAuth(req);
     if (authResult instanceof Response) return authResult;

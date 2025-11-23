@@ -12,6 +12,8 @@ import {
   successResponse,
 } from '@/lib/api-handler';
 import { UsuarioRol } from '@/lib/constants/enums';
+import { DIAS_LABORABLES_DEFAULT } from '@/lib/calculos/dias-laborables';
+import { persistDiasLaborables } from '@/lib/empresa/calendario-laboral';
 import { prisma, Prisma } from '@/lib/prisma';
 import { calendarioLaboralUpdateSchema } from '@/lib/validaciones/schemas';
 
@@ -41,30 +43,7 @@ export async function PATCH(req: NextRequest) {
 
     const diasLaborables = validationResult.data;
 
-    // Obtener empresa actual
-    const empresa = await prisma.empresa.findUnique({
-      where: { id: session.user.empresaId },
-      select: { config: true },
-    });
-
-    if (!empresa) {
-      return badRequestResponse('Empresa no encontrada');
-    }
-
-    // Actualizar config con días laborables
-    const configActual = empresa.config as Prisma.JsonValue;
-    const nuevaConfig: Prisma.JsonValue = {
-      ...(typeof configActual === 'object' && configActual !== null ? configActual : {}),
-      diasLaborables,
-    };
-
-    // Actualizar empresa
-    await prisma.empresa.update({
-      where: { id: session.user.empresaId },
-      data: {
-        config: nuevaConfig as Prisma.InputJsonValue,
-      },
-    });
+    await persistDiasLaborables(prisma, session.user.empresaId, diasLaborables);
 
     console.info(`[Calendario Laboral] Días laborables actualizados para empresa ${session.user.empresaId}:`, diasLaborables);
 
@@ -98,15 +77,7 @@ export async function GET(req: NextRequest) {
       typeof config === 'object' && config !== null && 'diasLaborables' in config
         ? config.diasLaborables
         : null
-    ) || {
-      lunes: true,
-      martes: true,
-      miercoles: true,
-      jueves: true,
-      viernes: true,
-      sabado: false,
-      domingo: false,
-    };
+    ) || DIAS_LABORABLES_DEFAULT;
 
     return successResponse({ diasLaborables });
   } catch (error) {

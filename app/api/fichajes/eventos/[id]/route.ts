@@ -21,7 +21,8 @@ const fichajeEventoUpdateSchema = z.object({
 });
 
 // PATCH /api/fichajes/eventos/[id] - Editar evento de fichaje
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, context: { params: Promise<{ id: string }> }) {
+    const params = await context.params;
   try {
     // Verificar autenticación
     const authResult = await requireAuth(req);
@@ -73,7 +74,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 }
 
 // DELETE /api/fichajes/eventos/[id] - Eliminar evento de fichaje
-export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(_req: NextRequest, context: { params: Promise<{ id: string }> }) {
+    const params = await context.params;
   try {
     // Verificar autenticación
     const authResult = await requireAuth(_req);

@@ -16,8 +16,9 @@ import { prisma } from '@/lib/prisma';
 // PATCH /api/notificaciones/[id]/marcar-leida
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  context: { params: Promise<{ id: string }> }
 ) {
+    const params = await context.params;
   try {
     // Verificar autenticación
     const authResult = await requireAuth(req);

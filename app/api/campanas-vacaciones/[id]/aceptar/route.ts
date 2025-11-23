@@ -17,8 +17,9 @@ import { prisma, Prisma } from '@/lib/prisma';
 // POST /api/campanas-vacaciones/[id]/aceptar - Empleado acepta propuesta de vacaciones
 export async function POST(
   req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  context: { params: Promise<{ id: string }> }
 ) {
+    const params = await context.params;
   try {
     // Verificar autenticación
     const authResult = await requireAuth(req);

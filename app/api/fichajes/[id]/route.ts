@@ -40,8 +40,9 @@ interface Params {
 // GET /api/fichajes/[id] - Obtener fichaje por ID
 export async function GET(
   req: NextRequest,
-  { params }: { params: Promise<Params> }
+  context: { params: Promise<Params> }
 ) {
+    const params = await context.params;
   try {
     // Verificar autenticación
     const authResult = await requireAuth(req);
@@ -92,8 +93,9 @@ export async function GET(
 // PATCH /api/fichajes/[id] - Aprobar/Rechazar o Editar fichaje
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: Promise<Params> }
+  context: { params: Promise<Params> }
 ) {
+    const params = await context.params;
   try {
     // Verificar autenticación
     const authResult = await requireAuth(req);
@@ -262,8 +264,9 @@ export async function PATCH(
 // DELETE /api/fichajes/[id] - Eliminar fichaje (solo HR Admin)
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: Promise<Params> }
+  context: { params: Promise<Params> }
 ) {
+    const params = await context.params;
   try {
     // Verificar autenticación y rol HR Admin
     const authResult = await requireAuthAsHR(req);

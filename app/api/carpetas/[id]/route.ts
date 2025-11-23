@@ -13,8 +13,9 @@ import { prisma, Prisma } from '@/lib/prisma';
 // GET /api/carpetas/[id] - Ver contenido de carpeta
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  context: { params: Promise<{ id: string }> }
 ) {
+    const params = await context.params;
   try {
     const session = await getSession();
 
@@ -86,8 +87,9 @@ export async function GET(
 // DELETE /api/carpetas/[id] - Eliminar carpeta (solo HR, no permitido para carpetas del sistema)
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  context: { params: Promise<{ id: string }> }
 ) {
+    const params = await context.params;
   try {
     const session = await getSession();
 
@@ -148,8 +150,9 @@ export async function DELETE(
 // PATCH /api/carpetas/[id] - Editar carpeta (solo HR Admin, para carpetas compartidas)
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  context: { params: Promise<{ id: string }> }
 ) {
+    const params = await context.params;
   try {
     const session = await getSession();
 

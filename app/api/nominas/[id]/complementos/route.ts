@@ -27,8 +27,9 @@ const AsignarMultiplesSchema = z.object({
 // Lista los complementos asignados/pendientes de una nómina
 export async function GET(
   req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  context: { params: Promise<{ id: string }> }
 ) {
+    const params = await context.params;
   try {
     const session = await getSession();
     if (!session) {
@@ -109,8 +110,9 @@ export async function GET(
 // Asigna uno o múltiples complementos a una nómina
 export async function POST(
   req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  context: { params: Promise<{ id: string }> }
 ) {
+    const params = await context.params;
   try {
     const session = await getSession();
     if (!session) {

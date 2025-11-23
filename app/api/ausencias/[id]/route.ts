@@ -43,8 +43,9 @@ const ausenciaAccionSchema = z.object({
 // PATCH /api/ausencias/[id] - Aprobar/Rechazar o Editar ausencia (HR Admin o Manager)
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  context: { params: Promise<{ id: string }> }
 ) {
+    const params = await context.params;
   try {
     // Verificar autenticación y rol HR Admin o Manager
     const authResult = await requireAuthAsHROrManager(req);
@@ -538,8 +539,9 @@ export async function PATCH(
 // DELETE /api/ausencias/[id] - Cancelar ausencia (solo empleado)
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  context: { params: Promise<{ id: string }> }
 ) {
+    const params = await context.params;
   try {
     // Verificar autenticación (debe ser empleado)
     const authResult = await requireAuth(req);

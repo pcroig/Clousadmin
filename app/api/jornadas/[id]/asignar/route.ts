@@ -28,8 +28,9 @@ interface Params {
 // POST /api/jornadas/[id]/asignar - Asignar jornada a empleados (solo HR Admin)
 export async function POST(
   req: NextRequest,
-  { params }: { params: Promise<Params> }
+  context: { params: Promise<Params> }
 ) {
+    const params = await context.params;
   try {
     // Verificar autenticación y rol HR Admin
     const authResult = await requireAuthAsHR(req);

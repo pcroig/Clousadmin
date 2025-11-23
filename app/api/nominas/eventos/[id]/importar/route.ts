@@ -21,8 +21,9 @@ import { uploadToS3 } from '@/lib/s3';
 // 2. Explicit: cada archivo con employeeId especificado
 export async function POST(
   req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  context: { params: Promise<{ id: string }> }
 ) {
+    const params = await context.params;
   try {
     const session = await getSession();
     if (!session) {
