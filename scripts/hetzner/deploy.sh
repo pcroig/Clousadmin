@@ -31,7 +31,8 @@ git pull origin main || git pull origin master
 # 3. Instalar dependencias
 echo ""
 echo "📦 Instalando dependencias..."
-npm ci
+# Necesitamos devDependencies para compilar Tailwind/PostCSS aunque NODE_ENV=production
+npm ci --include=dev
 
 # 4. Generar cliente Prisma
 echo ""
