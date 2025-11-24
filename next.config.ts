@@ -1,3 +1,4 @@
+import { withSentryConfig } from "@sentry/nextjs";
 import withPWAInit from "next-pwa";
 import runtimeCaching from "next-pwa/cache";
 
@@ -131,11 +132,11 @@ const nextConfig: NextConfig = {
             key: 'Content-Security-Policy',
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-inline' 'unsafe-eval'", // unsafe-eval necesario para Next.js dev
+              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://browser.sentry-cdn.com", // unsafe-eval necesario para Next.js dev
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: https:",
               "font-src 'self' data:",
-              "connect-src 'self'",
+              "connect-src 'self' https://*.sentry.io",
               "worker-src 'self'",
               "frame-ancestors 'none'",
             ].join('; '),
@@ -146,4 +147,13 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default withPWA(nextConfig);
+const sentryBuildOptions = {
+  silent: true,
+  tunnelRoute: '/monitoring',
+  sourcemaps: {
+    disable: !process.env.SENTRY_AUTH_TOKEN,
+    deleteSourcemapsAfterUpload: true,
+  },
+};
+
+export default withSentryConfig(withPWA(nextConfig), sentryBuildOptions);

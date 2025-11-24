@@ -10,6 +10,7 @@
 - [ ] `npm run build` ejecutado localmente (sin errores de TypeScript).
 - [ ] Migraciones Prisma aplicadas en staging (`npx prisma migrate deploy`).
 - [ ] Tests ejecutados localmente (`npm run test`).
+- [ ] Variables de Sentry configuradas (`NEXT_PUBLIC_SENTRY_DSN`, `SENTRY_DSN`, `SENTRY_ENVIRONMENT`, `SENTRY_AUTH_TOKEN` si se suben source maps).
 
 ## 2. Infraestructura
 - [ ] **CRÍTICO**: Managed PostgreSQL operativo (monitorización sin alertas).
@@ -32,10 +33,12 @@
   - Verifica: `healthy: true`, `database: "ok"`, `storage: "enabled"`
   - Redis puede estar en `degraded` (no crítico)
 - [ ] Logs de PM2 sin errores críticos (`pm2 logs clousadmin --lines 100`).
+- [ ] **Sentry**: Verificar que captura errores visitando `/api/test-sentry?action=error` y confirmando en dashboard de Sentry.
 - [ ] Tests de seguridad:
   - [ ] Cifrado de empleados verificado (NIF, NSS, IBAN encriptados)
   - [ ] Rate limiting funciona (probar con >100 requests)
   - [ ] Acceso a logs de auditoría funcional
+- [ ] Evento de prueba enviado a Sentry y visible en el dashboard del entorno correspondiente.
 - [ ] Backups diarios activos (`scripts/backup-db.sh` + cron).
 - [ ] Alertas/monitorización configuradas (UptimeRobot/Hetzner).
 

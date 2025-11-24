@@ -1,0 +1,563 @@
+{
+  "info": {
+    "name": "Clousadmin API",
+    "description": "Colección completa de endpoints de la API de Clousadmin",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "version": "1.0.0"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "https://api.clousadmin.com",
+      "type": "string"
+    },
+    {
+      "key": "token",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Autenticación",
+      "item": [
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const response = pm.response.json();",
+                  "    pm.collectionVariables.set('token', response.token);",
+                  "    console.log('Token guardado:', response.token);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@empresa.com\",\n  \"password\": \"Password123!\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "login"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Login con Google",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"credential\": \"GOOGLE_OAUTH_CREDENTIAL\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/google",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "google"]
+            }
+          }
+        },
+        {
+          "name": "Recuperar Contraseña",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"usuario@empresa.com\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/forgot-password",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "forgot-password"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Empleados",
+      "item": [
+        {
+          "name": "Listar Empleados",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/empleados?page=1&limit=10&activo=true",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "empleados"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "activo",
+                  "value": "true"
+                },
+                {
+                  "key": "search",
+                  "value": "García",
+                  "disabled": true
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Obtener Empleado",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/empleados/{{empleadoId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "empleados", "{{empleadoId}}"]
+            }
+          }
+        },
+        {
+          "name": "Mi Perfil",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/empleados/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "empleados", "me"]
+            }
+          }
+        },
+        {
+          "name": "Crear Empleado",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Juan\",\n  \"apellidos\": \"Pérez Martínez\",\n  \"email\": \"juan.perez@empresa.com\",\n  \"dni\": \"12345678A\",\n  \"telefono\": \"+34612345678\",\n  \"fechaNacimiento\": \"1990-05-15\",\n  \"fechaIngreso\": \"2025-07-01\",\n  \"salarioBrutoAnual\": 35000,\n  \"numeroPagas\": 14,\n  \"diasVacacionesAnuales\": 22\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/empleados",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "empleados"]
+            }
+          }
+        },
+        {
+          "name": "Actualizar Empleado",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"telefono\": \"+34612345679\",\n  \"salarioBrutoAnual\": 38000\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/empleados/{{empleadoId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "empleados", "{{empleadoId}}"]
+            }
+          }
+        },
+        {
+          "name": "Dar de Baja Empleado",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/empleados/{{empleadoId}}?fechaBaja=2025-06-30",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "empleados", "{{empleadoId}}"],
+              "query": [
+                {
+                  "key": "fechaBaja",
+                  "value": "2025-06-30"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Ausencias",
+      "item": [
+        {
+          "name": "Listar Ausencias",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/ausencias?page=1&limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "ausencias"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "tipo",
+                  "value": "vacaciones",
+                  "disabled": true
+                },
+                {
+                  "key": "estado",
+                  "value": "pendiente",
+                  "disabled": true
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Crear Ausencia (Vacaciones)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tipo\": \"vacaciones\",\n  \"fechaInicio\": \"2025-07-01\",\n  \"fechaFin\": \"2025-07-15\",\n  \"motivo\": \"Vacaciones de verano\",\n  \"medioDia\": false\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/ausencias",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "ausencias"]
+            }
+          }
+        },
+        {
+          "name": "Crear Ausencia (Medio Día)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tipo\": \"permiso\",\n  \"fechaInicio\": \"2025-06-10\",\n  \"fechaFin\": \"2025-06-10\",\n  \"motivo\": \"Visita médica\",\n  \"medioDia\": true,\n  \"periodo\": \"manana\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/ausencias",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "ausencias"]
+            }
+          }
+        },
+        {
+          "name": "Aprobar Ausencia",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"estado\": \"aprobada\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/ausencias/{{ausenciaId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "ausencias", "{{ausenciaId}}"]
+            }
+          }
+        },
+        {
+          "name": "Rechazar Ausencia",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"estado\": \"rechazada\",\n  \"motivoRechazo\": \"Período no disponible por alta carga de trabajo\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/ausencias/{{ausenciaId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "ausencias", "{{ausenciaId}}"]
+            }
+          }
+        },
+        {
+          "name": "Consultar Saldo",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/ausencias/saldo/{{empleadoId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "ausencias", "saldo", "{{empleadoId}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Fichajes",
+      "item": [
+        {
+          "name": "Listar Fichajes",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/fichajes?page=1&limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "fichajes"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "fechaDesde",
+                  "value": "2025-06-01",
+                  "disabled": true
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Fichar Entrada",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tipo\": \"entrada\",\n  \"timestamp\": \"{{$isoTimestamp}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/fichajes",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "fichajes"]
+            }
+          }
+        },
+        {
+          "name": "Fichar Salida",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tipo\": \"salida\",\n  \"timestamp\": \"{{$isoTimestamp}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/fichajes",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "fichajes"]
+            }
+          }
+        },
+        {
+          "name": "Balance de Horas",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/fichajes/balance/{{empleadoId}}?mes=6&anio=2025",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "fichajes", "balance", "{{empleadoId}}"],
+              "query": [
+                {
+                  "key": "mes",
+                  "value": "6"
+                },
+                {
+                  "key": "anio",
+                  "value": "2025"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Nóminas",
+      "item": [
+        {
+          "name": "Listar Nóminas",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/nominas?page=1&limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "nominas"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "mes",
+                  "value": "6",
+                  "disabled": true
+                },
+                {
+                  "key": "anio",
+                  "value": "2025",
+                  "disabled": true
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Obtener Nómina",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/nominas/{{nominaId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "nominas", "{{nominaId}}"]
+            }
+          }
+        },
+        {
+          "name": "Descargar PDF Nómina",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/nominas/{{nominaId}}/download",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "nominas", "{{nominaId}}", "download"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Equipos",
+      "item": [
+        {
+          "name": "Listar Equipos",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/equipos",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "equipos"]
+            }
+          }
+        },
+        {
+          "name": "Crear Equipo",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Equipo de Desarrollo\",\n  \"descripcion\": \"Equipo de desarrollo frontend\",\n  \"managerId\": \"{{managerId}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/equipos",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "equipos"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

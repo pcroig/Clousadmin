@@ -135,6 +135,19 @@ cleanupExpiredSessions()
 
 ---
 
+## 📊 Monitoring (Sentry)
+
+**Estado**: ✅ Implementado y operativo
+
+- Error tracking en cliente, servidor y edge runtime.
+- Performance monitoring (10% sample rate en producción).
+- Integración con BullMQ worker para tracking de jobs fallidos.
+- Sanitización automática de headers sensibles (cookies, authorization).
+- Variables de entorno: `NEXT_PUBLIC_SENTRY_DSN`, `SENTRY_DSN`, `SENTRY_ENVIRONMENT`.
+- Endpoint de prueba: `/api/test-sentry?action=error`
+
+---
+
 ## ⚖️ Derechos GDPR mínimos (versión 1)
 
 ### Exportación de datos personales (Artículo 15)
@@ -167,17 +180,25 @@ cleanupExpiredSessions()
 - [x] Timing attack mitigation en login
 - [x] Encriptación de campos sensibles en BD (APIs + migración legacy)
 - [x] Auditoría de accesos operativa (API + UI)
+- [x] Headers de seguridad completos (CSP actualizado para Sentry)
+- [x] Monitoring con Sentry (error tracking + performance)
 
 ### En Progreso
 - [ ] GDPR compliance (consentimientos, derecho al olvido, exportación)
 
 ### Pendiente
-- [ ] Headers de seguridad completos (CSP, HSTS)
 - [ ] File upload validation
 - [ ] Sanitización de logs
 - [ ] Tests de seguridad
 - [ ] Configurar gestor de secretos en producción (Hetzner Cloud, Vault, etc.)
 - [ ] Configuración de WAF (producción)
+
+## 🧱 Headers de Seguridad
+
+### Content-Security-Policy (24/11/2025)
+- `script-src` permite `https://browser.sentry-cdn.com` para cargar el SDK de Sentry sin relajar otras fuentes.
+- `connect-src` habilita `https://*.sentry.io` para el envío de errores y trazas hacia la plataforma de monitoreo.
+- Mantener estos dominios sincronizados con `next.config.ts` antes de cada despliegue para evitar bloqueos en producción.
 
 ---
 

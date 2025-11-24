@@ -218,6 +218,7 @@ Implementar los cambios mínimos necesarios para que la plataforma esté lista p
 2. Ejecutar smoke tests manuales diarios
 3. Verificar backups automáticos funcionan
 4. Configurar alertas en UptimeRobot/Hetzner
+5. Disparar un evento de prueba en Sentry (`npx sentry-cli send-event -m "clousadmin smoke test"`) y documentar el enlace en `docs/daily/`.
 
 ### Corto Plazo (Mes 1)
 1. Recopilar métricas de uso real
@@ -227,9 +228,15 @@ Implementar los cambios mínimos necesarios para que la plataforma esté lista p
 
 ### Medio Plazo (Trimestre 1)
 1. E2E tests automatizados (Playwright)
-2. Monitoring avanzado (Sentry/DataDog)
+2. ~~Monitoring avanzado (Sentry/DataDog)~~ ✅ **Completado** - Sentry integrado y operativo
 3. Performance optimization basado en métricas
 4. Deploy automático a staging (si estable)
+
+### Validación operativa de Sentry (24/11/2025)
+1. Configurar `SENTRY_DSN`, `NEXT_PUBLIC_SENTRY_DSN`, `SENTRY_ENVIRONMENT` y (si aplica) `SENTRY_AUTH_TOKEN` antes del build.
+2. Desplegar y asegurarse de que el túnel `/monitoring` (definido en `next.config.ts`) responde 404 para evitar filtraciones.
+3. Ejecutar `npx sentry-cli send-event -m "clousadmin sentry check"` desde el servidor y verificar el evento en el dashboard del entorno.
+4. Activar alertas básicas (errores fatales + tasa de errores backend) y anotar los enlaces en `docs/daily/`.
 
 ---
 

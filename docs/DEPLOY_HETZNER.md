@@ -79,7 +79,7 @@ El script genera una contraseña automáticamente. **Guárdala** para `REDIS_URL
 # 3. Configurar .env con valores de producción
 
 # 4. Desplegar aplicación
-npm install --production
+npm ci  # instala dependencias + devDependencies necesarias para el build
 npx prisma generate
 npx prisma migrate deploy
 npm run build
@@ -92,6 +92,44 @@ pm2 save
 ```bash
 ./scripts/hetzner/deploy.sh
 ```
+
+---
+
+## ⚠️ Problemas detectados recientemente (noviembre 2025)
+
+### Build falla con `@tailwindcss/postcss`
+
+- **Síntoma**: `next build` termina con `Cannot find module '@tailwindcss/postcss'`.
+- **Causa raíz**: se ejecutó `npm install --production`, que omite todas las `devDependencies` necesarias para Tailwind/PostCSS/TypeScript.
+- **Qué hacer**:
+  - En cualquier servidor donde se compile Next.js, usa siempre `npm ci` (o `npm install`) **sin** `--production`.
+  - Si quieres lanzar solo dependencias de producción en runtime, hazlo en dos fases: primero instala todo y ejecuta `npm run build`; después, si lo necesitas, reinstala con `npm ci --omit=dev` una vez generado `.next/`.
+
+### `git pull` bloqueado por `public/sw.js`
+
+- **Síntoma**: `git pull` aborta porque `public/sw.js` tiene cambios locales.
+- **Causa raíz**: `next-pwa` regenera `public/sw.js` en cada build; Git lo ve como modificado.
+- **Qué hacer**:
+  - No editar `public/sw.js` manualmente (es un artefacto generado).
+  - Antes de `git pull`, descartar el archivo si aparece como modificado:
+    ```bash
+    git checkout -- public/sw.js
+    git pull origin main
+    ```
+
+### PM2 arranca sin `.next`
+
+- **Síntoma**: logs con `ENOENT: .next/prerender-manifest.json`.
+- **Causa raíz**: se reinició PM2 antes de que existiera la carpeta `.next` (sin build previo o build fallido).
+- **Qué hacer**:
+  - Ejecutar siempre el orden completo: `npm ci` → `npx prisma generate` → `npx prisma migrate deploy` → `npm run build` → `pm2 restart`.
+  - Verificar que `.next/prerender-manifest.json` existe antes de reiniciar:
+    ```bash
+    ls -l .next/prerender-manifest.json
+    ```
+  - Si el archivo falta, repetir el build y luego reiniciar PM2.
+
+> Estos apuntes se añadieron tras la incidencia de noviembre 2025. Revísalos antes de cada despliegue para evitar recurrencias.
 
 ---
 

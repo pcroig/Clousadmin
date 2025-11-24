@@ -19,31 +19,41 @@ if [ ! -f "package.json" ]; then
     exit 1
 fi
 
-# 1. Obtener últimos cambios
+# 1. Restaurar artefactos generados
+echo "🧹 Restaurando artefactos generados..."
+git checkout -- public/sw.js 2>/dev/null || true
+
+# 2. Obtener últimos cambios
 echo "📥 Obteniendo últimos cambios..."
 git pull origin main || git pull origin master
 
-# 2. Instalar dependencias
+# 3. Instalar dependencias
 echo ""
 echo "📦 Instalando dependencias..."
-npm install --production
+npm ci
 
-# 3. Generar cliente Prisma
+# 4. Generar cliente Prisma
 echo ""
 echo "🔧 Generando cliente Prisma..."
 npx prisma generate
 
-# 4. Aplicar migraciones
+# 5. Aplicar migraciones
 echo ""
 echo "🗄️  Aplicando migraciones..."
 npx prisma migrate deploy
 
-# 5. Build de la aplicación
+# 6. Build de la aplicación
 echo ""
 echo "🏗️  Compilando aplicación..."
-npm run build
+NODE_OPTIONS="--max-old-space-size=8192" npm run build
 
-# 6. Reiniciar aplicación con PM2
+# 7. Verificar que .next existe
+if [ ! -f ".next/prerender-manifest.json" ]; then
+    echo "❌ Error: el build no generó .next/prerender-manifest.json"
+    exit 1
+fi
+
+# 8. Reiniciar aplicación con PM2
 echo ""
 echo "🔄 Reiniciando aplicación..."
 if pm2 list | grep -q "$APP_NAME"; then
@@ -53,7 +63,7 @@ else
     pm2 save
 fi
 
-# 7. Verificar estado
+# 9. Verificar estado
 echo ""
 echo "✅ Despliegue completado"
 echo ""

@@ -1,0 +1,1667 @@
+openapi: 3.0.3
+info:
+  title: Clousadmin API
+  description: |
+    API REST para la plataforma de gestión de recursos humanos Clousadmin.
+
+    ## Características principales
+    - Gestión completa de empleados y equipos
+    - Control horario y gestión de ausencias
+    - Procesamiento de nóminas
+    - Gestión documental y firma digital
+    - Sistema de onboarding y offboarding
+    - Integraciones con Stripe y Google Calendar
+
+    ## Autenticación
+    Todas las rutas protegidas requieren un token JWT en el header Authorization:
+    ```
+    Authorization: Bearer {token}
+    ```
+
+    ## Rate Limiting
+    - 1000 requests por hora por token
+    - 100 requests por minuto por token
+
+    ## Paginación
+    Los endpoints que retornan listas soportan paginación mediante query params:
+    - `page`: número de página (default: 1)
+    - `limit`: items por página (default: 10, max: 100)
+
+    ## Códigos de respuesta
+    - `200 OK`: Operación exitosa
+    - `201 Created`: Recurso creado exitosamente
+    - `400 Bad Request`: Validación fallida o datos inválidos
+    - `401 Unauthorized`: Token inválido o no proporcionado
+    - `403 Forbidden`: Sin permisos suficientes
+    - `404 Not Found`: Recurso no encontrado
+    - `409 Conflict`: Conflicto con estado actual (ej: ausencias solapadas)
+    - `422 Unprocessable Entity`: Error de lógica de negocio
+    - `500 Internal Server Error`: Error del servidor
+
+  version: 1.0.0
+  contact:
+    name: Soporte Clousadmin
+    email: soporte@clousadmin.com
+  license:
+    name: Propietario
+
+servers:
+  - url: https://api.clousadmin.com
+    description: Producción
+  - url: https://staging.api.clousadmin.com
+    description: Staging
+  - url: http://localhost:3000
+    description: Desarrollo local
+
+tags:
+  - name: Autenticación
+    description: Endpoints de autenticación y gestión de sesiones
+  - name: Empleados
+    description: Gestión de empleados
+  - name: Ausencias
+    description: Gestión de ausencias y vacaciones
+  - name: Fichajes
+    description: Control horario y fichajes
+  - name: Nóminas
+    description: Gestión de nóminas
+  - name: Equipos
+    description: Gestión de equipos
+  - name: Documentos
+    description: Gestión documental
+  - name: Onboarding
+    description: Proceso de onboarding de empleados
+  - name: Webhooks
+    description: Webhooks para integraciones externas
+
+paths:
+  # ========================================
+  # AUTENTICACIÓN
+  # ========================================
+  /api/auth/login:
+    post:
+      tags:
+        - Autenticación
+      summary: Iniciar sesión
+      description: Autentica un usuario con email y contraseña, retornando un token JWT
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: admin@empresa.com
+                password:
+                  type: string
+                  format: password
+                  example: Password123!
+            examples:
+              admin:
+                summary: Login como admin
+                value:
+                  email: admin@empresa.com
+                  password: Password123!
+              empleado:
+                summary: Login como empleado
+                value:
+                  email: empleado@empresa.com
+                  password: MiPassword456!
+      responses:
+        '200':
+          description: Login exitoso
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+                    description: Token JWT para autenticación
+                    example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+                  user:
+                    $ref: '#/components/schemas/Usuario'
+              examples:
+                success:
+                  summary: Login exitoso
+                  value:
+                    token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI1NTBlODQwMC1lMjliLTQxZDQtYTcxNi00NDY2NTU0NDAwMDAiLCJlbXByZXNhSWQiOiI3NzBlODQwMC1lMjliLTQxZDQtYTcxNi00NDY2NTU0NDAwMDAiLCJyb2xlIjoiaHJfYWRtaW4iLCJpYXQiOjE3MzI0NzM2MDAsImV4cCI6MTczMjU2MDAwMH0.dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk
+                    user:
+                      id: 550e8400-e29b-41d4-a716-446655440000
+                      email: admin@empresa.com
+                      nombre: María
+                      apellidos: García López
+                      role: hr_admin
+                      empresaId: 770e8400-e29b-41d4-a716-446655440000
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          description: Credenciales inválidas
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Credenciales inválidas
+                message: El email o la contraseña son incorrectos
+
+  /api/auth/google:
+    post:
+      tags:
+        - Autenticación
+      summary: Login con Google OAuth
+      description: Autentica un usuario mediante Google OAuth
+      operationId: loginGoogle
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - credential
+              properties:
+                credential:
+                  type: string
+                  description: Google OAuth credential token
+      responses:
+        '200':
+          description: Login exitoso
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+                  user:
+                    $ref: '#/components/schemas/Usuario'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/auth/forgot-password:
+    post:
+      tags:
+        - Autenticación
+      summary: Recuperar contraseña
+      description: Envía un email con un enlace para restablecer la contraseña
+      operationId: forgotPassword
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: usuario@empresa.com
+      responses:
+        '200':
+          description: Email enviado exitosamente
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Si existe una cuenta con ese email, recibirás un enlace de recuperación
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  # ========================================
+  # EMPLEADOS
+  # ========================================
+  /api/empleados:
+    get:
+      tags:
+        - Empleados
+      summary: Listar empleados
+      description: Obtiene la lista de empleados de la empresa con paginación
+      operationId: listEmpleados
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+        - name: search
+          in: query
+          description: Buscar por nombre, apellidos o email
+          schema:
+            type: string
+          example: García
+        - name: equipoId
+          in: query
+          description: Filtrar por equipo
+          schema:
+            type: string
+            format: uuid
+        - name: puestoId
+          in: query
+          description: Filtrar por puesto
+          schema:
+            type: string
+            format: uuid
+        - name: activo
+          in: query
+          description: Filtrar por estado activo/inactivo
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: Lista de empleados
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  empleados:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Empleado'
+                  total:
+                    type: integer
+                    example: 45
+                  page:
+                    type: integer
+                    example: 1
+                  limit:
+                    type: integer
+                    example: 10
+                  totalPages:
+                    type: integer
+                    example: 5
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+    post:
+      tags:
+        - Empleados
+      summary: Crear empleado
+      description: Crea un nuevo empleado en el sistema
+      operationId: createEmpleado
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmpleadoCreate'
+            examples:
+              empleadoCompleto:
+                summary: Empleado con todos los campos
+                value:
+                  nombre: Juan
+                  apellidos: Pérez Martínez
+                  email: juan.perez@empresa.com
+                  telefono: "+34612345678"
+                  dni: "12345678A"
+                  fechaNacimiento: "1990-05-15"
+                  fechaIngreso: "2025-01-01"
+                  puestoId: 550e8400-e29b-41d4-a716-446655440001
+                  equipoId: 550e8400-e29b-41d4-a716-446655440002
+                  sedeId: 550e8400-e29b-41d4-a716-446655440003
+                  salarioBrutoAnual: 35000
+                  numeroPagas: 14
+                  jornadaId: 550e8400-e29b-41d4-a716-446655440004
+                  diasVacacionesAnuales: 22
+      responses:
+        '201':
+          description: Empleado creado exitosamente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Empleado'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: Email o DNI ya existe
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Email ya existe
+                message: Ya existe un empleado con el email juan.perez@empresa.com
+
+  /api/empleados/{id}:
+    get:
+      tags:
+        - Empleados
+      summary: Obtener empleado
+      description: Obtiene los detalles de un empleado específico
+      operationId: getEmpleado
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/EmpleadoId'
+      responses:
+        '200':
+          description: Detalles del empleado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmpleadoDetalle'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    patch:
+      tags:
+        - Empleados
+      summary: Actualizar empleado
+      description: Actualiza los datos de un empleado
+      operationId: updateEmpleado
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/EmpleadoId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmpleadoUpdate'
+      responses:
+        '200':
+          description: Empleado actualizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Empleado'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      tags:
+        - Empleados
+      summary: Eliminar empleado
+      description: Elimina (baja) un empleado del sistema
+      operationId: deleteEmpleado
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/EmpleadoId'
+      responses:
+        '200':
+          description: Empleado eliminado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Empleado dado de baja exitosamente
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ========================================
+  # AUSENCIAS
+  # ========================================
+  /api/ausencias:
+    get:
+      tags:
+        - Ausencias
+      summary: Listar ausencias
+      description: Obtiene la lista de ausencias con filtros opcionales
+      operationId: listAusencias
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+        - name: empleadoId
+          in: query
+          description: Filtrar por empleado (HR puede ver todos, empleados solo las suyas)
+          schema:
+            type: string
+            format: uuid
+        - name: tipo
+          in: query
+          description: Filtrar por tipo de ausencia
+          schema:
+            type: string
+            enum: [vacaciones, baja_medica, permiso, otro]
+        - name: estado
+          in: query
+          description: Filtrar por estado
+          schema:
+            type: string
+            enum: [pendiente, aprobada, rechazada, cancelada]
+        - name: fechaDesde
+          in: query
+          description: Filtrar desde fecha (ISO 8601)
+          schema:
+            type: string
+            format: date
+        - name: fechaHasta
+          in: query
+          description: Filtrar hasta fecha (ISO 8601)
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Lista de ausencias
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ausencias:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Ausencia'
+                  total:
+                    type: integer
+                  page:
+                    type: integer
+                  limit:
+                    type: integer
+                  totalPages:
+                    type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    post:
+      tags:
+        - Ausencias
+      summary: Crear ausencia
+      description: Crea una nueva solicitud de ausencia
+      operationId: createAusencia
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AusenciaCreate'
+            examples:
+              vacaciones:
+                summary: Solicitud de vacaciones
+                value:
+                  tipo: vacaciones
+                  fechaInicio: "2025-07-01"
+                  fechaFin: "2025-07-15"
+                  motivo: Vacaciones de verano
+                  medioDia: false
+              permiso:
+                summary: Permiso medio día
+                value:
+                  tipo: permiso
+                  fechaInicio: "2025-06-10"
+                  fechaFin: "2025-06-10"
+                  motivo: Visita médica
+                  medioDia: true
+                  periodo: manana
+      responses:
+        '201':
+          description: Ausencia creada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ausencia'
+              example:
+                id: 550e8400-e29b-41d4-a716-446655440000
+                tipo: vacaciones
+                fechaInicio: "2025-07-01T00:00:00.000Z"
+                fechaFin: "2025-07-15T23:59:59.999Z"
+                estado: pendiente
+                diasSolicitados: 11
+                empleadoId: 770e8400-e29b-41d4-a716-446655440000
+                empleado:
+                  nombre: Juan
+                  apellidos: Pérez
+                motivo: Vacaciones de verano
+                medioDia: false
+                createdAt: "2025-06-01T10:00:00.000Z"
+        '400':
+          description: Validación fallida
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                saldoInsuficiente:
+                  summary: Saldo insuficiente
+                  value:
+                    error: Saldo insuficiente
+                    message: El empleado solo tiene 5 días de vacaciones disponibles pero solicita 11
+                    saldoDisponible: 5
+                    diasSolicitados: 11
+                ausenciasSolapadas:
+                  summary: Ausencias solapadas
+                  value:
+                    error: Ausencias solapadas
+                    message: Ya existe una ausencia en el período solicitado
+                    ausenciaExistente:
+                      id: 660e8400-e29b-41d4-a716-446655440000
+                      fechaInicio: "2025-07-05"
+                      fechaFin: "2025-07-10"
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/ausencias/{id}:
+    get:
+      tags:
+        - Ausencias
+      summary: Obtener ausencia
+      description: Obtiene los detalles de una ausencia específica
+      operationId: getAusencia
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Detalles de la ausencia
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AusenciaDetalle'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    patch:
+      tags:
+        - Ausencias
+      summary: Actualizar ausencia
+      description: Actualiza una ausencia (solo pendientes, o aprobar/rechazar si es HR/Manager)
+      operationId: updateAusencia
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AusenciaUpdate'
+            examples:
+              aprobar:
+                summary: Aprobar ausencia (HR/Manager)
+                value:
+                  estado: aprobada
+              rechazar:
+                summary: Rechazar ausencia (HR/Manager)
+                value:
+                  estado: rechazada
+                  motivoRechazo: Período no disponible por alta carga de trabajo
+              modificar:
+                summary: Modificar fechas (Empleado)
+                value:
+                  fechaInicio: "2025-07-05"
+                  fechaFin: "2025-07-19"
+      responses:
+        '200':
+          description: Ausencia actualizada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ausencia'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      tags:
+        - Ausencias
+      summary: Cancelar ausencia
+      description: Cancela una ausencia (solo si está pendiente o es futuro)
+      operationId: deleteAusencia
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Ausencia cancelada
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/ausencias/saldo/{empleadoId}:
+    get:
+      tags:
+        - Ausencias
+      summary: Consultar saldo de ausencias
+      description: Obtiene el saldo disponible de días de vacaciones y otros tipos de ausencias
+      operationId: getSaldoAusencias
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: empleadoId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Saldo de ausencias
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SaldoAusencias'
+              example:
+                empleadoId: 770e8400-e29b-41d4-a716-446655440000
+                vacaciones:
+                  asignadas: 22
+                  consumidas: 8
+                  pendientes: 3
+                  disponibles: 11
+                  caducanEn: "2025-12-31"
+                compensacion:
+                  horasAcumuladas: 15.5
+                  diasEquivalentes: 1.94
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ========================================
+  # FICHAJES
+  # ========================================
+  /api/fichajes:
+    get:
+      tags:
+        - Fichajes
+      summary: Listar fichajes
+      description: Obtiene la lista de fichajes con filtros
+      operationId: listFichajes
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+        - name: empleadoId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: fechaDesde
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: fechaHasta
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: estado
+          in: query
+          schema:
+            type: string
+            enum: [completo, incompleto, pendiente_revision]
+      responses:
+        '200':
+          description: Lista de fichajes
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  fichajes:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Fichaje'
+                  total:
+                    type: integer
+                  page:
+                    type: integer
+                  limit:
+                    type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    post:
+      tags:
+        - Fichajes
+      summary: Registrar fichaje
+      description: Registra una entrada o salida de fichaje
+      operationId: createFichaje
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FichajeCreate'
+            examples:
+              entrada:
+                summary: Fichaje de entrada
+                value:
+                  tipo: entrada
+                  timestamp: "2025-06-10T08:00:00Z"
+              salida:
+                summary: Fichaje de salida
+                value:
+                  tipo: salida
+                  timestamp: "2025-06-10T17:00:00Z"
+      responses:
+        '201':
+          description: Fichaje registrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Fichaje'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/fichajes/balance/{empleadoId}:
+    get:
+      tags:
+        - Fichajes
+      summary: Balance de horas
+      description: Obtiene el balance de horas trabajadas del empleado
+      operationId: getBalanceFichajes
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: empleadoId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: mes
+          in: query
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 12
+        - name: anio
+          in: query
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Balance de horas
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BalanceFichajes'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ========================================
+  # NÓMINAS
+  # ========================================
+  /api/nominas:
+    get:
+      tags:
+        - Nóminas
+      summary: Listar nóminas
+      description: Obtiene la lista de nóminas
+      operationId: listNominas
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+        - name: empleadoId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: mes
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 12
+        - name: anio
+          in: query
+          schema:
+            type: integer
+        - name: estado
+          in: query
+          schema:
+            type: string
+            enum: [borrador, generada, enviada, pagada]
+      responses:
+        '200':
+          description: Lista de nóminas
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  nominas:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Nomina'
+                  total:
+                    type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/nominas/{id}:
+    get:
+      tags:
+        - Nóminas
+      summary: Obtener nómina
+      description: Obtiene el detalle de una nómina
+      operationId: getNomina
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Detalle de nómina
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NominaDetalle'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/nominas/{id}/download:
+    get:
+      tags:
+        - Nóminas
+      summary: Descargar PDF de nómina
+      description: Descarga el PDF de una nómina
+      operationId: downloadNomina
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: PDF de la nómina
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ========================================
+  # WEBHOOKS
+  # ========================================
+  /api/webhooks/stripe:
+    post:
+      tags:
+        - Webhooks
+      summary: Webhook de Stripe
+      description: |
+        Recibe notificaciones de eventos de Stripe (pagos, suscripciones, etc.)
+
+        **Configuración en Stripe Dashboard:**
+        1. Ve a Developers > Webhooks
+        2. Añade endpoint: https://tu-dominio.com/api/webhooks/stripe
+        3. Selecciona eventos relevantes
+        4. Copia el signing secret a STRIPE_WEBHOOK_SECRET
+
+        **Eventos manejados:**
+        - product.* (creación, actualización, eliminación de productos)
+        - price.* (gestión de precios)
+        - customer.* (gestión de clientes)
+        - customer.subscription.* (gestión de suscripciones)
+        - checkout.session.completed
+        - invoice.paid
+        - invoice.payment_failed
+      operationId: stripeWebhook
+      parameters:
+        - name: stripe-signature
+          in: header
+          required: true
+          description: Firma de Stripe para verificar autenticidad del webhook
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: Evento de Stripe (formato varía según tipo)
+      responses:
+        '200':
+          description: Webhook procesado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  received:
+                    type: boolean
+                    example: true
+
+  /api/integrations/calendar/webhook:
+    post:
+      tags:
+        - Webhooks
+      summary: Webhook de Google Calendar
+      description: Recibe notificaciones de cambios en Google Calendar
+      operationId: calendarWebhook
+      parameters:
+        - name: x-goog-channel-id
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: x-goog-resource-id
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: x-goog-resource-state
+          in: header
+          required: true
+          schema:
+            type: string
+            enum: [sync, exists, not_exists, update]
+      responses:
+        '200':
+          description: Webhook procesado
+
+# ========================================
+# COMPONENTES REUTILIZABLES
+# ========================================
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        JWT token obtenido del endpoint /api/auth/login
+
+        Incluir en cada request:
+        ```
+        Authorization: Bearer {token}
+        ```
+
+        El token expira en 24 horas.
+
+  parameters:
+    Page:
+      name: page
+      in: query
+      description: Número de página (comienza en 1)
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+
+    Limit:
+      name: limit
+      in: query
+      description: Número de items por página
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 10
+
+    EmpleadoId:
+      name: id
+      in: path
+      required: true
+      description: ID del empleado
+      schema:
+        type: string
+        format: uuid
+
+  schemas:
+    # ========================================
+    # SCHEMAS DE AUTENTICACIÓN
+    # ========================================
+    Usuario:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        nombre:
+          type: string
+        apellidos:
+          type: string
+        role:
+          type: string
+          enum: [empleado, manager, hr_admin, admin]
+        empresaId:
+          type: string
+          format: uuid
+        avatar:
+          type: string
+          nullable: true
+
+    # ========================================
+    # SCHEMAS DE EMPLEADOS
+    # ========================================
+    Empleado:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        nombre:
+          type: string
+        apellidos:
+          type: string
+        email:
+          type: string
+          format: email
+        telefono:
+          type: string
+          nullable: true
+        dni:
+          type: string
+        fechaNacimiento:
+          type: string
+          format: date
+          nullable: true
+        fechaIngreso:
+          type: string
+          format: date
+        fechaBaja:
+          type: string
+          format: date
+          nullable: true
+        activo:
+          type: boolean
+        puestoId:
+          type: string
+          format: uuid
+          nullable: true
+        equipoId:
+          type: string
+          format: uuid
+          nullable: true
+        sedeId:
+          type: string
+          format: uuid
+          nullable: true
+        empresaId:
+          type: string
+          format: uuid
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    EmpleadoDetalle:
+      allOf:
+        - $ref: '#/components/schemas/Empleado'
+        - type: object
+          properties:
+            puesto:
+              type: object
+              nullable: true
+              properties:
+                id:
+                  type: string
+                  format: uuid
+                nombre:
+                  type: string
+            equipo:
+              type: object
+              nullable: true
+              properties:
+                id:
+                  type: string
+                  format: uuid
+                nombre:
+                  type: string
+            sede:
+              type: object
+              nullable: true
+              properties:
+                id:
+                  type: string
+                  format: uuid
+                nombre:
+                  type: string
+            jornada:
+              type: object
+              nullable: true
+              properties:
+                id:
+                  type: string
+                  format: uuid
+                nombre:
+                  type: string
+                horasSemanales:
+                  type: number
+            salarioBrutoAnual:
+              type: number
+              nullable: true
+            numeroPagas:
+              type: integer
+              nullable: true
+            diasVacacionesAnuales:
+              type: integer
+              nullable: true
+
+    EmpleadoCreate:
+      type: object
+      required:
+        - nombre
+        - apellidos
+        - email
+        - dni
+        - fechaIngreso
+      properties:
+        nombre:
+          type: string
+          minLength: 1
+        apellidos:
+          type: string
+          minLength: 1
+        email:
+          type: string
+          format: email
+        telefono:
+          type: string
+          nullable: true
+        dni:
+          type: string
+        fechaNacimiento:
+          type: string
+          format: date
+          nullable: true
+        fechaIngreso:
+          type: string
+          format: date
+        puestoId:
+          type: string
+          format: uuid
+          nullable: true
+        equipoId:
+          type: string
+          format: uuid
+          nullable: true
+        sedeId:
+          type: string
+          format: uuid
+          nullable: true
+        jornadaId:
+          type: string
+          format: uuid
+          nullable: true
+        salarioBrutoAnual:
+          type: number
+          minimum: 0
+          nullable: true
+        numeroPagas:
+          type: integer
+          minimum: 1
+          maximum: 14
+          nullable: true
+        diasVacacionesAnuales:
+          type: integer
+          minimum: 0
+          maximum: 50
+          nullable: true
+
+    EmpleadoUpdate:
+      type: object
+      properties:
+        nombre:
+          type: string
+        apellidos:
+          type: string
+        telefono:
+          type: string
+        fechaNacimiento:
+          type: string
+          format: date
+        puestoId:
+          type: string
+          format: uuid
+        equipoId:
+          type: string
+          format: uuid
+        sedeId:
+          type: string
+          format: uuid
+        jornadaId:
+          type: string
+          format: uuid
+        salarioBrutoAnual:
+          type: number
+        numeroPagas:
+          type: integer
+        diasVacacionesAnuales:
+          type: integer
+
+    # ========================================
+    # SCHEMAS DE AUSENCIAS
+    # ========================================
+    Ausencia:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        tipo:
+          type: string
+          enum: [vacaciones, baja_medica, permiso, otro]
+        fechaInicio:
+          type: string
+          format: date-time
+        fechaFin:
+          type: string
+          format: date-time
+        estado:
+          type: string
+          enum: [pendiente, aprobada, rechazada, cancelada]
+        diasSolicitados:
+          type: number
+        empleadoId:
+          type: string
+          format: uuid
+        empleado:
+          type: object
+          properties:
+            nombre:
+              type: string
+            apellidos:
+              type: string
+        motivo:
+          type: string
+          nullable: true
+        motivoRechazo:
+          type: string
+          nullable: true
+        medioDia:
+          type: boolean
+        periodo:
+          type: string
+          enum: [manana, tarde]
+          nullable: true
+        aprobadoPorId:
+          type: string
+          format: uuid
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    AusenciaDetalle:
+      allOf:
+        - $ref: '#/components/schemas/Ausencia'
+        - type: object
+          properties:
+            aprobadoPor:
+              type: object
+              nullable: true
+              properties:
+                nombre:
+                  type: string
+                apellidos:
+                  type: string
+
+    AusenciaCreate:
+      type: object
+      required:
+        - tipo
+        - fechaInicio
+        - fechaFin
+      properties:
+        tipo:
+          type: string
+          enum: [vacaciones, baja_medica, permiso, otro]
+        fechaInicio:
+          type: string
+          format: date
+        fechaFin:
+          type: string
+          format: date
+        motivo:
+          type: string
+          nullable: true
+        medioDia:
+          type: boolean
+          default: false
+        periodo:
+          type: string
+          enum: [manana, tarde]
+          nullable: true
+
+    AusenciaUpdate:
+      type: object
+      properties:
+        fechaInicio:
+          type: string
+          format: date
+        fechaFin:
+          type: string
+          format: date
+        motivo:
+          type: string
+        estado:
+          type: string
+          enum: [aprobada, rechazada, cancelada]
+        motivoRechazo:
+          type: string
+
+    SaldoAusencias:
+      type: object
+      properties:
+        empleadoId:
+          type: string
+          format: uuid
+        vacaciones:
+          type: object
+          properties:
+            asignadas:
+              type: number
+            consumidas:
+              type: number
+            pendientes:
+              type: number
+            disponibles:
+              type: number
+            caducanEn:
+              type: string
+              format: date
+        compensacion:
+          type: object
+          properties:
+            horasAcumuladas:
+              type: number
+            diasEquivalentes:
+              type: number
+
+    # ========================================
+    # SCHEMAS DE FICHAJES
+    # ========================================
+    Fichaje:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        empleadoId:
+          type: string
+          format: uuid
+        tipo:
+          type: string
+          enum: [entrada, salida, pausa_inicio, pausa_fin]
+        timestamp:
+          type: string
+          format: date-time
+        ubicacion:
+          type: string
+          nullable: true
+        incidencia:
+          type: boolean
+        observaciones:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+
+    FichajeCreate:
+      type: object
+      required:
+        - tipo
+        - timestamp
+      properties:
+        tipo:
+          type: string
+          enum: [entrada, salida, pausa_inicio, pausa_fin]
+        timestamp:
+          type: string
+          format: date-time
+        ubicacion:
+          type: string
+          nullable: true
+        observaciones:
+          type: string
+          nullable: true
+
+    BalanceFichajes:
+      type: object
+      properties:
+        empleadoId:
+          type: string
+          format: uuid
+        mes:
+          type: integer
+        anio:
+          type: integer
+        horasEsperadas:
+          type: number
+        horasTrabajadas:
+          type: number
+        balance:
+          type: number
+        horasExtra:
+          type: number
+        diasTrabajados:
+          type: integer
+        diasLaborables:
+          type: integer
+
+    # ========================================
+    # SCHEMAS DE NÓMINAS
+    # ========================================
+    Nomina:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        empleadoId:
+          type: string
+          format: uuid
+        mes:
+          type: integer
+        anio:
+          type: integer
+        estado:
+          type: string
+          enum: [borrador, generada, enviada, pagada]
+        salarioBruto:
+          type: number
+        deducciones:
+          type: number
+        salarioNeto:
+          type: number
+        empresaId:
+          type: string
+          format: uuid
+        createdAt:
+          type: string
+          format: date-time
+
+    NominaDetalle:
+      allOf:
+        - $ref: '#/components/schemas/Nomina'
+        - type: object
+          properties:
+            empleado:
+              type: object
+              properties:
+                nombre:
+                  type: string
+                apellidos:
+                  type: string
+                dni:
+                  type: string
+            conceptos:
+              type: array
+              items:
+                type: object
+                properties:
+                  tipo:
+                    type: string
+                  descripcion:
+                    type: string
+                  importe:
+                    type: number
+            complementos:
+              type: array
+              items:
+                type: object
+                properties:
+                  tipo:
+                    type: string
+                  descripcion:
+                    type: string
+                  importe:
+                    type: number
+            pdfUrl:
+              type: string
+              nullable: true
+
+    # ========================================
+    # SCHEMAS DE ERROR
+    # ========================================
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Tipo de error
+        message:
+          type: string
+          description: Mensaje descriptivo del error
+        details:
+          type: object
+          description: Detalles adicionales del error
+          nullable: true
+
+  responses:
+    BadRequest:
+      description: Petición inválida o validación fallida
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            validacionFallida:
+              summary: Error de validación
+              value:
+                error: Validation error
+                message: Los datos proporcionados no son válidos
+                details:
+                  email: Email inválido
+                  fechaInicio: Fecha requerida
+
+    Unauthorized:
+      description: No autenticado o token inválido
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: Unauthorized
+            message: Token JWT inválido o expirado
+
+    Forbidden:
+      description: Sin permisos suficientes
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: Forbidden
+            message: No tienes permisos para realizar esta acción
+
+    NotFound:
+      description: Recurso no encontrado
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: Not found
+            message: El recurso solicitado no existe
+
+security:
+  - BearerAuth: []

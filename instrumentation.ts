@@ -4,6 +4,10 @@
  * Usado para inicializar workers, servicios en background, etc.
  */
 
+import * as Sentry from '@sentry/nextjs';
+
+import './sentry.server.config';
+
 export async function register() {
   // Solo ejecutar en el servidor (Node.js runtime)
   if (process.env.NEXT_RUNTIME === 'nodejs') {
@@ -22,14 +26,34 @@ export async function register() {
     // Event handlers para el worker
     documentosWorker.on('completed', (job) => {
       console.log(`[Worker] Job ${job.id} completado`);
+      Sentry.addBreadcrumb({
+        category: 'bullmq',
+        message: `Job ${job.id} completado`,
+        level: 'info',
+      });
     });
 
     documentosWorker.on('failed', (job, err) => {
       console.error(`[Worker] Job ${job?.id} falló:`, err.message);
+      Sentry.captureException(err, {
+        tags: {
+          queue: 'documentos-generacion',
+        },
+        extra: {
+          jobId: job?.id,
+          name: job?.name,
+          attemptsMade: job?.attemptsMade,
+        },
+      });
     });
 
     documentosWorker.on('error', (err) => {
       console.error('[Worker] Error en worker:', err);
+      Sentry.captureException(err, {
+        tags: {
+          queue: 'documentos-generacion',
+        },
+      });
     });
 
     // Graceful shutdown

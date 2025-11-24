@@ -275,6 +275,13 @@ Además de la corrección crítica, se implementaron mejoras incrementales:
 
 ---
 
+## 🔄 Actualizaciones posteriores (24/11/2025)
+
+- Se añadió la dependencia `@sentry/nextjs` para habilitar monitoreo centralizado de errores y trazas en Next.js 16.
+- Esta fase habilita la integración progresiva de Sentry (configuración de cliente/servidor, instrumentation hook y despliegue) documentada en `docs/CONFIGURACION_SEGURIDAD.md`.
+
+---
+
 ## 📄 Documentación Relacionada
 
 1. `docs/RESUMEN_CORRECCION_SOLICITUDES_CIFRADO.md` - Análisis detallado del problema y solución
