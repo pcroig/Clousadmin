@@ -22,6 +22,7 @@ fi
 # 1. Restaurar artefactos generados
 echo "🧹 Restaurando artefactos generados..."
 git checkout -- public/sw.js 2>/dev/null || true
+git checkout -- package.json package-lock.json 2>/dev/null || true
 
 # 2. Obtener últimos cambios
 echo "📥 Obteniendo últimos cambios..."
