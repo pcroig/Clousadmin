@@ -23,6 +23,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { getAvatarStyle } from '@/lib/design-system';
+import { parseJson } from '@/lib/utils/json';
 
 import { PuestoFormModal } from './puesto-form-modal';
 
@@ -69,7 +70,7 @@ export function PuestoDetails({ puesto, onUpdate, onDelete }: PuestoDetailsProps
       });
 
       if (!response.ok) {
-        const error = await response.json();
+        const error = await parseJson<{ error?: string }>(response);
         throw new Error(error.error || 'Error al eliminar puesto');
       }
 
@@ -100,7 +101,7 @@ export function PuestoDetails({ puesto, onUpdate, onDelete }: PuestoDetailsProps
       });
 
       if (!response.ok) {
-        const error = await response.json();
+        const error = await parseJson<{ error?: string }>(response);
         throw new Error(error.error || 'Error al subir documento');
       }
 
@@ -127,7 +128,7 @@ export function PuestoDetails({ puesto, onUpdate, onDelete }: PuestoDetailsProps
       );
 
       if (!response.ok) {
-        const error = await response.json();
+        const error = await parseJson<{ error?: string }>(response);
         throw new Error(error.error || 'Error al eliminar documento');
       }
 

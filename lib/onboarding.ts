@@ -13,13 +13,7 @@ import { crearNotificacionOnboardingCompletado } from '@/lib/notificaciones';
 import { obtenerOnboardingConfig } from '@/lib/onboarding-config';
 import { prisma, Prisma } from '@/lib/prisma';
 import { uploadToS3 } from '@/lib/s3';
-
-/**
- * Helper function to safely convert values to Prisma JSON input
- */
-function toJsonValue<T extends Record<string, unknown>>(value: T): Prisma.InputJsonValue {
-  return value as unknown as Prisma.InputJsonValue;
-}
+import { asJsonValue } from '@/lib/prisma/json';
 
 /**
  * Tipo de onboarding
@@ -152,7 +146,7 @@ export async function crearOnboarding(
           token,
           tokenExpira,
           tipoOnboarding,
-          progreso: toJsonValue(progresoInicial),
+          progreso: asJsonValue(progresoInicial),
         },
       });
     });
@@ -287,7 +281,7 @@ export async function guardarCredenciales(
     await prisma.onboardingEmpleado.update({
       where: { id: onboarding.id },
       data: {
-        progreso: toJsonValue(progresoNuevo),
+        progreso: asJsonValue(progresoNuevo),
       },
     });
 
@@ -339,8 +333,8 @@ export async function guardarDatosPersonales(
     await prisma.onboardingEmpleado.update({
       where: { id: onboarding.id },
       data: {
-        datosTemporales: toJsonValue(datosTemporalesNuevos),
-        progreso: toJsonValue(progresoNuevo),
+        datosTemporales: asJsonValue(datosTemporalesNuevos),
+        progreso: asJsonValue(progresoNuevo),
       },
     });
 
@@ -392,8 +386,8 @@ export async function guardarDatosBancarios(
     await prisma.onboardingEmpleado.update({
       where: { id: onboarding.id },
       data: {
-        datosTemporales: toJsonValue(datosTemporalesNuevos),
-        progreso: toJsonValue(progresoNuevo),
+        datosTemporales: asJsonValue(datosTemporalesNuevos),
+        progreso: asJsonValue(progresoNuevo),
       },
     });
 
@@ -435,7 +429,7 @@ export async function guardarProgresoDocumentos(token: string) {
     await prisma.onboardingEmpleado.update({
       where: { id: onboarding.id },
       data: {
-        progreso: toJsonValue(progresoNuevo),
+        progreso: asJsonValue(progresoNuevo),
       },
     });
 
@@ -845,7 +839,7 @@ export async function guardarProgresoIntegraciones(token: string) {
     await prisma.onboardingEmpleado.update({
       where: { id: onboarding.id },
       data: {
-        progreso: toJsonValue({
+        progreso: asJsonValue({
           ...progreso,
           integraciones: true,
         }),
@@ -881,7 +875,7 @@ export async function guardarProgresoPWA(token: string) {
     await prisma.onboardingEmpleado.update({
       where: { id: onboarding.id },
       data: {
-        progreso: toJsonValue({
+        progreso: asJsonValue({
           ...progreso,
           pwa_explicacion: true,
         }),

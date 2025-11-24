@@ -40,11 +40,14 @@ export async function POST(
       mensajeFirma,
     } = body;
 
-    const ids: string[] = Array.isArray(empleadoIds)
+    const rawIds = Array.isArray(empleadoIds)
       ? empleadoIds
       : Array.isArray(empleadosIds)
         ? empleadosIds
         : [];
+    const ids = rawIds.filter(
+      (valor): valor is string => typeof valor === 'string' && valor.trim().length > 0
+    );
 
     // Validaciones
     if (ids.length === 0) {

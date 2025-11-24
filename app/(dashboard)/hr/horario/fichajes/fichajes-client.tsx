@@ -31,6 +31,7 @@ import { EstadoFichaje } from '@/lib/constants/enums';
 import { useIsMobile } from '@/lib/hooks/use-viewport';
 import { extractArrayFromResponse } from '@/lib/utils/api-response';
 import { formatearHorasMinutos } from '@/lib/utils/formatters';
+import { parseJson } from '@/lib/utils/json';
 
 import { EditarFichajeModal } from './editar-fichaje-modal';
 import { JornadasModal } from './jornadas-modal';
@@ -157,9 +158,9 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
     });
 
     return Object.entries(grupos).map(([fecha, fichajesDelDia]) => {
-      const eventosOrdenados = fichajesDelDia
-        .flatMap<FichajeEvento>((registro) => registro.eventos)
-        .sort(
+      const eventosOrdenados = (
+        fichajesDelDia.flatMap((registro) => registro.eventos) as FichajeEvento[]
+      ).sort(
           (a, b) => new Date(a.hora).getTime() - new Date(b.hora).getTime()
         );
 
@@ -230,7 +231,8 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
       }
 
       const response = await fetch(`/api/fichajes?${params}`);
-      const payload = await response.json() as Record<string, any>;
+      const payload =
+        (await parseJson<Record<string, any>>(response).catch(() => undefined)) ?? {};
 
       if (!response.ok) {
         const errorMessage =
@@ -332,8 +334,13 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
         return;
       }
 
-      const data = await response.json() as Record<string, any>;
-      const eventos = Array.isArray(data.eventos) ? data.eventos : [];
+      const data = await parseJson<Record<string, unknown>>(response).catch(() => null);
+      if (!data) {
+        return;
+      }
+      const eventos: FichajeEvento[] = Array.isArray(data.eventos)
+        ? (data.eventos as FichajeEvento[])
+        : [];
       if (eventos.length === 0) {
         return;
       }
@@ -372,7 +379,8 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
         toast.success('Fichaje actualizado correctamente');
         fetchFichajes(); // Recargar fichajes
       } else {
-        const error = await response.json() as Record<string, any>;
+        const error =
+          (await parseJson<{ error?: string }>(response).catch(() => undefined)) ?? {};
         toast.error(error.error || 'Error al actualizar fichaje');
       }
     } catch (error) {

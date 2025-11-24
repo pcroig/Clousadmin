@@ -24,6 +24,21 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { parseJson } from '@/lib/utils/json';
+interface CrearCarpetaResponse {
+  carpeta: {
+    id: string;
+  };
+  error?: string;
+}
+
+interface UploadDocumentoResponse {
+  documento?: {
+    id: string;
+    carpetaId: string;
+  };
+  error?: string;
+}
 
 interface UploadedFile {
   file: File;
@@ -74,11 +89,11 @@ export function CrearCarpetaConDocumentosModal({
       });
 
       if (!carpetaResponse.ok) {
-        const error = await carpetaResponse.json();
-        throw new Error(error.error || 'Error al crear carpeta');
+        const error = await parseJson<{ error?: string }>(carpetaResponse).catch(() => null);
+        throw new Error(error?.error || 'Error al crear carpeta');
       }
 
-      const { carpeta } = await carpetaResponse.json();
+      const { carpeta } = await parseJson<CrearCarpetaResponse>(carpetaResponse);
 
       // 2. Subir documentos si hay alguno
       if (documentos.length > 0) {
@@ -102,11 +117,11 @@ export function CrearCarpetaConDocumentosModal({
             });
 
             if (!uploadResponse.ok) {
-              const error = await uploadResponse.json();
-              throw new Error(error.error || `Error subiendo ${doc.nombre}`);
+              const error = await parseJson<{ error?: string }>(uploadResponse).catch(() => null);
+              throw new Error(error?.error || `Error subiendo ${doc.nombre}`);
             }
 
-            return await uploadResponse.json();
+            return parseJson<UploadDocumentoResponse>(uploadResponse);
           } catch (error) {
             console.error(`Error subiendo ${doc.nombre}:`, error);
             throw error;

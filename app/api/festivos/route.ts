@@ -16,6 +16,7 @@ import {
 import { UsuarioRol } from '@/lib/constants/enums';
 import { prisma, Prisma } from '@/lib/prisma';
 import { festivoCreateSchema } from '@/lib/validaciones/schemas';
+import { getJsonBody } from '@/lib/utils/json';
 
 // Force dynamic rendering
 export const dynamic = 'force-dynamic';
@@ -113,7 +114,7 @@ export async function POST(req: NextRequest) {
       return badRequestResponse('No tienes permisos para crear festivos');
     }
 
-    const body = await req.json() as Record<string, any>;
+    const body = await getJsonBody<Record<string, unknown>>(req);
     const validationResult = festivoCreateSchema.safeParse(body);
 
     if (!validationResult.success) {

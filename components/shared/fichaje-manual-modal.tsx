@@ -15,6 +15,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { parseJson } from '@/lib/utils/json';
 
 interface FichajeManualModalProps {
   open: boolean;
@@ -68,8 +69,8 @@ export function FichajeManualModal({ open, onClose, onSuccess }: FichajeManualMo
       });
 
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Error al crear solicitud');
+        const error = await parseJson<{ error?: string }>(response).catch(() => null);
+        throw new Error(error?.error || 'Error al crear solicitud');
       }
 
       toast.success('Solicitud de fichaje creada. Se procesará automáticamente.');

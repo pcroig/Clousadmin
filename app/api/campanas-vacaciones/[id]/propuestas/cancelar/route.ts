@@ -12,6 +12,7 @@ import {
 } from '@/lib/api-handler';
 import { UsuarioRol } from '@/lib/constants/enums';
 import { prisma } from '@/lib/prisma';
+import { JSON_NULL } from '@/lib/prisma/json';
 
 export const dynamic = 'force-dynamic';
 
@@ -51,17 +52,17 @@ export async function POST(
           campanaId,
         },
         data: {
-          propuestaIA: null,
+          propuestaIA: JSON_NULL,
           propuestaEnviada: false,
           cambioSolicitado: false,
-          propuestaEmpleado: null,
+          propuestaEmpleado: JSON_NULL,
         },
       });
 
       await tx.campanaVacaciones.update({
         where: { id: campanaId },
         data: {
-          propuestaIA: null,
+          propuestaIA: JSON_NULL,
           estado: 'abierta',
           cuadradaEn: null,
         },

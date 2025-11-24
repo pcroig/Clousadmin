@@ -69,7 +69,7 @@ export async function GET(req: NextRequest) {
 
     return successResponse(denuncias);
   } catch (error) {
-    return handleApiError(error);
+    return handleApiError(error, 'API GET /api/denuncias');
   }
 }
 
@@ -111,6 +111,6 @@ export async function POST(req: NextRequest) {
 
     return createdResponse(denuncia);
   } catch (error) {
-    return handleApiError(error);
+    return handleApiError(error, 'API POST /api/denuncias');
   }
 }

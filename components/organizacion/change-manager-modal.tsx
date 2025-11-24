@@ -19,6 +19,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { getAvatarStyle } from '@/lib/design-system';
+import { parseJson } from '@/lib/utils/json';
 
 interface TeamMember {
   id: string;
@@ -58,7 +59,7 @@ export function ChangeManagerModal({
       });
 
       if (!response.ok) {
-        const error = await response.json();
+        const error = await parseJson<{ error?: string }>(response);
         throw new Error(error.error || 'Error al cambiar responsable');
       }
 

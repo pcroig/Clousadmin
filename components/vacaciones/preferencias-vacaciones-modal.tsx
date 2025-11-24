@@ -18,8 +18,18 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Label } from '@/components/ui/label';
 import { useMutation } from '@/lib/hooks';
 import { toDateOnlyString } from '@/lib/utils';
+import { parseJson } from '@/lib/utils/json';
 
 const MIN_ALTERNATIVOS_RATIO = 0.5;
+
+interface PreferenciaResponse {
+  success?: boolean;
+  data?: {
+    diasIdeales?: string[];
+    diasPrioritarios?: string[];
+    diasAlternativos?: string[];
+  };
+}
 
 interface PreferenciasVacacionesModalProps {
   open: boolean;
@@ -68,24 +78,38 @@ export function PreferenciasVacacionesModal({
 
     let isMounted = true;
 
-    fetch(`/api/campanas-vacaciones/${campanaId}/preferencia`)
-      .then((res) => res.json())
-      .then((data) => {
+    const loadPreferencia = async () => {
+      try {
+        const res = await fetch(`/api/campanas-vacaciones/${campanaId}/preferencia`);
+        if (!res.ok) {
+          throw new Error('Error al cargar preferencia');
+        }
+        const data = await parseJson<PreferenciaResponse>(res);
         if (!isMounted || !data?.success || !data.data) {
           return;
         }
 
         const pref = data.data;
         setErrorMessage(null);
-        setDiasIdeales(Array.isArray(pref.diasIdeales) ? pref.diasIdeales.map((d: string) => new Date(d)) : []);
+        setDiasIdeales(
+          Array.isArray(pref.diasIdeales) ? pref.diasIdeales.map((d) => new Date(d)) : []
+        );
         setDiasPrioritarios(
-          Array.isArray(pref.diasPrioritarios) ? pref.diasPrioritarios.map((d: string) => new Date(d)) : []
+          Array.isArray(pref.diasPrioritarios)
+            ? pref.diasPrioritarios.map((d) => new Date(d))
+            : []
         );
         setDiasAlternativos(
-          Array.isArray(pref.diasAlternativos) ? pref.diasAlternativos.map((d: string) => new Date(d)) : []
+          Array.isArray(pref.diasAlternativos)
+            ? pref.diasAlternativos.map((d) => new Date(d))
+            : []
         );
-      })
-      .catch((err) => console.error('Error cargando preferencia:', err));
+      } catch (err) {
+        console.error('Error cargando preferencia:', err);
+      }
+    };
+
+    void loadPreferencia();
 
     return () => {
       isMounted = false;

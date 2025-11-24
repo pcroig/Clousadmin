@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Switch } from '@/components/ui/switch';
+import { parseJson } from '@/lib/utils/json';
 
 
 interface GeneralSettingsProps {
@@ -71,7 +72,7 @@ export function GeneralSettings({ usuario }: GeneralSettingsProps) {
       const response = await fetch('/api/empleados/export/me');
 
       if (!response.ok) {
-        const payload = await response.json().catch(() => null);
+        const payload = await parseJson<{ error?: string }>(response).catch(() => null);
         throw new Error(payload?.error || 'No se pudo generar la exportación');
       }
 
@@ -333,8 +334,8 @@ export function GeneralSettings({ usuario }: GeneralSettingsProps) {
                   const response = await fetch('/api/empleados/derecho-olvido', {
                     method: 'POST',
                   });
-                  const payload = await response.json().catch(() => null);
                   if (!response.ok) {
+                    const payload = await parseJson<{ error?: string }>(response).catch(() => null);
                     throw new Error(payload?.error || 'No se pudo registrar la solicitud');
                   }
                   toast.success('Solicitud de derecho al olvido registrada');

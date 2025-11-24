@@ -12,6 +12,7 @@ import {
 } from '@/lib/api-handler';
 import { prisma } from '@/lib/prisma';
 import { preferenciaVacacionesCreateSchema } from '@/lib/validaciones/schemas';
+import { getJsonBody } from '@/lib/utils/json';
 
 // POST /api/campanas-vacaciones/[id]/preferencias - Guardar preferencias del empleado
 export async function POST(
@@ -32,7 +33,7 @@ export async function POST(
       return badRequestResponse('Debes ser un empleado para indicar preferencias');
     }
 
-    const body = await req.json() as Record<string, any>;
+    const body = await getJsonBody<Record<string, unknown>>(req);
     
     // Forzar campanaId del parámetro
     body.campanaId = campanaId;

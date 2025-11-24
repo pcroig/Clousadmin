@@ -20,6 +20,7 @@ import {
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { parseJson } from '@/lib/utils/json';
 
 
 interface CrearCampanaModalProps {
@@ -66,8 +67,8 @@ export function CrearCampanaModal({
     try {
       const res = await fetch('/api/organizacion/equipos');
       if (res.ok) {
-        const data = await res.json() as Record<string, any>;
-        setEquipos(data);
+        const data = await parseJson<Equipo[]>(res);
+        setEquipos(Array.isArray(data) ? data : []);
       }
     } catch (e) {
       console.error('Error cargando equipos:', e);
@@ -125,7 +126,9 @@ export function CrearCampanaModal({
         onCreated();
         onClose();
       } else {
-        const error = await res.json() as Record<string, any>;
+        const error = await parseJson<{ error?: string }>(res).catch(() => ({
+          error: 'Error desconocido',
+        }));
         toast.error(error.error || 'Error al crear campaña');
       }
     } catch (e) {

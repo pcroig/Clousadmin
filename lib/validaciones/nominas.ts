@@ -7,6 +7,7 @@ import { Prisma } from '@prisma/client';
 
 import { EstadoAusencia } from '@/lib/constants/enums';
 import { prisma } from '@/lib/prisma';
+import { asJsonValue } from '@/lib/prisma/json';
 
 import { obtenerHorasEsperadas } from '../calculos/fichajes';
 
@@ -689,7 +690,7 @@ export async function detectarAlertas(
         categoria: alerta.categoria,
         codigo: alerta.codigo,
         mensaje: alerta.mensaje,
-        detalles: alerta.detalles || {},
+        detalles: alerta.detalles ? asJsonValue(alerta.detalles) : asJsonValue({}),
         accionUrl: alerta.accionUrl,
         resuelta: false,
       },
@@ -731,7 +732,7 @@ export async function obtenerAlertas(
     id: string;
     nombre: string;
     apellidos: string;
-  };
+  } | null;
 }>> {
   const where: Prisma.AlertaNominaWhereInput = {
     empresaId,

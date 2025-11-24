@@ -3,6 +3,7 @@
 // ========================================
 
 import { Readable } from 'node:stream';
+import type { ReadableStream as NodeReadableStream } from 'stream/web';
 
 import { NextRequest } from 'next/server';
 
@@ -21,7 +22,7 @@ const DEFAULT_MAX_UPLOAD_MB = Number(process.env.NEXT_PUBLIC_MAX_UPLOAD_MB ?? '1
 
 async function getUploadBody(file: File) {
   if (isS3Configured()) {
-    const webStream = file.stream() as unknown as ReadableStream;
+    const webStream = file.stream() as unknown as NodeReadableStream;
     return Readable.fromWeb(webStream);
   }
   const arrayBuffer = await file.arrayBuffer();

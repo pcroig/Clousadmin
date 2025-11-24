@@ -4,6 +4,7 @@
 // Funciones para gestionar la configuración de onboarding de HR admins
 
 import { prisma, Prisma } from '@/lib/prisma';
+import { asJsonValue } from '@/lib/prisma/json';
 
 /**
  * Configuración de campos requeridos
@@ -91,10 +92,6 @@ const DEFAULT_CONFIG: OnboardingConfigData = {
 /**
  * Helper para convertir a JSON válido de Prisma
  */
-function toJsonValue<T extends Record<string, unknown>>(value: T): Prisma.InputJsonValue {
-  return value as unknown as Prisma.InputJsonValue;
-}
-
 /**
  * Obtener configuración de onboarding de una empresa
  */
@@ -109,9 +106,9 @@ export async function obtenerOnboardingConfig(empresaId: string) {
       config = await prisma.onboardingConfig.create({
         data: {
           empresaId,
-          camposRequeridos: toJsonValue(DEFAULT_CONFIG.camposRequeridos),
-          documentosRequeridos: toJsonValue(DEFAULT_CONFIG.documentosRequeridos),
-          plantillasDocumentos: toJsonValue(DEFAULT_CONFIG.plantillasDocumentos),
+          camposRequeridos: asJsonValue(DEFAULT_CONFIG.camposRequeridos),
+          documentosRequeridos: asJsonValue(DEFAULT_CONFIG.documentosRequeridos),
+          plantillasDocumentos: asJsonValue(DEFAULT_CONFIG.plantillasDocumentos),
         },
       });
     }
@@ -158,7 +155,7 @@ export async function actualizarCamposRequeridos(
     const updated = await prisma.onboardingConfig.update({
       where: { empresaId },
       data: {
-        camposRequeridos: toJsonValue(camposRequeridos),
+        camposRequeridos: asJsonValue(camposRequeridos),
       },
     });
 
@@ -196,7 +193,7 @@ export async function actualizarDocumentosRequeridos(
     const updated = await prisma.onboardingConfig.update({
       where: { empresaId },
       data: {
-        documentosRequeridos: toJsonValue(documentosRequeridos),
+        documentosRequeridos: asJsonValue(documentosRequeridos),
       },
     });
 
@@ -234,7 +231,7 @@ export async function actualizarPlantillasDocumentos(
     const updated = await prisma.onboardingConfig.update({
       where: { empresaId },
       data: {
-        plantillasDocumentos: toJsonValue(plantillasDocumentos),
+        plantillasDocumentos: asJsonValue(plantillasDocumentos),
       },
     });
 

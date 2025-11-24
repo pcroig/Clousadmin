@@ -8,6 +8,7 @@ import { DarDeBajaModal } from '@/components/hr/DarDeBajaModal';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { parseJson } from '@/lib/utils/json';
 
 
 import type { MiEspacioEmpleado } from '@/types/empleado';
@@ -73,13 +74,27 @@ export function ContratosTab({ empleado, rol = 'empleado' }: ContratosTabProps) 
         if (!isMounted) return;
 
         if (jornadasResponse.status === 'fulfilled' && jornadasResponse.value.ok) {
-          const data: JornadaOption[] = await jornadasResponse.value.json();
-          setJornadas(data);
+          const payload = await parseJson<JornadaOption[] | { jornadas?: JornadaOption[] }>(
+            jornadasResponse.value
+          ).catch(() => null);
+          const lista = Array.isArray(payload)
+            ? payload
+            : Array.isArray(payload?.jornadas)
+            ? payload?.jornadas
+            : [];
+          setJornadas(lista);
         }
 
         if (puestosResponse.status === 'fulfilled' && puestosResponse.value.ok) {
-          const data: PuestoOption[] = await puestosResponse.value.json();
-          setPuestos(data);
+          const payload = await parseJson<PuestoOption[] | { puestos?: PuestoOption[] }>(
+            puestosResponse.value
+          ).catch(() => null);
+          const lista = Array.isArray(payload)
+            ? payload
+            : Array.isArray(payload?.puestos)
+            ? payload?.puestos
+            : [];
+          setPuestos(lista);
         }
       } catch (error) {
         console.error('[ContratosTab] Error fetching admin data', error);

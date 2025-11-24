@@ -48,7 +48,7 @@ export async function extraerCamposPDF(s3Key: string): Promise<string[]> {
 async function mapearCamposPDFConIA(
   camposPDF: string[],
   variablesDisponibles: string[]
-): Promise<Record<string, string>> {
+): Promise<Record<string, string | null>> {
   console.log(`[PDF-IA] Mapeando ${camposPDF.length} campos con IA...`);
 
   const prompt = `Eres un experto en mapeo de campos de formularios PDF a variables de sistema.
@@ -94,7 +94,7 @@ Responde SOLO en JSON:
       throw new Error('No se recibió respuesta de la IA');
     }
 
-    const mapeo = JSON.parse(content);
+    const mapeo = JSON.parse(content) as Record<string, string | null>;
     console.log(`[PDF-IA] Mapeo completado: ${Object.keys(mapeo).length} campos`);
 
     return mapeo;
@@ -156,6 +156,10 @@ export async function rellenarPDFFormulario(
  * Escanear PDF con GPT-4 Vision para detectar campos visuales
  * Detecta campos que no son formularios nativos pero visualmente aparecen como campos rellenables
  */
+type VisionFieldsResponse = {
+  campos?: Array<{ nombre: string; tipo: string; confianza: number; descripcion?: string }>;
+};
+
 export async function escanearPDFConVision(
   s3Key: string
 ): Promise<Array<{ nombre: string; tipo: string; confianza: number; descripcion?: string }>> {
@@ -227,8 +231,8 @@ NOTA: Este PDF tiene ${pageCount} páginas. Analiza especialmente la primera pá
       throw new Error('La IA no devolvió contenido interpretable');
     }
 
-    const resultado = JSON.parse(content);
-    const campos = resultado.campos || [];
+    const resultado = JSON.parse(content) as VisionFieldsResponse;
+    const campos = Array.isArray(resultado.campos) ? resultado.campos : [];
 
     console.log(`[PDF-Vision] Detectados ${campos.length} campos potenciales`);
 
@@ -346,6 +350,7 @@ export async function generarDocumentoDesdePDFRellenable(
         empresaId: true,
         variablesUsadas: true,
         usarIAParaExtraer: true,
+        permiteRellenar: true,
       },
     });
 
@@ -415,11 +420,70 @@ export async function generarDocumentoDesdePDFRellenable(
 
     // 6. Resolver variables necesarias
     const variablesNecesarias = Object.values(mapeoCampos).filter((v): v is string => v !== null);
-    const empleadoData: DatosEmpleado = {
+    const empresaNormalizada: DatosEmpleado['empresa'] = {
+      id: empleado.empresa.id,
+      nombre: empleado.empresa.nombre,
+      cif: empleado.empresa.cif ?? undefined,
+      email: empleado.empresa.email ?? undefined,
+      telefono: empleado.empresa.telefono ?? undefined,
+      direccion: empleado.empresa.direccion ?? undefined,
+      web: empleado.empresa.web ?? undefined,
+    };
+    const empleadoSanitizado = {
       ...empleado,
+      nif: empleado.nif ?? undefined,
+      nss: empleado.nss ?? undefined,
+      telefono: empleado.telefono ?? undefined,
+      fechaNacimiento: empleado.fechaNacimiento ?? undefined,
+      direccionCalle: empleado.direccionCalle ?? undefined,
+      direccionNumero: empleado.direccionNumero ?? undefined,
+      direccionPiso: empleado.direccionPiso ?? undefined,
+      codigoPostal: empleado.codigoPostal ?? undefined,
+      ciudad: empleado.ciudad ?? undefined,
+      direccionProvincia: empleado.direccionProvincia ?? undefined,
+      estadoCivil: empleado.estadoCivil ?? undefined,
+      numeroHijos: empleado.numeroHijos ?? undefined,
+      genero: empleado.genero ?? undefined,
+      iban: empleado.iban ?? undefined,
+      titularCuenta: empleado.titularCuenta ?? undefined,
+      puesto: empleado.puesto ?? undefined,
+      fechaBaja: empleado.fechaBaja ?? undefined,
+      tipoContrato: empleado.tipoContrato ?? undefined,
+      diasVacaciones: empleado.diasVacaciones ?? undefined,
+      ausencias: undefined,
+    };
+
+    const empleadoData: DatosEmpleado = {
+      ...empleadoSanitizado,
       salarioBrutoAnual: empleado.salarioBrutoAnual ? Number(empleado.salarioBrutoAnual) : undefined,
       salarioBrutoMensual: empleado.salarioBrutoMensual ? Number(empleado.salarioBrutoMensual) : undefined,
-      empresa: empleado.empresa,
+      empresa: empresaNormalizada,
+      jornada: empleado.jornada
+        ? {
+            nombre: empleado.jornada.nombre,
+            horasSemanales: Number(empleado.jornada.horasSemanales),
+          }
+        : undefined,
+      manager: empleado.manager
+        ? {
+            nombre: empleado.manager.nombre,
+            apellidos: empleado.manager.apellidos,
+            email: empleado.manager.email,
+          }
+        : undefined,
+      puestoRelacion: empleado.puestoRelacion
+        ? {
+            nombre: empleado.puestoRelacion.nombre,
+            descripcion: empleado.puestoRelacion.descripcion ?? undefined,
+          }
+        : undefined,
+      contratos: empleado.contratos?.map((contrato) => ({
+        id: contrato.id,
+        tipoContrato: contrato.tipoContrato,
+        fechaInicio: contrato.fechaInicio,
+        fechaFin: contrato.fechaFin ?? undefined,
+        salarioBrutoAnual: Number(contrato.salarioBrutoAnual),
+      })),
     };
 
     console.log(`[PDF] Resolviendo ${variablesNecesarias.length} variables...`);
@@ -523,12 +587,17 @@ export async function generarDocumentoDesdePDFRellenable(
     }
 
     if (!permiteRellenar && requiereFirmaFinal) {
+      const hashDocumento = documento.hashDocumento ?? 'sin-hash';
+      const tituloFirma = `Firma de ${documento.nombre}`;
+
       const solicitudFirma = await prisma.solicitudFirma.create({
         data: {
           empresaId: empleado.empresaId,
           documentoId: documento.id,
           solicitadoPor: solicitadoPor,
-          tipo: 'automatica',
+          titulo: tituloFirma,
+          nombreDocumento: documento.nombre,
+          hashDocumento,
           mensaje: configuracion.mensajeFirma || `Por favor firma el documento: ${nombreDocumento}`,
           fechaLimite: configuracion.fechaLimiteFirma,
         },
@@ -561,6 +630,7 @@ export async function generarDocumentoDesdePDFRellenable(
       empleadoNombre: `${empleado.nombre} ${empleado.apellidos}`,
       documentoId: documento.id,
       documentoNombre: nombreDocumento,
+      s3Key,
       tiempoMs: tiempoTotal,
     };
   } catch (error) {

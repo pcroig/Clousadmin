@@ -12,7 +12,8 @@ import {
 } from '@/lib/api-handler';
 import { calcularDias } from '@/lib/calculos/ausencias';
 import { EstadoAusencia } from '@/lib/constants/enums';
-import { prisma, Prisma } from '@/lib/prisma';
+import { prisma } from '@/lib/prisma';
+import { asJsonValue } from '@/lib/prisma/json';
 
 // POST /api/campanas-vacaciones/[id]/aceptar - Empleado acepta propuesta de vacaciones
 export async function POST(
@@ -111,12 +112,12 @@ export async function POST(
         diasNaturales,
         diasLaborables,
         diasSolicitados,
-        descripcion: `Vacaciones de campaña: ${preferencia.campana.titulo}`,
         descuentaSaldo: true,
         estado: EstadoAusencia.pendiente,
-        diasIdeales: preferencia.diasIdeales as unknown as Prisma.InputJsonValue,
-        diasPrioritarios: preferencia.diasPrioritarios as unknown as Prisma.InputJsonValue,
-        diasAlternativos: preferencia.diasAlternativos as unknown as Prisma.InputJsonValue,
+        motivo: `Vacaciones de campaña: ${preferencia.campana.titulo}`,
+          diasIdeales: asJsonValue(preferencia.diasIdeales),
+          diasPrioritarios: asJsonValue(preferencia.diasPrioritarios),
+          diasAlternativos: asJsonValue(preferencia.diasAlternativos),
       },
     });
 

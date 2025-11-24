@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
 import { extractArrayFromResponse } from '@/lib/utils/api-response';
+import { parseJson } from '@/lib/utils/json';
 
 interface EmpleadoItem {
   id: string;
@@ -56,7 +57,12 @@ export function SolicitarFirmaDialog({
     if (empleados.length === 0 && !cargandoEmpleados) {
       setCargandoEmpleados(true);
       fetch('/api/empleados?activos=true')
-        .then((res) => (res.ok ? res.json() : Promise.reject()))
+        .then(async (res) => {
+          if (!res.ok) {
+            throw new Error('Error al cargar empleados');
+          }
+          return parseJson<unknown>(res);
+        })
         .then((data) => {
           const lista = extractArrayFromResponse<
             {
@@ -159,7 +165,7 @@ export function SolicitarFirmaDialog({
         body: JSON.stringify(body),
       });
 
-      const data = await res.json();
+      const data = await parseJson<{ success?: boolean; error?: string }>(res);
       if (!res.ok || !data.success) {
         throw new Error(data.error || 'No se pudo crear la solicitud de firma');
       }

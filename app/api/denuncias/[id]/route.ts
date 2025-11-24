@@ -64,7 +64,7 @@ export async function GET(
 
     return successResponse(denuncia);
   } catch (error) {
-    return handleApiError(error);
+    return handleApiError(error, 'API GET /api/denuncias/[id]');
   }
 }
 

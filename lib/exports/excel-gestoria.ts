@@ -5,8 +5,10 @@
 
 import * as XLSX from 'xlsx';
 
-import { EstadoAusencia } from '@/lib/constants/enums';
+import { EstadoAusencia, EstadoSolicitud } from '@/lib/constants/enums';
 import { prisma } from '@/lib/prisma';
+
+import type { Prisma } from '@prisma/client';
 
 import { obtenerResumenesMensuales } from '../calculos/nominas';
 
@@ -356,10 +358,12 @@ async function agregarHojaCambios(
   }
 
   // 3. CAMBIOS SALARIALES: Solicitudes de cambio de datos bancarios/salario aprobadas
-  const cambiosSalario = await prisma.solicitudCambio.findMany({
+  const cambiosSalarioQuery = {
     where: {
       empresaId,
-      estado: EstadoAusencia.confirmada,
+      estado: {
+        in: [EstadoSolicitud.aprobada_manual, EstadoSolicitud.auto_aprobada],
+      },
       fechaRespuesta: {
         gte: fechaInicio,
         lte: fechaFin,
@@ -379,7 +383,9 @@ async function agregarHojaCambios(
     orderBy: {
       fechaRespuesta: 'asc',
     },
-  });
+  } satisfies Prisma.SolicitudCambioFindManyArgs;
+
+  const cambiosSalario = await prisma.solicitudCambio.findMany(cambiosSalarioQuery);
 
   for (const cambio of cambiosSalario) {
     const campos = cambio.camposCambiados as Record<string, unknown>;

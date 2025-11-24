@@ -23,6 +23,7 @@ import {
   crearNotificacionAusenciaRechazada,
 } from '@/lib/notificaciones';
 import { prisma } from '@/lib/prisma';
+import { getJsonBody } from '@/lib/utils/json';
 
 class SaldoInsuficienteError extends Error {
   saldoDisponible: number;
@@ -83,7 +84,7 @@ export async function PATCH(
     }
 
     // Leer body para determinar el tipo de operación
-    const body = await req.json() as Record<string, any>;
+    const body = await getJsonBody<Record<string, unknown>>(req);
 
     // Detectar si es aprobar/rechazar o edición
     if (body.accion && (body.accion === 'aprobar' || body.accion === 'rechazar')) {
@@ -321,6 +322,7 @@ export async function PATCH(
         fechaInicio: z.string().optional(),
         fechaFin: z.string().optional(),
         medioDia: z.boolean().optional(),
+        periodo: z.enum(['manana', 'tarde']).optional(),
         motivo: z.string().nullable().optional(),
         justificanteUrl: z.string().nullable().optional(),
         documentoId: z.string().uuid().nullable().optional(),

@@ -25,13 +25,30 @@ import { eliminarDocumentoPorId } from '@/lib/documentos';
 import { CalendarManager } from '@/lib/integrations/calendar/calendar-manager';
 import { crearNotificacionAusenciaAutoAprobada, crearNotificacionAusenciaSolicitada } from '@/lib/notificaciones';
 import { prisma } from '@/lib/prisma';
+import { asJsonValue, JSON_NULL } from '@/lib/prisma/json';
 import {
   buildPaginationMeta,
   parsePaginationParams,
 } from '@/lib/utils/pagination';
 import { ausenciaCreateSchema } from '@/lib/validaciones/schemas';
 
-import type { Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
+
+const ausenciaConEmpleadoInclude = Prisma.validator<Prisma.AusenciaInclude>()({
+  empleado: {
+    select: {
+      nombre: true,
+      apellidos: true,
+      puesto: true,
+      fotoUrl: true,
+      managerId: true,
+    },
+  },
+});
+
+type AusenciaConEmpleado = Prisma.AusenciaGetPayload<{
+  include: typeof ausenciaConEmpleadoInclude;
+}>;
 
 // GET /api/ausencias - Listar ausencias
 export async function GET(req: NextRequest) {
@@ -52,7 +69,7 @@ export async function GET(req: NextRequest) {
 
     // Filtrar por estado si se proporciona
     if (estado && estado !== 'todas') {
-      where.estado = estado;
+      where.estado = estado as EstadoAusencia;
     }
 
     // Filtrar por empleado si se proporciona
@@ -139,6 +156,7 @@ export async function POST(req: NextRequest) {
     if (!session.user.empleadoId) {
       return badRequestResponse('No tienes un empleado asignado. Contacta con HR.');
     }
+    const empleadoId = session.user.empleadoId;
 
     // Validar request body
     const validationResult = await validateRequest(req, ausenciaCreateSchema);
@@ -183,7 +201,7 @@ export async function POST(req: NextRequest) {
 
     const ausenciasSolapadas = await prisma.ausencia.findMany({
       where: {
-        empleadoId: session.user.empleadoId,
+        empleadoId,
         estado: {
           in: [EstadoAusencia.pendiente, EstadoAusencia.confirmada, EstadoAusencia.completada],
         },
@@ -249,7 +267,7 @@ export async function POST(req: NextRequest) {
     let equipoId: string | null = validatedData.equipoId || null;
     if (!equipoId) {
       const empleadoEquipo = await prisma.empleadoEquipo.findFirst({
-        where: { empleadoId: session.user.empleadoId },
+        where: { empleadoId },
         orderBy: { fechaIncorporacion: 'desc' },
       });
       equipoId = empleadoEquipo?.equipoId || null;
@@ -269,7 +287,7 @@ export async function POST(req: NextRequest) {
     if ((validatedData.tipo === 'vacaciones' || validatedData.tipo === 'otro') && equipoId) {
       const validacionPoliticas = await validarPoliticasEquipo(
         equipoId,
-        session.user.empleadoId,
+        empleadoId,
         fechaInicio,
         fechaFin,
         validatedData.tipo
@@ -300,13 +318,13 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    let ausencia;
+    let ausencia: AusenciaConEmpleado;
     try {
       ausencia = await prisma.$transaction(async (tx) => {
         if (descuentaSaldo) {
           const año = fechaInicio.getFullYear();
           const validacion = await validarSaldoSuficiente(
-            session.user.empleadoId,
+            empleadoId,
             año,
             diasSolicitadosFinal,
             tx,
@@ -318,7 +336,7 @@ export async function POST(req: NextRequest) {
           }
 
           await actualizarSaldo(
-            session.user.empleadoId,
+            empleadoId,
             año,
             'solicitar',
             diasSolicitadosFinal,
@@ -328,14 +346,14 @@ export async function POST(req: NextRequest) {
 
         return tx.ausencia.create({
           data: {
-            empleadoId: session.user.empleadoId,
+            empleadoId,
             empresaId: session.user.empresaId,
             equipoId,
             tipo: validatedData.tipo,
             fechaInicio,
             fechaFin,
             medioDia: validatedData.medioDia || false,
-            periodo: validatedData.medioDia ? validatedData.periodo || null : null,
+            periodo: validatedData.medioDia ? (validatedData.periodo || null) : null,
             diasNaturales,
             diasLaborables,
             diasSolicitados: diasSolicitadosFinal,
@@ -343,22 +361,18 @@ export async function POST(req: NextRequest) {
             justificanteUrl: validatedData.justificanteUrl,
             documentoId: validatedData.documentoId,
             descuentaSaldo,
-            diasIdeales: validatedData.diasIdeales || null,
-            diasPrioritarios: validatedData.diasPrioritarios || null,
-            diasAlternativos: validatedData.diasAlternativos || null,
+            diasIdeales: validatedData.diasIdeales
+              ? asJsonValue(validatedData.diasIdeales)
+              : JSON_NULL,
+            diasPrioritarios: validatedData.diasPrioritarios
+              ? asJsonValue(validatedData.diasPrioritarios)
+              : JSON_NULL,
+            diasAlternativos: validatedData.diasAlternativos
+              ? asJsonValue(validatedData.diasAlternativos)
+              : JSON_NULL,
             estado: estadoInicial,
           },
-          include: {
-            empleado: {
-              select: {
-                nombre: true,
-                apellidos: true,
-                puesto: true,
-                fotoUrl: true,
-                managerId: true,
-              },
-            },
-          },
+          include: ausenciaConEmpleadoInclude,
         });
       });
     } catch (error) {
@@ -378,7 +392,7 @@ export async function POST(req: NextRequest) {
         await crearNotificacionAusenciaAutoAprobada(prisma, {
           ausenciaId: ausencia.id,
           empresaId: session.user.empresaId,
-          empleadoId: session.user.empleadoId,
+          empleadoId,
           empleadoNombre: `${ausencia.empleado.nombre} ${ausencia.empleado.apellidos}`,
           managerId: ausencia.empleado.managerId,
           tipo: ausencia.tipo,
@@ -405,7 +419,7 @@ export async function POST(req: NextRequest) {
         await crearNotificacionAusenciaSolicitada(prisma, {
           ausenciaId: ausencia.id,
           empresaId: session.user.empresaId,
-          empleadoId: session.user.empleadoId,
+          empleadoId,
           empleadoNombre: `${ausencia.empleado.nombre} ${ausencia.empleado.apellidos}`,
           tipo: ausencia.tipo,
           fechaInicio: ausencia.fechaInicio,

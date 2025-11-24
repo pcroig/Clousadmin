@@ -9,8 +9,12 @@ import { useCallback, useEffect, useState } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
+import { parseJson } from '@/lib/utils/json';
 
 import { EditarFestivoModal } from './editar-festivo-modal';
+interface FestivosResponse {
+  festivos?: Festivo[];
+}
 
 interface Festivo {
   id: string;
@@ -47,7 +51,7 @@ export function CalendarioFestivos({ onUpdate }: CalendarioFestivosProps) {
       const año = mesActual.getFullYear();
       const response = await fetch(`/api/festivos?año=${año}`);
       if (response.ok) {
-        const data = await response.json();
+        const data = await parseJson<FestivosResponse>(response);
         const festivosList = data.festivos || [];
         setFestivos(festivosList);
         

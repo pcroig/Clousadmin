@@ -14,6 +14,7 @@ import {
   AIProvider,
   AIResponse,
   ContentType,
+  MetadataRecord,
   hasImageContent,
   type MessageContent,
   MessageRole,
@@ -22,8 +23,18 @@ import {
 
 type FilesCreateParams = Parameters<OpenAI['files']['create']>;
 type OpenAIFileInput = FilesCreateParams[0]['file'];
+type ChatCompletionMessageParam = OpenAI.Chat.ChatCompletionMessageParam;
+type ChatCompletionMessage = OpenAI.Chat.ChatCompletionMessage;
+type ChatCompletionContentPart = OpenAI.ChatCompletionContentPart;
+type ImageMessageContent = Extract<MessageContent, { type: ContentType.IMAGE_URL }>;
 
 const PDF_MIME_TYPE = 'application/pdf';
+const DEFAULT_PDF_FILENAME = 'document.pdf';
+const CHAT_ROLE_MAP: Record<MessageRole, 'system' | 'user' | 'assistant'> = {
+  [MessageRole.SYSTEM]: 'system',
+  [MessageRole.USER]: 'user',
+  [MessageRole.ASSISTANT]: 'assistant',
+};
 
 const isErrorWithMessage = (error: unknown): error is { message: string } =>
   typeof error === 'object' &&
@@ -166,7 +177,7 @@ export async function deleteOpenAIFile(fileId: string): Promise<void> {
   const client = getOpenAIClient();
   
   try {
-    await client.files.del(fileId);
+    await client.files.delete(fileId);
     console.info(`[OpenAI Provider] Archivo eliminado: ${fileId}`);
   } catch (error) {
     console.warn(
@@ -177,113 +188,131 @@ export async function deleteOpenAIFile(fileId: string): Promise<void> {
   }
 }
 
+function normalizeSystemContent(content: MessageContent): string {
+  if (typeof content === 'string') {
+    return content;
+  }
+
+  if (Array.isArray(content)) {
+    return content.map((item) => normalizeSystemContent(item as MessageContent)).join('\n');
+  }
+
+  if (content.type === ContentType.TEXT) {
+    return content.text;
+  }
+
+  return `[media:${content.image_url.url}]`;
+}
+
+function normalizeAssistantContent(content: MessageContent): string {
+  return normalizeSystemContent(content);
+}
+
+function contentToChatParts(content: MessageContent): ChatCompletionContentPart[] {
+  if (typeof content === 'string') {
+    return [{ type: 'text', text: content }];
+  }
+
+  if (Array.isArray(content)) {
+    return content.flatMap((item) => contentToChatParts(item as MessageContent));
+  }
+
+  if (content.type === ContentType.TEXT) {
+    return [{ type: 'text', text: content.text }];
+  }
+
+  return [createFileOrImagePart(content)];
+}
+
+function createFileOrImagePart(content: ImageMessageContent): ChatCompletionContentPart {
+  const url = content.image_url.url;
+
+  if (url.startsWith('file-')) {
+    return {
+      type: 'file',
+      file: {
+        file_id: url,
+      },
+    };
+  }
+
+  if (url.startsWith('data:application/pdf;base64,')) {
+    return {
+      type: 'file',
+      file: {
+        file_data: url,
+        filename: DEFAULT_PDF_FILENAME,
+      },
+    };
+  }
+
+  return {
+    type: 'image_url',
+    image_url: {
+      url,
+      detail: content.image_url.detail,
+    },
+  };
+}
+
 /**
  * Convierte mensajes unificados a formato OpenAI
  * Soporta: texto, imágenes (URLs y base64), y archivos (file_id)
  */
-function convertMessagesToOpenAI(messages: AIMessage[]): OpenAI.Chat.ChatCompletionMessageParam[] {
+function convertMessagesToOpenAI(messages: AIMessage[]): ChatCompletionMessageParam[] {
   return messages.map((msg) => {
-    // Si el contenido es string simple
-    if (typeof msg.content === 'string') {
+    const role = CHAT_ROLE_MAP[msg.role];
+
+    if (role === 'system') {
       return {
-        role: msg.role as 'system' | 'user' | 'assistant',
-        content: msg.content,
+        role,
+        content: normalizeSystemContent(msg.content),
       };
     }
-    
-    // Si es array de contenidos (texto + imagen/file)
-    if (Array.isArray(msg.content)) {
+
+    if (role === 'assistant') {
       return {
-        role: msg.role as 'system' | 'user' | 'assistant',
-        content: msg.content.map((c) => {
-          if (c.type === 'text') {
-            return { type: 'text', text: c.text };
-          } else if (c.type === 'image_url') {
-            // Verificar si es un file_id (formato: "file-xxx")
-            if (c.image_url.url.startsWith('file-')) {
-              // Formato correcto según documentación OpenAI: { type: 'file', file: { file_id: ... } }
-              return {
-                type: 'file' as const,
-                file: {
-                  file_id: c.image_url.url,
-                },
-              };
-            }
-            // Verificar si es base64 de PDF (data:application/pdf;base64,...)
-            if (c.image_url.url.startsWith('data:application/pdf;base64,')) {
-              const filename = c.image_url.filename ?? 'document.pdf';
-              return {
-                type: 'file' as const,
-                file: {
-                  filename,
-                  file_data: c.image_url.url, // Ya incluye el prefijo data:application/pdf;base64,
-                },
-              };
-            }
-            // Es una URL o base64 de imagen
-            return {
-              type: 'image_url',
-              image_url: c.image_url,
-            };
-          } else {
-            return {
-              type: 'image_url',
-              image_url: c.image_url,
-            };
-          }
-        }),
+        role,
+        content: normalizeAssistantContent(msg.content),
       };
     }
-    
-    // Si es un solo contenido estructurado
-    if (msg.content.type === 'text') {
-      return {
-        role: msg.role as 'system' | 'user' | 'assistant',
-        content: msg.content.text,
-      };
-    } else {
-      // Verificar si es un file_id
-      if (msg.content.image_url.url.startsWith('file-')) {
-        return {
-          role: msg.role as 'system' | 'user' | 'assistant',
-          content: [
-            {
-              type: 'file' as const,
-              file: {
-                file_id: msg.content.image_url.url,
-              },
-            },
-          ],
-        };
-      }
-      // Verificar si es base64 de PDF
-      if (msg.content.image_url.url.startsWith('data:application/pdf;base64,')) {
-        const filename = msg.content.image_url.filename ?? 'document.pdf';
-        return {
-          role: msg.role as 'system' | 'user' | 'assistant',
-          content: [
-            {
-              type: 'file' as const,
-              file: {
-                filename,
-                file_data: msg.content.image_url.url,
-              },
-            },
-          ],
-        };
-      }
-      // Es una imagen (URL o base64 de imagen)
-      return {
-        role: msg.role as 'system' | 'user' | 'assistant',
-        content: [
-          {
-            type: 'image_url',
-            image_url: msg.content.image_url,
-          },
-        ],
-      };
-    }
+
+    return {
+      role,
+      content: contentToChatParts(msg.content),
+    };
   });
+}
+
+function mapChatCompletionFinishReason(
+  reason: OpenAI.ChatCompletion.Choice['finish_reason'] | null | undefined
+): 'stop' | 'length' | 'content_filter' | 'tool_calls' | null {
+  switch (reason) {
+    case 'stop':
+      return 'stop';
+    case 'length':
+      return 'length';
+    case 'content_filter':
+      return 'content_filter';
+    case 'tool_calls':
+    case 'function_call':
+      return 'tool_calls';
+    default:
+      return null;
+  }
+}
+
+function extractMessageContent(
+  content: ChatCompletionMessage['content'] | null | undefined
+): string {
+  if (!content) {
+    return '';
+  }
+
+  if (typeof content === 'string') {
+    return content;
+  }
+  return '';
 }
 
 /**
@@ -298,19 +327,23 @@ function convertOpenAIResponse(response: OpenAI.Chat.ChatCompletion): AIResponse
       index: choice.index,
       message: {
         role: MessageRole.ASSISTANT,
-        content: choice.message.content || '',
+        content: extractMessageContent(choice.message.content),
       },
-      finishReason: (choice.finish_reason || 'stop') as 'stop' | 'length' | 'content_filter' | 'tool_calls',
+      finishReason: mapChatCompletionFinishReason(choice.finish_reason) ?? 'stop',
     })),
-    usage: response.usage ? {
-      promptTokens: response.usage.prompt_tokens,
-      completionTokens: response.usage.completion_tokens,
-      totalTokens: response.usage.total_tokens,
-    } : undefined,
+    usage: response.usage
+      ? {
+          promptTokens: response.usage.prompt_tokens,
+          completionTokens: response.usage.completion_tokens,
+          totalTokens: response.usage.total_tokens,
+        }
+      : undefined,
     created: response.created,
-    metadata: {
-      systemFingerprint: response.system_fingerprint,
-    },
+    metadata: response.system_fingerprint
+      ? {
+          systemFingerprint: response.system_fingerprint,
+        }
+      : undefined,
   };
 }
 
@@ -379,12 +412,11 @@ function contentToResponsesParts(content: MessageContent): ResponsesContentPart[
   }
 
   if (url.startsWith('data:application/pdf;base64,')) {
-    const imageUrlWithFilename = content.image_url as typeof content.image_url & { filename?: string };
     return [
       {
         type: 'input_file',
         file_data: url,
-        filename: imageUrlWithFilename.filename ?? 'document.pdf',
+        filename: DEFAULT_PDF_FILENAME,
       },
     ];
   }
@@ -427,7 +459,7 @@ function convertMessagesToResponsesPayload(messages: AIMessage[]): {
     .trim() || undefined;
 
   const input = conversationMessages.map((msg) => {
-    const role = msg.role === MessageRole.ASSISTANT ? 'assistant' : 'user';
+    const role: 'user' | 'assistant' = msg.role === MessageRole.ASSISTANT ? 'assistant' : 'user';
     const parts = contentToResponsesParts(msg.content);
     return {
       role,
@@ -455,29 +487,41 @@ function extractResponsesText(response: ResponsesAPIResponse): string {
     if (joined) return joined;
   }
 
-  const contentItems =
-    Array.isArray(response.output) && response.output.length > 0
-      ? response.output.flatMap((item) => item?.content ?? [])
-      : [];
+  const outputs = Array.isArray(response.output) ? response.output : [];
 
-  for (const contentItem of contentItems) {
-    if (!contentItem) continue;
+  for (const output of outputs) {
+    if (!output) continue;
 
-    if (contentItem.type === 'output_text' && typeof contentItem.text === 'string') {
-      return contentItem.text;
+    if (output.type === 'output_text' && typeof output.text === 'string' && output.text.trim()) {
+      return output.text.trim();
     }
 
-    if (contentItem.type === 'message' && Array.isArray(contentItem.content)) {
-      const textPart = contentItem.content.find(
-        (part): part is { text: string } => typeof part?.text === 'string'
-      );
+    if (output.type === 'message' && Array.isArray(output.content)) {
+      const textPart = output.content.find((part): part is { text: string } => {
+        if (!part || typeof part.text !== 'string') {
+          return false;
+        }
+        return part.text.trim().length > 0;
+      });
       if (textPart?.text) {
-        return textPart.text;
+        return textPart.text.trim();
       }
     }
 
-    if (typeof contentItem.text === 'string') {
-      return contentItem.text;
+    if (typeof output.text === 'string' && output.text.trim()) {
+      return output.text.trim();
+    }
+
+    if (Array.isArray(output.content)) {
+      const textPart = output.content.find((part): part is { text: string } => {
+        if (!part || typeof part.text !== 'string') {
+          return false;
+        }
+        return part.text.trim().length > 0;
+      });
+      if (textPart?.text) {
+        return textPart.text.trim();
+      }
     }
   }
 
@@ -496,6 +540,12 @@ function convertResponsesToAIResponse(response: ResponsesAPIResponse): AIRespons
       }
     : undefined;
 
+  const metadataRecord: MetadataRecord = {
+    api: 'responses',
+    responseId: response.id,
+    ...normalizeMetadataRecord(response.metadata),
+  };
+
   return {
     id: response.id,
     provider: AIProvider.OPENAI,
@@ -512,11 +562,7 @@ function convertResponsesToAIResponse(response: ResponsesAPIResponse): AIRespons
     ],
     usage,
     created: response.created_at ?? Math.floor(Date.now() / 1000),
-    metadata: {
-      api: 'responses',
-      responseId: response.id,
-      ...response.metadata,
-    },
+    metadata: metadataRecord,
   };
 }
 
@@ -696,4 +742,17 @@ function serializeMetadata(
     user,
   };
 }
+
+function normalizeMetadataRecord(source?: Record<string, unknown>): MetadataRecord {
+  if (!source) {
+    return {};
+  }
+
+  try {
+    return JSON.parse(JSON.stringify(source)) as MetadataRecord;
+  } catch {
+    return {};
+  }
+}
+
 

@@ -12,6 +12,8 @@ import { createToken, verifyToken } from '@/lib/auth-edge';
 import { prisma } from '@/lib/prisma';
 import { ensureEmpresaActivoColumn } from '@/lib/prisma/patches';
 
+import { UsuarioRol } from '@prisma/client';
+
 import type { SessionData, UsuarioAutenticado } from '@/types/auth';
 
 // Configuración
@@ -450,6 +452,12 @@ export async function registerUser(data: {
   // Hash de contraseña
   const hashedPassword = await hashPassword(data.password);
 
+  const availableRoles = new Set(Object.values(UsuarioRol));
+  const rolAsignado: UsuarioRol =
+    data.rol && availableRoles.has(data.rol as UsuarioRol)
+      ? (data.rol as UsuarioRol)
+      : UsuarioRol.empleado;
+
   // Crear usuario
   const usuario = await prisma.usuario.create({
     data: {
@@ -458,7 +466,7 @@ export async function registerUser(data: {
       nombre: data.nombre,
       apellidos: data.apellidos,
       empresaId: data.empresaId,
-      rol: data.rol || 'empleado',
+      rol: rolAsignado,
       empleadoId: data.empleadoId || null,
       emailVerificado: false,
       activo: true,

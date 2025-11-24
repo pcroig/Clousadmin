@@ -24,17 +24,18 @@ export async function POST() {
   try {
     // Verificar autenticación
     const session = await getSession();
-    if (!session) {
+    if (!session || !session.user) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
+    const { user } = session;
 
     // Solo HR Admin puede gestionar billing
-    if (session.rol !== 'hr_admin' && session.rol !== 'platform_admin') {
+    if (user.rol !== 'hr_admin' && user.rol !== 'platform_admin') {
       return NextResponse.json({ error: 'Permisos insuficientes' }, { status: 403 });
     }
 
     // Crear sesión del portal
-    const portalSession = await createBillingPortalSession(session.empresaId);
+    const portalSession = await createBillingPortalSession(user.empresaId);
 
     return NextResponse.json({
       url: portalSession.url,

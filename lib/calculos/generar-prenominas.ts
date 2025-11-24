@@ -270,7 +270,7 @@ export async function generarPrenominasEvento(
     if (nominaExistente) {
       const updateData: Prisma.NominaUpdateInput = {};
       if (nominaExistente.eventoNominaId !== eventoId) {
-        updateData.eventoNominaId = eventoId;
+        updateData.eventoNomina = { connect: { id: eventoId } };
         prenominasVinculadas += 1;
       }
 

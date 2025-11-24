@@ -22,6 +22,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import { extractArrayFromResponse } from '@/lib/utils/api-response';
+import { parseJson } from '@/lib/utils/json';
 
 interface Empleado {
   id: string;
@@ -64,21 +65,26 @@ export function PuestoFormModal({
   const fetchEmpleados = useCallback(async () => {
     try {
       const response = await fetch('/api/empleados');
-      if (response.ok) {
-        const data = await response.json();
-        setEmpleados(
-          extractArrayFromResponse<{ id: string; nombre?: string; apellidos?: string; usuario?: { nombre?: string; apellidos?: string } }>(
-            data,
-            { key: 'empleados' }
-          ).map((empleado) => ({
-            id: empleado.id,
-            nombre: empleado.nombre || empleado.usuario?.nombre || '',
-            apellidos: empleado.apellidos || empleado.usuario?.apellidos || '',
-          }))
-        );
+      if (!response.ok) {
+        const error = await parseJson<{ error?: string }>(response);
+        throw new Error(error.error || 'Error al cargar empleados');
       }
+      const data = await parseJson<unknown>(response);
+      setEmpleados(
+        extractArrayFromResponse<{
+          id: string;
+          nombre?: string;
+          apellidos?: string;
+          usuario?: { nombre?: string; apellidos?: string };
+        }>(data, { key: 'empleados' }).map((empleado) => ({
+          id: empleado.id,
+          nombre: empleado.nombre || empleado.usuario?.nombre || '',
+          apellidos: empleado.apellidos || empleado.usuario?.apellidos || '',
+        }))
+      );
     } catch (error) {
       console.error('Error fetching empleados:', error);
+      toast.error('Error al cargar empleados');
     }
   }, []);
 
@@ -86,14 +92,17 @@ export function PuestoFormModal({
     if (!puesto) return;
     try {
       const response = await fetch(`/api/puestos/${puesto.id}`);
-      if (response.ok) {
-        const data = await response.json() as PuestoData;
-        if (data.empleados) {
-          setEmpleadosSeleccionados(data.empleados.map((emp) => emp.id));
-        }
+      if (!response.ok) {
+        const error = await parseJson<{ error?: string }>(response);
+        throw new Error(error.error || 'Error al cargar empleados asignados');
+      }
+      const data = (await parseJson<PuestoData>(response));
+      if (data.empleados) {
+        setEmpleadosSeleccionados(data.empleados.map((emp) => emp.id));
       }
     } catch (error) {
       console.error('Error fetching empleados asignados:', error);
+      toast.error('Error al cargar empleados del puesto');
     }
   }, [puesto]);
 
@@ -164,7 +173,7 @@ export function PuestoFormModal({
       });
 
       if (!response.ok) {
-        const error = await response.json();
+        const error = await parseJson<{ error?: string }>(response);
         throw new Error(error.error || 'Error al guardar puesto');
       }
 
@@ -193,9 +202,12 @@ export function PuestoFormModal({
     try {
       // Obtener empleados actuales del puesto
       const response = await fetch(`/api/puestos/${puestoId}`);
-      if (!response.ok) return;
+      if (!response.ok) {
+        const error = await parseJson<{ error?: string }>(response);
+        throw new Error(error.error || 'Error al obtener empleados del puesto');
+      }
       
-      const data = await response.json() as PuestoData;
+      const data = await parseJson<PuestoData>(response);
       const empleadosActuales = (data.empleados || []).map((emp) => emp.id);
       
       // Encontrar empleados a añadir y a quitar

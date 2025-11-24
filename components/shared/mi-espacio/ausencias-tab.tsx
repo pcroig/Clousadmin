@@ -11,6 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { obtenerNombreDia } from '@/lib/utils/fechas';
+import { parseJson } from '@/lib/utils/json';
 
 interface Ausencia {
   id: string;
@@ -29,6 +30,38 @@ interface SaldoResponse {
   diasDisponibles: number;
 }
 
+interface AusenciasResponse {
+  ausencias?: Ausencia[];
+  data?: Ausencia[];
+  error?: string;
+}
+
+interface SaldoApiResponse {
+  data?: SaldoResponse;
+  diasTotales?: number;
+  diasUsados?: number;
+  diasPendientes?: number;
+  diasDisponibles?: number;
+}
+
+interface CalendarioLaboralResponse {
+  diasLaborables?: Partial<DiasLaborables>;
+}
+
+interface FestivosResponse {
+  festivos?: { fecha: string; nombre: string }[];
+}
+
+type DiasLaborables = {
+  lunes: boolean;
+  martes: boolean;
+  miercoles: boolean;
+  jueves: boolean;
+  viernes: boolean;
+  sabado: boolean;
+  domingo: boolean;
+};
+
 interface MiEspacioAusenciasTabProps {
   empleadoId: string;
   contexto?: 'empleado' | 'manager' | 'hr_admin';
@@ -37,7 +70,7 @@ interface MiEspacioAusenciasTabProps {
 export function AusenciasTab({ empleadoId, contexto = 'empleado' }: MiEspacioAusenciasTabProps) {
   const [ausencias, setAusencias] = useState<Ausencia[]>([]);
   const [saldo, setSaldo] = useState<SaldoResponse | null>(null);
-  const [diasLaborables, setDiasLaborables] = useState({
+  const [diasLaborables, setDiasLaborables] = useState<DiasLaborables>({
     lunes: true,
     martes: true,
     miercoles: true,
@@ -66,18 +99,17 @@ export function AusenciasTab({ empleadoId, contexto = 'empleado' }: MiEspacioAus
         const response = await fetch(`/api/ausencias?empleadoId=${empleadoId}`, {
           signal,
         });
-        if (response.ok) {
-          const data = await response.json();
-          const normalized =
-            Array.isArray(data)
-              ? data
-              : Array.isArray(data?.ausencias)
-              ? data.ausencias
-              : Array.isArray(data?.data)
-              ? data.data
-              : [];
-          setAusencias(normalized);
+        const payload = await parseJson<AusenciasResponse>(response).catch(() => null);
+        if (!response.ok) {
+          throw new Error(payload?.error || 'Error al cargar ausencias');
         }
+        const normalized =
+          Array.isArray(payload?.ausencias)
+            ? payload?.ausencias
+            : Array.isArray(payload?.data)
+            ? payload?.data
+            : [];
+        setAusencias(normalized);
       } catch (error: unknown) {
         if (error instanceof Error && error.name !== 'AbortError') {
           console.error('Error cargando ausencias:', error);
@@ -100,9 +132,22 @@ export function AusenciasTab({ empleadoId, contexto = 'empleado' }: MiEspacioAus
         const response = await fetch(`/api/ausencias/saldo?empleadoId=${empleadoId}`, {
           signal,
         });
-        if (response.ok) {
-          const data = await response.json();
-          setSaldo(data?.data ?? data);
+        const payload = await parseJson<SaldoApiResponse>(response).catch(() => null);
+        if (!response.ok) {
+          throw new Error('Error al cargar saldo de ausencias');
+        }
+        if (payload?.data) {
+          setSaldo(payload.data);
+        } else if (
+          typeof payload?.diasTotales === 'number' &&
+          typeof payload?.diasUsados === 'number'
+        ) {
+          setSaldo({
+            diasTotales: payload.diasTotales,
+            diasUsados: payload.diasUsados,
+            diasPendientes: payload.diasPendientes ?? 0,
+            diasDisponibles: payload.diasDisponibles ?? 0,
+          });
         }
       } catch (error: unknown) {
         if (error instanceof Error && error.name !== 'AbortError') {
@@ -129,20 +174,21 @@ export function AusenciasTab({ empleadoId, contexto = 'empleado' }: MiEspacioAus
         const diasResponse = await fetch('/api/empresa/calendario-laboral', {
           signal: controller.signal,
         });
-        if (diasResponse.ok) {
-          const diasData = await diasResponse.json();
-          if (diasData.diasLaborables) {
-            setDiasLaborables(diasData.diasLaborables);
-          }
+        const diasData = await parseJson<CalendarioLaboralResponse>(diasResponse).catch(() => null);
+        if (diasResponse.ok && diasData?.diasLaborables) {
+          setDiasLaborables((prev) => ({
+            ...prev,
+            ...diasData.diasLaborables,
+          }));
         }
 
         // Cargar festivos activos
         const festivosResponse = await fetch('/api/festivos?activo=true', {
           signal: controller.signal,
         });
+        const festivosData = await parseJson<FestivosResponse>(festivosResponse).catch(() => null);
         if (festivosResponse.ok) {
-          const festivosData = await festivosResponse.json();
-          setFestivos(festivosData.festivos || []);
+          setFestivos(festivosData?.festivos || []);
         }
       } catch (error: unknown) {
         if (error instanceof Error && error.name !== 'AbortError') {
@@ -237,7 +283,7 @@ export function AusenciasTab({ empleadoId, contexto = 'empleado' }: MiEspacioAus
   const handleDayClick = (
     date: Date | undefined,
     _modifiers?: unknown,
-    event?: React.MouseEvent<HTMLButtonElement>
+    event?: React.MouseEvent<Element, MouseEvent>
   ) => {
     if (!date || !event) return;
 
@@ -251,7 +297,7 @@ export function AusenciasTab({ empleadoId, contexto = 'empleado' }: MiEspacioAus
     }
 
     const containerRect = calendarContainerRef.current.getBoundingClientRect();
-    const buttonRect = event.currentTarget.getBoundingClientRect();
+    const buttonRect = (event.currentTarget as HTMLElement).getBoundingClientRect();
 
     const tooltipWidth = 260;
     const tooltipHeight = 160;

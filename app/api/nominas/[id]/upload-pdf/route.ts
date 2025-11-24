@@ -63,6 +63,7 @@ export async function POST(
     const _s3Url = await uploadToS3(buffer, s3Key, 'application/pdf');
 
     // Si ya existe un documento, actualizarlo; si no, crear uno nuevo
+    const bucketName = process.env.STORAGE_BUCKET || 'local';
     let documento;
 
     if (nomina.documentoId) {
@@ -70,19 +71,25 @@ export async function POST(
       documento = await prisma.documento.update({
         where: { id: nomina.documentoId },
         data: {
-          url: s3Key,
           nombre: file.name,
+          mimeType: 'application/pdf',
+          tamano: file.size,
+          s3Key,
+          s3Bucket: bucketName,
         },
       });
     } else {
       // Crear nuevo documento
       documento = await prisma.documento.create({
         data: {
-          nombre: file.name,
-          tipo: 'nomina',
-          url: s3Key,
           empresaId: session.user.empresaId,
-          uploadedById: session.user.id,
+          empleadoId: nomina.empleadoId,
+          nombre: file.name,
+          tipoDocumento: 'nomina',
+          mimeType: 'application/pdf',
+          tamano: file.size,
+          s3Key,
+          s3Bucket: bucketName,
         },
       });
 

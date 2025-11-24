@@ -9,7 +9,7 @@ import { Calendar, Download, Eye, FileText, Trash2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 
-interface Documento {
+export interface DocumentListItem {
   id: string;
   nombre: string;
   tipoDocumento: string;
@@ -21,10 +21,10 @@ interface Documento {
 }
 
 interface DocumentListProps {
-  documentos: Documento[];
-  onDownload?: (documento: Documento) => void;
-  onView?: (documento: Documento) => void;
-  onDelete?: (documento: Documento) => void;
+  documentos: DocumentListItem[];
+  onDownload?: (documento: DocumentListItem) => void;
+  onView?: (documento: DocumentListItem) => void;
+  onDelete?: (documento: DocumentListItem) => void;
   showActions?: {
     download?: boolean;
     view?: boolean;

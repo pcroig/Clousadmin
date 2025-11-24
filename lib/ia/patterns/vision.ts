@@ -428,7 +428,10 @@ Responde con JSON:
     
     const content = response.choices[0]?.message?.content || '{"valid":false,"issues":[]}';
     const cleaned = content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-    const parsed = JSON.parse(cleaned);
+    const parsed = JSON.parse(cleaned) as DocumentAnalysisResult<{
+      similarities: string[];
+      differences: string[];
+    }>['data'];
     
     const schema = z.object({
       valid: z.boolean(),
@@ -514,7 +517,10 @@ Responde con JSON:
     
     const content = response.choices[0]?.message?.content || '{"similarities":[],"differences":[]}';
     const cleaned = content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-    const parsed = JSON.parse(cleaned);
+    const parsed = JSON.parse(cleaned) as DocumentAnalysisResult<{
+      similarities: string[];
+      differences: string[];
+    }>['data'];
     
     return {
       success: true,

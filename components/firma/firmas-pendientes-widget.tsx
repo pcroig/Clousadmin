@@ -7,8 +7,12 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Spinner } from '@/components/ui/spinner';
+import { parseJson } from '@/lib/utils/json';
 
 import { FirmaPendiente, FirmarDocumentoDialog } from './firmar-documento-dialog';
+interface FirmasPendientesResponse {
+  firmasPendientes: ApiFirmaPendiente[];
+}
 
 interface ApiFirmaPendiente {
   id: string;
@@ -37,7 +41,12 @@ export function FirmasPendientesWidget() {
     setLoading(true);
     setError(null);
     fetch('/api/firma/pendientes')
-      .then((res) => (res.ok ? res.json() : Promise.reject()))
+      .then(async (res) => {
+        if (!res.ok) {
+          throw new Error('Error al cargar firmas');
+        }
+        return parseJson<FirmasPendientesResponse>(res);
+      })
       .then((data) => {
         const items: ApiFirmaPendiente[] = data?.firmasPendientes ?? [];
         const formateadas: FirmaPendiente[] = items.map((item) => ({

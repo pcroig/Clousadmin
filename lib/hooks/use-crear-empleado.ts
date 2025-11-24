@@ -18,13 +18,15 @@ import { prisma, Prisma } from '../prisma';
  *   // ... otros campos
  * });
  */
+type CrearEmpleadoInput = Prisma.EmpleadoUncheckedCreateInput & {
+  empresaId: string;
+  nombre: string;
+  apellidos: string;
+  email: string;
+};
+
 export async function crearEmpleadoConCarpetas(
-  data: Prisma.EmpleadoCreateInput & {
-    empresaId: string;
-    nombre: string;
-    apellidos: string;
-    email: string;
-  }
+  data: CrearEmpleadoInput
 ) {
   // Crear empleado en una transacción
   const empleado = await prisma.$transaction(async (tx) => {

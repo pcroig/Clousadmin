@@ -21,7 +21,7 @@ interface Integracion {
   [key: string]: unknown;
 }
 
-interface IntegracionesFormProps {
+export interface IntegracionesFormProps {
   integracionesIniciales?: Integracion[];
   token?: string;
   empresaId?: string;

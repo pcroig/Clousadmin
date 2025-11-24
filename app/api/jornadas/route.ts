@@ -12,6 +12,7 @@ import {
   validateRequest,
 } from '@/lib/api-handler';
 import { prisma } from '@/lib/prisma';
+import { asJsonValue } from '@/lib/prisma/json';
 import { jornadaCreateSchema } from '@/lib/validaciones/schemas';
 
 import type { JornadaConfig } from '@/lib/calculos/fichajes-helpers';
@@ -115,7 +116,7 @@ export async function POST(req: NextRequest) {
         nombre: validatedData.nombre,
         empresaId: empresaId,
         horasSemanales: validatedData.horasSemanales,
-        config,
+        config: asJsonValue(config),
         esPredefinida: false,
         activa: true,
       },

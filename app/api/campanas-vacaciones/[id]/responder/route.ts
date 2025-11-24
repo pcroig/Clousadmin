@@ -12,7 +12,9 @@ import {
 } from '@/lib/api-handler';
 import { calcularDias } from '@/lib/calculos/ausencias';
 import { EstadoAusencia } from '@/lib/constants/enums';
-import { prisma, Prisma } from '@/lib/prisma';
+import { prisma } from '@/lib/prisma';
+import { JSON_NULL, asJsonValue } from '@/lib/prisma/json';
+import { getJsonBody } from '@/lib/utils/json';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,6 +23,13 @@ interface VacacionesPropuesta {
   fechaFin: string | Date;
   tipo?: string;
   motivo?: string;
+}
+
+interface ResponderCampanaBody {
+  accion?: 'aceptar' | 'solicitar_cambio';
+  diasIdeales?: unknown;
+  diasPrioritarios?: unknown;
+  diasAlternativos?: unknown;
 }
 
 export async function POST(
@@ -38,7 +47,7 @@ export async function POST(
     }
 
     const { id: campanaId } = await params;
-    const body = await req.json() as Record<string, any>;
+    const body = await getJsonBody<ResponderCampanaBody>(req);
     const accion = body?.accion;
 
     if (!accion || !['aceptar', 'solicitar_cambio'].includes(accion)) {
@@ -74,7 +83,10 @@ export async function POST(
     }
 
     if (accion === 'aceptar') {
-      const propuesta = preferencia.propuestaIA as VacacionesPropuesta;
+      const propuesta = preferencia.propuestaIA as unknown as VacacionesPropuesta | null;
+      if (!propuesta?.fechaInicio || !propuesta?.fechaFin) {
+        return badRequestResponse('La propuesta no contiene fechas válidas');
+      }
       const fechaInicio = new Date(propuesta.fechaInicio);
       const fechaFin = new Date(propuesta.fechaFin);
 
@@ -104,9 +116,9 @@ export async function POST(
           motivo: `Vacaciones de campaña: ${preferencia.campana.titulo}`,
           descuentaSaldo: true,
           estado: EstadoAusencia.pendiente,
-          diasIdeales: preferencia.diasIdeales as Prisma.InputJsonValue,
-          diasPrioritarios: preferencia.diasPrioritarios as Prisma.InputJsonValue,
-          diasAlternativos: preferencia.diasAlternativos as Prisma.InputJsonValue,
+          diasIdeales: asJsonValue(preferencia.diasIdeales),
+          diasPrioritarios: asJsonValue(preferencia.diasPrioritarios),
+          diasAlternativos: asJsonValue(preferencia.diasAlternativos),
         },
       });
 
@@ -116,7 +128,7 @@ export async function POST(
           aceptada: true,
           propuestaEnviada: true,
           cambioSolicitado: false,
-          propuestaEmpleado: Prisma.JsonNull,
+          propuestaEmpleado: JSON_NULL,
         },
       });
 
@@ -127,9 +139,12 @@ export async function POST(
     }
 
     // Solicitar cambio con nuevas fechas
-    const diasIdeales = Array.isArray(body.diasIdeales) ? body.diasIdeales : [];
-    const diasPrioritarios = Array.isArray(body.diasPrioritarios) ? body.diasPrioritarios : [];
-    const diasAlternativos = Array.isArray(body.diasAlternativos) ? body.diasAlternativos : [];
+    const toStringArray = (value: unknown): string[] =>
+      Array.isArray(value) ? value.map((entry) => String(entry)) : [];
+
+    const diasIdeales = toStringArray(body.diasIdeales);
+    const diasPrioritarios = toStringArray(body.diasPrioritarios);
+    const diasAlternativos = toStringArray(body.diasAlternativos);
 
     if (diasIdeales.length === 0 && diasPrioritarios.length === 0 && diasAlternativos.length === 0) {
       return badRequestResponse('Debe proponer al menos una fecha');
@@ -147,11 +162,11 @@ export async function POST(
     await prisma.preferenciaVacaciones.update({
       where: { id: preferencia.id },
       data: {
-        propuestaEmpleado: {
+        propuestaEmpleado: asJsonValue({
           diasIdeales,
           diasPrioritarios,
           diasAlternativos,
-        } as Prisma.InputJsonValue,
+        }),
         cambioSolicitado: true,
         propuestaEnviada: true,
         aceptada: false,

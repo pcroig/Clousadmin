@@ -40,13 +40,10 @@ export function ViewportProvider({ children }: ViewportProviderProps) {
       isDesktop,
       isTablet: !isMobile && !isDesktop,
       breakpoint,
+      ready,
     };
-  }, [isMobile, isDesktop]);
+  }, [isMobile, isDesktop, ready]);
 
-  return (
-    <ViewportContext.Provider value={{ ...value, ready }}>
-      {children}
-    </ViewportContext.Provider>
-  );
+  return <ViewportContext.Provider value={value}>{children}</ViewportContext.Provider>;
 }
 

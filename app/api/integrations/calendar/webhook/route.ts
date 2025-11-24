@@ -10,7 +10,8 @@ import { EstadoAusencia, UsuarioRol } from '@/lib/constants/enums';
 import { createCalendarProvider } from "@/lib/integrations/calendar/providers";
 import { getGoogleOAuthConfig } from "@/lib/oauth/config";
 import { OAuthManager } from "@/lib/oauth/oauth-manager";
-import { prisma, Prisma } from "@/lib/prisma";
+import { prisma } from "@/lib/prisma";
+import { asJsonValue } from "@/lib/prisma/json";
 
 import type { CalendarIntegrationConfig } from "@/lib/integrations/types";
 
@@ -58,7 +59,11 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const config = (integracion.config ?? {}) as CalendarIntegrationConfig;
+    const config = parseCalendarConfig(integracion.config);
+    if (!config) {
+      console.error("Integración sin configuración válida");
+      return NextResponse.json({ error: "Configuración inválida" }, { status: 400 });
+    }
 
     // Verificar que el webhook pertenece a esta integración
     if (config.channelId !== channelId || config.resourceId !== resourceId) {
@@ -98,10 +103,12 @@ async function processCalendarChanges(integracionId: string) {
       return;
     }
 
-    const config = (integracion.config ?? {}) as CalendarIntegrationConfig & {
-      ausenciaEventMap?: Record<string, string>;
-    };
-    const ausenciaEventMap = config.ausenciaEventMap ?? {};
+    const config = parseCalendarConfig(integracion.config);
+    if (!config) {
+      console.error("Integración sin configuración válida");
+      return;
+    }
+    const ausenciaEventMap = { ...(config.ausenciaEventMap ?? {}) };
 
     // Obtener access token válido
     const usuarioId =
@@ -143,8 +150,7 @@ async function processCalendarChanges(integracionId: string) {
           await prisma.ausencia.update({
             where: { id: ausenciaId },
             data: {
-              estado: EstadoAusencia.cancelada,
-              // Podríamos añadir un campo "canceladaPor" con valor "calendar_sync"
+              estado: EstadoAusencia.rechazada,
             },
           });
 
@@ -154,10 +160,10 @@ async function processCalendarChanges(integracionId: string) {
           await prisma.integracion.update({
             where: { id: integracionId },
             data: {
-              config: {
+              config: asJsonValue({
                 ...config,
                 ausenciaEventMap: restMap,
-              } as Prisma.InputJsonValue,
+              }),
             },
           });
         }
@@ -186,4 +192,58 @@ async function getFirstAdminUsuarioId(empresaId: string): Promise<string | null>
   });
 
   return admin?.id || null;
+}
+
+function parseCalendarConfig(
+  value: unknown
+): (CalendarIntegrationConfig & { ausenciaEventMap?: Record<string, string> }) | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+
+  const record = value as Record<string, unknown>;
+  const accessToken = record.accessToken;
+
+  if (typeof accessToken !== "string") {
+    return null;
+  }
+
+  const config: CalendarIntegrationConfig & { ausenciaEventMap?: Record<string, string> } = {
+    accessToken,
+  };
+
+  if (typeof record.refreshToken === "string") {
+    config.refreshToken = record.refreshToken;
+  }
+  if (typeof record.expiresAt === "number") {
+    config.expiresAt = record.expiresAt;
+  }
+  if (typeof record.scope === "string") {
+    config.scope = record.scope;
+  }
+  if (typeof record.calendarId === "string") {
+    config.calendarId = record.calendarId;
+  }
+  if (typeof record.channelId === "string") {
+    config.channelId = record.channelId;
+  }
+  if (typeof record.resourceId === "string") {
+    config.resourceId = record.resourceId;
+  }
+  if (typeof record.webhookExpiration === "number") {
+    config.webhookExpiration = record.webhookExpiration;
+  }
+
+  const eventMap = record.ausenciaEventMap;
+  if (eventMap && typeof eventMap === "object" && !Array.isArray(eventMap)) {
+    const parsedMap = Object.entries(eventMap).reduce<Record<string, string>>((acc, [key, value]) => {
+      if (typeof value === "string") {
+        acc[key] = value;
+      }
+      return acc;
+    }, {});
+    config.ausenciaEventMap = parsedMap;
+  }
+
+  return config;
 }

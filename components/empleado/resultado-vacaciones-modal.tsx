@@ -18,7 +18,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Field, FieldLabel } from '@/components/ui/field';
-
+import { parseJson } from '@/lib/utils/json';
 
 interface PropuestaVacacion {
   fechaInicio: string;
@@ -61,8 +61,8 @@ export function ResultadoVacacionesModal({
         onAceptar();
         onClose();
       } else {
-        const error = await res.json();
-        toast.error(error.error || 'Error al aceptar propuesta');
+        const error = await parseJson<{ error?: string }>(res).catch(() => null);
+        toast.error(error?.error || 'Error al aceptar propuesta');
       }
     } catch (e) {
       console.error('Error aceptando propuesta:', e);

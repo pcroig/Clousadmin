@@ -50,7 +50,7 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
     await prisma.fichajeEvento.update({
       where: { id },
       data: {
-        tipo: (tipo as Prisma.TipoFichajeEvento) || evento.tipo,
+        tipo: tipo ?? evento.tipo,
         hora: hora ? new Date(hora) : evento.hora,
         editado: true,
         motivoEdicion: motivoEdicion ?? evento.motivoEdicion,

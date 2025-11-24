@@ -13,8 +13,7 @@ import { toast } from 'sonner';
 import { getInitials } from '@/components/shared/utils';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { getAvatarStyle } from '@/lib/design-system';
-
-
+import { parseJson } from '@/lib/utils/json';
 interface Denuncia {
   id: string;
   descripcion: string;
@@ -61,7 +60,7 @@ export function DenunciasDetails({ onClose, initialDenunciaId }: DenunciasDetail
         throw new Error('Error al cargar denuncias');
       }
 
-      const data = await response.json();
+      const data = await parseJson<Denuncia[]>(response);
       setDenuncias(data);
     } catch (error) {
       console.error('Error fetching denuncias:', error);

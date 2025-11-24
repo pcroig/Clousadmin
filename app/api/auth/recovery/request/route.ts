@@ -6,6 +6,7 @@ import { generateRecoveryToken } from '@/lib/auth';
 import { sendPasswordRecoveryEmail } from '@/lib/emails/password-recovery';
 import { prisma } from '@/lib/prisma';
 import { getClientIP, rateLimitLogin } from '@/lib/rate-limit';
+import { getJsonBody } from '@/lib/utils/json';
 
 const requestSchema = z.object({
   email: z.string().email(),
@@ -13,7 +14,7 @@ const requestSchema = z.object({
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json() as Record<string, any>;
+    const body = await getJsonBody<Record<string, unknown>>(req);
     const { email } = requestSchema.parse(body);
     const normalizedEmail = email.toLowerCase();
 

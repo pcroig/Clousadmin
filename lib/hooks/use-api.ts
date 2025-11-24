@@ -7,6 +7,8 @@
 
 import { useCallback, useRef, useState } from 'react';
 
+import { parseJson } from '@/lib/utils/json';
+
 export interface UseApiOptions<T> {
   onSuccess?: (data: T) => void;
   onError?: (error: Error) => void;
@@ -57,11 +59,13 @@ export function useApi<T = unknown>(
         });
 
         if (!response.ok) {
-          const errorData = await response.json().catch(() => ({ error: 'Error desconocido' }));
+          const errorData = await parseJson<{ error?: string }>(response).catch(() => ({
+            error: 'Error desconocido',
+          }));
           throw new Error(errorData.error || `HTTP ${response.status}`);
         }
 
-        const data = await response.json();
+        const data = await parseJson<T>(response);
 
         setState({ data, loading: false, error: null });
 

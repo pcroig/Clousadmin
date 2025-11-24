@@ -5,6 +5,11 @@ import * as React from 'react';
 
 import { cn } from '@/lib/utils';
 
+type OTPContextValue = {
+  value?: string;
+  activeInput?: number;
+};
+
 const InputOTP = React.forwardRef<
   React.ElementRef<typeof OTPInput>,
   OTPInputProps
@@ -42,7 +47,7 @@ const InputOTPSlot = React.forwardRef<
   HTMLDivElement,
   React.ComponentPropsWithoutRef<'div'> & { index: number }
 >(({ className, index, ...props }, ref) => {
-  const inputOtp = React.useContext(OTPInputContext);
+  const inputOtp = React.useContext(OTPInputContext) as OTPContextValue | null;
   const char = inputOtp?.value?.[index];
   const isActive = inputOtp?.activeInput === index;
 

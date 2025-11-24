@@ -6,7 +6,7 @@
 // Optimized for production with connection pooling
 // Lazy initialization to avoid environment variable timing issues
 
-import { Prisma, PrismaClient } from '@prisma/client';
+import { PrismaClient, Prisma } from '@prisma/client';
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
@@ -91,7 +91,10 @@ if (
   !globalForPrisma.prismaLoggerAttached
 ) {
   let queryCounter = 0;
-  prismaClientSingleton.$use(async (params, next) => {
+  const loggingMiddleware = async (
+    params: { model?: string | null; action: string },
+    next: (middlewareParams: unknown) => Promise<unknown>
+  ) => {
     const start = perf.now();
     const result = await next(params);
     const duration = perf.now() - start;
@@ -100,7 +103,10 @@ if (
       `[Prisma][${queryCounter}] ${params.model ?? 'raw'}.${params.action} - ${duration.toFixed(2)}ms`
     );
     return result;
-  });
+  };
+  (prismaClientSingleton as unknown as { $use(middleware: typeof loggingMiddleware): void }).$use(
+    loggingMiddleware
+  );
   globalForPrisma.prismaLoggerAttached = true;
 }
 

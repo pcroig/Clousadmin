@@ -18,6 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { parseJson } from '@/lib/utils/json';
 
 interface Invitacion {
   email: string;
@@ -39,18 +40,12 @@ interface ApiEmpleado {
   apellidos?: string | null;
   email?: string | null;
   usuario?: {
-    rol?: string;
+    rol?: string | null;
   } | null;
 }
 
-interface ApiEmpleado {
-  id: string;
-  nombre?: string | null;
-  apellidos?: string | null;
-  email?: string | null;
-  usuario?: {
-    rol?: string | null;
-  } | null;
+interface EmpleadosResponse {
+  data?: ApiEmpleado[];
 }
 
 export function InvitarHRAdmins() {
@@ -73,7 +68,7 @@ export function InvitarHRAdmins() {
         if (!response.ok) {
           throw new Error('No se pudieron cargar los empleados');
         }
-        const data = await response.json();
+        const data = await parseJson<EmpleadosResponse>(response);
         const lista: ApiEmpleado[] = Array.isArray(data?.data) ? data.data : [];
         const candidatos = lista.filter((emp) => emp?.usuario?.rol !== 'hr_admin');
         setEmpleados(
@@ -82,7 +77,7 @@ export function InvitarHRAdmins() {
             nombre: emp?.nombre ?? '',
             apellidos: emp?.apellidos ?? '',
             email: emp?.email ?? '',
-            rol: emp?.usuario?.rol,
+            rol: emp?.usuario?.rol ?? undefined,
           }))
         );
       } catch (err) {

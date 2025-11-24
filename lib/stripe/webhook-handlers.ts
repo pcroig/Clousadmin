@@ -8,6 +8,7 @@ import { BillingInterval } from '@prisma/client';
 import Stripe from 'stripe';
 
 import { prisma } from '@/lib/prisma';
+import { asJsonValue, JSON_NULL } from '@/lib/prisma/json';
 
 import { mapStripeStatusToPrisma } from './subscriptions';
 
@@ -19,7 +20,14 @@ export async function handleProductChange(product: Stripe.Product) {
   let features: string[] = [];
   if (product.metadata?.features) {
     try {
-      features = JSON.parse(product.metadata.features);
+      const parsed = JSON.parse(product.metadata.features) as unknown;
+      if (Array.isArray(parsed)) {
+        features = parsed
+          .filter((value): value is string => typeof value === 'string')
+          .map((value) => value.trim());
+      } else if (typeof parsed === 'string') {
+        features = parsed.split(',').map((f) => f.trim());
+      }
     } catch {
       features = product.metadata.features.split(',').map((f) => f.trim());
     }
@@ -35,7 +43,7 @@ export async function handleProductChange(product: Stripe.Product) {
       imagen: product.images?.[0] || null,
       features,
       orden: parseInt(product.metadata?.order || '0', 10),
-      metadata: product.metadata as Record<string, unknown>,
+      metadata: asJsonValue(product.metadata ?? {}),
     },
     update: {
       nombre: product.name,
@@ -44,7 +52,7 @@ export async function handleProductChange(product: Stripe.Product) {
       imagen: product.images?.[0] || null,
       features,
       orden: parseInt(product.metadata?.order || '0', 10),
-      metadata: product.metadata as Record<string, unknown>,
+      metadata: asJsonValue(product.metadata ?? {}),
     },
   });
 }
@@ -92,7 +100,7 @@ export async function handlePriceChange(price: Stripe.Price) {
       intervalCount: price.recurring?.interval_count || 1,
       trialDays: price.recurring?.trial_period_days || null,
       activo: price.active,
-      metadata: price.metadata as Record<string, unknown>,
+      metadata: asJsonValue(price.metadata ?? {}),
     },
     update: {
       unitAmount: price.unit_amount || 0,
@@ -101,7 +109,7 @@ export async function handlePriceChange(price: Stripe.Price) {
       intervalCount: price.recurring?.interval_count || 1,
       trialDays: price.recurring?.trial_period_days || null,
       activo: price.active,
-      metadata: price.metadata as Record<string, unknown>,
+      metadata: asJsonValue(price.metadata ?? {}),
     },
   });
 }
@@ -147,13 +155,13 @@ export async function handleCustomerChange(customer: Stripe.Customer) {
       empresaId,
       email: customer.email || '',
       nombre: customer.name,
-      direccion,
+      direccion: direccion ? asJsonValue(direccion) : JSON_NULL,
       taxId: customer.tax_ids?.data?.[0]?.value || null,
     },
     update: {
       email: customer.email || '',
       nombre: customer.name,
-      direccion,
+      direccion: direccion ? asJsonValue(direccion) : JSON_NULL,
       taxId: customer.tax_ids?.data?.[0]?.value || null,
     },
   });
@@ -231,7 +239,7 @@ async function upsertSubscription(
       trialEnd: subscription.trial_end ? new Date(subscription.trial_end * 1000) : null,
       cancelAtPeriodEnd: subscription.cancel_at_period_end,
       canceledAt: subscription.canceled_at ? new Date(subscription.canceled_at * 1000) : null,
-      metadata: subscription.metadata as Record<string, unknown>,
+      metadata: asJsonValue(subscription.metadata ?? {}),
     },
     update: {
       priceId,
@@ -242,7 +250,7 @@ async function upsertSubscription(
       trialEnd: subscription.trial_end ? new Date(subscription.trial_end * 1000) : null,
       cancelAtPeriodEnd: subscription.cancel_at_period_end,
       canceledAt: subscription.canceled_at ? new Date(subscription.canceled_at * 1000) : null,
-      metadata: subscription.metadata as Record<string, unknown>,
+      metadata: asJsonValue(subscription.metadata ?? {}),
     },
   });
 }

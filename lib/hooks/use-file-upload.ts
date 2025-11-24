@@ -114,61 +114,6 @@ export function useFileUpload({
     [validationOptions.acceptedTypes, validationOptions.maxSizeMB]
   );
 
-  const addFiles = useCallback(
-    async (incoming: FileList | File[]): Promise<FileValidationResult[]> => {
-      const filesArray = Array.from(incoming instanceof FileList ? incoming : Array.from(incoming));
-      const results: FileValidationResult[] = [];
-      const allowMultiple = validationOptions.allowMultiple ?? true;
-
-      for (const file of filesArray) {
-        if (!allowMultiple && (items.length > 0 || results.some((result) => result.valid))) {
-          results.push({
-            valid: false,
-            error: 'Solo puedes subir un archivo a la vez.',
-          });
-          continue;
-        }
-
-        const countResult = validateFileCount(items.length + results.filter((r) => r.valid).length, {
-          maxFiles: validationOptions.maxFiles,
-        });
-        if (!countResult.valid) {
-          results.push(countResult);
-          continue;
-        }
-
-        const validationResult = await validateFile(file, validationOptions);
-        results.push(validationResult);
-
-        if (!validationResult.valid) {
-          continue;
-        }
-
-        const previewUrl = createPreviewUrl(file);
-        const newItem: UploadItem = {
-          id: generateClientFileId(),
-          file,
-          previewUrl,
-          progress: 0,
-          status: 'queued',
-          attempts: 0,
-          uploadedBytes: 0,
-          totalBytes: file.size,
-          kind: getFileKind({ mimeType: file.type, extension: getFileExtension(file.name) }),
-        };
-
-        setItems((prev) => [...prev, newItem]);
-      }
-
-      if (autoUpload) {
-        void processQueue();
-      }
-
-      return results;
-    },
-    [autoUpload, items.length, processQueue, validationOptions]
-  );
-
   const updateItem = useCallback((id: string, updater: (item: UploadItem) => UploadItem) => {
     setItems((prev) => prev.map((item) => (item.id === id ? updater(item) : item)));
   }, []);
@@ -248,14 +193,73 @@ export function useFileUpload({
     processingRef.current = true;
 
     try {
-      const queuedItems = items.filter((item) => item.status === 'queued');
+      const queuedItems = itemsRef.current.filter((item) => item.status === 'queued');
       for (const nextItem of queuedItems) {
         await uploadSingle(nextItem);
       }
     } finally {
       processingRef.current = false;
     }
-  }, [items, uploadSingle]);
+  }, [uploadSingle]);
+
+  const addFiles = useCallback(
+    async (incoming: FileList | File[]): Promise<FileValidationResult[]> => {
+      const filesArray = Array.from(incoming instanceof FileList ? incoming : Array.from(incoming));
+      const results: FileValidationResult[] = [];
+      const allowMultiple = validationOptions.allowMultiple ?? true;
+
+      for (const file of filesArray) {
+        if (
+          !allowMultiple &&
+          (itemsRef.current.length > 0 || results.some((result) => result.valid))
+        ) {
+          results.push({
+            valid: false,
+            error: 'Solo puedes subir un archivo a la vez.',
+          });
+          continue;
+        }
+
+        const validCount = itemsRef.current.length + results.filter((r) => r.valid).length;
+        const countResult = validateFileCount(validCount, {
+          maxFiles: validationOptions.maxFiles,
+        });
+        if (!countResult.valid) {
+          results.push(countResult);
+          continue;
+        }
+
+        const validationResult = await validateFile(file, validationOptions);
+        results.push(validationResult);
+
+        if (!validationResult.valid) {
+          continue;
+        }
+
+        const previewUrl = createPreviewUrl(file);
+        const newItem: UploadItem = {
+          id: generateClientFileId(),
+          file,
+          previewUrl,
+          progress: 0,
+          status: 'queued',
+          attempts: 0,
+          uploadedBytes: 0,
+          totalBytes: file.size,
+          kind: getFileKind({ mimeType: file.type, extension: getFileExtension(file.name) }),
+        };
+
+        setItems((prev) => [...prev, newItem]);
+      }
+
+      if (autoUpload) {
+        void processQueue();
+      }
+
+      return results;
+    },
+    [autoUpload, processQueue, validationOptions]
+  );
 
   const removeFile = useCallback(
     (id: string) => {

@@ -15,7 +15,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { EstadoAusencia } from '@/lib/constants/enums';
 import { useApi } from '@/lib/hooks';
 
 import { EditarFichajeModal } from '../../../hr/horario/fichajes/editar-fichaje-modal';
@@ -50,7 +49,7 @@ export function FichajesTab({ empleadoId }: { empleadoId: string }) {
   const [fichajeEditando, setFichajeEditando] = useState<Fichaje | null>(null);
 
   // Hook para cargar fichajes
-  const { data: _fichajes = [], loading, execute: refetchFichajes } = useApi<Fichaje[]>({
+  const { loading, execute: refetchFichajes } = useApi<Fichaje[]>({
     onSuccess: (data) => {
       // Agrupar fichajes en jornadas cuando se cargan
       const jornadasAgrupadas = agruparPorJornada(data);
@@ -170,7 +169,7 @@ export function FichajesTab({ empleadoId }: { empleadoId: string }) {
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold text-gray-900">
-                {jornadas.filter(j => j.estado === EstadoAusencia.en_curso).length}
+                {jornadas.filter((j) => j.estado === 'en_curso').length}
               </div>
               <div className="text-xs text-gray-500 mt-1">En curso</div>
             </div>

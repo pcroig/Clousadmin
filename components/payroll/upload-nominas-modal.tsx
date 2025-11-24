@@ -12,6 +12,7 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { parseJson } from '@/lib/utils/json';
 
 interface UploadNominasModalProps {
   isOpen: boolean;
@@ -40,6 +41,20 @@ const meses = [
   'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
   'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
 ];
+
+interface UploadNominasResponse {
+  sessionId?: string | null;
+  results?: MatchingResult[];
+  stats?: {
+    autoAssigned?: number;
+  };
+  error?: string;
+}
+
+interface ConfirmNominasResponse {
+  imported?: number;
+  error?: string;
+}
 
 export function UploadNominasModal({ isOpen, onClose, onSuccess }: UploadNominasModalProps) {
   const currentDate = new Date();
@@ -105,13 +120,13 @@ export function UploadNominasModal({ isOpen, onClose, onSuccess }: UploadNominas
         body: formData,
       });
 
-      const data = await response.json();
+      const data = await parseJson<UploadNominasResponse>(response);
 
       if (!response.ok) {
         throw new Error(data.error || 'Error al procesar archivos');
       }
 
-      setSessionId(data.sessionId);
+      setSessionId(data.sessionId ?? null);
       setResults(data.results || []);
       setStep('review');
 
@@ -147,7 +162,7 @@ export function UploadNominasModal({ isOpen, onClose, onSuccess }: UploadNominas
         }),
       });
 
-      const data = await response.json();
+      const data = await parseJson<ConfirmNominasResponse>(response);
 
       if (!response.ok) {
         throw new Error(data.error || 'Error al confirmar nóminas');

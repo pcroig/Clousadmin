@@ -21,6 +21,7 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
+import { parseJson } from '@/lib/utils/json';
 
 
 interface EmpleadoDetectado {
@@ -193,10 +194,19 @@ export function ImportarEmpleadosExcel({
         body: formData,
       });
 
-      const analyzeResult = await analyzeResponse.json();
+      const analyzeResult = await parseJson<{
+        success?: boolean;
+        error?: string;
+        data?: {
+          empleados: EmpleadoDetectado[];
+          equiposDetectados: string[];
+          managersDetectados?: string[];
+          resumen: PreviewData['resumen'];
+        };
+      }>(analyzeResponse);
 
-      if (!analyzeResult.success) {
-        setError(analyzeResult.error || 'Error al analizar el archivo');
+      if (!analyzeResponse.ok || !analyzeResult?.success || !analyzeResult.data) {
+        setError(analyzeResult?.error || 'Error al analizar el archivo');
         if (showToast) toast.error('Error al analizar el archivo');
         return;
       }
@@ -251,10 +261,14 @@ export function ImportarEmpleadosExcel({
         }),
       });
 
-      const importResult = await importResponse.json();
+      const importResult = await parseJson<{
+        success?: boolean;
+        error?: string;
+        data?: ResultadoImportacion;
+      }>(importResponse);
 
-      if (importResult.success) {
-        setResultadoImportacion(importResult.data);
+      if (importResponse.ok && importResult.success) {
+        setResultadoImportacion(importResult.data ?? null);
         setPreviewData(null); // Limpiar preview
         if (showToast) {
           toast.success('Importación completada');
@@ -266,7 +280,8 @@ export function ImportarEmpleadosExcel({
           fileInputRef.current.value = '';
         }
       } else {
-        setError(importResult.error || 'Error al importar empleados');
+        const message = importResult.error || 'Error al importar empleados';
+        setError(message);
         if (showToast) toast.error('Error al importar empleados');
       }
     } catch (err) {
@@ -554,7 +569,7 @@ export function ImportarEmpleadosExcel({
             )}
 
             <Button
-              onClick={handleConfirmarImportacion} 
+              onClick={() => handleConfirmarImportacion()}
               disabled={previewData.resumen.validos === 0}
               className="bg-primary hover:bg-primary/90"
             >

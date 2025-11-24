@@ -16,6 +16,7 @@ import {
 import { EstadoSolicitud, UsuarioRol } from '@/lib/constants/enums';
 import { crearNotificacionSolicitudCreada } from '@/lib/notificaciones';
 import { prisma, Prisma } from '@/lib/prisma';
+import { asJsonValue } from '@/lib/prisma/json';
 
 // Schema de validación
 const solicitudCreateSchema = z.object({
@@ -33,13 +34,17 @@ export async function GET(request: NextRequest) {
     const { session } = authResult;
 
     const searchParams = request.nextUrl.searchParams;
-    const estado = searchParams.get('estado') || 'pendiente';
+    const estadoParam = searchParams.get('estado');
+    const estado =
+      estadoParam && Object.values(EstadoSolicitud).includes(estadoParam as EstadoSolicitud)
+        ? (estadoParam as EstadoSolicitud)
+        : undefined;
 
     // Si es empleado, solo ver sus propias solicitudes
     // Si es HR Admin o Manager, ver todas las solicitudes
     const where: Prisma.SolicitudCambioWhereInput = {
       empresaId: session.user.empresaId,
-      estado,
+      ...(estado ? { estado } : {}),
     };
 
     if (session.user.rol === UsuarioRol.empleado && session.user.empleadoId) {
@@ -100,7 +105,7 @@ export async function POST(request: NextRequest) {
         empresaId: session.user.empresaId,
         empleadoId: session.user.empleadoId,
         tipo: validatedData.tipo,
-        camposCambiados: validatedData.camposCambiados as Prisma.InputJsonValue,
+        camposCambiados: asJsonValue(validatedData.camposCambiados),
         motivo: validatedData.motivo,
         estado: EstadoSolicitud.pendiente,
       },

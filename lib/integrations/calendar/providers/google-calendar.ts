@@ -316,21 +316,19 @@ export class GoogleCalendarProvider implements CalendarProvider {
     location?: string | null;
   }): CalendarEvent {
     return {
-      id: googleEvent.id,
-      summary: googleEvent.summary || "",
-      description: googleEvent.description,
+      id: googleEvent.id ?? undefined,
+      summary: googleEvent.summary ?? "",
+      description: googleEvent.description ?? undefined,
       start: {
-        date: googleEvent.start?.date,
-        dateTime: googleEvent.start?.dateTime,
-        timeZone: googleEvent.start?.timeZone,
+        date: googleEvent.start?.date ?? undefined,
+        dateTime: googleEvent.start?.dateTime ?? undefined,
+        timeZone: googleEvent.start?.timeZone ?? undefined,
       },
       end: {
-        date: googleEvent.end?.date,
-        dateTime: googleEvent.end?.dateTime,
-        timeZone: googleEvent.end?.timeZone,
+        date: googleEvent.end?.date ?? undefined,
+        dateTime: googleEvent.end?.dateTime ?? undefined,
+        timeZone: googleEvent.end?.timeZone ?? undefined,
       },
-      colorId: googleEvent.colorId,
-      extendedProperties: googleEvent.extendedProperties,
     };
   }
 }

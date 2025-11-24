@@ -19,7 +19,7 @@ import {
 } from '@/components/ui/table';
 
 import { EditarFestivoModal } from './editar-festivo-modal';
-
+import { parseJson } from '@/lib/utils/json';
 
 interface Festivo {
   id: string;
@@ -53,7 +53,7 @@ export function ListaFestivos({ año, onUpdate }: ListaFestivosProps) {
       const url = año ? `/api/festivos?año=${año}` : '/api/festivos';
       const response = await fetch(url);
       if (response.ok) {
-        const data = await response.json();
+        const data = await parseJson<{ festivos?: Festivo[] }>(response);
         setFestivos(data.festivos || []);
       }
     } catch (error) {
@@ -82,8 +82,8 @@ export function ListaFestivos({ año, onUpdate }: ListaFestivosProps) {
         cargarFestivos();
         if (onUpdate) onUpdate();
       } else {
-        const error = await response.json();
-        toast.error(error.error || 'Error al eliminar festivo');
+        const error = await parseJson<{ error?: string }>(response).catch(() => null);
+        toast.error(error?.error || 'Error al eliminar festivo');
       }
     } catch (error) {
       console.error('Error:', error);

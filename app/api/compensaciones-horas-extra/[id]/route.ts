@@ -124,7 +124,6 @@ export async function PATCH(
           diasSolicitados: diasAusencia,
           descuentaSaldo: false, // No descuenta, suma al saldo
           estado: determinarEstadoTrasAprobacion(fechaFin),
-          descripcion: `Compensación de ${compensacion.horasBalance} horas extra`,
           motivo: 'Compensación de horas extra trabajadas', // Requerido para tipo 'otro'
           aprobadaPor: session.user.id,
           aprobadaEn: new Date(),

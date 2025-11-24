@@ -16,12 +16,42 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { parseJson } from '@/lib/utils/json';
 
 import { AddPersonaDocumentForm } from './add-persona-document-form';
 
 interface AddPersonaManualFormProps {
   onSuccess: () => void;
   onCancel: () => void;
+}
+
+interface ApiEquipo {
+  id: string;
+  nombre: string;
+}
+
+interface ApiPuesto {
+  id: string;
+  nombre: string;
+}
+
+interface EquiposResponse {
+  equipos?: ApiEquipo[];
+}
+
+interface PuestosResponse {
+  puestos?: ApiPuesto[];
+}
+
+interface CrearEmpleadoResponse {
+  success?: boolean;
+  error?: string;
+  code?: string;
+  empleadoExistente?: {
+    id: string;
+    nombre: string;
+    apellidos: string;
+  };
 }
 
 export function AddPersonaManualForm({ onSuccess, onCancel }: AddPersonaManualFormProps) {
@@ -39,13 +69,33 @@ export function AddPersonaManualForm({ onSuccess, onCancel }: AddPersonaManualFo
         ]);
         
         if (equiposRes.ok) {
-          const equiposData = await equiposRes.json();
-          setEquipos(equiposData);
+          const equiposData = await parseJson<EquiposResponse | ApiEquipo[]>(equiposRes);
+          const listaEquipos = Array.isArray(equiposData)
+            ? equiposData
+            : Array.isArray(equiposData?.equipos)
+              ? equiposData.equipos ?? []
+              : [];
+          setEquipos(
+            listaEquipos.map((equipo) => ({
+              id: equipo.id,
+              nombre: equipo.nombre,
+            }))
+          );
         }
         
         if (puestosRes.ok) {
-          const puestosData = await puestosRes.json();
-          setPuestos(puestosData);
+          const puestosData = await parseJson<PuestosResponse | ApiPuesto[]>(puestosRes);
+          const listaPuestos = Array.isArray(puestosData)
+            ? puestosData
+            : Array.isArray(puestosData?.puestos)
+              ? puestosData.puestos ?? []
+              : [];
+          setPuestos(
+            listaPuestos.map((puesto) => ({
+              id: puesto.id,
+              nombre: puesto.nombre,
+            }))
+          );
         }
       } catch (error) {
         console.error('Error fetching data:', error);
@@ -75,13 +125,13 @@ export function AddPersonaManualForm({ onSuccess, onCancel }: AddPersonaManualFo
       });
 
       if (!response.ok) {
-        const error = await response.json();
-        toast.error(error.error || 'Error al crear equipo');
+        const error = await parseJson<{ error?: string }>(response).catch(() => null);
+        toast.error(error?.error || 'Error al crear equipo');
         return null;
       }
 
-      const nuevoEquipo = await response.json();
-      setEquipos([...equipos, nuevoEquipo]);
+      const nuevoEquipo = await parseJson<ApiEquipo>(response);
+      setEquipos((prev) => [...prev, nuevoEquipo]);
       toast.success('Equipo creado correctamente');
       return nuevoEquipo.id;
     } catch (error) {
@@ -101,13 +151,13 @@ export function AddPersonaManualForm({ onSuccess, onCancel }: AddPersonaManualFo
       });
 
       if (!response.ok) {
-        const error = await response.json();
-        toast.error(error.error || 'Error al crear puesto');
+        const error = await parseJson<{ error?: string }>(response).catch(() => null);
+        toast.error(error?.error || 'Error al crear puesto');
         return null;
       }
 
-      const nuevoPuesto = await response.json();
-      setPuestos([...puestos, nuevoPuesto]);
+      const nuevoPuesto = await parseJson<ApiPuesto>(response);
+      setPuestos((prev) => [...prev, nuevoPuesto]);
       toast.success('Puesto creado correctamente');
       return nuevoPuesto.id;
     } catch (error) {
@@ -171,7 +221,7 @@ export function AddPersonaManualForm({ onSuccess, onCancel }: AddPersonaManualFo
         body: JSON.stringify(formData),
       });
 
-      const data = await response.json();
+      const data = await parseJson<CrearEmpleadoResponse>(response);
 
       if (response.ok) {
         toast.success('Empleado creado correctamente');

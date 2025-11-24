@@ -96,7 +96,7 @@ export async function PATCH(
     }
 
     await ensureManagerAccess(
-      session.user.rol,
+      session.user.rol as UsuarioRol,
       session.user.empleadoId ?? null,
       solicitud.empleadoId
     );

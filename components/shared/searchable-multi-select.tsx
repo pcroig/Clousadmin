@@ -180,7 +180,10 @@ export function SearchableMultiSelect({
                 <CommandGroup>
                   {items.map((item) => {
                     const isSelected = values.includes(item.value);
-                    const isDisabled = !isSelected && maxSelections && values.length >= maxSelections;
+                    const isDisabled =
+                      !isSelected &&
+                      typeof maxSelections === 'number' &&
+                      values.length >= maxSelections;
 
                     return (
                       <CommandItem
@@ -245,7 +248,10 @@ export function SearchableMultiSelect({
             <CommandGroup>
               {items.map((item) => {
                 const isSelected = values.includes(item.value);
-                const isDisabled = !isSelected && maxSelections && values.length >= maxSelections;
+                const isDisabled =
+                  !isSelected &&
+                  typeof maxSelections === 'number' &&
+                  values.length >= maxSelections;
 
                 return (
                   <CommandItem

@@ -6,6 +6,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 import { guardarDatosPersonales } from '@/lib/onboarding';
 import { datosPersonalesSchema } from '@/lib/validaciones/onboarding';
+import { getJsonBody } from '@/lib/utils/json';
 
 // POST /api/onboarding/[token]/datos-personales - Guardar datos personales (Paso 1)
 export async function POST(
@@ -16,7 +17,7 @@ export async function POST(
     const { token } = await context.params;
 
     // Parsear body
-    const body = await req.json() as Record<string, any>;
+    const body = await getJsonBody<Record<string, unknown>>(req);
 
     // Validar datos con Zod
     const validacion = datosPersonalesSchema.safeParse(body);

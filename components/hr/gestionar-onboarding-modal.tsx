@@ -22,6 +22,7 @@ import {
 } from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { parseJson } from '@/lib/utils/json';
 
 import { PlantillasTab } from './plantillas-tab';
 
@@ -79,13 +80,28 @@ export function GestionarOnboardingModal({
     }
   }, [open]);
 
+  interface OnboardingConfigResponse {
+    success?: boolean;
+    error?: string;
+    config?: {
+      camposRequeridos: CamposRequeridos;
+      documentosRequeridos?: DocumentoRequerido[];
+      plantillasDocumentos?: PlantillaDocumento[];
+    };
+  }
+
+  interface SimpleResponse {
+    success?: boolean;
+    error?: string;
+  }
+
   const cargarConfiguracion = async () => {
     setLoading(true);
     setError('');
 
     try {
       const res = await fetch('/api/hr/onboarding-config');
-      const data = await res.json();
+      const data = await parseJson<OnboardingConfigResponse>(res);
 
       if (data.success && data.config) {
         setCamposRequeridos(data.config.camposRequeridos);
@@ -120,7 +136,7 @@ export function GestionarOnboardingModal({
         }),
       });
 
-      const data = await res.json();
+      const data = await parseJson<SimpleResponse>(res);
 
       if (data.success) {
         setSuccess('Campos actualizados correctamente');
@@ -156,7 +172,7 @@ export function GestionarOnboardingModal({
         }),
       });
 
-      const data = await res.json();
+      const data = await parseJson<SimpleResponse>(res);
 
       if (data.success) {
         setSuccess('Documentos actualizados correctamente');

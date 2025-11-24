@@ -6,7 +6,9 @@ import { NextRequest, NextResponse } from 'next/server';
 
 import { getSession } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { asJsonValue, JSON_NULL } from '@/lib/prisma/json';
 import { deleteFromS3, getSignedDownloadUrl, uploadToS3 } from '@/lib/s3';
+import type { Prisma } from '@prisma/client';
 
 /**
  * GET /api/empleados/firma - Obtener firma guardada del empleado autenticado
@@ -145,10 +147,11 @@ export async function POST(request: NextRequest) {
     await uploadToS3(buffer, s3Key, file.type);
 
     // Parsear datos de trazo si se proporcionan
-    let firmaGuardadaData = null;
+    let firmaGuardadaData: Prisma.InputJsonValue | Prisma.NullableJsonNullValueInput = JSON_NULL;
     if (dataStr) {
       try {
-        firmaGuardadaData = JSON.parse(dataStr);
+        const parsed = JSON.parse(dataStr);
+        firmaGuardadaData = asJsonValue(parsed);
       } catch {
         return NextResponse.json(
           { error: 'Datos de firma inválidos. Debe ser JSON válido' },
@@ -232,7 +235,7 @@ export async function DELETE(_request: NextRequest) {
       data: {
         firmaGuardada: false,
         firmaS3Key: null,
-        firmaGuardadaData: null,
+        firmaGuardadaData: JSON_NULL,
       },
     });
 

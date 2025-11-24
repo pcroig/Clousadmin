@@ -25,7 +25,7 @@ import {
   validarLimitesJornada,
 } from '@/lib/calculos/fichajes';
 import { EstadoFichaje, UsuarioRol } from '@/lib/constants/enums';
-import { prisma } from '@/lib/prisma';
+import { prisma, Prisma } from '@/lib/prisma';
 import {
   buildPaginationMeta,
   parsePaginationParams,
@@ -65,14 +65,7 @@ export async function GET(req: NextRequest) {
     const propios = searchParams.get('propios');
 
     // 3. Construir filtros
-    interface FichajeWhereClause {
-      empresaId: string;
-      empleadoId?: string;
-      fecha?: { gte?: Date; lte?: Date };
-      estado?: EstadoFichaje;
-    }
-    
-    const where: FichajeWhereClause = {
+    const where: Prisma.FichajeWhereInput = {
       empresaId: session.user.empresaId,
     };
 
@@ -203,12 +196,12 @@ export async function GET(req: NextRequest) {
       const horasTrabajadas =
         fichaje.horasTrabajadas !== null && fichaje.horasTrabajadas !== undefined
           ? Number(fichaje.horasTrabajadas)
-          : calcularHorasTrabajadas(fichaje.eventos as unknown as Array<{ tipo: string; hora: Date }>);
+          : calcularHorasTrabajadas(fichaje.eventos);
 
       const horasEnPausa =
         fichaje.horasEnPausa !== null && fichaje.horasEnPausa !== undefined
           ? Number(fichaje.horasEnPausa)
-          : calcularTiempoEnPausa(fichaje.eventos as unknown as Array<{ tipo: string; hora: Date }>);
+          : calcularTiempoEnPausa(fichaje.eventos);
 
       const balance = Math.round((horasTrabajadas - horasEsperadas) * 100) / 100;
 

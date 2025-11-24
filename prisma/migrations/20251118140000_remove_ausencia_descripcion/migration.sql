@@ -12,3 +12,4 @@ DROP COLUMN "descripcion";
 
 
 
+

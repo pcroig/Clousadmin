@@ -1,5 +1,5 @@
 // eslint-disable-next-line import/order
-import type { AIMessage } from './core/types';
+import type { AIMessage, MessageContent } from './core/types';
 // ========================================
 // OpenAI Modelos - Configuraciones de Modelos
 // ========================================
@@ -115,6 +115,23 @@ export const FUNCTION_CONFIGS: Record<string, ModelConfig> = {
   },
 } as const;
 
+function mapOpenAIMessageContent(
+  content: OpenAI.Chat.ChatCompletionMessageParam['content']
+): MessageContent {
+  if (typeof content === 'string') {
+    return content;
+  }
+
+  if (Array.isArray(content)) {
+    return content
+      .map((part) => ('text' in part && typeof part.text === 'string' ? part.text : ''))
+      .filter(Boolean)
+      .join('\n');
+  }
+
+  return '';
+}
+
 /**
  * Obtiene la configuración de modelo para una funcionalidad específica
  * 
@@ -187,11 +204,12 @@ export async function callAIWithConfig(
   
   // Convertir resto de mensajes
   for (const msg of messages) {
+    const normalizedContent = mapOpenAIMessageContent(msg.content ?? '');
     aiMessages.push({
       role: msg.role === 'system' ? MsgRole.SYSTEM : 
             msg.role === 'assistant' ? MsgRole.ASSISTANT : 
             MsgRole.USER,
-      content: msg.content,
+      content: normalizedContent,
     });
   }
   

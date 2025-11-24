@@ -21,6 +21,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
+import { parseJson } from '@/lib/utils/json';
 
 import type {
   CamposRequeridos,
@@ -43,6 +44,31 @@ interface Plantilla {
   totalDocumentosGenerados?: number;
   creadoEn: string;
   s3Key: string;
+}
+
+interface PlantillasResponse {
+  success?: boolean;
+  plantillas?: Plantilla[];
+  error?: string;
+}
+
+interface OnboardingConfigResponse {
+  success?: boolean;
+  error?: string;
+  config?: {
+    plantillasDocumentos?: ConfigPlantilla[];
+  };
+}
+
+interface UploadPlantillaResponse {
+  success?: boolean;
+  error?: string;
+  tip?: string;
+}
+
+interface DeletePlantillaResponse {
+  success?: boolean;
+  error?: string;
 }
 
 interface PlantillasTabProps {
@@ -134,7 +160,7 @@ export function PlantillasTab({
 
     try {
       const res = await fetch('/api/plantillas');
-      const data = await res.json();
+      const data = await parseJson<PlantillasResponse>(res);
 
       if (data.success) {
         setPlantillas(data.plantillas || []);
@@ -163,7 +189,7 @@ export function PlantillasTab({
           data: seleccionadas,
         }),
       });
-      const data = await res.json();
+      const data = await parseJson<OnboardingConfigResponse>(res);
 
       if (!res.ok || !data.success) {
         throw new Error(data.error || 'Error al guardar plantillas seleccionadas');
@@ -248,7 +274,7 @@ export function PlantillasTab({
         body: formData,
       });
 
-      const data = await res.json();
+      const data = await parseJson<UploadPlantillaResponse>(res);
 
       if (data.success) {
         setSuccess('Plantilla subida correctamente. Variables detectadas automáticamente.');
@@ -285,7 +311,7 @@ export function PlantillasTab({
         method: 'DELETE',
       });
 
-      const data = await res.json();
+      const data = await parseJson<DeletePlantillaResponse>(res);
 
       if (data.success) {
         setSuccess('Plantilla eliminada correctamente');

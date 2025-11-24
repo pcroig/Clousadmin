@@ -119,9 +119,14 @@ export async function POST(request: NextRequest) {
         const tiposEventos = fichaje.eventos.map((e) => e.tipo);
 
         // JORNADA FIJA
-        if (config.tipo === 'fija' || (configDia && configDia.entrada && configDia.salida)) {
-          // Verificar que el día esté activo
-          if (!configDia || configDia.activo === false) {
+        if (config.tipo === 'fija' || (configDia?.entrada && configDia.salida)) {
+          const diaConfig = configDia;
+          if (
+            !diaConfig ||
+            diaConfig.activo === false ||
+            !diaConfig.entrada ||
+            !diaConfig.salida
+          ) {
             errores.push(`Fichaje ${fichajeId}: Día no activo en la jornada`);
             continue;
           }
@@ -130,7 +135,7 @@ export async function POST(request: NextRequest) {
           if (!tiposEventos.includes('entrada') 
               && validacion.eventosFaltantes.includes('entrada')
               && (!ausenciaMedioDia.tieneAusencia || ausenciaMedioDia.medioDia === 'tarde')) {
-            const [horas, minutos] = configDia.entrada.split(':').map(Number);
+            const [horas, minutos] = diaConfig.entrada.split(':').map(Number);
             const horaEntrada = new Date(fechaBase);
             horaEntrada.setHours(horas, minutos, 0, 0);
 
@@ -144,9 +149,9 @@ export async function POST(request: NextRequest) {
           }
 
           // Crear pausa si está configurada y falta (no crear si hay ausencia de medio día)
-          if (configDia.pausa_inicio && configDia.pausa_fin && !ausenciaMedioDia.tieneAusencia) {
+          if (diaConfig.pausa_inicio && diaConfig.pausa_fin && !ausenciaMedioDia.tieneAusencia) {
             if (!tiposEventos.includes('pausa_inicio') && validacion.eventosFaltantes.includes('pausa_inicio')) {
-              const [horas, minutos] = configDia.pausa_inicio.split(':').map(Number);
+              const [horas, minutos] = diaConfig.pausa_inicio.split(':').map(Number);
               const horaPausaInicio = new Date(fechaBase);
               horaPausaInicio.setHours(horas, minutos, 0, 0);
 
@@ -160,7 +165,7 @@ export async function POST(request: NextRequest) {
             }
 
             if (!tiposEventos.includes('pausa_fin') && validacion.eventosFaltantes.includes('pausa_fin')) {
-              const [horas, minutos] = configDia.pausa_fin.split(':').map(Number);
+              const [horas, minutos] = diaConfig.pausa_fin.split(':').map(Number);
               const horaPausaFin = new Date(fechaBase);
               horaPausaFin.setHours(horas, minutos, 0, 0);
 
@@ -178,7 +183,7 @@ export async function POST(request: NextRequest) {
           if (!tiposEventos.includes('salida') 
               && validacion.eventosFaltantes.includes('salida')
               && (!ausenciaMedioDia.tieneAusencia || ausenciaMedioDia.medioDia === 'manana')) {
-            const [horas, minutos] = configDia.salida.split(':').map(Number);
+            const [horas, minutos] = diaConfig.salida.split(':').map(Number);
             const horaSalida = new Date(fechaBase);
             horaSalida.setHours(horas, minutos, 0, 0);
 

@@ -16,6 +16,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { EstadoFichaje } from '@/lib/constants/enums';
+import { parseJson } from '@/lib/utils/json';
 
 interface FichajeEvento {
   id: string;
@@ -108,7 +109,7 @@ export function FichajesTab({ empleadoId }: { empleadoId: string }) {
       if (!response.ok) {
         throw new Error('Error al obtener fichajes');
       }
-      const data = await response.json() as Record<string, any>;
+      const data = await parseJson<ApiFichaje[]>(response).catch(() => []);
       const rawFichajes: ApiFichaje[] = Array.isArray(data) ? data : [];
 
       // Procesar fichajes con su nueva estructura (eventos separados)

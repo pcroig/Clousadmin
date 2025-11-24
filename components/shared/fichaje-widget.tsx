@@ -15,6 +15,7 @@ import { calcularHorasTrabajadas } from '@/lib/calculos/fichajes-cliente';
 import { MOBILE_DESIGN } from '@/lib/constants/mobile-design';
 import { extractArrayFromResponse } from '@/lib/utils/api-response';
 import { formatearHorasMinutos, formatTiempoTrabajado } from '@/lib/utils/formatters';
+import { parseJson } from '@/lib/utils/json';
 
 import { FichajeManualModal } from './fichaje-manual-modal';
 import { WidgetCard } from './widget-card';
@@ -187,16 +188,10 @@ export function FichajeWidget({
           cache: 'no-store',
         });
 
-        if (!response.ok) {
-          console.error('[FichajeWidget] Error obteniendo fichaje:', response.status);
-          dispatch({
-            type: 'SET_DATA',
-            payload: { status: 'sin_fichar', horaEntrada: null, eventos: [] },
-          });
-          return;
+        const payload = await parseJson<unknown>(response).catch(() => null);
+        if (!response.ok || !payload) {
+          throw new Error(`Error obteniendo fichaje: ${response.status}`);
         }
-
-        const payload = await response.json();
         const fichajes = extractArrayFromResponse<Fichaje>(payload, { key: 'fichajes' });
 
         if (fichajes.length === 0) {
@@ -265,8 +260,8 @@ export function FichajeWidget({
       });
 
       if (!response.ok) {
-        const error = await response.json();
-        toast.error(error.error || 'Error al fichar');
+        const error = await parseJson<{ error?: string }>(response).catch(() => null);
+        toast.error(error?.error || 'Error al fichar');
         return;
       }
 

@@ -122,7 +122,7 @@ export default async function HRBandejaEntradaPage(props: {
       tipo: 'ausencia' as const,
       detalles: `Solicitud de ${aus.tipo}`,
       fechaCreacion: aus.createdAt,
-      estado: EstadoAusencia.pendiente as const,
+      estado: EstadoAusencia.pendiente,
       metadata: {
         tipoAusencia: aus.tipo,
         fechaInicio: aus.fechaInicio,
@@ -139,7 +139,7 @@ export default async function HRBandejaEntradaPage(props: {
       tipo: 'cambio_datos' as const,
       detalles: `Solicitud de cambio de ${sol.tipo}`,
       fechaCreacion: sol.createdAt,
-      estado: EstadoAusencia.pendiente as const,
+      estado: EstadoAusencia.pendiente,
       metadata: {
         tipoCambioDatos: sol.tipo,
         camposCambiados: sol.camposCambiados as Record<string, unknown>,

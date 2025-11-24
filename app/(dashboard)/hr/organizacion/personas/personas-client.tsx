@@ -154,8 +154,8 @@ export function PersonasClient({ empleados, initialPanel, initialDenunciaId }: P
           {/* Búsqueda */}
           <div className="flex-shrink-0 mb-3">
             <CompactFilterBar
-              searchValue={filtros.busqueda}
-              onSearchChange={(value) => setFiltros((prev) => ({ ...prev, busqueda: value }))}
+              searchValue={searchTerm}
+              onSearchChange={setSearchTerm}
               searchPlaceholder="Buscar por nombre, email..."
             />
           </div>

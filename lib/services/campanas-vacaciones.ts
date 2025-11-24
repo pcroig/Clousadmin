@@ -132,7 +132,7 @@ export async function obtenerPropuestaPendiente(
       fechaFinObjetivo: preferencia.campana.fechaFinObjetivo,
       propuesta,
     };
-  } catch (error) {
+  } catch (error: unknown) {
     if (isMissingPreferenciaColumnError(error)) {
       handleMissingColumn();
       return null;

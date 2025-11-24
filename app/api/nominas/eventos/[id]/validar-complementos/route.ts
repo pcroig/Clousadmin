@@ -9,6 +9,7 @@ import { z } from 'zod';
 import { getSession } from '@/lib/auth';
 import { crearNotificacionNominaValidada } from '@/lib/notificaciones';
 import { prisma } from '@/lib/prisma';
+import { getJsonBody } from '@/lib/utils/json';
 
 const ValidarComplementosSchema = z.object({
   complementoIds: z.array(z.string()),
@@ -41,8 +42,8 @@ export async function POST(
       return NextResponse.json({ error: 'Evento no encontrado' }, { status: 404 });
     }
 
-    const body = await req.json() as Record<string, any>;
-    const data = ValidarComplementosSchema.parse(body);
+    const payload = await getJsonBody<Record<string, unknown>>(req);
+    const data = ValidarComplementosSchema.parse(payload);
 
     // Para managers, verificar que solo estén validando complementos de su equipo
     if (session.user.rol === 'manager') {

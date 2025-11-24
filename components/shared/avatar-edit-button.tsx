@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import { useRef, useState } from 'react';
 import { toast } from 'sonner';
 
+import { parseJson } from '@/lib/utils/json';
+
 interface AvatarEditButtonProps {
   empleadoId: string;
 }
@@ -47,7 +49,7 @@ export function AvatarEditButton({ empleadoId }: AvatarEditButtonProps) {
         body: formData,
       });
 
-      const data = await response.json();
+      const data = await parseJson<{ error?: string }>(response);
 
       if (!response.ok) {
         throw new Error(data.error || 'Error al subir el avatar');

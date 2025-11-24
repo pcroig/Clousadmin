@@ -11,7 +11,8 @@ import {
   extraerCamposPDF,
   fusionarCamposDetectados,
 } from '@/lib/plantillas';
-import { prisma, Prisma } from '@/lib/prisma';
+import { prisma } from '@/lib/prisma';
+import { asJsonValue } from '@/lib/prisma/json';
 
 /**
  * POST /api/plantillas/[id]/escanear-campos
@@ -94,8 +95,8 @@ export async function POST(
     await prisma.plantillaDocumento.update({
       where: { id },
       data: {
-        configuracionIA: configuracionIA as Prisma.InputJsonValue,
-        variablesUsadas: camposFusionados.map((c) => c.nombre) as Prisma.InputJsonValue,
+        configuracionIA: asJsonValue(configuracionIA),
+        variablesUsadas: asJsonValue(camposFusionados.map((c) => c.nombre)),
       },
     });
 

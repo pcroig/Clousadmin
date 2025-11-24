@@ -6,6 +6,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 import { guardarDatosBancarios } from '@/lib/onboarding';
 import { datosBancariosSchema } from '@/lib/validaciones/onboarding';
+import { getJsonBody } from '@/lib/utils/json';
 
 // POST /api/onboarding/[token]/datos-bancarios - Guardar datos bancarios (Paso 2)
 export async function POST(
@@ -16,7 +17,7 @@ export async function POST(
     const { token } = await context.params;
 
     // Parsear body
-    const body = await req.json() as Record<string, any>;
+    const body = await getJsonBody<Record<string, unknown>>(req);
 
     // Validar datos con Zod
     const validacion = datosBancariosSchema.safeParse(body);

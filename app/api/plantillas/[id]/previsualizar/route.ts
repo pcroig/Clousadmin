@@ -138,23 +138,90 @@ export async function GET(
 
     const variables = await extraerVariablesDePlantilla(plantilla.s3Key);
 
+    const empresaData = {
+      id: empleado.empresa.id,
+      nombre: empleado.empresa.nombre,
+      cif: empleado.empresa.cif ?? undefined,
+      email: empleado.empresa.email ?? undefined,
+      telefono: empleado.empresa.telefono ?? undefined,
+      direccion: empleado.empresa.direccion ?? undefined,
+      web: empleado.empresa.web ?? undefined,
+    };
+
     const empleadoData: DatosEmpleado = {
-      ...empleado,
+      id: empleado.id,
+      nombre: empleado.nombre,
+      apellidos: empleado.apellidos,
+      email: empleado.email,
+      nif: empleado.nif ?? undefined,
+      nss: empleado.nss ?? undefined,
+      telefono: empleado.telefono ?? undefined,
+      fechaNacimiento: empleado.fechaNacimiento ?? undefined,
+      direccionCalle: empleado.direccionCalle ?? undefined,
+      direccionNumero: empleado.direccionNumero ?? undefined,
+      direccionPiso: empleado.direccionPiso ?? undefined,
+      codigoPostal: empleado.codigoPostal ?? undefined,
+      ciudad: empleado.ciudad ?? undefined,
+      direccionProvincia: empleado.direccionProvincia ?? undefined,
+      estadoCivil: empleado.estadoCivil ?? undefined,
+      numeroHijos: empleado.numeroHijos ?? undefined,
+      genero: empleado.genero ?? undefined,
+      iban: empleado.iban ?? undefined,
+      titularCuenta: empleado.titularCuenta ?? undefined,
+      puesto: empleado.puesto ?? undefined,
+      fechaAlta: empleado.fechaAlta,
+      fechaBaja: empleado.fechaBaja ?? undefined,
+      tipoContrato: empleado.tipoContrato ?? undefined,
       salarioBrutoAnual: empleado.salarioBrutoAnual
         ? Number(empleado.salarioBrutoAnual)
         : undefined,
       salarioBrutoMensual: empleado.salarioBrutoMensual
         ? Number(empleado.salarioBrutoMensual)
         : undefined,
-      empresa: empleado.empresa,
+      empresa: empresaData,
+      jornada: empleado.jornada
+        ? {
+            nombre: empleado.jornada.nombre,
+            horasSemanales: Number(empleado.jornada.horasSemanales),
+          }
+        : undefined,
+      manager: empleado.manager
+        ? {
+            nombre: empleado.manager.nombre,
+            apellidos: empleado.manager.apellidos,
+            email: empleado.manager.email,
+          }
+        : undefined,
+      puestoRelacion: empleado.puestoRelacion
+        ? {
+            nombre: empleado.puestoRelacion.nombre,
+            descripcion: empleado.puestoRelacion.descripcion ?? undefined,
+          }
+        : undefined,
+      contratos: empleado.contratos?.map((contrato) => ({
+        id: contrato.id,
+        tipoContrato: contrato.tipoContrato,
+        fechaInicio: contrato.fechaInicio,
+        fechaFin: contrato.fechaFin ?? undefined,
+        salarioBrutoAnual: contrato.salarioBrutoAnual
+          ? Number(contrato.salarioBrutoAnual)
+          : 0,
+      })),
+      ausencias: empleado.ausencias?.map((ausencia) => ({
+        id: ausencia.id,
+        tipo: ausencia.tipo,
+        fechaInicio: ausencia.fechaInicio,
+        fechaFin: ausencia.fechaFin,
+        diasSolicitados: Number(ausencia.diasSolicitados),
+        estado: ausencia.estado,
+      })),
     };
 
     const valoresResueltos = await resolverVariables(variables, empleadoData);
 
-    const previewUrl = await getSignedDownloadUrl(
-      plantilla.s3Key,
-      PREVIEW_TTL_SECONDS
-    );
+    const previewUrl = await getSignedDownloadUrl(plantilla.s3Key, {
+      expiresIn: PREVIEW_TTL_SECONDS,
+    });
     const variablesConValor = Object.entries(valoresResueltos)
       .filter(([, value]) => {
         if (value === null || value === undefined) return false;

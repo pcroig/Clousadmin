@@ -15,6 +15,7 @@ import {
 } from '@/lib/firma-digital';
 import { crearNotificacionFirmaCompletada, crearNotificacionFirmaPendiente } from '@/lib/notificaciones';
 import { prisma } from '@/lib/prisma';
+import { asJsonValue, JSON_NULL } from '@/lib/prisma/json';
 import { downloadFromS3, uploadToS3 } from '@/lib/s3';
 
 import type {
@@ -24,6 +25,7 @@ import type {
   EstadoSolicitudFirmaDetallado,
   PosicionFirma,
   ResultadoFirma,
+  TipoFirma,
 } from '@/lib/firma-digital';
 
 
@@ -111,7 +113,7 @@ export async function crearSolicitudFirma(input: CrearSolicitudFirmaInput) {
       diasRecordatorio,
       nombreDocumento: documento.nombre,
       hashDocumento,
-      posicionFirma,
+      posicionFirma: posicionFirma ? asJsonValue(posicionFirma) : JSON_NULL,
       estado: 'pendiente',
       creadoPor,
     },
@@ -311,7 +313,7 @@ export async function firmarDocumento(
     data: {
       firmado: true,
       firmadoEn: ahora,
-      datosCapturados,
+      datosCapturados: asJsonValue(datosCapturados),
       ipAddress: datosCapturados.ip,
       certificadoHash: certificado.certificadoHash,
       metodoCaptura: datosCapturados.tipo,
@@ -399,8 +401,8 @@ export async function firmarDocumento(
                   dateStyle: 'short',
                   timeStyle: 'short',
                 }) || 'N/A',
-              tipoFirma: f.tipo,
-              certificadoHash: f.certificadoHash,
+              tipoFirma: f.tipo as TipoFirma,
+              certificadoHash: f.certificadoHash ?? undefined,
                posicion: posicionBase
                 ? {
                     pagina: posicionBase.pagina,

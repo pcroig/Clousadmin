@@ -187,6 +187,7 @@ export async function getSubscriptionStatus(empresaId: string) {
       hasSubscription: false,
       status: null,
       plan: null,
+      price: null,
       currentPeriodEnd: null,
       cancelAtPeriodEnd: false,
       isTrialing: false,
@@ -197,8 +198,24 @@ export async function getSubscriptionStatus(empresaId: string) {
   return {
     hasSubscription: true,
     status: subscription.status,
-    plan: subscription.price.producto,
-    price: subscription.price,
+    plan: subscription.price.producto
+      ? {
+          id: subscription.price.producto.id,
+          nombre: subscription.price.producto.nombre,
+          descripcion: subscription.price.producto.descripcion,
+          features: Array.isArray(subscription.price.producto.features)
+            ? (subscription.price.producto.features as string[])
+            : [],
+        }
+      : null,
+    price: subscription.price
+      ? {
+          id: subscription.price.id,
+          unitAmount: subscription.price.unitAmount,
+          currency: subscription.price.currency,
+          intervalo: subscription.price.intervalo,
+        }
+      : null,
     currentPeriodEnd: subscription.currentPeriodEnd,
     cancelAtPeriodEnd: subscription.cancelAtPeriodEnd,
     isTrialing: subscription.status === 'trialing',

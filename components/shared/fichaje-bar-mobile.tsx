@@ -14,6 +14,7 @@ import { MOBILE_DESIGN } from '@/lib/constants/mobile-design';
 import { cn } from '@/lib/utils';
 import { extractArrayFromResponse } from '@/lib/utils/api-response';
 import { formatTiempoTrabajado } from '@/lib/utils/formatters';
+import { parseJson } from '@/lib/utils/json';
 
 import type { FichajeEvento } from '@prisma/client';
 
@@ -173,16 +174,10 @@ export function FichajeBarMobile() {
           cache: 'no-store',
         });
 
-        if (!response.ok) {
-          console.error('[FichajeBarMobile] Error obteniendo fichaje:', response.status);
-          dispatch({
-            type: 'SET_DATA',
-            payload: { status: 'sin_fichar', horaEntrada: null, eventos: [] },
-          });
-          return;
+        const payload = await parseJson<unknown>(response).catch(() => null);
+        if (!response.ok || !payload) {
+          throw new Error(`Error obteniendo fichaje: ${response.status}`);
         }
-
-        const payload = await response.json();
         const fichajes = extractArrayFromResponse<Fichaje>(payload, { key: 'fichajes' });
 
         if (fichajes.length === 0) {
@@ -247,8 +242,8 @@ export function FichajeBarMobile() {
       });
 
       if (!response.ok) {
-        const error = await response.json();
-        toast.error(error.error || 'Error al fichar');
+        const error = await parseJson<{ error?: string }>(response).catch(() => null);
+        toast.error(error?.error || 'Error al fichar');
         return;
       }
 

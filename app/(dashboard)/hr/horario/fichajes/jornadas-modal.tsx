@@ -27,6 +27,7 @@ import {
 import { EditarJornadaModal, type JornadaDetalle } from './editar-jornada-modal';
 
 import type { DiaConfig, JornadaConfig } from '@/lib/calculos/fichajes-helpers';
+import { parseJson } from '@/lib/utils/json';
 
 type DiaKey = 'lunes' | 'martes' | 'miercoles' | 'jueves' | 'viernes' | 'sabado' | 'domingo';
 
@@ -62,7 +63,7 @@ export function JornadasModal({ open, onClose }: JornadasModalProps) {
   const [cargando, setCargando] = useState(false);
   const [editarModal, setEditarModal] = useState<{
     open: boolean;
-    jornada: Jornada | null;
+    jornada: JornadaDetalle | null;
     modo: 'crear' | 'editar';
   }>({
     open: false,
@@ -80,10 +81,12 @@ export function JornadasModal({ open, onClose }: JornadasModalProps) {
     setCargando(true);
     try {
       const response = await fetch('/api/jornadas');
-      if (response.ok) {
-        const data = await response.json() as Record<string, any>;
-        setJornadas(data);
+      if (!response.ok) {
+        throw new Error('Error al obtener jornadas');
       }
+      const data = await parseJson<unknown>(response).catch(() => null);
+      const jornadasData = Array.isArray(data) ? (data as JornadaResumen[]) : [];
+      setJornadas(jornadasData);
     } catch (error) {
       console.error('Error cargando jornadas:', error);
     } finally {

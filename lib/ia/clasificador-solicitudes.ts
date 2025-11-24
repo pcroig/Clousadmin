@@ -63,7 +63,7 @@ Motivo: ${motivo || 'No especificado'}
     `.trim();
 
     // Definir candidatos (decisiones posibles)
-    const candidates: Candidate[] = [
+    const candidates: Candidate<void>[] = [
       {
         id: 'auto',
         label: 'Puede auto-aprobarse (cambios simples y seguros)',
@@ -208,7 +208,7 @@ Días disponibles: ${empleado.diasVacacionesDisponibles || 'N/A'}
 Motivo: ${motivo || 'No especificado'}
     `.trim();
 
-    const candidates: Candidate[] = [
+    const candidates: Candidate<void>[] = [
       {
         id: 'auto',
         label: 'Puede auto-aprobarse (ausencia válida y dentro de políticas)',

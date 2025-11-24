@@ -322,10 +322,7 @@ export const calendarioJornadaOnboardingSchema = z
       nombre: z.string().min(3, 'El nombre de la jornada es obligatorio').max(100),
       tipo: z.enum(['flexible', 'fija']),
       horasSemanales: z
-        .number({
-          required_error: 'Las horas semanales son obligatorias',
-          invalid_type_error: 'Las horas semanales deben ser un número',
-        })
+        .number()
         .min(1, 'Las horas semanales deben ser mayores que 0')
         .max(168, 'Las horas semanales no pueden superar las 168 horas'),
       limiteInferior: z

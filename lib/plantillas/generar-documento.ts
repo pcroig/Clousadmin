@@ -216,11 +216,71 @@ export async function generarDocumentoDesdePlantilla(
       ? Math.round((salarioBrutoAnual / 12) * 100) / 100
       : undefined;
 
-    const empleadoData: DatosEmpleado = {
+    const empresaNormalizada: DatosEmpleado['empresa'] = {
+      id: empleado.empresa.id,
+      nombre: empleado.empresa.nombre,
+      cif: empleado.empresa.cif ?? undefined,
+      email: empleado.empresa.email ?? undefined,
+      telefono: empleado.empresa.telefono ?? undefined,
+      direccion: empleado.empresa.direccion ?? undefined,
+      web: empleado.empresa.web ?? undefined,
+    };
+
+    const empleadoSanitizado = {
       ...empleado,
+      nif: empleado.nif ?? undefined,
+      nss: empleado.nss ?? undefined,
+      telefono: empleado.telefono ?? undefined,
+      fechaNacimiento: empleado.fechaNacimiento ?? undefined,
+      direccionCalle: empleado.direccionCalle ?? undefined,
+      direccionNumero: empleado.direccionNumero ?? undefined,
+      direccionPiso: empleado.direccionPiso ?? undefined,
+      codigoPostal: empleado.codigoPostal ?? undefined,
+      ciudad: empleado.ciudad ?? undefined,
+      direccionProvincia: empleado.direccionProvincia ?? undefined,
+      estadoCivil: empleado.estadoCivil ?? undefined,
+      numeroHijos: empleado.numeroHijos ?? undefined,
+      genero: empleado.genero ?? undefined,
+      iban: empleado.iban ?? undefined,
+      titularCuenta: empleado.titularCuenta ?? undefined,
+      puesto: empleado.puesto ?? undefined,
+      fechaBaja: empleado.fechaBaja ?? undefined,
+      tipoContrato: empleado.tipoContrato ?? undefined,
+      diasVacaciones: empleado.diasVacaciones ?? undefined,
+      ausencias: undefined,
+    };
+
+    const empleadoData: DatosEmpleado = {
+      ...empleadoSanitizado,
       salarioBrutoAnual,
       salarioBrutoMensual,
-      empresa: empleado.empresa,
+      empresa: empresaNormalizada,
+      jornada: empleado.jornada
+        ? {
+            nombre: empleado.jornada.nombre,
+            horasSemanales: Number(empleado.jornada.horasSemanales),
+          }
+        : undefined,
+      manager: empleado.manager
+        ? {
+            nombre: empleado.manager.nombre,
+            apellidos: empleado.manager.apellidos,
+            email: empleado.manager.email,
+          }
+        : undefined,
+      puestoRelacion: empleado.puestoRelacion
+        ? {
+            nombre: empleado.puestoRelacion.nombre,
+            descripcion: empleado.puestoRelacion.descripcion ?? undefined,
+          }
+        : undefined,
+      contratos: empleado.contratos?.map((contrato) => ({
+        id: contrato.id,
+        tipoContrato: contrato.tipoContrato,
+        fechaInicio: contrato.fechaInicio,
+        fechaFin: contrato.fechaFin ?? undefined,
+        salarioBrutoAnual: Number(contrato.salarioBrutoAnual),
+      })),
     };
 
     console.log(`[Generar] Resolviendo ${variablesEnPlantilla.length} variables con IA...`);
@@ -360,12 +420,17 @@ export async function generarDocumentoDesdePlantilla(
 
     // 13. Si requiere firma, crear solicitud automáticamente
     if (!permiteRellenar && requiereFirmaFinal) {
+      const hashDocumento = documento.hashDocumento ?? 'sin-hash';
+      const tituloFirma = `Firma de ${documento.nombre}`;
+
       const solicitudFirma = await prisma.solicitudFirma.create({
         data: {
           empresaId: empleado.empresaId,
           documentoId: documento.id,
           solicitadoPor: solicitadoPor,
-          tipo: 'automatica',
+          titulo: tituloFirma,
+          nombreDocumento: documento.nombre,
+          hashDocumento,
           mensaje: configuracion.mensajeFirma || `Por favor firma el documento: ${nombreDocumentoPdf}`,
           fechaLimite: configuracion.fechaLimiteFirma,
         },
@@ -400,6 +465,7 @@ export async function generarDocumentoDesdePlantilla(
       empleadoNombre: `${empleado.nombre} ${empleado.apellidos}`,
       documentoId: documento.id,
       documentoNombre: nombreDocumentoPdf,
+      s3Key,
       tiempoMs: tiempoTotal,
     };
   } catch (error) {

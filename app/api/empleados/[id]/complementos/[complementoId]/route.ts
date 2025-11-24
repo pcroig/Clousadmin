@@ -8,6 +8,7 @@ import { z } from 'zod';
 
 import { getSession } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { getJsonBody } from '@/lib/utils/json';
 
 const UpdateComplementoSchema = z.object({
   importePersonalizado: z.number().optional(),
@@ -31,7 +32,7 @@ export async function PATCH(
 
     const { id, complementoId } = await params;
 
-    const body = await req.json() as Record<string, any>;
+    const body = await getJsonBody<Record<string, unknown>>(req);
     const data = UpdateComplementoSchema.parse(body);
 
     // Verificar que el complemento pertenece al empleado y a la empresa

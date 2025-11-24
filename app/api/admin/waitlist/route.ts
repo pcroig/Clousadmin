@@ -8,6 +8,7 @@ import { getSession } from '@/lib/auth';
 import { UsuarioRol } from '@/lib/constants/enums';
 import { convertirWaitlistEnInvitacion } from '@/lib/invitaciones-signup';
 import { prisma } from '@/lib/prisma';
+import { getJsonBody } from '@/lib/utils/json';
 
 
 // GET /api/admin/waitlist - Obtener lista de espera
@@ -51,8 +52,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const body = await req.json() as Record<string, any>;
-    const { email } = body;
+    const body = await getJsonBody<Record<string, unknown>>(req);
+    const { email } = body as { email?: string };
 
     if (!email) {
       return NextResponse.json(

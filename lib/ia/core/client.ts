@@ -304,7 +304,7 @@ export async function callAISafe(
     
     return {
       success: true,
-      data: response,
+      data: serializeToJsonValue(response),
       provider: response.provider,
       usage: response.usage,
       metadata: response.metadata,
@@ -348,6 +348,10 @@ export async function callAIWithRetry(
   }
   
   throw lastError || new Error('Máximo de reintentos alcanzado');
+}
+
+function serializeToJsonValue(response: AIResponse): JsonValue {
+  return JSON.parse(JSON.stringify(response)) as JsonValue;
 }
 
 // ========================================

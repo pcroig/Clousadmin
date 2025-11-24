@@ -3,6 +3,8 @@
 // ========================================
 // Genera alertas automáticas para detectar anomalías en pre-nóminas
 
+import { Prisma } from '@prisma/client';
+
 import { prisma } from '@/lib/prisma';
 
 /**
@@ -66,9 +68,16 @@ export async function generarAlertasParaNomina(
 ): Promise<number> {
 
   // Obtener datos del empleado y contrato
-  const empleado = await prisma.empleado.findUnique({
+  const empleadoQuery = {
     where: { id: empleadoId },
     include: {
+      jornada: {
+        select: {
+          id: true,
+          config: true,
+          horasSemanales: true,
+        },
+      },
       contratos: {
         where: {
           OR: [
@@ -80,7 +89,9 @@ export async function generarAlertasParaNomina(
         take: 1,
       },
     },
-  });
+  } satisfies Prisma.EmpleadoFindUniqueArgs;
+
+  const empleado = await prisma.empleado.findUnique(empleadoQuery);
 
   if (!empleado) {
     return 0;
@@ -116,7 +127,7 @@ export async function generarAlertasParaNomina(
 
   // 3. Salario no configurado
   const contratoActual = empleado.contratos[0];
-  if (!contratoActual || (!contratoActual.salarioBrutoAnual && !contratoActual.salarioBrutoMensual)) {
+  if (!contratoActual || !contratoActual.salarioBrutoAnual) {
     alertas.push({
       tipo: ALERT_TYPES.CRITICO,
       categoria: ALERT_CATEGORIES.DATOS_FALTANTES,
@@ -168,12 +179,10 @@ export async function generarAlertasParaNomina(
   // === ALERTAS DE ADVERTENCIA/INFO: Horas Trabajadas ===
   
   if (contratoActual) {
-    const jornada = await prisma.jornada.findUnique({
-      where: { id: contratoActual.jornadaId || '' },
-    });
+    const jornada = empleado.jornada;
 
     if (jornada) {
-      const horasEsperadasMes = Number(jornada.horasSemanales) * 4.33; // Promedio semanas por mes
+      const horasEsperadasMes = Number(jornada.horasSemanales ?? 0) * 4.33; // Promedio semanas por mes
       
       const fichajes = await prisma.fichaje.findMany({
         where: {
@@ -270,7 +279,12 @@ export async function generarAlertasParaNomina(
         empresaId,
         empleadoId,
         nominaId,
-        ...alerta,
+        tipo: alerta.tipo,
+        categoria: alerta.categoria,
+        codigo: alerta.codigo,
+        mensaje: alerta.mensaje,
+        detalles: alerta.detalles ? (alerta.detalles as Prisma.InputJsonValue) : Prisma.JsonNull,
+        accionUrl: alerta.accionUrl,
       })),
       skipDuplicates: true,
     });

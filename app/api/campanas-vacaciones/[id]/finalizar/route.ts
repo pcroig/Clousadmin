@@ -2,6 +2,7 @@
 // API Route: Finalizar Campaña de Vacaciones
 // ========================================
 
+import type { Prisma } from '@prisma/client';
 import { NextRequest } from 'next/server';
 
 import {
@@ -13,7 +14,8 @@ import {
 import { calcularDias } from '@/lib/calculos/ausencias';
 import { EstadoAusencia, UsuarioRol } from '@/lib/constants/enums';
 import { crearNotificacionCampanaCuadrada } from '@/lib/notificaciones';
-import { prisma, Prisma } from '@/lib/prisma';
+import { prisma } from '@/lib/prisma';
+import { JSON_NULL, asJsonValue } from '@/lib/prisma/json';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,6 +24,13 @@ interface VacacionesPropuesta {
   fechaFin: string | Date;
   tipo?: string;
   motivo?: string;
+}
+
+interface AusenciaPayload {
+  preferenciaId: string;
+  empleadoId: string;
+  equipoId: string | null;
+  data: Prisma.AusenciaUncheckedCreateInput;
 }
 
 export async function POST(
@@ -77,12 +86,15 @@ export async function POST(
       return badRequestResponse('No hay propuestas para finalizar la campaña');
     }
 
-    const ausenciasPayload = [];
+    const ausenciasPayload: AusenciaPayload[] = [];
 
     for (const pref of preferenciasConPropuesta) {
-      const propuesta = pref.propuestaIA as VacacionesPropuesta;
-      const fechaInicio = new Date(propuesta.fechaInicio!);
-      const fechaFin = new Date(propuesta.fechaFin!);
+      const propuesta = pref.propuestaIA as unknown as VacacionesPropuesta | null;
+      if (!propuesta?.fechaInicio || !propuesta?.fechaFin) {
+        return badRequestResponse('Una propuesta carece de fechas válidas');
+      }
+      const fechaInicio = new Date(propuesta.fechaInicio);
+      const fechaFin = new Date(propuesta.fechaFin);
 
       if (Number.isNaN(fechaInicio.getTime()) || Number.isNaN(fechaFin.getTime())) {
         return badRequestResponse('Fechas inválidas en una propuesta');
@@ -109,9 +121,9 @@ export async function POST(
           motivo: `Vacaciones asignadas por campaña: ${campana.titulo}`,
           descuentaSaldo: true,
           estado: EstadoAusencia.pendiente,
-          diasIdeales: pref.diasIdeales as Prisma.InputJsonValue,
-          diasPrioritarios: pref.diasPrioritarios as Prisma.InputJsonValue,
-          diasAlternativos: pref.diasAlternativos as Prisma.InputJsonValue,
+          diasIdeales: asJsonValue(pref.diasIdeales),
+          diasPrioritarios: asJsonValue(pref.diasPrioritarios),
+          diasAlternativos: asJsonValue(pref.diasAlternativos),
         },
       });
     }
@@ -131,7 +143,7 @@ export async function POST(
             aceptada: true,
             propuestaEnviada: true,
             cambioSolicitado: false,
-            propuestaEmpleado: Prisma.JsonNull,
+            propuestaEmpleado: JSON_NULL,
           },
         });
       }

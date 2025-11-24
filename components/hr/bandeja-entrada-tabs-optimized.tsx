@@ -22,6 +22,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { ejecutarAccionSolicitud } from '@/lib/services/solicitudes-actions';
+import { parseJson } from '@/lib/utils/json';
 
 import { BandejaEntradaNotificaciones } from './bandeja-entrada-notificaciones';
 import { BandejaEntradaSolicitudes } from './bandeja-entrada-solicitudes';
@@ -167,14 +168,18 @@ export function BandejaEntradaTabsOptimized({
         queryClient.invalidateQueries({ queryKey: ['notificaciones'] });
         queryClient.invalidateQueries({ queryKey: ['ausencias'] });
         
-        const data = await response.json();
+        const data = await parseJson<{
+          ausenciasAprobadas?: number;
+          solicitudesAprobadas?: number;
+          error?: string;
+        }>(response);
         toast.success(
           `Auto-aprobación completada: ${data.ausenciasAprobadas || 0} ausencias y ${data.solicitudesAprobadas || 0} solicitudes`
         );
       } else {
-        const error = await response.json();
+        const error = await parseJson<{ error?: string }>(response).catch(() => null);
         console.error('[BandejaEntradaTabs] Error en auto-aprobación:', error);
-        toast.error(error.error || 'Error en auto-aprobación');
+        toast.error(error?.error || 'Error en auto-aprobación');
       }
     } catch (error) {
       console.error('[BandejaEntradaTabs] Error en auto-aprobación:', error);

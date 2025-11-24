@@ -83,7 +83,7 @@ type AsignacionComplementoDetalle = Prisma.AsignacionComplementoGetPayload<{
   select: typeof asignacionComplementoSelect;
 }>;
 
-type NominaHistorico = {
+type NominaHistoricoAgg = {
   anio: number;
   mes: number;
   _sum: {
@@ -91,7 +91,7 @@ type NominaHistorico = {
   };
 };
 
-type NominaGroupResumen = {
+type NominaGroupResumenAgg = {
   anio: number;
   _sum: {
     totalNeto: Prisma.Decimal | null;
@@ -103,7 +103,7 @@ type NominaGroupResumen = {
   };
 };
 
-type NominaGroupMensual = {
+type NominaGroupMensualAgg = {
   anio: number;
   mes: number;
   _sum: {
@@ -157,11 +157,10 @@ export async function GET(request: NextRequest) {
     }
 
     // Obtener empleados con salarios y equipos
-    const empleadosArgs: Prisma.EmpleadoFindManyArgs = {
+    const empleados = await prisma.empleado.findMany({
       where,
       select: empleadoConEquiposSelect,
-    };
-    const empleados: EmpleadoConEquipos[] = await prisma.empleado.findMany(empleadosArgs);
+    });
 
     const empleadosIds = empleados.map((empleado: EmpleadoConEquipos) => empleado.id);
 
@@ -291,14 +290,15 @@ export async function GET(request: NextRequest) {
       anio: { gte: hace6Meses.getFullYear() },
     };
 
-    const nominasHistorico = (await prisma.nomina.groupBy({
+    const nominaHistoricoArgs = Prisma.validator<Prisma.NominaGroupByArgs>()({
       by: ['anio', 'mes'],
       where: nominaHistoricoWhere,
       _sum: {
         totalBruto: true,
       },
       orderBy: [{ anio: 'asc' }, { mes: 'asc' }],
-    })) as NominaHistorico[];
+    });
+    const nominasHistorico = await prisma.nomina.groupBy(nominaHistoricoArgs);
 
     // Construir evolución de costes desde datos históricos
     const evolucionCoste = [];
@@ -381,7 +381,7 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    const resumenPorAnioPromise = prisma.nomina.groupBy({
+    const resumenPorAnioArgs = Prisma.validator<Prisma.NominaGroupByArgs>()({
       by: ['anio'],
       where: {
         anio: { in: [previousYear, currentYear] },
@@ -395,9 +395,8 @@ export async function GET(request: NextRequest) {
       _count: {
         _all: true,
       },
-    }) as Promise<NominaGroupResumen[]>;
-
-    const tendenciaMensualPromise = prisma.nomina.groupBy({
+    });
+    const tendenciaMensualArgs = Prisma.validator<Prisma.NominaGroupByArgs>()({
       by: ['anio', 'mes'],
       where: {
         anio: currentYear,
@@ -414,16 +413,18 @@ export async function GET(request: NextRequest) {
       orderBy: {
         mes: 'asc',
       },
-    }) as Promise<NominaGroupMensual[]>;
+    });
+    const resumenPorAnioPromise = prisma.nomina.groupBy(resumenPorAnioArgs);
+    const tendenciaMensualPromise = prisma.nomina.groupBy(tendenciaMensualArgs);
 
-    const nominasEquiposArgs: Prisma.NominaFindManyArgs = {
+    const nominasEquiposArgs = Prisma.validator<Prisma.NominaFindManyArgs>()({
       where: {
         anio: currentYear,
         empleadoId: { in: empleadosIds },
       },
       select: nominaConEquiposSelect,
-    };
-    const nominasEquiposPromise = prisma.nomina.findMany(nominasEquiposArgs) as Promise<NominaConEquipos[]>;
+    });
+    const nominasEquiposPromise = prisma.nomina.findMany(nominasEquiposArgs);
 
     const _complementosAsignadosArgs: Prisma.AsignacionComplementoFindManyArgs = {
       where: {
@@ -442,7 +443,7 @@ export async function GET(request: NextRequest) {
       nominasEquiposPromise,
     ]);
 
-    const resumenPorAnio = resumenPorAnioRaw as NominaGroupResumen[];
+    const resumenPorAnio = resumenPorAnioRaw as NominaGroupResumenAgg[];
     const nominasEquipos = nominasEquiposRaw as NominaConEquipos[];
 
     const nominaIds = nominasEquipos.map((nomina) => nomina.id);
@@ -467,7 +468,7 @@ export async function GET(request: NextRequest) {
     };
 
     const resumenNominasPorAnio = resumenPorAnio.reduce<Record<number, ResumenAnio>>(
-      (acc: Record<number, ResumenAnio>, item: NominaGroupResumen) => {
+      (acc: Record<number, ResumenAnio>, item: NominaGroupResumenAgg) => {
         acc[item.anio] = {
           totalNeto: toNumber(item._sum.totalNeto),
           totalBruto: toNumber(item._sum.totalBruto),
@@ -511,7 +512,7 @@ export async function GET(request: NextRequest) {
     const tendenciaPorMes = tendenciaMensualRaw.reduce<
       Record<number, ResumenAnio>
     >(
-      (acc: Record<number, ResumenAnio>, item: NominaGroupMensual) => {
+      (acc: Record<number, ResumenAnio>, item: NominaGroupMensualAgg) => {
       acc[item.mes] = {
         totalNeto: toNumber(item._sum.totalNeto),
         totalBruto: toNumber(item._sum.totalBruto),

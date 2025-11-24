@@ -272,9 +272,9 @@ export async function POST(
 
     return NextResponse.json({
       importadas: resultados.length,
-      errores: errores.length,
-      resultados,
       errores,
+      totalErrores: errores.length,
+      resultados,
       eventoCompleto,
     });
   } catch (error) {

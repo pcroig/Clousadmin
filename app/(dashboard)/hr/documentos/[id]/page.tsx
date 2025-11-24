@@ -59,6 +59,7 @@ export default async function HRCarpetaDetailPage(context: { params: Promise<{ i
 
   // Si es carpeta global (sin empleadoId), obtener documentos agregados de todos los empleados
   let documentosAgregados = carpeta.documentos;
+  type DocumentoConEmpleado = (typeof documentosAgregados)[number];
   let esGlobal = false;
 
   if (!carpeta.empleadoId && carpeta.compartida && carpeta.esSistema) {
@@ -103,11 +104,11 @@ export default async function HRCarpetaDetailPage(context: { params: Promise<{ i
       ]);
 
       // Combinar y eliminar duplicados por ID
-      const documentosMap = new Map();
+      const documentosMap = new Map<string, DocumentoConEmpleado>();
       [...documentosEmpleados, ...documentosCarpetaGlobal].forEach((doc) => {
-        documentosMap.set(doc.id, doc);
+        documentosMap.set(doc.id, doc as DocumentoConEmpleado);
       });
-      
+
       documentosAgregados = Array.from(documentosMap.values()).sort(
         (a, b) => b.createdAt.getTime() - a.createdAt.getTime()
       );

@@ -7,6 +7,8 @@
 
 'use client';
 
+import { parseJson } from '@/lib/utils/json';
+
 export type SolicitudTipo =
   | 'ausencia'
   | 'cambio_datos'
@@ -78,17 +80,19 @@ export async function ejecutarAccionSolicitud<TData = unknown>(
     // Intentar parsear JSON si existe.
     const contentType = response.headers.get('Content-Type') ?? '';
     const isJson = contentType.includes('application/json');
-    const data = isJson ? await response.clone().json().catch(() => undefined) : undefined;
+    const parsedData = isJson
+      ? await parseJson<unknown>(response).catch(() => undefined)
+      : undefined;
 
     if (!response.ok) {
       const mensaje =
-        (data as { error?: string } | undefined)?.error ??
+        (parsedData as { error?: string } | undefined)?.error ??
         `Error al ${accion === 'aprobar' ? 'aprobar' : 'rechazar'} la solicitud`;
 
       return {
         ok: false,
         error: mensaje,
-        data,
+        data: parsedData as TData | undefined,
         status: response.status,
         endpoint,
       };
@@ -96,7 +100,7 @@ export async function ejecutarAccionSolicitud<TData = unknown>(
 
     return {
       ok: true,
-      data,
+      data: parsedData as TData | undefined,
       status: response.status,
       endpoint,
     };

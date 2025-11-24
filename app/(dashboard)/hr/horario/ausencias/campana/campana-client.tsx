@@ -15,6 +15,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { TablaCuadrajeCampana } from '@/components/vacaciones/tabla-cuadraje-campana';
+import { parseJson } from '@/lib/utils/json';
 
 interface EmpleadoEquipo {
   equipoId: string;
@@ -75,10 +76,13 @@ export function CampanaClient({ campana: initialCampana }: CampanaClientProps) {
   const recargarCampana = async () => {
     const reloadResponse = await fetch(`/api/campanas-vacaciones/${campana.id}`);
     if (!reloadResponse.ok) {
-      const error = await reloadResponse.json().catch(() => ({ error: 'Error desconocido' }));
+      const error = await parseJson<{ error?: string }>(reloadResponse).catch(() => ({
+        error: 'Error desconocido',
+      }));
       throw new Error(error.error || 'No se pudo recargar la campaña');
     }
-    const updatedCampana = await reloadResponse.json() as Record<string, any>;
+
+    const updatedCampana = await parseJson<CampanaData>(reloadResponse);
     setCampana(updatedCampana);
     const hayBorrador = Boolean(updatedCampana.propuestaIA);
     setMostrarPropuesta(hayBorrador);
@@ -94,7 +98,9 @@ export function CampanaClient({ campana: initialCampana }: CampanaClientProps) {
       });
 
       if (!response.ok) {
-        const error = await response.json().catch(() => ({ error: 'Error desconocido' }));
+        const error = await parseJson<{ error?: string }>(response).catch(() => ({
+          error: 'Error desconocido',
+        }));
         throw new Error(error.error || 'No se pudo cuadrar con IA');
       }
 
@@ -123,7 +129,9 @@ export function CampanaClient({ campana: initialCampana }: CampanaClientProps) {
       });
 
       if (!response.ok) {
-        const error = await response.json().catch(() => ({ error: 'Error desconocido' }));
+        const error = await parseJson<{ error?: string }>(response).catch(() => ({
+          error: 'Error desconocido',
+        }));
         throw new Error(error.error || 'No se pudo enviar la propuesta');
       }
 
@@ -150,7 +158,9 @@ export function CampanaClient({ campana: initialCampana }: CampanaClientProps) {
       });
 
       if (!response.ok) {
-        const error = await response.json().catch(() => ({ error: 'Error desconocido' }));
+        const error = await parseJson<{ error?: string }>(response).catch(() => ({
+          error: 'Error desconocido',
+        }));
         throw new Error(error.error || 'No se pudo finalizar la campaña');
       }
 
@@ -175,7 +185,9 @@ export function CampanaClient({ campana: initialCampana }: CampanaClientProps) {
       );
 
       if (!response.ok) {
-        const error = await response.json().catch(() => ({ error: 'Error desconocido' }));
+        const error = await parseJson<{ error?: string }>(response).catch(() => ({
+          error: 'Error desconocido',
+        }));
         throw new Error(error.error || 'No se pudo cancelar la propuesta');
       }
 
@@ -322,7 +334,9 @@ export function CampanaClient({ campana: initialCampana }: CampanaClientProps) {
               });
 
               if (!response.ok) {
-                const error = await response.json().catch(() => ({ error: 'Error desconocido' }));
+                const error = await parseJson<{ error?: string }>(response).catch(() => ({
+                  error: 'Error desconocido',
+                }));
                 throw new Error(error.error || 'No se pudo actualizar la preferencia');
               }
 

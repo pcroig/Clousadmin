@@ -23,7 +23,7 @@ async function main() {
     tsConfigFilePath: path.resolve(process.cwd(), 'tsconfig.json'),
   });
 
-  project.addSourceFilesAtPaths(['app/api/**/*.ts', 'app/api/**/*.tsx']);
+  project.addSourceFilesAtPaths(['app/**/*.ts', 'app/**/*.tsx']);
 
   let filesUpdated = 0;
   let paramsUpdated = 0;

@@ -14,13 +14,6 @@ import {
   ModelConfig,
 } from '../types';
 
-type AnthropicImageBlock = {
-  type: 'image';
-  source:
-    | { type: 'base64'; media_type: string; data: string }
-    | { type: 'url'; url: string };
-};
-
 /**
  * Cliente de Anthropic (singleton)
  */
@@ -63,6 +56,29 @@ export function resetAnthropicClient(): void {
 /**
  * Convierte mensajes unificados a formato Anthropic
  */
+function normalizeContent(content: AIMessage['content']): string {
+  if (typeof content === 'string') {
+    return content;
+  }
+
+  if (Array.isArray(content)) {
+    return content
+      .map((item) => {
+        if (item.type === 'text') {
+          return item.text;
+        }
+        return `[imagen:${item.image_url.url}]`;
+      })
+      .join('\n');
+  }
+
+  if (content.type === 'text') {
+    return content.text;
+  }
+
+  return `[imagen:${content.image_url.url}]`;
+}
+
 function convertMessagesToAnthropic(messages: AIMessage[]): {
   system?: string;
   messages: Anthropic.MessageParam[];
@@ -72,88 +88,7 @@ function convertMessagesToAnthropic(messages: AIMessage[]): {
   const conversationMessages = messages.filter((m) => m.role !== MessageRole.SYSTEM);
   
   const anthropicMessages: Anthropic.MessageParam[] = conversationMessages.map((msg) => {
-    // Convertir contenido a formato Anthropic
-    let content: string | Anthropic.ContentBlock[];
-    
-    if (typeof msg.content === 'string') {
-      content = msg.content;
-    } else if (Array.isArray(msg.content)) {
-      // Array de contenidos (texto + imagen)
-      content = msg.content.map((c) => {
-        if (c.type === 'text') {
-          return { 
-            type: 'text' as const, 
-            text: c.text 
-          } as Anthropic.TextBlock;
-        } else {
-          // Manejar imagen (URL o base64)
-          const url = c.image_url.url;
-          if (url.startsWith('data:')) {
-            // Base64 data URI - extraer el base64 y el tipo MIME
-            const match = url.match(/^data:([^;]+);base64,(.+)$/);
-            if (match) {
-              const mimeType = match[1];
-              const base64Data = match[2];
-              const imageBlock: AnthropicImageBlock = {
-                type: 'image',
-                source: {
-                  type: 'base64',
-                  media_type: mimeType,
-                  data: base64Data,
-                },
-              };
-              return imageBlock;
-            }
-          }
-          // URL normal
-          const imageBlock: AnthropicImageBlock = {
-            type: 'image',
-            source: {
-              type: 'url',
-              url: url,
-            },
-          };
-          return imageBlock;
-        }
-      });
-    } else if (msg.content.type === 'text') {
-      content = msg.content.text;
-    } else {
-      // Manejar imagen única (puede ser URL o base64)
-      const url = msg.content.image_url.url;
-      if (url.startsWith('data:')) {
-        // Base64 data URI
-        const match = url.match(/^data:([^;]+);base64,(.+)$/);
-        if (match) {
-          const mimeType = match[1];
-          const base64Data = match[2];
-          content = [
-            {
-              type: 'image',
-              source: {
-                type: 'base64',
-                media_type: mimeType,
-                data: base64Data,
-              },
-            } as AnthropicImageBlock,
-          ];
-        } else {
-          content = msg.content.image_url.url; // Fallback a texto
-        }
-      } else {
-        // URL normal
-        content = [
-          {
-            type: 'image',
-            source: {
-              type: 'url',
-              url: url,
-            },
-          } as AnthropicImageBlock,
-        ];
-      }
-    }
-    
+    const content = normalizeContent(msg.content);
     return {
       role: msg.role === MessageRole.ASSISTANT ? 'assistant' : 'user',
       content,
@@ -172,8 +107,12 @@ function convertMessagesToAnthropic(messages: AIMessage[]): {
 function convertAnthropicResponse(response: Anthropic.Message, model: string): AIResponse {
   // Extraer contenido de texto
   const textContent = response.content
-    .filter((block): block is Anthropic.TextBlock => block.type === 'text')
-    .map((block) => block.text)
+    .map((block) => {
+      if (block.type === 'text') {
+        return block.text;
+      }
+      return '';
+    })
     .join('');
   
   // Mapear stop_reason de Anthropic a formato unificado

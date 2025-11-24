@@ -21,6 +21,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
+import { parseJson } from '@/lib/utils/json';
 
 interface DocumentoSubido {
   id: string;
@@ -48,6 +49,54 @@ interface AddPersonaOnboardingFormProps {
   onSuccess: () => void;
   onCancel: () => void;
   tipoOnboarding?: 'completo' | 'simplificado';
+}
+
+interface PlantillaGenerarResponse {
+  success?: boolean;
+  error?: string;
+  details?: string;
+}
+
+interface DocumentoUploadResponse {
+  documento: { id: string };
+  error?: string;
+}
+
+interface EmpleadoCreateResponse {
+  id: string;
+  code?: string;
+  error?: string;
+  empleadoExistente?: {
+    id: string;
+    nombre: string;
+    apellidos: string;
+  };
+}
+
+interface OnboardingInviteResponse {
+  success?: boolean;
+  error?: string;
+}
+
+interface CarpetaCreateResponse {
+  carpeta: { id: string };
+  error?: string;
+}
+
+interface ApiPuesto {
+  id: string;
+  nombre: string;
+}
+
+interface PuestosResponse {
+  puestos?: ApiPuesto[];
+  data?: ApiPuesto[];
+}
+
+interface PlantillasApiResponse {
+  success?: boolean;
+  error?: string;
+  plantillas?: PlantillaAutoOnboarding[];
 }
 
 export function AddPersonaOnboardingForm({ onSuccess, onCancel, tipoOnboarding = 'completo' }: AddPersonaOnboardingFormProps) {
@@ -81,12 +130,21 @@ export function AddPersonaOnboardingForm({ onSuccess, onCancel, tipoOnboarding =
     async function fetchPuestos() {
       try {
         const response = await fetch('/api/organizacion/puestos');
-        if (response.ok) {
-          const data = await response.json();
-          setPuestos(data || []);
+        if (!response.ok) {
+          throw new Error('Error al cargar puestos');
         }
+        const data = await parseJson<PuestosResponse | ApiPuesto[]>(response);
+        const lista = Array.isArray(data)
+          ? data
+          : Array.isArray(data?.puestos)
+            ? data.puestos ?? []
+            : Array.isArray(data?.data)
+              ? data.data ?? []
+              : [];
+        setPuestos(lista.map((puesto) => ({ id: puesto.id, nombre: puesto.nombre })));
       } catch (error) {
         console.error('Error fetching puestos:', error);
+        toast.error('No se pudieron cargar los puestos');
       }
     }
     fetchPuestos();
@@ -112,13 +170,13 @@ export function AddPersonaOnboardingForm({ onSuccess, onCancel, tipoOnboarding =
       });
 
       if (!response.ok) {
-        const error = await response.json();
-        toast.error(error.error || 'Error al crear puesto');
+        const error = await parseJson<{ error?: string }>(response).catch(() => null);
+        toast.error(error?.error || 'Error al crear puesto');
         return null;
       }
 
-      const nuevoPuesto = await response.json();
-      setPuestos([...puestos, nuevoPuesto]);
+      const nuevoPuesto = await parseJson<ApiPuesto>(response);
+      setPuestos((prev) => [...prev, nuevoPuesto]);
       toast.success('Puesto creado correctamente');
       return nuevoPuesto.id;
     } catch (error) {
@@ -134,26 +192,14 @@ export function AddPersonaOnboardingForm({ onSuccess, onCancel, tipoOnboarding =
 
     try {
       const response = await fetch('/api/plantillas?activa=true');
-      const data = await response.json();
+      const data = await parseJson<PlantillasApiResponse>(response);
 
       if (!response.ok || !data.success) {
-        setPlantillasError(data.error || 'Error al cargar plantillas automáticas');
+        setPlantillasError(data?.error || 'Error al cargar plantillas automáticas');
         return;
       }
 
-      const plantillas: PlantillaAutoOnboarding[] = (data.plantillas || []).map((plantilla: {
-        id: string;
-        nombre: string;
-        descripcion?: string | null;
-        categoria?: string | null;
-        formato: 'docx' | 'pdf_rellenable';
-        requiereFirma?: boolean;
-        carpetaDestinoDefault?: string | null;
-        esOficial?: boolean;
-        autoGenerarOnboarding?: boolean;
-        permiteRellenar?: boolean;
-        requiereRevision?: boolean;
-      }) => ({
+      const plantillas: PlantillaAutoOnboarding[] = (data.plantillas || []).map((plantilla) => ({
         id: plantilla.id,
         nombre: plantilla.nombre,
         descripcion: plantilla.descripcion,
@@ -231,7 +277,7 @@ export function AddPersonaOnboardingForm({ onSuccess, onCancel, tipoOnboarding =
             }),
           });
 
-          const data = await response.json();
+          const data = await parseJson<PlantillaGenerarResponse>(response);
 
           if (!response.ok || !data.success) {
             throw new Error(data.error || data.details || 'Error al iniciar generación');
@@ -287,7 +333,7 @@ export function AddPersonaOnboardingForm({ onSuccess, onCancel, tipoOnboarding =
         body: formData,
       });
 
-      const data = await response.json();
+      const data = await parseJson<DocumentoUploadResponse>(response);
 
       if (response.ok) {
         // Añadir a la lista de documentos subidos
@@ -366,7 +412,7 @@ export function AddPersonaOnboardingForm({ onSuccess, onCancel, tipoOnboarding =
         body: JSON.stringify(empleadoData),
       });
 
-      const dataEmpleado = await responseEmpleado.json();
+      const dataEmpleado = await parseJson<EmpleadoCreateResponse>(responseEmpleado);
 
       if (!responseEmpleado.ok) {
         // Manejo específico para email duplicado
@@ -404,7 +450,7 @@ export function AddPersonaOnboardingForm({ onSuccess, onCancel, tipoOnboarding =
         }),
       });
 
-      const onboardingData = await responseOnboarding.json();
+      const onboardingData = await parseJson<OnboardingInviteResponse>(responseOnboarding);
 
       if (!responseOnboarding.ok) {
         toast.error(onboardingData.error || 'Error al activar onboarding');
@@ -431,7 +477,7 @@ export function AddPersonaOnboardingForm({ onSuccess, onCancel, tipoOnboarding =
               body: formDataDoc,
             });
 
-            const dataDoc = await responseDoc.json();
+            const dataDoc = await parseJson<DocumentoUploadResponse>(responseDoc);
 
             if (!responseDoc.ok) {
               toast.error(`Error al subir ${doc.nombre}: ${dataDoc.error || 'Error desconocido'}`);
@@ -669,7 +715,7 @@ export function AddPersonaOnboardingForm({ onSuccess, onCancel, tipoOnboarding =
                       return null;
                     }
                     
-                    const { carpeta } = await response.json();
+                    const { carpeta } = await parseJson<CarpetaCreateResponse>(response);
                     toast.success('Carpeta creada correctamente');
                     return carpeta.id;
                   } catch {
@@ -770,7 +816,7 @@ export function AddPersonaOnboardingForm({ onSuccess, onCancel, tipoOnboarding =
                     return null;
                   }
                   
-                  const { carpeta } = await response.json();
+                  const { carpeta } = await parseJson<CarpetaCreateResponse>(response);
                   toast.success('Carpeta creada correctamente');
                   return carpeta.id;
                 } catch {

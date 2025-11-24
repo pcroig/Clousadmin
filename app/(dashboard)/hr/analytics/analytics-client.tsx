@@ -13,6 +13,7 @@ import { AnalyticsFilters, FilterValues } from '@/components/analytics/filters';
 import { KpiCard } from '@/components/analytics/kpi-card';
 import { PieChartComponent } from '@/components/analytics/pie-chart';
 import { Button } from '@/components/ui/button';
+import { parseJson } from '@/lib/utils/json';
 
 
 interface PlantillaData {
@@ -193,7 +194,7 @@ export function AnalyticsClient() {
   const fetchEquipos = useCallback(async () => {
     try {
       const response = await fetch('/api/analytics/equipos');
-      const data = await response.json() as Record<string, any>;
+      const data = await parseJson<Array<{ id: string; nombre: string }>>(response);
       setEquipos(data);
     } catch (error) {
       console.error('Error fetching equipos:', error);
@@ -222,9 +223,9 @@ export function AnalyticsClient() {
       }
 
       const [plantilla, compensacion, fichajes] = await Promise.all([
-        plantillaRes.json(),
-        compensacionRes.json(),
-        fichajesRes.json(),
+        parseJson<PlantillaData>(plantillaRes),
+        parseJson<CompensacionData>(compensacionRes),
+        parseJson<FichajesData>(fichajesRes),
       ]);
 
       setPlantillaData(plantilla);

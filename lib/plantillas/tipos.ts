@@ -37,6 +37,7 @@ export interface ResultadoGeneracion {
   empleadoNombre?: string;
   documentoId?: string;
   documentoNombre?: string;
+  s3Key?: string;
   error?: string;
   tiempoMs?: number;
 }

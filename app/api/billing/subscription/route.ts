@@ -20,12 +20,12 @@ export async function GET() {
   try {
     // Verificar autenticación
     const session = await getSession();
-    if (!session) {
+    if (!session || !session.user) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
 
     // Obtener estado de suscripción
-    const status = await getSubscriptionStatus(session.empresaId);
+    const status = await getSubscriptionStatus(session.user.empresaId);
 
     return NextResponse.json(status);
   } catch (error) {

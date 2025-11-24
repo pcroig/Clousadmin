@@ -11,7 +11,11 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-
+import { parseJson } from '@/lib/utils/json';
+interface RellenarDocumentoResponse {
+  success?: boolean;
+  error?: string;
+}
 
 interface CampoFormulario {
   nombre: string;
@@ -70,7 +74,7 @@ export function RellenarDocumentoForm({
         }
       );
 
-      const data = await response.json();
+      const data = await parseJson<RellenarDocumentoResponse>(response);
 
       if (!response.ok) {
         throw new Error(data.error || 'Error al actualizar el documento');

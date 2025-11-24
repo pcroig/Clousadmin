@@ -13,8 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-
-
+import { parseJson } from '@/lib/utils/json';
 interface ComplementoEmpleado {
   empleadoId: string;
   empleadoNombre: string;
@@ -98,8 +97,8 @@ export function ModalComplementosNomina({
         onOpenChange(false);
         onGuardado?.();
       } else {
-        const error = await response.json();
-        toast.error(error.error || 'Error al guardar complementos');
+        const error = await parseJson<{ error?: string }>(response).catch(() => null);
+        toast.error(error?.error || 'Error al guardar complementos');
       }
     } catch (error) {
       console.error('[Modal Complementos] Error:', error);

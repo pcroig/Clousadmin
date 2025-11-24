@@ -16,7 +16,9 @@ import {
 import { UsuarioRol } from '@/lib/constants/enums';
 import { crearNotificacionCampanaCreada } from '@/lib/notificaciones';
 import { prisma, Prisma } from '@/lib/prisma';
+import { asJsonValue } from '@/lib/prisma/json';
 import { campanaVacacionesCreateSchema } from '@/lib/validaciones/schemas';
+import { getJsonBody } from '@/lib/utils/json';
 
 // GET /api/campanas-vacaciones - Obtener campaña activa (single active campaign)
 export async function GET(req: NextRequest) {
@@ -75,7 +77,7 @@ export async function POST(req: NextRequest) {
       return badRequestResponse('No tienes permisos para crear campañas de vacaciones');
     }
 
-    const body = await req.json() as Record<string, any>;
+    const body = await getJsonBody<Record<string, unknown>>(req);
     const validationResult = campanaVacacionesCreateSchema.safeParse(body);
 
     if (!validationResult.success) {
@@ -255,7 +257,7 @@ interface EmpleadoAsignado {
         empresaId: session.user.empresaId,
         titulo: data.titulo,
         alcance: data.alcance,
-        equipoIds: (data.equipoIds || null) as unknown as Prisma.InputJsonValue,
+        equipoIds: asJsonValue(data.equipoIds || null),
         solapamientoMaximoPct,
         fechaInicioObjetivo,
         fechaFinObjetivo,

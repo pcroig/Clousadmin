@@ -95,6 +95,15 @@ export async function GET(
     }
 
     // Reconstruir certificado
+    const datosCapturados =
+      firma.datosCapturados && typeof firma.datosCapturados === 'object'
+        ? (firma.datosCapturados as Record<string, unknown>)
+        : null;
+    const userAgent =
+      typeof datosCapturados?.userAgent === 'string'
+        ? datosCapturados.userAgent
+        : 'unknown';
+
     const certificado = {
       solicitudFirmaId: firma.solicitudFirmaId,
       firmaId: firma.id,
@@ -106,7 +115,7 @@ export async function GET(
       documentoHash: firma.solicitudFirma.hashDocumento,
       firmadoEn: firma.firmadoEn.toISOString(),
       ipAddress: firma.ipAddress || 'unknown',
-      userAgent: firma.datosCapturados?.userAgent || 'unknown',
+      userAgent,
       certificadoHash: firma.certificadoHash || '',
       version: '1.0-simple',
     };

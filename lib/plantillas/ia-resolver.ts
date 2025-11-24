@@ -7,7 +7,7 @@ import { get } from 'lodash';
 
 import { decrypt } from '@/lib/crypto';
 import { callAIWithConfig } from '@/lib/ia';
-import { prisma } from '@/lib/prisma';
+import { prisma, Prisma } from '@/lib/prisma';
 import { cache as redisCache } from '@/lib/redis';
 
 import { QUICK_MAPPINGS } from './constantes';
@@ -26,13 +26,23 @@ import { DatosEmpleado, VariableMapping } from './tipos';
 
 import type OpenAI from 'openai';
 
+type SchemaObject = Record<string, string | string[]>;
+type SchemaStructure = string | SchemaObject | SchemaObject[];
+type RawMappingResponse = {
+  jsonPath?: string | null;
+  requiresDecryption?: boolean;
+  requiresFormatting?: boolean;
+  formatType?: 'date' | 'currency' | 'number' | null;
+  formatPattern?: string | null;
+};
+
 // Cache en memoria (rápido, se resetea con el servidor)
 const memoryCache = new Map<string, VariableMapping>();
 
 /**
  * Obtener estructura del schema para IA (simplificado)
  */
-function getSchemaStructure(_empleadoData: DatosEmpleado): Record<string, string | Record<string, string | string[]>> {
+function getSchemaStructure(_empleadoData: DatosEmpleado): Record<string, SchemaStructure> {
   return {
     nombre: 'string',
     apellidos: 'string',
@@ -148,7 +158,7 @@ Responde SOLO en JSON:
       throw new Error('No se recibió respuesta de la IA');
     }
 
-    const mapping = JSON.parse(content);
+    const mapping = JSON.parse(content) as RawMappingResponse;
 
     // Validar respuesta
     if (!mapping.jsonPath && mapping.jsonPath !== null) {
@@ -162,9 +172,10 @@ Responde SOLO en JSON:
       requiresDecryption: mapping.requiresDecryption || false,
       requiresFormatting: mapping.requiresFormatting || false,
       formatType: mapping.formatType || null,
-      formatPattern: mapping.formatPattern || null,
+      formatPattern: mapping.formatPattern ?? undefined,
       confianza: 0.9, // Alta confianza en GPT-4o-mini para tareas estructuradas
     };
+    const confianzaDecimal = new Prisma.Decimal(fullMapping.confianza ?? 0);
 
     // Guardar en BD para persistencia
     await prisma.variableMapping.create({
@@ -176,7 +187,7 @@ Responde SOLO en JSON:
         formatType: fullMapping.formatType,
         formatPattern: fullMapping.formatPattern,
         generadoPorIA: true,
-        confianza: fullMapping.confianza,
+        confianza: confianzaDecimal,
         vecesUsado: 1,
       },
     });

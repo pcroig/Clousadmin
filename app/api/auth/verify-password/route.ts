@@ -20,7 +20,7 @@ export async function POST(request: Request) {
     const parsed = bodySchema.safeParse(json);
 
     if (!parsed.success) {
-      const firstError = parsed.error.errors[0]?.message ?? 'Datos inválidos';
+      const firstError = parsed.error.issues[0]?.message ?? 'Datos inválidos';
       return NextResponse.json({ error: firstError }, { status: 400 });
     }
 

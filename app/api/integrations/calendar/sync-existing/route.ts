@@ -31,11 +31,7 @@ export async function GET(_req: NextRequest) {
       where: {
         empleadoId: session.user.empleadoId,
         estado: {
-          in: [
-            EstadoAusencia.en_curso,
-            EstadoAusencia.completada,
-            EstadoAusencia.auto_aprobada,
-          ],
+          in: [EstadoAusencia.confirmada, EstadoAusencia.completada],
         },
       },
       include: {

@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { parseJson } from '@/lib/utils/json';
 
 
 const MESES = [
@@ -49,6 +50,17 @@ interface BalanceEmpleado {
   balance: {
     balanceTotal: number;
   };
+}
+
+interface BalancesResponse {
+  balances?: BalanceEmpleado[];
+  error?: string;
+}
+
+interface CompensarResponse {
+  compensacionesCreadas?: number;
+  errores?: number;
+  error?: string;
 }
 
 type CompensarHorasDialogProps =
@@ -122,16 +134,15 @@ export function CompensarHorasDialog(props: CompensarHorasDialogProps) {
           : `/api/fichajes/bolsa-horas?${query.toString()}`;
 
       const response = await fetch(endpoint);
-      const data = await response.json();
-      if (response.ok) {
-        const positivos = (data.balances || []).filter(
-          (item: BalanceEmpleado) => item.balance.balanceTotal > 0
-        );
-        setBalances(positivos);
-        setSelectedIds(new Set());
-      } else {
-        toast.error(data.error || 'Error al obtener balances');
+      const data = await parseJson<BalancesResponse>(response);
+      if (!response.ok) {
+        throw new Error(data.error || 'Error al obtener balances');
       }
+      const positivos = (data.balances || []).filter(
+        (item) => item.balance.balanceTotal > 0
+      );
+      setBalances(positivos);
+      setSelectedIds(new Set());
     } catch (error) {
       console.error('Error fetching balances:', error);
       toast.error('Error al obtener balances');
@@ -220,20 +231,20 @@ export function CompensarHorasDialog(props: CompensarHorasDialogProps) {
         body: JSON.stringify(body),
       });
 
-      const data = await response.json();
+      const data = await parseJson<CompensarResponse>(response);
 
-      if (response.ok) {
-        toast.success(
-          `Compensación aplicada. Éxitos: ${data.compensacionesCreadas}, Errores: ${data.errores}`
-        );
-        setSelectedIds(new Set());
-        props.onClose();
-      } else {
-        toast.error(data.error || 'Error al compensar horas');
+      if (!response.ok) {
+        throw new Error(data.error || 'Error al compensar horas');
       }
+
+      toast.success(
+        `Compensación aplicada. Éxitos: ${data.compensacionesCreadas ?? 0}, Errores: ${data.errores ?? 0}`
+      );
+      setSelectedIds(new Set());
+      props.onClose();
     } catch (error) {
       console.error('Error compensando horas:', error);
-      toast.error('Error al compensar horas');
+      toast.error(error instanceof Error ? error.message : 'Error al compensar horas');
     } finally {
       setProcesando(false);
     }

@@ -253,6 +253,20 @@ export default async function EmpleadoDetailPage(props: EmpleadoDetailPageProps)
 
   const empleadoData = {
     ...empleadoDesencriptado,
+    fechaAlta:
+      empleadoDesencriptado.fechaAlta instanceof Date
+        ? empleadoDesencriptado.fechaAlta.toISOString()
+        : typeof empleadoDesencriptado.fechaAlta === 'string'
+          ? empleadoDesencriptado.fechaAlta
+          : new Date(empleadoDesencriptado.fechaAlta).toISOString(),
+    fechaBaja:
+      empleadoDesencriptado.fechaBaja instanceof Date
+        ? empleadoDesencriptado.fechaBaja.toISOString()
+        : empleadoDesencriptado.fechaBaja ?? null,
+    fechaNacimiento:
+      empleadoDesencriptado.fechaNacimiento instanceof Date
+        ? empleadoDesencriptado.fechaNacimiento.toISOString()
+        : empleadoDesencriptado.fechaNacimiento ?? null,
     // Convertir campos Decimal a números para Client Components
     salarioBrutoAnual: decimalToNumber(empleadoDesencriptado.salarioBrutoAnual),
     salarioBrutoMensual: decimalToNumber(empleadoDesencriptado.salarioBrutoMensual),
@@ -279,8 +293,10 @@ export default async function EmpleadoDetailPage(props: EmpleadoDetailPageProps)
     })),
     contratos: empleadoActualizado.contratos.map((c) => ({
       id: c.id,
-      fechaInicio: c.fechaInicio,
-      fechaFin: c.fechaFin,
+      fechaInicio:
+        c.fechaInicio instanceof Date ? c.fechaInicio.toISOString() : c.fechaInicio,
+      fechaFin:
+        c.fechaFin instanceof Date ? c.fechaFin.toISOString() : c.fechaFin,
       tipoContrato: c.tipoContrato,
       salarioBrutoAnual: Number(c.salarioBrutoAnual),
     })),
@@ -314,7 +330,8 @@ export default async function EmpleadoDetailPage(props: EmpleadoDetailPageProps)
         nombre: doc.nombre,
         tipoDocumento: doc.tipoDocumento,
         tamano: doc.tamano,
-        createdAt: doc.createdAt,
+        createdAt:
+          doc.createdAt instanceof Date ? doc.createdAt.toISOString() : doc.createdAt,
       })),
     })),
   };

@@ -11,6 +11,7 @@ import { encryptEmpleadoData } from '@/lib/empleado-crypto';
 import { invitarEmpleado } from '@/lib/invitaciones';
 import { getPredefinedJornada } from '@/lib/jornadas/get-or-create-default';
 import { prisma } from '@/lib/prisma';
+import { getJsonBody } from '@/lib/utils/json';
 
 import type { EmpleadoDetectado } from '@/lib/ia/procesar-excel-empleados';
 
@@ -48,7 +49,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const body: ConfirmarImportacionBody = await req.json();
+    const body = await getJsonBody<ConfirmarImportacionBody>(req);
 
     const sanitizeOptionalString = (value: unknown): string | null => {
       if (typeof value !== 'string') return null;
@@ -285,6 +286,8 @@ export async function POST(req: NextRequest) {
                 ciudad: sanitizeOptionalString(empleadoData.ciudad),
                 codigoPostal: sanitizeOptionalString(empleadoData.codigoPostal),
                 direccionProvincia: sanitizeOptionalString(empleadoData.direccionProvincia),
+                nss: sanitizeOptionalString(empleadoData.nss),
+                iban: sanitizeOptionalString(empleadoData.iban),
                 onboardingCompletado: false,
                 activo: true,
               };

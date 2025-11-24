@@ -46,6 +46,7 @@ import {
 } from '@/components/ui/select';
 import { UploadHandler } from '@/lib/hooks/use-file-upload';
 import { extractArrayFromResponse } from '@/lib/utils/api-response';
+import { parseJsonString } from '@/lib/utils/json';
 
 interface Documento {
   id: string;
@@ -267,11 +268,9 @@ export function CarpetaDetailClient({ carpeta, empleados = [] }: CarpetaDetailCl
             resolve({ success: true });
           } else {
             let errorMessage = 'Error al subir archivo';
-            try {
-              const response = JSON.parse(xhr.responseText);
-              if (response?.error) errorMessage = response.error;
-            } catch {
-              // ignore
+            const response = parseJsonString<{ error?: string }>(xhr.responseText, {});
+            if (response.error) {
+              errorMessage = response.error;
             }
             resolve({ success: false, error: errorMessage });
           }
@@ -443,7 +442,6 @@ export function CarpetaDetailClient({ carpeta, empleados = [] }: CarpetaDetailCl
                 <div className="mt-2 flex items-center gap-2 text-sm text-gray-600">
                   <InfoTooltip
                     content={`Carpeta global que reúne todos los documentos tipo "${carpeta.nombre}" de la empresa.`}
-                    variant="subtle"
                   />
                   <span>
                     Carpeta global con documentos de todos los empleados.

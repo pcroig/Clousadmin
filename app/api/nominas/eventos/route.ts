@@ -11,6 +11,7 @@ import { generarPrenominasEvento } from '@/lib/calculos/generar-prenominas';
 import { UsuarioRol } from '@/lib/constants/enums';
 import { crearNotificacionComplementosPendientes } from '@/lib/notificaciones';
 import { prisma } from '@/lib/prisma';
+import { getJsonBody } from '@/lib/utils/json';
 
 const GenerarEventoSchema = z.object({
   mes: z.number().int().min(1).max(12),
@@ -180,8 +181,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Acceso denegado' }, { status: 403 });
     }
 
-    const body = await req.json() as Record<string, any>;
-    const data = GenerarEventoSchema.parse(body);
+    const payload = await getJsonBody<Record<string, unknown>>(req);
+    const data = GenerarEventoSchema.parse(payload);
 
     // Verificar que no existe ya un evento para este mes/año
     const existente = await prisma.eventoNomina.findFirst({

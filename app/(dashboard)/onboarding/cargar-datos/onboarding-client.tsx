@@ -10,7 +10,7 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 
 import { ImportarEmpleados } from '@/components/onboarding/importar-empleados';
-import { IntegracionesForm } from '@/components/onboarding/integraciones-form';
+import { IntegracionesForm, type IntegracionesFormProps } from '@/components/onboarding/integraciones-form';
 import { InvitarHRAdmins } from '@/components/onboarding/invitar-hr-admins';
 import { SedesForm } from '@/components/onboarding/sedes-form';
 import { Button } from '@/components/ui/button';
@@ -31,13 +31,14 @@ interface Sede {
   }>;
 }
 
-interface Integracion {
-  id: string;
-  tipo: string;
-  proveedor: string;
-  activa: boolean;
-  config: Prisma.JsonValue;
-}
+type Integracion =
+  NonNullable<IntegracionesFormProps['integracionesIniciales']>[number] & {
+    id: string;
+    tipo: string;
+    proveedor: string;
+    activa: boolean;
+    config: Prisma.JsonValue;
+  };
 
 interface OnboardingClientProps {
   sedes: Sede[];

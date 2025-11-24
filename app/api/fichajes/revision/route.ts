@@ -251,8 +251,14 @@ export async function POST(request: NextRequest) {
           continue;
         }
 
-          const datos = (autoCompletado.datosOriginales as unknown) as DatosOriginales | null;
-          const sugerencias = (autoCompletado.sugerencias as unknown) as Sugerencias | null;
+        const datos = (autoCompletado.datosOriginales as unknown) as DatosOriginales | null;
+        const sugerencias = (autoCompletado.sugerencias as unknown) as Sugerencias | null;
+
+        if (!datos) {
+          errores.push(`ID ${id}: No hay datos originales para reconstruir el fichaje`);
+          continue;
+        }
+
         const fichajeId = datos.fichajeId;
 
         if (accion === 'actualizar') {

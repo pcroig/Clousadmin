@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useState } from 'react';
 
+import { parseJson } from '@/lib/utils/json';
+
 const _SENSITIVE_FIELDS = ['nif', 'nss', 'iban'] as const;
 export type SensitiveFieldKey = (typeof _SENSITIVE_FIELDS)[number];
 
@@ -51,8 +53,9 @@ export function useSensitiveUnlock() {
       });
 
       if (!response.ok) {
-        const data = await response.json().catch(() => null);
-        setError(data?.error ?? 'No se pudo verificar la contraseña');
+        const data =
+          (await parseJson<{ error?: string }>(response).catch(() => undefined)) ?? {};
+        setError(data.error ?? 'No se pudo verificar la contraseña');
         return;
       }
 

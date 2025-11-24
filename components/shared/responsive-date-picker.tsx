@@ -54,10 +54,6 @@ interface ResponsiveDatePickerProps {
    */
   className?: string;
   /**
-   * Si se puede seleccionar un rango de fechas
-   */
-  mode?: 'single' | 'range';
-  /**
    * Fecha mínima seleccionable
    */
   fromDate?: Date;
@@ -74,7 +70,6 @@ export function ResponsiveDatePicker({
   disabled,
   label = 'Seleccionar fecha',
   className,
-  mode = 'single',
   fromDate,
   toDate,
 }: ResponsiveDatePickerProps) {
@@ -85,7 +80,7 @@ export function ResponsiveDatePicker({
 
   const handleSelect = (selectedDate: Date | undefined) => {
     onSelect(selectedDate);
-    if (selectedDate && mode === 'single') {
+    if (selectedDate) {
       setOpen(false);
     }
   };
@@ -119,7 +114,7 @@ export function ResponsiveDatePicker({
 
             <div className="flex justify-center pb-4">
               <Calendar
-                mode={mode}
+                mode="single"
                 selected={date}
                 onSelect={handleSelect}
                 disabled={typeof disabled === 'function' ? disabled : undefined}
@@ -187,7 +182,7 @@ export function ResponsiveDatePicker({
       </PopoverTrigger>
       <PopoverContent className="w-auto p-0" align="start">
         <Calendar
-          mode={mode}
+          mode="single"
           selected={date}
           onSelect={handleSelect}
           disabled={typeof disabled === 'function' ? disabled : undefined}

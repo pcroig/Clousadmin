@@ -25,6 +25,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { parseJson } from '@/lib/utils/json';
 
 
 
@@ -63,30 +64,39 @@ export function EquipoFormModal({
   const isEditing = !!team;
 
   useEffect(() => {
-    if (isOpen) {
-      // Load sedes
-      fetch('/api/sedes')
-        .then((res) => res.json())
-        .then((data) => setSedes(data))
-        .catch((error) => {
-          console.error('Error loading offices:', error);
-          toast.error('Error al cargar sedes');
-        });
+    if (!isOpen) {
+      return;
+    }
 
-      // Reset or populate form
-      if (team) {
-        setFormData({
-          nombre: team.nombre,
-          descripcion: team.descripcion || '',
-          sedeId: team.sedeId || '',
-        });
-      } else {
-        setFormData({
-          nombre: '',
-          descripcion: '',
-          sedeId: '',
-        });
+    const loadSedes = async () => {
+      try {
+        const res = await fetch('/api/sedes');
+        if (!res.ok) {
+          const error = await parseJson<{ error?: string }>(res);
+          throw new Error(error.error || 'Error al cargar sedes');
+        }
+        const data = await parseJson<Sede[]>(res);
+        setSedes(data);
+      } catch (error) {
+        console.error('Error loading offices:', error);
+        toast.error('Error al cargar sedes');
       }
+    };
+
+    loadSedes();
+
+    if (team) {
+      setFormData({
+        nombre: team.nombre,
+        descripcion: team.descripcion || '',
+        sedeId: team.sedeId || '',
+      });
+    } else {
+      setFormData({
+        nombre: '',
+        descripcion: '',
+        sedeId: '',
+      });
     }
   }, [isOpen, team]);
 
@@ -109,7 +119,7 @@ export function EquipoFormModal({
       });
 
       if (!response.ok) {
-        const error = await response.json();
+        const error = await parseJson<{ error?: string }>(response);
         throw new Error(error.error || 'Error al guardar equipo');
       }
 

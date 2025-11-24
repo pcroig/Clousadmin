@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-
+import { parseJson } from '@/lib/utils/json';
 
 interface CompensacionEmpleado {
   nombre: string;
@@ -73,8 +73,8 @@ export function CompensacionModal({ compensacion, open, onClose, onSuccess }: Co
       });
 
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Error al procesar compensación');
+        const error = await parseJson<{ error?: string }>(response).catch(() => null);
+        throw new Error(error?.error || 'Error al procesar compensación');
       }
 
       toast.success(

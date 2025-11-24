@@ -9,6 +9,7 @@ import { z } from 'zod';
 import { getSession } from '@/lib/auth';
 import { UsuarioRol } from '@/lib/constants/enums';
 import { getClientIP, rateLimitApi, rateLimitApiWrite } from '@/lib/rate-limit';
+import { getJsonBody } from '@/lib/utils/json';
 
 import type { SessionData } from '@/types/auth';
 
@@ -141,7 +142,7 @@ export async function validateRequest<T>(
   schema: z.ZodSchema<T>
 ): Promise<{ data: T } | NextResponse> {
   try {
-    const body = await req.json();
+    const body = await getJsonBody<unknown>(req);
     const validatedData = schema.parse(body);
     return { data: validatedData };
   } catch (error) {

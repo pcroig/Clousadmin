@@ -8,6 +8,7 @@ import { Job, Queue, QueueEvents, Worker } from 'bullmq';
 
 import { crearNotificacionDocumentoGeneracionLote } from '@/lib/notificaciones';
 import { prisma } from '@/lib/prisma';
+import { asJsonValue } from '@/lib/prisma/json';
 import { cache } from '@/lib/redis';
 
 import { generarDocumentoDesdePlantilla } from './generar-documento';
@@ -87,7 +88,7 @@ async function procesarEmpleadosJob(
         procesados,
         exitosos,
         fallidos,
-        resultados: resultados as Prisma.InputJsonValue,
+        resultados: asJsonValue(resultados),
       },
     });
 
@@ -193,7 +194,7 @@ async function procesarJobSinCola(jobId: string, config: JobConfig) {
         fallidos,
         completadoEn: new Date(),
         tiempoTotal: Date.now() - inicio,
-        resultados: resultados as Prisma.InputJsonValue,
+        resultados: asJsonValue(resultados),
       },
     });
 
@@ -305,7 +306,7 @@ export async function agregarJobGeneracion(config: JobConfig): Promise<string> {
       plantillaId: config.plantillaId,
       solicitadoPor: config.solicitadoPor,
       empleadoIds: config.empleadoIds,
-      configuracion: config.configuracion as Prisma.InputJsonValue,
+        configuracion: asJsonValue(config.configuracion),
       estado: 'en_cola',
       totalEmpleados: config.empleadoIds.length,
     },
@@ -353,7 +354,7 @@ export async function agregarJobGeneracion(config: JobConfig): Promise<string> {
       where: { id: jobRecord.id },
       data: {
         estado: 'fallido',
-        error: error?.message || 'Error al agregar job',
+        error: errorObj?.message || 'Error al agregar job',
         completadoEn: new Date(),
       },
     });
@@ -373,6 +374,10 @@ export async function obtenerEstadoJob(jobId: string): Promise<JobProgress | nul
 
     if (!jobRecord) return null;
 
+    const resultados = Array.isArray(jobRecord.resultados)
+      ? (jobRecord.resultados as unknown as ResultadoGeneracion[])
+      : undefined;
+
     return {
       jobId: jobRecord.id,
       estado: jobRecord.estado as 'en_cola' | 'procesando' | 'completado' | 'fallido',
@@ -381,7 +386,7 @@ export async function obtenerEstadoJob(jobId: string): Promise<JobProgress | nul
       procesados: jobRecord.procesados,
       exitosos: jobRecord.exitosos,
       fallidos: jobRecord.fallidos,
-      resultados: jobRecord.resultados as ResultadoGeneracion[] | undefined,
+      resultados,
       error: jobRecord.error || undefined,
       tiempoTotal: jobRecord.tiempoTotal || undefined,
     };
@@ -464,7 +469,7 @@ export const documentosWorker = new Worker(
         fallidos,
         completadoEn: new Date(),
         tiempoTotal,
-        resultados: resultados as Prisma.InputJsonValue,
+        resultados: asJsonValue(resultados),
       },
     });
 
@@ -507,14 +512,19 @@ export const documentosWorker = new Worker(
 // Manejar errores de conexión silenciosamente
 let workerErrorLogged = false;
 documentosWorker.on('error', (error) => {
+  const workerError = error as Error & { code?: string };
   // Solo mostrar error una vez si es de conexión
-  if (error?.message?.includes('ECONNREFUSED') || error?.message?.includes('connect') || error?.code === 'ECONNREFUSED') {
+  if (
+    workerError?.message?.includes('ECONNREFUSED') ||
+    workerError?.message?.includes('connect') ||
+    workerError?.code === 'ECONNREFUSED'
+  ) {
     if (!workerErrorLogged) {
       // Ya se muestra en redis.ts, no duplicar
       workerErrorLogged = true;
     }
-  } else if (error) {
-    console.error('[Worker] Error:', error.message || error);
+  } else if (workerError) {
+    console.error('[Worker] Error:', workerError.message || workerError);
   }
 });
 

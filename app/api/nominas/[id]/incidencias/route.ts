@@ -6,7 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 import { getSession } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { prisma, Prisma } from '@/lib/prisma';
 
 export async function GET(
   req: NextRequest,
@@ -22,13 +22,21 @@ export async function GET(
     const { id } = await params;
 
     // Obtener la nómina
+    const empleadoWhere: Prisma.EmpleadoWhereInput = {
+      empresaId: session.user.empresaId,
+    };
+
+    if (session.user.rol === 'empleado') {
+      if (!session.user.empleadoId) {
+        return NextResponse.json({ error: 'Empleado no asignado' }, { status: 403 });
+      }
+      empleadoWhere.id = session.user.empleadoId;
+    }
+
     const nomina = await prisma.nomina.findFirst({
       where: {
         id,
-        empleado: {
-          empresaId: session.user.empresaId,
-          ...(session.user.rol === 'empleado' ? { id: session.user.empleadoId } : {}),
-        },
+        empleado: empleadoWhere,
       },
       select: {
         id: true,

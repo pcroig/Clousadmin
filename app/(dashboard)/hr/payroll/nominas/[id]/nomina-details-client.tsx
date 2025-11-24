@@ -23,8 +23,9 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { NOMINA_ESTADO_LABELS, NOMINA_ESTADOS } from '@/lib/constants/nomina-estados';
+import { parseJson } from '@/lib/utils/json';
 
-interface NominaDetailsClientProps {
+export interface NominaDetailsClientProps {
   nomina: {
     id: string;
     empleadoId: string;
@@ -43,8 +44,12 @@ interface NominaDetailsClientProps {
       nombre: string;
       apellidos: string;
       email: string;
-      numeroSeguroSocial: string | null;
+      nss: string | null;
       iban: string | null;
+      puesto?: string | null;
+      puestoRelacion?: {
+        nombre: string | null;
+      } | null;
       equipos: Array<{
         equipo: {
           id: string;
@@ -52,10 +57,6 @@ interface NominaDetailsClientProps {
         } | null;
       }>;
     };
-    contrato: {
-      puesto: string;
-      tipoContrato: string;
-    } | null;
     complementosAsignados: Array<{
       id: string;
       importe: number;
@@ -68,7 +69,6 @@ interface NominaDetailsClientProps {
     }>;
     documento: {
       id: string;
-      url: string;
       nombre: string;
     } | null;
     eventoNomina: {
@@ -186,7 +186,9 @@ export function NominaDetailsClient({ nomina, ausencias }: NominaDetailsClientPr
           body: formData,
         });
 
-        const data = await response.json() as Record<string, any>;
+        const data = await parseJson<{ error?: string }>(response).catch(() => ({
+          error: 'Error al subir el PDF',
+        }));
 
         if (!response.ok) {
           throw new Error(data.error || 'Error al subir el PDF');
@@ -353,14 +355,14 @@ export function NominaDetailsClient({ nomina, ausencias }: NominaDetailsClientPr
             <div>
               <div className="text-sm text-gray-600 mb-1">Puesto</div>
               <div className="font-medium text-gray-900">
-                {nomina.contrato?.puesto || '-'}
+                {nomina.empleado.puestoRelacion?.nombre || nomina.empleado.puesto || '-'}
               </div>
             </div>
 
             <div>
               <div className="text-sm text-gray-600 mb-1">Número Seguridad Social</div>
               <div className="font-medium text-gray-900">
-                {nomina.empleado.numeroSeguroSocial || (
+                {nomina.empleado.nss || (
                   <span className="text-orange-600 flex items-center gap-1">
                     <AlertCircle className="w-4 h-4" />
                     Sin configurar

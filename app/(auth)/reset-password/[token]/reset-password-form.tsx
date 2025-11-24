@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { parseJsonSafe } from '@/lib/utils/json';
 
 interface ResetPasswordFormProps {
   token: string;
@@ -40,7 +41,7 @@ export function ResetPasswordForm({ token, tokenValid }: ResetPasswordFormProps)
       });
 
       if (!response.ok) {
-        const data = await response.json().catch(() => ({ error: 'error' }));
+        const data = await parseJsonSafe<{ error?: string }>(response, { error: 'error' });
         setError(
           data.error === 'invalid_or_expired'
             ? 'El enlace no es válido o ha expirado.'

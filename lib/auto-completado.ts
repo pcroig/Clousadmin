@@ -6,6 +6,8 @@
 
 import type { Prisma, PrismaClient } from '@prisma/client';
 
+import { asJsonValue } from '@/lib/prisma/json';
+
 type AutoCompletadoClient = PrismaClient | Prisma.TransactionClient;
 
 interface RegistrarAutoCompletadoParams {
@@ -42,8 +44,8 @@ export async function registrarAutoCompletado(
       empresaId,
       empleadoId,
       tipo,
-      datosOriginales: datosOriginales as Prisma.InputJsonValue,
-      sugerencias: sugerencias as Prisma.InputJsonValue,
+      datosOriginales: asJsonValue(datosOriginales),
+      sugerencias: asJsonValue(sugerencias),
       estado,
       aprobadoPor,
       aprobadoEn: aprobadoEn ?? new Date(),

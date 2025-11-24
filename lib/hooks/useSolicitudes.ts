@@ -7,6 +7,8 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
+import { parseJson } from '@/lib/utils/json';
+
 // ========================================
 // TYPES
 // ========================================
@@ -73,7 +75,7 @@ export function useSolicitudes(estado?: string) {
 
       const res = await fetch(`/api/solicitudes?${params}`);
       if (!res.ok) throw new Error('Error al cargar solicitudes');
-      return res.json() as Promise<SolicitudCambio[]>;
+      return parseJson<SolicitudCambio[]>(res);
     },
   });
 }
@@ -87,7 +89,7 @@ export function useSolicitud(id: string) {
     queryFn: async () => {
       const res = await fetch(`/api/solicitudes/${id}`);
       if (!res.ok) throw new Error('Error al cargar solicitud');
-      return res.json() as Promise<SolicitudCambio>;
+      return parseJson<SolicitudCambio>(res);
     },
     enabled: !!id, // Solo ejecutar si hay ID
   });
@@ -107,10 +109,11 @@ export function useCrearSolicitud() {
         body: JSON.stringify(data),
       });
       if (!res.ok) {
-        const error = await res.json();
+        const error =
+          (await parseJson<{ error?: string }>(res).catch(() => undefined)) ?? {};
         throw new Error(error.error || 'Error al crear solicitud');
       }
-      return res.json();
+      return parseJson<SolicitudCambio>(res);
     },
     onSuccess: () => {
       // Invalidar queries de solicitudes para refrescar
@@ -133,10 +136,11 @@ export function useAccionSolicitud(id: string) {
         body: JSON.stringify(data),
       });
       if (!res.ok) {
-        const error = await res.json();
+        const error =
+          (await parseJson<{ error?: string }>(res).catch(() => undefined)) ?? {};
         throw new Error(error.error || 'Error al procesar solicitud');
       }
-      return res.json();
+      return parseJson<SolicitudCambio>(res);
     },
     onSuccess: () => {
       // Invalidar queries de solicitudes y notificaciones
@@ -158,10 +162,11 @@ export function useAutoAprobarSolicitudes() {
         method: 'POST',
       });
       if (!res.ok) {
-        const error = await res.json();
+        const error =
+          (await parseJson<{ error?: string }>(res).catch(() => undefined)) ?? {};
         throw new Error(error.error || 'Error al auto-aprobar solicitudes');
       }
-      return res.json();
+      return parseJson<Record<string, unknown>>(res);
     },
     onSuccess: () => {
       // Invalidar queries de solicitudes y notificaciones

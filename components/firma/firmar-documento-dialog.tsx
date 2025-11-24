@@ -9,7 +9,23 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
 
+import { parseJson } from '@/lib/utils/json';
 import { SignatureCanvas, SignatureCanvasHandle } from './signature-canvas';
+interface FirmaInfoResponse {
+  firmaGuardada?: boolean;
+  firmaUrl?: string | null;
+}
+
+interface FirmaGuardarResponse {
+  success?: boolean;
+  error?: string;
+}
+
+interface FirmarSolicitudResponse {
+  success: boolean;
+  mensaje?: string;
+  error?: string;
+}
 
 
 export interface FirmaPendiente {
@@ -55,7 +71,12 @@ export function FirmarDocumentoDialog({
     }
 
     fetch('/api/empleados/firma')
-      .then((res) => (res.ok ? res.json() : Promise.reject()))
+      .then(async (res) => {
+        if (!res.ok) {
+          throw new Error('Error al cargar firma guardada');
+        }
+        return parseJson<FirmaInfoResponse>(res);
+      })
       .then((data) => {
         setFirmaGuardadaDisponible(Boolean(data?.firmaGuardada));
         setFirmaGuardadaUrl(data?.firmaUrl ?? null);
@@ -76,7 +97,7 @@ export function FirmarDocumentoDialog({
     });
 
     if (!res.ok) {
-      const data = await res.json();
+      const data = await parseJson<FirmaGuardarResponse>(res).catch(() => ({ error: '' }));
       throw new Error(data.error || 'No se pudo guardar la firma');
     }
 
@@ -117,7 +138,7 @@ export function FirmarDocumentoDialog({
         body: JSON.stringify(body),
       });
 
-      const data = await res.json();
+      const data = await parseJson<FirmarSolicitudResponse>(res);
       if (!res.ok || !data.success) {
         throw new Error(data.error || 'No se pudo firmar el documento');
       }

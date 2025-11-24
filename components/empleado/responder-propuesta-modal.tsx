@@ -19,6 +19,11 @@ import {
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { cn, toDateOnlyString } from '@/lib/utils';
+import { parseJson } from '@/lib/utils/json';
+interface ApiBasicResponse {
+  success?: boolean;
+  error?: string;
+}
 
 
 const MIN_ALTERNATIVOS_RATIO = 0.5;
@@ -103,7 +108,9 @@ export function ResponderPropuestaModal({
       });
 
       if (!response.ok) {
-        const error = await response.json().catch(() => ({ error: 'Error desconocido' }));
+        const error = await parseJson<ApiBasicResponse>(response).catch(() => ({
+          error: 'Error desconocido',
+        }));
         throw new Error(error.error || 'No se pudo aceptar la propuesta');
       }
 
@@ -139,7 +146,9 @@ export function ResponderPropuestaModal({
       });
 
       if (!response.ok) {
-        const error = await response.json().catch(() => ({ error: 'Error desconocido' }));
+        const error = await parseJson<ApiBasicResponse>(response).catch(() => ({
+          error: 'Error desconocido',
+        }));
         throw new Error(error.error || 'No se pudo solicitar el cambio');
       }
 

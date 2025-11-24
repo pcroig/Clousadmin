@@ -163,6 +163,10 @@ export async function POST(
           creadoPor: session.user.id,
         });
 
+        if (!solicitud) {
+          throw new Error('No se pudo crear la solicitud de firma');
+        }
+
         solicitudFirmaId = solicitud.id;
 
         if (documentoGenerado.empleado.usuarioId) {

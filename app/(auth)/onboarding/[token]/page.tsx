@@ -57,7 +57,7 @@ export default async function OnboardingPage(context: { params: Promise<{ token:
                 progreso={onboarding!.progreso as unknown as ProgresoOnboarding}
                 datosTemporales={onboarding!.datosTemporales as unknown as DatosTemporales | null}
                 nombreEmpresa={onboarding!.empresa.nombre}
-                tipoOnboarding={onboarding!.tipo}
+                tipoOnboarding={onboarding!.tipoOnboarding}
                 onboardingConfig={onboardingConfig}
               />
             )}

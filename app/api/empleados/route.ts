@@ -87,6 +87,11 @@ export async function POST(request: NextRequest) {
     const { session } = authResult;
 
     const body = await request.json() as Record<string, any>;
+    const equipoIdsInput = Array.isArray(body.equipoIds)
+      ? body.equipoIds.filter(
+          (value): value is string => typeof value === 'string' && value.trim().length > 0
+        )
+      : [];
 
     const sanitizeOptionalString = (value: unknown): string | null => {
       if (typeof value !== 'string') return null;
@@ -234,9 +239,9 @@ export async function POST(request: NextRequest) {
       });
 
       // Asignar equipos si se proporcionaron
-      if (body.equipoIds && Array.isArray(body.equipoIds) && body.equipoIds.length > 0) {
+      if (equipoIdsInput.length > 0) {
         await tx.empleadoEquipo.createMany({
-          data: body.equipoIds.map((equipoId: string) => ({
+          data: equipoIdsInput.map((equipoId) => ({
             empleadoId: empleado.id,
             equipoId,
           })),

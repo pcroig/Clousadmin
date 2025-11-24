@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { getAvatarStyle } from '@/lib/design-system';
+import { parseJson } from '@/lib/utils/json';
 
 export interface OnboardingEmpleado {
   nombre?: string;
@@ -28,6 +29,11 @@ interface CredencialesFormProps {
 }
 
 export function CredencialesForm({ token, empleado, onComplete, initialProgress = false }: CredencialesFormProps) {
+  interface CredencialesResponse {
+    success?: boolean;
+    error?: string;
+  }
+
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
@@ -88,7 +94,7 @@ export function CredencialesForm({ token, empleado, onComplete, initialProgress 
         body: formData,
       });
 
-      const data = await res.json();
+      const data = await parseJson<CredencialesResponse>(res);
 
       if (res.ok && data.success) {
         setSuccess('Credenciales guardadas correctamente');

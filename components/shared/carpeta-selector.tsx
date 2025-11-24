@@ -12,11 +12,17 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { parseJson } from '@/lib/utils/json';
 
 interface Carpeta {
   id: string;
   nombre: string;
   esSistema: boolean;
+}
+
+interface CarpetasResponse {
+  carpetas?: Carpeta[];
+  error?: string;
 }
 
 interface CarpetaSelectorProps {
@@ -51,10 +57,11 @@ export function CarpetaSelector({
     setLoading(true);
     try {
       const response = await fetch(`/api/carpetas?empleadoId=${empleadoId}`);
-      if (response.ok) {
-        const data = await response.json();
-        setCarpetas(data.carpetas || []);
+      const data = await parseJson<CarpetasResponse>(response).catch(() => null);
+      if (!response.ok) {
+        throw new Error(data?.error || 'Error al cargar carpetas');
       }
+      setCarpetas(data?.carpetas || []);
     } catch (error) {
       console.error('Error cargando carpetas:', error);
     } finally {

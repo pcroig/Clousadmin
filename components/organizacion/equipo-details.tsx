@@ -22,6 +22,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { getAvatarStyle } from '@/lib/design-system';
+import { parseJson } from '@/lib/utils/json';
 
 import { ChangeManagerModal } from './change-manager-modal';
 import { EquipoFormModal } from './equipo-form-modal';
@@ -69,7 +70,7 @@ export function EquipoDetails({ equipo, onUpdate, onDelete }: EquipoDetailsProps
       });
 
       if (!response.ok) {
-        const error = await response.json();
+        const error = await parseJson<{ error?: string }>(response);
         throw new Error(error.error || 'Error al eliminar equipo');
       }
 
@@ -83,6 +84,12 @@ export function EquipoDetails({ equipo, onUpdate, onDelete }: EquipoDetailsProps
       setShowDeleteDialog(false);
     }
   };
+
+  const membersForModals = equipo.empleados.map((empleado) => ({
+    id: empleado.id,
+    nombre: empleado.nombre,
+    avatar: empleado.fotoUrl ?? empleado.avatar ?? undefined,
+  }));
 
   return (
     <>
@@ -236,7 +243,7 @@ export function EquipoDetails({ equipo, onUpdate, onDelete }: EquipoDetailsProps
         onClose={() => setShowMembersModal(false)}
         onSuccess={onUpdate}
         teamId={equipo.id}
-        currentMembers={equipo.empleados}
+        currentMembers={membersForModals}
       />
 
       <ChangeManagerModal
@@ -245,7 +252,7 @@ export function EquipoDetails({ equipo, onUpdate, onDelete }: EquipoDetailsProps
         onSuccess={onUpdate}
         teamId={equipo.id}
         currentManagerId={equipo.responsableId}
-        members={equipo.empleados}
+        members={membersForModals}
       />
 
       {/* Delete Confirmation Dialog */}

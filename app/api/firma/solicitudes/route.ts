@@ -11,6 +11,7 @@ import {
   type CrearSolicitudFirmaInput,
   listarSolicitudesFirma,
 } from '@/lib/firma-digital/db-helpers';
+import { TipoFirma, type FirmanteInput } from '@/lib/firma-digital/tipos';
 import { getClientIP, rateLimitApiWrite } from '@/lib/rate-limit';
 
 /**
@@ -121,7 +122,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!body.firmantes || !Array.isArray(body.firmantes) || body.firmantes.length === 0) {
+    type FirmanteBody = { empleadoId: string; orden?: number; tipo?: string };
+    const firmantesEntrada = Array.isArray(body.firmantes) ? body.firmantes : [];
+    const firmantes: FirmanteBody[] = firmantesEntrada.filter(
+      (firmante): firmante is FirmanteBody =>
+        typeof firmante === 'object' &&
+        firmante !== null &&
+        typeof (firmante as { empleadoId?: unknown }).empleadoId === 'string'
+    );
+    const sanitizedFirmantes: FirmanteInput[] = firmantes.map((firmante) => ({
+      empleadoId: firmante.empleadoId,
+      orden: typeof firmante.orden === 'number' && firmante.orden > 0 ? firmante.orden : undefined,
+      tipo: esTipoFirma(firmante.tipo) ? firmante.tipo : undefined,
+    }));
+
+    if (sanitizedFirmantes.length === 0) {
       return NextResponse.json(
         { error: 'Debe especificar al menos un firmante' },
         { status: 400 }
@@ -129,7 +144,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Validar estructura de firmantes
-    for (const firmante of body.firmantes) {
+    for (const firmante of firmantes) {
       if (!firmante.empleadoId) {
         return NextResponse.json(
           { error: 'Cada firmante debe tener un empleadoId' },
@@ -140,8 +155,8 @@ export async function POST(request: NextRequest) {
 
     // Si hay orden de firma, validar que todos tengan orden
     if (body.ordenFirma) {
-      const todosConOrden = body.firmantes.every(
-        (f: { empleadoId: string; orden?: number; tipo?: string }) => typeof f.orden === 'number' && f.orden > 0
+      const todosConOrden = sanitizedFirmantes.every(
+        (f) => typeof f.orden === 'number' && f.orden > 0
       );
 
       if (!todosConOrden) {
@@ -152,7 +167,7 @@ export async function POST(request: NextRequest) {
       }
 
       // Validar que no haya órdenes duplicados
-      const ordenes = body.firmantes.map((f: { empleadoId: string; orden?: number; tipo?: string }) => f.orden);
+      const ordenes = sanitizedFirmantes.map((f) => f.orden);
       const ordenesUnicos = new Set(ordenes);
 
       if (ordenes.length !== ordenesUnicos.size) {
@@ -206,7 +221,7 @@ export async function POST(request: NextRequest) {
       empresaId: session.user.empresaId,
       titulo: body.titulo,
       mensaje: body.mensaje,
-      firmantes: body.firmantes,
+      firmantes: sanitizedFirmantes,
       ordenFirma: body.ordenFirma ?? false,
       proveedor: 'interno', // Fase 1 solo interno
       recordatorioAutomatico: body.recordatorioAutomatico ?? true,
@@ -238,4 +253,9 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
+}
+
+const TIPO_FIRMA_VALUES = Object.values(TipoFirma);
+function esTipoFirma(valor: unknown): valor is TipoFirma {
+  return typeof valor === 'string' && TIPO_FIRMA_VALUES.includes(valor as TipoFirma);
 }

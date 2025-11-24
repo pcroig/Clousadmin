@@ -61,6 +61,7 @@ import {
 } from '@/lib/constants/nomina-estados';
 import { useIsMobile } from '@/lib/hooks/use-viewport';
 import { cn } from '@/lib/utils';
+import { parseJson } from '@/lib/utils/json';
 
 interface ComplementoAsignado {
   id: string;
@@ -95,7 +96,9 @@ interface Nomina {
   totalBruto: number;
   totalNeto: number;
   diasTrabajados: number;
+  diasAusencias?: number | null;
   complementosAsignados: ComplementoAsignado[];
+  complementosPendientes?: boolean;
   alertas?: AlertaNomina[];
   documento?: {
     id: string;
@@ -205,8 +208,11 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
   const fetchEventos = async () => {
     try {
       const response = await fetch('/api/nominas/eventos');
-      const data = await response.json() as Record<string, any>;
-      setEventos(data.eventos || []);
+      if (!response.ok) {
+        throw new Error('Error al cargar eventos');
+      }
+      const data = await parseJson<{ eventos?: EventoNomina[] }>(response).catch(() => null);
+      setEventos(Array.isArray(data?.eventos) ? data!.eventos : []);
     } catch (error) {
       console.error('Error fetching eventos:', error);
       toast.error('Error al cargar eventos');
@@ -229,10 +235,10 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
         }),
       });
 
-      const data = await response.json() as Record<string, any>;
+      const data = await parseJson<Record<string, any>>(response).catch(() => null);
 
-      if (!response.ok) {
-        throw new Error(data.error || 'Error al generar evento');
+      if (!response.ok || !data) {
+        throw new Error(data?.error || 'Error al generar evento');
       }
 
       if (data.evento?.id) {
@@ -281,10 +287,10 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
         }
       );
 
-      const data = await response.json() as Record<string, any>;
+      const data = await parseJson<Record<string, any>>(response).catch(() => null);
 
-      if (!response.ok) {
-        throw new Error(data.error || 'Error al generar pre-nóminas');
+      if (!response.ok || !data) {
+        throw new Error(data?.error || 'Error al generar pre-nóminas');
       }
 
       const nuevasPrenominas = data.resultado?.prenominasCreadas ?? 0;
@@ -325,8 +331,9 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
       const response = await fetch(`/api/nominas/eventos/${evento.id}/exportar`);
 
       if (!response.ok) {
-        const data = await response.json() as Record<string, any>;
-        throw new Error(data.error || 'Error al exportar');
+        const errorData =
+          (await parseJson<{ error?: string }>(response).catch(() => undefined)) ?? {};
+        throw new Error(errorData.error || 'Error al exportar');
       }
 
       const blob = await response.blob();
@@ -380,7 +387,8 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
           body: formData,
         });
 
-        const data = await response.json() as Record<string, any>;
+        const data =
+          (await parseJson<Record<string, any>>(response).catch(() => undefined)) ?? {};
 
         if (!response.ok) {
           throw new Error(data.error || 'Error al importar');
@@ -441,7 +449,8 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
         method: 'POST',
       });
 
-      const data = await response.json() as Record<string, any>;
+      const data =
+        (await parseJson<Record<string, any>>(response).catch(() => undefined)) ?? {};
 
       if (!response.ok) {
         throw new Error(data.error || 'Error al publicar');
@@ -1040,10 +1049,11 @@ function NominaDetailsPanel({
     setLoading(true);
     try {
       const response = await fetch(`/api/nominas/${nominaId}`);
-      const data = await response.json() as Record<string, any>;
-      if (response.ok) {
-        setNomina(data);
+      const data = await parseJson<Nomina & { error?: string }>(response).catch(() => null);
+      if (!response.ok || !data) {
+        throw new Error(data?.error || 'Error al obtener la nómina');
       }
+      setNomina(data);
     } catch (error) {
       console.error('Error fetching nomina:', error);
     } finally {
@@ -1055,10 +1065,13 @@ function NominaDetailsPanel({
     setLoadingIncidencias(true);
     try {
       const response = await fetch(`/api/nominas/${nominaId}/incidencias`);
-      const data = await response.json() as Record<string, any>;
-      if (response.ok) {
-        setIncidencias(data.incidencias || null);
+      const data = await parseJson<
+        { incidencias: typeof incidencias | null; error?: string }
+      >(response).catch(() => null);
+      if (!response.ok || !data) {
+        throw new Error(data?.error || 'Error al obtener incidencias');
       }
+      setIncidencias(data.incidencias || null);
     } catch (error) {
       console.error('Error fetching incidencias:', error);
     } finally {
@@ -1132,7 +1145,7 @@ function NominaDetailsPanel({
                             </div>
                 <div>
                   <dt className="text-gray-600">Días Ausencias</dt>
-                  <dd className="font-medium text-gray-900">{nomina.diasAusencias || 0}</dd>
+                  <dd className="font-medium text-gray-900">{nomina.diasAusencias ?? 0}</dd>
                           </div>
               </dl>
                           </div>
@@ -1187,9 +1200,13 @@ function NominaDetailsPanel({
                       <AlertCircle className="w-4 h-4 text-red-600 mt-0.5" />
                       <div>
                         <p className="font-medium text-red-900">{alerta.mensaje}</p>
-                        {alerta.detalles && (
-                          <p className="text-xs text-red-700 mt-1">{JSON.stringify(alerta.detalles)}</p>
-                              )}
+                        {alerta.detalles ? (
+                          <p className="text-xs text-red-700 mt-1">
+                            {typeof alerta.detalles === 'string'
+                              ? alerta.detalles
+                              : JSON.stringify(alerta.detalles)}
+                          </p>
+                        ) : null}
                         </div>
                                       </div>
                       </div>
@@ -1328,22 +1345,26 @@ function EventoDetailsPanel({
     setLoading(true);
     try {
       const response = await fetch(`/api/nominas/eventos/${eventoId}`);
-      const data = await response.json() as Record<string, any>;
-      if (response.ok) {
-        // El endpoint devuelve { evento, stats }
-        const eventoData = data.evento || data;
-        // Calcular alertas agregadas desde las nóminas si no vienen en el formato esperado
-        if (eventoData.nominas && !eventoData.alertas) {
-          const alertas = eventoData.nominas.flatMap((n: Nomina) => n.alertas || []) as AlertaNomina[];
-          eventoData.alertas = {
-            criticas: alertas.filter((a) => a.tipo === 'critico').length,
-            advertencias: alertas.filter((a) => a.tipo === 'advertencia').length,
-            informativas: alertas.filter((a) => a.tipo === 'info').length,
-            total: alertas.length,
-          };
-        }
-        setEvento(eventoData);
+      if (!response.ok) {
+        throw new Error('Error al cargar evento');
       }
+      const data = await parseJson<Record<string, any>>(response).catch(() => null);
+      if (!data) {
+        throw new Error('Respuesta inválida del servidor');
+      }
+      // El endpoint devuelve { evento, stats }
+      const eventoData = data.evento || data;
+      // Calcular alertas agregadas desde las nóminas si no vienen en el formato esperado
+      if (eventoData.nominas && !eventoData.alertas) {
+        const alertas = eventoData.nominas.flatMap((n: Nomina) => n.alertas || []) as AlertaNomina[];
+        eventoData.alertas = {
+          criticas: alertas.filter((a) => a.tipo === 'critico').length,
+          advertencias: alertas.filter((a) => a.tipo === 'advertencia').length,
+          informativas: alertas.filter((a) => a.tipo === 'info').length,
+          total: alertas.length,
+        };
+      }
+      setEvento(eventoData);
     } catch (error) {
       console.error('Error fetching evento:', error);
     } finally {
@@ -1469,17 +1490,17 @@ function EventoDetailsPanel({
                               )}
                               
                               {/* Ausencias */}
-                              {nomina.diasAusencias > 0 && (
+                              {(nomina.diasAusencias ?? 0) > 0 && (
                                 <span className="inline-flex items-center gap-1 text-blue-600">
                                   <Calendar className="w-3 h-3" />
-                                  {nomina.diasAusencias} día{nomina.diasAusencias > 1 ? 's' : ''} ausencia
+                                  {nomina.diasAusencias} día{(nomina.diasAusencias ?? 0) > 1 ? 's' : ''} ausencia
                                 </span>
                               )}
                               
                               {/* Si no hay nada que destacar */}
                               {!nomina.complementosPendientes && 
                                (!nomina.alertas || nomina.alertas.length === 0) && 
-                               nomina.diasAusencias === 0 && (
+                               (nomina.diasAusencias ?? 0) === 0 && (
                                 <span className="text-gray-500">
                                   Sin incidencias
                                 </span>

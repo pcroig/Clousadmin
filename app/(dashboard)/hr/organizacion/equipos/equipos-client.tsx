@@ -28,7 +28,8 @@ interface Equipo {
   empleados: {
     id: string;
     nombre: string;
-    avatar?: string;
+    avatar?: string | null;
+    fotoUrl?: string | null;
   }[];
   sede?: {
     id: string;
@@ -102,14 +103,21 @@ export function EquiposClient({ equipos: initialEquipos }: EquiposClientProps) {
         responsable: equipo.manager
           ? `${equipo.manager.nombre} ${equipo.manager.apellidos}`
           : 'Sin responsable',
-        responsableId: equipo.managerId,
+        responsableId: equipo.managerId ?? null,
         numeroEmpleados: equipo.miembros.length,
         empleados: equipo.miembros.map((miembro) => ({
           id: miembro.empleado.id,
           nombre: `${miembro.empleado.nombre} ${miembro.empleado.apellidos}`,
-          avatar: miembro.empleado.fotoUrl || undefined,
+          avatar: miembro.empleado.fotoUrl || null,
+          fotoUrl: miembro.empleado.fotoUrl || null,
         })),
-        sede: equipo.sede,
+        sede: equipo.sede
+          ? {
+              id: equipo.sede.id,
+              nombre: equipo.sede.nombre,
+              ciudad: equipo.sede.ciudad || undefined,
+            }
+          : null,
         sedeId: equipo.sedeId,
       }));
 
@@ -203,8 +211,8 @@ export function EquiposClient({ equipos: initialEquipos }: EquiposClientProps) {
             {/* Búsqueda */}
             <div className="flex-shrink-0 mb-3">
               <CompactFilterBar
-                searchValue={filtros.busqueda}
-                onSearchChange={(value) => setFiltros((prev) => ({ ...prev, busqueda: value }))}
+                searchValue={searchTerm}
+                onSearchChange={setSearchTerm}
                 searchPlaceholder="Buscar equipo..."
               />
             </div>

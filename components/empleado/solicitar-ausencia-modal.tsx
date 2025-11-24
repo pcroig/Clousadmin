@@ -16,6 +16,7 @@ import {
   PeriodoMedioDiaValue,
   PERIODOS_MEDIO_DIA_OPTIONS,
 } from '@/lib/constants/enums';
+import { parseJson } from '@/lib/utils/json';
 
 interface ErrorDetail {
   field?: string;
@@ -27,6 +28,17 @@ interface ApiErrorResponse {
   error: string;
   details: ErrorDetail[];
   [key: string]: unknown;
+}
+
+interface EmpleadoMeResponse {
+  id: string;
+}
+
+interface UploadApiResponse {
+  url: string;
+  documento?: {
+    id: string;
+  } | null;
 }
 
 interface SolicitarAusenciaModalProps {
@@ -156,7 +168,7 @@ export function SolicitarAusenciaModal({
         
         // Obtener empleadoId del usuario actual
         const empleadoResponse = await fetch('/api/empleados/me');
-        const empleadoData = await empleadoResponse.json();
+        const empleadoData = await parseJson<EmpleadoMeResponse>(empleadoResponse);
         const empleadoId = empleadoData?.id;
 
         const formData = new FormData();
@@ -167,19 +179,22 @@ export function SolicitarAusenciaModal({
           formData.append('empleadoId', empleadoId);
         }
 
-        const uploadResponse = await fetch('/api/upload', {
-          method: 'POST',
-          body: formData,
-        });
+        try {
+          const uploadResponse = await fetch('/api/upload', {
+            method: 'POST',
+            body: formData,
+          });
 
-        if (!uploadResponse.ok) {
-          throw new Error('Error al subir el justificante');
+          if (!uploadResponse.ok) {
+            throw new Error('Error al subir el justificante');
+          }
+
+          const uploadData = await parseJson<UploadApiResponse>(uploadResponse);
+          justificanteUrl = uploadData.url;
+          documentoId = uploadData.documento?.id;
+        } finally {
+          setUploadingJustificante(false);
         }
-
-        const uploadData = await uploadResponse.json();
-        justificanteUrl = uploadData.url;
-        documentoId = uploadData.documento?.id;
-        setUploadingJustificante(false);
       }
 
       // Construir payload solo con campos que tienen valores
@@ -224,7 +239,7 @@ export function SolicitarAusenciaModal({
         body: JSON.stringify(payload),
       });
 
-      const data = await response.json();
+      const data = await parseJson<ApiErrorResponse | { success: boolean }>(response);
 
       if (!response.ok) {
         // Mostrar detalles de validación si están disponibles

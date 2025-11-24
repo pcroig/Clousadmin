@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 
 import { crearInvitacionSignup } from '@/lib/invitaciones-signup';
+import { getJsonBody } from '@/lib/utils/json';
 
 const invitacionSignupSchema = z.object({
   email: z.string().email('Email inválido'),
@@ -41,7 +42,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Validar request body
-    const body = await req.json() as Record<string, any>;
+    const body = await getJsonBody<Record<string, unknown>>(req);
     const validatedData = invitacionSignupSchema.parse(body);
 
     const { email } = validatedData;

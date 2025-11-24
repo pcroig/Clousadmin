@@ -28,6 +28,7 @@ import {
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import type { ComponentType } from 'react';
 import { toast } from 'sonner';
 
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -49,6 +50,20 @@ interface SidebarProps {
     apellidos: string;
     avatar?: string | null;
   };
+}
+
+type SidebarIcon = ComponentType<{ className?: string }>;
+
+interface NavigationChild {
+  name: string;
+  href: string;
+}
+
+interface NavigationItem {
+  name: string;
+  href?: string;
+  icon?: SidebarIcon;
+  children?: NavigationChild[];
 }
 
 export function Sidebar({ rol, usuario }: SidebarProps) {
@@ -128,7 +143,7 @@ export function Sidebar({ rol, usuario }: SidebarProps) {
   };
 
   // Navegación para HR
-  const hrNavigation = [
+  const hrNavigation: NavigationItem[] = [
     {
       name: 'Dashboard',
       href: '/hr/dashboard',
@@ -183,7 +198,7 @@ export function Sidebar({ rol, usuario }: SidebarProps) {
   ];
 
   // Navegación para Manager (similar a HR pero limitado)
-  const managerNavigation = [
+  const managerNavigation: NavigationItem[] = [
     {
       name: 'Dashboard',
       href: '/manager/dashboard',
@@ -214,7 +229,7 @@ export function Sidebar({ rol, usuario }: SidebarProps) {
   ];
 
   // Navegación para Empleado
-  const empleadoNavigation = [
+  const empleadoNavigation: NavigationItem[] = [
     {
       name: 'Dashboard',
       href: '/empleado/dashboard',
@@ -253,7 +268,7 @@ export function Sidebar({ rol, usuario }: SidebarProps) {
   ];
 
   // Navegación para Platform Admin
-  const platformNavigation = [
+  const platformNavigation: NavigationItem[] = [
     {
       name: 'Panel de invitaciones',
       href: '/platform/invitaciones',
@@ -272,7 +287,7 @@ export function Sidebar({ rol, usuario }: SidebarProps) {
   ];
 
   // Seleccionar navegación según rol
-  const navigation =
+  const navigation: NavigationItem[] =
     rol === UsuarioRol.hr_admin
       ? hrNavigation
       : rol === UsuarioRol.manager

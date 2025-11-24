@@ -438,7 +438,7 @@ export async function obtenerHorasEsperadas(
   const jornada = empleado.jornada;
   const config = jornada.config as JornadaConfig;
 
-  return calcularHorasEsperadasDesdeConfig(config, fecha, jornada.horasSemanales);
+  return calcularHorasEsperadasDesdeConfig(config, fecha, Number(jornada.horasSemanales ?? 0));
 }
 
 export async function obtenerHorasEsperadasBatch(

@@ -5,10 +5,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 import { aceptarInvitacion } from '@/lib/invitaciones';
+import { getJsonBody } from '@/lib/utils/json';
 
 export async function POST(req: NextRequest) {
   try {
-    const { token, password } = await req.json();
+    const { token, password } = await getJsonBody<{ token?: string; password?: string }>(req);
 
     if (!token || !password) {
       return NextResponse.json(

@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { UploadHandler } from '@/lib/hooks/use-file-upload';
+import { parseJson } from '@/lib/utils/json';
 
 interface DatosExtraidos {
   nombre?: string;
@@ -42,6 +43,23 @@ interface SubirDocumentoIndividualProps {
   onCancel?: () => void;
 }
 
+interface ExtraerDocumentoResponse {
+  success: boolean;
+  datosExtraidos?: DatosExtraidos;
+  error?: string;
+}
+
+interface CrearEmpleadoResponse {
+  success?: boolean;
+  error?: string;
+  code?: string;
+  empleadoExistente?: {
+    id: string;
+    nombre: string;
+    apellidos: string;
+  };
+}
+
 export function SubirDocumentoIndividual({ onSuccess, onCancel }: SubirDocumentoIndividualProps = {}) {
   const router = useRouter();
   const [archivo, setArchivo] = useState<File | null>(null);
@@ -67,10 +85,10 @@ export function SubirDocumentoIndividual({ onSuccess, onCancel }: SubirDocumento
           signal,
         });
 
-        const result = await response.json();
+        const result = await parseJson<ExtraerDocumentoResponse>(response);
 
         if (result.success) {
-          setDatosExtraidos(result.datosExtraidos);
+          setDatosExtraidos(result.datosExtraidos ?? null);
           toast.success('Datos extraídos correctamente');
           return { success: true };
         }
@@ -107,7 +125,7 @@ export function SubirDocumentoIndividual({ onSuccess, onCancel }: SubirDocumento
         body: JSON.stringify(datosExtraidos),
       });
 
-      const data = await response.json();
+      const data = await parseJson<CrearEmpleadoResponse>(response);
 
       if (response.ok) {
         toast.success('Empleado creado correctamente');

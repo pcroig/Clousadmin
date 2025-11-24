@@ -8,7 +8,7 @@ import { MOBILE_DESIGN } from '@/lib/constants/mobile-design';
 import { useIsMobile } from '@/lib/hooks/use-viewport';
 import { cn } from '@/lib/utils';
 
-import { OverflowMenu } from './OverflowMenu';
+import { OverflowMenu, type OverflowAction } from './OverflowMenu';
 
 export interface ActionItem {
   icon?: React.ComponentType<{ className?: string }>;
@@ -73,6 +73,20 @@ export function MobileActionBar({
   const isMobile = useIsMobile();
   const [overflowOpen, setOverflowOpen] = useState(false);
 
+  const overflowReadyActions: OverflowAction[] = overflowActions
+    .filter(
+      (action): action is ActionItem & {
+        icon: React.ComponentType<{ className?: string }>;
+      } => typeof action.icon === 'function'
+    )
+    .map((action) => ({
+      icon: action.icon,
+      label: action.label,
+      onClick: action.onClick,
+      disabled: action.disabled,
+      variant: action.variant === 'destructive' ? 'destructive' : undefined,
+    }));
+
   // En desktop, renderizar botones completos
   if (!isMobile) {
     return (
@@ -106,9 +120,9 @@ export function MobileActionBar({
             {action.label}
           </Button>
         ))}
-        {overflowActions.length > 0 && (
+        {overflowReadyActions.length > 0 && (
           <OverflowMenu
-            actions={overflowActions}
+            actions={overflowReadyActions}
             open={overflowOpen}
             onOpenChange={setOverflowOpen}
           />
@@ -196,9 +210,9 @@ export function MobileActionBar({
         ))}
 
         {/* Overflow Menu */}
-        {overflowActions.length > 0 && (
+        {overflowReadyActions.length > 0 && (
           <OverflowMenu
-            actions={overflowActions}
+            actions={overflowReadyActions}
             open={overflowOpen}
             onOpenChange={setOverflowOpen}
             trigger={

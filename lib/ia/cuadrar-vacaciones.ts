@@ -306,7 +306,7 @@ const resultadoSchema = z.object({
   resumen: z
     .object({
       solapamientoMaximo: z.number().optional(),
-      solapamientoPorDia: z.record(z.number()).optional(),
+      solapamientoPorDia: z.record(z.string(), z.number()).optional(),
     })
     .optional(),
   warnings: z.array(z.string()).optional(),
@@ -338,6 +338,8 @@ function validarYNormalizarResultado(
 
   const empleadosConIdeal = propuestasValidas.filter((p) => p.tipo === 'ideal').length;
   const empleadosAjustados = propuestasValidas.filter((p) => p.tipo === 'ajustado').length;
+  const solapamientoPorDia =
+    (parsed.data.resumen?.solapamientoPorDia as Record<string, number> | undefined) ?? {};
 
   return {
     propuestas: propuestasValidas,
@@ -346,7 +348,7 @@ function validarYNormalizarResultado(
       empleadosConIdeal,
       empleadosAjustados,
       solapamientoMaximo: parsed.data.resumen?.solapamientoMaximo ?? 0,
-      solapamientoPorDia: parsed.data.resumen?.solapamientoPorDia ?? {},
+      solapamientoPorDia,
     },
     warnings,
     metadata: {
@@ -366,7 +368,6 @@ function generarPropuestasFallback(
   console.warn('[Cuadrar Vacaciones] Generando propuestas fallback:', {
     totalEmpleados: preferencias.length,
     solapamientoMaximo: solapamientoMaximoPct ?? 0,
-      solapamientoMaximo: solapamientoMaximoPct ?? 0,
   });
 
   const propuestas: PropuestaVacacionEmpleado[] = [];

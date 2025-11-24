@@ -9,7 +9,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { UsuarioRol } from '@/lib/constants/enums';
 import { confirmarUpload, obtenerSesion } from '@/lib/imports/nominas-upload';
-
+import { getJsonBody } from '@/lib/utils/json';
 
 // POST /api/nominas/confirmar-upload
 export async function POST(req: NextRequest) {
@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Obtener body
-    const body = await req.json() as Record<string, any>;
+    const body = await getJsonBody<{ sessionId?: string; confirmaciones?: unknown }>(req);
     const { sessionId, confirmaciones } = body;
 
     if (!sessionId) {
@@ -38,6 +38,21 @@ export async function POST(req: NextRequest) {
     if (!confirmaciones || !Array.isArray(confirmaciones)) {
       return NextResponse.json(
         { error: 'Se requiere array de confirmaciones' },
+        { status: 400 }
+      );
+    }
+
+    const confirmacionesLimpias = confirmaciones.filter(
+      (item): item is { filename: string; empleadoId: string } =>
+        typeof item === 'object' &&
+        item !== null &&
+        typeof (item as { filename?: unknown }).filename === 'string' &&
+        typeof (item as { empleadoId?: unknown }).empleadoId === 'string'
+    );
+
+    if (confirmacionesLimpias.length === 0) {
+      return NextResponse.json(
+        { error: 'No se proporcionaron confirmaciones válidas' },
         { status: 400 }
       );
     }
@@ -62,7 +77,7 @@ export async function POST(req: NextRequest) {
     const uploadDir = join(process.cwd(), 'uploads');
     const result = await confirmarUpload(
       sessionId,
-      confirmaciones,
+      confirmacionesLimpias,
       uploadDir,
       session.user.empresaId,
       session.user.id

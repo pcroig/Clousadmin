@@ -11,7 +11,8 @@ import { UsuarioRol } from '@/lib/constants/enums';
 import { getGoogleCalendarOAuthConfig } from "@/lib/oauth/config";
 import { OAuthManager } from "@/lib/oauth/oauth-manager";
 import { createOAuthProvider } from "@/lib/oauth/providers";
-import { prisma, Prisma } from "@/lib/prisma";
+import { prisma } from "@/lib/prisma";
+import { asJsonValue } from "@/lib/prisma/json";
 
 import type { CalendarIntegrationConfig } from "@/lib/integrations/types";
 
@@ -128,7 +129,7 @@ export async function GET(req: NextRequest) {
       await prisma.integracion.update({
         where: { id: existingIntegration.id },
         data: {
-          config: integrationConfig as Prisma.InputJsonValue,
+          config: asJsonValue(integrationConfig),
           calendarId: calendarId,
           activa: true,
         },
@@ -141,7 +142,7 @@ export async function GET(req: NextRequest) {
           usuarioId: integrationType === "personal" ? session.user.id : null,
           tipo: "calendario",
           proveedor: "google_calendar",
-          config: integrationConfig as Prisma.InputJsonValue,
+          config: asJsonValue(integrationConfig),
           calendarId: calendarId,
           activa: true,
         },

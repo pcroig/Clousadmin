@@ -8,6 +8,8 @@ import { sendOnboardingEmail } from '@/lib/email';
 import { crearOnboarding, type TipoOnboarding } from '@/lib/onboarding';
 import { prisma } from '@/lib/prisma';
 
+import type { InvitacionEmpleado } from '@prisma/client';
+
 /**
  * Crear invitación para un empleado
  */
@@ -40,13 +42,21 @@ export async function crearInvitacion(
       };
     }
 
+    const tokenExpiraValue = onboarding.onboarding.tokenExpira;
+    const expiraEn =
+      tokenExpiraValue instanceof Date
+        ? tokenExpiraValue
+        : tokenExpiraValue
+        ? new Date(tokenExpiraValue as string | number)
+        : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
     const invitacion = await prisma.invitacionEmpleado.create({
       data: {
         empresaId,
         empleadoId,
         email,
         token: onboarding.token,
-        expiraEn: onboarding.onboarding.tokenExpira,
+        expiraEn,
       },
     });
 
@@ -65,10 +75,7 @@ export async function crearInvitacion(
   }
 }
 
-type CrearInvitacionReturn = Awaited<ReturnType<typeof crearInvitacion>>;
-
-type InvitacionEntidad =
-  CrearInvitacionReturn extends { invitacion: infer T } ? T : undefined;
+type InvitacionEntidad = InvitacionEmpleado;
 
 export interface InvitarEmpleadoParams {
   empleadoId: string;

@@ -16,7 +16,7 @@ import {
   obtenerOnboardingConfig,
   type PlantillaDocumento,
 } from '@/lib/onboarding-config';
-
+import { getJsonBody } from '@/lib/utils/json';
 
 // Schema de validación para campos requeridos
 const camposRequeridosSchema = z.object({
@@ -105,7 +105,7 @@ export async function PATCH(req: NextRequest) {
       );
     }
 
-    const body = await req.json() as Record<string, any>;
+    const body = await getJsonBody<Record<string, unknown>>(req);
     const { tipo, data } = body;
 
     if (!tipo) {

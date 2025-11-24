@@ -14,6 +14,7 @@ import {
   verifyTotpCode,
 } from '@/lib/auth/two-factor';
 import { prisma } from '@/lib/prisma';
+import { JSON_NULL } from '@/lib/prisma/json';
 
 async function requireSession() {
   const session = await getSession();
@@ -35,7 +36,7 @@ export async function startTwoFactorSetup() {
     data: {
       totpSecret: encryptedSecret,
       totpEnabled: false,
-      backupCodes: null,
+      backupCodes: JSON_NULL,
     },
   });
 
@@ -124,7 +125,7 @@ export async function disableTwoFactorAction(password: string) {
       totpEnabled: false,
       totpEnabledAt: null,
       totpSecret: null,
-      backupCodes: null,
+      backupCodes: JSON_NULL,
     },
   });
 

@@ -8,6 +8,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { extractArrayFromResponse } from '@/lib/utils/api-response';
+import { parseJson } from '@/lib/utils/json';
 
 // ========================================
 // TYPES
@@ -64,7 +65,8 @@ export function useNotificaciones(filtros?: NotificacionesFiltros) {
 
       const res = await fetch(`/api/notificaciones?${params}`);
       if (!res.ok) throw new Error('Error al cargar notificaciones');
-      const payload = await res.json();
+      const payload =
+        (await parseJson<Record<string, unknown>>(res).catch(() => undefined)) ?? {};
       return extractArrayFromResponse<Notificacion>(payload, { key: 'notificaciones' });
     },
   });
@@ -79,7 +81,12 @@ export function useNotificacionesNoLeidas() {
     queryFn: async () => {
       const res = await fetch('/api/notificaciones?count=true');
       if (!res.ok) throw new Error('Error al cargar conteo');
-      const data = await res.json();
+      const data =
+        (await parseJson<{
+          count?: number;
+          metrics?: { noLeidas?: number };
+          noLeidas?: number;
+        }>(res).catch(() => undefined)) ?? {};
       if (typeof data.count === 'number') {
         return data.count;
       }
@@ -107,7 +114,7 @@ export function useMarcarLeida() {
         method: 'PATCH',
       });
       if (!res.ok) throw new Error('Error al marcar como leída');
-      return res.json();
+      return parseJson<Record<string, unknown>>(res).catch(() => undefined);
     },
     onSuccess: () => {
       // Invalidar queries de notificaciones para refrescar
@@ -128,7 +135,7 @@ export function useMarcarTodasLeidas() {
         method: 'PATCH',
       });
       if (!res.ok) throw new Error('Error al marcar todas como leídas');
-      return res.json();
+      return parseJson<Record<string, unknown>>(res).catch(() => undefined);
     },
     onSuccess: () => {
       // Invalidar queries de notificaciones para refrescar

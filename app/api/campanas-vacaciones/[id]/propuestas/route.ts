@@ -1,5 +1,6 @@
 import { differenceInBusinessDays } from 'date-fns';
 import { NextRequest } from 'next/server';
+import { z } from 'zod';
 
 import {
   badRequestResponse,
@@ -8,7 +9,9 @@ import {
   successResponse,
 } from '@/lib/api-handler';
 import { UsuarioRol } from '@/lib/constants/enums';
-import { prisma, Prisma } from '@/lib/prisma';
+import { prisma } from '@/lib/prisma';
+import { asJsonValue } from '@/lib/prisma/json';
+import { getJsonBody } from '@/lib/utils/json';
 
 export const dynamic = 'force-dynamic';
 
@@ -35,8 +38,24 @@ export async function PATCH(
     }
 
     const { id: campanaId } = await params;
-    const body = await req.json() as Record<string, any>;
-    const ajustes: AjustePayload[] = Array.isArray(body.ajustes) ? body.ajustes : [];
+    const body = await getJsonBody<Record<string, unknown>>(req);
+
+    const ajustesSchema = z.array(
+      z.object({
+        preferenciaId: z.string(),
+        fechaInicio: z.string(),
+        fechaFin: z.string(),
+        tipo: z.enum(['ideal', 'alternativo', 'ajustado']).optional(),
+        motivo: z.string().optional(),
+      })
+    );
+    const ajustesResult = ajustesSchema.safeParse(body.ajustes);
+    if (!ajustesResult.success) {
+      return badRequestResponse(
+        ajustesResult.error.issues[0]?.message || 'Datos de ajustes inválidos'
+      );
+    }
+    const ajustes = ajustesResult.data;
 
     if (ajustes.length === 0) {
       return badRequestResponse('Debes indicar al menos un ajuste');
@@ -134,12 +153,16 @@ export async function PATCH(
         await tx.preferenciaVacaciones.update({
           where: { id: propuesta.preferenciaId },
           data: {
-            propuestaIA: propuesta.propuesta as Prisma.JsonValue,
+            propuestaIA: asJsonValue(propuesta.propuesta),
           },
         });
       }
 
-      const propuestaCampana = (campana.propuestaIA as Record<string, unknown>) || {};
+      type CampanaPropuestaIA = {
+        propuestas?: Array<Record<string, unknown>>;
+        [key: string]: unknown;
+      };
+      const propuestaCampana = ((campana.propuestaIA ?? {}) as CampanaPropuestaIA);
       const propuestasExistentes: Array<Record<string, unknown>> = Array.isArray(propuestaCampana.propuestas)
         ? propuestaCampana.propuestas
         : [];
@@ -160,10 +183,10 @@ export async function PATCH(
       await tx.campanaVacaciones.update({
         where: { id: campanaId },
         data: {
-          propuestaIA: {
+          propuestaIA: asJsonValue({
             ...propuestaCampana,
             propuestas: propuestasActualizadas,
-          } as Prisma.JsonValue,
+          }),
         },
       });
     });

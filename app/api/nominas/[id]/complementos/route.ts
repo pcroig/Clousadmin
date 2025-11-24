@@ -10,6 +10,7 @@ import { z } from 'zod';
 import { getSession } from '@/lib/auth';
 import { NOMINA_ESTADOS } from '@/lib/constants/nomina-estados';
 import { prisma } from '@/lib/prisma';
+import { getJsonBody } from '@/lib/utils/json';
 
 const AsignarComplementoSchema = z.object({
   empleadoComplementoId: z.string().uuid(),
@@ -126,7 +127,7 @@ export async function POST(
       return NextResponse.json({ error: 'Acceso denegado' }, { status: 403 });
     }
 
-    const body = await req.json() as Record<string, any>;
+    const body = await getJsonBody<Record<string, unknown>>(req);
 
     // Soportar asignación única o múltiple
     let complementos: z.infer<typeof AsignarComplementoSchema>[];

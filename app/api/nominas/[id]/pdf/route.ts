@@ -49,12 +49,12 @@ export async function GET(
       camposAccedidos: ['documento_pdf'],
     });
 
-    if (!nomina.documento || !nomina.documento.url) {
+    if (!nomina.documento || !nomina.documento.s3Key) {
       return NextResponse.json({ error: 'No hay PDF disponible' }, { status: 404 });
     }
 
     // Obtener URL firmada de S3
-    const downloadUrl = await getSignedDownloadUrl(nomina.documento.url);
+    const downloadUrl = await getSignedDownloadUrl(nomina.documento.s3Key);
 
     // Redirigir a la URL firmada
     return NextResponse.redirect(downloadUrl);

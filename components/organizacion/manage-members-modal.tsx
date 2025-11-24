@@ -20,6 +20,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { getAvatarStyle } from '@/lib/design-system';
+import { parseJson } from '@/lib/utils/json';
 
 interface Employee {
   id: string;
@@ -59,9 +60,10 @@ export function ManageMembersModal({
     try {
       const response = await fetch(`/api/equipos/${teamId}/available-members`);
       if (!response.ok) {
-        throw new Error('Error al cargar empleados');
+        const error = await parseJson<{ error?: string }>(response);
+        throw new Error(error.error || 'Error al cargar empleados');
       }
-      const data = await response.json();
+      const data = await parseJson<Employee[]>(response);
       setAvailableEmployees(data);
     } catch (error) {
       console.error('Error loading employees:', error);
@@ -86,7 +88,7 @@ export function ManageMembersModal({
       });
 
       if (!response.ok) {
-        const error = await response.json();
+        const error = await parseJson<{ error?: string }>(response);
         throw new Error(error.error || 'Error al añadir miembro');
       }
 
@@ -112,7 +114,7 @@ export function ManageMembersModal({
       );
 
       if (!response.ok) {
-        const error = await response.json();
+        const error = await parseJson<{ error?: string }>(response);
         throw new Error(error.error || 'Error al eliminar miembro');
       }
 

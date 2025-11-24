@@ -7,7 +7,7 @@ import * as XLSX from 'xlsx';
 import { obtenerLogAuditoria } from '@/lib/auditoria';
 import { decryptEmpleadoData } from '@/lib/empleado-crypto';
 
-import type { PrismaClient } from '@prisma/client';
+import type { Prisma, PrismaClient } from '@prisma/client';
 
 type FichajeWithEventos = {
   id: string;
@@ -28,7 +28,6 @@ type ContratoResumen = {
   fechaFin: Date | string | null;
   tipoContrato: string;
   salarioBrutoAnual: number | null;
-  salarioBrutoMensual?: number | null;
 };
 
 export interface EmpleadoExportData {
@@ -86,7 +85,7 @@ function formatDate(value: Date | string | null | undefined): string {
   return date.toISOString();
 }
 
-function normalizeValue(value: unknown): unknown {
+function normalizeValue(value: unknown): string | number | null | undefined {
   if (value === null || typeof value === 'undefined') {
     return '';
   }
@@ -101,7 +100,11 @@ function normalizeValue(value: unknown): unknown {
     }
   }
 
-  return value;
+  if (typeof value === 'string' || typeof value === 'number') {
+    return value;
+  }
+
+  return String(value);
 }
 
 function sanitizeRecord<T extends Record<string, unknown>>(record: T): Record<string, unknown> {
@@ -150,7 +153,7 @@ export async function loadEmpleadoExportData(
   prisma: PrismaClient,
   params: { empresaId: string; empleadoId: string }
 ): Promise<EmpleadoExportData | null> {
-  const empleado = await prisma.empleado.findFirst({
+  const empleadoQuery = {
     where: {
       id: params.empleadoId,
       empresaId: params.empresaId,
@@ -224,7 +227,6 @@ export async function loadEmpleadoExportData(
           fechaFin: true,
           tipoContrato: true,
           salarioBrutoAnual: true,
-          salarioBrutoMensual: true,
           createdAt: true,
         },
         orderBy: {
@@ -233,7 +235,9 @@ export async function loadEmpleadoExportData(
         take: 50,
       },
     },
-  });
+  } satisfies Prisma.EmpleadoFindFirstArgs;
+
+  const empleado = await prisma.empleado.findFirst(empleadoQuery);
 
   if (!empleado) {
     return null;
@@ -285,7 +289,6 @@ export function buildEmpleadoExcelBuffer(data: EmpleadoExportData): Buffer {
     ['NIF', empleado.nif || ''],
     ['NSS', empleado.nss || ''],
     ['Salario bruto anual', normalizeValue(empleado.salarioBrutoAnual)],
-    ['Salario bruto mensual', normalizeValue(empleado.salarioBrutoMensual)],
     ['Teléfono', empleado.telefono || ''],
     ['Dirección', `${empleado.direccionCalle ?? ''} ${empleado.direccionNumero ?? ''}`.trim()],
     ['Ciudad', empleado.ciudad ?? ''],
@@ -374,7 +377,9 @@ export function buildEmpleadoExcelBuffer(data: EmpleadoExportData): Buffer {
         FechaInicio: contrato.fechaInicio,
         FechaFin: contrato.fechaFin,
         SalarioBrutoAnual: contrato.salarioBrutoAnual,
-        SalarioBrutoMensual: contrato.salarioBrutoMensual,
+        SalarioBrutoMensual: contrato.salarioBrutoAnual
+          ? Number(contrato.salarioBrutoAnual) / 12
+          : '',
       })
     ),
     'Contratos'

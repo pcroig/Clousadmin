@@ -8,6 +8,7 @@ import { z } from 'zod';
 
 import { getSession } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { getJsonBody } from '@/lib/utils/json';
 
 // Validation schema
 const TipoComplementoSchema = z.object({
@@ -77,8 +78,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Acceso denegado' }, { status: 403 });
     }
 
-    const body = await req.json() as Record<string, any>;
-    const data = TipoComplementoSchema.parse(body);
+    const payload = await getJsonBody<Record<string, unknown>>(req);
+    const data = TipoComplementoSchema.parse(payload);
 
     // Validación: Si es importe fijo, debe tener importeFijo
     if (data.esImporteFijo && !data.importeFijo) {

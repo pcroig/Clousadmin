@@ -21,6 +21,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
 import { extractArrayFromResponse } from '@/lib/utils/api-response';
+import { parseJson } from '@/lib/utils/json';
 
 interface Plantilla {
   id: string;
@@ -33,6 +34,7 @@ interface Plantilla {
   activa: boolean;
   variablesUsadas: string[];
   requiereFirma: boolean;
+  carpetaDestinoDefault?: string | null;
 }
 
 interface Empleado {
@@ -86,13 +88,38 @@ export function GenerarDesdePlantillaModal({
 
   // Estado de procesamiento
   const [jobId, setJobId] = useState<string | null>(null);
-  const [jobStatus, setJobStatus] = useState<{
+  const [jobStatus, setJobStatus] = useState<JobStatus | null>(null);
+
+  interface JobStatus {
     estado: string;
     documentosGenerados?: number;
     totalEmpleados?: number;
     porcentaje?: number;
     mensajeError?: string;
-  } | null>(null);
+  }
+
+  interface JobStatusResponse {
+    success?: boolean;
+    job?: JobStatus;
+  }
+
+  interface PlantillasListResponse {
+    success?: boolean;
+    plantillas?: Plantilla[];
+    error?: string;
+  }
+
+  interface PlantillaDetailResponse {
+    success?: boolean;
+    plantilla?: Plantilla;
+    error?: string;
+  }
+
+  interface GenerarDocumentosResponse {
+    success?: boolean;
+    jobId?: string;
+    error?: string;
+  }
 
   useEffect(() => {
     if (open) {
@@ -123,7 +150,7 @@ export function GenerarDesdePlantillaModal({
     const interval = setInterval(async () => {
       try {
         const res = await fetch(`/api/plantillas/jobs/${jobId}`);
-        const data = await res.json();
+        const data = await parseJson<JobStatusResponse>(res);
 
         if (data.success && data.job) {
           setJobStatus(data.job);
@@ -153,7 +180,7 @@ export function GenerarDesdePlantillaModal({
     setLoading(true);
     try {
       const res = await fetch('/api/plantillas?activas=true');
-      const data = await res.json();
+      const data = await parseJson<PlantillasListResponse>(res);
       if (data.success) {
         setPlantillas(data.plantillas || []);
       }
@@ -168,7 +195,7 @@ export function GenerarDesdePlantillaModal({
   const cargarEmpleados = async () => {
     try {
       const res = await fetch('/api/empleados');
-      const data = await res.json();
+      const data = await parseJson<unknown>(res);
       const lista = extractArrayFromResponse<
         {
           id: string;
@@ -189,10 +216,10 @@ export function GenerarDesdePlantillaModal({
       setEmpleados(
         lista.map((emp) => ({
           id: emp.id,
-          nombre: emp.usuario?.nombre || emp.nombre,
-          apellidos: emp.usuario?.apellidos || emp.apellidos,
-          email: emp.usuario?.email || emp.email,
-          departamento: emp.puestoRelacion?.nombre,
+          nombre: emp.usuario?.nombre ?? emp.nombre ?? '',
+          apellidos: emp.usuario?.apellidos ?? emp.apellidos ?? '',
+          email: emp.usuario?.email ?? emp.email ?? '',
+          departamento: emp.puestoRelacion?.nombre ?? null,
         }))
       );
     } catch (err) {
@@ -203,7 +230,7 @@ export function GenerarDesdePlantillaModal({
   const cargarPlantillaPreseleccionada = async (plantillaId: string) => {
     try {
       const res = await fetch(`/api/plantillas/${plantillaId}`);
-      const data = await res.json();
+      const data = await parseJson<PlantillaDetailResponse>(res);
 
       if (data.success && data.plantilla) {
         const plantilla = data.plantilla;
@@ -266,10 +293,10 @@ export function GenerarDesdePlantillaModal({
         }),
       });
 
-      const data = await res.json();
+      const data = await parseJson<GenerarDocumentosResponse>(res);
 
       if (data.success) {
-        setJobId(data.jobId);
+        setJobId(data.jobId ?? null);
         setPaso('procesando');
       } else {
         setError(data.error || 'Error al generar documentos');

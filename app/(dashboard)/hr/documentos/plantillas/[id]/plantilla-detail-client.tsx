@@ -36,13 +36,14 @@ interface ConfiguracionIA {
 
 interface DocumentoGeneradoResumen {
   id: string;
-  empleadoId: string;
+  empleadoNombre: string;
   documentoId: string | null;
   generadoEn: string;
-  variablesUtilizadas: string[];
-  usadaIA: boolean;
-  notificado: boolean;
   firmado: boolean;
+  requiereFirma: boolean;
+  variablesUtilizadas?: string[];
+  usadaIA?: boolean;
+  notificado?: boolean;
 }
 
 interface EmpleadoResumen {
@@ -208,17 +209,6 @@ export function PlantillaDetailClient({ plantilla }: PlantillaDetailClientProps)
   };
 
   useEffect(() => {
-    setPreviewUrl(null);
-    setPreviewRenderState('idle');
-    setPreviewError(null);
-    setVariablesConValor([]);
-    setVariablesSinValor([]);
-    setVariablesValores({});
-    setEmpleadosSeleccionados(new Set());
-    cargarDatosIniciales();
-  }, [plantilla.id, cargarDatosIniciales]);
-
-  useEffect(() => {
     if (!previewUrl) return;
     if (typeof window === 'undefined') return;
 
@@ -362,6 +352,17 @@ export function PlantillaDetailClient({ plantilla }: PlantillaDetailClientProps)
       setLoadingEmpleados(false);
     }
   }, [cargarPrevisualizacion]);
+
+  useEffect(() => {
+    setPreviewUrl(null);
+    setPreviewRenderState('idle');
+    setPreviewError(null);
+    setVariablesConValor([]);
+    setVariablesSinValor([]);
+    setVariablesValores({});
+    setEmpleadosSeleccionados(new Set());
+    cargarDatosIniciales();
+  }, [plantilla.id, cargarDatosIniciales]);
 
   const handleToggleEmpleado = (empleadoId: string) => {
     const nuevos = new Set(empleadosSeleccionados);

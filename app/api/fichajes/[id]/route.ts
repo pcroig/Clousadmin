@@ -13,7 +13,6 @@ import {
   requireAuth,
   requireAuthAsHR,
   successResponse,
-  validateRequest,
 } from '@/lib/api-handler';
 import {
   actualizarCalculosFichaje,
@@ -21,6 +20,7 @@ import {
 } from '@/lib/calculos/fichajes';
 import { EstadoFichaje, UsuarioRol } from '@/lib/constants/enums';
 import { prisma } from '@/lib/prisma';
+import { getJsonBody } from '@/lib/utils/json';
 
 const fichajeApprovalSchema = z.object({
   accion: z.enum(['aprobar', 'rechazar']),
@@ -116,28 +116,32 @@ export async function PATCH(
       return notFoundResponse('Fichaje no encontrado');
     }
 
-    // Caso 1: Aprobar/Rechazar fichaje (solo HR/Manager)
-    // Intentar parsear el body primero para ver si tiene accion
-    let body;
-    try {
-      body = await req.json();
-    } catch {
-      return badRequestResponse('Body inválido');
-    }
+    const rawBody = await getJsonBody<unknown>(req);
 
     // Si tiene accion, procesar aprobación/rechazo
-    if (body.accion) {
+    if (typeof rawBody === 'object' && rawBody !== null && 'accion' in rawBody) {
       // Verificar rol HR Admin o Manager
       if (session.user.rol !== UsuarioRol.hr_admin && session.user.rol !== UsuarioRol.manager) {
         return forbiddenResponse('Solo HR Admin o Manager pueden aprobar/rechazar fichajes');
       }
 
       // Validar con schema
-      const validationResult = await validateRequest(req, fichajeApprovalSchema);
-      if (validationResult instanceof Response) return validationResult;
-      const { data: validatedData } = validationResult;
+      const validationResult = fichajeApprovalSchema.safeParse(rawBody);
+      if (!validationResult.success) {
+        return badRequestResponse(
+          validationResult.error.issues[0]?.message || 'Datos inválidos'
+        );
+      }
+      const { accion } = validationResult.data;
+      const motivoRechazo =
+        typeof rawBody === 'object' &&
+        rawBody !== null &&
+        'motivoRechazo' in rawBody &&
+        typeof (rawBody as Record<string, unknown>).motivoRechazo === 'string'
+          ? (rawBody as Record<string, unknown>).motivoRechazo
+          : undefined;
 
-      if (validatedData.accion === 'aprobar') {
+      if (accion === 'aprobar') {
         // Validar que el fichaje tiene los eventos mínimos requeridos (entrada y salida)
         const eventos = await prisma.fichajeEvento.findMany({
           where: { fichajeId: fichaje.id },
@@ -166,7 +170,7 @@ export async function PATCH(
         });
 
         return successResponse(actualizado);
-      } else if (validatedData.accion === 'rechazar') {
+      } else if (accion === 'rechazar') {
         const actualizado = await prisma.fichaje.update({
           where: { id },
           data: {
@@ -179,9 +183,13 @@ export async function PATCH(
     }
 
     // Caso 2: Editar fichaje (solo HR/Manager o el propio empleado para solicitar corrección)
-    const validationResult = await validateRequest(req, fichajeEditSchema);
-    if (validationResult instanceof Response) return validationResult;
-    const { data: validatedData } = validationResult;
+    const editValidation = fichajeEditSchema.safeParse(rawBody);
+    if (!editValidation.success) {
+      return badRequestResponse(
+        editValidation.error.issues[0]?.message || 'Datos inválidos'
+      );
+    }
+    const validatedData = editValidation.data;
 
     if (session.user.rol === UsuarioRol.empleado) {
       return forbiddenResponse(

@@ -23,6 +23,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { iconButtonClasses } from '@/lib/design-system';
 import { ejecutarAccionSolicitud } from '@/lib/services/solicitudes-actions';
+import { parseJson } from '@/lib/utils/json';
 
 import { BandejaEntradaNotificaciones } from './bandeja-entrada-notificaciones';
 import { BandejaEntradaSolicitudes } from './bandeja-entrada-solicitudes';
@@ -206,13 +207,13 @@ export function BandejaEntradaTabs({
       });
 
       if (response.ok) {
-        const result = await response.json();
+        const result = await parseJson<{ message?: string; error?: string }>(response);
         toast.success(result.message || 'Solicitudes auto-aprobadas correctamente');
         router.refresh();
       } else {
-        const error = await response.json();
+        const error = await parseJson<{ error?: string }>(response).catch(() => null);
         console.error('[BandejaEntradaTabs] Error al auto-aprobar:', error);
-        toast.error(error.error || 'No se pudieron auto-aprobar las solicitudes');
+        toast.error(error?.error || 'No se pudieron auto-aprobar las solicitudes');
       }
     } catch (error) {
       console.error('[BandejaEntradaTabs] Error al auto-aprobar:', error);

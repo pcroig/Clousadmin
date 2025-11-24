@@ -19,6 +19,7 @@ import {
   crearNotificacionJornadaAsignada,
 } from '@/lib/notificaciones';
 import { prisma, Prisma } from '@/lib/prisma';
+import type { Empleado } from '@prisma/client';
 
 // Schema de validación para actualizar empleado
 const empleadoUpdateSchema = z.object({
@@ -45,6 +46,7 @@ const empleadoUpdateSchema = z.object({
   categoriaProfesional: z.string().optional(),
   nivelEducacion: z.string().optional(),
   grupoCotizacion: z.number().int().optional(),
+  jornadaId: z.string().optional(),
 
   // Información Bancaria
   iban: z.string().optional(),
@@ -271,12 +273,15 @@ export async function PATCH(
         key !== 'salarioBrutoMensual' &&
         empleadoData[key as keyof typeof empleadoData] !== undefined
       ) {
-        datosParaActualizar[key] = empleadoData[key as keyof typeof empleadoData];
+        (datosParaActualizar as Record<string, unknown>)[key] =
+          empleadoData[key as keyof typeof empleadoData];
       }
     });
 
     // Encriptar campos sensibles antes de guardar
-    const datosEncriptados = encryptEmpleadoData(datosParaActualizar);
+    const datosEncriptados = encryptEmpleadoData(
+      datosParaActualizar as Partial<Empleado>
+    ) as Prisma.EmpleadoUpdateInput;
 
     // Actualizar empleado y relaciones en una transacción
     const empleado = await prisma.$transaction(async (tx) => {

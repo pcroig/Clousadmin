@@ -6,6 +6,8 @@
 
 import { z } from 'zod';
 
+type AnyZodObject = z.ZodObject<any, any>;
+
 import { callAI, getPrimaryProvider } from '../core/client';
 import { AIUseCase, createConfigForUseCase } from '../core/config';
 import { AIMessage, AIProvider, MessageRole } from '../core/types';
@@ -293,7 +295,7 @@ Si no encuentras ningún item, retorna un array vacío: { "items": [] }`;
 /**
  * Extrae datos con campos opcionales (más flexible)
  */
-export async function extractPartialData<T extends z.ZodType>(
+export async function extractPartialData<T extends AnyZodObject>(
   input: string,
   schema: T,
   fields: Record<string, string>,
@@ -302,7 +304,9 @@ export async function extractPartialData<T extends z.ZodType>(
   // Hacer todos los campos opcionales
   const partialSchema = schema.partial();
   
-  return extractStructuredData(input, partialSchema, fields, options);
+  return extractStructuredData(input, partialSchema, fields, options) as Promise<
+    ExtractionResult<Partial<z.infer<T>>>
+  >;
 }
 
 

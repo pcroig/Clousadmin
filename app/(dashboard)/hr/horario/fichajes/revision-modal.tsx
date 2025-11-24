@@ -289,7 +289,6 @@ export function RevisionModal({ open, onClose, onReviewed, onEditFichaje: _onEdi
               <div className="flex items-center justify-end gap-2 py-2">
                 <InfoTooltip
                   content="Oculta temporalmente los días sin fichajes para centrar el cuadrado en jornadas con actividad."
-                  variant="subtle"
                   side="left"
                 />
                 <Button

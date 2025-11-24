@@ -6,7 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 import { getSession } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { prisma, Prisma } from '@/lib/prisma';
 
 export async function GET(
   req: NextRequest,
@@ -43,7 +43,7 @@ export async function GET(
     const empleadoIds = evento.nominas.map((n) => n.empleadoId);
 
     // Obtener complementos de los empleados del evento
-    const complementos = await prisma.empleadoComplemento.findMany({
+    const complementos = (await prisma.empleadoComplemento.findMany({
       where: {
         empleadoId: { in: empleadoIds },
         activo: true,
@@ -74,7 +74,7 @@ export async function GET(
             nombre: true,
             descripcion: true,
             importeFijo: true,
-            periodicidad: true,
+            esImporteFijo: true,
           },
         },
       },
@@ -82,13 +82,48 @@ export async function GET(
         { empleado: { apellidos: 'asc' } },
         { empleado: { nombre: 'asc' } },
       ],
-    });
+    })) as Array<
+      Prisma.EmpleadoComplementoGetPayload<{
+        include: {
+          empleado: {
+            select: {
+              id: true;
+              nombre: true;
+              apellidos: true;
+              email: true;
+              equipos: {
+                include: {
+                  equipo: {
+                    select: {
+                      id: true;
+                      nombre: true;
+                      managerId: true;
+                    };
+                  };
+                };
+              };
+            };
+          };
+          tipoComplemento: {
+            select: {
+              id: true;
+              nombre: true;
+              descripcion: true;
+              importeFijo: true;
+              esImporteFijo: true;
+            };
+          };
+        };
+      }>
+    >;
 
     // Filtrar si es manager (solo ver complementos de su equipo)
     let complementosFiltrados = complementos;
     if (session.user.rol === 'manager') {
       complementosFiltrados = complementos.filter((comp) =>
-        comp.empleado.equipos.some((eq) => eq.equipo.managerId === session.user.id)
+        comp.empleado.equipos.some(
+          (eq: { equipo: { managerId: string | null } }) => eq.equipo.managerId === session.user.id
+        )
       );
     }
 

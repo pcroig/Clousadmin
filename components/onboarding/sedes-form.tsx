@@ -27,6 +27,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { parseJson } from '@/lib/utils/json';
 
 interface Sede {
   id: string;
@@ -48,6 +49,29 @@ type TipoAsignacion = 'empresa' | 'equipo';
 interface SedesFormProps {
   sedesIniciales?: Sede[];
 }
+
+type SedeApi = Omit<Sede, 'equipos'> & {
+  equipos?: Array<{ id: string; nombre?: string | null }>;
+};
+
+interface EquiposResponse {
+  equipos?: Array<{ id: string; nombre?: string | null }>;
+}
+
+const normalizeEquipos = (
+  equipos?: Array<{ id: string; nombre?: string | null }>
+): Sede['equipos'] => {
+  if (!equipos) return undefined;
+  return equipos.map((equipo) => ({
+    id: equipo.id,
+    nombre: equipo.nombre ?? '',
+  }));
+};
+
+const normalizeSede = (sede: SedeApi): Sede => ({
+  ...sede,
+  equipos: normalizeEquipos(sede.equipos),
+});
 
 export function SedesForm({ sedesIniciales = [] }: SedesFormProps) {
   const [sedes, setSedes] = useState<Sede[]>(sedesIniciales);
@@ -71,12 +95,16 @@ export function SedesForm({ sedesIniciales = [] }: SedesFormProps) {
         if (!response.ok) {
           throw new Error('Error al cargar equipos');
         }
-        const data = await response.json() as { equipos?: Array<{ id: string; nombre: string }> };
-        const equiposList = Array.isArray(data.equipos) ? data.equipos : Array.isArray(data) ? data : [];
-        const equiposTransformados = equiposList.map((equipo) => ({
+        const data = await parseJson<EquiposResponse | EquipoOption[]>(response);
+        const equiposList = Array.isArray(data)
+          ? data
+          : Array.isArray(data?.equipos)
+            ? data.equipos ?? []
+            : [];
+        const equiposTransformados: EquipoOption[] = equiposList.map((equipo) => ({
           id: equipo.id,
-          nombre: equipo.nombre,
-        })) as EquipoOption[];
+          nombre: equipo.nombre ?? '',
+        }));
         setEquipos(equiposTransformados);
       } catch (err) {
         console.error('Error:', err);
@@ -111,8 +139,9 @@ export function SedesForm({ sedesIniciales = [] }: SedesFormProps) {
       const result = await asignarSedeAction(sedeId, config);
 
       if (result.success && result.sede) {
+        const sedeActualizada = normalizeSede(result.sede as SedeApi);
         setSedes((prev) =>
-          prev.map((sede) => (sede.id === sedeId ? { ...sede, ...result.sede } : sede))
+          prev.map((sede) => (sede.id === sedeId ? sedeActualizada : sede))
         );
         toast.success('Asignación actualizada');
       } else {
@@ -183,15 +212,16 @@ export function SedesForm({ sedesIniciales = [] }: SedesFormProps) {
       });
 
       if (result.success && result.sede) {
-        setSedes([...sedes, result.sede]);
+        const nuevaSede = normalizeSede(result.sede as SedeApi);
+        setSedes((prev) => [...prev, nuevaSede]);
         setCiudad('');
         setAsignacionNueva('empresa');
         setEquipoNuevo('');
         setAsignaciones((prev) => ({
           ...prev,
-          [result.sede.id]: asignacionSeleccionada === 'empresa'
+          [nuevaSede.id]: asignacionSeleccionada === 'empresa'
             ? { tipo: 'empresa' }
-            : { tipo: 'equipo', equipoId: equipoSeleccionado || result.sede.equipos?.[0]?.id },
+            : { tipo: 'equipo', equipoId: equipoSeleccionado || nuevaSede.equipos?.[0]?.id },
         }));
         toast.success('Sede creada correctamente');
       } else {

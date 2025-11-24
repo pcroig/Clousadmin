@@ -11,8 +11,21 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { parseJson } from '@/lib/utils/json';
+interface UploadDocumentoResponse {
+  id: string;
+  error?: string;
+}
 
+interface FinalizarContratoResponse {
+  success?: boolean;
+  error?: string;
+}
 
+interface CrearCarpetaResponse {
+  carpeta: { id: string };
+  error?: string;
+}
 
 interface DarDeBajaModalProps {
   isOpen: boolean;
@@ -99,10 +112,11 @@ export function DarDeBajaModal({
           });
 
           if (!uploadResponse.ok) {
-            throw new Error(`Error al subir ${doc.nombre}`);
+            const error = await parseJson<{ error?: string }>(uploadResponse).catch(() => null);
+            throw new Error(error?.error || `Error al subir ${doc.nombre}`);
           }
 
-          const uploadedDoc = await uploadResponse.json();
+          const uploadedDoc = await parseJson<UploadDocumentoResponse>(uploadResponse);
           documentosIds.push(uploadedDoc.id);
         }
       }
@@ -119,8 +133,8 @@ export function DarDeBajaModal({
       });
 
       if (!finalizarResponse.ok) {
-        const error = await finalizarResponse.json();
-        throw new Error(error.error || 'Error al finalizar contrato');
+        const error = await parseJson<{ error?: string }>(finalizarResponse).catch(() => null);
+        throw new Error(error?.error || 'Error al finalizar contrato');
       }
 
       toast.success('Contrato finalizado correctamente');
@@ -173,10 +187,11 @@ export function DarDeBajaModal({
                   }),
                 });
                 if (!response.ok) {
-                  toast.error('Error al crear carpeta');
+                  const error = await parseJson<{ error?: string }>(response).catch(() => null);
+                  toast.error(error?.error || 'Error al crear carpeta');
                   return null;
                 }
-                const { carpeta } = await response.json();
+                const { carpeta } = await parseJson<CrearCarpetaResponse>(response);
                 toast.success('Carpeta creada correctamente');
                 return carpeta.id;
               } catch (error) {

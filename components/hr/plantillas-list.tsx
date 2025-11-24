@@ -19,6 +19,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
+import { parseJson } from '@/lib/utils/json';
 
 interface Plantilla {
   id: string;
@@ -34,6 +35,11 @@ interface Plantilla {
   carpetaDestinoDefault: string | null;
   totalDocumentosGenerados?: number;
   createdAt: string;
+}
+
+interface PlantillasResponse {
+  success?: boolean;
+  plantillas?: Plantilla[];
 }
 
 export function PlantillasList() {
@@ -53,7 +59,7 @@ export function PlantillasList() {
     setLoading(true);
     try {
       const res = await fetch('/api/plantillas');
-      const data = await res.json();
+      const data = await parseJson<PlantillasResponse>(res);
 
       if (data.success) {
         setPlantillas(data.plantillas || []);

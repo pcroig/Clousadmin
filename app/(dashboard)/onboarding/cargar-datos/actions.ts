@@ -16,6 +16,7 @@ import { crearInvitacion } from '@/lib/invitaciones';
 import { persistDiasLaborables } from '@/lib/empresa/calendario-laboral';
 import { DEFAULT_JORNADA_FORM_VALUES } from '@/lib/jornadas/defaults';
 import { prisma, Prisma } from '@/lib/prisma';
+import { asJsonValue } from '@/lib/prisma/json';
 import {
   calendarioJornadaOnboardingSchema,
   integracionCreateSchema,
@@ -23,13 +24,6 @@ import {
 } from '@/lib/validaciones/schemas';
 
 
-
-/**
- * Helper function to safely convert values to Prisma JSON input
- */
-function toJsonValue<T extends Record<string, unknown>>(value: T): Prisma.InputJsonValue {
-  return value as unknown as Prisma.InputJsonValue;
-}
 
 type DiaKey = 'lunes' | 'martes' | 'miercoles' | 'jueves' | 'viernes' | 'sabado' | 'domingo';
 
@@ -411,7 +405,7 @@ export async function configurarCalendarioYJornadaAction(input: z.infer<typeof c
       const dataJornada = {
         nombre: normalizedJornada.nombre,
         horasSemanales: normalizedJornada.horasSemanales,
-        config: toJsonValue(configJornada),
+        config: asJsonValue(configJornada),
         esPredefinida: true,
         activa: true,
       };
@@ -503,7 +497,7 @@ export async function configurarIntegracionAction(
       ? await prisma.integracion.update({
           where: { id: existingIntegration.id },
           data: {
-            config: toJsonValue(validatedData.config || {}),
+            config: asJsonValue(validatedData.config || {}),
             activa: true,
           },
         })
@@ -512,7 +506,7 @@ export async function configurarIntegracionAction(
             empresaId: validatedData.empresaId,
             tipo: validatedData.tipo,
             proveedor: validatedData.proveedor,
-            config: toJsonValue(validatedData.config || {}),
+            config: asJsonValue(validatedData.config || {}),
             activa: true,
           },
         });
@@ -565,7 +559,7 @@ export async function invitarHRAdminAction({
       };
     }
 
-    const headersList = headers();
+    const headersList = await headers();
     const origin = headersList.get('origin') ?? undefined;
     const baseUrl = getBaseUrl(origin);
 

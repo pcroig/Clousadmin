@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { UsuarioRol } from '@/lib/constants/enums';
 import { prisma } from '@/lib/prisma';
+import { getJsonBody } from '@/lib/utils/json';
 
 /**
  * GET /api/empresa/politica-ausencias
@@ -69,8 +70,11 @@ export async function PATCH(req: NextRequest) {
       );
     }
 
-    const body = await req.json() as Record<string, any>;
-    const { maxSolapamientoPct, requiereAntelacionDias } = body;
+    const body = await getJsonBody<Record<string, unknown>>(req);
+    const { maxSolapamientoPct, requiereAntelacionDias } = body as {
+      maxSolapamientoPct: number;
+      requiereAntelacionDias: number;
+    };
 
     // Validaciones
     if (

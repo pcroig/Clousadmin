@@ -8,10 +8,8 @@ import { z } from 'zod';
 
 import { getSession } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import {
-  empleadoCompensacionSelect,
-  procesarCompensacionHorasExtra,
-} from '@/lib/services/compensacion-horas';
+import { procesarCompensacionHorasExtra } from '@/lib/services/compensacion-horas';
+import { getJsonBody } from '@/lib/utils/json';
 
 const CompensarHorasMasivoSchema = z.object({
   empleadoIds: z.array(z.string()),
@@ -45,31 +43,19 @@ export async function POST(
       return NextResponse.json({ error: 'Evento no encontrado' }, { status: 404 });
     }
 
-    const body = await req.json() as Record<string, any>;
-    const data = CompensarHorasMasivoSchema.parse(body);
+    const payload = await getJsonBody<Record<string, unknown>>(req);
+    const data = CompensarHorasMasivoSchema.parse(payload);
 
     // Verificar que los empleados pertenecen a la empresa
-    const empleados = await prisma.empleado.findMany({
+    const empleadosValidos = await prisma.empleado.findMany({
       where: {
         id: { in: data.empleadoIds },
         empresaId: session.user.empresaId,
       },
-      select: {
-        ...empleadoCompensacionSelect,
-        saldosAusencias: {
-          where: {
-            anio: evento.anio,
-          },
-          select: {
-            id: true,
-            año: true,
-            diasTotales: true,
-          },
-        },
-      },
+      select: { id: true },
     });
 
-    if (empleados.length !== data.empleadoIds.length) {
+    if (empleadosValidos.length !== data.empleadoIds.length) {
       return NextResponse.json(
         { error: 'Algunos empleados no fueron encontrados' },
         { status: 404 }
@@ -86,7 +72,6 @@ export async function POST(
       usarTodasLasHoras: data.usarTodasLasHoras,
       horasPorEmpleado: data.horasPorEmpleado,
       origen: 'nominas',
-      empleadosPreCargados: empleados,
     });
 
     return NextResponse.json({

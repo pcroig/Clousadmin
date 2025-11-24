@@ -5,6 +5,8 @@
 
 import { Prisma, PrismaClient } from '@prisma/client';
 
+import { JSON_NULL } from '@/lib/prisma/json';
+
 import { EstadoEmpleado } from '@/lib/constants/enums';
 
 type TransactionClient = Omit<
@@ -80,7 +82,7 @@ export async function anonymizeEmpleado(
     },
     firmaGuardada: false,
     firmaS3Key: null,
-    firmaGuardadaData: Prisma.JsonNull,
+    firmaGuardadaData: JSON_NULL,
     documentosCompletos: false,
     documentosCompletadosEn: null,
     onboardingCompletado: false,

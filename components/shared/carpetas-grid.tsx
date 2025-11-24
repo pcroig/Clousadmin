@@ -10,6 +10,8 @@ import { memo } from 'react';
 
 import { CarpetaCard, type CarpetaCardData } from './carpeta-card';
 
+export type { CarpetaCardData };
+
 interface CarpetasGridProps {
   carpetas: CarpetaCardData[];
   onCarpetaClick?: (carpetaId: string) => void;

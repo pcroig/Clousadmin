@@ -16,6 +16,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { EstadoAusencia } from '@/lib/constants/enums';
 import { MOBILE_DESIGN } from '@/lib/constants/mobile-design';
 import { cn } from '@/lib/utils';
+import { getAusenciaEstadoLabel } from '@/lib/utils/formatters';
 
 interface BalanceResumen {
   diario: number;

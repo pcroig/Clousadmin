@@ -12,10 +12,10 @@ import {
   successResponse,
   validateRequest,
 } from '@/lib/api-handler';
-import { prisma } from '@/lib/prisma';
-import { jornadaUpdateSchema } from '@/lib/validaciones/schemas';
-
 import type { JornadaConfig } from '@/lib/calculos/fichajes-helpers';
+import { prisma, Prisma } from '@/lib/prisma';
+import { asJsonValue } from '@/lib/prisma/json';
+import { jornadaUpdateSchema } from '@/lib/validaciones/schemas';
 
 interface Params {
   id: string;
@@ -94,17 +94,13 @@ export async function PATCH(
       return badRequestResponse('No se pueden editar jornadas predefinidas');
     }
 
-    const dataToUpdate: {
-      nombre?: string;
-      horasSemanales?: number;
-      config?: JornadaConfig;
-    } = {
+    const dataToUpdate: Prisma.JornadaUpdateInput = {
       nombre: validatedData.nombre,
       horasSemanales: validatedData.horasSemanales,
     };
 
     if (validatedData.config) {
-      dataToUpdate.config = validatedData.config as JornadaConfig;
+      dataToUpdate.config = asJsonValue(validatedData.config as JornadaConfig);
     }
 
     // Actualizar jornada

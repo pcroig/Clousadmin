@@ -38,7 +38,7 @@ export async function GET(
       motivo: 'derecho_acceso',
     });
 
-    return new NextResponse(excelBuffer, {
+    return new NextResponse(excelBuffer as unknown as BodyInit, {
       headers: {
         'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         'Content-Disposition': `attachment; filename="empleado-${params.id}-datos.xlsx"`,

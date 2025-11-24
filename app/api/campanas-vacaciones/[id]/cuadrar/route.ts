@@ -12,7 +12,8 @@ import {
 } from '@/lib/api-handler';
 import { EstadoAusencia, UsuarioRol } from '@/lib/constants/enums';
 import { cuadrarVacacionesIA } from '@/lib/ia/cuadrar-vacaciones';
-import { prisma, Prisma } from '@/lib/prisma';
+import { prisma } from '@/lib/prisma';
+import { asJsonValue } from '@/lib/prisma/json';
 
 // Force dynamic rendering
 export const dynamic = 'force-dynamic';
@@ -111,7 +112,7 @@ export async function POST(
     await prisma.campanaVacaciones.update({
       where: { id: campanaId },
       data: {
-        propuestaIA: resultado as Prisma.JsonValue,
+        propuestaIA: asJsonValue(resultado),
         estado: 'borrador_generado',
       },
     });
@@ -124,7 +125,7 @@ export async function POST(
           empleadoId: propuesta.empleadoId,
         },
         data: {
-          propuestaIA: propuesta as Prisma.JsonValue,
+          propuestaIA: asJsonValue(propuesta),
         },
       });
     }

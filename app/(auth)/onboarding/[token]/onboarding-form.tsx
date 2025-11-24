@@ -9,7 +9,7 @@ import { ChevronLeft, ChevronRight, Upload, User } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { PWAExplicacion } from '@/components/onboarding/pwa-explicacion';
-import { DocumentList } from '@/components/shared/document-list';
+import { DocumentList, type DocumentListItem } from '@/components/shared/document-list';
 import { DocumentUploader } from '@/components/shared/document-uploader';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -40,18 +40,12 @@ interface OnboardingFormProps {
 
 type PasoClave = 'credenciales' | 'datosPersonales' | 'datosBancarios' | 'documentos' | 'pwa';
 
-interface DocumentoOnboarding {
-  id: string;
-  tipoDocumento: string;
-  nombre: string;
+interface DocumentoOnboarding extends DocumentListItem {
   url?: string;
-  downloadUrl?: string | null;
-  createdAt?: string;
-  s3Key?: string;
 }
 
 type DocumentoRequeridoUI = ConfigDocumentoRequerido & {
-  descripcion?: string | null;
+  descripcion?: string;
   carpetaDestino?: string | null;
 };
 
@@ -89,7 +83,8 @@ function mapDocumentosConfig(
     };
     return {
       ...doc,
-      descripcion: descriptor.descripcion ?? null,
+      // Normalizamos a string | undefined para alinear con el contrato de ConfigDocumentoRequerido
+      descripcion: descriptor.descripcion ?? undefined,
       carpetaDestino: descriptor.carpetaDestino ?? 'Otros',
     };
   });
@@ -401,7 +396,9 @@ export function OnboardingForm({
           const errores: string[] = [];
           Object.entries(data.details).forEach(([campo, mensajes]) => {
             if (Array.isArray(mensajes) && mensajes.length > 0) {
-              mensajes.forEach((msg: string) => {
+              mensajes
+                .filter((mensaje): mensaje is string => typeof mensaje === 'string')
+                .forEach((msg) => {
                 if (campo === 'password') {
                   errores.push(`Contraseña: ${msg}`);
                 } else if (campo === 'confirmPassword') {
@@ -1234,7 +1231,7 @@ export function OnboardingForm({
               {documentosRequeridos.length > 0 && (
                 <div className="space-y-4">
                   <h3 className="font-medium">Documentos requeridos:</h3>
-                  {documentosRequeridos.map((docReq: DocumentoRequerido) => {
+                  {documentosRequeridos.map((docReq: DocumentoRequeridoUI) => {
                     const docSubido = documentos.find((d) =>
                       documentoCumpleRequerimiento(d, docReq)
                     );

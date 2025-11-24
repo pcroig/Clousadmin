@@ -18,7 +18,7 @@ import {
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-
+import { parseJson } from '@/lib/utils/json';
 
 interface DenunciaDialogProps {
   isOpen: boolean;
@@ -66,8 +66,10 @@ export function DenunciaDialog({ isOpen, onClose }: DenunciaDialogProps) {
         toast.success('Denuncia enviada correctamente');
         handleClose();
       } else {
-        const error = await response.json();
-        toast.error(error.message || 'Error al enviar la denuncia');
+        const error = await parseJson<{ error?: string; message?: string }>(response).catch(
+          () => null
+        );
+        toast.error(error?.message || error?.error || 'Error al enviar la denuncia');
       }
     } catch (error) {
       console.error('Error al enviar denuncia:', error);

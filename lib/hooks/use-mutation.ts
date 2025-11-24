@@ -7,6 +7,8 @@
 
 import { useCallback, useState } from 'react';
 
+import { parseJson } from '@/lib/utils/json';
+
 export interface UseMutationOptions<TData, _TVariables> {
   onSuccess?: (data: TData) => void;
   onError?: (error: Error) => void;
@@ -62,11 +64,13 @@ export function useMutation<TData = unknown, TVariables = unknown>(
         });
 
         if (!response.ok) {
-          const errorData = await response.json().catch(() => ({ error: 'Error desconocido' }));
+          const errorData = await parseJson<{ error?: string }>(response).catch(() => ({
+            error: 'Error desconocido',
+          }));
           throw new Error(errorData.error || `HTTP ${response.status}`);
         }
 
-        const data = await response.json();
+        const data = await parseJson<TData>(response);
         setLoading(false);
 
         if (options?.onSuccess) {

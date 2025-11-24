@@ -12,6 +12,7 @@ import { AreaChartComponent } from '@/components/analytics/area-chart';
 import { BarChartComponent } from '@/components/analytics/bar-chart';
 import { AnalyticsFilters, FilterValues } from '@/components/analytics/filters';
 import { KpiCard } from '@/components/analytics/kpi-card';
+import { parseJson } from '@/lib/utils/json';
 
 
 interface PlantillaData {
@@ -68,10 +69,17 @@ export function AnalyticsClient() {
         fetch(`/api/analytics/fichajes?${queryParams}`),
       ]);
 
+      const responses = [plantillaRes, compensacionRes, fichajesRes];
+      for (const res of responses) {
+        if (!res.ok) {
+          throw new Error('Error al obtener datos de analytics');
+        }
+      }
+
       const [plantilla, compensacion, fichajes] = await Promise.all([
-        plantillaRes.json(),
-        compensacionRes.json(),
-        fichajesRes.json(),
+        parseJson<PlantillaData>(plantillaRes),
+        parseJson<CompensacionData>(compensacionRes),
+        parseJson<FichajesData>(fichajesRes),
       ]);
 
       setPlantillaData(plantilla);

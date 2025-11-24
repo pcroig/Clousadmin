@@ -27,6 +27,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
+import { parseJson } from '@/lib/utils/json';
 
 
 interface Campo {
@@ -34,6 +35,41 @@ interface Campo {
   origen: 'nativo' | 'ia';
   tipo?: string;
   confianza?: number;
+}
+
+interface PlantillaIAConfig {
+  camposFusionados?: Campo[];
+  mapeoCampos?: Record<string, string>;
+}
+
+interface PlantillaDetail {
+  configuracionIA?: PlantillaIAConfig;
+  variablesUsadas?: string[];
+}
+
+interface VariablesResponse {
+  success?: boolean;
+  variables?: string[];
+}
+
+interface PlantillaResponse {
+  success?: boolean;
+  plantilla?: PlantillaDetail;
+  error?: string;
+}
+
+interface EscanearCamposResponse {
+  success?: boolean;
+  camposTotal?: number;
+  camposNativos?: number;
+  camposIA?: number;
+  campos?: Campo[];
+  error?: string;
+}
+
+interface GuardarMapeosResponse {
+  success?: boolean;
+  error?: string;
 }
 
 interface MapearCamposModalProps {
@@ -62,7 +98,7 @@ export function MapearCamposModal({
   const cargarVariablesDisponibles = useCallback(async () => {
     try {
       const res = await fetch('/api/plantillas/variables');
-      const data = await res.json();
+      const data = await parseJson<VariablesResponse>(res);
       if (data.success) {
         setVariablesDisponibles(data.variables || []);
       }
@@ -75,7 +111,7 @@ export function MapearCamposModal({
     setLoading(true);
     try {
       const res = await fetch(`/api/plantillas/${plantillaId}`);
-      const data = await res.json();
+      const data = await parseJson<PlantillaResponse>(res);
 
       if (data.success && data.plantilla) {
         const plantilla = data.plantilla;
@@ -119,7 +155,7 @@ export function MapearCamposModal({
       const res = await fetch(`/api/plantillas/${plantillaId}/escanear-campos`, {
         method: 'POST',
       });
-      const data = await res.json();
+      const data = await parseJson<EscanearCamposResponse>(res);
 
       if (data.success) {
         toast.success(
@@ -247,7 +283,7 @@ export function MapearCamposModal({
         }),
       });
 
-      const data = await res.json();
+      const data = await parseJson<GuardarMapeosResponse>(res);
 
       if (data.success) {
         toast.success('Mapeos guardados correctamente');
@@ -294,7 +330,7 @@ export function MapearCamposModal({
               <Button
                 variant="outline"
                 size="sm"
-                onClick={handleAutoMapear}
+                onClick={() => handleAutoMapear()}
                 disabled={campos.length === 0}
               >
                 <Wand2 className="h-4 w-4 mr-2" />

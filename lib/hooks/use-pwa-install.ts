@@ -13,7 +13,8 @@ function isStandalone(): boolean {
   if (typeof window === 'undefined') {
     return false;
   }
-  return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+  const nav = window.navigator as Navigator & { standalone?: boolean };
+  return window.matchMedia('(display-mode: standalone)').matches || nav.standalone === true;
 }
 
 export function usePWAInstallPrompt() {

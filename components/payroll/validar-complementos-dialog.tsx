@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-
+import { parseJson } from '@/lib/utils/json';
 
 interface Complemento {
   id: string;
@@ -52,10 +52,23 @@ interface Stats {
   variables: number;
 }
 
+type FiltroEstado = 'todos' | 'pendientes' | 'validados' | 'rechazados' | 'variables';
+
 interface ValidarComplementosDialogProps {
   isOpen: boolean;
   onClose: () => void;
   eventoId: string;
+}
+
+interface ComplementosResponse {
+  complementos?: Complemento[];
+  stats?: Stats;
+  error?: string;
+}
+
+interface ValidarResponse {
+  complementosActualizados?: number;
+  error?: string;
 }
 
 export function ValidarComplementosDialog({
@@ -68,7 +81,7 @@ export function ValidarComplementosDialog({
   const [loading, setLoading] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [searchTerm, setSearchTerm] = useState('');
-  const [filtroEstado, setFiltroEstado] = useState<'todos' | 'pendientes' | 'validados' | 'rechazados' | 'variables'>('pendientes');
+  const [filtroEstado, setFiltroEstado] = useState<FiltroEstado>('pendientes');
   const [showRechazarModal, setShowRechazarModal] = useState(false);
   const [motivoRechazo, setMotivoRechazo] = useState('');
   const [procesando, setProcesando] = useState(false);
@@ -77,17 +90,17 @@ export function ValidarComplementosDialog({
     setLoading(true);
     try {
       const response = await fetch(`/api/nominas/eventos/${eventoId}/complementos-pendientes`);
-      const data = await response.json();
+      const data = await parseJson<ComplementosResponse>(response);
 
-      if (response.ok) {
-        setComplementos(data.complementos || []);
-        setStats(data.stats || null);
-      } else {
-        toast.error(data.error || 'Error al cargar complementos');
+      if (!response.ok) {
+        throw new Error(data.error || 'Error al cargar complementos');
       }
+
+      setComplementos(data.complementos || []);
+      setStats(data.stats || null);
     } catch (error) {
       console.error('Error fetching complementos:', error);
-      toast.error('Error al cargar complementos');
+      toast.error(error instanceof Error ? error.message : 'Error al cargar complementos');
     } finally {
       setLoading(false);
     }
@@ -159,18 +172,18 @@ export function ValidarComplementosDialog({
         }),
       });
 
-      const data = await response.json();
+      const data = await parseJson<ValidarResponse>(response);
 
-      if (response.ok) {
-        toast.success(`${data.complementosActualizados} complemento(s) validado(s)`);
-        setSelectedIds(new Set());
-        await fetchComplementos();
-      } else {
-        toast.error(data.error || 'Error al validar complementos');
+      if (!response.ok) {
+        throw new Error(data.error || 'Error al validar complementos');
       }
+
+      toast.success(`${data.complementosActualizados ?? 0} complemento(s) validado(s)`);
+      setSelectedIds(new Set());
+      await fetchComplementos();
     } catch (error) {
       console.error('Error validando complementos:', error);
-      toast.error('Error al validar complementos');
+      toast.error(error instanceof Error ? error.message : 'Error al validar complementos');
     } finally {
       setProcesando(false);
     }
@@ -199,20 +212,20 @@ export function ValidarComplementosDialog({
         }),
       });
 
-      const data = await response.json();
+      const data = await parseJson<ValidarResponse>(response);
 
-      if (response.ok) {
-        toast.success(`${data.complementosActualizados} complemento(s) rechazado(s)`);
-        setSelectedIds(new Set());
-        setShowRechazarModal(false);
-        setMotivoRechazo('');
-        await fetchComplementos();
-      } else {
-        toast.error(data.error || 'Error al rechazar complementos');
+      if (!response.ok) {
+        throw new Error(data.error || 'Error al rechazar complementos');
       }
+
+      toast.success(`${data.complementosActualizados ?? 0} complemento(s) rechazado(s)`);
+      setSelectedIds(new Set());
+      setShowRechazarModal(false);
+      setMotivoRechazo('');
+      await fetchComplementos();
     } catch (error) {
       console.error('Error rechazando complementos:', error);
-      toast.error('Error al rechazar complementos');
+      toast.error(error instanceof Error ? error.message : 'Error al rechazar complementos');
     } finally {
       setProcesando(false);
     }
@@ -266,7 +279,10 @@ export function ValidarComplementosDialog({
                 className="pl-10"
               />
             </div>
-            <Select value={filtroEstado} onValueChange={(value: string) => setFiltroEstado(value)}>
+            <Select
+              value={filtroEstado}
+              onValueChange={(value: FiltroEstado) => setFiltroEstado(value)}
+            >
               <SelectTrigger className="w-48">
                 <SelectValue />
               </SelectTrigger>

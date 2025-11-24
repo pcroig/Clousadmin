@@ -7,9 +7,8 @@
  * 3. El PDF resultante puede tener campos rellenables adicionales
  */
 
-import { Prisma } from '@prisma/client';
-
 import { prisma } from '@/lib/prisma';
+import { asJsonValue } from '@/lib/prisma/json';
 
 import { convertDocxFromS3ToPdf } from './docx-to-pdf';
 import { generarDocumentoDesdePlantilla } from './generar-documento';
@@ -76,7 +75,11 @@ export async function generarDocumentoHibrido(
     // 2. Convertir DOCX a PDF
     console.log(`[Híbrido] Convirtiendo DOCX a PDF...`);
 
-    const { pdfS3Key } = await convertDocxFromS3ToPdf(resultadoDOCX.s3Key!);
+    if (!resultadoDOCX.s3Key) {
+      throw new Error('El documento generado no incluye la clave S3 del DOCX original');
+    }
+
+    const { pdfS3Key } = await convertDocxFromS3ToPdf(resultadoDOCX.s3Key);
 
     // 3. Actualizar registro del documento con el PDF
     const documento = await prisma.documento.update({
@@ -177,12 +180,12 @@ export async function crearPlantillaHibridaConfig(
     where: { id: plantillaId },
     data: {
       tipo: 'hibrida',
-      configuracionIA: {
+      configuracionIA: asJsonValue({
         esHibrida: true,
         variablesAResolver: config.variablesAResolver,
         camposADejar: config.camposADejar,
         configuradoEn: new Date().toISOString(),
-      } as Prisma.InputJsonValue,
+      }),
     },
   });
 

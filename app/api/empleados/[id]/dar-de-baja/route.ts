@@ -47,7 +47,7 @@ export async function POST(
     if (!validation.success) {
       return successResponse(
         { error: 'Datos inválidos', details: validation.error.issues },
-        { status: 400 }
+        400
       );
     }
 
@@ -87,7 +87,7 @@ export async function POST(
     if (empleado.estadoEmpleado === 'baja') {
       return successResponse(
         { error: 'El empleado ya está dado de baja' },
-        { status: 400 }
+        400
       );
     }
 
@@ -98,7 +98,7 @@ export async function POST(
     if (fechaFin < fechaAlta) {
       return successResponse(
         { error: 'La fecha de finalización no puede ser anterior a la fecha de alta del empleado' },
-        { status: 400 }
+        400
       );
     }
 

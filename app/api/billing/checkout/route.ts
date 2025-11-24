@@ -26,12 +26,13 @@ export async function POST(request: NextRequest) {
   try {
     // Verificar autenticación
     const session = await getSession();
-    if (!session) {
+    if (!session || !session.user) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
+    const { user } = session;
 
     // Solo HR Admin puede gestionar billing
-    if (session.rol !== 'hr_admin' && session.rol !== 'platform_admin') {
+    if (user.rol !== 'hr_admin' && user.rol !== 'platform_admin') {
       return NextResponse.json({ error: 'Permisos insuficientes' }, { status: 403 });
     }
 
@@ -44,7 +45,7 @@ export async function POST(request: NextRequest) {
 
     // Obtener datos de la empresa
     const empresa = await prisma.empresa.findUnique({
-      where: { id: session.empresaId },
+      where: { id: user.empresaId },
       select: { id: true, nombre: true, email: true },
     });
 
@@ -56,7 +57,7 @@ export async function POST(request: NextRequest) {
     const checkoutSession = await createCheckoutSession({
       empresaId: empresa.id,
       priceId,
-      email: empresa.email || session.email,
+      email: empresa.email || user.email,
       nombreEmpresa: empresa.nombre,
     });
 

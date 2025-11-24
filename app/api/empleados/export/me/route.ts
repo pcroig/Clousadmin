@@ -44,7 +44,7 @@ export async function GET(request: NextRequest) {
 
     const today = new Date().toISOString().split('T')[0];
 
-    return new NextResponse(excelBuffer, {
+    return new NextResponse(excelBuffer as unknown as BodyInit, {
       headers: {
         'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         'Content-Disposition': `attachment; filename="datos-personales-${today}.xlsx"`,

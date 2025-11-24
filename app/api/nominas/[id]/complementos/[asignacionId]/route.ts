@@ -10,6 +10,7 @@ import { z } from 'zod';
 import { getSession } from '@/lib/auth';
 import { NOMINA_ESTADOS } from '@/lib/constants/nomina-estados';
 import { prisma } from '@/lib/prisma';
+import { getJsonBody } from '@/lib/utils/json';
 
 const UpdateAsignacionSchema = z.object({
   importe: z.number().positive().optional(),
@@ -31,8 +32,8 @@ export async function PATCH(
     }
 
     const { id, asignacionId } = await params;
-    const body = await req.json() as Record<string, any>;
-    const data = UpdateAsignacionSchema.parse(body);
+    const payload = await getJsonBody<Record<string, unknown>>(req);
+    const data = UpdateAsignacionSchema.parse(payload);
 
     // Verificar que la asignación existe y pertenece a la nómina
     const asignacion = await prisma.asignacionComplemento.findFirst({

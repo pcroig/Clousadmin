@@ -12,7 +12,6 @@ export interface Empleado {
   apellidos: string;
   email: string;
   nif?: string | null;
-  numeroSeguridadSocial?: string | null;
   nss?: string | null;
   telefono?: string | null;
   direccion?: string | null;

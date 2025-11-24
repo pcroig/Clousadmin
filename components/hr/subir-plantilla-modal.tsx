@@ -13,11 +13,18 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
+import { parseJson } from '@/lib/utils/json';
 
 interface SubirPlantillaModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess?: () => void;
+}
+
+interface UploadPlantillaResponse {
+  success?: boolean;
+  error?: string;
+  tip?: string;
 }
 
 export function SubirPlantillaModal({
@@ -77,7 +84,7 @@ export function SubirPlantillaModal({
         body: formData,
       });
 
-      const data = await res.json();
+      const data = await parseJson<UploadPlantillaResponse>(res);
 
       if (data.success) {
         setSuccess('Plantilla subida correctamente. Variables detectadas automáticamente.');

@@ -3,8 +3,9 @@
 // ========================================
 
 import { existsSync } from 'fs';
-import { mkdir, writeFile } from 'fs/promises';
+import { mkdir, writeFile, unlink } from 'fs/promises';
 import { Readable } from 'node:stream';
+import type { ReadableStream as NodeReadableStream } from 'stream/web';
 import { join } from 'path';
 
 import { revalidatePath } from 'next/cache';
@@ -23,7 +24,7 @@ import {
 } from '@/lib/documentos';
 import { prisma, Prisma } from '@/lib/prisma';
 import { getClientIP, rateLimitApiWrite } from '@/lib/rate-limit';
-import { shouldUseCloudStorage, uploadToS3 } from '@/lib/s3';
+import { deleteFromS3, shouldUseCloudStorage, uploadToS3 } from '@/lib/s3';
 import { sanitizeFileName } from '@/lib/utils/file-helpers';
 import {
   buildPaginationMeta,
@@ -212,7 +213,7 @@ export async function POST(request: NextRequest) {
     // Convertir File a Buffer
     const useCloudStorage = shouldUseCloudStorage();
     const bodyForStorage = useCloudStorage
-      ? Readable.fromWeb(file.stream() as unknown as ReadableStream)
+      ? Readable.fromWeb(file.stream() as unknown as NodeReadableStream)
       : Buffer.from(await file.arrayBuffer());
 
     // Generar ruta de storage

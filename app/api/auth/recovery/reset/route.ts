@@ -9,6 +9,7 @@ import {
 } from '@/lib/auth';
 import { sendPasswordResetConfirmationEmail } from '@/lib/emails/password-recovery';
 import { prisma } from '@/lib/prisma';
+import { getJsonBody } from '@/lib/utils/json';
 
 const resetSchema = z.object({
   token: z.string().min(1),
@@ -19,7 +20,7 @@ const resetSchema = z.object({
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json() as Record<string, any>;
+    const body = await getJsonBody<Record<string, unknown>>(req);
     const { token, password } = resetSchema.parse(body);
 
     const validation = await validateRecoveryToken(token);

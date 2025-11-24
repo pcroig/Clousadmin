@@ -88,10 +88,17 @@ export async function POST(request: NextRequest) {
         );
 
         // Clasificar solicitud con IA
+        const camposCambiados =
+          solicitud.camposCambiados &&
+          typeof solicitud.camposCambiados === 'object' &&
+          !Array.isArray(solicitud.camposCambiados)
+            ? (solicitud.camposCambiados as Record<string, unknown>)
+            : {};
+
         const clasificacion = await clasificarSolicitud({
           id: solicitud.id,
           tipo: solicitud.tipo,
-          camposCambiados: solicitud.camposCambiados,
+          camposCambiados,
           motivo: solicitud.motivo || undefined,
           empleado: {
             nombre: solicitud.empleado.nombre,
@@ -151,13 +158,8 @@ export async function POST(request: NextRequest) {
             });
 
             // Aplicar cambios al empleado con validación y cifrado
-            if (solicitud.camposCambiados && typeof solicitud.camposCambiados === 'object') {
-              await aplicarCambiosSolicitud(
-                tx,
-                solicitud.id,
-                solicitud.empleadoId,
-                solicitud.camposCambiados as Record<string, unknown>
-              );
+            if (Object.keys(camposCambiados).length > 0) {
+              await aplicarCambiosSolicitud(tx, solicitud.id, solicitud.empleadoId, camposCambiados);
             }
           });
 

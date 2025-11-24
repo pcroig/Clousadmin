@@ -14,6 +14,7 @@ import { UsuarioRol } from '@/lib/constants/enums';
 import { MOBILE_DESIGN } from '@/lib/constants/mobile-design';
 import { type SensitiveFieldKey, useSensitiveUnlock } from '@/lib/hooks/useSensitiveUnlock';
 import { cn } from '@/lib/utils';
+import { parseJson } from '@/lib/utils/json';
 
 import type { MiEspacioEmpleado, Usuario } from '@/types/empleado';
 
@@ -318,8 +319,8 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado', onFieldUpdate,
         });
 
         if (!response.ok) {
-          const error = await response.json();
-          toast.error(error.error || 'Error al enviar solicitud');
+          const error = await parseJson<{ error?: string }>(response).catch(() => null);
+          toast.error(error?.error || 'Error al enviar solicitud');
           return;
         }
 
@@ -352,8 +353,8 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado', onFieldUpdate,
         });
 
         if (!response.ok) {
-          const error = await response.json();
-          toast.error(error.error || 'Error al guardar cambios');
+          const error = await parseJson<{ error?: string }>(response).catch(() => null);
+          toast.error(error?.error || 'Error al guardar cambios');
           return;
         }
 

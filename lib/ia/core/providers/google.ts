@@ -10,6 +10,7 @@ import {
   AIMessage,
   AIProvider,
   AIResponse,
+  JsonValue,
   MessageRole,
   ModelConfig,
 } from '../types';
@@ -124,6 +125,25 @@ function convertMessagesToGoogle(messages: AIMessage[]): {
   };
 }
 
+function mapFinishReason(
+  reason: string | null | undefined
+): 'stop' | 'length' | 'content_filter' | 'tool_calls' | null {
+  switch (reason) {
+    case 'stop':
+      return 'stop';
+    case 'max_tokens':
+    case 'length':
+      return 'length';
+    case 'safety':
+    case 'content_filter':
+      return 'content_filter';
+    case 'tool_calls':
+      return 'tool_calls';
+    default:
+      return null;
+  }
+}
+
 /**
  * Convierte respuesta de Google AI a formato unificado
  */
@@ -133,6 +153,10 @@ function convertGoogleResponse(response: GoogleGenerateContentResponse, model: s
     candidate?.content?.parts
       ?.map((part) => ('text' in part && typeof part.text === 'string' ? part.text : ''))
       .join('') || '';
+  const finishReason = mapFinishReason(candidate?.finishReason?.toLowerCase());
+  const safetyRatings = candidate?.safetyRatings
+    ? (JSON.parse(JSON.stringify(candidate.safetyRatings)) as JsonValue)
+    : undefined;
   
   return {
     id: `google-${Date.now()}`,
@@ -145,7 +169,7 @@ function convertGoogleResponse(response: GoogleGenerateContentResponse, model: s
           role: MessageRole.ASSISTANT,
           content: text,
         },
-        finishReason: candidate?.finishReason?.toLowerCase() || 'stop',
+        finishReason: finishReason ?? 'stop',
       },
     ],
     usage: response.response.usageMetadata ? {
@@ -154,9 +178,11 @@ function convertGoogleResponse(response: GoogleGenerateContentResponse, model: s
       totalTokens: response.response.usageMetadata.totalTokenCount || 0,
     } : undefined,
     created: Date.now() / 1000,
-    metadata: {
-      safetyRatings: candidate?.safetyRatings,
-    },
+    metadata: safetyRatings
+      ? {
+          safetyRatings,
+        }
+      : undefined,
   };
 }
 

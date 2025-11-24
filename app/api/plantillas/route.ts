@@ -11,6 +11,7 @@ import { getSession } from '@/lib/auth';
 import { extraerVariablesDePlantilla } from '@/lib/plantillas';
 import { sanitizarNombreArchivo } from '@/lib/plantillas/sanitizar';
 import { prisma } from '@/lib/prisma';
+import { asJsonValue } from '@/lib/prisma/json';
 import { subirDocumento } from '@/lib/s3';
 
 /**
@@ -33,7 +34,7 @@ export async function GET(request: NextRequest) {
     const autoOffboarding = searchParams.get('autoOffboarding');
 
     // Filtros
-    const where: Prisma.PlantillaWhereInput = {
+    const where: Prisma.PlantillaDocumentoWhereInput = {
       OR: [
         { empresaId: session.user.empresaId }, // Plantillas de la empresa
         { empresaId: null }, // Plantillas oficiales
@@ -195,7 +196,7 @@ export async function POST(request: NextRequest) {
         formato,
         s3Key,
         s3Bucket: process.env.STORAGE_BUCKET || 'clousadmin-documents',
-        variablesUsadas: variablesUsadas as Prisma.InputJsonValue,
+        variablesUsadas: asJsonValue(variablesUsadas),
         carpetaDestinoDefault,
         requiereContrato,
         requiereFirma,

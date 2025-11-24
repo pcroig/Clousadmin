@@ -6,7 +6,16 @@ import { NextRequest } from 'next/server';
 
 import { badRequestResponse, handleApiError, requireAuth, successResponse } from '@/lib/api-handler';
 import { crearNotificacionCampanaCompletada } from '@/lib/notificaciones';
-import { prisma, Prisma } from '@/lib/prisma';
+import { prisma } from '@/lib/prisma';
+import { asJsonValue } from '@/lib/prisma/json';
+import { getJsonBody } from '@/lib/utils/json';
+
+interface PreferenciaPayload {
+  diasIdeales?: unknown;
+  diasPrioritarios?: unknown;
+  diasAlternativos?: unknown;
+  completada?: unknown;
+}
 
 export const dynamic = 'force-dynamic';
 
@@ -66,7 +75,7 @@ export async function PATCH(
     const { session } = authResult;
 
     const { id: campanaId } = await params;
-    const body = await req.json() as Record<string, any>;
+    const body = await getJsonBody<PreferenciaPayload>(req);
 
     // Obtener empleado del usuario
     const empleado = await prisma.empleado.findFirst({
@@ -80,9 +89,12 @@ export async function PATCH(
       return badRequestResponse('Empleado no encontrado');
     }
 
-    const diasIdeales = Array.isArray(body.diasIdeales) ? body.diasIdeales : [];
-    const diasPrioritarios = Array.isArray(body.diasPrioritarios) ? body.diasPrioritarios : [];
-    const diasAlternativos = Array.isArray(body.diasAlternativos) ? body.diasAlternativos : [];
+    const toStringArray = (value: unknown): string[] =>
+      Array.isArray(value) ? value.map((entry) => String(entry)) : [];
+
+    const diasIdeales = toStringArray(body.diasIdeales);
+    const diasPrioritarios = toStringArray(body.diasPrioritarios);
+    const diasAlternativos = toStringArray(body.diasAlternativos);
 
     // Validar datos
     if (diasIdeales.length === 0 && diasPrioritarios.length === 0 && diasAlternativos.length === 0) {
@@ -113,10 +125,13 @@ export async function PATCH(
     const preferenciaActualizada = await prisma.preferenciaVacaciones.update({
       where: { id: preferenciaExistente.id },
       data: {
-        diasIdeales: diasIdeales as unknown as Prisma.InputJsonValue,
-        diasPrioritarios: diasPrioritarios as unknown as Prisma.InputJsonValue,
-        diasAlternativos: diasAlternativos as unknown as Prisma.InputJsonValue,
-        completada: body.completada !== undefined ? body.completada : preferenciaExistente.completada,
+        diasIdeales: asJsonValue(diasIdeales),
+        diasPrioritarios: asJsonValue(diasPrioritarios),
+        diasAlternativos: asJsonValue(diasAlternativos),
+        completada:
+          typeof body.completada === 'boolean'
+            ? body.completada
+            : preferenciaExistente.completada,
       },
     });
 

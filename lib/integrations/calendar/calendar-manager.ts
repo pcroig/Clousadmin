@@ -5,7 +5,8 @@
 
 import { getGoogleCalendarOAuthConfig } from "@/lib/oauth/config";
 import { OAuthManager } from "@/lib/oauth/oauth-manager";
-import { prisma, Prisma } from "@/lib/prisma";
+import { prisma } from "@/lib/prisma";
+import { asJsonValue } from "@/lib/prisma/json";
 
 import {
   ausenciaToCalendarEvent,
@@ -174,7 +175,7 @@ export class CalendarManager {
 
         await prisma.integracion.update({
           where: { id: integracionId },
-          data: { config: updatedConfig as Prisma.InputJsonValue },
+          data: { config: asJsonValue(updatedConfig) },
         });
       }
 
@@ -258,10 +259,10 @@ export class CalendarManager {
           await prisma.integracion.update({
             where: { id: integracion.id },
             data: {
-              config: {
+              config: asJsonValue({
                 ...restConfig,
                 ausenciaEventMap,
-              } as Prisma.InputJsonValue,
+              }),
             },
           });
         } catch (error) {

@@ -9,7 +9,7 @@ import { promises as fs } from 'fs';
 import { Readable } from 'node:stream';
 import path from 'path';
 
-import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { DeleteObjectCommand, GetObjectCommand, ObjectCannedACL, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
 
@@ -123,7 +123,7 @@ async function ensureBuffer(body: UploadBody): Promise<Buffer> {
   if (body instanceof Uint8Array) return Buffer.from(body);
   if (isReadable(body)) {
     const chunks: Buffer[] = [];
-    for await (const chunk of body) {
+    for await (const chunk of body as AsyncIterable<Uint8Array>) {
       chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
     }
     return Buffer.concat(chunks);
@@ -184,7 +184,7 @@ async function deleteFromLocal(key: string): Promise<void> {
  * @returns The full URL of the uploaded file (Object Storage or local)
  */
 type UploadOptions = {
-  acl?: 'private' | 'public-read';
+  acl?: ObjectCannedACL;
   cacheControl?: string;
   contentDisposition?: string;
 };
@@ -208,13 +208,16 @@ export async function uploadToS3(
   }
 
   try {
+    const envAcl = process.env.STORAGE_DEFAULT_ACL as ObjectCannedACL | undefined;
+    const acl: ObjectCannedACL = options?.acl ?? envAcl ?? 'private';
+
     await s3Client.send(
       new PutObjectCommand({
         Bucket: BUCKET_NAME,
         Key: key,
         Body: file,
         ContentType: contentType,
-        ACL: options?.acl ?? process.env.STORAGE_DEFAULT_ACL ?? 'private',
+        ACL: acl,
         CacheControl: options?.cacheControl,
         ContentDisposition: options?.contentDisposition,
       })
@@ -326,7 +329,7 @@ export async function downloadFromS3(key: string): Promise<Buffer> {
       // Type guard para verificar que es iterable
       const body = response.Body as { [Symbol.asyncIterator]?: () => AsyncIterableIterator<Uint8Array> };
       if (body[Symbol.asyncIterator]) {
-        for await (const chunk of body) {
+        for await (const chunk of body as AsyncIterable<Uint8Array>) {
           chunks.push(chunk);
         }
       } else {
@@ -434,7 +437,7 @@ export async function descargarDocumento(key: string): Promise<Buffer> {
       // Type guard para verificar que es iterable
       const body = response.Body as { [Symbol.asyncIterator]?: () => AsyncIterableIterator<Uint8Array> };
       if (body[Symbol.asyncIterator]) {
-        for await (const chunk of body) {
+        for await (const chunk of body as AsyncIterable<Uint8Array>) {
           chunks.push(chunk);
         }
       } else {

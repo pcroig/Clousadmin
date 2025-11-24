@@ -8,6 +8,7 @@ import { z } from 'zod';
 
 import { getSession } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { getJsonBody } from '@/lib/utils/json';
 
 const AsignarComplementoSchema = z.object({
   tipoComplementoId: z.string().uuid(),
@@ -71,7 +72,7 @@ export async function GET(
         },
       },
       orderBy: {
-        fechaAsignacion: 'desc',
+        createdAt: 'desc',
       },
     });
 
@@ -107,7 +108,7 @@ export async function POST(
       return NextResponse.json({ error: 'Acceso denegado' }, { status: 403 });
     }
 
-    const body = await req.json() as Record<string, any>;
+    const body = await getJsonBody<Record<string, unknown>>(req);
     const data = AsignarComplementoSchema.parse(body);
 
     // Verificar que el empleado pertenece a la empresa

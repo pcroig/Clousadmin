@@ -13,6 +13,7 @@ import {
   successResponse,
 } from '@/lib/api-handler';
 import { prisma } from '@/lib/prisma';
+import { getJsonBody } from '@/lib/utils/json';
 
 // Schema de validación
 const politicaSchema = z.object({
@@ -94,8 +95,8 @@ export async function PUT(
       return notFoundResponse('Equipo no encontrado');
     }
 
-    const body = await req.json() as Record<string, any>;
-    const validationResult = politicaSchema.safeParse(body);
+    const payload = await getJsonBody<Record<string, unknown>>(req);
+    const validationResult = politicaSchema.safeParse(payload);
 
     if (!validationResult.success) {
       return badRequestResponse(

@@ -151,35 +151,42 @@ export default async function ManagerBandejaEntradaPage(props: {
   });
 
   // Combinar solicitudes pendientes
-  const solicitudesPendientes = [
-    ...ausenciasPendientes.map((aus) => ({
+  type SolicitudPendiente = Parameters<
+    typeof BandejaEntradaTabs
+  >[0]['solicitudesPendientes'][number];
+  type SolicitudResuelta = Parameters<
+    typeof BandejaEntradaTabs
+  >[0]['solicitudesResueltas'][number];
+
+  const solicitudesPendientes: SolicitudPendiente[] = [
+    ...ausenciasPendientes.map<SolicitudPendiente>((aus) => ({
       id: aus.id,
       empleado: {
         nombre: aus.empleado.nombre,
         apellidos: aus.empleado.apellidos,
         fotoUrl: aus.empleado.fotoUrl || undefined,
       },
-      tipo: 'ausencia' as const,
+      tipo: 'ausencia',
       detalles: `Solicitud de ${aus.tipo}`,
       fechaCreacion: aus.createdAt,
-      estado: EstadoAusencia.pendiente as const,
+      estado: EstadoAusencia.pendiente,
       metadata: {
         tipoAusencia: aus.tipo,
         fechaInicio: aus.fechaInicio,
         fechaFin: aus.fechaFin,
       },
     })),
-    ...solicitudesCambioPendientes.map((sol) => ({
+    ...solicitudesCambioPendientes.map<SolicitudPendiente>((sol) => ({
       id: sol.id,
       empleado: {
         nombre: sol.empleado.nombre,
         apellidos: sol.empleado.apellidos,
         fotoUrl: sol.empleado.fotoUrl || undefined,
       },
-      tipo: 'cambio_datos' as const,
+      tipo: 'cambio_datos',
       detalles: `Solicitud de cambio de ${sol.tipo}`,
       fechaCreacion: sol.createdAt,
-      estado: EstadoAusencia.pendiente as const,
+      estado: EstadoAusencia.pendiente,
       metadata: {
         tipoCambioDatos: sol.tipo,
         camposCambiados: sol.camposCambiados as Record<string, unknown>,
@@ -188,15 +195,15 @@ export default async function ManagerBandejaEntradaPage(props: {
   ].sort((a, b) => b.fechaCreacion.getTime() - a.fechaCreacion.getTime());
 
   // Combinar solicitudes resueltas
-  const solicitudesResueltas = [
-    ...ausenciasResueltas.map((aus) => ({
+  const solicitudesResueltas: SolicitudResuelta[] = [
+    ...ausenciasResueltas.map<SolicitudResuelta>((aus) => ({
       id: aus.id,
       empleado: {
         nombre: aus.empleado.nombre,
         apellidos: aus.empleado.apellidos,
         fotoUrl: aus.empleado.fotoUrl || undefined,
       },
-      tipo: 'ausencia' as const,
+      tipo: 'ausencia',
       detalles: `Solicitud de ${aus.tipo}`,
       fechaCreacion: aus.createdAt,
       estado: aus.estado,
@@ -207,14 +214,14 @@ export default async function ManagerBandejaEntradaPage(props: {
         fechaFin: aus.fechaFin,
       },
     })),
-    ...solicitudesCambioResueltas.map((sol) => ({
+    ...solicitudesCambioResueltas.map<SolicitudResuelta>((sol) => ({
       id: sol.id,
       empleado: {
         nombre: sol.empleado.nombre,
         apellidos: sol.empleado.apellidos,
         fotoUrl: sol.empleado.fotoUrl || undefined,
       },
-      tipo: 'cambio_datos' as const,
+      tipo: 'cambio_datos',
       detalles: `Solicitud de cambio de ${sol.tipo}`,
       fechaCreacion: sol.createdAt,
       estado:

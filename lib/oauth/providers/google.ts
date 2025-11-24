@@ -5,12 +5,22 @@
 
 import { OAuth2Client } from "google-auth-library";
 
+import { parseJson } from "@/lib/utils/json";
+
 import type {
   OAuthConfig,
   OAuthProvider,
   OAuthTokens,
   OAuthUserInfo,
 } from "../types";
+
+interface GoogleUserInfoResponse {
+  id: string;
+  email: string;
+  name?: string;
+  picture?: string;
+  verified_email?: boolean;
+}
 
 export class GoogleOAuthProvider implements OAuthProvider {
   name = "google" as const;
@@ -113,7 +123,7 @@ export class GoogleOAuthProvider implements OAuthProvider {
         throw new Error("Failed to fetch user info from Google");
       }
 
-      const data = await response.json();
+      const data = await parseJson<GoogleUserInfoResponse>(response);
 
       // Validar que tengamos datos mínimos requeridos
       if (!data.id) {

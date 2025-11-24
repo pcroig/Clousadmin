@@ -12,6 +12,7 @@ import {
   NOMINA_ESTADOS,
 } from '@/lib/constants/nomina-estados';
 import { prisma } from '@/lib/prisma';
+import { getJsonBody } from '@/lib/utils/json';
 
 const UpdateEventoSchema = z.object({
   estado: z.enum([EVENTO_ESTADOS.ABIERTO, EVENTO_ESTADOS.CERRADO]).optional(),
@@ -128,8 +129,8 @@ export async function PATCH(
 
     const { id } = await params;
 
-    const body = await req.json() as Record<string, any>;
-    const data = UpdateEventoSchema.parse(body);
+    const payload = await getJsonBody<Record<string, unknown>>(req);
+    const data = UpdateEventoSchema.parse(payload);
 
     // Verificar que el evento pertenece a la empresa
     const evento = await prisma.eventoNomina.findFirst({

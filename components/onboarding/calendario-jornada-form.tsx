@@ -15,6 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { parseJson } from '@/lib/utils/json';
 
 import type { DiasLaborables } from '@/lib/calculos/dias-laborables';
 import { DIAS_LABORABLES_DEFAULT } from '@/lib/calculos/dias-laborables';
@@ -39,6 +40,25 @@ interface CalendarioJornadaFormProps {
 
 export interface CalendarioJornadaFormHandle {
   guardar: () => Promise<boolean>;
+}
+
+interface CalendarioResponse {
+  diasLaborables?: Partial<DiasLaborables>;
+}
+
+interface JornadaLite {
+  id: string;
+  nombre: string;
+  esPredefinida?: boolean;
+  horasSemanales?: number | string;
+  config?: Record<string, unknown>;
+}
+
+interface JornadaConfigData extends Record<string, unknown> {
+  tipo?: string;
+  limiteInferior?: string;
+  limiteSuperior?: string;
+  lunes?: Record<string, unknown>;
 }
 
 export const CalendarioJornadaForm = forwardRef<
@@ -78,7 +98,7 @@ export const CalendarioJornadaForm = forwardRef<
         ]);
 
         if (isMounted && calendarioRes.ok) {
-          const data = await calendarioRes.json();
+          const data = await parseJson<CalendarioResponse>(calendarioRes);
           if (data?.diasLaborables) {
             setDiasLaborables((prev) => ({
               ...prev,
@@ -88,8 +108,12 @@ export const CalendarioJornadaForm = forwardRef<
         }
 
         if (isMounted && jornadasRes.ok) {
-          const data = await jornadasRes.json();
-          const lista = Array.isArray(data) ? data : [];
+          const data = await parseJson<JornadaLite[] | { jornadas?: JornadaLite[] }>(jornadasRes);
+          const lista: JornadaLite[] = Array.isArray(data)
+            ? data
+            : Array.isArray(data?.jornadas)
+              ? data.jornadas ?? []
+              : [];
           const predefinida = lista.find((j) => j.esPredefinida);
 
           if (predefinida) {
@@ -97,15 +121,17 @@ export const CalendarioJornadaForm = forwardRef<
             const horas = Number(predefinida.horasSemanales ?? 40);
             setHorasSemanales(Number.isNaN(horas) ? '40' : horas.toString());
 
-            const config = (predefinida.config || {}) as Record<string, unknown>;
+            const config = (predefinida.config ?? {}) as JornadaConfigData;
             const nuevoTipo = config.tipo === 'fija' ? 'fija' : 'flexible';
             setTipo(nuevoTipo);
 
             const updatedDias: DiasLaborables = createDefaultDias();
             DIA_LABELS.forEach(({ key }) => {
               const diaConfig = config[key];
-              if (diaConfig && typeof diaConfig === 'object' && 'activo' in (diaConfig as Record<string, unknown>)) {
-                updatedDias[key] = Boolean((diaConfig as Record<string, unknown>).activo);
+              if (diaConfig && typeof diaConfig === 'object' && 'activo' in diaConfig) {
+                updatedDias[key] = Boolean(
+                  (diaConfig as { activo?: unknown }).activo
+                );
               }
             });
             setDiasLaborables(updatedDias);
@@ -118,7 +144,7 @@ export const CalendarioJornadaForm = forwardRef<
                 setLimiteSuperior(config.limiteSuperior);
               }
             } else {
-              const diaReferencia = config.lunes as Record<string, unknown> | undefined;
+              const diaReferencia = config.lunes as { entrada?: unknown; salida?: unknown } | undefined;
               if (diaReferencia?.entrada && typeof diaReferencia.entrada === 'string') {
                 setHoraEntrada(diaReferencia.entrada);
               }

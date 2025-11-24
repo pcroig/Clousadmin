@@ -18,8 +18,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-
-
+import { parseJson } from '@/lib/utils/json';
 interface Festivo {
   id: string;
   fecha: string;
@@ -84,8 +83,8 @@ export function EditarFestivoModal({
         });
 
         if (!response.ok) {
-          const error = await response.json();
-          toast.error(error.error || 'Error al crear festivo');
+          const error = await parseJson<{ error?: string }>(response).catch(() => null);
+          toast.error(error?.error || 'Error al crear festivo');
           return;
         }
 
@@ -98,8 +97,8 @@ export function EditarFestivoModal({
         });
 
         if (!response.ok) {
-          const error = await response.json();
-          toast.error(error.error || 'Error al actualizar festivo');
+          const error = await parseJson<{ error?: string }>(response).catch(() => null);
+          toast.error(error?.error || 'Error al actualizar festivo');
           return;
         }
 

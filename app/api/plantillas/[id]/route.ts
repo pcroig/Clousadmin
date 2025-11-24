@@ -8,7 +8,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 import { getSession } from '@/lib/auth';
-import { prisma, Prisma } from '@/lib/prisma';
+import { prisma } from '@/lib/prisma';
+import { asJsonValue } from '@/lib/prisma/json';
 
 /**
  * GET /api/plantillas/[id]
@@ -137,12 +138,12 @@ export async function PATCH(
         }),
         ...(requiereFirma !== undefined && { requiereFirma }),
         ...(configuracionIA !== undefined && { 
-          configuracionIA: {
+          configuracionIA: asJsonValue({
             ...(typeof plantillaExistente.configuracionIA === 'object' && plantillaExistente.configuracionIA !== null 
-              ? plantillaExistente.configuracionIA as Record<string, unknown>
+              ? (plantillaExistente.configuracionIA as Record<string, unknown>)
               : {}),
             ...configuracionIA,
-          } as Prisma.InputJsonValue,
+          }),
         }),
       },
     });

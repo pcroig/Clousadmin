@@ -16,6 +16,7 @@ import { DIAS_LABORABLES_DEFAULT } from '@/lib/calculos/dias-laborables';
 import { persistDiasLaborables } from '@/lib/empresa/calendario-laboral';
 import { prisma, Prisma } from '@/lib/prisma';
 import { calendarioLaboralUpdateSchema } from '@/lib/validaciones/schemas';
+import { getJsonBody } from '@/lib/utils/json';
 
 // Force dynamic rendering
 export const dynamic = 'force-dynamic';
@@ -32,7 +33,7 @@ export async function PATCH(req: NextRequest) {
       return badRequestResponse('No tienes permisos para modificar el calendario laboral');
     }
 
-    const body = await req.json() as Record<string, any>;
+    const body = await getJsonBody<Record<string, unknown>>(req);
     const validationResult = calendarioLaboralUpdateSchema.safeParse(body);
 
     if (!validationResult.success) {

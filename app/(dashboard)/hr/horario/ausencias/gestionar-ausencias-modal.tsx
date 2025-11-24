@@ -25,6 +25,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { parseJson } from '@/lib/utils/json';
 
 interface GestionarAusenciasModalProps {
   open: boolean;
@@ -74,15 +75,17 @@ export function GestionarAusenciasModal({ open, onClose, onSaved }: GestionarAus
       // Cargar equipos
       const resEquipos = await fetch('/api/organizacion/equipos');
       if (resEquipos.ok) {
-        const dataEquipos = await resEquipos.json() as Record<string, any>;
-        setEquipos(dataEquipos);
+        const dataEquipos = await parseJson<Equipo[]>(resEquipos);
+        setEquipos(Array.isArray(dataEquipos) ? dataEquipos : []);
       }
       
       // Cargar configuración de calendario laboral
       const resCalendario = await fetch('/api/empresa/calendario-laboral');
       if (resCalendario.ok) {
-        const dataCalendario = await resCalendario.json() as Record<string, any>;
-        if (dataCalendario.diasLaborables) {
+        const dataCalendario = await parseJson<{ diasLaborables?: typeof diasLaborables }>(
+          resCalendario
+        );
+        if (dataCalendario?.diasLaborables) {
           setDiasLaborables(dataCalendario.diasLaborables);
         }
       }
@@ -90,7 +93,10 @@ export function GestionarAusenciasModal({ open, onClose, onSaved }: GestionarAus
       // Cargar políticas de ausencias de la empresa
       const resPoliticas = await fetch('/api/empresa/politica-ausencias');
       if (resPoliticas.ok) {
-        const dataPoliticas = await resPoliticas.json() as Record<string, any>;
+        const dataPoliticas = await parseJson<{
+          maxSolapamientoPct?: number;
+          requiereAntelacionDias?: number;
+        }>(resPoliticas);
         if (dataPoliticas.maxSolapamientoPct !== undefined) {
           setSolapamientoPct(dataPoliticas.maxSolapamientoPct.toString());
         }
@@ -113,8 +119,8 @@ export function GestionarAusenciasModal({ open, onClose, onSaved }: GestionarAus
     setCargando(true);
     try {
       // Validar datos de política
-      const pct = parseInt(solapamientoPct);
-      const dias = parseInt(antelacionDias);
+      const pct = parseInt(solapamientoPct, 10);
+      const dias = parseInt(antelacionDias, 10);
       
       if (isNaN(pct) || pct < 0 || pct > 100) {
         toast.error('El porcentaje de solapamiento debe estar entre 0 y 100');
@@ -139,7 +145,9 @@ export function GestionarAusenciasModal({ open, onClose, onSaved }: GestionarAus
       });
 
       if (!resPolitica.ok) {
-        const error = await resPolitica.json() as Record<string, any>;
+        const error = await parseJson<{ error?: string }>(resPolitica).catch(() => ({
+          error: 'Error desconocido',
+        }));
         toast.error(error.error || 'Error al guardar política');
         setCargando(false);
         return;
@@ -157,7 +165,9 @@ export function GestionarAusenciasModal({ open, onClose, onSaved }: GestionarAus
       });
 
       if (!resSaldo.ok) {
-        const error = await resSaldo.json() as Record<string, any>;
+        const error = await parseJson<{ error?: string }>(resSaldo).catch(() => ({
+          error: 'Error desconocido',
+        }));
         toast.error(error.error || 'Error al guardar saldo');
         setCargando(false);
         return;
@@ -186,7 +196,9 @@ export function GestionarAusenciasModal({ open, onClose, onSaved }: GestionarAus
         toast.success('Calendario laboral guardado correctamente');
         if (onSaved) onSaved();
       } else {
-        const error = await response.json() as Record<string, any>;
+        const error = await parseJson<{ error?: string }>(response).catch(() => ({
+          error: 'Error desconocido',
+        }));
         toast.error(error.error || 'Error al guardar calendario');
       }
     } catch (e) {
@@ -209,11 +221,13 @@ export function GestionarAusenciasModal({ open, onClose, onSaved }: GestionarAus
       });
 
       if (response.ok) {
-        const data = await response.json() as Record<string, any>;
+        const data = await parseJson<{ message?: string }>(response);
         toast.success(data.message || 'Festivos importados exitosamente');
         if (onSaved) onSaved();
       } else {
-        const error = await response.json() as Record<string, any>;
+        const error = await parseJson<{ error?: string }>(response).catch(() => ({
+          error: 'Error desconocido',
+        }));
         toast.error(error.error || 'Error al importar festivos');
       }
     } catch (e) {

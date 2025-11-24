@@ -8,6 +8,7 @@ import { z } from 'zod';
 
 import { getSession } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { getJsonBody } from '@/lib/utils/json';
 
 const UpdateSchema = z.object({
   nombre: z.string().min(1).max(200).optional(),
@@ -33,8 +34,8 @@ export async function PATCH(
 
     const { id } = await params;
 
-    const body = await req.json() as Record<string, any>;
-    const data = UpdateSchema.parse(body);
+    const payload = await getJsonBody<Record<string, unknown>>(req);
+    const data = UpdateSchema.parse(payload);
 
     // Verificar que el tipo pertenece a la empresa
     const tipo = await prisma.tipoComplemento.findFirst({

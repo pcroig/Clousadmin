@@ -58,9 +58,11 @@ export default async function OnboardingSimplificadoPage(context: { params: Prom
                   nombre: onboarding!.empleado.nombre,
                   apellidos: onboarding!.empleado.apellidos,
                   empresaId: onboarding!.empleado.empresaId,
-                  usuario: onboarding!.empleado.usuario ? {
-                    image: onboarding!.empleado.usuario.fotoUrl || null
-                  } : null
+                  usuario: onboarding!.empleado.usuario
+                    ? {
+                        image: onboarding!.empleado.usuario.avatar || null,
+                      }
+                    : null,
                 }}
                 progreso={onboarding!.progreso as unknown as ProgresoOnboardingSimplificado}
                 datosTemporales={onboarding!.datosTemporales as unknown as DatosTemporales | null}

@@ -112,6 +112,7 @@ export function AusenciasClient({}: AusenciasClientProps) {
   const [campanaActiva, setCampanaActiva] = useState<Campana | null>(null);
   const [loading, setLoading] = useState(true);
   const [filtroEstado, setFiltroEstado] = useState('todas');
+  const [filtroTipo, setFiltroTipo] = useState('todos');
   const [busquedaEmpleado, setBusquedaEmpleado] = useState('');
   
   const [gestionarModal, setGestionarModal] = useState(false);

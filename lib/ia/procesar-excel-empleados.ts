@@ -17,6 +17,8 @@ export interface EmpleadoDetectado {
   apellidos: string | null;
   email: string | null;
   nif: string | null;
+  nss: string | null;
+  iban: string | null;
   telefono: string | null;
   fechaNacimiento: string | null; // ISO date string
 
@@ -41,6 +43,37 @@ export interface EmpleadoDetectado {
   codigoPostal: string | null;
 }
 
+const EMPLEADO_CAMPOS: Array<keyof EmpleadoDetectado> = [
+  'nombre',
+  'apellidos',
+  'email',
+  'nif',
+  'nss',
+  'iban',
+  'telefono',
+  'fechaNacimiento',
+  'puesto',
+  'equipo',
+  'manager',
+  'fechaAlta',
+  'tipoContrato',
+  'salarioBrutoAnual',
+  'salarioBrutoMensual',
+  'direccion',
+  'direccionCalle',
+  'direccionNumero',
+  'direccionPiso',
+  'direccionProvincia',
+  'ciudad',
+  'codigoPostal',
+];
+
+const EMPLEADO_CAMPOS_SET = new Set<keyof EmpleadoDetectado>(EMPLEADO_CAMPOS);
+
+function isEmpleadoCampo(campo: string): campo is keyof EmpleadoDetectado {
+  return EMPLEADO_CAMPOS_SET.has(campo as keyof EmpleadoDetectado);
+}
+
 /**
  * Respuesta de la IA al procesar el Excel
  */
@@ -63,6 +96,8 @@ export const EmpleadoDetectadoSchema = z.object({
   apellidos: z.string().nullable(),
   email: z.string().nullable(),
   nif: z.string().nullable(),
+  nss: z.string().nullable(),
+  iban: z.string().nullable(),
   telefono: z.string().nullable(),
   fechaNacimiento: z.string().nullable(),
   puesto: z.string().nullable(),
@@ -288,6 +323,8 @@ function procesarEmpleadosConMapeo(
       apellidos: null,
       email: null,
       nif: null,
+    nss: null,
+    iban: null,
       telefono: null,
       fechaNacimiento: null,
       puesto: null,
@@ -322,6 +359,10 @@ function procesarEmpleadosConMapeo(
 
     // Mapear campos usando el diccionario de columnas
     Object.entries(mapeoColumnas).forEach(([columnaOriginal, campoMapeado]) => {
+      if (!isEmpleadoCampo(campoMapeado)) {
+        return;
+      }
+      
       // Si ya procesamos nombre completo, saltar columnas individuales de nombre
       if (nombreCompletoEncontrado && (campoMapeado === 'nombre' || campoMapeado === 'apellidos')) {
         return;
@@ -338,11 +379,9 @@ function procesarEmpleadosConMapeo(
       // Procesar según tipo de campo
       if (campoMapeado === 'fechaNacimiento' || campoMapeado === 'fechaAlta') {
         const fechaISO = convertirFechaExcelAISO(valor);
-        // @ts-expect-error - Asignación dinámica basada en mapeo de columnas validado
         empleado[campoMapeado] = fechaISO;
       } else if (campoMapeado === 'salarioBrutoAnual' || campoMapeado === 'salarioBrutoMensual') {
         const num = convertirANumero(valor);
-        // @ts-expect-error - Asignación dinámica basada en mapeo de columnas validado
         empleado[campoMapeado] = num;
       } else if (campoMapeado === 'nombre' && typeof valor === 'string' && valor.includes(' ')) {
         // Dividir nombre completo si tiene espacios
@@ -351,7 +390,6 @@ function procesarEmpleadosConMapeo(
         empleado.apellidos = apellidos || null;
       } else {
         // Campos de texto normales
-        // @ts-expect-error - Asignación dinámica basada en mapeo de columnas validado
         empleado[campoMapeado] = String(valor).trim() || null;
       }
     });

@@ -41,6 +41,9 @@ export async function GET(request: NextRequest) {
 
     // Control de acceso
     if (session.user.rol === UsuarioRol.empleado) {
+      if (!session.user.empleadoId) {
+        return badRequestResponse('No tienes un empleado asignado');
+      }
       // Empleados solo ven sus propias compensaciones
       where.empleadoId = session.user.empleadoId;
     } else if (empleadoId) {

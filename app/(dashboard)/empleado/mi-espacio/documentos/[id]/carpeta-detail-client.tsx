@@ -13,6 +13,7 @@ import { EmptyState } from '@/components/shared/empty-state';
 import { FileUploadAdvanced } from '@/components/shared/file-upload-advanced';
 import { Button } from '@/components/ui/button';
 import { UploadHandler } from '@/lib/hooks/use-file-upload';
+import { parseJsonString } from '@/lib/utils/json';
 
 import type { MiEspacioCarpeta, MiEspacioDocumento } from '@/types/empleado';
 
@@ -65,11 +66,9 @@ export function CarpetaDetailClientEmpleado({
             resolve({ success: true });
           } else {
             let errorMessage = 'Error al subir archivo';
-            try {
-              const response = JSON.parse(xhr.responseText);
-              if (response?.error) errorMessage = response.error;
-            } catch {
-              // ignore
+            const response = parseJsonString<{ error?: string }>(xhr.responseText, {});
+            if (response.error) {
+              errorMessage = response.error;
             }
             resolve({ success: false, error: errorMessage });
           }
@@ -128,7 +127,8 @@ export function CarpetaDetailClientEmpleado({
     return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
   };
 
-  const formatearFecha = (fecha: string) => {
+  const formatearFecha = (fecha?: string | null) => {
+    if (!fecha) return '-';
     return new Date(fecha).toLocaleDateString('es-ES', {
       year: 'numeric',
       month: 'short',
@@ -274,7 +274,7 @@ export function CarpetaDetailClientEmpleado({
                       </span>
                     </td>
                     <td className="py-3 px-4 text-sm text-gray-600">
-                      {formatearTamano(documento.tamano)}
+                      {formatearTamano(documento.tamano ?? 0)}
                     </td>
                     <td className="py-3 px-4 text-sm text-gray-600">
                       {formatearFecha(documento.createdAt)}
