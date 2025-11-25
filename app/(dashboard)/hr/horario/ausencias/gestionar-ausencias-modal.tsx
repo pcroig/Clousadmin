@@ -62,7 +62,6 @@ export function GestionarAusenciasModal({ open, onClose, onSaved }: GestionarAus
   const [solapamientoPct, setSolapamientoPct] = useState('50');
   const [antelacionDias, setAntelacionDias] = useState('5');
   const [carryOverMode, setCarryOverMode] = useState<'limpiar' | 'extender'>('limpiar');
-  const [carryOverMonths, setCarryOverMonths] = useState('4');
   
   // Calendario laboral
   const [diasLaborables, setDiasLaborables] = useState({
@@ -123,11 +122,6 @@ export function GestionarAusenciasModal({ open, onClose, onSaved }: GestionarAus
         } else {
           setCarryOverMode('limpiar');
         }
-        if (dataPoliticas.carryOverMeses !== undefined) {
-          setCarryOverMonths(dataPoliticas.carryOverMeses.toString());
-        } else {
-          setCarryOverMonths('4');
-        }
       }
     } catch (e) {
       console.error('Error cargando datos:', e);
@@ -159,16 +153,6 @@ export function GestionarAusenciasModal({ open, onClose, onSaved }: GestionarAus
         return;
       }
 
-      let mesesExtension = parseInt(carryOverMonths || '4', 10);
-      if (Number.isNaN(mesesExtension)) {
-        mesesExtension = 4;
-      }
-      if (carryOverMode === 'extender' && (mesesExtension < 1 || mesesExtension > 12)) {
-        toast.error('Los meses de extensión deben estar entre 1 y 12');
-        setSavingPolitica(false);
-        return;
-      }
-
       // Guardar política de ausencias (nivel empresa)
       const resPolitica = await fetch('/api/empresa/politica-ausencias', {
         method: 'PATCH',
@@ -177,7 +161,7 @@ export function GestionarAusenciasModal({ open, onClose, onSaved }: GestionarAus
           maxSolapamientoPct: pct,
           requiereAntelacionDias: dias,
           carryOverModo: carryOverMode,
-          carryOverMeses: carryOverMode === 'extender' ? mesesExtension : 0,
+          carryOverMeses: carryOverMode === 'extender' ? 4 : 0,
         }),
       });
 
@@ -391,9 +375,9 @@ export function GestionarAusenciasModal({ open, onClose, onSaved }: GestionarAus
               <Field>
                 <div className="flex items-center justify-between">
                   <div>
-                    <FieldLabel>Tratamiento de saldo al cierre</FieldLabel>
+                    <FieldLabel>Saldo al cierre</FieldLabel>
                     <p className="text-xs text-gray-500">
-                      Define si el saldo pendiente se limpia automáticamente o se extiende unos meses.
+                      El saldo pendiente se limpia al cerrar el año o se extiende automáticamente 4 meses más.
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
@@ -404,97 +388,84 @@ export function GestionarAusenciasModal({ open, onClose, onSaved }: GestionarAus
                         setCarryOverMode(checked ? 'extender' : 'limpiar')
                       }
                     />
-                    <span className="text-xs text-gray-500">Extender</span>
+                    <span className="text-xs text-gray-500">Extender 4 meses</span>
                   </div>
                 </div>
-                {carryOverMode === 'extender' && (
-                  <div className="mt-4 flex items-center gap-3">
-                    <Input
-                      type="number"
-                      min={1}
-                      max={12}
-                      value={carryOverMonths}
-                      onChange={(e) => setCarryOverMonths(e.target.value)}
-                      className="w-24"
-                    />
-                    <span className="text-sm text-gray-600">meses adicionales</span>
-                  </div>
-                )}
               </Field>
             </div>
 
             <div className="border-t pt-6 space-y-4">
               <div className="flex items-start gap-2">
-                <h3 className="text-lg font-semibold text-gray-900 flex-1">Políticas de Ausencia</h3>
+                <h3 className="text-lg font-semibold text-gray-900 flex-1">Reglas y límites</h3>
                 <InfoTooltip
                   content="Estas políticas se aplican a toda la empresa. La antelación sólo afecta a vacaciones y ausencias 'otro', y el solapamiento se aplica únicamente a vacaciones."
                   side="left"
                 />
               </div>
+              
+              <div className="grid gap-4 md:grid-cols-2">
+                <Field>
+                  <div className="flex items-center gap-2">
+                    <FieldLabel>Antelación mínima</FieldLabel>
+                    <InfoTooltip
+                      content={(
+                        <div className="space-y-2 text-sm">
+                          <p className="font-medium">¿Qué es la antelación mínima?</p>
+                          <p className="text-xs">
+                            Días mínimos entre la solicitud de ausencia y su inicio (solo para vacaciones y «otro»).
+                          </p>
+                          <p className="text-xs mt-2">
+                            Ejemplo: con 5 días, una ausencia que empieza el 15/01 debe pedirse antes del 10/01.
+                          </p>
+                        </div>
+                      )}
+                    />
+                  </div>
+                  
+                  <div className="flex items-center gap-3 mt-3">
+                    <Input
+                      type="number"
+                      value={antelacionDias}
+                      onChange={(e) => setAntelacionDias(e.target.value)}
+                      min="0"
+                      max="365"
+                      className="w-full"
+                    />
+                    <span className="text-sm text-gray-600 shrink-0">días</span>
+                  </div>
+                </Field>
 
-              <Field>
-                <div className="flex items-center gap-2">
-                  <FieldLabel>Días de antelación mínima</FieldLabel>
-                  <InfoTooltip
-                    content={(
-                      <div className="space-y-2 text-sm">
-                        <p className="font-medium">¿Qué es la antelación mínima?</p>
-                        <p className="text-xs">
-                          Número mínimo de días que deben pasar entre la solicitud de ausencia y la fecha de inicio.
-                          Solo aplica a ausencias que requieren aprobación (vacaciones y «otro»).
-                        </p>
-                        <p className="text-xs mt-2">
-                          Ejemplo: Con 5 días de antelación, una ausencia que empieza el 15 de enero debe solicitarse antes del 10 de enero.
-                        </p>
-                      </div>
-                    )}
-                  />
-                </div>
-                
-                <div className="flex items-center gap-4 mt-4">
-                  <Input
-                    type="number"
-                    value={antelacionDias}
-                    onChange={(e) => setAntelacionDias(e.target.value)}
-                    min="0"
-                    max="365"
-                    className="w-32"
-                  />
-                  <span className="text-sm text-gray-600">días</span>
-                </div>
-              </Field>
-
-              <Field>
-                <div className="flex items-center gap-2">
-                  <FieldLabel>Solapamiento máximo permitido</FieldLabel>
-                  <InfoTooltip
-                    content={(
-                      <div className="space-y-2 text-sm">
-                        <p className="font-medium">¿Qué significa el solapamiento?</p>
-                        <p className="text-xs">
-                          Porcentaje máximo de empleados que pueden estar de vacaciones al mismo tiempo.
-                          Controla la capacidad de la empresa durante los periodos con más ausencias.
-                        </p>
-                        <p className="text-xs mt-2">
-                          Ejemplo: Con un 50%, si la empresa tiene 10 empleados, máximo 5 podrán estar de vacaciones simultáneamente.
-                        </p>
-                      </div>
-                    )}
-                  />
-                </div>
-                
-                <div className="flex items-center gap-4 mt-4">
-                  <Input
-                    type="number"
-                    value={solapamientoPct}
-                    onChange={(e) => setSolapamientoPct(e.target.value)}
-                    min="0"
-                    max="100"
-                    className="w-32"
-                  />
-                  <span className="text-sm text-gray-600">%</span>
-                </div>
-              </Field>
+                <Field>
+                  <div className="flex items-center gap-2">
+                    <FieldLabel>Solapamiento máximo</FieldLabel>
+                    <InfoTooltip
+                      content={(
+                        <div className="space-y-2 text-sm">
+                          <p className="font-medium">¿Qué significa el solapamiento?</p>
+                          <p className="text-xs">
+                            Porcentaje máximo de empleados que pueden estar de vacaciones al mismo tiempo.
+                          </p>
+                          <p className="text-xs mt-2">
+                            Ejemplo: con 50%, en un equipo de 10, solo 5 pueden coincidir de vacaciones.
+                          </p>
+                        </div>
+                      )}
+                    />
+                  </div>
+                  
+                  <div className="flex items-center gap-3 mt-3">
+                    <Input
+                      type="number"
+                      value={solapamientoPct}
+                      onChange={(e) => setSolapamientoPct(e.target.value)}
+                      min="0"
+                      max="100"
+                      className="w-full"
+                    />
+                    <span className="text-sm text-gray-600 shrink-0">%</span>
+                  </div>
+                </Field>
+              </div>
             </div>
 
             <DialogFooter>

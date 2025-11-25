@@ -10,9 +10,11 @@
 | Endpoint | Método | Descripción |
 |----------|--------|-------------|
 | `/api/ausencias` | GET | Listado con filtros y paginación |
-| `/api/ausencias` | POST | Solicitar una ausencia |
+| `/api/ausencias` | POST | Solicitar una ausencia (empleado) o crear directamente (HR Admin) |
 | `/api/ausencias/{id}` | PATCH | Aprobar, rechazar o actualizar |
-| `/api/ausencias/saldo/{empleadoId}` | GET | Consultar saldo disponible |
+| `/api/ausencias/saldo` | GET | Consultar saldo disponible (considera carry-over) |
+| `/api/ausencias/saldo` | POST | Asignar saldo anual (empresa o equipos) |
+| `/api/empresa/politica-ausencias` | PATCH | Configurar política de carry-over (limpiar vs extender) |
 
 ---
 

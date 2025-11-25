@@ -37,3 +37,4 @@
 - [`RATE_LIMITING.md`](../RATE_LIMITING.md) – Documento completo.
 - [`API_REFACTORING.md`](../API_REFACTORING.md) – Patrones y helpers reutilizables.
 
+

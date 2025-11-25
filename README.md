@@ -36,39 +36,27 @@ npm run dev
 
 Toda la documentación está en `docs/`:
 
-### 📚 Documentación Principal
-
-- **[docs/README.md](docs/README.md)** - Índice completo de toda la documentación
-- **[docs/SETUP.md](docs/SETUP.md)** - ⭐ Guía de configuración inicial
+### Configuración y Arquitectura
+- **[docs/README.md](docs/README.md)** - Índice de toda la documentación
+- **[docs/SETUP.md](docs/SETUP.md)** - Guía de configuración completa (incluye autenticación)
+- **[docs/SETUP_GOOGLE_OAUTH.md](docs/SETUP_GOOGLE_OAUTH.md)** - Configuración de Google OAuth y Calendar
+- **[docs/SETUP_PLANTILLAS.md](docs/SETUP_PLANTILLAS.md)** - Configuración del sistema de plantillas
 - **[docs/ARQUITECTURA.md](docs/ARQUITECTURA.md)** - Decisiones técnicas y estructura
-- **[docs/DESIGN_SYSTEM.md](docs/DESIGN_SYSTEM.md)** - Sistema de diseño UI/UX y patrones
-- **[docs/PATRONES_CODIGO.md](docs/PATRONES_CODIGO.md)** - Convenciones de código TypeScript/Next.js
+- **[docs/DESIGN_SYSTEM.md](docs/DESIGN_SYSTEM.md)** - Guías de diseño UI/UX y patrones de componentes
 - **[.cursorrules](.cursorrules)** - Principios de desarrollo
 
-### 🔐 Autenticación y Configuración
+### 📱 Adaptación Mobile (NUEVO)
+- **[docs/MOBILE_ADAPTATION_SUMMARY.md](docs/MOBILE_ADAPTATION_SUMMARY.md)** - Resumen ejecutivo de la adaptación mobile completa
+- **[docs/MOBILE_COMPONENTS_GUIDE.md](docs/MOBILE_COMPONENTS_GUIDE.md)** - Guía de uso de componentes responsive
+- **[docs/MOBILE_FORM_COMPONENTS.md](docs/MOBILE_FORM_COMPONENTS.md)** - Formularios y inputs optimizados para touch
+- **[docs/MOBILE_PERFORMANCE_OPTIMIZATIONS.md](docs/MOBILE_PERFORMANCE_OPTIMIZATIONS.md)** - Estrategias de optimización mobile
+- **[docs/MOBILE_TESTING_PLAN.md](docs/MOBILE_TESTING_PLAN.md)** - Plan de testing en dispositivos reales
+- **[docs/MOBILE_FILES_CHANGED.md](docs/MOBILE_FILES_CHANGED.md)** - Inventario completo de archivos modificados
 
-- **[docs/funcionalidades/autenticacion.md](docs/funcionalidades/autenticacion.md)** - Flujos de autenticación y onboarding
-- **[docs/INVITAR_USUARIOS.md](docs/INVITAR_USUARIOS.md)** - Invitaciones y alta de usuarios
-- **[docs/SETUP_GOOGLE_OAUTH.md](docs/SETUP_GOOGLE_OAUTH.md)** - Configuración de Google OAuth y Calendar
-- **[docs/SETUP_PLANTILLAS.md](docs/SETUP_PLANTILLAS.md)** - Sistema de plantillas de documentos
-
-### 📱 Mobile
-
-- **[docs/MOBILE_OPTIMIZACION.md](docs/MOBILE_OPTIMIZACION.md)** - ⭐ Guía principal de adaptación mobile
-- **[docs/MOBILE_ADAPTATION_SUMMARY.md](docs/MOBILE_ADAPTATION_SUMMARY.md)** - Resumen ejecutivo
-- **[docs/MOBILE_COMPONENTS_GUIDE.md](docs/MOBILE_COMPONENTS_GUIDE.md)** - Componentes responsive
-- **[docs/MOBILE_FORM_COMPONENTS.md](docs/MOBILE_FORM_COMPONENTS.md)** - Formularios touch-optimized
-
-### 🚀 CI/CD y Despliegue
-
-- **[docs/CI_CD_SETUP.md](docs/CI_CD_SETUP.md)** - ⭐ Guía completa de CI/CD con GitHub Actions
-- **[docs/DEPLOY_HETZNER.md](docs/DEPLOY_HETZNER.md)** - Guía de despliegue en Hetzner
-- **[docs/PRODUCCION_CHECKLIST.md](docs/PRODUCCION_CHECKLIST.md)** - Checklist de producción
-- **[docs/TROUBLESHOOTING_PROD.md](docs/TROUBLESHOOTING_PROD.md)** - Troubleshooting en producción
-
-### 📖 Funcionalidades
-
+### Funcionalidades
 - **[docs/funcionalidades/](docs/funcionalidades/)** - Documentación detallada de cada feature
+- **[docs/funcionalidades/billing.md](docs/funcionalidades/billing.md)** - Pasarela de pago con Stripe y flujo de facturación
+- **[docs/historial/](docs/historial/)** - Documentación histórica y migración
 
 ---
 
@@ -76,7 +64,7 @@ Toda la documentación está en `docs/`:
 
 - **Frontend**: Next.js 16 (App Router) con React 19, TypeScript, Tailwind CSS 4, shadcn/ui
 - **Backend**: Node.js, Prisma, PostgreSQL
-- **Auth**: JWT (jose) + bcryptjs + Google OAuth (NextAuth v5) + 2FA TOTP
+- **Auth**: JWT (jose) + bcryptjs
 - **Cloud**: Hetzner Object Storage (S3-compatible)
 - **IA**: OpenAI GPT-4 Vision (opcional)
 
@@ -108,10 +96,7 @@ Clousadmin/
 ## 🎯 Funcionalidades
 
 ### ✅ Completadas
-- Autenticación JWT con roles (HR Admin, Manager, Empleado, Platform Admin)
-- Login con Google OAuth (NextAuth v5)
-- Recuperación de contraseña
-- Autenticación en dos pasos (2FA TOTP + Backup Codes)
+- Autenticación JWT con roles (HR Admin, Manager, Empleado)
 - Dashboard multi-rol con widgets personalizados
 - Gestión de empleados, equipos y puestos
 - Gestión de ausencias (solicitud, aprobación, saldo)
@@ -148,121 +133,10 @@ Clousadmin/
 
 ## 🧪 Testing
 
-**Cobertura de Tests**: 159 tests implementados (87 unit, 43 E2E, 19 integration)
-
-### Ejecutar Tests
-
-```bash
-# Tests unitarios
-npm run test
-
-# Tests E2E (requiere servidor corriendo)
-npm run test:e2e
-
-# Tests de integración
-npm run test:integration
-
-# Cobertura
-npm run test:coverage
-```
-
-### Documentación de Testing
-
-- **[docs/TESTING_FINAL_REPORT.md](docs/TESTING_FINAL_REPORT.md)** - ⭐ Reporte completo de testing
-- **[docs/TESTING_SUMMARY.md](docs/TESTING_SUMMARY.md)** - Resumen técnico
-
-### Infraestructura de Tests
-
-- **Test Runner**: Vitest con happy-dom
-- **E2E**: Playwright (Chrome, Firefox, Safari)
-- **Coverage Target**: 60% (70%+ en módulos críticos)
-- **Helpers**: Auth utilities, data factories, API mocking
-
-### Áreas Cubiertas
-
-✅ Autenticación JWT y seguridad
-✅ Cálculos de ausencias y validaciones
-✅ Schemas de empleados (Zod)
-✅ Sistema de alertas de nóminas
-✅ Flujos E2E: login, fichajes, ausencias
-✅ CRUD de empleados con DB real
-
-### Otras Utilidades
-
-```bash
-# Linting
-npm run lint
-
-# Diagnóstico de base de datos
-npm run diagnostico
-
-# Visor de Prisma
-npm run db:studio
-```
-
----
-
-## 🔄 CI/CD - Integración y Despliegue Continuo
-
-**Sistema automatizado** con GitHub Actions para validación de código y despliegue a Hetzner.
-
-### Workflows Activos
-
-| Workflow | Trigger | Estado |
-|----------|---------|--------|
-| **CI** - Lint, Test, Build | Push a `main`, PRs | ✅ Activo |
-| **Tests** - Coverage | Push, PRs | ✅ Activo |
-| **CD** - Deploy Hetzner | Push a `main` | ⚠️ Requiere configuración |
-| **Cron** - Fichajes | Diario 23:30 UTC | ✅ Activo |
-| **Cron** - Solicitudes IA | Diario 02:00 UTC | ✅ Activo |
-
-### Features
-
-✅ **CI Automático**: Lint + Tests + Build en cada PR
-✅ **Coverage Reports**: Upload automático a Codecov
-✅ **Deploy Automático**: Push a `main` → Deploy a producción
-✅ **Rollback Automático**: Si el deploy falla, vuelve a versión anterior
-✅ **Cron Jobs**: Tareas automatizadas diarias
-✅ **Health Checks**: Verificación post-deploy
-
-### Configuración Necesaria
-
-Para activar el deploy automático, configura estos **Secrets** en GitHub:
-
-```bash
-HETZNER_SSH_KEY      # Clave privada SSH
-HETZNER_HOST         # IP del servidor
-HETZNER_USER         # Usuario SSH (ej: root)
-APP_URL              # URL pública
-CRON_SECRET          # Secret para cron jobs
-```
-
-### Documentación Completa
-
-- **[docs/CI_CD_SETUP.md](docs/CI_CD_SETUP.md)** - ⭐ Guía completa de configuración CI/CD
-- Instrucciones paso a paso para configurar secrets
-- Troubleshooting y resolución de problemas
-- Monitoreo y verificación de deploys
-
-### Quick Start - Activar CD
-
-1. **Generar SSH Key**:
-```bash
-ssh-keygen -t ed25519 -C "github-actions" -f ~/.ssh/github_deploy
-```
-
-2. **Añadir secrets en GitHub**:
-   - Settings → Secrets → New repository secret
-   - Añade los 5 secrets mencionados arriba
-
-3. **Probar deploy manual**:
-   - GitHub → Actions → "CD - Deploy to Hetzner" → Run workflow
-
-4. **Deploy automático activado** 🎉:
-   - Cada push a `main` despliega automáticamente
-   - Rollback automático si falla
-
-Ver [docs/CI_CD_SETUP.md](docs/CI_CD_SETUP.md) para instrucciones detalladas.
+- Actualmente no hay una batería de tests automatizados publicada. Revísalo en `docs/OPTIMIZACION_PENDIENTE.md`.
+- Ejecuta el linting con `npm run lint`.
+- Para diagnósticos rápidos de la base de datos utiliza `npm run diagnostico`.
+- Accede al visor de Prisma con `npx prisma studio` o `npm run db:studio`.
 
 ---
 
@@ -345,16 +219,5 @@ Para preguntas o soporte: [info@clousadmin.com](mailto:info@clousadmin.com)
 
 ---
 
-**Versión**: 1.4.0  
+**Versión**: 1.3.0
 **Última actualización**: 27 de enero de 2025
-
----
-
-## 📝 Cambios Recientes en Documentación
-
-**27 de enero de 2025** - Revisión exhaustiva de documentación:
-- ✅ Consolidados archivos históricos (movidos a `docs/historial/`)
-- ✅ Unificada documentación de mobile, optimización y seguridad
-- ✅ Mejoradas referencias cruzadas entre documentos
-- ✅ Creado índice completo (`docs/INDICE_COMPLETO.md`)
-- ✅ Actualizada información de autenticación y funcionalidades

@@ -21,3 +21,4 @@
 - [`docs/api/authentication.md`](../authentication.md) – Guía completa de flujo.
 - `lib/auth.ts` – Helpers de JWT y sesión.
 
+

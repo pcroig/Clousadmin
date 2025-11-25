@@ -128,6 +128,14 @@ La jornada del empleado se determina por prioridad:
 2. **Jornada de equipo** (asignada a todo el equipo)
 3. **Jornada empresa** (default para todos)
 
+### Jornada por Defecto
+
+**✅ Todos los empleados activos tienen jornada asignada automáticamente:**
+- Al crear un empleado, si no se especifica `jornadaId`, se asigna la jornada predefinida de la empresa (`esPredefinida: true`)
+- Si un empleado activo no tiene jornada, el sistema asigna automáticamente la jornada por defecto
+- Endpoint: `POST /api/jornadas/asegurar-empleados` (HR Admin) para asignar jornadas a empleados existentes sin jornada
+- Función: `lib/jornadas/asegurar-jornada-empleados.ts` - `asegurarJornadaEmpleados(empresaId)`
+
 ### Gestión desde HR
 
 #### Crear Jornada
@@ -136,6 +144,7 @@ La jornada del empleado se determina por prioridad:
 - Horas semanales
 - Horarios por día (si es fija)
 - Límites opcionales (no fichar antes/después de X hora)
+- Marcar como predefinida (`esPredefinida: true`) para que sea la jornada por defecto
 
 #### Asignar Jornada
 - **Toda la empresa**: Aplica a todos los empleados activos
@@ -144,13 +153,15 @@ La jornada del empleado se determina por prioridad:
 
 ---
 
-## 3. Balance de Horas
+## 3. Balance de Horas (Saldo de Horas)
 
 ### Cálculo
 
 ```
 Balance = Σ(Horas trabajadas reales) - Σ(Horas esperadas según jornada)
 ```
+
+**⚠️ IMPORTANTE**: Las horas trabajadas **descuentan automáticamente el tiempo en pausa**. El cálculo suma solo el tiempo entre `entrada`/`pausa_fin` y `pausa_inicio`/`salida`, excluyendo períodos de descanso.
 
 Se calcula para:
 - **Diario**: Horas del día vs esperadas ese día
@@ -159,9 +170,25 @@ Se calcula para:
 
 ### Visualización
 
+- Tablas de fichajes muestran columnas: **Horas Trabajadas**, **Horas Esperadas**, **Balance**
 - Widget muestra horas trabajadas vs esperadas
 - Balance acumulado (+ horas extras o - horas pendientes)
-- Actualización en tiempo real
+- **Actualización automática**: El balance se recalcula automáticamente al:
+  - Editar eventos de fichaje
+  - Cuadrar fichajes pendientes
+  - Crear nuevos eventos
+  - Modificar fichajes desde cualquier flujo
+
+### Renovar Saldo de Horas
+
+**Funcionalidad disponible para HR Admin** en el espacio individual del empleado (`/hr/organizacion/personas/[id]` → Tab Fichajes):
+
+- **Campo `saldoRenovadoDesde`**: Fecha desde la cual se calcula el saldo (almacenado en `Empleado.saldoRenovadoDesde`)
+- **Botón "Renovar saldo"**: Resetea el contador de horas trabajadas, esperadas y saldo para que empiecen a contar desde hoy
+- **Confirmación**: Muestra diálogo de confirmación antes de renovar
+- **No destructivo**: No elimina fichajes históricos, solo cambia la fecha base de cálculo
+- **Endpoint**: `POST /api/empleados/[id]/renovar-saldo` (HR Admin)
+- **Consulta**: `GET /api/empleados/[id]/renovar-saldo` para obtener fecha de última renovación
 
 ---
 
@@ -304,7 +331,27 @@ enum PeriodoMedioDia {
 - Cabecera con empleado y fecha única del día.
 - Lista de eventos del día editable en línea: para cada evento se puede cambiar `tipo` y `hora`, y eliminarlo.
 - Botón "Añadir evento" para crear nuevos registros del día.
-- Al guardar, se recalculan `horasTrabajadas` y `horasEnPausa` del fichaje.
+- **⚠️ Sin auto-guardado**: Los cambios se acumulan localmente y solo se persisten al hacer click en "Guardar Cambios"
+- Al guardar, se recalculan `horasTrabajadas` y `horasEnPausa` del fichaje, y se actualiza el balance automáticamente
+- **Tracking de cambios**: El sistema rastrea eventos nuevos, modificados y eliminados, aplicándolos en orden al guardar
+
+### Añadir Fichajes Manuales
+
+**Dos flujos según rol:**
+
+1. **HR Admin**: Puede añadir fichajes directamente desde:
+   - Espacio individual del empleado (`/hr/organizacion/personas/[id]` → Tab Fichajes)
+   - Vista de fichajes (`/hr/horario/fichajes`)
+   - **Comportamiento**: Se guarda directamente, creando el evento inmediatamente
+   - Endpoint: `POST /api/fichajes` + `POST /api/fichajes/eventos`
+
+2. **Empleado**: Puede solicitar fichajes manuales desde:
+   - Su propio espacio de fichajes (`/empleado/mi-espacio` → Tab Fichajes)
+   - Vista de fichajes (`/empleado/horario/fichajes`)
+   - **Comportamiento**: Crea una solicitud que requiere aprobación de HR/Manager
+   - Endpoint: `POST /api/solicitudes` (tipo: `fichaje_manual`)
+
+**Componente**: `components/shared/fichaje-manual-modal.tsx` - Se adapta según prop `esHRAdmin`
 
 ### Solicitudes de corrección (flujo formal)
 - **Empleados**: desde `/empleado/horario/fichajes` envían una solicitud indicando motivo y nuevos valores. Endpoint: `POST /api/fichajes/correcciones`.
@@ -342,7 +389,34 @@ enum PeriodoMedioDia {
 
 ---
 
-## 7. Permisos por Rol
+## 7. Vista Individual de Fichajes
+
+### Espacio del Empleado (`/empleado/mi-espacio` → Tab Fichajes)
+
+**Cards de resumen (horizontal):**
+1. **Card "Tiempo"**:
+   - Tiempo trabajado (horas acumuladas)
+   - Tiempo esperado (horas esperadas según jornada)
+   - Saldo de horas (diferencia entre trabajado y esperado)
+   - **Rango de fechas**: Muestra "Desde [fecha]" en la esquina superior derecha (basado en `saldoRenovadoDesde` o `fechaAlta`)
+   - **Sin botón renovar**: Los empleados no pueden renovar su propio saldo
+
+2. **Card "Horarios"**:
+   - Hora media de entrada
+   - Hora media de salida
+   - Horas medias trabajadas
+
+**Tabla de fichajes**: Muestra todos los fichajes con columnas: Fecha, Entrada, Salida, Horas Trabajadas, Horas Esperadas, Balance, Estado
+
+### Espacio HR (`/hr/organizacion/personas/[id]` → Tab Fichajes)
+
+**Misma estructura que empleado, pero con:**
+- **Botón "Renovar saldo"**: Visible solo para HR Admin, permite resetear el contador desde hoy
+- **Botón "Añadir fichaje"**: HR puede añadir fichajes directamente (se guardan sin solicitud)
+
+---
+
+## 8. Permisos por Rol
 
 | Acción | Empleado | Manager | HR Admin |
 |--------|----------|---------|----------|
@@ -351,14 +425,17 @@ enum PeriodoMedioDia {
 | Ver fichajes de equipo | ❌ | ✅ | ✅ |
 | Ver todos los fichajes | ❌ | ❌ | ✅ |
 | Solicitar corrección de fichaje | ✅ | ✅ | ❌ |
+| Solicitar fichaje manual | ✅ | ✅ | ❌ |
+| Añadir fichaje directamente | ❌ | ❌ | ✅ |
 | Aprobar fichajes | ❌ | ✅ (su equipo) | ✅ (todos) |
 | Cuadrar fichajes masivamente | ❌ | ✅ (su equipo) | ✅ (todos) |
+| Renovar saldo de horas | ❌ | ❌ | ✅ |
 | Configurar jornadas | ❌ | ❌ | ✅ |
 | Asignar jornadas | ❌ | ❌ | ✅ |
 
 ---
 
-## 8. Integraciones Futuras
+## 9. Integraciones Futuras
 
 ### Slack (Fase 3+)
 
@@ -375,7 +452,7 @@ enum PeriodoMedioDia {
 
 ---
 
-## 9. Troubleshooting
+## 10. Troubleshooting
 
 ### Problema: "Ya tienes una jornada iniciada" cuando no es cierto
 
@@ -425,7 +502,7 @@ await prisma.empleado.create({
 
 ---
 
-## 10. Modelos de Datos
+## 11. Modelos de Datos
 
 ### Fichaje
 
@@ -440,8 +517,8 @@ model Fichaje {
   estado          String   @default("en_curso") @db.VarChar(50)
   // Valores (3 estados únicos): 'en_curso', 'pendiente', 'finalizado'
   
-  // Cálculos agregados
-  horasTrabajadas Decimal?  @db.Decimal(5, 2)
+  // Cálculos agregados (se actualizan automáticamente al modificar eventos)
+  horasTrabajadas Decimal?  @db.Decimal(5, 2) // Descuenta pausas automáticamente
   horasEnPausa    Decimal?  @db.Decimal(5, 2)
   
   // Auditoría de cuadre masivo
@@ -460,6 +537,17 @@ model Fichaje {
   eventos         FichajeEvento[]
   
   @@unique([empleadoId, fecha])
+}
+```
+
+### Empleado (campos relacionados)
+
+```prisma
+model Empleado {
+  // ... otros campos
+  jornadaId         String? // Jornada asignada (obligatoria para empleados activos)
+  saldoRenovadoDesde DateTime? // Fecha desde la cual se calcula el saldo de horas
+  // ... otros campos
 }
 
 model FichajeEvento {
@@ -501,7 +589,7 @@ model Jornada {
 
 | Endpoint | Método | Descripción | Auth |
 |----------|--------|-------------|------|
-| `/api/fichajes` | GET | Lista fichajes con filtros (empleadoId, fecha, fechaInicio, fechaFin, estado, propios) | ✅ |
+| `/api/fichajes` | GET | Lista fichajes con filtros (empleadoId, fecha, fechaInicio, fechaFin, estado, propios). Incluye `horasEsperadas` y `balance` calculados | ✅ |
 | `/api/fichajes` | POST | Crea evento en fichaje del día (entrada, pausa_inicio, pausa_fin, salida). Crea fichaje si no existe | ✅ |
 | `/api/fichajes/[id]` | GET | Obtiene fichaje específico con todos sus eventos | ✅ |
 | `/api/fichajes/[id]` | PATCH | Aprueba/rechaza fichaje (`accion: 'aprobar'|'rechazar'`) | HR/Manager |
@@ -527,6 +615,19 @@ model Jornada {
 | Endpoint | Método | Descripción | Auth |
 |----------|--------|-------------|------|
 | `/api/fichajes/stats` | GET | Obtiene estadísticas de fichajes (horas trabajadas, balance, etc.) | ✅ |
+
+### Renovar Saldo de Horas
+
+| Endpoint | Método | Descripción | Auth |
+|----------|--------|-------------|------|
+| `/api/empleados/[id]/renovar-saldo` | POST | Renueva el saldo de horas del empleado (resetea `saldoRenovadoDesde` a hoy) | HR Admin |
+| `/api/empleados/[id]/renovar-saldo` | GET | Obtiene la fecha de última renovación del saldo | ✅ |
+
+### Jornadas
+
+| Endpoint | Método | Descripción | Auth |
+|----------|--------|-------------|------|
+| `/api/jornadas/asegurar-empleados` | POST | Asigna jornada por defecto a todos los empleados activos sin jornada | HR Admin |
 
 ### CRON Jobs
 
@@ -641,7 +742,7 @@ model ProcesamientoMarcajes {
 
 ---
 
-**Versión**: 3.2
+**Versión**: 3.3
 **Última actualización**: 27 enero 2025
 **Estado**: Sistema completo implementado:
 - ✅ Validación determinística de fichajes completos
@@ -651,3 +752,11 @@ model ProcesamientoMarcajes {
 - ✅ Formularios actualizados con selector de periodo
 - ✅ API de revisión busca directamente en tabla `fichaje` (no `autoCompletado`)
 - ✅ Notificaciones automáticas cuando CRON marca fichajes como `pendiente`
+- ✅ **Edición sin auto-guardado**: Cambios se acumulan y se guardan solo al hacer click en "Guardar Cambios"
+- ✅ **Saldo de horas descuenta pausas**: Cálculo correcto que excluye tiempo en pausa
+- ✅ **Jornadas por defecto**: Todos los empleados activos tienen jornada asignada automáticamente
+- ✅ **Horas esperadas en tablas**: Columnas visibles en todas las vistas de fichajes
+- ✅ **Balance actualizado automáticamente**: Se recalcula al editar, cuadrar o crear fichajes
+- ✅ **Cards horizontales en vista individual**: Tiempo y Horarios en layout horizontal
+- ✅ **Renovar saldo de horas**: HR Admin puede resetear contador desde fecha específica
+- ✅ **Añadir fichajes manuales**: HR guarda directamente, empleados crean solicitud

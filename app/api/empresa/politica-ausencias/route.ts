@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { UsuarioRol } from '@/lib/constants/enums';
 import { prisma } from '@/lib/prisma';
+import { asJsonValue } from '@/lib/prisma/json';
 import { getJsonBody } from '@/lib/utils/json';
 
 /**
@@ -52,9 +53,7 @@ export async function GET(_req: NextRequest) {
         ? 'extender'
         : 'limpiar';
     const carryOverMeses =
-      carryOverConfig && typeof carryOverConfig.mesesExtension === 'number'
-        ? Math.min(Math.max(carryOverConfig.mesesExtension, 1), 12)
-        : 4;
+      carryOverConfig && carryOverConfig.modo === 'extender' ? 4 : 0;
 
     // Retornar política de ausencias (valores por defecto si no existen)
     return NextResponse.json({
@@ -131,16 +130,6 @@ export async function PATCH(req: NextRequest) {
       );
     }
 
-    if (carryOverModo === 'extender') {
-      const meses = typeof carryOverMeses === 'number' ? carryOverMeses : 4;
-      if (meses < 1 || meses > 12) {
-        return NextResponse.json(
-          { error: 'Los meses de extensión deben estar entre 1 y 12' },
-          { status: 400 }
-        );
-      }
-    }
-
     // Obtener configuración actual
     const empresa = await prisma.empresa.findUnique({
       where: { id: session.user.empresaId },
@@ -160,10 +149,7 @@ export async function PATCH(req: NextRequest) {
       typeof carryOverModo === 'string'
         ? {
             modo: carryOverModo,
-            mesesExtension:
-              carryOverModo === 'extender'
-                ? Math.min(Math.max(typeof carryOverMeses === 'number' ? carryOverMeses : 4, 1), 12)
-                : 0,
+            mesesExtension: carryOverModo === 'extender' ? 4 : 0,
           }
         : (configActual.carryOver as Record<string, unknown> | undefined) ?? {
             modo: 'limpiar',
@@ -174,12 +160,12 @@ export async function PATCH(req: NextRequest) {
     await prisma.empresa.update({
       where: { id: session.user.empresaId },
       data: {
-        config: {
+        config: asJsonValue({
           ...configActual,
           maxSolapamientoPct,
           requiereAntelacionDias,
           carryOver: carryOverConfig,
-        },
+        }),
       },
     });
 
@@ -192,9 +178,7 @@ export async function PATCH(req: NextRequest) {
           : 'limpiar',
       carryOverMeses:
         typeof carryOverConfig.modo === 'string' && carryOverConfig.modo === 'extender'
-          ? (typeof carryOverConfig.mesesExtension === 'number'
-              ? (carryOverConfig.mesesExtension as number)
-              : 4)
+          ? 4
           : 0,
     });
   } catch (error) {

@@ -271,3 +271,4 @@ npm run dev  # Ya usa Turbopack automáticamente
 **✅ Todas las optimizaciones son seguras, no rompen funcionalidad existente y el código es limpio y escalable.**
 
 
+

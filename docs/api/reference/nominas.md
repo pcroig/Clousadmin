@@ -24,3 +24,4 @@
 - `app/api/nominas/eventos/[id]/balance-horas/route.ts`
 - `lib/nominas/*`
 
+

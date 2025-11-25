@@ -288,3 +288,4 @@ La solución fue **unificar la fuente de datos**: ambos ahora usan la tabla `fic
 **Versión**: 1.0  
 
 
+

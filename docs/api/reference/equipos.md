@@ -23,3 +23,4 @@
 - `app/api/equipos/[id]/route.ts`
 - `app/api/equipos/[id]/miembros/route.ts`
 
+

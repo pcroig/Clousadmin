@@ -32,12 +32,8 @@ function parseCarryOverPolicy(config?: Record<string, unknown> | null): CarryOve
   const raw = config.carryOver as Record<string, unknown>;
   const mode =
     typeof raw.modo === 'string' && raw.modo === 'extender' ? 'extender' : 'limpiar';
-  const monthsRaw =
-    typeof raw.mesesExtension === 'number' ? raw.mesesExtension : CARRY_OVER_DEFAULT_MONTHS;
-  const months = Math.min(Math.max(monthsRaw, 1), 12);
-
   if (mode === 'extender') {
-    return { mode, months };
+    return { mode, months: CARRY_OVER_DEFAULT_MONTHS };
   }
 
   return { mode: 'limpiar', months: 0 };

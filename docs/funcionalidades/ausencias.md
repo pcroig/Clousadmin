@@ -8,6 +8,28 @@
 
 ## 🔄 CAMBIOS RECIENTES
 
+### v3.4.0 - Política de Carry-Over y Mejoras de UX (27 Ene 2025)
+
+**Cambios**:
+- **Política de carry-over**: Toggle en "Gestionar Ausencias" para elegir entre limpiar saldo al acabar el año (por defecto) o extender saldo pendiente 4 meses
+- **Saldo extendido**: Con la opción de extender, empleados tienen saldo del año actual + saldo del año anterior (temporal) durante 4 meses, luego solo se limpia la parte temporal
+- **Campo `diasDesdeCarryOver`**: Nuevo campo en `Ausencia` para rastrear días cubiertos con saldo extendido
+- **Sincronización con compensación**: La compensación de horas extra ahora sincroniza correctamente con el saldo de ausencias, considerando carry-over
+- **HR/Empleado pueden crear ausencias**: HR puede abrir ausencias directamente desde espacio de empleados, empleados solicitan desde su espacio
+- **Card de saldo mejorada**: Fecha de rango visible en esquina superior derecha (no debajo)
+
+**Archivos afectados**:
+- `app/(dashboard)/hr/horario/ausencias/gestionar-ausencias-modal.tsx`
+- `app/api/empresa/politica-ausencias/route.ts`
+- `lib/calculos/ausencias.ts`
+- `app/api/ausencias/route.ts`
+- `app/api/ausencias/[id]/route.ts`
+- `components/shared/mi-espacio/ausencias-tab.tsx`
+- `components/empleado/solicitar-ausencia-modal.tsx`
+- `prisma/schema.prisma`
+
+---
+
 ### v3.3.0 - Interfaz Unificada de Campañas de Vacaciones (27 Ene 2025)
 
 **Cambios**:
@@ -205,7 +227,9 @@
 - ✅ Diseño visual con `FechaCalendar`
 - ✅ Tabs "Próximas" y "Pasadas"
 - ✅ Botón "Nueva Ausencia" en card calendario
-- ✅ Saldo de vacaciones (Total, Disponibles, Usados)
+- ✅ **Card "Saldo de ausencias" mejorada**: Fecha de rango visible en esquina superior derecha (no debajo)
+- ✅ Saldo de vacaciones (Total, Disponibles, Usados, Carry-Over si aplica)
+- ✅ Muestra saldo extendido y fecha de expiración si hay carry-over activo
 
 **Estados**:
 - Soporta estados nuevos: `pendiente_aprobacion`, `en_curso`, `completada`, `auto_aprobada`, `rechazada`
@@ -227,6 +251,7 @@
 - ✅ Ordenadas por fecha más reciente primero
 - ✅ Click en fila para ver detalles/editar
 - ✅ Usa `Dialog` de shadcn/ui (consistente)
+- ✅ **Botón "Abrir ausencia"**: HR puede crear ausencias directamente (sin solicitud)
 
 ---
 
@@ -235,14 +260,23 @@
 #### ✅ `SolicitarAusenciaModal`
 - ✅ Implementado y funcional
 - ✅ Usa Dialog de shadcn/ui
-- ✅ Validación de saldo
+- ✅ Validación de saldo (considera carry-over si aplica)
 - ✅ Selector de tipos con información detallada (aprobación y descuento de saldo)
 - ✅ Campo de upload de justificante (opcional, recomendado para tipos sin aprobación)
 - ✅ Soporte para archivos PDF, JPG, PNG (máx 5MB)
 - ✅ Subida a S3 antes de crear la ausencia
+- ✅ **Adaptativo según contexto**: 
+  - Si `esHRAdmin=true`: Crea ausencia directamente (sin solicitud)
+  - Si `esHRAdmin=false`: Crea solicitud que requiere aprobación
+- ✅ **Prop `empleadoIdDestino`**: Permite a HR crear ausencias para otros empleados
 
 #### ✅ `GestionarAusenciasModal`
 - ✅ Tab **Política de ausencias**: saldo anual y reglas (solapamiento, antelación) para toda la empresa
+- ✅ **✨ NUEVO: Toggle de Política de Carry-Over**:
+  - **Limpiar saldo al acabar el año** (por defecto): Saldo pendiente se limpia al finalizar el año
+  - **Extender saldo 4 meses**: Saldo pendiente del año anterior se extiende automáticamente 4 meses al siguiente año
+  - Extiende siempre 4 meses (valor fijo)
+  - Se guarda en `Empresa.config.politicaAusencias.carryOverMeses`
 - ✅ Tab **Calendario Laboral**: días laborables + gestión de festivos (importación y lista simplificada)
 
 #### ✅ `FechaCalendar`
@@ -312,9 +346,10 @@ const diasPendientes = ausencias
    - Selecciona tipo de ausencia (con información visual sobre aprobación y descuento)
    - Completa formulario (tipo, fechas, motivo/detalles según tipo)
    - **Opcional**: Sube justificante (recomendado para enfermedad, enfermedad_familiar, maternidad_paternidad)
-   - Sistema valida saldo disponible (si es vacaciones)
+   - Sistema valida saldo disponible (si es vacaciones), considerando carry-over si aplica
    - Se crea ausencia con estado `pendiente_aprobacion` (o directamente aprobada según tipo)
    - Saldo pendiente se incrementa automáticamente (si descuenta saldo)
+   - Si hay saldo extendido disponible, se usa primero (`diasDesdeCarryOver` se registra en la ausencia)
 
 2. **Ver Ausencias Propias**
    - Tab "Próximas": Ausencias con fechaFin >= hoy y estados `pendiente_aprobacion`, `en_curso`, `auto_aprobada`
@@ -333,12 +368,19 @@ const diasPendientes = ausencias
    - Filtra por estado: todas, pendientes, en curso, completadas, rechazadas
    - Busca por nombre de empleado
 
-2. **Aprobar/Rechazar Individual**
+2. **Abrir Ausencia Directamente** ⭐ NUEVO
+   - HR puede crear ausencias directamente desde:
+     - Espacio individual del empleado (`/hr/organizacion/personas/[id]` → Tab Ausencias)
+     - Vista de ausencias (`/hr/horario/ausencias`)
+   - **Comportamiento**: Se crea la ausencia directamente (sin solicitud), con estado según tipo
+   - Endpoint: `POST /api/ausencias` (con validación de permisos HR)
+
+3. **Aprobar/Rechazar Individual**
    - Click en ausencia pendiente
    - Modal muestra detalles completos
    - Opciones: Aprobar, Rechazar, Editar
    - Al aprobar: sistema determina `en_curso` o `completada` según fechaFin
-   - Saldo se actualiza automáticamente (días pendientes → días usados)
+   - Saldo se actualiza automáticamente (días pendientes → días usados), considerando carry-over
 
 3. **Actualización Masiva**
    - Botón "Actualizar ausencias" aprueba todas las pendientes
@@ -347,6 +389,9 @@ const diasPendientes = ausencias
 4. **Gestionar Ausencias**
    - Modal con dos tabs:
      - **Política de ausencias**: Configura días totales anuales (empresa o equipos), límite de solapamiento y días de antelación mínimos (todo a nivel empresa, sin selector adicional por equipo)
+     - **✨ NUEVO: Política de Carry-Over**: Toggle para elegir entre:
+       - **Limpiar saldo al acabar el año** (por defecto): Saldo pendiente se limpia al finalizar el año
+       - **Extender saldo 4 meses**: Saldo pendiente del año anterior se extiende 4 meses al siguiente año, luego se limpia solo la parte temporal
      - **Calendario Laboral**: Define días laborables y gestiona festivos (importación nacional + listado scrollable)
 
 5. **Editar Ausencia**
@@ -356,7 +401,7 @@ const diasPendientes = ausencias
    - Valida saldo si cambia número de días
    - Permite subir/actualizar justificante después de crear la ausencia
 
-> ℹ️ **Integración con bolsa de horas**: Cuando HR compensa horas extra desde `/hr/horario/fichajes` o desde nóminas, las ausencias generadas se crean automáticamente con tipo `otro`, `descuentaSaldo = false` y se actualiza `EmpleadoSaldoAusencias`, manteniendo el saldo sincronizado sin intervención manual.
+> ℹ️ **Integración con bolsa de horas**: Cuando HR compensa horas extra desde `/hr/horario/fichajes` o desde nóminas, las ausencias generadas se crean automáticamente con tipo `otro`, `descuentaSaldo = false` y se actualiza `EmpleadoSaldoAusencias`, manteniendo el saldo sincronizado sin intervención manual. **✅ Sincronización mejorada**: La compensación ahora considera correctamente el carry-over y actualiza los campos `diasDesdeCarryOver` y `carryOverUsado` en el saldo.
 
 ---
 
@@ -769,6 +814,59 @@ Todas las funciones de cálculo de días usan la configuración:
 
 ---
 
+## 🔄 POLÍTICA DE CARRY-OVER (EXTENSIÓN DE SALDO)
+
+### Descripción
+
+El sistema permite configurar cómo se maneja el saldo pendiente de ausencias al finalizar el año:
+
+1. **Limpiar saldo al acabar el año** (por defecto):
+   - Al finalizar el año, todo el saldo pendiente se limpia
+   - Los empleados empiezan el nuevo año solo con el saldo asignado para ese año
+
+2. **Extender saldo 4 meses**:
+   - El saldo pendiente del año anterior se extiende al siguiente año
+   - Durante el período de extensión, los empleados tienen:
+     - Saldo del año actual
+     - Saldo extendido del año anterior (temporal)
+   - Al finalizar el período de extensión, solo se limpia la parte temporal (del año anterior)
+   - El saldo del año actual se mantiene
+
+### Configuración
+
+**Ubicación**: Modal "Gestionar Ausencias" → Tab "Política de ausencias"
+
+**Campo en base de datos**: `Empresa.config.politicaAusencias.carryOverMeses`
+- `0`: Limpiar saldo al acabar el año (por defecto)
+- `4`: Extender saldo 4 meses
+
+**Endpoint**: `PATCH /api/empresa/politica-ausencias`
+
+### Funcionamiento Técnico
+
+1. **Al crear ausencia con saldo extendido**:
+   - El sistema verifica primero si hay saldo extendido disponible (`carryOverDisponible`)
+   - Si hay saldo extendido, se usa primero (se registra en `Ausencia.diasDesdeCarryOver`)
+   - Si no hay suficiente saldo extendido, se usa el saldo del año actual
+
+2. **Tracking en `EmpleadoSaldoAusencias`**:
+   - `carryOverDisponible`: Saldo extendido disponible del año anterior
+   - `carryOverUsado`: Saldo extendido ya utilizado
+   - `carryOverExpiraEn`: Fecha de expiración del saldo extendido (año anterior + 4 meses)
+
+3. **Limpieza automática**:
+- Al finalizar los 4 meses, se limpia automáticamente `carryOverDisponible` y `carryOverUsado`
+   - El saldo del año actual (`diasTotales`, `diasUsados`, `diasPendientes`) no se ve afectado
+
+### Sincronización con Compensación de Horas Extra
+
+Cuando HR compensa horas extra creando ausencias:
+- Las ausencias generadas NO descuentan saldo (`descuentaSaldo = false`)
+- El saldo de ausencias se actualiza correctamente, considerando carry-over si aplica
+- Los campos `diasDesdeCarryOver` y `carryOverUsado` se actualizan si la ausencia usa saldo extendido
+
+---
+
 ## 🎯 PRÓXIMOS PASOS SUGERIDOS
 
 ### Prioridad ALTA
@@ -806,11 +904,13 @@ Todas las funciones de cálculo de días usan la configuración:
 
 ### Lógica de Negocio
 - Cálculos: `lib/calculos/ausencias.ts`
-  - `calcularSaldoDisponible()` - Cálculo atómico en transacciones
-  - `validarSaldoSuficiente()` - Validación con soporte transaccional
+  - `calcularSaldoDisponible()` - Cálculo atómico en transacciones, considera carry-over
+  - `validarSaldoSuficiente()` - Validación con soporte transaccional, considera carry-over
   - `calcularDias()`, `validarPoliticasEquipo()`
+  - `actualizarSaldo()` - Actualiza saldo considerando carry-over y `diasDesdeCarryOver`
 - Días Laborables: `lib/calculos/dias-laborables.ts`
 - Validaciones: `lib/validaciones/schemas.ts` (ausenciaCreateSchema, ausenciaUpdateSchema)
+- Política Carry-Over: `app/api/empresa/politica-ausencias/route.ts`
 
 ### UI
 - UI HR: `app/(dashboard)/hr/horario/ausencias/ausencias-client.tsx`
@@ -856,5 +956,5 @@ Todas las funciones de cálculo de días usan la configuración:
 
 **Última actualización**: 27 Enero 2025  
 **Versión**: 3.4.0  
-**Estado**: Sistema refactorizado con validaciones robustas, transacciones atómicas y campo único de motivo/detalles. Interfaz de campañas de vacaciones mejorada con vista unificada e interacción directa. Modal de preferencias optimizado: apertura única automática al iniciar sesión, integración con notificaciones mediante eventos, y UI unificada con selector y visualización de días en la parte superior.
+**Estado**: Sistema refactorizado con validaciones robustas, transacciones atómicas y campo único de motivo/detalles. Interfaz de campañas de vacaciones mejorada con vista unificada e interacción directa. Modal de preferencias optimizado: apertura única automática al iniciar sesión, integración con notificaciones mediante eventos, y UI unificada con selector y visualización de días en la parte superior. **NUEVO**: Política de carry-over configurable (limpiar vs extender saldo), HR/empleado pueden crear ausencias, card de saldo mejorada con fecha arriba, sincronización mejorada con compensación de horas extra.
 

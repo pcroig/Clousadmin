@@ -46,7 +46,12 @@ grep -q "api/cron/revisar-solicitudes" "$TMP_CRON" 2>/dev/null || {
   echo '0 2 * * * curl -s -X POST '"$APP_URL"'/api/cron/revisar-solicitudes -H "Authorization: Bearer '"$CRON_SECRET"'" >> '"$LOG_FILE"' 2>&1' >> "$TMP_CRON"
 }
 
-# 3) Backup DB diario 02:00 (requiere envs de storage y DB)
+# 3) Renovar saldo de horas extra: 1 de enero 00:10 UTC
+grep -q "api/cron/renovar-saldo-horas" "$TMP_CRON" 2>/dev/null || {
+  echo '10 0 1 1 * curl -s -X POST '"$APP_URL"'/api/cron/renovar-saldo-horas -H "Authorization: Bearer '"$CRON_SECRET"'" >> '"$LOG_FILE"' 2>&1' >> "$TMP_CRON"
+}
+
+# 4) Backup DB diario 02:00 (requiere envs de storage y DB)
 if [[ -n "${DATABASE_URL:-}" && -n "${STORAGE_ENDPOINT:-}" && -n "${STORAGE_ACCESS_KEY:-}" && -n "${STORAGE_SECRET_KEY:-}" && -n "${STORAGE_REGION:-}" && -n "${BACKUP_BUCKET:-}" ]]; then
   # Asegurar permisos de ejecución del script de backup
   chmod +x /opt/clousadmin/scripts/backup-db.sh 2>/dev/null || true

@@ -10,10 +10,16 @@
 | Endpoint | Método | Descripción |
 |----------|--------|-------------|
 | `/api/fichajes` | POST | Registrar fichaje (entrada, pausa, salida) |
-| `/api/fichajes` | GET | Listar fichajes con filtros por empleado, estado y fecha |
+| `/api/fichajes` | GET | Listar fichajes con filtros (incluye `horasEsperadas` y `balance`) |
+| `/api/fichajes/eventos` | POST | Crear evento en fichaje existente |
+| `/api/fichajes/eventos/{id}` | PATCH | Editar evento (sin auto-guardado, se acumula hasta guardar) |
+| `/api/fichajes/eventos/{id}` | DELETE | Eliminar evento |
 | `/api/fichajes/balance/{empleadoId}` | GET | Balance de horas |
 | `/api/fichajes/correccion` | POST | Solicitar corrección |
 | `/api/fichajes/bolsa-horas` | GET | Bolsa de horas para HR |
+| `/api/empleados/{id}/renovar-saldo` | POST | Renovar saldo de horas (HR Admin) |
+| `/api/empleados/{id}/renovar-saldo` | GET | Obtener fecha de última renovación |
+| `/api/jornadas/asegurar-empleados` | POST | Asignar jornada por defecto a empleados sin jornada |
 
 ---
 

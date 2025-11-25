@@ -44,3 +44,4 @@ Todas las respuestas paginadas siguen el mismo formato:
 - Todos los endpoints documentados en `docs/api/reference/*.md` usan estos helpers.
 - Para listas muy grandes, considera `limit` pequeños y filtros específicos.
 
+

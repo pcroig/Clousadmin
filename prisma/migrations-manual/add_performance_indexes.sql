@@ -30,3 +30,4 @@ CREATE INDEX IF NOT EXISTS "empleados_empresa_estado_nombre_idx" ON "empleados" 
 ANALYZE;
 
 
+

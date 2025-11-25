@@ -302,18 +302,50 @@ export async function calcularBalancePeriodo(
   fechaInicio: Date,
   fechaFin: Date
 ): Promise<BalancePeriodo> {
-  // Obtener todos los fichajes del período
+  const fechaInicioNormalizada = normalizarInicioDeDia(fechaInicio);
+  const fechaFinNormalizada = normalizarFinDeDia(fechaFin);
+
+  const empleado = await prismaClient.empleado.findUnique({
+    where: { id: empleadoId },
+    select: {
+      empresaId: true,
+      saldoRenovadoDesde: true,
+    },
+  });
+
+  if (!empleado) {
+    throw new Error(`[BalanceHoras] Empleado ${empleadoId} no encontrado`);
+  }
+
+  const saldoRenovadoDesde =
+    empleado.saldoRenovadoDesde != null
+      ? normalizarInicioDeDia(empleado.saldoRenovadoDesde)
+      : null;
+
+  const fechaInicioEfectiva =
+    saldoRenovadoDesde && saldoRenovadoDesde > fechaInicioNormalizada
+      ? saldoRenovadoDesde
+      : fechaInicioNormalizada;
+
+  if (fechaInicioEfectiva > fechaFinNormalizada) {
+    return {
+      totalHorasTrabajadas: 0,
+      totalHorasEsperadas: 0,
+      balanceTotal: 0,
+      dias: [],
+    };
+  }
+
+  // Obtener todos los fichajes del período efectivo
   const fichajes = await prismaClient.fichaje.findMany({
     where: {
       empleadoId,
       fecha: {
-        gte: fechaInicio,
-        lte: fechaFin,
+        gte: fechaInicioEfectiva,
+        lte: fechaFinNormalizada,
       },
     },
-    orderBy: [
-      { fecha: 'asc' },
-    ],
+    orderBy: [{ fecha: 'asc' }],
     include: {
       eventos: {
         orderBy: {
@@ -330,20 +362,10 @@ export async function calcularBalancePeriodo(
   }));
   const fichajesPorDia = agruparFichajesPorDia(fichajesConEventos);
 
-  // Obtener festivos del período
-  const empleado = await prismaClient.empleado.findUnique({
-    where: { id: empleadoId },
-    select: { empresaId: true },
-  });
-
-  if (!empleado) {
-    throw new Error(`[BalanceHoras] Empleado ${empleadoId} no encontrado`);
-  }
-
-  const diasDelPeriodo = generarDiasDelPeriodo(fechaInicio, fechaFin);
+  const diasDelPeriodo = generarDiasDelPeriodo(fechaInicioEfectiva, fechaFinNormalizada);
 
   const [festivos, diasLaborablesConfig] = await Promise.all([
-    getFestivosActivosEnRango(empleado.empresaId, fechaInicio, fechaFin),
+    getFestivosActivosEnRango(empleado.empresaId, fechaInicioEfectiva, fechaFinNormalizada),
     getDiasLaborablesEmpresa(empleado.empresaId),
   ]);
   const festivosSet = crearSetFestivos(festivos);
@@ -403,6 +425,18 @@ export async function calcularBalancePeriodo(
     balanceTotal: Math.round((totalHorasTrabajadas - totalHorasEsperadas) * 100) / 100,
     dias,
   };
+}
+
+function normalizarInicioDeDia(fecha: Date): Date {
+  const normalizada = new Date(fecha);
+  normalizada.setHours(0, 0, 0, 0);
+  return normalizada;
+}
+
+function normalizarFinDeDia(fecha: Date): Date {
+  const normalizada = new Date(fecha);
+  normalizada.setHours(23, 59, 59, 999);
+  return normalizada;
 }
 
 /**
