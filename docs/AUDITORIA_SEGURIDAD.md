@@ -1,7 +1,12 @@
 # Auditoría de Seguridad - Clousadmin
 
 **Fecha**: 2025-01-27  
-**Estado**: Completada
+**Última actualización**: 27 de enero de 2025  
+**Estado**: ✅ Completada
+
+> **Nota**: Este documento contiene la auditoría completa. Para configuración práctica:
+> - [`CONFIGURACION_SEGURIDAD.md`](CONFIGURACION_SEGURIDAD.md) - Guía de configuración
+> - [`RESUMEN_SEGURIDAD_IMPLEMENTADA.md`](RESUMEN_SEGURIDAD_IMPLEMENTADA.md) - Resumen ejecutivo
 
 ---
 

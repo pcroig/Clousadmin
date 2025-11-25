@@ -2,7 +2,11 @@
 
 ## Visión General
 
-Sistema de autenticación robusto que soporta login local (bcrypt) y prepara para Google OAuth. 
+Sistema de autenticación robusto que soporta múltiples métodos de autenticación:
+- ✅ Login local con email/contraseña (bcrypt)
+- ✅ Google OAuth (NextAuth v5)
+- ✅ Recuperación de contraseña
+- ✅ Autenticación en dos pasos (2FA TOTP + Backup Codes) 
 
 **Dos tipos de invitaciones:**
 - **Invitación de Signup**: Para crear una nueva empresa y el primer HR Admin (requiere token de invitación)
@@ -246,7 +250,7 @@ Desde `Organización > Personas > + Crear persona`
 - Los tokens OAuth se almacenan en la tabla `Account` para uso en integraciones
 
 **Configuración:**
-📖 **Ver guía completa:** [`docs/SETUP_GOOGLE_OAUTH.md`](../../SETUP_GOOGLE_OAUTH.md)
+📖 **Ver guía completa:** [`docs/SETUP_GOOGLE_OAUTH.md`](../SETUP_GOOGLE_OAUTH.md)
 
 **Variables de entorno requeridas:**
 ```env
@@ -680,7 +684,7 @@ console.log('[loginAction] Password válida:', isValid)
 - Reinicia el servidor después de añadir las variables
 
 **Otros errores comunes:**
-📖 **Ver troubleshooting completo:** [`docs/SETUP_GOOGLE_OAUTH.md#troubleshooting`](../../SETUP_GOOGLE_OAUTH.md#troubleshooting)
+📖 **Ver troubleshooting completo:** [`docs/SETUP_GOOGLE_OAUTH.md#troubleshooting`](../SETUP_GOOGLE_OAUTH.md#troubleshooting)
 
 ---
 
@@ -696,19 +700,28 @@ console.log('[loginAction] Password válida:', isValid)
 - [x] Fix de empleadoId en seed
 - [x] UI moderna para login/onboarding/signup
 
-### Fase 2 (Pendiente)
+### Fase 2 (Completado) ✅
 - [x] Google OAuth completamente funcional
 - [x] Envío de emails de invitación (Resend) - Ver `docs/CONFIGURACION_RESEND.md`
-- [ ] Botón "Reenviar invitación" en UI
 - [x] Recuperación de contraseña
-- [ ] Verificación de email adicional
+- [x] 2FA (Two-Factor Authentication)
 
 ### Fase 3 (Futuro)
+- [ ] Botón "Reenviar invitación" en UI
 - [ ] Microsoft Azure AD / Outlook OAuth
-- [x] 2FA (Two-Factor Authentication)
 - [ ] SSO empresarial
 - [ ] Audit log de sesiones
 - [ ] Política de expiración de contraseñas
+- [ ] Verificación de email adicional
+
+---
+
+## Referencias
+
+- **Configuración inicial**: [`docs/SETUP.md`](../SETUP.md)
+- **Invitaciones de signup**: [`docs/INVITAR_USUARIOS.md`](../INVITAR_USUARIOS.md)
+- **Google OAuth**: [`docs/SETUP_GOOGLE_OAUTH.md`](../SETUP_GOOGLE_OAUTH.md)
+- **Arquitectura**: [`docs/ARQUITECTURA.md`](../ARQUITECTURA.md#autenticación-y-autorización)
 
 ---
 

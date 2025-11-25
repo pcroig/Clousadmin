@@ -96,10 +96,12 @@ export async function PATCH(
       const validatedData = validationResult.data;
       
       const { accion, motivoRechazo } = validatedData;
+      const diasSolicitados = Number(ausencia.diasSolicitados);
+      const diasDesdeCarryOriginal = Number(ausencia.diasDesdeCarryOver ?? 0);
 
     // Determinar estado resultante
     let nuevoEstado: EstadoAusencia = EstadoAusencia.rechazada;
-    if (accion === 'aprobar') {
+      if (accion === 'aprobar') {
       const hoy = new Date();
       hoy.setHours(0, 0, 0, 0);
       const fechaFin = new Date(ausencia.fechaFin);
@@ -110,8 +112,6 @@ export async function PATCH(
       // Validar saldo suficiente antes de aprobar si la ausencia descuenta saldo
       if (ausencia.descuentaSaldo) {
         const año = ausencia.fechaInicio.getFullYear();
-        const diasSolicitados = Number(ausencia.diasSolicitados);
-        
         const validacion = await validarSaldoSuficiente(
           ausencia.empleadoId,
           año,
@@ -134,7 +134,6 @@ export async function PATCH(
       const ejecutarTransaccion = () => prisma.$transaction(async (tx) => {
         if (accion === 'aprobar' && ausencia.descuentaSaldo) {
           const año = ausencia.fechaInicio.getFullYear();
-          const diasSolicitados = Number(ausencia.diasSolicitados);
           const validacionSaldo = await validarSaldoSuficiente(
             ausencia.empleadoId,
             año,
@@ -176,65 +175,16 @@ export async function PATCH(
     // Actualizar saldo si la ausencia descuenta saldo
     if (ausencia.descuentaSaldo) {
       const año = ausencia.fechaInicio.getFullYear();
-      const diasSolicitados = Number(ausencia.diasSolicitados);
-      
-          // Obtener o crear saldo
-          let saldo = await tx.empleadoSaldoAusencias.findFirst({
-            where: {
-              empleadoId: ausencia.empleadoId,
-              año,
-            },
-          });
-
-          if (!saldo) {
-            const empleado = await tx.empleado.findUnique({
-              where: { id: ausencia.empleadoId },
-              select: { diasVacaciones: true, empresaId: true },
-            });
-
-            if (!empleado) {
-              throw new Error('Empleado no encontrado');
-            }
-
-            saldo = await tx.empleadoSaldoAusencias.create({
-              data: {
-                empleadoId: ausencia.empleadoId,
-                empresaId: empleado.empresaId,
-                año,
-                diasTotales: empleado.diasVacaciones,
-                diasUsados: 0,
-                diasPendientes: 0,
-                origen: 'manual_hr',
-              },
-            });
-          }
-
-          // Actualizar saldo según la acción
-      if (accion === 'aprobar') {
-        // Mover días de pendientes a usados
-            await tx.empleadoSaldoAusencias.update({
-              where: { id: saldo.id },
-              data: {
-                diasPendientes: {
-                  decrement: diasSolicitados,
-                },
-                diasUsados: {
-                  increment: diasSolicitados,
-                },
-              },
-            });
-          } else {
-            // Devolver días pendientes
-            await tx.empleadoSaldoAusencias.update({
-              where: { id: saldo.id },
-              data: {
-                diasPendientes: {
-                  decrement: diasSolicitados,
-                },
-              },
-            });
-          }
-        }
+      const accionSaldo = accion === 'aprobar' ? 'aprobar' : 'rechazar';
+      await actualizarSaldo(
+        ausencia.empleadoId,
+        año,
+        accionSaldo,
+        diasSolicitados,
+        tx,
+        { diasDesdeCarryOver: diasDesdeCarryOriginal }
+      );
+    }
 
         return updatedAusencia;
       });
@@ -413,6 +363,8 @@ export async function PATCH(
         return badRequestResponse('El motivo es obligatorio para ausencias de tipo "Otro"');
       }
 
+      let diasDesdeCarryActual = Number(ausencia.diasDesdeCarryOver ?? 0);
+
       // Manejar cambios en el tipo (vacaciones ↔ otro tipo)
       if (cambioTipo) {
         const diasAnteriores = Number(ausencia.diasSolicitados);
@@ -420,13 +372,33 @@ export async function PATCH(
         if (ausencia.descuentaSaldo && !nuevoDescuentaSaldo) {
           // Cambió de vacaciones a otro tipo: devolver días al saldo
           if (ausencia.estado === EstadoAusencia.pendiente) {
-            await actualizarSaldo(ausencia.empleadoId, año, 'cancelar', diasAnteriores);
+            const liberarCarry = Math.min(diasDesdeCarryActual, diasAnteriores);
+            await actualizarSaldo(
+              ausencia.empleadoId,
+              año,
+              'cancelar',
+              diasAnteriores,
+              undefined,
+              { diasDesdeCarryOver: liberarCarry }
+            );
+            diasDesdeCarryActual = Math.max(0, diasDesdeCarryActual - liberarCarry);
           } else if (ausencia.estado === EstadoAusencia.confirmada || ausencia.estado === EstadoAusencia.completada) {
             // Devolver días usados
             await prisma.empleadoSaldoAusencias.updateMany({
               where: { empleadoId: ausencia.empleadoId, año },
-              data: { diasUsados: { decrement: diasAnteriores } },
+              data: {
+                diasUsados: { decrement: diasAnteriores },
+                ...(diasDesdeCarryActual > 0 && {
+                  carryOverUsado: {
+                    decrement: Math.min(diasDesdeCarryActual, diasAnteriores),
+                  },
+                }),
+              },
             });
+            diasDesdeCarryActual = Math.max(
+              0,
+              diasDesdeCarryActual - Math.min(diasDesdeCarryActual, diasAnteriores)
+            );
           }
         } else if (!ausencia.descuentaSaldo && nuevoDescuentaSaldo) {
           // Cambió de otro tipo a vacaciones: reservar días
@@ -436,7 +408,13 @@ export async function PATCH(
           }
           
           if (ausencia.estado === EstadoAusencia.pendiente) {
-            await actualizarSaldo(ausencia.empleadoId, año, 'solicitar', nuevosDiasSolicitados);
+            const resultadoSaldo = await actualizarSaldo(
+              ausencia.empleadoId,
+              año,
+              'solicitar',
+              nuevosDiasSolicitados
+            );
+            diasDesdeCarryActual = resultadoSaldo.diasDesdeCarryOver;
           } else if (ausencia.estado === EstadoAusencia.confirmada || ausencia.estado === EstadoAusencia.completada) {
             // Marcar como usados
             await prisma.empleadoSaldoAusencias.updateMany({
@@ -484,17 +462,46 @@ export async function PATCH(
       // Actualizar saldo si cambió el número de días (sin cambio de tipo)
       if (!cambioTipo && nuevoDescuentaSaldo && diferenciaDias !== 0) {
         if (ausencia.estado === EstadoAusencia.pendiente) {
-          // Ajustar días pendientes
-          await prisma.empleadoSaldoAusencias.updateMany({
-            where: { empleadoId: ausencia.empleadoId, año },
-            data: { diasPendientes: { increment: diferenciaDias } },
-          });
+          if (diferenciaDias > 0) {
+            const resultadoSaldo = await actualizarSaldo(
+              ausencia.empleadoId,
+              año,
+              'solicitar',
+              diferenciaDias
+            );
+            diasDesdeCarryActual += resultadoSaldo.diasDesdeCarryOver;
+          } else {
+            const reducir = Math.abs(diferenciaDias);
+            const liberarCarry = Math.min(diasDesdeCarryActual, reducir);
+            await actualizarSaldo(
+              ausencia.empleadoId,
+              año,
+              'cancelar',
+              reducir,
+              undefined,
+              { diasDesdeCarryOver: liberarCarry }
+            );
+            diasDesdeCarryActual = Math.max(0, diasDesdeCarryActual - liberarCarry);
+          }
         } else if (ausencia.estado === EstadoAusencia.confirmada || ausencia.estado === EstadoAusencia.completada) {
-          // Ajustar días usados
           await prisma.empleadoSaldoAusencias.updateMany({
             where: { empleadoId: ausencia.empleadoId, año },
-            data: { diasUsados: { increment: diferenciaDias } },
+            data: {
+              diasUsados: { increment: diferenciaDias },
+              ...(diferenciaDias < 0 &&
+                diasDesdeCarryActual > 0 && {
+                  carryOverUsado: {
+                    decrement: Math.min(diasDesdeCarryActual, Math.abs(diferenciaDias)),
+                  },
+                }),
+            },
           });
+          if (diferenciaDias < 0) {
+            diasDesdeCarryActual = Math.max(
+              0,
+              diasDesdeCarryActual - Math.min(diasDesdeCarryActual, Math.abs(diferenciaDias))
+            );
+          }
         }
       }
 
@@ -518,6 +525,7 @@ export async function PATCH(
             diasLaborables,
             diasSolicitados: nuevosDiasSolicitados,
           }),
+          diasDesdeCarryOver: diasDesdeCarryActual,
           descuentaSaldo: nuevoDescuentaSaldo,
         },
         include: {
@@ -574,13 +582,19 @@ export async function DELETE(
     if (ausencia.descuentaSaldo) {
       const año = ausencia.fechaInicio.getFullYear();
       const diasSolicitados = Number(ausencia.diasSolicitados);
+      const diasDesdeCarry = Math.min(
+        Number(ausencia.diasDesdeCarryOver ?? 0),
+        diasSolicitados
+      );
       
       // Devolver días pendientes
       await actualizarSaldo(
         ausencia.empleadoId,
         año,
         'cancelar',
-        diasSolicitados
+        diasSolicitados,
+        undefined,
+        { diasDesdeCarryOver: diasDesdeCarry }
       );
     }
 

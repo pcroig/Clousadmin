@@ -28,6 +28,8 @@ interface SaldoResponse {
   diasUsados: number;
   diasPendientes: number;
   diasDisponibles: number;
+  carryOverDisponible?: number;
+  carryOverExpiraEn?: string | Date | null;
 }
 
 interface AusenciasResponse {
@@ -42,6 +44,8 @@ interface SaldoApiResponse {
   diasUsados?: number;
   diasPendientes?: number;
   diasDisponibles?: number;
+  carryOverDisponible?: number;
+  carryOverExpiraEn?: string | Date | null;
 }
 
 interface CalendarioLaboralResponse {
@@ -92,6 +96,8 @@ export function AusenciasTab({ empleadoId, contexto = 'empleado' }: MiEspacioAus
 
   const calendarContainerRef = useRef<HTMLDivElement>(null);
   const puedeSolicitar = contexto === 'empleado' || contexto === 'manager';
+  const puedeRegistrar = contexto === 'hr_admin';
+  const puedeAccionar = puedeSolicitar || puedeRegistrar;
 
   const cargarAusencias = useCallback(
     async (signal?: AbortSignal) => {
@@ -137,7 +143,11 @@ export function AusenciasTab({ empleadoId, contexto = 'empleado' }: MiEspacioAus
           throw new Error('Error al cargar saldo de ausencias');
         }
         if (payload?.data) {
-          setSaldo(payload.data);
+          setSaldo({
+            ...payload.data,
+            carryOverDisponible: payload.data.carryOverDisponible ?? 0,
+            carryOverExpiraEn: payload.data.carryOverExpiraEn ?? null,
+          });
         } else if (
           typeof payload?.diasTotales === 'number' &&
           typeof payload?.diasUsados === 'number'
@@ -147,6 +157,8 @@ export function AusenciasTab({ empleadoId, contexto = 'empleado' }: MiEspacioAus
             diasUsados: payload.diasUsados,
             diasPendientes: payload.diasPendientes ?? 0,
             diasDisponibles: payload.diasDisponibles ?? 0,
+            carryOverDisponible: payload.carryOverDisponible ?? 0,
+            carryOverExpiraEn: payload.carryOverExpiraEn ?? null,
           });
         }
       } catch (error: unknown) {
@@ -203,7 +215,7 @@ export function AusenciasTab({ empleadoId, contexto = 'empleado' }: MiEspacioAus
   }, []);
 
   // Calcular saldo de ausencias
-  const calcularSaldo = useCallback(() => {
+  const calcularSaldo = useCallback((): SaldoResponse => {
     const diasTotales = 22; // Ejemplo: podria venir de la API
     const diasUsados = ausencias
       .filter((a) => a.estado === 'approved' || a.estado === 'auto_aprobada')
@@ -213,10 +225,26 @@ export function AusenciasTab({ empleadoId, contexto = 'empleado' }: MiEspacioAus
       .reduce((sum, a) => sum + (a.diasLaborables || 0), 0);
     const diasDisponibles = diasTotales - diasUsados - diasPendientes;
 
-    return { diasTotales, diasUsados, diasPendientes, diasDisponibles };
+    return {
+      diasTotales,
+      diasUsados,
+      diasPendientes,
+      diasDisponibles,
+      carryOverDisponible: 0,
+      carryOverExpiraEn: null,
+    };
   }, [ausencias]);
 
-  const saldoResumen = useMemo(() => saldo ?? calcularSaldo(), [saldo, calcularSaldo]);
+  const saldoResumen = useMemo<SaldoResponse>(() => {
+    if (saldo) {
+      return {
+        ...saldo,
+        carryOverDisponible: saldo.carryOverDisponible ?? 0,
+        carryOverExpiraEn: saldo.carryOverExpiraEn ?? null,
+      };
+    }
+    return calcularSaldo();
+  }, [saldo, calcularSaldo]);
 
   // Próximas ausencias
   const proximasAusencias = ausencias
@@ -346,9 +374,10 @@ export function AusenciasTab({ empleadoId, contexto = 'empleado' }: MiEspacioAus
   };
 
   const handleOpenSolicitud = () => {
-    if (!puedeSolicitar) {
+    if (!puedeAccionar) {
       return;
     }
+    setTooltipData(null);
     setSolicitudModalOpen(true);
   };
 
@@ -391,15 +420,17 @@ export function AusenciasTab({ empleadoId, contexto = 'empleado' }: MiEspacioAus
       <div className="space-y-6">
         {/* Card de saldo */}
         <div className="bg-white rounded-lg border border-gray-200 p-6">
-          <div className="flex items-center gap-2 mb-4">
-            <svg className="w-5 h-5 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <h3 className="text-sm font-semibold text-gray-900">Saldo de ausencias</h3>
+          <div className="flex items-start justify-between gap-4 mb-4">
+            <div className="flex items-center gap-2">
+              <svg className="w-5 h-5 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <h3 className="text-sm font-semibold text-gray-900">Saldo de ausencias</h3>
+            </div>
+            <span className="text-xs text-gray-500">
+              Ene {new Date().getFullYear()} - Dic {new Date().getFullYear()}
+            </span>
           </div>
-          <p className="text-xs text-gray-500 mb-4">
-            De enero {new Date().getFullYear()} a diciembre {new Date().getFullYear()}
-          </p>
           <div className="grid grid-cols-4 gap-4">
             <div>
               <div className="text-2xl font-bold text-gray-900">{saldoResumen.diasTotales}</div>
@@ -418,6 +449,14 @@ export function AusenciasTab({ empleadoId, contexto = 'empleado' }: MiEspacioAus
               <div className="text-xs text-gray-500 mt-1">Disponibles</div>
             </div>
           </div>
+          {saldoResumen.carryOverDisponible && saldoResumen.carryOverDisponible > 0 && (
+            <p className="text-[11px] text-gray-500 mt-3">
+              Incluye {saldoResumen.carryOverDisponible} día(s) extendidos
+              {saldoResumen.carryOverExpiraEn
+                ? ` · disponible hasta ${new Date(saldoResumen.carryOverExpiraEn).toLocaleDateString('es-ES')}`
+                : ''}
+            </p>
+          )}
         </div>
 
         {/* Ausencias listado */}
@@ -464,9 +503,9 @@ export function AusenciasTab({ empleadoId, contexto = 'empleado' }: MiEspacioAus
       <div className="rounded-lg border border-gray-200 bg-white p-6">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold text-gray-900">Calendario</h3>
-          {puedeSolicitar && (
+          {puedeAccionar && (
             <Button size="sm" onClick={handleOpenSolicitud}>
-              Solicitar ausencia
+              {puedeRegistrar ? 'Registrar ausencia' : 'Solicitar ausencia'}
             </Button>
           )}
         </div>
@@ -559,7 +598,7 @@ export function AusenciasTab({ empleadoId, contexto = 'empleado' }: MiEspacioAus
                       </div>
                     )}
                   </>
-                ) : esDiaLaborable(tooltipData.date) && puedeSolicitar ? (
+                ) : esDiaLaborable(tooltipData.date) && puedeAccionar ? (
                   <>
                     <p className="text-sm text-gray-600">Día laborable disponible</p>
                     <Button
@@ -567,7 +606,7 @@ export function AusenciasTab({ empleadoId, contexto = 'empleado' }: MiEspacioAus
                       className="w-full"
                       onClick={handleOpenSolicitud}
                     >
-                      Solicitar ausencia
+                      {puedeRegistrar ? 'Registrar ausencia' : 'Solicitar ausencia'}
                     </Button>
                   </>
                 ) : (
@@ -579,7 +618,7 @@ export function AusenciasTab({ empleadoId, contexto = 'empleado' }: MiEspacioAus
         </div>
       </div>
 
-      {puedeSolicitar && (
+      {puedeAccionar && (
         <SolicitarAusenciaModal
           open={solicitudModalOpen}
           onClose={() => setSolicitudModalOpen(false)}
@@ -588,6 +627,8 @@ export function AusenciasTab({ empleadoId, contexto = 'empleado' }: MiEspacioAus
             await Promise.all([cargarAusencias(), cargarSaldo()]);
           }}
           saldoDisponible={saldoResumen.diasDisponibles}
+          contexto={contexto}
+          empleadoIdDestino={puedeRegistrar ? empleadoId : undefined}
         />
       )}
     </div>

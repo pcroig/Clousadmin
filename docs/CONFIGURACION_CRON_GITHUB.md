@@ -142,9 +142,9 @@ Con `CRON_SECRET`:
 Si crees que el secret se comprometió:
 
 1. Genera uno nuevo:
-   ```bash
-   openssl rand -base64 32
-   ```
+```bash
+openssl rand -base64 32
+```
 
 2. Actualiza en Hetzner (`.env`)
 3. Actualiza en GitHub (si usas GitHub Actions)
@@ -184,7 +184,7 @@ Si crees que el secret se comprometió:
 
 - [Ver logs de crons](./cron/VER_LOGS.md)
 - [Inventario de crons](./cron/INVENTARIO.md)
-- [Guía de migración a Hetzner](../MIGRACION_HETZNER.md)
+- [Guía de migración a Hetzner](MIGRACION_HETZNER.md)
 
 **Última actualización**: 21 de noviembre 2025  
 **Estado**: ✅ Configurado en Hetzner

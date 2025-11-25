@@ -15,6 +15,169 @@ import {
 
 import type { Prisma } from '@prisma/client';
 
+const CARRY_OVER_DEFAULT_MONTHS = 4;
+
+type CarryOverPolicy = {
+  mode: 'limpiar' | 'extender';
+  months: number;
+};
+
+type PrismaTx = Prisma.TransactionClient;
+
+function parseCarryOverPolicy(config?: Record<string, unknown> | null): CarryOverPolicy {
+  if (!config || typeof config.carryOver !== 'object' || config.carryOver === null) {
+    return { mode: 'limpiar', months: 0 };
+  }
+
+  const raw = config.carryOver as Record<string, unknown>;
+  const mode =
+    typeof raw.modo === 'string' && raw.modo === 'extender' ? 'extender' : 'limpiar';
+  const monthsRaw =
+    typeof raw.mesesExtension === 'number' ? raw.mesesExtension : CARRY_OVER_DEFAULT_MONTHS;
+  const months = Math.min(Math.max(monthsRaw, 1), 12);
+
+  if (mode === 'extender') {
+    return { mode, months };
+  }
+
+  return { mode: 'limpiar', months: 0 };
+}
+
+function computeCarryOverExpiry(year: number, months: number): Date {
+  const targetMonthIndex = Math.min(Math.max(months, 1), 12);
+  // Date.UTC month is zero-based; using targetMonthIndex gives us the first day of the month following the extension
+  const expira = new Date(Date.UTC(year, targetMonthIndex, 0, 23, 59, 59, 999));
+  return expira;
+}
+
+function decimalToNumber(value: Prisma.Decimal | number | string | null | undefined): number {
+  if (value === null || value === undefined) return 0;
+  if (typeof value === 'number') return value;
+  if (typeof value === 'string') {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+  if (typeof (value as Prisma.Decimal).toNumber === 'function') {
+    try {
+      return (value as Prisma.Decimal).toNumber();
+    } catch {
+      return 0;
+    }
+  }
+  return 0;
+}
+
+async function limpiarCarryOverSiExpirado(
+  saldo: Prisma.EmpleadoSaldoAusencias,
+  executor: PrismaTx | typeof prisma
+): Promise<Prisma.EmpleadoSaldoAusencias> {
+  if (!saldo.carryOverExpiraEn || decimalToNumber(saldo.carryOverAsignado) <= 0) {
+    return saldo;
+  }
+
+  const hoy = new Date();
+  if (hoy <= saldo.carryOverExpiraEn) {
+    return saldo;
+  }
+
+  return executor.empleadoSaldoAusencias.update({
+    where: { id: saldo.id },
+    data: {
+      carryOverAsignado: 0,
+      carryOverPendiente: 0,
+      carryOverExpiraEn: null,
+      carryOverFuenteAnio: null,
+    },
+  });
+}
+
+async function calcularDatosCarryOverParaNuevoSaldo(params: {
+  empleadoId: string;
+  año: number;
+  empresaId: string;
+  empresaConfig: Record<string, unknown> | null;
+  executor: PrismaTx | typeof prisma;
+}): Promise<Pick<
+  Prisma.EmpleadoSaldoAusenciasCreateInput,
+  'carryOverAsignado' | 'carryOverPendiente' | 'carryOverUsado' | 'carryOverExpiraEn' | 'carryOverFuenteAnio'
+>> {
+  const policy = parseCarryOverPolicy(params.empresaConfig);
+  if (policy.mode !== 'extender') {
+    return {
+      carryOverAsignado: 0,
+      carryOverPendiente: 0,
+      carryOverUsado: 0,
+      carryOverExpiraEn: null,
+      carryOverFuenteAnio: null,
+    };
+  }
+
+  const saldoAnterior = await params.executor.empleadoSaldoAusencias.findUnique({
+    where: {
+      empleadoId_año: {
+        empleadoId: params.empleadoId,
+        año: params.año - 1,
+      },
+    },
+  });
+
+  if (!saldoAnterior) {
+    return {
+      carryOverAsignado: 0,
+      carryOverPendiente: 0,
+      carryOverUsado: 0,
+      carryOverExpiraEn: null,
+      carryOverFuenteAnio: null,
+    };
+  }
+
+  const diasDisponiblesAnterior =
+    saldoAnterior.diasTotales -
+    decimalToNumber(saldoAnterior.diasUsados) -
+    decimalToNumber(saldoAnterior.diasPendientes);
+
+  if (diasDisponiblesAnterior <= 0) {
+    return {
+      carryOverAsignado: 0,
+      carryOverPendiente: 0,
+      carryOverUsado: 0,
+      carryOverExpiraEn: null,
+      carryOverFuenteAnio: null,
+    };
+  }
+
+  return {
+    carryOverAsignado: diasDisponiblesAnterior,
+    carryOverPendiente: 0,
+    carryOverUsado: 0,
+    carryOverExpiraEn: computeCarryOverExpiry(params.año, policy.months),
+    carryOverFuenteAnio: params.año - 1,
+  };
+}
+
+function obtenerCarryOverDisponible(
+  saldo: Prisma.EmpleadoSaldoAusencias,
+  referencia: Date
+): { disponible: number; activo: boolean; expiraEn?: Date } {
+  const asignado = decimalToNumber(saldo.carryOverAsignado);
+  if (asignado <= 0) {
+    return { disponible: 0, activo: false };
+  }
+
+  if (saldo.carryOverExpiraEn && referencia > saldo.carryOverExpiraEn) {
+    return { disponible: 0, activo: false, expiraEn: saldo.carryOverExpiraEn };
+  }
+
+  const pendiente = decimalToNumber(saldo.carryOverPendiente);
+  const usado = decimalToNumber(saldo.carryOverUsado);
+  const disponible = Math.max(0, asignado - pendiente - usado);
+  return {
+    disponible,
+    activo: disponible > 0,
+    expiraEn: saldo.carryOverExpiraEn ?? undefined,
+  };
+}
+
 
 /**
  * Determina el estado aprobado para una ausencia en función de la fecha fin.
@@ -159,8 +322,6 @@ export async function calcularDias(
 /**
  * Obtiene o crea el saldo de ausencias de un empleado para un año
  */
-type PrismaTx = Prisma.TransactionClient;
-
 export async function getSaldoEmpleado(
   empleadoId: string,
   año: number,
@@ -169,8 +330,6 @@ export async function getSaldoEmpleado(
 ) {
   const executor = tx ?? prisma;
 
-  // Nota: Prisma no soporta SELECT ... FOR UPDATE directamente
-  // Para locking, usar transacciones aisladas o row versioning
   let saldo = await executor.empleadoSaldoAusencias.findFirst({
     where: {
       empleadoId,
@@ -178,16 +337,31 @@ export async function getSaldoEmpleado(
     },
   });
 
-  // Si no existe, crear uno por defecto
   if (!saldo) {
     const empleado = await prisma.empleado.findUnique({
       where: { id: empleadoId },
-      select: { diasVacaciones: true, empresaId: true },
+      select: {
+        diasVacaciones: true,
+        empresaId: true,
+        empresa: {
+          select: {
+            config: true,
+          },
+        },
+      },
     });
 
     if (!empleado) {
       throw new Error('Empleado no encontrado');
     }
+
+    const carryOverData = await calcularDatosCarryOverParaNuevoSaldo({
+      empleadoId,
+      año,
+      empresaId: empleado.empresaId,
+      empresaConfig: (empleado.empresa?.config as Record<string, unknown> | null) ?? null,
+      executor,
+    });
 
     saldo = await executor.empleadoSaldoAusencias.create({
       data: {
@@ -198,8 +372,11 @@ export async function getSaldoEmpleado(
         diasUsados: 0,
         diasPendientes: 0,
         origen: 'manual_hr',
+        ...carryOverData,
       },
     });
+  } else {
+    saldo = await limpiarCarryOverSiExpirado(saldo, executor);
   }
 
   return saldo;
@@ -222,115 +399,28 @@ export async function calcularSaldoDisponible(
   diasUsados: number;
   diasPendientes: number;
   diasDisponibles: number;
+  carryOverDisponible: number;
+  carryOverExpiraEn: Date | null;
 }> {
-  const saldo = await getSaldoEmpleado(empleadoId, año, tx, options);
+  const executor = tx ?? prisma;
+  let saldo = await getSaldoEmpleado(empleadoId, año, tx, options);
+  saldo = await limpiarCarryOverSiExpirado(saldo, executor);
 
-  // Si estamos en transacción, confiar en los valores de la tabla (no recalcular)
-  // para evitar race conditions
-  if (tx) {
-    const diasDisponibles = saldo.diasTotales - Number(saldo.diasUsados) - Number(saldo.diasPendientes);
-    return {
-      diasTotales: saldo.diasTotales,
-      diasUsados: Number(saldo.diasUsados),
-      diasPendientes: Number(saldo.diasPendientes),
-      diasDisponibles,
-    };
-  }
+  const referencia = new Date();
+  const carryInfo = obtenerCarryOverDisponible(saldo, referencia);
 
-  // Fuera de transacción: recalcular desde ausencias para sincronización
-  const executor = prisma;
-  const yearStart = new Date(Date.UTC(año, 0, 1));
-  const nextYearStart = new Date(Date.UTC(año + 1, 0, 1));
-  const yearEnd = new Date(nextYearStart.getTime() - 24 * 60 * 60 * 1000);
-
-  const ausencias = await executor.ausencia.findMany({
-    where: {
-      empleadoId,
-      descuentaSaldo: true,
-      fechaFin: {
-        gte: yearStart,
-      },
-      fechaInicio: {
-        lt: nextYearStart,
-      },
-    },
-  });
-
-  const [diasLaborablesConfig, festivos] = await Promise.all([
-    getDiasLaborablesEmpresa(saldo.empresaId),
-    getFestivosActivosEnRango(saldo.empresaId, yearStart, nextYearStart),
-  ]);
-  const festivosSet = crearSetFestivos(festivos);
-
-  const contarDiasLaborablesEnMemoria = (inicio: Date, fin: Date) => {
-    const fecha = new Date(inicio);
-    const limite = new Date(fin);
-    let count = 0;
-
-    while (fecha <= limite) {
-      const diaSemana = fecha.getDay();
-      const mapaDias: Record<number, keyof typeof diasLaborablesConfig> = {
-        0: 'domingo',
-        1: 'lunes',
-        2: 'martes',
-        3: 'miercoles',
-        4: 'jueves',
-        5: 'viernes',
-        6: 'sabado',
-      };
-      const nombreDia = mapaDias[diaSemana];
-      const esLaborable = diasLaborablesConfig[nombreDia] && !festivosSet.has(formatearClaveFecha(fecha));
-      if (esLaborable) {
-        count++;
-      }
-      fecha.setDate(fecha.getDate() + 1);
-    }
-
-    return count;
-  };
-
-  let diasUsados = 0;
-  let diasPendientes = 0;
-
-  for (const ausencia of ausencias) {
-    const tramoInicio = ausencia.fechaInicio > yearStart ? ausencia.fechaInicio : yearStart;
-    const tramoFin = ausencia.fechaFin < yearEnd ? ausencia.fechaFin : yearEnd;
-    if (tramoInicio > tramoFin) {
-      continue;
-    }
-
-    let diasEnAño = 0;
-    const esMedioDia = ausencia.medioDia && ausencia.fechaInicio.toDateString() === ausencia.fechaFin.toDateString();
-    if (esMedioDia) {
-      const fechaMedioDia = ausencia.fechaInicio;
-      if (fechaMedioDia >= yearStart && fechaMedioDia < nextYearStart) {
-        diasEnAño = 0.5;
-      }
-    } else {
-      diasEnAño = contarDiasLaborablesEnMemoria(tramoInicio, tramoFin);
-    }
-
-    if (diasEnAño === 0) {
-      continue;
-    }
-
-    if (ausencia.estado === EstadoAusencia.pendiente) {
-      diasPendientes += diasEnAño;
-    } else if (
-      ausencia.estado === EstadoAusencia.confirmada ||
-      ausencia.estado === EstadoAusencia.completada
-    ) {
-      diasUsados += diasEnAño;
-    }
-  }
-
-  const diasDisponibles = saldo.diasTotales - diasUsados - diasPendientes;
+  const diasTotales = saldo.diasTotales;
+  const diasUsados = decimalToNumber(saldo.diasUsados);
+  const diasPendientes = decimalToNumber(saldo.diasPendientes);
+  const diasDisponibles = diasTotales - diasUsados - diasPendientes + carryInfo.disponible;
 
   return {
-    diasTotales: saldo.diasTotales,
+    diasTotales,
     diasUsados,
     diasPendientes,
     diasDisponibles,
+    carryOverDisponible: carryInfo.disponible,
+    carryOverExpiraEn: carryInfo.expiraEn ?? saldo.carryOverExpiraEn ?? null,
   };
 }
 
@@ -372,24 +462,46 @@ export async function actualizarSaldo(
   año: number,
   accion: 'solicitar' | 'aprobar' | 'rechazar' | 'cancelar',
   diasSolicitados: number,
-  tx?: PrismaTx
-) {
+  tx?: PrismaTx,
+  options?: { diasDesdeCarryOver?: number }
+): Promise<{ diasDesdeCarryOver: number }> {
   const ejecutar = async (client: PrismaTx) => {
-    const saldo = await getSaldoEmpleado(empleadoId, año, client, { lock: true });
+    let saldo = await getSaldoEmpleado(empleadoId, año, client, { lock: true });
+    saldo = await limpiarCarryOverSiExpirado(saldo, client);
+
+    const hoy = new Date();
+    let diasDesdeCarryOver = 0;
 
     switch (accion) {
-      case 'solicitar':
+      case 'solicitar': {
+        const carryInfo = obtenerCarryOverDisponible(saldo, hoy);
+        if (carryInfo.disponible > 0) {
+          diasDesdeCarryOver = Math.min(diasSolicitados, carryInfo.disponible);
+        }
+
         await client.empleadoSaldoAusencias.update({
           where: { id: saldo.id },
           data: {
             diasPendientes: {
               increment: diasSolicitados,
             },
+            ...(diasDesdeCarryOver > 0 && {
+              carryOverPendiente: {
+                increment: diasDesdeCarryOver,
+              },
+            }),
           },
         });
         break;
+      }
 
-      case 'aprobar':
+      case 'aprobar': {
+        const diasCarry =
+          options && typeof options.diasDesdeCarryOver === 'number'
+            ? Math.min(options.diasDesdeCarryOver, diasSolicitados)
+            : 0;
+        diasDesdeCarryOver = diasCarry;
+
         await client.empleadoSaldoAusencias.update({
           where: { id: saldo.id },
           data: {
@@ -399,30 +511,52 @@ export async function actualizarSaldo(
             diasUsados: {
               increment: diasSolicitados,
             },
+            ...(diasCarry > 0 && {
+              carryOverPendiente: {
+                decrement: diasCarry,
+              },
+              carryOverUsado: {
+                increment: diasCarry,
+              },
+            }),
           },
         });
         break;
+      }
 
       case 'rechazar':
-      case 'cancelar':
+      case 'cancelar': {
+        const diasCarry =
+          options && typeof options.diasDesdeCarryOver === 'number'
+            ? Math.min(options.diasDesdeCarryOver, diasSolicitados)
+            : 0;
+        diasDesdeCarryOver = diasCarry;
+
         await client.empleadoSaldoAusencias.update({
           where: { id: saldo.id },
           data: {
             diasPendientes: {
               decrement: diasSolicitados,
             },
+            ...(diasCarry > 0 && {
+              carryOverPendiente: {
+                decrement: diasCarry,
+              },
+            }),
           },
         });
         break;
+      }
     }
+
+    return { diasDesdeCarryOver };
   };
 
   if (tx) {
-    await ejecutar(tx);
-    return;
+    return ejecutar(tx);
   }
 
-  await prisma.$transaction(async (transaction) => ejecutar(transaction));
+  return prisma.$transaction(async (transaction) => ejecutar(transaction));
 }
 
 /**

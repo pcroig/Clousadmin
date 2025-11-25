@@ -2,9 +2,12 @@
 
 Bienvenido a la documentación oficial de la API REST de Clousadmin.
 
-> **Versión actual:** 1.0.0
-> **Base URL:** `https://api.clousadmin.com`
+> **Versión actual:** 1.0.0  
+> **Última actualización:** 27 de enero de 2025  
+> **Base URL:** `https://api.clousadmin.com`  
 > **Autenticación:** JWT Bearer Token
+
+> **Nota**: Para detalles de refactorización de APIs (2025-01-27), ver [`API_REFACTORING.md`](../API_REFACTORING.md)
 
 ---
 

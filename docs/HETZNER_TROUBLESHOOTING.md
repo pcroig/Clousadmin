@@ -215,7 +215,7 @@ console.log('URL:', url);
 - [Hetzner Object Storage Docs](https://docs.hetzner.com/storage/object-storage/)
 - [AWS SDK S3 Client](https://docs.aws.amazon.com/AWSJavaScriptSDK/v3/latest/clients/client-s3/)
 - [S3 API Compatibility](https://docs.hetzner.com/storage/object-storage/s3-api/)
-- [Documentación de Migración](docs/MIGRACION_HETZNER.md)
+- [Documentación de Migración](MIGRACION_HETZNER.md)
 
 ---
 
@@ -233,6 +233,7 @@ console.log('URL:', url);
 ---
 
 **Última actualización**: 2025-01-27
+
 
 
 

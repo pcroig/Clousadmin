@@ -7,6 +7,7 @@ import { getSession } from '@/lib/auth';
 import { EstadoAusencia, UsuarioRol } from '@/lib/constants/enums';
 import { prisma } from '@/lib/prisma';
 import { obtenerCampanaPendiente, obtenerPropuestaPendiente } from '@/lib/services/campanas-vacaciones';
+import { calcularSaldoDisponible } from '@/lib/calculos/ausencias';
 
 import { EmpleadoDashboardClient } from './dashboard-client';
 
@@ -104,35 +105,26 @@ async function obtenerDatosDashboard(session: { user: { id: string; empresaId: s
 
   // Ausencias del empleado - con manejo de errores
   const añoActual = new Date().getFullYear();
-  let saldo;
-  
+  let saldoFinal;
   try {
-    saldo = await prisma.empleadoSaldoAusencias.findFirst({
-      where: {
-        empleadoId: empleado.id,
-        año: añoActual,
-      },
-    });
+    const saldo = await calcularSaldoDisponible(empleado.id, añoActual);
+    saldoFinal = {
+      diasTotales: saldo.diasTotales,
+      diasUsados: saldo.diasUsados,
+      diasPendientes: saldo.diasPendientes,
+    };
   } catch (error) {
     console.error('[EmpleadoDashboard] Error obteniendo saldo de ausencias:', {
       empleadoId: empleado.id,
       año: añoActual,
       error,
     });
-    saldo = null;
+    saldoFinal = {
+      diasTotales: 22,
+      diasUsados: 0,
+      diasPendientes: 0,
+    };
   }
-
-  // Si no existe saldo, crear uno por defecto
-  // Convertir Decimal a números para serialización (Client Components)
-  const saldoFinal = saldo ? {
-    diasTotales: saldo.diasTotales,
-    diasUsados: Number(saldo.diasUsados),
-    diasPendientes: Number(saldo.diasPendientes),
-  } : {
-    diasTotales: 22, // Días por defecto en España
-    diasUsados: 0,
-    diasPendientes: 0,
-  };
 
   // Próximas ausencias
   const hoy = new Date();

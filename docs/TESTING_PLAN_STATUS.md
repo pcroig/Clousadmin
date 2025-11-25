@@ -1,5 +1,9 @@
 # Plan de Testing - Estado y Progreso
 
+> **Nota**: Este documento consolida el estado actual del testing. Para más detalles:
+> - [`TESTING_SUMMARY.md`](TESTING_SUMMARY.md) - Resumen ejecutivo de tests implementados
+> - [`EVALUACION_PLAN_TESTING.md`](EVALUACION_PLAN_TESTING.md) - Evaluación crítica del plan
+
 ## 📊 Resumen General
 
 **Fase Actual:** Fase 2 Completada ✅ | Fase 3 Iniciada 🚧

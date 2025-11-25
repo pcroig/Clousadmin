@@ -26,6 +26,7 @@ import {
 } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { parseJson } from '@/lib/utils/json';
+import { Switch } from '@/components/ui/switch';
 import type { Festivo, FestivoEditorState } from '@/types/festivos';
 
 interface GestionarAusenciasModalProps {
@@ -60,6 +61,8 @@ export function GestionarAusenciasModal({ open, onClose, onSaved }: GestionarAus
   // Políticas de Ausencia - Para toda la empresa
   const [solapamientoPct, setSolapamientoPct] = useState('50');
   const [antelacionDias, setAntelacionDias] = useState('5');
+  const [carryOverMode, setCarryOverMode] = useState<'limpiar' | 'extender'>('limpiar');
+  const [carryOverMonths, setCarryOverMonths] = useState('4');
   
   // Calendario laboral
   const [diasLaborables, setDiasLaborables] = useState({
@@ -103,6 +106,8 @@ export function GestionarAusenciasModal({ open, onClose, onSaved }: GestionarAus
           maxSolapamientoPct?: number;
           requiereAntelacionDias?: number;
           diasVacacionesDefault?: number;
+          carryOverModo?: 'limpiar' | 'extender';
+          carryOverMeses?: number;
         }>(resPoliticas);
         if (dataPoliticas.maxSolapamientoPct !== undefined) {
           setSolapamientoPct(dataPoliticas.maxSolapamientoPct.toString());
@@ -112,6 +117,16 @@ export function GestionarAusenciasModal({ open, onClose, onSaved }: GestionarAus
         }
         if (dataPoliticas.diasVacacionesDefault !== undefined) {
           setDiasTotales(dataPoliticas.diasVacacionesDefault.toString());
+        }
+        if (dataPoliticas.carryOverModo) {
+          setCarryOverMode(dataPoliticas.carryOverModo);
+        } else {
+          setCarryOverMode('limpiar');
+        }
+        if (dataPoliticas.carryOverMeses !== undefined) {
+          setCarryOverMonths(dataPoliticas.carryOverMeses.toString());
+        } else {
+          setCarryOverMonths('4');
         }
       }
     } catch (e) {
@@ -144,6 +159,16 @@ export function GestionarAusenciasModal({ open, onClose, onSaved }: GestionarAus
         return;
       }
 
+      let mesesExtension = parseInt(carryOverMonths || '4', 10);
+      if (Number.isNaN(mesesExtension)) {
+        mesesExtension = 4;
+      }
+      if (carryOverMode === 'extender' && (mesesExtension < 1 || mesesExtension > 12)) {
+        toast.error('Los meses de extensión deben estar entre 1 y 12');
+        setSavingPolitica(false);
+        return;
+      }
+
       // Guardar política de ausencias (nivel empresa)
       const resPolitica = await fetch('/api/empresa/politica-ausencias', {
         method: 'PATCH',
@@ -151,6 +176,8 @@ export function GestionarAusenciasModal({ open, onClose, onSaved }: GestionarAus
         body: JSON.stringify({
           maxSolapamientoPct: pct,
           requiereAntelacionDias: dias,
+          carryOverModo: carryOverMode,
+          carryOverMeses: carryOverMode === 'extender' ? mesesExtension : 0,
         }),
       });
 
@@ -359,6 +386,40 @@ export function GestionarAusenciasModal({ open, onClose, onSaved }: GestionarAus
                   max="365"
                   placeholder="22"
                 />
+              </Field>
+
+              <Field>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <FieldLabel>Tratamiento de saldo al cierre</FieldLabel>
+                    <p className="text-xs text-gray-500">
+                      Define si el saldo pendiente se limpia automáticamente o se extiende unos meses.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-gray-500">Limpiar</span>
+                    <Switch
+                      checked={carryOverMode === 'extender'}
+                      onCheckedChange={(checked) =>
+                        setCarryOverMode(checked ? 'extender' : 'limpiar')
+                      }
+                    />
+                    <span className="text-xs text-gray-500">Extender</span>
+                  </div>
+                </div>
+                {carryOverMode === 'extender' && (
+                  <div className="mt-4 flex items-center gap-3">
+                    <Input
+                      type="number"
+                      min={1}
+                      max={12}
+                      value={carryOverMonths}
+                      onChange={(e) => setCarryOverMonths(e.target.value)}
+                      className="w-24"
+                    />
+                    <span className="text-sm text-gray-600">meses adicionales</span>
+                  </div>
+                )}
               </Field>
             </div>
 

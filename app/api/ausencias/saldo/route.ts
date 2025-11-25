@@ -13,7 +13,8 @@ import {
   successResponse,
   validateRequest,
 } from '@/lib/api-handler';
-import { EstadoAusencia, UsuarioRol } from '@/lib/constants/enums';
+import { calcularSaldoDisponible } from '@/lib/calculos/ausencias';
+import { UsuarioRol } from '@/lib/constants/enums';
 import { prisma } from '@/lib/prisma';
 import { asJsonValue } from '@/lib/prisma/json';
 
@@ -57,50 +58,13 @@ export async function GET(req: NextRequest) {
     }
 
     const añoActual = new Date().getFullYear();
-
-    // Obtener saldo asignado
-    const saldoAsignado = await prisma.empleadoSaldoAusencias.findUnique({
-      where: {
-        empleadoId_año: {
-          empleadoId,
-          año: añoActual,
-        },
-      },
-    });
-
-    // Obtener ausencias del empleado para calcular usadas/pendientes
-    // IMPORTANTE: Solo contar ausencias que descuentan saldo (vacaciones)
-    const ausencias = await prisma.ausencia.findMany({
-      where: {
-        empleadoId,
-        descuentaSaldo: true, // Solo vacaciones descuentan saldo
-        fechaInicio: {
-          gte: new Date(`${añoActual}-01-01`),
-          lt: new Date(`${añoActual + 1}-01-01`),
-        },
-      },
-    });
-
-    interface Ausencia {
-      estado: string;
-      diasSolicitados: number | { toNumber(): number } | string;
-    }
-    
-    const diasUsados = (ausencias as Ausencia[])
-      .filter((a) => a.estado === EstadoAusencia.confirmada || a.estado === EstadoAusencia.completada)
-      .reduce((sum: number, a) => sum + Number(a.diasSolicitados), 0);
-
-    const diasPendientes = (ausencias as Ausencia[])
-      .filter((a) => a.estado === EstadoAusencia.pendiente)
-      .reduce((sum: number, a) => sum + Number(a.diasSolicitados), 0);
-
-    const diasTotales = saldoAsignado?.diasTotales || 0;
+    const saldoActual = await calcularSaldoDisponible(empleadoId, añoActual);
 
     return successResponse({
-      diasTotales,
-      diasUsados,
-      diasPendientes,
-      diasDisponibles: diasTotales - diasUsados - diasPendientes,
+      ...saldoActual,
+      carryOverExpiraEn: saldoActual.carryOverExpiraEn
+        ? saldoActual.carryOverExpiraEn.toISOString()
+        : null,
     });
   } catch (error) {
     return handleApiError(error, 'API GET /api/ausencias/saldo');

@@ -549,10 +549,10 @@ WHERE c.nombre = 'Offboarding' AND c.empleadoId = 'empleado-id';
 
 ### Documentación Relacionada
 
-- [Contratos](./contratos.md)
-- [Nóminas](./nominas.md)
+- [Contratos](./documentos-procesos-onboarding-offboarding.md)
+- [Nóminas](./gestion-nominas.md)
 - [Documentos](./documentos.md)
-- [Gestión de Empleados](./empleados.md)
+- [Gestión de Empleados](../ESTRUCTURA.md)
 
 ---
 

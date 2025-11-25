@@ -533,12 +533,12 @@ Para dudas o issues:
 1. Revisar esta documentación
 2. Revisar logs en consola
 3. Verificar configuración de variables de entorno
-4. Revisar [ARQUITECTURA_IA.md](./ia/ARQUITECTURA_IA.md) para temas de IA
+4. Revisar [ARQUITECTURA_IA.md](../ia/ARQUITECTURA_IA.md) para temas de IA
 
 **Documentos relacionados:**
 - [IMPLEMENTACION_NOTIFICACIONES_SOLICITUDES.md](./IMPLEMENTACION_NOTIFICACIONES_SOLICITUDES.md)
-- [ia/ARQUITECTURA_IA.md](./ia/ARQUITECTURA_IA.md)
-- [ia/ENV_VARIABLES.md](./ia/ENV_VARIABLES.md)
+- [ia/ARQUITECTURA_IA.md](../ia/ARQUITECTURA_IA.md)
+- [ia/ENV_VARIABLES.md](../ia/ENV_VARIABLES.md)
 
 ---
 

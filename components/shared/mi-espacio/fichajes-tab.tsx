@@ -2,8 +2,9 @@
 
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Clock } from 'lucide-react';
+import { Clock, CalendarDays, RotateCcw } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
+import { toast } from 'sonner';
 
 
 import { EditarFichajeModal } from '@/app/(dashboard)/hr/horario/fichajes/editar-fichaje-modal';
@@ -49,6 +50,7 @@ export function FichajesTab({ empleadoId, empleado, contexto = 'empleado' }: Fic
   const [jornadas, setJornadas] = useState<JornadaUI[]>([]);
   const [fichajeEditando, setFichajeEditando] = useState<FichajeNormalizado | null>(null);
   const [fichajeManualModalOpen, setFichajeManualModalOpen] = useState(false);
+  const [fechaInicio, setFechaInicio] = useState<Date | null>(null);
 
   // Obtener horas objetivo desde jornada del empleado
   const horasObjetivo = useMemo(() => {
@@ -72,60 +74,225 @@ export function FichajesTab({ empleadoId, empleado, contexto = 'empleado' }: Fic
     refetchFichajes(`/api/fichajes?empleadoId=${empleadoId}&propios=1`);
   }, [empleadoId, refetchFichajes]);
 
-  const resumen = useMemo(() => calcularResumenJornadas(jornadas), [jornadas]);
+  const resumen = useMemo(() => {
+    // Si hay fecha de renovación, filtrar jornadas anteriores
+    const jornadasFiltradas = fechaInicio 
+      ? jornadas.filter(j => j.fecha >= fechaInicio) 
+      : jornadas;
+      
+    return calcularResumenJornadas(jornadasFiltradas);
+  }, [jornadas, fechaInicio]);
   const puedeCrearManual = contexto === 'empleado' || contexto === 'manager';
   const puedeEditar = contexto === 'hr_admin';
+  const mostrarRenovar = contexto === 'hr_admin';
+
+  // Calcular tiempo esperado total
+  const tiempoEsperado = useMemo(() => {
+    const jornadasFiltradas = fechaInicio 
+      ? jornadas.filter(j => j.fecha >= fechaInicio) 
+      : jornadas;
+    return jornadasFiltradas.reduce((sum, j) => sum + (j.horasObjetivo || 0), 0);
+  }, [jornadas, fechaInicio]);
+
+  // Calcular promedios de horarios
+  const promedios = useMemo(() => {
+    const jornadasFiltradas = fechaInicio 
+      ? jornadas.filter(j => j.fecha >= fechaInicio) 
+      : jornadas;
+      
+    const fichajesConHorarios = jornadasFiltradas.filter(j => j.entrada && j.salida);
+    if (fichajesConHorarios.length === 0) {
+      return { horaEntrada: '--:--', horaSalida: '--:--', horasTrabajadas: '0.0' };
+    }
+
+    // Calcular minutos desde medianoche para cada hora
+    const minutosEntrada = fichajesConHorarios.map(j => {
+      if (!j.entrada) return 0;
+      const fecha = new Date(j.entrada);
+      return fecha.getHours() * 60 + fecha.getMinutes();
+    });
+
+    const minutosSalida = fichajesConHorarios.map(j => {
+      if (!j.salida) return 0;
+      const fecha = new Date(j.salida);
+      return fecha.getHours() * 60 + fecha.getMinutes();
+    });
+
+    const promedioEntrada = minutosEntrada.reduce((a, b) => a + b, 0) / minutosEntrada.length;
+    const promedioSalida = minutosSalida.reduce((a, b) => a + b, 0) / minutosSalida.length;
+
+    const formatearHora = (minutos: number) => {
+      const h = Math.floor(minutos / 60);
+      const m = Math.round(minutos % 60);
+      return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+    };
+
+    const promedioHoras = fichajesConHorarios.reduce((sum, j) => sum + j.horasTrabajadas, 0) / fichajesConHorarios.length;
+
+    return {
+      horaEntrada: formatearHora(promedioEntrada),
+      horaSalida: formatearHora(promedioSalida),
+      horasTrabajadas: promedioHoras.toFixed(1),
+    };
+  }, [jornadas]);
+
+  // Cargar fecha de inicio (última renovación o fecha de alta)
+  useEffect(() => {
+    async function cargarFechaInicio() {
+      if (!empleadoId) return;
+      
+      try {
+        const res = await fetch(`/api/empleados/${empleadoId}/renovar-saldo`);
+        if (res.ok) {
+          const data = await res.json() as Record<string, any>;
+          setFechaInicio(new Date(data.fechaRenovacion));
+        }
+      } catch (error) {
+        console.error('Error cargando fecha de renovación:', error);
+        // Fallback: usar fecha más antigua de jornadas
+        if (jornadas.length > 0) {
+          const fechaMasAntigua = jornadas.reduce((min, j) => {
+            return j.fecha < min ? j.fecha : min;
+          }, jornadas[0].fecha);
+          setFechaInicio(fechaMasAntigua);
+        }
+      }
+    }
+    
+    cargarFechaInicio();
+  }, [empleadoId, jornadas]);
+
+  const handleRenovarSaldo = async () => {
+    // Confirmar con el usuario
+    const confirmado = window.confirm(
+      '¿Estás seguro de que deseas renovar el saldo? El saldo de horas volverá a 0 y el contador empezará desde hoy.'
+    );
+    
+    if (!confirmado) return;
+
+    try {
+      const res = await fetch(`/api/empleados/${empleadoId}/renovar-saldo`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      if (!res.ok) {
+        const error = await res.json() as Record<string, any>;
+        throw new Error(error.error || 'Error al renovar saldo');
+      }
+
+      const data = await res.json() as Record<string, any>;
+      toast.success(data.mensaje || 'Saldo renovado correctamente');
+      setFechaInicio(new Date(data.fechaRenovacion));
+      
+      // Recargar fichajes
+      refetchFichajes(`/api/fichajes?empleadoId=${empleadoId}&propios=1`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Error al renovar el saldo');
+      console.error(error);
+    }
+  };
 
   return (
     <div className="space-y-6">
-      {/* Widget Resumen */}
-      <Card>
-        <CardHeader className="pb-4">
-          <div className="flex items-center gap-2">
-            <Clock className="h-5 w-5 text-[#d97757]" />
-            <CardTitle className="text-base font-semibold">Resumen de fichajes</CardTitle>
-          </div>
-        </CardHeader>
-        <CardContent className="grid grid-cols-4 gap-4">
-          <div className="text-center">
-            <div className="text-2xl font-bold text-gray-900">
-              {jornadas.length > 0 ? resumen.totalHoras.toFixed(1) : '0.0'}h
+      {/* Cards de Resumen - Horizontal */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Card 1: Tiempo */}
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Clock className="h-5 w-5 text-[#d97757]" />
+                <CardTitle className="text-base font-semibold">Tiempo</CardTitle>
+              </div>
+              <div className="flex items-center gap-2 text-xs text-gray-500">
+                <CalendarDays className="h-4 w-4" />
+                <span>
+                  {fechaInicio ? `Desde ${format(fechaInicio, 'dd/MM/yyyy', { locale: es })}` : 'Sin datos'}
+                </span>
+                {mostrarRenovar && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6"
+                    onClick={handleRenovarSaldo}
+                    title="Renovar saldo"
+                  >
+                    <RotateCcw className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
             </div>
-            <div className="mt-1 text-xs text-gray-500">Total trabajado</div>
-          </div>
-          <div className="text-center">
-            <div className="text-2xl font-bold text-gray-900">{resumen.diasConFichaje}</div>
-            <div className="mt-1 text-xs text-gray-500">Días con fichaje</div>
-          </div>
-          <div className="text-center">
-            <div
-              className={`text-2xl font-bold ${
-                resumen.balanceAcumulado >= 0 ? 'text-green-600' : 'text-red-600'
-              }`}
-            >
-              {resumen.balanceAcumulado >= 0 ? '+' : ''}
-              {resumen.balanceAcumulado.toFixed(1)}h
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-gray-600">Tiempo trabajado</span>
+              <span className="text-lg font-semibold text-gray-900">
+                {resumen.totalHoras.toFixed(1)}h
+              </span>
             </div>
-            <div className="mt-1 text-xs text-gray-500">Balance</div>
-          </div>
-          <div className="text-center">
-            <div className="text-2xl font-bold text-gray-900">{resumen.enCurso}</div>
-            <div className="mt-1 text-xs text-gray-500">En curso</div>
-          </div>
-        </CardContent>
-      </Card>
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-gray-600">Tiempo esperado</span>
+              <span className="text-lg font-semibold text-gray-900">
+                {tiempoEsperado.toFixed(1)}h
+              </span>
+            </div>
+            <div className="flex items-center justify-between pt-2 border-t">
+              <span className="text-sm font-medium text-gray-700">Saldo de horas</span>
+              <span
+                className={`text-lg font-bold ${
+                  resumen.balanceAcumulado >= 0 ? 'text-green-600' : 'text-red-600'
+                }`}
+              >
+                {resumen.balanceAcumulado >= 0 ? '+' : ''}
+                {resumen.balanceAcumulado.toFixed(1)}h
+              </span>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Card 2: Horarios */}
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex items-center gap-2">
+              <Clock className="h-5 w-5 text-[#d97757]" />
+              <CardTitle className="text-base font-semibold">Horarios</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-gray-600">Hora media de entrada</span>
+              <span className="text-lg font-semibold text-gray-900">
+                {promedios.horaEntrada}
+              </span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-gray-600">Hora media de salida</span>
+              <span className="text-lg font-semibold text-gray-900">
+                {promedios.horaSalida}
+              </span>
+            </div>
+            <div className="flex items-center justify-between pt-2 border-t">
+              <span className="text-sm font-medium text-gray-700">Horas medias trabajadas</span>
+              <span className="text-lg font-bold text-gray-900">
+                {promedios.horasTrabajadas}h
+              </span>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Tabla de fichajes */}
-      <div className="rounded-lg border border-gray-200 bg-white">
+      <Card className="p-0">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 px-6 py-4">
           <h3 className="text-sm font-semibold text-gray-900">Historial por jornadas</h3>
-          {puedeCrearManual && (
+          {(puedeCrearManual || puedeEditar) && (
             <Button
               size="sm"
               variant="outline"
               onClick={() => setFichajeManualModalOpen(true)}
             >
-              Solicitar fichaje manual
+              {contexto === 'hr_admin' ? 'Añadir fichaje' : 'Solicitar fichaje manual'}
             </Button>
           )}
         </div>
@@ -135,6 +302,7 @@ export function FichajesTab({ empleadoId, empleado, contexto = 'empleado' }: Fic
               <TableRow>
                 <TableHead>Fecha</TableHead>
                 <TableHead>Horas trabajadas</TableHead>
+                <TableHead>Horas esperadas</TableHead>
                 <TableHead>Horario</TableHead>
                 <TableHead>Balance</TableHead>
                 <TableHead>Estado</TableHead>
@@ -143,13 +311,13 @@ export function FichajesTab({ empleadoId, empleado, contexto = 'empleado' }: Fic
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="py-8 text-center text-gray-500">
+                  <TableCell colSpan={6} className="py-8 text-center text-gray-500">
                     Cargando...
                   </TableCell>
                 </TableRow>
               ) : jornadas.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="py-8 text-center text-gray-500">
+                  <TableCell colSpan={6} className="py-8 text-center text-gray-500">
                     No tienes fichajes registrados
                   </TableCell>
                 </TableRow>
@@ -171,6 +339,9 @@ export function FichajesTab({ empleadoId, empleado, contexto = 'empleado' }: Fic
                       </TableCell>
                       <TableCell>
                         <span className="text-sm font-medium">{jornada.horasTrabajadas.toFixed(1)}h</span>
+                      </TableCell>
+                      <TableCell>
+                        <span className="text-sm text-gray-600">{jornada.horasObjetivo.toFixed(1)}h</span>
                       </TableCell>
                       <TableCell>
                         <span className="text-sm text-gray-600">
@@ -199,7 +370,7 @@ export function FichajesTab({ empleadoId, empleado, contexto = 'empleado' }: Fic
             </TableBody>
           </Table>
         </div>
-      </div>
+      </Card>
 
       {/* Modal Editar Fichaje */}
       {puedeEditar && fichajeEditando && (
@@ -215,7 +386,7 @@ export function FichajesTab({ empleadoId, empleado, contexto = 'empleado' }: Fic
         />
       )}
 
-      {puedeCrearManual && (
+      {(puedeCrearManual || puedeEditar) && (
         <FichajeManualModal
           open={fichajeManualModalOpen}
           onClose={() => setFichajeManualModalOpen(false)}
@@ -223,6 +394,8 @@ export function FichajesTab({ empleadoId, empleado, contexto = 'empleado' }: Fic
             setFichajeManualModalOpen(false);
             refetchFichajes(`/api/fichajes?empleadoId=${empleadoId}&propios=1`);
           }}
+          esHRAdmin={contexto === 'hr_admin'}
+          empleadoId={empleadoId}
         />
       )}
     </div>

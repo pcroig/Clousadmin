@@ -1,8 +1,13 @@
 # Resumen Ejecutivo - Implementación de Seguridad
 
 **Fecha**: 2025-11-17  
+**Última actualización**: 27 de enero de 2025  
 **Estado**: Fases 1-5 completadas ✅ · Cifrado y auditoría operacionales  
 **Versión**: 1.2
+
+> **Nota**: Este es el resumen ejecutivo. Para más detalles:
+> - [`AUDITORIA_SEGURIDAD.md`](AUDITORIA_SEGURIDAD.md) - Auditoría completa y hallazgos
+> - [`CONFIGURACION_SEGURIDAD.md`](CONFIGURACION_SEGURIDAD.md) - Guía de configuración práctica
 
 ---
 

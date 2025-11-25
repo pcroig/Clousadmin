@@ -588,7 +588,7 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
 
   const renderDesktopTable = () => (
     <Card className="overflow-hidden">
-      <div className="overflow-x-auto px-2 sm:px-4">
+      <div className="overflow-x-auto">
         <Table className="min-w-full">
           <TableHeader>
             <TableRow>

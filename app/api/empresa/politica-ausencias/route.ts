@@ -46,12 +46,23 @@ export async function GET(_req: NextRequest) {
       typeof config?.requiereAntelacionDias === 'number' ? (config.requiereAntelacionDias as number) : 5;
     const diasVacacionesDefault =
       typeof config?.diasVacacionesDefault === 'number' ? (config.diasVacacionesDefault as number) : 22;
+    const carryOverConfig = (config?.carryOver as Record<string, unknown> | undefined) ?? undefined;
+    const carryOverModo =
+      carryOverConfig && typeof carryOverConfig.modo === 'string' && carryOverConfig.modo === 'extender'
+        ? 'extender'
+        : 'limpiar';
+    const carryOverMeses =
+      carryOverConfig && typeof carryOverConfig.mesesExtension === 'number'
+        ? Math.min(Math.max(carryOverConfig.mesesExtension, 1), 12)
+        : 4;
 
     // Retornar política de ausencias (valores por defecto si no existen)
     return NextResponse.json({
       maxSolapamientoPct,
       requiereAntelacionDias,
       diasVacacionesDefault,
+      carryOverModo,
+      carryOverMeses,
     });
   } catch (error) {
     console.error('[GET /api/empresa/politica-ausencias] Error:', error);
@@ -78,9 +89,16 @@ export async function PATCH(req: NextRequest) {
     }
 
     const body = await getJsonBody<Record<string, unknown>>(req);
-    const { maxSolapamientoPct, requiereAntelacionDias } = body as {
+    const {
+      maxSolapamientoPct,
+      requiereAntelacionDias,
+      carryOverModo,
+      carryOverMeses,
+    } = body as {
       maxSolapamientoPct: number;
       requiereAntelacionDias: number;
+      carryOverModo?: 'limpiar' | 'extender';
+      carryOverMeses?: number;
     };
 
     // Validaciones
@@ -106,6 +124,23 @@ export async function PATCH(req: NextRequest) {
       );
     }
 
+    if (carryOverModo && carryOverModo !== 'limpiar' && carryOverModo !== 'extender') {
+      return NextResponse.json(
+        { error: 'El modo de limpieza debe ser "limpiar" o "extender"' },
+        { status: 400 }
+      );
+    }
+
+    if (carryOverModo === 'extender') {
+      const meses = typeof carryOverMeses === 'number' ? carryOverMeses : 4;
+      if (meses < 1 || meses > 12) {
+        return NextResponse.json(
+          { error: 'Los meses de extensión deben estar entre 1 y 12' },
+          { status: 400 }
+        );
+      }
+    }
+
     // Obtener configuración actual
     const empresa = await prisma.empresa.findUnique({
       where: { id: session.user.empresaId },
@@ -121,6 +156,20 @@ export async function PATCH(req: NextRequest) {
 
     const configActual = (empresa.config as Record<string, unknown>) || {};
 
+    const carryOverConfig: Record<string, unknown> =
+      typeof carryOverModo === 'string'
+        ? {
+            modo: carryOverModo,
+            mesesExtension:
+              carryOverModo === 'extender'
+                ? Math.min(Math.max(typeof carryOverMeses === 'number' ? carryOverMeses : 4, 1), 12)
+                : 0,
+          }
+        : (configActual.carryOver as Record<string, unknown> | undefined) ?? {
+            modo: 'limpiar',
+            mesesExtension: 0,
+          };
+
     // Actualizar config
     await prisma.empresa.update({
       where: { id: session.user.empresaId },
@@ -129,6 +178,7 @@ export async function PATCH(req: NextRequest) {
           ...configActual,
           maxSolapamientoPct,
           requiereAntelacionDias,
+          carryOver: carryOverConfig,
         },
       },
     });
@@ -136,6 +186,16 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({
       maxSolapamientoPct,
       requiereAntelacionDias,
+      carryOverModo:
+        typeof carryOverConfig.modo === 'string' && carryOverConfig.modo === 'extender'
+          ? 'extender'
+          : 'limpiar',
+      carryOverMeses:
+        typeof carryOverConfig.modo === 'string' && carryOverConfig.modo === 'extender'
+          ? (typeof carryOverConfig.mesesExtension === 'number'
+              ? (carryOverConfig.mesesExtension as number)
+              : 4)
+          : 0,
     });
   } catch (error) {
     console.error('[PATCH /api/empresa/politica-ausencias] Error:', error);

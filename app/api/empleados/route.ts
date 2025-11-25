@@ -16,7 +16,7 @@ import { UsuarioRol } from '@/lib/constants/enums';
 import { CARPETAS_SISTEMA } from '@/lib/documentos';
 import { decryptEmpleadoList, encryptEmpleadoData } from '@/lib/empleado-crypto';
 import { invitarEmpleado } from '@/lib/invitaciones';
-import { getPredefinedJornada } from '@/lib/jornadas/get-or-create-default';
+import { getOrCreateDefaultJornada } from '@/lib/jornadas/get-or-create-default';
 import { crearNotificacionEmpleadoCreado } from '@/lib/notificaciones';
 import { prisma } from '@/lib/prisma';
 import { empleadoSelectListado } from '@/lib/prisma/selects';
@@ -157,8 +157,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Obtener jornada predefinida (configurada en onboarding)
-    const jornadaPorDefecto = await getPredefinedJornada(prisma, session.user.empresaId);
+    // Obtener o crear jornada por defecto (garantiza que siempre haya una)
+    const jornadaPorDefecto = await getOrCreateDefaultJornada(prisma, session.user.empresaId);
 
     // Crear usuario y empleado en transacción
     const result = await prisma.$transaction(async (tx) => {
@@ -207,7 +207,7 @@ export async function POST(request: NextRequest) {
         iban: sanitizeOptionalString(body.iban),
         titularCuenta: sanitizeOptionalString(body.titularCuenta),
         puestoId: body.puestoId || null,
-        jornadaId: jornadaPorDefecto?.id ?? null,
+        jornadaId: jornadaPorDefecto.id, // Siempre tendrá una jornada (getOrCreateDefaultJornada garantiza que exista)
         fechaAlta: body.fechaAlta ? new Date(body.fechaAlta) : new Date(),
         tipoContrato: body.tipoContrato || 'indefinido',
         salarioBrutoAnual,

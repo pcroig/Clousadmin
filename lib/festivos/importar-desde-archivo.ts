@@ -151,3 +151,4 @@ export function parseFestivosDesdeArchivo(
   throw new Error('Formato no soportado. Usa archivos .ics o .csv');
 }
 
+

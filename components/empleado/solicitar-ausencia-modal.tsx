@@ -46,6 +46,8 @@ interface SolicitarAusenciaModalProps {
   onClose: () => void;
   onSuccess: () => void;
   saldoDisponible?: number;
+  contexto?: 'empleado' | 'manager' | 'hr_admin';
+  empleadoIdDestino?: string;
 }
 
 type TipoAusenciaOption = {
@@ -97,7 +99,10 @@ export function SolicitarAusenciaModal({
   onClose,
   onSuccess,
   saldoDisponible = 0,
+  contexto = 'empleado',
+  empleadoIdDestino,
 }: SolicitarAusenciaModalProps) {
+  const esHRAdmin = contexto === 'hr_admin';
   const [tipo, setTipo] = useState<string>('vacaciones');
   const [fechaInicio, setFechaInicio] = useState<Date>();
   const [fechaFin, setFechaFin] = useState<Date>();
@@ -146,6 +151,12 @@ export function SolicitarAusenciaModal({
       return;
     }
 
+    if (esHRAdmin && !empleadoIdDestino) {
+      setError('Selecciona un empleado válido');
+      setLoading(false);
+      return;
+    }
+
     if (medioDia && !medioDiaDisponible) {
       setError('El medio día solo está disponible para ausencias de un solo día');
       setLoading(false);
@@ -166,17 +177,20 @@ export function SolicitarAusenciaModal({
       if (justificante) {
         setUploadingJustificante(true);
         
-        // Obtener empleadoId del usuario actual
-        const empleadoResponse = await fetch('/api/empleados/me');
-        const empleadoData = await parseJson<EmpleadoMeResponse>(empleadoResponse);
-        const empleadoId = empleadoData?.id;
+        // Obtener empleadoId para asociar documento
+        let empleadoIdDocumento = empleadoIdDestino;
+        if (!empleadoIdDocumento) {
+          const empleadoResponse = await fetch('/api/empleados/me');
+          const empleadoData = await parseJson<EmpleadoMeResponse>(empleadoResponse);
+          empleadoIdDocumento = empleadoData?.id;
+        }
 
         const formData = new FormData();
         formData.append('file', justificante);
         formData.append('tipo', 'justificante');
         formData.append('crearDocumento', 'true');
-        if (empleadoId) {
-          formData.append('empleadoId', empleadoId);
+        if (empleadoIdDocumento) {
+          formData.append('empleadoId', empleadoIdDocumento);
         }
 
         try {
@@ -207,6 +221,7 @@ export function SolicitarAusenciaModal({
         motivo?: string;
         justificanteUrl?: string;
         documentoId?: string;
+        empleadoId?: string;
       }
       
       const payload: AusenciaPayload = {
@@ -215,6 +230,10 @@ export function SolicitarAusenciaModal({
         fechaFin: fechaFin.toISOString(),
         medioDia,
       };
+
+      if (esHRAdmin && empleadoIdDestino) {
+        payload.empleadoId = empleadoIdDestino;
+      }
       
       // Solo incluir periodo si medioDia es true
       if (medioDia) {
@@ -275,7 +294,7 @@ export function SolicitarAusenciaModal({
     <ResponsiveDialog
       open={open}
       onOpenChange={(isOpen) => !isOpen && onClose()}
-      title="Solicitar Ausencia"
+      title={esHRAdmin ? 'Registrar ausencia' : 'Solicitar Ausencia'}
       complexity="complex"
       footer={
         <div className="flex gap-2 w-full">
@@ -295,7 +314,13 @@ export function SolicitarAusenciaModal({
             disabled={loading || uploadingJustificante || (tipo === 'otro' && !motivoValido)}
             className="flex-1"
           >
-            {uploadingJustificante ? 'Subiendo...' : loading ? 'Enviando...' : 'Solicitar'}
+            {uploadingJustificante
+              ? 'Subiendo...'
+              : loading
+                ? esHRAdmin ? 'Registrando...' : 'Enviando...'
+                : esHRAdmin
+                  ? 'Registrar'
+                  : 'Solicitar'}
           </LoadingButton>
         </div>
       }
@@ -331,7 +356,7 @@ export function SolicitarAusenciaModal({
           </div>
 
           {/* Saldo disponible (solo vacaciones) */}
-          {tipo === 'vacaciones' && (
+          {tipo === 'vacaciones' && !esHRAdmin && Number.isFinite(saldoDisponible) && (
             <div className="flex flex-wrap items-center gap-2 text-sm text-gray-600">
               <span className="flex items-center gap-1 font-medium text-gray-900">
                 Días disponibles

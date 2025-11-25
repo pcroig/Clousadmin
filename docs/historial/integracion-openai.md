@@ -354,7 +354,7 @@ El archivo `lib/openai.ts` mantiene re-exports para compatibilidad, pero se reco
 
 ## Referencias
 
-- [Documentación Completa del Sistema de IA](./ia/README.md)
+- [Documentación Completa del Sistema de IA](../ia/README.md)
 - [OpenAI SDK Docs](https://github.com/openai/openai-node)
 - [Chat Completions API](https://platform.openai.com/docs/api-reference/chat)
 - [Modelos Disponibles](https://platform.openai.com/docs/models)

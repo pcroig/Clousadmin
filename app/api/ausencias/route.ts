@@ -153,15 +153,73 @@ export async function POST(req: NextRequest) {
     if (authResult instanceof Response) return authResult;
     const { session } = authResult;
 
-    if (!session.user.empleadoId) {
-      return badRequestResponse('No tienes un empleado asignado. Contacta con HR.');
-    }
-    const empleadoId = session.user.empleadoId;
-
     // Validar request body
     const validationResult = await validateRequest(req, ausenciaCreateSchema);
     if (validationResult instanceof Response) return validationResult;
     const { data: validatedData } = validationResult;
+
+    let empleadoIdDestino: string | null = null;
+    if (validatedData.empleadoId) {
+      if (
+        validatedData.empleadoId !== session.user.empleadoId &&
+        session.user.rol !== UsuarioRol.hr_admin
+      ) {
+        return badRequestResponse('Solo HR Admin puede registrar ausencias para otros empleados');
+      }
+      empleadoIdDestino = validatedData.empleadoId;
+    } else {
+      empleadoIdDestino = session.user.empleadoId ?? null;
+    }
+
+    if (!empleadoIdDestino) {
+      return badRequestResponse('No tienes un empleado asignado. Contacta con HR.');
+    }
+
+    const empleadoDestino = await prisma.empleado.findFirst({
+      where: {
+        id: empleadoIdDestino,
+        empresaId: session.user.empresaId,
+      },
+      select: {
+        id: true,
+        empresaId: true,
+        managerId: true,
+      },
+    });
+
+    if (!empleadoDestino) {
+      return badRequestResponse('Empleado destino no encontrado en tu empresa');
+    }
+
+    if (
+      session.user.rol === UsuarioRol.manager &&
+      empleadoIdDestino !== session.user.empleadoId
+    ) {
+      // Validar que el empleado pertenezca a sus equipos
+      if (!session.user.empleadoId) {
+        return badRequestResponse('No tienes permisos para registrar esta ausencia');
+      }
+      const equiposManager = await prisma.empleadoEquipo.findMany({
+        where: {
+          empleadoId: session.user.empleadoId,
+        },
+        select: { equipoId: true },
+      });
+      const equiposDestino = await prisma.empleadoEquipo.findMany({
+        where: {
+          empleadoId: empleadoDestino.id,
+        },
+        select: { equipoId: true },
+      });
+      const equiposPermitidos = new Set(equiposManager.map((e) => e.equipoId));
+      const pertenece =
+        equiposDestino.filter((e) => equiposPermitidos.has(e.equipoId)).length > 0;
+      if (!pertenece) {
+        return badRequestResponse('No tienes permisos para registrar esta ausencia');
+      }
+    }
+
+    const empleadoId = empleadoDestino.id;
 
     const cleanupDocumentoHuérfano = async () => {
       if (validatedData.documentoId) {
@@ -321,6 +379,7 @@ export async function POST(req: NextRequest) {
     let ausencia: AusenciaConEmpleado;
     try {
       ausencia = await prisma.$transaction(async (tx) => {
+        let diasDesdeCarryOver = 0;
         if (descuentaSaldo) {
           const año = fechaInicio.getFullYear();
           const validacion = await validarSaldoSuficiente(
@@ -335,13 +394,14 @@ export async function POST(req: NextRequest) {
             throw new SaldoInsuficienteError(validacion.saldoActual, validacion.mensaje);
           }
 
-          await actualizarSaldo(
+          const saldoResult = await actualizarSaldo(
             empleadoId,
             año,
             'solicitar',
             diasSolicitadosFinal,
             tx
           );
+          diasDesdeCarryOver = saldoResult.diasDesdeCarryOver;
         }
 
         return tx.ausencia.create({
@@ -357,6 +417,7 @@ export async function POST(req: NextRequest) {
             diasNaturales,
             diasLaborables,
             diasSolicitados: diasSolicitadosFinal,
+            diasDesdeCarryOver,
             motivo: validatedData.motivo,
             justificanteUrl: validatedData.justificanteUrl,
             documentoId: validatedData.documentoId,

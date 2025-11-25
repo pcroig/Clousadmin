@@ -319,6 +319,7 @@ export function AusenciasEmpleadoClient({ saldo, campanas = [] }: Props) {
           fetchAusencias();
         }}
         saldoDisponible={saldo.diasDisponibles}
+        contexto="empleado"
       />
     </div>
   );

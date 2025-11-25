@@ -73,6 +73,9 @@ export async function GET(_request: NextRequest) {
     const hoy = new Date();
     hoy.setHours(0, 0, 0, 0);
 
+    console.log('[API Revisión GET] Fecha hoy:', hoy.toISOString());
+    console.log('[API Revisión GET] Buscando fichajes pendientes anteriores a hoy...');
+
     let fichajesPendientes;
     try {
       fichajesPendientes = await prisma.fichaje.findMany({

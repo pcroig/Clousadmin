@@ -58,7 +58,9 @@ interface EditarFichajeModalProps {
 export function EditarFichajeModal({ open, fichaje: _fichaje, fichajeDiaId, onClose, onSave: _onSave }: EditarFichajeModalProps) {
   const [cargando, setCargando] = useState(false);
   const [fichajeDia, setFichajeDia] = useState<FichajeDia | null>(null);
-  const [eventos, setEventos] = useState<Array<{ id: string; tipo: string; hora: string; editado?: boolean }>>([]);
+  const [eventos, setEventos] = useState<Array<{ id: string; tipo: string; hora: string; editado?: boolean; isNew?: boolean }>>([]);
+  const [eventosOriginales, setEventosOriginales] = useState<Array<{ id: string; tipo: string; hora: string; editado?: boolean }>>([]);
+  const [eventosEliminados, setEventosEliminados] = useState<string[]>([]);
 
   // Cargar fichaje completo del día
   useEffect(() => {
@@ -88,6 +90,8 @@ export function EditarFichajeModal({ open, fichaje: _fichaje, fichajeDiaId, onCl
           })
         );
         setEventos(evs);
+        setEventosOriginales(evs);
+        setEventosEliminados([]);
       } catch (e) {
         console.error('[EditarFichajeModal] Error cargando fichaje:', e);
       } finally {
@@ -98,19 +102,46 @@ export function EditarFichajeModal({ open, fichaje: _fichaje, fichajeDiaId, onCl
   }, [open, fichajeDiaId]);
 
   async function handleGuardarCambios() {
+    if (!fichajeDiaId) return;
+    
     setCargando(true);
     try {
-      // Guardar todos los eventos modificados
-      for (const ev of eventos) {
-        await fetch(`/api/fichajes/eventos/${ev.id}`, {
-          method: 'PATCH',
+      // 1. Eliminar eventos marcados para eliminación
+      for (const eventoId of eventosEliminados) {
+        await fetch(`/api/fichajes/eventos/${eventoId}`, { method: 'DELETE' });
+      }
+
+      // 2. Crear eventos nuevos
+      for (const ev of eventos.filter((e) => e.isNew)) {
+        await fetch('/api/fichajes/eventos', {
+          method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
+            fichajeId: fichajeDiaId,
             tipo: ev.tipo,
             hora: new Date(ev.hora).toISOString(),
           }),
         });
       }
+
+      // 3. Actualizar eventos modificados (los que existen y cambiaron)
+      for (const ev of eventos.filter((e) => !e.isNew)) {
+        const original = eventosOriginales.find((o) => o.id === ev.id);
+        if (!original) continue;
+        
+        // Solo actualizar si cambió
+        if (original.tipo !== ev.tipo || original.hora !== ev.hora) {
+          await fetch(`/api/fichajes/eventos/${ev.id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              tipo: ev.tipo,
+              hora: new Date(ev.hora).toISOString(),
+            }),
+          });
+        }
+      }
+      
       toast.success('Cambios guardados correctamente');
       onClose();
     } catch (error) {
@@ -121,63 +152,41 @@ export function EditarFichajeModal({ open, fichaje: _fichaje, fichajeDiaId, onCl
     }
   }
 
-  async function handleEliminarEvento(id: string) {
-    if (!confirm('¿Eliminar este evento?')) return;
-    setCargando(true);
-    try {
-      const res = await fetch(`/api/fichajes/eventos/${id}`, { method: 'DELETE' });
-      if (res.ok) {
-        setEventos((prev) => prev.filter((e) => e.id !== id));
-        toast.success('Evento eliminado correctamente');
-      } else {
-        toast.error('No se pudo eliminar el evento');
-      }
-    } catch {
-      toast.error('Error al eliminar el evento');
-    } finally {
-      setCargando(false);
+  function handleEliminarEvento(id: string) {
+    const evento = eventos.find((e) => e.id === id);
+    if (!evento) return;
+    
+    // Si es un evento nuevo, simplemente quitarlo de la lista
+    if (evento.isNew) {
+      setEventos((prev) => prev.filter((e) => e.id !== id));
+    } else {
+      // Si es un evento existente, marcarlo para eliminación
+      setEventos((prev) => prev.filter((e) => e.id !== id));
+      setEventosEliminados((prev) => [...prev, id]);
     }
   }
 
-  async function handleAñadirEvento() {
+  function handleAñadirEvento() {
     if (!fichajeDiaId || !fichajeDia) return;
-    setCargando(true);
-    try {
-      // Crear con hora actual del día del fichaje
-      const fechaBase = new Date(fichajeDia.fecha);
-      const ahora = new Date();
-      fechaBase.setHours(ahora.getHours(), ahora.getMinutes(), 0, 0);
+    
+    // Crear con hora actual del día del fichaje
+    const fechaBase = new Date(fichajeDia.fecha);
+    const ahora = new Date();
+    fechaBase.setHours(ahora.getHours(), ahora.getMinutes(), 0, 0);
 
-      const res = await fetch('/api/fichajes/eventos', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          fichajeId: fichajeDiaId,
-          tipo: 'entrada',
-          hora: fechaBase.toISOString(),
-        }),
-      });
-
-      if (res.ok) {
-        const data = await res.json() as Record<string, any>;
-        setEventos((prev) => [
-          ...prev,
-          {
-            id: data.eventoId,
-            tipo: 'entrada',
-            hora: format(fechaBase, "yyyy-MM-dd'T'HH:mm"),
-            editado: false,
-          },
-        ]);
-        toast.success('Evento añadido correctamente');
-      } else {
-        toast.error('No se pudo añadir el evento');
-      }
-    } catch {
-      toast.error('Error al añadir el evento');
-    } finally {
-      setCargando(false);
-    }
+    // Generar ID temporal para el nuevo evento
+    const tempId = `temp_${Date.now()}`;
+    
+    setEventos((prev) => [
+      ...prev,
+      {
+        id: tempId,
+        tipo: 'entrada',
+        hora: format(fechaBase, "yyyy-MM-dd'T'HH:mm"),
+        editado: false,
+        isNew: true,
+      },
+    ]);
   }
 
   function actualizarEvento(id: string, campo: 'tipo' | 'hora', valor: string) {
@@ -285,8 +294,10 @@ export function EditarFichajeModal({ open, fichaje: _fichaje, fichajeDiaId, onCl
                       variant="ghost"
                       size="icon"
                       className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                      onClick={() => handleEliminarEvento(ev.id)}
-                      disabled={cargando}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleEliminarEvento(ev.id);
+                      }}
                     >
                       <Trash2 className="w-4 h-4" />
                     </Button>

@@ -316,6 +316,9 @@ model Empleado {
   firmaS3Key        String? @db.Text // S3 key de la imagen de firma (PNG/SVG)
   firmaGuardadaData Json? // Datos de trazo de firma manuscrita (opcional)
 
+  // Renovación de saldo de horas
+  saldoRenovadoDesde DateTime?
+
   // Control
   activo    Boolean  @default(true)
   createdAt DateTime @default(now())
@@ -607,6 +610,7 @@ model Ausencia {
   diasNaturales   Int // Total days (including weekends)
   diasLaborables  Int // Working days only
   diasSolicitados Decimal @db.Decimal(4, 1) // Días reales solicitados (excluye festivos)
+  diasDesdeCarryOver Decimal @default(0) @db.Decimal(4, 1) // Días cubiertos con saldo extendido
 
   // Optional fields
   motivo          String? @db.Text // Motivo o descripción (obligatorio para tipo 'otro')
@@ -693,6 +697,11 @@ model EmpleadoSaldoAusencias {
   diasTotales    Int     @default(0) // Días asignados (desde contrato o manual)
   diasUsados     Decimal @default(0) @db.Decimal(4, 1) // Días ya usados (ausencias aprobadas)
   diasPendientes Decimal @default(0) @db.Decimal(4, 1) // Días en solicitudes pendientes
+  carryOverAsignado Decimal @default(0) @db.Decimal(4, 1) // Días arrastrados del año anterior
+  carryOverPendiente Decimal @default(0) @db.Decimal(4, 1) // Días arrastrados en solicitudes pendientes
+  carryOverUsado Decimal @default(0) @db.Decimal(4, 1) // Días arrastrados ya consumidos
+  carryOverExpiraEn DateTime?
+  carryOverFuenteAnio Int? @db.SmallInt
 
   origen String @db.VarChar(50) // 'contrato', 'manual_hr'
 

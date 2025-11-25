@@ -345,7 +345,7 @@ curl -X POST https://yourapp.com/api/cron/revisar-solicitudes \
    - Arquitectura del sistema
    - Especificaciones
 
-3. **[ia/ARQUITECTURA_IA.md](./ia/ARQUITECTURA_IA.md)**
+3. **[ia/ARQUITECTURA_IA.md](../ia/ARQUITECTURA_IA.md)**
    - Sistema IA unificado
    - Patrones y capabilities
    - Multi-proveedor

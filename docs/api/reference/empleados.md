@@ -754,7 +754,7 @@ curl -X GET 'https://api.clousadmin.com/api/empleados/me' \
 
 ## Próximos Pasos
 
-- [Documentación de Ausencias](./ausencias.md)
-- [Documentación de Fichajes](./fichajes.md)
+- [Documentación de Ausencias](../../funcionalidades/ausencias.md)
+- [Documentación de Fichajes](../../funcionalidades/fichajes.md)
 - [Ver todos los endpoints](../README.md)
 - [Explorar API interactivamente](/api-docs)

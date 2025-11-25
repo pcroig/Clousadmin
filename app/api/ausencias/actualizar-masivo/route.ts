@@ -149,7 +149,8 @@ export async function POST(req: NextRequest) {
                 año,
                 'aprobar',
                 Number(ausencia.diasSolicitados),
-                tx
+                tx,
+                { diasDesdeCarryOver: Number(ausencia.diasDesdeCarryOver ?? 0) }
               );
             }
           }
@@ -172,7 +173,8 @@ export async function POST(req: NextRequest) {
                 año,
                 'rechazar',
                 Number(ausencia.diasSolicitados),
-                tx
+                tx,
+                { diasDesdeCarryOver: Number(ausencia.diasDesdeCarryOver ?? 0) }
               );
             }
           }

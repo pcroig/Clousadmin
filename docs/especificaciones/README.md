@@ -250,7 +250,7 @@ Antes de empezar implementación, necesitas decidir:
 
 ---
 
-**Última actualización**: 12 de Noviembre 2025
+**Última actualización**: 27 de enero de 2025
 
 
 

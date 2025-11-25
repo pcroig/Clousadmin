@@ -137,6 +137,7 @@ export function EmpleadoDashboardClient({
           setModalAusencia(false);
           router.refresh();
         }}
+        contexto="empleado"
       />
 
       {!propuestaData && (

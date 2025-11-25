@@ -132,6 +132,7 @@ export type JornadaAsignarInput = z.infer<typeof jornadaAsignarSchema>;
 
 export const ausenciaCreateSchema = z.object({
   tipo: z.enum(['vacaciones', 'enfermedad', 'enfermedad_familiar', 'maternidad_paternidad', 'otro']),
+  empleadoId: z.string().uuid().optional(),
   fechaInicio: z.union([
     z.string().refine((val) => !isNaN(new Date(val).getTime()), {
       message: 'fechaInicio debe ser una fecha válida',

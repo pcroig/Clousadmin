@@ -5,6 +5,15 @@
 **Puntuación objetivo**: 9.0/10  
 **Última actualización**: 27 de enero de 2025
 
+> **Nota**: Este es el documento principal de mobile. Para guías específicas, ver:
+> - [`MOBILE_ADAPTATION_SUMMARY.md`](MOBILE_ADAPTATION_SUMMARY.md) - Resumen ejecutivo
+> - [`MOBILE_COMPONENTS_GUIDE.md`](MOBILE_COMPONENTS_GUIDE.md) - Guía de componentes
+> - [`MOBILE_FORM_COMPONENTS.md`](MOBILE_FORM_COMPONENTS.md) - Formularios responsive
+> - [`MOBILE_UX_PATTERNS.md`](MOBILE_UX_PATTERNS.md) - Patrones UX
+> - [`MOBILE_PERFORMANCE_OPTIMIZATIONS.md`](MOBILE_PERFORMANCE_OPTIMIZATIONS.md) - Optimizaciones
+> - [`MOBILE_TESTING_PLAN.md`](MOBILE_TESTING_PLAN.md) - Plan de testing
+> - [`MODAL_MIGRATION_GUIDE.md`](MODAL_MIGRATION_GUIDE.md) - Migración de modales
+
 ---
 
 ## 📋 Índice
@@ -905,6 +914,7 @@ Después de implementar, verificar:
 
 **Estado actual**: ✅ **READY TO DEPLOY**  
 **Próximo paso**: Implementar Prioridad 1
+
 
 
 

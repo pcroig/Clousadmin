@@ -616,7 +616,7 @@ Cuando excedes el límite:
 
 ## Próximos Pasos
 
-- [Ver documentación completa de endpoints](./reference/README.md)
+- [Ver documentación completa de endpoints](./README.md#referencia-de-api)
 - [Consultar manejo de errores](./errors.md)
 - [Ver ejemplos de flujos comunes](./guides/common-workflows.md)
 - [Explorar API interactivamente con Swagger UI](/api-docs)

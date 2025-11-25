@@ -134,6 +134,7 @@ async function main() {
     where: { usuarioId: usuarioAdmin.id },
     update: {
       activo: true,
+      jornadaId: jornadaCompleta.id, // Asegurar que se asigna jornada también en update
     },
     create: {
       usuarioId: usuarioAdmin.id,
@@ -263,6 +264,7 @@ async function main() {
         salarioBrutoAnual: empData.salarioBrutoAnual,
         salarioBrutoMensual: Math.round(empData.salarioBrutoAnual / 12),
         activo: true,
+        jornadaId: jornadaCompleta.id, // Asegurar que se asigna jornada también en update
       },
       create: {
         usuarioId: usuario.id,

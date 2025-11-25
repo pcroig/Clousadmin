@@ -741,6 +741,6 @@ except ClousadminAPIError as e:
 ## Recursos Adicionales
 
 - [Documentación de Autenticación](./authentication.md)
-- [Referencia de API](./reference/README.md)
+- [Referencia de API](./README.md#referencia-de-api)
 - [Explorar con Swagger UI](/api-docs)
 - [Postman Collection](../openapi/postman/clousadmin.json)

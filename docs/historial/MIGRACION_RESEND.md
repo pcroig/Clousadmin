@@ -213,9 +213,9 @@ Si por alguna razón necesitas volver a AWS SES:
 
 ## Documentación Adicional
 
-- [Configuración Completa de Resend](./CONFIGURACION_RESEND.md)
-- [Setup de Email Templates](./CONFIGURACION_RESEND.md#funciones-de-email-disponibles)
-- [Troubleshooting](./CONFIGURACION_RESEND.md#troubleshooting)
+- [Configuración Completa de Resend](../CONFIGURACION_RESEND.md)
+- [Setup de Email Templates](../CONFIGURACION_RESEND.md#funciones-de-email-disponibles)
+- [Troubleshooting](../CONFIGURACION_RESEND.md#troubleshooting)
 
 ---
 

@@ -287,3 +287,4 @@ La solución fue **unificar la fuente de datos**: ambos ahora usan la tabla `fic
 **Revisado por**: Sofia Roig  
 **Versión**: 1.0  
 
+
