@@ -23,7 +23,7 @@ jobs:
   verify-ci:
     name: Verify CI Status
     runs-on: ubuntu-latest
-    if: ${{ github.event.inputs.skip_tests != 'true' }}
+    if: ${{ github.event_name == 'push' }}
 
     steps:
       - name: Wait for CI to complete
