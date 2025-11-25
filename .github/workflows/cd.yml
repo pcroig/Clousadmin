@@ -1,0 +1,202 @@
+name: CD - Deploy to Hetzner
+
+# Solo ejecutar en push a main y permitir ejecución manual
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      skip_tests:
+        description: 'Skip tests before deploy?'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
+
+permissions:
+  contents: read
+
+jobs:
+  # Verificar que CI pasó antes de deploy
+  verify-ci:
+    name: Verify CI Status
+    runs-on: ubuntu-latest
+    if: ${{ github.event.inputs.skip_tests != 'true' }}
+
+    steps:
+      - name: Wait for CI to complete
+        uses: lewagon/wait-on-check-action@v1.3.4
+        with:
+          ref: ${{ github.sha }}
+          check-name: 'CI Success'
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          wait-interval: 10
+
+  deploy:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: [verify-ci]
+    if: |
+      always() &&
+      (needs.verify-ci.result == 'success' || needs.verify-ci.result == 'skipped')
+
+    timeout-minutes: 20
+
+    environment:
+      name: production
+      url: ${{ secrets.APP_URL }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.HETZNER_SSH_KEY }}
+
+      - name: Add Hetzner host to known_hosts
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H ${{ secrets.HETZNER_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Deploy to Hetzner
+        run: |
+          ssh ${{ secrets.HETZNER_USER }}@${{ secrets.HETZNER_HOST }} << 'ENDSSH'
+            set -e
+
+            echo "🚀 Starting deployment to Hetzner..."
+
+            # Navegar al directorio de la aplicación
+            cd /var/www/clousadmin || exit 1
+
+            # Hacer backup del .env actual
+            echo "📦 Backing up .env file..."
+            cp .env .env.backup.$(date +%Y%m%d_%H%M%S)
+
+            # Pull latest changes
+            echo "📥 Pulling latest changes..."
+            git fetch origin main
+            git reset --hard origin/main
+
+            # Restaurar .env
+            echo "🔐 Restoring .env file..."
+            cp .env.backup.$(date +%Y%m%d_%H%M%S | tail -1) .env
+
+            # Install dependencies
+            echo "📦 Installing dependencies..."
+            npm ci --production=false
+
+            # Generate Prisma Client
+            echo "🔧 Generating Prisma Client..."
+            npx prisma generate
+
+            # Run migrations
+            echo "🗄️ Running database migrations..."
+            npx prisma migrate deploy
+
+            # Build application
+            echo "🏗️ Building application..."
+            NODE_OPTIONS="--max-old-space-size=8192" npm run build
+
+            # Restart PM2
+            echo "♻️ Restarting application..."
+            pm2 restart clousadmin || pm2 start npm --name clousadmin -- start
+            pm2 save
+
+            # Verificar que la app está corriendo
+            echo "✅ Verifying application is running..."
+            pm2 list
+
+            # Limpiar backups antiguos (mantener últimos 5)
+            echo "🧹 Cleaning old backups..."
+            ls -t .env.backup.* 2>/dev/null | tail -n +6 | xargs -r rm
+
+            echo "✅ Deployment completed successfully!"
+          ENDSSH
+
+      - name: Verify deployment
+        run: |
+          echo "🔍 Verifying deployment..."
+
+          # Esperar 10 segundos para que la app se reinicie
+          sleep 10
+
+          # Verificar que la app responde
+          http_code=$(curl -s -o /dev/null -w "%{http_code}" ${{ secrets.APP_URL }}/api/health || echo "000")
+
+          if [ "$http_code" = "200" ]; then
+            echo "✅ Application is responding correctly (HTTP $http_code)"
+          else
+            echo "⚠️ Application returned HTTP $http_code - checking logs..."
+            ssh ${{ secrets.HETZNER_USER }}@${{ secrets.HETZNER_HOST }} "pm2 logs clousadmin --lines 50 --nostream"
+            exit 1
+          fi
+
+      - name: Notify deployment status
+        if: always()
+        run: |
+          if [ "${{ job.status }}" == "success" ]; then
+            echo "✅ Deployment to production completed successfully"
+            echo "🌐 Application URL: ${{ secrets.APP_URL }}"
+          else
+            echo "❌ Deployment failed - check logs above"
+            exit 1
+          fi
+
+  # Rollback automático si el deploy falla
+  rollback:
+    name: Rollback on Failure
+    runs-on: ubuntu-latest
+    needs: [deploy]
+    if: failure()
+
+    steps:
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.HETZNER_SSH_KEY }}
+
+      - name: Add Hetzner host to known_hosts
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H ${{ secrets.HETZNER_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Perform rollback
+        run: |
+          ssh ${{ secrets.HETZNER_USER }}@${{ secrets.HETZNER_HOST }} << 'ENDSSH'
+            set -e
+
+            echo "⚠️ Deployment failed - performing rollback..."
+
+            cd /var/www/clousadmin || exit 1
+
+            # Volver al commit anterior
+            git reset --hard HEAD~1
+
+            # Restaurar último .env
+            latest_backup=$(ls -t .env.backup.* 2>/dev/null | head -1)
+            if [ -n "$latest_backup" ]; then
+              cp "$latest_backup" .env
+            fi
+
+            # Reinstalar dependencias
+            npm ci --production=false
+            npx prisma generate
+
+            # Rebuild
+            NODE_OPTIONS="--max-old-space-size=8192" npm run build
+
+            # Restart
+            pm2 restart clousadmin
+
+            echo "✅ Rollback completed"
+          ENDSSH
+
+      - name: Notify rollback
+        if: always()
+        run: |
+          echo "🔄 Rollback completed - application reverted to previous version"
+          echo "⚠️ Please check the deployment logs and fix the issues before trying again"

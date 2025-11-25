@@ -10,7 +10,14 @@ jobs:
   unit-tests:
     name: Unit & Integration Tests
     runs-on: ubuntu-latest
-    
+
+    env:
+      DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/clousadmin_test"
+      NEXTAUTH_SECRET: "test-secret-key-minimum-32-characters-long-for-ci"
+      ENCRYPTION_KEY: "3f70cf35f9f2efeff971a06fb8b3f2440d9b30b0271fd6936c9b72bd183216df"
+      NEXT_PUBLIC_APP_URL: "http://localhost:3000"
+      NODE_ENV: "test"
+
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -19,6 +26,7 @@ jobs:
           cache: 'npm'
 
       - run: npm ci
+      - run: npx prisma generate
       - run: npm test
       
       - name: Upload coverage
@@ -30,7 +38,13 @@ jobs:
   lint:
     name: Lint & TypeCheck
     runs-on: ubuntu-latest
-    
+
+    env:
+      DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/clousadmin_test"
+      NEXTAUTH_SECRET: "test-secret-key-minimum-32-characters-long-for-ci"
+      ENCRYPTION_KEY: "3f70cf35f9f2efeff971a06fb8b3f2440d9b30b0271fd6936c9b72bd183216df"
+      NEXT_PUBLIC_APP_URL: "http://localhost:3000"
+
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -39,5 +53,6 @@ jobs:
           cache: 'npm'
 
       - run: npm ci
+      - run: npx prisma generate
       - run: npm run lint || echo "Lint not configured"
       - run: npx tsc --noEmit
