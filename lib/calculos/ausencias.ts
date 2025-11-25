@@ -13,7 +13,7 @@ import {
   getFestivosActivosEnRango,
 } from './dias-laborables';
 
-import type { Prisma } from '@prisma/client';
+import type { EmpleadoSaldoAusencias, Prisma } from '@prisma/client';
 
 const CARRY_OVER_DEFAULT_MONTHS = 4;
 
@@ -64,9 +64,9 @@ function decimalToNumber(value: Prisma.Decimal | number | string | null | undefi
 }
 
 async function limpiarCarryOverSiExpirado(
-  saldo: Prisma.EmpleadoSaldoAusencias,
+  saldo: EmpleadoSaldoAusencias,
   executor: PrismaTx | typeof prisma
-): Promise<Prisma.EmpleadoSaldoAusencias> {
+): Promise<EmpleadoSaldoAusencias> {
   if (!saldo.carryOverExpiraEn || decimalToNumber(saldo.carryOverAsignado) <= 0) {
     return saldo;
   }
@@ -152,7 +152,7 @@ async function calcularDatosCarryOverParaNuevoSaldo(params: {
 }
 
 function obtenerCarryOverDisponible(
-  saldo: Prisma.EmpleadoSaldoAusencias,
+  saldo: EmpleadoSaldoAusencias,
   referencia: Date
 ): { disponible: number; activo: boolean; expiraEn?: Date } {
   const asignado = decimalToNumber(saldo.carryOverAsignado);

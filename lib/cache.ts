@@ -41,20 +41,26 @@ export const CacheDurations = {
  * );
  * ```
  */
-export function cachedQuery<T extends (...args: never[]) => Promise<unknown>>(
-  fn: T,
+type AsyncFn = (...args: any[]) => Promise<unknown>;
+
+export function cachedQuery<TFunc extends AsyncFn>(
+  fn: TFunc,
   keyParts: string[],
   options: {
     revalidate?: number;
     tags?: string[];
   } = {}
-): T {
+): (...args: Parameters<TFunc>) => ReturnType<TFunc> {
   const { revalidate = CacheDurations.LISTINGS, tags = [] } = options;
 
-  return unstable_cache(fn, keyParts, {
+  const cachedFn = unstable_cache(fn, keyParts, {
     revalidate,
     tags,
-  }) as T;
+  });
+
+  return ((...args: Parameters<TFunc>) => cachedFn(...args)) as (
+    ...args: Parameters<TFunc>
+  ) => ReturnType<TFunc>;
 }
 
 /**

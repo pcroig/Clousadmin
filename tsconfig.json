@@ -47,6 +47,7 @@
     "docs/**/*",
     "prisma/seed.ts",
     "prisma/seed-plantillas.ts",
+    "playwright.config.ts",
     "tests/**/*",
     "vitest.config.ts"
   ]

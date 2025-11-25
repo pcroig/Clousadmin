@@ -78,6 +78,7 @@ jobs:
       NEXTAUTH_SECRET: "test-secret-key-minimum-32-characters-long-for-ci"
       ENCRYPTION_KEY: "3f70cf35f9f2efeff971a06fb8b3f2440d9b30b0271fd6936c9b72bd183216df"
       NEXT_PUBLIC_APP_URL: "http://localhost:3000"
+      NODE_OPTIONS: "--max-old-space-size=8192"
 
     steps:
       - uses: actions/checkout@v4

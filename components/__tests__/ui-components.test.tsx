@@ -2,6 +2,7 @@
  * Tests de componentes UI básicos
  */
 
+import '@testing-library/jest-dom/vitest';
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@/tests/helpers/react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';

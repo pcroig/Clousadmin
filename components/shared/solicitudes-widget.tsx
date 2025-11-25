@@ -26,6 +26,7 @@ export interface Solicitud {
   tipo: SolicitudTipo;
   empleado: {
     nombre: string;
+    apellidos?: string | null;
     fotoUrl?: string | null;
     avatar?: string | null;
   };

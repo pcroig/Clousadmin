@@ -13,6 +13,8 @@ const baseEmpleado: EmpleadoDetectado = {
   apellidos: 'García',
   email: 'ana@example.com',
   nif: '12345678Z',
+  nss: null,
+  iban: null,
   telefono: null,
   fechaNacimiento: null,
   puesto: 'Desarrolladora',
