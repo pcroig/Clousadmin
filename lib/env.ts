@@ -62,6 +62,10 @@ const envSchema = z.object({
   // JWT Secret (required)
   NEXTAUTH_SECRET: z.string().min(32, 'NEXTAUTH_SECRET debe tener al menos 32 caracteres'),
 
+  // Google OAuth
+  GOOGLE_CLIENT_ID: z.string().min(1).optional(),
+  GOOGLE_CLIENT_SECRET: z.string().min(1).optional(),
+
   // Email (Resend)
   RESEND_API_KEY: z.string().min(1).optional(),
   RESEND_FROM_EMAIL: z.string().email().optional(),
@@ -127,6 +131,10 @@ if (validatedEnv.ENABLE_CLOUD_STORAGE && !hasStorageConfig) {
 }
 
 if (isProduction) {
+  if (!validatedEnv.GOOGLE_CLIENT_ID || !validatedEnv.GOOGLE_CLIENT_SECRET) {
+    throw new Error('[ENV] GOOGLE_CLIENT_ID y GOOGLE_CLIENT_SECRET son obligatorios en producción');
+  }
+
   if (!validatedEnv.REDIS_URL) {
     throw new Error('[ENV] REDIS_URL es obligatorio en producción');
   }

@@ -36,3 +36,4 @@ export async function hasSubscriptionTable(): Promise<boolean> {
   return subscriptionTableExistsCache;
 }
 
+

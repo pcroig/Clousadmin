@@ -34,3 +34,4 @@ Este documento sirve como índice rápido y apunta a la guía principal del sist
 Esta referencia se mantendrá breve. Para profundizar en tokens, componentes y ejemplos de código, consulta `DESIGN_SYSTEM.md`.
 
 
+

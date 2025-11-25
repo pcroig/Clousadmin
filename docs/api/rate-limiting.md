@@ -38,3 +38,4 @@
 - [`API_REFACTORING.md`](../API_REFACTORING.md) – Patrones y helpers reutilizables.
 
 
+

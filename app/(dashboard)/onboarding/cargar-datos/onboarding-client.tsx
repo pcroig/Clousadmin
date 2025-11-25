@@ -6,7 +6,7 @@
 
 import { Building2, CheckCircle, Plug, UserPlus, Users } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 import { ImportarEmpleados } from '@/components/onboarding/importar-empleados';
@@ -44,58 +44,99 @@ interface OnboardingClientProps {
   sedes: Sede[];
   integraciones: Integracion[];
   nombreEmpresa: string;
+  empresaId: string;
 }
 
 export function OnboardingClient({
   sedes,
   integraciones,
   nombreEmpresa: _nombreEmpresa,
+  empresaId,
 }: OnboardingClientProps) {
   void _nombreEmpresa; // Explicitly mark as unused
   const router = useRouter();
   const [currentTab, setCurrentTab] = useState('sedes');
   const [loading, setLoading] = useState(false);
 
-  const tabs = [
-    {
-      value: 'sedes',
-      label: 'Sedes',
-      icon: Building2,
-      component: <SedesForm sedesIniciales={sedes} />,
-    },
-    {
-      value: 'empleados',
-      label: 'Empleados',
-      icon: Users,
-      component: <ImportarEmpleados />,
-    },
-    {
-      value: 'integraciones',
-      label: 'Integraciones',
-      icon: Plug,
-      component: <IntegracionesForm integracionesIniciales={integraciones} />,
-    },
-    {
-      value: 'admins',
-      label: 'HR Admins',
-      icon: UserPlus,
-      component: <InvitarHRAdmins />,
-    },
-  ];
+  const tabs = useMemo(
+    () => [
+      {
+        value: 'sedes',
+        label: 'Sedes',
+        icon: Building2,
+        component: <SedesForm sedesIniciales={sedes} />,
+      },
+      {
+        value: 'empleados',
+        label: 'Empleados',
+        icon: Users,
+        component: <ImportarEmpleados />,
+      },
+      {
+        value: 'integraciones',
+        label: 'Integraciones',
+        icon: Plug,
+        component: <IntegracionesForm integracionesIniciales={integraciones} />,
+      },
+      {
+        value: 'admins',
+        label: 'HR Admins',
+        icon: UserPlus,
+        component: <InvitarHRAdmins />,
+      },
+    ],
+    [sedes, integraciones]
+  );
+
+  const tabValues = useMemo(() => tabs.map((tab) => tab.value), [tabs]);
+
+  const storageKey = useMemo(
+    () => (empresaId ? `onboarding-step-${empresaId}` : null),
+    [empresaId]
+  );
+
+  useEffect(() => {
+    if (!storageKey) {
+      return;
+    }
+    try {
+      const saved = localStorage.getItem(storageKey);
+      if (saved && tabValues.includes(saved)) {
+        setCurrentTab(saved);
+      }
+    } catch (error) {
+      console.error('[Onboarding] Error leyendo paso guardado:', error);
+    }
+  }, [storageKey, tabValues]);
 
   const currentTabIndex = tabs.findIndex((tab) => tab.value === currentTab);
   const isLastTab = currentTabIndex === tabs.length - 1;
   const isFirstTab = currentTabIndex === 0;
 
+  const persistStep = useCallback(
+    (value: string) => {
+      setCurrentTab(value);
+      if (!storageKey) {
+        return;
+      }
+      try {
+        localStorage.setItem(storageKey, value);
+      } catch (error) {
+        console.error('[Onboarding] Error guardando paso:', error);
+      }
+    },
+    [storageKey]
+  );
+
   const handleNext = () => {
     if (!isLastTab) {
-      setCurrentTab(tabs[currentTabIndex + 1].value);
+      persistStep(tabs[currentTabIndex + 1].value);
     }
   };
 
   const handlePrevious = () => {
     if (!isFirstTab) {
-      setCurrentTab(tabs[currentTabIndex - 1].value);
+      persistStep(tabs[currentTabIndex - 1].value);
     }
   };
 
@@ -106,6 +147,13 @@ export function OnboardingClient({
       const result = await completarOnboardingAction();
 
       if (result.success) {
+        if (storageKey) {
+          try {
+            localStorage.removeItem(storageKey);
+          } catch (error) {
+            console.error('[Onboarding] Error limpiando paso guardado:', error);
+          }
+        }
         router.push('/hr/dashboard');
         router.refresh();
       } else {
@@ -174,7 +222,7 @@ export function OnboardingClient({
           </div>
         </div>
         
-        <Tabs value={currentTab} onValueChange={setCurrentTab} className="space-y-6">
+        <Tabs value={currentTab} onValueChange={persistStep} className="space-y-6">
           {/* Tabs content - sin tabs list visible, solo el contenido */}
           <div className="bg-white rounded-lg border p-6 min-h-[500px]">
             {tabs.map((tab) => (

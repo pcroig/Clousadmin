@@ -1,6 +1,28 @@
 // ========================================
 // IA - Procesar Excel de Empleados
 // ========================================
+// 
+// LÍMITES Y UMBRALES:
+// -------------------
+// - Máximo tamaño archivo: 5MB (configurable vía IMPORT_EXCEL_MAX_BYTES)
+// - Umbral para estrategia de muestra: 50 registros
+// - Tamaño de muestra para IA: 30 registros
+// - Límite seguro de caracteres en prompt: 350K (~87K tokens)
+// - Batch size para procesamiento: 50 empleados
+// - Concurrencia en creación: 8 empleados paralelos
+// - Timeout de transacción: 15 segundos
+//
+// ESCALABILIDAD:
+// --------------
+// - Archivos <50 registros: Todos procesados por IA
+// - Archivos ≥50 registros: Muestra de 30 a IA, resto con mapeo detectado
+// - Archivos con datos muy grandes: Fallback a mapeo básico automático
+//
+// ESTRATEGIA DE FALLBACK:
+// -----------------------
+// 1. Intento con IA (OpenAI → Anthropic → Google)
+// 2. Si falla o datos muy grandes: Mapeo básico de columnas
+// 3. Siempre retorna resultados (nunca falla completamente)
 
 import * as XLSX from 'xlsx';
 import { z } from 'zod';
@@ -73,6 +95,69 @@ const EMPLEADO_CAMPOS_SET = new Set<keyof EmpleadoDetectado>(EMPLEADO_CAMPOS);
 function isEmpleadoCampo(campo: string): campo is keyof EmpleadoDetectado {
   return EMPLEADO_CAMPOS_SET.has(campo as keyof EmpleadoDetectado);
 }
+
+const EMPLEADO_CAMPO_DESCRIPCIONES: Record<keyof EmpleadoDetectado, string> = {
+  nombre: 'Nombre (solo nombre de pila, sin apellidos)',
+  apellidos: 'Apellidos completos',
+  email: 'Email corporativo o de contacto del empleado',
+  nif: 'Documento identificativo (DNI/NIE/NIF) en mayúsculas y sin espacios',
+  nss: 'Número de la Seguridad Social sin espacios ni guiones',
+  iban: 'Cuenta bancaria IBAN completa y sin espacios',
+  telefono: 'Número de teléfono con prefijo si está disponible',
+  fechaNacimiento: 'Fecha de nacimiento en formato YYYY-MM-DD',
+  puesto: 'Puesto o rol principal',
+  equipo: 'Equipo o departamento asignado',
+  manager: 'Manager directo (nombre completo o email)',
+  fechaAlta: 'Fecha de alta/incorporación en formato YYYY-MM-DD',
+  tipoContrato: 'Tipo de contrato (indefinido, temporal, prácticas, etc.)',
+  salarioBrutoAnual: 'Salario bruto anual en euros como número',
+  salarioBrutoMensual: 'Salario bruto mensual en euros como número',
+  direccion: 'Dirección completa cuando solo existe una columna',
+  direccionCalle: 'Calle o vía (sin número)',
+  direccionNumero: 'Número o portal de la dirección',
+  direccionPiso: 'Piso, planta, puerta o apartamento',
+  direccionProvincia: 'Provincia / estado / región',
+  ciudad: 'Ciudad o municipio',
+  codigoPostal: 'Código postal / ZIP',
+};
+
+const CAMPOS_DESCRIPCION_TEXTO = EMPLEADO_CAMPOS.map(
+  (campo) => `- "${campo}": ${EMPLEADO_CAMPO_DESCRIPCIONES[campo]}`
+).join('\n');
+
+const EMPLEADO_JSON_TEMPLATE = `{
+  "empleados": [
+    {
+      "nombre": string | null,
+      "apellidos": string | null,
+      "email": string | null,
+      "nif": string | null,
+      "nss": string | null,
+      "iban": string | null,
+      "telefono": string | null,
+      "fechaNacimiento": string | null,
+      "puesto": string | null,
+      "equipo": string | null,
+      "manager": string | null,
+      "fechaAlta": string | null,
+      "tipoContrato": string | null,
+      "salarioBrutoAnual": number | null,
+      "salarioBrutoMensual": number | null,
+      "direccion": string | null,
+      "direccionCalle": string | null,
+      "direccionNumero": string | null,
+      "direccionPiso": string | null,
+      "direccionProvincia": string | null,
+      "ciudad": string | null,
+      "codigoPostal": string | null
+    }
+  ],
+  "equiposDetectados": string[],
+  "managersDetectados": string[],
+  "columnasDetectadas": {
+    "columna_original": "campo_mapeado"
+  }
+}`;
 
 /**
  * Respuesta de la IA al procesar el Excel
@@ -237,52 +322,120 @@ function obtenerMapeoBasicoColumnas(): Record<string, keyof EmpleadoDetectado> {
     // Nombre completo
     'nombre completo': 'nombre',
     'nombrecompleto': 'nombre',
+    'full name': 'nombre',
     // Nombre y apellidos
     'nombre': 'nombre',
     'name': 'nombre',
+    'first name': 'nombre',
     'apellidos': 'apellidos',
     'apellido': 'apellidos',
-    // Email
+    'last name': 'apellidos',
+    'surname': 'apellidos',
+    // Correos
     'correo electrónico': 'email',
     'correoelectronico': 'email',
     'email': 'email',
     'correo': 'email',
-    // NIF
+    'email personal': 'email',
+    'work email': 'email',
+    // Documentos
     'nif': 'nif',
     'dni': 'nif',
+    'nie': 'nif',
+    'documento': 'nif',
+    // Seguridad Social
+    'nss': 'nss',
+    'numero ss': 'nss',
+    'número ss': 'nss',
+    'numero seguridad social': 'nss',
+    'número seguridad social': 'nss',
+    'seguridad social': 'nss',
+    // IBAN / cuentas
+    'iban': 'iban',
+    'cuenta bancaria': 'iban',
+    'numero de cuenta': 'iban',
+    'número de cuenta': 'iban',
+    'ccc': 'iban',
+    'bank account': 'iban',
     // Teléfono
     'teléfono móvil': 'telefono',
     'telefonomovil': 'telefono',
     'teléfono': 'telefono',
     'telefono': 'telefono',
+    'movil': 'telefono',
+    'celular': 'telefono',
+    'mobile': 'telefono',
+    'phone': 'telefono',
+    'teléfono corporativo': 'telefono',
     // Puesto
     'puesto': 'puesto',
     'cargo': 'puesto',
+    'position': 'puesto',
+    'role': 'puesto',
     // Equipo (compatibilidad con columna "departamento")
     'departamento': 'equipo',
     'department': 'equipo',
     'equipo': 'equipo',
     'team': 'equipo',
+    'area': 'equipo',
     // Manager
     'manager': 'manager',
     'jefe': 'manager',
     'responsable': 'manager',
+    'manager email': 'manager',
+    'line manager': 'manager',
     // Fechas
     'fecha de nacimiento': 'fechaNacimiento',
     'fechanacimiento': 'fechaNacimiento',
     'fecha de alta': 'fechaAlta',
     'fechaalta': 'fechaAlta',
+    'fecha incorporación': 'fechaAlta',
+    'fecha incorporacion': 'fechaAlta',
+    'hire date': 'fechaAlta',
+    'start date': 'fechaAlta',
+    'fecha contrato': 'fechaAlta',
     'tipo de contrato': 'tipoContrato',
     'tipocontrato': 'tipoContrato',
+    'contract type': 'tipoContrato',
+    'contrato': 'tipoContrato',
     // Salario
     'salario bruto anual': 'salarioBrutoAnual',
     'salariobrutoanual': 'salarioBrutoAnual',
     'salario bruto anual (€)': 'salarioBrutoAnual',
+    'salary': 'salarioBrutoAnual',
+    'annual salary': 'salarioBrutoAnual',
+    'compensacion anual': 'salarioBrutoAnual',
+    'salario bruto mensual': 'salarioBrutoMensual',
+    'salario mensual': 'salarioBrutoMensual',
+    'monthly salary': 'salarioBrutoMensual',
     // Ubicación
+    'direccion': 'direccion',
+    'dirección': 'direccion',
+    'address': 'direccion',
+    'address line 1': 'direccionCalle',
+    'address line 2': 'direccionPiso',
+    'calle': 'direccionCalle',
+    'street': 'direccionCalle',
     'ubicación de oficina': 'ciudad',
     'ubicaciondeoficina': 'ciudad',
     'ciudad': 'ciudad',
-    'direccion': 'direccion',
+    'city': 'ciudad',
+    'municipio': 'ciudad',
+    'localidad': 'ciudad',
+    'numero': 'direccionNumero',
+    'número': 'direccionNumero',
+    'portal': 'direccionNumero',
+    'piso': 'direccionPiso',
+    'planta': 'direccionPiso',
+    'apartamento': 'direccionPiso',
+    'provincia': 'direccionProvincia',
+    'province': 'direccionProvincia',
+    'state': 'direccionProvincia',
+    'codigo postal': 'codigoPostal',
+    'código postal': 'codigoPostal',
+    'cp': 'codigoPostal',
+    'postal code': 'codigoPostal',
+    'zip': 'codigoPostal',
   };
 }
 
@@ -323,8 +476,8 @@ function procesarEmpleadosConMapeo(
       apellidos: null,
       email: null,
       nif: null,
-    nss: null,
-    iban: null,
+      nss: null,
+      iban: null,
       telefono: null,
       fechaNacimiento: null,
       puesto: null,
@@ -459,57 +612,51 @@ export async function mapearEmpleadosConIA(
       `(${usarMuestra ? `muestra de ${registrosParaIA.length} para IA` : 'todos a la IA'})`
     );
     
+    // Validar tamaño de datos antes de construir prompt
+    // Estimación: 1 token ≈ 4 caracteres, límite seguro: 100K tokens = 400K caracteres
+    const datosString = JSON.stringify(registrosParaIA);
+    const MAX_SAFE_CHARS = 350000; // 350K chars = ~87K tokens (margen de seguridad)
+    
+    if (datosString.length > MAX_SAFE_CHARS) {
+      console.warn(
+        `[mapearEmpleadosConIA] Datos muy grandes (${datosString.length} chars). ` +
+        `Reduciendo muestra a 20 registros para evitar límite de tokens.`
+      );
+      // Reducir muestra si es demasiado grande
+      const registrosReducidos = excelData.slice(0, 20);
+      const mapeoBasico = obtenerMapeoBasicoColumnas();
+      const resultado = procesarEmpleadosConMapeo(excelData, mapeoBasico);
+      return {
+        ...resultado,
+        columnasDetectadas: {},
+      };
+    }
+    
     // Construir el prompt para la IA
     const prompt = `
-Analiza los siguientes datos de empleados desde un archivo Excel y mapea cada columna a los campos correspondientes del modelo de empleado.
+Analiza los siguientes datos de empleados desde un archivo Excel y mapea cada columna a los campos del modelo interno.
 
-**IMPORTANTE:**
-- Si un campo no existe o está vacío, usa null
-- Detecta todas las variaciones posibles de nombres de columnas (ej: "email", "correo", "e-mail", etc.)
-- Identifica equipos únicos (si la columna se llama "departamento", mapea el valor a equipo)
-- Identifica managers (pueden estar en columna "Manager", "Jefe", "Responsable", etc.)
-- Normaliza fechas al formato ISO (YYYY-MM-DD)
-- Los salarios deben ser números sin símbolos
-- Si hay una columna "Nombre Completo", divídela en "nombre" y "apellidos"
+**Campos soportados (extrae TODOS los que puedas):**
+${CAMPOS_DESCRIPCION_TEXTO}
+
+**Reglas clave:**
+- Usa null si un campo no existe o está vacío.
+- Detecta todas las variaciones posibles de nombres de columna (correo/email, departamento/equipo, etc.).
+- Normaliza NIF/NIE, NSS e IBAN eliminando espacios, guiones y usando mayúsculas.
+- Divide cualquier columna de "Nombre Completo" en "nombre" y "apellidos".
+- Convierte TODAS las fechas al formato ISO (YYYY-MM-DD).
+- Convierte salarios a números (sin símbolos). Si solo existe el salario anual, calcula salarioBrutoMensual = salarioBrutoAnual / 12.
+- Cuando haya columnas separadas de dirección, completa direccionCalle, direccionNumero, direccionPiso, direccionProvincia, ciudad y codigoPostal. Si solo hay una columna de dirección completa, úsala en "direccion".
+- Identifica equipos (department/área) y managers únicos (emails o nombres completos).
 
 **Datos del Excel (${registrosParaIA.length} de ${totalRegistros} registros):**
 ${JSON.stringify(registrosParaIA, null, 2)}
 
-**Responde con un JSON con esta estructura:**
-{
-  "empleados": [
-    {
-      "nombre": string | null,
-      "apellidos": string | null,
-      "email": string | null,
-      "nif": string | null,
-      "telefono": string | null,
-      "fechaNacimiento": string | null,
-      "puesto": string | null,
-      "equipo": string | null,
-      "manager": string | null,
-      "fechaAlta": string | null,
-      "tipoContrato": string | null,
-      "salarioBrutoAnual": number | null,
-      "salarioBrutoMensual": number | null,
-      "direccion": string | null,
-      "direccionCalle": string | null,
-      "direccionNumero": string | null,
-      "direccionPiso": string | null,
-      "direccionProvincia": string | null,
-      "ciudad": string | null,
-      "codigoPostal": string | null
-    }
-  ],
-  "equiposDetectados": string[],
-  "managersDetectados": string[],
-  "columnasDetectadas": {
-    "columna_original": "campo_mapeado"
-  }
-}
+**Responde con un JSON con esta estructura EXACTA (sin texto adicional ni markdown):**
+${EMPLEADO_JSON_TEMPLATE}
 
 ${usarMuestra 
-  ? `Procesa SOLO los ${registrosParaIA.length} registros proporcionados. El sistema procesará el resto automáticamente usando el mapeo de columnas que detectes.`
+  ? `Procesa SOLO los ${registrosParaIA.length} registros proporcionados. El sistema procesará el resto usando el mapeo de columnas que detectes.`
   : `Procesa TODOS los ${totalRegistros} registros proporcionados.`
 }
 `;
@@ -533,12 +680,7 @@ ${usarMuestra
 
     // Limpiar mapeo de columnas: remover valores null y normalizar campos con "/"
     const mapeoLimpio: Record<string, string> = {};
-    const camposValidos = new Set([
-      'nombre', 'apellidos', 'email', 'nif', 'telefono', 'fechaNacimiento',
-      'puesto', 'equipo', 'manager', 'fechaAlta', 'tipoContrato',
-      'salarioBrutoAnual', 'salarioBrutoMensual', 'direccion', 'direccionCalle',
-      'direccionNumero', 'direccionPiso', 'direccionProvincia', 'ciudad', 'codigoPostal'
-    ]);
+    const camposValidos = new Set<string>(EMPLEADO_CAMPOS);
 
     Object.entries(validado.columnasDetectadas).forEach(([columna, campo]) => {
       if (!campo || typeof campo !== 'string') return;

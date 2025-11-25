@@ -24,3 +24,4 @@
 - `app/api/equipos/[id]/miembros/route.ts`
 
 
+

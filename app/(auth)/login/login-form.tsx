@@ -239,9 +239,9 @@ export function LoginForm({ callbackUrl }: LoginFormProps) {
           </p>
           <Link
             href="/waitlist"
-            className="text-sm text-primary hover:underline focus:outline-none"
-          >
-            Solicitar invitación
+                className="text-sm text-primary hover:underline focus:outline-none"
+              >
+                Solicitar invitación
           </Link>
         </div>
       </div>

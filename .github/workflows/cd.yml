@@ -121,6 +121,21 @@ jobs:
             echo "🏗️ Building application..."
             NODE_OPTIONS="--max-old-space-size=8192" npm run build
 
+            # Verificar que el build fue exitoso
+            echo "🔍 Verifying build artifacts..."
+            if [ ! -f ".next/BUILD_ID" ]; then
+              echo "❌ Build failed: .next/BUILD_ID not found"
+              exit 1
+            fi
+            
+            if [ ! -f ".next/package.json" ]; then
+              echo "❌ Build failed: .next/package.json not found"
+              exit 1
+            fi
+
+            echo "✅ Build artifacts verified"
+            echo "📦 Build ID: $(cat .next/BUILD_ID)"
+
             # Restart PM2
             echo "♻️ Restarting application..."
             pm2 restart clousadmin || pm2 start npm --name clousadmin -- start
@@ -129,6 +144,16 @@ jobs:
             # Verificar que la app está corriendo
             echo "✅ Verifying application is running..."
             pm2 list
+            
+            # Esperar un momento para que PM2 detecte si hay errores inmediatos
+            sleep 3
+            
+            # Verificar que no hay errores inmediatos
+            if pm2 list | grep -q "errored"; then
+              echo "❌ Application errored immediately after start"
+              pm2 logs clousadmin --lines 100 --nostream
+              exit 1
+            fi
 
             # Limpiar backups antiguos (mantener últimos 5)
             echo "🧹 Cleaning old backups..."
@@ -141,17 +166,49 @@ jobs:
         run: |
           echo "🔍 Verifying deployment..."
 
-          # Esperar 10 segundos para que la app se reinicie
-          sleep 10
+          # Esperar 15 segundos para que la app se reinicie completamente
+          echo "⏳ Waiting for application to start..."
+          sleep 15
 
-          # Verificar que la app responde
-          http_code=$(curl -s -o /dev/null -w "%{http_code}" ${{ secrets.APP_URL }}/api/health || echo "000")
+          # Asegurar que usamos HTTPS (nginx redirige HTTP->HTTPS con 308)
+          HEALTH_URL="${{ secrets.APP_URL }}/api/health"
+          # Si la URL no empieza con https://, agregarla
+          if [[ ! "$HEALTH_URL" =~ ^https?:// ]]; then
+            HEALTH_URL="https://$HEALTH_URL"
+          fi
+          # Forzar HTTPS si se puso HTTP
+          HEALTH_URL="${HEALTH_URL/http:/https:}"
+
+          echo "🔍 Checking: $HEALTH_URL"
+
+          # Verificar que la app responde (seguir redirects con -L)
+          http_code=$(curl -L -s -o /dev/null -w "%{http_code}" "$HEALTH_URL" || echo "000")
 
           if [ "$http_code" = "200" ]; then
             echo "✅ Application is responding correctly (HTTP $http_code)"
+            
+            # Verificar que la respuesta JSON es válida
+            health_response=$(curl -L -s "$HEALTH_URL")
+            echo "📊 Health check response: $health_response"
+            
+            # Verificar que el JSON contiene "healthy": true
+            if echo "$health_response" | grep -q '"healthy":true'; then
+              echo "✅ Application is healthy"
+            else
+              echo "⚠️ Application responded but is not healthy"
+              echo "Response: $health_response"
+              echo "📋 Checking application logs..."
+              ssh ${{ secrets.HETZNER_USER }}@${{ secrets.HETZNER_HOST }} "pm2 logs clousadmin --lines 50 --nostream"
+              exit 1
+            fi
           else
-            echo "⚠️ Application returned HTTP $http_code - checking logs..."
-            ssh ${{ secrets.HETZNER_USER }}@${{ secrets.HETZNER_HOST }} "pm2 logs clousadmin --lines 50 --nostream"
+            echo "❌ Application returned HTTP $http_code"
+            echo "📋 Checking application logs..."
+            ssh ${{ secrets.HETZNER_USER }}@${{ secrets.HETZNER_HOST }} "pm2 logs clousadmin --lines 100 --nostream"
+            echo "📋 Checking PM2 status..."
+            ssh ${{ secrets.HETZNER_USER }}@${{ secrets.HETZNER_HOST }} "pm2 status"
+            echo "📋 Checking if .next directory exists..."
+            ssh ${{ secrets.HETZNER_USER }}@${{ secrets.HETZNER_HOST }} "ls -la /opt/clousadmin/.next/ | head -20"
             exit 1
           fi
 

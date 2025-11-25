@@ -1,6 +1,31 @@
 // ========================================
 // API: Empleados - Confirmar Importación desde Excel
 // ========================================
+//
+// ESTRATEGIA DE PROCESAMIENTO:
+// ----------------------------
+// - Batch size: 50 empleados por lote
+// - Concurrencia: 8 empleados procesados en paralelo por lote
+// - Timeout por transacción: 15 segundos
+// - Total máximo recomendado: 500 empleados por importación
+//
+// OPERACIONES POR EMPLEADO:
+// -------------------------
+// 1. Validar email único
+// 2. Validar NIF único (si existe)
+// 3. Crear usuario
+// 4. Encriptar datos sensibles (NIF, NSS, IBAN)
+// 5. Crear empleado
+// 6. Vincular usuario-empleado
+// 7. Asignar a equipo (si aplica)
+// 8. Crear y enviar invitación
+//
+// OPTIMIZACIONES IMPLEMENTADAS:
+// -----------------------------
+// - Creación de equipos en batch (upsert para evitar duplicados)
+// - Búsqueda optimizada de managers (1-2 queries vs N queries)
+// - Procesamiento paralelo con Promise.allSettled (errores no bloquean)
+// - Asignación de managers en segunda pasada (después de que todos existan)
 
 import { Prisma } from '@prisma/client';
 import { NextRequest, NextResponse } from 'next/server';
@@ -334,7 +359,9 @@ export async function POST(req: NextRequest) {
                 fechaAlta: empleado.fechaAlta ? empleado.fechaAlta.toISOString() : null,
                 salarioBrutoAnual: empleado.salarioBrutoAnual ? parseFloat(empleado.salarioBrutoAnual.toString()) : null,
               };
-            }, { timeout: 10000 });
+            }, { 
+              timeout: 15000, // 15s timeout para casos con alta latencia de red
+            });
 
             if (!creationResult) {
               return null; // Ya se registró el error correspondiente
@@ -455,55 +482,88 @@ export async function POST(req: NextRequest) {
       
       // Crear mapa de managers: email/nombre -> empleadoId
       const managersMap = new Map<string, string>();
+      const managersArray = Array.from(managersUnicos);
       
-      for (const managerInfo of Array.from(managersUnicos)) {
-        try {
-          // Buscar por email (primero intentar email)
-          let managerEmpleado = await prisma.empleado.findFirst({
-            where: {
-              empresaId: session.user.empresaId,
-              email: managerInfo,
-            },
-          });
-
-          // Si no se encuentra por email, buscar por nombre completo
-          if (!managerEmpleado) {
-            // Intentar dividir el nombre en nombre y apellidos
-            const partesNombre = managerInfo.split(' ');
-            if (partesNombre.length >= 2) {
-              const nombre = partesNombre[0];
-              const apellidos = partesNombre.slice(1).join(' ');
-              
-              managerEmpleado = await prisma.empleado.findFirst({
-                where: {
-                  empresaId: session.user.empresaId,
-                  nombre: { contains: nombre, mode: 'insensitive' },
-                  apellidos: { contains: apellidos, mode: 'insensitive' },
-                },
-              });
-            } else if (partesNombre.length === 1) {
-              // Solo nombre, buscar por nombre o apellidos
-              managerEmpleado = await prisma.empleado.findFirst({
-                where: {
-                  empresaId: session.user.empresaId,
-                  OR: [
-                    { nombre: { contains: partesNombre[0], mode: 'insensitive' } },
-                    { apellidos: { contains: partesNombre[0], mode: 'insensitive' } },
-                  ],
-                },
-              });
+      // OPTIMIZACIÓN: Buscar todos los managers en una sola query
+      // 1. Separar emails de nombres
+      const emailsABuscar = managersArray.filter(m => m.includes('@'));
+      const nombresABuscar = managersArray.filter(m => !m.includes('@'));
+      
+      try {
+        // 2. Buscar todos los managers por email en una sola query
+        const managersEncontradosPorEmail = emailsABuscar.length > 0
+          ? await prisma.empleado.findMany({
+              where: {
+                empresaId: session.user.empresaId,
+                email: { in: emailsABuscar },
+              },
+              select: { id: true, email: true },
+            })
+          : [];
+        
+        // Mapear resultados por email
+        managersEncontradosPorEmail.forEach(m => {
+          managersMap.set(m.email, m.id);
+          console.log(`[ConfirmarImportacion] Manager encontrado: ${m.email} -> ${m.id}`);
+        });
+        
+        // 3. Buscar managers por nombre (más complejo, pero aún en una query)
+        if (nombresABuscar.length > 0) {
+          // Construir array de condiciones OR para búsqueda por nombre
+          const nombreConditions = nombresABuscar.map(nombreCompleto => {
+            const partes = nombreCompleto.split(' ').filter(p => p.length > 0);
+            if (partes.length >= 2) {
+              return {
+                AND: [
+                  { nombre: { contains: partes[0], mode: 'insensitive' as const } },
+                  { apellidos: { contains: partes.slice(1).join(' '), mode: 'insensitive' as const } },
+                ],
+              };
+            } else if (partes.length === 1) {
+              return {
+                OR: [
+                  { nombre: { contains: partes[0], mode: 'insensitive' as const } },
+                  { apellidos: { contains: partes[0], mode: 'insensitive' as const } },
+                ],
+              };
             }
+            return null;
+          }).filter(Boolean);
+          
+          if (nombreConditions.length > 0) {
+            const managersEncontradosPorNombre = await prisma.empleado.findMany({
+              where: {
+                empresaId: session.user.empresaId,
+                OR: nombreConditions as any, // Type assertion necesaria por complejidad de tipos
+              },
+              select: { id: true, nombre: true, apellidos: true },
+            });
+            
+            // Intentar emparejar resultados con nombres buscados
+            managersEncontradosPorNombre.forEach(manager => {
+              const nombreCompleto = `${manager.nombre} ${manager.apellidos}`.toLowerCase();
+              // Buscar coincidencia en nombres buscados
+              const coincidencia = nombresABuscar.find(nombre => 
+                nombreCompleto.includes(nombre.toLowerCase()) ||
+                nombre.toLowerCase().includes(nombreCompleto)
+              );
+              
+              if (coincidencia) {
+                managersMap.set(coincidencia, manager.id);
+                console.log(`[ConfirmarImportacion] Manager encontrado: ${coincidencia} -> ${manager.id}`);
+              }
+            });
           }
-
-          if (managerEmpleado) {
-            managersMap.set(managerInfo, managerEmpleado.id);
-            console.log(`[ConfirmarImportacion] Manager encontrado: ${managerInfo} -> ${managerEmpleado.id}`);
-          } else {
-            console.warn(`[ConfirmarImportacion] Manager no encontrado: ${managerInfo}`);
-          }
-        } catch (error) {
-          console.error(`[ConfirmarImportacion] Error buscando manager ${managerInfo}:`, error);
         }
+        
+        // Reportar managers no encontrados
+        managersArray.forEach(manager => {
+          if (!managersMap.has(manager)) {
+            console.warn(`[ConfirmarImportacion] Manager no encontrado: ${manager}`);
+          }
+        });
+      } catch (error) {
+        console.error('[ConfirmarImportacion] Error buscando managers:', error);
       }
 
       // Asignar managers a empleados y equipos

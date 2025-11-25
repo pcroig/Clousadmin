@@ -383,7 +383,9 @@ type ResponsesCreateParams = {
   top_p?: number;
   max_output_tokens?: number;
   metadata?: Record<string, unknown>;
-  response_format?: { type: 'json_object' };
+  text?: {
+    format?: { type: 'json_object' };
+  };
 };
 
 type OpenAIClientWithResponses = OpenAI & {
@@ -582,6 +584,12 @@ export async function callOpenAI(
 
   const responsesCapableClient = client as OpenAIClientWithResponses;
   const canUseResponsesAPI = typeof responsesCapableClient.responses?.create === 'function';
+  const responsesTextConfig =
+    responseFormat === 'json_object'
+      ? {
+          format: { type: 'json_object' as const },
+        }
+      : undefined;
 
   if (canUseResponsesAPI) {
     try {
@@ -595,7 +603,7 @@ export async function callOpenAI(
         top_p: config.topP,
         max_output_tokens: maxTokens,
         metadata: Object.keys(metadata.openAIMetadata).length ? metadata.openAIMetadata : undefined,
-        response_format: responseFormat === 'json_object' ? { type: 'json_object' } : undefined,
+        text: responsesTextConfig,
       });
 
       console.info(
@@ -624,11 +632,12 @@ async function callOpenAIChatCompletions(
   metadata: ReturnType<typeof serializeMetadata>
 ): Promise<AIResponse> {
   const client = getOpenAIClient();
+  const maxTokens = options?.maxTokens ?? config.maxTokens;
   const params: OpenAI.Chat.ChatCompletionCreateParams = {
     model: config.model,
     messages: convertMessagesToOpenAI(messages),
     temperature: options?.temperature ?? config.temperature ?? 0.7,
-    max_tokens: options?.maxTokens ?? config.maxTokens,
+    max_completion_tokens: maxTokens,
     top_p: config.topP,
     frequency_penalty: config.frequencyPenalty,
     presence_penalty: config.presencePenalty,

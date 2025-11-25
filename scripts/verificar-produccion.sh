@@ -136,6 +136,8 @@ if [ -f ".env" ]; then
         "NEXT_PUBLIC_APP_URL"
         "NODE_ENV"
         "ENCRYPTION_KEY"
+  "GOOGLE_CLIENT_ID"
+  "GOOGLE_CLIENT_SECRET"
     )
     
     for var in "${REQUIRED_VARS[@]}"; do

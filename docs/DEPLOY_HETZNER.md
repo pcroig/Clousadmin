@@ -27,8 +27,10 @@ openssl rand -base64 32
 **Variables críticas a configurar:**
 - `DATABASE_URL` - PostgreSQL (crear usuario dedicado, no usar postgres)
 - `REDIS_URL` - Redis (obtener contraseña del script de instalación)
-- `NEXTAUTH_SECRET` - **NUEVO para producción**
-- `ENCRYPTION_KEY` - **NUEVO para producción**
+- `NEXTAUTH_SECRET` - **NUEVO para producción** (generar con `openssl rand -base64 32`)
+- `ENCRYPTION_KEY` - **NUEVO para producción** (generar con `openssl rand -hex 32`)
+- `GOOGLE_CLIENT_ID` - **REQUERIDO** (obtener de Google Cloud Console)
+- `GOOGLE_CLIENT_SECRET` - **REQUERIDO** (obtener de Google Cloud Console)
 - `NEXT_PUBLIC_APP_URL` - URL de producción (https://tu-dominio.com)
 - `NODE_ENV=production`
 

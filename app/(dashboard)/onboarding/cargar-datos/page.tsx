@@ -65,6 +65,7 @@ export default async function CargarDatosPage() {
       sedes={sedes}
       integraciones={integraciones}
       nombreEmpresa={empresa?.nombre || ''}
+      empresaId={session.user.empresaId}
     />
   );
 }

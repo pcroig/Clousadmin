@@ -159,6 +159,7 @@ npm start
 - `DATABASE_URL` - PostgreSQL connection string
 - `REDIS_URL` - Redis connection (generado automáticamente)
 - `NEXTAUTH_SECRET` - JWT secret (generar con `openssl rand -base64 32`)
+- `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` - **REQUERIDO** (ver [docs/CONFIGURAR_OAUTH_ENTORNOS.md](docs/CONFIGURAR_OAUTH_ENTORNOS.md))
 - `NEXT_PUBLIC_APP_URL` - URL pública de la app
 - `NEXT_PUBLIC_BILLING_ENABLED` - Activa/desactiva la UI de facturación
 - `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` / `STRIPE_SECRET_KEY` - Credenciales Stripe

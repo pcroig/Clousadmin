@@ -22,3 +22,4 @@
 - `lib/auth.ts` – Helpers de JWT y sesión.
 
 
+

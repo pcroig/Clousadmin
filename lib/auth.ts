@@ -5,14 +5,13 @@
 
 import { randomBytes } from 'crypto';
 
+import { UsuarioRol } from '@prisma/client';
 import { compare, hash } from 'bcryptjs';
 import { cookies } from 'next/headers';
 
 import { createToken, verifyToken } from '@/lib/auth-edge';
 import { prisma } from '@/lib/prisma';
 import { ensureEmpresaActivoColumn } from '@/lib/prisma/patches';
-
-import { UsuarioRol } from '@prisma/client';
 
 import type { SessionData, UsuarioAutenticado } from '@/types/auth';
 
@@ -69,7 +68,7 @@ export async function hashToken(token: string): Promise<string> {
 export async function createSession(
   sessionData: SessionData,
   metadata?: { ipAddress?: string; userAgent?: string }
-): Promise<void> {
+): Promise<string> {
   const token = await createToken(sessionData);
   const tokenHash = await hashToken(token);
   const cookieStore = await cookies();
@@ -97,6 +96,8 @@ export async function createSession(
     maxAge: SESSION_DURATION / 1000,
     path: '/',
   });
+
+  return token;
 }
 
 /**
@@ -106,18 +107,20 @@ export async function getSession(): Promise<SessionData | null> {
   const cookieStore = await cookies();
   const token = cookieStore.get(SESSION_COOKIE_NAME);
 
-  if (!token) {
+  const tokenValue = token?.value?.trim();
+
+  if (!tokenValue) {
     return null;
   }
 
   // Verificar JWT
-  const sessionData = await verifyToken(token.value);
+  const sessionData = await verifyToken(tokenValue);
   if (!sessionData) {
     return null;
   }
 
   // Verificar que la sesión existe en BD y no ha sido invalidada
-  const tokenHash = await hashToken(token.value);
+  const tokenHash = await hashToken(tokenValue);
   try {
     const sesionActiva = await prisma.sesionActiva.findUnique({
       where: { tokenHash },
@@ -173,10 +176,11 @@ export async function getSession(): Promise<SessionData | null> {
 export async function destroySession(): Promise<void> {
   const cookieStore = await cookies();
   const token = cookieStore.get(SESSION_COOKIE_NAME);
+  const tokenValue = token?.value?.trim();
 
   // Eliminar sesión de BD
-  if (token) {
-    const tokenHash = await hashToken(token.value);
+  if (tokenValue) {
+    const tokenHash = await hashToken(tokenValue);
     try {
       await prisma.sesionActiva.delete({
         where: { tokenHash },

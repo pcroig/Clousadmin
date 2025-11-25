@@ -66,6 +66,12 @@ DATABASE_URL="postgresql://postgres:password@localhost:5432/clousadmin"
 # Auth (CRÍTICO - genera con: openssl rand -base64 32)
 NEXTAUTH_SECRET="your-super-secret-jwt-key-minimum-32-characters-long"
 
+# Google OAuth (REQUERIDO EN PRODUCCIÓN)
+# Obtén las credenciales desde: https://console.cloud.google.com/apis/credentials
+# Ver docs/SETUP_GOOGLE_OAUTH.md para instrucciones detalladas
+GOOGLE_CLIENT_ID="your-google-client-id.apps.googleusercontent.com"
+GOOGLE_CLIENT_SECRET="your-google-client-secret"
+
 # App
 NEXT_PUBLIC_APP_URL="http://localhost:3000"
 NODE_ENV="development"
