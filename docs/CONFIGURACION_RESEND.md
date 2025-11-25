@@ -153,6 +153,60 @@ Envía una alerta interna cuando alguien se apunta a la waitlist.
 - Destinatario configurable mediante `WAITLIST_NOTIFY_EMAIL` (por defecto `pabloroigburgui@gmail.com`)
 - Incluye resumen (email, nombre, empresa y mensaje) para que el platform admin priorice solicitudes
 
+### `sendFirmaPendienteEmail(email, empleadoNombre, documentoNombre, firmaUrl)`
+
+Envía email cuando hay un documento pendiente de firma digital.
+
+```typescript
+import { sendFirmaPendienteEmail } from '@/lib/email';
+
+await sendFirmaPendienteEmail(
+  'juan.perez@example.com',
+  'Juan Pérez',
+  'Contrato Temporal',
+  'https://app.clousadmin.com/empleado/mi-espacio/documentos?tab=firmas'
+);
+```
+
+### `sendNominaDisponibleEmail(email, empleadoNombre, mes, año, nominaUrl)`
+
+Envía email cuando una nómina está disponible para descarga.
+
+```typescript
+import { sendNominaDisponibleEmail } from '@/lib/email';
+
+await sendNominaDisponibleEmail(
+  'juan.perez@example.com',
+  'Juan Pérez',
+  'Enero',
+  2025,
+  'https://app.clousadmin.com/empleado/mi-espacio/nominas'
+);
+```
+
+### `sendPasswordRecoveryEmail({ email, token })`
+
+Envía email de recuperación de contraseña con token de reset.
+
+```typescript
+import { sendPasswordRecoveryEmail } from '@/lib/email';
+
+await sendPasswordRecoveryEmail({
+  email: 'usuario@example.com',
+  token: 'token-generado'
+});
+```
+
+### `sendPasswordResetConfirmationEmail(email)`
+
+Envía confirmación cuando se ha cambiado la contraseña exitosamente.
+
+```typescript
+import { sendPasswordResetConfirmationEmail } from '@/lib/email';
+
+await sendPasswordResetConfirmationEmail('usuario@example.com');
+```
+
 ## Límites y Planes
 
 ### Plan Gratuito
@@ -213,7 +267,7 @@ El dominio debe estar verificado en Resend antes de enviar emails desde él. Sig
 
 ---
 
-**Última actualización**: 2025-11-10
+**Última actualización**: 2025-01-27
 
 
 
