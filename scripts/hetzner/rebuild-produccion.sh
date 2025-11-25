@@ -148,16 +148,35 @@ else
   exit 1
 fi
 
-if [ -f ".next/server/webpack-runtime.js" ]; then
-  SIZE=$(stat -f%z ".next/server/webpack-runtime.js" 2>/dev/null || stat -c%s ".next/server/webpack-runtime.js" 2>/dev/null || echo "0")
-  echo -e "${GREEN}✅ webpack-runtime.js encontrado ($SIZE bytes)${NC}"
+# Verificar archivos críticos del servidor (webpack-runtime puede no existir en Next.js 16)
+if [ -d ".next/server" ]; then
+  echo -e "${GREEN}✅ Directorio .next/server existe${NC}"
   
-  if [ "$SIZE" -lt "100" ]; then
-    echo -e "${RED}❌ webpack-runtime.js es demasiado pequeño, puede estar corrupto${NC}"
+  # Verificar que hay archivos en el directorio server
+  SERVER_FILES=$(find .next/server -type f | wc -l)
+  if [ "$SERVER_FILES" -gt "0" ]; then
+    echo -e "${GREEN}✅ Archivos de servidor encontrados ($SERVER_FILES archivos)${NC}"
+  else
+    echo -e "${RED}❌ No se encontraron archivos en .next/server${NC}"
     exit 1
   fi
+  
+  # Verificar webpack-runtime.js si existe (opcional en Next.js 16)
+  if [ -f ".next/server/webpack-runtime.js" ]; then
+    SIZE=$(stat -f%z ".next/server/webpack-runtime.js" 2>/dev/null || stat -c%s ".next/server/webpack-runtime.js" 2>/dev/null || echo "0")
+    echo -e "${GREEN}✅ webpack-runtime.js encontrado ($SIZE bytes)${NC}"
+  else
+    echo -e "${YELLOW}⚠️  webpack-runtime.js no encontrado (puede ser normal en Next.js 16 con Turbopack)${NC}"
+  fi
+  
+  # Verificar que existe al menos un archivo .js en server
+  if [ -f ".next/server/app-paths-manifest.json" ] || [ -f ".next/server/app-paths-manifest.js" ]; then
+    echo -e "${GREEN}✅ Manifest de servidor encontrado${NC}"
+  else
+    echo -e "${YELLOW}⚠️  Manifest de servidor no encontrado, pero continuando...${NC}"
+  fi
 else
-  echo -e "${RED}❌ webpack-runtime.js no encontrado${NC}"
+  echo -e "${RED}❌ Directorio .next/server no existe${NC}"
   exit 1
 fi
 

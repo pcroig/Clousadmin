@@ -61,18 +61,34 @@ if [ -d "/opt/clousadmin/.next" ]; then
     check_error "package.json de build no encontrado"
   fi
 
-  if [ -f "/opt/clousadmin/.next/server/webpack-runtime.js" ]; then
-    check_ok "webpack-runtime.js existe"
+  # Verificar directorio server
+  if [ -d "/opt/clousadmin/.next/server" ]; then
+    check_ok "Directorio .next/server existe"
     
-    # Verificar tamaño del archivo
-    SIZE=$(stat -f%z "/opt/clousadmin/.next/server/webpack-runtime.js" 2>/dev/null || stat -c%s "/opt/clousadmin/.next/server/webpack-runtime.js" 2>/dev/null || echo "0")
-    if [ "$SIZE" -gt "100" ]; then
-      check_ok "webpack-runtime.js tiene tamaño válido ($SIZE bytes)"
+    # Contar archivos en server
+    SERVER_FILES=$(find /opt/clousadmin/.next/server -type f 2>/dev/null | wc -l)
+    if [ "$SERVER_FILES" -gt "0" ]; then
+      check_ok "Archivos de servidor encontrados ($SERVER_FILES archivos)"
     else
-      check_error "webpack-runtime.js es demasiado pequeño ($SIZE bytes)"
+      check_error "No se encontraron archivos en .next/server"
+    fi
+    
+    # Verificar webpack-runtime.js si existe (opcional en Next.js 16)
+    if [ -f "/opt/clousadmin/.next/server/webpack-runtime.js" ]; then
+      check_ok "webpack-runtime.js existe"
+      
+      # Verificar tamaño del archivo
+      SIZE=$(stat -f%z "/opt/clousadmin/.next/server/webpack-runtime.js" 2>/dev/null || stat -c%s "/opt/clousadmin/.next/server/webpack-runtime.js" 2>/dev/null || echo "0")
+      if [ "$SIZE" -gt "100" ]; then
+        check_ok "webpack-runtime.js tiene tamaño válido ($SIZE bytes)"
+      else
+        check_error "webpack-runtime.js es demasiado pequeño ($SIZE bytes)"
+      fi
+    else
+      check_warn "webpack-runtime.js no encontrado (puede ser normal en Next.js 16)"
     fi
   else
-    check_error "webpack-runtime.js no encontrado"
+    check_error "Directorio .next/server no existe"
   fi
   
 else
