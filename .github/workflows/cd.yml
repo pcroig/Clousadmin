@@ -83,7 +83,8 @@ jobs:
             cd /opt/clousadmin || exit 1
             # Hacer backup del .env actual
             echo "📦 Backing up .env file..."
-            cp .env .env.backup.$(date +%Y%m%d_%H%M%S)
+            BACKUP_NAME=".env.backup.$(date +%Y%m%d_%H%M%S)"
+            cp .env "$BACKUP_NAME"
 
             # Pull latest changes
             echo "📥 Pulling latest changes..."
@@ -92,7 +93,17 @@ jobs:
 
             # Restaurar .env
             echo "🔐 Restoring .env file..."
-            cp .env.backup.$(date +%Y%m%d_%H%M%S | tail -1) .env
+            if [ -f "$BACKUP_NAME" ]; then
+              cp "$BACKUP_NAME" .env
+            else
+              latest_backup=$(ls -t .env.backup.* 2>/dev/null | head -1 || true)
+              if [ -n "$latest_backup" ]; then
+                echo "⚠️ Backup original no encontrado, usando $latest_backup"
+                cp "$latest_backup" .env
+              else
+                echo "⚠️ No backup .env disponible, manteniendo .env actual"
+              fi
+            fi
 
             # Install dependencies
             echo "📦 Installing dependencies..."
