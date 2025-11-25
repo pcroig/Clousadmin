@@ -131,7 +131,22 @@ pm2 save
     ```
   - Si el archivo falta, repetir el build y luego reiniciar PM2.
 
-> Estos apuntes se añadieron tras la incidencia de noviembre 2025. Revísalos antes de cada despliegue para evitar recurrencias.
+### TypeError en webpack-runtime.js (noviembre 2025)
+
+- **Síntoma**: App no arranca, `TypeError: Cannot read properties of undefined (reading 'call')` en `.next/server/webpack-runtime.js`.
+- **Causa raíz**: Build corrupto o incompleto, variables de entorno faltantes.
+- **Qué hacer**:
+  - Ejecutar diagnóstico: `./scripts/hetzner/diagnostico-produccion.sh`
+  - Si el build está corrupto, hacer rebuild completo: `./scripts/hetzner/rebuild-produccion.sh`
+  - Verificar variables de entorno críticas: `DATABASE_URL`, `NEXTAUTH_SECRET`, `ENCRYPTION_KEY`, `NEXT_PUBLIC_APP_URL`, `NODE_ENV`
+
+### Health check retorna 308 (noviembre 2025)
+
+- **Síntoma**: Workflow de CD falla en "Verify deployment" con HTTP 308.
+- **Causa raíz**: Nginx redirige HTTP → HTTPS automáticamente (Let's Encrypt).
+- **Qué hacer**: El workflow ya está actualizado para usar HTTPS automáticamente. Si pruebas manualmente, usa: `curl -L https://tu-dominio.com/api/health`
+
+> Estos apuntes se añadieron tras las incidencias de noviembre 2025. Revísalos antes de cada despliegue para evitar recurrencias.
 
 ---
 
@@ -250,6 +265,8 @@ redis-cli ping  # Debería responder PONG
 - `scripts/hetzner/setup-server.sh` - Configuración completa del servidor
 - `scripts/hetzner/setup-redis.sh` - Instalación de Redis
 - `scripts/hetzner/deploy.sh` - Actualización rápida
+- `scripts/hetzner/diagnostico-produccion.sh` - Diagnóstico completo de problemas
+- `scripts/hetzner/rebuild-produccion.sh` - Rebuild completo (cuando el build está corrupto)
 
 ---
 
