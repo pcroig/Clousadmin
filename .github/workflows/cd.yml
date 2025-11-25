@@ -70,8 +70,7 @@ jobs:
             echo "🚀 Starting deployment to Hetzner..."
 
             # Navegar al directorio de la aplicación
-            cd /var/www/clousadmin || exit 1
-
+            cd /opt/clousadmin || exit 1
             # Hacer backup del .env actual
             echo "📦 Backing up .env file..."
             cp .env .env.backup.$(date +%Y%m%d_%H%M%S)
@@ -171,8 +170,7 @@ jobs:
 
             echo "⚠️ Deployment failed - performing rollback..."
 
-            cd /var/www/clousadmin || exit 1
-
+            cd /opt/clousadmin || exit 1
             # Volver al commit anterior
             git reset --hard HEAD~1
 
