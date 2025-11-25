@@ -6,11 +6,9 @@
 
 import Link from 'next/link';
 
-import { getInitials } from '@/components/shared/utils';
+import { EmployeeAvatar } from '@/components/shared/employee-avatar';
 import { WidgetCard } from '@/components/shared/widget-card';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { MOBILE_DESIGN } from '@/lib/constants/mobile-design';
-import { getAvatarStyle } from '@/lib/design-system';
 import { cn } from '@/lib/utils';
 
 interface EmpleadoResumen {
@@ -90,23 +88,16 @@ export function PlantillaWidget({
                 <p className={cn(MOBILE_DESIGN.text.tiny)}>{item.count} personas</p>
               </div>
               <div className="flex -space-x-1.5 flex-shrink-0 ml-2">
-                {item.empleados.slice(0, 3).map((emp, idx) => {
-                  const avatarStyle = getAvatarStyle(emp.nombre);
-                  return (
-                    <Avatar
-                      key={idx}
-                      className={cn(MOBILE_DESIGN.components.avatar.small, 'border border-white')}
-                    >
-                      {emp.avatar && <AvatarImage src={emp.avatar} />}
-                      <AvatarFallback
-                        className="text-[9px] font-semibold uppercase"
-                        style={avatarStyle}
-                      >
-                        {getInitials(emp.nombre)}
-                      </AvatarFallback>
-                    </Avatar>
-                  );
-                })}
+                {item.empleados.slice(0, 3).map((emp, idx) => (
+                  <EmployeeAvatar
+                    key={idx}
+                    nombre={emp.nombre}
+                    fotoUrl={emp.avatar ?? null}
+                    size="sm"
+                    className={cn(MOBILE_DESIGN.components.avatar.small, 'border border-white')}
+                    fallbackClassName="text-[9px]"
+                  />
+                ))}
                 {item.count > 3 && (
                   <div className={cn(
                     MOBILE_DESIGN.components.avatar.small,
@@ -139,24 +130,16 @@ export function PlantillaWidget({
                 <p className="text-[11px] text-gray-500">{trabajando.count} personas</p>
               </div>
               <div className="flex -space-x-2 flex-shrink-0 ml-3">
-                {trabajando.empleados.slice(0, 4).map((emp, idx) => {
-                  const avatarStyle = getAvatarStyle(emp.nombre);
-
-                  return (
-                    <Avatar
-                      key={idx}
-                      className="h-8 w-8 border-2 border-white"
-                    >
-                      {emp.avatar && <AvatarImage src={emp.avatar} />}
-                      <AvatarFallback
-                        className="text-[11px] font-semibold uppercase"
-                        style={avatarStyle}
-                      >
-                        {getInitials(emp.nombre)}
-                      </AvatarFallback>
-                    </Avatar>
-                  );
-                })}
+                {trabajando.empleados.slice(0, 4).map((emp, idx) => (
+                  <EmployeeAvatar
+                    key={idx}
+                    nombre={emp.nombre}
+                    fotoUrl={emp.avatar ?? null}
+                    size="sm"
+                    className="h-8 w-8 border-2 border-white"
+                    fallbackClassName="text-[11px]"
+                  />
+                ))}
                 {trabajando.count > 4 && (
                   <div className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-white bg-accent-light text-[11px] font-semibold text-accent">
                     +{trabajando.count - 4}
@@ -174,24 +157,16 @@ export function PlantillaWidget({
                 <p className="text-[11px] text-gray-500">{ausentes.count} personas</p>
               </div>
               <div className="flex -space-x-2 flex-shrink-0 ml-3">
-                {ausentes.empleados.slice(0, 4).map((emp, idx) => {
-                  const avatarStyle = getAvatarStyle(emp.nombre);
-
-                  return (
-                    <Avatar
-                      key={idx}
-                      className="h-8 w-8 border-2 border-white"
-                    >
-                      {emp.avatar && <AvatarImage src={emp.avatar} />}
-                      <AvatarFallback
-                        className="text-[11px] font-semibold uppercase"
-                        style={avatarStyle}
-                      >
-                        {getInitials(emp.nombre)}
-                      </AvatarFallback>
-                    </Avatar>
-                  );
-                })}
+                {ausentes.empleados.slice(0, 4).map((emp, idx) => (
+                  <EmployeeAvatar
+                    key={idx}
+                    nombre={emp.nombre}
+                    fotoUrl={emp.avatar ?? null}
+                    size="sm"
+                    className="h-8 w-8 border-2 border-white"
+                    fallbackClassName="text-[11px]"
+                  />
+                ))}
                 {ausentes.count > 4 && (
                   <div className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-white bg-warning-light text-[11px] font-semibold text-warning">
                     +{ausentes.count - 4}
@@ -209,24 +184,16 @@ export function PlantillaWidget({
                 <p className="text-[11px] text-gray-500">{sinFichar.count} personas</p>
               </div>
               <div className="flex -space-x-2 flex-shrink-0 ml-3">
-                {sinFichar.empleados.slice(0, 4).map((emp, idx) => {
-                  const avatarStyle = getAvatarStyle(emp.nombre);
-
-                  return (
-                    <Avatar
-                      key={idx}
-                      className="h-8 w-8 border-2 border-white"
-                    >
-                      {emp.avatar && <AvatarImage src={emp.avatar} />}
-                      <AvatarFallback
-                        className="text-[11px] font-semibold uppercase"
-                        style={avatarStyle}
-                      >
-                        {getInitials(emp.nombre)}
-                      </AvatarFallback>
-                    </Avatar>
-                  );
-                })}
+                {sinFichar.empleados.slice(0, 4).map((emp, idx) => (
+                  <EmployeeAvatar
+                    key={idx}
+                    nombre={emp.nombre}
+                    fotoUrl={emp.avatar ?? null}
+                    size="sm"
+                    className="h-8 w-8 border-2 border-white"
+                    fallbackClassName="text-[11px]"
+                  />
+                ))}
                 {sinFichar.count > 4 && (
                   <div className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-white bg-error-light text-[11px] font-semibold text-error">
                     +{sinFichar.count - 4}

@@ -6,7 +6,7 @@
 
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Calendar, RefreshCw, Send, Sparkles, X } from 'lucide-react';
+import { ArrowLeft, Calendar, RefreshCw, Send, Sparkles, X } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { TablaCuadrajeCampana } from '@/components/vacaciones/tabla-cuadraje-campana';
 import { parseJson } from '@/lib/utils/json';
+import Link from 'next/link';
 
 interface EmpleadoEquipo {
   equipoId: string;
@@ -64,14 +65,11 @@ interface CampanaClientProps {
 export function CampanaClient({ campana: initialCampana }: CampanaClientProps) {
   const [campana, setCampana] = useState(initialCampana);
   const [cuadrandoIA, setCuadrandoIA] = useState(false);
-  const borradorInicial = Boolean(initialCampana.propuestaIA);
-  const [mostrarPropuesta, setMostrarPropuesta] = useState(borradorInicial);
-  const [vistaComparacion, setVistaComparacion] = useState<'solicitado' | 'propuesto'>(
-    borradorInicial ? 'propuesto' : 'solicitado'
-  );
   const [enviandoPropuesta, setEnviandoPropuesta] = useState(false);
   const [finalizando, setFinalizando] = useState(false);
   const [cancelando, setCancelando] = useState(false);
+
+  const hayPropuestaIA = Boolean(campana.propuestaIA);
 
   const recargarCampana = async () => {
     const reloadResponse = await fetch(`/api/campanas-vacaciones/${campana.id}`);
@@ -84,9 +82,6 @@ export function CampanaClient({ campana: initialCampana }: CampanaClientProps) {
 
     const updatedCampana = await parseJson<CampanaData>(reloadResponse);
     setCampana(updatedCampana);
-    const hayBorrador = Boolean(updatedCampana.propuestaIA);
-    setMostrarPropuesta(hayBorrador);
-    setVistaComparacion(hayBorrador ? 'propuesto' : 'solicitado');
     return updatedCampana;
   };
 
@@ -104,9 +99,7 @@ export function CampanaClient({ campana: initialCampana }: CampanaClientProps) {
         throw new Error(error.error || 'No se pudo cuadrar con IA');
       }
 
-      // Reload campaign data to get updated propuestas
       await recargarCampana();
-
       toast.success('Vacaciones cuadradas con IA exitosamente');
     } catch (error) {
       console.error('[CuadrarIA] Error:', error);
@@ -117,7 +110,9 @@ export function CampanaClient({ campana: initialCampana }: CampanaClientProps) {
   };
 
   const handleReintentarIA = async () => {
-    setMostrarPropuesta(false);
+    if (!confirm('¿Estás seguro de que quieres reintentar el cuadraje? Se perderán los ajustes manuales actuales.')) {
+      return;
+    }
     await handleCuadrarIA();
   };
 
@@ -136,7 +131,6 @@ export function CampanaClient({ campana: initialCampana }: CampanaClientProps) {
       }
 
       toast.success('Propuesta enviada a los empleados');
-      
       await recargarCampana();
     } catch (error) {
       console.error('[EnviarPropuesta] Error:', error);
@@ -177,6 +171,10 @@ export function CampanaClient({ campana: initialCampana }: CampanaClientProps) {
   };
 
   const handleCancelarPropuesta = async () => {
+    if (!confirm('¿Estás seguro de que quieres cancelar la propuesta actual?')) {
+      return;
+    }
+    
     setCancelando(true);
     try {
       const response = await fetch(
@@ -192,7 +190,7 @@ export function CampanaClient({ campana: initialCampana }: CampanaClientProps) {
       }
 
       await recargarCampana();
-      toast.success('Borrador cancelado correctamente');
+      toast.success('Propuesta cancelada correctamente');
     } catch (error) {
       console.error('[CancelarPropuesta] Error:', error);
       toast.error(error instanceof Error ? error.message : 'Error al cancelar propuesta');
@@ -206,119 +204,92 @@ export function CampanaClient({ campana: initialCampana }: CampanaClientProps) {
 
   return (
     <div className="h-full w-full flex flex-col">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6 gap-4">
-        <div>
-          <p className="text-xs uppercase tracking-wide text-gray-500 mb-1">
-            Campaña activa
-          </p>
-          <h1 className="text-2xl font-bold text-gray-900">Cuadraje de la campaña</h1>
-          <p className="text-sm text-gray-600 mt-2 flex flex-wrap items-center gap-2">
-            <span className="font-medium text-gray-900">“{campana.titulo}”</span>
-            <span className="inline-flex items-center text-gray-500">
-              <Calendar className="w-4 h-4 mr-1" />
-              {format(fechaInicio, 'dd MMM', { locale: es })} - {format(fechaFin, 'dd MMM yyyy', { locale: es })}
-            </span>
-            <span className="text-gray-500">
-              {campana.empleadosCompletados}/{campana.totalEmpleadosAsignados} preferencias completadas
-            </span>
-          </p>
+      {/* Header simplificado */}
+      <div className="flex flex-wrap items-center justify-between mb-6 gap-4">
+        <div className="flex items-center gap-3">
+          <Button asChild variant="ghost" size="sm" className="text-gray-600 hover:text-gray-900 px-2">
+            <Link href="/hr/horario/ausencias" className="inline-flex items-center gap-2">
+              <ArrowLeft className="w-4 h-4" />
+              Volver a ausencias
+            </Link>
+          </Button>
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">{campana.titulo}</h1>
+            <p className="text-sm text-gray-600 mt-2 flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center text-gray-500">
+                <Calendar className="w-4 h-4 mr-1" />
+                {format(fechaInicio, 'dd MMM', { locale: es })} - {format(fechaFin, 'dd MMM yyyy', { locale: es })}
+              </span>
+              <span className="text-gray-300">|</span>
+              <span className="text-gray-500">
+                {campana.empleadosCompletados}/{campana.totalEmpleadosAsignados} preferencias completadas
+              </span>
+            </p>
+          </div>
         </div>
         <div className="flex items-center gap-3 shrink-0">
-          <Badge className="bg-yellow-100 text-yellow-800 border-0">
-            En curso
-          </Badge>
+          {hayPropuestaIA ? (
+            <>
+              <LoadingButton
+                variant="outline"
+                size="sm"
+                onClick={handleCancelarPropuesta}
+                loading={cancelando}
+                disabled={cancelando}
+              >
+                <X className="w-4 h-4 mr-2" />
+                Cancelar propuesta
+              </LoadingButton>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleReintentarIA}
+                disabled={cuadrandoIA}
+              >
+                <RefreshCw className="w-4 h-4 mr-2" />
+                Reintentar IA
+              </Button>
+            </>
+          ) : (
+             <LoadingButton
+                onClick={handleCuadrarIA}
+                loading={cuadrandoIA}
+                disabled={cuadrandoIA}
+              >
+                <Sparkles className="w-4 h-4 mr-2" />
+                {cuadrandoIA ? 'Cuadrando...' : 'Cuadrar con IA'}
+              </LoadingButton>
+          )}
+
+          <div className="h-6 w-px bg-gray-300 mx-2" />
+
           <LoadingButton
-            onClick={handleCuadrarIA}
-            loading={cuadrandoIA}
-            disabled={cuadrandoIA}
+            variant="outline"
+            size="sm"
+            onClick={handleEnviarPropuesta}
+            loading={enviandoPropuesta}
+            disabled={enviandoPropuesta}
           >
-            <Sparkles className="w-4 h-4 mr-2" />
-            {cuadrandoIA ? 'Cuadrando...' : 'Cuadrar con IA'}
+            <Send className="w-4 h-4 mr-2" />
+            Enviar propuesta
+          </LoadingButton>
+          <LoadingButton
+            size="sm"
+            onClick={handleFinalizarCampana}
+            loading={finalizando}
+            disabled={finalizando}
+          >
+            Finalizar campaña
           </LoadingButton>
         </div>
       </div>
 
-      {/* Comparison Toggle (shown after AI squaring) */}
-      {mostrarPropuesta && (
-        <div className="mb-4 flex items-center justify-between">
-          <div className="flex flex-col gap-1">
-            <span className="text-sm text-gray-700 font-medium">Vista:</span>
-            <p className="text-xs text-gray-500">
-              “Solicitado” muestra los días ideales enviados por los empleados. “Propuesto” refleja el borrador generado (IA/ajustes manuales).
-            </p>
-            <div className="inline-flex rounded-lg border border-gray-300 p-1 bg-gray-50">
-              <button
-                onClick={() => setVistaComparacion('solicitado')}
-                className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${
-                  vistaComparacion === 'solicitado'
-                    ? 'bg-white text-gray-900 shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                Solicitado (ideales)
-              </button>
-              <button
-                onClick={() => setVistaComparacion('propuesto')}
-                className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${
-                  vistaComparacion === 'propuesto'
-                    ? 'bg-white text-gray-900 shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                Propuesto (IA)
-              </button>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <LoadingButton
-              variant="outline"
-              size="sm"
-              onClick={handleCancelarPropuesta}
-              loading={cancelando}
-              disabled={cancelando}
-            >
-              <X className="w-4 h-4 mr-1" />
-              Cancelar
-            </LoadingButton>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleReintentarIA}
-              disabled={cuadrandoIA}
-            >
-              <RefreshCw className="w-4 h-4 mr-1" />
-              Reintentar
-            </Button>
-            <LoadingButton
-              variant="outline"
-              size="sm"
-              onClick={handleEnviarPropuesta}
-              loading={enviandoPropuesta}
-              disabled={enviandoPropuesta}
-            >
-              <Send className="w-4 h-4 mr-1" />
-              Enviar propuesta
-            </LoadingButton>
-            <LoadingButton
-              size="sm"
-              onClick={handleFinalizarCampana}
-              loading={finalizando}
-              disabled={finalizando}
-            >
-              Finalizar campaña
-            </LoadingButton>
-          </div>
-        </div>
-      )}
-
       <Separator className="mb-6" />
 
-      {/* Calendar Table */}
+      {/* Tabla Unificada */}
       <div className="flex-1 min-h-0 overflow-auto">
         <TablaCuadrajeCampana
           campana={campana}
-          vistaComparacion={mostrarPropuesta ? vistaComparacion : 'solicitado'}
           onActualizarPreferencia={async (preferenciaId, datos) => {
             try {
               const response = await fetch(`/api/campanas-vacaciones/${campana.id}/propuestas`, {
@@ -341,11 +312,11 @@ export function CampanaClient({ campana: initialCampana }: CampanaClientProps) {
               }
 
               await recargarCampana();
-              toast.success('Asignación actualizada correctamente');
+              toast.success('Asignación actualizada');
             } catch (error) {
               console.error('[ActualizarPreferencia] Error:', error);
               toast.error(error instanceof Error ? error.message : 'Error al actualizar asignación');
-              throw error;
+              throw error; // Propagate to component to revert local change if needed
             }
           }}
         />
@@ -353,4 +324,3 @@ export function CampanaClient({ campana: initialCampana }: CampanaClientProps) {
     </div>
   );
 }
-

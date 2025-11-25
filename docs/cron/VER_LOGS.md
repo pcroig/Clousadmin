@@ -4,58 +4,77 @@
 
 ### 1. Script de Verificación (Recomendado)
 
+**En el servidor Hetzner**:
+```bash
+cd /opt/clousadmin
+./scripts/hetzner/test-crons.sh
+```
+
+**Localmente**:
 ```bash
 npx tsx scripts/verificar-crons.ts
 ```
 
 Muestra:
 - Fichajes pendientes/auto-cuadrados recientes
-- Solicitudes pendientes >48 h y revisadas por IA
+- Solicitudes pendientes >48h y revisadas por IA
 - Estado de variables (`CRON_SECRET`, `CRON_ALERT_WEBHOOK`, etc.)
 - Recomendaciones si algo falta
 
-### 2. Logs en Consola del Servidor
+### 2. Logs en Servidor Hetzner
 
-**Desarrollo local**
 ```bash
-npm run dev
-# Los logs aparecen en la terminal
-```
-
-**Producción (Hetzner/VPS)**
-```bash
+# Ver logs en tiempo real
 tail -f /var/log/clousadmin-cron.log
-# o con systemd
-journalctl -u clousadmin-cron -f
+
+# Ver últimas 50 líneas
+tail -50 /var/log/clousadmin-cron.log
+
+# Buscar errores
+grep -i error /var/log/clousadmin-cron.log
 ```
 
 Formato típico:
 ```
-[CRON Clasificar Fichajes] Inicio 2025-11-18T23:30:00.000Z
-[CRON Clasificar Fichajes] Procesando día: 2025-11-17
-[CRON Clasificar Fichajes] Finalizado en 1234ms { empresas: 1, fichajesCreados: 5 }
+{"success":true,"fecha":"2025-11-20","empresas":0,"fichajesCreados":0,"fichajesPendientes":0,"fichajesFinalizados":0,"errores":[]}
+{"success":true,"timestamp":"2025-11-21T02:00:01.707Z","solicitudesRevisadas":0,"autoAprobadas":0,"requierenRevision":0,"errores":[]}
 ```
 
-### 3. GitHub Actions
+### 3. Verificar Crontab
 
-1. Abrir `https://github.com/<ORG>/<REPO>/actions`
-2. Elegir el workflow **Cron - Revisar Solicitudes con IA** o **Cron - Clasificar Fichajes**
-3. Revisar el último job:
-   - `Status Code: 200` → OK
-   - `Status Code: 401/500` → revisar secrets o servidor
+```bash
+# Ver crons instalados
+crontab -l
 
-### 4. Webhook de Alertas
+# Deberías ver:
+# 30 23 * * * curl -s -X POST https://app.hrcron.com/api/cron/clasificar-fichajes ...
+# 0 2 * * * curl -s -X POST https://app.hrcron.com/api/cron/revisar-solicitudes ...
+```
 
-Configura `CRON_ALERT_WEBHOOK` con tu URL (Slack/Teams) para recibir POSTs cuando un cron falla.
+### 4. Pruebas Manuales
 
-Ejemplo de payload:
+```bash
+# Clasificar fichajes
+curl -X POST https://app.tu-dominio.com/api/cron/clasificar-fichajes \
+  -H "Authorization: Bearer $CRON_SECRET" \
+  -H "Content-Type: application/json"
+
+# Revisar solicitudes
+curl -X POST https://app.tu-dominio.com/api/cron/revisar-solicitudes \
+  -H "Authorization: Bearer $CRON_SECRET" \
+  -H "Content-Type: application/json"
+```
+
+Respuesta esperada:
 ```json
 {
-  "cron": "Clasificar Fichajes",
-  "success": false,
-  "durationMs": 5000,
-  "errors": ["Error procesando empleado ..."],
-  "timestamp": "2025-11-18T23:30:05.000Z"
+  "success": true,
+  "fecha": "2025-11-20",
+  "empresas": 1,
+  "fichajesCreados": 5,
+  "fichajesPendientes": 3,
+  "fichajesFinalizados": 2,
+  "errores": []
 }
 ```
 
@@ -71,17 +90,6 @@ WHERE f.estado = 'pendiente'
   AND f.fecha >= CURRENT_DATE - INTERVAL '1 day'
 ORDER BY f.createdAt DESC;
 
--- Fichajes cuadrados masivamente
-SELECT f.id, f.fecha, f.cuadradoEn, f.cuadradoPor,
-       e.nombre || ' ' || e.apellidos AS empleado
-FROM fichaje f
-JOIN empleado e ON e.id = f.empleadoId
-WHERE f.cuadradoMasivamente = true
-  AND f.cuadradoEn >= NOW() - INTERVAL '1 day'
-ORDER BY f.cuadradoEn DESC;
-```
-
-```sql
 -- Solicitudes pendientes >48h
 SELECT s.id, s.tipo, s.createdAt, s.revisadaPorIA,
        e.nombre || ' ' || e.apellidos AS empleado
@@ -93,52 +101,29 @@ WHERE s.estado = 'pendiente'
 ORDER BY s.createdAt ASC;
 ```
 
-### 6. Pruebas Manuales
+### 6. Webhook de Alertas (Opcional)
 
-```bash
-# Clasificar fichajes
-curl -X POST https://tu-app.com/api/cron/clasificar-fichajes \
-  -H "Authorization: Bearer $CRON_SECRET"
+Configura `CRON_ALERT_WEBHOOK` con tu URL (Slack/Teams) para recibir POSTs cuando un cron falla.
 
-# Revisar solicitudes
-curl -X POST https://tu-app.com/api/cron/revisar-solicitudes \
-  -H "Authorization: Bearer $CRON_SECRET"
-```
-
-Respuesta esperada:
+Ejemplo de payload:
 ```json
 {
-  "success": true,
-  "fecha": "2025-11-17",
-  "empresas": 1,
-  "fichajesCreados": 5,
-  "fichajesPendientes": 3,
-  "fichajesFinalizados": 2,
-  "errores": []
+  "cron": "Clasificar Fichajes",
+  "success": false,
+  "durationMs": 5000,
+  "errors": ["Error procesando empleado ..."],
+  "timestamp": "2025-11-18T23:30:05.000Z"
 }
 ```
-
-### 7. Script de Hetzner
-
-En el servidor:
-```bash
-./scripts/hetzner/test-crons.sh
-```
-Valida:
-- Respuesta HTTP de ambos endpoints
-- Configuración de `crontab`
-- Últimas líneas del log
-- Script de backup (si hay variables)
 
 ---
 
 ## Checklist Rápido
 
-- [ ] `CRON_SECRET` configurado (hosting + GitHub)
-- [ ] `CRON_ALERT_WEBHOOK` (opcional) configurado
-- [ ] `ENABLE_GITHUB_CRONS` según el runner usado
-- [ ] `scripts/hetzner/setup-cron.sh` ejecutado (si usas Hetzner)
-- [ ] `npx tsx scripts/verificar-crons.ts` sin errores
+- [ ] `CRON_SECRET` configurado en `.env`
+- [ ] `APP_URL` configurado en `.env`
+- [ ] `crontab -l` muestra los crons instalados
+- [ ] `./scripts/hetzner/test-crons.sh` sin errores
+- [ ] Logs en `/var/log/clousadmin-cron.log` se actualizan
 
-**Última actualización**: 18 de noviembre 2025
-
+**Última actualización**: 21 de noviembre 2025

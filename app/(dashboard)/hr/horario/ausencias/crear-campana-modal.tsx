@@ -1,6 +1,5 @@
 'use client';
 
-import { Info } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -8,6 +7,7 @@ import { LoadingButton } from '@/components/shared/loading-button';
 import { ResponsiveDatePicker } from '@/components/shared/responsive-date-picker';
 import { ResponsiveDialog } from '@/components/shared/responsive-dialog';
 import { SearchableMultiSelect } from '@/components/shared/searchable-multi-select';
+import { InfoTooltip } from '@/components/shared/info-tooltip';
 import { Button } from '@/components/ui/button';
 import { Field, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
@@ -19,7 +19,6 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { parseJson } from '@/lib/utils/json';
 
 
@@ -266,31 +265,28 @@ export function CrearCampanaModal({
             />
           </Field>
 
-          <div className="flex items-start gap-2 pt-2">
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button type="button" className="text-gray-400 hover:text-gray-600">
-                    <Info className="w-4 h-4" />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent className="max-w-xs">
+          <div className="pt-2">
+            <div className="flex items-center gap-2 text-sm font-medium text-gray-900">
+              ¿Cómo funciona?
+              <InfoTooltip
+                size="md"
+                side="right"
+                content={(
                   <div className="space-y-2 text-sm">
-                    <p className="font-medium">¿Cómo funciona?</p>
-                    <ol className="list-decimal list-inside space-y-1 text-xs">
-                      <li>Los empleados recibirán una notificación para indicar sus preferencias</li>
-                      <li>Podrán seleccionar días ideales, prioritarios y alternativos</li>
-                      <li>Cuando todos completen o cuando tú decidas, podrás cerrar la campaña</li>
+                    <p className="font-medium">Pasos de la campaña</p>
+                    <ol className="list-decimal list-inside space-y-1 text-xs text-gray-600">
+                      <li>Los empleados reciben una notificación para indicar sus preferencias.</li>
+                      <li>Pueden seleccionar días ideales, prioritarios y alternativos.</li>
+                      <li>Cuando todos completen (o tú decidas) podrás cerrar la campaña.</li>
                       <li>
-                        El sistema usará IA para cuadrar las vacaciones respetando el límite
-                        de solapamiento que definas (si está activado)
+                        El sistema usará IA para cuadrar vacaciones respetando el límite de solapamiento que definas (si está activado).
                       </li>
-                      <li>Los empleados recibirán la propuesta y podrán aceptarla o solicitar cambios</li>
+                      <li>Los empleados reciben la propuesta y pueden aceptarla o solicitar cambios.</li>
                     </ol>
                   </div>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+                )}
+              />
+            </div>
           </div>
         </div>
     </ResponsiveDialog>

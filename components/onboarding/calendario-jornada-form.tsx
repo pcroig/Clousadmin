@@ -114,14 +114,15 @@ export const CalendarioJornadaForm = forwardRef<
             : Array.isArray(data?.jornadas)
               ? data.jornadas ?? []
               : [];
-          const predefinida = lista.find((j) => j.esPredefinida);
+          // ✅ Ya no buscamos jornadas predefinidas, buscamos la primera jornada activa
+          const primeraJornada = lista.find((j) => !j.esPredefinida) || lista[0];
 
-          if (predefinida) {
-            setNombre(predefinida.nombre);
-            const horas = Number(predefinida.horasSemanales ?? 40);
+          if (primeraJornada) {
+            setNombre(primeraJornada.nombre);
+            const horas = Number(primeraJornada.horasSemanales ?? 40);
             setHorasSemanales(Number.isNaN(horas) ? '40' : horas.toString());
 
-            const config = (predefinida.config ?? {}) as JornadaConfigData;
+            const config = (primeraJornada.config ?? {}) as JornadaConfigData;
             const nuevoTipo = config.tipo === 'fija' ? 'fija' : 'flexible';
             setTipo(nuevoTipo);
 

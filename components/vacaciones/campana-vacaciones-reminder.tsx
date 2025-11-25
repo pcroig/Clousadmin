@@ -1,8 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { PreferenciasVacacionesModal } from './preferencias-vacaciones-modal';
+
+import { VACACIONES_PREFERENCIAS_EVENT, type VacacionesPreferenciasEventDetail } from '@/lib/events/vacaciones';
 
 interface CampanaPendiente {
   id: string;
@@ -47,7 +49,50 @@ function CampanaVacacionesReminderContent({
   autoOpen,
   onCompleted,
 }: CampanaVacacionesReminderContentProps) {
-  const [open, setOpen] = useState(autoOpen);
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    if (!campanaPendiente || !autoOpen) {
+      setOpen(false);
+      return;
+    }
+
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    try {
+      const storageKey = `clousadmin:campana-preferencias:${campanaPendiente.id}`;
+      const alreadyShown = window.sessionStorage.getItem(storageKey) === 'true';
+
+      if (!alreadyShown) {
+        window.sessionStorage.setItem(storageKey, 'true');
+        setOpen(true);
+      }
+    } catch {
+      setOpen(true);
+    }
+  }, [campanaPendiente, autoOpen]);
+
+  useEffect(() => {
+    if (!campanaPendiente) {
+      return;
+    }
+
+    const handler = (event: Event) => {
+      const customEvent = event as CustomEvent<VacacionesPreferenciasEventDetail>;
+      if (customEvent.detail?.campanaId !== campanaPendiente.id) {
+        return;
+      }
+      customEvent.detail.handled = true;
+      setOpen(true);
+    };
+
+    window.addEventListener(VACACIONES_PREFERENCIAS_EVENT, handler as EventListener);
+    return () => {
+      window.removeEventListener(VACACIONES_PREFERENCIAS_EVENT, handler as EventListener);
+    };
+  }, [campanaPendiente]);
 
   const handleClose = () => setOpen(false);
   const handleSuccess = () => {

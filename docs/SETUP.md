@@ -94,10 +94,13 @@ OPENAI_API_KEY=""
 ANTHROPIC_API_KEY=""
 GOOGLE_AI_API_KEY=""
 
-# Platform Admin - Invitar usuarios al signup (OPCIONAL)
+# Platform Admin - Invitar usuarios al signup
 # Genera una clave segura: openssl rand -hex 32
 PLATFORM_ADMIN_SECRET_KEY=""
 PLATFORM_ADMIN_EMAIL="admin@tu-plataforma.com"
+
+# Waitlist - Email que recibe notificaciones de nuevas solicitudes
+WAITLIST_NOTIFY_EMAIL="tu-email@ejemplo.com"
 
 # Feature Flags
 ENABLE_AI_EXTRACTION="false"
@@ -157,6 +160,22 @@ Empleado:
   Password: Empleado123!
 ```
 
+### 4.4 Crear usuario Platform Admin (opcional)
+
+Si necesitas gestionar invitaciones desde el panel web, crea un usuario con rol `platform_admin`:
+
+```bash
+npm run create:platform-admin -- \
+  --email=tu-email@ejemplo.com \
+  --password="TuPasswordSeguro123!" \
+  --nombre="Tu" \
+  --apellidos="Nombre"
+```
+
+Esto te permitirá acceder a `/platform/invitaciones` para gestionar invitaciones y waitlist desde la interfaz web.
+
+> **Nota**: El script también puede usarse para promover un usuario existente a `platform_admin` omitiendo `--password`.
+
 ---
 
 ## 🚀 5. Ejecutar el Proyecto
@@ -200,6 +219,9 @@ npm run db:migrate       # Crear nueva migración
 npm run db:deploy        # Aplicar migraciones (producción)
 npm run db:generate      # Regenerar cliente Prisma
 npm run diagnostico      # Diagnóstico rápido de Prisma
+
+# Administración
+npm run create:platform-admin  # Crear o promover usuario platform_admin
 
 # Linting
 npm run lint             # Ejecutar ESLint

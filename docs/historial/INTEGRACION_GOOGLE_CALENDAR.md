@@ -246,9 +246,8 @@ Ver `SETUP_GOOGLE_OAUTH.md` para instrucciones detalladas.
 3. Configurar OAuth Consent Screen
 4. Crear credenciales OAuth 2.0
 5. Añadir Authorized redirect URIs:
-   - `http://localhost:3000/api/auth/callback/google` (obligatorio)
-   - `http://localhost:3000/api/integrations/calendar/callback`
-   - *(Opcional)* `http://localhost:3000/api/auth/google/callback` si necesitas mantener compatibilidad con enlaces antiguos.
+   - `http://localhost:3000/api/auth/callback/google` (obligatorio para login con NextAuth v5)
+   - `http://localhost:3000/api/integrations/calendar/callback` (para calendario)
 6. Añadir scopes:
    - `openid`, `userinfo.email`, `userinfo.profile`
    - `calendar`

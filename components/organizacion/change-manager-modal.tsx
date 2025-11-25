@@ -8,9 +8,8 @@ import { Check } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
+import { EmployeeAvatar } from '@/components/shared/employee-avatar';
 import { LoadingButton } from '@/components/shared/loading-button';
-import { getInitials } from '@/components/shared/utils';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -18,13 +17,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { getAvatarStyle } from '@/lib/design-system';
 import { parseJson } from '@/lib/utils/json';
 
 interface TeamMember {
   id: string;
   nombre: string;
-  avatar?: string;
+  fotoUrl?: string | null;
 }
 
 interface ChangeManagerModalProps {
@@ -113,8 +111,6 @@ export function ChangeManagerModal({
 
               {/* Team Members */}
               {members.map((member) => {
-                const avatarStyle = getAvatarStyle(member.nombre);
-
                 return (
                   <button
                     key={member.id}
@@ -125,15 +121,11 @@ export function ChangeManagerModal({
                         : 'border-gray-200 hover:bg-gray-50'
                     }`}
                   >
-                    <Avatar className="h-8 w-8">
-                      {member.avatar && <AvatarImage src={member.avatar} />}
-                      <AvatarFallback
-                        className="text-xs font-semibold uppercase"
-                        style={avatarStyle}
-                      >
-                        {getInitials(member.nombre)}
-                      </AvatarFallback>
-                    </Avatar>
+                    <EmployeeAvatar
+                      nombre={member.nombre}
+                      fotoUrl={member.fotoUrl}
+                      size="sm"
+                    />
                     <div className="flex-1 text-left">
                       <p className="text-sm font-medium text-gray-900">{member.nombre}</p>
                     </div>

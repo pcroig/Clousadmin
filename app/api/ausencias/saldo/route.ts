@@ -15,6 +15,7 @@ import {
 } from '@/lib/api-handler';
 import { EstadoAusencia, UsuarioRol } from '@/lib/constants/enums';
 import { prisma } from '@/lib/prisma';
+import { asJsonValue } from '@/lib/prisma/json';
 
 const saldoSchema = z.object({
   nivel: z.enum(['empresa', 'equipo']),
@@ -146,27 +147,60 @@ export async function POST(req: NextRequest) {
     }
 
     // Upsert saldo para cada empleado
-    const promises = empleadosIds.map((empleadoId) =>
-      prisma.empleadoSaldoAusencias.upsert({
-        where: {
-          empleadoId_año: { empleadoId, año: añoActual },
-        },
-        update: {
-          diasTotales: validatedData.diasTotales,
-        },
-        create: {
-          empleadoId,
-          empresaId: session.user.empresaId,
-          año: añoActual,
-          diasTotales: validatedData.diasTotales,
-          diasUsados: 0,
-          diasPendientes: 0,
-          origen: 'manual_hr',
-        },
-      })
-    );
+    await prisma.$transaction(async (tx) => {
+      await Promise.all(
+        empleadosIds.map((empleadoId) =>
+          tx.empleadoSaldoAusencias.upsert({
+            where: {
+              empleadoId_año: { empleadoId, año: añoActual },
+            },
+            update: {
+              diasTotales: validatedData.diasTotales,
+            },
+            create: {
+              empleadoId,
+              empresaId: session.user.empresaId,
+              año: añoActual,
+              diasTotales: validatedData.diasTotales,
+              diasUsados: 0,
+              diasPendientes: 0,
+              origen: 'manual_hr',
+            },
+          })
+        )
+      );
 
-    await Promise.all(promises);
+      await tx.empleado.updateMany({
+        where: {
+          id: {
+            in: empleadosIds,
+          },
+        },
+        data: {
+          diasVacaciones: validatedData.diasTotales,
+        },
+      });
+
+      const empresa = await tx.empresa.findUnique({
+        where: { id: session.user.empresaId },
+        select: { config: true },
+      });
+
+      const configActual =
+        (empresa?.config && typeof empresa.config === 'object'
+          ? (empresa.config as Record<string, unknown>)
+          : {}) || {};
+
+      await tx.empresa.update({
+        where: { id: session.user.empresaId },
+        data: {
+          config: asJsonValue({
+            ...configActual,
+            diasVacacionesDefault: validatedData.diasTotales,
+          }),
+        },
+      });
+    });
 
     return successResponse({
       success: true,

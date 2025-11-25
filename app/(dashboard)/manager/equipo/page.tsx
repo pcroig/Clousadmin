@@ -8,13 +8,12 @@ import { Briefcase, Calendar, Mail, MapPin, Phone, Users } from 'lucide-react';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { EmployeeAvatar } from '@/components/shared/employee-avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { getSession } from '@/lib/auth';
 import { UsuarioRol } from '@/lib/constants/enums';
-import { getAvatarStyle } from '@/lib/design-system';
 import { prisma } from '@/lib/prisma';
 
 export default async function ManagerEquipoPage() {
@@ -99,10 +98,6 @@ export default async function ManagerEquipoPage() {
     },
   });
 
-  const getInitials = (nombre: string, apellidos: string) => {
-    return `${nombre.charAt(0)}${apellidos.charAt(0)}`.toUpperCase();
-  };
-
   return (
     <div className="p-8">
       <div className="mb-8">
@@ -130,20 +125,17 @@ export default async function ManagerEquipoPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {empleadosACargo.map((empleado) => {
-            const avatarStyle = getAvatarStyle(`${empleado.nombre} ${empleado.apellidos}`);
-
             return (
               <Card key={empleado.id} className="p-6 hover:shadow-lg transition-shadow">
                 <div className="flex items-start gap-4">
-                  <Avatar className="h-16 w-16">
-                    {empleado.fotoUrl && <AvatarImage src={empleado.fotoUrl} />}
-                    <AvatarFallback
-                      className="text-lg font-semibold uppercase"
-                      style={avatarStyle}
-                    >
-                      {getInitials(empleado.nombre, empleado.apellidos)}
-                    </AvatarFallback>
-                  </Avatar>
+                  <EmployeeAvatar
+                    nombre={empleado.nombre}
+                    apellidos={empleado.apellidos}
+                    fotoUrl={empleado.fotoUrl}
+                    size="lg"
+                    className="h-16 w-16 flex-shrink-0"
+                    fallbackClassName="text-lg"
+                  />
                   <div className="flex-1 min-w-0">
                     <h3 className="text-lg font-semibold text-gray-900 truncate">
                       {empleado.nombre} {empleado.apellidos}

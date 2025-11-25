@@ -8,8 +8,8 @@ import { Briefcase, Download, FileText, Pencil, Trash2, Upload } from 'lucide-re
 import { useState } from 'react';
 import { toast } from 'sonner';
 
+import { EmployeeAvatar } from '@/components/shared/employee-avatar';
 import { LoadingButton } from '@/components/shared/loading-button';
-import { getInitials } from '@/components/shared/utils';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -20,9 +20,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { getAvatarStyle } from '@/lib/design-system';
 import { parseJson } from '@/lib/utils/json';
 
 import { PuestoFormModal } from './puesto-form-modal';
@@ -192,7 +190,6 @@ export function PuestoDetails({ puesto, onUpdate, onDelete }: PuestoDetailsProps
               </p>
             ) : (
               puesto.empleados.map((empleado) => {
-                const avatarStyle = getAvatarStyle(empleado.nombre);
                 const fotoUrl = empleado.fotoUrl ?? empleado.avatar ?? undefined;
 
                 return (
@@ -200,15 +197,11 @@ export function PuestoDetails({ puesto, onUpdate, onDelete }: PuestoDetailsProps
                     key={empleado.id}
                     className="flex items-center gap-3 p-3 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
                   >
-                    <Avatar className="h-9 w-9">
-                      {fotoUrl && <AvatarImage src={fotoUrl} />}
-                      <AvatarFallback
-                        className="text-xs font-semibold uppercase"
-                        style={avatarStyle}
-                      >
-                        {getInitials(empleado.nombre)}
-                      </AvatarFallback>
-                    </Avatar>
+                    <EmployeeAvatar
+                      nombre={empleado.nombre}
+                      fotoUrl={fotoUrl}
+                      size="sm"
+                    />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm text-gray-900 font-medium">{empleado.nombre}</p>
                     </div>

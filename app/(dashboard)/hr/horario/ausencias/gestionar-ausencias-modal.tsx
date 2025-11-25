@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { type ChangeEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 import { CalendarioFestivos } from '@/components/hr/calendario-festivos';
@@ -26,6 +26,7 @@ import {
 } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { parseJson } from '@/lib/utils/json';
+import type { Festivo, FestivoEditorState } from '@/types/festivos';
 
 interface GestionarAusenciasModalProps {
   open: boolean;
@@ -45,7 +46,9 @@ interface _PoliticaEquipo {
 }
 
 export function GestionarAusenciasModal({ open, onClose, onSaved }: GestionarAusenciasModalProps) {
-  const [cargando, setCargando] = useState(false);
+  const [savingPolitica, setSavingPolitica] = useState(false);
+  const [savingCalendario, setSavingCalendario] = useState(false);
+  const [processingFestivos, setProcessingFestivos] = useState(false);
   const [tab, setTab] = useState<'politicas' | 'calendario'>('politicas');
 
   // Saldo y Políticas (ahora juntos)
@@ -68,7 +71,10 @@ export function GestionarAusenciasModal({ open, onClose, onSaved }: GestionarAus
     sabado: false,
     domingo: false,
   });
-  const [verCalendario, setVerCalendario] = useState(false);
+  const [festivosView, setFestivosView] = useState<'calendario' | 'lista'>('lista');
+  const [festivoEditor, setFestivoEditor] = useState<FestivoEditorState | null>(null);
+  const [festivosRefreshKey, setFestivosRefreshKey] = useState(0);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const cargarDatos = useCallback(async () => {
     try {
@@ -96,12 +102,16 @@ export function GestionarAusenciasModal({ open, onClose, onSaved }: GestionarAus
         const dataPoliticas = await parseJson<{
           maxSolapamientoPct?: number;
           requiereAntelacionDias?: number;
+          diasVacacionesDefault?: number;
         }>(resPoliticas);
         if (dataPoliticas.maxSolapamientoPct !== undefined) {
           setSolapamientoPct(dataPoliticas.maxSolapamientoPct.toString());
         }
         if (dataPoliticas.requiereAntelacionDias !== undefined) {
           setAntelacionDias(dataPoliticas.requiereAntelacionDias.toString());
+        }
+        if (dataPoliticas.diasVacacionesDefault !== undefined) {
+          setDiasTotales(dataPoliticas.diasVacacionesDefault.toString());
         }
       }
     } catch (e) {
@@ -116,7 +126,7 @@ export function GestionarAusenciasModal({ open, onClose, onSaved }: GestionarAus
   }, [open, cargarDatos]);
 
   async function handleGuardarPoliticaYSaldo() {
-    setCargando(true);
+    setSavingPolitica(true);
     try {
       // Validar datos de política
       const pct = parseInt(solapamientoPct, 10);
@@ -124,13 +134,13 @@ export function GestionarAusenciasModal({ open, onClose, onSaved }: GestionarAus
       
       if (isNaN(pct) || pct < 0 || pct > 100) {
         toast.error('El porcentaje de solapamiento debe estar entre 0 y 100');
-        setCargando(false);
+        setSavingPolitica(false);
         return;
       }
       
       if (isNaN(dias) || dias < 0 || dias > 365) {
         toast.error('Los días de antelación deben estar entre 0 y 365');
-        setCargando(false);
+        setSavingPolitica(false);
         return;
       }
 
@@ -149,7 +159,7 @@ export function GestionarAusenciasModal({ open, onClose, onSaved }: GestionarAus
           error: 'Error desconocido',
         }));
         toast.error(error.error || 'Error al guardar política');
-        setCargando(false);
+        setSavingPolitica(false);
         return;
       }
 
@@ -169,7 +179,7 @@ export function GestionarAusenciasModal({ open, onClose, onSaved }: GestionarAus
           error: 'Error desconocido',
         }));
         toast.error(error.error || 'Error al guardar saldo');
-        setCargando(false);
+        setSavingPolitica(false);
         return;
       }
 
@@ -179,12 +189,12 @@ export function GestionarAusenciasModal({ open, onClose, onSaved }: GestionarAus
       console.error('Error guardando configuración:', e);
       toast.error('Error al guardar la configuración');
     } finally {
-      setCargando(false);
+      setSavingPolitica(false);
     }
   }
   
   async function handleGuardarCalendario() {
-    setCargando(true);
+    setSavingCalendario(true);
     try {
       const response = await fetch('/api/empresa/calendario-laboral', {
         method: 'PATCH',
@@ -205,38 +215,62 @@ export function GestionarAusenciasModal({ open, onClose, onSaved }: GestionarAus
       console.error('Error guardando calendario:', e);
       toast.error('Error al guardar calendario');
     } finally {
-      setCargando(false);
+      setSavingCalendario(false);
     }
   }
   
-  async function handleImportarFestivos() {
-    if (!confirm('¿Importar festivos nacionales para el año actual y próximo?')) {
+  async function handleArchivoFestivosChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) {
       return;
     }
 
-    setCargando(true);
+    setProcessingFestivos(true);
     try {
-      const response = await fetch('/api/festivos/importar-nacionales', {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await fetch('/api/festivos/importar', {
         method: 'POST',
+        body: formData,
       });
 
+      const data = await parseJson<{ message?: string; error?: string }>(response).catch(() => null);
+
       if (response.ok) {
-        const data = await parseJson<{ message?: string }>(response);
-        toast.success(data.message || 'Festivos importados exitosamente');
-        if (onSaved) onSaved();
+        toast.success(data?.message || 'Calendario importado correctamente');
+        await cargarDatos();
+        setFestivosRefreshKey((prev) => prev + 1);
+        onSaved?.();
       } else {
-        const error = await parseJson<{ error?: string }>(response).catch(() => ({
-          error: 'Error desconocido',
-        }));
-        toast.error(error.error || 'Error al importar festivos');
+        toast.error(data?.error || 'Error al importar calendario');
       }
-    } catch (e) {
-      console.error('Error importando festivos:', e);
-      toast.error('Error al importar festivos');
+    } catch (error) {
+      console.error('Error importando calendario desde archivo:', error);
+      toast.error('Error al importar calendario');
     } finally {
-      setCargando(false);
+      setProcessingFestivos(false);
+      event.target.value = '';
     }
   }
+
+  const handleCloseEditor = () => setFestivoEditor(null);
+
+  const handleCreateFestivoInline = (fecha?: string) => {
+    setFestivosView('lista');
+    setFestivoEditor({
+      mode: 'crear',
+      fecha,
+    });
+  };
+
+  const handleEditFestivoInline = (festivo: Festivo) => {
+    setFestivosView('lista');
+    setFestivoEditor({
+      mode: 'editar',
+      festivo,
+    });
+  };
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
@@ -406,8 +440,12 @@ export function GestionarAusenciasModal({ open, onClose, onSaved }: GestionarAus
               <Button variant="outline" onClick={onClose}>
                 Cancelar
               </Button>
-              <LoadingButton onClick={handleGuardarPoliticaYSaldo} loading={cargando} disabled={cargando}>
-                {cargando ? 'Guardando...' : 'Guardar Configuración'}
+              <LoadingButton
+                onClick={handleGuardarPoliticaYSaldo}
+                loading={savingPolitica}
+                disabled={savingPolitica}
+              >
+                {savingPolitica ? 'Guardando...' : 'Guardar Configuración'}
               </LoadingButton>
             </DialogFooter>
           </TabsContent>
@@ -452,47 +490,70 @@ export function GestionarAusenciasModal({ open, onClose, onSaved }: GestionarAus
               </div>
             </Field>
 
-            <div className="border-t pt-6">
-              <div className="flex flex-col gap-3 mb-4 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex items-center gap-2">
-                  <h4 className="font-semibold">Calendario de Festivos</h4>
-                  <InfoTooltip
-                    content="Los festivos se excluyen automáticamente del cálculo de días laborables en las solicitudes de ausencia."
-                  />
-                </div>
-                <div className="flex gap-2">
-                  <LoadingButton
-                    size="sm"
-                    variant="outline"
-                    onClick={handleImportarFestivos}
-                    loading={cargando}
-                    disabled={cargando}
-                  >
-                    {cargando ? 'Importando...' : 'Importar Calendario'}
-                  </LoadingButton>
+            <Tabs
+              value={festivosView}
+              onValueChange={(value) => {
+                if (value === 'calendario' || value === 'lista') {
+                  setFestivosView(value);
+                }
+              }}
+              className="space-y-4"
+            >
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="calendario">Calendario visual</TabsTrigger>
+                <TabsTrigger value="lista">Lista de festivos</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="calendario" className="space-y-4">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".ics,.csv"
+                  className="hidden"
+                  onChange={handleArchivoFestivosChange}
+                />
+                <div className="flex justify-end">
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={() => setVerCalendario(!verCalendario)}
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={processingFestivos}
                   >
-                    {verCalendario ? 'Ver Lista' : 'Ver Calendario'}
+                    {processingFestivos ? 'Importando...' : 'Importar calendario'}
                   </Button>
                 </div>
-              </div>
 
-              {verCalendario ? (
-                <CalendarioFestivos onUpdate={cargarDatos} />
-              ) : (
-                <ListaFestivos onUpdate={cargarDatos} />
-              )}
-            </div>
+                <CalendarioFestivos
+                  diasLaborables={diasLaborables}
+                  onUpdate={cargarDatos}
+                  refreshToken={festivosRefreshKey}
+                  onRequestCreate={handleCreateFestivoInline}
+                  onRequestEdit={handleEditFestivoInline}
+                />
+              </TabsContent>
+
+              <TabsContent value="lista">
+                <ListaFestivos
+                  refreshToken={festivosRefreshKey}
+                  onUpdate={cargarDatos}
+                  editorState={festivoEditor}
+                  onEditorClose={handleCloseEditor}
+                  onCreateRequest={() => handleCreateFestivoInline()}
+                  onEditRequest={handleEditFestivoInline}
+                />
+              </TabsContent>
+            </Tabs>
 
             <DialogFooter className="border-t pt-4">
               <Button variant="outline" onClick={onClose}>
                 Cancelar
               </Button>
-              <LoadingButton onClick={handleGuardarCalendario} loading={cargando} disabled={cargando}>
-                {cargando ? 'Guardando...' : 'Guardar Calendario'}
+              <LoadingButton
+                onClick={handleGuardarCalendario}
+                loading={savingCalendario}
+                disabled={savingCalendario}
+              >
+                {savingCalendario ? 'Guardando...' : 'Guardar Calendario'}
               </LoadingButton>
             </DialogFooter>
           </TabsContent>

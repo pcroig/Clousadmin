@@ -13,8 +13,14 @@ import { NotificacionesWidget } from '@/components/shared/notificaciones-widget'
 import { SolicitudesWidget } from '@/components/shared/solicitudes-widget';
 import { getSession } from '@/lib/auth';
 import { obtenerResumenPlantilla } from '@/lib/calculos/plantilla';
-import { EstadoAusencia, UsuarioRol } from '@/lib/constants/enums';
-import { prisma } from '@/lib/prisma';
+import { UsuarioRol } from '@/lib/constants/enums';
+import {
+  getAutoCompletadosStats,
+  getNotificacionesUsuario,
+  getSolicitudesAusenciasPendientes,
+  getSolicitudesCambioPendientes,
+} from '@/lib/queries/dashboard';
+import { ensureDate } from '@/lib/utils/fechas';
 
 import type { TipoNotificacion } from '@/lib/notificaciones';
 import type { NotificacionUI } from '@/types/Notificacion';
@@ -26,46 +32,11 @@ export default async function HRDashboardPage() {
     redirect('/login');
   }
 
-  // Obtener solicitudes pendientes
-  const ausenciasPendientes = await prisma.ausencia.findMany({
-    where: {
-      empresaId: session.user.empresaId,
-      estado: EstadoAusencia.pendiente,
-    },
-    include: {
-      empleado: {
-        select: {
-          nombre: true,
-          apellidos: true,
-          fotoUrl: true,
-        },
-      },
-    },
-    orderBy: {
-      createdAt: 'desc',
-    },
-    take: 5,
-  });
-
-  const solicitudesCambioPendientes = await prisma.solicitudCambio.findMany({
-    where: {
-      empresaId: session.user.empresaId,
-      estado: 'pendiente',
-    },
-    include: {
-      empleado: {
-        select: {
-          nombre: true,
-          apellidos: true,
-          fotoUrl: true,
-        },
-      },
-    },
-    orderBy: {
-      createdAt: 'desc',
-    },
-    take: 5,
-  });
+  // Obtener solicitudes pendientes (cached)
+  const [ausenciasPendientes, solicitudesCambioPendientes] = await Promise.all([
+    getSolicitudesAusenciasPendientes(session.user.empresaId),
+    getSolicitudesCambioPendientes(session.user.empresaId),
+  ]);
 
   // Combinar solicitudes
   const solicitudes = [
@@ -77,7 +48,7 @@ export default async function HRDashboardPage() {
       },
       tipo: 'ausencia' as const,
       descripcion: `${aus.empleado.nombre} ${aus.empleado.apellidos} solicita ${aus.tipo}`,
-      fecha: aus.createdAt,
+      fecha: ensureDate(aus.createdAt),
       prioridad: 'media' as const,
     })),
     ...solicitudesCambioPendientes.map((sol) => ({
@@ -88,22 +59,16 @@ export default async function HRDashboardPage() {
       },
       tipo: 'cambio_datos' as const,
       descripcion: `Solicitud de cambio de ${sol.tipo}`,
-      fecha: sol.createdAt,
+      fecha: ensureDate(sol.createdAt),
       prioridad: 'baja' as const,
     })),
   ].sort((a, b) => b.fecha.getTime() - a.fecha.getTime());
 
-  // Notificaciones reales del usuario HR actual
-  const notificacionesDb = await prisma.notificacion.findMany({
-    where: {
-      empresaId: session.user.empresaId,
-      usuarioId: session.user.id,
-    },
-    orderBy: {
-      createdAt: 'desc',
-    },
-    take: 10,
-  });
+  // Notificaciones reales del usuario HR actual (cached)
+  const notificacionesDb = await getNotificacionesUsuario(
+    session.user.empresaId,
+    session.user.id
+  );
 
   const notificaciones: NotificacionUI[] = notificacionesDb.map((notif) => ({
     id: notif.id,
@@ -118,32 +83,10 @@ export default async function HRDashboardPage() {
   // Resumen actual de la plantilla
   const plantillaResumen = await obtenerResumenPlantilla(session.user.empresaId);
 
-  // Auto-completed stats - Widget muestra lo aprobado automáticamente por el sistema
+  // Auto-completed stats (cached) - Widget muestra lo aprobado automáticamente por el sistema
   // NOTA: Las ausencias que NO requieren aprobación (enfermedad, etc.) NO se registran aquí
   // porque no hubo "aprobación automática", simplemente no necesitaban aprobación
-  const fichajesAutoCompletados = await prisma.autoCompletado.count({
-    where: {
-      empresaId: session.user.empresaId,
-      tipo: 'fichaje_completado',
-      estado: 'aprobado',
-    },
-  });
-
-  const ausenciasAutoCompletadas = await prisma.autoCompletado.count({
-    where: {
-      empresaId: session.user.empresaId,
-      tipo: 'ausencia_auto_aprobada',
-      estado: 'aprobado',
-    },
-  });
-
-  const solicitudesAutoCompletadas = await prisma.autoCompletado.count({
-    where: {
-      empresaId: session.user.empresaId,
-      tipo: 'solicitud_auto_aprobada',
-      estado: 'aprobado',
-    },
-  });
+  const autoCompletadosStats = await getAutoCompletadosStats(session.user.empresaId);
 
   return (
     <>
@@ -207,13 +150,7 @@ export default async function HRDashboardPage() {
 
           {/* Auto-completed Widget - Fila 2 */}
           <div className="h-full min-h-[220px]">
-            <AutoCompletadoWidget
-              stats={{
-                fichajesCompletados: fichajesAutoCompletados,
-                ausenciasCompletadas: ausenciasAutoCompletadas,
-                solicitudesCompletadas: solicitudesAutoCompletadas,
-              }}
-            />
+            <AutoCompletadoWidget stats={autoCompletadosStats} />
           </div>
         </div>
       </div>

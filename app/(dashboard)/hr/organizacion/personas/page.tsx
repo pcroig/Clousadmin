@@ -84,6 +84,7 @@ export default async function PersonasPage(props: {
     puesto: emp.puestoRelacion?.nombre || emp.puesto || 'Sin puesto', // Usar puestoRelacion primero, luego fallback a puesto deprecated
     activo: emp.activo,
     avatar: emp.fotoUrl || undefined,
+    fotoUrl: emp.fotoUrl || null,
     // Datos completos para detalles
     detalles: {
       dni: emp.nif || '',

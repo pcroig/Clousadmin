@@ -287,7 +287,7 @@ const columns: Column<Empleado>[] = [
     header: 'Nombre',
     priority: 'high',    // Siempre visible
     sticky: true,        // Sticky en mobile
-    cell: (row) => <AvatarCell nombre={row.nombre} avatar={row.avatar} />
+    cell: (row) => <AvatarCell nombre={row.nombre} fotoUrl={row.fotoUrl} />
   },
   {
     id: 'puesto',
@@ -323,7 +323,7 @@ import { AvatarCell } from '@/components/shared/data-table';
 
 <AvatarCell 
   nombre="Sofia Roig"
-  avatar="/avatar.jpg"
+  fotoUrl="/avatars/sofia-roig.jpg"
   subtitle="HR Manager"
   compact={true}
 />
@@ -443,7 +443,7 @@ function ListaEmpleados() {
       <div className="space-y-2">
         {empleados.map(emp => (
           <Card key={emp.id} onClick={() => handleClick(emp)}>
-            <AvatarCell nombre={emp.nombre} avatar={emp.avatar} />
+            <AvatarCell nombre={emp.nombre} fotoUrl={emp.fotoUrl} />
           </Card>
         ))}
       </div>

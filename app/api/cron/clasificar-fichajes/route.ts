@@ -93,6 +93,17 @@ export async function POST(request: NextRequest) {
               console.log(`[CRON Cerrar Jornadas] Fichaje creado para ${empleado.nombre} ${empleado.apellidos}`);
               fichajesCreados++;
               fichajesPendientes++;
+              
+              // Crear notificación de fichaje pendiente
+              await crearNotificacionFichajeRequiereRevision(prisma, {
+                fichajeId: fichaje.id,
+                empresaId: empresa.id,
+                empleadoId: empleado.id,
+                empleadoNombre: `${empleado.nombre} ${empleado.apellidos}`,
+                fecha: fichaje.fecha,
+                razon: 'No se registraron fichajes en el día',
+              });
+              
               continue;
             }
 

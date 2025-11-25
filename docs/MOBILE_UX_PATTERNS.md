@@ -1,7 +1,7 @@
 # Patrones UX Mobile - Clousadmin
 
-**Versión**: 2.1.0  
-**Fecha**: 2025-01-22  
+**Versión**: 2.2.0  
+**Fecha**: 2025-01-27  
 **Autor**: Equipo de Desarrollo
 
 ---
@@ -37,17 +37,19 @@ Este documento define los patrones UX mobile implementados en Clousadmin para ga
 ```
 Mobile Viewport (375x667px typical):
 ┌─────────────────────────────┐
-│ ActionBar (48px)            │ ← 7% viewport
-│ FilterBar (44px)            │ ← 7% viewport
-│ DateControl (40px)          │ ← 6% viewport (opcional)
-├─────────────────────────────┤
+│ ActionBar (~40px)            │ ← 6% viewport (título embebido)
+│ DateControl (~36px)          │ ← 5% viewport (opcional, compacto)
+│ FilterBar (44px)             │ ← 7% viewport
+├─────────────────────────────┤ Total: ~120px (18%)
 │                             │
-│   CONTENIDO PRINCIPAL       │ ← 70-80% viewport
+│   CONTENIDO PRINCIPAL       │ ← 80-82% viewport
 │   (Tabla/Cards/Datos)       │
 │                             │
 │                             │
 └─────────────────────────────┘
 ```
+
+**Nota**: Los títulos están embebidos directamente en el background de la página, sin bordes o boxes adicionales, maximizando el espacio para contenido.
 
 ### 2. Touch Targets
 
@@ -73,9 +75,12 @@ Barra de acciones compacta que reemplaza filas de botones grandes.
 <MobileActionBar
   title="Fichajes"                    // Título (opcional)
   primaryAction={{                    // Acción destacada (1)
-    icon: Plus,
-    label: "Cuadrar fichajes",
-    onClick: handleCuadrar
+    icon: Plus,                        // Opcional
+    label: "Cuadrar",
+    onClick: handleCuadrar,
+    display: 'label',                 // 'icon' | 'label' | 'icon-label'
+    size: 'sm',                        // 'sm' | 'default'
+    variant: 'default'                 // 'default' | 'destructive' | 'ghost' | 'outline'
   }}
   secondaryActions={[                 // Iconos visibles (máx 2)
     { icon: Calendar, label: "...", onClick: ... }
@@ -86,9 +91,15 @@ Barra de acciones compacta que reemplaza filas de botones grandes.
 />
 ```
 
-**Altura**: 48px  
+**Props de ActionItem**:
+- `display`: Controla visualización en mobile (`'icon'` por defecto, `'label'` para texto, `'icon-label'` para ambos)
+- `size`: Tamaño del botón (`'sm'` por defecto, `'default'` para más grande)
+- `icon`: Opcional - si no se proporciona, solo se muestra el label
+- `className`: Clases adicionales para personalización
+
+**Altura**: ~40px (sin bordes adicionales, embebido en background)  
 **Desktop**: Botones completos con texto  
-**Mobile**: Iconos compactos + overflow
+**Mobile**: Iconos compactos + overflow (o label según `display`)
 
 ### CompactFilterBar
 
@@ -152,10 +163,10 @@ Flecha bounce que indica contenido scrollable.
 **Mobile Layout**:
 ```
 ┌─────────────────────────────────────┐
-│ [Fichajes    📅 ⚙️ ...]            │ ActionBar (48px)
-│ [🔍 Buscar | Filtros (2)]          │ FilterBar (44px)
-│ [← Sem 3 Ene →]                    │ DateNav (40px)
-├─────────────────────────────────────┤ Total: 132px (20%)
+│ Fichajes          📅 ⚙️ Cuadrar    │ ActionBar (~40px, sin bordes)
+│ Sem  <  Sem 3 Ene  >               │ DateNav (~36px, compacto)
+│ 🔍 Buscar | Filtros (2)            │ FilterBar (44px)
+├─────────────────────────────────────┤ Total: ~120px (18%)
 │ ┌─────────────────────────────┐   │
 │ │ Card Empleado 1             │   │
 │ │ Horas: 8h 15m | Balance: +15m│   │
@@ -168,8 +179,12 @@ Flecha bounce que indica contenido scrollable.
 └─────────────────────────────────────┘
 ```
 
-**Reducción lograda**: ~60% en altura de headers  
-**Antes**: ~350px de headers → **Después**: ~132px
+**Características**:
+- Título embebido directamente en background (sin bordes/boxes adicionales)
+- Acciones: iconos para secundarias, label corto para principal
+- Controles de fecha comprimidos (solo iconos de navegación)
+- **Reducción lograda**: ~66% en altura de headers  
+- **Antes**: ~350px de headers → **Después**: ~120px
 
 ### Páginas con Cards/Grid
 
@@ -204,17 +219,35 @@ Flecha bounce que indica contenido scrollable.
 ```tsx
 <MobileActionBar
   title="..."
-  primaryAction={...}
-  secondaryActions={...}
-  overflowActions={...}
+  primaryAction={{
+    label: 'Acción Principal',
+    display: 'label',  // o 'icon' si tiene icono
+    onClick: handlePrimary
+  }}
+  secondaryActions={[
+    { icon: Settings, label: 'Config', onClick: handleConfig }
+  ]}
+  overflowActions={[...]}
 />
+{/* Date controls compactos si aplica */}
+<div className="flex items-center gap-2 mb-3">
+  <Select value={periodo} ...>
+    <SelectTrigger className="w-20 h-9 text-xs">...</SelectTrigger>
+  </Select>
+  <Button variant="outline" size="sm" onClick={prev} className="h-9 w-9 p-0">
+    <ChevronLeft className="h-4 w-4" />
+  </Button>
+  <span className="text-sm font-medium flex-1 text-center">{periodLabel}</span>
+  <Button variant="outline" size="sm" onClick={next} className="h-9 w-9 p-0">
+    <ChevronRight className="h-4 w-4" />
+  </Button>
+</div>
 <CompactFilterBar
   searchValue={...}
   onSearchChange={...}
   activeFiltersCount={...}
   filtersContent={...}
 />
-{/* Date controls si aplica */}
 <div className="flex-1 min-h-0 overflow-y-auto">
   <DataTable ... />
 </div>
@@ -338,13 +371,18 @@ import { MobileActionBar } from '@/components/adaptive/MobileActionBar';
 
 // 2. Definir acciones
 const primaryAction = {
-  icon: Plus,
-  label: 'Crear nuevo',
-  onClick: handleCreate
+  label: 'Cuadrar',                    // Texto corto para acción principal
+  onClick: handleCreate,
+  display: 'label'                     // Mostrar solo texto
 };
 
 const secondaryActions = [
-  { icon: Settings, label: 'Configurar', onClick: handleConfig }
+  { 
+    icon: Settings, 
+    label: 'Configurar', 
+    onClick: handleConfig 
+    // display: 'icon' por defecto
+  }
 ];
 
 const overflowActions = [
@@ -352,18 +390,20 @@ const overflowActions = [
   { icon: Archive, label: 'Archivar', onClick: handleArchive }
 ];
 
-// 3. Renderizar
-{isMobile ? (
-  <MobileActionBar
-    title="Mi Página"
-    primaryAction={primaryAction}
-    secondaryActions={secondaryActions}
-    overflowActions={overflowActions}
-  />
-) : (
-  // Desktop: botones completos
-)}
+// 3. Renderizar (sin wrapper condicional, el componente ya lo maneja)
+<MobileActionBar
+  title="Mi Página"
+  primaryAction={primaryAction}
+  secondaryActions={secondaryActions}
+  overflowActions={overflowActions}
+/>
 ```
+
+**Notas**:
+- El componente ya maneja la detección mobile/desktop internamente
+- Acciones secundarias: usar `display: 'icon'` (por defecto) para máximo espacio
+- Acción principal: usar `display: 'label'` si el texto es corto y claro
+- Iconos opcionales: si no hay icono, se muestra solo el label
 
 ### Añadir CompactFilterBar
 
@@ -432,6 +472,6 @@ const activeFiltersCount = useMemo(() => {
 
 ---
 
-**Última actualización**: 2025-01-22  
-**Próxima revisión**: 2025-02-22
+**Última actualización**: 2025-01-27  
+**Próxima revisión**: 2025-02-27
 

@@ -6,7 +6,7 @@
 // Optimized for production with connection pooling
 // Lazy initialization to avoid environment variable timing issues
 
-import { PrismaClient, Prisma } from '@prisma/client';
+import { Prisma, PrismaClient } from '@prisma/client';
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
@@ -74,18 +74,38 @@ const getDatabaseUrl = () => {
 const prismaClientSingleton =
   globalForPrisma.prisma ??
   new PrismaClient({
+    log: process.env.NODE_ENV === 'development' 
+      ? [
+          { level: 'query', emit: 'event' },
+          { level: 'error', emit: 'stdout' },
+          { level: 'warn', emit: 'stdout' },
+        ]
+      : [
+          { level: 'error', emit: 'stdout' },
+        ],
     datasources: {
       db: {
         url: getDatabaseUrl(),
       },
     },
-    log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
   });
 
 if (process.env.NODE_ENV !== 'production') {
   globalForPrisma.prisma = prismaClientSingleton;
 }
 
+// Listener para queries lentas en desarrollo (activar solo cuando sea necesario)
+if (process.env.NODE_ENV === 'development' && !globalForPrisma.prismaLoggerAttached) {
+  prismaClientSingleton.$on('query' as never, (e: { query: string; duration: number }) => {
+    // Log solo queries que tomen más de 100ms
+    if (e.duration > 100) {
+      console.warn(`🐌 [Prisma Slow Query] ${e.duration}ms\n${e.query}`);
+    }
+  });
+  globalForPrisma.prismaLoggerAttached = true;
+}
+
+// Middleware de performance (opcional - activar con PRISMA_PERF_LOG=true)
 if (
   process.env.PRISMA_PERF_LOG === 'true' &&
   !globalForPrisma.prismaLoggerAttached
@@ -99,15 +119,17 @@ if (
     const result = await next(params);
     const duration = perf.now() - start;
     queryCounter += 1;
+    
+    // Colorear según el tiempo
+    const emoji = duration > 1000 ? '🔴' : duration > 500 ? '🟡' : '🟢';
     console.log(
-      `[Prisma][${queryCounter}] ${params.model ?? 'raw'}.${params.action} - ${duration.toFixed(2)}ms`
+      `${emoji} [Prisma][${queryCounter}] ${params.model ?? 'raw'}.${params.action} - ${duration.toFixed(2)}ms`
     );
     return result;
   };
   (prismaClientSingleton as unknown as { $use(middleware: typeof loggingMiddleware): void }).$use(
     loggingMiddleware
   );
-  globalForPrisma.prismaLoggerAttached = true;
 }
 
 export const prisma = prismaClientSingleton;

@@ -1,8 +1,7 @@
 'use client';
 
 import { AvatarEditButton } from '@/components/shared/avatar-edit-button';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { getAvatarStyle } from '@/lib/design-system';
+import { EmployeeAvatar } from '@/components/shared/employee-avatar';
 import { cn } from '@/lib/utils';
 
 import type { ReactNode } from 'react';
@@ -31,26 +30,17 @@ export function ProfileAvatar({
   avatarSize = 'md',
 }: ProfileAvatarProps) {
   const fullName = `${nombre ?? ''} ${apellidos ?? ''}`.trim();
-  const initials = `${nombre?.charAt(0) ?? ''}${apellidos?.charAt(0) ?? ''}`.toUpperCase() || '??';
-  const avatarStyle = getAvatarStyle(fullName || 'Usuario');
-
-  const avatarClasses =
-    avatarSize === 'lg'
-      ? 'h-20 w-20'
-      : 'h-16 w-16';
+  const avatarComponentSize = avatarSize === 'lg' ? 'xl' : 'lg';
 
   return (
     <div className={cn('flex items-center gap-4', className)}>
       <div className="relative">
-        <Avatar className={avatarClasses}>
-          {fotoUrl && <AvatarImage src={fotoUrl} alt={fullName || 'Avatar'} />}
-          <AvatarFallback
-            className="text-lg font-semibold uppercase"
-            style={avatarStyle}
-          >
-            {initials}
-          </AvatarFallback>
-        </Avatar>
+        <EmployeeAvatar
+          nombre={nombre}
+          apellidos={apellidos}
+          fotoUrl={fotoUrl}
+          size={avatarComponentSize}
+        />
         {showEditButton && <AvatarEditButton empleadoId={empleadoId} />}
       </div>
 

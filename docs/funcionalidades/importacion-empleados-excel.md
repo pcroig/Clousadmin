@@ -78,6 +78,11 @@ Sistema de importación masiva de empleados desde archivos Excel con procesamien
 
 **Uso:** Durante el proceso de onboarding inicial de la empresa para importar empleados masivamente.
 
+**Comportamiento especial en onboarding:**
+- Auto-confirmación: Después del análisis, la importación se confirma automáticamente (sin paso intermedio de guardado)
+- Los empleados se crean sin jornada asignada (se asignará cuando se complete el paso de "Calendario y Jornada")
+- UI simplificada: Sin títulos/descripciones duplicados, diseño unificado
+
 ### HR/Organización
 
 **Ruta:** `/hr/organizacion/personas` → "Añadir Persona" → "Importar" → "Excel Masivo"
@@ -353,7 +358,7 @@ Los datos sensibles se encriptan antes de guardar:
    - Se crea empleado con datos encriptados
    - Se vincula empleado al usuario
    - Se asigna a equipo (si corresponde)
-   - Se asigna jornada por defecto
+   - **Nota:** En onboarding, los empleados se crean sin jornada. Se asignará cuando se complete el paso de "Calendario y Jornada"
 
 4. **Managers** (segunda pasada)
    - Se buscan managers por email o nombre
@@ -483,7 +488,7 @@ Los datos sensibles se encriptan antes de guardar:
 ---
 
 **Última actualización:** 2025-01-27  
-**Versión:** 2.0.0
+**Versión:** 2.1.0
 
 
 

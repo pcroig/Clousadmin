@@ -31,6 +31,7 @@ interface Empleado {
   puesto: string;
   activo: boolean;
   avatar?: string;
+  fotoUrl?: string | null;
   detalles: {
     dni: string;
     numeroSS: string | null;
@@ -73,7 +74,13 @@ export function PersonasClient({ empleados, initialPanel, initialDenunciaId }: P
     {
       id: 'nombre',
       header: 'Nombre',
-      cell: (row) => <AvatarCell nombre={row.nombre} avatar={row.avatar} />,
+      cell: (row) => (
+        <AvatarCell
+          nombre={row.nombre}
+          fotoUrl={row.fotoUrl ?? row.avatar ?? null}
+          subtitle={row.email}
+        />
+      ),
       width: '25%',
       priority: 'high',
       sticky: true,

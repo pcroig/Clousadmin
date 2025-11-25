@@ -49,7 +49,8 @@ Clousadmin/
 │   ├── (dashboard)/              # Rutas protegidas
 │   │   ├── empleado/             # Dashboard empleado
 │   │   ├── hr/                   # Dashboard HR Admin
-│   │   └── manager/              # Dashboard Manager
+│   │   ├── manager/              # Dashboard Manager
+│   │   └── platform/             # Panel Platform Admin (invitaciones, gestión empresas)
 │   ├── api/                      # API Routes
 │   │   ├── ausencias/
 │   │   ├── denuncias/            # ✨ Canal de denuncias
@@ -262,9 +263,11 @@ El sistema maneja **dos tipos de invitaciones**:
 
 Sistema de lista de espera para usuarios que quieren crear cuenta pero no tienen invitación:
 
-- Acceso: `/waitlist` o desde `/login` si el email no existe
-- Almacenamiento: Tabla `Waitlist`
-- Conversión: Administrador puede convertir entrada de waitlist en invitación
+- **Acceso**: `/waitlist` (página dedicada) o modal desde `/login` (botón "Solicitar invitación")
+- **Almacenamiento**: Tabla `Waitlist`
+- **Notificaciones**: Al recibir una solicitud, se envía email de confirmación al usuario y notificación interna a `WAITLIST_NOTIFY_EMAIL`
+- **Conversión**: Administrador de plataforma revisa `/platform/invitaciones` y convierte entrada de waitlist en invitación con un clic
+- **Panel de gestión**: `/platform/invitaciones` muestra todas las solicitudes pendientes con botón "Invitar" que genera automáticamente la invitación y envía el email
 
 📖 **Ver documentación completa:** [`docs/funcionalidades/autenticacion.md`](funcionalidades/autenticacion.md)
 
@@ -281,9 +284,12 @@ Sistema de lista de espera para usuarios que quieren crear cuenta pero no tienen
 
 ### Roles
 
-- **hr_admin**: Acceso total
+- **platform_admin**: Super administrador de la plataforma (gestión de empresas, invitaciones, métricas globales)
+- **hr_admin**: Acceso total a la empresa
 - **manager**: Acceso a su equipo
 - **empleado**: Acceso a sus datos
+
+**Panel Platform Admin**: `/platform/invitaciones` - Gestión de invitaciones, waitlist, empresas y suscripciones
 
 ### Implementación
 
@@ -334,6 +340,29 @@ model Empleado {
   @@map("empleados")  // Plural en DB
 }
 ```
+
+### Soft Delete Pattern
+
+El sistema usa soft delete para empresas y usuarios mediante el campo `activo`:
+
+```prisma
+model Empresa {
+  id     String  @id @default(uuid())
+  activo Boolean @default(true)  // Soft delete
+  // ...
+}
+
+model Usuario {
+  id     String  @id @default(uuid())
+  activo Boolean @default(true)  // Soft delete
+  // ...
+}
+```
+
+**Comportamiento**:
+- Empresas inactivas: usuarios no pueden iniciar sesión (verificado en `getSession()`)
+- Desactivar empresa: también desactiva usuarios asociados y cancela suscripción en Stripe
+- Los datos se mantienen en BD para auditoría
 
 ### Migraciones
 

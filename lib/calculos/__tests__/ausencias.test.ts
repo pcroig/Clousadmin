@@ -1,118 +1,92 @@
-// ========================================
-// Tests Unitarios: Ausencias
-// ========================================
+/**
+ * Tests unitarios para cálculos de ausencias
+ * Cobertura: funciones puras y lógica de negocio
+ */
 
-import { afterAll, beforeAll, describe, expect, it } from '@jest/globals';
-import { TipoAusencia } from '@prisma/client';
-
-import { prisma } from '@/lib/prisma';
-
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { EstadoAusencia } from '@/lib/constants/enums';
 import {
-  validarAntelacion,
+  determinarEstadoTrasAprobacion,
+  esFinDeSemana,
 } from '../ausencias';
 
-/**
- * NOTA: Estos son tests de ejemplo para la estructura básica.
- * Para una suite completa, se necesitaría:
- * - Mock de Prisma client
- * - Setup de datos de prueba
- * - Tests de edge cases con fechas límite
- * - Tests de concurrencia para race conditions
- */
+// ========================================
+// determinarEstadoTrasAprobacion
+// ========================================
 
-describe('Ausencias - Validaciones', () => {
-  let _empresaId: string;
-  let _empleadoId: string;
-
-  beforeAll(async () => {
-    // Setup: crear empresa y empleado de prueba
-    // En producción, usar factories o fixtures
+describe('determinarEstadoTrasAprobacion', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
   });
 
-  afterAll(async () => {
-    // Cleanup: eliminar datos de prueba
-    await prisma.$disconnect();
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
-  describe('validarSaldoSuficiente', () => {
-    it('debe validar correctamente cuando hay saldo suficiente', async () => {
-      // Este test requiere setup de empresa/empleado con saldo
-      // Por ahora, solo estructura de ejemplo
-      expect(true).toBe(true);
-    });
-
-    it('debe rechazar cuando el saldo es insuficiente', async () => {
-      expect(true).toBe(true);
-    });
-
-    it('debe prevenir race conditions usando valores de tabla en transacción', async () => {
-      // Test crítico: cuando se pasa `tx`, debe confiar en valores de tabla
-      // no recalcular desde ausencias
-      expect(true).toBe(true);
-    });
+  it('should return completada when fechaFin is in the past', () => {
+    vi.setSystemTime(new Date('2024-06-15T12:00:00Z'));
+    const fechaFin = new Date('2024-06-10T00:00:00Z');
+    const resultado = determinarEstadoTrasAprobacion(fechaFin);
+    expect(resultado).toBe(EstadoAusencia.completada);
   });
 
-  describe('calcularDias', () => {
-    it('debe calcular correctamente días laborables excluyendo festivos', async () => {
-      // Mock de empresa con días laborables L-V
-      // Mock de festivos
-      // Verificar cálculo correcto
-      expect(true).toBe(true);
-    });
-
-    it('debe respetar la configuración de días laborables personalizada', async () => {
-      // Empresa con L-S (6 días)
-      expect(true).toBe(true);
-    });
+  it('should return confirmada when fechaFin is today', () => {
+    vi.setSystemTime(new Date('2024-06-15T12:00:00Z'));
+    const fechaFin = new Date('2024-06-15T18:00:00Z');
+    const resultado = determinarEstadoTrasAprobacion(fechaFin);
+    expect(resultado).toBe(EstadoAusencia.confirmada);
   });
 
-  describe('validarAntelacion', () => {
-    it('debe validar antelación para vacaciones', async () => {
-      expect(true).toBe(true);
-    });
-
-    it('no debe validar antelación para enfermedad', async () => {
-      const resultado = await validarAntelacion(
-        null,
-        new Date(),
-        TipoAusencia.enfermedad
-      );
-      expect(resultado.valida).toBe(true);
-    });
+  it('should return confirmada when fechaFin is in the future', () => {
+    vi.setSystemTime(new Date('2024-06-15T12:00:00Z'));
+    const fechaFin = new Date('2024-06-20T00:00:00Z');
+    const resultado = determinarEstadoTrasAprobacion(fechaFin);
+    expect(resultado).toBe(EstadoAusencia.confirmada);
   });
 });
 
-describe('Ausencias - Saldos Multi-Año', () => {
-  it('debe calcular correctamente ausencias que cruzan años', async () => {
-    // Test para ausencias 31/12 - 05/01
-    // Verificar que se descuentan días de ambos años
-    expect(true).toBe(true);
+// ========================================
+// esFinDeSemana
+// ========================================
+
+describe('esFinDeSemana', () => {
+  it('should return true for Saturday', () => {
+    const sabado = new Date('2024-06-15T12:00:00Z');
+    expect(esFinDeSemana(sabado)).toBe(true);
   });
 
-  it('debe manejar correctamente año bisiesto', async () => {
-    expect(true).toBe(true);
+  it('should return true for Sunday', () => {
+    const domingo = new Date('2024-06-16T12:00:00Z');
+    expect(esFinDeSemana(domingo)).toBe(true);
+  });
+
+  it('should return false for Monday through Friday', () => {
+    const lunes = new Date('2024-06-17T12:00:00Z');
+    const martes = new Date('2024-06-18T12:00:00Z');
+    const miercoles = new Date('2024-06-19T12:00:00Z');
+    const jueves = new Date('2024-06-20T12:00:00Z');
+    const viernes = new Date('2024-06-21T12:00:00Z');
+
+    expect(esFinDeSemana(lunes)).toBe(false);
+    expect(esFinDeSemana(martes)).toBe(false);
+    expect(esFinDeSemana(miercoles)).toBe(false);
+    expect(esFinDeSemana(jueves)).toBe(false);
+    expect(esFinDeSemana(viernes)).toBe(false);
+  });
+
+  it('should identify all 7 days of the week correctly', () => {
+    const semana = [
+      { fecha: new Date('2024-06-16T12:00:00Z'), esFinDeSemana: true },  // domingo
+      { fecha: new Date('2024-06-17T12:00:00Z'), esFinDeSemana: false }, // lunes
+      { fecha: new Date('2024-06-18T12:00:00Z'), esFinDeSemana: false }, // martes
+      { fecha: new Date('2024-06-19T12:00:00Z'), esFinDeSemana: false }, // miércoles
+      { fecha: new Date('2024-06-20T12:00:00Z'), esFinDeSemana: false }, // jueves
+      { fecha: new Date('2024-06-21T12:00:00Z'), esFinDeSemana: false }, // viernes
+      { fecha: new Date('2024-06-22T12:00:00Z'), esFinDeSemana: true },  // sábado
+    ];
+
+    semana.forEach(({ fecha, esFinDeSemana: esperado }) => {
+      expect(esFinDeSemana(fecha)).toBe(esperado);
+    });
   });
 });
-
-describe('Ausencias - Medio Día', () => {
-  it('debe permitir medio día solo en ausencias de un día', async () => {
-    // Verificar que validación rechaza medioDia en rangos
-    expect(true).toBe(true);
-  });
-
-  it('debe requerir periodo cuando medioDia es true', async () => {
-    expect(true).toBe(true);
-  });
-});
-
-/**
- * PRÓXIMOS PASOS:
- * 
- * 1. Configurar Jest/Vitest en package.json
- * 2. Implementar mocks de Prisma con prisma-mock o similar
- * 3. Crear fixtures de datos de prueba
- * 4. Implementar tests de integración con base de datos de test
- * 5. Tests de race conditions con Promise.all()
- * 6. Tests de validaciones complejas (solapamiento, políticas)
- */
-

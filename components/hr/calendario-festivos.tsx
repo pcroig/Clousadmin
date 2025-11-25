@@ -4,46 +4,54 @@
 // Calendario Visual de Festivos
 // ========================================
 
-import { ChevronLeft, ChevronRight, Plus } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
-import { Button } from '@/components/ui/button';
-import { Calendar } from '@/components/ui/calendar';
+import { Calendar, CalendarDayButton } from '@/components/ui/calendar';
+import type { DiasLaborables } from '@/lib/calculos/dias-laborables';
+import { cn } from '@/lib/utils';
 import { parseJson } from '@/lib/utils/json';
+import type { Festivo } from '@/types/festivos';
 
-import { EditarFestivoModal } from './editar-festivo-modal';
 interface FestivosResponse {
   festivos?: Festivo[];
 }
 
-interface Festivo {
-  id: string;
-  fecha: string;
-  nombre: string;
-  tipo: string;
-  activo: boolean;
-}
-
 interface CalendarioFestivosProps {
+  diasLaborables: DiasLaborables;
   onUpdate?: () => void;
+  refreshToken?: number;
+  onRequestCreate: (fecha: string) => void;
+  onRequestEdit: (festivo: Festivo) => void;
 }
 
-export function CalendarioFestivos({ onUpdate }: CalendarioFestivosProps) {
+const DIA_SEMANA_KEYS: Array<keyof DiasLaborables> = [
+  'domingo',
+  'lunes',
+  'martes',
+  'miercoles',
+  'jueves',
+  'viernes',
+  'sabado',
+];
+
+export function CalendarioFestivos({
+  diasLaborables,
+  onUpdate,
+  refreshToken = 0,
+  onRequestCreate,
+  onRequestEdit,
+}: CalendarioFestivosProps) {
   const [mesActual, setMesActual] = useState(new Date());
   const [festivos, setFestivos] = useState<Festivo[]>([]);
-  const [festivosDates, setFestivosDates] = useState<Date[]>([]);
   const [cargando, setCargando] = useState(true);
-  const [modalCrear, setModalCrear] = useState(false);
-  const [fechaSeleccionada, setFechaSeleccionada] = useState<Date>();
-  const [modalEditar, setModalEditar] = useState<{
-    open: boolean;
-    festivo: Festivo | null;
-    modo: 'crear' | 'editar';
-  }>({
-    open: false,
-    festivo: null,
-    modo: 'crear',
-  });
+
+  const festivosDates = useMemo(
+    () =>
+      festivos
+        .filter((festivo) => festivo.activo)
+        .map((festivo) => new Date(`${festivo.fecha}T00:00:00`)),
+    [festivos]
+  );
 
   const cargarFestivos = useCallback(async () => {
     setCargando(true);
@@ -52,14 +60,7 @@ export function CalendarioFestivos({ onUpdate }: CalendarioFestivosProps) {
       const response = await fetch(`/api/festivos?año=${año}`);
       if (response.ok) {
         const data = await parseJson<FestivosResponse>(response);
-        const festivosList = data.festivos || [];
-        setFestivos(festivosList);
-        
-        // Convertir fechas a objetos Date para el calendario
-        const dates = festivosList
-          .filter((f: Festivo) => f.activo)
-          .map((f: Festivo) => new Date(f.fecha + 'T00:00:00'));
-        setFestivosDates(dates);
+        setFestivos(Array.isArray(data?.festivos) ? data.festivos : []);
       }
     } catch (error) {
       console.error('Error cargando festivos:', error);
@@ -70,80 +71,29 @@ export function CalendarioFestivos({ onUpdate }: CalendarioFestivosProps) {
 
   useEffect(() => {
     cargarFestivos();
-  }, [cargarFestivos]);
+  }, [cargarFestivos, refreshToken]);
 
   function handleDiaClick(date: Date | undefined) {
     if (!date) return;
 
-    // Formatear fecha como YYYY-MM-DD
     const fechaStr = date.toISOString().split('T')[0];
-    
-    // Buscar si existe un festivo en esa fecha
     const festivoExistente = festivos.find((f) => f.fecha === fechaStr);
 
     if (festivoExistente) {
-      // Abrir modal de edición
-      setModalEditar({
-        open: true,
-        festivo: festivoExistente,
-        modo: 'editar',
-      });
-    } else {
-      // Abrir modal de creación con fecha preseleccionada
-      setFechaSeleccionada(date);
-      setModalCrear(true);
+      onRequestEdit(festivoExistente);
     }
   }
 
-  function cambiarMes(direccion: 'anterior' | 'siguiente') {
-    setMesActual((prev) => {
-      const nueva = new Date(prev);
-      if (direccion === 'anterior') {
-        nueva.setMonth(nueva.getMonth() - 1);
-      } else {
-        nueva.setMonth(nueva.getMonth() + 1);
-      }
-      return nueva;
-    });
-  }
-
-  const nombreMes = mesActual.toLocaleDateString('es-ES', {
-    month: 'long',
-    year: 'numeric',
-  });
+  const esDiaLaborable = useCallback(
+    (date: Date) => {
+      const key = DIA_SEMANA_KEYS[date.getDay()];
+      return diasLaborables[key];
+    },
+    [diasLaborables]
+  );
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold capitalize">{nombreMes}</h3>
-        <div className="flex gap-2">
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => cambiarMes('anterior')}
-          >
-            <ChevronLeft className="w-4 h-4" />
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => cambiarMes('siguiente')}
-          >
-            <ChevronRight className="w-4 h-4" />
-          </Button>
-          <Button
-            size="sm"
-            onClick={() => {
-              setFechaSeleccionada(undefined);
-              setModalCrear(true);
-            }}
-          >
-            <Plus className="w-4 h-4 mr-1" />
-            Nuevo Festivo
-          </Button>
-        </div>
-      </div>
-
       <div className="rounded-md border p-4">
         {cargando ? (
           <div className="text-center py-8 text-gray-500">Cargando calendario...</div>
@@ -156,49 +106,31 @@ export function CalendarioFestivos({ onUpdate }: CalendarioFestivosProps) {
             onMonthChange={setMesActual}
             modifiers={{
               festivo: festivosDates,
+              noLaborable: (date: Date) => !esDiaLaborable(date),
             }}
-            modifiersClassNames={{
-              festivo: 'bg-red-100 text-red-900 font-semibold hover:bg-red-200',
+            components={{
+              DayButton: (props) => (
+                <CalendarDayButton
+                  {...props}
+                  className={cn(
+                    props.className,
+                    props.modifiers?.noLaborable && 'text-gray-400 bg-muted/40',
+                    props.modifiers?.festivo && 'bg-red-100 text-red-900 font-semibold'
+                  )}
+                />
+              ),
             }}
             className="mx-auto"
           />
         )}
       </div>
 
-      <EditarFestivoModal
-        open={modalCrear}
-        festivo={
-          fechaSeleccionada
-            ? {
-                id: '',
-                fecha: fechaSeleccionada.toISOString().split('T')[0],
-                nombre: '',
-                tipo: 'empresa',
-                activo: true,
-              }
-            : null
-        }
-        modo="crear"
-        onClose={() => {
-          setModalCrear(false);
-          setFechaSeleccionada(undefined);
-        }}
-        onSuccess={() => {
-          cargarFestivos();
-          if (onUpdate) onUpdate();
-        }}
-      />
-
-      <EditarFestivoModal
-        open={modalEditar.open}
-        festivo={modalEditar.festivo}
-        modo={modalEditar.modo}
-        onClose={() => setModalEditar({ open: false, festivo: null, modo: 'crear' })}
-        onSuccess={() => {
-          cargarFestivos();
-          if (onUpdate) onUpdate();
-        }}
-      />
+      {onUpdate && (
+        <div className="text-xs text-muted-foreground">
+          Las actualizaciones desde la lista de festivos se sincronizan automáticamente con este
+          calendario.
+        </div>
+      )}
     </div>
   );
 }

@@ -28,6 +28,7 @@ import {
   getEstadoBadgeConfig,
   type JornadaUI,
 } from '@/lib/utils/fichajesHistorial';
+import { cn } from '@/lib/utils';
 
 import type { MiEspacioEmpleado } from '@/types/empleado';
 
@@ -73,6 +74,7 @@ export function FichajesTab({ empleadoId, empleado, contexto = 'empleado' }: Fic
 
   const resumen = useMemo(() => calcularResumenJornadas(jornadas), [jornadas]);
   const puedeCrearManual = contexto === 'empleado' || contexto === 'manager';
+  const puedeEditar = contexto === 'hr_admin';
 
   return (
     <div className="space-y-6">
@@ -123,7 +125,7 @@ export function FichajesTab({ empleadoId, empleado, contexto = 'empleado' }: Fic
               variant="outline"
               onClick={() => setFichajeManualModalOpen(true)}
             >
-              Abrir fichaje
+              Solicitar fichaje manual
             </Button>
           )}
         </div>
@@ -159,8 +161,8 @@ export function FichajesTab({ empleadoId, empleado, contexto = 'empleado' }: Fic
                   return (
                     <TableRow
                       key={key}
-                      className="cursor-pointer hover:bg-gray-50"
-                      onClick={() => setFichajeEditando(jornada.fichaje)}
+                      className={cn(puedeEditar ? 'cursor-pointer hover:bg-gray-50' : 'cursor-default')}
+                      onClick={puedeEditar ? () => setFichajeEditando(jornada.fichaje) : undefined}
                     >
                       <TableCell>
                         <span className="text-sm font-medium">
@@ -200,7 +202,7 @@ export function FichajesTab({ empleadoId, empleado, contexto = 'empleado' }: Fic
       </div>
 
       {/* Modal Editar Fichaje */}
-      {fichajeEditando && (
+      {puedeEditar && fichajeEditando && (
         <EditarFichajeModal
           open
           fichaje={null}

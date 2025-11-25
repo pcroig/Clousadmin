@@ -332,14 +332,15 @@ export function SolicitarAusenciaModal({
 
           {/* Saldo disponible (solo vacaciones) */}
           {tipo === 'vacaciones' && (
-            <div className="flex items-center gap-2 text-sm text-gray-600">
-              <InfoTooltip
-                content="Incluye los días de vacaciones disponibles teniendo en cuenta solicitudes aprobadas y pendientes."
-                side="right"
-              />
-              <span>
-                <span className="font-medium text-gray-900">Días disponibles:</span> {saldoDisponible} días
+            <div className="flex flex-wrap items-center gap-2 text-sm text-gray-600">
+              <span className="flex items-center gap-1 font-medium text-gray-900">
+                Días disponibles
+                <InfoTooltip
+                  content="Incluye los días de vacaciones disponibles teniendo en cuenta solicitudes aprobadas y pendientes."
+                  side="right"
+                />
               </span>
+              <span className="text-gray-900">{saldoDisponible} días</span>
             </div>
           )}
 

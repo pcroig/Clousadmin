@@ -15,21 +15,75 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Label } from '@/components/ui/label';
 import { useMutation } from '@/lib/hooks';
-import { toDateOnlyString } from '@/lib/utils';
-import { parseJson } from '@/lib/utils/json';
+import { cn, toDateOnlyString } from '@/lib/utils';
+import { parseJson, parseJsonSafe } from '@/lib/utils/json';
 
 const MIN_ALTERNATIVOS_RATIO = 0.5;
 
-interface PreferenciaResponse {
-  success?: boolean;
-  data?: {
-    diasIdeales?: string[];
-    diasPrioritarios?: string[];
-    diasAlternativos?: string[];
-  };
+type ModoSeleccion = 'ideales' | 'prioritarios' | 'alternativos';
+
+interface PreferenciaPayload {
+  diasIdeales?: unknown;
+  diasPrioritarios?: unknown;
+  diasAlternativos?: unknown;
 }
+
+const parseFechaArray = (value: unknown): Date[] => {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map((entry) => {
+      const fecha = new Date(entry as string);
+      return Number.isNaN(fecha.getTime()) ? null : fecha;
+    })
+    .filter((fecha): fecha is Date => Boolean(fecha));
+};
+
+const modoConfig: Record<
+  ModoSeleccion,
+  {
+    label: string;
+    description: string;
+    accentClass: string;
+    previewBadgeClass: string;
+    summaryBadgeClass: string;
+    emptyText: string;
+    activeClasses: string;
+  }
+> = {
+  ideales: {
+    label: 'Fechas ideales',
+    description: 'Tus días perfectos de vacaciones',
+    accentClass: 'text-blue-700',
+    previewBadgeClass: 'bg-blue-600 text-white border-0',
+    summaryBadgeClass: 'bg-blue-100 text-blue-800 border-0',
+    emptyText: 'Añade tus fechas ideales en el calendario',
+    activeClasses: 'border-blue-400 bg-blue-50 shadow-sm',
+  },
+  prioritarios: {
+    label: 'Fechas prioritarias',
+    description: 'Días críticos que no puedes mover',
+    accentClass: 'text-orange-700',
+    previewBadgeClass: 'bg-orange-600 text-white border-0',
+    summaryBadgeClass: 'bg-orange-100 text-orange-800 border-0',
+    emptyText: 'Marca aquí los días inamovibles',
+    activeClasses: 'border-orange-400/70 bg-orange-50 shadow-sm',
+  },
+  alternativos: {
+    label: 'Fechas alternativas',
+    description: 'Opciones flexibles (mín. 50% de ideales)',
+    accentClass: 'text-gray-700',
+    previewBadgeClass: 'bg-gray-700 text-white border-0',
+    summaryBadgeClass: 'bg-gray-200 text-gray-800 border-0',
+    emptyText: 'Define tus opciones alternativas',
+    activeClasses: 'border-gray-400 bg-gray-50 shadow-sm',
+  },
+};
+
+const modosOrdenados: ModoSeleccion[] = ['ideales', 'prioritarios', 'alternativos'];
 
 interface PreferenciasVacacionesModalProps {
   open: boolean;
@@ -53,7 +107,7 @@ export function PreferenciasVacacionesModal({
   const [diasIdeales, setDiasIdeales] = useState<Date[]>([]);
   const [diasPrioritarios, setDiasPrioritarios] = useState<Date[]>([]);
   const [diasAlternativos, setDiasAlternativos] = useState<Date[]>([]);
-  const [modoSeleccion, setModoSeleccion] = useState<'ideales' | 'prioritarios' | 'alternativos'>('ideales');
+  const [modoSeleccion, setModoSeleccion] = useState<ModoSeleccion>('ideales');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   interface MutationVariables {
@@ -82,28 +136,18 @@ export function PreferenciasVacacionesModal({
       try {
         const res = await fetch(`/api/campanas-vacaciones/${campanaId}/preferencia`);
         if (!res.ok) {
-          throw new Error('Error al cargar preferencia');
+          const errorResponse = await parseJsonSafe<{ error?: string }>(res, {});
+          throw new Error(errorResponse.error ?? 'Error al cargar preferencia');
         }
-        const data = await parseJson<PreferenciaResponse>(res);
-        if (!isMounted || !data?.success || !data.data) {
+        const data = await parseJson<PreferenciaPayload>(res);
+        if (!isMounted) {
           return;
         }
 
-        const pref = data.data;
         setErrorMessage(null);
-        setDiasIdeales(
-          Array.isArray(pref.diasIdeales) ? pref.diasIdeales.map((d) => new Date(d)) : []
-        );
-        setDiasPrioritarios(
-          Array.isArray(pref.diasPrioritarios)
-            ? pref.diasPrioritarios.map((d) => new Date(d))
-            : []
-        );
-        setDiasAlternativos(
-          Array.isArray(pref.diasAlternativos)
-            ? pref.diasAlternativos.map((d) => new Date(d))
-            : []
-        );
+        setDiasIdeales(parseFechaArray(data.diasIdeales));
+        setDiasPrioritarios(parseFechaArray(data.diasPrioritarios));
+        setDiasAlternativos(parseFechaArray(data.diasAlternativos));
       } catch (err) {
         console.error('Error cargando preferencia:', err);
       }
@@ -119,7 +163,7 @@ export function PreferenciasVacacionesModal({
   const fechaInicio = new Date(fechaInicioObjetivo);
   const fechaFin = new Date(fechaFinObjetivo);
 
-  const toggleFecha = (fecha: Date, modo: 'ideales' | 'prioritarios' | 'alternativos') => {
+  const toggleFecha = (fecha: Date, modo: ModoSeleccion) => {
     const fechaStr = toDateOnlyString(fecha);
     
     const toggle = (lista: Date[], setLista: (value: Date[]) => void) => {
@@ -162,7 +206,7 @@ export function PreferenciasVacacionesModal({
     );
   };
 
-  const esFechaSeleccionada = (fecha: Date, modo: 'ideales' | 'prioritarios' | 'alternativos') => {
+  const esFechaSeleccionada = (fecha: Date, modo: ModoSeleccion) => {
     const fechaStr = toDateOnlyString(fecha);
     if (modo === 'ideales') {
       return diasIdeales.some(d => toDateOnlyString(d) === fechaStr);
@@ -188,9 +232,30 @@ export function PreferenciasVacacionesModal({
         <DialogHeader>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <DialogTitle className="text-xl font-semibold text-gray-900">
-                {campanaTitulo}
-              </DialogTitle>
+              <div className="flex items-center gap-2">
+                <DialogTitle className="text-xl font-semibold text-gray-900">
+                  {campanaTitulo}
+                </DialogTitle>
+                <InfoTooltip
+                  content={(
+                    <div className="space-y-2 text-sm">
+                      <p className="font-medium">¿Cómo funciona?</p>
+                      <ul className="space-y-1 text-xs">
+                        <li>
+                          <strong>Fechas ideales:</strong> Tus días preferidos de vacaciones
+                        </li>
+                        <li>
+                          <strong>Fechas prioritarias:</strong> Días críticos que no puedes mover
+                        </li>
+                        <li>
+                          <strong>Fechas alternativas:</strong> Opciones de respaldo (mínimo 50% de los días ideales)
+                        </li>
+                      </ul>
+                    </div>
+                  )}
+                  side="left"
+                />
+              </div>
               <div className="mt-2 flex items-center gap-2 text-sm text-gray-600">
                 <CalendarIcon className="w-4 h-4 text-gray-500" />
                 <span>
@@ -198,58 +263,73 @@ export function PreferenciasVacacionesModal({
                 </span>
               </div>
             </div>
-            <InfoTooltip
-              content={(
-                <div className="space-y-2 text-sm">
-                  <p className="font-medium">¿Cómo funciona?</p>
-                  <ul className="space-y-1 text-xs">
-                    <li>
-                      <strong>Fechas ideales:</strong> Tus días preferidos de vacaciones
-                    </li>
-                    <li>
-                      <strong>Fechas prioritarias:</strong> Días críticos que no puedes mover
-                    </li>
-                    <li>
-                      <strong>Fechas alternativas:</strong> Opciones de respaldo (mínimo 50% de los días ideales)
-                    </li>
-                  </ul>
-                </div>
-              )}
-              side="left"
-            />
           </div>
         </DialogHeader>
 
         <div className="space-y-6 py-4">
-          {/* Selector de modo */}
-          <div className="flex gap-2">
-            <Button
-              variant={modoSeleccion === 'ideales' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setModoSeleccion('ideales')}
-              className="flex-1"
-            >
-              Ideales ({diasIdeales.length})
-            </Button>
-            <Button
-              variant={modoSeleccion === 'prioritarios' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setModoSeleccion('prioritarios')}
-              className="flex-1"
-            >
-              Prioritarios ({diasPrioritarios.length})
-            </Button>
-            <Button
-              variant={modoSeleccion === 'alternativos' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setModoSeleccion('alternativos')}
-              className="flex-1"
-            >
-              Alternativos ({diasAlternativos.length})
-            </Button>
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+            {modosOrdenados.map((modo) => {
+              const config = modoConfig[modo];
+              const lista =
+                modo === 'ideales'
+                  ? diasIdeales
+                  : modo === 'prioritarios'
+                    ? diasPrioritarios
+                    : diasAlternativos;
+              const isActive = modoSeleccion === modo;
+
+              return (
+                <button
+                  key={modo}
+                  type="button"
+                  aria-pressed={isActive}
+                  onClick={() => setModoSeleccion(modo)}
+                  className={cn(
+                    'rounded-xl border p-3 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-200',
+                    isActive ? config.activeClasses : 'border-gray-200 hover:border-gray-300'
+                  )}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <p className={cn('text-sm font-semibold', config.accentClass)}>{config.label}</p>
+                      <p className="text-xs text-gray-500">{config.description}</p>
+                    </div>
+                    <Badge
+                      className={cn(
+                        'px-2 py-0.5 text-xs font-semibold rounded-full',
+                        config.summaryBadgeClass
+                      )}
+                    >
+                      {lista.length}
+                    </Badge>
+                  </div>
+
+                  <div className="mt-3 flex flex-wrap gap-1.5 min-h-[42px]">
+                    {lista.length === 0 ? (
+                      <span className="text-[11px] text-gray-500">{config.emptyText}</span>
+                    ) : (
+                      <>
+                        {lista.slice(0, 5).map((fecha) => (
+                          <Badge
+                            key={`${modo}-${toDateOnlyString(fecha)}`}
+                            className={cn('text-xs', config.previewBadgeClass)}
+                          >
+                            {format(fecha, 'dd MMM', { locale: es })}
+                          </Badge>
+                        ))}
+                        {lista.length > 5 && (
+                          <Badge className={cn('text-xs', config.summaryBadgeClass)}>
+                            +{lista.length - 5}
+                          </Badge>
+                        )}
+                      </>
+                    )}
+                  </div>
+                </button>
+              );
+            })}
           </div>
 
-          {/* Calendario */}
           <div className="border border-gray-200 rounded-lg p-4 bg-white">
             <Calendar
               mode="single"
@@ -282,79 +362,6 @@ export function PreferenciasVacacionesModal({
                 Necesitas al menos {alternativosRequeridos} días alternativos para continuar.
               </p>
             )}
-          </div>
-
-          {/* Resumen */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="border border-blue-200 rounded-lg p-3 bg-blue-50">
-              <Label className="text-xs text-blue-700 font-medium mb-2 block">
-                Fechas Ideales
-              </Label>
-              <div className="flex flex-wrap gap-1.5 min-h-[60px]">
-                {diasIdeales.length === 0 ? (
-                  <span className="text-xs text-blue-600">Ninguna seleccionada</span>
-                ) : (
-                  diasIdeales.slice(0, 5).map((fecha) => (
-                    <Badge key={fecha.toISOString()} className="bg-blue-600 text-white border-0 text-xs">
-                      {format(fecha, 'dd MMM', { locale: es })}
-                    </Badge>
-                  ))
-                )}
-                {diasIdeales.length > 5 && (
-                  <Badge className="bg-blue-200 text-blue-800 border-0 text-xs">
-                    +{diasIdeales.length - 5}
-                  </Badge>
-                )}
-              </div>
-            </div>
-
-            <div className="border border-orange-200 rounded-lg p-3 bg-orange-50">
-              <Label className="text-xs text-orange-700 font-medium mb-2 block">
-                Fechas Prioritarias
-              </Label>
-              <div className="flex flex-wrap gap-1.5 min-h-[60px]">
-                {diasPrioritarios.length === 0 ? (
-                  <span className="text-xs text-orange-600">Ninguna seleccionada</span>
-                ) : (
-                  diasPrioritarios.slice(0, 5).map((fecha) => (
-                    <Badge key={fecha.toISOString()} className="bg-orange-600 text-white border-0 text-xs">
-                      {format(fecha, 'dd MMM', { locale: es })}
-                    </Badge>
-                  ))
-                )}
-                {diasPrioritarios.length > 5 && (
-                  <Badge className="bg-orange-200 text-orange-800 border-0 text-xs">
-                    +{diasPrioritarios.length - 5}
-                  </Badge>
-                )}
-              </div>
-            </div>
-
-            <div className="border border-gray-200 rounded-lg p-3 bg-gray-50">
-              <Label className="text-xs text-gray-700 font-medium mb-2 block">
-                Fechas Alternativas
-              </Label>
-              <div className="flex flex-wrap gap-1.5 min-h-[60px]">
-                {diasAlternativos.length === 0 ? (
-                  <span className="text-xs text-gray-600">
-                    {diasIdeales.length > 0
-                      ? `Selecciona al menos ${alternativosRequeridos}`
-                      : 'Ninguna seleccionada'}
-                  </span>
-                ) : (
-                  diasAlternativos.slice(0, 5).map((fecha) => (
-                    <Badge key={fecha.toISOString()} className="bg-gray-700 text-white border-0 text-xs">
-                      {format(fecha, 'dd MMM', { locale: es })}
-                    </Badge>
-                  ))
-                )}
-                {diasAlternativos.length > 5 && (
-                  <Badge className="bg-gray-200 text-gray-800 border-0 text-xs">
-                    +{diasAlternativos.length - 5}
-                  </Badge>
-                )}
-              </div>
-            </div>
           </div>
         </div>
 

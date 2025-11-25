@@ -11,9 +11,7 @@ import { useRouter } from 'next/navigation';
 import { memo, useCallback, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
-import { getInitials } from '@/components/shared/utils';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { getAvatarStyle } from '@/lib/design-system';
+import { EmployeeAvatar } from '@/components/shared/employee-avatar';
 import {
   ejecutarAccionSolicitud,
   type SolicitudAccion,
@@ -142,10 +140,6 @@ export const SolicitudesWidget = memo(function SolicitudesWidget({
         ) : (
           solicitudesMostradas.map((solicitud) => {
             const estaProcesando = accionEnCurso?.id === solicitud.id;
-            const fullName = solicitud.empleado.nombre || 'Empleado';
-            const initials = getInitials(fullName);
-            const avatarStyle = getAvatarStyle(fullName);
-            const fotoUrl = solicitud.empleado.fotoUrl ?? solicitud.empleado.avatar ?? undefined;
 
             return (
               <div
@@ -154,15 +148,12 @@ export const SolicitudesWidget = memo(function SolicitudesWidget({
                 className="py-3 border-b border-gray-200 last:border-0 hover:bg-gray-50 transition-colors px-2 -mx-2 cursor-pointer"
               >
                 <div className="flex items-start gap-3">
-                  <Avatar className="h-10 w-10 flex-shrink-0">
-                    {fotoUrl && <AvatarImage src={fotoUrl} alt={fullName} />}
-                    <AvatarFallback
-                      className="text-xs font-semibold uppercase"
-                      style={avatarStyle}
-                    >
-                      {initials}
-                    </AvatarFallback>
-                  </Avatar>
+                  <EmployeeAvatar
+                    nombre={solicitud.empleado.nombre}
+                    apellidos={solicitud.empleado.apellidos}
+                    fotoUrl={solicitud.empleado.fotoUrl}
+                    size="sm"
+                  />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-2 mb-1">
                       <p className="text-[13px] text-gray-900 leading-tight">

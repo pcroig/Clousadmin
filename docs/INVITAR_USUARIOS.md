@@ -37,7 +37,7 @@ Parámetros soportados:
 
 - `--email` (obligatorio al crear) – también puedes usar la variable `PLATFORM_ADMIN_EMAIL`
 - `--password` (obligatorio al crear) – opcional si solo vas a promover un usuario existente
-- `--nombre` y `--apellidos` – opcional, por defecto “Platform Admin”
+- `--nombre` y `--apellidos` – opcional, por defecto "Platform Admin"
 - `--reset-password` – fuerza el cambio de contraseña aunque ya exista una
 
 El script marca al usuario como activo, con email verificado y rol `platform_admin`. Si la cuenta ya existe y no pasas `--password`, mantiene su contraseña actual.
@@ -207,53 +207,47 @@ npx prisma studio
 
 ---
 
-## 🖥️ Consola para Platform Admin
+## 🖥️ Panel de Gestión (Platform Admin)
 
-Además de la API, los super administradores pueden gestionar invitaciones desde la aplicación:
+Además de la API, los super administradores pueden gestionar invitaciones desde la interfaz web:
 
-- Ruta protegida: `/platform/invitaciones`
-- Requiere sesión con rol `platform_admin`
-- Incluye:
-  - Formulario para generar invitaciones directas (usa `crearInvitacionSignup`)
-  - Listado de las últimas 100 invitaciones con estado y enlace para copiar
-  - Panel de waitlist con acción “Invitar” que convierte la solicitud con `convertirWaitlistEnInvitacion`
-  - Botón para refrescar datos sin recargar toda la app
+### Acceso
 
-### Flujo sugerido
+- **Ruta**: `/platform/invitaciones`
+- **Requisito**: Sesión activa con rol `platform_admin`
+- **Redirección automática**: Al iniciar sesión como `platform_admin`, se redirige automáticamente a este panel
 
-1. Abre sesión con la cuenta `platform_admin`.
-2. Accede a `/platform/invitaciones`.
-3. Genera invitaciones manualmente o revisa la waitlist.
-4. Usa el botón “Invitar” para cada empresa aprobada; el sistema enviará automáticamente el email.
-5. Copia el enlace si necesitas reenviarlo por otro canal.
+### Funcionalidades
 
-> Nota: el panel reutiliza los mismos permisos y lógica de la API, por lo que respetará expiraciones, tokens únicos y registros de quién invitó.
+1. **Generar invitaciones directas**
+   - Formulario para crear invitaciones por email
+   - Genera token único y envía email automáticamente
+   - Muestra URL generada para copiar si es necesario
 
+2. **Historial de invitaciones**
+   - Listado de las últimas 100 invitaciones
+   - Estado visual (Activa, Usada, Expirada)
+   - Botón para copiar enlace de invitación
+   - Fecha de creación y expiración
 
+3. **Gestión de waitlist**
+   - Tabla con todas las solicitudes pendientes
+   - Información del contacto (nombre, email, empresa, mensaje)
+   - Botón "Invitar" que convierte automáticamente la solicitud en invitación
+   - Estado visual (Pendiente, Invitado)
 
+4. **Métricas**
+   - Contador de invitaciones activas
+   - Contador de invitaciones expiradas/usadas
+   - Contador de solicitudes pendientes en waitlist
 
+### Flujo de trabajo recomendado
 
+1. Inicia sesión con tu cuenta `platform_admin`
+2. Accede a `/platform/invitaciones` (redirección automática)
+3. Revisa la sección "Solicitudes de waitlist"
+4. Para cada empresa aprobada, haz clic en "Invitar"
+5. El sistema genera automáticamente la invitación y envía el email
+6. Opcionalmente, copia el enlace si necesitas compartirlo por otro canal
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+> **Nota**: El panel reutiliza la misma lógica y permisos que la API (`crearInvitacionSignup`, `convertirWaitlistEnInvitacion`), por lo que respeta expiraciones, tokens únicos y registros de auditoría.

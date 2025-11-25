@@ -1,12 +1,28 @@
 # 🏖️ DOCUMENTACIÓN: GESTIÓN DE AUSENCIAS - ESTADO ACTUAL
 
-**Versión**: 3.2.2  
-**Fecha**: 18 Noviembre 2025  
-**Estado**: Sistema refactorizado con validaciones robustas, transacciones atómicas y prevención REAL de race conditions (campo único de motivo/detalle)
+**Versión**: 3.3.0  
+**Fecha**: 27 Enero 2025  
+**Estado**: Sistema refactorizado con validaciones robustas, transacciones atómicas y prevención REAL de race conditions. Interfaz de campañas de vacaciones unificada con interacción directa.
 
 ---
 
 ## 🔄 CAMBIOS RECIENTES
+
+### v3.3.0 - Interfaz Unificada de Campañas de Vacaciones (27 Ene 2025)
+
+**Cambios**:
+- **Vista unificada**: Eliminación de tabs "Solicitado" vs "Propuesto". Ahora se visualiza todo en una única tabla con comparación directa
+- **Interacción directa**: Click en fechas para asignar/desasignar días sin necesidad de desplegables
+- **Botones contextuales**: "Cancelar propuesta" y "Reintentar IA" solo aparecen cuando hay propuesta generada
+- **Navegación mejorada**: Botón "Volver a ausencias" para acceso rápido al listado
+- **Validaciones mejoradas**: Validación de rangos de campaña en frontend antes de enviar a API
+- **Correcciones**: Fix de error `getAvatarStyle` usando componente `EmployeeAvatar` reutilizable
+
+**Archivos afectados**: 
+- `app/(dashboard)/hr/horario/ausencias/campana/campana-client.tsx`
+- `components/vacaciones/tabla-cuadraje-campana.tsx`
+
+---
 
 ### v3.2.2 - Campo Único de Motivo/Detalle (18 Nov 2025)
 
@@ -470,28 +486,92 @@ El sistema permite subir justificantes (documentos) para ausencias, especialment
 - **Vacaciones**: Justificante opcional
 - **Otro**: Justificante opcional
 
-## 🎯 CAMPAÑAS DE VACACIONES PARA EMPLEADOS
+## 🎯 CAMPAÑAS DE VACACIONES
 
-### Vista en Dashboard
+### Vista HR: Cuadraje de Campaña
 
+**Ruta**: `/hr/horario/ausencias/campana/[id]`
+
+**Características principales**:
+
+1. **Vista Unificada**:
+   - Tabla única que muestra simultáneamente días solicitados por empleados y días propuestos (IA o manual)
+   - Comparación visual directa sin necesidad de cambiar entre vistas
+   - Indicadores visuales:
+     - 🟢 Verde con check: Asignado y coincide con solicitud
+     - 🔵 Azul: Asignado (propuesta diferente a solicitud)
+     - ⚪ Gris: Día solicitado pero no asignado
+
+2. **Interacción Directa**:
+   - Click en cualquier celda de fecha para asignar/desasignar días
+   - Actualización optimista (cambios inmediatos en UI)
+   - Validación automática de rangos de campaña
+   - Solo permite reducir rangos desde los extremos (inicio/fin)
+
+3. **Botones de Acción**:
+   - **"Cuadrar con IA"**: Genera propuesta automática (solo visible si no hay propuesta)
+   - **"Cancelar propuesta"**: Elimina la propuesta actual (solo visible si hay propuesta)
+   - **"Reintentar IA"**: Regenera propuesta con IA (solo visible si hay propuesta)
+   - **"Enviar propuesta"**: Envía propuesta a empleados para revisión
+   - **"Finalizar campaña"**: Crea ausencias definitivas y cierra la campaña
+   - **"Volver a ausencias"**: Navegación rápida al listado de ausencias
+
+4. **Flujo de Trabajo**:
+   ```
+   1. HR crea campaña → Empleados envían preferencias
+   2. HR hace click en "Cuadrar con IA" → Sistema genera propuesta
+   3. HR revisa y ajusta manualmente (click en fechas)
+   4. HR envía propuesta → Empleados revisan y aceptan/cambian
+   5. HR finaliza campaña → Se crean ausencias automáticamente
+   ```
+
+**Componentes**:
+- `app/(dashboard)/hr/horario/ausencias/campana/campana-client.tsx`: Componente principal
+- `components/vacaciones/tabla-cuadraje-campana.tsx`: Tabla interactiva de calendario
+
+**APIs relacionadas**:
+- `POST /api/campanas-vacaciones/[id]/cuadrar`: Generar propuesta con IA
+- `PATCH /api/campanas-vacaciones/[id]/propuestas`: Actualizar asignaciones manuales
+- `POST /api/campanas-vacaciones/[id]/propuestas/cancelar`: Cancelar propuesta
+- `POST /api/campanas-vacaciones/[id]/enviar-propuesta`: Enviar a empleados
+- `POST /api/campanas-vacaciones/[id]/finalizar`: Finalizar y crear ausencias
+
+### Vista Empleado: Participación en Campañas
+
+**Modal de Preferencias**:
+- **Apertura automática**: Se muestra una vez al iniciar sesión si hay campaña pendiente (usando `sessionStorage`)
+- **Apertura desde notificaciones**: Al hacer clic en notificaciones de campaña, se abre el modal mediante eventos personalizados
+- **UI unificada**: Selector de tipo de días (ideales, prioritarios, alternativos) y visualización de días seleccionados en tarjetas interactivas en la parte superior
+- **Calendario interactivo**: Selección de fechas con indicadores visuales por tipo (azul=ideales, naranja=prioritarios, gris=alternativos)
+- **Validación**: Requiere mínimo 50% de días alternativos respecto a días ideales
+- **Endpoint**: `GET /api/campanas-vacaciones/[id]/preferencia` crea automáticamente la preferencia si no existe
+
+**Vista en Dashboard**:
 - **Widget pequeño**: `CampanasVacacionesWidget`
 - Muestra campaña activa si existe
 - Estado de participación del empleado
 - Botón para ver detalles
 
-### Vista en Pantalla de Ausencias
-
+**Vista en Pantalla de Ausencias**:
 - **Panel expandible**: Similar al de HR pero adaptado
 - Muestra todas las campañas activas
 - Información de fechas objetivo
 - Estado de participación (Participando/Pendiente/Sin participar)
 - Botón "Ver detalles" para cada campaña
 
-### Integración
-
+**Integración**:
 - Las campañas se obtienen automáticamente al cargar la página
 - Se filtran por empresa y estado 'activa'
 - Se incluye la preferencia del empleado si existe
+
+**Componentes**:
+- `components/vacaciones/preferencias-vacaciones-modal.tsx`: Modal de selección de preferencias
+- `components/vacaciones/campana-vacaciones-reminder.tsx`: Recordatorio automático con control de apertura única
+- `lib/events/vacaciones.ts`: Sistema de eventos para apertura del modal desde notificaciones
+
+**APIs relacionadas**:
+- `GET /api/campanas-vacaciones/[id]/preferencia`: Obtener o crear preferencia del empleado
+- `PATCH /api/campanas-vacaciones/[id]/preferencia`: Actualizar preferencias y marcar como completada
 
 ## 📝 PRÓXIMAS MEJORAS
 
@@ -734,6 +814,8 @@ Todas las funciones de cálculo de días usan la configuración:
 
 ### UI
 - UI HR: `app/(dashboard)/hr/horario/ausencias/ausencias-client.tsx`
+- UI HR Campaña: `app/(dashboard)/hr/horario/ausencias/campana/campana-client.tsx`
+- Tabla Cuadraje: `components/vacaciones/tabla-cuadraje-campana.tsx`
 - UI Empleado Mi Espacio: `app/(dashboard)/empleado/mi-espacio/tabs/ausencias-tab.tsx`
 - UI Empleado Ausencias: `app/(dashboard)/empleado/horario/ausencias/ausencias-empleado-client.tsx`
 - Modal Solicitar: `components/empleado/solicitar-ausencia-modal.tsx`
@@ -772,7 +854,7 @@ Todas las funciones de cálculo de días usan la configuración:
 
 ---
 
-**Última actualización**: 18 Noviembre 2025  
-**Versión**: 3.2.2  
-**Estado**: Sistema refactorizado con validaciones robustas, transacciones atómicas y campo único de motivo/detalles (bugs críticos corregidos)
+**Última actualización**: 27 Enero 2025  
+**Versión**: 3.4.0  
+**Estado**: Sistema refactorizado con validaciones robustas, transacciones atómicas y campo único de motivo/detalles. Interfaz de campañas de vacaciones mejorada con vista unificada e interacción directa. Modal de preferencias optimizado: apertura única automática al iniciar sesión, integración con notificaciones mediante eventos, y UI unificada con selector y visualización de días en la parte superior.
 

@@ -80,6 +80,41 @@ curl -X POST http://localhost:3000/api/admin/invitar-signup \
 
 **Server Action:** `signupEmpresaAction` en `app/(auth)/signup/actions.ts`
 
+#### Paso 4: Onboarding Inicial de la Empresa
+
+Después del signup, el usuario HR Admin es redirigido a `/onboarding/cargar-datos` para completar la configuración inicial de la empresa. Este proceso consta de **6 pasos**:
+
+**Paso 1 - Importar Empleados:**
+- Importación masiva desde Excel con procesamiento IA
+- Preview completo antes de confirmar
+- Auto-confirmación en onboarding (sin paso intermedio de guardado)
+- Los empleados se crean sin jornada asignada (se asignará en el paso 3)
+
+**Paso 2 - Sedes:**
+- Crear sedes (oficinas) de la empresa
+- Asignación automática a equipos o toda la empresa
+- Cambios se persisten automáticamente (sin botón de guardado intermedio)
+
+**Paso 3 - Calendario y Jornada:**
+- Configuración del calendario laboral por defecto (días laborables: L-V, festivos nacionales)
+- Creación de jornada predefinida (40h flexible por defecto, editable)
+- La jornada se asigna automáticamente a todos los empleados sin jornada
+- Valores pre-rellenados pero completamente editables
+- Botón para restaurar valores recomendados
+
+**Paso 4 - Integraciones:**
+- Configuración de integraciones opcionales (Google Calendar, etc.)
+
+**Paso 5 - Invitar Administradores HR:**
+- Invitar otros miembros del equipo como HR Admin
+- Puede seleccionar empleados ya importados en el paso 1
+- Enlaces de invitación generados con URL de producción (no localhost)
+
+**Paso 6 - Finalizar:**
+- Completa el onboarding y redirige al dashboard
+
+> **Nota importante:** La jornada por defecto **no se crea automáticamente** al crear la cuenta. Se configura en el paso 3 del onboarding, donde aparece pre-rellenada pero es completamente editable. Los empleados importados en el paso 1 quedan sin jornada hasta completar el paso 3.
+
 ---
 
 ### 2. Waitlist (Lista de Espera)
@@ -88,8 +123,8 @@ curl -X POST http://localhost:3000/api/admin/invitar-signup \
 
 #### Acceso a waitlist
 
-1. Desde `/login`: El banner “¿No tienes cuenta?” incluye un botón **Solicitar invitación** que abre un modal con el formulario de waitlist.
-2. Directamente: `/waitlist`
+1. Desde `/login`: El banner "¿No tienes cuenta?" incluye un botón **Solicitar invitación** que abre un modal inline con el formulario de waitlist (sin salir de la página de login).
+2. Directamente: `/waitlist` (página dedicada)
 3. Por mensajes de error: Si un email no existe, se mantiene el aviso y CTA hacia la espera.
 
 #### Formulario
@@ -101,13 +136,13 @@ curl -X POST http://localhost:3000/api/admin/invitar-signup \
 
 #### Proceso
 
-1. Usuario completa formulario (modal o página dedicada)
+1. Usuario completa formulario (modal desde `/login` o página `/waitlist`)
 2. Entrada guardada en tabla `waitlist`
-3. Se envían dos emails:
+3. Se envían dos emails automáticamente:
    - Confirmación al usuario (`sendWaitlistConfirmationEmail`)
-   - Notificación interna a `WAITLIST_NOTIFY_EMAIL`
-4. Administrador de plataforma revisa `/platform/invitaciones` y convierte en invitación
-5. Usuario recibe invitación por email
+   - Notificación interna a `WAITLIST_NOTIFY_EMAIL` (configurado en `.env.local`)
+4. Administrador de plataforma revisa `/platform/invitaciones` y convierte la solicitud en invitación
+5. Usuario recibe invitación por email automáticamente
 
 **Server Action:** `agregarAWaitlistAction` en `app/(auth)/waitlist/actions.ts`
 
@@ -133,6 +168,7 @@ curl -X POST http://localhost:3000/api/admin/invitar-signup \
 5. Si el email existe, valida contraseña
 6. Crea sesión JWT (cookie `clousadmin-session`, 7 días de duración)
 7. Redirige según rol:
+   - `platform_admin` → `/platform/invitaciones`
    - `hr_admin` → `/hr/dashboard`
    - `manager` → `/manager/dashboard`
    - `empleado` → `/empleado/dashboard`
@@ -195,12 +231,24 @@ Desde `Organización > Personas > + Crear persona`
 
 **Estado:** ✅ En producción
 
-- Flujo implementado con `app/api/auth/[...nextauth]/route.ts` usando NextAuth v5 + proveedor de Google.
-- Callback oficial: `/api/auth/callback/google` (NextAuth v5) — debe estar registrado en Google Cloud.
-- El endpoint legado `/api/auth/google/callback` redirige al callback oficial para mantener compatibilidad con redirect URIs existentes.
-- Al completar el callback se crea sesión JWT propia (`lib/auth.ts`) y se persisten los tokens OAuth en `Account`.
+**Flujo:**
+1. Usuario hace clic en "Continuar con Google" en `/login`
+2. NextAuth redirige a Google para autorización
+3. Google redirige a `/api/auth/callback/google` (callback oficial NextAuth v5)
+4. Se crea sesión JWT propia (`lib/auth.ts`) y se persisten tokens OAuth en `Account`
+5. Redirige al dashboard según rol del usuario
 
-**Configuración obligatoria (.env.local):**
+**Características:**
+- Implementado con NextAuth v5 (`app/api/auth/[...nextauth]/route.ts`)
+- Solo usuarios existentes pueden autenticarse (no se crean cuentas sin invitación)
+- Los roles se respetan igual que en login local
+- Si el email de Google no está verificado, se rechaza el login
+- Los tokens OAuth se almacenan en la tabla `Account` para uso en integraciones
+
+**Configuración:**
+📖 **Ver guía completa:** [`docs/SETUP_GOOGLE_OAUTH.md`](../../SETUP_GOOGLE_OAUTH.md)
+
+**Variables de entorno requeridas:**
 ```env
 GOOGLE_CLIENT_ID=tu-client-id.apps.googleusercontent.com
 GOOGLE_CLIENT_SECRET=tu-client-secret
@@ -208,10 +256,7 @@ NEXTAUTH_URL=https://tudominio.com
 NEXTAUTH_SECRET=clave-super-secreta
 ```
 
-**Notas:**
-- Solo usuarios existentes pueden autenticarse con Google (no se crean cuentas nuevas sin invitación).
-- Los roles se respetan igual que en login local (redirect automático según dashboard).
-- Si Google devuelve un email no verificado se rechaza el login (`/login?error=email_not_verified`).
+**Importante:** La URI de callback `/api/auth/callback/google` debe estar registrada en Google Cloud Console.
 
 ---
 
@@ -471,6 +516,15 @@ model Waitlist {
 
 **Nota:** Este endpoint actualiza solo `empleado.fotoUrl` como fuente única de verdad. El campo `usuario.avatar` está deprecado y no se actualiza. La sesión JWT copia el avatar desde `empleado.fotoUrl` al hacer login.
 
+**Almacenamiento:**
+- Las imágenes se suben a Hetzner Object Storage (o almacenamiento local en desarrollo)
+- Se configuran con ACL `public-read` para acceso público
+- Ruta: `avatars/{empresaId}/{empleadoId}/{timestamp}-{random}.{ext}`
+
+**Frontend:**
+- Usa el componente `EmployeeAvatar` de `@/components/shared/employee-avatar` para renderizar avatares de forma consistente
+- El componente maneja automáticamente fallbacks con iniciales y colores consistentes usando `getAvatarStyle` y `getInitials`
+
 ---
 
 ## Seguridad
@@ -616,11 +670,17 @@ console.log('[loginAction] Password válida:', isValid)
 
 ### Google OAuth - troubleshooting
 
-- Verifica que `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `NEXTAUTH_SECRET` y `NEXTAUTH_URL` estén definidos.
-- Asegúrate de que la URI de redirección incluya **ambas** rutas:
-  - `https://tu-dominio.com/api/auth/callback/google` (NextAuth)
-  - `https://tu-dominio.com/api/auth/google/callback` (legacy, redirige al callback anterior)
-- Si Google devuelve `access_denied`, revisa que el usuario pertenezca a la organización permitida en Google Cloud.
+**Error: "redirect_uri_mismatch"**
+- Verifica que `/api/auth/callback/google` esté registrado en Google Cloud Console
+- La URI debe coincidir exactamente (incluyendo protocolo `http://` o `https://`)
+- Asegúrate de que `NEXTAUTH_URL` coincida con tu dominio
+
+**Error: "Google OAuth not configured"**
+- Verifica que `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `NEXTAUTH_SECRET` y `NEXTAUTH_URL` estén definidos
+- Reinicia el servidor después de añadir las variables
+
+**Otros errores comunes:**
+📖 **Ver troubleshooting completo:** [`docs/SETUP_GOOGLE_OAUTH.md#troubleshooting`](../../SETUP_GOOGLE_OAUTH.md#troubleshooting)
 
 ---
 
@@ -652,7 +712,7 @@ console.log('[loginAction] Password válida:', isValid)
 
 ---
 
-**Última actualización:** 20 de noviembre 2025  
+**Última actualización:** 27 de enero 2025  
 **Autor:** Clousadmin Dev Team
 
 

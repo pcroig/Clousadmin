@@ -395,10 +395,14 @@ export async function configurarCalendarioYJornadaAction(input: z.infer<typeof c
         limiteSuperior: normalizedJornada.limiteSuperior,
       });
 
+      // Buscar la primera jornada activa de la empresa (ya no hay jornadas predefinidas)
       const jornadaExistente = await tx.jornada.findFirst({
         where: {
           empresaId: session.user.empresaId,
-          esPredefinida: true,
+          activa: true,
+        },
+        orderBy: {
+          createdAt: 'asc',
         },
       });
 
@@ -406,7 +410,7 @@ export async function configurarCalendarioYJornadaAction(input: z.infer<typeof c
         nombre: normalizedJornada.nombre,
         horasSemanales: normalizedJornada.horasSemanales,
         config: asJsonValue(configJornada),
-        esPredefinida: true,
+        esPredefinida: false, // ✅ Ahora es una jornada normal que se puede editar y eliminar
         activa: true,
       };
 

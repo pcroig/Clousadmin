@@ -418,6 +418,62 @@ curl -X PATCH 'https://api.clousadmin.com/api/empleados/550e8400-e29b-41d4-a716-
 
 ---
 
+### POST /api/empleados/{id}/avatar
+
+Sube o actualiza el avatar de un empleado.
+
+**Autenticación:** Requerida
+
+**Roles:**
+- `empleado`: Solo su propio avatar
+- `hr_admin` y `admin`: Cualquier empleado
+
+**Path Parameters:**
+
+| Parámetro | Tipo | Descripción |
+|-----------|------|-------------|
+| id | uuid | ID del empleado |
+
+**Body:** FormData con campo `file` (imagen)
+
+**Requisitos del archivo:**
+- Formatos: JPG, PNG, WEBP
+- Tamaño máximo: 2MB
+- Tipo MIME: `image/jpeg`, `image/png`, `image/webp`
+
+**Ejemplo de Request:**
+
+```bash
+curl -X POST 'https://api.clousadmin.com/api/empleados/550e8400-e29b-41d4-a716-446655440000/avatar' \
+  -H 'Authorization: Bearer YOUR_TOKEN' \
+  -F 'file=@/path/to/avatar.jpg'
+```
+
+**Ejemplo de Response (200 OK):**
+
+```json
+{
+  "success": true,
+  "url": "https://fsn1.your-objectstorage.com/clousadmin/avatars/empresa-id/empleado-id/timestamp-random.png",
+  "message": "Avatar actualizado correctamente"
+}
+```
+
+**Errores:**
+- `400 Bad Request`: Archivo inválido, formato no soportado, o tamaño excede 2MB
+- `401 Unauthorized`: Token inválido
+- `403 Forbidden`: Sin permisos para actualizar este avatar
+- `404 Not Found`: Empleado no existe
+- `500 Internal Server Error`: Error al subir archivo
+
+**Notas:**
+- El avatar se almacena en `empleado.fotoUrl` (fuente única de verdad)
+- El campo `usuario.avatar` está deprecado y no se actualiza
+- Las imágenes se suben con ACL `public-read` para acceso público
+- La sesión JWT incluye el avatar desde `empleado.fotoUrl` al hacer login
+
+---
+
 ### DELETE /api/empleados/{id}
 
 Da de baja a un empleado (soft delete).
@@ -501,7 +557,8 @@ interface Empleado {
   equipoId: string | null;  // UUID
   sedeId: string | null;    // UUID
   empresaId: string;        // UUID
-  avatar: string | null;    // URL
+  fotoUrl: string | null;   // URL del avatar (fuente única de verdad)
+  avatar: string | null;   // DEPRECADO: Usar fotoUrl. Mantenido para retrocompatibilidad
   createdAt: string;        // ISO 8601 datetime
   updatedAt: string;        // ISO 8601 datetime
 }

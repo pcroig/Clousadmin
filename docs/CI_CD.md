@@ -112,17 +112,23 @@ graph TD
 # Staging
 ssh clousadmin-staging
 cd /var/www/clousadmin
+git checkout -- public/sw.js  # Descartar cambios en archivo generado
 git pull origin main
-npm ci
-npm run build
+npm ci  # Instala todas las dependencias (incluidas devDependencies)
+npx prisma generate
+npx prisma migrate deploy
+NODE_OPTIONS="--max-old-space-size=8192" npm run build
 pm2 restart clousadmin
 
 # Producción (requiere aprobación)
 ssh clousadmin-production
 cd /var/www/clousadmin
+git checkout -- public/sw.js  # Descartar cambios en archivo generado
 git pull origin main
-npm ci
-npm run build
+npm ci  # Instala todas las dependencias (incluidas devDependencies)
+npx prisma generate
+npx prisma migrate deploy
+NODE_OPTIONS="--max-old-space-size=8192" npm run build
 pm2 restart clousadmin
 ```
 

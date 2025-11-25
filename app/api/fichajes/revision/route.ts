@@ -68,14 +68,20 @@ export async function GET(_request: NextRequest) {
 
     console.log('[API Revisión GET] EmpresaId:', session.user.empresaId);
 
-    // Obtener registros de auto_completados con estado "pendiente" (requieren revisión)
-    let autoCompletados;
+    // CAMBIO: Buscar directamente fichajes con estado 'pendiente' en tabla fichaje
+    // (en lugar de buscar en autoCompletado que el CRON no rellena)
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0);
+
+    let fichajesPendientes;
     try {
-      autoCompletados = await prisma.autoCompletado.findMany({
+      fichajesPendientes = await prisma.fichaje.findMany({
         where: {
           empresaId: session.user.empresaId,
           estado: 'pendiente',
-          tipo: 'fichaje_revision',
+          fecha: {
+            lt: hoy, // Solo fichajes de días anteriores
+          },
         },
         include: {
           empleado: {
@@ -83,11 +89,22 @@ export async function GET(_request: NextRequest) {
               id: true,
               nombre: true,
               apellidos: true,
+              jornada: {
+                select: jornadaSelectCompleta,
+              },
+            },
+          },
+          eventos: {
+            orderBy: { hora: 'asc' },
+            select: {
+              id: true,
+              tipo: true,
+              hora: true,
             },
           },
         },
         orderBy: {
-          createdAt: 'asc',
+          fecha: 'asc',
         },
       });
     } catch (prismaError) {
@@ -95,106 +112,79 @@ export async function GET(_request: NextRequest) {
       throw prismaError;
     }
 
-    console.log('[API Revisión] Encontrados:', autoCompletados.length, 'fichajes');
+    console.log('[API Revisión] Encontrados:', fichajesPendientes.length, 'fichajes pendientes');
 
-    const fichajeIds = Array.from(
-      new Set(
-        autoCompletados
-          .map((ac) => {
-            const datosOriginales = ac.datosOriginales as DatosOriginales | null;
-            return typeof datosOriginales?.fichajeId === 'string' ? datosOriginales.fichajeId : null;
-          })
-          .filter((id): id is string => Boolean(id))
-      )
-    );
-
-    const fichajesBatch = fichajeIds.length
-      ? await prisma.fichaje.findMany({
-          where: { id: { in: fichajeIds } },
-          select: {
-            id: true,
-            fecha: true,
-            empleado: {
-              select: {
-                id: true,
-                jornada: {
-                  select: jornadaSelectCompleta,
-                },
-              },
-            },
-            eventos: {
-              orderBy: { hora: 'asc' },
-              select: {
-                id: true,
-                tipo: true,
-                hora: true,
-              },
-            },
-          },
-        })
-      : [];
-
-    const fichajesMap = new Map(fichajesBatch.map((fichaje) => [fichaje.id, fichaje]));
-
-    // Formatear datos para el modal (síncronamente, ya no hay queries dentro)
-    const fichajes = autoCompletados.map((ac) => {
-      const datosOriginales = (ac.datosOriginales as unknown) as DatosOriginales | null;
-      const sugerencias = (ac.sugerencias as unknown) as Sugerencias | null;
-
-      const eventosExistentesRaw = Array.isArray(datosOriginales?.eventosExistentes)
-        ? datosOriginales.eventosExistentes
-        : Array.isArray(datosOriginales?.fichajesExistentes)
-          ? datosOriginales.fichajesExistentes
-          : [];
-
-      const eventosRegistrados = eventosExistentesRaw.map((evento: { tipo: string; hora: string | Date }) => ({
+    // Formatear datos para el modal
+    const fichajes = fichajesPendientes.map((fichaje) => {
+      const eventosRegistrados = fichaje.eventos.map((evento) => ({
         tipo: evento.tipo,
-        hora: evento.hora,
+        hora: evento.hora.toISOString(),
         origen: 'registrado' as const,
       }));
 
       // Calcular vista previa propuesta basándose en la jornada asignada del empleado
       const previewEventos: { tipo: string; hora: string; origen: 'propuesto' }[] = [];
       try {
-        const fichajeId = typeof datosOriginales?.fichajeId === 'string' ? datosOriginales.fichajeId : undefined;
-        if (fichajeId) {
-          const fichaje = fichajesMap.get(fichajeId);
-          const fechaBase = datosOriginales?.fecha ? new Date(datosOriginales.fecha) : new Date();
-          const jornada = fichaje?.empleado?.jornada;
-          if (jornada?.config) {
-            const dias = ['domingo','lunes','martes','miercoles','jueves','viernes','sabado'];
-            const nombreDia = dias[fechaBase.getDay()];
-            const configJornada = (jornada.config as unknown) as ConfigJornada;
-            const confDia = configJornada[nombreDia] as ConfigDiaJornada | undefined;
-            if (confDia?.activo && confDia.entrada && confDia.salida) {
-              const setHora = (base: Date, hhmm: string) => {
-                const [h, m] = hhmm.split(':').map(Number);
-                const d = new Date(base);
-                d.setHours(h || 0, m || 0, 0, 0);
-                return d.toISOString();
-              };
-              previewEventos.push({ tipo: 'entrada', hora: setHora(fechaBase, confDia.entrada), origen: 'propuesto' });
-              if (confDia.pausa_inicio && confDia.pausa_fin) {
-                previewEventos.push({ tipo: 'pausa_inicio', hora: setHora(fechaBase, confDia.pausa_inicio), origen: 'propuesto' });
-                previewEventos.push({ tipo: 'pausa_fin', hora: setHora(fechaBase, confDia.pausa_fin), origen: 'propuesto' });
-              }
-              previewEventos.push({ tipo: 'salida', hora: setHora(fechaBase, confDia.salida), origen: 'propuesto' });
+        const fechaBase = new Date(fichaje.fecha);
+        const jornada = fichaje.empleado?.jornada;
+        if (jornada?.config) {
+          const dias = ['domingo','lunes','martes','miercoles','jueves','viernes','sabado'];
+          const nombreDia = dias[fechaBase.getDay()];
+          const configJornada = (jornada.config as unknown) as ConfigJornada;
+          const confDia = configJornada[nombreDia] as ConfigDiaJornada | undefined;
+          if (confDia?.activo && confDia.entrada && confDia.salida) {
+            const setHora = (base: Date, hhmm: string) => {
+              const [h, m] = hhmm.split(':').map(Number);
+              const d = new Date(base);
+              d.setHours(h || 0, m || 0, 0, 0);
+              return d.toISOString();
+            };
+            previewEventos.push({ tipo: 'entrada', hora: setHora(fechaBase, confDia.entrada), origen: 'propuesto' });
+            if (confDia.pausa_inicio && confDia.pausa_fin) {
+              previewEventos.push({ tipo: 'pausa_inicio', hora: setHora(fechaBase, confDia.pausa_inicio), origen: 'propuesto' });
+              previewEventos.push({ tipo: 'pausa_fin', hora: setHora(fechaBase, confDia.pausa_fin), origen: 'propuesto' });
             }
+            previewEventos.push({ tipo: 'salida', hora: setHora(fechaBase, confDia.salida), origen: 'propuesto' });
           }
         }
       } catch (e) {
         console.warn('[API Revisión] No se pudo construir vista previa por jornada:', e);
       }
       
+      // Determinar razón por la que está pendiente
+      let razon = 'Requiere revisión manual';
+      if (fichaje.eventos.length === 0) {
+        razon = 'Sin fichajes registrados en el día';
+      } else {
+        const tiposEventos = fichaje.eventos.map(e => e.tipo);
+        const eventosFaltantes: string[] = [];
+        
+        if (!tiposEventos.includes('entrada')) eventosFaltantes.push('entrada');
+        if (!tiposEventos.includes('salida')) eventosFaltantes.push('salida');
+        
+        if (eventosFaltantes.length > 0) {
+          razon = `Faltan eventos: ${eventosFaltantes.join(', ')}`;
+        }
+      }
+
+      // Determinar eventos faltantes
+      const tiposEventos = fichaje.eventos.map(e => e.tipo);
+      const eventosFaltantes: string[] = [];
+      
+      if (!tiposEventos.includes('entrada')) eventosFaltantes.push('entrada');
+      if (!tiposEventos.includes('salida')) eventosFaltantes.push('salida');
+
       return {
-        id: ac.id,
-        fichajeId: datosOriginales?.fichajeId || null,
-        empleadoId: ac.empleadoId,
-        empleadoNombre: `${ac.empleado.nombre} ${ac.empleado.apellidos}`,
-        fecha: datosOriginales?.fecha || new Date().toISOString(),
-        eventos: previewEventos.length > 0 ? previewEventos : eventosRegistrados.map((e) => ({ ...e, origen: 'registrado' as const })),
-        razon: sugerencias?.razon || 'Requiere revisión manual',
-        confianza: sugerencias?.confianza || 0,
+        id: fichaje.id, // Usar el ID del fichaje directamente
+        fichajeId: fichaje.id,
+        empleadoId: fichaje.empleadoId,
+        empleadoNombre: `${fichaje.empleado.nombre} ${fichaje.empleado.apellidos}`,
+        fecha: fichaje.fecha.toISOString(),
+        eventos: previewEventos.length > 0 ? previewEventos : eventosRegistrados,
+        eventosRegistrados, // Campo esperado por el modal
+        razon,
+        eventosFaltantes, // Campo esperado por el modal
+        confianza: 0,
       };
     });
 
@@ -241,32 +231,10 @@ export async function POST(request: NextRequest) {
 
     for (const { id, accion } of revisiones) {
       try {
-        const autoCompletado = await prisma.autoCompletado.findUnique({
-          where: { id },
-          include: { empleado: true },
-        });
-
-        if (!autoCompletado) {
-          errores.push(`ID ${id}: No encontrado`);
-          continue;
-        }
-
-        const datos = (autoCompletado.datosOriginales as unknown) as DatosOriginales | null;
-        const sugerencias = (autoCompletado.sugerencias as unknown) as Sugerencias | null;
-
-        if (!datos) {
-          errores.push(`ID ${id}: No hay datos originales para reconstruir el fichaje`);
-          continue;
-        }
-
-        const fichajeId = datos.fichajeId;
+        // CAMBIO: Ahora el 'id' es directamente el fichajeId
+        const fichajeId = id;
 
         if (accion === 'actualizar') {
-          if (!fichajeId) {
-            errores.push(`ID ${id}: No se encontró fichajeId`);
-            continue;
-          }
-
           const fichaje = await prisma.fichaje.findUnique({
             where: { id: fichajeId },
             include: { 
@@ -277,6 +245,12 @@ export async function POST(request: NextRequest) {
 
           if (!fichaje) {
             errores.push(`ID ${id}: Fichaje no encontrado`);
+            continue;
+          }
+
+          // Verificar que el fichaje pertenece a la empresa del usuario
+          if (fichaje.empresaId !== session.user.empresaId) {
+            errores.push(`ID ${id}: No autorizado (diferente empresa)`);
             continue;
           }
 
@@ -311,22 +285,14 @@ export async function POST(request: NextRequest) {
             }
           }
 
-          // Fallback: si no hay jornada con horas, usar entrada existente y salida sugerida/8h después
+          // Fallback: si no hay jornada con horas, usar entrada existente y salida 8h después
           if (eventosAcrear.length === 0) {
             const entradaExistente = fichaje.eventos.find(e => e.tipo === 'entrada');
-            let salidaHora: Date | null = null;
-            if (sugerencias?.salidaSugerida) {
-              salidaHora = new Date(sugerencias.salidaSugerida);
-            } else if (entradaExistente) {
+            if (entradaExistente) {
               const s = new Date(entradaExistente.hora);
               s.setHours(s.getHours() + 8);
-              salidaHora = s;
-            }
-            if (entradaExistente) {
               eventosAcrear.push({ tipo: 'entrada', hora: new Date(entradaExistente.hora) });
-            }
-            if (salidaHora) {
-              eventosAcrear.push({ tipo: 'salida', hora: salidaHora });
+              eventosAcrear.push({ tipo: 'salida', hora: s });
             }
           }
 
@@ -358,7 +324,7 @@ export async function POST(request: NextRequest) {
             await prisma.fichaje.update({
               where: { id: fichajeId },
               data: {
-              estado: 'finalizado',
+                estado: 'finalizado',
                 horasTrabajadas,
                 horasEnPausa,
                 autoCompletado: true,
@@ -369,20 +335,11 @@ export async function POST(request: NextRequest) {
             await crearNotificacionFichajeResuelto(prisma, {
               fichajeId,
               empresaId: session.user.empresaId,
-              empleadoId: autoCompletado.empleadoId,
-              empleadoNombre: `${autoCompletado.empleado.nombre} ${autoCompletado.empleado.apellidos}`,
+              empleadoId: fichaje.empleadoId,
+              empleadoNombre: `${fichaje.empleado.nombre} ${fichaje.empleado.apellidos}`,
               fecha: fichaje.fecha,
             });
           }
-
-          await prisma.autoCompletado.update({
-            where: { id },
-            data: {
-              estado: 'aprobado',
-              aprobadoPor: session.user.id,
-              aprobadoEn: new Date(),
-            },
-          });
 
           actualizados++;
         }

@@ -87,16 +87,16 @@ export function ResultadoVacacionesModal({
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-            <div className="space-y-1">
+          <div className="space-y-2">
+            <div className="flex items-start gap-2">
               <DialogTitle>Resultado del cuadrado de vacaciones</DialogTitle>
-              <DialogDescription className="text-sm text-gray-600">
-                <span className="font-medium text-gray-700">Campaña:</span> {campanaTitulo}
-              </DialogDescription>
+              <InfoTooltip
+                content="El sistema ajusta automáticamente las vacaciones para evitar solapamientos y respetar las preferencias indicadas."
+              />
             </div>
-            <InfoTooltip
-              content="El sistema ajusta automáticamente las vacaciones para evitar solapamientos y respetar las preferencias indicadas."
-            />
+            <DialogDescription className="text-sm text-gray-600">
+              <span className="font-medium text-gray-700">Campaña:</span> {campanaTitulo}
+            </DialogDescription>
           </div>
         </DialogHeader>
 

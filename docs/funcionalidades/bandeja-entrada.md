@@ -1,7 +1,7 @@
 # Bandeja de Entrada
 
 **Fecha de creación:** 01/11/2025
-**Última actualización:** 02/11/2025
+**Última actualización:** 27/01/2025
 **Estado:** ✅ Completado y Reforzado
 
 > 🔐 **SEGURIDAD:** Se han resuelto 2 problemas críticos de seguridad y consistencia de datos. Ver sección "Correcciones Críticas" abajo.
@@ -183,8 +183,13 @@ interface BandejaEntradaSolvedProps {
 **Archivo:** `/components/hr/bandeja-entrada-notificaciones.tsx`
 
 **Features:**
-- Cards clickeables que marcan como leídas
-- Indicador visual de no leída (borde izquierdo azul + dot)
+- Notificaciones embebidas en el fondo con separadores (sin cards)
+- Iconos sin fondo, tamaño `h-4 w-4`, color gris
+- Fecha en formato corto relativo ("5min", "3h", "1d") alineada a la derecha
+- Punto azul de no leída alineado junto a la fecha
+- Click en la fila marca como leída y navega a `accionUrl` si existe
+- Botón CTA solo para notificaciones especiales (pequeño, variante `default`)
+- Integración con `openPreferenciasModalFromUrl` para campañas de vacaciones
 - Botón "Leer todas" en header
 - Integración con API endpoints
 
@@ -205,7 +210,9 @@ interface BandejaEntradaSolvedProps {
 ```
 Header: "Notificaciones"
 [Filtros] --------------------------------- [Leer todas (X)]
-[Lista de notificaciones con badge "new" si no leída]
+[Lista de notificaciones embebidas con separadores]
+  - Icono (sin fondo) | Título | Mensaje | [Fecha] [Punto no leída]
+  - Botón CTA (solo si es notificación especial)
 ```
 
 ---
@@ -260,15 +267,31 @@ Header: "Notificaciones"
 
 ### Principios de Diseño
 - **Paleta:** Principalmente gris/negro (excepción: botones Aprobar/Rechazar)
-- **Iconos:** Lucide icons para consistencia
+- **Iconos:** Lucide icons para consistencia, sin fondo, tamaño `h-4 w-4`
 - **Spacing:** Tailwind spacing scale
 - **Hover states:** Transiciones suaves (transition-colors, transition-shadow)
+- **Layout:** Notificaciones embebidas en el fondo con separadores, sin cards
 
 ### Estados Visuales
 
 #### Notificaciones No Leídas
-- Badge "new" (bg-blue-600, text-white)
-- Borde izquierdo azul (border-l-4 border-l-blue-500)
+- Punto azul (`bg-blue-500`) alineado a la derecha junto a la fecha
+- Click en la fila marca como leída automáticamente
+
+#### Notificaciones con Acción Especial
+- Botón CTA pequeño (`size="sm"`) con variante `default`
+- Solo visible si tiene `requiresModal`, `requiresSignature` o `requiresSelection`
+- Texto de acción personalizado (ej: "Ver campaña", "Firmar documento")
+
+#### Formato de Fecha
+- Formato corto relativo: "5min", "3h", "1d", "2sem", "4mes", "1a"
+- Alineado a la derecha, misma altura que el título
+- Utiliza `formatRelativeTimeShort` de `lib/utils/formatRelativeTime.ts`
+
+#### Campañas de Vacaciones
+- Integración con `openPreferenciasModalFromUrl` para abrir modal automáticamente
+- Detecta URLs de campañas y emite evento `vacaciones:preferencias:open`
+- No navega a la URL si el modal se abre correctamente
 
 #### Solicitudes Resueltas
 - Badge de estado (Aprobada: green, Rechazada: red)

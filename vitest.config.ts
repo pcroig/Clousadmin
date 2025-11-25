@@ -94,6 +94,7 @@ export default defineConfig({
       '.next/**',
       'dist/**',
       'build/**',
+      'tests/e2e/**',  // E2E tests are for Playwright
     ],
 
     // ========================================

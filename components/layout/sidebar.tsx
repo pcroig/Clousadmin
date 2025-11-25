@@ -31,7 +31,7 @@ import { useEffect, useState } from 'react';
 import type { ComponentType } from 'react';
 import { toast } from 'sonner';
 
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { EmployeeAvatar } from '@/components/shared/employee-avatar';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -40,7 +40,6 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { UsuarioRol } from '@/lib/constants/enums';
-import { getAvatarStyle } from '@/lib/design-system';
 
 
 interface SidebarProps {
@@ -89,12 +88,6 @@ export function Sidebar({ rol, usuario }: SidebarProps) {
   };
 
   const isActive = (path: string) => pathname?.startsWith(path);
-
-  const getInitials = () => {
-    return `${usuario.nombre.charAt(0)}${usuario.apellidos.charAt(0)}`.toUpperCase();
-  };
-
-  const avatarStyle = getAvatarStyle(`${usuario.nombre} ${usuario.apellidos}`);
 
   const containerPadding = isCollapsed ? 'px-2 py-6' : 'px-4 py-6';
   const itemHorizontalPadding = isCollapsed ? 'px-0' : 'px-3';
@@ -384,15 +377,14 @@ export function Sidebar({ rol, usuario }: SidebarProps) {
             <button className={`w-full ${footerPadding} hover:bg-gray-50 transition-colors focus:outline-none`}>
               {!isCollapsed ? (
                 <div className="flex items-center gap-3">
-                  <Avatar className="h-10 w-10">
-                    {usuario.avatar && <AvatarImage src={usuario.avatar} />}
-                    <AvatarFallback
-                      className="text-sm font-semibold uppercase"
-                      style={avatarStyle}
-                    >
-                      {getInitials()}
-                    </AvatarFallback>
-                  </Avatar>
+                  <EmployeeAvatar
+                    nombre={usuario.nombre}
+                    apellidos={usuario.apellidos}
+                    fotoUrl={usuario.avatar ?? null}
+                    size="md"
+                    className="h-10 w-10"
+                    fallbackClassName="text-sm"
+                  />
                   <div className="flex-1 overflow-hidden text-left">
                     <p className="text-sm font-medium text-gray-900 truncate">
                       {usuario.nombre} {usuario.apellidos}
@@ -411,15 +403,14 @@ export function Sidebar({ rol, usuario }: SidebarProps) {
                 </div>
               ) : (
                 <div className="flex w-full items-center justify-center">
-                  <Avatar className="h-9 w-9">
-                    {usuario.avatar && <AvatarImage src={usuario.avatar} />}
-                    <AvatarFallback
-                      className="text-xs font-semibold uppercase"
-                      style={avatarStyle}
-                    >
-                      {getInitials()}
-                    </AvatarFallback>
-                  </Avatar>
+                  <EmployeeAvatar
+                    nombre={usuario.nombre}
+                    apellidos={usuario.apellidos}
+                    fotoUrl={usuario.avatar ?? null}
+                    size="sm"
+                    className="h-9 w-9"
+                    fallbackClassName="text-xs"
+                  />
                 </div>
               )}
             </button>

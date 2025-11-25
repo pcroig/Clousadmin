@@ -283,11 +283,6 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado', onFieldUpdate,
             </Button>
           )}
         </div>
-        {!unlocked && (
-          <p className="mt-1 text-xs text-gray-500">
-            Protegido. Desbloquea una sola vez para ver o editar todos los campos sensibles.
-          </p>
-        )}
       </div>
     );
   };

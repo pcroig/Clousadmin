@@ -440,12 +440,10 @@ export function CarpetaDetailClient({ carpeta, empleados = [] }: CarpetaDetailCl
               )}
               {carpeta.esGlobal && (
                 <div className="mt-2 flex items-center gap-2 text-sm text-gray-600">
+                  <span>Carpeta global con documentos de todos los empleados.</span>
                   <InfoTooltip
                     content={`Carpeta global que reúne todos los documentos tipo "${carpeta.nombre}" de la empresa.`}
                   />
-                  <span>
-                    Carpeta global con documentos de todos los empleados.
-                  </span>
                 </div>
               )}
             </div>

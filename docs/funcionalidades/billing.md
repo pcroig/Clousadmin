@@ -115,11 +115,12 @@ Endpoint: `POST /api/webhooks/stripe`
 ## 🖥️ UI de Facturación
 
 - **Ruta**: `/hr/settings/facturacion`
+- **Acceso**: Visible en Settings → Facturación (solo HR Admin, requiere `BILLING_ENABLED=true`)
 - Componentes:
-  - `pricing-grid.tsx` + `pricing-card.tsx`: catálogos responsive con badges por plan.
-  - `plan-selection.tsx`: onboarding wizard reutilizable para HR Onboarding.
-  - Estado actual: muestra plan activo, límite de empleados, CTA “Gestionar suscripción” (Customer Portal).
-- Mobile-first mediante `ResponsiveContainer`.
+  - `billing-client.tsx`: UI principal con estado de suscripción, planes disponibles y portal de gestión
+  - Estado actual: muestra plan activo, límite de empleados, CTA "Gestionar suscripción" (Customer Portal)
+  - Catálogo de planes: grid responsive con badges, precios mensuales/anuales y features
+- Mobile-first mediante `ResponsiveContainer`
 
 ---
 

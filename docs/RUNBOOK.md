@@ -1,6 +1,6 @@
 # 🛠️ Runbook Operativo - Clousadmin
 
-Última actualización: 16/11/2025
+Última actualización: 22/11/2025
 
 ---
 
@@ -58,6 +58,16 @@ tail -f /var/log/clousadmin-cron.log
   npx tsx scripts/normalize-document-storage.ts
   ```
 - El script valida qué URL está usando y corta si no hay credenciales. Revisa la salida: deberá mostrar cuántas carpetas/documentos se ajustaron y terminar con `✅ Normalización completada`.
+
+### 2.6 Gestión de empresas (Platform Admin)
+- **Panel**: `/platform/invitaciones` (requiere rol `platform_admin`)
+- **Desactivar empresa**: desde el panel, botón "Suspender" en la tabla de empresas
+  - Realiza soft delete (`empresa.activo = false`)
+  - Desactiva usuarios y empleados asociados
+  - Cierra sesiones activas
+  - Cancela suscripción en Stripe al final del período
+- **Verificar estado**: consulta `empresas.activo` en la base de datos
+- **Reactivar**: actualizar manualmente `empresa.activo = true` y reactivar usuarios si es necesario
 
 ---
 

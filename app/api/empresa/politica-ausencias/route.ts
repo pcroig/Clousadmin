@@ -39,12 +39,19 @@ export async function GET(_req: NextRequest) {
       );
     }
 
-    const config = empresa.config as Record<string, unknown> | null;
-    
+    const config = (empresa.config as Record<string, unknown> | null) ?? null;
+    const maxSolapamientoPct =
+      typeof config?.maxSolapamientoPct === 'number' ? (config.maxSolapamientoPct as number) : 50;
+    const requiereAntelacionDias =
+      typeof config?.requiereAntelacionDias === 'number' ? (config.requiereAntelacionDias as number) : 5;
+    const diasVacacionesDefault =
+      typeof config?.diasVacacionesDefault === 'number' ? (config.diasVacacionesDefault as number) : 22;
+
     // Retornar política de ausencias (valores por defecto si no existen)
     return NextResponse.json({
-      maxSolapamientoPct: config?.maxSolapamientoPct || 50,
-      requiereAntelacionDias: config?.requiereAntelacionDias || 5,
+      maxSolapamientoPct,
+      requiereAntelacionDias,
+      diasVacacionesDefault,
     });
   } catch (error) {
     console.error('[GET /api/empresa/politica-ausencias] Error:', error);

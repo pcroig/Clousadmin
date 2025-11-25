@@ -63,7 +63,7 @@ Las notificaciones se organizan en **5 categorías principales**, cada una con s
   - Denuncias
   - Onboarding completado
 
-> **Nota**: Todos los iconos usan el color terciario definido en el sistema de diseño (`text-tertiary`)
+> **Nota**: Todos los iconos usan color gris (`text-gray-600`) sin fondo, tamaño `h-4 w-4` para consistencia visual.
 
 ---
 
@@ -71,14 +71,16 @@ Las notificaciones se organizan en **5 categorías principales**, cada una con s
 
 Algunos tipos requieren **acciones específicas** del usuario:
 
-| Tipo | Acción | Flag | CTA |
-|------|--------|------|-----|
-| `firma_pendiente` | Firma digital | `requiresSignature: true` | "Firmar documento" |
-| `campana_vacaciones_creada` | Selección de días | `requiresSelection: true` | "Seleccionar días preferidos" |
-| `campana_vacaciones_cuadrada` | Revisar propuesta | `requiresModal: true` | "Revisar propuesta" |
-| `complementos_pendientes` | Completar complementos | `requiresModal: true` | "Completar complementos" |
-| `documento_pendiente_rellenar` | Completar formulario | `requiresModal: true` | "Completar ahora" |
-| `documento_solicitado` | Subir documento | - | "Subir documento" |
+| Tipo | Acción | Flag | CTA | Nota |
+|------|--------|------|-----|------|
+| `firma_pendiente` | Firma digital | `requiresSignature: true` | "Firmar documento" | - |
+| `campana_vacaciones_creada` | Abrir modal preferencias | - | "Ver campaña" | Usa `openPreferenciasModalFromUrl` |
+| `campana_vacaciones_cuadrada` | Revisar propuesta | `requiresModal: true` | "Revisar propuesta" | Usa `openPreferenciasModalFromUrl` |
+| `complementos_pendientes` | Completar complementos | `requiresModal: true` | "Completar complementos" | - |
+| `documento_pendiente_rellenar` | Completar formulario | `requiresModal: true` | "Completar ahora" | - |
+| `documento_solicitado` | Subir documento | - | "Subir documento" | - |
+
+> **Nota**: Las campañas de vacaciones (`campana_vacaciones_creada`, `campana_vacaciones_cuadrada`) utilizan `openPreferenciasModalFromUrl` para detectar URLs de campañas y abrir automáticamente el modal de preferencias en lugar de navegar.
 
 ---
 
@@ -93,7 +95,7 @@ Algunos tipos requieren **acciones específicas** del usuario:
 | `ausencia_rechazada` | Ausencias | Empleado | Normal | `/app/api/ausencias/[id]/route.ts` |
 | `ausencia_cancelada` | Ausencias | HR Admin + Manager | Normal | `/app/api/ausencias/[id]/route.ts` |
 | `fichaje_autocompletado` | Fichajes | Empleado | Normal | `/lib/ia/clasificador-fichajes.ts` |
-| `fichaje_requiere_revision` | Fichajes | HR Admin | Alta | `/lib/ia/clasificador-fichajes.ts` |
+| `fichaje_requiere_revision` | Fichajes | HR Admin | Alta | `/lib/ia/clasificador-fichajes.ts`, `/app/api/cron/clasificar-fichajes/route.ts` |
 | `fichaje_resuelto` | Fichajes | Empleado | Normal | `/app/api/fichajes/revision/route.ts` |
 
 ### Fase 2 - Alta Prioridad (✅ COMPLETADO)
@@ -109,7 +111,7 @@ Algunos tipos requieren **acciones específicas** del usuario:
 
 | Tipo | Categoría | Acción Especial | Flag |
 |------|-----------|-----------------|------|
-| `campana_vacaciones_creada` | Ausencias | Selección de días | `requiresSelection: true` |
+| `campana_vacaciones_creada` | Ausencias | Abrir modal preferencias | - |
 | `campana_vacaciones_cuadrada` | Ausencias | Revisar propuesta | `requiresModal: true` |
 | `complementos_pendientes` | Nóminas | Completar complementos | `requiresModal: true` |
 | `firma_pendiente` | Fichas | Firma digital | `requiresSignature: true` |
@@ -135,7 +137,7 @@ Algunos tipos requieren **acciones específicas** del usuario:
 | `ausencia_aprobada` | Ausencias | ❌ | `CheckCircle` |
 | `ausencia_rechazada` | Ausencias | ❌ | `XCircle` |
 | `ausencia_cancelada` | Ausencias | ❌ | `Calendar` |
-| `campana_vacaciones_creada` | Ausencias | ✅ Selección | `Calendar` |
+| `campana_vacaciones_creada` | Ausencias | ✅ Modal | `Calendar` |
 | `campana_vacaciones_cuadrada` | Ausencias | ✅ Modal | `Calendar` |
 | `campana_vacaciones_completada` | Ausencias | ❌ | `Calendar` |
 | `fichaje_autocompletado` | Fichajes | ❌ | `Clock` |
@@ -213,9 +215,8 @@ interface NotificacionMetadata {
   fechaInicio: '2025-07-01',
   fechaFin: '2025-08-31',
   prioridad: 'alta',
-  accionUrl: '/empleado/dashboard?campana=uuid',
-  accionTexto: 'Seleccionar días preferidos',
-  requiresSelection: true
+  accionUrl: '/empleado/vacaciones/campanas/uuid',
+  accionTexto: 'Ver campaña'
 }
 
 // Firma pendiente (acción especial)
@@ -354,21 +355,41 @@ Este helper envía la notificación al empleado para que descargue el documento 
 
 ## 🎨 UI - Características Visuales
 
+### Diseño Unificado
+
+El sistema de notificaciones utiliza un diseño consistente entre el widget (`NotificacionesWidget`) y la bandeja de entrada (`BandejaEntradaNotificaciones`):
+
+- **Layout**: Notificaciones embebidas en el fondo con separadores, sin cards
+- **Iconos**: Sin fondo, tamaño `h-4 w-4`, color gris (`text-gray-600`)
+- **Fecha**: Formato corto relativo (`formatRelativeTimeShort`): "5min", "3h", "1d", "2sem", "4mes", "1a"
+- **Alineación**: Fecha y punto de no leída alineados a la derecha, a la misma altura que el título
+- **Botones CTA**: Solo para notificaciones especiales (con `requiresModal`, `requiresSignature` o `requiresSelection`), tamaño pequeño (`size="sm"`), variante `default`
+- **Navegación**: Click en la fila completa navega a `accionUrl` si existe
+
 ### Indicadores Visuales
 
-- **No leídas**: Fondo azul claro + punto azul en la esquina
-- **Acciones especiales**: CTA destacado con fondo azul y flecha (→)
-- **Todos los iconos**: Color terciario del sistema (`text-tertiary`)
+- **No leídas**: Punto azul (`bg-blue-500`) alineado a la derecha junto a la fecha
+- **Acciones especiales**: Botón CTA pequeño con texto de acción (ej: "Ver campaña", "Firmar documento")
+- **Campañas de vacaciones**: Integración con `openPreferenciasModalFromUrl` para abrir modal de preferencias automáticamente
 
-### Widget de Notificaciones
+### Componentes
 
-El componente `NotificacionesWidget` incluye:
-- ✅ Iconos dinámicos según tipo/categoría
+#### Widget de Notificaciones (`NotificacionesWidget`)
+
+- ✅ Iconos dinámicos según tipo/categoría (sin fondo)
 - ✅ Título y mensaje formateados
-- ✅ Fecha en formato español
-- ✅ CTA (Call-to-Action) si hay acción disponible
-- ✅ Indicador visual de no leídas
+- ✅ Fecha en formato corto relativo
+- ✅ CTA solo para notificaciones especiales
+- ✅ Indicador visual de no leídas (punto azul)
 - ✅ Estado vacío con mensaje amigable
+- ✅ Click en fila navega a acción o bandeja de entrada
+
+#### Bandeja de Entrada (`BandejaEntradaNotificaciones`)
+
+- ✅ Mismo diseño visual que el widget
+- ✅ Marca notificaciones como leídas al hacer click
+- ✅ Botón "Leer todas" en el header
+- ✅ Separadores entre notificaciones
 
 ---
 
@@ -495,5 +516,5 @@ Ver `/docs/notificaciones/sugerencias-futuras.md` para:
 
 ---
 
-**Versión**: 2.0.0  
+**Versión**: 2.2.0  
 **Última actualización**: 2025-01-27

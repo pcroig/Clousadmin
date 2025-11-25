@@ -1,62 +1,53 @@
-# 🕒 Inventario de Cron Jobs (nov 2025)
+# 🕒 Inventario de Cron Jobs
 
-| Cron | Endpoint | Trigger | Programación recomendada | Logs / Alertas |
-|------|----------|---------|--------------------------|----------------|
-| Revisar solicitudes con IA | `POST /api/cron/revisar-solicitudes` | GitHub Action (`cron-revisar-solicitudes.yml`) o `crontab` en Hetzner | Diario 02:00 UTC (variable `SOLICITUDES_PERIODO_REVISION_HORAS`) | Consola + `CRON_ALERT_WEBHOOK` cuando falla |
-| Cerrar jornadas anteriores | `POST /api/cron/clasificar-fichajes` | `crontab` servidor Hetzner (`scripts/hetzner/setup-cron.sh`) o GitHub Action auxiliar | Diario 23:30 hora servidor | Consola + `CRON_ALERT_WEBHOOK` cuando falla |
+| Cron | Endpoint | Configuración | Programación | Logs |
+|------|----------|---------------|--------------|------|
+| Revisar solicitudes con IA | `POST /api/cron/revisar-solicitudes` | `crontab` en Hetzner | Diario 02:00 UTC | `/var/log/clousadmin-cron.log` |
+| Cerrar jornadas anteriores | `POST /api/cron/clasificar-fichajes` | `crontab` en Hetzner | Diario 23:30 UTC | `/var/log/clousadmin-cron.log` |
+| Backup base de datos | `scripts/backup-db.sh` | `crontab` en Hetzner | Diario 02:00 UTC | `/var/log/clousadmin-cron.log` |
 
-## Variables implicadas
+## Configuración Actual
 
-```
-CRON_SECRET=  # Obligatoria. Se valida en todos los endpoints /api/cron/*
-SOLICITUDES_PERIODO_REVISION_HORAS=48  # Umbral horas para auto-revisar solicitudes
-CRON_ALERT_WEBHOOK=  # Opcional. Webhook HTTPS (Slack/Teams) para alertas de fallo
-```
+Los cron jobs están configurados en el servidor Hetzner usando `crontab`. Para instalarlos:
 
-> ⚠️ `.env.example` no puede modificarse desde este entorno (archivo bloqueado). Añade manualmente `CRON_ALERT_WEBHOOK` en tu `.env` cuando quieras activar alertas.
-
-### Repository variables (GitHub)
-
-- `ENABLE_GITHUB_CRONS` → si vale `false`, los workflows `cron-*` quedan desactivados y se delega la ejecución al crontab de Hetzner. Manténla vacía o en `true` para que GitHub programe las tareas.
-
-## Ejecución en Hetzner (crontab)
-
-```
-# Revisar solicitudes (02:00 UTC)
-0 2 * * * curl -X POST https://app.tu-dominio.com/api/cron/revisar-solicitudes \
-  -H "Authorization: Bearer $CRON_SECRET"
-
-# Cerrar jornadas (23:30 hora servidor)
-30 23 * * * curl -X POST https://app.tu-dominio.com/api/cron/clasificar-fichajes \
-  -H "Authorization: Bearer $CRON_SECRET"
+```bash
+cd /opt/clousadmin
+CRON_SECRET="tu-secret" APP_URL="https://app.tu-dominio.com" \
+  ./scripts/hetzner/setup-cron.sh
 ```
 
-## Monitorización básica
+## Variables Requeridas
 
-- Ambos cron jobs usan `lib/cron/logger.ts`:
-  - Registra inicio/fin + métricas (duración, registros procesados).
-  - Si `CRON_ALERT_WEBHOOK` está definido y el cron falla, envía `POST` con `{ cron, durationMs, errors }`.
-- Para GitHub Actions, habilita notificaciones de workflow fallidos.
-- En Hetzner, redirige la salida de `curl` a `/var/log/clousadmin-cron.log` para revisión rápida.
-- Ejecuta `npx tsx scripts/verificar-crons.ts` para obtener un estado consolidado (fichajes procesados, solicitudes revisadas y variables configuradas).
+```bash
+CRON_SECRET=              # Obligatoria. Se valida en todos los endpoints /api/cron/*
+APP_URL=                  # URL de la aplicación (ej: https://app.hrcron.com)
+SOLICITUDES_PERIODO_REVISION_HORAS=48  # Umbral horas para auto-revisar solicitudes (opcional)
+CRON_ALERT_WEBHOOK=       # Opcional. Webhook HTTPS (Slack/Teams) para alertas de fallo
+```
 
-## Checklist después de deploy
+## Verificación
 
-1. Secretos sincronizados (`CRON_SECRET`, `CRON_ALERT_WEBHOOK`) en hosting y GitHub.
-2. Prueba manual de cada endpoint:
-   ```
-   curl -X POST https://app.../api/cron/revisar-solicitudes \
-     -H "Authorization: Bearer <CRON_SECRET>"
-   ```
-3. Confirmar logs en servidor o GitHub.
-4. Verificar que el webhook recibe alertas simulando un fallo (opcional: forzar `throw` temporalmente).
+```bash
+# Probar manualmente
+./scripts/hetzner/test-crons.sh
 
-## Próximos cron jobs sugeridos
+# Ver logs
+tail -f /var/log/clousadmin-cron.log
 
-- Recordatorios diarios/semanales (`/api/cron/daily-notifications`).
-- Limpieza de sesiones expiradas (`lib/auth.ts` ya expone helper).
-- Backups (`scripts/backup-db.sh` + `docs/DISASTER_RECOVERY.md`).
+# Verificar crontab
+crontab -l
+```
 
-Mantén este inventario actualizado cada vez que se añada un nuevo cron job.
+## GitHub Actions (Respaldo Manual)
 
+Los workflows de GitHub Actions están disponibles como respaldo manual:
+- Configura `ENABLE_GITHUB_CRONS=false` en GitHub Variables para desactivarlos
+- Útiles para ejecución manual desde la UI de GitHub
 
+## Monitorización
+
+- Logs consolidados en `/var/log/clousadmin-cron.log`
+- Script de verificación: `npx tsx scripts/verificar-crons.ts`
+- Alertas opcionales vía `CRON_ALERT_WEBHOOK` cuando un cron falla
+
+**Última actualización**: 21 de noviembre 2025

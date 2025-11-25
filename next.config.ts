@@ -1,6 +1,6 @@
 import { withSentryConfig } from "@sentry/nextjs";
 import withPWAInit from "next-pwa";
-import runtimeCaching from "next-pwa/cache";
+import runtimeCaching from "./config/pwa-runtime-caching";
 
 import type { NextConfig } from "next";
 

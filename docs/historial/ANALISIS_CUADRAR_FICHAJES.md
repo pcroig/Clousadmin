@@ -1,7 +1,9 @@
 # Análisis Completo: Funcionalidad de Cuadrar Fichajes
 
 **Fecha**: 18 de noviembre de 2025  
-**Estado**: ✅ Diagnóstico Completo - En corrección
+**Estado**: ✅ **RESUELTO** - Ver fix en `2025-01-27-FIX-CUADRAR-FICHAJES.md`
+
+**Nota**: Este documento describe el análisis inicial del problema. El problema fue resuelto el 27 de enero de 2025. La causa raíz era una desconexión entre el CRON (que escribía en tabla `fichaje`) y la API de revisión (que buscaba en tabla `autoCompletado`). La solución fue modificar la API para buscar directamente en `fichaje` con estado `pendiente`.
 
 ---
 

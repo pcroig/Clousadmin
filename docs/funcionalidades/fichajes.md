@@ -10,7 +10,7 @@ El sistema de fichajes permite a los empleados registrar su jornada laboral comp
 - **Array duplicado de días**: el literal incorrecto en `app/api/fichajes/revision/route.ts` no se usa; el sistema emplea constantemente la constante correcta `dias`, por lo que no impacta cálculos.
 - **Finalizar desde pausa**: la validación (`lib/calculos/fichajes.ts`) permite cerrar jornada estando en pausa para garantizar que el tiempo en descanso no compute como trabajado. Cualquier cambio exigiría decisión de negocio.
 - **Correcciones de fichaje**: ✅ Implementado workflow formal con solicitud/aprobación. Empleados solicitan desde `/empleado/horario/fichajes`, HR/Manager aprueban desde la bandeja de entrada. Incluye notificaciones automáticas y auditoría completa.
-- **`autoCompletado`**: sigue alimentando dashboards, auditoría y la pantalla de revisión; no se debe eliminar hasta migrar todos los consumidores a los campos de cuadre masivo.
+- **`autoCompletado`**: sigue alimentando dashboards y auditoría de otras funcionalidades (ausencias, solicitudes). Para fichajes, la revisión ahora busca directamente en tabla `fichaje` con estado `pendiente`.
 - **Slack y geolocalización**: mantienen estado “roadmap” (documentadas en esta guía), no hay código en producción que debamos retirar o activar.
 - **Entrada/salida múltiples**: `validarEvento` impide reabrir entradas mientras el estado no vuelva a `sin_fichar`, por lo que no se generan múltiples ciclos el mismo día.
 
@@ -248,11 +248,13 @@ enum PeriodoMedioDia {
 **Proceso:**
 1. Para cada empresa activa, procesa el día anterior
 2. Para cada empleado con día laboral:
-   - Si **NO tiene fichaje**: Crea fichaje con estado `pendiente`
+   - Si **NO tiene fichaje**: Crea fichaje con estado `pendiente` y notifica a HR
    - Si **tiene fichaje `en_curso`**:
      - Valida si está completo según su jornada
      - Si completo → estado `finalizado`
-     - Si incompleto → estado `pendiente`
+     - Si incompleto → estado `pendiente` y notifica a HR
+
+**Notificaciones**: El CRON crea notificaciones automáticas para HR Admin cuando marca fichajes como `pendiente`, alertando de la necesidad de revisión.
 
 **Archivos**:
 - Endpoint: `app/api/cron/clasificar-fichajes/route.ts`
@@ -264,17 +266,18 @@ enum PeriodoMedioDia {
 **Acceso**: Solo HR Admin y Managers (para su equipo)
 
 **Funcionalidad:**
-1. **Listado**: Muestra todos los fichajes con estado `pendiente` de días anteriores
+1. **Listado**: Muestra todos los fichajes con estado `pendiente` de días anteriores (busca directamente en tabla `fichaje`)
 2. **Vista previa**: Para cada fichaje muestra:
-   - Eventos registrados (verde)
-   - Eventos propuestos basados en jornada (azul)
-   - Razón de la pendencia
+   - Eventos registrados (si existen)
+   - Eventos propuestos basados en jornada del empleado (azul)
+   - Razón de la pendencia (eventos faltantes)
 3. **Cuadre masivo**: 
    - Seleccionar múltiples fichajes
    - Botón "Cuadrar" crea eventos faltantes según jornada
    - Considera ausencias de medio día (no crea eventos para períodos ausentes)
    - Marca como `finalizado` y registra auditoría
-4. **Edición individual**: Abrir modal para editar eventos manualmente
+   - Notifica al empleado del fichaje resuelto
+4. **Edición individual**: Abrir modal para editar eventos manualmente antes de cuadrar
 
 **Auditoría de cuadre:**
 - `cuadradoMasivamente`: Boolean (true si fue cuadrado desde esta funcionalidad)
@@ -515,7 +518,8 @@ model Jornada {
 
 | Endpoint | Método | Descripción | Auth |
 |----------|--------|-------------|------|
-| `/api/fichajes/revision` | GET | Obtener fichajes pendientes de revisión (estado `pendiente`, días anteriores) | HR |
+| `/api/fichajes/revision` | GET | Obtener fichajes pendientes de revisión. Busca directamente en tabla `fichaje` con estado `pendiente` de días anteriores | HR |
+| `/api/fichajes/revision` | POST | Actualizar fichajes individuales desde modal de revisión (legacy, usar `/api/fichajes/cuadrar` para masivo) | HR |
 | `/api/fichajes/cuadrar` | POST | Cuadrar fichajes masivamente. Crea eventos faltantes según jornada y marca como `finalizado` | HR |
 
 ### Estadísticas
@@ -579,25 +583,26 @@ model ProcesamientoMarcajes {
 
 ```typescript
 // GET /api/fichajes/revision
+// Busca directamente en tabla fichaje con estado 'pendiente' de días anteriores
 
 // Sistema retorna:
 {
   "fichajes": [
     {
-      "id": "fichaje-uuid",
+      "id": "fichaje-uuid", // ID del fichaje (usado para cuadrar)
       "fichajeId": "fichaje-uuid",
       "empleadoId": "empleado-uuid",
       "empleadoNombre": "Juan Pérez",
       "fecha": "2025-11-06T00:00:00.000Z",
       "eventos": [
-        // Vista previa con eventos propuestos (azul) y registrados (verde)
+        // Vista previa: eventos propuestos según jornada (azul) o registrados si existen
         { "tipo": "entrada", "hora": "2025-11-06T09:00:00.000Z", "origen": "propuesto" },
         { "tipo": "pausa_inicio", "hora": "2025-11-06T14:00:00.000Z", "origen": "propuesto" },
         { "tipo": "pausa_fin", "hora": "2025-11-06T15:00:00.000Z", "origen": "propuesto" },
         { "tipo": "salida", "hora": "2025-11-06T18:00:00.000Z", "origen": "propuesto" }
       ],
       "eventosRegistrados": [
-        // Eventos que el empleado ya fichó
+        // Eventos que el empleado ya fichó (si existen)
       ],
       "razon": "Faltan eventos: entrada, salida",
       "eventosFaltantes": ["entrada", "salida"]
@@ -636,11 +641,13 @@ model ProcesamientoMarcajes {
 
 ---
 
-**Versión**: 3.1
-**Última actualización**: 12 noviembre 2025
+**Versión**: 3.2
+**Última actualización**: 27 enero 2025
 **Estado**: Sistema completo implementado:
 - ✅ Validación determinística de fichajes completos
 - ✅ Campo `periodo` en ausencias de medio día (mañana/tarde)
 - ✅ CRON nocturno configurado con GitHub Actions
 - ✅ Cuadre masivo con consideración de periodo de ausencia
 - ✅ Formularios actualizados con selector de periodo
+- ✅ API de revisión busca directamente en tabla `fichaje` (no `autoCompletado`)
+- ✅ Notificaciones automáticas cuando CRON marca fichajes como `pendiente`

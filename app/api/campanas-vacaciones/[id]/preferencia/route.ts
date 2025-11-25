@@ -45,7 +45,7 @@ export async function GET(
     }
 
     // Buscar preferencia
-    const preferencia = await prisma.preferenciaVacaciones.findFirst({
+    let preferencia = await prisma.preferenciaVacaciones.findFirst({
       where: {
         campanaId,
         empleadoId: empleado.id,
@@ -54,7 +54,30 @@ export async function GET(
     });
 
     if (!preferencia) {
-      return badRequestResponse('Preferencia no encontrada');
+      const campana = await prisma.campanaVacaciones.findFirst({
+        where: {
+          id: campanaId,
+          empresaId: session.user.empresaId,
+        },
+        select: { id: true },
+      });
+
+      if (!campana) {
+        return badRequestResponse('Campaña no encontrada');
+      }
+
+      preferencia = await prisma.preferenciaVacaciones.create({
+        data: {
+          campanaId,
+          empleadoId: empleado.id,
+          empresaId: session.user.empresaId,
+          diasIdeales: asJsonValue([]),
+          diasPrioritarios: asJsonValue([]),
+          diasAlternativos: asJsonValue([]),
+          completada: false,
+          aceptada: false,
+        },
+      });
     }
 
     return successResponse(preferencia);

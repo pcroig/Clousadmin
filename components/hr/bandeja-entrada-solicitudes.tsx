@@ -8,8 +8,7 @@ import { Check, ClipboardList, MoreVertical, X } from 'lucide-react';
 import { useState } from 'react';
 
 import { EmptyState } from '@/components/shared/empty-state';
-import { getInitials } from '@/components/shared/utils';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { EmployeeAvatar } from '@/components/shared/employee-avatar';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -17,7 +16,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { getAvatarStyle } from '@/lib/design-system';
 import { formatRelativeTime } from '@/lib/utils/formatRelativeTime';
 
 type SolicitudEstado =
@@ -304,22 +302,16 @@ export function BandejaEntradaSolicitudes({
             const titulo = getSolicitudTitulo(solicitud);
             const descripcion = getSolicitudDescripcion(solicitud);
             const fullName = `${solicitud.empleado.nombre} ${solicitud.empleado.apellidos}`.trim();
-            const initials = getInitials(fullName || solicitud.empleado.nombre);
-            const avatarStyle = getAvatarStyle(fullName || solicitud.empleado.nombre);
-            const fotoUrl = solicitud.empleado.fotoUrl ?? solicitud.empleado.avatar ?? undefined;
 
             return (
               <div key={solicitud.id} className="bg-white rounded-lg border border-gray-200 p-5 hover:shadow-sm transition-shadow">
                 <div className="flex items-start gap-4">
-                  <Avatar className="h-12 w-12">
-                    {fotoUrl && <AvatarImage src={fotoUrl} alt={fullName || 'Avatar'} />}
-                    <AvatarFallback
-                      className="text-base font-semibold uppercase"
-                      style={avatarStyle}
-                    >
-                      {initials}
-                    </AvatarFallback>
-                  </Avatar>
+                  <EmployeeAvatar
+                    nombre={solicitud.empleado.nombre}
+                    apellidos={solicitud.empleado.apellidos}
+                    fotoUrl={solicitud.empleado.fotoUrl}
+                    size="md"
+                  />
 
                   <div className="flex-1 space-y-1">
                     <p className="text-sm font-semibold text-gray-900">{titulo}</p>

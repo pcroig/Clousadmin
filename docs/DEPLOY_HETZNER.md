@@ -82,7 +82,7 @@ El script genera una contraseña automáticamente. **Guárdala** para `REDIS_URL
 npm ci  # instala dependencias + devDependencies necesarias para el build
 npx prisma generate
 npx prisma migrate deploy
-npm run build
+NODE_OPTIONS="--max-old-space-size=8192" npm run build
 pm2 start npm --name clousadmin -- start
 pm2 save
 ```
@@ -251,4 +251,4 @@ redis-cli ping  # Debería responder PONG
 
 ---
 
-**Última actualización**: 27 de enero 2025
+**Última actualización**: 24 de noviembre 2025

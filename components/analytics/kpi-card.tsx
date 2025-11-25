@@ -1,6 +1,7 @@
 "use client"
 
 import { ArrowDown, ArrowUp } from "lucide-react"
+import { memo } from "react"
 
 import { Card } from "@/components/ui/card"
 
@@ -15,7 +16,7 @@ interface KpiCardProps {
   className?: string
 }
 
-export function KpiCard({
+export const KpiCard = memo(function KpiCard({
   title,
   value,
   subtitle,
@@ -46,4 +47,4 @@ export function KpiCard({
       )}
     </Card>
   )
-}
+})

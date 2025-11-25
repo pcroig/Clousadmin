@@ -1,122 +1,119 @@
-# ⏰ Configuración del Cron Job con GitHub Actions
+# ⏰ Configuración de Cron Jobs
 
 ## 📋 Descripción
 
-El sistema utiliza un cron job automatizado para revisar solicitudes pendientes con IA tras 48 horas (configurable). Este documento explica cómo configurarlo usando GitHub Actions.
+El sistema utiliza cron jobs automatizados para:
+- **Revisar solicitudes con IA**: Revisa solicitudes pendientes tras 48 horas (configurable)
+- **Clasificar fichajes**: Cierra jornadas del día anterior y valida fichajes incompletos
+
+**Configuración actual**: Los cron jobs se ejecutan desde el servidor Hetzner usando `crontab`.
 
 ---
 
-## 🚀 Configuración Rápida
+## 🚀 Configuración en Hetzner (Recomendado)
 
-### 1. Generar CRON_SECRET
+### 1. Variables de Entorno
 
-```bash
-# En tu terminal local
-openssl rand -base64 32
-```
-
-Guarda el resultado, lo necesitarás en el siguiente paso.
-
-### 2. Configurar Secrets en GitHub
-
-1. Ve a tu repositorio en GitHub
-2. Click en **Settings** (Configuración)
-3. En el menú lateral, click en **Secrets and variables** → **Actions**
-4. Click en **New repository secret**
-5. Agrega los siguientes secrets:
-
-#### Secret 1: `CRON_SECRET`
-- **Name**: `CRON_SECRET`
-- **Value**: El secret generado en el paso 1
-- Click **Add secret**
-
-#### Secret 2: `APP_URL`
-- **Name**: `APP_URL`
-- **Value**: URL de tu aplicación (ej: `https://clousadmin.com`)
-- **Importante**: SIN barra final (/)
-- Click **Add secret**
-
-> ℹ️ Si vas a delegar los crons al servidor Hetzner (crontab), crea además un **Repository Variable**
-> llamado `ENABLE_GITHUB_CRONS` con valor `false`.  
-> Los workflows `cron-*` sólo se ejecutarán cuando esta variable **no** sea `false`, de modo que
-> puedes alternar entre GitHub Actions y el crontab sin editar los YAML.
-
-### 3. Agregar variables de entorno a tu hosting
-
-En tu plataforma de hosting (Vercel, Netlify, AWS Amplify, etc.), agrega:
+Asegúrate de tener estas variables en `/opt/clousadmin/.env`:
 
 ```bash
-CRON_SECRET=tu-secret-generado-aqui
+CRON_SECRET="tu-secret-generado"  # Generar con: openssl rand -base64 32
+APP_URL="https://app.tu-dominio.com"  # URL de tu aplicación (sin / final)
 SOLICITUDES_PERIODO_REVISION_HORAS=48  # Opcional, default 48
-CRON_ALERT_WEBHOOK=https://hooks.slack.com/services/tu/webhook  # Opcional
+```
+
+### 2. Instalar Crons
+
+```bash
+cd /opt/clousadmin
+CRON_SECRET="tu-secret" APP_URL="https://app.tu-dominio.com" \
+  ./scripts/hetzner/setup-cron.sh
+```
+
+El script instala automáticamente:
+- Clasificar fichajes: 23:30 UTC
+- Revisar solicitudes: 02:00 UTC
+- Backup DB: 02:00 UTC (si las variables están configuradas)
+
+### 3. Verificar Instalación
+
+```bash
+# Ver crons instalados
+crontab -l
+
+# Probar manualmente
+./scripts/hetzner/test-crons.sh
+
+# Ver logs
+tail -f /var/log/clousadmin-cron.log
 ```
 
 ---
 
-## 📁 Archivos del Sistema
+## 🔄 GitHub Actions (Respaldo Manual)
 
-### Workflow: `.github/workflows/cron-revisar-solicitudes.yml`
+Los workflows de GitHub Actions están disponibles como respaldo o para ejecución manual.
 
-```yaml
-name: Cron - Revisar Solicitudes con IA
+### Configuración
 
-on:
-  schedule:
-    - cron: '0 2 * * *'  # Diario a las 2 AM UTC
-  workflow_dispatch:  # Ejecución manual
+1. **Generar CRON_SECRET**:
+   ```bash
+   openssl rand -base64 32
+   ```
 
-jobs:
-  revisar-solicitudes:
-    name: Revisar solicitudes pendientes
-    runs-on: ubuntu-latest
-    
-    steps:
-      - name: Ejecutar revisión de solicitudes
-        run: |
-          curl -X POST ${{ secrets.APP_URL }}/api/cron/revisar-solicitudes \
-            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
-```
+2. **Configurar Secrets en GitHub**:
+   - `CRON_SECRET`: El secret generado
+   - `APP_URL`: URL de tu aplicación (ej: `https://app.hrcron.com`)
 
-### Endpoint: `/app/api/cron/revisar-solicitudes/route.ts`
+3. **Desactivar ejecución automática** (si usas Hetzner):
+   - Ve a Settings → Secrets and variables → Actions → Variables
+   - Crea `ENABLE_GITHUB_CRONS` con valor `false`
 
-El endpoint ya está implementado y:
-- ✅ Verifica el `CRON_SECRET`
-- ✅ Busca solicitudes pendientes con más de 48h
-- ✅ Clasifica con IA (auto-aprobable vs revisión manual)
-- ✅ Auto-aprueba o marca para revisión
-- ✅ Crea notificaciones automáticas
-- ✅ Registra logs detallados
+### Ejecución Manual
+
+1. Ve a Actions → "Cron - Revisar Solicitudes con IA"
+2. Click en "Run workflow" → "Run workflow"
+
+---
+
+## 📊 Endpoints
+
+### `/api/cron/revisar-solicitudes`
+- **Método**: POST
+- **Autenticación**: `Authorization: Bearer ${CRON_SECRET}`
+- **Funcionalidad**: 
+  - Busca solicitudes pendientes con más de 48h
+  - Clasifica con IA (auto-aprobable vs revisión manual)
+  - Auto-aprueba o marca para revisión
+  - Crea notificaciones automáticas
+
+### `/api/cron/clasificar-fichajes`
+- **Método**: POST
+- **Autenticación**: `Authorization: Bearer ${CRON_SECRET}`
+- **Funcionalidad**:
+  - Procesa fichajes del día anterior
+  - Crea fichajes pendientes si faltan
+  - Valida fichajes en curso
+  - Marca como finalizado o pendiente según corresponda
 
 ---
 
 ## 🧪 Testing
 
-### Probar localmente
+### Probar desde el servidor
 
 ```bash
-# Asegúrate de tener CRON_SECRET configurado en .env.local
-curl -X POST http://localhost:3000/api/cron/revisar-solicitudes \
-  -H "Authorization: Bearer tu-CRON_SECRET-local"
+curl -X POST https://app.tu-dominio.com/api/cron/revisar-solicitudes \
+  -H "Authorization: Bearer $CRON_SECRET" \
+  -H "Content-Type: application/json"
 ```
 
-### Probar manualmente en GitHub
+### Respuesta esperada
 
-1. Ve a tu repositorio en GitHub
-2. Click en **Actions**
-3. Selecciona **Cron - Revisar Solicitudes con IA**
-4. Click en **Run workflow**
-5. Click en **Run workflow** (botón verde)
-6. Espera unos segundos y verás el resultado
-
-### Verificar logs
-
-```bash
-# En los logs del workflow verás:
-✅ Status Code: 200
-📝 Response:
+```json
 {
   "success": true,
-  "timestamp": "2025-11-08T02:00:00.000Z",
+  "timestamp": "2025-11-21T02:00:00.000Z",
   "solicitudesRevisadas": 5,
   "autoAprobadas": 3,
   "requierenRevision": 2,
@@ -126,65 +123,17 @@ curl -X POST http://localhost:3000/api/cron/revisar-solicitudes \
 
 ---
 
-## ⚙️ Configuración Avanzada
-
-### Cambiar horario de ejecución
-
-Edita `.github/workflows/cron-revisar-solicitudes.yml`:
-
-```yaml
-schedule:
-  - cron: '0 2 * * *'  # Formato: minuto hora día mes díaSemana
-```
-
-Ejemplos:
-- `0 2 * * *` - Diario a las 2 AM UTC
-- `0 */6 * * *` - Cada 6 horas
-- `0 8 * * 1-5` - De lunes a viernes a las 8 AM
-- `30 14 * * *` - Diario a las 2:30 PM
-
-**Nota**: GitHub Actions usa UTC. Calcula la diferencia con tu zona horaria:
-- España (CET/CEST): UTC +1/+2
-- Para ejecutar a las 3 AM España (invierno): `0 2 * * *` (2 AM UTC)
-
-### Cambiar periodo de revisión
-
-En tu hosting, modifica:
-
-```bash
-SOLICITUDES_PERIODO_REVISION_HORAS=24  # 24 horas en lugar de 48
-```
-
-O en el código (`app/api/cron/revisar-solicitudes/route.ts`):
-
-```typescript
-const PERIODO_REVISION_HORAS = parseInt(
-  process.env.SOLICITUDES_PERIODO_REVISION_HORAS || '48'
-);
-```
-
-### Notificaciones en caso de error
-
-Si el cron falla, GitHub te enviará un email automáticamente (si tienes las notificaciones activadas).
-
-También puedes configurar notificaciones adicionales:
-- Slack: https://github.com/marketplace/actions/slack-notify
-- Discord: https://github.com/marketplace/actions/discord-webhook
-- Email: https://github.com/marketplace/actions/send-email
-
----
-
 ## 🔒 Seguridad
 
 ### ¿Por qué usar CRON_SECRET?
 
-Sin protección, cualquiera podría llamar a `/api/cron/revisar-solicitudes` y ejecutar el proceso:
-- ❌ Sobrecarga del servidor
-- ❌ Consumo de APIs de IA innecesario
+Sin protección, cualquiera podría llamar a los endpoints y:
+- ❌ Sobrecargar el servidor
+- ❌ Consumir APIs de IA innecesariamente
 - ❌ Posibles race conditions
 
 Con `CRON_SECRET`:
-- ✅ Solo GitHub (o quien tenga el secret) puede ejecutarlo
+- ✅ Solo quien tenga el secret puede ejecutarlo
 - ✅ El endpoint verifica: `Authorization: Bearer ${CRON_SECRET}`
 - ✅ Si no coincide, retorna 401 Unauthorized
 
@@ -193,16 +142,17 @@ Con `CRON_SECRET`:
 Si crees que el secret se comprometió:
 
 1. Genera uno nuevo:
-```bash
-openssl rand -base64 32
-```
+   ```bash
+   openssl rand -base64 32
+   ```
 
-2. Actualiza en GitHub:
-   - Settings → Secrets → CRON_SECRET → Update
-
-3. Actualiza en tu hosting (Vercel, etc.)
-
-4. El cambio es inmediato, no requiere redeploy del código
+2. Actualiza en Hetzner (`.env`)
+3. Actualiza en GitHub (si usas GitHub Actions)
+4. Actualiza `crontab` con el nuevo secret:
+   ```bash
+   CRON_SECRET="nuevo-secret" APP_URL="https://app.tu-dominio.com" \
+     ./scripts/hetzner/setup-cron.sh
+   ```
 
 ---
 
@@ -210,137 +160,31 @@ openssl rand -base64 32
 
 ### El cron no se ejecuta
 
-**Síntoma**: No hay logs en GitHub Actions
-
-**Solución**:
-1. Verifica que el archivo `.github/workflows/cron-revisar-solicitudes.yml` está en el repo
-2. Verifica que hiciste push del archivo
-3. Ve a Actions y verifica que el workflow esté habilitado
-4. Los crons pueden tener hasta 15 min de retraso en GitHub (es normal)
+**Verificar**:
+1. `crontab -l` muestra las entradas
+2. Los logs en `/var/log/clousadmin-cron.log` tienen entradas recientes
+3. Las variables `CRON_SECRET` y `APP_URL` están configuradas
 
 ### Error 401 Unauthorized
 
-**Síntoma**: `Status Code: 401`
-
 **Solución**:
-1. Verifica que `CRON_SECRET` esté configurado en GitHub Secrets
-2. Verifica que `CRON_SECRET` esté configurado en tu hosting
-3. Ambos deben ser exactamente iguales (sin espacios extra)
+1. Verifica que `CRON_SECRET` en `.env` coincida con el usado en `crontab`
+2. Verifica que el header sea exactamente `Bearer ${CRON_SECRET}`
 
 ### Error 404 Not Found
 
-**Síntoma**: `Status Code: 404`
-
 **Solución**:
-1. Verifica que `APP_URL` en GitHub Secrets sea correcta
-2. Verifica que tu app esté desplegada y accesible
-3. Verifica que el endpoint `/api/cron/revisar-solicitudes` exista
-
-### El clasificador IA falla
-
-**Síntoma**: `errores` en la respuesta
-
-**Solución**:
-1. Verifica que al menos una API key de IA esté configurada:
-   - `OPENAI_API_KEY`
-   - `ANTHROPIC_API_KEY`
-   - `GOOGLE_AI_API_KEY`
-2. Verifica que la API key sea válida
-3. Revisa los logs del servidor para más detalles
-
-### Solicitudes no se auto-aprueban
-
-**Síntoma**: Todas van a revisión manual
-
-**Solución**:
-1. Verifica que las solicitudes tengan más de 48h (o el periodo configurado)
-2. Verifica que `revisadaPorIA: false` en la base de datos
-3. Revisa el razonamiento del clasificador en los logs
-4. Puede ser que el clasificador determine correctamente que requieren revisión manual
-
----
-
-## 📊 Monitoreo
-
-### Métricas importantes
-
-- Total de solicitudes revisadas por día
-- % auto-aprobadas vs revisión manual
-- Tiempo promedio de ejecución del cron
-- Tasa de errores
-
-### Logs en producción
-
-Los logs del cron se guardan en:
-- **GitHub Actions**: Actions → Workflow → Ver run
-- **Tu servidor**: Depende del hosting (Vercel Logs, CloudWatch, etc.)
-
-Busca líneas como:
-```
-[CRON Revisar Solicitudes] Iniciando proceso...
-[CRON Revisar Solicitudes] 5 solicitudes a revisar
-[CRON Revisar Solicitudes] Clasificación: AUTO (confianza: 90%)
-[CRON Revisar Solicitudes] Proceso completado
-```
-
----
-
-## 🔄 Migración a Hetzner
-
-Cuando migres a Hetzner, tienes dos opciones:
-
-### Opción 1: Mantener GitHub Actions (Recomendado)
-
-No cambies nada. GitHub Actions seguirá llamando a tu nueva URL en Hetzner.
-
-Solo actualiza el secret `APP_URL` en GitHub:
-```
-https://tu-nueva-url-hetzner.com
-```
-
-### Opción 2: Usar crontab en el servidor
-
-1. SSH a tu servidor Hetzner
-2. Edita crontab:
-```bash
-crontab -e
-```
-
-3. Agrega:
-```bash
-0 2 * * * curl -X POST https://localhost:3000/api/cron/revisar-solicitudes -H "Authorization: Bearer $CRON_SECRET" >> /var/log/cron-solicitudes.log 2>&1
-```
-
-4. Guarda y cierra
-
-**Ventaja**: No depende de servicios externos  
-**Desventaja**: Logs menos accesibles
-
----
-
-## ✅ Checklist de Configuración
-
-- [ ] Generar `CRON_SECRET` con `openssl rand -base64 32`
-- [ ] Configurar secret `CRON_SECRET` en GitHub
-- [ ] Configurar secret `APP_URL` en GitHub
-- [ ] Configurar `CRON_SECRET` en el hosting
-- [ ] Verificar que el archivo `.github/workflows/cron-revisar-solicitudes.yml` está en el repo
-- [ ] Hacer push del workflow al repo
-- [ ] Probar ejecución manual en GitHub Actions
-- [ ] Esperar 24h y verificar que se ejecutó automáticamente
-- [ ] Revisar logs para verificar que funciona correctamente
+1. Verifica que `APP_URL` sea correcta
+2. Verifica que la aplicación esté desplegada y accesible
+3. Verifica que el endpoint `/api/cron/*` exista
 
 ---
 
 ## 📚 Referencias
 
-- [GitHub Actions Cron Syntax](https://docs.github.com/en/actions/using-workflows/events-that-trigger-workflows#schedule)
-- [Crontab Guru](https://crontab.guru/) - Generador de expresiones cron
-- [Documentación del clasificador IA](./ia/ARQUITECTURA_IA.md)
-- [Guía completa de notificaciones](./GUIA_COMPLETA_NOTIFICACIONES.md)
+- [Ver logs de crons](./cron/VER_LOGS.md)
+- [Inventario de crons](./cron/INVENTARIO.md)
+- [Guía de migración a Hetzner](../MIGRACION_HETZNER.md)
 
----
-
-**Última actualización**: 8 de Noviembre, 2025  
-**Estado**: ✅ Listo para producción
-
+**Última actualización**: 21 de noviembre 2025  
+**Estado**: ✅ Configurado en Hetzner

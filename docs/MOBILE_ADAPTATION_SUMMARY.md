@@ -1,8 +1,8 @@
 # Resumen de Adaptación Mobile - Clousadmin
 
-**Versión**: 2.1.0 (UX Redesign)  
+**Versión**: 2.2.0 (UX Refinement)  
 **Fecha de implementación**: 2025-01-21  
-**Última actualización**: 2025-01-22  
+**Última actualización**: 2025-01-27  
 **Implementado por**: Equipo de Desarrollo
 
 ---
@@ -56,9 +56,10 @@ La adaptación inicial (v2.0) hacía la app responsive pero no optimizaba la jer
 ### Componentes Nuevos
 
 #### MobileActionBar
-Barra de acciones compacta (48px) que reemplaza filas de botones.
+Barra de acciones compacta (~40px) que reemplaza filas de botones.
 - **Desktop**: Botones completos con texto
-- **Mobile**: Título + iconos + overflow menu
+- **Mobile**: Título embebido + iconos/labels + overflow menu
+- **Props clave**: `display` ('icon'|'label'|'icon-label'), `size`, `icon` opcional
 - **Ubicación**: `components/adaptive/MobileActionBar.tsx`
 
 #### CompactFilterBar
@@ -100,10 +101,11 @@ Flecha bounce que indica contenido scrollable.
 
 | Página | Headers Before | Headers After | Mejora | Tabla Visible |
 |--------|----------------|---------------|--------|---------------|
-| Fichajes | 350px | 132px | -62% | 75% viewport |
-| Ausencias | 320px | 120px | -63% | 78% viewport |
-| Personas | 280px | 92px | -67% | 82% viewport |
-| Equipos | 240px | 92px | -62% | 82% viewport |
+| Fichajes | 350px | ~120px | -66% | 80% viewport |
+| Ausencias | 320px | ~100px | -69% | 82% viewport |
+| Personas | 280px | ~88px | -69% | 85% viewport |
+| Equipos | 240px | ~88px | -63% | 85% viewport |
+| Puestos | 240px | ~88px | -63% | 85% viewport |
 
 ### Documentación
 

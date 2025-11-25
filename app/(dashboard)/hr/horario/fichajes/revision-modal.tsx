@@ -286,11 +286,14 @@ export function RevisionModal({ open, onClose, onReviewed, onEditFichaje: _onEdi
               </div>
 
               {/* Barra de filtros */}
-              <div className="flex items-center justify-end gap-2 py-2">
-                <InfoTooltip
-                  content="Oculta temporalmente los días sin fichajes para centrar el cuadrado en jornadas con actividad."
-                  side="left"
-                />
+              <div className="flex flex-wrap items-center justify-end gap-3 py-2">
+                <div className="flex items-center gap-1 text-sm text-gray-600">
+                  <span>Filtro de días sin fichajes</span>
+                  <InfoTooltip
+                    content="Oculta temporalmente los días sin fichajes para centrar el cuadrado en jornadas con actividad."
+                    side="left"
+                  />
+                </div>
                 <Button
                   variant={ocultarDiasSinFichajes ? "default" : "outline"}
                   size="sm"

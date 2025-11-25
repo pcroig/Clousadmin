@@ -10,9 +10,7 @@ import { AlertCircle, ChevronRight, FileText, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
-import { getInitials } from '@/components/shared/utils';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { getAvatarStyle } from '@/lib/design-system';
+import { EmployeeAvatar } from '@/components/shared/employee-avatar';
 import { parseJson } from '@/lib/utils/json';
 interface Denuncia {
   id: string;
@@ -94,11 +92,6 @@ export function DenunciasDetails({ onClose, initialDenunciaId }: DenunciasDetail
   }
 
   if (selectedDenuncia) {
-    // Vista de detalle individual
-    const avatarStyle = selectedDenuncia.denunciante
-      ? getAvatarStyle(`${selectedDenuncia.denunciante.nombre} ${selectedDenuncia.denunciante.apellidos}`)
-      : null;
-
     return (
       <div className="space-y-6">
         {/* Header con ID y botones */}
@@ -157,17 +150,14 @@ export function DenunciasDetails({ onClose, initialDenunciaId }: DenunciasDetail
             </div>
           ) : selectedDenuncia.denunciante ? (
             <div className="flex items-center gap-3 p-3 rounded-lg border border-gray-200 bg-gray-50">
-              <Avatar className="h-9 w-9">
-                {selectedDenuncia.denunciante.fotoUrl && (
-                  <AvatarImage src={selectedDenuncia.denunciante.fotoUrl} />
-                )}
-                <AvatarFallback
-                  className="text-xs font-semibold uppercase"
-                  style={avatarStyle || undefined}
-                >
-                  {getInitials(`${selectedDenuncia.denunciante.nombre} ${selectedDenuncia.denunciante.apellidos}`)}
-                </AvatarFallback>
-              </Avatar>
+              <EmployeeAvatar
+                nombre={selectedDenuncia.denunciante.nombre}
+                apellidos={selectedDenuncia.denunciante.apellidos}
+                fotoUrl={selectedDenuncia.denunciante.fotoUrl}
+                size="sm"
+                className="h-9 w-9"
+                fallbackClassName="text-xs"
+              />
               <div className="flex-1 min-w-0">
                 <p className="text-sm text-gray-900 font-medium">
                   {selectedDenuncia.denunciante.nombre} {selectedDenuncia.denunciante.apellidos}
@@ -239,10 +229,6 @@ export function DenunciasDetails({ onClose, initialDenunciaId }: DenunciasDetail
       ) : (
         <div className="space-y-2">
           {denuncias.map((denuncia) => {
-            const avatarStyle = denuncia.denunciante
-              ? getAvatarStyle(`${denuncia.denunciante.nombre} ${denuncia.denunciante.apellidos}`)
-              : null;
-
             return (
               <button
                 key={denuncia.id}
@@ -254,17 +240,14 @@ export function DenunciasDetails({ onClose, initialDenunciaId }: DenunciasDetail
                     <AlertCircle className="w-5 h-5 text-gray-500" />
                   </div>
                 ) : denuncia.denunciante ? (
-                  <Avatar className="h-10 w-10 flex-shrink-0">
-                    {denuncia.denunciante.fotoUrl && (
-                      <AvatarImage src={denuncia.denunciante.fotoUrl} />
-                    )}
-                    <AvatarFallback
-                      className="text-xs font-semibold uppercase"
-                      style={avatarStyle || undefined}
-                    >
-                      {getInitials(`${denuncia.denunciante.nombre} ${denuncia.denunciante.apellidos}`)}
-                    </AvatarFallback>
-                  </Avatar>
+                  <EmployeeAvatar
+                    nombre={denuncia.denunciante.nombre}
+                    apellidos={denuncia.denunciante.apellidos}
+                    fotoUrl={denuncia.denunciante.fotoUrl}
+                    size="md"
+                    className="h-10 w-10 flex-shrink-0"
+                    fallbackClassName="text-xs"
+                  />
                 ) : null}
 
                 <div className="flex-1 min-w-0">

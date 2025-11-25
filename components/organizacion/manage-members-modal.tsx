@@ -8,9 +8,8 @@ import { Search, UserPlus, X } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
+import { EmployeeAvatar } from '@/components/shared/employee-avatar';
 import { LoadingButton } from '@/components/shared/loading-button';
-import { getInitials } from '@/components/shared/utils';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -19,7 +18,6 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { getAvatarStyle } from '@/lib/design-system';
 import { parseJson } from '@/lib/utils/json';
 
 interface Employee {
@@ -33,7 +31,7 @@ interface Employee {
 interface TeamMember {
   id: string;
   nombre: string;
-  avatar?: string;
+  fotoUrl?: string | null;
 }
 
 interface ManageMembersModalProps {
@@ -170,22 +168,16 @@ export function ManageMembersModal({
                 </p>
               ) : (
                 filteredMembers.map((member) => {
-                  const avatarStyle = getAvatarStyle(member.nombre);
-
                   return (
                     <div
                       key={member.id}
                       className="flex items-center gap-2 p-2 rounded-lg hover:bg-gray-50"
                     >
-                      <Avatar className="h-8 w-8">
-                        {member.avatar && <AvatarImage src={member.avatar} />}
-                        <AvatarFallback
-                          className="text-xs font-semibold uppercase"
-                          style={avatarStyle}
-                        >
-                          {getInitials(member.nombre)}
-                        </AvatarFallback>
-                      </Avatar>
+                  <EmployeeAvatar
+                    nombre={member.nombre}
+                    fotoUrl={member.fotoUrl}
+                    size="sm"
+                  />
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-gray-900 truncate">
                           {member.nombre}
@@ -223,22 +215,17 @@ export function ManageMembersModal({
                 </p>
               ) : (
                 filteredEmployees.map((emp) => {
-                  const avatarStyle = getAvatarStyle(`${emp.nombre} ${emp.apellidos}`);
-
                   return (
                     <div
                       key={emp.id}
                       className="flex items-center gap-2 p-2 rounded-lg hover:bg-gray-50"
                     >
-                      <Avatar className="h-8 w-8">
-                        {emp.fotoUrl && <AvatarImage src={emp.fotoUrl} />}
-                        <AvatarFallback
-                          className="text-xs font-semibold uppercase"
-                          style={avatarStyle}
-                        >
-                          {getInitials(`${emp.nombre} ${emp.apellidos}`)}
-                        </AvatarFallback>
-                      </Avatar>
+                  <EmployeeAvatar
+                    nombre={emp.nombre}
+                    apellidos={emp.apellidos}
+                    fotoUrl={emp.fotoUrl}
+                    size="sm"
+                  />
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-gray-900 truncate">
                           {emp.nombre} {emp.apellidos}

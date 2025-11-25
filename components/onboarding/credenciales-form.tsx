@@ -5,7 +5,7 @@ import { useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 import { LoadingButton } from '@/components/shared/loading-button';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { EmployeeAvatar } from '@/components/shared/employee-avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -123,18 +123,16 @@ export function CredencialesForm({ token, empleado, onComplete, initialProgress 
       <div className="space-y-4">
         <Label>Avatar (opcional)</Label>
         <div className="flex items-center gap-4">
-          <Avatar className="h-20 w-20">
-            {avatarPreview ? (
-              <AvatarImage src={avatarPreview} alt="Avatar" />
-            ) : (
-              <AvatarFallback
-                className="flex items-center justify-center"
-                style={avatarStyle}
-              >
-                <User className="h-10 w-10 opacity-70" />
-              </AvatarFallback>
-            )}
-          </Avatar>
+          <EmployeeAvatar
+            nombre={empleado.nombre}
+            apellidos={empleado.apellidos}
+            fotoUrl={avatarPreview}
+            size="xl"
+            className="h-20 w-20"
+            fallbackClassName="flex items-center justify-center"
+            fallbackContent={<User className="h-10 w-10 opacity-70" />}
+            fallbackStyle={avatarStyle}
+          />
           <div className="space-y-2">
             <Button
               type="button"

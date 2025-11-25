@@ -9,6 +9,7 @@ import { useRouter } from 'next/navigation';
 
 import { EmptyState } from '@/components/shared/empty-state';
 import { Button } from '@/components/ui/button';
+import { openPreferenciasModalFromUrl } from '@/lib/events/vacaciones';
 import { obtenerIconoPorTipo } from '@/lib/notificaciones/helpers';
 import { cn } from '@/lib/utils';
 import { formatRelativeTimeShort } from '@/lib/utils/formatRelativeTime';
@@ -32,6 +33,9 @@ export function BandejaEntradaNotificaciones({
 
     const accionUrl = notificacion.metadata?.accionUrl;
     if (accionUrl) {
+      if (openPreferenciasModalFromUrl(accionUrl)) {
+        return;
+      }
       router.push(accionUrl);
     }
   };
@@ -55,6 +59,9 @@ export function BandejaEntradaNotificaciones({
     const handleAccion = (event: MouseEvent<HTMLButtonElement>) => {
       event.stopPropagation();
       onMarcarLeida?.(notificacion.id);
+      if (openPreferenciasModalFromUrl(accionUrl)) {
+        return;
+      }
       router.push(accionUrl);
     };
 

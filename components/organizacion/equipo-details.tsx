@@ -8,7 +8,7 @@ import { MapPin, Pencil, Trash2, User, Users } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
-import { getInitials } from '@/components/shared/utils';
+import { EmployeeAvatar } from '@/components/shared/employee-avatar';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -19,9 +19,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { getAvatarStyle } from '@/lib/design-system';
 import { parseJson } from '@/lib/utils/json';
 
 import { ChangeManagerModal } from './change-manager-modal';
@@ -88,7 +86,7 @@ export function EquipoDetails({ equipo, onUpdate, onDelete }: EquipoDetailsProps
   const membersForModals = equipo.empleados.map((empleado) => ({
     id: empleado.id,
     nombre: empleado.nombre,
-    avatar: empleado.fotoUrl ?? empleado.avatar ?? undefined,
+    fotoUrl: empleado.fotoUrl ?? empleado.avatar ?? undefined,
   }));
 
   return (
@@ -180,7 +178,6 @@ export function EquipoDetails({ equipo, onUpdate, onDelete }: EquipoDetailsProps
               </p>
             ) : (
               equipo.empleados.map((empleado) => {
-                const avatarStyle = getAvatarStyle(empleado.nombre);
                 const fotoUrl = empleado.fotoUrl ?? empleado.avatar ?? undefined;
 
                 return (
@@ -188,15 +185,11 @@ export function EquipoDetails({ equipo, onUpdate, onDelete }: EquipoDetailsProps
                     key={empleado.id}
                     className="flex items-center gap-3 p-3 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
                   >
-                    <Avatar className="h-9 w-9">
-                      {fotoUrl && <AvatarImage src={fotoUrl} />}
-                      <AvatarFallback
-                        className="text-xs font-semibold uppercase"
-                        style={avatarStyle}
-                      >
-                        {getInitials(empleado.nombre)}
-                      </AvatarFallback>
-                    </Avatar>
+                    <EmployeeAvatar
+                      nombre={empleado.nombre}
+                      fotoUrl={fotoUrl}
+                      size="sm"
+                    />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm text-gray-900 font-medium">{empleado.nombre}</p>
                     </div>

@@ -70,12 +70,13 @@ Esta guía te ayudará a configurar Google OAuth para permitir el login con Goog
    - **Authorized JavaScript origins**:
      - `http://localhost:3000` (desarrollo)
      - `https://tudominio.com` (producción)
-  - **Authorized redirect URIs**:
-    - `http://localhost:3000/api/auth/callback/google` (desarrollo · NextAuth v5)
+  - **Authorized redirect URIs** (añade todas las necesarias):
+    - `http://localhost:3000/api/auth/callback/google` (desarrollo · Login)
     - `http://localhost:3000/api/integrations/calendar/callback` (desarrollo · Calendar)
-    - `https://tudominio.com/api/auth/callback/google` (producción · NextAuth v5)
+    - `https://tudominio.com/api/auth/callback/google` (producción · Login)
     - `https://tudominio.com/api/integrations/calendar/callback` (producción · Calendar)
-    - *(Opcional)* `http(s)://.../api/auth/google/callback` si todavía tienes integraciones antiguas y quieres mantener compatibilidad con enlaces viejos.
+    
+    **⚠️ Importante:** La URI `/api/auth/callback/google` es obligatoria para el login con Google. NextAuth v5 usa esta ruta automáticamente.
 5. Click en "Create"
 6. **¡Guarda el Client ID y Client Secret!** Los necesitarás en el siguiente paso
 
@@ -171,8 +172,17 @@ Para que los webhooks funcionen en producción, necesitas:
 
 ### Error: "redirect_uri_mismatch"
 
-- Asegúrate de que las URIs de redirect en Google Cloud Console coincidan exactamente con tu URL
-- Verifica que `NEXT_PUBLIC_APP_URL` esté correctamente configurado
+**Causa:** La URI de callback en Google Cloud Console no coincide con la que usa NextAuth.
+
+**Solución:**
+1. Ve a Google Cloud Console → "APIs & Services" → "Credentials"
+2. Edita tu OAuth 2.0 Client ID
+3. En **"Authorized redirect URIs"**, asegúrate de tener exactamente:
+   - `http://localhost:3000/api/auth/callback/google` (desarrollo)
+   - `https://tu-dominio.com/api/auth/callback/google` (producción)
+4. **Importante:** La URI debe ser exactamente `/api/auth/callback/google` (no `/api/auth/google/callback`)
+5. Verifica que `NEXTAUTH_URL` en tu `.env.local` coincida con tu dominio
+6. Guarda los cambios y espera 1-2 minutos para que Google propague los cambios
 
 ### Error: "Access blocked: This app's request is invalid"
 
@@ -219,9 +229,8 @@ lib/integrations/
 │   ├── calendar-manager.ts     # Sync logic
 │   └── types.ts
 
-app/api/auth/google/
-├── route.ts                # Start OAuth flow
-└── callback/route.ts       # OAuth callback
+app/api/auth/[...nextauth]/
+└── route.ts                # NextAuth handler (maneja /api/auth/callback/google automáticamente)
 
 app/api/integrations/calendar/
 ├── connect/route.ts        # Connect calendar

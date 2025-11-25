@@ -10,6 +10,7 @@ import { useRouter } from 'next/navigation';
 import { memo, type MouseEvent } from 'react';
 
 import { Button } from '@/components/ui/button';
+import { openPreferenciasModalFromUrl } from '@/lib/events/vacaciones';
 import { obtenerIconoPorTipo } from '@/lib/notificaciones/helpers';
 import { formatRelativeTimeShort } from '@/lib/utils/formatRelativeTime';
 
@@ -38,6 +39,9 @@ export const NotificacionesWidget = memo(function NotificacionesWidget({
   const handleClick = (notif: NotificacionUI) => {
     // Si tiene URL de acción, navegar allí
     if (notif.metadata?.accionUrl) {
+      if (openPreferenciasModalFromUrl(notif.metadata.accionUrl)) {
+        return;
+      }
       router.push(notif.metadata.accionUrl);
     } else {
       // Si no, ir a la bandeja de entrada
@@ -64,6 +68,9 @@ export const NotificacionesWidget = memo(function NotificacionesWidget({
 
       const handleAccion = (event: MouseEvent<HTMLButtonElement>) => {
         event.stopPropagation();
+        if (openPreferenciasModalFromUrl(accionUrl)) {
+          return;
+        }
         router.push(accionUrl);
       };
 

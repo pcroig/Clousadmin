@@ -8,7 +8,10 @@ import { Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
-
+import {
+  JornadaFormFields,
+  type JornadaFormData,
+} from '@/components/shared/jornada-form-fields';
 import { LoadingButton } from '@/components/shared/loading-button';
 import {
   AlertDialog,
@@ -21,7 +24,6 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
 import {
   Dialog,
   DialogContent,
@@ -29,24 +31,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import {
-  Field,
-  FieldDescription,
-  FieldError,
-  FieldGroup,
-  FieldLabel,
-} from '@/components/ui/field';
-import { Input } from '@/components/ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { extractArrayFromResponse } from '@/lib/utils/api-response';
-
-
 
 import type { DiaConfig, JornadaConfig } from '@/lib/calculos/fichajes-helpers';
 
@@ -96,23 +81,24 @@ interface EditarJornadaModalProps {
 }
 
 export function EditarJornadaModal({ open, modo, jornada, onClose }: EditarJornadaModalProps) {
-  // Estados del formulario de jornada
-  const [nombre, setNombre] = useState('');
-  const [tipoJornada, setTipoJornada] = useState<'fija' | 'flexible'>('flexible');
-  const [horasSemanales, setHorasSemanales] = useState('40');
-  const [limiteInferior, setLimiteInferior] = useState('');
-  const [limiteSuperior, setLimiteSuperior] = useState('');
-  const [horariosFijos, setHorariosFijos] = useState<Record<string, HorarioDia>>({
-    lunes: { activo: true, entrada: '09:00', salida: '18:00', pausa_inicio: '', pausa_fin: '' },
-    martes: { activo: true, entrada: '09:00', salida: '18:00', pausa_inicio: '', pausa_fin: '' },
-    miercoles: { activo: true, entrada: '09:00', salida: '18:00', pausa_inicio: '', pausa_fin: '' },
-    jueves: { activo: true, entrada: '09:00', salida: '18:00', pausa_inicio: '', pausa_fin: '' },
-    viernes: { activo: true, entrada: '09:00', salida: '18:00', pausa_inicio: '', pausa_fin: '' },
-    sabado: { activo: false, entrada: '', salida: '', pausa_inicio: '', pausa_fin: '' },
-    domingo: { activo: false, entrada: '', salida: '', pausa_inicio: '', pausa_fin: '' },
+  // Estados del formulario unificado
+  const [formData, setFormData] = useState<JornadaFormData>({
+    nombre: '',
+    tipoJornada: 'flexible',
+    horasSemanales: '40',
+    limiteInferior: '',
+    limiteSuperior: '',
+    horariosFijos: {
+      lunes: { activo: true, entrada: '09:00', salida: '18:00' },
+      martes: { activo: true, entrada: '09:00', salida: '18:00' },
+      miercoles: { activo: true, entrada: '09:00', salida: '18:00' },
+      jueves: { activo: true, entrada: '09:00', salida: '18:00' },
+      viernes: { activo: true, entrada: '09:00', salida: '18:00' },
+      sabado: { activo: false, entrada: '', salida: '' },
+      domingo: { activo: false, entrada: '', salida: '' },
+    },
+    descansoMinutos: '',
   });
-  const [usarDescanso, setUsarDescanso] = useState(false);
-  const [descansoFlexible, setDescansoFlexible] = useState<string>('');
 
   // Estados de asignación
   const [empleados, setEmpleados] = useState<Empleado[]>([]);
@@ -137,64 +123,63 @@ export function EditarJornadaModal({ open, modo, jornada, onClose }: EditarJorna
     if (open) {
       if (modo === 'editar' && jornada) {
         // Cargar datos de la jornada
-        setNombre(jornada.nombre);
-        setHorasSemanales(jornada.horasSemanales.toString());
-        
         const config = jornada.config;
         const esFija = DIA_KEYS.some((dia) => {
           const diaConfig = getDiaConfig(config, dia);
           return Boolean(diaConfig?.entrada && diaConfig?.salida);
         });
-        setTipoJornada(esFija ? 'fija' : 'flexible');
 
-        setHorariosFijos(prevState => {
-          const newState = { ...prevState };
-
-          DIA_KEYS.forEach((dia) => {
-            const diaConfig = getDiaConfig(config, dia);
-            if (diaConfig) {
-              if (esFija) {
-                newState[dia] = {
-                  ...newState[dia],
-                  activo: diaConfig.activo ?? true,
-                  entrada: diaConfig.entrada ?? newState[dia].entrada,
-                  salida: diaConfig.salida ?? newState[dia].salida,
-                  pausa_inicio: diaConfig.pausa_inicio,
-                  pausa_fin: diaConfig.pausa_fin,
-                };
-              } else {
-                newState[dia] = {
-                  ...newState[dia],
-                  activo: Boolean(diaConfig.activo),
-                };
-              }
-            } else {
-              newState[dia] = {
-                ...newState[dia],
-                activo: dia !== 'sabado' && dia !== 'domingo',
-              };
-            }
-          });
-
-          return newState;
+        const newHorariosFijos: Record<string, HorarioDia> = {};
+        DIA_KEYS.forEach((dia) => {
+          const diaConfig = getDiaConfig(config, dia);
+          if (diaConfig) {
+            newHorariosFijos[dia] = {
+              activo: diaConfig.activo ?? true,
+              entrada: diaConfig.entrada ?? '09:00',
+              salida: diaConfig.salida ?? '18:00',
+            };
+          } else {
+            newHorariosFijos[dia] = {
+              activo: dia !== 'sabado' && dia !== 'domingo',
+              entrada: '09:00',
+              salida: '18:00',
+            };
+          }
         });
 
+        // Calcular minutos de descanso desde pausa_inicio y pausa_fin
+        let descansoMinutos = '';
         if (esFija) {
-          const algunDiaConPausa = DIA_KEYS.some((dia) => {
+          const primerDiaConPausa = DIA_KEYS.find((dia) => {
             const diaConfig = getDiaConfig(config, dia);
             return Boolean(diaConfig?.pausa_inicio && diaConfig?.pausa_fin);
           });
-          setUsarDescanso(Boolean(algunDiaConPausa));
-          setDescansoFlexible('');
+          if (primerDiaConPausa) {
+            const diaConfig = getDiaConfig(config, primerDiaConPausa);
+            if (diaConfig?.pausa_inicio && diaConfig?.pausa_fin) {
+              const [h1, m1] = diaConfig.pausa_inicio.split(':').map(Number);
+              const [h2, m2] = diaConfig.pausa_fin.split(':').map(Number);
+              const minutos = (h2 * 60 + m2) - (h1 * 60 + m1);
+              descansoMinutos = minutos.toString();
+            }
+          }
         } else {
-          setUsarDescanso(false);
-          const descansoMinimo =
-            typeof config?.descansoMinimo === 'string' ? config.descansoMinimo : '';
-          setDescansoFlexible(descansoMinimo);
+          const descansoMinimo = typeof config?.descansoMinimo === 'string' ? config.descansoMinimo : '';
+          if (descansoMinimo) {
+            const [h, m] = descansoMinimo.split(':').map(Number);
+            descansoMinutos = (h * 60 + m).toString();
+          }
         }
-        
-        setLimiteInferior(config?.limiteInferior || '');
-        setLimiteSuperior(config?.limiteSuperior || '');
+
+        setFormData({
+          nombre: jornada.nombre,
+          tipoJornada: esFija ? 'fija' : 'flexible',
+          horasSemanales: jornada.horasSemanales.toString(),
+          limiteInferior: config?.limiteInferior || '',
+          limiteSuperior: config?.limiteSuperior || '',
+          horariosFijos: newHorariosFijos,
+          descansoMinutos,
+        });
       } else {
         // Limpiar formulario para crear
         limpiarFormulario();
@@ -240,26 +225,37 @@ export function EditarJornadaModal({ open, modo, jornada, onClose }: EditarJorna
   }
 
   function limpiarFormulario() {
-    setNombre('');
-    setTipoJornada('flexible');
-    setHorasSemanales('40');
-    setLimiteInferior('');
-    setLimiteSuperior('');
-    setUsarDescanso(false);
-    setDescansoFlexible('');
+    setFormData({
+      nombre: '',
+      tipoJornada: 'flexible',
+      horasSemanales: '40',
+      limiteInferior: '',
+      limiteSuperior: '',
+      horariosFijos: {
+        lunes: { activo: true, entrada: '09:00', salida: '18:00' },
+        martes: { activo: true, entrada: '09:00', salida: '18:00' },
+        miercoles: { activo: true, entrada: '09:00', salida: '18:00' },
+        jueves: { activo: true, entrada: '09:00', salida: '18:00' },
+        viernes: { activo: true, entrada: '09:00', salida: '18:00' },
+        sabado: { activo: false, entrada: '', salida: '' },
+        domingo: { activo: false, entrada: '', salida: '' },
+      },
+      descansoMinutos: '',
+    });
     setNivelAsignacion('empresa');
     setEmpleadosSeleccionados([]);
+    setEquipoSeleccionado('');
     setErrors({});
   }
 
   function validarFormulario(): boolean {
     const newErrors: Record<string, string> = {};
     
-    if (!nombre.trim()) {
+    if (!formData.nombre.trim()) {
       newErrors.nombre = 'El nombre es obligatorio';
     }
     
-    if (!horasSemanales || parseFloat(horasSemanales) <= 0) {
+    if (!formData.horasSemanales || parseFloat(formData.horasSemanales) <= 0) {
       newErrors.horasSemanales = 'Las horas semanales deben ser mayores a 0';
     }
     
@@ -337,28 +333,52 @@ export function EditarJornadaModal({ open, modo, jornada, onClose }: EditarJorna
       // Construir configuración
       const config: JornadaConfig = {};
       
-      if (tipoJornada === 'fija') {
+      // Convertir minutos de descanso a formato de pausa
+      const descansoMinutos = parseInt(formData.descansoMinutos || '0', 10);
+      
+      if (formData.tipoJornada === 'fija') {
         DIA_KEYS.forEach((dia) => {
-          const horario = horariosFijos[dia];
-          config[dia] = usarDescanso
-            ? horario
-            : { activo: horario.activo, entrada: horario.entrada, salida: horario.salida };
+          const horario = formData.horariosFijos[dia];
+          if (descansoMinutos > 0 && horario.activo) {
+            // Calcular pausa_inicio y pausa_fin desde descansoMinutos
+            const pausaInicio = '14:00';
+            const [h, m] = pausaInicio.split(':').map(Number);
+            const totalMinutos = h * 60 + m + descansoMinutos;
+            const pausaFin = `${Math.floor(totalMinutos / 60).toString().padStart(2, '0')}:${(totalMinutos % 60).toString().padStart(2, '0')}`;
+            
+            config[dia] = {
+              activo: horario.activo,
+              entrada: horario.entrada,
+              salida: horario.salida,
+              pausa_inicio: pausaInicio,
+              pausa_fin: pausaFin,
+            };
+          } else {
+            config[dia] = {
+              activo: horario.activo,
+              entrada: horario.entrada,
+              salida: horario.salida,
+            };
+          }
         });
       } else {
         // Jornada flexible: todos los días activos sin horario específico
         DIA_KEYS.forEach((dia) => {
-          const estadoDia = horariosFijos[dia];
+          const estadoDia = formData.horariosFijos[dia];
           config[dia] = { activo: estadoDia?.activo ?? false };
         });
 
-        if (descansoFlexible) {
-          config.descansoMinimo = descansoFlexible;
+        if (descansoMinutos > 0) {
+          // Convertir minutos a formato HH:MM
+          const horas = Math.floor(descansoMinutos / 60);
+          const minutos = descansoMinutos % 60;
+          config.descansoMinimo = `${horas.toString().padStart(2, '0')}:${minutos.toString().padStart(2, '0')}`;
         }
       }
 
-      if (limiteInferior) config.limiteInferior = limiteInferior;
-      if (limiteSuperior) config.limiteSuperior = limiteSuperior;
-      config.tipo = tipoJornada;
+      if (formData.limiteInferior) config.limiteInferior = formData.limiteInferior;
+      if (formData.limiteSuperior) config.limiteSuperior = formData.limiteSuperior;
+      config.tipo = formData.tipoJornada;
 
       // Crear o actualizar jornada
       const url = modo === 'crear' ? '/api/jornadas' : `/api/jornadas/${jornada?.id}`;                                                                          
@@ -368,12 +388,12 @@ export function EditarJornadaModal({ open, modo, jornada, onClose }: EditarJorna
         method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          nombre,
-          tipo: tipoJornada,
-          horasSemanales: parseFloat(horasSemanales),
+          nombre: formData.nombre,
+          tipo: formData.tipoJornada,
+          horasSemanales: parseFloat(formData.horasSemanales),
           config,
-          limiteInferior: limiteInferior || undefined,
-          limiteSuperior: limiteSuperior || undefined,
+          limiteInferior: formData.limiteInferior || undefined,
+          limiteSuperior: formData.limiteSuperior || undefined,
         }),
       });
 
@@ -473,14 +493,6 @@ export function EditarJornadaModal({ open, modo, jornada, onClose }: EditarJorna
     }
   }
 
-  function toggleEmpleado(empleadoId: string) {
-    setEmpleadosSeleccionados(prev =>
-      prev.includes(empleadoId)
-        ? prev.filter(id => id !== empleadoId)
-        : [...prev, empleadoId]
-    );
-  }
-
   const esPredefinida = jornada?.esPredefinida;
 
   return (
@@ -492,295 +504,21 @@ export function EditarJornadaModal({ open, modo, jornada, onClose }: EditarJorna
           </DialogTitle>
         </DialogHeader>
 
-        <FieldGroup className="space-y-3">
-          {/* Información de la jornada */}
-          <Field>
-            <FieldLabel htmlFor="nombre">Nombre de la jornada *</FieldLabel>
-            <Input
-              id="nombre"
-              value={nombre}
-              onChange={(e) => setNombre(e.target.value)}
-              placeholder="Ej: Jornada Completa 40h"
-              aria-invalid={!!errors.nombre}
-              disabled={esPredefinida}
-            />
-            {errors.nombre && <FieldError>{errors.nombre}</FieldError>}
-            <FieldDescription>Nombre identificativo de la jornada laboral</FieldDescription>
-          </Field>
-
-          <div className="grid grid-cols-2 gap-4">
-            <Field>
-              <FieldLabel htmlFor="tipo">Tipo de jornada</FieldLabel>
-              <Select
-                value={tipoJornada}
-                onValueChange={(v) => {
-                  setTipoJornada(v as 'fija' | 'flexible');
-                  if (v === 'fija') {
-                    setDescansoFlexible('');
-                  }
-                }}
-                disabled={esPredefinida}
-              >
-                <SelectTrigger id="tipo">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="flexible">Flexible</SelectItem>
-                  <SelectItem value="fija">Fija</SelectItem>
-                </SelectContent>
-              </Select>
-              <FieldDescription>
-                {tipoJornada === 'fija' ? 'Horarios específicos por día' : 'Solo cuenta horas semanales'}
-              </FieldDescription>
-            </Field>
-
-            <Field>
-              <FieldLabel htmlFor="horas">Horas semanales *</FieldLabel>
-              <Input
-                id="horas"
-                type="number"
-                value={horasSemanales}
-                onChange={(e) => setHorasSemanales(e.target.value)}
-                placeholder="40"
-                aria-invalid={!!errors.horasSemanales}
-                disabled={esPredefinida}
-              />
-              {errors.horasSemanales && <FieldError>{errors.horasSemanales}</FieldError>}
-            </Field>
-          </div>
-
-          {/* Asignación */}
-          <div className="mt-6 pt-6 border-t">
-            <h3 className="text-base font-semibold text-gray-900 mb-3">¿A quién aplicar esta jornada?</h3>
-            
-            <Field>
-              <Select 
-                value={nivelAsignacion} 
-                onValueChange={(v) => setNivelAsignacion(v as 'empresa' | 'equipo' | 'individual')}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="empresa">Toda la empresa</SelectItem>
-                  <SelectItem value="equipo">Un equipo concreto</SelectItem>
-                  <SelectItem value="individual">Empleados específicos</SelectItem>
-                </SelectContent>
-              </Select>
-              <FieldDescription>
-                {nivelAsignacion === 'empresa' 
-                  ? 'Se asignará a todos los empleados de la empresa' 
-                  : nivelAsignacion === 'equipo'
-                  ? 'Selecciona un equipo para asignar su jornada a todos sus miembros'
-                  : 'Selecciona empleados específicos'}
-              </FieldDescription>
-            </Field>
-
-            {nivelAsignacion === 'equipo' && (
-              <Field className="mt-3">
-                <FieldLabel>Seleccionar equipo</FieldLabel>
-                <Select value={equipoSeleccionado} onValueChange={setEquipoSeleccionado}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Elige un equipo" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {equipos.map(eq => (
-                      <SelectItem key={eq.id} value={eq.id}>
-                        {eq.nombre} ({eq.miembros})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </Field>
-            )}
-
-            {nivelAsignacion === 'individual' && (
-              <Field className="mt-3">
-                <FieldLabel>Seleccionar empleados</FieldLabel>
-                <div className="border rounded-md p-4 space-y-2 max-h-64 overflow-y-auto mt-2">
-                  {empleados.map(empleado => (
-                    <div key={empleado.id} className="flex items-center gap-2">
-                      <Checkbox
-                        checked={empleadosSeleccionados.includes(empleado.id)}
-                        onCheckedChange={() => toggleEmpleado(empleado.id)}
-                      />
-                      <span className="text-sm">{empleado.nombre} {empleado.apellidos}</span>
-                    </div>
-                  ))}
-                </div>
-                <FieldDescription>
-                  {empleadosSeleccionados.length} empleado{empleadosSeleccionados.length !== 1 ? 's' : ''} seleccionado{empleadosSeleccionados.length !== 1 ? 's' : ''}
-                </FieldDescription>
-              </Field>
-            )}
-          </div>
-
-          {/* Días de la semana - SIEMPRE VISIBLE */}
-          <div className="mt-6 pt-6 border-t">
-            <h3 className="text-base font-semibold text-gray-900 mb-3">Días laborables</h3>
-            <FieldLabel>Días de la semana</FieldLabel>
-            <div className="flex gap-2 mt-3">
-              {[
-                { key: 'lunes', label: 'Lun', configKey: 'lunes' },
-                { key: 'martes', label: 'Mar', configKey: 'martes' },
-                { key: 'miercoles', label: 'Mie', configKey: 'miercoles' },
-                { key: 'jueves', label: 'Jue', configKey: 'jueves' },
-                { key: 'viernes', label: 'Vie', configKey: 'viernes' },
-                { key: 'sabado', label: 'Sab', configKey: 'sabado' },
-                { key: 'domingo', label: 'Dom', configKey: 'domingo' },
-              ].map((dia) => {
-                const horarioDia = horariosFijos[dia.configKey as keyof typeof horariosFijos];
-                const activo = horarioDia?.activo ?? false;
-                
-                return (
-                  <button
-                    key={dia.key}
-                    type="button"
-                    onClick={() => {
-                      if (!esPredefinida) {
-                        setHorariosFijos(prev => ({
-                          ...prev,
-                          [dia.configKey]: { 
-                            ...prev[dia.configKey as keyof typeof prev], 
-                            activo: !activo 
-                          },
-                        }));
-                      }
-                    }}
-                    disabled={esPredefinida}
-                    className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                      activo
-                        ? 'bg-gray-900 text-white'
-                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                    } ${esPredefinida ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}`}
-                  >
-                    {dia.label}
-                  </button>
-                );
-              })}
-            </div>
-            {tipoJornada === 'flexible' && (
-              <FieldDescription className="mt-2">
-                Los días marcados son laborables. El empleado distribuirá las horas semanales libremente en estos días.
-              </FieldDescription>
-            )}
-          </div>
-
-          {/* Pausa mínima - UNIFICADO para ambos tipos */}
-          {!esPredefinida && (
-            <Field className="mt-3">
-              <FieldLabel htmlFor="descanso">Tiempo de descanso (opcional)</FieldLabel>
-              <Input
-                id="descanso"
-                type="time"
-                step={60}
-                value={tipoJornada === 'flexible' ? descansoFlexible : (usarDescanso && horariosFijos.lunes?.pausa_inicio) || ''}
-                onChange={(e) => {
-                  if (tipoJornada === 'flexible') {
-                    setDescansoFlexible(e.target.value);
-                  } else {
-                    // Para jornadas fijas, aplicar el mismo descanso a todos los días
-                    setUsarDescanso(!!e.target.value);
-                    if (e.target.value) {
-                      const [h, m] = e.target.value.split(':');
-                      const pausaInicio = '14:00'; // Hora por defecto para inicio de pausa
-                      const pausaFin = `${(parseInt(h) + 14).toString().padStart(2, '0')}:${m}`;
-                      
-                      Object.keys(horariosFijos).forEach(dia => {
-                        if (horariosFijos[dia as keyof typeof horariosFijos]?.activo) {
-                          setHorariosFijos(prev => ({
-                            ...prev,
-                            [dia]: {
-                              ...prev[dia as keyof typeof prev],
-                              pausa_inicio: pausaInicio,
-                              pausa_fin: pausaFin,
-                            },
-                          }));
-                        }
-                      });
-                    }
-                  }
-                }}
-                placeholder="00:30"
-              />
-              <FieldDescription>
-                {tipoJornada === 'flexible' 
-                  ? 'Descanso mínimo obligatorio que se tendrá en cuenta al cuadrar fichajes y calcular balances.'
-                  : 'Tiempo de descanso que se aplicará a todos los días laborables (de 14:00 a la hora correspondiente).'}
-              </FieldDescription>
-            </Field>
-          )}
-
-          {/* Horarios específicos (solo si es tipo fija) */}
-          {tipoJornada === 'fija' && !esPredefinida && (
-            <div className="mt-3">
-              <FieldLabel>Horarios por día</FieldLabel>
-                <div className="space-y-3 mt-3">
-                  {Object.entries(horariosFijos)
-                    .filter(([_, horario]) => horario.activo)
-                    .map(([dia, horario]) => (
-                    <div key={dia} className="flex items-center gap-4">
-                      <span className="w-24 capitalize text-sm">{dia}</span>
-                      <Input
-                        type="time"
-                        value={horario.entrada}
-                        onChange={(e) => {
-                          setHorariosFijos(prev => ({
-                            ...prev,
-                            [dia]: { ...prev[dia as keyof typeof prev], entrada: e.target.value },
-                          }));
-                        }}
-                        className="w-32"
-                      />
-                      <span className="text-gray-400">-</span>
-                      <Input
-                        type="time"
-                        value={horario.salida}
-                        onChange={(e) => {
-                          setHorariosFijos(prev => ({
-                            ...prev,
-                            [dia]: { ...prev[dia as keyof typeof prev], salida: e.target.value },
-                          }));
-                        }}
-                        className="w-32"
-                      />
-                    </div>
-                  ))}
-                </div>
-            </div>
-          )}
-
-          {/* Límites de fichaje */}
-          {!esPredefinida && (
-            <div className="mt-6 pt-6 border-t">
-              <div className="grid grid-cols-2 gap-4">
-                <Field>
-                  <FieldLabel htmlFor="limiteInferior">Límite inferior</FieldLabel>
-                  <Input
-                    id="limiteInferior"
-                    type="time"
-                    value={limiteInferior}
-                    onChange={(e) => setLimiteInferior(e.target.value)}
-                    placeholder="08:00"
-                  />
-                  <FieldDescription>Hora mínima de fichaje</FieldDescription>
-                </Field>
-
-                <Field>
-                  <FieldLabel htmlFor="limiteSuperior">Límite superior</FieldLabel>
-                  <Input
-                    id="limiteSuperior"
-                    type="time"
-                    value={limiteSuperior}
-                    onChange={(e) => setLimiteSuperior(e.target.value)}
-                    placeholder="20:00"
-                  />
-                  <FieldDescription>Hora máxima de fichaje</FieldDescription>
-                </Field>
-              </div>
-            </div>
-          )}
-        </FieldGroup>
+        <JornadaFormFields
+          data={formData}
+          onChange={setFormData}
+          errors={errors}
+          disabled={esPredefinida}
+          showAsignacion={true}
+          nivelAsignacion={nivelAsignacion}
+          onNivelAsignacionChange={setNivelAsignacion}
+          empleados={empleados}
+          empleadosSeleccionados={empleadosSeleccionados}
+          onEmpleadosSeleccionChange={setEmpleadosSeleccionados}
+          equipos={equipos}
+          equipoSeleccionado={equipoSeleccionado}
+          onEquipoSeleccionadoChange={setEquipoSeleccionado}
+        />
 
         <DialogFooter className="gap-2">
           {modo === 'editar' && !esPredefinida && (

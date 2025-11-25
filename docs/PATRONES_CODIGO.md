@@ -518,6 +518,120 @@ vi.mock('@/lib/openai', () => ({
 
 ---
 
+## 👤 Avatar Components
+
+### EmployeeAvatar (Componente Unificado)
+
+**Siempre usa `EmployeeAvatar` para renderizar avatares de empleados.** Este componente centraliza la lógica de avatares, asegurando consistencia visual y comportamiento uniforme.
+
+```typescript
+// ✅ GOOD: Usar EmployeeAvatar
+import { EmployeeAvatar } from '@/components/shared/employee-avatar';
+
+<EmployeeAvatar
+  nombre={empleado.nombre}
+  apellidos={empleado.apellidos}
+  fotoUrl={empleado.fotoUrl}
+  size="md"
+/>
+
+// ❌ BAD: Implementación manual duplicada
+<Avatar>
+  <AvatarImage src={empleado.fotoUrl} />
+  <AvatarFallback>{getInitials(empleado.nombre)}</AvatarFallback>
+</Avatar>
+```
+
+**Tamaños disponibles:**
+- `xs`: 24x24px (text-[10px])
+- `sm`: 32x32px (text-xs)
+- `md`: 48x48px (text-base) - **default**
+- `lg`: 64x64px (text-lg)
+- `xl`: 80x80px (text-xl)
+
+**Props personalizables:**
+```typescript
+<EmployeeAvatar
+  nombre="María"
+  apellidos="García López"
+  fotoUrl="https://..."
+  size="lg"
+  className="border-2 border-primary" // Clases adicionales
+  fallbackClassName="text-sm"         // Override tamaño texto fallback
+  fallbackContent={<UserIcon />}      // Contenido custom para fallback
+  alt="Foto de perfil de María"       // Alt text para accesibilidad
+/>
+```
+
+**Fuente de datos:**
+- **Siempre usar `empleado.fotoUrl`** como fuente única de verdad
+- El campo `usuario.avatar` está deprecado y no debe usarse
+- En APIs y queries, siempre incluir `fotoUrl: true` en el select de Prisma
+
+```typescript
+// ✅ GOOD: Incluir fotoUrl en queries
+const empleado = await prisma.empleado.findUnique({
+  where: { id },
+  select: {
+    id: true,
+    nombre: true,
+    apellidos: true,
+    fotoUrl: true, // Siempre incluir
+  },
+});
+
+// ✅ GOOD: Usar fotoUrl en componentes
+<EmployeeAvatar
+  nombre={empleado.nombre}
+  apellidos={empleado.apellidos}
+  fotoUrl={empleado.fotoUrl}
+/>
+```
+
+**AvatarCell (Para tablas):**
+Para celdas de tabla con avatar + nombre, usa `AvatarCell`:
+
+```typescript
+import { AvatarCell } from '@/components/shared/data-table';
+
+// En definición de columnas
+{
+  id: 'nombre',
+  header: 'Nombre',
+  cell: (row) => (
+    <AvatarCell
+      nombre={row.nombre}
+      apellidos={row.apellidos}
+      fotoUrl={row.fotoUrl}
+      subtitle={row.puesto}
+      compact={isMobile}
+    />
+  ),
+}
+```
+
+**Subida de avatares:**
+- Endpoint: `POST /api/empleados/[id]/avatar`
+- Formato: FormData con campo `file`
+- Validación: JPG/PNG/WEBP, máx. 2MB
+- Almacenamiento: Hetzner Object Storage con ACL `public-read`
+
+```typescript
+// ✅ GOOD: Subir avatar
+const formData = new FormData();
+formData.append('file', file);
+
+const response = await fetch(`/api/empleados/${empleadoId}/avatar`, {
+  method: 'POST',
+  body: formData,
+});
+
+const { url } = await response.json();
+// El avatar se actualiza automáticamente en empleado.fotoUrl
+```
+
+---
+
 ## 📝 Code Comments
 
 ```typescript
@@ -540,5 +654,5 @@ const empleado = await prisma.empleado.findUnique({ where: { id } });
 
 ---
 
-**Versión**: 1.0  
-**Última actualización**: 25 de octubre 2025
+**Versión**: 1.1  
+**Última actualización**: 27 de enero 2025

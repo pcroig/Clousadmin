@@ -6,9 +6,8 @@
 
 import { type LucideIcon } from 'lucide-react';
 
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { EmployeeAvatar } from '@/components/shared/employee-avatar';
 import { MOBILE_DESIGN } from '@/lib/constants/mobile-design';
-import { getAvatarStyle } from '@/lib/design-system';
 import { cn } from '@/lib/utils';
 
 import { EmptyState } from './empty-state';
@@ -210,39 +209,45 @@ export function DataTable<T extends object>({
  * - Mobile: avatar más pequeño, texto compacto
  * - Desktop: tamaño normal
  */
-export function AvatarCell({ 
-  nombre, 
+interface AvatarCellProps {
+  nombre?: string | null;
+  apellidos?: string | null;
+  fotoUrl?: string | null;
+  avatar?: string | null; // Backward compatibility
+  subtitle?: string;
+  compact?: boolean;
+}
+
+export function AvatarCell({
+  nombre,
+  apellidos,
+  fotoUrl,
   avatar,
   subtitle,
   compact = false,
-}: { 
-  nombre: string; 
-  avatar?: string;
-  subtitle?: string;
-  compact?: boolean;
-}) {
-  const avatarStyle = getAvatarStyle(nombre);
+}: AvatarCellProps) {
+  const resolvedNombre = nombre ?? 'Empleado';
+  const resolvedFotoUrl = fotoUrl ?? avatar ?? null;
 
   return (
     <div className={cn('flex items-center', compact ? 'gap-2' : 'gap-2 sm:gap-3')}>
-      <Avatar className={cn(compact ? 'h-7 w-7 sm:h-9 sm:w-9' : 'h-9 w-9')}>
-        {avatar && <AvatarImage src={avatar} />}
-        <AvatarFallback
-          className={cn(
-            'font-semibold uppercase',
-            compact ? 'text-[10px] sm:text-xs' : 'text-xs'
-          )}
-          style={avatarStyle}
-        >
-          {getInitials(nombre)}
-        </AvatarFallback>
-      </Avatar>
+      <EmployeeAvatar
+        nombre={resolvedNombre}
+        apellidos={apellidos}
+        fotoUrl={resolvedFotoUrl}
+        size={compact ? 'sm' : 'md'}
+        className={cn(
+          compact ? 'h-7 w-7 sm:h-9 sm:w-9' : 'h-9 w-9',
+          'flex-shrink-0'
+        )}
+        fallbackClassName={compact ? 'text-[10px] sm:text-xs' : 'text-xs'}
+      />
       <div className="min-w-0 flex-1">
         <span className={cn(
           'font-medium block truncate',
           compact && 'text-xs sm:text-sm'
         )}>
-          {nombre}
+          {resolvedNombre}
         </span>
         {subtitle && (
           <span className={cn(

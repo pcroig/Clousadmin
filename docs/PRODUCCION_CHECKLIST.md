@@ -1,6 +1,6 @@
 # ✅ Checklist de Producción - Clousadmin
 
-Última actualización: 17/11/2025
+Última actualización: 24/11/2025
 
 ---
 
@@ -22,8 +22,10 @@
 - [ ] Crons instalados (`scripts/hetzner/setup-cron.sh`).
 
 ## 3. Despliegue
-- [ ] `npm install` + `npm run build` ejecutados en el servidor.
-- [ ] `npx prisma migrate deploy`.
+- [ ] `npm ci` ejecutado en el servidor (instala todas las dependencias, incluidas devDependencies necesarias para el build).
+- [ ] `npx prisma generate` + `npx prisma migrate deploy`.
+- [ ] `NODE_OPTIONS="--max-old-space-size=8192" npm run build` ejecutado correctamente.
+- [ ] Verificar que `.next/prerender-manifest.json` existe antes de reiniciar.
 - [ ] `pm2 restart clousadmin`.
 - [ ] `pm2 start scripts/start-worker.js --name clousadmin-worker` (si no existe).
 - [ ] `pm2 save`.
@@ -45,6 +47,20 @@
 ## 5. Smoke tests (ver `scripts/smoke-tests.sh`)
 - [ ] Login HR/Admin.
 - [ ] Subida de documento en `/hr/documentos`.
+- [ ] Creación de ausencia y aprobación.
+- [ ] Importación de nóminas + publicación.
+- [ ] Generación de export gestoria.
+- [ ] Firma digital: solicitar y firmar documento.
+- [ ] Upload nómina en empleado → disponible en `/empleado/mi-espacio/nominas`.
+- [ ] Notificaciones push internas visibles.
+
+## 6. Post-deploy
+- [ ] Revisar métricas (CPU, RAM, disco).
+- [ ] Revisar costos en Hetzner (storage + tráfico).
+- [ ] Revisar logs durante primeras 2 horas.
+- [ ] Documentar en `docs/daily/` la ejecución y resultados.
+
+
 - [ ] Creación de ausencia y aprobación.
 - [ ] Importación de nóminas + publicación.
 - [ ] Generación de export gestoria.

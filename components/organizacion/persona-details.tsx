@@ -6,10 +6,8 @@
 
 import { Calendar, CreditCard, DollarSign, Mail, MapPin, Phone } from 'lucide-react';
 
-import { getInitials } from '@/components/shared/utils';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { EmployeeAvatar } from '@/components/shared/employee-avatar';
 import { Button } from '@/components/ui/button';
-import { getAvatarStyle } from '@/lib/design-system';
 
 interface PersonaDetailsProps {
   empleado: {
@@ -39,7 +37,6 @@ interface PersonaDetailsProps {
 
 export function PersonaDetails({ empleado }: PersonaDetailsProps) {
 
-  const avatarStyle = getAvatarStyle(empleado.nombre);
   const fotoUrl = empleado.fotoUrl ?? empleado.avatar ?? undefined;
 
   const formatDate = (date: Date | null) => {
@@ -63,15 +60,12 @@ export function PersonaDetails({ empleado }: PersonaDetailsProps) {
     <div className="space-y-6">
       {/* Header con Avatar */}
       <div className="flex flex-col items-center text-center pb-6 border-b border-gray-200">
-        <Avatar className="h-20 w-20 mb-3">
-          {fotoUrl && <AvatarImage src={fotoUrl} />}
-          <AvatarFallback
-            className="text-lg font-semibold uppercase"
-            style={avatarStyle}
-          >
-            {getInitials(empleado.nombre)}
-          </AvatarFallback>
-        </Avatar>
+        <EmployeeAvatar
+          nombre={empleado.nombre}
+          fotoUrl={fotoUrl}
+          size="xl"
+          className="mb-3"
+        />
         <h3 className="text-lg font-semibold text-gray-900">{empleado.nombre}</h3>
         <p className="text-sm text-gray-500">{empleado.puesto}</p>
         <span
