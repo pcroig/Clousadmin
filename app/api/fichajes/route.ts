@@ -11,6 +11,7 @@ import {
   createdResponse,
   forbiddenResponse,
   handleApiError,
+  isNextResponse,
   requireAuth,
   successResponse,
   validateRequest,
@@ -43,7 +44,7 @@ export async function GET(req: NextRequest) {
   try {
     // Verificar autenticación
     const authResult = await requireAuth(req);
-    if (authResult instanceof NextResponse) return authResult;
+    if (isNextResponse(authResult)) return authResult;
     const { session } = authResult;
 
     // Validar que la sesión tiene empresaId
@@ -228,12 +229,12 @@ export async function POST(req: NextRequest) {
   try {
     // Verificar autenticación
     const authResult = await requireAuth(req);
-    if (authResult instanceof NextResponse) return authResult;
+    if (isNextResponse(authResult)) return authResult;
     const { session } = authResult;
 
     // Validar request body
     const validationResult = await validateRequest(req, fichajeEventoCreateSchema);
-    if (validationResult instanceof NextResponse) return validationResult;
+    if (isNextResponse(validationResult)) return validationResult;
     const { data: validatedData } = validationResult;
 
     // 3. Determinar fecha y hora

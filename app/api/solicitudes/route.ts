@@ -9,6 +9,7 @@ import {
   createdResponse,
   forbiddenResponse,
   handleApiError,
+  isNextResponse,
   requireAuth,
   successResponse,
   validateRequest,
@@ -30,7 +31,7 @@ export async function GET(request: NextRequest) {
   try {
     // Verificar autenticación
     const authResult = await requireAuth(request);
-    if (authResult instanceof NextResponse) return authResult;
+    if (isNextResponse(authResult)) return authResult;
     const { session } = authResult;
 
     const searchParams = request.nextUrl.searchParams;
@@ -87,7 +88,7 @@ export async function POST(request: NextRequest) {
   try {
     // Verificar autenticación
     const authResult = await requireAuth(request);
-    if (authResult instanceof NextResponse) return authResult;
+    if (isNextResponse(authResult)) return authResult;
     const { session } = authResult;
 
     // Solo empleados pueden crear solicitudes de cambio
@@ -97,7 +98,7 @@ export async function POST(request: NextRequest) {
 
     // Validar request body
     const validationResult = await validateRequest(request, solicitudCreateSchema);
-    if (validationResult instanceof NextResponse) return validationResult;
+    if (isNextResponse(validationResult)) return validationResult;
     const { data: validatedData } = validationResult;
 
     const solicitud = await prisma.solicitudCambio.create({

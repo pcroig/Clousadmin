@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-import { handleApiError, requireAuth } from '@/lib/api-handler';
+import { handleApiError, isNextResponse, requireAuth } from '@/lib/api-handler';
 import { logAccesoSensibles } from '@/lib/auditoria';
 import { prisma } from '@/lib/prisma';
 
 export async function POST(request: NextRequest) {
   try {
     const authResult = await requireAuth(request);
-    if (authResult instanceof NextResponse) {
+    if (isNextResponse(authResult)) {
       return authResult;
     }
 

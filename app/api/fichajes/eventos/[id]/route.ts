@@ -7,6 +7,7 @@ import { z } from 'zod';
 
 import {
   handleApiError,
+  isNextResponse,
   notFoundResponse,
   requireAuth,
   successResponse,
@@ -26,14 +27,14 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
   try {
     // Verificar autenticación
     const authResult = await requireAuth(req);
-    if (authResult instanceof NextResponse) return authResult;
+    if (isNextResponse(authResult)) return authResult;
     const { session } = authResult;
 
     const { id } = params;
 
     // Validar request body
     const validationResult = await validateRequest(req, fichajeEventoUpdateSchema);
-    if (validationResult instanceof NextResponse) return validationResult;
+    if (isNextResponse(validationResult)) return validationResult;
     const { data: validatedData } = validationResult;
 
     const { tipo, hora, motivoEdicion } = validatedData;
@@ -79,7 +80,7 @@ export async function DELETE(_req: NextRequest, context: { params: Promise<{ id:
   try {
     // Verificar autenticación
     const authResult = await requireAuth(_req);
-    if (authResult instanceof NextResponse) return authResult;
+    if (isNextResponse(authResult)) return authResult;
     const { session } = authResult;
 
     const { id } = params;

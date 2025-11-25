@@ -29,6 +29,15 @@ export interface AuthenticatedContext {
   request: NextRequest;
 }
 
+/**
+ * Determina si el valor es una respuesta de Next.js/Fetch API
+ * NextResponse extiende Response, pero en tests solemos usar Response nativo.
+ * Este helper permite detectar ambos casos de forma segura.
+ */
+export function isNextResponse(value: unknown): value is NextResponse {
+  return value instanceof Response;
+}
+
 // ========================================
 // Authentication Helpers
 // ========================================
@@ -315,7 +324,7 @@ export async function requireAuthAndRole(
 ): Promise<{ session: SessionData } | NextResponse> {
   const authResult = await requireAuth(req);
   
-  if (authResult instanceof NextResponse) {
+  if (isNextResponse(authResult)) {
     return authResult;
   }
   

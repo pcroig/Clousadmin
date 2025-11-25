@@ -9,6 +9,7 @@ import {
   badRequestResponse,
   createdResponse,
   handleApiError,
+  isNextResponse,
   requireAuth,
   successResponse,
   validateRequest,
@@ -27,7 +28,7 @@ const crearCorreccionSchema = z.object({
 export async function POST(req: NextRequest) {
   try {
     const authResult = await requireAuth(req);
-    if (authResult instanceof NextResponse) return authResult;
+    if (isNextResponse(authResult)) return authResult;
     const { session } = authResult;
 
     if (!session.user.empleadoId) {
@@ -35,7 +36,7 @@ export async function POST(req: NextRequest) {
     }
 
     const validation = await validateRequest(req, crearCorreccionSchema);
-    if (validation instanceof NextResponse) return validation;
+    if (isNextResponse(validation)) return validation;
 
     const { fichajeId, motivo, nuevaFecha, nuevaHora } = validation.data;
 
@@ -117,7 +118,7 @@ async function getManagerEmpleadoIds(managerEmpleadoId: string) {
 export async function GET(req: NextRequest) {
   try {
     const authResult = await requireAuth(req);
-    if (authResult instanceof NextResponse) return authResult;
+    if (isNextResponse(authResult)) return authResult;
     const { session } = authResult;
 
     const paramsValidation = obtenerCorreccionesSchema.safeParse({

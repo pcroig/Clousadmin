@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 import {
   handleApiError,
+  isNextResponse,
   requireAuth,
   successResponse,
 } from '@/lib/api-handler';
@@ -21,7 +22,7 @@ export async function POST(request: NextRequest) {
   try {
     // Verificar autenticación (puede ser ejecutado por cron o por HR admin)
     const authResult = await requireAuth(request);
-    if (authResult instanceof NextResponse) return authResult;
+    if (isNextResponse(authResult)) return authResult;
     const { session: _session } = authResult;
 
     console.info('[Procesar Fichajes] Iniciando procesamiento de solicitudes pendientes');

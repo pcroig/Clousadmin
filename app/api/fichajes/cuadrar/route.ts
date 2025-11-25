@@ -8,6 +8,7 @@ import { z } from 'zod';
 
 import {
   handleApiError,
+  isNextResponse,
   requireAuthAsHR,
   successResponse,
   validateRequest
@@ -32,12 +33,12 @@ export async function POST(request: NextRequest) {
   try {
     // Verificar autenticación y rol HR Admin
     const authResult = await requireAuthAsHR(request);
-    if (authResult instanceof NextResponse) return authResult;
+    if (isNextResponse(authResult)) return authResult;
     const { session } = authResult;
 
     // Validar request body
     const validationResult = await validateRequest(request, cuadrarSchema);
-    if (validationResult instanceof NextResponse) return validationResult;
+    if (isNextResponse(validationResult)) return validationResult;
     const { data: validatedData } = validationResult;
 
     const { fichajeIds } = validatedData;

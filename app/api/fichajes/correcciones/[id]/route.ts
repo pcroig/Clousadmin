@@ -8,6 +8,7 @@ import { z } from 'zod';
 import {
   forbiddenResponse,
   handleApiError,
+  isNextResponse,
   notFoundResponse,
   requireAuthAsHROrManager,
   successResponse,
@@ -59,11 +60,11 @@ export async function PATCH(
     const params = await context.params;
   try {
     const authResult = await requireAuthAsHROrManager(req);
-    if (authResult instanceof NextResponse) return authResult;
+    if (isNextResponse(authResult)) return authResult;
     const { session } = authResult;
 
     const validation = await validateRequest(req, accionSchema);
-    if (validation instanceof NextResponse) return validation;
+    if (isNextResponse(validation)) return validation;
 
     const { accion, motivoRespuesta } = validation.data;
 
@@ -142,7 +143,7 @@ export async function PATCH(
 
     return successResponse(actualizada);
   } catch (error) {
-    if (error instanceof NextResponse) {
+    if (isNextResponse(error)) {
       return error;
     }
     return handleApiError(error, 'API PATCH /api/fichajes/correcciones/[id]');

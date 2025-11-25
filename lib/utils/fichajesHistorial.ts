@@ -35,6 +35,7 @@ export interface JornadaUI {
   fecha: Date;
   fichaje: FichajeNormalizado;
   horasTrabajadas: number;
+  horasObjetivo: number;
   entrada: Date | null;
   salida: Date | null;
   balance: number;
@@ -217,6 +218,7 @@ export function agruparFichajesEnJornadas(
         fecha: fechaDate,
         fichaje: fichajeNormalizado,
         horasTrabajadas,
+        horasObjetivo,
         entrada,
         salida,
         balance,

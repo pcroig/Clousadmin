@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-import { handleApiError, requireAuthAsHR } from '@/lib/api-handler';
+import { handleApiError, isNextResponse, requireAuthAsHR } from '@/lib/api-handler';
 import { logAccesoSensibles } from '@/lib/auditoria';
 import { buildEmpleadoExcelBuffer, loadEmpleadoExportData } from '@/lib/empleados/export-data';
 import { prisma } from '@/lib/prisma';
@@ -12,7 +12,7 @@ export async function GET(
     const params = await context.params;
   try {
     const authResult = await requireAuthAsHR(request);
-    if (authResult instanceof NextResponse) {
+    if (isNextResponse(authResult)) {
       return authResult;
     }
     const { session } = authResult;

@@ -4,6 +4,7 @@
 |------|----------|---------------|--------------|------|
 | Revisar solicitudes con IA | `POST /api/cron/revisar-solicitudes` | `crontab` en Hetzner | Diario 02:00 UTC | `/var/log/clousadmin-cron.log` |
 | Cerrar jornadas anteriores | `POST /api/cron/clasificar-fichajes` | `crontab` en Hetzner | Diario 23:30 UTC | `/var/log/clousadmin-cron.log` |
+| Renovar saldo horas extra | `POST /api/cron/renovar-saldo-horas` | `crontab` en Hetzner | 1 de enero 00:10 UTC | `/var/log/clousadmin-cron.log` |
 | Backup base de datos | `scripts/backup-db.sh` | `crontab` en Hetzner | Diario 02:00 UTC | `/var/log/clousadmin-cron.log` |
 
 ## Configuración Actual
@@ -24,6 +25,11 @@ APP_URL=                  # URL de la aplicación (ej: https://app.hrcron.com)
 SOLICITUDES_PERIODO_REVISION_HORAS=48  # Umbral horas para auto-revisar solicitudes (opcional)
 CRON_ALERT_WEBHOOK=       # Opcional. Webhook HTTPS (Slack/Teams) para alertas de fallo
 ```
+
+### Renovar saldo de horas extra
+- Resetea automáticamente `saldoRenovadoDesde` de todos los empleados activos cada 1 de enero.
+- El endpoint soporta `?force=1` para ejecuciones manuales (por ejemplo, tras una migración).
+- El código tiene una guarda interna, de modo que si se invoca fuera del 1 de enero sin `force`, devuelve `ejecutado=false` y no realiza cambios.
 
 ## Verificación
 

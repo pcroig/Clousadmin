@@ -189,6 +189,7 @@ Se calcula para:
 - **No destructivo**: No elimina fichajes históricos, solo cambia la fecha base de cálculo
 - **Endpoint**: `POST /api/empleados/[id]/renovar-saldo` (HR Admin)
 - **Consulta**: `GET /api/empleados/[id]/renovar-saldo` para obtener fecha de última renovación
+- **Renovación automática**: Cron `POST /api/cron/renovar-saldo-horas` se ejecuta cada 1 de enero (00:10 UTC) y actualiza `saldoRenovadoDesde` de todos los empleados activos. Puede forzarse con `?force=1`.
 
 ---
 
