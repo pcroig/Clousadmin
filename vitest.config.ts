@@ -74,13 +74,9 @@ export default defineConfig({
     // ========================================
     // POOLING
     // ========================================
-    // Threads para paralelización
+    // Threads para paralelización (Vitest gestiona automáticamente,
+    // sin opciones adicionales para mantener compatibilidad tipada)
     pool: 'threads',
-    poolOptions: {
-      threads: {
-        singleThread: false, // Permitir paralelización
-      },
-    },
 
     // ========================================
     // INCLUDE / EXCLUDE
