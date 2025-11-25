@@ -2,6 +2,7 @@ import Image from 'next/image';
 import { redirect } from 'next/navigation';
 
 import { getSession } from '@/lib/auth';
+import { prisma } from '@/lib/prisma';
 import { obtenerInvitacionSignupPorToken, verificarInvitacionSignup } from '@/lib/invitaciones-signup';
 
 import { SignupForm } from './signup-form';
@@ -9,6 +10,50 @@ import { SignupForm } from './signup-form';
 
 interface SignupPageProps {
   searchParams: Promise<{ token?: string }>;
+}
+
+type WaitlistPrefill = {
+  nombreEmpresa?: string | null;
+  nombre?: string | null;
+  apellidos?: string | null;
+} | null;
+
+function splitNombreCompleto(nombre?: string | null): { nombre?: string; apellidos?: string } {
+  if (!nombre) {
+    return {};
+  }
+
+  const partes = nombre.trim().split(/\s+/);
+  if (partes.length === 0) {
+    return {};
+  }
+
+  if (partes.length === 1) {
+    return { nombre: partes[0] };
+  }
+
+  return {
+    nombre: partes[0],
+    apellidos: partes.slice(1).join(' '),
+  };
+}
+
+async function obtenerWaitlistPrefill(email: string): Promise<WaitlistPrefill> {
+  const entry = await prisma.waitlist.findUnique({
+    where: { email: email.toLowerCase() },
+  });
+
+  if (!entry) {
+    return null;
+  }
+
+  const { nombre, apellidos } = splitNombreCompleto(entry.nombre);
+
+  return {
+    nombreEmpresa: entry.empresa,
+    nombre: nombre ?? undefined,
+    apellidos: apellidos ?? undefined,
+  };
 }
 
 export default async function SignupPage(props: SignupPageProps) {
@@ -52,13 +97,19 @@ export default async function SignupPage(props: SignupPageProps) {
     }
   }
 
+  const waitlistPrefill = await obtenerWaitlistPrefill(invitacion.email);
+
   return (
     <div className="grid min-h-svh lg:grid-cols-2">
       {/* Columna izquierda: Formulario */}
       <div className="flex flex-col gap-4 p-6 md:p-10">
         <div className="flex flex-1 items-center justify-center">
           <div className="w-full max-w-xl">
-            <SignupForm token={token} emailInvitacion={invitacion.email || ''} />
+            <SignupForm
+              token={token}
+              emailInvitacion={invitacion.email || ''}
+              prefill={waitlistPrefill ?? undefined}
+            />
           </div>
         </div>
       </div>

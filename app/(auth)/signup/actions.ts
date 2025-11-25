@@ -57,6 +57,11 @@ export async function signupEmpresaAction(
       };
     }
 
+    // Verificar si tenemos datos previos en waitlist (para sincronizar)
+    const waitlistEntry = await prisma.waitlist.findUnique({
+      where: { email: validatedData.email.toLowerCase() },
+    });
+
     // Verificar que el email no exista ya como usuario
     const existingUser = await prisma.usuario.findUnique({
       where: { email: validatedData.email.toLowerCase() },
@@ -152,6 +157,22 @@ export async function signupEmpresaAction(
         activo: result.usuario.activo,
       },
     });
+
+    // 7. Mantener sincronizada la entrada en waitlist (si venía de ahí)
+    if (waitlistEntry) {
+      const nombreCompleto = `${validatedData.nombre} ${validatedData.apellidos}`.trim();
+      try {
+        await prisma.waitlist.update({
+          where: { id: waitlistEntry.id },
+          data: {
+            nombre: nombreCompleto || waitlistEntry.nombre,
+            empresa: validatedData.nombreEmpresa || waitlistEntry.empresa,
+          },
+        });
+      } catch (syncError) {
+        console.error('[signupEmpresaAction] Error sincronizando waitlist:', syncError);
+      }
+    }
 
     return {
       success: true,

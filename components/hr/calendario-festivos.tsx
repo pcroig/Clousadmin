@@ -7,9 +7,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { Calendar, CalendarDayButton } from '@/components/ui/calendar';
-import type { DiasLaborables } from '@/lib/calculos/dias-laborables';
+import {
+  type DiasLaborables,
+} from '@/lib/calculos/dias-laborables.definitions';
 import { cn } from '@/lib/utils';
 import { parseJson } from '@/lib/utils/json';
+
 import type { Festivo } from '@/types/festivos';
 
 interface FestivosResponse {
@@ -81,7 +84,10 @@ export function CalendarioFestivos({
 
     if (festivoExistente) {
       onRequestEdit(festivoExistente);
+      return;
     }
+
+    onRequestCreate(fechaStr);
   }
 
   const esDiaLaborable = useCallback(

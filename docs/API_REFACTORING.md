@@ -95,6 +95,31 @@ verifyEmpresaAccess(session: SessionData, resourceEmpresaId: string): NextRespon
 verifyEmpleadoAccess(session: SessionData, empleadoId: string): Promise<NextResponse | null>
 ```
 
+#### **Rate Limiting**
+```typescript
+// Verificar rate limit para el request actual
+// Retorna 429 si se excede el límite
+requireRateLimit(req: NextRequest, isWrite?: boolean): Promise<NextResponse | null>
+
+// Helper completo: Rate Limit + Auth + Role
+// Ideal para APIs POST/PATCH/DELETE que requieren autenticación
+requireRateLimitAuthAndRole(
+  req: NextRequest,
+  allowedRoles: string[],
+  isWrite?: boolean
+): Promise<{ session: SessionData } | NextResponse>
+
+// Helper completo para endpoints HR: Rate Limit + Auth HR Admin
+requireRateLimitAuthHR(req: NextRequest, isWrite?: boolean): Promise<{ session: SessionData } | NextResponse>
+```
+
+**Nota sobre Rate Limiting:**
+- Los límites se aplican por IP del cliente
+- **GET requests**: 100 requests/minuto
+- **POST/PATCH/DELETE**: 50 requests/minuto
+- Si se excede el límite, retorna 429 con headers `X-RateLimit-*` y `Retry-After`
+- El sistema degrada graciosamente si falla el rate limiting (permite el request)
+
 ---
 
 ## 📝 Patrón de Uso
@@ -283,8 +308,8 @@ Ver [ARQUITECTURA.md](ARQUITECTURA.md#3-paginación-en-apis-2025-01-27) para má
 
 ### 2. **Optimizaciones Adicionales**
 - [x] ✅ Implementar paginación en APIs de listado (completado 2025-01-27)
+- [x] ✅ Implementar rate limiting en APIs críticas (completado - helpers disponibles en `api-handler.ts`)
 - [ ] Revisar y optimizar queries Prisma (N+1)
-- [ ] Implementar rate limiting en APIs críticas
 - [ ] Cache para endpoints frecuentes (`unstable_cache`)
 
 ### 3. **Documentación API**
@@ -371,6 +396,56 @@ export async function POST(req: NextRequest) {
 
 **Última actualización**: 27 de enero 2025  
 **Mantenido por**: Equipo de Desarrollo Clousadmin
+
+---
+
+## 🔒 Rate Limiting (2025-01-27)
+
+### Implementación
+
+Se han añadido helpers de rate limiting a `lib/api-handler.ts` para proteger las APIs contra abuso:
+
+**Funciones disponibles:**
+- `requireRateLimit()` - Verifica rate limit básico
+- `requireRateLimitAuthAndRole()` - Combina rate limit + auth + rol
+- `requireRateLimitAuthHR()` - Helper específico para endpoints HR
+
+**Límites configurados:**
+- **APIs de lectura (GET)**: 100 requests/minuto por IP
+- **APIs de escritura (POST/PATCH/DELETE)**: 50 requests/minuto por IP
+
+**Ejemplo de uso:**
+```typescript
+export async function POST(req: NextRequest) {
+  try {
+    // Rate limit + Auth + Role en una sola llamada
+    const authResult = await requireRateLimitAuthHR(req, true);
+    if (authResult instanceof Response) return authResult;
+    const { session } = authResult;
+
+    // ... resto de la lógica
+  } catch (error) {
+    return handleApiError(error, 'API POST /api/[recurso]');
+  }
+}
+```
+
+**Respuesta cuando se excede el límite:**
+```json
+{
+  "error": "Demasiadas solicitudes",
+  "retryAfter": 60,
+  "message": "Has excedido el límite de solicitudes. Por favor, espera 60 segundos."
+}
+```
+
+**Headers HTTP incluidos:**
+- `X-RateLimit-Limit`: Límite máximo
+- `X-RateLimit-Remaining`: Solicitudes restantes (0 cuando se excede)
+- `X-RateLimit-Reset`: Timestamp de cuando se resetea el límite
+- `Retry-After`: Segundos a esperar antes de reintentar
+
+**Nota**: El sistema degrada graciosamente si falla el rate limiting (permite el request) para evitar que errores en el sistema de rate limiting bloqueen las APIs.
 
 
 

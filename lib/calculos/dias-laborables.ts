@@ -4,6 +4,10 @@
 
 import { prisma } from '@/lib/prisma';
 
+import { DIAS_LABORABLES_DEFAULT } from './dias-laborables.definitions';
+
+import type { DiasLaborables } from './dias-laborables.definitions';
+
 export type FestivosSet = Set<string>;
 
 type FestivoConFecha = {
@@ -49,26 +53,6 @@ export async function getFestivosActivosEnRango(
     },
   });
 }
-
-export interface DiasLaborables {
-  lunes: boolean;
-  martes: boolean;
-  miercoles: boolean;
-  jueves: boolean;
-  viernes: boolean;
-  sabado: boolean;
-  domingo: boolean;
-}
-
-export const DIAS_LABORABLES_DEFAULT: DiasLaborables = {
-  lunes: true,
-  martes: true,
-  miercoles: true,
-  jueves: true,
-  viernes: true,
-  sabado: false,
-  domingo: false,
-};
 
 /**
  * Obtiene la configuración de días laborables de una empresa
@@ -273,6 +257,9 @@ export async function getDiasNoLaborables(
 
   return diasNoLaborables;
 }
+
+export { DIAS_LABORABLES_DEFAULT } from './dias-laborables.definitions';
+export type { DiasLaborables } from './dias-laborables.definitions';
 
 
 

@@ -18,7 +18,6 @@ const AnalyticsClient = dynamic(() => import('./analytics-client').then((mod) =>
       </div>
     </div>
   ),
-  ssr: false, // Charts no necesitan SSR
 });
 
 export default async function InformesPage() {

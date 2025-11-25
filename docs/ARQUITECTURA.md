@@ -702,11 +702,86 @@ function MiComponente() {
 
 ---
 
+## 🔔 Sistema de Notificaciones
+
+**Ubicación**: `lib/notificaciones.ts` (35 funciones)
+
+Sistema dual: **notificaciones in-app** (base de datos) + **emails** (Resend) para acciones críticas.
+
+### Notificaciones Implementadas
+
+- **Ausencias**: solicitada, aprobada, rechazada, cancelada, auto-aprobada
+- **Fichajes**: autocompletado, requiere revisión, resuelto
+- **Solicitudes**: creada, aprobada, rechazada, requiere revisión
+- **Documentos**: generado, pendiente rellenar, generación lote
+- **Firmas**: pendiente, completada
+- **Nóminas**: disponible, validada, complementos pendientes
+- **Empleados**: creado, cambio manager, cambio puesto, jornada asignada, asignado equipo
+- **Campañas**: creada, completada, cuadrada
+- **Onboarding**: completado
+- **Denuncias**: recibida, actualizada
+
+### Características
+
+- ✅ Tipo-safe con tipos específicos (35 tipos)
+- ✅ Metadata con URLs de redirección por rol
+- ✅ Iconos dinámicos según tipo
+- ✅ Prioridad configurable (baja, normal, alta, crítica)
+- ✅ Widget + pantalla completa con misma funcionalidad
+- ✅ Integración con sistema de permisos
+
+---
+
+## 📧 Sistema de Emails
+
+**Stack**: React Email + Resend
+**Ubicación**: `lib/emails/` (componentes reutilizables)
+
+### Arquitectura
+
+```
+lib/emails/
+├── components/        # Layout, Button, Heading, Text, Footer, Link
+├── templates/         # Emails por categoría
+│   ├── auth/         # Signup, waitlist, password recovery
+│   ├── onboarding/   # Bienvenida empleados
+│   ├── documentos/   # Firmas pendientes
+│   └── nominas/      # Nóminas disponibles
+└── utils/            # Renderizado a HTML/text
+```
+
+### Emails Disponibles
+
+1. **Autenticación**: signup invitation, waitlist (confirmation, invitation, internal), password recovery/reset
+2. **Onboarding**: employee welcome
+3. **Documentos**: firma pendiente *(nuevo)*
+4. **Nóminas**: nómina disponible *(nuevo)*
+
+### Uso
+
+```typescript
+import { sendFirmaPendienteEmail, sendNominaDisponibleEmail } from '@/lib/email';
+
+await sendFirmaPendienteEmail(email, nombre, documento, url);
+await sendNominaDisponibleEmail(email, nombre, 'Enero', 2025, url);
+```
+
+**Ventajas**:
+- ✅ Diseño consistente (basado en Vercel)
+- ✅ Componentes reutilizables
+- ✅ Type-safe con TypeScript
+- ✅ Responsive por defecto
+- ✅ Preview en desarrollo con React Email
+
+---
+
 ## 📝 Próximos Pasos
 
 - Implementar auto-completado de fichajes
 - ✅ Integrar Hetzner Object Storage para documentos (completado)
 - ✅ Sistema de uploads avanzado con progress tracking (completado)
+- ✅ Sistema de notificaciones completo (completado)
+- ✅ Sistema de emails con React Email (completado)
 - Implementar IA para extracción de datos
 - Tests unitarios e integración
 
@@ -743,11 +818,12 @@ function MiComponente() {
 
 ---
 
-**Versión**: 1.4
-**Última actualización**: 27 de enero 2025
-**Cambios**: 
-- Agregado sistema de uploads avanzado con progress tracking, streaming, rate limiting y componentes reutilizables
-- Implementada paginación en todas las APIs de listado
-- Creadas utilidades centralizadas para fechas y números
-- Optimizadas operaciones masivas con transacciones
-- Mejorada gestión de estado en componentes complejos
+**Versión**: 1.5
+**Última actualización**: 25 de noviembre 2025
+**Cambios**:
+- ✅ Sistema de notificaciones completo (35 tipos, URLs por rol, metadata)
+- ✅ Sistema de emails migrado a React Email (9 emails, componentes reutilizables)
+- ✅ Agregado sistema de uploads avanzado con progress tracking, streaming, rate limiting
+- ✅ Implementada paginación en todas las APIs de listado
+- ✅ Creadas utilidades centralizadas para fechas y números
+- ✅ Optimizadas operaciones masivas con transacciones

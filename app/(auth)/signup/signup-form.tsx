@@ -5,6 +5,7 @@
 // ========================================
 
 import { Loader2 } from 'lucide-react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useRef, useState } from 'react';
 import { toast } from 'sonner';
@@ -25,12 +26,19 @@ import { Label } from '@/components/ui/label';
 import { signupEmpresaAction } from './actions';
 
 
+interface SignupPrefill {
+  nombreEmpresa?: string | null;
+  nombre?: string | null;
+  apellidos?: string | null;
+}
+
 interface SignupFormProps {
   token: string;
   emailInvitacion: string;
+  prefill?: SignupPrefill;
 }
 
-export function SignupForm({ token, emailInvitacion }: SignupFormProps) {
+export function SignupForm({ token, emailInvitacion, prefill }: SignupFormProps) {
   const router = useRouter();
   
   // Estado del paso actual (0-5)
@@ -40,15 +48,15 @@ export function SignupForm({ token, emailInvitacion }: SignupFormProps) {
   const [finalizando, setFinalizando] = useState(false);
   
   // Estado del formulario inicial (paso 0)
-  const [formData, setFormData] = useState({
-    nombreEmpresa: '',
+  const [formData, setFormData] = useState(() => ({
+    nombreEmpresa: prefill?.nombreEmpresa ?? '',
     webEmpresa: '',
-    nombre: '',
-    apellidos: '',
+    nombre: prefill?.nombre ?? '',
+    apellidos: prefill?.apellidos ?? '',
     email: emailInvitacion, // Pre-rellenar con email de la invitación
     password: '',
     consentimientoTratamiento: false,
-  });
+  }));
   
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -334,11 +342,20 @@ export function SignupForm({ token, emailInvitacion }: SignupFormProps) {
           {loading ? 'Creando cuenta...' : 'Crear cuenta y continuar'}
         </Button>
 
-        <div className="text-center pt-4">
-          <span className="text-sm text-gray-500">¿Ya tienes cuenta? </span>
-          <a href="/login" className="text-sm text-primary hover:underline">
-            Inicia sesión
-          </a>
+        <div className="space-y-3 pt-4">
+          <p className="text-center text-xs text-gray-500">
+            ¿Tu empresa usa Google Workspace? Tras crear la cuenta podrás iniciar sesión desde{' '}
+            <Link href="/login" className="text-primary hover:underline">
+              «Continuar con Google»
+            </Link>{' '}
+            usando este mismo email.
+          </p>
+          <div className="text-center">
+            <span className="text-sm text-gray-500">¿Ya tienes cuenta? </span>
+            <a href="/login" className="text-sm text-primary hover:underline">
+              Inicia sesión
+            </a>
+          </div>
         </div>
       </form>
       )}

@@ -15,11 +15,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  DIAS_LABORABLES_DEFAULT,
+  type DiasLaborables,
+} from '@/lib/calculos/dias-laborables.definitions';
+import { DEFAULT_JORNADA_FORM_VALUES } from '@/lib/jornadas/defaults';
 import { parseJson } from '@/lib/utils/json';
 
-import type { DiasLaborables } from '@/lib/calculos/dias-laborables';
-import { DIAS_LABORABLES_DEFAULT } from '@/lib/calculos/dias-laborables';
-import { DEFAULT_JORNADA_FORM_VALUES } from '@/lib/jornadas/defaults';
 import type { CalendarioJornadaOnboardingInput } from '@/lib/validaciones/schemas';
 
 type DiaKey = keyof DiasLaborables;
