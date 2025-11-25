@@ -46,7 +46,9 @@ jobs:
 
     environment:
       name: production
-      url: ${{ secrets.APP_URL }}
+
+    env:
+      APP_URL: ${{ secrets.APP_URL }}
 
     steps:
       - name: Checkout code
