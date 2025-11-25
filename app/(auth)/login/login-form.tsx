@@ -4,20 +4,12 @@
 // Login Form Component
 // ========================================
 
+import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { signIn } from 'next-auth/react';
 import { useEffect, useState } from 'react';
 
-import { WaitlistRequestForm } from '@/components/auth/WaitlistRequestForm';
 import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { UsuarioRol } from '@/lib/constants/enums';
@@ -38,7 +30,6 @@ export function LoginForm({ callbackUrl }: LoginFormProps) {
   const [googleLoading, setGoogleLoading] = useState(false);
   const [rateLimited, setRateLimited] = useState(false);
   const [retryAfter, setRetryAfter] = useState(0);
-  const [waitlistOpen, setWaitlistOpen] = useState(false);
 
   // Detectar errores en la URL (cuenta inactiva, OAuth, etc.)
   useEffect(() => {
@@ -246,29 +237,12 @@ export function LoginForm({ callbackUrl }: LoginFormProps) {
           <p className="text-sm text-gray-500">
             ¿No tienes cuenta? Necesitas una invitación para crear una cuenta.
           </p>
-          <Dialog open={waitlistOpen} onOpenChange={setWaitlistOpen}>
-            <DialogTrigger asChild>
-              <button
-                type="button"
-                className="text-sm text-primary hover:underline focus:outline-none"
-              >
-                Solicitar invitación
-              </button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-lg">
-              <DialogHeader>
-                <DialogTitle>Solicitar invitación</DialogTitle>
-                <DialogDescription>
-                  Déjanos tus datos y te avisaremos en cuanto habilitemos tu cuenta corporativa.
-                </DialogDescription>
-              </DialogHeader>
-              <WaitlistRequestForm
-                variant="dialog"
-                backLinkHref={undefined}
-                className="pt-2"
-              />
-            </DialogContent>
-          </Dialog>
+          <Link
+            href="/waitlist"
+            className="text-sm text-primary hover:underline focus:outline-none"
+          >
+            Solicitar invitación
+          </Link>
         </div>
       </div>
     </div>

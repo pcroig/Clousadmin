@@ -85,76 +85,85 @@ export async function setupTestDatabase() {
 export async function cleanDatabase() {
   const prisma = getPrismaTest();
 
-  try {
-    // ORDEN IMPORTANTE: Limpiar en orden inverso de dependencias
-    await prisma.$transaction([
-      // Tablas dependientes primero
-      prisma.firmaDocumento.deleteMany(),
-      prisma.documentoGenerado.deleteMany(),
-      prisma.documentoContrato.deleteMany(),
-      prisma.documentoProcesoOffboarding.deleteMany(),
-      prisma.campo.deleteMany(),
-      prisma.carpeta.deleteMany(),
-      prisma.plantilla.deleteMany(),
-      prisma.tipoDocumento.deleteMany(),
+  // Lista ordenada (dependencias inversas). Algunos modelos pueden haber sido eliminados;
+  // por eso validamos antes de llamar a deleteMany para evitar fallos en tests.
+  const modeloOrden: string[] = [
+    // Documentos
+    'firmaDocumento',
+    'documentoGenerado',
+    'documentoContrato',
+    'documentoProcesoOffboarding',
+    'campo',
+    'carpeta',
+    'plantilla',
+    'tipoDocumento',
+    // Ausencias y calendario
+    'ausencia',
+    'eventoCalendario',
+    'campanaVacaciones',
+    // Fichajes
+    'fichaje',
+    'correccionFichaje',
+    'bolsaHoras',
+    // Nóminas
+    'complementoNomina',
+    'eventoNomina',
+    'incidenciaNomina',
+    'nomina',
+    'tipoComplemento',
+    // Empleados y organización
+    'onboardingProgress',
+    'empleado',
+    'equipo',
+    'puesto',
+    'sede',
+    'jornada',
+    // Festivos
+    'festivo',
+    // Notificaciones
+    'notificacion',
+    // Denuncias
+    'denuncia',
+    // Billing
+    'subscription',
+    'product',
+    'price',
+    // Usuarios / empresa
+    'usuario',
+    'empresa',
+    // Solicitudes
+    'solicitud',
+    'solicitudCorreccionFichaje',
+    'solicitudEliminacionDatos',
+    'solicitudCambio',
+    // Integraciones
+    'calendarIntegration',
+    // Auditoría
+    'auditLog',
+  ];
 
-      // Ausencias y eventos
-      prisma.ausencia.deleteMany(),
-      prisma.eventoCalendario.deleteMany(),
-      prisma.campanaVacaciones.deleteMany(),
+  const prismaAny = prisma as Record<string, { deleteMany?: () => Promise<unknown> }>;
 
-      // Fichajes
-      prisma.fichaje.deleteMany(),
-      prisma.correccionFichaje.deleteMany(),
-      prisma.bolsaHoras.deleteMany(),
+  for (const modelo of modeloOrden) {
+    const tabla = prismaAny[modelo];
 
-      // Nóminas
-      prisma.complementoNomina.deleteMany(),
-      prisma.eventoNomina.deleteMany(),
-      prisma.incidenciaNomina.deleteMany(),
-      prisma.nomina.deleteMany(),
-      prisma.tipoComplemento.deleteMany(),
+    if (typeof tabla?.deleteMany !== 'function') {
+      console.warn(`[cleanDatabase] Modelo ${modelo} no existe, se omite en tests`);
+      continue;
+    }
 
-      // Empleados y relacionados
-      prisma.onboardingProgress.deleteMany(),
-      prisma.empleado.deleteMany(),
-      prisma.equipo.deleteMany(),
-      prisma.puesto.deleteMany(),
-      prisma.sede.deleteMany(),
-      prisma.jornada.deleteMany(),
+    try {
+      await tabla.deleteMany();
+    } catch (error: any) {
+      // Ignorar tablas que no existan en el esquema actual (P2021)
+      if (error?.code === 'P2021') {
+        console.warn(`[cleanDatabase] Tabla no encontrada para modelo ${modelo}, se omite`);
+        continue;
+      }
 
-      // Festivos
-      prisma.festivo.deleteMany(),
-
-      // Notificaciones
-      prisma.notificacion.deleteMany(),
-
-      // Denuncias
-      prisma.denuncia.deleteMany(),
-
-      // Billing
-      prisma.subscription.deleteMany(),
-      prisma.product.deleteMany(),
-      prisma.price.deleteMany(),
-
-      // Usuarios y empresa
-      prisma.usuario.deleteMany(),
-      prisma.empresa.deleteMany(),
-
-      // Solicitudes
-      prisma.solicitud.deleteMany(),
-
-      // Calendar integrations
-      prisma.calendarIntegration.deleteMany(),
-
-      // Auditoría (último)
-      prisma.auditLog.deleteMany(),
-    ]);
-
-    // console.log('✅ BD limpiada');
-  } catch (error) {
-    console.error('❌ Error limpiando BD:', error);
-    throw error;
+      console.error('❌ Error limpiando BD:', error);
+      throw error;
+    }
   }
 }
 

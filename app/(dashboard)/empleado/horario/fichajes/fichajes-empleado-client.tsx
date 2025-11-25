@@ -136,7 +136,7 @@ export function FichajesEmpleadoClient({ balanceInicial }: Props) {
         new Date(a.hora).getTime() - new Date(b.hora).getTime()
       );
 
-      const horasTrabajadas = calcularHorasTrabajadas(eventosOrdenados);
+      const horasTrabajadas = calcularHorasTrabajadas(eventosOrdenados) ?? 0;
 
       const entrada = eventosOrdenados.find(e => e.tipo === 'entrada');
       const salida = eventosOrdenados.find(e => e.tipo === 'salida');

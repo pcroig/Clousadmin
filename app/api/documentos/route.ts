@@ -22,6 +22,7 @@ import {
   validarNombreArchivo,
   validarTamanoArchivo,
 } from '@/lib/documentos';
+import { crearNotificacionDocumentoSubido } from '@/lib/notificaciones';
 import { prisma, Prisma } from '@/lib/prisma';
 import { getClientIP, rateLimitApiWrite } from '@/lib/rate-limit';
 import { deleteFromS3, shouldUseCloudStorage, uploadToS3 } from '@/lib/s3';
@@ -289,6 +290,22 @@ export async function POST(request: NextRequest) {
       });
 
       cleanupUpload = null;
+
+      // Notificar a HR cuando un empleado sube un documento
+      if (session.user.rol !== UsuarioRol.hr_admin && empleadoId && documento.empleado) {
+        try {
+          await crearNotificacionDocumentoSubido(prisma, {
+            documentoId: documento.id,
+            empresaId: session.user.empresaId,
+            empleadoId,
+            empleadoNombre: `${documento.empleado.nombre} ${documento.empleado.apellidos}`,
+            tipoDocumento: tipoDocumentoFinal,
+          });
+        } catch (notifError) {
+          console.error('[Documentos] Error creando notificación:', notifError);
+          // No fallar la subida si falla la notificación
+        }
+      }
 
       // Revalidar la página de la carpeta para mostrar el nuevo documento
       revalidatePath(`/hr/documentos/${carpetaId}`);

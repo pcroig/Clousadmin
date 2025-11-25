@@ -1207,6 +1207,13 @@ export async function crearNotificacionNominaDisponible(
   });
 }
 
+/**
+ * @deprecated Esta función no se utiliza. Los errores de nómina se gestionan
+ * directamente como alertas cuando se crea el evento de nómina, sin necesidad
+ * de notificaciones adicionales.
+ *
+ * Mantener comentada para referencia pero no usar en nuevas implementaciones.
+ */
 export async function crearNotificacionNominaError(
   prisma: PrismaClient,
   params: {
@@ -1217,6 +1224,9 @@ export async function crearNotificacionNominaError(
     error: string;
   }
 ) {
+  // Función deprecada - no usar
+  console.warn('[DEPRECATED] crearNotificacionNominaError no debería usarse. Los errores de nómina se gestionan como alertas directas.');
+
   const { nominaId, empresaId, empleadoNombre, error } = params;
 
   const usuarioIds = await obtenerUsuariosANotificar(prisma, empresaId, {
@@ -1320,7 +1330,7 @@ export async function crearNotificacionDocumentoSolicitado(
       tipoDocumento,
       ...(fechaLimite && { fechaLimite: fechaLimite.toISOString() }),
       prioridad: 'alta',
-      accionUrl: '/empleado/documentos',
+      accionUrl: '/empleado/mi-espacio/documentos',
       accionTexto: 'Subir documento',
     },
   });
@@ -1385,7 +1395,7 @@ export async function crearNotificacionDocumentoRechazado(
       tipoDocumento,
       motivo,
       prioridad: 'alta',
-      accionUrl: '/empleado/documentos',
+      accionUrl: '/empleado/mi-espacio/documentos',
       accionTexto: 'Volver a subir',
     },
   });
@@ -1555,7 +1565,7 @@ export async function crearNotificacionCampanaCreada(
       await crearNotificaciones(prisma, {
         empresaId,
         usuarioIds,
-        tipo: 'solicitud_creada', // Reutilizamos tipo genérico
+        tipo: 'campana_vacaciones_creada',
         titulo: 'Nueva campaña de vacaciones',
         mensaje: `Se ha iniciado la campaña "${titulo}" para planificar tus vacaciones del ${fechaInicio.toLocaleDateString('es-ES')} al ${fechaFin.toLocaleDateString('es-ES')}. Por favor, indica tus preferencias.`,
         metadata: {
@@ -1675,7 +1685,7 @@ export async function crearNotificacionOnboardingCompletado(
   await crearNotificaciones(prisma, {
     empresaId,
     usuarioIds,
-    tipo: 'solicitud_creada',
+    tipo: 'onboarding_completado',
     titulo: 'Onboarding completado',
     mensaje: `${empleadoNombre} ha completado su proceso de onboarding y está listo para comenzar.`,
     metadata: {

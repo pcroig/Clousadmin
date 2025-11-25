@@ -321,7 +321,7 @@ export async function POST(request: NextRequest) {
           });
 
           if (fichajeActualizado) {
-            const horasTrabajadas = calcularHorasTrabajadas(fichajeActualizado.eventos);
+          const horasTrabajadas = calcularHorasTrabajadas(fichajeActualizado.eventos) ?? 0;
             const horasEnPausa = calcularTiempoEnPausa(fichajeActualizado.eventos);
 
             await prisma.fichaje.update({

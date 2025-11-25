@@ -152,7 +152,7 @@ export function FichajeBarMobile() {
     if (state.eventos.length === 0) {
       return 0;
     }
-    return calcularHorasTrabajadas(state.eventos);
+    return calcularHorasTrabajadas(state.eventos) ?? 0;
   }, [state.eventos, tick]);
 
   const tiempoTrabajado = useMemo(

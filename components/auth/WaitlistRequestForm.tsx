@@ -10,11 +10,9 @@ import { agregarAWaitlistAction } from '@/app/(auth)/waitlist/actions';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 
 interface WaitlistRequestFormProps {
-  variant?: 'page' | 'dialog';
   title?: string;
   description?: string;
   successTitle?: string;
@@ -25,7 +23,6 @@ interface WaitlistRequestFormProps {
 }
 
 export function WaitlistRequestForm({
-  variant = 'page',
   title,
   description,
   successTitle,
@@ -38,35 +35,27 @@ export function WaitlistRequestForm({
     nombre: '',
     email: '',
     empresa: '',
-    mensaje: '',
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
 
-  const resolvedTitle =
-    title ||
-    (variant === 'dialog' ? 'Solicitar invitación' : 'Lista de espera');
-  const resolvedDescription =
-    description ||
-    (variant === 'dialog'
-      ? 'Comparte tus datos y te avisaremos cuando abramos nuevas plazas.'
-      : 'Solicita una invitación para crear tu cuenta en Clousadmin');
+  const DEFAULT_TITLE = 'En un periquete te doy acceso';
+  const DEFAULT_DESCRIPTION = 'Solo es un pequeño filtro para impostores!!';
+
+  const resolvedTitle = title || DEFAULT_TITLE;
+  const resolvedDescription = description || DEFAULT_DESCRIPTION;
   const resolvedSuccessTitle =
     successTitle ||
-    (variant === 'dialog'
-      ? '¡Solicitud enviada!'
-      : '¡Te hemos añadido a la lista!');
+    '¡Te hemos añadido a la lista!';
   const resolvedSuccessDescription =
     successDescription ||
     'Te notificaremos cuando tengamos una invitación disponible.';
-  const resolvedBackLink =
-    backLinkHref ?? (variant === 'page' ? '/login' : undefined);
-
-  const headingAlignment = variant === 'dialog' ? 'text-left' : 'text-center';
+  const resolvedBackLink = backLinkHref ?? '/login';
+  const headingAlignment = 'text-center';
 
   const handleChange = (
-    event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+    event: React.ChangeEvent<HTMLInputElement>
   ) => {
     const { name, value } = event.target;
     setFormData((prev) => ({
@@ -84,8 +73,7 @@ export function WaitlistRequestForm({
       const result = await agregarAWaitlistAction(
         formData.email.trim(),
         formData.nombre.trim() || undefined,
-        formData.empresa.trim() || undefined,
-        formData.mensaje.trim() || undefined
+        formData.empresa.trim() || undefined
       );
 
       if (result.success) {
@@ -94,7 +82,6 @@ export function WaitlistRequestForm({
           nombre: '',
           email: '',
           empresa: '',
-          mensaje: '',
         });
         onSuccess?.();
       } else {
@@ -191,18 +178,6 @@ export function WaitlistRequestForm({
           />
         </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="mensaje">Contexto (opcional)</Label>
-          <Textarea
-            id="mensaje"
-            name="mensaje"
-            placeholder="Cuéntanos qué necesitas o cuándo planeas implementar Clousadmin"
-            value={formData.mensaje}
-            onChange={handleChange}
-            rows={variant === 'dialog' ? 3 : 4}
-          />
-        </div>
-
         {error && (
           <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
             {error}
@@ -214,11 +189,6 @@ export function WaitlistRequestForm({
         </Button>
       </form>
 
-      {variant === 'dialog' && (
-        <p className="text-xs text-muted-foreground">
-          Responderemos en menos de 24h laborales. Solo aceptamos cuentas corporativas.
-        </p>
-      )}
     </div>
   );
 }

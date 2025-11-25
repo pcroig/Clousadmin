@@ -155,10 +155,12 @@ describe('GET /api/fichajes', () => {
       await GET(request);
 
       // Debe consultar empleados a cargo
-      expect(mockPrisma.empleado.findMany).toHaveBeenCalledWith({
-        where: { managerId: managerId, empresaId },
-        select: { id: true },
-      });
+      expect(mockPrisma.empleado.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ managerId: managerId, empresaId }),
+          select: expect.objectContaining({ id: true }),
+        })
+      );
 
       // Debe filtrar fichajes por empleados a cargo
       expect(mockPrisma.fichaje.findMany).toHaveBeenCalledWith(

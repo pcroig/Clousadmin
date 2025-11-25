@@ -14,6 +14,7 @@ import { WidgetCard } from '@/components/shared/widget-card';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { getSession } from '@/lib/auth';
 import { UsuarioRol } from '@/lib/constants/enums';
+import { hasSubscriptionTable } from '@/lib/platform/subscriptions';
 import { prisma } from '@/lib/prisma';
 
 type PlatformMetrics = {
@@ -64,28 +65,49 @@ async function getPlatformMetrics(): Promise<PlatformMetrics> {
   };
 }
 
+type CompanyQueryRow = {
+  id: string;
+  nombre: string;
+  activo: boolean;
+  createdAt: Date;
+  subscriptions?: {
+    id: string;
+    status: string;
+    cancelAtPeriodEnd: boolean;
+    currentPeriodEnd: Date | null;
+  }[];
+};
+
 async function getCompanyRows(): Promise<CompanyStatusRow[]> {
+  const includeSubscriptions = await hasSubscriptionTable();
+
   const [companies, activeEmployees] = await Promise.all([
-    prisma.empresa.findMany({
-      orderBy: { createdAt: 'desc' },
-      take: 25,
-      select: {
-        id: true,
-        nombre: true,
-        activo: true,
-        createdAt: true,
-        subscriptions: {
-          orderBy: { createdAt: 'desc' },
-          take: 1,
-          select: {
-            id: true,
-            status: true,
-            cancelAtPeriodEnd: true,
-            currentPeriodEnd: true,
-          },
+    prisma.empresa
+      .findMany({
+        orderBy: { createdAt: 'desc' },
+        take: 25,
+        select: {
+          id: true,
+          nombre: true,
+          activo: true,
+          createdAt: true,
+          ...(includeSubscriptions
+            ? {
+                subscriptions: {
+                  orderBy: { createdAt: 'desc' },
+                  take: 1,
+                  select: {
+                    id: true,
+                    status: true,
+                    cancelAtPeriodEnd: true,
+                    currentPeriodEnd: true,
+                  },
+                },
+              }
+            : {}),
         },
-      },
-    }),
+      })
+      .then((rows) => rows as CompanyQueryRow[]),
     prisma.empleado.groupBy({
       by: ['empresaId'],
       where: {
@@ -102,23 +124,27 @@ async function getCompanyRows(): Promise<CompanyStatusRow[]> {
     return acc;
   }, {});
 
-  return companies.map((company) => ({
-    id: company.id,
-    nombre: company.nombre,
-    activo: company.activo,
-    createdAt: company.createdAt.toISOString(),
-    activeEmployees: employeeMap[company.id] ?? 0,
-    subscription: company.subscriptions[0]
-      ? {
-          id: company.subscriptions[0].id,
-          status: company.subscriptions[0].status,
-          cancelAtPeriodEnd: company.subscriptions[0].cancelAtPeriodEnd,
-          currentPeriodEnd: company.subscriptions[0].currentPeriodEnd
-            ? company.subscriptions[0].currentPeriodEnd.toISOString()
-            : null,
-        }
-      : null,
-  }));
+  return companies.map((company) => {
+    const latestSubscription = company.subscriptions?.[0];
+
+    return {
+      id: company.id,
+      nombre: company.nombre,
+      activo: company.activo,
+      createdAt: company.createdAt.toISOString(),
+      activeEmployees: employeeMap[company.id] ?? 0,
+      subscription: latestSubscription
+        ? {
+            id: latestSubscription.id,
+            status: latestSubscription.status,
+            cancelAtPeriodEnd: latestSubscription.cancelAtPeriodEnd,
+            currentPeriodEnd: latestSubscription.currentPeriodEnd
+              ? latestSubscription.currentPeriodEnd.toISOString()
+              : null,
+          }
+        : null,
+    };
+  });
 }
 
 export default async function PlatformInvitationsPage() {

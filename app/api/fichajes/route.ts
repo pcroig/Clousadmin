@@ -193,16 +193,17 @@ export async function GET(req: NextRequest) {
       const key = `${fichaje.empleadoId}_${fechaBase.toISOString().split('T')[0]}`;
 
       const horasEsperadas = horasEsperadasMap[key] ?? 0;
+      const eventos = fichaje.eventos ?? [];
 
       const horasTrabajadas =
         fichaje.horasTrabajadas !== null && fichaje.horasTrabajadas !== undefined
           ? Number(fichaje.horasTrabajadas)
-          : calcularHorasTrabajadas(fichaje.eventos);
+          : calcularHorasTrabajadas(eventos) ?? 0;
 
       const horasEnPausa =
         fichaje.horasEnPausa !== null && fichaje.horasEnPausa !== undefined
           ? Number(fichaje.horasEnPausa)
-          : calcularTiempoEnPausa(fichaje.eventos);
+          : calcularTiempoEnPausa(eventos);
 
       const balance = Math.round((horasTrabajadas - horasEsperadas) * 100) / 100;
 
@@ -335,7 +336,7 @@ export async function POST(req: NextRequest) {
       orderBy: { hora: 'asc' },
     });
     
-    const horasTrabajadas = calcularHorasTrabajadas(todosEventos);
+    const horasTrabajadas = calcularHorasTrabajadas(todosEventos) ?? 0;
     const horasEnPausa = calcularTiempoEnPausa(todosEventos);
 
     // 9. Validar si el fichaje está completo después de agregar el evento

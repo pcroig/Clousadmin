@@ -85,57 +85,67 @@ export async function obtenerEstadoFichaje(empleadoId: string): Promise<EstadoFi
 /**
  * Calcula las horas trabajadas a partir de los eventos de un fichaje
  */
-export function calcularHorasTrabajadas(eventos: FichajeEvento[]): number {
-  if (eventos.length === 0) return 0;
+export function calcularHorasTrabajadas(eventos: FichajeEvento[]): number | null {
+  if (eventos.length === 0) return null;
 
-  // Ordenar por hora
-  const ordenados = [...eventos].sort((a, b) => 
-    new Date(a.hora).getTime() - new Date(b.hora).getTime()
+  const ordenados = [...eventos].sort(
+    (a, b) => new Date(a.hora).getTime() - new Date(b.hora).getTime()
   );
 
   let horasTotales = 0;
   let inicioTrabajo: Date | null = null;
+  let estado: 'sin_fichar' | 'trabajando' | 'en_pausa' | 'finalizado' = 'sin_fichar';
 
   for (const evento of ordenados) {
     const hora = new Date(evento.hora);
 
     switch (evento.tipo) {
-      case 'entrada':
+      case 'entrada': {
+        if (estado === 'trabajando' || estado === 'en_pausa') {
+          return null;
+        }
+        estado = 'trabajando';
         inicioTrabajo = hora;
         break;
-
-      case 'pausa_inicio':
-        if (inicioTrabajo) {
-          // Sumar tiempo trabajado hasta la pausa
-          const tiempoTrabajado = (hora.getTime() - inicioTrabajo.getTime()) / (1000 * 60 * 60);
-          horasTotales += tiempoTrabajado;
-          inicioTrabajo = null;
+      }
+      case 'pausa_inicio': {
+        if (estado !== 'trabajando' || !inicioTrabajo) {
+          return null;
         }
+        const tiempoTrabajado = (hora.getTime() - inicioTrabajo.getTime()) / (1000 * 60 * 60);
+        horasTotales += tiempoTrabajado;
+        inicioTrabajo = null;
+        estado = 'en_pausa';
         break;
-
-      case 'pausa_fin':
-        inicioTrabajo = hora; // Reiniciar trabajo
-        break;
-
-      case 'salida':
-        if (inicioTrabajo) {
-          // Sumar tiempo trabajado desde última entrada/reanudación
-          const tiempoTrabajado = (hora.getTime() - inicioTrabajo.getTime()) / (1000 * 60 * 60);
-          horasTotales += tiempoTrabajado;
-          inicioTrabajo = null;
+      }
+      case 'pausa_fin': {
+        if (estado !== 'en_pausa') {
+          return null;
         }
+        estado = 'trabajando';
+        inicioTrabajo = hora;
+        break;
+      }
+      case 'salida': {
+        if (estado !== 'trabajando' || !inicioTrabajo) {
+          return null;
+        }
+        const tiempoTrabajado = (hora.getTime() - inicioTrabajo.getTime()) / (1000 * 60 * 60);
+        horasTotales += tiempoTrabajado;
+        inicioTrabajo = null;
+        estado = 'finalizado';
+        break;
+      }
+      default:
         break;
     }
   }
 
-  // Si sigue trabajando (sin salida), calcular hasta ahora
-  if (inicioTrabajo) {
-    const ahora = new Date();
-    const tiempoTrabajado = (ahora.getTime() - inicioTrabajo.getTime()) / (1000 * 60 * 60);
-    horasTotales += tiempoTrabajado;
+  if (estado === 'trabajando' || estado === 'en_pausa') {
+    return null;
   }
 
-  return Math.round(horasTotales * 100) / 100; // Redondear a 2 decimales
+  return Math.round(horasTotales * 100) / 100;
 }
 
 /**
@@ -144,8 +154,8 @@ export function calcularHorasTrabajadas(eventos: FichajeEvento[]): number {
 export function calcularTiempoEnPausa(eventos: FichajeEvento[]): number {
   if (eventos.length === 0) return 0;
 
-  const ordenados = [...eventos].sort((a, b) => 
-    new Date(a.hora).getTime() - new Date(b.hora).getTime()
+  const ordenados = [...eventos].sort(
+    (a, b) => new Date(a.hora).getTime() - new Date(b.hora).getTime()
   );
 
   let tiempoPausaTotal = 0;
@@ -155,6 +165,10 @@ export function calcularTiempoEnPausa(eventos: FichajeEvento[]): number {
     const hora = new Date(evento.hora);
 
     if (evento.tipo === 'pausa_inicio') {
+      if (inicioPausa) {
+        // Ya hay una pausa abierta sin cerrar: ignorar el nuevo inicio para evitar inconsistencias
+        continue;
+      }
       inicioPausa = hora;
     } else if (evento.tipo === 'pausa_fin' && inicioPausa) {
       const tiempoPausa = (hora.getTime() - inicioPausa.getTime()) / (1000 * 60 * 60);
@@ -163,23 +177,117 @@ export function calcularTiempoEnPausa(eventos: FichajeEvento[]): number {
     }
   }
 
-  // Si sigue en pausa (sin fin de pausa), calcular hasta ahora
-  if (inicioPausa) {
-    const ahora = new Date();
-    const tiempoPausa = (ahora.getTime() - inicioPausa.getTime()) / (1000 * 60 * 60);
-    tiempoPausaTotal += tiempoPausa;
-  }
-
+  // Pausas sin cerrar NO se cuentan (fail-open)
   return Math.round(tiempoPausaTotal * 100) / 100;
 }
 
 /**
  * Valida si un empleado puede agregar un evento al fichaje según su estado actual
  */
-export async function validarEvento(
+type ValidacionEvento = { valido: boolean; error?: string };
+
+function obtenerEstadoDesdeEventos(
+  eventos: Pick<FichajeEvento, 'tipo' | 'hora'>[]
+): EstadoFichaje | 'invalido' {
+  if (eventos.length === 0) {
+    return 'sin_fichar';
+  }
+
+  let estado: EstadoFichaje = 'sin_fichar';
+  const ordenados = [...eventos].sort(
+    (a, b) => new Date(a.hora).getTime() - new Date(b.hora).getTime()
+  );
+  let ultimoTimestamp: Date | null = null;
+
+  for (const evento of ordenados) {
+    const hora = new Date(evento.hora);
+    if (ultimoTimestamp && hora.getTime() < ultimoTimestamp.getTime()) {
+      return 'invalido';
+    }
+    ultimoTimestamp = hora;
+
+    switch (evento.tipo) {
+      case 'entrada':
+        if (estado === 'trabajando' || estado === 'en_pausa') {
+          return 'invalido';
+        }
+        estado = 'trabajando';
+        break;
+      case 'pausa_inicio':
+        if (estado !== 'trabajando') return 'invalido';
+        estado = 'en_pausa';
+        break;
+      case 'pausa_fin':
+        if (estado !== 'en_pausa') return 'invalido';
+        estado = 'trabajando';
+        break;
+      case 'salida':
+        if (estado !== 'trabajando') return 'invalido';
+        estado = 'finalizado';
+        break;
+      default:
+        return 'invalido';
+    }
+  }
+
+  return estado;
+}
+
+function validarEventoEnMemoria(
+  eventos: Pick<FichajeEvento, 'tipo' | 'hora'>[],
+  nuevoEvento: Pick<FichajeEvento, 'tipo' | 'hora'>
+): ValidacionEvento {
+  const estadoActual = obtenerEstadoDesdeEventos(eventos);
+
+  if (estadoActual === 'invalido') {
+    return { valido: false, error: 'Secuencia de eventos inválida' };
+  }
+
+  const ultimoEvento = [...eventos].sort(
+    (a, b) => new Date(a.hora).getTime() - new Date(b.hora).getTime()
+  ).pop();
+
+  if (ultimoEvento) {
+    const ultimo = new Date(ultimoEvento.hora).getTime();
+    const nuevo = new Date(nuevoEvento.hora).getTime();
+    if (nuevo < ultimo) {
+      return { valido: false, error: 'El evento debe ser posterior al último registro' };
+    }
+  }
+
+  switch (nuevoEvento.tipo) {
+    case 'entrada':
+      if (estadoActual === 'trabajando' || estadoActual === 'en_pausa') {
+        return { valido: false, error: 'Ya existe una entrada activa' };
+      }
+      if (estadoActual === 'finalizado') {
+        return {
+          valido: false,
+          error: 'Ya has finalizado la jornada de hoy. Podrás iniciar una nueva jornada mañana.',
+        };
+      }
+      return { valido: true };
+    case 'pausa_inicio':
+      return estadoActual === 'trabajando'
+        ? { valido: true }
+        : { valido: false, error: 'Debes estar trabajando para pausar' };
+    case 'pausa_fin':
+      return estadoActual === 'en_pausa'
+        ? { valido: true }
+        : { valido: false, error: 'No estás en pausa' };
+    case 'salida':
+      return estadoActual === 'trabajando'
+        ? { valido: true }
+        : { valido: false, error: 'No tienes una jornada iniciada' };
+    default:
+      return { valido: false, error: 'Tipo de evento inválido' };
+  }
+}
+
+async function validarEventoRemoto(
   tipoEvento: string,
   empleadoId: string
-): Promise<{ valido: boolean; error?: string }> {
+): Promise<ValidacionEvento> {
   const estadoActual = await obtenerEstadoFichaje(empleadoId);
 
   switch (tipoEvento) {
@@ -221,6 +329,25 @@ export async function validarEvento(
   }
 
   return { valido: true };
+}
+
+export function validarEvento(
+  eventos: Pick<FichajeEvento, 'tipo' | 'hora'>[],
+  nuevoEvento: Pick<FichajeEvento, 'tipo' | 'hora'>
+): ValidacionEvento;
+export function validarEvento(tipoEvento: string, empleadoId: string): Promise<ValidacionEvento>;
+export function validarEvento(
+  arg1: Pick<FichajeEvento, 'tipo' | 'hora'>[] | string,
+  arg2: Pick<FichajeEvento, 'tipo' | 'hora'> | string
+): ValidacionEvento | Promise<ValidacionEvento> {
+  if (Array.isArray(arg1)) {
+    return validarEventoEnMemoria(
+      arg1,
+      arg2 as Pick<FichajeEvento, 'tipo' | 'hora'>
+    );
+  }
+
+  return validarEventoRemoto(arg1, arg2 as string);
 }
 
 /**
@@ -450,16 +577,17 @@ export async function obtenerHorasEsperadasBatch(
 
   const uniqueEmpleadoIds = Array.from(new Set(entradas.map((entrada) => entrada.empleadoId)));
 
-  const empleados = await prisma.empleado.findMany({
-    where: {
-      id: {
-        in: uniqueEmpleadoIds,
+  const empleados =
+    (await prisma.empleado.findMany({
+      where: {
+        id: {
+          in: uniqueEmpleadoIds,
+        },
       },
-    },
-    include: {
-      jornada: true,
-    },
-  });
+      include: {
+        jornada: true,
+      },
+    })) ?? [];
 
   const empleadoMap = new Map(empleados.map((empleado) => [empleado.id, empleado]));
   const resultado: Record<string, number> = {};
@@ -509,7 +637,7 @@ export async function actualizarCalculosFichaje(fichajeId: string): Promise<void
     throw new Error(`Fichaje ${fichajeId} no encontrado`);
   }
 
-  const horasTrabajadas = calcularHorasTrabajadas(fichaje.eventos);
+  const horasTrabajadas = calcularHorasTrabajadas(fichaje.eventos) ?? 0;
   const horasEnPausa = calcularTiempoEnPausa(fichaje.eventos);
 
   await prisma.fichaje.update({

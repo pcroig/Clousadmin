@@ -7,12 +7,14 @@ import { z } from 'zod';
 
 import {
   handleApiError,
+  isNextResponse,
   notFoundResponse,
   requireAuth,
   successResponse,
   validateRequest,
 } from '@/lib/api-handler';
 import { prisma } from '@/lib/prisma';
+import { calcularHorasTrabajadas, calcularTiempoEnPausa } from '@/lib/calculos/fichajes';
 
 const fichajeEventoSchema = z.object({
   fichajeId: z.string().uuid(),
@@ -26,12 +28,12 @@ export async function POST(req: NextRequest) {
   try {
     // Verificar autenticación
     const authResult = await requireAuth(req);
-    if (authResult instanceof Response) return authResult;
+    if (isNextResponse(authResult)) return authResult;
     const { session } = authResult;
 
     // Validar request body
     const validationResult = await validateRequest(req, fichajeEventoSchema);
-    if (validationResult instanceof Response) return validationResult;
+    if (isNextResponse(validationResult)) return validationResult;
     const { data: validatedData } = validationResult;
 
     const { fichajeId, tipo, hora, motivoEdicion } = validatedData;
@@ -39,6 +41,13 @@ export async function POST(req: NextRequest) {
     // Verificar que el fichaje existe y pertenece a la empresa
     const fichaje = await prisma.fichaje.findFirst({
       where: { id: fichajeId, empresaId: session.user.empresaId },
+      include: {
+        eventos: {
+          orderBy: {
+            hora: 'asc',
+          },
+        },
+      },
     });
     if (!fichaje) {
       return notFoundResponse('Fichaje no encontrado');
@@ -54,14 +63,16 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // Recalcular
-    const { calcularHorasTrabajadas, calcularTiempoEnPausa } = await import('@/lib/calculos/fichajes');
-    const actualizado = await prisma.fichaje.findUnique({ where: { id: fichajeId }, include: { eventos: true } });
-    if (actualizado) {
-      const horasTrabajadas = calcularHorasTrabajadas(actualizado.eventos);
-      const horasEnPausa = calcularTiempoEnPausa(actualizado.eventos);
-      await prisma.fichaje.update({ where: { id: fichajeId }, data: { horasTrabajadas, horasEnPausa } });
-    }
+    // Recalcular con eventos in-memory (incluyendo el recién creado)
+    const eventosParaCalculo = [...(fichaje.eventos ?? []), evento].sort(
+      (a, b) => new Date(a.hora).getTime() - new Date(b.hora).getTime()
+    );
+    const horasTrabajadas = calcularHorasTrabajadas(eventosParaCalculo) ?? 0;
+    const horasEnPausa = calcularTiempoEnPausa(eventosParaCalculo);
+    await prisma.fichaje.update({
+      where: { id: fichajeId },
+      data: { horasTrabajadas, horasEnPausa },
+    });
 
     return successResponse({ success: true, eventoId: evento.id });
   } catch (error) {

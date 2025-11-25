@@ -4,7 +4,7 @@
 // Helpers para parsear parámetros de paginación y construir metadatos
 
 const DEFAULT_PAGE = 1;
-const DEFAULT_LIMIT = 50;
+const DEFAULT_LIMIT = 20;
 const MAX_LIMIT = 200;
 
 export interface PaginationParams {
@@ -18,6 +18,7 @@ export interface PaginationMeta {
   limit: number;
   total: number;
   pages: number;
+  totalPages: number;
 }
 
 interface ParseOptions {
@@ -61,6 +62,7 @@ export function buildPaginationMeta(
     limit: safeLimit,
     total,
     pages,
+    totalPages: pages,
   };
 }
 

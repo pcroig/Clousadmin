@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 
 import { generateRecoveryToken } from '@/lib/auth';
-import { sendPasswordRecoveryEmail } from '@/lib/emails/password-recovery';
+import { sendPasswordRecoveryEmail } from '@/lib/email';
 import { prisma } from '@/lib/prisma';
 import { getClientIP, rateLimitLogin } from '@/lib/rate-limit';
 import { getJsonBody } from '@/lib/utils/json';

@@ -7,7 +7,7 @@ import {
   invalidateAllUserSessions,
   validateRecoveryToken,
 } from '@/lib/auth';
-import { sendPasswordResetConfirmationEmail } from '@/lib/emails/password-recovery';
+import { sendPasswordResetConfirmationEmail } from '@/lib/email';
 import { prisma } from '@/lib/prisma';
 import { getJsonBody } from '@/lib/utils/json';
 

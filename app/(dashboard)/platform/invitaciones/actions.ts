@@ -10,6 +10,7 @@ import { z } from 'zod';
 import { getSession } from '@/lib/auth';
 import { UsuarioRol } from '@/lib/constants/enums';
 import { convertirWaitlistEnInvitacion, crearInvitacionSignup } from '@/lib/invitaciones-signup';
+import { hasSubscriptionTable } from '@/lib/platform/subscriptions';
 import { prisma } from '@/lib/prisma';
 import { cancelSubscriptionAtPeriodEnd } from '@/lib/stripe/subscriptions';
 
@@ -114,20 +115,26 @@ export async function deactivateCompanyAction(rawEmpresaId: string): Promise<Act
     await assertPlatformAdmin();
     const { empresaId } = deactivateCompanySchema.parse({ empresaId: rawEmpresaId });
 
+    const includeSubscriptions = await hasSubscriptionTable();
+
     const company = await prisma.empresa.findUnique({
       where: { id: empresaId },
       select: {
         id: true,
         activo: true,
-        subscriptions: {
-          orderBy: { createdAt: 'desc' },
-          take: 1,
-          select: {
-            id: true,
-            status: true,
-            cancelAtPeriodEnd: true,
-          },
-        },
+        ...(includeSubscriptions
+          ? {
+              subscriptions: {
+                orderBy: { createdAt: 'desc' },
+                take: 1,
+                select: {
+                  id: true,
+                  status: true,
+                  cancelAtPeriodEnd: true,
+                },
+              },
+            }
+          : {}),
       },
     });
 
@@ -173,7 +180,7 @@ export async function deactivateCompanyAction(rawEmpresaId: string): Promise<Act
       });
     });
 
-    const activeSubscription = company.subscriptions[0];
+    const activeSubscription = company.subscriptions?.[0];
     if (activeSubscription && !activeSubscription.cancelAtPeriodEnd) {
       try {
         await cancelSubscriptionAtPeriodEnd(activeSubscription.id);

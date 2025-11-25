@@ -99,7 +99,7 @@ export function calcularHorasTrabajadasDelDia(fichaje?: FichajeConEventos): numb
     return Number(fichaje.horasTrabajadas);
   }
 
-  return calcularHorasTrabajadas(fichaje.eventos);
+  return calcularHorasTrabajadas(fichaje.eventos) ?? 0;
 }
 
 /**

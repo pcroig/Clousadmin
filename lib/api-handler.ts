@@ -240,15 +240,15 @@ export function createdResponse<T>(data: T): NextResponse {
 /**
  * Respuesta de no encontrado
  */
-export function notFoundResponse(message: string = 'Recurso no encontrado'): NextResponse {                                                                     
-  return NextResponse.json({ error: message }, { status: 404 });
+export function notFoundResponse(message: string = 'Recurso no encontrado'): NextResponse {
+  return NextResponse.json({ error: message, message }, { status: 404 });
 }
 
 /**
  * Respuesta de bad request
  */
-export function badRequestResponse(message: string, details?: unknown): NextResponse {                                                                          
-  const payload: { error: string; details?: unknown } = { error: message };
+export function badRequestResponse(message: string, details?: unknown): NextResponse {
+  const payload: { error: string; message: string; details?: unknown } = { error: message, message };
   if (typeof details !== 'undefined') {
     payload.details = details;
   }
@@ -259,8 +259,8 @@ export function badRequestResponse(message: string, details?: unknown): NextResp
 /**
  * Respuesta de forbidden (403)
  */
-export function forbiddenResponse(message: string = 'No autorizado'): NextResponse {                                                                            
-  return NextResponse.json({ error: message }, { status: 403 });
+export function forbiddenResponse(message: string = 'No autorizado'): NextResponse {
+  return NextResponse.json({ error: message, message }, { status: 403 });
 }
 
 // ========================================

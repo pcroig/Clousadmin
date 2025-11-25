@@ -1,8 +1,21 @@
 // ========================================
-// Email Service - Resend
+// Email Service - Resend with React Email
 // ========================================
 
 import { Resend } from 'resend';
+
+import {
+  EmployeeWelcomeEmail,
+  FirmaPendienteEmail,
+  NominaDisponibleEmail,
+  PasswordRecoveryEmail,
+  PasswordResetConfirmationEmail,
+  renderEmail,
+  SignupInvitationEmail,
+  WaitlistConfirmationEmail,
+  WaitlistInternalEmail,
+  WaitlistInvitationEmail,
+} from '@/lib/emails';
 
 // ========================================
 // CONFIGURACIÓN Y HELPERS
@@ -54,34 +67,6 @@ function isValidEmail(email: string): boolean {
 }
 
 /**
- * Sanitiza texto para usar en HTML (previene XSS básico)
- */
-function sanitizeHtml(text: string): string {
-  return text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#x27;');
-}
-
-/**
- * Sanitiza URL para usar en atributos href
- */
-function sanitizeUrl(url: string): string {
-  try {
-    const parsed = new URL(url);
-    // Solo permitir http/https
-    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-      return '#';
-    }
-    return parsed.toString();
-  } catch {
-    return '#';
-  }
-}
-
-/**
  * Verifica si Resend está configurado
  */
 function isResendConfigured(): boolean {
@@ -103,12 +88,12 @@ function getResendClient(): Resend | null {
   if (!isResendConfigured()) {
     return null;
   }
-  
+
   // Singleton: crear solo una vez
   if (!resendClientInstance) {
     resendClientInstance = new Resend(process.env.RESEND_API_KEY!);
   }
-  
+
   return resendClientInstance;
 }
 
@@ -118,7 +103,7 @@ function getResendClient(): Resend | null {
 
 /**
  * Envía email usando Resend
- * 
+ *
  * @param to Email del destinatario (validado)
  * @param subject Asunto del email
  * @param htmlBody Cuerpo HTML del email
@@ -168,70 +153,8 @@ export async function sendEmail(
 }
 
 // ========================================
-// TEMPLATES DE EMAIL
+// FUNCIONES DE EMAIL CON REACT EMAIL
 // ========================================
-
-/**
- * Template base para emails con botón CTA
- */
-function createEmailTemplateWithButton(params: {
-  titulo: string;
-  mensajePrincipal: string;
-  mensajeSecundario?: string;
-  buttonText: string;
-  buttonUrl: string;
-  mensajeFooter?: string;
-}): { html: string; text: string } {
-  const { titulo, mensajePrincipal, mensajeSecundario, buttonText, buttonUrl, mensajeFooter } = params;
-  const safeUrl = sanitizeUrl(buttonUrl);
-  const safeTitulo = sanitizeHtml(titulo);
-  const safeMensajePrincipal = sanitizeHtml(mensajePrincipal);
-  const safeMensajeSecundario = mensajeSecundario ? sanitizeHtml(mensajeSecundario) : '';
-  const safeButtonText = sanitizeHtml(buttonText);
-  const safeMensajeFooter = mensajeFooter ? sanitizeHtml(mensajeFooter) : '';
-
-  const html = `
-    <!DOCTYPE html>
-    <html>
-      <head>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      </head>
-      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-        <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
-          <h1 style="color: #2563eb;">${safeTitulo}</h1>
-          <p>${safeMensajePrincipal}</p>
-          ${safeMensajeSecundario ? `<p>${safeMensajeSecundario}</p>` : ''}
-          <div style="text-align: center; margin: 30px 0;">
-            <a href="${safeUrl}" 
-               style="display: inline-block; padding: 12px 24px; background-color: #2563eb; color: white; text-decoration: none; border-radius: 6px; font-weight: bold;">
-              ${safeButtonText}
-            </a>
-          </div>
-          <p style="font-size: 12px; color: #666;">
-            O copia y pega este enlace en tu navegador:<br>
-            <a href="${safeUrl}" style="color: #2563eb; word-break: break-all;">${safeUrl}</a>
-          </p>
-          ${safeMensajeFooter ? `<p style="font-size: 12px; color: #999; margin-top: 30px;">${safeMensajeFooter}</p>` : ''}
-        </div>
-      </body>
-    </html>
-  `;
-
-  const text = `
-${safeTitulo}
-
-${safeMensajePrincipal}
-${safeMensajeSecundario ? `\n${safeMensajeSecundario}` : ''}
-
-Para comenzar, visita este enlace:
-${safeUrl}
-
-${safeMensajeFooter ? `\n${safeMensajeFooter}` : ''}
-  `.trim();
-
-  return { html, text };
-}
 
 /**
  * Envía email de invitación para signup
@@ -240,22 +163,15 @@ export async function sendSignupInvitationEmail(
   email: string,
   invitationUrl: string
 ): Promise<void> {
-  const safeUrl = sanitizeUrl(invitationUrl);
-  
-  const template = createEmailTemplateWithButton({
-    titulo: '¡Bienvenido a Clousadmin!',
-    mensajePrincipal: 'Has sido invitado a crear tu cuenta y empresa en Clousadmin.',
-    mensajeSecundario: 'Haz clic en el siguiente botón para comenzar:',
-    buttonText: 'Crear mi cuenta',
-    buttonUrl: safeUrl,
-    mensajeFooter: 'Este enlace expirará en 7 días. Si no solicitaste esta invitación, puedes ignorar este email.',
-  });
+  const { html, text } = await renderEmail(
+    SignupInvitationEmail({ invitationUrl })
+  );
 
   await sendEmail(
     email,
     'Invitación para crear tu cuenta en Clousadmin',
-    template.html,
-    template.text
+    html,
+    text
   );
 }
 
@@ -263,42 +179,15 @@ export async function sendSignupInvitationEmail(
  * Envía confirmación de waitlist
  */
 export async function sendWaitlistConfirmationEmail(email: string): Promise<void> {
-  const htmlBody = `
-    <!DOCTYPE html>
-    <html>
-      <head>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      </head>
-      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-        <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
-          <h1 style="color: #2563eb;">¡Te hemos añadido a la lista de espera!</h1>
-          <p>Gracias por tu interés en Clousadmin.</p>
-          <p>Hemos recibido tu solicitud y te notificaremos cuando tengamos una invitación disponible para ti.</p>
-          <p>Mientras tanto, puedes conocer más sobre Clousadmin en nuestro sitio web.</p>
-          <p style="font-size: 12px; color: #999; margin-top: 30px;">
-            Si tienes alguna pregunta, no dudes en contactarnos.
-          </p>
-        </div>
-      </body>
-    </html>
-  `;
-
-  const textBody = `
-¡Te hemos añadido a la lista de espera!
-
-Gracias por tu interés en Clousadmin.
-
-Hemos recibido tu solicitud y te notificaremos cuando tengamos una invitación disponible para ti.
-
-Mientras tanto, puedes conocer más sobre Clousadmin en nuestro sitio web.
-  `;
+  const { html, text } = await renderEmail(
+    WaitlistConfirmationEmail()
+  );
 
   await sendEmail(
     email,
     'Has sido añadido a la lista de espera de Clousadmin',
-    htmlBody,
-    textBody
+    html,
+    text
   );
 }
 
@@ -309,22 +198,15 @@ export async function sendWaitlistInvitationEmail(
   email: string,
   invitationUrl: string
 ): Promise<void> {
-  const safeUrl = sanitizeUrl(invitationUrl);
-  
-  const template = createEmailTemplateWithButton({
-    titulo: '¡Buenas noticias!',
-    mensajePrincipal: 'Tu solicitud ha sido aprobada y ahora tienes una invitación para crear tu cuenta en Clousadmin.',
-    mensajeSecundario: 'Haz clic en el siguiente botón para comenzar:',
-    buttonText: 'Crear mi cuenta',
-    buttonUrl: safeUrl,
-    mensajeFooter: 'Este enlace expirará en 7 días.',
-  });
+  const { html, text } = await renderEmail(
+    WaitlistInvitationEmail({ invitationUrl })
+  );
 
   await sendEmail(
     email,
     'Tu invitación para Clousadmin está lista',
-    template.html,
-    template.text
+    html,
+    text
   );
 }
 
@@ -344,52 +226,15 @@ export async function sendWaitlistInternalNotificationEmail(
   const { email, nombre, empresa, mensaje } = payload;
   const destinatario = INTERNAL_WAITLIST_EMAIL;
 
-  const safeNombre = nombre ? sanitizeHtml(nombre) : 'Sin nombre';
-  const safeEmpresa = empresa ? sanitizeHtml(empresa) : 'Sin empresa';
-  const safeMensaje = mensaje ? sanitizeHtml(mensaje) : 'Sin mensaje adicional';
-
-  const htmlBody = `
-    <!DOCTYPE html>
-    <html>
-      <head>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      </head>
-      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-        <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
-          <h1 style="color: #2563eb;">Nueva solicitud de waitlist</h1>
-          <p>Se ha registrado una nueva empresa interesada en Clousadmin:</p>
-          <ul>
-            <li><strong>Email:</strong> ${sanitizeHtml(email)}</li>
-            <li><strong>Nombre:</strong> ${safeNombre}</li>
-            <li><strong>Empresa:</strong> ${safeEmpresa}</li>
-          </ul>
-          <p><strong>Mensaje:</strong></p>
-          <p style="background-color: #f3f4f6; padding: 12px; border-radius: 6px;">${safeMensaje}</p>
-          <p style="font-size: 12px; color: #999; margin-top: 30px;">
-            Puedes gestionar esta solicitud desde el panel de invitaciones del platform admin.
-          </p>
-        </div>
-      </body>
-    </html>
-  `;
-
-  const textBody = `
-Nueva solicitud de waitlist
-
-Email: ${email}
-Nombre: ${nombre || 'Sin nombre'}
-Empresa: ${empresa || 'Sin empresa'}
-
-Mensaje:
-${mensaje || 'Sin mensaje adicional'}
-  `.trim();
+  const { html, text } = await renderEmail(
+    WaitlistInternalEmail({ email, nombre, empresa, mensaje })
+  );
 
   await sendEmail(
     destinatario,
     `Nueva solicitud de waitlist: ${empresa || email}`,
-    htmlBody,
-    textBody
+    html,
+    text
   );
 }
 
@@ -403,83 +248,112 @@ export async function sendOnboardingEmail(
   empresaNombre: string,
   onboardingUrl: string
 ): Promise<void> {
-  const safeNombre = sanitizeHtml(empleadoNombre);
-  const safeEmpresa = sanitizeHtml(empresaNombre);
-  const safeUrl = sanitizeUrl(onboardingUrl);
-  
-  const htmlBody = `
-    <!DOCTYPE html>
-    <html>
-      <head>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      </head>
-      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-        <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
-          <h1 style="color: #2563eb;">¡Bienvenido/a a ${safeEmpresa}, ${safeNombre}!</h1>
-          
-          <p>Para completar tu alta, necesitamos que completes tus datos personales y bancarios.</p>
-          
-          <p><strong>Este proceso te tomará solo 2 minutos.</strong></p>
-          
-          <p>Solo necesitas rellenar formularios, sin subir ningún documento.</p>
-          
-          <div style="background-color: #f3f4f6; padding: 15px; border-radius: 6px; margin: 20px 0;">
-            <p style="margin: 0; font-size: 14px; color: #666;">
-              <strong>¿Qué necesitas completar?</strong>
-            </p>
-            <ul style="margin: 10px 0 0 0; padding-left: 20px; font-size: 14px; color: #666;">
-              <li>Paso 1: Datos personales (NIF, NSS, dirección, teléfono)</li>
-              <li>Paso 2: Datos bancarios (IBAN)</li>
-            </ul>
-          </div>
-          
-          <div style="text-align: center; margin: 30px 0;">
-            <a href="${safeUrl}" 
-               style="display: inline-block; padding: 14px 32px; background-color: #4F46E5; color: white; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px;">
-              Completar mis datos
-            </a>
-          </div>
-          
-          <p style="font-size: 12px; color: #666;">
-            O copia y pega este enlace en tu navegador:<br>
-            <a href="${safeUrl}" style="color: #2563eb; word-break: break-all;">${safeUrl}</a>
-          </p>
-          
-          <div style="border-top: 1px solid #e5e7eb; margin-top: 30px; padding-top: 20px;">
-            <p style="font-size: 12px; color: #999; margin: 0;">
-              <strong>Importante:</strong> Este link es válido durante 7 días. Si necesitas ayuda, contacta con RRHH.
-            </p>
-          </div>
-        </div>
-      </body>
-    </html>
-  `;
-
-  const textBody = `
-¡Bienvenido/a a ${safeEmpresa}, ${safeNombre}!
-
-Para completar tu alta, necesitamos que completes tus datos personales y bancarios.
-
-Este proceso te tomará solo 2 minutos.
-
-Solo necesitas rellenar formularios, sin subir ningún documento.
-
-¿Qué necesitas completar?
-- Paso 1: Datos personales (NIF, NSS, dirección, teléfono)
-- Paso 2: Datos bancarios (IBAN)
-
-Para comenzar, visita este enlace:
-${safeUrl}
-
-Importante: Este link es válido durante 7 días. Si necesitas ayuda, contacta con RRHH.
-  `;
+  const { html, text } = await renderEmail(
+    EmployeeWelcomeEmail({
+      empleadoNombre,
+      empresaNombre,
+      onboardingUrl,
+    })
+  );
 
   await sendEmail(
     email,
-    `¡Bienvenido/a! Completa tus datos - ${safeEmpresa}`,
-    htmlBody,
-    textBody
+    `¡Bienvenido/a! Completa tus datos - ${empresaNombre}`,
+    html,
+    text
   );
 }
 
+/**
+ * Envía email de firma pendiente
+ */
+export async function sendFirmaPendienteEmail(
+  email: string,
+  empleadoNombre: string,
+  documentoNombre: string,
+  firmaUrl: string
+): Promise<void> {
+  const { html, text } = await renderEmail(
+    FirmaPendienteEmail({
+      empleadoNombre,
+      documentoNombre,
+      firmaUrl,
+    })
+  );
+
+  await sendEmail(
+    email,
+    `Documento pendiente de firma: ${documentoNombre}`,
+    html,
+    text
+  );
+}
+
+/**
+ * Envía email de nómina disponible
+ */
+export async function sendNominaDisponibleEmail(
+  email: string,
+  empleadoNombre: string,
+  mes: string,
+  año: number,
+  nominaUrl: string
+): Promise<void> {
+  const { html, text } = await renderEmail(
+    NominaDisponibleEmail({
+      empleadoNombre,
+      mes,
+      año,
+      nominaUrl,
+    })
+  );
+
+  await sendEmail(
+    email,
+    `Tu nómina de ${mes} ${año} está disponible`,
+    html,
+    text
+  );
+}
+
+/**
+ * Envía email de recuperación de contraseña
+ */
+export async function sendPasswordRecoveryEmail(params: {
+  email: string;
+  token: string;
+}): Promise<void> {
+  const { email, token } = params;
+  const baseUrl = getBaseUrl();
+  const resetUrl = `${baseUrl}/reset-password/${token}`;
+
+  const { html, text } = await renderEmail(
+    PasswordRecoveryEmail({ resetUrl })
+  );
+
+  await sendEmail(
+    email,
+    'Restablece tu contraseña de Clousadmin',
+    html,
+    text
+  );
+}
+
+/**
+ * Envía confirmación de cambio de contraseña
+ */
+export async function sendPasswordResetConfirmationEmail(email: string): Promise<void> {
+  const baseUrl = getBaseUrl();
+  const loginUrl = `${baseUrl}/login`;
+
+  const { html, text } = await renderEmail(
+    PasswordResetConfirmationEmail({ loginUrl })
+  );
+
+  await sendEmail(
+    email,
+    'Tu contraseña se ha actualizado',
+    html,
+    text
+  );
+}

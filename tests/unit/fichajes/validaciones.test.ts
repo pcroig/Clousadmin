@@ -236,7 +236,7 @@ describe('Validaciones de Fichajes', () => {
       const resultado = validarEvento(eventos, nuevoEvento as any);
 
       expect(resultado.valido).toBe(false);
-      expect(resultado.error).toContain('No hay entrada');
+      expect(resultado.error).toContain('No tienes una jornada iniciada');
     });
 
     it('debe rechazar pausa sin entrada previa', () => {
@@ -249,7 +249,7 @@ describe('Validaciones de Fichajes', () => {
       const resultado = validarEvento(eventos, nuevoEvento as any);
 
       expect(resultado.valido).toBe(false);
-      expect(resultado.error).toContain('entrada');
+      expect(resultado.error).toContain('Debes estar trabajando para pausar');
     });
 
     it('debe rechazar pausa_fin sin pausa_inicio previo', () => {
@@ -317,7 +317,7 @@ describe('Validaciones de Fichajes', () => {
       const resultado = validarEvento(eventos as any, nuevoEvento as any);
 
       expect(resultado.valido).toBe(false);
-      expect(resultado.error).toContain('cronológico');
+      expect(resultado.error).toContain('posterior al último registro');
     });
   });
 

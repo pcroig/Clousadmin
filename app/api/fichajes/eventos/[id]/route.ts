@@ -63,7 +63,7 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
     const { calcularHorasTrabajadas, calcularTiempoEnPausa } = await import('@/lib/calculos/fichajes');
     const actualizado = await prisma.fichaje.findUnique({ where: { id: evento.fichajeId }, include: { eventos: true } });
     if (actualizado) {
-      const horasTrabajadas = calcularHorasTrabajadas(actualizado.eventos);
+      const horasTrabajadas = calcularHorasTrabajadas(actualizado.eventos) ?? 0;
       const horasEnPausa = calcularTiempoEnPausa(actualizado.eventos);
       await prisma.fichaje.update({ where: { id: evento.fichajeId }, data: { horasTrabajadas, horasEnPausa } });
     }
@@ -100,7 +100,7 @@ export async function DELETE(_req: NextRequest, context: { params: Promise<{ id:
     const { calcularHorasTrabajadas, calcularTiempoEnPausa } = await import('@/lib/calculos/fichajes');
     const actualizado = await prisma.fichaje.findUnique({ where: { id: evento.fichajeId }, include: { eventos: true } });
     if (actualizado) {
-      const horasTrabajadas = calcularHorasTrabajadas(actualizado.eventos);
+      const horasTrabajadas = calcularHorasTrabajadas(actualizado.eventos) ?? 0;
       const horasEnPausa = calcularTiempoEnPausa(actualizado.eventos);
       await prisma.fichaje.update({ where: { id: evento.fichajeId }, data: { horasTrabajadas, horasEnPausa } });
     }

@@ -681,8 +681,8 @@ async function main() {
           });
 
           // Actualizar cálculos
-          const horasTrabajadas = calcularHorasTrabajadas(fichaje.eventos);
-          const horasEnPausa = calcularTiempoEnPausa(fichaje.eventos);
+          const horasTrabajadas = calcularHorasTrabajadas(fichaje.eventos) ?? 0;
+          const horasEnPausa = calcularTiempoEnPausa(fichaje.eventos) ?? 0;
           
           await prisma.fichaje.update({
             where: { id: fichaje.id },
@@ -723,8 +723,8 @@ async function main() {
           });
 
           // Actualizar cálculos parciales
-          const horasTrabajadas = calcularHorasTrabajadas(fichaje.eventos);
-          const horasEnPausa = calcularTiempoEnPausa(fichaje.eventos);
+          const horasTrabajadas = calcularHorasTrabajadas(fichaje.eventos) ?? 0;
+          const horasEnPausa = calcularTiempoEnPausa(fichaje.eventos) ?? 0;
           
           await prisma.fichaje.update({
             where: { id: fichaje.id },
@@ -773,8 +773,8 @@ async function main() {
           });
 
           // Actualizar cálculos
-          const horasTrabajadas = calcularHorasTrabajadas(fichaje.eventos);
-          const horasEnPausa = calcularTiempoEnPausa(fichaje.eventos);
+          const horasTrabajadas = calcularHorasTrabajadas(fichaje.eventos) ?? 0;
+          const horasEnPausa = calcularTiempoEnPausa(fichaje.eventos) ?? 0;
           
           await prisma.fichaje.update({
             where: { id: fichaje.id },
@@ -811,8 +811,8 @@ async function main() {
           });
 
           // Actualizar cálculos
-          const horasTrabajadas = calcularHorasTrabajadas(fichaje.eventos);
-          const horasEnPausa = calcularTiempoEnPausa(fichaje.eventos);
+          const horasTrabajadas = calcularHorasTrabajadas(fichaje.eventos) ?? 0;
+          const horasEnPausa = calcularTiempoEnPausa(fichaje.eventos) ?? 0;
           
           await prisma.fichaje.update({
             where: { id: fichaje.id },

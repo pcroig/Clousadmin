@@ -13,8 +13,8 @@ import type { FichajeEvento } from '@prisma/client';
  * pero aislada para uso en componentes cliente sin dependencia de Prisma ni de
  * variables de entorno de servidor.
  */
-export function calcularHorasTrabajadas(eventos: FichajeEvento[]): number {
-  if (eventos.length === 0) return 0;
+export function calcularHorasTrabajadas(eventos: FichajeEvento[]): number | null {
+  if (eventos.length === 0) return null;
 
   // Ordenar por hora
   const ordenados = [...eventos].sort(
@@ -58,15 +58,10 @@ export function calcularHorasTrabajadas(eventos: FichajeEvento[]): number {
     }
   }
 
-  // Si sigue trabajando (sin salida), calcular hasta ahora
   if (inicioTrabajo) {
-    const ahora = new Date();
-    const tiempoTrabajado =
-      (ahora.getTime() - inicioTrabajo.getTime()) / (1000 * 60 * 60);
-    horasTotales += tiempoTrabajado;
+    return null;
   }
 
-  // Redondear a 2 decimales
   return Number(horasTotales.toFixed(2));
 }
 

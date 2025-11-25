@@ -170,10 +170,10 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
         const valor = fichaje.horasTrabajadas;
         horasTrabajadas = typeof valor === 'string' ? parseFloat(valor) : valor;
         if (Number.isNaN(horasTrabajadas)) {
-          horasTrabajadas = calcularHorasTrabajadas(eventosOrdenados);
+          horasTrabajadas = calcularHorasTrabajadas(eventosOrdenados) ?? 0;
         }
       } else {
-        horasTrabajadas = calcularHorasTrabajadas(eventosOrdenados);
+        horasTrabajadas = calcularHorasTrabajadas(eventosOrdenados) ?? 0;
       }
 
       const entrada = eventosOrdenados.find(e => e.tipo === 'entrada');
