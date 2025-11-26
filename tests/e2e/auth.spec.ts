@@ -3,7 +3,7 @@
  * Flujo completo de login, autenticación y logout
  */
 
-import { test, expect } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 
 test.describe('Authentication Flow', () => {
   test.beforeEach(async ({ page }) => {

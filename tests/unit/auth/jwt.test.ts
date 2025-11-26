@@ -3,8 +3,9 @@
  * PRIORIDAD: CRÍTICA (seguridad)
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
 import * as jose from 'jose';
+import { beforeEach, describe, expect, it } from 'vitest';
+
 import { UsuarioRol } from '@/lib/constants/enums';
 
 describe('JWT Token Management', () => {

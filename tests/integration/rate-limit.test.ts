@@ -3,7 +3,8 @@
  * Requiere Redis para funcionar
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
+
 import { rateLimitApi, resetRateLimit } from '@/lib/rate-limit';
 
 describe.skip('Rate Limiting Integration', () => {

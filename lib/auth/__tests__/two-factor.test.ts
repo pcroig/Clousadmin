@@ -2,7 +2,8 @@
  * Tests para funciones de autenticación de dos factores
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
+
 import {
   generateBackupCodes,
   hashBackupCodes,
@@ -96,7 +97,7 @@ describe('Two-Factor Authentication', () => {
 
     it('should allow using all codes sequentially', () => {
       const codes = ['AAAA1111', 'BBBB2222', 'CCCC3333'];
-      let hashed = hashBackupCodes(codes);
+      const hashed = hashBackupCodes(codes);
 
       const first = verifyBackupCode(hashed, 'AAAA1111');
       expect(first.valid).toBe(true);

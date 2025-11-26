@@ -243,7 +243,7 @@ export async function POST(req: NextRequest) {
     const requestedEmpleadoId = validatedData.empleadoId;
     const sessionEmpleadoId = session.user.empleadoId ?? undefined;
 
-    let targetEmpleadoId = requestedEmpleadoId ?? sessionEmpleadoId;
+    const targetEmpleadoId = requestedEmpleadoId ?? sessionEmpleadoId;
 
     if (!targetEmpleadoId) {
       return badRequestResponse('No se ha especificado un empleado válido para el fichaje');

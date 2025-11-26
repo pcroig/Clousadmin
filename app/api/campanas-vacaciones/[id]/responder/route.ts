@@ -13,7 +13,7 @@ import {
 import { calcularDias } from '@/lib/calculos/ausencias';
 import { EstadoAusencia } from '@/lib/constants/enums';
 import { prisma } from '@/lib/prisma';
-import { JSON_NULL, asJsonValue } from '@/lib/prisma/json';
+import { asJsonValue, JSON_NULL } from '@/lib/prisma/json';
 import { getJsonBody } from '@/lib/utils/json';
 
 export const dynamic = 'force-dynamic';

@@ -65,14 +65,11 @@ export {
 } from './core/config';
 
 export {
-  MODELS,
-  getModelConfig,
-  getModelConfigOrDefault,
-  callOpenAIWithConfig,
-  callAIWithConfig,
-} from './models';
+  callFeatureAI,
+  listAvailableFeatures,
+} from './core/features';
 
-export type { ModelName, ModelConfig as LegacyModelConfig } from './models';
+export type { FeatureCallOptions, FeatureName } from './core/features';
 
 // ========================================
 // PATTERNS - Patrones Reutilizables

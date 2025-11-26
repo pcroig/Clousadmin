@@ -6,7 +6,7 @@
 import { get } from 'lodash';
 
 import { decrypt } from '@/lib/crypto';
-import { callAIWithConfig } from '@/lib/ia';
+import { callFeatureAI, MessageRole } from '@/lib/ia';
 import { prisma, Prisma } from '@/lib/prisma';
 import { cache as redisCache } from '@/lib/redis';
 
@@ -24,7 +24,7 @@ import {
 } from './sanitizar';
 import { DatosEmpleado, VariableMapping } from './tipos';
 
-import type OpenAI from 'openai';
+import type { AIMessage } from '@/lib/ia';
 
 type SchemaObject = Record<string, string | string[]>;
 type SchemaStructure = string | SchemaObject | SchemaObject[];
@@ -144,14 +144,14 @@ Responde SOLO en JSON:
 }`;
 
   try {
-    const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
+    const messages: AIMessage[] = [
       {
-        role: 'user',
+        role: MessageRole.USER,
         content: prompt,
       },
     ];
 
-    const completion = await callAIWithConfig('plantillas-resolver-variable', messages);
+    const completion = await callFeatureAI('plantillas-resolver-variable', messages);
 
     const content = completion.choices[0]?.message?.content;
     if (!content) {

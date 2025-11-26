@@ -2,7 +2,8 @@
  * Tests para validación de empleados extraídos de Excel
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
+
 import {
   type EmpleadoDetectado,
   validarEmpleado,

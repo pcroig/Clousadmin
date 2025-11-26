@@ -3,10 +3,11 @@
  */
 
 import '@testing-library/jest-dom/vitest';
-import { describe, it, expect } from 'vitest';
-import { render, screen } from '@/tests/helpers/react';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
+import { describe, expect, it } from 'vitest';
+
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { render, screen } from '@/tests/helpers/react';
 
 describe('UI Components', () => {
   describe('Card', () => {

@@ -326,33 +326,80 @@ enum PeriodoMedioDia {
 
 ---
 
-## 5. Edición de fichajes (HR)
+## 5. Edición y Creación de Fichajes
 
-### Modal de edición (estilo "editar ausencia")
-- Cabecera con empleado y fecha única del día.
-- Lista de eventos del día editable en línea: para cada evento se puede cambiar `tipo` y `hora`, y eliminarlo.
-- Botón "Añadir evento" para crear nuevos registros del día.
-- **⚠️ Sin auto-guardado**: Los cambios se acumulan localmente y solo se persisten al hacer click en "Guardar Cambios"
+### Modal Unificado de Fichajes
+
+**Componente**: `components/shared/fichajes/fichaje-modal.tsx`
+
+Un único modal reutilizable para **crear** y **editar** fichajes con múltiples eventos. Se adapta automáticamente según el contexto y modo de uso.
+
+#### Características Principales
+
+- **Múltiples eventos**: Permite añadir tantos eventos como sean necesarios (entrada, pausa inicio/fin, salida) en una sola operación
+- **Layout compacto**: Cada evento ocupa una sola línea horizontal con:
+  - Selector de tipo de evento
+  - Input de hora
+  - Botón de eliminar
+- **Validación anti-futuro**: No permite crear/editar eventos para fechas u horas futuras
+- **Indicador de edición**: Muestra qué eventos fueron previamente editados
+- **Motivo opcional**: Campo de texto para justificar el fichaje/cambio
+
+#### Modos de Operación
+
+**Modo Crear** (`modo="crear"`):
+- Permite añadir múltiples eventos desde cero
+- Fecha editable solo para HR/Manager (empleados usan fecha actual)
+- Empleado: Crea solicitud que requiere aprobación
+- HR/Manager: Guarda directamente sin solicitud
+
+**Modo Editar** (`modo="editar"`):
+- Carga eventos existentes del fichaje del día
+- Permite modificar tipo y hora de eventos existentes
+- Permite añadir nuevos eventos al día
+- Permite eliminar eventos (marcados para eliminación al guardar)
+- Fecha no editable (siempre del fichaje existente)
+- **Sin auto-guardado**: Los cambios se acumulan localmente y solo se persisten al hacer click en "Guardar Cambios"
 - Al guardar, se recalculan `horasTrabajadas` y `horasEnPausa` del fichaje, y se actualiza el balance automáticamente
 - **Tracking de cambios**: El sistema rastrea eventos nuevos, modificados y eliminados, aplicándolos en orden al guardar
 
-### Añadir Fichajes Manuales
+#### Contextos y Permisos
 
-**Dos flujos según rol:**
+| Contexto | Puede crear fichajes | Puede editar fichajes | Fecha editable | Empleado editable |
+|----------|---------------------|----------------------|----------------|-------------------|
+| `empleado` | ✅ (solicitud) | ✅ (propios) | ❌ | ❌ |
+| `manager` | ✅ (directo, su equipo) | ✅ (su equipo) | ✅ (solo crear) | ❌ |
+| `hr_admin` | ✅ (directo, todos) | ✅ (todos) | ✅ (solo crear) | ✅ (solo crear) |
 
-1. **HR Admin**: Puede añadir fichajes directamente desde:
-   - Espacio individual del empleado (`/hr/organizacion/personas/[id]` → Tab Fichajes)
-   - Vista de fichajes (`/hr/horario/fichajes`)
-   - **Comportamiento**: Se guarda directamente, creando el evento inmediatamente
-   - Endpoint: `POST /api/fichajes` + `POST /api/fichajes/eventos`
+#### Lugares de Uso
 
-2. **Empleado**: Puede solicitar fichajes manuales desde:
-   - Su propio espacio de fichajes (`/empleado/mi-espacio` → Tab Fichajes)
-   - Vista de fichajes (`/empleado/horario/fichajes`)
-   - **Comportamiento**: Crea una solicitud que requiere aprobación de HR/Manager
-   - Endpoint: `POST /api/solicitudes` (tipo: `fichaje_manual`)
+1. **Widget de Fichaje** (`components/shared/fichaje-widget.tsx`):
+   - Empleados pueden crear fichajes manuales (solicitud)
+   - Contexto: `empleado`, modo: `crear`
 
-**Componente**: `components/shared/fichaje-manual-modal.tsx` - Se adapta según prop `esHRAdmin`
+2. **Mi Espacio - Tab Fichajes** (`components/shared/mi-espacio/fichajes-tab.tsx`):
+   - Empleados: Crear solicitudes y editar propios fichajes
+   - HR/Manager: Crear fichajes directos y editar cualquier fichaje
+   - Contexto: `empleado`/`manager`/`hr_admin`, modo: `crear`/`editar`
+
+3. **Vista HR de Fichajes** (`app/(dashboard)/hr/horario/fichajes/fichajes-client.tsx`):
+   - HR puede editar cualquier fichaje desde la tabla
+   - Contexto: `hr_admin`, modo: `editar`
+
+4. **Modal de Revisión** (`app/(dashboard)/hr/horario/fichajes/revision-modal.tsx`):
+   - HR puede editar fichajes pendientes antes de cuadrar
+   - Contexto: `hr_admin`, modo: `editar`
+
+5. **Espacio Individual de Empleado** (`app/(dashboard)/hr/organizacion/personas/[id]`):
+   - HR puede crear y editar fichajes del empleado
+   - Contexto: `hr_admin`, modo: `crear`/`editar`
+
+#### Endpoints Utilizados
+
+- **Crear fichaje directo** (HR/Manager): `POST /api/fichajes` + `POST /api/fichajes/eventos`
+- **Crear solicitud** (Empleado): `POST /api/solicitudes` (tipo: `fichaje_manual`)
+- **Editar fichaje**: `PATCH /api/fichajes/eventos/[id]`, `POST /api/fichajes/eventos`, `DELETE /api/fichajes/eventos/[id]`
+- **Cargar fichaje**: `GET /api/fichajes/[id]`
 
 ### Solicitudes de corrección (flujo formal)
 - **Empleados**: desde `/empleado/horario/fichajes` envían una solicitud indicando motivo y nuevos valores. Endpoint: `POST /api/fichajes/correcciones`.
@@ -427,7 +474,10 @@ enum PeriodoMedioDia {
 | Ver todos los fichajes | ❌ | ❌ | ✅ |
 | Solicitar corrección de fichaje | ✅ | ✅ | ❌ |
 | Solicitar fichaje manual | ✅ | ✅ | ❌ |
-| Añadir fichaje directamente | ❌ | ❌ | ✅ |
+| Crear fichaje directamente | ❌ | ✅ (su equipo) | ✅ (todos) |
+| Editar fichajes propios | ✅ | ✅ | ✅ |
+| Editar fichajes de equipo | ❌ | ✅ | ✅ |
+| Editar cualquier fichaje | ❌ | ❌ | ✅ |
 | Aprobar fichajes | ❌ | ✅ (su equipo) | ✅ (todos) |
 | Cuadrar fichajes masivamente | ❌ | ✅ (su equipo) | ✅ (todos) |
 | Renovar saldo de horas | ❌ | ❌ | ✅ |
@@ -743,7 +793,7 @@ model ProcesamientoMarcajes {
 
 ---
 
-**Versión**: 3.3
+**Versión**: 3.4
 **Última actualización**: 27 enero 2025
 **Estado**: Sistema completo implementado:
 - ✅ Validación determinística de fichajes completos
@@ -760,4 +810,8 @@ model ProcesamientoMarcajes {
 - ✅ **Balance actualizado automáticamente**: Se recalcula al editar, cuadrar o crear fichajes
 - ✅ **Cards horizontales en vista individual**: Tiempo y Horarios en layout horizontal
 - ✅ **Renovar saldo de horas**: HR Admin puede resetear contador desde fecha específica
-- ✅ **Añadir fichajes manuales**: HR guarda directamente, empleados crean solicitud
+- ✅ **Modal unificado de fichajes**: Un solo componente para crear y editar fichajes con múltiples eventos
+- ✅ **Múltiples eventos en una operación**: Permite añadir varios eventos (entrada, pausas, salida) en un solo modal
+- ✅ **Layout compacto**: Eventos en una línea horizontal (tipo, hora, eliminar)
+- ✅ **Validación anti-futuro**: No permite crear/editar eventos para fechas u horas futuras
+- ✅ **Crear/editar fichajes**: HR/Manager guardan directamente, empleados crean solicitud

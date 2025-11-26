@@ -5,6 +5,7 @@ import { es } from 'date-fns/locale';
 import { Clock } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
+import { FichajeModal } from '@/components/shared/fichajes/fichaje-modal';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -17,7 +18,6 @@ import {
 } from '@/components/ui/table';
 import { useApi } from '@/lib/hooks';
 
-import { EditarFichajeModal } from '../../../hr/horario/fichajes/editar-fichaje-modal';
 
 interface FichajeEvento {
   id: string;
@@ -255,15 +255,17 @@ export function FichajesTab({ empleadoId }: { empleadoId: string }) {
 
       {/* Modal Editar Fichaje */}
       {fichajeEditando && (
-        <EditarFichajeModal
+        <FichajeModal
           open={!!fichajeEditando}
-          fichaje={fichajeEditando.eventos?.[0] || null}
           fichajeDiaId={fichajeEditando.id}
           onClose={() => setFichajeEditando(null)}
-          onSave={() => {
+          onSuccess={() => {
             setFichajeEditando(null);
             refetchFichajes(`/api/fichajes?empleadoId=${empleadoId}&propios=1`);
           }}
+          contexto="empleado"
+          empleadoId={empleadoId}
+          modo="editar"
         />
       )}
     </div>

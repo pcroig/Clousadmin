@@ -4,6 +4,7 @@
  */
 
 import { NextRequest } from 'next/server';
+
 import type { MockSession } from './auth';
 
 /**

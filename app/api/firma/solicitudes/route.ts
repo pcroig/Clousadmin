@@ -11,7 +11,7 @@ import {
   type CrearSolicitudFirmaInput,
   listarSolicitudesFirma,
 } from '@/lib/firma-digital/db-helpers';
-import { TipoFirma, type FirmanteInput } from '@/lib/firma-digital/tipos';
+import { type FirmanteInput, TipoFirma } from '@/lib/firma-digital/tipos';
 import { getClientIP, rateLimitApiWrite } from '@/lib/rate-limit';
 
 /**

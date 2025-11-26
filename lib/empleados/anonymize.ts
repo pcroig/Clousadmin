@@ -5,9 +5,9 @@
 
 import { Prisma, PrismaClient } from '@prisma/client';
 
+import { EstadoEmpleado } from '@/lib/constants/enums';
 import { JSON_NULL } from '@/lib/prisma/json';
 
-import { EstadoEmpleado } from '@/lib/constants/enums';
 
 type TransactionClient = Omit<
   PrismaClient,

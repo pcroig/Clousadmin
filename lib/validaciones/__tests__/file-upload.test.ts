@@ -3,14 +3,15 @@
  * Cobertura: 100% de funciones y casos edge
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
+
 import {
   normalizeAcceptedTypes,
-  validateFileType,
-  validateFileSize,
-  validateFileCount,
-  validateMagicNumber,
   validateFile,
+  validateFileCount,
+  validateFileSize,
+  validateFileType,
+  validateMagicNumber,
 } from '../file-upload';
 
 // ========================================

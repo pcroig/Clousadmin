@@ -23,11 +23,11 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { parseJson } from '@/lib/utils/json';
 
 import { EditarJornadaModal, type JornadaDetalle } from './editar-jornada-modal';
 
 import type { DiaConfig, JornadaConfig } from '@/lib/calculos/fichajes-helpers';
-import { parseJson } from '@/lib/utils/json';
 
 type DiaKey = 'lunes' | 'martes' | 'miercoles' | 'jueves' | 'viernes' | 'sabado' | 'domingo';
 

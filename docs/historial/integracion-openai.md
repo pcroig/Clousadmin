@@ -1,5 +1,8 @@
 # Integración OpenAI - Sistema Centralizado de IA
 
+> ⚠️ **Documento histórico**: describe la integración inicial basada en `models.ts`.
+> Para la arquitectura vigente (FEATURE_CONFIGS + `callFeatureAI`) consulta `docs/ia/README.md`.
+
 ## Resumen
 
 El sistema utiliza OpenAI para múltiples funcionalidades de IA. La arquitectura está diseñada para ser **escalable y modular**, con **instalación y configuración base centralizadas** y **cada funcionalidad en su propio archivo**.

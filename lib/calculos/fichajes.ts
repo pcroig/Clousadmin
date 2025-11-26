@@ -11,7 +11,6 @@ import {
   EstadoFichaje as PrismaEstadoFichaje,
 } from '@prisma/client';
 
-import type { DiasLaborables, FestivosSet } from '@/lib/calculos/dias-laborables';
 import {
   crearSetFestivos,
   esDiaLaborableSync,
@@ -24,6 +23,7 @@ import { obtenerNombreDia } from '@/lib/utils/fechas';
 import { redondearHoras } from '@/lib/utils/numeros';
 
 import type { DiaConfig, JornadaConfig } from './fichajes-helpers';
+import type { DiasLaborables, FestivosSet } from '@/lib/calculos/dias-laborables';
 
 /**
  * Estados posibles del fichaje (del día completo)

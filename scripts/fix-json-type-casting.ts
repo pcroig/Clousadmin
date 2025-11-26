@@ -5,6 +5,7 @@
  */
 
 import { readFileSync, writeFileSync } from 'fs';
+
 import { globSync } from 'glob';
 
 const files = globSync('app/**/*.{ts,tsx}', { 

@@ -6,19 +6,21 @@
  * Ver instrucciones al final del archivo.
  */
 
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
-import { EstadoAusencia } from '@/lib/constants/enums';
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+
 import {
   calcularSaldoDisponible,
-  validarSaldoSuficiente,
   determinarEstadoTrasAprobacion,
+  validarSaldoSuficiente,
 } from '@/lib/calculos/ausencias';
+import { EstadoAusencia } from '@/lib/constants/enums';
+
 import {
-  getPrismaTest,
   cleanDatabase,
-  teardownTestDatabase,
-  createTestEmpresa,
   createTestEmpleado,
+  createTestEmpresa,
+  getPrismaTest,
+  teardownTestDatabase,
 } from '../helpers/db';
 
 // IMPORTANTE: Estos tests requieren BD de test configurada

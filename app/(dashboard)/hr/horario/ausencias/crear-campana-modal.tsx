@@ -3,11 +3,11 @@
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
+import { InfoTooltip } from '@/components/shared/info-tooltip';
 import { LoadingButton } from '@/components/shared/loading-button';
 import { ResponsiveDatePicker } from '@/components/shared/responsive-date-picker';
 import { ResponsiveDialog } from '@/components/shared/responsive-dialog';
 import { SearchableMultiSelect } from '@/components/shared/searchable-multi-select';
-import { InfoTooltip } from '@/components/shared/info-tooltip';
 import { Button } from '@/components/ui/button';
 import { Field, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';

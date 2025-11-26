@@ -20,7 +20,8 @@ lib/ia/
 ├── core/                           # Núcleo del sistema
 │   ├── types.ts                    # Tipos unificados (AIMessage, AIResponse, etc.)
 │   ├── client.ts                   # Cliente con fallback automático
-│   ├── config.ts                   # Configuración de modelos
+│   ├── config.ts                   # Configuración de modelos y FEATURE_CONFIGS
+│   ├── features.ts                 # Helper declarativo (callFeatureAI)
 │   └── providers/                  # Proveedores específicos
 │       ├── openai.ts              # Wrapper de OpenAI SDK (Responses API + fallback)
 │       ├── anthropic.ts           # Wrapper de Anthropic SDK
@@ -37,8 +38,7 @@ lib/ia/
 ├── cuadrar-vacaciones.ts          # Optimización de vacaciones
 ├── clasificador-solicitudes.ts    # Clasificación de solicitudes
 │
-├── index.ts                        # Punto de entrada centralizado
-└── models.ts                       # Configuraciones legacy (compatibilidad)
+└── index.ts                        # Punto de entrada centralizado
 ```
 
 ## Core - Sistema Base
@@ -309,7 +309,7 @@ El sistema usa **OpenAI Responses API** por defecto para todas las llamadas, con
 ```
 Usuario ejecuta funcionalidad IA
          ↓
-callAIWithConfig('feature-name', messages)  [models.ts]
+callFeatureAI('feature-name', messages)  [core/features.ts]
          ↓
 callAI(messages, config, options)  [core/client.ts]
          ↓

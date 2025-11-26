@@ -2,7 +2,8 @@
  * Tests para cálculo de antigüedad de empleados
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
+
 import { obtenerRangoFechaAntiguedad } from '@/lib/calculos/antiguedad';
 
 describe('Cálculos de Antigüedad', () => {

@@ -2,11 +2,12 @@
  * Tests de integración: Encriptación de datos de empleados
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
-import { encrypt, decrypt, hashForSearch, encryptFields, decryptFields } from '@/lib/crypto';
+import { beforeEach, describe, expect, it } from 'vitest';
+
+import { decrypt, decryptFields, encrypt, encryptFields, hashForSearch } from '@/lib/crypto';
 import {
-  encryptEmpleadoData,
   decryptEmpleadoData,
+  encryptEmpleadoData,
   isFieldEncrypted,
 } from '@/lib/empleado-crypto';
 

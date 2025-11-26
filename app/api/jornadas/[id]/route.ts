@@ -12,10 +12,11 @@ import {
   successResponse,
   validateRequest,
 } from '@/lib/api-handler';
-import type { JornadaConfig } from '@/lib/calculos/fichajes-helpers';
 import { prisma, Prisma } from '@/lib/prisma';
 import { asJsonValue } from '@/lib/prisma/json';
 import { jornadaUpdateSchema } from '@/lib/validaciones/schemas';
+
+import type { JornadaConfig } from '@/lib/calculos/fichajes-helpers';
 
 interface Params {
   id: string;

@@ -1,7 +1,8 @@
-import type { Prisma, PrismaClient } from '@prisma/client';
+import { asJsonValue } from '@/lib/prisma/json';
 
 import type { DiasLaborables } from '@/lib/calculos/dias-laborables';
-import { asJsonValue } from '@/lib/prisma/json';
+import type { Prisma, PrismaClient } from '@prisma/client';
+
 
 type DbClient = PrismaClient | Prisma.TransactionClient;
 

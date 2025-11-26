@@ -2,7 +2,6 @@
 // API Route: Finalizar Campaña de Vacaciones
 // ========================================
 
-import type { Prisma } from '@prisma/client';
 import { NextRequest } from 'next/server';
 
 import {
@@ -15,7 +14,9 @@ import { calcularDias } from '@/lib/calculos/ausencias';
 import { EstadoAusencia, UsuarioRol } from '@/lib/constants/enums';
 import { crearNotificacionCampanaCuadrada } from '@/lib/notificaciones';
 import { prisma } from '@/lib/prisma';
-import { JSON_NULL, asJsonValue } from '@/lib/prisma/json';
+import { asJsonValue, JSON_NULL } from '@/lib/prisma/json';
+
+import type { Prisma } from '@prisma/client';
 
 export const dynamic = 'force-dynamic';
 

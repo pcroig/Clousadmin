@@ -309,9 +309,10 @@ export function OnboardingForm({
     try {
       const configRes = await fetch(`/api/onboarding/${token}/config`);
       const configData = await configRes.json() as Record<string, unknown>;
-      if (configData.success && configData.config) {
+      if (configData.success && configData.config && typeof configData.config === 'object') {
+        const config = configData.config as Record<string, unknown>;
         setDocumentosRequeridos(
-          mapDocumentosConfig(configData.config.documentosRequeridos || [])
+          mapDocumentosConfig((config.documentosRequeridos as ConfigDocumentoRequerido[] | null) || null)
         );
       }
     } catch (err) {

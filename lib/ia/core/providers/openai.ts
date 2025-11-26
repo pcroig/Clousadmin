@@ -14,10 +14,10 @@ import {
   AIProvider,
   AIResponse,
   ContentType,
-  MetadataRecord,
   hasImageContent,
   type MessageContent,
   MessageRole,
+  MetadataRecord,
   ModelConfig,
 } from '../types';
 

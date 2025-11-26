@@ -2,6 +2,7 @@
 // API Route: Ausencias
 // ========================================
 
+import { Prisma } from '@prisma/client';
 import { NextRequest } from 'next/server';
 
 import {
@@ -32,7 +33,6 @@ import {
 } from '@/lib/utils/pagination';
 import { ausenciaCreateSchema } from '@/lib/validaciones/schemas';
 
-import { Prisma } from '@prisma/client';
 
 const ausenciaConEmpleadoInclude = Prisma.validator<Prisma.AusenciaInclude>()({
   empleado: {

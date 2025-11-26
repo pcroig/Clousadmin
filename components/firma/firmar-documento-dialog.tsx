@@ -8,8 +8,8 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
-
 import { parseJson } from '@/lib/utils/json';
+
 import { SignatureCanvas, SignatureCanvasHandle } from './signature-canvas';
 interface FirmaInfoResponse {
   firmaGuardada?: boolean;

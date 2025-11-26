@@ -3,7 +3,7 @@
  * Flujo completo de control horario (crítico legal en España)
  */
 
-import { test, expect } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 
 // Helper para login
 async function loginAsEmpleado(page: any) {

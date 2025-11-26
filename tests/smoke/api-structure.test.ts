@@ -5,9 +5,10 @@
  * Ejecutar con: npm test
  */
 
-import { describe, it, expect } from 'vitest';
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+
+import { describe, expect, it } from 'vitest';
 
 const APP_DIR = resolve(process.cwd(), 'app/api');
 

@@ -14,6 +14,7 @@ import { CompactFilterBar } from '@/components/adaptive/CompactFilterBar';
 import { MobileActionBar } from '@/components/adaptive/MobileActionBar';
 import { ResponsiveContainer } from '@/components/adaptive/ResponsiveContainer';
 import { CompensarHorasDialog } from '@/components/shared/compensar-horas-dialog';
+import { FichajeModal } from '@/components/shared/fichajes/fichaje-modal';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -33,7 +34,6 @@ import { extractArrayFromResponse } from '@/lib/utils/api-response';
 import { formatearHorasMinutos } from '@/lib/utils/formatters';
 import { parseJson } from '@/lib/utils/json';
 
-import { EditarFichajeModal } from './editar-fichaje-modal';
 import { JornadasModal } from './jornadas-modal';
 import { RevisionModal } from './revision-modal';
 
@@ -102,10 +102,10 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
   );
   const [editarFichajeModal, setEditarFichajeModal] = useState<{
     open: boolean;
-    fichaje: FichajeEventoParaEditar | null;
+    fichajeDiaId: string | null;
   }>({
     open: false,
-    fichaje: null,
+    fichajeDiaId: null,
   });
   const [_filtersOpen, _setFiltersOpen] = useState(false);
   const isMobile = useIsMobile();
@@ -346,19 +346,10 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
       }
 
       const eventoSalida = eventos.find((evento: FichajeEvento) => evento.tipo === 'salida');
-      const eventoObjetivo = eventoSalida || eventos[eventos.length - 1];
-
-      if (eventoObjetivo) {
-        setEditarFichajeModal({
-          open: true,
-          fichaje: {
-            id: eventoObjetivo.id,
-            tipo: eventoObjetivo.tipo,
-            hora: eventoObjetivo.hora,
-            editado: Boolean(eventoObjetivo.editado),
-          },
-        });
-      }
+      setEditarFichajeModal({
+        open: true,
+        fichajeDiaId: fichaje.id,
+      });
     } catch (error) {
       console.error('[Fichajes] Error al abrir edición desde revisión:', error);
     }
@@ -394,8 +385,8 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
     setShowCompensarHorasDialog(true);
   };
 
-  const openEditarModalFromJornada = (jornada: JornadaDia) => {
-    const eventos = jornada.fichaje.eventos;
+  const openEditarModalFromJornada = (jornadaSeleccionada: JornadaDia) => {
+    const eventos = jornadaSeleccionada.fichaje.eventos;
     if (!eventos || eventos.length === 0) {
       return;
     }
@@ -404,14 +395,10 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
     if (!target) {
       return;
     }
+
     setEditarFichajeModal({
       open: true,
-      fichaje: {
-        id: target.id,
-        tipo: target.tipo,
-        hora: target.hora,
-        editado: Boolean(target.editado),
-      },
+      fichajeDiaId: jornadaSeleccionada.fichaje.id,
     });
   };
 
@@ -924,18 +911,16 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
       />
 
       {/* Modal Editar Fichaje */}
-      <EditarFichajeModal
+      <FichajeModal
         open={editarFichajeModal.open}
-        fichaje={editarFichajeModal.fichaje}
-        fichajeDiaId={(() => {
-          // Inferir el fichaje del día a partir del evento seleccionado buscando en jornadas cargadas
-          const evt = editarFichajeModal.fichaje;
-          if (!evt) return undefined;
-          const match = jornadas.find(j => j.fichaje.eventos.some(e => e.id === evt.id));
-          return match?.fichaje.id;
-        })()}
-        onClose={() => setEditarFichajeModal({ open: false, fichaje: null })}
-        onSave={handleEditarFichaje}
+        fichajeDiaId={editarFichajeModal.fichajeDiaId ?? undefined}
+        onClose={() => setEditarFichajeModal({ open: false, fichajeDiaId: null })}
+        onSuccess={() => {
+          setEditarFichajeModal({ open: false, fichajeDiaId: null });
+          fetchFichajes();
+        }}
+        contexto="hr_admin"
+        modo="editar"
       />
 
       {/* Modal Revisión de Fichajes */}

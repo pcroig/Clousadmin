@@ -6,7 +6,8 @@
 // Importar desde punto de entrada centralizado (base común)
 import { z } from 'zod';
 
-import { callAIWithConfig } from './models';
+import { callFeatureAI } from './core/features';
+import { MessageRole } from './core/types';
 
 import type { Ausencia, Empleado, PreferenciaVacaciones } from '@prisma/client';
 
@@ -157,9 +158,9 @@ export async function cuadrarVacacionesIA(
 
   try {
     // 3. Llamar a IA usando el cliente unificado (con fallback automático)
-    const completion = await callAIWithConfig('cuadrar-vacaciones', [
+    const completion = await callFeatureAI('cuadrar-vacaciones', [
       {
-        role: 'user',
+        role: MessageRole.USER,
         content: prompt,
       },
     ]);

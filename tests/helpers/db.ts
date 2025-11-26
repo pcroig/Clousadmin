@@ -3,10 +3,12 @@
  * Maneja setup, teardown y seeding de la BD de test
  */
 
-import { PrismaClient } from '@prisma/client';
 import { execSync } from 'child_process';
-import { config } from 'dotenv';
 import path from 'path';
+
+import { PrismaClient } from '@prisma/client';
+import { config } from 'dotenv';
+
 
 // Cargar .env.test
 config({ path: path.resolve(__dirname, '../../.env.test') });

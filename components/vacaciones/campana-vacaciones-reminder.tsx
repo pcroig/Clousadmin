@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from 'react';
 
+import { VACACIONES_PREFERENCIAS_EVENT, type VacacionesPreferenciasEventDetail } from '@/lib/events/vacaciones';
+
 import { PreferenciasVacacionesModal } from './preferencias-vacaciones-modal';
 
-import { VACACIONES_PREFERENCIAS_EVENT, type VacacionesPreferenciasEventDetail } from '@/lib/events/vacaciones';
 
 interface CampanaPendiente {
   id: string;

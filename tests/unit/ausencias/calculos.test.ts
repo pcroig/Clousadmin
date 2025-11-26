@@ -3,7 +3,8 @@
  * Prueba la lógica de cálculo de días laborables y saldo
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
+
 import {
   determinarEstadoTrasAprobacion,
   esFinDeSemana,

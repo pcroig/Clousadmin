@@ -7,7 +7,7 @@ Esta guía documenta el proceso de migración de modales `Dialog` existentes a `
 Hemos migrado los siguientes modales clave a `ResponsiveDialog`:
 
 ✅ **SolicitarAusenciaModal** - Formulario complejo con 7+ campos  
-✅ **FichajeManualModal** - Formulario mediano con 4 campos  
+✅ **FichajeModal** - Modal unificado para crear/editar fichajes con múltiples eventos (reemplaza FichajeManualModal y EditarFichajeModal)  
 ✅ **CrearCampanaModal** - Formulario complejo con date pickers  
 
 ## 📦 Componentes Responsivos Disponibles
@@ -329,7 +329,7 @@ Para cada modal:
 - [ ] `components/organizacion/puesto-form-modal.tsx` - medium
 - [ ] `components/empleado/responder-propuesta-modal.tsx` - medium
 - [ ] `components/empleado/resultado-vacaciones-modal.tsx` - medium
-- [ ] `app/(dashboard)/hr/horario/fichajes/editar-fichaje-modal.tsx` - simple
+- [x] ~~`app/(dashboard)/hr/horario/fichajes/editar-fichaje-modal.tsx`~~ - ✅ Unificado en `FichajeModal`
 - [ ] `components/vacaciones/preferencias-vacaciones-modal.tsx` - complex
 
 ### Media Prioridad
@@ -492,6 +492,7 @@ npx eslint components/path/to/modal.tsx
 
 - ✅ Componentes responsive creados: 5/5
 - ✅ Modales migrados: 3/25 (12%)
+- ✅ **FichajeModal unificado**: Reemplaza FichajeManualModal y EditarFichajeModal (2025-01-27)
 - ⏳ Modales pendientes: 22/25 (88%)
 
 **Objetivo:**

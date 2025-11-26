@@ -3,7 +3,7 @@
  * Valida detección de datos faltantes y anomalías
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 describe('Sistema de Alertas de Nóminas', () => {
   describe('Tipos de Alertas', () => {

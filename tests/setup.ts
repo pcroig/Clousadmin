@@ -3,8 +3,9 @@
  * Se ejecuta una vez antes de todos los tests
  */
 
-import { config } from 'dotenv';
 import path from 'path';
+
+import { config } from 'dotenv';
 import '@testing-library/jest-dom/vitest';
 
 // ========================================

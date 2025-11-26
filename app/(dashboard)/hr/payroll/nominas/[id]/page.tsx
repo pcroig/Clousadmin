@@ -2,9 +2,9 @@
 // HR Payroll - Detalles de Nómina Individual
 // ========================================
 
+import { Prisma } from '@prisma/client';
 import { redirect } from 'next/navigation';
 
-import { Prisma } from '@prisma/client';
 
 import { getSession } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';

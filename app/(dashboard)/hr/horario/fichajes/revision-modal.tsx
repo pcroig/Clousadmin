@@ -11,6 +11,7 @@ import { AlertCircle, CheckCircle2, ChevronDown, ChevronRight, Clock, Edit2, Fil
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
+import { FichajeModal } from '@/components/shared/fichajes/fichaje-modal';
 import { InfoTooltip } from '@/components/shared/info-tooltip';
 import { LoadingButton } from '@/components/shared/loading-button';
 import { Badge } from '@/components/ui/badge';
@@ -34,7 +35,6 @@ import {
 
 
 
-import { EditarFichajeModal } from './editar-fichaje-modal';
 
 
 interface EventoPropuesto {
@@ -64,7 +64,7 @@ interface RevisionModalProps {
 
 interface EditarFichajeModalState {
   open: boolean;
-  fichajeId: string | null;
+  fichajeDiaId: string | null;
 }
 
 const EVENT_LABELS: Record<string, string> = {
@@ -88,7 +88,7 @@ export function RevisionModal({ open, onClose, onReviewed, onEditFichaje: _onEdi
   const [ocultarDiasSinFichajes, setOcultarDiasSinFichajes] = useState(false);
   const [editarFichajeModal, setEditarFichajeModal] = useState<EditarFichajeModalState>({
     open: false,
-    fichajeId: null,
+    fichajeDiaId: null,
   });
 
   useEffect(() => {
@@ -424,7 +424,7 @@ export function RevisionModal({ open, onClose, onReviewed, onEditFichaje: _onEdi
                                       if (fichaje.fichajeId) {
                                         setEditarFichajeModal({
                                           open: true,
-                                          fichajeId: fichaje.fichajeId,
+                                          fichajeDiaId: fichaje.fichajeId,
                                         });
                                       } else {
                                         toast.error('No se encontró el identificador del fichaje para editar.');
@@ -450,20 +450,22 @@ export function RevisionModal({ open, onClose, onReviewed, onEditFichaje: _onEdi
       </DialogContent>
 
       {/* Modal Editar Fichaje - Renderizado fuera del Dialog principal para correcto z-index */}
-      <EditarFichajeModal
+      <FichajeModal
         open={editarFichajeModal.open}
-        fichaje={null} // No necesario, se carga desde fichajeDiaId
-        fichajeDiaId={editarFichajeModal.fichajeId || undefined}
+        fichajeDiaId={editarFichajeModal.fichajeDiaId ?? undefined}
         onClose={() => {
-          setEditarFichajeModal({ open: false, fichajeId: null });
+          setEditarFichajeModal({ open: false, fichajeDiaId: null });
           // Recargar fichajes después de editar
           fetchFichajesRevision();
         }}
-        onSave={async (_fichajeId, _hora, _tipo) => {
+        onSuccess={async () => {
+          setEditarFichajeModal({ open: false, fichajeDiaId: null });
           // El modal ya guarda los cambios, solo necesitamos recargar
           await fetchFichajesRevision();
           if (onReviewed) onReviewed();
         }}
+        contexto="hr_admin"
+        modo="editar"
       />
     </Dialog>
   );

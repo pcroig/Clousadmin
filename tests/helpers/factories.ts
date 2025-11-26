@@ -4,12 +4,12 @@
  */
 
 import {
+  EstadoAusencia,
   EstadoEmpleado,
   EstadoFichaje,
+  TipoAusencia,
   TipoContrato,
   TipoFichajeEvento,
-  TipoAusencia,
-  EstadoAusencia,
 } from '@/lib/constants/enums';
 
 let counter = 0;

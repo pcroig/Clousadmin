@@ -271,6 +271,17 @@ export function createConfigForUseCase(
 // ========================================
 
 /**
+ * Configuración extendida para features específicas
+ */
+export interface FeatureConfigDefinition {
+  useCase: AIUseCase;
+  systemMessage?: string;
+  temperature?: number;
+  responseFormat?: 'text' | 'json_object';
+  maxTokens?: number;
+}
+
+/**
  * Configuraciones para features específicas de la aplicación
  */
 export const FEATURE_CONFIGS = {
@@ -281,6 +292,7 @@ export const FEATURE_CONFIGS = {
     useCase: AIUseCase.VISION,
     systemMessage: 'Eres un asistente experto en extracción de información de documentos legales y administrativos.',
     temperature: 0.1, // Muy bajo para máxima precisión
+    responseFormat: 'json_object',
   },
   
   /**
@@ -290,6 +302,7 @@ export const FEATURE_CONFIGS = {
     useCase: AIUseCase.CLASSIFICATION,
     systemMessage: 'Eres un asistente experto en análisis de nóminas y matching de documentos con empleados.',
     temperature: 0.2,
+    responseFormat: 'json_object',
   },
   
   /**
@@ -308,6 +321,7 @@ export const FEATURE_CONFIGS = {
     useCase: AIUseCase.EXTRACTION,
     systemMessage: 'Eres un asistente experto en análisis de datos de recursos humanos y mapeo de información de empleados desde hojas de cálculo.',
     temperature: 0.2,
+    responseFormat: 'json_object',
     maxTokens: 12000, // Aumentado para manejar respuestas JSON grandes (hasta ~50 empleados completos)
   },
   
@@ -318,21 +332,64 @@ export const FEATURE_CONFIGS = {
     useCase: AIUseCase.GENERATION,
     systemMessage: 'Eres un asistente experto en análisis de sentimientos y feedback de empleados.',
     temperature: 0.4,
+    responseFormat: 'json_object',
   },
-} as const;
+  
+  /**
+   * Resolver variables dinámicas de plantillas
+   */
+  'plantillas-resolver-variable': {
+    useCase: AIUseCase.EXTRACTION,
+    systemMessage: 'Eres un experto en mapeo de datos estructurados. Respondes SOLO en JSON válido.',
+    temperature: 0,
+    responseFormat: 'json_object',
+    maxTokens: 2500,
+  },
+  
+  /**
+   * Mapear campos de PDFs rellenables a variables del sistema
+   */
+  'plantillas-mapear-campos-pdf': {
+    useCase: AIUseCase.EXTRACTION,
+    systemMessage:
+      'Eres un asistente experto en mapeo de campos de formularios PDF a variables internas del sistema. Siempre devuelve JSON válido.',
+    temperature: 0.1,
+    responseFormat: 'json_object',
+    maxTokens: 5000,
+  },
+  
+  /**
+   * Escanear PDFs (visuales) para detectar campos rellenables
+   */
+  'plantillas-escanear-pdf': {
+    useCase: AIUseCase.VISION,
+    systemMessage:
+      'Eres un asistente experto en análisis de documentos PDF. Detectas campos rellenables y devuelves resultados estructurados en JSON.',
+    temperature: 0.1,
+    responseFormat: 'json_object',
+    maxTokens: 5000,
+  },
+} as const satisfies Record<string, FeatureConfigDefinition>;
+
+export type FeatureName = keyof typeof FEATURE_CONFIGS;
 
 /**
  * Obtiene configuración para una feature específica
  */
 export function getFeatureConfig(
-  featureName: keyof typeof FEATURE_CONFIGS,
+  featureName: FeatureName,
   provider: AIProvider
 ): ModelConfig {
   const featureConfig = FEATURE_CONFIGS[featureName];
+  if (!featureConfig) {
+    throw new Error(`Configuración de feature no encontrada: ${featureName}`);
+  }
   
   const config = createConfigForUseCase(featureConfig.useCase, provider, {
     systemMessage: featureConfig.systemMessage,
     temperature: featureConfig.temperature,
+    responseFormat: featureConfig.responseFormat,
+    maxTokens: featureConfig.maxTokens,
   });
 
   config.metadata = {

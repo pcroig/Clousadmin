@@ -11,12 +11,12 @@ import {
   requireAuth,
   successResponse,
 } from '@/lib/api-handler';
-import { UsuarioRol } from '@/lib/constants/enums';
 import { DIAS_LABORABLES_DEFAULT } from '@/lib/calculos/dias-laborables';
+import { UsuarioRol } from '@/lib/constants/enums';
 import { persistDiasLaborables } from '@/lib/empresa/calendario-laboral';
 import { prisma, Prisma } from '@/lib/prisma';
-import { calendarioLaboralUpdateSchema } from '@/lib/validaciones/schemas';
 import { getJsonBody } from '@/lib/utils/json';
+import { calendarioLaboralUpdateSchema } from '@/lib/validaciones/schemas';
 
 // Force dynamic rendering
 export const dynamic = 'force-dynamic';

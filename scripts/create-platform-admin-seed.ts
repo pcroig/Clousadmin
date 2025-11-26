@@ -4,8 +4,8 @@
 // Ejecutar con: npx tsx scripts/create-platform-admin-seed.ts
 // Crea empresa base "Clousadmin Platform" y usuario platform_admin
 
-import { hash } from 'bcryptjs';
 import { PrismaClient, UsuarioRol } from '@prisma/client';
+import { hash } from 'bcryptjs';
 
 const prisma = new PrismaClient();
 

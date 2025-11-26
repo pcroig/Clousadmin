@@ -3,10 +3,11 @@
  * Valida operaciones completas contra base de datos
  */
 
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
-import { prisma } from '@/lib/prisma';
-import { EstadoEmpleado, TipoContrato } from '@/lib/constants/enums';
 import bcrypt from 'bcryptjs';
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+
+import { EstadoEmpleado, TipoContrato } from '@/lib/constants/enums';
+import { prisma } from '@/lib/prisma';
 
 describe.skip('Empleados CRUD Integration', () => {
   let testEmpresaId: string;

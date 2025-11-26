@@ -8,7 +8,7 @@ import { MOBILE_DESIGN } from '@/lib/constants/mobile-design';
 import { useIsMobile } from '@/lib/hooks/use-viewport';
 import { cn } from '@/lib/utils';
 
-import { OverflowMenu, type OverflowAction } from './OverflowMenu';
+import { type OverflowAction, OverflowMenu } from './OverflowMenu';
 
 export interface ActionItem {
   icon?: React.ComponentType<{ className?: string }>;

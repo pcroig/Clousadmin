@@ -2,7 +2,8 @@
  * Tests para normalización de correcciones de fichajes
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
+
 import {
   normalizarFechaCorreccion,
   normalizarHoraCorreccion,

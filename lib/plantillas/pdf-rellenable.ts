@@ -5,7 +5,7 @@
 
 import { PDFCheckBox, PDFDocument, PDFDropdown, PDFTextField } from 'pdf-lib';
 
-import { callAIWithConfig } from '@/lib/ia';
+import { callFeatureAI, MessageRole } from '@/lib/ia';
 import { deleteOpenAIFile, uploadPDFToOpenAI } from '@/lib/ia/core/providers/openai';
 import {
   crearNotificacionDocumentoGeneradoEmpleado,
@@ -19,7 +19,7 @@ import { resolverVariables } from './ia-resolver';
 import { sanitizarNombreArchivo } from './sanitizar';
 import { ConfiguracionGeneracion, DatosEmpleado, ResultadoGeneracion } from './tipos';
 
-import type OpenAI from 'openai';
+import type { AIMessage } from '@/lib/ia';
 
 /**
  * Extraer campos de formulario de un PDF
@@ -80,14 +80,14 @@ Responde SOLO en JSON:
 }`;
 
   try {
-    const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
+    const messages: AIMessage[] = [
       {
-        role: 'user',
+        role: MessageRole.USER,
         content: prompt,
       },
     ];
 
-    const completion = await callAIWithConfig('plantillas-mapear-campos-pdf', messages);
+    const completion = await callFeatureAI('plantillas-mapear-campos-pdf', messages);
 
     const content = completion.choices[0]?.message?.content;
     if (!content) {
@@ -214,9 +214,9 @@ NOTA: Este PDF tiene ${pageCount} páginas. Analiza especialmente la primera pá
 
     openaiFileId = await uploadPDFToOpenAI(pdfBuffer, 'plantilla.pdf');
 
-    const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
+    const messages: AIMessage[] = [
       {
-        role: 'user',
+        role: MessageRole.USER,
         content: [
           { type: 'text', text: prompt },
           { type: 'image_url', image_url: { url: openaiFileId, detail: 'high' } },
@@ -224,7 +224,7 @@ NOTA: Este PDF tiene ${pageCount} páginas. Analiza especialmente la primera pá
       },
     ];
 
-    const completion = await callAIWithConfig('plantillas-escanear-pdf', messages);
+    const completion = await callFeatureAI('plantillas-escanear-pdf', messages);
 
     const content = completion.choices[0]?.message?.content;
     if (!content) {

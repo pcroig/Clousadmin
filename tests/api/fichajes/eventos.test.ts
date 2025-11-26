@@ -3,11 +3,12 @@
  * PRIORIDAD: CRÍTICA (obligatorio legal en España)
  */
 
-import { describe, it, expect, beforeEach, beforeAll, vi } from 'vitest';
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { TipoFichajeEvento } from '@/lib/constants/enums';
 import { createMockRequest, parseResponse } from '@/tests/helpers/api';
 import { createMockSession, mockUsers } from '@/tests/helpers/auth';
-import { fichajeFactory, empresaFactory } from '@/tests/helpers/factories';
-import { TipoFichajeEvento } from '@/lib/constants/enums';
+import { empresaFactory, fichajeFactory } from '@/tests/helpers/factories';
 
 // Mock de dependencies
 vi.mock('@/lib/api-handler', async () => {

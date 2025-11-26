@@ -3,7 +3,7 @@
  * Flujo completo de solicitud y aprobación
  */
 
-import { test, expect } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 
 // Helpers de login
 async function loginAsEmpleado(page: any) {

@@ -4,7 +4,7 @@
  * Arregla el error: 'data' is of type 'unknown'
  */
 
-import { readFileSync, writeFileSync, readdirSync, statSync } from 'fs';
+import { readdirSync, readFileSync, statSync, writeFileSync } from 'fs';
 import { join } from 'path';
 
 function getAllFiles(dir, files = []) {

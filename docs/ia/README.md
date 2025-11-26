@@ -64,20 +64,17 @@ El sistema usa esta prioridad automáticamente:
 **Todo lo relacionado con la base común** (instalación, cliente, modelos) se importa desde:
 
 ```typescript
-// ✅ Punto de entrada centralizado - Base común (NUEVO)
+// ✅ Punto de entrada centralizado (cliente multi-proveedor + helpers declarativos)
 import {
-  getAIClient,         // Cliente con fallback automático
-  isAIAvailable,       // Verificar disponibilidad (OpenAI o Replicate)
-  getActiveProvider,   // Saber qué proveedor está activo
-  MODELS,              // Modelos disponibles
-  getModelConfig,      // Obtener configuración por funcionalidad
+  callFeatureAI,       // Ejecuta una feature declarada en FEATURE_CONFIGS
+  callAI,              // Cliente bajo nivel (mensajes IAMessage)
+  getAvailableProviders,
+  getPrimaryProvider,
+  MessageRole,
 } from '@/lib/ia';
 
-// ⚠️ Legacy (deprecated pero funcionan por compatibilidad)
-import {
-  getOpenAIClient,     // Solo OpenAI, sin fallback
-  isOpenAIAvailable,   // Solo verifica OpenAI
-} from '@/lib/ia';
+// ⚠️ Legacy (deprecated pero disponible temporalmente)
+import { getOpenAIClient, isOpenAIAvailable } from '@/lib/ia';
 ```
 
 **Cada funcionalidad específica** se importa desde su archivo:
@@ -130,40 +127,23 @@ console.log(`Usando proveedor: ${provider}`);
 
 ```
 lib/ia/
-├── index.ts                     # 📦 PUNTO DE ENTRADA CENTRALIZADO
-│                                #    Instalación y configuración base común
-│
-├── client.ts                    # 🔧 BASE COMÚN
-│                                #    Cliente de IA con fallback automático
-│                                #    (OpenAI → Replicate)
-│
-├── fallback-client.ts           # 🔄 FALLBACK
-│                                #    Cliente Replicate (Llama 3.1 70B)
-│                                #    Interfaz compatible con OpenAI
-│
-├── models.ts                    # ⚙️ BASE COMÚN
-│                                #    Configuraciones de modelos (GPT-4.1)
-│                                #    por funcionalidad
-│
-├── cuadrar-vacaciones.ts        # 🎯 FUNCIONALIDAD ESPECÍFICA
-│                                #    Optimización de vacaciones con IA
-│
-├── clasificador-fichajes.ts     # 🎯 FUNCIONALIDAD ESPECÍFICA
-│                                #    Clasificación de fichajes
-│
-├── clasificador-nominas.ts      # 🎯 FUNCIONALIDAD ESPECÍFICA
-│                                #    Matching de nóminas con empleados
-│
-├── procesar-excel-empleados.ts  # 🎯 FUNCIONALIDAD ESPECÍFICA
-│                                #    Mapeo de Excel a empleados
-│
-└── [nueva-funcionalidad].ts     # 🎯 NUEVAS FUNCIONALIDADES
-                                 #    Cada una en su propio archivo
+├── index.ts                  # 📦 Punto de entrada centralizado
+├── core/
+│   ├── client.ts             # 🔧 Cliente unificado con fallback (OpenAI → Anthropic → Google)
+│   ├── config.ts             # ⚙️ Modelos, AIUseCase y FEATURE_CONFIGS declarativos
+│   ├── features.ts           # 🚀 Helper callFeatureAI/listAvailableFeatures
+│   └── providers/            # 🧱 Integraciones específicas (openai|anthropic|google)
+├── patterns/                 # ♻️ Patrones reutilizables (extraction, classification, vision, generation)
+├── cuadrar-vacaciones.ts     # 🎯 Funcionalidad específica
+├── clasificador-nominas.ts   # 🎯 Funcionalidad específica
+├── procesar-excel-empleados.ts
+├── plantillas/               # 🎯 Funcionalidades ligadas a plantillas/pdf
+└── [nueva-funcionalidad].ts  # 🎯 Nuevos módulos con su propia lógica
 ```
 
 ### Separación Clara
 
-- **BASE COMÚN** (`index.ts`, `client.ts`, `fallback-client.ts`, `models.ts`):
+- **BASE COMÚN** (`index.ts`, `core/client.ts`, `core/config.ts`, `core/features.ts`):
   - Instalación y configuración compartida
   - Cliente de IA con fallback automático (OpenAI → Replicate)
   - Definiciones de modelos (GPT-4.1 como estándar)
@@ -205,34 +185,35 @@ const resultado = await cuadrarVacacionesIA({
 Si necesitas usar el cliente de IA directamente (no recomendado, mejor usar funcionalidades específicas):
 
 ```typescript
-import { getAIClient, getModelConfig, getActiveProvider } from '@/lib/ia';
+import { callAI, getFeatureConfig, getPrimaryProvider, MessageRole } from '@/lib/ia';
 
-// El cliente detecta automáticamente qué proveedor usar
-const client = getAIClient();  // OpenAI o Replicate
-const config = getModelConfig('cuadrar-vacaciones');
-const provider = getActiveProvider();  // 'openai' | 'replicate'
+const provider = getPrimaryProvider();
+if (!provider) {
+  throw new Error('Configura OPENAI_API_KEY, ANTHROPIC_API_KEY o GOOGLE_AI_API_KEY');
+}
 
-console.log(`Usando: ${provider}`);
+const config = getFeatureConfig('cuadrar-vacaciones', provider);
 
-const completion = await client.chat.completions.create({
-  model: config.model,
-  messages: [...],
-  temperature: config.temperature,
-});
+const completion = await callAI(
+  [
+    {
+      role: MessageRole.USER,
+      content: 'Prompt aquí',
+    },
+  ],
+  config
+);
 ```
 
 ### 3. Verificar Disponibilidad
 
 ```typescript
-import { isAIAvailable, getActiveProvider } from '@/lib/ia';
+import { getAvailableProviders, isAnyProviderAvailable } from '@/lib/ia';
 
-if (isAIAvailable()) {
-  const provider = getActiveProvider();
-  console.log(`IA disponible: ${provider}`);
-  // Mostrar opciones de IA
+if (isAnyProviderAvailable()) {
+  console.log(`IA disponible: ${getAvailableProviders().join(', ')}`);
 } else {
-  // Mostrar alternativa sin IA o mensaje de configuración
-  console.log('Configura OPENAI_API_KEY o REPLICATE_API_TOKEN');
+  console.warn('Configura OPENAI_API_KEY, ANTHROPIC_API_KEY o GOOGLE_AI_API_KEY');
 }
 ```
 
@@ -245,8 +226,7 @@ if (isAIAvailable()) {
 ```typescript
 // lib/ia/nueva-funcionalidad.ts
 
-// ✅ Importar base común desde punto centralizado
-import { getOpenAIClient, getModelConfig } from './index';
+import { callFeatureAI, MessageRole } from '@/lib/ia';
 
 export interface NuevaFuncionalidadInput {
   // Tipos específicos de esta funcionalidad
@@ -259,59 +239,33 @@ export interface NuevaFuncionalidadResult {
 export async function nuevaFuncionalidadIA(
   input: NuevaFuncionalidadInput
 ): Promise<NuevaFuncionalidadResult> {
-  // 1. Obtener configuración del modelo para esta funcionalidad
-  const modelConfig = getModelConfig('nueva-funcionalidad');
-  if (!modelConfig) {
-    throw new Error('Configuración no encontrada para nueva-funcionalidad');
-  }
+  const completion = await callFeatureAI('nueva-funcionalidad', [
+    { role: MessageRole.USER, content: 'Tu prompt aquí' },
+  ]);
 
-  // 2. Obtener cliente base (común a todas las funcionalidades)
-  const openai = getOpenAIClient();
-
-  // 3. Lógica específica de esta funcionalidad
-  const completion = await openai.chat.completions.create({
-    model: modelConfig.model,
-    messages: [
-      ...(modelConfig.systemMessage
-        ? [{ role: 'system', content: modelConfig.systemMessage }]
-        : []),
-      { role: 'user', content: 'Tu prompt aquí' },
-    ],
-    temperature: modelConfig.temperature,
-    response_format: modelConfig.responseFormat === 'json_object'
-      ? { type: 'json_object' }
-      : undefined,
-  });
-
-  // 4. Procesar resultado y retornar
   return {
-    // Resultado procesado
+    // Resultado procesado con completion.choices[0].message.content
   };
 }
 ```
 
-### Paso 2: Añadir Configuración en `models.ts`
+> 💡 También puedes usar los patrones (`lib/ia/patterns/*`) cuando necesites extracción estructurada, clasificación o visión. Estos patrones ya usan `callAI` internamente.
+
+### Paso 2: Añadir Configuración en `core/config.ts`
 
 ```typescript
-// lib/ia/models.ts
+// lib/ia/core/config.ts
 
-export const FUNCTION_CONFIGS: Record<string, ModelConfig> = {
-  // ... configuraciones existentes
-
-  /**
-   * Nueva Funcionalidad
-   * - Descripción de qué hace
-   * - Modelo apropiado: gpt-5, gpt-4.1, etc.
-   * - Temperatura según necesidad
-   */
+export const FEATURE_CONFIGS = {
+  // ...otras features
   'nueva-funcionalidad': {
-    model: MODELS.GPT_5, // o MODELS.GPT_4_1, etc.
+    useCase: AIUseCase.EXTRACTION, // o el caso de uso que corresponda
+    systemMessage: 'Eres un asistente experto en...',
     temperature: 0.4,
     responseFormat: 'json_object',
-    systemMessage: 'Eres un asistente experto en...',
-    maxTokens: 2000, // opcional
+    maxTokens: 2000,
   },
-};
+} as const;
 ```
 
 ### Paso 3: Usar la Nueva Funcionalidad
@@ -331,25 +285,23 @@ const resultado = await nuevaFuncionalidadIA({
 
 ### En `lib/ia/index.ts`
 
-✅ **Instalación y configuración base**:
-- `getOpenAIClient()` - Cliente OpenAI único
-- `isOpenAIAvailable()` - Verificar disponibilidad
-- `MODELS` - Modelos disponibles
-- `getModelConfig()` - Configuraciones por funcionalidad
+✅ **Exports centralizados**:
+- Cliente unificado (`callAI`, `callAISafe`, patrones)
+- Helpers declarativos (`callFeatureAI`, `listAvailableFeatures`)
+- Tipos (`AIProvider`, `MessageRole`, `FeatureCallOptions`, etc.)
 
-### En `lib/ia/client.ts`
+### En `lib/ia/core/client.ts`
 
-✅ **Cliente base común**:
-- Singleton pattern (una sola instancia)
-- Lazy initialization (no falla en build)
-- Validación de API key
+✅ **Cliente multi-proveedor**:
+- Fallback automático OpenAI → Anthropic → Google
+- Reintentos con backoff
+- Logging y metadatos homogéneos
 
-### En `lib/ia/models.ts`
+### En `lib/ia/core/config.ts`
 
-✅ **Configuraciones centralizadas**:
-- Definición de modelos disponibles
-- Configuraciones por funcionalidad
-- Helpers para usar configuraciones
+✅ **Declaración de modelos**:
+- `AIUseCase`, `OPENAI_MODELS`, `FEATURE_CONFIGS`
+- Helpers para obtener configuraciones (`getFeatureConfig`, `createConfigForUseCase`)
 
 ---
 

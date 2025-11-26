@@ -11,8 +11,8 @@ import {
   successResponse,
 } from '@/lib/api-handler';
 import { prisma } from '@/lib/prisma';
-import { preferenciaVacacionesCreateSchema } from '@/lib/validaciones/schemas';
 import { getJsonBody } from '@/lib/utils/json';
+import { preferenciaVacacionesCreateSchema } from '@/lib/validaciones/schemas';
 
 // POST /api/campanas-vacaciones/[id]/preferencias - Guardar preferencias del empleado
 export async function POST(

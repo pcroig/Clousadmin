@@ -1,12 +1,13 @@
 'use client';
 
-import type { CSSProperties, ReactNode } from 'react';
 
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { getAvatarStyle } from '@/lib/design-system';
 import { cn } from '@/lib/utils';
 
 import { getInitials } from './utils';
+
+import type { CSSProperties, ReactNode } from 'react';
 
 interface EmployeeAvatarProps {
   nombre?: string | null;

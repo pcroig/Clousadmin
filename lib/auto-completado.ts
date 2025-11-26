@@ -4,9 +4,10 @@
 // Centraliza la creación de registros en la tabla auto_completados para que
 // los widgets de “Auto-completed” tengan trazabilidad consistente.
 
+import { asJsonValue } from '@/lib/prisma/json';
+
 import type { Prisma, PrismaClient } from '@prisma/client';
 
-import { asJsonValue } from '@/lib/prisma/json';
 
 type AutoCompletadoClient = PrismaClient | Prisma.TransactionClient;
 

@@ -24,9 +24,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { parseJson } from '@/lib/utils/json';
-import { Switch } from '@/components/ui/switch';
+
 import type { Festivo, FestivoEditorState } from '@/types/festivos';
 
 interface GestionarAusenciasModalProps {

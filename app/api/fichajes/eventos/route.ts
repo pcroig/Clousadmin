@@ -13,8 +13,8 @@ import {
   successResponse,
   validateRequest,
 } from '@/lib/api-handler';
-import { prisma } from '@/lib/prisma';
 import { calcularHorasTrabajadas, calcularTiempoEnPausa } from '@/lib/calculos/fichajes';
+import { prisma } from '@/lib/prisma';
 
 const fichajeEventoSchema = z.object({
   fichajeId: z.string().uuid(),

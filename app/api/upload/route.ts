@@ -3,7 +3,7 @@
 // ========================================
 
 import { Readable } from 'node:stream';
-import type { ReadableStream as NodeReadableStream } from 'stream/web';
+
 
 import { NextRequest } from 'next/server';
 
@@ -13,6 +13,8 @@ import { prisma } from '@/lib/prisma';
 import { getClientIP, rateLimitApiWrite } from '@/lib/rate-limit';
 import { isS3Configured, uploadToS3 } from '@/lib/s3';
 import { sanitizeFileName } from '@/lib/utils/file-helpers';
+
+import type { ReadableStream as NodeReadableStream } from 'stream/web';
 
 // Configuración de Next.js para manejar uploads
 export const runtime = 'nodejs';

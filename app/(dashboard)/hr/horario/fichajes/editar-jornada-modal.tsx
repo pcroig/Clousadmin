@@ -9,8 +9,8 @@ import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
 import {
-  JornadaFormFields,
   type JornadaFormData,
+  JornadaFormFields,
 } from '@/components/shared/jornada-form-fields';
 import { LoadingButton } from '@/components/shared/loading-button';
 import {

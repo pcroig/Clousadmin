@@ -17,7 +17,7 @@ import { extractArrayFromResponse } from '@/lib/utils/api-response';
 import { formatearHorasMinutos, formatTiempoTrabajado } from '@/lib/utils/formatters';
 import { parseJson } from '@/lib/utils/json';
 
-import { FichajeManualModal } from './fichaje-manual-modal';
+import { FichajeModal } from './fichajes/fichaje-modal';
 import { WidgetCard } from './widget-card';
 
 import type { FichajeEvento } from '@prisma/client';
@@ -516,7 +516,7 @@ export function FichajeWidget({
       </div>
 
       {/* Modal de fichaje manual */}
-      <FichajeManualModal
+      <FichajeModal
         open={state.modalManual}
         onClose={() => dispatch({ type: 'SET_MODAL', payload: false })}
         onSuccess={() => {
@@ -524,6 +524,7 @@ export function FichajeWidget({
           obtenerEstadoActual();
         }}
         contexto="empleado"
+        modo="crear"
       />
     </div>
   );

@@ -3,12 +3,13 @@
  * Prueba permisos por rol y paginación
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
 import { GET } from '@/app/api/fichajes/route';
+import { EstadoFichaje, UsuarioRol } from '@/lib/constants/enums';
 import { createMockRequest, parseResponse } from '@/tests/helpers/api';
 import { createMockSession, mockUsers } from '@/tests/helpers/auth';
 import { fichajeFactory } from '@/tests/helpers/factories';
-import { UsuarioRol, EstadoFichaje } from '@/lib/constants/enums';
 
 // Mock de dependencies
 vi.mock('@/lib/api-handler', async () => {

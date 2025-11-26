@@ -5,11 +5,11 @@
 import { NextRequest } from 'next/server';
 
 import {
+  forbiddenResponse,
   handleApiError,
+  notFoundResponse,
   requireAuth,
   successResponse,
-  forbiddenResponse,
-  notFoundResponse,
 } from '@/lib/api-handler';
 import { UsuarioRol } from '@/lib/constants/enums';
 import { prisma } from '@/lib/prisma';

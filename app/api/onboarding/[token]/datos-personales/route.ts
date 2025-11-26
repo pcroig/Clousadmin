@@ -5,8 +5,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 import { guardarDatosPersonales } from '@/lib/onboarding';
-import { datosPersonalesSchema } from '@/lib/validaciones/onboarding';
 import { getJsonBody } from '@/lib/utils/json';
+import { datosPersonalesSchema } from '@/lib/validaciones/onboarding';
 
 // POST /api/onboarding/[token]/datos-personales - Guardar datos personales (Paso 1)
 export async function POST(

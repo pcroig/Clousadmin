@@ -5,8 +5,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 import { guardarDatosBancarios } from '@/lib/onboarding';
-import { datosBancariosSchema } from '@/lib/validaciones/onboarding';
 import { getJsonBody } from '@/lib/utils/json';
+import { datosBancariosSchema } from '@/lib/validaciones/onboarding';
 
 // POST /api/onboarding/[token]/datos-bancarios - Guardar datos bancarios (Paso 2)
 export async function POST(

@@ -1,4 +1,5 @@
 import defaultRuntimeCaching from 'next-pwa/cache';
+
 import type { RuntimeCaching } from 'workbox-build';
 
 /**

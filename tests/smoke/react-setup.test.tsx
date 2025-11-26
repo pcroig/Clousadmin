@@ -2,8 +2,9 @@
  * Smoke test: Validar que Testing Library está configurado correctamente
  */
 
-import { describe, it, expect } from 'vitest';
-import { render, screen, renderWithProviders } from '../helpers/react';
+import { describe, expect, it } from 'vitest';
+
+import { render, renderWithProviders, screen } from '../helpers/react';
 
 // Componente simple para testing
 function TestComponent({ name }: { name: string }) {

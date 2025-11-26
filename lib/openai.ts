@@ -4,16 +4,17 @@
 // ⚠️ DEPRECATED: Este archivo mantiene compatibilidad con imports antiguos
 // 
 // ✅ NUEVA UBICACIÓN RECOMENDADA (Todo centralizado):
-//   import { getOpenAIClient, MODELS } from '@/lib/ia';
+//   import { getOpenAIClient, OPENAI_MODELS, callFeatureAI } from '@/lib/ia';
 //
-// ESTRUCTURA ACTUAL:
+// ESTRUCTURA ACTUAL (resumen):
 //   lib/ia/
-//     ├── index.ts           # Punto de entrada centralizado (instalación/configuración común)
-//     ├── client.ts          # Cliente base OpenAI (común)
-//     ├── models.ts          # Configuraciones de modelos (común)
-//     ├── cuadrar-vacaciones.ts    # Funcionalidad específica
-//     ├── clasificador-fichajes.ts # Funcionalidad específica
-//     └── [nueva-funcionalidad].ts  # Otras funcionalidades
+//     ├── index.ts            # Punto de entrada centralizado
+//     ├── core/
+//     │   ├── client.ts       # Cliente multi-proveedor
+//     │   ├── config.ts       # AIUseCase + FEATURE_CONFIGS
+//     │   └── features.ts     # Helper declarativo (callFeatureAI)
+//     ├── patterns/           # Patrones reutilizables
+//     └── [feature].ts        # Funciones específicas (cuadrar-vacaciones, etc.)
 
 /**
  * @deprecated Use `@/lib/ia` instead (punto de entrada centralizado)
@@ -23,11 +24,9 @@
 export {
   getOpenAIClient,
   isOpenAIAvailable,
-  MODELS,
-  getModelConfig,
-  getModelConfigOrDefault,
-  callOpenAIWithConfig,
+  OPENAI_MODELS,
+  callFeatureAI,
 } from './ia';
 
-export type { LegacyModelConfig as ModelConfig, ModelName } from './ia';
+export type { FeatureCallOptions } from './ia';
 

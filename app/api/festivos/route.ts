@@ -15,8 +15,8 @@ import {
 } from '@/lib/api-handler';
 import { UsuarioRol } from '@/lib/constants/enums';
 import { prisma, Prisma } from '@/lib/prisma';
-import { festivoCreateSchema } from '@/lib/validaciones/schemas';
 import { getJsonBody } from '@/lib/utils/json';
+import { festivoCreateSchema } from '@/lib/validaciones/schemas';
 
 // Force dynamic rendering
 export const dynamic = 'force-dynamic';

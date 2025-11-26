@@ -2,10 +2,11 @@
  * Tests de integración: Validaciones complejas combinadas
  */
 
-import { describe, it, expect } from 'vitest';
-import { validarNIF, validarNIE, obtenerInfoValidacionNIF } from '@/lib/validaciones/nif';
-import { validarIBAN, extraerCodigoBanco } from '@/lib/validaciones/iban';
+import { describe, expect, it } from 'vitest';
+
 import { validateFile } from '@/lib/validaciones/file-upload';
+import { extraerCodigoBanco, validarIBAN } from '@/lib/validaciones/iban';
+import { obtenerInfoValidacionNIF, validarNIE, validarNIF } from '@/lib/validaciones/nif';
 
 describe('Validaciones Complejas Integration', () => {
   describe('Flujo completo: Crear empleado', () => {

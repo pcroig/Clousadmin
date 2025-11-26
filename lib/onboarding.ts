@@ -12,8 +12,8 @@ import { encryptEmpleadoData } from '@/lib/empleado-crypto';
 import { crearNotificacionOnboardingCompletado } from '@/lib/notificaciones';
 import { obtenerOnboardingConfig } from '@/lib/onboarding-config';
 import { prisma, Prisma } from '@/lib/prisma';
-import { uploadToS3 } from '@/lib/s3';
 import { asJsonValue } from '@/lib/prisma/json';
+import { uploadToS3 } from '@/lib/s3';
 
 /**
  * Tipo de onboarding

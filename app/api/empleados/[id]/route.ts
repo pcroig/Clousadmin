@@ -19,6 +19,7 @@ import {
   crearNotificacionJornadaAsignada,
 } from '@/lib/notificaciones';
 import { prisma, Prisma } from '@/lib/prisma';
+
 import type { Empleado } from '@prisma/client';
 
 // Schema de validación para actualizar empleado

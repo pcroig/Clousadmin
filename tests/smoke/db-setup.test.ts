@@ -2,8 +2,9 @@
  * Smoke test: Validar que los helpers de BD funcionan correctamente
  */
 
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { getPrismaTest, cleanDatabase, teardownTestDatabase } from '../helpers/db';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+
+import { cleanDatabase, getPrismaTest, teardownTestDatabase } from '../helpers/db';
 
 describe('Database Setup', () => {
   const prisma = getPrismaTest();

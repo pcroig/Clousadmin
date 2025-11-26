@@ -28,7 +28,6 @@ import {
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import type { ComponentType } from 'react';
 import { toast } from 'sonner';
 
 import { EmployeeAvatar } from '@/components/shared/employee-avatar';
@@ -40,6 +39,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { UsuarioRol } from '@/lib/constants/enums';
+
+import type { ComponentType } from 'react';
 
 
 interface SidebarProps {

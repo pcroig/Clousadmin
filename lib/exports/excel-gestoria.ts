@@ -8,9 +8,10 @@ import * as XLSX from 'xlsx';
 import { EstadoAusencia, EstadoSolicitud } from '@/lib/constants/enums';
 import { prisma } from '@/lib/prisma';
 
+import { obtenerResumenesMensuales } from '../calculos/nominas';
+
 import type { Prisma } from '@prisma/client';
 
-import { obtenerResumenesMensuales } from '../calculos/nominas';
 
 
 /**

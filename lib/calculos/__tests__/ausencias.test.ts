@@ -3,8 +3,10 @@
  * Cobertura: funciones puras y lógica de negocio
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
 import { EstadoAusencia } from '@/lib/constants/enums';
+
 import {
   determinarEstadoTrasAprobacion,
   esFinDeSemana,

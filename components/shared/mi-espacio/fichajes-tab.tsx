@@ -2,13 +2,12 @@
 
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Clock, CalendarDays, RotateCcw } from 'lucide-react';
+import { CalendarDays, Clock, RotateCcw } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 
-import { EditarFichajeModal } from '@/app/(dashboard)/hr/horario/fichajes/editar-fichaje-modal';
-import { FichajeManualModal } from '@/components/shared/fichaje-manual-modal';
+import { FichajeModal } from '@/components/shared/fichajes/fichaje-modal';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -21,6 +20,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { useApi } from '@/lib/hooks';
+import { cn } from '@/lib/utils';
 import {
   agruparFichajesEnJornadas,
   calcularResumenJornadas,
@@ -29,7 +29,6 @@ import {
   getEstadoBadgeConfig,
   type JornadaUI,
 } from '@/lib/utils/fichajesHistorial';
-import { cn } from '@/lib/utils';
 
 import type { MiEspacioEmpleado } from '@/types/empleado';
 
@@ -134,7 +133,7 @@ export function FichajesTab({ empleadoId, empleado, contexto = 'empleado' }: Fic
       horaSalida: formatearHora(promedioSalida),
       horasTrabajadas: promedioHoras.toFixed(1),
     };
-  }, [jornadas]);
+  }, [jornadas, fechaInicio]);
 
   // Cargar fecha de inicio (última renovación o fecha de alta)
   useEffect(() => {
@@ -144,8 +143,8 @@ export function FichajesTab({ empleadoId, empleado, contexto = 'empleado' }: Fic
       try {
         const res = await fetch(`/api/empleados/${empleadoId}/renovar-saldo`);
         if (res.ok) {
-          const data = await res.json() as Record<string, any>;
-          setFechaInicio(new Date(data.fechaRenovacion));
+          const data = await res.json() as Record<string, unknown>;
+          setFechaInicio(new Date(data.fechaRenovacion as string));
         }
       } catch (error) {
         console.error('Error cargando fecha de renovación:', error);
@@ -177,13 +176,13 @@ export function FichajesTab({ empleadoId, empleado, contexto = 'empleado' }: Fic
       });
 
       if (!res.ok) {
-        const error = await res.json() as Record<string, any>;
-        throw new Error(error.error || 'Error al renovar saldo');
+        const error = await res.json() as Record<string, unknown>;
+        throw new Error((error.error as string) || 'Error al renovar saldo');
       }
 
-      const data = await res.json() as Record<string, any>;
-      toast.success(data.mensaje || 'Saldo renovado correctamente');
-      setFechaInicio(new Date(data.fechaRenovacion));
+      const data = await res.json() as Record<string, unknown>;
+      toast.success((data.mensaje as string) || 'Saldo renovado correctamente');
+      setFechaInicio(new Date(data.fechaRenovacion as string));
       
       // Recargar fichajes
       refetchFichajes(`/api/fichajes?empleadoId=${empleadoId}&propios=1`);
@@ -378,29 +377,32 @@ export function FichajesTab({ empleadoId, empleado, contexto = 'empleado' }: Fic
 
       {/* Modal Editar Fichaje */}
       {puedeEditar && fichajeEditando && (
-        <EditarFichajeModal
+        <FichajeModal
           open
-          fichaje={null}
           fichajeDiaId={typeof fichajeEditando.id === 'string' ? fichajeEditando.id : undefined}
           onClose={() => setFichajeEditando(null)}
-          onSave={() => {
+          onSuccess={() => {
             setFichajeEditando(null);
             refetchFichajes(`/api/fichajes?empleadoId=${empleadoId}&propios=1`);
           }}
+          contexto={contexto}
+          empleadoId={empleadoId}
+          modo="editar"
         />
       )}
 
+      {/* Modal Crear Fichaje */}
       {(puedeCrearManual || puedeEditar) && (
-        <FichajeManualModal
+        <FichajeModal
           open={fichajeManualModalOpen}
           onClose={() => setFichajeManualModalOpen(false)}
           onSuccess={() => {
             setFichajeManualModalOpen(false);
             refetchFichajes(`/api/fichajes?empleadoId=${empleadoId}&propios=1`);
           }}
-          esHRAdmin={contexto === 'hr_admin'}
           contexto={contexto}
           empleadoId={empleadoId}
+          modo="crear"
         />
       )}
     </div>

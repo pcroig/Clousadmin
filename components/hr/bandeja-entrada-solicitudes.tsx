@@ -7,8 +7,8 @@
 import { Check, ClipboardList, MoreVertical, X } from 'lucide-react';
 import { useState } from 'react';
 
-import { EmptyState } from '@/components/shared/empty-state';
 import { EmployeeAvatar } from '@/components/shared/employee-avatar';
+import { EmptyState } from '@/components/shared/empty-state';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,

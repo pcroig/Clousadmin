@@ -3,15 +3,16 @@
  * Cobertura: encrypt, decrypt, hash, validación
  */
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+
 import {
-  encrypt,
   decrypt,
+  decryptFields,
+  encrypt,
+  encryptFields,
+  generateEncryptionKey,
   hashForSearch,
   validateEncryptionSetup,
-  generateEncryptionKey,
-  encryptFields,
-  decryptFields,
 } from '../crypto';
 
 // ========================================

@@ -17,8 +17,8 @@ import { UsuarioRol } from '@/lib/constants/enums';
 import { crearNotificacionCampanaCreada } from '@/lib/notificaciones';
 import { prisma, Prisma } from '@/lib/prisma';
 import { asJsonValue } from '@/lib/prisma/json';
-import { campanaVacacionesCreateSchema } from '@/lib/validaciones/schemas';
 import { getJsonBody } from '@/lib/utils/json';
+import { campanaVacacionesCreateSchema } from '@/lib/validaciones/schemas';
 
 // GET /api/campanas-vacaciones - Obtener campaña activa (single active campaign)
 export async function GET(req: NextRequest) {

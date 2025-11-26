@@ -3,7 +3,8 @@
  * Valida Zod schemas y reglas de negocio
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
+
 import { empleadoCreateSchema } from '@/lib/validaciones/schemas';
 
 describe('Empleado Schemas', () => {

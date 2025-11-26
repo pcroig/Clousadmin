@@ -28,7 +28,8 @@ import * as XLSX from 'xlsx';
 import { z } from 'zod';
 
 import { isAnyProviderAvailable } from './core/client';
-import { callAIWithConfig } from './models';
+import { callFeatureAI } from './core/features';
+import { MessageRole } from './core/types';
 
 /**
  * Estructura de un empleado detectado por la IA
@@ -631,7 +632,6 @@ export async function mapearEmpleadosConIA(
         `Reduciendo muestra a 20 registros para evitar límite de tokens.`
       );
       // Reducir muestra si es demasiado grande
-      const registrosReducidos = excelData.slice(0, 20);
       const mapeoBasico = obtenerMapeoBasicoColumnas();
       const resultado = procesarEmpleadosConMapeo(excelData, mapeoBasico);
       return {
@@ -670,9 +670,9 @@ ${usarMuestra
 `;
 
     // Llamar a la IA con la configuración específica (usa cliente unificado con fallback)
-    const completion = await callAIWithConfig('procesar-excel-empleados', [
+    const completion = await callFeatureAI('procesar-excel-empleados', [
       {
-        role: 'user',
+        role: MessageRole.USER,
         content: prompt,
       },
     ]);
