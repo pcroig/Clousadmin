@@ -11,6 +11,7 @@ import {
   EstadoFichaje as PrismaEstadoFichaje,
 } from '@prisma/client';
 
+import type { DiasLaborables, FestivosSet } from '@/lib/calculos/dias-laborables';
 import {
   crearSetFestivos,
   esDiaLaborableSync,
@@ -42,13 +43,17 @@ function normalizarFecha(fecha: Date): Date {
   return fechaNormalizada;
 }
 
-export interface EmpleadoDisponible
-  extends Pick<Empleado, 'id' | 'empresaId' | 'nombre' | 'apellidos' | 'fotoUrl'> {
+type EmpleadoConJornadaMinimal = Pick<Empleado, 'id' | 'empresaId'> & {
   jornada: {
     id: string;
     activa: boolean;
     config: unknown;
   } | null;
+};
+
+export interface EmpleadoDisponible
+  extends EmpleadoConJornadaMinimal,
+    Pick<Empleado, 'nombre' | 'apellidos' | 'fotoUrl'> {
 }
 
 const EMPLEADOS_DISPONIBLES_CACHE_TTL_MS = 60_000;
@@ -115,6 +120,44 @@ function esDiaActivoSegunJornada(configValue: unknown, nombreDia: string): boole
   }
 
   return true;
+}
+
+type EvaluacionDisponibilidad =
+  | { disponible: true }
+  | {
+      disponible: false;
+      motivo: 'sin_jornada' | 'jornada_inactiva' | 'ausencia_dia_completo' | 'dia_no_laborable_empresa' | 'dia_inactivo_jornada';
+    };
+
+function evaluarDisponibilidadEmpleado(
+  empleado: EmpleadoConJornadaMinimal,
+  fecha: Date,
+  diasLaborables: DiasLaborables,
+  festivosSet: FestivosSet,
+  ausenciasSet?: Set<string>
+): EvaluacionDisponibilidad {
+  if (!empleado.jornada) {
+    return { disponible: false, motivo: 'sin_jornada' };
+  }
+
+  if (!empleado.jornada.activa) {
+    return { disponible: false, motivo: 'jornada_inactiva' };
+  }
+
+  if (ausenciasSet?.has(empleado.id)) {
+    return { disponible: false, motivo: 'ausencia_dia_completo' };
+  }
+
+  if (!esDiaLaborableSync(fecha, diasLaborables, festivosSet)) {
+    return { disponible: false, motivo: 'dia_no_laborable_empresa' };
+  }
+
+  const nombreDia = obtenerNombreDia(fecha);
+  if (!esDiaActivoSegunJornada(empleado.jornada.config, nombreDia)) {
+    return { disponible: false, motivo: 'dia_inactivo_jornada' };
+  }
+
+  return { disponible: true };
 }
 
 /**
@@ -785,18 +828,17 @@ export async function esDiaLaboral(empleadoId: string, fecha: Date): Promise<boo
     }),
   ]);
 
-  if (ausencia) {
-    return false;
-  }
-
   const festivosSet = crearSetFestivos(festivos);
-  const esLaborableEmpresa = esDiaLaborableSync(fechaSinHora, diasLaborables, festivosSet);
-  if (!esLaborableEmpresa) {
-    return false;
-  }
+  const ausenciasSet = ausencia ? new Set<string>([empleado.id]) : undefined;
+  const evaluacion = evaluarDisponibilidadEmpleado(
+    empleado,
+    fechaSinHora,
+    diasLaborables,
+    festivosSet,
+    ausenciasSet
+  );
 
-  const nombreDia = obtenerNombreDia(fechaSinHora);
-  return esDiaActivoSegunJornada(empleado.jornada.config, nombreDia);
+  return evaluacion.disponible;
 }
 
 /**
@@ -874,50 +916,57 @@ async function calcularEmpleadosDisponibles(
   }
 
   const ausenciasSet = new Set(ausenciasDiaCompleto.map((ausencia) => ausencia.empleadoId));
-  const nombreDia = obtenerNombreDia(fecha);
+  const stats = {
+    sinJornada: 0,
+    jornadaInactiva: 0,
+    ausenciaDiaCompleto: 0,
+    diaNoLaborableEmpresa: 0,
+    diaInactivoJornada: 0,
+  };
 
   const filtrados = empleados.filter((empleado) => {
-    if (!empleado.jornada || !empleado.jornada.activa) {
+    const evaluacion = evaluarDisponibilidadEmpleado(
+      empleado,
+      fecha,
+      diasLaborables,
+      festivosSet,
+      ausenciasSet
+    );
+
+    if (!evaluacion.disponible) {
+      switch (evaluacion.motivo) {
+        case 'sin_jornada':
+          stats.sinJornada++;
+          break;
+        case 'jornada_inactiva':
+          stats.jornadaInactiva++;
+          break;
+        case 'ausencia_dia_completo':
+          stats.ausenciaDiaCompleto++;
+          break;
+        case 'dia_no_laborable_empresa':
+          stats.diaNoLaborableEmpresa++;
+          break;
+        case 'dia_inactivo_jornada':
+          stats.diaInactivoJornada++;
+          break;
+        default:
+          break;
+      }
       return false;
     }
 
-    if (ausenciasSet.has(empleado.id)) {
-      return false;
-    }
-
-    return esDiaActivoSegunJornada(empleado.jornada.config, nombreDia);
+    return true;
   });
 
   if (filtrados.length === 0 && empleados.length > 0) {
     console.warn(
-      `[obtenerEmpleadosDisponibles] Fallback legacy activado. Empresa=${empresaId}, Fecha=${fecha.toISOString()}, EmpleadosActivos=${empleados.length}`
+      `[obtenerEmpleadosDisponibles] 0 empleados disponibles tras filtrar. Empresa=${empresaId}, Fecha=${fecha.toISOString()}`,
+      stats
     );
-    return filtrarEmpleadosLegacy(empleados, fecha);
   }
 
   return filtrados;
-}
-
-async function filtrarEmpleadosLegacy(
-  empleados: EmpleadoDisponible[],
-  fecha: Date
-): Promise<EmpleadoDisponible[]> {
-  const resultados = await Promise.all(
-    empleados.map(async (empleado) => {
-      try {
-        const esLaboral = await esDiaLaboral(empleado.id, fecha);
-        return esLaboral ? empleado : null;
-      } catch (error) {
-        console.error(
-          `[obtenerEmpleadosDisponibles] Error en fallback legacy para empleado ${empleado.id}:`,
-          error
-        );
-        return null;
-      }
-    })
-  );
-
-  return resultados.filter((empleado): empleado is EmpleadoDisponible => empleado !== null);
 }
 
 /**
