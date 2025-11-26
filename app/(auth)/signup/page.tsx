@@ -2,8 +2,8 @@ import Image from 'next/image';
 import { redirect } from 'next/navigation';
 
 import { getSession } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
 import { obtenerInvitacionSignupPorToken, verificarInvitacionSignup } from '@/lib/invitaciones-signup';
+import { prisma } from '@/lib/prisma';
 
 import { SignupForm } from './signup-form';
 

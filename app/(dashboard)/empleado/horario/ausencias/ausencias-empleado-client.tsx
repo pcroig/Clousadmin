@@ -81,7 +81,7 @@ export function AusenciasEmpleadoClient({ saldo, campanas = [] }: Props) {
     setLoading(true);
     try {
       const response = await fetch('/api/ausencias');
-      const data = await response.json() as Record<string, any>;
+      const data = await response.json() as Record<string, unknown>;
       setAusencias(
         extractArrayFromResponse<Ausencia>(data, { key: 'ausencias' })
       );

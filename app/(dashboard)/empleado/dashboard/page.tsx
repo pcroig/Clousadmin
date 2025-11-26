@@ -4,10 +4,10 @@
 
 import { AusenciaItem } from '@/components/shared/ausencias-widget';
 import { getSession } from '@/lib/auth';
+import { calcularSaldoDisponible } from '@/lib/calculos/ausencias';
 import { EstadoAusencia, UsuarioRol } from '@/lib/constants/enums';
 import { prisma } from '@/lib/prisma';
 import { obtenerCampanaPendiente, obtenerPropuestaPendiente } from '@/lib/services/campanas-vacaciones';
-import { calcularSaldoDisponible } from '@/lib/calculos/ausencias';
 
 import { EmpleadoDashboardClient } from './dashboard-client';
 

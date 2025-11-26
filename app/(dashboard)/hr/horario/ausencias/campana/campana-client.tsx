@@ -7,16 +7,15 @@
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { ArrowLeft, Calendar, RefreshCw, Send, Sparkles, X } from 'lucide-react';
+import Link from 'next/link';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
 import { LoadingButton } from '@/components/shared/loading-button';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { TablaCuadrajeCampana } from '@/components/vacaciones/tabla-cuadraje-campana';
 import { parseJson } from '@/lib/utils/json';
-import Link from 'next/link';
 
 interface EmpleadoEquipo {
   equipoId: string;

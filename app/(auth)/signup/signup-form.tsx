@@ -11,23 +11,23 @@ import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 import {
-  type JornadaStepHandle,
-  JornadaStep,
-} from '@/components/onboarding/jornada-step';
-import {
-  type CalendarioStepHandle,
   CalendarioStep,
+  type CalendarioStepHandle,
 } from '@/components/onboarding/calendario-step';
 import { ImportarEmpleados } from '@/components/onboarding/importar-empleados';
 import { IntegracionesForm } from '@/components/onboarding/integraciones-form';
 import { InvitarHRAdmins } from '@/components/onboarding/invitar-hr-admins';
+import {
+  JornadaStep,
+  type JornadaStepHandle,
+} from '@/components/onboarding/jornada-step';
 import { SedesForm } from '@/components/onboarding/sedes-form';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
-import { signupEmpresaAction, completarOnboardingAction } from './actions';
+import { completarOnboardingAction, signupEmpresaAction } from './actions';
 
 
 interface SignupPrefill {
@@ -76,10 +76,7 @@ export function SignupForm({ token, emailInvitacion, prefill }: SignupFormProps)
   useEffect(() => {
     // Evitar que Next.js redirija al dashboard mientras estamos en onboarding
     // El flag se limpia solo cuando se completa el onboarding
-    const preventRedirect = () => {
-      // No hacer nada, solo mantener al usuario aquí
-    };
-    
+
     // Si el usuario intenta navegar atrás/adelante en el navegador
     const handlePopState = (e: PopStateEvent) => {
       e.preventDefault();

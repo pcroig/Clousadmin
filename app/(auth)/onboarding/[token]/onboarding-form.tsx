@@ -308,7 +308,7 @@ export function OnboardingForm({
   const fetchOnboardingConfig = useCallback(async () => {
     try {
       const configRes = await fetch(`/api/onboarding/${token}/config`);
-      const configData = await configRes.json() as Record<string, any>;
+      const configData = await configRes.json() as Record<string, unknown>;
       if (configData.success && configData.config) {
         setDocumentosRequeridos(
           mapDocumentosConfig(configData.config.documentosRequeridos || [])
@@ -323,7 +323,7 @@ export function OnboardingForm({
     setLoadingDocumentos(true);
     try {
       const docsRes = await fetch(`/api/onboarding/${token}/documentos`);
-      const docsData = await docsRes.json() as Record<string, any>;
+      const docsData = await docsRes.json() as Record<string, unknown>;
       if (docsData.success) {
         setDocumentos(docsData.documentos || []);
       } else {
@@ -379,7 +379,7 @@ export function OnboardingForm({
         body: formData,
       });
 
-      const data = await res.json() as Record<string, any>;
+      const data = await res.json() as Record<string, unknown>;
 
       if (res.ok && data.success) {
         setSuccess('Credenciales guardadas correctamente');
@@ -444,7 +444,7 @@ export function OnboardingForm({
         return;
       }
 
-      const data = await res.json() as Record<string, any>;
+      const data = await res.json() as Record<string, unknown>;
 
       if (res.ok && data.success) {
         setSuccess('Datos personales guardados correctamente');
@@ -492,7 +492,7 @@ export function OnboardingForm({
         return;
       }
 
-      const data = await res.json() as Record<string, any>;
+      const data = await res.json() as Record<string, unknown>;
 
       if (res.ok && data.success) {
         setSuccess('Datos bancarios guardados correctamente');
@@ -538,7 +538,7 @@ export function OnboardingForm({
         body: formData,
       });
 
-      const data = await res.json() as Record<string, any>;
+      const data = await res.json() as Record<string, unknown>;
 
       if (data.success) {
         setSuccess('Documento subido correctamente');
@@ -565,7 +565,7 @@ export function OnboardingForm({
       });
 
       if (!pwaRes.ok) {
-        const pwaData = await pwaRes.json() as Record<string, any>;
+        const pwaData = await pwaRes.json() as Record<string, unknown>;
         throw new Error(pwaData.error || 'Error al marcar PWA como completado');
       }
 
@@ -574,7 +574,7 @@ export function OnboardingForm({
         method: 'POST',
       });
 
-      const data = await res.json() as Record<string, any>;
+      const data = await res.json() as Record<string, unknown>;
 
       if (res.ok && data.success) {
         setSuccess('¡Onboarding completado! Redirigiendo...');
