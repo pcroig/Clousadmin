@@ -876,7 +876,7 @@ async function calcularEmpleadosDisponibles(
   const ausenciasSet = new Set(ausenciasDiaCompleto.map((ausencia) => ausencia.empleadoId));
   const nombreDia = obtenerNombreDia(fecha);
 
-  return empleados.filter((empleado) => {
+  const filtrados = empleados.filter((empleado) => {
     if (!empleado.jornada || !empleado.jornada.activa) {
       return false;
     }
@@ -887,6 +887,37 @@ async function calcularEmpleadosDisponibles(
 
     return esDiaActivoSegunJornada(empleado.jornada.config, nombreDia);
   });
+
+  if (filtrados.length === 0 && empleados.length > 0) {
+    console.warn(
+      `[obtenerEmpleadosDisponibles] Fallback legacy activado. Empresa=${empresaId}, Fecha=${fecha.toISOString()}, EmpleadosActivos=${empleados.length}`
+    );
+    return filtrarEmpleadosLegacy(empleados, fecha);
+  }
+
+  return filtrados;
+}
+
+async function filtrarEmpleadosLegacy(
+  empleados: EmpleadoDisponible[],
+  fecha: Date
+): Promise<EmpleadoDisponible[]> {
+  const resultados = await Promise.all(
+    empleados.map(async (empleado) => {
+      try {
+        const esLaboral = await esDiaLaboral(empleado.id, fecha);
+        return esLaboral ? empleado : null;
+      } catch (error) {
+        console.error(
+          `[obtenerEmpleadosDisponibles] Error en fallback legacy para empleado ${empleado.id}:`,
+          error
+        );
+        return null;
+      }
+    })
+  );
+
+  return resultados.filter((empleado): empleado is EmpleadoDisponible => empleado !== null);
 }
 
 /**
