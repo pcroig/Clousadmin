@@ -73,9 +73,6 @@ jobs:
 
       - name: Build producción
         run: npm run build
-        env:
-          # TypeScript check habilitado
-          # Si hay errores de TypeScript, el build fallará
 
       - name: Verificar artefactos de build
         run: |

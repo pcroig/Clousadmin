@@ -4,16 +4,25 @@
 // Jornada Step - Onboarding
 // ========================================
 
-import { useEffect, useState, forwardRef, useImperativeHandle } from 'react';
+import { forwardRef, useEffect, useImperativeHandle, useState } from 'react';
 import { toast } from 'sonner';
 
 import {
-  JornadaFormFields,
   type JornadaFormData,
+  JornadaFormFields,
 } from '@/components/shared/jornada-form-fields';
+import { type JornadaConfig } from '@/lib/calculos/fichajes-helpers';
 import { extractArrayFromResponse } from '@/lib/utils/api-response';
 import { parseJson } from '@/lib/utils/json';
-import { type JornadaConfig } from '@/lib/calculos/fichajes-helpers';
+
+// Tipo para las jornadas que vienen del API
+interface JornadaAPI {
+  id: string;
+  nombre: string;
+  horasSemanales: number;
+  config?: JornadaConfig | null;
+  esPredefinida?: boolean;
+}
 
 // Helper types from existing code
 type DiaKey = 'lunes' | 'martes' | 'miercoles' | 'jueves' | 'viernes' | 'sabado' | 'domingo';
@@ -35,9 +44,7 @@ export interface JornadaStepHandle {
   guardar: () => Promise<boolean>;
 }
 
-interface JornadaStepProps {
-  // No props needed for now
-}
+type JornadaStepProps = Record<string, never>;
 
 export const JornadaStep = forwardRef<JornadaStepHandle, JornadaStepProps>(function JornadaStep(_, ref) {
   // Form State
@@ -85,7 +92,7 @@ export const JornadaStep = forwardRef<JornadaStepHandle, JornadaStepProps>(funct
 
         // Load Employees
         if (empRes.ok) {
-          const data = await empRes.json() as Record<string, any>;
+          const data = await empRes.json() as Record<string, unknown>;
           setEmpleados(
             extractArrayFromResponse<{ id: string; nombre: string; apellidos: string }>(data, {
               key: 'empleados',
@@ -95,7 +102,7 @@ export const JornadaStep = forwardRef<JornadaStepHandle, JornadaStepProps>(funct
 
         // Load Teams
         if (equipRes.ok) {
-          const data = await equipRes.json() as Record<string, any>;
+          const data = await equipRes.json() as Record<string, unknown>;
           setEquipos(
             (data || []).map((equipo: { id: string; nombre: string; _count?: { miembros?: number } }) => ({
               id: equipo.id,
@@ -107,10 +114,10 @@ export const JornadaStep = forwardRef<JornadaStepHandle, JornadaStepProps>(funct
 
         // Load Existing Jornada (if any, populate form)
         if (jornadasRes.ok) {
-          const data = await parseJson<any[]>(jornadasRes);
+          const data = await parseJson<JornadaAPI[]>(jornadasRes);
           const jornadas = Array.isArray(data) ? data : [];
           // Use the first non-predefined jornada, or create new default
-          const jornada = jornadas.find(j => !j.esPredefinida) || jornadas[0];
+          const jornada: JornadaAPI | undefined = jornadas.find((j) => !j.esPredefinida) || jornadas[0];
 
           if (jornada) {
             setExistingJornadaId(jornada.id);
@@ -121,7 +128,7 @@ export const JornadaStep = forwardRef<JornadaStepHandle, JornadaStepProps>(funct
               return Boolean(diaConfig?.entrada && diaConfig?.salida);
             });
 
-            const newHorariosFijos: Record<string, any> = {};
+            const newHorariosFijos: Record<string, { activo: boolean; entrada: string; salida: string }> = {};
             DIA_KEYS.forEach((dia) => {
               const diaConfig = getDiaConfig(config, dia);
               if (diaConfig) {
@@ -282,7 +289,12 @@ export const JornadaStep = forwardRef<JornadaStepHandle, JornadaStepProps>(funct
                           nivelAsignacion === 'empresa';
 
       if (debeAsignar) {
-        const body: any = { jornadaId: jornadaGuardada.id, nivel: nivelAsignacion };
+        const body: {
+          jornadaId: string;
+          nivel: string;
+          equipoIds?: string[];
+          empleadoIds?: string[];
+        } = { jornadaId: jornadaGuardada.id, nivel: nivelAsignacion };
         if (nivelAsignacion === 'equipo') body.equipoIds = [equipoSeleccionado];
         if (nivelAsignacion === 'individual') body.empleadoIds = empleadosSeleccionados;
 
