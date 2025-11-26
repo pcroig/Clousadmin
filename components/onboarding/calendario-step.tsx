@@ -38,7 +38,9 @@ export const CalendarioStep = forwardRef<CalendarioStepHandle, CalendarioStepPro
   const [festivosRefreshKey, setFestivosRefreshKey] = useState(0);
   const [processingFestivos, setProcessingFestivos] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [importandoNacionales, setImportandoNacionales] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const nacionalesImportadosRef = useRef(false);
 
   const cargarDatos = useCallback(async () => {
     try {
@@ -57,6 +59,33 @@ export const CalendarioStep = forwardRef<CalendarioStepHandle, CalendarioStepPro
   useEffect(() => {
     cargarDatos();
   }, [cargarDatos]);
+
+  useEffect(() => {
+    async function ensureFestivosNacionales() {
+      if (nacionalesImportadosRef.current) return;
+      nacionalesImportadosRef.current = true;
+      setImportandoNacionales(true);
+      try {
+        const response = await fetch('/api/festivos/importar-nacionales', {
+          method: 'POST',
+        });
+
+        if (response.ok) {
+          setFestivosRefreshKey((prev) => prev + 1);
+        } else {
+          console.warn('[CalendarioStep] No se pudieron importar los festivos nacionales por defecto.');
+          nacionalesImportadosRef.current = false;
+        }
+      } catch (error) {
+        console.error('Error importando festivos nacionales por defecto:', error);
+        nacionalesImportadosRef.current = false;
+      } finally {
+        setImportandoNacionales(false);
+      }
+    }
+
+    void ensureFestivosNacionales();
+  }, []);
 
   const handleCreateFestivoInline = (fecha?: string) => {
     setFestivosView('lista');
@@ -145,7 +174,12 @@ export const CalendarioStep = forwardRef<CalendarioStepHandle, CalendarioStepPro
         </p>
       </div>
 
-      <div className="rounded-lg border bg-white p-6 space-y-6">
+      <div className="space-y-6">
+        {importandoNacionales && (
+          <p className="text-sm text-muted-foreground">
+            Importando festivos nacionales por defecto...
+          </p>
+        )}
         <Field>
           <FieldLabel>Días laborables de la semana</FieldLabel>
           <div className="flex gap-2 mt-3">

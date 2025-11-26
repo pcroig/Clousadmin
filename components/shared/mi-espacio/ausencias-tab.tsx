@@ -2,7 +2,7 @@
 
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Calendar as CalendarIcon, ChevronRight } from 'lucide-react';
+import { Calendar as CalendarIcon, ChevronRight, Info } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { SolicitarAusenciaModal } from '@/components/empleado/solicitar-ausencia-modal';
@@ -10,6 +10,12 @@ import { FechaCalendar } from '@/components/shared/fecha-calendar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { obtenerNombreDia } from '@/lib/utils/fechas';
 import { parseJson } from '@/lib/utils/json';
 
@@ -427,36 +433,45 @@ export function AusenciasTab({ empleadoId, contexto = 'empleado' }: MiEspacioAus
               </svg>
               <h3 className="text-sm font-semibold text-gray-900">Saldo de ausencias</h3>
             </div>
+            <div className="flex items-center gap-2">
             <span className="text-xs text-gray-500">
               Ene {new Date().getFullYear()} - Dic {new Date().getFullYear()}
             </span>
+              {saldoResumen.carryOverDisponible > 0 && saldoResumen.carryOverExpiraEn && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button className="text-[#d97757] hover:text-[#c26847]">
+                        <Info className="h-4 w-4" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p className="text-sm">
+                        Tienes {saldoResumen.carryOverDisponible} días del año anterior que caducan el{' '}
+                        {typeof saldoResumen.carryOverExpiraEn === 'string'
+                          ? format(new Date(saldoResumen.carryOverExpiraEn), "d 'de' MMMM", { locale: es })
+                          : format(saldoResumen.carryOverExpiraEn, "d 'de' MMMM", { locale: es })}
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
+            </div>
           </div>
-          <div className="grid grid-cols-4 gap-4">
+          <div className="grid grid-cols-3 gap-4">
             <div>
               <div className="text-2xl font-bold text-gray-900">{saldoResumen.diasTotales}</div>
-              <div className="text-xs text-gray-500 mt-1">Total</div>
-            </div>
-            <div>
-              <div className="text-2xl font-bold text-gray-600">{saldoResumen.diasUsados}</div>
-              <div className="text-xs text-gray-500 mt-1">Usados</div>
-            </div>
-            <div>
-              <div className="text-2xl font-bold text-yellow-600">{saldoResumen.diasPendientes}</div>
-              <div className="text-xs text-gray-500 mt-1">Pendientes</div>
+              <div className="text-xs text-gray-500 mt-1">Días acumulados</div>
             </div>
             <div>
               <div className="text-2xl font-bold text-green-600">{saldoResumen.diasDisponibles}</div>
-              <div className="text-xs text-gray-500 mt-1">Disponibles</div>
+              <div className="text-xs text-gray-500 mt-1">Días disponibles</div>
+            </div>
+            <div>
+              <div className="text-2xl font-bold text-gray-600">{saldoResumen.diasUsados}</div>
+              <div className="text-xs text-gray-500 mt-1">Días utilizados</div>
             </div>
           </div>
-          {saldoResumen.carryOverDisponible && saldoResumen.carryOverDisponible > 0 && (
-            <p className="text-[11px] text-gray-500 mt-3">
-              Incluye {saldoResumen.carryOverDisponible} día(s) extendidos
-              {saldoResumen.carryOverExpiraEn
-                ? ` · disponible hasta ${new Date(saldoResumen.carryOverExpiraEn).toLocaleDateString('es-ES')}`
-                : ''}
-            </p>
-          )}
         </div>
 
         {/* Ausencias listado */}

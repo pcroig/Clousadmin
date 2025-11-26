@@ -50,18 +50,6 @@ export function MiEspacioManagerClient({ empleado, usuario }: MiEspacioManagerCl
           />
 
           <div className="flex items-center gap-2">
-            {/* Botón Guardar - visible en General */}
-            {activeTab === 'general' && (
-              <Button
-                onClick={() => {
-                  const event = new CustomEvent('saveGeneral');
-                  window.dispatchEvent(event);
-                }}
-              >
-                Guardar cambios
-              </Button>
-            )}
-
             {/* Botón Canal de Denuncias */}
             <Button
               variant="outline"

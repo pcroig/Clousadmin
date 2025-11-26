@@ -334,7 +334,7 @@ export async function getSaldoEmpleado(
   });
 
   if (!saldo) {
-    const empleado = await prisma.empleado.findUnique({
+    const empleado = await executor.empleado.findUnique({
       where: { id: empleadoId },
       select: {
         diasVacaciones: true,
@@ -359,8 +359,15 @@ export async function getSaldoEmpleado(
       executor,
     });
 
-    saldo = await executor.empleadoSaldoAusencias.create({
-      data: {
+    // Usar upsert para evitar race conditions con unique constraint
+    saldo = await executor.empleadoSaldoAusencias.upsert({
+      where: {
+        empleadoId_año: {
+          empleadoId,
+          año,
+        },
+      },
+      create: {
         empleadoId,
         empresaId: empleado.empresaId,
         año,
@@ -368,6 +375,10 @@ export async function getSaldoEmpleado(
         diasUsados: 0,
         diasPendientes: 0,
         origen: 'manual_hr',
+        ...carryOverData,
+      },
+      update: {
+        // Si ya existe, solo actualizamos el carryOver si ha cambiado
         ...carryOverData,
       },
     });

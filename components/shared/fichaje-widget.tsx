@@ -523,6 +523,7 @@ export function FichajeWidget({
           dispatch({ type: 'SET_MODAL', payload: false });
           obtenerEstadoActual();
         }}
+        contexto="empleado"
       />
     </div>
   );

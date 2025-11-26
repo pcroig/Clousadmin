@@ -93,11 +93,22 @@ export type EmpleadoCreateInput = z.infer<typeof empleadoCreateSchema>;
 // ========================================
 
 export const jornadaConfigDiaSchema = z.object({
-  activo: z.boolean(),
+  activo: z.boolean().optional(),
   entrada: z.string().optional(), // "09:00"
   salida: z.string().optional(), // "18:00"
   pausa: z.number().optional(), // Horas de pausa (ej: 1)
+  pausa_inicio: z.string().optional(), // "14:00"
+  pausa_fin: z.string().optional(), // "15:00"
 });
+
+const jornadaConfigSchema = z
+  .object({
+    tipo: z.enum(['fija', 'flexible']).optional(),
+    descansoMinimo: z.string().optional(),
+    limiteInferior: z.string().optional(),
+    limiteSuperior: z.string().optional(),
+  })
+  .catchall(jornadaConfigDiaSchema);
 
 export const jornadaCreateSchema = z.object({
   nombre: z.string().min(1, 'Nombre requerido'),
@@ -106,7 +117,7 @@ export const jornadaCreateSchema = z.object({
   horasSemanales: z.number().positive('Horas semanales deben ser positivas'),
   
   // Configuración por día (para jornadas fijas)
-  config: z.record(z.string(), jornadaConfigDiaSchema).optional(),
+  config: jornadaConfigSchema.optional(),
   
   // Límites de horario
   limiteInferior: z.string().optional(), // "08:00"

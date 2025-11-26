@@ -290,3 +290,4 @@ La solución fue **unificar la fuente de datos**: ambos ahora usan la tabla `fic
 
 
 
+

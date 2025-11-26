@@ -57,3 +57,4 @@ UNION ALL
 SELECT 'ausencias', COUNT(*) FROM "ausencias";
 
 
+

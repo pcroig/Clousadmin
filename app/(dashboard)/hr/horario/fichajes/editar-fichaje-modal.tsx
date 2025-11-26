@@ -10,6 +10,7 @@ import { Plus, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
+import { FichajeEventFields, TipoEventoFichaje } from '@/components/shared/fichajes/fichaje-event-fields';
 import { LoadingButton } from '@/components/shared/loading-button';
 import { Button } from '@/components/ui/button';
 import {
@@ -19,10 +20,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import {
-  Field,
-  FieldLabel,
-} from '@/components/ui/field';
+import { FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import {
   Select,
@@ -31,10 +29,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-
 interface FichajeEvento {
   id: string;
-  tipo: string;
+  tipo: TipoEventoFichaje;
   hora: Date | string;
   editado?: boolean;
 }
@@ -58,8 +55,12 @@ interface EditarFichajeModalProps {
 export function EditarFichajeModal({ open, fichaje: _fichaje, fichajeDiaId, onClose, onSave: _onSave }: EditarFichajeModalProps) {
   const [cargando, setCargando] = useState(false);
   const [fichajeDia, setFichajeDia] = useState<FichajeDia | null>(null);
-  const [eventos, setEventos] = useState<Array<{ id: string; tipo: string; hora: string; editado?: boolean; isNew?: boolean }>>([]);
-  const [eventosOriginales, setEventosOriginales] = useState<Array<{ id: string; tipo: string; hora: string; editado?: boolean }>>([]);
+  const [eventos, setEventos] = useState<
+    Array<{ id: string; tipo: TipoEventoFichaje; hora: string; editado?: boolean; isNew?: boolean }>
+  >([]);
+  const [eventosOriginales, setEventosOriginales] = useState<
+    Array<{ id: string; tipo: TipoEventoFichaje; hora: string; editado?: boolean }>
+  >([]);
   const [eventosEliminados, setEventosEliminados] = useState<string[]>([]);
 
   // Cargar fichaje completo del día
@@ -83,10 +84,10 @@ export function EditarFichajeModal({ open, fichaje: _fichaje, fichajeDiaId, onCl
         // Convertir eventos a formato editable
         const evs = (data.eventos || []).map(
           (e: { id: string; tipo: string; hora: string; editado?: boolean }) => ({
-          id: e.id,
-          tipo: e.tipo,
-          hora: format(new Date(e.hora), "yyyy-MM-dd'T'HH:mm"),
-          editado: e.editado,
+            id: e.id,
+            tipo: e.tipo as TipoEventoFichaje,
+            hora: format(new Date(e.hora), "yyyy-MM-dd'T'HH:mm"),
+            editado: e.editado,
           })
         );
         setEventos(evs);
@@ -102,8 +103,17 @@ export function EditarFichajeModal({ open, fichaje: _fichaje, fichajeDiaId, onCl
   }, [open, fichajeDiaId]);
 
   async function handleGuardarCambios() {
-    if (!fichajeDiaId) return;
-    
+    if (!fichajeDiaId || !fichajeDia) return;
+
+    const hoyLimite = new Date();
+    hoyLimite.setHours(23, 59, 59, 999);
+    const fechaFichajeDate = new Date(fichajeDia.fecha);
+
+    if (fechaFichajeDate > hoyLimite) {
+      toast.error('Solo puedes editar fichajes hasta el día actual');
+      return;
+    }
+
     setCargando(true);
     try {
       // 1. Eliminar eventos marcados para eliminación
@@ -168,7 +178,15 @@ export function EditarFichajeModal({ open, fichaje: _fichaje, fichajeDiaId, onCl
 
   function handleAñadirEvento() {
     if (!fichajeDiaId || !fichajeDia) return;
-    
+
+    const hoyLimite = new Date();
+    hoyLimite.setHours(23, 59, 59, 999);
+    const fechaFichajeDate = new Date(fichajeDia.fecha);
+    if (fechaFichajeDate > hoyLimite) {
+      toast.error('No puedes añadir eventos en fechas futuras');
+      return;
+    }
+
     // Crear con hora actual del día del fichaje
     const fechaBase = new Date(fichajeDia.fecha);
     const ahora = new Date();
@@ -242,67 +260,42 @@ export function EditarFichajeModal({ open, fichaje: _fichaje, fichajeDiaId, onCl
               </div>
             ) : (
               <div className="space-y-2">
-                {eventos.map((ev) => (
-                  <div
-                    key={ev.id}
-                    className="flex items-center gap-3 p-3 border rounded-lg bg-gray-50"
-                  >
-                    {/* Tipo */}
-                    <div className="flex-1">
-          <Field>
-            <Select 
-                          value={ev.tipo}
-                          onValueChange={(val) => actualizarEvento(ev.id, 'tipo', val)}
-            >
-                          <SelectTrigger className="h-9 bg-white">
-                            <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="entrada">Entrada</SelectItem>
-                <SelectItem value="pausa_inicio">Pausa Inicio</SelectItem>
-                <SelectItem value="pausa_fin">Pausa Fin</SelectItem>
-                <SelectItem value="salida">Salida</SelectItem>
-              </SelectContent>
-            </Select>
-          </Field>
-                    </div>
-
-                    {/* Hora */}
-                    <div className="flex-1">
-          <Field>
-            <Input
-                          type="time"
-                          value={ev.hora.split('T')[1] || ''}
-                          onChange={(e) => {
-                            const fechaParte = ev.hora.split('T')[0];
-                            actualizarEvento(ev.id, 'hora', `${fechaParte}T${e.target.value}`);
+                {eventos.map((ev) => {
+                  const horaValue = ev.hora.includes('T')
+                    ? ev.hora.split('T')[1]?.slice(0, 5) ?? ''
+                    : ev.hora;
+                  return (
+                    <div key={ev.id} className="space-y-2 rounded-lg border border-gray-200 bg-gray-50 p-3">
+                      <FichajeEventFields
+                        tipo={ev.tipo}
+                        hora={horaValue}
+                        onTipoChange={(valor) => actualizarEvento(ev.id, 'tipo', valor)}
+                        onHoraChange={(valor) => {
+                          const fechaParte = ev.hora.split('T')[0];
+                          actualizarEvento(ev.id, 'hora', `${fechaParte}T${valor}`);
+                        }}
+                      />
+                      <div className="flex items-center justify-between">
+                        {ev.editado && (
+                          <span className="text-xs text-amber-600 whitespace-nowrap">
+                            Editado
+                          </span>
+                        )}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleEliminarEvento(ev.id);
                           }}
-                          className="h-9 bg-white"
-                        />
-          </Field>
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
                     </div>
-
-                    {/* Estado editado */}
-                    {ev.editado && (
-                      <span className="text-xs text-amber-600 whitespace-nowrap">
-                        Editado
-                      </span>
-                    )}
-
-                    {/* Eliminar */}
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleEliminarEvento(ev.id);
-                      }}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
           )}
           </div>

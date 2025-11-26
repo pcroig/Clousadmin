@@ -23,3 +23,4 @@ COMMENT ON COLUMN "campanas_vacaciones"."estado" IS 'abierta | borrador_generado
 
 
 
+

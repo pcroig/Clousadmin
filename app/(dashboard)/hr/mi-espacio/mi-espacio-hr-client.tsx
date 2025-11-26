@@ -74,19 +74,6 @@ export function MiEspacioHRClient({ empleado, usuario }: MiEspacioHRClientProps)
           />
 
           <div className="flex items-center gap-2">
-            {/* Botón Dar de Baja - visible en Contratos */}
-            {activeTab === 'contratos' && (
-              <Button
-                variant="destructive"
-                onClick={() => {
-                  const event = new CustomEvent('darDeBajaContrato');
-                  window.dispatchEvent(event);
-                }}
-              >
-                Dar de Baja
-              </Button>
-            )}
-
             {/* Botón Canal de Denuncias */}
             <Button
               variant="outline"

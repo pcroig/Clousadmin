@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, MoreVertical } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
@@ -12,6 +12,12 @@ import { FichajesTab as FichajesTabShared } from '@/components/shared/mi-espacio
 import { GeneralTab as GeneralTabShared } from '@/components/shared/mi-espacio/general-tab';
 import { ProfileAvatar } from '@/components/shared/profile-avatar';
 import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 import type { MiEspacioEmpleado, Usuario } from '@/types/empleado';
 
@@ -22,8 +28,8 @@ interface EmpleadoDetailClientProps {
 
 const TABS = [
   { id: 'general', label: 'General' },
-  { id: 'fichajes', label: 'Fichajes' },
   { id: 'ausencias', label: 'Ausencias' },
+  { id: 'fichajes', label: 'Fichajes' },
   { id: 'contratos', label: 'Contratos' },
   { id: 'documentos', label: 'Documentos' },
 ];
@@ -83,16 +89,27 @@ export function EmpleadoDetailClient({ empleado, usuario }: EmpleadoDetailClient
         </div>
 
         <div className="flex items-center gap-2">
-          {activeTab === 'general' && (
-            <Button onClick={triggerSaveGeneral}>
-              Guardar cambios
-            </Button>
-          )}
-          {activeTab === 'contratos' && (
-            <Button variant="destructive" onClick={triggerDarDeBaja}>
-              Dar de baja
-            </Button>
-          )}
+          {/* Menú de opciones */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="rounded-lg"
+                title="Más opciones"
+              >
+                <MoreVertical className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                onClick={triggerDarDeBaja}
+                className="text-red-600"
+              >
+                Dar de baja
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 

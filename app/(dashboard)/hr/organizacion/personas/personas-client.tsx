@@ -29,6 +29,8 @@ interface Empleado {
   telefono: string;
   equipo: string;
   puesto: string;
+  tipoContrato: string;
+  manager: string;
   activo: boolean;
   avatar?: string;
   fotoUrl?: string | null;
@@ -86,30 +88,41 @@ export function PersonasClient({ empleados, initialPanel, initialDenunciaId }: P
       sticky: true,
     },
     {
-      id: 'email',
-      header: 'Email',
-      accessorKey: 'email',
-      width: '25%',
-      priority: 'high',
-    },
-    {
-      id: 'telefono',
-      header: 'Teléfono',
-      accessorKey: 'telefono',
-      width: '15%',
-      priority: 'medium',
-    },
-    {
       id: 'equipo',
       header: 'Equipo',
       accessorKey: 'equipo',
       width: '15%',
-      priority: 'medium',
+      priority: 'high',
     },
     {
       id: 'puesto',
       header: 'Puesto',
       accessorKey: 'puesto',
+      width: '15%',
+      priority: 'medium',
+    },
+    {
+      id: 'tipoContrato',
+      header: 'Tipo de Contrato',
+      cell: (row) => {
+        const contratoLabels: Record<string, string> = {
+          indefinido: 'Indefinido',
+          temporal: 'Temporal',
+          administrador: 'Administrador',
+          fijo_discontinuo: 'Fijo discontinuo',
+          becario: 'Becario',
+          practicas: 'Prácticas',
+          obra_y_servicio: 'Obra y servicio',
+        };
+        return contratoLabels[row.tipoContrato] || row.tipoContrato;
+      },
+      width: '15%',
+      priority: 'medium',
+    },
+    {
+      id: 'manager',
+      header: 'Manager',
+      accessorKey: 'manager',
       width: '15%',
       priority: 'low',
     },
@@ -127,7 +140,7 @@ export function PersonasClient({ empleados, initialPanel, initialDenunciaId }: P
           {row.activo ? 'Activo' : 'Inactivo'}
         </span>
       ),
-      width: '5%',
+      width: '10%',
       priority: 'low',
     },
   ];

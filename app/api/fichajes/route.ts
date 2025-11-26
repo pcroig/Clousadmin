@@ -37,6 +37,7 @@ const fichajeEventoCreateSchema = z.object({
   fecha: z.string().optional(), // Opcional, default hoy
   hora: z.string().optional(), // Opcional, default ahora
   ubicacion: z.string().optional(),
+  empleadoId: z.string().uuid().optional(),
 });
 
 // GET /api/fichajes - Listar fichajes
@@ -238,25 +239,62 @@ export async function POST(req: NextRequest) {
     if (isNextResponse(validationResult)) return validationResult;
     const { data: validatedData } = validationResult;
 
-    // 3. Determinar fecha y hora
+    // 3. Determinar empleado objetivo
+    const requestedEmpleadoId = validatedData.empleadoId;
+    const sessionEmpleadoId = session.user.empleadoId ?? undefined;
+
+    let targetEmpleadoId = requestedEmpleadoId ?? sessionEmpleadoId;
+
+    if (!targetEmpleadoId) {
+      return badRequestResponse('No se ha especificado un empleado válido para el fichaje');
+    }
+
+    if (requestedEmpleadoId && requestedEmpleadoId !== sessionEmpleadoId) {
+      if (session.user.rol === UsuarioRol.empleado) {
+        return forbiddenResponse('No puedes registrar fichajes para otros empleados');
+      }
+
+      if (session.user.rol === UsuarioRol.manager) {
+        if (!sessionEmpleadoId) {
+          return forbiddenResponse('No tienes un empleado asignado. Contacta con HR.');
+        }
+
+        const empleadosACargo = await prisma.empleado.findMany({
+          where: {
+            managerId: sessionEmpleadoId,
+            empresaId: session.user.empresaId,
+            activo: true,
+          },
+          select: { id: true },
+        });
+
+        const puedeGestionar = empleadosACargo.some((emp) => emp.id === requestedEmpleadoId);
+        if (!puedeGestionar) {
+          return forbiddenResponse('No puedes registrar fichajes para empleados fuera de tu equipo');
+        }
+      }
+    }
+
+    // 4. Determinar fecha y hora
     const fechaBase = validatedData.fecha ? new Date(validatedData.fecha) : new Date();
     const fecha = new Date(fechaBase.getFullYear(), fechaBase.getMonth(), fechaBase.getDate());
     const hora = validatedData.hora ? new Date(validatedData.hora) : new Date();
 
-    // 4. Validar que el empleado puede fichar
-    const empleadoId = session.user.empleadoId;
-    
-    if (!empleadoId) {
-      return badRequestResponse('No tienes un empleado asignado. Contacta con HR.');
-    }
-
     // Validar que el empleado tiene jornada asignada
     const empleado = await prisma.empleado.findUnique({
-      where: { id: empleadoId },
-      select: { jornadaId: true, jornada: { select: { activa: true } } },
+      where: { id: targetEmpleadoId, empresaId: session.user.empresaId },
+      select: {
+        empresaId: true,
+        jornadaId: true,
+        jornada: { select: { activa: true } },
+      },
     });
 
-    if (!empleado || !empleado.jornadaId) {
+    if (!empleado) {
+      return badRequestResponse('Empleado no encontrado en tu empresa');
+    }
+
+    if (!empleado.jornadaId) {
       return badRequestResponse('No tienes una jornada laboral asignada. Contacta con HR para que te asignen una jornada antes de fichar.');
     }
 
@@ -265,7 +303,7 @@ export async function POST(req: NextRequest) {
       return badRequestResponse('Tu jornada laboral está inactiva. Contacta con HR para que te asignen una jornada activa.');
     }
 
-    const validacion = await validarEvento(validatedData.tipo, empleadoId);
+    const validacion = await validarEvento(validatedData.tipo, targetEmpleadoId);
 
     if (!validacion.valido) {
       return badRequestResponse(validacion.error || 'Evento inválido');
@@ -273,7 +311,7 @@ export async function POST(req: NextRequest) {
 
     // Validar que es día laborable (solo para entrada)
     if (validatedData.tipo === 'entrada') {
-      const esLaboral = await esDiaLaboral(empleadoId, fecha);
+      const esLaboral = await esDiaLaboral(targetEmpleadoId, fecha);
       
       if (!esLaboral) {
         return badRequestResponse('No puedes fichar en este día. Puede ser un día no laborable según el calendario de la empresa, un festivo, o tienes una ausencia de día completo.');
@@ -281,7 +319,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Validar límites de jornada
-    const validacionLimites = await validarLimitesJornada(empleadoId, hora);
+    const validacionLimites = await validarLimitesJornada(targetEmpleadoId, hora);
 
     if (!validacionLimites.valido) {
       return badRequestResponse(validacionLimites.error || 'Límites de jornada inválidos');
@@ -291,7 +329,7 @@ export async function POST(req: NextRequest) {
     let fichaje = await prisma.fichaje.findUnique({
       where: {
         empleadoId_fecha: {
-          empleadoId,
+          empleadoId: targetEmpleadoId,
           fecha,
         },
       },
@@ -308,8 +346,8 @@ export async function POST(req: NextRequest) {
 
       fichaje = await prisma.fichaje.create({
         data: {
-          empresaId: session.user.empresaId,
-          empleadoId,
+          empresaId: empleado.empresaId,
+          empleadoId: targetEmpleadoId,
           fecha,
           estado: EstadoFichaje.en_curso,
         },

@@ -195,7 +195,7 @@ export function FichajesTab({ empleadoId, empleado, contexto = 'empleado' }: Fic
 
   return (
     <div className="space-y-6">
-      {/* Cards de Resumen - Horizontal */}
+      {/* Cards de Resumen */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Card 1: Tiempo */}
         <Card>
@@ -224,29 +224,31 @@ export function FichajesTab({ empleadoId, empleado, contexto = 'empleado' }: Fic
               </div>
             </div>
           </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-600">Tiempo trabajado</span>
-              <span className="text-lg font-semibold text-gray-900">
-                {resumen.totalHoras.toFixed(1)}h
-              </span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-600">Tiempo esperado</span>
-              <span className="text-lg font-semibold text-gray-900">
-                {tiempoEsperado.toFixed(1)}h
-              </span>
-            </div>
-            <div className="flex items-center justify-between pt-2 border-t">
-              <span className="text-sm font-medium text-gray-700">Saldo de horas</span>
-              <span
-                className={`text-lg font-bold ${
-                  resumen.balanceAcumulado >= 0 ? 'text-green-600' : 'text-red-600'
-                }`}
-              >
-                {resumen.balanceAcumulado >= 0 ? '+' : ''}
-                {resumen.balanceAcumulado.toFixed(1)}h
-              </span>
+          <CardContent>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div>
+                <p className="text-xs text-gray-500">Tiempo trabajado</p>
+                <p className="text-xl font-semibold text-gray-900">
+                  {resumen.totalHoras.toFixed(1)}h
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500">Tiempo esperado</p>
+                <p className="text-xl font-semibold text-gray-900">
+                  {tiempoEsperado.toFixed(1)}h
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500">Saldo de horas</p>
+                <p
+                  className={`text-xl font-bold ${
+                    resumen.balanceAcumulado >= 0 ? 'text-green-600' : 'text-red-600'
+                  }`}
+                >
+                  {resumen.balanceAcumulado >= 0 ? '+' : ''}
+                  {resumen.balanceAcumulado.toFixed(1)}h
+                </p>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -259,24 +261,26 @@ export function FichajesTab({ empleadoId, empleado, contexto = 'empleado' }: Fic
               <CardTitle className="text-base font-semibold">Horarios</CardTitle>
             </div>
           </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-600">Hora media de entrada</span>
-              <span className="text-lg font-semibold text-gray-900">
-                {promedios.horaEntrada}
-              </span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-600">Hora media de salida</span>
-              <span className="text-lg font-semibold text-gray-900">
-                {promedios.horaSalida}
-              </span>
-            </div>
-            <div className="flex items-center justify-between pt-2 border-t">
-              <span className="text-sm font-medium text-gray-700">Horas medias trabajadas</span>
-              <span className="text-lg font-bold text-gray-900">
-                {promedios.horasTrabajadas}h
-              </span>
+          <CardContent>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div>
+                <p className="text-xs text-gray-500">Hora media de entrada</p>
+                <p className="text-xl font-semibold text-gray-900">
+                  {promedios.horaEntrada}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500">Hora media de salida</p>
+                <p className="text-xl font-semibold text-gray-900">
+                  {promedios.horaSalida}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500">Horas medias trabajadas</p>
+                <p className="text-xl font-semibold text-gray-900">
+                  {promedios.horasTrabajadas}h
+                </p>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -296,7 +300,7 @@ export function FichajesTab({ empleadoId, empleado, contexto = 'empleado' }: Fic
             </Button>
           )}
         </div>
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto px-6">
           <Table>
             <TableHeader>
               <TableRow>
@@ -395,6 +399,7 @@ export function FichajesTab({ empleadoId, empleado, contexto = 'empleado' }: Fic
             refetchFichajes(`/api/fichajes?empleadoId=${empleadoId}&propios=1`);
           }}
           esHRAdmin={contexto === 'hr_admin'}
+          contexto={contexto}
           empleadoId={empleadoId}
         />
       )}

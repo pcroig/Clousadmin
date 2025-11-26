@@ -36,6 +36,8 @@ export default async function PersonasPage(props: {
       telefono: true,
       puesto: true, // Mantener para retrocompatibilidad
       puestoId: true,
+      tipoContrato: true,
+      managerId: true,
       activo: true,
       fotoUrl: true,
       nif: true,
@@ -54,6 +56,13 @@ export default async function PersonasPage(props: {
         select: {
           id: true,
           nombre: true,
+        },
+      },
+      manager: {
+        select: {
+          id: true,
+          nombre: true,
+          apellidos: true,
         },
       },
       equipos: {
@@ -82,6 +91,8 @@ export default async function PersonasPage(props: {
     telefono: emp.telefono || '',
     equipo: emp.equipos[0]?.equipo.nombre || 'Sin equipo',
     puesto: emp.puestoRelacion?.nombre || emp.puesto || 'Sin puesto', // Usar puestoRelacion primero, luego fallback a puesto deprecated
+    tipoContrato: emp.tipoContrato,
+    manager: emp.manager ? `${emp.manager.nombre} ${emp.manager.apellidos}` : 'Sin manager',
     activo: emp.activo,
     avatar: emp.fotoUrl || undefined,
     fotoUrl: emp.fotoUrl || null,
