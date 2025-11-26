@@ -106,24 +106,33 @@ El onboarding de empresa es el proceso mediante el cual un nuevo HR Admin config
 
 **Características:**
 - Usa `JornadaFormFields` (componente reutilizable del panel de HR)
+- **Diseño embedded** (sin fondo ni border, integrado directamente en el paso)
+- **Sin loader inicial** - renderiza instantáneamente con valores por defecto
 - Valores por defecto pre-rellenados:
-  - Nombre: "Jornada Estándar"
+  - Nombre: "Jornada Estándar" (opcional, si está vacío se usa "Jornada base")
   - Tipo: Flexible
   - Horas semanales: 40
   - Días laborables: Lunes a Viernes
-  - Límites: 7:00 - 21:00
+  - Límites: opcionales
 
 **Configuración:**
 - Tipo de jornada: Fija o Flexible
-- Horas semanales
+- Horas semanales * (obligatorio)
+- Nombre (opcional)
 - Días laborables (selector visual)
 - Horarios por día (para jornada fija)
 - Descansos en minutos
-- Límites de fichaje
+- Límites de fichaje (opcionales)
 
 **Acción al guardar:**
 - Crea o actualiza la jornada predefinida
-- **Asigna automáticamente** a todos los empleados sin jornada (del paso 1)
+- **Asigna automáticamente** a toda la empresa (nivel empresa)
+- No requiere selección manual de asignación (simplificado para onboarding)
+
+**Notas técnicas:**
+- Si existe una jornada no predefinida, se actualiza en lugar de crear nueva
+- El nombre se normaliza: si está vacío, se usa "Jornada base"
+- Los límites solo se envían si tienen valor (opcionales)
 
 **Server Action:** `configurarCalendarioYJornadaAction`
 
@@ -313,10 +322,14 @@ El stepper muestra:
    - Esto asegura consistencia de diseño y funcionalidad
 
 5. **Navegación durante onboarding:**
+   - **Persistencia de estado:** El paso actual se guarda en `sessionStorage` con clave `signup-step-{token}`
+   - **Prevención de re-submit:** El paso 0 (crear cuenta) no se re-ejecuta al volver atrás si ya está completado
+   - **Flag de completado:** Se guarda `signup-step-{token}-completed` para evitar re-crear la cuenta
    - El componente previene redirecciones automáticas al dashboard
    - Los botones "Anterior" y "Siguiente" controlan la navegación
-   - El estado se mantiene durante todo el flujo
-   - Solo al completar el paso 6 se redirige a `/hr/dashboard`
+   - El estado se mantiene durante todo el flujo (incluso con refresh)
+   - Al completar el paso 6, se limpian las claves de sessionStorage y se redirige a `/hr/dashboard`
+   - **Solución al bucle login/dashboard:** El paso 0 verifica si ya está completado antes de ejecutar signup
 
 6. **Importación de empleados (Paso 1):**
    - Timeout de transacciones: 60 segundos (permite encriptación de datos)

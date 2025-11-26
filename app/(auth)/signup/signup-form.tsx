@@ -244,7 +244,7 @@ export function SignupForm({ token, emailInvitacion, prefill }: SignupFormProps)
     },
     {
       titulo: 'Importa empleados',
-      descripcion: 'Sube un archivo Excel con los datos de tus empleados',
+      descripcion: 'Sube un archivo Excel. La confirmación puede tardar 1-5 minutos según el volumen',
     },
     {
       titulo: 'Configura las sedes',
