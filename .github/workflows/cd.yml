@@ -121,20 +121,28 @@ jobs:
             echo "🏗️ Building application..."
             NODE_OPTIONS="--max-old-space-size=8192" npm run build
 
-            # Verificar que el build fue exitoso
+            # Verificar artefactos de build ANTES de reiniciar
             echo "🔍 Verifying build artifacts..."
             if [ ! -f ".next/BUILD_ID" ]; then
               echo "❌ Build failed: .next/BUILD_ID not found"
               exit 1
             fi
-            
-            if [ ! -f ".next/package.json" ]; then
-              echo "❌ Build failed: .next/package.json not found"
+
+            if [ ! -d ".next/server" ]; then
+              echo "❌ Build failed: .next/server directory not found"
+              exit 1
+            fi
+
+            # Verificar que hay archivos en .next/server
+            SERVER_FILES=$(find .next/server -type f 2>/dev/null | wc -l)
+            if [ "$SERVER_FILES" -eq "0" ]; then
+              echo "❌ Build failed: No server files found in .next/server"
               exit 1
             fi
 
             echo "✅ Build artifacts verified"
             echo "📦 Build ID: $(cat .next/BUILD_ID)"
+            echo "📦 Server files: $SERVER_FILES"
 
             # Restart PM2
             echo "♻️ Restarting application..."
@@ -144,12 +152,12 @@ jobs:
             # Verificar que la app está corriendo
             echo "✅ Verifying application is running..."
             pm2 list
-            
+
             # Esperar un momento para que PM2 detecte si hay errores inmediatos
             sleep 3
-            
-            # Verificar que no hay errores inmediatos
-            if pm2 list | grep -q "errored"; then
+
+            # Verificar que no hay errores inmediatos en PM2
+            if pm2 list | grep "clousadmin" | grep -q "errored"; then
               echo "❌ Application errored immediately after start"
               pm2 logs clousadmin --lines 100 --nostream
               exit 1
@@ -186,11 +194,11 @@ jobs:
 
           if [ "$http_code" = "200" ]; then
             echo "✅ Application is responding correctly (HTTP $http_code)"
-            
+
             # Verificar que la respuesta JSON es válida
             health_response=$(curl -L -s "$HEALTH_URL")
             echo "📊 Health check response: $health_response"
-            
+
             # Verificar que el JSON contiene "healthy": true
             if echo "$health_response" | grep -q '"healthy":true'; then
               echo "✅ Application is healthy"
