@@ -7,7 +7,7 @@
 import { Calendar, Check, DollarSign, MessageSquare } from 'lucide-react';
 import { useState } from 'react';
 
-import { configurarIntegracionAction } from '@/app/(dashboard)/onboarding/cargar-datos/actions';
+import { configurarIntegracionAction } from '@/app/(auth)/signup/actions';
 import { Button } from '@/components/ui/button';
 import {
   Select,

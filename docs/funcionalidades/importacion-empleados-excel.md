@@ -1,7 +1,7 @@
 # 📊 Importación Masiva de Empleados desde Excel
 
 **Estado**: ✅ Implementado  
-**Versión**: 2.3.0  
+**Versión**: 2.4.0  
 **Última actualización**: 2025-11-26
 
 ---
@@ -73,16 +73,16 @@ Sistema de importación masiva de empleados desde archivos Excel con procesamien
 
 ### Onboarding (Sign Up de Empresa)
 
-**Ruta:** `/onboarding/cargar-datos` → Tab "Empleados"
+**Ruta:** `/signup` → Paso 1 "Importar Empleados"
 
 **Componente:** `components/onboarding/importar-empleados.tsx`
 
 **Uso:** Durante el proceso de onboarding inicial de la empresa para importar empleados masivamente.
 
 **Comportamiento especial en onboarding:**
-- Auto-confirmación: Después del análisis, la importación se confirma automáticamente (sin paso intermedio de guardado)
-- Los empleados se crean sin jornada asignada (se asignará cuando se complete el paso de "Calendario y Jornada")
-- UI simplificada: Sin títulos/descripciones duplicados, diseño unificado
+- Los empleados se crean sin jornada asignada (se asignará cuando se complete el paso 3 "Jornada Laboral")
+- UI integrada en el flujo multi-paso del signup
+- El onboarding completo consta de 7 pasos (0-6) todos en la misma ruta `/signup`
 
 ### HR/Organización
 
@@ -490,7 +490,7 @@ Si un campo no se detecta:
 ## 🧠 Configuración IA y Límites
 
 - **Cliente unificado**: prioriza OpenAI Responses API → Anthropic → Google → mapeo básico.
-- **Modelo `procesar-excel-empleados`**: `temperature = 0.2`, `maxTokens = 8000`, `top_p = 0.9`. Los 8K tokens permiten respuestas completas para ~50 empleados sin truncado.
+- **Modelo `procesar-excel-empleados`**: `temperature = 0.2`, `maxTokens = 12000`, `top_p = 0.9`. Los 12K tokens permiten respuestas completas para ~75 empleados sin truncado.
 - **Seguridad de prompt**: se valida `MAX_SAFE_CHARS = 350 000` (~87K tokens). Si se supera, se usa mapeo básico para evitar caídas.
 - **Control de truncado**: se inspecciona `finishReason` y se descarta cualquier respuesta que no termine en `}` o `]`, activando fallback automático.
 - **Estrategia escalable**: `<50` registros → todos a IA. `>=50` → muestra de 30 registros para IA + mapeo manual para el resto.
@@ -506,7 +506,7 @@ Si un campo no se detecta:
 | Batch size | 50 empleados | Sí | `BATCH_SIZE` |
 | Concurrencia | 8 paralelos | Sí | `CONCURRENCY` |
 | Timeout transacción | 15 segundos | Sí | `{ timeout: 15000 }` |
-| Tokens IA output | 8000 | Sí | `maxTokens` en config |
+| Tokens IA output | 12000 | Sí | `maxTokens` en config |
 
 ---
 
@@ -567,7 +567,7 @@ Si un campo no se detecta:
 
 ### 2025-11-26 · JSON truncado en IA
 
-- Respaldos al Responses API con `maxTokens = 8000`
+- Respaldos al Responses API con `maxTokens = 12000`
 - Detección proactiva de `finishReason = length` y de JSON incompleto
 - Registro completo del contenido truncado para depuración
 - Fix: Cambio de `finish_reason` a `finishReason` (camelCase)

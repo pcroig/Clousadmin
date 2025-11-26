@@ -7,7 +7,7 @@
 import { Check, Copy, UserPlus } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
-import { invitarHRAdminAction } from '@/app/(dashboard)/onboarding/cargar-datos/actions';
+import { invitarHRAdminAction } from '@/app/(auth)/signup/actions';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';

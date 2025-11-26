@@ -5,8 +5,8 @@
 // ESTRATEGIA DE PROCESAMIENTO:
 // ----------------------------
 // - Batch size: 50 empleados por lote
-// - Concurrencia: 8 empleados procesados en paralelo por lote
-// - Timeout por transacción: 15 segundos
+// - Concurrencia: 3 empleados procesados en paralelo por lote
+// - Timeout por transacción: 60 segundos
 // - Total máximo recomendado: 500 empleados por importación
 //
 // OPERACIONES POR EMPLEADO:
@@ -219,7 +219,7 @@ export async function POST(req: NextRequest) {
     const jornadaPorDefecto = await getPredefinedJornada(prisma, session.user.empresaId);
 
     // 2. Crear empleados en batches con paralelismo controlado
-    const CONCURRENCY = 8; // Procesamos 8 empleados en paralelo (balance entre velocidad y carga DB)
+    const CONCURRENCY = 3; // Procesamos 3 empleados en paralelo (reducido para evitar timeouts por encriptación)
     
     for (const batch of batches) {
       // Dividir batch en chunks de CONCURRENCY para paralelismo controlado
@@ -360,7 +360,7 @@ export async function POST(req: NextRequest) {
                 salarioBrutoAnual: empleado.salarioBrutoAnual ? parseFloat(empleado.salarioBrutoAnual.toString()) : null,
               };
             }, { 
-              timeout: 15000, // 15s timeout para casos con alta latencia de red
+              timeout: 60000, // 60s timeout para permitir encriptación de datos sensibles
             });
 
             if (!creationResult) {

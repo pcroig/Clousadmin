@@ -12,7 +12,7 @@ import {
   asignarSedeAction,
   crearSedeAction,
   eliminarSedeAction,
-} from '@/app/(dashboard)/onboarding/cargar-datos/actions';
+} from '@/app/(auth)/signup/actions';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';

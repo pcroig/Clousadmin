@@ -31,8 +31,10 @@ export default async function HrSectionLayout({
       select: { onboardingCompletado: true },
     });
 
+    // Si el onboarding no está completado, redirigir a login
+    // (El onboarding completo se hace ahora en /signup durante la creación de cuenta)
     if (!empleado?.onboardingCompletado) {
-      redirect('/onboarding/cargar-datos');
+      redirect('/login');
     }
   }
 

@@ -28,7 +28,7 @@ Sistema de gestión de jornadas laborales que permite a HR definir horarios de t
 - ✅ Tipos de jornada: **Fija** (horario específico) y **Flexible** (horas semanales)
 - ✅ Configuración por día de la semana
 - ✅ Campos: `horasSemanales`, `config` (JSON), `activa`
-- ✅ **Configuración desde onboarding**: En el paso 3 del onboarding inicial (`/onboarding/cargar-datos`), se configura la jornada predefinida con valores por defecto (40h flexible, L-V) que son editables
+- ✅ **Configuración desde onboarding**: En el paso 3 del onboarding inicial (`/signup`), se configura la jornada predefinida con valores por defecto (40h flexible, L-V) que son editables
 - ✅ **Asignación automática**: Al guardar el paso de calendario/jornada, se asigna automáticamente a todos los empleados sin jornada
 - ✅ **Importante**: La jornada **no se crea automáticamente** al crear la cuenta. Se configura en el onboarding.
 
@@ -288,24 +288,41 @@ Componentes:
 
 ### Configurar Jornada en Onboarding (Nuevo HR Admin)
 
-Durante el onboarding inicial de la empresa (`/onboarding/cargar-datos`), en el **Paso 3 - Calendario y Jornada**:
+Durante el onboarding inicial de la empresa en `/signup`, la jornada y el calendario se configuran en **dos pasos separados**:
+
+#### Paso 3 - Jornada Laboral:
 
 1. El sistema muestra valores por defecto pre-rellenados:
-   - **Calendario**: Lunes a Viernes laborables, festivos nacionales
    - **Jornada**: 40 horas semanales, tipo flexible
    - **Horario mínimo diario**: 7:00 - 21:00
    - **Días laborables**: L-V activos
 
 2. El usuario puede:
    - Editar todos los valores (nombre, horas, tipo, horarios, días)
-   - Usar el botón "Restaurar valores recomendados" para volver a los defaults
+   - Configurar descansos en minutos
+   - Seleccionar tipo de jornada (Fija o Flexible)
 
 3. Al guardar:
    - Se crea/actualiza la jornada predefinida
-   - Se actualiza el calendario laboral de la empresa
    - **Se asigna automáticamente** a todos los empleados que no tienen jornada (importados en el paso 1)
 
-> **Importante**: La jornada no se crea automáticamente al crear la cuenta. Debe configurarse en este paso del onboarding. Los empleados importados en el paso 1 quedan sin jornada hasta completar este paso.
+#### Paso 4 - Calendario Laboral:
+
+1. Configuración de días laborables de la semana (Lunes a Domingo)
+2. Gestión de festivos:
+   - Importar desde archivo ICS/CSV
+   - Crear festivos manualmente
+   - Vista de calendario visual y lista de festivos
+
+3. Al guardar:
+   - Se actualiza el calendario laboral de la empresa
+   - Los festivos se guardan en la base de datos
+
+> **Importante**: 
+> - La jornada no se crea automáticamente al crear la cuenta. Debe configurarse en el paso 3.
+> - Los empleados importados en el paso 1 quedan sin jornada hasta completar el paso 3.
+> - El calendario laboral (días laborables y festivos) se configura en el paso 4.
+> - Todos los pasos se completan en `/signup` sin redirección a otras páginas.
 
 ### Crear Jornada (HR)
 

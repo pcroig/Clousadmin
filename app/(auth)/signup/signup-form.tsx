@@ -27,7 +27,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
-import { signupEmpresaAction } from './actions';
+import { signupEmpresaAction, completarOnboardingAction } from './actions';
 
 
 interface SignupPrefill {
@@ -70,6 +70,30 @@ export function SignupForm({ token, emailInvitacion, prefill }: SignupFormProps)
   
   // Total de pasos
   const totalPasos = 7;
+
+  // Prevenir redirección automática durante el onboarding
+  // Esto es crítico porque el usuario está en /signup (ruta auth) pero ya tiene sesión activa
+  useEffect(() => {
+    // Evitar que Next.js redirija al dashboard mientras estamos en onboarding
+    // El flag se limpia solo cuando se completa el onboarding
+    const preventRedirect = () => {
+      // No hacer nada, solo mantener al usuario aquí
+    };
+    
+    // Si el usuario intenta navegar atrás/adelante en el navegador
+    const handlePopState = (e: PopStateEvent) => {
+      e.preventDefault();
+      // Mantener en la página actual
+      window.history.pushState(null, '', window.location.href);
+    };
+    
+    window.history.pushState(null, '', window.location.href);
+    window.addEventListener('popstate', handlePopState);
+    
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, []);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({
@@ -118,7 +142,7 @@ export function SignupForm({ token, emailInvitacion, prefill }: SignupFormProps)
     }
   };
 
-  const handleFinalizarOnboarding = () => {
+  const handleFinalizarOnboarding = async () => {
     if (finalizando) {
       return;
     }
@@ -126,9 +150,17 @@ export function SignupForm({ token, emailInvitacion, prefill }: SignupFormProps)
     setFinalizando(true);
 
     try {
-      toast.success('Cuenta creada con éxito. Te llevamos a tu panel.');
-      router.push('/hr/dashboard');
-      router.refresh();
+      // Marcar el onboarding como completado
+      const result = await completarOnboardingAction();
+      
+      if (result.success) {
+        toast.success('Cuenta creada con éxito. Te llevamos a tu panel.');
+        router.push('/hr/dashboard');
+        router.refresh();
+      } else {
+        toast.error(result.error || 'Error al completar el onboarding');
+        setFinalizando(false);
+      }
     } catch (err) {
       console.error('Finalizar onboarding error:', err);
       toast.error('No hemos podido redirigirte. Inténtalo de nuevo.');

@@ -80,44 +80,57 @@ curl -X POST http://localhost:3000/api/admin/invitar-signup \
      - Empleado (vinculado al usuario)
    - Marca invitación como usada
    - Autentica automáticamente al usuario
-   - Redirige a `/onboarding/cargar-datos`
+   - **Continúa en el mismo flujo de signup** (no redirige a otra página)
 
 **Server Action:** `signupEmpresaAction` en `app/(auth)/signup/actions.ts`
 
-#### Paso 4: Onboarding Inicial de la Empresa
+#### Paso 4: Onboarding Inicial de la Empresa (Continuación en `/signup`)
 
-Después del signup, el usuario HR Admin es redirigido a `/onboarding/cargar-datos` para completar la configuración inicial de la empresa. Este proceso consta de **6 pasos**:
+Después de crear la cuenta en el Paso 0, el usuario HR Admin continúa en la misma página `/signup` para completar la configuración inicial de la empresa. Este proceso consta de **7 pasos totales (0-6)**:
+
+**Paso 0 - Crear Cuenta:**
+- Nombre de la empresa *
+- Sitio web (opcional)
+- Nombre del administrador *
+- Apellidos del administrador *
+- Contraseña (mínimo 8 caracteres) *
+- Consentimiento de tratamiento de datos *
 
 **Paso 1 - Importar Empleados:**
 - Importación masiva desde Excel con procesamiento IA
 - Preview completo antes de confirmar
-- Auto-confirmación en onboarding (sin paso intermedio de guardado)
 - Los empleados se crean sin jornada asignada (se asignará en el paso 3)
 
-**Paso 2 - Sedes:**
+**Paso 2 - Configurar Sedes:**
 - Crear sedes (oficinas) de la empresa
 - Asignación automática a equipos o toda la empresa
-- Cambios se persisten automáticamente (sin botón de guardado intermedio)
+- Cambios se persisten automáticamente
 
-**Paso 3 - Calendario y Jornada:**
+**Paso 3 - Jornada Laboral:**
+- Configuración de la jornada predefinida (40h flexible por defecto, editable)
+- Tipos: Fija (horario específico) o Flexible (horas semanales)
+- Configuración de días laborables y descansos
+- La jornada se guarda y se asigna automáticamente a todos los empleados sin jornada
+
+**Paso 4 - Calendario Laboral:**
 - Configuración del calendario laboral por defecto (días laborables: L-V, festivos nacionales)
-- Creación de jornada predefinida (40h flexible por defecto, editable)
-- La jornada se asigna automáticamente a todos los empleados sin jornada
-- Valores pre-rellenados pero completamente editables
-- Botón para restaurar valores recomendados
+- Gestión de festivos (importar desde archivo ICS/CSV o crear manualmente)
+- Vista de calendario visual y lista de festivos
 
-**Paso 4 - Integraciones:**
+**Paso 5 - Integraciones (Opcional):**
 - Configuración de integraciones opcionales (Google Calendar, etc.)
 
-**Paso 5 - Invitar Administradores HR:**
+**Paso 6 - Invitar Administradores HR (Opcional):**
 - Invitar otros miembros del equipo como HR Admin
 - Puede seleccionar empleados ya importados en el paso 1
-- Enlaces de invitación generados con URL de producción (no localhost)
+- Enlaces de invitación generados con URL de producción
+- Al finalizar, completa el onboarding y redirige a `/hr/dashboard`
 
-**Paso 6 - Finalizar:**
-- Completa el onboarding y redirige al dashboard
-
-> **Nota importante:** La jornada por defecto **no se crea automáticamente** al crear la cuenta. Se configura en el paso 3 del onboarding, donde aparece pre-rellenada pero es completamente editable. Los empleados importados en el paso 1 quedan sin jornada hasta completar el paso 3.
+> **Nota importante:** 
+> - La jornada por defecto **no se crea automáticamente** al crear la cuenta. Se configura en el paso 3 del onboarding.
+> - Los empleados importados en el paso 1 quedan sin jornada hasta completar el paso 3.
+> - El calendario laboral (días laborables y festivos) se configura en el paso 4.
+> - Todos los pasos se completan en una única ruta: `/signup` (no hay redirección a otras páginas).
 
 ---
 

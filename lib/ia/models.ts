@@ -71,7 +71,7 @@ export const FUNCTION_CONFIGS: Record<string, ModelConfig> = {
     model: MODELS.GPT_5_1,
     temperature: 0.2,
     responseFormat: 'json_object',
-    maxTokens: 4000,
+    maxTokens: 12000,
     systemMessage: 'Eres un asistente experto en análisis de datos de recursos humanos y mapeo de información de empleados desde hojas de cálculo.',
   },
   'clasificador-nominas': {
@@ -84,6 +84,7 @@ export const FUNCTION_CONFIGS: Record<string, ModelConfig> = {
     model: MODELS.GPT_5_1,
     temperature: 0.2,
     responseFormat: 'json_object',
+    maxTokens: 6000,
     systemMessage: 'Eres un asistente experto en extracción de información de documentos legales y administrativos.',
   },
   'analisis-sentimientos': {
@@ -96,21 +97,21 @@ export const FUNCTION_CONFIGS: Record<string, ModelConfig> = {
     model: MODELS.GPT_5_1_MINI,
     temperature: 0,
     responseFormat: 'json_object',
-    maxTokens: 1200,
+    maxTokens: 2500,
     systemMessage: 'Eres un experto en mapeo de datos estructurados. Respondes SOLO en JSON válido.',
   },
   'plantillas-mapear-campos-pdf': {
     model: MODELS.GPT_5_1_MINI,
     temperature: 0.1,
     responseFormat: 'json_object',
-    maxTokens: 1500,
+    maxTokens: 5000,
     systemMessage: 'Eres un asistente experto en mapeo de campos de formularios PDF a variables internas del sistema. Siempre devuelve JSON válido.',
   },
   'plantillas-escanear-pdf': {
     model: MODELS.GPT_5_1,
     temperature: 0.1,
     responseFormat: 'json_object',
-    maxTokens: 2000,
+    maxTokens: 5000,
     systemMessage: 'Eres un asistente experto en análisis de documentos PDF. Detectas campos rellenables y devuelves resultados estructurados en JSON.',
   },
 } as const;
