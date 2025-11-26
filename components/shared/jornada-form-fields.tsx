@@ -111,7 +111,7 @@ export function JornadaFormFields({
     <div className="space-y-4">
       {/* Nombre y configuración básica */}
       <Field>
-        <FieldLabel htmlFor="nombre">Nombre de la jornada *</FieldLabel>
+        <FieldLabel htmlFor="nombre">Nombre de la jornada (opcional)</FieldLabel>
         <Input
           id="nombre"
           value={data.nombre}

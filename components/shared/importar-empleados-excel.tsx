@@ -144,7 +144,7 @@ export function ImportarEmpleadosExcel({
   onCancel,
   showToast = true,
   title = 'Importar múltiples empleados',
-  description = 'Sube un archivo Excel con los datos de múltiples empleados. La IA procesará automáticamente la estructura.',
+  description = 'Sube un archivo Excel con los datos de múltiples empleados. La IA procesará automáticamente la estructura. La confirmación puede tardar entre 1 y 5 minutos dependiendo del volumen.',
   showCancelButton,
   showFinishButton,
   showHeader = true,

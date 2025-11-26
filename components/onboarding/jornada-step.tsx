@@ -12,7 +12,6 @@ import {
   JornadaFormFields,
 } from '@/components/shared/jornada-form-fields';
 import { type JornadaConfig } from '@/lib/calculos/fichajes-helpers';
-import { extractArrayFromResponse } from '@/lib/utils/api-response';
 import { parseJson } from '@/lib/utils/json';
 
 // Tipo para las jornadas que vienen del API
@@ -68,15 +67,6 @@ export const JornadaStep = forwardRef<JornadaStepHandle, JornadaStepProps>(funct
   });
 
   // Data State
-  const [empleados, setEmpleados] = useState<Array<{ id: string; nombre: string; apellidos: string }>>([]);
-  const [equipos, setEquipos] = useState<Array<{ id: string; nombre: string; miembros: number }>>([]);
-  
-  // Assignment State
-  const [nivelAsignacion, setNivelAsignacion] = useState<'empresa' | 'equipo' | 'individual'>('empresa');
-  const [empleadosSeleccionados, setEmpleadosSeleccionados] = useState<string[]>([]);
-  const [equipoSeleccionado, setEquipoSeleccionado] = useState<string>('');
-
-  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [existingJornadaId, setExistingJornadaId] = useState<string | null>(null);
@@ -85,35 +75,8 @@ export const JornadaStep = forwardRef<JornadaStepHandle, JornadaStepProps>(funct
   useEffect(() => {
     async function loadData() {
       try {
-        const [empRes, equipRes, jornadasRes] = await Promise.all([
-          fetch('/api/empleados'),
-          fetch('/api/organizacion/equipos'),
-          fetch('/api/jornadas')
-        ]);
+        const jornadasRes = await fetch('/api/jornadas');
 
-        // Load Employees
-        if (empRes.ok) {
-          const data = await empRes.json() as Record<string, unknown>;
-          setEmpleados(
-            extractArrayFromResponse<{ id: string; nombre: string; apellidos: string }>(data, {
-              key: 'empleados',
-            })
-          );
-        }
-
-        // Load Teams
-        if (equipRes.ok) {
-          const data = await equipRes.json() as { id: string; nombre: string; _count?: { miembros?: number } }[];
-          setEquipos(
-            (data || []).map((equipo) => ({
-              id: equipo.id,
-              nombre: equipo.nombre,
-              miembros: equipo._count?.miembros ?? 0,
-            }))
-          );
-        }
-
-        // Load Existing Jornada (if any, populate form)
         if (jornadasRes.ok) {
           const data = await parseJson<JornadaAPI[]>(jornadasRes);
           const jornadas = Array.isArray(data) ? data : [];
@@ -187,8 +150,6 @@ export const JornadaStep = forwardRef<JornadaStepHandle, JornadaStepProps>(funct
       } catch (err) {
         console.error('Error loading data', err);
         toast.error('Error al cargar datos iniciales');
-      } finally {
-        setLoading(false);
       }
     }
 
@@ -197,10 +158,6 @@ export const JornadaStep = forwardRef<JornadaStepHandle, JornadaStepProps>(funct
 
   function validarFormulario(): boolean {
     const newErrors: Record<string, string> = {};
-    
-    if (!formData.nombre.trim()) {
-      newErrors.nombre = 'El nombre es obligatorio';
-    }
     
     if (!formData.horasSemanales || parseFloat(formData.horasSemanales) <= 0) {
       newErrors.horasSemanales = 'Las horas semanales deben ser mayores a 0';
@@ -261,15 +218,16 @@ export const JornadaStep = forwardRef<JornadaStepHandle, JornadaStepProps>(funct
       config.tipo = formData.tipoJornada;
 
       // Save Jornada
-      // If we have an existing non-predefined jornada, update it. Otherwise create new.
       const url = existingJornadaId ? `/api/jornadas/${existingJornadaId}` : '/api/jornadas';
       const method = existingJornadaId ? 'PATCH' : 'POST';
+
+      const nombreNormalizado = formData.nombre.trim() || 'Jornada base';
 
       const response = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          nombre: formData.nombre,
+          nombre: nombreNormalizado,
           tipo: formData.tipoJornada,
           horasSemanales: parseFloat(formData.horasSemanales),
           config,
@@ -283,29 +241,19 @@ export const JornadaStep = forwardRef<JornadaStepHandle, JornadaStepProps>(funct
       }
 
       const jornadaGuardada = await response.json() as { id: string };
+      setExistingJornadaId(jornadaGuardada.id);
 
-      // Assign
-      const debeAsignar = (nivelAsignacion === 'individual' && empleadosSeleccionados.length > 0) ||
-                          (nivelAsignacion === 'equipo' && equipoSeleccionado) ||
-                          nivelAsignacion === 'empresa';
-
-      if (debeAsignar) {
-        const body: {
-          jornadaId: string;
-          nivel: string;
-          equipoIds?: string[];
-          empleadoIds?: string[];
-        } = { jornadaId: jornadaGuardada.id, nivel: nivelAsignacion };
-        if (nivelAsignacion === 'equipo') body.equipoIds = [equipoSeleccionado];
-        if (nivelAsignacion === 'individual') body.empleadoIds = empleadosSeleccionados;
-
-        // Note: In onboarding we force assignment (skipping warning about previous assignments for simplicity, 
-        // assuming this is the initial setup)
-        await fetch('/api/jornadas/asignar', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(body),
-        });
+      // Assign jornada to entire company by default
+      const asignacionResponse = await fetch('/api/jornadas/asignar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          jornadaId: jornadaGuardada.id,
+          nivel: 'empresa',
+        }),
+      });
+      if (!asignacionResponse.ok) {
+        console.warn('No se pudo asignar la jornada a la empresa en onboarding.');
       }
 
       toast.success('Jornada guardada correctamente');
@@ -324,10 +272,6 @@ export const JornadaStep = forwardRef<JornadaStepHandle, JornadaStepProps>(funct
     guardar
   }));
 
-  if (loading) {
-    return <div className="py-8 text-center text-gray-500">Cargando configuración...</div>;
-  }
-
   return (
     <div className="space-y-6">
       <div className="space-y-2">
@@ -337,23 +281,13 @@ export const JornadaStep = forwardRef<JornadaStepHandle, JornadaStepProps>(funct
         </p>
       </div>
 
-      <div className="rounded-lg border bg-white p-6">
-        <JornadaFormFields
-          data={formData}
-          onChange={setFormData}
-          errors={errors}
-          disabled={saving}
-          showAsignacion={true}
-          nivelAsignacion={nivelAsignacion}
-          onNivelAsignacionChange={setNivelAsignacion}
-          empleados={empleados}
-          empleadosSeleccionados={empleadosSeleccionados}
-          onEmpleadosSeleccionChange={setEmpleadosSeleccionados}
-          equipos={equipos}
-          equipoSeleccionado={equipoSeleccionado}
-          onEquipoSeleccionadoChange={setEquipoSeleccionado}
-        />
-      </div>
+      <JornadaFormFields
+        data={formData}
+        onChange={setFormData}
+        errors={errors}
+        disabled={saving}
+        showAsignacion={false}
+      />
     </div>
   );
 });

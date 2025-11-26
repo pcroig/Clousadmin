@@ -60,6 +60,7 @@ Sistema de importación masiva de empleados desde archivos Excel con procesamien
      - ✅ Relaciones empleado-equipo
      - ✅ Asignación de managers
      - ✅ Invitaciones por email (si está activado)
+   - ⏱️ **Tiempo estimado:** dependiendo del número de empleados y la encriptación necesaria, puede tardar entre **1 y 5 minutos**. Mantén la pestaña abierta hasta que termine.
 
 6. **Sistema muestra resultado final:**
    - Resumen de empleados creados

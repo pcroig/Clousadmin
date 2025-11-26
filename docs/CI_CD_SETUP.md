@@ -43,6 +43,122 @@ NEXTAUTH_SECRET: test-secret-min-32-chars-long-for-ci
 ENCRYPTION_KEY: 3f70cf35f9f2efeff971a06fb8b3f2440d9b30b0271fd6936c9b72bd183216df
 ```
 
+---
+
+## 🚨 Troubleshooting de Workflows
+
+### Problema: Tests fallan con "Can't reach database server"
+
+**Síntomas**:
+- Tests pasan localmente pero fallan en CI
+- Error: `Can't reach database server at localhost:5432`
+
+**Causa**: El workflow no tiene PostgreSQL configurado
+
+**Solución**:
+```yaml
+# En .github/workflows/ci.yml o test.yml
+services:
+  postgres:
+    image: postgres:15
+    env:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: clousadmin_test
+    ports:
+      - 5432:5432
+    options: >-
+      --health-cmd="pg_isready -U postgres -d clousadmin_test"
+      --health-interval=10s
+      --health-timeout=5s
+      --health-retries=5
+```
+
+Luego agregar pasos para esperar PostgreSQL:
+```yaml
+- name: Wait for PostgreSQL
+  run: |
+    for i in {1..20}; do
+      if pg_isready -h localhost -p 5432 -U postgres -d clousadmin_test; then
+        echo "PostgreSQL is ready"
+        exit 0
+      fi
+      sleep 3
+    done
+    exit 1
+```
+
+### Problema: CD falla esperando checks incorrectos
+
+**Síntomas**:
+- CD workflow falla en "Verify CI Status"
+- Error: "Check not found" o "Check didn't complete"
+
+**Causa**: El nombre del check en CD no coincide con el job en CI
+
+**Solución**:
+1. Verificar el nombre del job en `ci.yml`:
+   ```yaml
+   jobs:
+     lint-test-build:
+       name: Lint, Test & Build  # ← Este es el nombre
+   ```
+
+2. Actualizar CD para esperar el check correcto:
+   ```yaml
+   - name: Wait for CI to complete
+     uses: lewagon/wait-on-check-action@v1.3.4
+     with:
+       check-name: 'Lint, Test & Build'  # ← Debe coincidir
+   ```
+
+### Problema: Build falla con errores de TypeScript
+
+**Síntomas**:
+- `error TS2339: Property 'X' does not exist on type 'Y'`
+- `error TS18046: 'variable' is of type 'unknown'`
+- `Unexpected any. Specify a different type`
+
+**Solución rápida**:
+```bash
+# 1. Verificar localmente ANTES de push
+npm run build
+
+# 2. Si falla, arreglar errores de tipos
+# - Nunca usar 'any', usar 'unknown'
+# - Definir interfaces para respuestas de API
+# - Verificar que campos existen en schemas de validación
+
+# 3. Ejecutar linting
+npx eslint . --fix
+
+# 4. Verificar nuevamente
+npm run build
+```
+
+**Prevención**: Ver archivo `.cursorrules` en la raíz del proyecto
+
+### Problema: Linting annotations en GitHub
+
+**Síntomas**:
+- Workflow pasa pero muestra warnings/errores
+- "Unexpected any", "Import should occur before", etc.
+
+**Solución**:
+```bash
+# Arreglar automáticamente
+npx eslint . --fix
+
+# Arreglar tipos any
+grep -r "Record<string, any>" .
+# Reemplazar con Record<string, unknown>
+
+# Eliminar imports no usados
+# eslint --fix lo hace automáticamente
+```
+
+---
+
 ### 2. Tests (`test.yml`)
 
 **Propósito**: Ejecutar suite completa de tests con coverage

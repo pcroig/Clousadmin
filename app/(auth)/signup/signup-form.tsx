@@ -47,6 +47,7 @@ export function SignupForm({ token, emailInvitacion, prefill }: SignupFormProps)
   
   // Estado del paso actual (0-6)
   const [pasoActual, setPasoActual] = useState(0);
+  const [primerPasoCompletado, setPrimerPasoCompletado] = useState(false);
   
   const jornadaStepRef = useRef<JornadaStepHandle>(null);
   const calendarioStepRef = useRef<CalendarioStepHandle>(null);
@@ -71,26 +72,44 @@ export function SignupForm({ token, emailInvitacion, prefill }: SignupFormProps)
   // Total de pasos
   const totalPasos = 7;
 
-  // Prevenir redirección automática durante el onboarding
-  // Esto es crítico porque el usuario está en /signup (ruta auth) pero ya tiene sesión activa
-  useEffect(() => {
-    // Evitar que Next.js redirija al dashboard mientras estamos en onboarding
-    // El flag se limpia solo cuando se completa el onboarding
+  const STORAGE_KEY = `signup-step-${token || 'local'}`;
+  const STORAGE_COMPLETED_KEY = `${STORAGE_KEY}-completed`;
 
-    // Si el usuario intenta navegar atrás/adelante en el navegador
-    const handlePopState = (e: PopStateEvent) => {
-      e.preventDefault();
-      // Mantener en la página actual
-      window.history.pushState(null, '', window.location.href);
-    };
-    
-    window.history.pushState(null, '', window.location.href);
-    window.addEventListener('popstate', handlePopState);
-    
-    return () => {
-      window.removeEventListener('popstate', handlePopState);
-    };
-  }, []);
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const storedStep = window.sessionStorage.getItem(STORAGE_KEY);
+    if (storedStep !== null) {
+      const parsed = Number(storedStep);
+      if (!Number.isNaN(parsed) && parsed >= 0 && parsed < totalPasos) {
+        setPasoActual(parsed);
+      }
+    }
+
+    const storedCompleted = window.sessionStorage.getItem(STORAGE_COMPLETED_KEY);
+    if (storedCompleted === 'true') {
+      setPrimerPasoCompletado(true);
+    }
+  }, [STORAGE_KEY, STORAGE_COMPLETED_KEY, totalPasos]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+    window.sessionStorage.setItem(STORAGE_KEY, pasoActual.toString());
+  }, [STORAGE_KEY, pasoActual]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+    window.sessionStorage.setItem(
+      STORAGE_COMPLETED_KEY,
+      primerPasoCompletado ? 'true' : 'false'
+    );
+  }, [STORAGE_COMPLETED_KEY, primerPasoCompletado]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({
@@ -108,6 +127,12 @@ export function SignupForm({ token, emailInvitacion, prefill }: SignupFormProps)
 
   const handleSubmitPaso0 = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (primerPasoCompletado) {
+      setPasoActual(1);
+      return;
+    }
+
     setError('');
     setLoading(true);
 
@@ -118,7 +143,7 @@ export function SignupForm({ token, emailInvitacion, prefill }: SignupFormProps)
       });
 
       if (result.success) {
-        // Usuario autenticado, pasar al siguiente paso
+        setPrimerPasoCompletado(true);
         setPasoActual(1);
       } else {
         if (result.requiereInvitacion) {
@@ -151,6 +176,10 @@ export function SignupForm({ token, emailInvitacion, prefill }: SignupFormProps)
       const result = await completarOnboardingAction();
       
       if (result.success) {
+        if (typeof window !== 'undefined') {
+          window.sessionStorage.removeItem(STORAGE_KEY);
+          window.sessionStorage.removeItem(STORAGE_COMPLETED_KEY);
+        }
         toast.success('Cuenta creada con éxito. Te llevamos a tu panel.');
         router.push('/hr/dashboard');
         router.refresh();
