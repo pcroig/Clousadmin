@@ -100,13 +100,17 @@ export function limpiarCacheEmpleadosDisponibles(empresaId?: string): void {
 
 function esDiaActivoSegunJornada(configValue: unknown, nombreDia: string): boolean {
   if (!configValue || typeof configValue !== 'object') {
-    return false;
+    return true;
   }
 
   const config = configValue as JornadaConfig;
   const diaConfig = config[nombreDia] as DiaConfig | undefined;
 
-  if (diaConfig && diaConfig.activo === false) {
+  if (!diaConfig) {
+    return true;
+  }
+
+  if ('activo' in diaConfig && diaConfig.activo === false) {
     return false;
   }
 
