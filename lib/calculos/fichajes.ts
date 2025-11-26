@@ -11,7 +11,12 @@ import {
   EstadoFichaje as PrismaEstadoFichaje,
 } from '@prisma/client';
 
-
+import {
+  crearSetFestivos,
+  esDiaLaborableSync,
+  getDiasLaborablesEmpresa,
+  getFestivosActivosEnRango,
+} from '@/lib/calculos/dias-laborables';
 import { EstadoAusencia } from '@/lib/constants/enums';
 import { prisma } from '@/lib/prisma';
 import { obtenerNombreDia } from '@/lib/utils/fechas';
@@ -30,6 +35,83 @@ export type EstadoFichaje = 'sin_fichar' | 'trabajando' | 'en_pausa' | 'finaliza
 export type FichajeConEventos = Fichaje & {
   eventos: FichajeEvento[];
 };
+
+function normalizarFecha(fecha: Date): Date {
+  const fechaNormalizada = new Date(fecha);
+  fechaNormalizada.setHours(0, 0, 0, 0);
+  return fechaNormalizada;
+}
+
+export interface EmpleadoDisponible
+  extends Pick<Empleado, 'id' | 'empresaId' | 'nombre' | 'apellidos' | 'fotoUrl'> {
+  jornada: {
+    id: string;
+    activa: boolean;
+    config: unknown;
+  } | null;
+}
+
+const EMPLEADOS_DISPONIBLES_CACHE_TTL_MS = 60_000;
+
+interface EmpleadosDisponiblesCacheEntry {
+  value: EmpleadoDisponible[];
+  expiresAt: number;
+}
+
+const empleadosDisponiblesCache = new Map<string, EmpleadosDisponiblesCacheEntry>();
+
+function buildDisponiblesCacheKey(empresaId: string, fecha: Date): string {
+  return `${empresaId}:${fecha.toISOString().split('T')[0]}`;
+}
+
+function getCachedEmpleadosDisponibles(key: string): EmpleadoDisponible[] | null {
+  const entry = empleadosDisponiblesCache.get(key);
+  if (!entry) {
+    return null;
+  }
+
+  if (entry.expiresAt < Date.now()) {
+    empleadosDisponiblesCache.delete(key);
+    return null;
+  }
+
+  return entry.value;
+}
+
+function setCachedEmpleadosDisponibles(key: string, value: EmpleadoDisponible[]): void {
+  empleadosDisponiblesCache.set(key, {
+    value,
+    expiresAt: Date.now() + EMPLEADOS_DISPONIBLES_CACHE_TTL_MS,
+  });
+}
+
+export function limpiarCacheEmpleadosDisponibles(empresaId?: string): void {
+  if (!empresaId) {
+    empleadosDisponiblesCache.clear();
+    return;
+  }
+
+  for (const key of empleadosDisponiblesCache.keys()) {
+    if (key.startsWith(`${empresaId}:`)) {
+      empleadosDisponiblesCache.delete(key);
+    }
+  }
+}
+
+function esDiaActivoSegunJornada(configValue: unknown, nombreDia: string): boolean {
+  if (!configValue || typeof configValue !== 'object') {
+    return false;
+  }
+
+  const config = configValue as JornadaConfig;
+  const diaConfig = config[nombreDia] as DiaConfig | undefined;
+
+  if (diaConfig && diaConfig.activo === false) {
+    return false;
+  }
+
+  return true;
+}
 
 /**
  * Obtiene el estado actual de fichaje de un empleado
@@ -658,74 +740,59 @@ export async function actualizarCalculosFichaje(fichajeId: string): Promise<void
  * - Ausencias de día completo del empleado
  */
 export async function esDiaLaboral(empleadoId: string, fecha: Date): Promise<boolean> {
-  // Normalizar fecha (sin hora)
-  const fechaSinHora = new Date(fecha.getFullYear(), fecha.getMonth(), fecha.getDate());
-  
-  // 1. Obtener empleado con jornada
+  const fechaSinHora = normalizarFecha(fecha);
+
   const empleado = await prisma.empleado.findUnique({
     where: { id: empleadoId },
-    include: {
-      jornada: true,
-    },
-  });
-
-  if (!empleado) {
-    return false;
-  }
-
-  // 2. Verificar si tiene jornada asignada
-  if (!empleado.jornada) {
-    return false;
-  }
-
-  // 3. Verificar jornada activa
-  if (!empleado.jornada.activa) {
-    return false;
-  }
-
-  // 4. Verificar calendario laboral de la EMPRESA (días laborables + festivos)
-  const { esDiaLaborable } = await import('@/lib/calculos/dias-laborables');
-  const esLaborableEmpresa = await esDiaLaborable(fechaSinHora, empleado.empresaId);
-  
-  if (!esLaborableEmpresa) {
-    // El día no es laborable para la empresa (fin de semana según config o festivo)
-    return false;
-  }
-
-  // 5. Verificar configuración de JORNADA del empleado para ese día específico
-  // (El empleado puede tener días específicos no activos aunque la empresa trabaje)
-  const nombreDia = obtenerNombreDia(fechaSinHora);
-  const config = empleado.jornada.config as JornadaConfig;
-  const diaConfig = config[nombreDia] as DiaConfig | undefined;
-
-  if (diaConfig && diaConfig.activo === false) {
-    return false;
-  }
-
-  // 6. Verificar ausencias (aprobadas o pendientes)
-  // IMPORTANTE: Solo excluir ausencias de día completo (no medio día)
-  // Si tiene ausencia de medio día, aún puede trabajar y debe fichar
-  const ausencia = await prisma.ausencia.findFirst({
-    where: {
-      empleadoId,
-      medioDia: false, // Solo ausencias de día completo
-      estado: {
-        in: [EstadoAusencia.confirmada, EstadoAusencia.completada],
-      },
-      fechaInicio: {
-        lte: fechaSinHora,
-      },
-      fechaFin: {
-        gte: fechaSinHora,
+    select: {
+      id: true,
+      empresaId: true,
+      jornada: {
+        select: {
+          id: true,
+          activa: true,
+          config: true,
+        },
       },
     },
   });
+
+  if (!empleado || !empleado.jornada || !empleado.jornada.activa) {
+    return false;
+  }
+
+  const [diasLaborables, festivos, ausencia] = await Promise.all([
+    getDiasLaborablesEmpresa(empleado.empresaId),
+    getFestivosActivosEnRango(empleado.empresaId, fechaSinHora, fechaSinHora),
+    prisma.ausencia.findFirst({
+      where: {
+        empleadoId,
+        medioDia: false,
+        estado: {
+          in: [EstadoAusencia.confirmada, EstadoAusencia.completada],
+        },
+        fechaInicio: {
+          lte: fechaSinHora,
+        },
+        fechaFin: {
+          gte: fechaSinHora,
+        },
+      },
+    }),
+  ]);
 
   if (ausencia) {
     return false;
   }
 
-  return true;
+  const festivosSet = crearSetFestivos(festivos);
+  const esLaborableEmpresa = esDiaLaborableSync(fechaSinHora, diasLaborables, festivosSet);
+  if (!esLaborableEmpresa) {
+    return false;
+  }
+
+  const nombreDia = obtenerNombreDia(fechaSinHora);
+  return esDiaActivoSegunJornada(empleado.jornada.config, nombreDia);
 }
 
 /**
@@ -735,31 +802,87 @@ export async function esDiaLaboral(empleadoId: string, fecha: Date): Promise<boo
 export async function obtenerEmpleadosDisponibles(
   empresaId: string,
   fecha: Date
-): Promise<Empleado[]> {
-  const fechaSinHora = new Date(fecha.getFullYear(), fecha.getMonth(), fecha.getDate());
+): Promise<EmpleadoDisponible[]> {
+  const fechaSinHora = normalizarFecha(fecha);
+  const cacheKey = buildDisponiblesCacheKey(empresaId, fechaSinHora);
+  const cached = getCachedEmpleadosDisponibles(cacheKey);
 
-  // Obtener todos los empleados activos de la empresa
-  const empleados = await prisma.empleado.findMany({
-    where: {
-      empresaId,
-      activo: true,
-    },
-    include: {
-      jornada: true,
-    },
-  });
-
-  // Filtrar empleados que tienen día laboral
-  const empleadosDisponibles: Empleado[] = [];
-
-  for (const empleado of empleados) {
-    const esLaboral = await esDiaLaboral(empleado.id, fechaSinHora);
-    if (esLaboral) {
-      empleadosDisponibles.push(empleado);
-    }
+  if (cached) {
+    return cached;
   }
 
+  const empleadosDisponibles = await calcularEmpleadosDisponibles(empresaId, fechaSinHora);
+  setCachedEmpleadosDisponibles(cacheKey, empleadosDisponibles);
+
   return empleadosDisponibles;
+}
+
+async function calcularEmpleadosDisponibles(
+  empresaId: string,
+  fecha: Date
+): Promise<EmpleadoDisponible[]> {
+  const [empleados, diasLaborables, festivos, ausenciasDiaCompleto] = await Promise.all([
+    prisma.empleado.findMany({
+      where: {
+        empresaId,
+        activo: true,
+      },
+      select: {
+        id: true,
+        empresaId: true,
+        nombre: true,
+        apellidos: true,
+        fotoUrl: true,
+        jornada: {
+          select: {
+            id: true,
+            activa: true,
+            config: true,
+          },
+        },
+      },
+    }),
+    getDiasLaborablesEmpresa(empresaId),
+    getFestivosActivosEnRango(empresaId, fecha, fecha),
+    prisma.ausencia.findMany({
+      where: {
+        empresaId,
+        medioDia: false,
+        estado: {
+          in: [EstadoAusencia.confirmada, EstadoAusencia.completada],
+        },
+        fechaInicio: {
+          lte: fecha,
+        },
+        fechaFin: {
+          gte: fecha,
+        },
+      },
+      select: {
+        empleadoId: true,
+      },
+    }),
+  ]);
+
+  const festivosSet = crearSetFestivos(festivos);
+  if (!esDiaLaborableSync(fecha, diasLaborables, festivosSet)) {
+    return [];
+  }
+
+  const ausenciasSet = new Set(ausenciasDiaCompleto.map((ausencia) => ausencia.empleadoId));
+  const nombreDia = obtenerNombreDia(fecha);
+
+  return empleados.filter((empleado) => {
+    if (!empleado.jornada || !empleado.jornada.activa) {
+      return false;
+    }
+
+    if (ausenciasSet.has(empleado.id)) {
+      return false;
+    }
+
+    return esDiaActivoSegunJornada(empleado.jornada.config, nombreDia);
+  });
 }
 
 /**
