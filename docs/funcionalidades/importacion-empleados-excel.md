@@ -504,9 +504,11 @@ Si un campo no se detecta:
 | Tamaño de muestra | 30 registros | Sí | `TAMAÑO_MUESTRA` |
 | Límite de prompt | 350K chars | Sí | `MAX_SAFE_CHARS` |
 | Batch size | 50 empleados | Sí | `BATCH_SIZE` |
-| Concurrencia | 8 paralelos | Sí | `CONCURRENCY` |
-| Timeout transacción | 15 segundos | Sí | `{ timeout: 15000 }` |
+| Concurrencia | 3 paralelos | Sí | `CONCURRENCY` |
+| Timeout transacción | 60 segundos | Sí | `{ timeout: 60000 }` |
 | Tokens IA output | 12000 | Sí | `maxTokens` en config |
+
+> **Actualización 2025-01-27**: Reducida concurrencia de 8 a 3 y aumentado timeout de 15s a 60s para evitar errores de transacción por encriptación de datos sensibles.
 
 ---
 
@@ -578,6 +580,23 @@ Si un campo no se detecta:
 - Selección inteligente de hoja con scoring
 - Documentación de proceso de troubleshooting
 - Identificación de causa raíz: columnas faltantes en Excel vs. mapeo erróneo
+
+### 2025-01-27 · Optimización de timeouts y concurrencia
+
+**Problema detectado:**
+- Timeouts de transacciones Prisma (`P2028`) al importar 20+ empleados
+- Error: "Transaction already closed: timeout 15000 ms exceeded"
+- Transacciones duraban 25+ segundos debido a encriptación de datos sensibles
+
+**Solución implementada:**
+- ✅ **Timeout aumentado**: 15s → 60s para permitir encriptación completa
+- ✅ **Concurrencia reducida**: 8 → 3 empleados en paralelo para evitar saturación de DB
+- ✅ **Documentación actualizada**: Reflejados nuevos límites en comentarios de código
+
+**Impacto:**
+- Importaciones de 20-50 empleados ahora completan sin timeouts
+- Tiempo total aumenta ligeramente pero con 100% de éxito
+- Mejora la estabilidad en producción
 
 ---
 

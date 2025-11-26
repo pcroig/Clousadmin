@@ -26,19 +26,11 @@ jobs:
     if: ${{ github.event_name == 'push' }}
 
     steps:
-      - name: Wait for Unit & Integration Tests
+      - name: Wait for CI to complete
         uses: lewagon/wait-on-check-action@v1.3.4
         with:
           ref: ${{ github.sha }}
-          check-name: 'Unit & Integration Tests'
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
-          wait-interval: 10
-
-      - name: Wait for Lint & TypeCheck
-        uses: lewagon/wait-on-check-action@v1.3.4
-        with:
-          ref: ${{ github.sha }}
-          check-name: 'Lint & TypeCheck'
+          check-name: 'Lint, Test & Build'
           repo-token: ${{ secrets.GITHUB_TOKEN }}
           wait-interval: 10
 

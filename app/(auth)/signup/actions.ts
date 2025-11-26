@@ -320,7 +320,6 @@ export async function configurarCalendarioYJornadaAction(
         validatedData.jornada.tipo === 'fija'
           ? validatedData.jornada.horaSalida || DEFAULT_JORNADA_FORM_VALUES.horaSalida
           : validatedData.jornada.horaSalida || DEFAULT_JORNADA_FORM_VALUES.horaSalida,
-      descansoMinutos: validatedData.jornada.descansoMinutos,
     };
 
     const jornadaCreada = await prisma.$transaction(async (tx) => {
@@ -331,7 +330,6 @@ export async function configurarCalendarioYJornadaAction(
         horaSalida: normalizedJornada.horaSalida,
         limiteInferior: normalizedJornada.limiteInferior,
         limiteSuperior: normalizedJornada.limiteSuperior,
-        descansoMinutos: normalizedJornada.descansoMinutos,
       });
 
       // Buscar la primera jornada activa de la empresa

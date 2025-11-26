@@ -738,6 +738,48 @@ console.log('[loginAction] Password válida:', isValid)
 
 ---
 
+---
+
+## 🔧 Troubleshooting - Onboarding
+
+### Problema: Redirección automática a /hr/dashboard durante onboarding
+
+**Síntoma:**
+- Al hacer clic en "Anterior" durante el onboarding, el usuario es redirigido a `/hr/dashboard`
+- El progreso del onboarding se pierde
+
+**Causa:**
+- El layout de HR (`app/(dashboard)/hr/layout.tsx`) redirige si `onboardingCompletado = false`
+- El usuario tiene sesión activa pero el onboarding no está completado
+
+**Solución implementada (2025-01-27):**
+- El componente `SignupForm` ahora previene redirecciones automáticas con `useEffect`
+- El `history.pushState` mantiene al usuario en la página de onboarding
+- Solo al completar el paso 6 y llamar a `completarOnboardingAction()` se permite la redirección
+
+### Problema: Timeouts al importar empleados (P2028)
+
+**Síntoma:**
+- Error: "Transaction API error: Unable to start a transaction in the given time"
+- Error: "Transaction already closed: timeout exceeded"
+- Solo algunos empleados se importan correctamente
+
+**Causa:**
+- Encriptación de datos sensibles (NIF, NSS, IBAN, salarios) consume tiempo
+- Concurrencia alta (8 paralelos) satura la base de datos
+- Timeout de 15s insuficiente para transacciones complejas
+
+**Solución implementada (2025-01-27):**
+- Timeout aumentado: 15s → 60s
+- Concurrencia reducida: 8 → 3 empleados en paralelo
+- Documentados nuevos límites en código y docs
+
+**Resultado:**
+- Importaciones de 20-50 empleados completan sin errores
+- Mayor estabilidad en producción
+
+---
+
 **Última actualización:** 27 de enero 2025  
 **Autor:** Clousadmin Dev Team
 

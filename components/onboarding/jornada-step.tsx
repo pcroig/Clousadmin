@@ -44,7 +44,8 @@ export interface JornadaStepHandle {
   guardar: () => Promise<boolean>;
 }
 
-type JornadaStepProps = Record<string, never>;
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
+interface JornadaStepProps {}
 
 export const JornadaStep = forwardRef<JornadaStepHandle, JornadaStepProps>(function JornadaStep(_, ref) {
   // Form State
@@ -102,9 +103,9 @@ export const JornadaStep = forwardRef<JornadaStepHandle, JornadaStepProps>(funct
 
         // Load Teams
         if (equipRes.ok) {
-          const data = await equipRes.json() as Record<string, unknown>;
+          const data = await equipRes.json() as { id: string; nombre: string; _count?: { miembros?: number } }[];
           setEquipos(
-            (data || []).map((equipo: { id: string; nombre: string; _count?: { miembros?: number } }) => ({
+            (data || []).map((equipo) => ({
               id: equipo.id,
               nombre: equipo.nombre,
               miembros: equipo._count?.miembros ?? 0,

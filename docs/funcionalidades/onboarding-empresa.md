@@ -312,6 +312,18 @@ El stepper muestra:
    - Los componentes de jornada y calendario son los mismos que usa el panel de HR admin
    - Esto asegura consistencia de diseño y funcionalidad
 
+5. **Navegación durante onboarding:**
+   - El componente previene redirecciones automáticas al dashboard
+   - Los botones "Anterior" y "Siguiente" controlan la navegación
+   - El estado se mantiene durante todo el flujo
+   - Solo al completar el paso 6 se redirige a `/hr/dashboard`
+
+6. **Importación de empleados (Paso 1):**
+   - Timeout de transacciones: 60 segundos (permite encriptación de datos)
+   - Concurrencia: 3 empleados procesados en paralelo
+   - Los errores en empleados individuales no bloquean la importación completa
+   - Se envían invitaciones por email automáticamente si está activado
+
 ---
 
 ## 📚 Referencias
