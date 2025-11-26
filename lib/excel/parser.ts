@@ -4,6 +4,93 @@
 
 import * as XLSX from 'xlsx';
 
+type SheetAnalysis = {
+  sheetName: string;
+  rows: Record<string, unknown>[];
+  rowCount: number;
+  columnCount: number;
+  keywordMatches: number;
+  sensitiveMatches: number;
+  score: number;
+};
+
+const EMPLOYEE_KEYWORDS = [
+  'nombre',
+  'name',
+  'apellidos',
+  'surname',
+  'email',
+  'correo',
+  'mail',
+  'telefono',
+  'phone',
+  'equipo',
+  'department',
+  'team',
+  'manager',
+  'puesto',
+  'role',
+  'hire',
+  'fecha',
+];
+
+const SENSITIVE_KEYWORDS = [
+  'nif',
+  'dni',
+  'nie',
+  'iban',
+  'cuenta',
+  'bank',
+  'ccc',
+  'nss',
+  'seguridad social',
+  'ss',
+];
+
+function normalizeHeader(header: string): string {
+  return header
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+}
+
+function scoreSheet(sheetName: string, rows: Record<string, unknown>[]): SheetAnalysis {
+  const normalizedHeaders = new Set<string>();
+  rows.forEach((row) => {
+    Object.keys(row || {}).forEach((key) => {
+      if (!key) return;
+      normalizedHeaders.add(normalizeHeader(key));
+    });
+  });
+
+  const keywordMatches = Array.from(normalizedHeaders).reduce((acc, header) => {
+    return acc + (EMPLOYEE_KEYWORDS.some((keyword) => header.includes(keyword)) ? 1 : 0);
+  }, 0);
+
+  const sensitiveMatches = Array.from(normalizedHeaders).reduce((acc, header) => {
+    return acc + (SENSITIVE_KEYWORDS.some((keyword) => header.includes(keyword)) ? 1 : 0);
+  }, 0);
+
+  const rowCount = rows.length;
+  const columnCount = normalizedHeaders.size;
+  const score =
+    rowCount * 3 +
+    columnCount * 2 +
+    keywordMatches * 5 +
+    sensitiveMatches * 8;
+
+  return {
+    sheetName,
+    rows,
+    rowCount,
+    columnCount,
+    keywordMatches,
+    sensitiveMatches,
+    score,
+  };
+}
+
 /**
  * Parsear un archivo Excel a JSON
  * Lee la primera hoja del archivo y retorna un array de objetos
@@ -13,24 +100,54 @@ import * as XLSX from 'xlsx';
  */
 export function parseExcelToJSON(buffer: Buffer): Record<string, unknown>[] {
   try {
-    // Leer el archivo Excel desde el buffer
     const workbook = XLSX.read(buffer, { type: 'buffer' });
+    const { SheetNames } = workbook;
 
-    // Obtener el nombre de la primera hoja
-    const firstSheetName = workbook.SheetNames[0];
-    
-    if (!firstSheetName) {
+    if (!SheetNames || SheetNames.length === 0) {
       throw new Error('El archivo Excel no contiene hojas');
     }
 
-    // Obtener la primera hoja
-    const worksheet = workbook.Sheets[firstSheetName];
+    const analyses: SheetAnalysis[] = [];
 
-    // Convertir la hoja a JSON
-    // header: 1 = array de arrays, sin header: objeto con headers
-    const jsonData: Record<string, unknown>[] = XLSX.utils.sheet_to_json(worksheet);
+    SheetNames.forEach((sheetName) => {
+      const worksheet = workbook.Sheets[sheetName];
+      if (!worksheet) return;
 
-    return jsonData;
+      const rows: Record<string, unknown>[] = XLSX.utils.sheet_to_json(worksheet, {
+        defval: null,
+        blankrows: false,
+      });
+
+      if (rows.length === 0) {
+        return;
+      }
+
+      analyses.push(scoreSheet(sheetName, rows));
+    });
+
+    if (analyses.length === 0) {
+      throw new Error('El archivo Excel no contiene datos válidos');
+    }
+
+    analyses.sort((a, b) => b.score - a.score);
+    const bestSheet = analyses[0];
+
+    if (bestSheet.sheetName !== SheetNames[0]) {
+      console.info(
+        `[parseExcelToJSON] Seleccionada hoja "${bestSheet.sheetName}" (score: ${bestSheet.score}) ` +
+          `en lugar de "${SheetNames[0]}"`
+      );
+    }
+
+    // Log de columnas detectadas para debugging
+    if (bestSheet.rows.length > 0) {
+      const columnasDetectadas = Object.keys(bestSheet.rows[0] || {});
+      console.info(
+        `[parseExcelToJSON] Columnas detectadas (${columnasDetectadas.length}): ${columnasDetectadas.join(', ')}`
+      );
+    }
+
+    return bestSheet.rows;
   } catch (error) {
     console.error('[parseExcelToJSON] Error:', error);
     throw new Error('Error al parsear el archivo Excel');

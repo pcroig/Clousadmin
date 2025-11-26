@@ -612,6 +612,14 @@ export async function mapearEmpleadosConIA(
       `(${usarMuestra ? `muestra de ${registrosParaIA.length} para IA` : 'todos a la IA'})`
     );
     
+    // Log columnas del primer registro para debugging
+    if (registrosParaIA.length > 0) {
+      const columnasEnviadas = Object.keys(registrosParaIA[0] || {});
+      console.info(
+        `[mapearEmpleadosConIA] Columnas enviadas a IA (${columnasEnviadas.length}): ${columnasEnviadas.join(', ')}`
+      );
+    }
+    
     // Validar tamaño de datos antes de construir prompt
     // Estimación: 1 token ≈ 4 caracteres, límite seguro: 100K tokens = 400K caracteres
     const datosString = JSON.stringify(registrosParaIA);
@@ -669,14 +677,96 @@ ${usarMuestra
       },
     ]);
 
-    const content = completion.choices[0].message.content;
+    let content = completion.choices[0].message.content;
     if (!content) {
       throw new Error('La IA no devolvió respuesta');
     }
 
+    // Detectar si la respuesta fue truncada por límite de tokens
+    const finishReason = completion.choices[0].finishReason;
+    if (finishReason === 'length') {
+      console.warn('[mapearEmpleadosConIA] ⚠️ Respuesta truncada por límite de tokens. Usando fallback.');
+      throw new Error('Respuesta de IA truncada por límite de tokens');
+    }
+
+    // Sanitizar respuesta: extraer JSON si viene envuelto en markdown
+    content = content.trim();
+    
+    // Si viene con ```json ... ```, extraer el contenido
+    const jsonBlockMatch = content.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/);
+    if (jsonBlockMatch) {
+      content = jsonBlockMatch[1].trim();
+    }
+    
     // Parsear y validar con Zod (validación estructurada robusta)
-    const parsed = JSON.parse(content);
+    let parsed;
+    try {
+      parsed = JSON.parse(content);
+    } catch (parseError) {
+      // Si falla el parse inicial, intentar reparar JSON común
+      console.error('[mapearEmpleadosConIA] Error parseando JSON inicial:', parseError);
+      console.error('[mapearEmpleadosConIA] Total chars:', content.length);
+      console.error('[mapearEmpleadosConIA] Primeros 1000 chars:', content.substring(0, 1000));
+      console.error('[mapearEmpleadosConIA] Últimos 1000 chars:', content.substring(Math.max(0, content.length - 1000)));
+      
+      // Encontrar la posición del error
+      const errorMatch = parseError instanceof SyntaxError 
+        ? parseError.message.match(/position (\d+)/)
+        : null;
+      
+      if (errorMatch) {
+        const errorPos = parseInt(errorMatch[1], 10);
+        const contextStart = Math.max(0, errorPos - 200);
+        const contextEnd = Math.min(content.length, errorPos + 200);
+        console.error('[mapearEmpleadosConIA] Contexto del error (pos ' + errorPos + '):');
+        console.error(content.substring(contextStart, contextEnd));
+      }
+      
+      // Detectar JSON truncado (termina abruptamente sin cerrar estructuras)
+      const contentTrimmed = content.trim();
+      const lastChar = contentTrimmed[contentTrimmed.length - 1];
+      if (lastChar !== '}' && lastChar !== ']') {
+        console.warn('[mapearEmpleadosConIA] ⚠️ JSON truncado detectado (no termina con } o ]). Usando fallback.');
+        throw new Error('JSON truncado por límite de tokens');
+      }
+      
+      // Intentar reparar problemas comunes:
+      let repairedContent = content;
+      
+      // 1. Trailing commas antes de ] o }
+      repairedContent = repairedContent.replace(/,(\s*[\]}])/g, '$1');
+      
+      // 2. Control characters no escapados (excepto \n, \r, \t que son válidos escapados)
+      repairedContent = repairedContent.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]/g, '');
+      
+      // 3. Saltos de línea sin escapar dentro de strings (heurística)
+      // Esto es complicado, pero podemos intentar escapar \n, \r, \t dentro de strings
+      // Patrón: encontrar strings con saltos de línea literales
+      repairedContent = repairedContent.replace(/"([^"]*?)(\r?\n)([^"]*?)"/g, (match, before, newline, after) => {
+        // Solo reemplazar si parece ser un string con salto de línea accidental
+        return `"${before}\\n${after}"`;
+      });
+      
+      // 4. Backslashes sin escapar (excepto los que ya están escapados)
+      // Esto es muy peligroso, solo hacerlo si encontramos el patrón específico
+      
+      try {
+        parsed = JSON.parse(repairedContent);
+        console.warn('[mapearEmpleadosConIA] ✅ JSON reparado exitosamente');
+      } catch (repairError) {
+        console.error('[mapearEmpleadosConIA] ❌ No se pudo reparar el JSON:', repairError);
+        console.error('[mapearEmpleadosConIA] Contenido reparado (primeros 1000):', repairedContent.substring(0, 1000));
+        throw parseError; // Lanzar error original
+      }
+    }
+    
     const validado = RespuestaProcesamientoExcelSchema.parse(parsed);
+
+    // Log del mapeo de columnas detectado por la IA
+    console.info(
+      `[mapearEmpleadosConIA] Mapeo de columnas detectado por IA:`,
+      JSON.stringify(validado.columnasDetectadas, null, 2)
+    );
 
     // Limpiar mapeo de columnas: remover valores null y normalizar campos con "/"
     const mapeoLimpio: Record<string, string> = {};

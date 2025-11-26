@@ -1,0 +1,243 @@
+'use client';
+
+// ========================================
+// Calendario Laboral Step - Onboarding
+// ========================================
+
+import { useEffect, useState, useRef, forwardRef, useImperativeHandle, useCallback } from 'react';
+import { toast } from 'sonner';
+
+import { CalendarioFestivos } from '@/components/hr/calendario-festivos';
+import { ListaFestivos } from '@/components/hr/lista-festivos';
+import { Button } from '@/components/ui/button';
+import { Field, FieldLabel } from '@/components/ui/field';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { parseJson } from '@/lib/utils/json';
+import { type Festivo, type FestivoEditorState } from '@/types/festivos';
+
+export interface CalendarioStepHandle {
+  guardar: () => Promise<boolean>;
+}
+
+interface CalendarioStepProps {
+  // No props needed
+}
+
+export const CalendarioStep = forwardRef<CalendarioStepHandle, CalendarioStepProps>(function CalendarioStep(_, ref) {
+  const [diasLaborables, setDiasLaborables] = useState({
+    lunes: true,
+    martes: true,
+    miercoles: true,
+    jueves: true,
+    viernes: true,
+    sabado: false,
+    domingo: false,
+  });
+  const [festivosView, setFestivosView] = useState<'calendario' | 'lista'>('lista');
+  const [festivoEditor, setFestivoEditor] = useState<FestivoEditorState | null>(null);
+  const [festivosRefreshKey, setFestivosRefreshKey] = useState(0);
+  const [processingFestivos, setProcessingFestivos] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const cargarDatos = useCallback(async () => {
+    try {
+      const resCalendario = await fetch('/api/empresa/calendario-laboral');
+      if (resCalendario.ok) {
+        const dataCalendario = await parseJson<{ diasLaborables?: typeof diasLaborables }>(resCalendario);
+        if (dataCalendario?.diasLaborables) {
+          setDiasLaborables(dataCalendario.diasLaborables);
+        }
+      }
+    } catch (e) {
+      console.error('Error cargando calendario:', e);
+    }
+  }, []);
+
+  useEffect(() => {
+    cargarDatos();
+  }, [cargarDatos]);
+
+  const handleCreateFestivoInline = (fecha?: string) => {
+    setFestivosView('lista');
+    setFestivoEditor({
+      mode: 'crear',
+      fecha,
+    });
+  };
+
+  const handleEditFestivoInline = (festivo: Festivo) => {
+    setFestivosView('lista');
+    setFestivoEditor({
+      mode: 'editar',
+      festivo,
+    });
+  };
+
+  const handleCloseEditor = () => setFestivoEditor(null);
+
+  async function handleArchivoFestivosChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setProcessingFestivos(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await fetch('/api/festivos/importar', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const data = await parseJson<{ message?: string; error?: string }>(response).catch(() => null);
+
+      if (response.ok) {
+        toast.success(data?.message || 'Calendario importado correctamente');
+        await cargarDatos();
+        setFestivosRefreshKey((prev) => prev + 1);
+      } else {
+        toast.error(data?.error || 'Error al importar calendario');
+      }
+    } catch (error) {
+      console.error('Error importando calendario:', error);
+      toast.error('Error al importar calendario');
+    } finally {
+      setProcessingFestivos(false);
+      event.target.value = '';
+    }
+  }
+
+  const guardar = async (): Promise<boolean> => {
+    setSaving(true);
+    try {
+      const response = await fetch('/api/empresa/calendario-laboral', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(diasLaborables),
+      });
+
+      if (response.ok) {
+        toast.success('Calendario laboral guardado correctamente');
+        return true;
+      } else {
+        throw new Error('Error al guardar calendario');
+      }
+    } catch (e) {
+      console.error('Error guardando calendario:', e);
+      toast.error('Error al guardar calendario');
+      return false;
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useImperativeHandle(ref, () => ({
+    guardar
+  }));
+
+  return (
+    <div className="space-y-6">
+      <div className="space-y-2">
+        <h3 className="text-lg font-semibold text-gray-900">Configura el calendario laboral</h3>
+        <p className="text-sm text-gray-500">
+          Establece los días laborables de la semana y añade los festivos de tu localidad.
+        </p>
+      </div>
+
+      <div className="rounded-lg border bg-white p-6 space-y-6">
+        <Field>
+          <FieldLabel>Días laborables de la semana</FieldLabel>
+          <div className="flex gap-2 mt-3">
+            {[
+              { key: 'lunes', label: 'Lun' },
+              { key: 'martes', label: 'Mar' },
+              { key: 'miercoles', label: 'Mié' },
+              { key: 'jueves', label: 'Jue' },
+              { key: 'viernes', label: 'Vie' },
+              { key: 'sabado', label: 'Sáb' },
+              { key: 'domingo', label: 'Dom' },
+            ].map((dia) => {
+              const activo = diasLaborables[dia.key as keyof typeof diasLaborables];
+              
+              return (
+                <button
+                  key={dia.key}
+                  type="button"
+                  onClick={() => {
+                    setDiasLaborables({
+                      ...diasLaborables,
+                      [dia.key]: !activo,
+                    });
+                  }}
+                  className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    activo
+                      ? 'bg-gray-900 text-white'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  } cursor-pointer`}
+                >
+                  {dia.label}
+                </button>
+              );
+            })}
+          </div>
+        </Field>
+
+        <Tabs
+          value={festivosView}
+          onValueChange={(value) => {
+            if (value === 'calendario' || value === 'lista') {
+              setFestivosView(value);
+            }
+          }}
+          className="space-y-4"
+        >
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="calendario">Calendario visual</TabsTrigger>
+            <TabsTrigger value="lista">Lista de festivos</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="calendario" className="space-y-4">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".ics,.csv"
+              className="hidden"
+              onChange={handleArchivoFestivosChange}
+            />
+            <div className="flex justify-end">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={processingFestivos}
+              >
+                {processingFestivos ? 'Importando...' : 'Importar calendario'}
+              </Button>
+            </div>
+
+            <CalendarioFestivos
+              diasLaborables={diasLaborables}
+              onUpdate={cargarDatos}
+              refreshToken={festivosRefreshKey}
+              onRequestCreate={handleCreateFestivoInline}
+              onRequestEdit={handleEditFestivoInline}
+            />
+          </TabsContent>
+
+          <TabsContent value="lista">
+            <ListaFestivos
+              refreshToken={festivosRefreshKey}
+              onUpdate={cargarDatos}
+              editorState={festivoEditor}
+              onEditorClose={handleCloseEditor}
+              onCreateRequest={() => handleCreateFestivoInline()}
+              onEditRequest={handleEditFestivoInline}
+            />
+          </TabsContent>
+        </Tabs>
+      </div>
+    </div>
+  );
+});
+

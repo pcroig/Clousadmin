@@ -11,9 +11,13 @@ import { useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 import {
-  CalendarioJornadaForm,
-  type CalendarioJornadaFormHandle,
-} from '@/components/onboarding/calendario-jornada-form';
+  type JornadaStepHandle,
+  JornadaStep,
+} from '@/components/onboarding/jornada-step';
+import {
+  type CalendarioStepHandle,
+  CalendarioStep,
+} from '@/components/onboarding/calendario-step';
 import { ImportarEmpleados } from '@/components/onboarding/importar-empleados';
 import { IntegracionesForm } from '@/components/onboarding/integraciones-form';
 import { InvitarHRAdmins } from '@/components/onboarding/invitar-hr-admins';
@@ -41,10 +45,13 @@ interface SignupFormProps {
 export function SignupForm({ token, emailInvitacion, prefill }: SignupFormProps) {
   const router = useRouter();
   
-  // Estado del paso actual (0-5)
+  // Estado del paso actual (0-6)
   const [pasoActual, setPasoActual] = useState(0);
-  const calendarioFormRef = useRef<CalendarioJornadaFormHandle>(null);
-  const [guardandoCalendario, setGuardandoCalendario] = useState(false);
+  
+  const jornadaStepRef = useRef<JornadaStepHandle>(null);
+  const calendarioStepRef = useRef<CalendarioStepHandle>(null);
+  
+  const [guardandoPaso, setGuardandoPaso] = useState(false);
   const [finalizando, setFinalizando] = useState(false);
   
   // Estado del formulario inicial (paso 0)
@@ -62,7 +69,7 @@ export function SignupForm({ token, emailInvitacion, prefill }: SignupFormProps)
   const [loading, setLoading] = useState(false);
   
   // Total de pasos
-  const totalPasos = 6;
+  const totalPasos = 7;
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({
@@ -129,20 +136,35 @@ export function SignupForm({ token, emailInvitacion, prefill }: SignupFormProps)
     }
   };
 
-  const handleGuardarCalendarioYJornada = async () => {
-    if (!calendarioFormRef.current) {
+  const handleGuardarJornada = async () => {
+    if (!jornadaStepRef.current) {
       handleSiguiente();
       return;
     }
 
-    setGuardandoCalendario(true);
-    const success = await calendarioFormRef.current.guardar();
-    setGuardandoCalendario(false);
+    setGuardandoPaso(true);
+    const success = await jornadaStepRef.current.guardar();
+    setGuardandoPaso(false);
 
     if (success) {
       handleSiguiente();
     }
   };
+
+  const handleGuardarCalendario = async () => {
+    if (!calendarioStepRef.current) {
+      handleSiguiente();
+      return;
+    }
+
+    setGuardandoPaso(true);
+    const success = await calendarioStepRef.current.guardar();
+    setGuardandoPaso(false);
+
+    if (success) {
+      handleSiguiente();
+    }
+  }
 
   const handleSiguiente = () => {
     if (pasoActual < totalPasos - 1) {
@@ -171,8 +193,12 @@ export function SignupForm({ token, emailInvitacion, prefill }: SignupFormProps)
       descripcion: 'Añade las oficinas o centros de trabajo y decide a quién se asignan',
     },
     {
-      titulo: 'Calendario y jornada base',
-      descripcion: 'Define los días laborables y la jornada predeterminada de tu equipo',
+      titulo: 'Jornada Laboral',
+      descripcion: 'Define el horario y jornada base de tu equipo',
+    },
+    {
+      titulo: 'Calendario Laboral',
+      descripcion: 'Establece días laborables y festivos',
     },
     {
       titulo: 'Integraciones (opcional)',
@@ -390,16 +416,16 @@ export function SignupForm({ token, emailInvitacion, prefill }: SignupFormProps)
         </div>
       )}
 
-      {/* Paso 3: Calendario y jornada */}
+      {/* Paso 3: Jornada Laboral */}
       {pasoActual === 3 && (
         <div className="space-y-6">
-          <CalendarioJornadaForm ref={calendarioFormRef} />
+          <JornadaStep ref={jornadaStepRef} />
           <div className="flex justify-between pt-4 border-t">
             <Button variant="outline" onClick={handleAnterior}>
               Anterior
             </Button>
-            <Button onClick={handleGuardarCalendarioYJornada} disabled={guardandoCalendario}>
-              {guardandoCalendario ? (
+            <Button onClick={handleGuardarJornada} disabled={guardandoPaso}>
+              {guardandoPaso ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Guardando...
@@ -412,8 +438,30 @@ export function SignupForm({ token, emailInvitacion, prefill }: SignupFormProps)
         </div>
       )}
 
-      {/* Paso 4: Integraciones */}
+      {/* Paso 4: Calendario Laboral */}
       {pasoActual === 4 && (
+        <div className="space-y-6">
+          <CalendarioStep ref={calendarioStepRef} />
+          <div className="flex justify-between pt-4 border-t">
+            <Button variant="outline" onClick={handleAnterior}>
+              Anterior
+            </Button>
+            <Button onClick={handleGuardarCalendario} disabled={guardandoPaso}>
+              {guardandoPaso ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Guardando...
+                </>
+              ) : (
+                'Guardar y continuar'
+              )}
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Paso 5: Integraciones */}
+      {pasoActual === 5 && (
         <div className="space-y-6">
           <IntegracionesForm integracionesIniciales={[]} />
           <div className="flex justify-between pt-4 border-t">
@@ -427,8 +475,8 @@ export function SignupForm({ token, emailInvitacion, prefill }: SignupFormProps)
         </div>
       )}
 
-      {/* Paso 5: Invitar HR Admins */}
-      {pasoActual === 5 && (
+      {/* Paso 6: Invitar HR Admins */}
+      {pasoActual === 6 && (
         <div className="space-y-6">
           <InvitarHRAdmins />
           <div className="flex justify-between pt-4 border-t">
@@ -452,4 +500,3 @@ export function SignupForm({ token, emailInvitacion, prefill }: SignupFormProps)
     </div>
   );
 }
-

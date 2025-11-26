@@ -1,8 +1,8 @@
 # 📊 Importación Masiva de Empleados desde Excel
 
 **Estado**: ✅ Implementado  
-**Versión**: 2.0.0  
-**Última actualización**: 2025-01-27
+**Versión**: 2.3.0  
+**Última actualización**: 2025-11-26
 
 ---
 
@@ -11,13 +11,14 @@
 Sistema de importación masiva de empleados desde archivos Excel con procesamiento inteligente mediante IA. El sistema detecta automáticamente la estructura del Excel, mapea los datos a campos de empleados, y permite revisar un preview completo antes de guardar en la base de datos.
 
 **Características clave:**
-- ✅ Procesamiento con IA (OpenAI GPT-4 Vision)
+- ✅ Procesamiento con IA (OpenAI GPT-4 con fallback a Anthropic/Google)
 - ✅ Preview completo antes de guardar
 - ✅ Validación automática de datos
 - ✅ Detección automática de equipos y puestos
 - ✅ Creación automática de equipos y puestos si no existen
 - ✅ Envío opcional de invitaciones por email
 - ✅ Flujo unificado para onboarding y HR/Organización
+- ✅ Selección inteligente de hoja con datos más relevantes
 
 ---
 
@@ -227,7 +228,7 @@ FormData {
 
 ### Detección Automática de Columnas
 
-El sistema usa **OpenAI GPT-4 Vision** para:
+El sistema usa **OpenAI GPT-4** (con fallback a Anthropic Claude y Google Gemini) para:
 1. Analizar la estructura del Excel
 2. Detectar automáticamente qué columnas corresponden a qué campos
 3. Mapear datos incluso si las columnas tienen nombres diferentes
@@ -238,13 +239,16 @@ El sistema usa **OpenAI GPT-4 Vision** para:
 El sistema puede detectar automáticamente:
 - ✅ Nombre y apellidos
 - ✅ Email
-- ✅ NIF/NIE
+- ✅ NIF/NIE/DNI
+- ✅ NSS (Número Seguridad Social)
+- ✅ IBAN
 - ✅ Teléfono
 - ✅ Fecha de nacimiento
 - ✅ Puesto de trabajo
 - ✅ Equipo
 - ✅ Manager
 - ✅ Fecha de alta
+- ✅ Tipo de contrato
 - ✅ Salario bruto anual/mensual
 - ✅ Dirección completa (calle, número, piso, ciudad, código postal, provincia)
 
@@ -276,6 +280,23 @@ El Excel puede tener cualquier estructura. La IA detecta automáticamente las co
 - **Excel 97-2003**: `.xls`
 - **CSV**: `.csv` (valores separados por comas)
 
+### Hojas Múltiples
+
+Si el Excel tiene múltiples hojas, el sistema:
+1. Analiza TODAS las hojas
+2. Puntúa cada hoja según:
+   - Número de filas y columnas
+   - Coincidencias con palabras clave generales (`nombre`, `email`, `equipo`, etc.)
+   - Coincidencias con columnas sensibles (`nif`, `dni`, `iban`, `nss`, etc.)
+3. Selecciona automáticamente la hoja con mayor puntuación
+4. Registra la decisión en logs: `[parseExcelToJSON] Seleccionada hoja "Empleados" (score: 450) en lugar de "Hoja1"`
+
+**Ejemplo de puntuación:**
+- Cada fila: +3 puntos
+- Cada columna: +2 puntos
+- Cada coincidencia con palabra clave: +5 puntos
+- Cada coincidencia con columna sensible: +8 puntos
+
 ---
 
 ## 🔐 Seguridad y Validaciones
@@ -283,6 +304,7 @@ El Excel puede tener cualquier estructura. La IA detecta automáticamente las co
 ### Validaciones de Archivo
 
 - ✅ Tipo de archivo válido (`.xlsx`, `.xls`, `.csv`)
+- ✅ Tamaño máximo: 5MB
 - ✅ Archivo no vacío
 - ✅ Estructura Excel válida
 
@@ -297,6 +319,8 @@ El Excel puede tener cualquier estructura. La IA detecta automáticamente las co
 
 Los datos sensibles se encriptan antes de guardar:
 - NIF
+- NSS
+- IBAN
 - Teléfono
 - Dirección completa
 - Salarios
@@ -360,8 +384,8 @@ Los datos sensibles se encriptan antes de guardar:
    - Se asigna a equipo (si corresponde)
    - **Nota:** En onboarding, los empleados se crean sin jornada. Se asignará cuando se complete el paso de "Calendario y Jornada"
 
-4. **Managers** (segunda pasada)
-   - Se buscan managers por email o nombre
+4. **Managers** (segunda pasada - optimizado)
+   - Se buscan managers por email o nombre en 2 queries batch
    - Se asignan a empleados
    - Se asignan como managers de equipos (si el equipo no tiene manager)
 
@@ -429,26 +453,131 @@ Los datos sensibles se encriptan antes de guardar:
    - No debe guardar nada en BD
    - Debe permitir volver a subir archivo
 
+6. **Excel con múltiples hojas**
+   - Debe seleccionar automáticamente la hoja más relevante
+   - Debe registrar la decisión en logs
+
 ---
 
 ## 📝 Notas de Implementación
 
-### Cambios Recientes (v2.0.0)
+### Cambios Recientes (v2.3.0 - 26/11/2025)
 
-**Problema anterior:**
-- El sistema guardaba equipos y puestos automáticamente después de analizar el Excel
-- No había oportunidad de revisar antes de guardar
+**Logs de depuración añadidos:**
+- Log de columnas detectadas por el parser
+- Log de columnas enviadas a la IA
+- Log del mapeo de columnas detectado por la IA
 
-**Solución implementada:**
-- Separación en dos fases: Análisis (preview) y Confirmación (guardado)
-- Preview completo antes de guardar
-- Usuario debe confirmar explícitamente para guardar
+**Para troubleshooting:**
+1. Verificar logs del parser: `[parseExcelToJSON] Columnas detectadas (X): col1, col2, ...`
+2. Verificar logs de IA: `[mapearEmpleadosConIA] Columnas enviadas a IA (X): col1, col2, ...`
+3. Verificar mapeo: `[mapearEmpleadosConIA] Mapeo de columnas detectado por IA: { ... }`
+
+Si un campo no se detecta:
+- **Paso 1**: Verificar que la columna existe en el Excel
+- **Paso 2**: Verificar que el parser la extrajo (log 1)
+- **Paso 3**: Verificar que llegó a la IA (log 2)
+- **Paso 4**: Verificar que la IA la mapeó correctamente (log 3)
 
 ### Unificación de Flujos
 
 - ✅ Mismo componente para onboarding y HR/Organización
 - ✅ Misma funcionalidad en ambos contextos
 - ✅ Misma experiencia de usuario
+
+---
+
+## 🧠 Configuración IA y Límites
+
+- **Cliente unificado**: prioriza OpenAI Responses API → Anthropic → Google → mapeo básico.
+- **Modelo `procesar-excel-empleados`**: `temperature = 0.2`, `maxTokens = 8000`, `top_p = 0.9`. Los 8K tokens permiten respuestas completas para ~50 empleados sin truncado.
+- **Seguridad de prompt**: se valida `MAX_SAFE_CHARS = 350 000` (~87K tokens). Si se supera, se usa mapeo básico para evitar caídas.
+- **Control de truncado**: se inspecciona `finishReason` y se descarta cualquier respuesta que no termine en `}` o `]`, activando fallback automático.
+- **Estrategia escalable**: `<50` registros → todos a IA. `>=50` → muestra de 30 registros para IA + mapeo manual para el resto.
+
+### Límites Configurados
+
+| Parámetro | Valor | Configurable | Ubicación |
+|-----------|-------|--------------|-----------|
+| Tamaño máx. archivo | 5MB | Sí | `IMPORT_EXCEL_MAX_BYTES` |
+| Umbral para muestra | 50 registros | Sí | `UMBRAL_REGISTROS_PARA_MUESTRA` |
+| Tamaño de muestra | 30 registros | Sí | `TAMAÑO_MUESTRA` |
+| Límite de prompt | 350K chars | Sí | `MAX_SAFE_CHARS` |
+| Batch size | 50 empleados | Sí | `BATCH_SIZE` |
+| Concurrencia | 8 paralelos | Sí | `CONCURRENCY` |
+| Timeout transacción | 15 segundos | Sí | `{ timeout: 15000 }` |
+| Tokens IA output | 8000 | Sí | `maxTokens` en config |
+
+---
+
+## 🩺 Diagnóstico de Campos No Detectados
+
+### Problema Común: "La IA no detecta DNI/IBAN"
+
+**Causa raíz:** La IA **SÍ recibe** todas las columnas del Excel. Si un campo aparece como `null`, es porque:
+
+1. **El Excel NO contiene esa columna**
+   - Verificar log: `[parseExcelToJSON] Columnas detectadas: ...`
+   - Si la columna no está en la lista, no existe en el Excel
+
+2. **La columna existe pero está vacía en todos los registros**
+   - La IA correctamente devuelve `null`
+
+3. **La columna tiene un nombre muy diferente**
+   - Ejemplo: "ID Fiscal" en lugar de "DNI"
+   - La IA intentará mapear pero puede fallar
+   - Solución: Usar nombres estándar o añadir al mapeo básico
+
+4. **El Excel tiene múltiples hojas y los datos están dispersos**
+   - El parser selecciona la hoja con mayor score
+   - Verificar log: `[parseExcelToJSON] Seleccionada hoja "..."`
+   - Consolidar datos en una sola hoja o verificar que la hoja correcta tiene el mayor score
+
+### Solución Implementada (26/11/2025)
+
+**Logs de depuración añadidos:**
+
+1. **Parser** → `[parseExcelToJSON] Columnas detectadas (12): EmployeeID, Name, Email, DNI, IBAN, ...`
+2. **IA Input** → `[mapearEmpleadosConIA] Columnas enviadas a IA (12): EmployeeID, Name, Email, DNI, IBAN, ...`
+3. **IA Output** → `[mapearEmpleadosConIA] Mapeo de columnas detectado por IA: { "DNI": "nif", "IBAN": "iban", ... }`
+
+**Proceso de troubleshooting:**
+1. Subir Excel
+2. Revisar logs en consola del servidor
+3. Comparar las 3 listas
+4. Identificar dónde se pierde la información
+
+**Buenas prácticas para el Excel:**
+
+- Mantener los datos en una sola hoja cuando sea posible
+- Usar encabezados claros: `NIF`, `IBAN`, `Cuenta bancaria`, `Teléfono`, `Department`
+- Evitar encabezados merged o filas vacías antes del header
+- Usar formatos estándar para fechas y números
+
+---
+
+## 🧪 Postmortems Integrados
+
+### 2025-11-25 · Auditoría integral
+
+- Validación de tamaño de prompt (límite seguro de 350K caracteres)
+- Optimización de asignación de managers (2 queries ↔️ antes N+1)
+- Batch processing con `BATCH_SIZE = 50` y concurrencia controlada (8)
+- Timeout de transacciones aumentado a 15 s y documentación de límites
+
+### 2025-11-26 · JSON truncado en IA
+
+- Respaldos al Responses API con `maxTokens = 8000`
+- Detección proactiva de `finishReason = length` y de JSON incompleto
+- Registro completo del contenido truncado para depuración
+- Fix: Cambio de `finish_reason` a `finishReason` (camelCase)
+
+### 2025-11-26 · Diagnóstico de campos no detectados
+
+- Logs de depuración en 3 niveles (parser, IA input, IA output)
+- Selección inteligente de hoja con scoring
+- Documentación de proceso de troubleshooting
+- Identificación de causa raíz: columnas faltantes en Excel vs. mapeo erróneo
 
 ---
 
@@ -475,6 +604,10 @@ Los datos sensibles se encriptan antes de guardar:
    - Validar fechas de alta futuras
    - Validar rangos salariales
 
+6. **UI de mapeo manual:**
+   - Si la IA no detecta una columna, permitir mapeo manual en el preview
+   - Mostrar columnas del Excel vs. campos del sistema
+
 ---
 
 ## 📚 Referencias
@@ -482,27 +615,11 @@ Los datos sensibles se encriptan antes de guardar:
 - **Componente:** `components/shared/importar-empleados-excel.tsx`
 - **API Análisis:** `app/api/empleados/importar-excel/route.ts`
 - **API Confirmación:** `app/api/empleados/importar-excel/confirmar/route.ts`
+- **Parser Excel:** `lib/excel/parser.ts`
 - **Procesamiento IA:** `lib/ia/procesar-excel-empleados.ts`
 - **Validaciones:** `lib/ia/procesar-excel-empleados.ts` (función `validarEmpleado`)
 
 ---
 
-**Última actualización:** 2025-01-27  
-**Versión:** 2.1.0
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+**Última actualización:** 2025-11-26  
+**Versión:** 2.3.0

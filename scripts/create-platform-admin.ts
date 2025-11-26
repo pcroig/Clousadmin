@@ -12,6 +12,7 @@
  *   --password / PLATFORM_ADMIN_PASSWORD      (obligatorio al crear un usuario nuevo)
  *   --nombre / PLATFORM_ADMIN_NAME            (opcional, defecto "Platform")
  *   --apellidos / PLATFORM_ADMIN_LASTNAME     (opcional, defecto "Admin")
+ *   --empresa-id / PLATFORM_ADMIN_EMPRESA_ID  (opcional, fuerza el tenant a usar)
  *   --reset-password                          (opcional, fuerza reset de password aunque exista)
  *
  * Si el usuario ya existe:
@@ -45,6 +46,58 @@ function hasFlag(key: string) {
   return process.argv.includes(`--${key}`);
 }
 
+async function resolveEmpresa() {
+  const empresaIdArg =
+    getArgValue('empresa-id') ||
+    process.env.PLATFORM_ADMIN_EMPRESA_ID;
+
+  if (empresaIdArg) {
+    const empresa = await prisma.empresa.findUnique({
+      where: { id: empresaIdArg },
+    });
+
+    if (!empresa) {
+      throw new Error(
+        `No existe una empresa con id=${empresaIdArg}. Revisa el valor proporcionado en --empresa-id`
+      );
+    }
+
+    return empresa;
+  }
+
+  const empresas = await prisma.empresa.findMany({
+    orderBy: { createdAt: 'asc' },
+    take: 2,
+  });
+
+  if (empresas.length === 1) {
+    return empresas[0];
+  }
+
+  const existingPlatformEmpresa = await prisma.empresa.findFirst({
+    where: {
+      OR: [
+        { nombre: 'Clousadmin Platform' },
+        { cif: 'PLATFORM-ADMIN' },
+      ],
+    },
+  });
+
+  if (existingPlatformEmpresa) {
+    return existingPlatformEmpresa;
+  }
+
+  return prisma.empresa.create({
+    data: {
+      nombre: 'Clousadmin Platform',
+      cif: 'PLATFORM-ADMIN',
+      email: 'platform@clousadmin.com',
+      web: 'https://clousadmin.com',
+      activo: true,
+    },
+  });
+}
+
 async function main() {
   const email =
     getArgValue('email') ||
@@ -74,6 +127,9 @@ async function main() {
     where: { email: normalizedEmail },
   });
 
+  const empresa = await resolveEmpresa();
+  console.log(`🏢 Usando empresa: ${empresa.nombre} (${empresa.id})`);
+
   const shouldResetPassword = Boolean(password) || hasFlag('reset-password');
 
   if (!existingUser && !password) {
@@ -98,6 +154,7 @@ async function main() {
         rol: UsuarioRol.platform_admin,
         activo: true,
         emailVerificado: true,
+        empresaId: empresa.id,
       },
     });
 
@@ -124,6 +181,10 @@ async function main() {
 
   if (shouldResetPassword && hashedPassword) {
     updateData.password = hashedPassword;
+  }
+
+  if (!existingUser.empresaId) {
+    updateData.empresaId = empresa.id;
   }
 
   const updated = await prisma.usuario.update({

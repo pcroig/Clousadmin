@@ -57,6 +57,7 @@ export function OnboardingClient({
   const router = useRouter();
   const [currentTab, setCurrentTab] = useState('sedes');
   const [loading, setLoading] = useState(false);
+  const [isInitialized, setIsInitialized] = useState(false);
 
   const tabs = useMemo(
     () => [
@@ -106,6 +107,8 @@ export function OnboardingClient({
       }
     } catch (error) {
       console.error('[Onboarding] Error leyendo paso guardado:', error);
+    } finally {
+      setIsInitialized(true);
     }
   }, [storageKey, tabValues]);
 
@@ -188,6 +191,14 @@ export function OnboardingClient({
   };
 
   const configActual = pasoConfig[currentTab as keyof typeof pasoConfig];
+
+  if (!isInitialized) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">

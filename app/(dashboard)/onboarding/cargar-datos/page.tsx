@@ -24,6 +24,17 @@ export default async function CargarDatosPage() {
     redirect('/empleado/dashboard');
   }
 
+  if (session.user.empleadoId) {
+    const empleado = await prisma.empleado.findUnique({
+      where: { id: session.user.empleadoId },
+      select: { onboardingCompletado: true },
+    });
+
+    if (empleado?.onboardingCompletado) {
+      redirect('/hr/dashboard');
+    }
+  }
+
   // Obtener sedes existentes
   const sedes = await prisma.sede.findMany({
     where: {

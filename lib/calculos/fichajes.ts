@@ -112,9 +112,9 @@ export function calcularHorasTrabajadas(eventos: FichajeEvento[]): number | null
         if (estado !== 'trabajando' || !inicioTrabajo) {
           return null;
         }
-        const tiempoTrabajado = (hora.getTime() - inicioTrabajo.getTime()) / (1000 * 60 * 60);
-        horasTotales += tiempoTrabajado;
-        inicioTrabajo = null;
+          const tiempoTrabajado = (hora.getTime() - inicioTrabajo.getTime()) / (1000 * 60 * 60);
+          horasTotales += tiempoTrabajado;
+          inicioTrabajo = null;
         estado = 'en_pausa';
         break;
       }
@@ -130,12 +130,12 @@ export function calcularHorasTrabajadas(eventos: FichajeEvento[]): number | null
         if (estado !== 'trabajando' || !inicioTrabajo) {
           return null;
         }
-        const tiempoTrabajado = (hora.getTime() - inicioTrabajo.getTime()) / (1000 * 60 * 60);
-        horasTotales += tiempoTrabajado;
-        inicioTrabajo = null;
+          const tiempoTrabajado = (hora.getTime() - inicioTrabajo.getTime()) / (1000 * 60 * 60);
+          horasTotales += tiempoTrabajado;
+          inicioTrabajo = null;
         estado = 'finalizado';
         break;
-      }
+        }
       default:
         break;
     }
@@ -579,14 +579,14 @@ export async function obtenerHorasEsperadasBatch(
 
   const empleados =
     (await prisma.empleado.findMany({
-      where: {
-        id: {
-          in: uniqueEmpleadoIds,
-        },
+    where: {
+      id: {
+        in: uniqueEmpleadoIds,
       },
-      include: {
-        jornada: true,
-      },
+    },
+    include: {
+      jornada: true,
+    },
     })) ?? [];
 
   const empleadoMap = new Map(empleados.map((empleado) => [empleado.id, empleado]));

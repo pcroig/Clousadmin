@@ -308,6 +308,7 @@ export const FEATURE_CONFIGS = {
     useCase: AIUseCase.EXTRACTION,
     systemMessage: 'Eres un asistente experto en análisis de datos de recursos humanos y mapeo de información de empleados desde hojas de cálculo.',
     temperature: 0.2,
+    maxTokens: 8000, // Aumentado para manejar respuestas JSON grandes con muchos empleados
   },
   
   /**

@@ -101,11 +101,11 @@ export async function cleanDatabase() {
     'ausencia',
     'eventoCalendario',
     'campanaVacaciones',
-    // Fichajes
+      // Fichajes
     'fichaje',
     'correccionFichaje',
     'bolsaHoras',
-    // Nóminas
+      // Nóminas
     'complementoNomina',
     'eventoNomina',
     'incidenciaNomina',
@@ -118,20 +118,20 @@ export async function cleanDatabase() {
     'puesto',
     'sede',
     'jornada',
-    // Festivos
+      // Festivos
     'festivo',
-    // Notificaciones
+      // Notificaciones
     'notificacion',
-    // Denuncias
+      // Denuncias
     'denuncia',
-    // Billing
+      // Billing
     'subscription',
     'product',
     'price',
     // Usuarios / empresa
     'usuario',
     'empresa',
-    // Solicitudes
+      // Solicitudes
     'solicitud',
     'solicitudCorreccionFichaje',
     'solicitudEliminacionDatos',
@@ -161,8 +161,8 @@ export async function cleanDatabase() {
         continue;
       }
 
-      console.error('❌ Error limpiando BD:', error);
-      throw error;
+    console.error('❌ Error limpiando BD:', error);
+    throw error;
     }
   }
 }

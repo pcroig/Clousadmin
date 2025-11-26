@@ -163,15 +163,15 @@ export function InvitarHRAdmins() {
         <div className="space-y-2">
           <Label>Selecciona un empleado existente (opcional)</Label>
           <Select
-            value={empleadoSeleccionado}
-            onValueChange={handleSelectEmpleado}
+            value={empleadoSeleccionado || 'manual'}
+            onValueChange={(val) => handleSelectEmpleado(val === 'manual' ? '' : val)}
             disabled={cargandoEmpleados || empleados.length === 0}
           >
             <SelectTrigger>
               <SelectValue placeholder="Introduce los datos manualmente" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">Introduce los datos manualmente</SelectItem>
+              <SelectItem value="manual">Introduce los datos manualmente</SelectItem>
               {empleados.map((emp) => (
                 <SelectItem key={emp.id} value={emp.id}>
                   {emp.nombre} {emp.apellidos} ({emp.email})
