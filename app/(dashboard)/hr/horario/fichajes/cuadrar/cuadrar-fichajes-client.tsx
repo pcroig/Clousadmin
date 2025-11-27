@@ -25,6 +25,7 @@ import {
 } from '@/components/ui/table';
 import { useIsMobile } from '@/lib/hooks/use-viewport';
 import { parseJson } from '@/lib/utils/json';
+import { calcularRangoFechas, toMadridDate } from '@/lib/utils/fechas';
 
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -121,37 +122,6 @@ export function CuadrarFichajesClient() {
     loadEquipos();
   }, []);
 
-  const calcularRangoFechas = useCallback((fecha: Date, rango: 'dia' | 'semana' | 'mes') => {
-    const inicio = new Date(fecha);
-    const fin = new Date(fecha);
-
-    switch (rango) {
-      case 'dia': {
-        inicio.setHours(0, 0, 0, 0);
-        fin.setHours(23, 59, 59, 999);
-        break;
-      }
-      case 'semana': {
-        const diaSemana = fecha.getDay();
-        const diffInicio = diaSemana === 0 ? -6 : 1 - diaSemana;
-        inicio.setDate(fecha.getDate() + diffInicio);
-        inicio.setHours(0, 0, 0, 0);
-        fin.setDate(inicio.getDate() + 6);
-        fin.setHours(23, 59, 59, 999);
-        break;
-      }
-      case 'mes': {
-        inicio.setDate(1);
-        inicio.setHours(0, 0, 0, 0);
-        fin.setMonth(fecha.getMonth() + 1, 0);
-        fin.setHours(23, 59, 59, 999);
-        break;
-      }
-    }
-
-    return { inicio, fin };
-  }, []);
-
   const periodLabel = useMemo(() => {
     switch (rangoFechas) {
       case 'dia':
@@ -192,8 +162,9 @@ export function CuadrarFichajesClient() {
     try {
       const params = new URLSearchParams();
       const { inicio, fin } = calcularRangoFechas(fechaBase, rangoFechas);
-      params.append('fechaInicio', inicio.toISOString().split('T')[0]);
-      params.append('fechaFin', fin.toISOString().split('T')[0]);
+      // Usar format local para evitar desfases de zona horaria
+      params.append('fechaInicio', format(inicio, 'yyyy-MM-dd'));
+      params.append('fechaFin', format(fin, 'yyyy-MM-dd'));
       if (filtroEquipo !== 'todos') {
         params.append('equipoId', filtroEquipo);
       }
