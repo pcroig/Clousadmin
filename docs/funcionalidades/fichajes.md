@@ -293,23 +293,48 @@ enum PeriodoMedioDia {
 - Script de instalación: `scripts/hetzner/setup-cron.sh`
 - Logs: `/var/log/clousadmin-cron.log` en el servidor
 
-### Cuadrar Fichajes (HR)
+### Cuadrar Fichajes (HR) ⭐ REFACTORIZADO
 
-**Acceso**: Solo HR Admin y Managers (para su equipo)
+**Acceso**: Solo HR Admin (pantalla completa en `/hr/horario/fichajes/cuadrar`)
+
+**Interfaz de Pantalla Completa:**
+- **Header limpio**: Enlace "← Volver a fichajes" en lugar de subtítulo
+- **Toolbar embebida**: Barra de acciones a la derecha con:
+  - Contador de "Pendientes"
+  - Botón "Seleccionar todos" (sin bordes, estilo texto)
+  - Botón "Descartar días vacíos" (filtra y excluye días sin fichajes)
+  - Botón "Cuadrar (X)" con contador de seleccionados
+- **Tabla plana optimizada**: Eliminado acordeón, lista ordenada por empleado y fecha
+  - Iconos visuales: Círculo punteado (○) para días vacíos, Alerta (⚠) para incompletos
+  - Fecha sin año (formato: "dd MMM")
+  - Columna de estado con razón de pendencia
+  - Acciones: "Editar" y "Ausencia" (abre modal de solicitud de ausencia)
+- **Filtros unificados**: Usa componentes `DataFilters` y `DateRangeControls` para búsqueda, estado, equipo y rango de fechas
 
 **Funcionalidad:**
-1. **Listado**: Muestra todos los fichajes con estado `pendiente` de días anteriores (busca directamente en tabla `fichaje`)
-2. **Vista previa**: Para cada fichaje muestra:
-   - Eventos registrados (si existen)
-   - Eventos propuestos basados en jornada del empleado (azul)
-   - Razón de la pendencia (eventos faltantes)
-3. **Cuadre masivo**: 
-   - Seleccionar múltiples fichajes
+1. **Listado inteligente**: Muestra fichajes `pendiente` con filtros avanzados (equipo, búsqueda, rango de fechas)
+2. **Vista descriptiva**: Para cada fichaje muestra:
+   - **Indicador visual**: Icono diferenciando días vacíos (sin eventos) vs incompletos (con eventos parciales)
+   - Eventos registrados (si existen) con hora formateada
+   - Eventos faltantes como badges
+   - Razón de la pendencia
+   - Información del equipo del empleado
+3. **Cuadre masivo inteligente**: 
+   - Seleccionar múltiples fichajes con checkboxes
    - Botón "Cuadrar" crea eventos faltantes según jornada
+   - **Lógica de pausas dinámicas**: Si el empleado fichó inicio de pausa (ej. 14:15), el sistema calcula el fin respetando la duración de la jornada (ej. 1h → 15:15), en lugar de usar horario fijo
    - Considera ausencias de medio día (no crea eventos para períodos ausentes)
    - Marca como `finalizado` y registra auditoría
    - Notifica al empleado del fichaje resuelto
-4. **Edición individual**: Abrir modal para editar eventos manualmente antes de cuadrar
+4. **Descartar días vacíos**: Botón para excluir masivamente días sin fichajes (útil cuando no se trabajó)
+5. **Edición individual**: Botón "Editar" abre modal para modificar eventos manualmente
+6. **Registrar ausencia**: Botón "Ausencia" permite crear ausencia directamente desde la revisión
+
+**Cálculo Inteligente de Pausas:**
+- **Antes**: Usaba siempre horarios fijos de la jornada (ej. 14:00-15:00)
+- **Ahora**: Si existe un evento `pausa_inicio` real, calcula `pausa_fin` relativo al inicio real + duración configurada
+- Aplicado tanto en preview (GET) como en cuadre (POST)
+- Ejemplo: Empleado fichó pausa a las 14:15, jornada tiene 1h de descanso → propone fin a las 15:15
 
 **Auditoría de cuadre:**
 - `cuadradoMasivamente`: Boolean (true si fue cuadrado desde esta funcionalidad)
@@ -388,10 +413,14 @@ Un único modal reutilizable para **crear** y **editar** fichajes con múltiples
 
 3. **Vista HR de Fichajes** (`app/(dashboard)/hr/horario/fichajes/fichajes-client.tsx`):
    - HR puede editar cualquier fichaje desde la tabla
+   - **Filtros avanzados**: Búsqueda por empleado, filtro por estado y por equipo
+   - **Controles de fecha unificados**: Navegación por día/semana/mes con diseño compacto
    - Contexto: `hr_admin`, modo: `editar`
 
-4. **Modal de Revisión** (`app/(dashboard)/hr/horario/fichajes/revision-modal.tsx`):
+4. **Pantalla Cuadrar Fichajes** (`app/(dashboard)/hr/horario/fichajes/cuadrar/cuadrar-fichajes-client.tsx`):
+   - Pantalla completa (refactorizada desde modal)
    - HR puede editar fichajes pendientes antes de cuadrar
+   - **Tabla plana optimizada**: Sin acordeón, con iconos de estado y acciones mejoradas
    - Contexto: `hr_admin`, modo: `editar`
 
 5. **Espacio Individual de Empleado** (`app/(dashboard)/hr/organizacion/personas/[id]`):
@@ -644,7 +673,7 @@ model Jornada {
 
 | Endpoint | Método | Descripción | Auth |
 |----------|--------|-------------|------|
-| `/api/fichajes` | GET | Lista fichajes con filtros (empleadoId, fecha, fechaInicio, fechaFin, estado, propios). Incluye `horasEsperadas` y `balance` calculados | ✅ |
+| `/api/fichajes` | GET | Lista fichajes con filtros (empleadoId, fecha, fechaInicio, fechaFin, estado, equipoId, propios). Incluye `horasEsperadas` y `balance` calculados. **Nuevo**: Filtro por `equipoId` para filtrar por equipo del empleado | ✅ |
 | `/api/fichajes` | POST | Crea evento en fichaje del día (entrada, pausa_inicio, pausa_fin, salida). Crea fichaje si no existe | ✅ |
 | `/api/fichajes/[id]` | GET | Obtiene fichaje específico con todos sus eventos | ✅ |
 | `/api/fichajes/[id]` | PATCH | Aprueba/rechaza fichaje (`accion: 'aprobar'|'rechazar'`) | HR/Manager |
@@ -661,9 +690,9 @@ model Jornada {
 
 | Endpoint | Método | Descripción | Auth |
 |----------|--------|-------------|------|
-| `/api/fichajes/revision` | GET | Obtener fichajes pendientes de revisión. Busca directamente en tabla `fichaje` con estado `pendiente` de días anteriores | HR |
-| `/api/fichajes/revision` | POST | Actualizar fichajes individuales desde modal de revisión (legacy, usar `/api/fichajes/cuadrar` para masivo) | HR |
-| `/api/fichajes/cuadrar` | POST | Cuadrar fichajes masivamente. Crea eventos faltantes según jornada y marca como `finalizado` | HR |
+| `/api/fichajes/revision` | GET | Obtener fichajes pendientes de revisión. Busca directamente en tabla `fichaje` con estado `pendiente` de días anteriores. **Parámetros**: `fechaInicio`, `fechaFin`, `equipoId`, `search` (búsqueda por nombre empleado). **Nuevo**: Cálculo dinámico de pausas (respeta inicio real + duración jornada) | HR |
+| `/api/fichajes/revision` | POST | Actualizar fichajes individuales desde pantalla de revisión. Soporta `accion: 'actualizar'` (cuadrar) y `accion: 'descartar'` (marcar días vacíos como finalizados) | HR |
+| `/api/fichajes/cuadrar` | POST | Cuadrar fichajes masivamente. Crea eventos faltantes según jornada con **lógica de pausas dinámicas** y marca como `finalizado`. **Body**: `{ fichajeIds: string[] }` o `{ descartarIds: string[] }` para descartar días vacíos | HR |
 
 ### Estadísticas
 
@@ -677,6 +706,12 @@ model Jornada {
 |----------|--------|-------------|------|
 | `/api/empleados/[id]/renovar-saldo` | POST | Renueva el saldo de horas del empleado (resetea `saldoRenovadoDesde` a hoy) | HR Admin |
 | `/api/empleados/[id]/renovar-saldo` | GET | Obtiene la fecha de última renovación del saldo | ✅ |
+
+### Exportación de Fichajes
+
+| Endpoint | Método | Descripción | Auth |
+|----------|--------|-------------|------|
+| `/api/empleados/me/fichajes/export` | GET | Exporta historial completo de fichajes del empleado a Excel (.xlsx). Parámetro: `anio` (YYYY). Incluye: fecha, estado, eventos, horas trabajadas, tiempo en pausa, discrepancias | Empleado |
 
 ### Jornadas
 
@@ -738,8 +773,13 @@ model ProcesamientoMarcajes {
 ### Obtener Fichajes Pendientes (HR)
 
 ```typescript
-// GET /api/fichajes/revision
+// GET /api/fichajes/revision?fechaInicio=2025-11-01&fechaFin=2025-11-30&equipoId=equipo-uuid&search=Juan
 // Busca directamente en tabla fichaje con estado 'pendiente' de días anteriores
+// Parámetros opcionales:
+//   - fechaInicio: Fecha de inicio del rango (ISO string)
+//   - fechaFin: Fecha de fin del rango (ISO string)
+//   - equipoId: Filtrar por equipo del empleado
+//   - search: Búsqueda por nombre o apellidos del empleado (case-insensitive)
 
 // Sistema retorna:
 {
@@ -749,19 +789,24 @@ model ProcesamientoMarcajes {
       "fichajeId": "fichaje-uuid",
       "empleadoId": "empleado-uuid",
       "empleadoNombre": "Juan Pérez",
+      "equipoId": "equipo-uuid",
+      "equipoNombre": "Desarrollo",
+      "tieneEventosRegistrados": true, // true = incompleto, false = vacío
       "fecha": "2025-11-06T00:00:00.000Z",
       "eventos": [
         // Vista previa: eventos propuestos según jornada (azul) o registrados si existen
+        // Si existe pausa_inicio real, pausa_fin se calcula dinámicamente
         { "tipo": "entrada", "hora": "2025-11-06T09:00:00.000Z", "origen": "propuesto" },
-        { "tipo": "pausa_inicio", "hora": "2025-11-06T14:00:00.000Z", "origen": "propuesto" },
-        { "tipo": "pausa_fin", "hora": "2025-11-06T15:00:00.000Z", "origen": "propuesto" },
+        { "tipo": "pausa_inicio", "hora": "2025-11-06T14:15:00.000Z", "origen": "registrado" },
+        { "tipo": "pausa_fin", "hora": "2025-11-06T15:15:00.000Z", "origen": "propuesto" }, // Calculado: 14:15 + 1h
         { "tipo": "salida", "hora": "2025-11-06T18:00:00.000Z", "origen": "propuesto" }
       ],
       "eventosRegistrados": [
         // Eventos que el empleado ya fichó (si existen)
+        { "tipo": "pausa_inicio", "hora": "2025-11-06T14:15:00.000Z" }
       ],
-      "razon": "Faltan eventos: entrada, salida",
-      "eventosFaltantes": ["entrada", "salida"]
+      "razon": "Faltan eventos: entrada, pausa_fin, salida",
+      "eventosFaltantes": ["entrada", "pausa_fin", "salida"]
     }
   ]
 }
@@ -771,8 +816,14 @@ model ProcesamientoMarcajes {
 
 ```typescript
 // POST /api/fichajes/cuadrar
+// Opción 1: Cuadrar fichajes seleccionados
 {
   "fichajeIds": ["fichaje-uuid-1", "fichaje-uuid-2", "fichaje-uuid-3"]
+}
+
+// Opción 2: Descartar días vacíos (sin eventos)
+{
+  "descartarIds": ["fichaje-uuid-4", "fichaje-uuid-5"]
 }
 
 // Sistema automáticamente:
@@ -782,16 +833,27 @@ model ProcesamientoMarcajes {
 //    - Jornada fija: usa horarios configurados
 //    - Jornada flexible: calcula horarios basándose en horas semanales
 //    - NO crea eventos para períodos con ausencia de medio día
-// 4. Recalcula horasTrabajadas y horasEnPausa
-// 5. Cambia estado a 'finalizado'
-// 6. Registra auditoría: cuadradoMasivamente=true, cuadradoPor, cuadradoEn
+// 4. **Lógica de pausas dinámicas**: Si existe `pausa_inicio` real, calcula `pausa_fin` 
+//    relativo al inicio real + duración configurada (ej. 14:15 + 1h = 15:15)
+// 5. Recalcula horasTrabajadas y horasEnPausa
+// 6. Cambia estado a 'finalizado' (o 'descartado' si se usó descartarIds)
+// 7. Registra auditoría: cuadradoMasivamente=true, cuadradoPor, cuadradoEn
+// 8. Notifica al empleado del fichaje resuelto
 
-// Respuesta:
+// Respuesta (cuadrar):
 {
   "success": true,
   "cuadrados": 3,
   "errores": [],
   "mensaje": "3 fichajes cuadrados correctamente"
+}
+
+// Respuesta (descartar):
+{
+  "success": true,
+  "cuadrados": 2,
+  "errores": [],
+  "mensaje": "2 días sin fichajes descartados correctamente"
 }
 ```
 
@@ -809,6 +871,7 @@ model ProcesamientoMarcajes {
 - Desde `Ajustes > General > Exportar Fichajes`, el empleado puede descargar un Excel con todos sus fichajes del año seleccionado.
 - El archivo incluye: fecha, estado, eventos (entrada/pausas/salida), horas trabajadas, tiempo en pausa y discrepancias asociadas.
 - Endpoint: `GET /api/empleados/me/fichajes/export?anio=YYYY`. La generación se realiza con la librería `xlsx` y se actualiza al momento de la descarga.
+- **Formato**: Columnas con anchos optimizados, incluye fila vacía si no hay registros para el año seleccionado.
 
 ## 8. Sincronización en Tiempo Real
 
@@ -819,12 +882,68 @@ model ProcesamientoMarcajes {
 ## 9. Zona Horaria (Europe/Madrid)
 
 - Todas las fechas mostradas al usuario se normalizan explícitamente a la zona horaria `Europe/Madrid` mediante los helpers `toMadridDate` y `formatFechaMadrid` (`lib/utils/fechas.ts`).
-- Esto evita desfases de “día anterior” cuando el navegador del empleado está en otra zona horaria o cuando la consulta ocurre cerca de medianoche UTC.
+- Esto evita desfases de "día anterior" cuando el navegador del empleado está en otra zona horaria o cuando la consulta ocurre cerca de medianoche UTC.
 - Las APIs continúan trabajando en UTC, pero la capa de presentación formatea y envía fechas ya convertidas al huso horario oficial.
+
+## 10. Componentes Unificados de Filtros y Fechas ⭐ NUEVO
+
+### DataFilters (`components/shared/filters/data-filters.tsx`)
+
+Componente reutilizable para búsqueda y filtros que unifica la experiencia en Fichajes, Cuadrar Fichajes y Ausencias.
+
+**Características:**
+- **Búsqueda**: Input de texto con icono de búsqueda
+- **Filtro de Estado**: Selector desplegable con opciones configurables
+- **Filtro de Equipo**: Selector con opción "Todos los equipos" y "Sin equipo asignado"
+- **Botón "Limpiar"**: Aparece automáticamente cuando hay filtros activos
+- **Slot para contenido extra**: Permite añadir badges, contadores u otros elementos
+
+**Uso:**
+```tsx
+<DataFilters
+  searchQuery={busqueda}
+  onSearchChange={setBusqueda}
+  estadoValue={filtroEstado}
+  onEstadoChange={setFiltroEstado}
+  estadoOptions={ESTADO_OPTIONS}
+  equipoValue={filtroEquipo}
+  onEquipoChange={setFiltroEquipo}
+  equipoOptions={equiposOptions}
+>
+  {/* Contenido extra (badges, contadores) */}
+</DataFilters>
+```
+
+### DateRangeControls (`components/shared/filters/date-range-controls.tsx`)
+
+Componente unificado para navegación de períodos de tiempo (Día/Semana/Mes).
+
+**Características:**
+- **Diseño compacto**: Sin bordes innecesarios, flechas secundarias (ghost)
+- **Sin iconos redundantes**: Selector de rango sin icono de calendario
+- **Sin botón "Hoy"**: Eliminado para simplificar la interfaz
+- **Navegación fluida**: Flechas prev/next con espaciado optimizado
+- **Variantes**: Desktop (horizontal) y Mobile (vertical)
+
+**Uso:**
+```tsx
+<DateRangeControls
+  range={rangoFechas}
+  label={periodLabel}
+  onRangeChange={setRangoFechas}
+  onNavigate={(direction) => direction === 'prev' ? goToPrevious() : goToNext()}
+  variant={isMobile ? 'mobile' : 'desktop'}
+/>
+```
+
+**Aplicación:**
+- ✅ Fichajes (`/hr/horario/fichajes`)
+- ✅ Cuadrar Fichajes (`/hr/horario/fichajes/cuadrar`)
+- ✅ Ausencias (`/hr/horario/ausencias`)
 
 ---
 
-**Versión**: 3.4
+**Versión**: 3.5
 **Última actualización**: 27 enero 2025
 **Estado**: Sistema completo implementado:
 - ✅ Validación determinística de fichajes completos
@@ -846,3 +965,10 @@ model ProcesamientoMarcajes {
 - ✅ **Layout compacto**: Eventos en una línea horizontal (tipo, hora, eliminar)
 - ✅ **Validación anti-futuro**: No permite crear/editar eventos para fechas u horas futuras
 - ✅ **Crear/editar fichajes**: HR/Manager guardan directamente, empleados crean solicitud
+- ✅ **Cuadrar Fichajes refactorizado**: Pantalla completa con tabla plana, iconos de estado y acciones mejoradas
+- ✅ **Componentes unificados de filtros**: `DataFilters` y `DateRangeControls` aplicados en Fichajes, Cuadrar y Ausencias
+- ✅ **Filtros avanzados**: Filtro por equipo (end-to-end), estado y búsqueda unificada
+- ✅ **Lógica de pausas dinámicas**: Cálculo inteligente de fin de pausa relativo al inicio real + duración jornada
+- ✅ **Descartar días vacíos**: Funcionalidad para excluir masivamente días sin fichajes
+- ✅ **Botón Ausencia en cuadrar**: Permite crear ausencia directamente desde la revisión de fichajes
+- ✅ **Exportación Excel mejorada**: Formato optimizado con anchos de columna y manejo de casos vacíos

@@ -5,9 +5,10 @@
 // ========================================
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Calendar, Check, ChevronLeft, ChevronRight, Clock } from 'lucide-react';
+import { Calendar, Check, Clock } from 'lucide-react';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -16,11 +17,11 @@ import { MobileActionBar } from '@/components/adaptive/MobileActionBar';
 import { ResponsiveContainer } from '@/components/adaptive/ResponsiveContainer';
 import { CompensarHorasDialog } from '@/components/shared/compensar-horas-dialog';
 import { FichajeModal } from '@/components/shared/fichajes/fichaje-modal';
+import { DataFilters, type FilterOption } from '@/components/shared/filters/data-filters';
+import { DateRangeControls } from '@/components/shared/filters/date-range-controls';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   Table,
   TableBody,
@@ -37,8 +38,6 @@ import { toMadridDate } from '@/lib/utils/fechas';
 import { parseJson } from '@/lib/utils/json';
 
 import { JornadasModal } from './jornadas-modal';
-
-
 
 // NUEVO MODELO: Fichaje tiene eventos dentro
 interface FichajeEvento {
@@ -64,12 +63,19 @@ interface Fichaje {
     nombre: string;
     apellidos: string;
     puesto: string;
+    equipoId?: string | null;
+    equipo?: {
+      id: string;
+      nombre: string;
+    } | null;
   };
 }
 
 interface JornadaDia {
   empleadoId: string;
   empleadoNombre: string;
+  equipoId?: string | null;
+  equipoNombre?: string | null;
   fecha: Date;
   fichaje: Fichaje;
   horasTrabajadas: number;
@@ -79,21 +85,29 @@ interface JornadaDia {
   balance: number;
 }
 
-// Interfaz para el modal de edición (solo necesita el evento)
-interface FichajeEventoParaEditar {
-  id: string;
-  tipo: string;
-  hora: string;
-  editado?: boolean;
-}
+const ESTADO_OPTIONS: FilterOption[] = [
+  { value: 'en_curso', label: 'En curso' },
+  { value: 'finalizado', label: 'Finalizado' },
+  { value: 'revisado', label: 'Revisado' },
+  { value: 'pendiente', label: 'Pendiente' },
+];
 
 export function FichajesClient({ initialState }: { initialState?: string }) {
+  const router = useRouter();
   const [jornadas, setJornadas] = useState<JornadaDia[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filtroEstadoFichaje, setFiltroEstadoFichaje] = useState(initialState || 'todos'); // fichaje individual: confirmado/auto/rechazado
+  
+  // Filtros State
+  const [filtroEstadoFichaje, setFiltroEstadoFichaje] = useState(initialState || 'todos');
+  const [filtroEquipo, setFiltroEquipo] = useState('todos');
+  const [busquedaEmpleado, setBusquedaEmpleado] = useState('');
+  const [equiposOptions, setEquiposOptions] = useState<FilterOption[]>([]);
+  
+  // Date State
   const [rangoFechas, setRangoFechas] = useState<'dia' | 'semana' | 'mes'>('semana');
   const [fechaBase, setFechaBase] = useState(new Date());
-  const [busquedaEmpleado, setBusquedaEmpleado] = useState('');
+
+  // Modals
   const [jornadasModal, setJornadasModal] = useState(false);
   const [showCompensarHorasDialog, setShowCompensarHorasDialog] = useState(false);
   const [periodoCompensar, setPeriodoCompensar] = useState<{ mes: number; anio: number }>(() =>
@@ -106,8 +120,26 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
     open: false,
     fichajeDiaId: null,
   });
-  const [_filtersOpen, _setFiltersOpen] = useState(false);
+  
   const isMobile = useIsMobile();
+
+  // Load Equipos
+  useEffect(() => {
+    async function loadEquipos() {
+      try {
+        const response = await fetch('/api/organizacion/equipos');
+        if (response.ok) {
+          const data = await parseJson<Array<{ id: string; nombre: string }>>(response).catch(() => []);
+          if (Array.isArray(data)) {
+            setEquiposOptions(data.map(e => ({ label: e.nombre, value: e.id })));
+          }
+        }
+      } catch (error) {
+        console.error('[Fichajes] Error cargando equipos', error);
+      }
+    }
+    loadEquipos();
+  }, []);
 
   const calcularHorasTrabajadas = useCallback((eventos: FichajeEvento[]): number => {
     let horasTotales = 0;
@@ -204,6 +236,8 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
       return {
         empleadoId: fichaje.empleado.id,
         empleadoNombre: `${fichaje.empleado.nombre} ${fichaje.empleado.apellidos}`,
+        equipoId: fichaje.empleado.equipoId ?? null,
+        equipoNombre: fichaje.empleado.equipo?.nombre ?? null,
         fecha: new Date(fecha),
         fichaje,
         horasTrabajadas,
@@ -237,6 +271,9 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
       if (filtroEstadoFichaje !== 'todos') {
         params.append('estado', filtroEstadoFichaje);
       }
+      if (filtroEquipo !== 'todos') {
+        params.append('equipoId', filtroEquipo);
+      }
 
       const response = await fetch(`/api/fichajes?${params}`);
       const payload =
@@ -260,7 +297,7 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
     } finally {
       setLoading(false);
     }
-  }, [agruparPorJornada, fechaBase, rangoFechas, filtroEstadoFichaje]);
+  }, [agruparPorJornada, fechaBase, filtroEquipo, filtroEstadoFichaje, rangoFechas]);
 
   useEffect(() => {
     fetchFichajes();
@@ -300,116 +337,59 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
     return { inicio, fin };
   }
 
-  // NUEVO MODELO: Los fichajes ya vienen agrupados (un fichaje por día con eventos)
-  // useEffect(() => {
-  //   fetchFichajes();
-  // }, [filtroEstadoFichaje, rangoFechas, fechaBase]);
-
-  // useEffect(() => {
-  //   fetchFichajes();
-  // }, [filtroEstadoFichaje, rangoFechas, fechaBase]);
-
-  async function handleEditarFichaje(fichajeId: string, hora: string, tipo: string) {
-    try {
-      const response = await fetch(`/api/fichajes/${fichajeId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          hora,
-          tipo,
-        }),
-      });
-
-      if (response.ok) {
-        toast.success('Fichaje actualizado correctamente');
-        fetchFichajes(); // Recargar fichajes
-      } else {
-        const error =
-          (await parseJson<{ error?: string }>(response).catch(() => undefined)) ?? {};
-        toast.error(error.error || 'Error al actualizar fichaje');
-      }
-    } catch (error) {
-      console.error('Error:', error);
-      toast.error('Error al actualizar fichaje');
-    }
-  }
-
-  const handleAbrirCompensacion = () => {
-    setPeriodoCompensar(obtenerPeriodoDesdeFecha(fechaBase));
-    setShowCompensarHorasDialog(true);
-  };
-
-  const openEditarModalFromJornada = (jornadaSeleccionada: JornadaDia) => {
-    const eventos = jornadaSeleccionada.fichaje.eventos;
-    if (!eventos || eventos.length === 0) {
-      return;
-    }
-    const eventoSalida = eventos.find((e: FichajeEvento) => e.tipo === 'salida');
-    const target = eventoSalida || eventos[eventos.length - 1];
-    if (!target) {
-      return;
-    }
-
-    setEditarFichajeModal({
-      open: true,
-      fichajeDiaId: jornadaSeleccionada.fichaje.id,
-    });
-  };
-
-  // Funciones de navegación de fechas - definidas antes de su uso
   const goToPreviousPeriod = useCallback(() => {
-    setFechaBase((prev) => {
-      const nueva = new Date(prev);
-      if (rangoFechas === 'dia') nueva.setDate(nueva.getDate() - 1);
-      else if (rangoFechas === 'semana') nueva.setDate(nueva.getDate() - 7);
-      else nueva.setMonth(nueva.getMonth() - 1);
-      return nueva;
-    });
-  }, [rangoFechas]);
-
-  const goToNextPeriod = useCallback(() => {
-    setFechaBase((prev) => {
-      const nueva = new Date(prev);
-      if (rangoFechas === 'dia') nueva.setDate(nueva.getDate() + 1);
-      else if (rangoFechas === 'semana') nueva.setDate(nueva.getDate() + 7);
-      else nueva.setMonth(nueva.getMonth() + 1);
-      return nueva;
-    });
-  }, [rangoFechas]);
-
-  const resetToToday = useCallback(() => {
-    setFechaBase(new Date());
-  }, []);
-
-  const periodLabel = useMemo(() => {
+    const nuevaFecha = new Date(fechaBase);
     if (rangoFechas === 'dia') {
-      return format(fechaBase, 'dd MMM', { locale: es });
+      nuevaFecha.setDate(nuevaFecha.getDate() - 1);
+    } else if (rangoFechas === 'semana') {
+      nuevaFecha.setDate(nuevaFecha.getDate() - 7);
+    } else {
+      nuevaFecha.setMonth(nuevaFecha.getMonth() - 1);
     }
-    if (rangoFechas === 'semana') {
-      return `Sem ${format(fechaBase, 'w', { locale: es })}`;
-    }
-    return format(fechaBase, 'MMM yyyy', { locale: es });
+    setFechaBase(nuevaFecha);
   }, [fechaBase, rangoFechas]);
 
-  // Filtrar jornadas por búsqueda de empleado y estado de fichaje
-  const jornadasFiltradas = useMemo(() => {
-    let filtradas = busquedaEmpleado
-      ? jornadas.filter(j => 
-          j.empleadoNombre.toLowerCase().includes(busquedaEmpleado.toLowerCase())
-        )
-      : jornadas;
+  const goToNextPeriod = useCallback(() => {
+    const nuevaFecha = new Date(fechaBase);
+    if (rangoFechas === 'dia') {
+      nuevaFecha.setDate(nuevaFecha.getDate() + 1);
+    } else if (rangoFechas === 'semana') {
+      nuevaFecha.setDate(nuevaFecha.getDate() + 7);
+    } else {
+      nuevaFecha.setMonth(nuevaFecha.getMonth() + 1);
+    }
+    setFechaBase(nuevaFecha);
+  }, [fechaBase, rangoFechas]);
 
-    // Aplicar filtro de estado de fichaje
-    if (filtroEstadoFichaje !== 'todos') {
-      filtradas = filtradas.filter(jornada => 
-        jornada.fichaje.estado === filtroEstadoFichaje
+  const periodLabel = useMemo(() => {
+    switch (rangoFechas) {
+      case 'dia':
+        return format(fechaBase, 'dd MMM', { locale: es });
+      case 'semana':
+        return `Sem ${format(fechaBase, 'w', { locale: es })}`;
+      default:
+        return format(fechaBase, 'MMM yyyy', { locale: es });
+    }
+  }, [fechaBase, rangoFechas]);
+
+  // Filtrar jornadas por búsqueda de empleado
+  // El filtro de estado y equipo YA se aplica en backend, pero mantenemos búsqueda local por si acaso
+  // para la responsividad inmediata mientras carga o si el backend devuelve más de lo necesario.
+  const jornadasFiltradas = useMemo(() => {
+    let filtradas = jornadas;
+
+    if (busquedaEmpleado) {
+      filtradas = filtradas.filter(j => 
+        j.empleadoNombre.toLowerCase().includes(busquedaEmpleado.toLowerCase())
       );
     }
 
+    // Nota: Filtros de estado y equipo aplicados en servidor (fetchFichajes)
+    
     return filtradas;
-  }, [jornadas, busquedaEmpleado, filtroEstadoFichaje]);
+  }, [jornadas, busquedaEmpleado]);
 
-  // Fichajes que requieren atención (no completados ni aprobados)
+  // Stats Counters
   const fichajesRevisados = useMemo(() => 
     jornadasFiltradas.filter(j => j.fichaje.estado === 'revisado').length,
     [jornadasFiltradas]
@@ -425,105 +405,73 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
     [jornadasFiltradas]
   );
 
-  const _hasActiveFilters = useMemo(() =>
-    filtroEstadoFichaje !== 'todos' || Boolean(busquedaEmpleado),
-    [filtroEstadoFichaje, busquedaEmpleado]
-  );
-
-  const FiltersForm = ({ layout }: { layout: 'desktop' | 'mobile' }) => {
-    const inputClassName = layout === 'desktop' ? 'w-[200px]' : 'w-full';
-    const selectClassName = layout === 'desktop' ? 'w-[200px]' : 'w-full';
-    return (
-      <div className={layout === 'desktop' ? 'flex items-center gap-3 flex-wrap' : 'space-y-3'}>
-        <Input
-          placeholder="Buscar empleado..."
-          value={busquedaEmpleado}
-          onChange={(e) => setBusquedaEmpleado(e.target.value)}
-          className={inputClassName}
-        />
-        <Select value={filtroEstadoFichaje} onValueChange={setFiltroEstadoFichaje}>
-          <SelectTrigger className={selectClassName}>
-            <SelectValue placeholder="Estado del fichaje" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="todos">Todos</SelectItem>
-            <SelectItem value="en_curso">En curso</SelectItem>
-            <SelectItem value="finalizado">Finalizado</SelectItem>
-            <SelectItem value="revisado">Revisado</SelectItem>
-            <SelectItem value="pendiente">Pendiente</SelectItem>
-          </SelectContent>
-        </Select>
-        <div className={layout === 'desktop' ? 'flex items-center gap-2' : 'flex flex-wrap gap-2'}>
-          {fichajesRevisados > 0 && (
-            <Badge className="bg-green-50 text-green-700 border border-green-200">
-              {fichajesRevisados} revisados
-            </Badge>
-          )}
-          {fichajesPendientesRevision > 0 && (
-            <Badge className="bg-yellow-100 text-yellow-800">
-              {fichajesPendientesRevision} pendientes
-            </Badge>
-          )}
-        </div>
-      </div>
-    );
+  const handleAbrirCompensacion = () => {
+    setPeriodoCompensar(obtenerPeriodoDesdeFecha(fechaBase));
+    setShowCompensarHorasDialog(true);
   };
 
-  const DesktopDateControls = (
-    <div className="flex items-center gap-2">
-      <Select value={rangoFechas} onValueChange={(v) => setRangoFechas(v as 'dia' | 'semana' | 'mes')}>
-        <SelectTrigger className="w-[120px]">
-          <Calendar className="w-4 h-4 mr-2" />
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="dia">Día</SelectItem>
-          <SelectItem value="semana">Semana</SelectItem>
-          <SelectItem value="mes">Mes</SelectItem>
-        </SelectContent>
-      </Select>
-      <Button variant="outline" size="sm" onClick={goToPreviousPeriod} title="Período anterior">
-        ←
-      </Button>
-      <span className="text-sm font-medium min-w-[160px] text-center">{periodLabel}</span>
-      <Button variant="outline" size="sm" onClick={goToNextPeriod} title="Próximo período">
-        →
-      </Button>
-      <Button variant="outline" size="sm" onClick={resetToToday}>
-        Hoy
-      </Button>
+  const renderMobileList = () => (
+    <div className="space-y-4 pb-20">
+      {jornadasFiltradas.length === 0 ? (
+        <div className="text-center py-10 text-gray-500">
+          {busquedaEmpleado ? 'No se encontraron empleados' : 'No hay fichajes'}
+        </div>
+      ) : (
+        jornadasFiltradas.map((jornada) => (
+          <Card key={`${jornada.empleadoId}-${jornada.fecha.toISOString()}`} className="p-4 space-y-3">
+            <div className="flex justify-between items-start">
+              <div>
+                <h3 className="font-medium text-gray-900">{jornada.empleadoNombre}</h3>
+                <p className="text-xs text-gray-500">{format(jornada.fecha, 'EEEE, d MMM', { locale: es })}</p>
+              </div>
+              <EstadoBadge estado={jornada.fichaje.estado} />
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4 py-2 border-t border-gray-100 mt-2">
+              <div>
+                <p className="text-xs text-gray-500 mb-1">Horario</p>
+                <div className="flex items-center gap-1.5">
+                  <Clock className="w-3.5 h-3.5 text-gray-400" />
+                  <span className="text-sm font-medium">
+                    {jornada.horarioEntrada || '--:--'} - {jornada.horarioSalida || '--:--'}
+                  </span>
+                </div>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500 mb-1">Trabajado</p>
+                <div className="text-sm font-medium">
+                  {formatearHorasMinutos(jornada.horasTrabajadas)} / {formatearHorasMinutos(jornada.horasEsperadas)}
+                </div>
+              </div>
+            </div>
+
+            {jornada.balance !== 0 && (
+              <div className="flex items-center justify-between text-xs pt-2 border-t border-gray-100">
+                <span className="text-gray-500">Balance diario</span>
+                <span className={`font-medium ${jornada.balance > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  {jornada.balance > 0 ? '+' : ''}{formatearHorasMinutos(jornada.balance)}
+                </span>
+              </div>
+            )}
+
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="w-full mt-2 text-xs h-8"
+              onClick={() =>
+                setEditarFichajeModal({
+                  open: true,
+                  fichajeDiaId: jornada.fichaje.id,
+                })
+              }
+            >
+              Ver detalles
+            </Button>
+          </Card>
+        ))
+      )}
     </div>
   );
-
-  const _MobileDateControls = (
-    <div className="space-y-3">
-      <Select value={rangoFechas} onValueChange={(v) => setRangoFechas(v as 'dia' | 'semana' | 'mes')}>
-        <SelectTrigger className="w-full">
-          <Calendar className="w-4 h-4 mr-2" />
-          <SelectValue placeholder="Rango" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="dia">Día</SelectItem>
-          <SelectItem value="semana">Semana</SelectItem>
-          <SelectItem value="mes">Mes</SelectItem>
-        </SelectContent>
-      </Select>
-      <div className="flex items-center justify-between gap-2">
-        <Button variant="outline" onClick={goToPreviousPeriod} className="flex-1">
-          Anterior
-        </Button>
-        <span className="text-sm font-semibold text-gray-900">{periodLabel}</span>
-        <Button variant="outline" onClick={goToNextPeriod} className="flex-1">
-          Siguiente
-        </Button>
-      </div>
-      <Button variant="ghost" onClick={resetToToday} className="w-full text-gray-600">
-        Ir a hoy
-      </Button>
-    </div>
-  );
-
-  const emptyStateMessage = busquedaEmpleado ? 'No se encontraron empleados' : 'No hay fichajes';
 
   const renderDesktopTable = () => (
     <Card className="overflow-hidden">
@@ -539,77 +487,80 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
               <TableHead>Horario</TableHead>
               <TableHead>Balance</TableHead>
               <TableHead>Estado</TableHead>
+              <TableHead className="text-right">Acciones</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {loading ? (
+            {jornadasFiltradas.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="text-center py-8 text-gray-500">
-                  Cargando...
-                </TableCell>
-              </TableRow>
-            ) : jornadasFiltradas.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={8} className="text-center py-8 text-gray-500">
-                  {emptyStateMessage}
+                <TableCell colSpan={9} className="h-24 text-center text-gray-500">
+                  {busquedaEmpleado ? 'No se encontraron empleados' : 'No hay fichajes'}
                 </TableCell>
               </TableRow>
             ) : (
-              jornadasFiltradas.map((jornada) => {
-                const key = `${jornada.empleadoId}_${jornada.fecha.toISOString()}`;
-                return (
-                  <React.Fragment key={key}>
-                    <TableRow
-                      id={key}
-                      className="cursor-pointer hover:bg-gray-50"
-                      onClick={() => openEditarModalFromJornada(jornada)}
+              jornadasFiltradas.map((jornada) => (
+                <TableRow key={`${jornada.empleadoId}-${jornada.fecha.toISOString()}`}>
+                  <TableCell>
+                    {/* Avatar placeholder o componente Avatar */}
+                    <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-xs font-medium text-gray-600">
+                      {jornada.empleadoNombre.charAt(0)}
+                    </div>
+                  </TableCell>
+                  <TableCell className="font-medium text-gray-900">
+                    <div>{jornada.empleadoNombre}</div>
+                    <div className="text-xs text-gray-500">{jornada.equipoNombre}</div>
+                  </TableCell>
+                  <TableCell className="text-gray-500">
+                    {format(jornada.fecha, 'dd MMM', { locale: es })}
+                  </TableCell>
+                  <TableCell>
+                    <span className="font-medium text-gray-900">
+                      {formatearHorasMinutos(jornada.horasTrabajadas)}
+                    </span>
+                  </TableCell>
+                  <TableCell className="text-gray-500">
+                    {formatearHorasMinutos(jornada.horasEsperadas)}
+                  </TableCell>
+                  <TableCell className="text-gray-500 text-xs">
+                    {jornada.horarioEntrada ? (
+                      <span className="inline-flex items-center gap-1 bg-gray-50 px-2 py-1 rounded">
+                        {jornada.horarioEntrada} - {jornada.horarioSalida || '...'}
+                      </span>
+                    ) : (
+                      '-'
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <Badge 
+                      variant="outline" 
+                      className={`${
+                        jornada.balance >= 0 
+                          ? 'bg-green-50 text-green-700 border-green-200' 
+                          : 'bg-red-50 text-red-700 border-red-200'
+                      }`}
                     >
-                      <TableCell />
-                      <TableCell>
-                        <div className="font-medium text-gray-900">{jornada.empleadoNombre}</div>
-                      </TableCell>
-                      <TableCell>
-                        <span className="text-sm text-gray-600">
-                          {format(jornada.fecha, 'dd MMM yyyy', { locale: es })}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <span className="text-sm font-medium">
-                          {formatearHorasMinutos(jornada.horasTrabajadas)}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <span className="text-sm text-gray-600">
-                          {formatearHorasMinutos(jornada.horasEsperadas)}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <span className="text-sm text-gray-600">
-                          {jornada.horarioEntrada && jornada.horarioSalida
-                            ? `${jornada.horarioEntrada} - ${jornada.horarioSalida}`
-                            : jornada.horarioEntrada
-                            ? `${jornada.horarioEntrada} - ...`
-                            : 'Sin datos'}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <span
-                          className={`text-sm font-medium ${
-                            jornada.balance >= 0 ? 'text-green-600' : 'text-red-600'
-                          }`}
-                        >
-                          {Number.isFinite(jornada.balance) && jornada.balance !== 0
-                            ? `${jornada.balance > 0 ? '+' : '-'}${formatearHorasMinutos(
-                                Math.abs(jornada.balance),
-                              )}`
-                            : '0h 0m'}
-                        </span>
-                      </TableCell>
-                      <TableCell>{getFichajeBadge(jornada.fichaje.estado)}</TableCell>
-                    </TableRow>
-                  </React.Fragment>
-                );
-              })
+                      {jornada.balance > 0 ? '+' : ''}{formatearHorasMinutos(jornada.balance)}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <EstadoBadge estado={jornada.fichaje.estado} />
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() =>
+                        setEditarFichajeModal({
+                          open: true,
+                          fichajeDiaId: jornada.fichaje.id,
+                        })
+                      }
+                    >
+                      Detalles
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))
             )}
           </TableBody>
         </Table>
@@ -617,91 +568,14 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
     </Card>
   );
 
-  const renderMobileList = () => {
-    if (loading) {
-      return (
-        <Card className="p-4">
-          <p className="text-sm text-gray-500">Cargando fichajes...</p>
-        </Card>
-      );
-    }
-
-    if (jornadasFiltradas.length === 0) {
-      return (
-        <Card className="p-4">
-          <p className="text-sm text-gray-500">{emptyStateMessage}</p>
-        </Card>
-      );
-    }
-
-    return (
-      <div className="space-y-3 pb-4">
-        {jornadasFiltradas.map((jornada) => {
-          const key = `${jornada.empleadoId}_${jornada.fecha.toISOString()}`;
-          return (
-            <Card
-              key={key}
-              className="p-4 space-y-3"
-              onClick={() => openEditarModalFromJornada(jornada)}
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-base font-semibold text-gray-900">{jornada.empleadoNombre}</p>
-                  <p className="text-sm text-gray-500">
-                    {format(jornada.fecha, 'dd MMM yyyy', { locale: es })}
-                  </p>
-                </div>
-                {getFichajeBadge(jornada.fichaje.estado)}
-              </div>
-              <div className="grid grid-cols-2 gap-3 text-sm text-gray-700">
-                <div>
-                  <p className="text-xs text-gray-500">Horas trabajadas</p>
-                  <p className="font-medium">{formatearHorasMinutos(jornada.horasTrabajadas)}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-500">Horas esperadas</p>
-                  <p>{formatearHorasMinutos(jornada.horasEsperadas)}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-500">Horario</p>
-                  <p>
-                    {jornada.horarioEntrada && jornada.horarioSalida
-                      ? `${jornada.horarioEntrada} - ${jornada.horarioSalida}`
-                      : jornada.horarioEntrada
-                      ? `${jornada.horarioEntrada} - ...`
-                      : 'Sin datos'}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-500">Balance</p>
-                  <p className={jornada.balance >= 0 ? 'text-green-600' : 'text-red-600'}>
-                    {Number.isFinite(jornada.balance) && jornada.balance !== 0
-                      ? `${jornada.balance > 0 ? '+' : '-'}${formatearHorasMinutos(
-                          Math.abs(jornada.balance),
-                        )}`
-                      : '0h 0m'}
-                  </p>
-                </div>
-              </div>
-            </Card>
-          );
-        })}
-      </div>
-    );
-  };
-
-  function getFichajeBadge(estado: string) {
+  function EstadoBadge({ estado }: { estado: string }) {
     const variants: Record<string, { label: string; className: string }> = {
-      en_curso: { label: 'En curso', className: 'bg-yellow-100 text-yellow-800' },
-      finalizado: { label: 'Finalizado', className: 'bg-green-100 text-green-800' },
-      revisado: { label: 'Revisado', className: 'bg-green-50 text-green-700 border-green-200 border' },
-      pendiente: { label: 'Pendiente', className: 'bg-gray-100 text-gray-800' },
-      // Estados legacy (compatibilidad temporal con datos existentes)
-      pendiente_revision: { label: 'Pendiente', className: 'bg-yellow-100 text-yellow-800' },
-      aprobado: { label: 'Finalizado', className: 'bg-green-100 text-green-800' },
-      rechazado: { label: 'Pendiente', className: 'bg-yellow-100 text-yellow-800' },
-      confirmado: { label: 'Finalizado', className: 'bg-green-100 text-green-800' },
-      auto: { label: 'Finalizado', className: 'bg-green-100 text-green-800' },
+      en_curso: { label: 'En curso', className: 'bg-blue-100 text-blue-800' },
+      finalizado: { label: 'Finalizado', className: 'bg-gray-100 text-gray-800' },
+      revisado: { label: 'Revisado', className: 'bg-green-100 text-green-800' },
+      pendiente: { label: 'Pendiente', className: 'bg-yellow-100 text-yellow-800' },
+      rechazado: { label: 'Rechazado', className: 'bg-red-100 text-red-800' },
+      pendiente_revision: { label: 'Pendiente Rev.', className: 'bg-orange-100 text-orange-800' }
     };
 
     const variant = variants[estado] || variants.en_curso;
@@ -720,7 +594,7 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
             title="Fichajes"
             primaryAction={{
               label: 'Cuadrar',
-              onClick: handleCuadrarFichajes,
+              onClick: () => router.push('/hr/horario/fichajes/cuadrar'),
               display: 'label',
             }}
             secondaryActions={[
@@ -739,87 +613,77 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
           />
 
           {/* Navegación de período + filtros en una línea */}
-          <div className="flex-shrink-0 mb-3 space-y-2">
-            {/* Período de tiempo compacto */}
-            <div className="flex items-center gap-2">
-              <Select 
-                value={rangoFechas} 
-                onValueChange={(v) => setRangoFechas(v as 'dia' | 'semana' | 'mes')}
-              >
-                <SelectTrigger className="w-20 h-9 text-xs">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="dia">Día</SelectItem>
-                  <SelectItem value="semana">Sem</SelectItem>
-                  <SelectItem value="mes">Mes</SelectItem>
-                </SelectContent>
-              </Select>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={goToPreviousPeriod}
-                className="h-9 w-9 p-0"
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <span className="text-sm font-medium text-gray-900 flex-1 text-center">
-                {periodLabel}
-              </span>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={goToNextPeriod}
-                className="h-9 w-9 p-0"
-              >
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </div>
+          <div className="flex-shrink-0 mb-3 space-y-3">
+            <DateRangeControls
+              variant="mobile"
+              range={rangoFechas}
+              label={periodLabel}
+              onRangeChange={setRangoFechas}
+              onNavigate={(direction) => (direction === 'prev' ? goToPreviousPeriod() : goToNextPeriod())}
+            />
 
             {/* Búsqueda y filtros */}
             <CompactFilterBar
               searchValue={busquedaEmpleado}
               onSearchChange={setBusquedaEmpleado}
               searchPlaceholder="Buscar empleado..."
-              activeFiltersCount={filtroEstadoFichaje !== 'todos' ? 1 : 0}
+              activeFiltersCount={(filtroEstadoFichaje !== 'todos' ? 1 : 0) + (filtroEquipo !== 'todos' ? 1 : 0)}
               filtersContent={
-                <>
-                  <div className="space-y-3">
-                    <div>
-                      <label className="text-sm font-medium text-gray-700 mb-1.5 block">
-                        Estado del fichaje
-                      </label>
-                      <Select value={filtroEstadoFichaje} onValueChange={setFiltroEstadoFichaje}>
-                        <SelectTrigger className="w-full">
-                          <SelectValue placeholder="Estado del fichaje" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="todos">Todos</SelectItem>
-                          <SelectItem value="en_curso">En curso</SelectItem>
-                          <SelectItem value="finalizado">Finalizado</SelectItem>
-                          <SelectItem value="revisado">Revisado</SelectItem>
-                          <SelectItem value="pendiente">Pendiente</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    {fichajesRevisados > 0 && (
-                      <div className="flex items-center gap-2 p-3 bg-green-50 rounded-lg">
-                        <Check className="h-4 w-4 text-green-600" />
-                        <span className="text-sm text-green-700 font-medium">
-                          {fichajesRevisados} fichajes revisados
-                        </span>
-                      </div>
-                    )}
-                    {fichajesPendientesRevision > 0 && (
-                      <div className="flex items-center gap-2 p-3 bg-yellow-50 rounded-lg">
-                        <Clock className="h-4 w-4 text-yellow-600" />
-                        <span className="text-sm text-yellow-700 font-medium">
-                          {fichajesPendientesRevision} pendientes de revisión
-                        </span>
-                      </div>
-                    )}
+                <div className="space-y-3">
+                  <div>
+                    <label className="text-sm font-medium text-gray-700 mb-1.5 block">
+                      Estado del fichaje
+                    </label>
+                    <Select value={filtroEstadoFichaje} onValueChange={setFiltroEstadoFichaje}>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Estado del fichaje" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="todos">Todos</SelectItem>
+                        {ESTADO_OPTIONS.map((opt) => (
+                          <SelectItem key={opt.value} value={opt.value}>
+                            {opt.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
-                </>
+                  <div>
+                    <label className="text-sm font-medium text-gray-700 mb-1.5 block">
+                      Equipo
+                    </label>
+                    <Select value={filtroEquipo} onValueChange={setFiltroEquipo}>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Equipo" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="todos">Todos los equipos</SelectItem>
+                        <SelectItem value="sin_equipo">Sin equipo asignado</SelectItem>
+                        {equiposOptions.map((equipo) => (
+                          <SelectItem key={equipo.value} value={equipo.value}>
+                            {equipo.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {fichajesRevisados > 0 && (
+                    <div className="flex items-center gap-2 p-3 bg-green-50 rounded-lg">
+                      <Check className="h-4 w-4 text-green-600" />
+                      <span className="text-sm text-green-700 font-medium">
+                        {fichajesRevisados} fichajes revisados
+                      </span>
+                    </div>
+                  )}
+                  {fichajesPendientesRevision > 0 && (
+                    <div className="flex items-center gap-2 p-3 bg-yellow-50 rounded-lg">
+                      <Clock className="h-4 w-4 text-yellow-600" />
+                      <span className="text-sm text-yellow-700 font-medium">
+                        {fichajesPendientesRevision} pendientes de revisión
+                      </span>
+                    </div>
+                  )}
+                </div>
               }
               filtersTitle="Filtros"
             />
@@ -849,8 +713,36 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
             </div>
           </div>
           <div className="flex items-center justify-between mb-6 gap-4 flex-wrap">
-            <FiltersForm layout="desktop" />
-            {DesktopDateControls}
+            <DataFilters
+              searchQuery={busquedaEmpleado}
+              onSearchChange={setBusquedaEmpleado}
+              estadoValue={filtroEstadoFichaje}
+              onEstadoChange={setFiltroEstadoFichaje}
+              estadoOptions={ESTADO_OPTIONS}
+              equipoValue={filtroEquipo}
+              onEquipoChange={setFiltroEquipo}
+              equipoOptions={equiposOptions}
+            >
+              <div className="flex items-center gap-2">
+                {fichajesRevisados > 0 && (
+                  <Badge className="bg-green-50 text-green-700 border border-green-200">
+                    {fichajesRevisados} revisados
+                  </Badge>
+                )}
+                {fichajesPendientesRevision > 0 && (
+                  <Badge className="bg-yellow-100 text-yellow-800">
+                    {fichajesPendientesRevision} pendientes
+                  </Badge>
+                )}
+              </div>
+            </DataFilters>
+            
+            <DateRangeControls
+              range={rangoFechas}
+              label={periodLabel}
+              onRangeChange={setRangoFechas}
+              onNavigate={(direction) => (direction === 'prev' ? goToPreviousPeriod() : goToNextPeriod())}
+            />
           </div>
           <div className="flex-1 overflow-y-auto">{renderDesktopTable()}</div>
         </>

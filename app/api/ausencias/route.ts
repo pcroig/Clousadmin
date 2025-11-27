@@ -61,6 +61,10 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const estado = searchParams.get('estado');
     const empleadoId = searchParams.get('empleadoId');
+    const equipoId = searchParams.get('equipoId');
+    const fechaInicioParam = searchParams.get('fechaInicio');
+    const fechaFinParam = searchParams.get('fechaFin');
+    const search = searchParams.get('search');
 
     // Filtros base
     const where: Prisma.AusenciaWhereInput = {
@@ -75,6 +79,43 @@ export async function GET(req: NextRequest) {
     // Filtrar por empleado si se proporciona
     if (empleadoId) {
       where.empleadoId = empleadoId;
+    }
+
+    const andFilters: Prisma.AusenciaWhereInput[] = [];
+
+    if (equipoId && equipoId !== 'todos') {
+      andFilters.push({
+        empleado: {
+          equipoId,
+        },
+      });
+    }
+
+    if (fechaInicioParam) {
+      const inicio = new Date(fechaInicioParam);
+      inicio.setHours(0, 0, 0, 0);
+      if (!Number.isNaN(inicio.getTime())) {
+        andFilters.push({ fechaInicio: { gte: inicio } });
+      }
+    }
+
+    if (fechaFinParam) {
+      const fin = new Date(fechaFinParam);
+      fin.setHours(23, 59, 59, 999);
+      if (!Number.isNaN(fin.getTime())) {
+        andFilters.push({ fechaInicio: { lte: fin } });
+      }
+    }
+
+    if (search) {
+      andFilters.push({
+        empleado: {
+          OR: [
+            { nombre: { contains: search, mode: 'insensitive' } },
+            { apellidos: { contains: search, mode: 'insensitive' } },
+          ],
+        },
+      });
     }
 
     // Si es empleado, solo ver sus propias ausencias
@@ -112,6 +153,10 @@ export async function GET(req: NextRequest) {
       };
     }
 
+    if (andFilters.length > 0) {
+      where.AND = [...(where.AND ?? []), ...andFilters];
+    }
+
     const { page, limit, skip } = parsePaginationParams(searchParams);
 
     const [ausencias, total] = await Promise.all([
@@ -124,7 +169,14 @@ export async function GET(req: NextRequest) {
               apellidos: true,
               puesto: true,
               fotoUrl: true,
-            }
+              equipoId: true,
+              equipo: {
+                select: {
+                  id: true,
+                  nombre: true,
+                },
+              },
+            },
           },
         },
         orderBy: {

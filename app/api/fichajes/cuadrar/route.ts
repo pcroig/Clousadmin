@@ -23,8 +23,12 @@ import type { DiaConfig, JornadaConfig } from '@/lib/calculos/fichajes-helpers';
 
 
 const cuadrarSchema = z.object({
-  fichajeIds: z.array(z.string()).min(1, 'Debe proporcionar al menos un fichaje'),
-});
+  fichajeIds: z.array(z.string()).optional(),
+  descartarIds: z.array(z.string()).optional(),
+}).refine(
+  (data) => (data.fichajeIds?.length ?? 0) > 0 || (data.descartarIds?.length ?? 0) > 0,
+  { message: 'Debe proporcionar al menos un fichaje' }
+);
 
 // POST /api/fichajes/cuadrar - Cuadrar fichajes masivamente (solo HR Admin)
 export async function POST(request: NextRequest) {
@@ -39,7 +43,8 @@ export async function POST(request: NextRequest) {
     if (isNextResponse(validationResult)) return validationResult;
     const { data: validatedData } = validationResult;
 
-    const { fichajeIds } = validatedData;
+    const fichajeIds = validatedData.fichajeIds ?? [];
+    const descartarIds = validatedData.descartarIds ?? [];
 
     let cuadrados = 0;
     const errores: string[] = [];
@@ -50,6 +55,49 @@ export async function POST(request: NextRequest) {
     // ----------------------------------------------------------------------
 
     // 1. Cargar todos los fichajes solicitados con sus relaciones
+    if (descartarIds.length > 0) {
+      const fichajesDescartar = await prisma.fichaje.findMany({
+        where: {
+          id: { in: descartarIds },
+          empresaId: session.user.empresaId,
+        },
+        include: {
+          eventos: true,
+        },
+      });
+
+      for (const fichaje of fichajesDescartar) {
+        if (fichaje.eventos.length > 0) {
+          errores.push(`Fichaje ${fichaje.id}: Solo se pueden descartar días sin fichajes`);
+          continue;
+        }
+
+        await prisma.fichaje.update({
+          where: { id: fichaje.id },
+          data: {
+            estado: 'finalizado',
+            horasTrabajadas: 0,
+            horasEnPausa: 0,
+            autoCompletado: false,
+            cuadradoMasivamente: true,
+            cuadradoPor: session.user.id,
+            cuadradoEn: new Date(),
+            fechaAprobacion: new Date(),
+          },
+        });
+        cuadrados++;
+      }
+    }
+
+    if (fichajeIds.length === 0) {
+      return successResponse({
+        success: true,
+        cuadrados,
+        errores,
+        mensaje: `${cuadrados} fichajes procesados${errores.length ? `, ${errores.length} errores` : ''}`,
+      });
+    }
+
     const fichajes = await prisma.fichaje.findMany({
       where: {
         id: { in: fichajeIds },
@@ -199,7 +247,53 @@ export async function POST(request: NextRequest) {
           }
 
           const tiposEventos = fichaje.eventos.map((e) => e.tipo);
-          const eventosFaltantes = eventosRequeridos.filter(req => !tiposEventos.includes(req));
+          let eventosFaltantes = eventosRequeridos.filter((req) => !tiposEventos.includes(req));
+
+          const minutosDescansoConfig = (() => {
+            if (configDia?.pausa_inicio && configDia?.pausa_fin) {
+              const [inicioH, inicioM] = configDia.pausa_inicio.split(':').map(Number);
+              const [finH, finM] = configDia.pausa_fin.split(':').map(Number);
+              const minutos = (finH * 60 + (finM ?? 0)) - (inicioH * 60 + (inicioM ?? 0));
+              return Math.max(minutos, 0);
+            }
+            if (typeof config.descansoMinimo === 'string') {
+              const [h, m] = config.descansoMinimo.split(':').map(Number);
+              return Math.max(h * 60 + (m ?? 0), 0);
+            }
+            return 0;
+          })();
+
+          if (
+            minutosDescansoConfig > 0 &&
+            eventosFaltantes.includes('pausa_fin') &&
+            !tiposEventos.includes('pausa_fin')
+          ) {
+            const ultimaPausaInicio = [...fichaje.eventos]
+              .filter((e) => e.tipo === 'pausa_inicio')
+              .sort((a, b) => new Date(a.hora).getTime() - new Date(b.hora).getTime())
+              .pop();
+
+            if (ultimaPausaInicio) {
+              const existeFinPosterior = fichaje.eventos.some(
+                (ev) =>
+                  ev.tipo === 'pausa_fin' &&
+                  new Date(ev.hora).getTime() > new Date(ultimaPausaInicio.hora).getTime()
+              );
+
+              if (!existeFinPosterior) {
+                const horaFin = new Date(new Date(ultimaPausaInicio.hora).getTime() + minutosDescansoConfig * 60 * 1000);
+                await tx.fichajeEvento.create({
+                  data: {
+                    fichajeId,
+                    tipo: 'pausa_fin',
+                    hora: horaFin,
+                  },
+                });
+                tiposEventos.push('pausa_fin');
+                eventosFaltantes = eventosRequeridos.filter((req) => !tiposEventos.includes(req));
+              }
+            }
+          }
 
           // Si no faltan eventos, solo cerrar
           if (eventosFaltantes.length === 0) {
