@@ -178,14 +178,29 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
     return Math.round(horasTotales * 100) / 100;
   }, []);
 
+  const obtenerFechaReferencia = useCallback((fichaje: Fichaje): Date => {
+    const primerEvento = fichaje.eventos?.[0];
+    if (primerEvento?.hora) {
+      const horaEvento =
+        typeof primerEvento.hora === 'string' ? new Date(primerEvento.hora) : primerEvento.hora;
+      return toMadridDate(horaEvento);
+    }
+
+    return toMadridDate(fichaje.fecha);
+  }, []);
+
   const agruparPorJornada = useCallback((fichajes: Fichaje[]): JornadaDia[] => {
     const grupos: Record<string, Fichaje[]> = {};
 
     fichajes.forEach(f => {
-      if (!grupos[f.fecha]) {
-        grupos[f.fecha] = [];
+      // Normalizar fecha a string YYYY-MM-DD para usar como key
+      const fechaReferencia = obtenerFechaReferencia(f);
+      const fechaKey = format(fechaReferencia, 'yyyy-MM-dd');
+      
+      if (!grupos[fechaKey]) {
+        grupos[fechaKey] = [];
       }
-      grupos[f.fecha].push(f);
+      grupos[fechaKey].push(f);
     });
 
     return Object.entries(grupos).map(([fecha, fichajesDelDia]) => {
@@ -233,12 +248,15 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
           : Math.round((horasTrabajadas - horasEsperadas) * 100) / 100;
       })();
 
+      // Convertir fecha string a Date usando toMadridDate para evitar desfases de zona horaria
+      const fechaDate = toMadridDate(fecha);
+      
       return {
         empleadoId: fichaje.empleado.id,
         empleadoNombre: `${fichaje.empleado.nombre} ${fichaje.empleado.apellidos}`,
         equipoId: fichaje.empleado.equipoId ?? null,
         equipoNombre: fichaje.empleado.equipo?.nombre ?? null,
-        fecha: new Date(fecha),
+        fecha: fechaDate,
         fichaje,
         horasTrabajadas,
         horasEsperadas,
@@ -247,7 +265,7 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
         balance,
       };
     }).sort((a, b) => b.fecha.getTime() - a.fecha.getTime());
-  }, [calcularHorasTrabajadas]);
+  }, [calcularHorasTrabajadas, obtenerFechaReferencia]);
 
   // Listener para refrescar en tiempo real
   useEffect(() => {
@@ -658,6 +676,7 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
         <>
           <div className="flex items-center justify-between mb-6">
             <h1 className="text-2xl font-semibold text-gray-900">Fichajes</h1>
+            <span className="text-xs text-gray-400">debug marker 00:45</span>
             <div className="flex gap-2">
               <Button variant="outline" onClick={() => setJornadasModal(true)} className="border-gray-200">
                 <Clock className="w-4 h-4 mr-2" />
