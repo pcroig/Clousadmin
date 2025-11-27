@@ -154,7 +154,11 @@ export async function GET(req: NextRequest) {
     if (equipoId && equipoId !== 'todos') {
       andFilters.push({
         empleado: {
-          equipoId,
+          equipos: {
+            some: {
+              equipoId,
+            },
+          },
         },
       });
     }
@@ -185,12 +189,16 @@ export async function GET(req: NextRequest) {
               nombre: true,
               apellidos: true,
               puesto: true,
-              equipoId: true,
-              equipo: {
+              equipos: {
                 select: {
-                  id: true,
-                  nombre: true,
+                  equipo: {
+                    select: {
+                      id: true,
+                      nombre: true,
+                    },
+                  },
                 },
+                take: 1,
               },
             },
           },
@@ -224,6 +232,21 @@ export async function GET(req: NextRequest) {
     );
 
     const fichajesConBalance = fichajes.map((fichaje) => {
+      const equipoAsignado = fichaje.empleado.equipos?.[0]?.equipo ?? null;
+      const empleado = {
+        id: fichaje.empleado.id,
+        nombre: fichaje.empleado.nombre,
+        apellidos: fichaje.empleado.apellidos,
+        puesto: fichaje.empleado.puesto,
+        equipoId: equipoAsignado?.id ?? null,
+        equipo: equipoAsignado
+          ? {
+              id: equipoAsignado.id,
+              nombre: equipoAsignado.nombre,
+            }
+          : null,
+      };
+
       const fechaBase = new Date(fichaje.fecha.getFullYear(), fichaje.fecha.getMonth(), fichaje.fecha.getDate());
       const key = `${fichaje.empleadoId}_${fechaBase.toISOString().split('T')[0]}`;
 
@@ -242,8 +265,11 @@ export async function GET(req: NextRequest) {
 
       const balance = Math.round((horasTrabajadas - horasEsperadas) * 100) / 100;
 
+      const { empleado: _empleado, ...restoFichaje } = fichaje;
+
       return {
-        ...fichaje,
+        ...restoFichaje,
+        empleado,
         horasTrabajadas,
         horasEnPausa,
         horasEsperadas,
