@@ -3,10 +3,10 @@
  * Flujo completo de solicitud y aprobación
  */
 
-import { expect, test } from '@playwright/test';
+import { expect, type Page, test } from '@playwright/test';
 
 // Helpers de login
-async function loginAsEmpleado(page: any) {
+async function loginAsEmpleado(page: Page) {
   await page.goto('/login');
   await page.getByLabel(/email/i).fill('ana.garcia@clousadmin.com');
   await page.getByLabel(/contraseña|password/i).fill('Empleado123!');
@@ -14,7 +14,7 @@ async function loginAsEmpleado(page: any) {
   await expect(page).toHaveURL(/\/(dashboard|empleado)/, { timeout: 10000 });
 }
 
-async function loginAsManager(page: any) {
+async function loginAsManager(page: Page) {
   // Usar credenciales de manager si existen, sino HR admin
   await page.goto('/login');
   await page.getByLabel(/email/i).fill('admin@clousadmin.com');

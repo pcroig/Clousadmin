@@ -107,9 +107,9 @@ export function RevisionModal({ open, onClose, onReviewed, onEditFichaje: _onEdi
       const response = await fetch('/api/fichajes/revision');
       
       if (response.ok) {
-        const data = await response.json() as Record<string, any>;
-        const fichajes: FichajeRevision[] = data.fichajes || [];
-        
+        const data = await response.json() as Record<string, unknown>;
+        const fichajes: FichajeRevision[] = Array.isArray(data.fichajes) ? data.fichajes as FichajeRevision[] : [];
+
         setFichajesRevision(fichajes);
         
         const estadoInicial: Record<string, boolean> = {};
@@ -174,16 +174,18 @@ export function RevisionModal({ open, onClose, onReviewed, onEditFichaje: _onEdi
       });
 
       if (response.ok) {
-        const resultado = await response.json() as Record<string, any>;
+        const resultado = await response.json() as Record<string, unknown>;
+        const cuadrados = typeof resultado.cuadrados === 'number' ? resultado.cuadrados : 0;
+        const errores = Array.isArray(resultado.errores) ? resultado.errores : [];
         toast.success(
-          `Fichajes cuadrados: ${resultado.cuadrados}` +
-            (resultado.errores?.length ? `. Con incidencias: ${resultado.errores.length}` : '')
+          `Fichajes cuadrados: ${cuadrados}` +
+            (errores.length ? `. Con incidencias: ${errores.length}` : '')
         );
         onReviewed();
         onClose();
       } else {
-        const error = await response.json() as Record<string, any>;
-        toast.error(error.error || 'Error al actualizar fichajes');
+        const error = await response.json() as Record<string, unknown>;
+        toast.error(typeof error.error === 'string' ? error.error : 'Error al actualizar fichajes');
       }
     } catch (error) {
       console.error('Error actualizando fichajes:', error);

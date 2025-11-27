@@ -3,6 +3,8 @@
  * Se ejecuta una vez antes de todos los tests
  */
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 import path from 'path';
 
 import { config } from 'dotenv';

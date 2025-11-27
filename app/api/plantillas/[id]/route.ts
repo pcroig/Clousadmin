@@ -86,7 +86,7 @@ export async function PATCH(
     }
 
     const { id } = await params;
-    const body = await request.json() as Record<string, any>;
+    const body = await request.json() as Record<string, unknown>;
 
     // Verificar que la plantilla existe y pertenece a su empresa
     const plantillaExistente = await prisma.plantillaDocumento.findUnique({
@@ -126,26 +126,25 @@ export async function PATCH(
         ? undefined
         : (carpetaDestinoDefault?.toString().trim() || 'Otros');
 
+    const updateData: Record<string, unknown> = {};
+    if (nombre) updateData.nombre = nombre;
+    if (descripcion !== undefined) updateData.descripcion = descripcion;
+    if (categoria !== undefined) updateData.categoria = categoria;
+    if (activa !== undefined) updateData.activa = activa;
+    if (carpetaDestinoSanitizada !== undefined) updateData.carpetaDestinoDefault = carpetaDestinoSanitizada;
+    if (requiereFirma !== undefined) updateData.requiereFirma = requiereFirma;
+    if (configuracionIA !== undefined) {
+      updateData.configuracionIA = asJsonValue({
+        ...(typeof plantillaExistente.configuracionIA === 'object' && plantillaExistente.configuracionIA !== null
+          ? (plantillaExistente.configuracionIA as Record<string, unknown>)
+          : {}),
+        ...configuracionIA,
+      });
+    }
+
     const plantillaActualizada = await prisma.plantillaDocumento.update({
       where: { id },
-      data: {
-        ...(nombre && { nombre }),
-        ...(descripcion !== undefined && { descripcion }),
-        ...(categoria !== undefined && { categoria }),
-        ...(activa !== undefined && { activa }),
-        ...(carpetaDestinoSanitizada !== undefined && {
-          carpetaDestinoDefault: carpetaDestinoSanitizada,
-        }),
-        ...(requiereFirma !== undefined && { requiereFirma }),
-        ...(configuracionIA !== undefined && { 
-          configuracionIA: asJsonValue({
-            ...(typeof plantillaExistente.configuracionIA === 'object' && plantillaExistente.configuracionIA !== null 
-              ? (plantillaExistente.configuracionIA as Record<string, unknown>)
-              : {}),
-            ...configuracionIA,
-          }),
-        }),
-      },
+      data: updateData,
     });
 
     return NextResponse.json({

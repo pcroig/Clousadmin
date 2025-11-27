@@ -7,12 +7,15 @@ import { cachedQuery, CacheDurations } from '@/lib/cache';
 import { EstadoAusencia } from '@/lib/constants/enums';
 import { prisma } from '@/lib/prisma';
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AsyncFn = (...args: any[]) => Promise<any>;
+
 /**
  * Obtener solicitudes pendientes de ausencias
  * Cache: 30 segundos (dashboard data)
  */
 export const getSolicitudesAusenciasPendientes = cachedQuery(
-  async (empresaId: string) => {
+  (async (empresaId: string) => {
     return await prisma.ausencia.findMany({
       where: {
         empresaId,
@@ -32,7 +35,7 @@ export const getSolicitudesAusenciasPendientes = cachedQuery(
       },
       take: 5,
     });
-  },
+  }) as AsyncFn,
   ['solicitudes-ausencias-pendientes'],
   {
     revalidate: CacheDurations.DASHBOARD,
@@ -45,7 +48,7 @@ export const getSolicitudesAusenciasPendientes = cachedQuery(
  * Cache: 30 segundos (dashboard data)
  */
 export const getSolicitudesCambioPendientes = cachedQuery(
-  async (empresaId: string) => {
+  (async (empresaId: string) => {
     return await prisma.solicitudCambio.findMany({
       where: {
         empresaId,
@@ -65,7 +68,7 @@ export const getSolicitudesCambioPendientes = cachedQuery(
       },
       take: 5,
     });
-  },
+  }) as AsyncFn,
   ['solicitudes-cambio-pendientes'],
   {
     revalidate: CacheDurations.DASHBOARD,
@@ -78,7 +81,7 @@ export const getSolicitudesCambioPendientes = cachedQuery(
  * Cache: 30 segundos (notificaciones pueden esperar un poco)
  */
 export const getNotificacionesUsuario = cachedQuery(
-  async (empresaId: string, usuarioId: string) => {
+  (async (empresaId: string, usuarioId: string) => {
     return await prisma.notificacion.findMany({
       where: {
         empresaId,
@@ -89,7 +92,7 @@ export const getNotificacionesUsuario = cachedQuery(
       },
       take: 10,
     });
-  },
+  }) as AsyncFn,
   ['notificaciones-usuario'],
   {
     revalidate: CacheDurations.DASHBOARD,
@@ -102,7 +105,7 @@ export const getNotificacionesUsuario = cachedQuery(
  * Cache: 5 minutos (data histórica, no cambia frecuentemente)
  */
 export const getAutoCompletadosStats = cachedQuery(
-  async (empresaId: string) => {
+  (async (empresaId: string) => {
     const [fichajes, ausencias, solicitudes] = await Promise.all([
       prisma.autoCompletado.count({
         where: {
@@ -132,7 +135,7 @@ export const getAutoCompletadosStats = cachedQuery(
       ausenciasCompletadas: ausencias,
       solicitudesCompletadas: solicitudes,
     };
-  },
+  }) as AsyncFn,
   ['auto-completados-stats'],
   {
     revalidate: CacheDurations.LISTINGS,
@@ -145,7 +148,7 @@ export const getAutoCompletadosStats = cachedQuery(
  * Cache: 30 segundos (dashboard data)
  */
 export const getFichajesRecientes = cachedQuery(
-  async (empleadoId: string) => {
+  (async (empleadoId: string) => {
     const fichajesRaw = await prisma.fichaje.findMany({
       where: {
         empleadoId,
@@ -169,7 +172,7 @@ export const getFichajesRecientes = cachedQuery(
       horasTrabajadas: f.horasTrabajadas != null ? Number(f.horasTrabajadas) : null,
       horasEnPausa: f.horasEnPausa != null ? Number(f.horasEnPausa) : null,
     }));
-  },
+  }) as AsyncFn,
   ['fichajes-recientes'],
   {
     revalidate: CacheDurations.DASHBOARD,
@@ -182,7 +185,7 @@ export const getFichajesRecientes = cachedQuery(
  * Cache: 30 segundos (dashboard data)
  */
 export const getAusenciasRecientes = cachedQuery(
-  async (empleadoId: string) => {
+  (async (empleadoId: string) => {
     const ausenciasRaw = await prisma.ausencia.findMany({
       where: {
         empleadoId,
@@ -197,7 +200,7 @@ export const getAusenciasRecientes = cachedQuery(
       ...a,
       diasSolicitados: a.diasSolicitados != null ? Number(a.diasSolicitados) : 0,
     }));
-  },
+  }) as AsyncFn,
   ['ausencias-recientes'],
   {
     revalidate: CacheDurations.DASHBOARD,

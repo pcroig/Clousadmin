@@ -3,6 +3,8 @@
  * Evita llamadas reales y cargos a tarjetas
  */
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 import { vi } from 'vitest';
 
 // ========================================

@@ -41,7 +41,8 @@ export const CacheDurations = {
  * );
  * ```
  */
-type AsyncFn = (...args: any[]) => Promise<unknown>;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AsyncFn = (...args: any[]) => Promise<any>;
 
 export function cachedQuery<TFunc extends AsyncFn>(
   fn: TFunc,

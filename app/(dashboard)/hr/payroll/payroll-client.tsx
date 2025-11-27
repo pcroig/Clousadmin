@@ -235,16 +235,19 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
         }),
       });
 
-      const data = await parseJson<Record<string, any>>(response).catch(() => null);
+      const data = await parseJson<Record<string, unknown>>(response).catch(() => null);
 
       if (!response.ok || !data) {
-        throw new Error(data?.error || 'Error al generar evento');
+        throw new Error(typeof data?.error === 'string' ? data.error : 'Error al generar evento');
       }
 
-      if (data.evento?.id) {
+      const evento = data.evento as Record<string, unknown> | undefined;
+      const eventoId = evento && typeof evento.id === 'string' ? evento.id : undefined;
+
+      if (eventoId) {
         if (abrirCompensarTrasCreacion) {
           setEventoCompensarContext({
-            eventoId: data.evento.id,
+            eventoId: eventoId,
             mes: mesActual,
             anio: anioActual,
           });
@@ -252,18 +255,19 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
         }
 
         if (abrirValidarTrasCreacion) {
-          setEventoIdParaValidar(data.evento.id);
+          setEventoIdParaValidar(eventoId);
           setShowValidarComplementosDialog(true);
         }
       }
 
+      const nominasGeneradas = typeof data.nominasGeneradas === 'number' ? data.nominasGeneradas : 0;
       toast.success('Evento generado correctamente', {
-        description: `${data.nominasGeneradas ?? 0} pre-nómina(s) creadas`,
+        description: `${nominasGeneradas} pre-nómina(s) creadas`,
       });
 
       setShowCreateEventDialog(false);
-      if (data.evento?.id) {
-        setSelectedEventoId(data.evento.id);
+      if (eventoId) {
+        setSelectedEventoId(eventoId);
         setSelectedNominaId(null);
       }
       fetchEventos();
@@ -287,17 +291,18 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
         }
       );
 
-      const data = await parseJson<Record<string, any>>(response).catch(() => null);
+      const data = await parseJson<Record<string, unknown>>(response).catch(() => null);
 
       if (!response.ok || !data) {
-        throw new Error(data?.error || 'Error al generar pre-nóminas');
+        throw new Error(typeof data?.error === 'string' ? data.error : 'Error al generar pre-nóminas');
       }
 
-      const nuevasPrenominas = data.resultado?.prenominasCreadas ?? 0;
+      const resultado = data.resultado as Record<string, unknown> | undefined;
+      const prenominasCreadas = resultado && typeof resultado.prenominasCreadas === 'number' ? resultado.prenominasCreadas : 0;
       toast.success('Pre-nóminas generadas correctamente', {
         description:
-          nuevasPrenominas > 0
-            ? `${nuevasPrenominas} pre-nómina(s) creadas`
+          prenominasCreadas > 0
+            ? `${prenominasCreadas} pre-nómina(s) creadas`
             : 'Se sincronizaron las pre-nóminas existentes',
       });
 
@@ -388,23 +393,28 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
         });
 
         const data =
-          (await parseJson<Record<string, any>>(response).catch(() => undefined)) ?? {};
+          (await parseJson<Record<string, unknown>>(response).catch(() => undefined)) ?? {};
 
         if (!response.ok) {
-          throw new Error(data.error || 'Error al importar');
+          throw new Error(typeof data.error === 'string' ? data.error : 'Error al importar');
         }
 
+        const errores = typeof data.errores === 'number' ? data.errores : 0;
+        const importadas = typeof data.importadas === 'number' ? data.importadas : 0;
+        const eventoCompleto = typeof data.eventoCompleto === 'boolean' ? data.eventoCompleto : false;
+        const faltantes = typeof data.faltantes === 'number' ? data.faltantes : 0;
+
         // Mostrar sonner/toast con la información de importación
-        if (data.errores > 0) {
-          toast.warning(`${data.importadas} nóminas importadas`, {
-            description: `${data.errores} archivo(s) con errores. Revisa los detalles.`,
+        if (errores > 0) {
+          toast.warning(`${importadas} nóminas importadas`, {
+            description: `${errores} archivo(s) con errores. Revisa los detalles.`,
             duration: 5000,
           });
         } else {
-        toast.success(`${data.importadas} nóminas importadas correctamente`, {
-            description: data.eventoCompleto 
+        toast.success(`${importadas} nóminas importadas correctamente`, {
+            description: eventoCompleto
               ? 'Todas las nóminas han sido importadas. Ya puedes publicarlas.'
-              : `${data.importadas} de ${data.importadas + (data.faltantes || 0)} nóminas importadas.`,
+              : `${importadas} de ${importadas + faltantes} nóminas importadas.`,
             duration: 5000,
         });
         }
@@ -450,14 +460,17 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
       });
 
       const data =
-        (await parseJson<Record<string, any>>(response).catch(() => undefined)) ?? {};
+        (await parseJson<Record<string, unknown>>(response).catch(() => undefined)) ?? {};
 
       if (!response.ok) {
-        throw new Error(data.error || 'Error al publicar');
+        throw new Error(typeof data.error === 'string' ? data.error : 'Error al publicar');
       }
 
-      toast.success(`${data.nominasPublicadas} nóminas publicadas`, {
-        description: `${data.empleadosNotificados} empleados notificados`,
+      const nominasPublicadas = typeof data.nominasPublicadas === 'number' ? data.nominasPublicadas : 0;
+      const empleadosNotificados = typeof data.empleadosNotificados === 'number' ? data.empleadosNotificados : 0;
+
+      toast.success(`${nominasPublicadas} nóminas publicadas`, {
+        description: `${empleadosNotificados} empleados notificados`,
       });
 
       fetchEventos();
@@ -1348,15 +1361,18 @@ function EventoDetailsPanel({
       if (!response.ok) {
         throw new Error('Error al cargar evento');
       }
-      const data = await parseJson<Record<string, any>>(response).catch(() => null);
+      const data = await parseJson<Record<string, unknown>>(response).catch(() => null);
       if (!data) {
         throw new Error('Respuesta inválida del servidor');
       }
       // El endpoint devuelve { evento, stats }
-      const eventoData = data.evento || data;
+      const eventoData = (data.evento || data) as Record<string, unknown>;
       // Calcular alertas agregadas desde las nóminas si no vienen en el formato esperado
-      if (eventoData.nominas && !eventoData.alertas) {
-        const alertas = eventoData.nominas.flatMap((n: Nomina) => n.alertas || []) as AlertaNomina[];
+      if (Array.isArray(eventoData.nominas) && !eventoData.alertas) {
+        const alertas = eventoData.nominas.flatMap((n: unknown) => {
+          const nomina = n as Nomina;
+          return nomina.alertas || [];
+        }) as AlertaNomina[];
         eventoData.alertas = {
           criticas: alertas.filter((a) => a.tipo === 'critico').length,
           advertencias: alertas.filter((a) => a.tipo === 'advertencia').length,
@@ -1364,7 +1380,7 @@ function EventoDetailsPanel({
           total: alertas.length,
         };
       }
-      setEvento(eventoData);
+      setEvento(eventoData as unknown as EventoNomina);
     } catch (error) {
       console.error('Error fetching evento:', error);
     } finally {

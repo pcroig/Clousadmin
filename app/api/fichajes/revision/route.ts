@@ -215,7 +215,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const body = await request.json() as Record<string, any>;
+    const body = await request.json() as Record<string, unknown>;
     const validation = revisionSchema.safeParse(body);
 
     if (!validation.success) {

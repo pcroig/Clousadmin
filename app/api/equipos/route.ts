@@ -70,10 +70,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
 
-    const body = await request.json() as Record<string, any>;
+    const body = await request.json() as Record<string, unknown>;
     const { nombre, descripcion, sedeId } = body;
 
-    if (!nombre || nombre.trim() === '') {
+    if (!nombre || typeof nombre !== 'string' || nombre.trim() === '') {
       return NextResponse.json({ error: 'El nombre es requerido' }, { status: 400 });
     }
 
@@ -92,12 +92,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const descripcionStr = typeof descripcion === 'string' ? descripcion : undefined;
+    const sedeIdStr = typeof sedeId === 'string' ? sedeId : null;
+
     const equipo = await prisma.equipo.create({
       data: {
         empresaId: session.user.empresaId,
         nombre: nombre.trim(),
-        descripcion: descripcion?.trim() || null,
-        sedeId: sedeId || null,
+        descripcion: descripcionStr?.trim() || null,
+        sedeId: sedeIdStr,
       },
       include: {
         manager: {

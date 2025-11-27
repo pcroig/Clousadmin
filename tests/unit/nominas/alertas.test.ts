@@ -3,6 +3,8 @@
  * Valida detección de datos faltantes y anomalías
  */
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 import { describe, expect, it } from 'vitest';
 
 describe('Sistema de Alertas de Nóminas', () => {

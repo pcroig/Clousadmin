@@ -9,19 +9,19 @@ export default function ApiDocsPage() {
     script.src = 'https://unpkg.com/swagger-ui-dist@5.10.0/swagger-ui-bundle.js';
     script.async = true;
     script.onload = () => {
-      // @ts-expect-error
+      // @ts-expect-error - SwaggerUIBundle is loaded from CDN
       window.SwaggerUIBundle({
         url: '/openapi.yaml',
         dom_id: '#swagger-ui',
         deepLinking: true,
         presets: [
-          // @ts-expect-error
+          // @ts-expect-error - SwaggerUIBundle presets loaded from CDN
           window.SwaggerUIBundle.presets.apis,
-          // @ts-expect-error
+          // @ts-expect-error - SwaggerUIStandalonePreset loaded from CDN
           window.SwaggerUIStandalonePreset
         ],
         plugins: [
-          // @ts-expect-error
+          // @ts-expect-error - SwaggerUIBundle plugins loaded from CDN
           window.SwaggerUIBundle.plugins.DownloadUrl
         ],
         layout: 'StandaloneLayout',

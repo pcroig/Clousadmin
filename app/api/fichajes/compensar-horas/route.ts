@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
     if (authResult instanceof Response) return authResult;
     const { session } = authResult;
 
-    const body = await request.json() as Record<string, any>;
+    const body = await request.json() as Record<string, unknown>;
     const data = CompensarHorasSchema.parse(body);
 
     const empleados = await prisma.empleado.findMany({

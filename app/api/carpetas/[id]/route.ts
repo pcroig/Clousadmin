@@ -164,7 +164,7 @@ export async function PATCH(
     }
 
     const { id } = await params;
-    const body = await request.json() as Record<string, any>;
+    const body = await request.json() as Record<string, unknown>;
     const { compartida, asignadoA } = body;
 
     // Buscar carpeta
@@ -196,7 +196,7 @@ export async function PATCH(
     const dataToUpdate: Prisma.CarpetaUpdateInput = {};
 
     if (compartida !== undefined) {
-      dataToUpdate.compartida = compartida;
+      dataToUpdate.compartida = compartida as boolean;
     }
 
     if (asignadoA !== undefined) {

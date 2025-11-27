@@ -105,7 +105,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const body = await request.json() as Record<string, any>;
+    const body = await request.json() as Record<string, unknown>;
 
     // Validaciones
     if (!body.documentoId) {
@@ -179,10 +179,14 @@ export async function POST(request: NextRequest) {
     }
 
     let posicionFirma: CrearSolicitudFirmaInput['posicionFirma'];
-    if (body.posicionFirma) {
-      const { pagina, x, y } = body.posicionFirma;
+    if (body.posicionFirma && typeof body.posicionFirma === 'object' && body.posicionFirma !== null) {
+      const pos = body.posicionFirma as Record<string, unknown>;
+      const pagina = typeof pos.pagina === 'number' ? pos.pagina : 0;
+      const x = typeof pos.x === 'number' ? pos.x : 0;
+      const y = typeof pos.y === 'number' ? pos.y : 0;
+
       const valoresSonNumeros =
-        typeof pagina === 'number' && typeof x === 'number' && typeof y === 'number';
+        typeof pos.pagina === 'number' && typeof pos.x === 'number' && typeof pos.y === 'number';
       if (!valoresSonNumeros || Number.isNaN(pagina) || Number.isNaN(x) || Number.isNaN(y)) {
         return NextResponse.json(
           { error: 'La posicionFirma debe incluir pagina, x e y numéricos' },
@@ -216,16 +220,23 @@ export async function POST(request: NextRequest) {
     }
 
     // Crear input para db-helper
+    const documentoId = typeof body.documentoId === 'string' ? body.documentoId : '';
+    const titulo = typeof body.titulo === 'string' ? body.titulo : '';
+    const mensaje = typeof body.mensaje === 'string' ? body.mensaje : undefined;
+    const ordenFirma = typeof body.ordenFirma === 'boolean' ? body.ordenFirma : false;
+    const recordatorioAutomatico = typeof body.recordatorioAutomatico === 'boolean' ? body.recordatorioAutomatico : true;
+    const diasRecordatorio = typeof body.diasRecordatorio === 'number' ? body.diasRecordatorio : 3;
+
     const input: CrearSolicitudFirmaInput = {
-      documentoId: body.documentoId,
+      documentoId,
       empresaId: session.user.empresaId,
-      titulo: body.titulo,
-      mensaje: body.mensaje,
+      titulo,
+      mensaje,
       firmantes: sanitizedFirmantes,
-      ordenFirma: body.ordenFirma ?? false,
+      ordenFirma,
       proveedor: 'interno', // Fase 1 solo interno
-      recordatorioAutomatico: body.recordatorioAutomatico ?? true,
-      diasRecordatorio: body.diasRecordatorio ?? 3,
+      recordatorioAutomatico,
+      diasRecordatorio,
       creadoPor: session.user.email || session.user.id,
       posicionFirma,
     };

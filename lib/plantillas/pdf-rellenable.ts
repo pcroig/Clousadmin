@@ -5,7 +5,7 @@
 
 import { PDFCheckBox, PDFDocument, PDFDropdown, PDFTextField } from 'pdf-lib';
 
-import { callFeatureAI, MessageRole } from '@/lib/ia';
+import { callFeatureAI, MessageRole, ContentType } from '@/lib/ia';
 import { deleteOpenAIFile, uploadPDFToOpenAI } from '@/lib/ia/core/providers/openai';
 import {
   crearNotificacionDocumentoGeneradoEmpleado,
@@ -218,8 +218,8 @@ NOTA: Este PDF tiene ${pageCount} páginas. Analiza especialmente la primera pá
       {
         role: MessageRole.USER,
         content: [
-          { type: 'text', text: prompt },
-          { type: 'image_url', image_url: { url: openaiFileId, detail: 'high' } },
+          { type: ContentType.TEXT, text: prompt },
+          { type: ContentType.IMAGE_URL, image_url: { url: openaiFileId, detail: 'high' } },
         ],
       },
     ];

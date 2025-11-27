@@ -3,6 +3,8 @@
  * PRIORIDAD: CRÍTICA (obligatorio legal en España)
  */
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { TipoFichajeEvento } from '@/lib/constants/enums';

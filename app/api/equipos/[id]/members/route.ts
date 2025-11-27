@@ -26,7 +26,7 @@ export async function POST(request: NextRequest, context: RouteParams) {
     }
 
     const { id: equipoId } = params;
-    const body = await request.json() as Record<string, any>;
+    const body = await request.json() as Record<string, unknown>;
     const { empleadoId } = body;
 
     if (!empleadoId) {
@@ -58,10 +58,11 @@ export async function POST(request: NextRequest, context: RouteParams) {
     }
 
     // Check if already a member
+    const empleadoIdStr = typeof empleadoId === 'string' ? empleadoId : '';
     const existingMember = await prisma.empleadoEquipo.findUnique({
       where: {
         empleadoId_equipoId: {
-          empleadoId,
+          empleadoId: empleadoIdStr,
           equipoId,
         },
       },
@@ -77,7 +78,7 @@ export async function POST(request: NextRequest, context: RouteParams) {
     // Add member
     await prisma.empleadoEquipo.create({
       data: {
-        empleadoId,
+        empleadoId: empleadoIdStr,
         equipoId,
       },
     });

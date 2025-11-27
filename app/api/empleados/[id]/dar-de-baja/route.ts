@@ -41,7 +41,7 @@ export async function POST(
     const { id: empleadoId } = await params;
 
     // Parsear y validar request body
-    const body = await request.json() as Record<string, any>;
+    const body = await request.json() as Record<string, unknown>;
     const validation = darDeBajaSchema.safeParse(body);
     
     if (!validation.success) {

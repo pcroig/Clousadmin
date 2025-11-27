@@ -86,7 +86,7 @@ export async function POST(request: NextRequest) {
     if (authResult instanceof Response) return authResult;
     const { session } = authResult;
 
-    const body = await request.json() as Record<string, any>;
+    const body = await request.json() as Record<string, unknown>;
     const equipoIdsInput = Array.isArray(body.equipoIds)
       ? body.equipoIds.filter(
           (value): value is string => typeof value === 'string' && value.trim().length > 0
@@ -171,17 +171,17 @@ export async function POST(request: NextRequest) {
           nombre,
           apellidos,
           empresaId: session.user.empresaId,
-          activo: body.activo !== undefined ? body.activo : true,
+          activo: typeof body.activo === 'boolean' ? body.activo : true,
         },
       });
 
       // Preparar datos del empleado
       const salarioBrutoAnual =
-        body.salarioBrutoAnual !== undefined && body.salarioBrutoAnual !== null
+        body.salarioBrutoAnual !== undefined && body.salarioBrutoAnual !== null && typeof body.salarioBrutoAnual === 'number'
           ? new Prisma.Decimal(body.salarioBrutoAnual)
           : null;
       const salarioBrutoMensual =
-        body.salarioBrutoMensual !== undefined && body.salarioBrutoMensual !== null
+        body.salarioBrutoMensual !== undefined && body.salarioBrutoMensual !== null && typeof body.salarioBrutoMensual === 'number'
           ? new Prisma.Decimal(body.salarioBrutoMensual)
           : null;
 
@@ -193,7 +193,7 @@ export async function POST(request: NextRequest) {
         email,
         nif: sanitizeNif(body.nif),
         nss: sanitizeOptionalString(body.nss),
-        fechaNacimiento: body.fechaNacimiento ? new Date(body.fechaNacimiento) : null,
+        fechaNacimiento: typeof body.fechaNacimiento === 'string' ? new Date(body.fechaNacimiento) : null,
         telefono: sanitizeOptionalString(body.telefono),
         direccionCalle: sanitizeOptionalString(body.direccionCalle),
         direccionNumero: sanitizeOptionalString(body.direccionNumero),
@@ -202,19 +202,19 @@ export async function POST(request: NextRequest) {
         ciudad: sanitizeOptionalString(body.ciudad),
         direccionProvincia: sanitizeOptionalString(body.direccionProvincia),
         estadoCivil: sanitizeOptionalString(body.estadoCivil),
-        numeroHijos: body.numeroHijos || 0,
+        numeroHijos: typeof body.numeroHijos === 'number' ? body.numeroHijos : 0,
         genero: sanitizeOptionalString(body.genero),
         iban: sanitizeOptionalString(body.iban),
         titularCuenta: sanitizeOptionalString(body.titularCuenta),
-        puestoId: body.puestoId || null,
+        puestoId: typeof body.puestoId === 'string' ? body.puestoId : null,
         jornadaId: jornadaPorDefecto.id, // Siempre tendrá una jornada (getOrCreateDefaultJornada garantiza que exista)
-        fechaAlta: body.fechaAlta ? new Date(body.fechaAlta) : new Date(),
-        tipoContrato: body.tipoContrato || 'indefinido',
+        fechaAlta: typeof body.fechaAlta === 'string' ? new Date(body.fechaAlta) : new Date(),
+        tipoContrato: typeof body.tipoContrato === 'string' ? body.tipoContrato : 'indefinido',
         salarioBrutoAnual,
         salarioBrutoMensual,
-        activo: body.activo !== undefined ? body.activo : true,
-        onboardingCompletado: body.onboardingCompletado || false,
-      };
+        activo: typeof body.activo === 'boolean' ? body.activo : true,
+        onboardingCompletado: typeof body.onboardingCompletado === 'boolean' ? body.onboardingCompletado : false,
+      } as const;
 
       // Encriptar datos sensibles antes de crear
       const datosEncriptados = encryptEmpleadoData({
@@ -229,7 +229,8 @@ export async function POST(request: NextRequest) {
 
       // Crear empleado con datos encriptados
       const empleado = await tx.empleado.create({
-        data: empleadoCreateData,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        data: empleadoCreateData as any,
       });
 
       // Garantizar vínculo bidireccional usuario <-> empleado

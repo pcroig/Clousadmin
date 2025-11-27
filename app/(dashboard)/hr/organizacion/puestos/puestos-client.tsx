@@ -68,7 +68,7 @@ export function PuestosClient({ puestos: initialPuestos }: PuestosClientProps) {
       if (!response.ok) {
         throw new Error('Error al cargar puestos');
       }
-      const data = await response.json() as Record<string, any>;
+      const data = await response.json() as Record<string, unknown>;
 
       // Transform data to match the expected format
       interface ApiPuesto {
@@ -96,7 +96,7 @@ export function PuestosClient({ puestos: initialPuestos }: PuestosClientProps) {
         }>;
       }
 
-      const apiData = data as ApiPuesto[];
+      const apiData = Array.isArray(data) ? data as unknown as ApiPuesto[] : [];
       const transformedData = apiData.map((puesto) => ({
         id: puesto.id,
         nombre: puesto.nombre,

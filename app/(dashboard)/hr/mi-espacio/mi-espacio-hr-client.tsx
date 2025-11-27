@@ -39,8 +39,8 @@ export function MiEspacioHRClient({ empleado, usuario }: MiEspacioHRClientProps)
       });
 
       if (!response.ok) {
-        const error = await response.json() as Record<string, any>;
-        throw new Error(error.error || 'Error al actualizar campo');
+        const error = await response.json() as Record<string, unknown>;
+        throw new Error(typeof error.error === 'string' ? error.error : 'Error al actualizar campo');
       }
 
       toast.success('Campo actualizado correctamente');

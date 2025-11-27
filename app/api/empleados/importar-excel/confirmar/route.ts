@@ -534,7 +534,7 @@ export async function POST(req: NextRequest) {
             const managersEncontradosPorNombre = await prisma.empleado.findMany({
               where: {
                 empresaId: session.user.empresaId,
-                OR: nombreConditions as any, // Type assertion necesaria por complejidad de tipos
+                OR: nombreConditions,
               },
               select: { id: true, nombre: true, apellidos: true },
             });

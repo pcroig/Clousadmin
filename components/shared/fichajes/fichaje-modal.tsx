@@ -343,11 +343,13 @@ export function FichajeModal({
         }
 
         const dataCrear = await parseJson<{ fichajeId?: string }>(resCrear);
-        fichajeId = dataCrear.fichajeId;
+        const nuevoFichajeId = typeof dataCrear.fichajeId === 'string' ? dataCrear.fichajeId : undefined;
 
-        if (!fichajeId) {
+        if (!nuevoFichajeId) {
           throw new Error('No se obtuvo el ID del fichaje creado');
         }
+
+        fichajeId = nuevoFichajeId;
       }
 
       // Añadir el resto de eventos (o todos si ya existía el fichaje)

@@ -6,7 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 import { getSession } from '@/lib/auth';
-import { agregarJobGeneracion } from '@/lib/plantillas';
+import { agregarJobGeneracion, type ConfiguracionGeneracion } from '@/lib/plantillas';
 import { prisma } from '@/lib/prisma';
 
 /**
@@ -28,7 +28,7 @@ export async function POST(
     // Await params en Next.js 15+
     const { id } = await params;
 
-    const body = await request.json() as Record<string, any>;
+    const body = await request.json() as Record<string, unknown>;
     const {
       empleadoIds,
       empleadosIds,
@@ -105,13 +105,13 @@ export async function POST(
     }
 
     // Configuración de generación
-    const configuracion = {
-      nombreDocumento,
-      carpetaDestino,
-      notificarEmpleado,
-      requiereFirma,
-      fechaLimiteFirma: fechaLimiteFirma ? new Date(fechaLimiteFirma) : undefined,
-      mensajeFirma,
+    const configuracion: ConfiguracionGeneracion = {
+      nombreDocumento: typeof nombreDocumento === 'string' ? nombreDocumento : undefined,
+      carpetaDestino: typeof carpetaDestino === 'string' ? carpetaDestino : undefined,
+      notificarEmpleado: typeof notificarEmpleado === 'boolean' ? notificarEmpleado : undefined,
+      requiereFirma: typeof requiereFirma === 'boolean' ? requiereFirma : undefined,
+      fechaLimiteFirma: fechaLimiteFirma ? new Date(fechaLimiteFirma as string) : undefined,
+      mensajeFirma: typeof mensajeFirma === 'string' ? mensajeFirma : undefined,
     };
 
     // Crear job en la cola

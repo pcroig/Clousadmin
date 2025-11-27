@@ -19,9 +19,8 @@ export interface CalendarioStepHandle {
   guardar: () => Promise<boolean>;
 }
 
-interface CalendarioStepProps {
-  // No props needed
-}
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
+interface CalendarioStepProps {}
 
 export const CalendarioStep = forwardRef<CalendarioStepHandle, CalendarioStepProps>(function CalendarioStep(_, ref) {
   const [diasLaborables, setDiasLaborables] = useState({

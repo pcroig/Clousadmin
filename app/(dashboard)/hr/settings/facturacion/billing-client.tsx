@@ -57,7 +57,7 @@ export function BillingClient({ subscription, products }: BillingClientProps) {
   const canceled = searchParams.get('canceled');
 
   if (success === 'true') {
-    toast.success('Suscripci\u00f3n activada correctamente');
+    toast.success('Suscripción activada correctamente');
   } else if (canceled === 'true') {
     toast.info('Has cancelado el proceso de pago');
   }
@@ -71,14 +71,15 @@ export function BillingClient({ subscription, products }: BillingClientProps) {
         body: JSON.stringify({ priceId }),
       });
 
-      const data = await response.json() as Record<string, any>;
+      const data = await response.json() as Record<string, unknown>;
 
       if (!response.ok) {
-        throw new Error(data.error || 'Error al crear la sesi\u00f3n de pago');
+        throw new Error(typeof data.error === 'string' ? data.error : 'Error al crear la sesión de pago');
       }
 
       // Redirigir a Stripe Checkout
-      window.location.href = data.url;
+      const url = typeof data.url === 'string' ? data.url : '/';
+      window.location.href = url;
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Error desconocido');
     } finally {
@@ -93,14 +94,15 @@ export function BillingClient({ subscription, products }: BillingClientProps) {
         method: 'POST',
       });
 
-      const data = await response.json() as Record<string, any>;
+      const data = await response.json() as Record<string, unknown>;
 
       if (!response.ok) {
-        throw new Error(data.error || 'Error al acceder al portal');
+        throw new Error(typeof data.error === 'string' ? data.error : 'Error al acceder al portal');
       }
 
       // Redirigir al portal de Stripe
-      window.location.href = data.url;
+      const url = typeof data.url === 'string' ? data.url : '/';
+      window.location.href = url;
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Error desconocido');
     } finally {
@@ -119,7 +121,7 @@ export function BillingClient({ subscription, products }: BillingClientProps) {
       case 'canceled':
         return <Badge variant="secondary">Cancelada</Badge>;
       default:
-        return <Badge variant="outline">Sin suscripci\u00f3n</Badge>;
+        return <Badge variant="outline">Sin suscripción</Badge>;
     }
   };
 
@@ -136,9 +138,9 @@ export function BillingClient({ subscription, products }: BillingClientProps) {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Facturaci\u00f3n</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Facturación</h1>
         <p className="text-muted-foreground">
-          Gestiona tu suscripci\u00f3n y m\u00e9todos de pago
+          Gestiona tu suscripción y métodos de pago
         </p>
       </div>
 
@@ -181,17 +183,17 @@ export function BillingClient({ subscription, products }: BillingClientProps) {
                 ) : (
                   <ExternalLink className="h-4 w-4 mr-2" />
                 )}
-                Gestionar facturaci\u00f3n
+                Gestionar facturación
               </Button>
             </div>
 
             {subscription.cancelAtPeriodEnd && (
               <Alert>
                 <AlertCircle className="h-4 w-4" />
-                <AlertTitle>Suscripci\u00f3n cancelada</AlertTitle>
+                <AlertTitle>Suscripción cancelada</AlertTitle>
                 <AlertDescription>
-                  Tu suscripci\u00f3n finalizar\u00e1 el {formatDate(subscription.currentPeriodEnd)}.
-                  Puedes reactivarla desde el portal de facturaci\u00f3n.
+                  Tu suscripción finalizará el {formatDate(subscription.currentPeriodEnd)}.
+                  Puedes reactivarla desde el portal de facturación.
                 </AlertDescription>
               </Alert>
             )}
@@ -199,7 +201,7 @@ export function BillingClient({ subscription, products }: BillingClientProps) {
             {!subscription.cancelAtPeriodEnd && subscription.currentPeriodEnd && (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Calendar className="h-4 w-4" />
-                <span>Pr\u00f3xima renovaci\u00f3n: {formatDate(subscription.currentPeriodEnd)}</span>
+                <span>Próxima renovación: {formatDate(subscription.currentPeriodEnd)}</span>
               </div>
             )}
 
@@ -222,7 +224,7 @@ export function BillingClient({ subscription, products }: BillingClientProps) {
       ) : (
         <Alert>
           <Sparkles className="h-4 w-4" />
-          <AlertTitle>Sin suscripci\u00f3n activa</AlertTitle>
+          <AlertTitle>Sin suscripción activa</AlertTitle>
           <AlertDescription>
             Elige un plan para desbloquear todas las funcionalidades de Clousadmin.
           </AlertDescription>
@@ -282,7 +284,7 @@ export function BillingClient({ subscription, products }: BillingClientProps) {
                         {price ? formatPrice(price.unitAmount, price.currency) : '-'}
                       </span>
                       <span className="text-muted-foreground">
-                        /{billingInterval === 'month' ? 'mes' : 'a\u00f1o'}
+                        /{billingInterval === 'month' ? 'mes' : 'año'}
                       </span>
                     </div>
                   </CardHeader>

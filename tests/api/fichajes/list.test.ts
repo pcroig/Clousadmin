@@ -3,6 +3,8 @@
  * Prueba permisos por rol y paginación
  */
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { GET } from '@/app/api/fichajes/route';

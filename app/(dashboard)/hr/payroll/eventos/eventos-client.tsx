@@ -56,8 +56,8 @@ export function EventosClient() {
   const fetchEventos = async () => {
     try {
       const response = await fetch('/api/nominas/eventos');
-      const data = await response.json() as Record<string, any>;
-      setEventos(data.eventos || []);
+      const data = await response.json() as Record<string, unknown>;
+      setEventos(Array.isArray(data.eventos) ? data.eventos as EventoNomina[] : []);
     } catch (error) {
       console.error('Error fetching eventos:', error);
       toast.error('Error al cargar eventos');
@@ -73,8 +73,8 @@ export function EventosClient() {
       const response = await fetch(`/api/nominas/eventos/${eventoId}/exportar`);
 
       if (!response.ok) {
-        const data = await response.json() as Record<string, any>;
-        throw new Error(data.error || 'Error al exportar');
+        const data = await response.json() as Record<string, unknown>;
+        throw new Error(typeof data.error === 'string' ? data.error : 'Error al exportar');
       }
 
       // Descargar el archivo Excel
@@ -129,18 +129,21 @@ export function EventosClient() {
           body: formData,
         });
 
-        const data = await response.json() as Record<string, any>;
+        const data = await response.json() as Record<string, unknown>;
 
         if (!response.ok) {
-          throw new Error(data.error || 'Error al importar');
+          throw new Error(typeof data.error === 'string' ? data.error : 'Error al importar');
         }
 
-        toast.success(`${data.importadas} nóminas importadas correctamente`, {
-          description: data.errores > 0 ? `${data.errores} archivos con errores` : undefined,
+        const importadas = typeof data.importadas === 'number' ? data.importadas : 0;
+        const errores = typeof data.errores === 'number' ? data.errores : 0;
+
+        toast.success(`${importadas} nóminas importadas correctamente`, {
+          description: errores > 0 ? `${errores} archivos con errores` : undefined,
         });
 
-        if (data.errores > 0) {
-          console.warn('Errores de importación:', data.errores);
+        if (errores > 0) {
+          console.warn('Errores de importación:', errores);
         }
 
         fetchEventos(); // Refrescar lista
@@ -167,14 +170,17 @@ export function EventosClient() {
         method: 'POST',
       });
 
-      const data = await response.json() as Record<string, any>;
+      const data = await response.json() as Record<string, unknown>;
 
       if (!response.ok) {
-        throw new Error(data.error || 'Error al publicar');
+        throw new Error(typeof data.error === 'string' ? data.error : 'Error al publicar');
       }
 
-      toast.success(`${data.nominasPublicadas} nóminas publicadas`, {
-        description: `${data.empleadosNotificados} empleados notificados`,
+      const nominasPublicadas = typeof data.nominasPublicadas === 'number' ? data.nominasPublicadas : 0;
+      const empleadosNotificados = typeof data.empleadosNotificados === 'number' ? data.empleadosNotificados : 0;
+
+      toast.success(`${nominasPublicadas} nóminas publicadas`, {
+        description: `${empleadosNotificados} empleados notificados`,
       });
 
       fetchEventos(); // Refrescar lista

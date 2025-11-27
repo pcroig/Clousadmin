@@ -194,7 +194,7 @@ export function EditarJornadaModal({ open, modo, jornada, onClose }: EditarJorna
     try {
       const response = await fetch('/api/empleados');
       if (response.ok) {
-        const data = await response.json() as Record<string, any>;
+        const data = await response.json() as Record<string, unknown>;
         setEmpleados(
           extractArrayFromResponse<{ id: string; nombre: string; apellidos: string }>(data, {
             key: 'empleados',
@@ -210,13 +210,17 @@ export function EditarJornadaModal({ open, modo, jornada, onClose }: EditarJorna
     try {
       const response = await fetch('/api/organizacion/equipos');
       if (response.ok) {
-        const data = await response.json() as Record<string, any>;
+        const data = await response.json() as Record<string, unknown>;
+        const equiposArray = Array.isArray(data) ? data : [];
         setEquipos(
-          (data || []).map((equipo: { id: string; nombre: string; _count?: { miembros?: number } }) => ({
-            id: equipo.id,
-            nombre: equipo.nombre,
-            miembros: equipo._count?.miembros ?? 0,
-          }))
+          equiposArray.map((equipo: unknown) => {
+            const e = equipo as { id: string; nombre: string; _count?: { miembros?: number } };
+            return {
+              id: e.id,
+              nombre: e.nombre,
+              miembros: e._count?.miembros ?? 0,
+            };
+          })
         );
       }
     } catch (error: unknown) {
@@ -275,7 +279,7 @@ export function EditarJornadaModal({ open, modo, jornada, onClose }: EditarJorna
 
       const response = await fetch(url);
       if (response.ok) {
-        const data = await response.json() as Record<string, any>;
+        const data = await response.json() as Record<string, unknown>;
         return data;
       }
       return null;
@@ -398,13 +402,14 @@ export function EditarJornadaModal({ open, modo, jornada, onClose }: EditarJorna
       });
 
       if (!response.ok) {
-        const error = await response.json() as Record<string, any>;
-        toast.error(error.error || `Error al ${modo === 'crear' ? 'crear' : 'actualizar'} jornada`);                                                            
+        const error = await response.json() as Record<string, unknown>;
+        toast.error(typeof error.error === 'string' ? error.error : `Error al ${modo === 'crear' ? 'crear' : 'actualizar'} jornada`);
         setCargando(false);
         return;
       }
 
-      const jornadaGuardada = await response.json() as Record<string, any>;
+      const jornadaGuardada = await response.json() as Record<string, unknown>;
+      const jornadaId = typeof jornadaGuardada.id === 'string' ? jornadaGuardada.id : '';
 
       // Verificar si hay asignación y si hay jornadas previas
       const debeAsignar = (nivelAsignacion === 'individual' && empleadosSeleccionados.length > 0) ||
@@ -413,22 +418,22 @@ export function EditarJornadaModal({ open, modo, jornada, onClose }: EditarJorna
 
       if (debeAsignar) {
         // Verificar jornadas previas antes de asignar
-        const previasInfo = await verificarJornadasPrevias(jornadaGuardada.id);
-        
-        if (previasInfo?.tieneJornadasPrevias && previasInfo.jornadas.length > 0) {
+        const previasInfo = await verificarJornadasPrevias(jornadaId);
+
+        if (previasInfo?.tieneJornadasPrevias && Array.isArray(previasInfo.jornadas) && previasInfo.jornadas.length > 0) {
           // Mostrar alerta de confirmación
           setJornadasPreviasInfo({
             tieneJornadas: true,
-            jornadas: previasInfo.jornadas,
+            jornadas: previasInfo.jornadas as { nombre: string; cantidad: number }[],
             nivel: nivelAsignacion,
-            jornadaId: jornadaGuardada.id,
+            jornadaId: jornadaId,
           });
           setMostrarAlertaJornadas(true);
           setCargando(false);
           return;
         } else {
           // No hay jornadas previas, asignar directamente
-          const asignado = await realizarAsignacion(jornadaGuardada.id);
+          const asignado = await realizarAsignacion(jornadaId);
           if (!asignado) {
             toast.error('Error al asignar la jornada');
             setCargando(false);
@@ -482,8 +487,8 @@ export function EditarJornadaModal({ open, modo, jornada, onClose }: EditarJorna
         toast.success('Jornada eliminada exitosamente');
         onClose();
       } else {
-        const error = await response.json() as Record<string, any>;
-        toast.error(error.error || 'Error al eliminar jornada');
+        const error = await response.json() as Record<string, unknown>;
+        toast.error(typeof error.error === 'string' ? error.error : 'Error al eliminar jornada');
       }
     } catch (error) {
       console.error('Error:', error);

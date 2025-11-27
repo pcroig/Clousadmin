@@ -22,7 +22,7 @@ export async function POST(
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
 
-    const body = await request.json() as Record<string, any>;
+    const body = await request.json() as Record<string, unknown>;
     const campos = body.campos as Record<string, string>;
 
     if (!campos || typeof campos !== 'object' || Array.isArray(campos)) {

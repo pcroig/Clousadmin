@@ -388,8 +388,8 @@ export function getFeatureConfig(
   const config = createConfigForUseCase(featureConfig.useCase, provider, {
     systemMessage: featureConfig.systemMessage,
     temperature: featureConfig.temperature,
-    responseFormat: featureConfig.responseFormat,
-    maxTokens: featureConfig.maxTokens,
+    responseFormat: 'responseFormat' in featureConfig ? featureConfig.responseFormat : undefined,
+    maxTokens: 'maxTokens' in featureConfig ? featureConfig.maxTokens : undefined,
   });
 
   config.metadata = {

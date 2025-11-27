@@ -26,7 +26,7 @@ export async function PATCH(request: NextRequest, context: RouteParams) {
     }
 
     const { id } = params;
-    const body = await request.json() as Record<string, any>;
+    const body = await request.json() as Record<string, unknown>;
     const { nombre, descripcion, sedeId } = body;
 
     // Verify team belongs to user's company
@@ -42,7 +42,7 @@ export async function PATCH(request: NextRequest, context: RouteParams) {
     }
 
     // If updating name, check it doesn't conflict with another team
-    if (nombre && nombre.trim() !== existingTeam.nombre) {
+    if (nombre && typeof nombre === 'string' && nombre.trim() !== existingTeam.nombre) {
       const nameConflict = await prisma.equipo.findFirst({
         where: {
           empresaId: session.user.empresaId,
@@ -61,12 +61,16 @@ export async function PATCH(request: NextRequest, context: RouteParams) {
       }
     }
 
+    const nombreStr = typeof nombre === 'string' ? nombre : undefined;
+    const descripcionStr = typeof descripcion === 'string' ? descripcion : undefined;
+    const sedeIdStr = typeof sedeId === 'string' ? sedeId : undefined;
+
     const updatedTeam = await prisma.equipo.update({
       where: { id },
       data: {
-        ...(nombre && { nombre: nombre.trim() }),
-        ...(descripcion !== undefined && { descripcion: descripcion?.trim() || null }),
-        ...(sedeId !== undefined && { sedeId: sedeId || null }),
+        ...(nombreStr && { nombre: nombreStr.trim() }),
+        ...(descripcionStr !== undefined && { descripcion: descripcionStr.trim() || null }),
+        ...(sedeIdStr !== undefined && { sedeId: sedeIdStr || null }),
       },
       include: {
         manager: {

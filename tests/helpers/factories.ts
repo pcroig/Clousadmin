@@ -3,6 +3,8 @@
  * Crea datos de test reutilizables con valores por defecto sensibles
  */
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 import {
   EstadoAusencia,
   EstadoEmpleado,

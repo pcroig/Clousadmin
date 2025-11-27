@@ -3,6 +3,8 @@
  * Evita llamadas reales a la API y costos
  */
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 import { vi } from 'vitest';
 
 export const mockOpenAI = {

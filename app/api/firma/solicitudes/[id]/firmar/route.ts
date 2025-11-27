@@ -36,11 +36,11 @@ export async function POST(
     }
 
     const { id: firmaId } = await context.params;
-    const body = await request.json() as Record<string, any>;
+    const body = await request.json() as Record<string, unknown>;
 
-    const firmaImagen: string | undefined = body.firmaImagen;
-    const firmaImagenWidth: number | undefined = body.firmaImagenWidth;
-    const firmaImagenHeight: number | undefined = body.firmaImagenHeight;
+    const firmaImagen: string | undefined = typeof body.firmaImagen === 'string' ? body.firmaImagen : undefined;
+    const firmaImagenWidth: number | undefined = typeof body.firmaImagenWidth === 'number' ? body.firmaImagenWidth : undefined;
+    const firmaImagenHeight: number | undefined = typeof body.firmaImagenHeight === 'number' ? body.firmaImagenHeight : undefined;
 
     // Obtener empleado asociado al usuario autenticado
     const empleado = await prisma.empleado.findUnique({

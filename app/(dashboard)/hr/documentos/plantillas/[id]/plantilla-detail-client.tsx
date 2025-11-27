@@ -281,27 +281,25 @@ export function PlantillaDetailClient({ plantilla }: PlantillaDetailClientProps)
       const res = await fetch(
         `/api/plantillas/${plantilla.id}/previsualizar?empleadoId=${empleadoId}`
       );
-      const data = await res.json() as Record<string, any>;
+      const data = await res.json() as Record<string, unknown>;
 
       if (data.success && data.previewUrl) {
-        setPreviewUrl(data.previewUrl);
-        const valores = data.variablesResueltas || {};
+        setPreviewUrl(typeof data.previewUrl === 'string' ? data.previewUrl : null);
+        const valores = (typeof data.variablesResueltas === 'object' && data.variablesResueltas !== null) ? data.variablesResueltas as Record<string, string> : {};
         setVariablesValores(valores);
 
-        const conValor =
-          data.variablesConValor ||
+        const conValor = (Array.isArray(data.variablesConValor) ? data.variablesConValor :
           Object.entries(valores)
             .filter(([, value]) => {
               if (value === null || value === undefined) return false;
               if (typeof value === 'string') return value.trim().length > 0;
               return String(value).trim().length > 0;
             })
-            .map(([key]) => key);
+            .map(([key]) => key)) as string[];
 
-        const sinValorBase =
-          data.variablesSinValor ||
-          data.variablesFaltantes ||
-          variablesDetectadas.filter((variable) => !conValor.includes(variable));
+        const sinValorBase = (Array.isArray(data.variablesSinValor) ? data.variablesSinValor :
+          (Array.isArray(data.variablesFaltantes) ? data.variablesFaltantes :
+          variablesDetectadas.filter((variable) => !conValor.includes(variable)))) as string[];
 
         setVariablesConValor(Array.from(new Set(conValor)));
         setVariablesSinValor(
@@ -309,7 +307,7 @@ export function PlantillaDetailClient({ plantilla }: PlantillaDetailClientProps)
         );
       } else {
         setPreviewRenderState('error');
-        setPreviewError(data.error || 'No se pudo generar la previsualización');
+        setPreviewError(typeof data.error === 'string' ? data.error : 'No se pudo generar la previsualización');
       }
     } catch (error) {
       console.error('Error cargando previsualización:', error);
@@ -330,7 +328,7 @@ export function PlantillaDetailClient({ plantilla }: PlantillaDetailClientProps)
 
     try {
       const res = await fetch('/api/empleados?activos=true');
-      const data = await res.json() as Record<string, any>;
+      const data = await res.json() as Record<string, unknown>;
 
       const listaEmpleados = normalizarRespuestaEmpleados(data).map(mapearEmpleado);
       setEmpleados(listaEmpleados);
@@ -402,7 +400,7 @@ export function PlantillaDetailClient({ plantilla }: PlantillaDetailClientProps)
         }),
       });
 
-      const data = await res.json() as Record<string, any>;
+      const data = await res.json() as Record<string, unknown>;
 
       if (data.success) {
         toast.success(
@@ -411,7 +409,7 @@ export function PlantillaDetailClient({ plantilla }: PlantillaDetailClientProps)
         setEmpleadosSeleccionados(new Set());
         router.refresh();
       } else {
-        toast.error(data.error || 'Error al generar documentos');
+        toast.error(typeof data.error === 'string' ? data.error : 'Error al generar documentos');
       }
     } catch (error) {
       console.error('Error generando documentos:', error);

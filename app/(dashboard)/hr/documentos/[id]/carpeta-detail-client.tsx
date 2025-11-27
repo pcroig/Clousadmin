@@ -152,7 +152,7 @@ export function CarpetaDetailClient({ carpeta, empleados = [] }: CarpetaDetailCl
       ]);
 
       if (equiposRes.ok) {
-        const payload = await equiposRes.json() as Record<string, any>;
+        const payload = await equiposRes.json() as Record<string, unknown>;
         const listaEquipos = extractArrayFromResponse<
           { id: string; nombre: string }
         >(payload, { key: 'equipos' });
@@ -160,7 +160,7 @@ export function CarpetaDetailClient({ carpeta, empleados = [] }: CarpetaDetailCl
       }
 
       if (empleadosRes.ok) {
-        const payload = await empleadosRes.json() as Record<string, any>;
+        const payload = await empleadosRes.json() as Record<string, unknown>;
         const lista = extractArrayFromResponse<
           {
             id: string;
@@ -230,8 +230,8 @@ export function CarpetaDetailClient({ carpeta, empleados = [] }: CarpetaDetailCl
       });
 
       if (!response.ok) {
-        const error = await response.json() as Record<string, any>;
-        throw new Error(error.error || 'Error al actualizar asignación');
+        const error = await response.json() as Record<string, unknown>;
+        throw new Error(typeof error.error === 'string' ? error.error : 'Error al actualizar asignación');
       }
 
       toast.success('Asignación actualizada correctamente');
@@ -351,8 +351,8 @@ export function CarpetaDetailClient({ carpeta, empleados = [] }: CarpetaDetailCl
       });
 
       if (!response.ok) {
-        const error = await response.json() as Record<string, any>;
-        throw new Error(error.error || 'Error al eliminar documento');
+        const error = await response.json() as Record<string, unknown>;
+        throw new Error(typeof error.error === 'string' ? error.error : 'Error al eliminar documento');
       }
 
       setModalEliminar(false);

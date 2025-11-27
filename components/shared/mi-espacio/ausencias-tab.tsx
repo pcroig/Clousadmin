@@ -437,7 +437,7 @@ export function AusenciasTab({ empleadoId, contexto = 'empleado' }: MiEspacioAus
             <span className="text-xs text-gray-500">
               Ene {new Date().getFullYear()} - Dic {new Date().getFullYear()}
             </span>
-              {saldoResumen.carryOverDisponible > 0 && saldoResumen.carryOverExpiraEn && (
+              {saldoResumen.carryOverDisponible && saldoResumen.carryOverDisponible > 0 && saldoResumen.carryOverExpiraEn && (
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger asChild>

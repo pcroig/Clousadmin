@@ -3,6 +3,8 @@
  * Helpers para testear API routes de Next.js
  */
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 import { NextRequest } from 'next/server';
 
 import type { MockSession } from './auth';

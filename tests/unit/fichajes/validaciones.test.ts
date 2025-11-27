@@ -3,6 +3,8 @@
  * Prueba la lógica de negocio sin dependencias externas
  */
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 import { describe, expect, it } from 'vitest';
 
 import {

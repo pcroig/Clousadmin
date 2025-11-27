@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Permisos insuficientes' }, { status: 403 });
     }
 
-    const body = await request.json() as Record<string, any>;
+    const body = await request.json() as Record<string, unknown>;
     const { priceId } = body;
 
     if (!priceId) {
@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
     // Crear sesión de checkout
     const checkoutSession = await createCheckoutSession({
       empresaId: empresa.id,
-      priceId,
+      priceId: priceId as string,
       email: empresa.email || user.email,
       nombreEmpresa: empresa.nombre,
     });

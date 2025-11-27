@@ -3,10 +3,10 @@
  * Flujo completo de control horario (crítico legal en España)
  */
 
-import { expect, test } from '@playwright/test';
+import { expect, type Page, test } from '@playwright/test';
 
 // Helper para login
-async function loginAsEmpleado(page: any) {
+async function loginAsEmpleado(page: Page) {
   await page.goto('/login');
   await page.getByLabel(/email/i).fill('ana.garcia@clousadmin.com');
   await page.getByLabel(/contraseña|password/i).fill('Empleado123!');
@@ -176,7 +176,7 @@ test.describe('Fichaje - Pausas', () => {
 });
 
 test.describe('Fichaje - Vista HR', () => {
-  async function loginAsHR(page: any) {
+  async function loginAsHR(page: Page) {
     await page.goto('/login');
     await page.getByLabel(/email/i).fill('admin@clousadmin.com');
     await page.getByLabel(/contraseña|password/i).fill('Admin123!');

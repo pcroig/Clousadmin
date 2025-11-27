@@ -82,12 +82,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
     }
 
-    const body = await request.json() as Record<string, any>;
-    const { 
-      nombre, 
-      parentId, 
-      compartida, 
-      asignadoA, 
+    const body = await request.json() as Record<string, unknown>;
+    const {
+      nombre,
+      parentId,
+      compartida,
+      asignadoA,
       empleadoId,
       vinculadaAProceso,
       requiereFirma,
@@ -96,7 +96,7 @@ export async function POST(request: NextRequest) {
     } = body;
 
     // Validar nombre
-    if (!nombre || nombre.trim().length === 0) {
+    if (!nombre || typeof nombre !== 'string' || nombre.trim().length === 0) {
       return NextResponse.json(
         { error: 'El nombre de la carpeta es requerido' },
         { status: 400 }
@@ -104,7 +104,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Solo HR Admin puede crear carpetas compartidas
-    if (compartida && session.user.rol !== 'hr_admin') {
+    const isCompartida = typeof compartida === 'boolean' ? compartida : false;
+    if (isCompartida && session.user.rol !== 'hr_admin') {
       return NextResponse.json(
         { error: 'No autorizado para crear carpetas compartidas' },
         { status: 403 }
@@ -112,7 +113,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Validar proceso vinculado
-    if (vinculadaAProceso && !['onboarding', 'offboarding'].includes(vinculadaAProceso)) {
+    if (vinculadaAProceso && typeof vinculadaAProceso === 'string' && !['onboarding', 'offboarding'].includes(vinculadaAProceso)) {
       return NextResponse.json(
         { error: 'Proceso vinculado inválido. Debe ser "onboarding" o "offboarding"' },
         { status: 400 }
@@ -123,16 +124,17 @@ export async function POST(request: NextRequest) {
     const carpeta = await prisma.carpeta.create({
       data: {
         empresaId: session.user.empresaId,
-        nombre,
-        parentId: parentId || null,
-        empleadoId: empleadoId || null,
+        nombre: nombre as string,
+        parentId: typeof parentId === 'string' ? parentId : null,
+        empleadoId: typeof empleadoId === 'string' ? empleadoId : null,
         esSistema: false,
-        compartida: compartida || false,
-        asignadoA: compartida ? asignadoA : null,
-        vinculadaAProceso: vinculadaAProceso || null,
-        requiereFirma: requiereFirma || false,
-        requiereRellenarDatos: requiereRellenarDatos || false,
-        camposRequeridos: camposRequeridos || null,
+        compartida: isCompartida,
+        asignadoA: isCompartida && typeof asignadoA === 'string' ? asignadoA : null,
+        vinculadaAProceso: typeof vinculadaAProceso === 'string' ? vinculadaAProceso : null,
+        requiereFirma: typeof requiereFirma === 'boolean' ? requiereFirma : false,
+        requiereRellenarDatos: typeof requiereRellenarDatos === 'boolean' ? requiereRellenarDatos : false,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        camposRequeridos: camposRequeridos ? camposRequeridos as any : null,
       },
       include: {
         empleado: {

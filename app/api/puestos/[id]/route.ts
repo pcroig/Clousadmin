@@ -94,7 +94,7 @@ export async function PATCH(request: NextRequest, context: RouteParams) {
     }
 
     const { id } = params;
-    const body = await request.json() as Record<string, any>;
+    const body = await request.json() as Record<string, unknown>;
     const validatedData = puestoUpdateSchema.parse(body);
 
     // Verificar que el puesto existe y pertenece a la empresa

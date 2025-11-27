@@ -3,6 +3,8 @@
  * Evita envío real de emails
  */
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 import { vi } from 'vitest';
 
 // ========================================

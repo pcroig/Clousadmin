@@ -40,7 +40,8 @@ export default async function HRDashboardPage() {
 
   // Combinar solicitudes
   const solicitudes = [
-    ...ausenciasPendientes.map((aus) => ({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ...(Array.isArray(ausenciasPendientes) ? ausenciasPendientes as any : []).map((aus: any) => ({
       id: aus.id,
       empleado: {
         nombre: `${aus.empleado.nombre} ${aus.empleado.apellidos}`,
@@ -51,7 +52,8 @@ export default async function HRDashboardPage() {
       fecha: ensureDate(aus.createdAt),
       prioridad: 'media' as const,
     })),
-    ...solicitudesCambioPendientes.map((sol) => ({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ...(solicitudesCambioPendientes as any).map((sol: any) => ({
       id: sol.id,
       empleado: {
         nombre: `${sol.empleado.nombre} ${sol.empleado.apellidos}`,
@@ -70,7 +72,8 @@ export default async function HRDashboardPage() {
     session.user.id
   );
 
-  const notificaciones: NotificacionUI[] = notificacionesDb.map((notif) => ({
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const notificaciones: NotificacionUI[] = (notificacionesDb as any).map((notif: any) => ({
     id: notif.id,
     tipo: notif.tipo as TipoNotificacion,
     titulo: notif.titulo,
@@ -86,7 +89,8 @@ export default async function HRDashboardPage() {
   // Auto-completed stats (cached) - Widget muestra lo aprobado automáticamente por el sistema
   // NOTA: Las ausencias que NO requieren aprobación (enfermedad, etc.) NO se registran aquí
   // porque no hubo "aprobación automática", simplemente no necesitaban aprobación
-  const autoCompletadosStats = await getAutoCompletadosStats(session.user.empresaId);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const autoCompletadosStats = await getAutoCompletadosStats(session.user.empresaId) as any;
 
   return (
     <>

@@ -324,7 +324,7 @@ export function OnboardingForm({
     setLoadingDocumentos(true);
     try {
       const docsRes = await fetch(`/api/onboarding/${token}/documentos`);
-      const docsData = await docsRes.json() as Record<string, unknown>;
+      const docsData = await docsRes.json() as { success?: boolean; documentos?: DocumentoOnboarding[]; error?: string };
       if (docsData.success) {
         setDocumentos(docsData.documentos || []);
       } else {
@@ -412,7 +412,7 @@ export function OnboardingForm({
           });
           setError(errores.length > 0 ? errores.join('. ') : 'Por favor, corrige los errores indicados');
         } else {
-          setError(data.error || 'Error al guardar credenciales');
+          setError(typeof data.error === 'string' ? data.error : 'Error al guardar credenciales');
           setErrorDetails({});
         }
       }
@@ -459,7 +459,7 @@ export function OnboardingForm({
           setErrorDetails(data.details as Record<string, string[]>);
           setError('Por favor, corrige los errores en los campos indicados');
         } else {
-          setError(data.error || 'Error al guardar datos personales');
+          setError(typeof data.error === 'string' ? data.error : 'Error al guardar datos personales');
           setErrorDetails({});
         }
         setLoading(false);
@@ -507,7 +507,7 @@ export function OnboardingForm({
           setErrorDetails(data.details as Record<string, string[]>);
           setError('Por favor, corrige los errores en los campos indicados');
         } else {
-        setError(data.error || 'Error al guardar datos bancarios');
+        setError(typeof data.error === 'string' ? data.error : 'Error al guardar datos bancarios');
           setErrorDetails({});
         }
         setLoading(false);
@@ -546,7 +546,7 @@ export function OnboardingForm({
         await cargarDocumentos();
         setTimeout(() => setSuccess(''), 3000);
       } else {
-        setError(data.error || 'Error al subir documento');
+        setError(typeof data.error === 'string' ? data.error : 'Error al subir documento');
         setTimeout(() => setError(''), 3000);
       }
     } catch (err) {
@@ -567,7 +567,7 @@ export function OnboardingForm({
 
       if (!pwaRes.ok) {
         const pwaData = await pwaRes.json() as Record<string, unknown>;
-        throw new Error(pwaData.error || 'Error al marcar PWA como completado');
+        throw new Error(typeof pwaData.error === 'string' ? pwaData.error : 'Error al marcar PWA como completado');
       }
 
       // Luego finalizar onboarding
@@ -584,7 +584,7 @@ export function OnboardingForm({
           window.location.href = '/login?onboarding=success';
         }, 2000);
       } else {
-        setError(data.error || 'Error al finalizar onboarding');
+        setError(typeof data.error === 'string' ? data.error : 'Error al finalizar onboarding');
         setLoading(false);
       }
     } catch (err) {

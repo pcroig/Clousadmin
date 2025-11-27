@@ -232,7 +232,7 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
 
       const response = await fetch(`/api/fichajes?${params}`);
       const payload =
-        (await parseJson<Record<string, any>>(response).catch(() => undefined)) ?? {};
+        (await parseJson<Record<string, unknown>>(response).catch(() => undefined)) ?? {};
 
       if (!response.ok) {
         const errorMessage =
@@ -348,7 +348,7 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
       const eventoSalida = eventos.find((evento: FichajeEvento) => evento.tipo === 'salida');
       setEditarFichajeModal({
         open: true,
-        fichajeDiaId: fichaje.id,
+        fichajeDiaId: fichajeId,
       });
     } catch (error) {
       console.error('[Fichajes] Error al abrir edición desde revisión:', error);

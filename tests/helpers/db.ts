@@ -3,6 +3,8 @@
  * Maneja setup, teardown y seeding de la BD de test
  */
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 import { execSync } from 'child_process';
 import path from 'path';
 

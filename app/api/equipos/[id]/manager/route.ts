@@ -26,7 +26,7 @@ export async function PATCH(request: NextRequest, context: RouteParams) {
     }
 
     const { id: equipoId } = params;
-    const body = await request.json() as Record<string, any>;
+    const body = await request.json() as Record<string, unknown>;
     const { managerId } = body;
 
     // Verify team belongs to user's company
@@ -42,11 +42,12 @@ export async function PATCH(request: NextRequest, context: RouteParams) {
     }
 
     // If managerId is provided, verify they are a member of the team
-    if (managerId) {
+    const managerIdStr = typeof managerId === 'string' ? managerId : null;
+    if (managerIdStr) {
       const isMember = await prisma.empleadoEquipo.findUnique({
         where: {
           empleadoId_equipoId: {
-            empleadoId: managerId,
+            empleadoId: managerIdStr,
             equipoId,
           },
         },
