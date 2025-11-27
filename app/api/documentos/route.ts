@@ -238,7 +238,7 @@ export async function POST(request: NextRequest) {
           throw new Error('STORAGE_BUCKET no configurado');
         }
         storageKey = `documentos/${rutaStorage}`;
-        await uploadToS3(bodyForStorage, storageKey, file.type);
+        await uploadToS3(bodyForStorage, storageKey, file.type, { contentLength: file.size });
         storageBucket = bucketName;
         cleanupUpload = async () => {
           await deleteFromS3(storageKey);

@@ -10,6 +10,7 @@ Guía completa para configurar el proyecto desde cero.
 - **PostgreSQL** 15+ ([postgresql.org](https://www.postgresql.org/download/))
 - **npm** o **pnpm**
 - **Git**
+- **macOS Apple Silicon (M1/M2/M3)**: usa `nvm` para instalar una variante `arm64` de Node y describe tu terminal con la función `load_nvm_environment` (ya incluida en `.zshrc`) para evitar que `errreturn` interrumpa la carga.
 
 ---
 
@@ -247,6 +248,11 @@ npm run lint             # Ejecutar ESLint
 rm -rf node_modules package-lock.json
 npm install
 ```
+Si trabajas en un Apple Silicon (M1/M2/M3) y ves errores similares como `Cannot find module '../lightningcss.darwin-arm64.node'`, asegúrate de:
+
+1. Usar `nvm` con Node arm64 (`nvm install --lts` o la versión que requiere el proyecto).
+2. Borrar `node_modules`/lock y reinstalar para recompilar los binarios nativos en la nueva arquitectura.
+3. Repetir el paso anterior cada vez que cambies de arquitectura o ejecutes `nvm use` con una versión distinta.
 
 ### Error: permisos de npm
 ```bash

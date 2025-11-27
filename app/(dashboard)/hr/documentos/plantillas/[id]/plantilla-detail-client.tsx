@@ -16,12 +16,19 @@ import {
   Send,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import PizZip from 'pizzip';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
 import { VARIABLES_DISPONIBLES } from '@/lib/plantillas/constantes';
 
@@ -85,19 +92,24 @@ interface PlantillaDetailClientProps {
 
 export function PlantillaDetailClient({ plantilla }: PlantillaDetailClientProps) {
   const router = useRouter();
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [loadingPreview, setLoadingPreview] = useState(true);
-  const [previewRenderState, setPreviewRenderState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
+  const [previewNonce, setPreviewNonce] = useState(() => Date.now());
   const [previewError, setPreviewError] = useState<string | null>(null);
-  const previewContainerRef = useRef<HTMLDivElement>(null);
+  const [viewerLoading, setViewerLoading] = useState(true);
   const [empleados, setEmpleados] = useState<Array<{ id: string; nombre: string; apellidos: string; email: string }>>([]);
   const [empleadosSeleccionados, setEmpleadosSeleccionados] = useState<Set<string>>(new Set());
   const [loadingEmpleados, setLoadingEmpleados] = useState(true);
   const [generando, setGenerando] = useState(false);
-  const [empleadoPreviewId, setEmpleadoPreviewId] = useState<string | null>(null);
+  const [empleadoPreviewId, setEmpleadoPreviewId] = useState<string>('');
   const [variablesConValor, setVariablesConValor] = useState<string[]>([]);
   const [variablesSinValor, setVariablesSinValor] = useState<string[]>([]);
   const [variablesValores, setVariablesValores] = useState<Record<string, string>>({});
+  const [analizandoVariables, setAnalizandoVariables] = useState(false);
+  const [ultimoAnalisisEmpleado, setUltimoAnalisisEmpleado] = useState<string | null>(null);
+
+  const previewFrameUrl = useMemo(
+    () => `/api/plantillas/${plantilla.id}/preview?ts=${previewNonce}`,
+    [plantilla.id, previewNonce]
+  );
 
   const variablesDetectadas = useMemo(
     () => (Array.isArray(plantilla.variablesUsadas) ? plantilla.variablesUsadas : []),
@@ -127,130 +139,55 @@ export function PlantillaDetailClient({ plantilla }: PlantillaDetailClientProps)
     return variablesDetectadas.filter((variable) => !variablesAutoCompletadas.includes(variable));
   }, [variablesSinValor, variablesDetectadas, variablesAutoCompletadas]);
 
-  const renderDocxToHtml = async (
-    buffer: ArrayBuffer,
-    container: HTMLDivElement,
-    options?: {
-      autoFill?: Set<string>;
-      missing?: Set<string>;
-    }
-  ) => {
-    const zip = new PizZip(buffer);
-    const documentXml = zip.file('word/document.xml')?.asText();
-    if (!documentXml) {
-      throw new Error('No se encontró el documento principal dentro del DOCX');
-    }
-
-    const parser = new DOMParser();
-    const xmlDoc = parser.parseFromString(documentXml, 'application/xml');
-    const paragraphs = Array.from(xmlDoc.getElementsByTagName('w:p'));
-    const fragment = document.createDocumentFragment();
-
-    let renderedParagraphs = 0;
-
-    paragraphs.forEach((paragraph) => {
-      const texts = Array.from(paragraph.getElementsByTagName('w:t'))
-        .map((node) => node.textContent || '')
-        .join('');
-
-      if (!texts.trim()) {
-        return;
-      }
-
-      const tokens = texts.split(/(\{\{[a-z_][a-z0-9_]*\}\})/gi);
-      const p = document.createElement('p');
-      p.className = 'text-sm text-gray-800 mb-2 leading-relaxed break-words';
-
-      tokens.forEach((token) => {
-        if (!token) {
-          return;
-        }
-
-        const variableMatch = token.match(/^\{\{([a-z_][a-z0-9_]*)\}\}$/i);
-        if (variableMatch) {
-          const variableKey = variableMatch[1];
-          const normalizedKey = variableKey.toLowerCase();
-          const span = document.createElement('span');
-          span.dataset.variable = normalizedKey;
-          span.className =
-            'inline-flex items-center px-1.5 py-0.5 mr-1 rounded border text-xs font-semibold font-mono';
-
-          if (options?.autoFill?.has(normalizedKey)) {
-            span.classList.add('bg-green-100', 'text-green-800', 'border-green-200');
-            span.title = 'Campo soportado y rellenado automáticamente';
-          } else if (options?.missing?.has(normalizedKey)) {
-            span.classList.add('bg-amber-100', 'text-amber-800', 'border-amber-200');
-            span.title = 'Campo sin datos en los modelos actuales';
-          } else {
-            span.classList.add('bg-blue-100', 'text-blue-800', 'border-blue-200');
-            span.title = 'Campo personalizado o pendiente de mapear';
-          }
-
-          span.textContent = `{{${variableKey}}}`;
-          p.appendChild(span);
-          return;
-        }
-
-        p.appendChild(document.createTextNode(token));
-      });
-
-      fragment.appendChild(p);
-      renderedParagraphs += 1;
-    });
-
-    if (renderedParagraphs === 0) {
-      const empty = document.createElement('p');
-      empty.className = 'text-sm text-gray-500 italic';
-      empty.textContent = 'No se pudo interpretar el contenido. Descarga el DOCX para revisarlo.';
-      fragment.appendChild(empty);
-    }
-
-    container.appendChild(fragment);
-  };
-
-  useEffect(() => {
-    if (!previewUrl) return;
-    if (typeof window === 'undefined') return;
-
-    const controller = new AbortController();
-
-    const renderPreview = async () => {
+  const analizarVariablesParaEmpleado = useCallback(
+    async (empleadoId: string) => {
+      setEmpleadoPreviewId(empleadoId);
+      setAnalizandoVariables(true);
       try {
-        setPreviewRenderState('loading');
-        const res = await fetch(previewUrl, { signal: controller.signal });
-        if (!res.ok) {
-          throw new Error('No se pudo descargar la previsualización');
+        const res = await fetch(`/api/plantillas/${plantilla.id}/previsualizar?empleadoId=${empleadoId}`);
+        const data = await res.json() as Record<string, unknown>;
+
+        if (!res.ok || !data.success) {
+          throw new Error(typeof data.error === 'string' ? data.error : 'No se pudo analizar la plantilla');
         }
 
-        const buffer = await res.arrayBuffer();
-        if (controller.signal.aborted) return;
+        const valores =
+          typeof data.variablesResueltas === 'object' && data.variablesResueltas !== null
+            ? (data.variablesResueltas as Record<string, string>)
+            : {};
+        setVariablesValores(valores);
 
-        const container = previewContainerRef.current;
-        if (!container) return;
-        container.innerHTML = '';
+        const conValor = Array.isArray(data.variablesConValor)
+          ? (data.variablesConValor as string[])
+          : Object.entries(valores)
+              .filter(([, value]) => {
+                if (value === null || value === undefined) return false;
+                if (typeof value === 'string') return value.trim().length > 0;
+                return String(value).trim().length > 0;
+              })
+              .map(([key]) => key);
 
-        await renderDocxToHtml(buffer, container, {
-          autoFill: new Set(variablesAutoCompletadas.map((value) => value.toLowerCase())),
-          missing: new Set(variablesSinDatos.map((value) => value.toLowerCase())),
-        });
+        const sinValorBase = Array.isArray(data.variablesSinValor)
+          ? (data.variablesSinValor as string[])
+          : Array.isArray(data.variablesFaltantes)
+            ? (data.variablesFaltantes as string[])
+            : variablesDetectadas.filter((variable) => !conValor.includes(variable));
 
-        if (!controller.signal.aborted) {
-          setPreviewRenderState('ready');
-        }
+        setVariablesConValor(Array.from(new Set(conValor)));
+        setVariablesSinValor(Array.from(new Set(sinValorBase)));
+        setUltimoAnalisisEmpleado(empleadoId);
+        toast.success('Análisis actualizado con los datos del empleado seleccionado.');
       } catch (error) {
-        if (controller.signal.aborted) return;
-        console.error('[DocxPreview] Error al renderizar DOCX:', error);
-        setPreviewRenderState('error');
-        setPreviewError('No se pudo renderizar la previsualización. Descarga el DOCX para revisarlo.');
+        console.error('Error analizando variables:', error);
+        toast.error(
+          error instanceof Error ? error.message : 'No se pudo analizar la plantilla con ese empleado'
+        );
+      } finally {
+        setAnalizandoVariables(false);
       }
-    };
-
-    renderPreview();
-
-    return () => {
-      controller.abort();
-    };
-  }, [previewUrl, variablesAutoCompletadas, variablesSinDatos]);
+    },
+    [plantilla.id, variablesDetectadas]
+  );
 
   const normalizarRespuestaEmpleados = (data: unknown): EmpleadoResumen[] => {
     if (!data) return [];
@@ -270,95 +207,34 @@ export function PlantillaDetailClient({ plantilla }: PlantillaDetailClientProps)
     email: empleado?.usuario?.email || empleado?.email || '',
   });
 
-  const cargarPrevisualizacion = useCallback(async (empleadoId: string) => {
-    if (!empleadoId) return;
-
-    try {
-      setLoadingPreview(true);
-      setPreviewRenderState('loading');
-      setPreviewError(null);
-
-      const res = await fetch(
-        `/api/plantillas/${plantilla.id}/previsualizar?empleadoId=${empleadoId}`
-      );
-      const data = await res.json() as Record<string, unknown>;
-
-      if (data.success && data.previewUrl) {
-        setPreviewUrl(typeof data.previewUrl === 'string' ? data.previewUrl : null);
-        const valores = (typeof data.variablesResueltas === 'object' && data.variablesResueltas !== null) ? data.variablesResueltas as Record<string, string> : {};
-        setVariablesValores(valores);
-
-        const conValor = (Array.isArray(data.variablesConValor) ? data.variablesConValor :
-          Object.entries(valores)
-            .filter(([, value]) => {
-              if (value === null || value === undefined) return false;
-              if (typeof value === 'string') return value.trim().length > 0;
-              return String(value).trim().length > 0;
-            })
-            .map(([key]) => key)) as string[];
-
-        const sinValorBase = (Array.isArray(data.variablesSinValor) ? data.variablesSinValor :
-          (Array.isArray(data.variablesFaltantes) ? data.variablesFaltantes :
-          variablesDetectadas.filter((variable) => !conValor.includes(variable)))) as string[];
-
-        setVariablesConValor(Array.from(new Set(conValor)));
-        setVariablesSinValor(
-          Array.from(new Set(sinValorBase.length ? sinValorBase : []))
-        );
-      } else {
-        setPreviewRenderState('error');
-        setPreviewError(typeof data.error === 'string' ? data.error : 'No se pudo generar la previsualización');
-      }
-    } catch (error) {
-      console.error('Error cargando previsualización:', error);
-      setPreviewRenderState('error');
-      setPreviewError('No se pudo generar la previsualización');
-    } finally {
-      setLoadingPreview(false);
-    }
-  }, [plantilla.id, variablesDetectadas]);
-
   const cargarDatosIniciales = useCallback(async () => {
     setLoadingEmpleados(true);
-    setLoadingPreview(true);
-    setPreviewRenderState('idle');
-    setPreviewError(null);
-    setPreviewUrl(null);
-    setEmpleadoPreviewId(null);
-
     try {
       const res = await fetch('/api/empleados?activos=true');
       const data = await res.json() as Record<string, unknown>;
-
       const listaEmpleados = normalizarRespuestaEmpleados(data).map(mapearEmpleado);
       setEmpleados(listaEmpleados);
-
       if (listaEmpleados.length > 0) {
         setEmpleadoPreviewId(listaEmpleados[0].id);
-        await cargarPrevisualizacion(listaEmpleados[0].id);
-      } else {
-        setLoadingPreview(false);
-        setPreviewRenderState('error');
-        setPreviewError('Necesitas al menos un empleado activo para generar la previsualización.');
       }
     } catch (error) {
       console.error('Error cargando empleados:', error);
-      setLoadingPreview(false);
-      setPreviewRenderState('error');
-      setPreviewError('No se pudieron cargar los empleados para la previsualización.');
+      toast.error('No se pudieron cargar los empleados para generar documentos.');
     } finally {
       setLoadingEmpleados(false);
     }
-  }, [cargarPrevisualizacion]);
+  }, []);
 
   useEffect(() => {
-    setPreviewUrl(null);
-    setPreviewRenderState('idle');
     setPreviewError(null);
+    setViewerLoading(true);
+    setPreviewNonce(Date.now());
     setVariablesConValor([]);
     setVariablesSinValor([]);
     setVariablesValores({});
     setEmpleadosSeleccionados(new Set());
+    setUltimoAnalisisEmpleado(null);
+    setEmpleadoPreviewId('');
     cargarDatosIniciales();
   }, [plantilla.id, cargarDatosIniciales]);
 
@@ -372,6 +248,12 @@ export function PlantillaDetailClient({ plantilla }: PlantillaDetailClientProps)
     setEmpleadosSeleccionados(nuevos);
   };
 
+  const handleRefreshPreview = useCallback(() => {
+    setPreviewError(null);
+    setViewerLoading(true);
+    setPreviewNonce(Date.now());
+  }, []);
+
   const handleSeleccionarTodos = () => {
     if (empleadosSeleccionados.size === empleados.length) {
       setEmpleadosSeleccionados(new Set());
@@ -379,6 +261,14 @@ export function PlantillaDetailClient({ plantilla }: PlantillaDetailClientProps)
       setEmpleadosSeleccionados(new Set(empleados.map((e) => e.id)));
     }
   };
+
+  const handleAnalizarVariables = useCallback(() => {
+    if (!empleadoPreviewId) {
+      toast.error('Selecciona un empleado para analizar las variables.');
+      return;
+    }
+    void analizarVariablesParaEmpleado(empleadoPreviewId);
+  }, [analizarVariablesParaEmpleado, empleadoPreviewId]);
 
   const handleGenerar = async () => {
     if (empleadosSeleccionados.size === 0) {
@@ -430,14 +320,6 @@ export function PlantillaDetailClient({ plantilla }: PlantillaDetailClientProps)
       .replace(/\b\w/g, (l) => l.toUpperCase());
   };
 
-  const handleRefrescarPrevisualizacion = () => {
-    const objetivo = empleadoPreviewId || empleados[0]?.id;
-    if (objetivo) {
-      setEmpleadoPreviewId(objetivo);
-      cargarPrevisualizacion(objetivo);
-    }
-  };
-
   const totalVariables = variablesDetectadas.length;
   const cobertura =
     totalVariables > 0 ? Math.round((variablesAutoCompletadas.length / totalVariables) * 100) : 0;
@@ -484,58 +366,59 @@ export function PlantillaDetailClient({ plantilla }: PlantillaDetailClientProps)
         {/* Left: Preview */}
         <div className="flex flex-col min-h-0">
           <div className="border rounded-lg overflow-hidden bg-white flex-1 flex flex-col">
-            <div className="flex items-start justify-between border-b px-4 py-3">
+            <div className="flex flex-col gap-3 border-b px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-900">Previsualización</p>
                 <p className="text-xs text-gray-500">
                   Generada con los datos reales del empleado y la empresa para validar variables.
                 </p>
               </div>
-              <div className="flex items-center gap-2">
-                <Button variant="ghost" size="sm" onClick={handleRefrescarPrevisualizacion}>
-                  Reprocesar
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                <Button variant="outline" size="sm" onClick={handleRefreshPreview} disabled={viewerLoading}>
+                  Refrescar
                 </Button>
-                {previewUrl && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => window.open(previewUrl, '_blank')}
-                  >
-                    <Download className="w-4 h-4 mr-2" />
-                    Descargar DOCX
-                  </Button>
-                )}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => window.open(previewFrameUrl, '_blank')}
+                >
+                  <Download className="w-4 h-4 mr-2" />
+                  Descargar PDF
+                </Button>
               </div>
             </div>
 
-            <div className="relative flex-1 overflow-auto bg-gray-50">
-              <div
-                ref={previewContainerRef}
-                className="docx-preview-wrapper min-h-[480px] w-full px-4 py-4"
+            <div className="relative flex-1 overflow-hidden bg-gray-50">
+              <iframe
+                key={previewFrameUrl}
+                src={previewFrameUrl}
+                className="h-full w-full border-0 bg-white"
+                title="Previsualización de la plantilla"
+                onLoad={() => setViewerLoading(false)}
+                onError={() => {
+                  setViewerLoading(false);
+                  setPreviewError('No se pudo cargar la vista previa del documento.');
+                }}
               />
 
-              {(loadingPreview || previewRenderState === 'loading') && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/90 text-center gap-3">
+              {viewerLoading && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/80 text-center gap-3">
                   <Spinner className="w-6 h-6 text-gray-500" />
                   <div>
-                    <p className="text-sm font-medium text-gray-900">Generando previsualización</p>
-                    <p className="text-xs text-gray-500">
-                      Renderizamos el DOCX con los datos reales para validar variables.
-                    </p>
+                    <p className="text-sm font-medium text-gray-900">Procesando documento</p>
+                    <p className="text-xs text-gray-500">Esto puede tardar unos segundos.</p>
                   </div>
                 </div>
               )}
 
-              {previewRenderState === 'error' && (
+              {previewError && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/95 text-center gap-3 px-6">
                   <AlertCircle className="w-6 h-6 text-red-500" />
                   <div>
                     <p className="text-sm font-medium text-gray-900">No se pudo previsualizar</p>
-                    <p className="text-xs text-gray-600">
-                      {previewError || 'Intenta reprocesar la previsualización.'}
-                    </p>
+                    <p className="text-xs text-gray-600">{previewError}</p>
                   </div>
-                  <Button variant="outline" size="sm" onClick={handleRefrescarPrevisualizacion}>
+                  <Button variant="outline" size="sm" onClick={handleRefreshPreview}>
                     Reintentar
                   </Button>
                 </div>
@@ -639,6 +522,53 @@ export function PlantillaDetailClient({ plantilla }: PlantillaDetailClientProps)
               {totalVariables > 0 && (
                 <p className="text-xs text-gray-500 mt-1">
                   Cobertura automática actual: <span className="font-semibold text-gray-900">{cobertura}%</span>
+                </p>
+              )}
+            </div>
+
+            <div className="mb-6 space-y-2">
+              <Label className="text-xs text-gray-500">Analizar variables con datos reales (opcional)</Label>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                <Select
+                  value={empleadoPreviewId}
+                  onValueChange={setEmpleadoPreviewId}
+                  disabled={loadingEmpleados}
+                >
+                  <SelectTrigger className="h-9 text-sm">
+                    <SelectValue placeholder="Selecciona un empleado" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {empleados.map((empleado) => (
+                      <SelectItem key={empleado.id} value={empleado.id}>
+                        {empleado.nombre} {empleado.apellidos}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleAnalizarVariables}
+                  disabled={analizandoVariables || !empleadoPreviewId}
+                >
+                  {analizandoVariables ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Analizando...
+                    </>
+                  ) : (
+                    'Analizar variables'
+                  )}
+                </Button>
+              </div>
+              {ultimoAnalisisEmpleado && (
+                <p className="text-xs text-gray-500">
+                  Último análisis realizado con{' '}
+                  {(() => {
+                    const empleado = empleados.find((emp) => emp.id === ultimoAnalisisEmpleado);
+                    return empleado ? `${empleado.nombre} ${empleado.apellidos}` : 'el empleado seleccionado';
+                  })()}
+                  .
                 </p>
               )}
             </div>
@@ -756,6 +686,7 @@ export function PlantillaDetailClient({ plantilla }: PlantillaDetailClientProps)
           </div>
         </div>
       </div>
+
     </div>
   );
 }

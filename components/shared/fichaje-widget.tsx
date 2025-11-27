@@ -11,16 +11,15 @@ import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { calcularHorasTrabajadas } from '@/lib/calculos/fichajes-cliente';
+import { calcularHorasObjetivoDesdeJornada, calcularProgresoEventos } from '@/lib/calculos/fichajes-cliente';
 import { MOBILE_DESIGN } from '@/lib/constants/mobile-design';
 import { extractArrayFromResponse } from '@/lib/utils/api-response';
+import { toMadridDate } from '@/lib/utils/fechas';
 import { formatearHorasMinutos, formatTiempoTrabajado } from '@/lib/utils/formatters';
 import { parseJson } from '@/lib/utils/json';
 
 import { FichajeModal } from './fichajes/fichaje-modal';
 import { WidgetCard } from './widget-card';
-
-import type { FichajeEvento } from '@prisma/client';
 
 interface FichajeWidgetProps {
   href?: string;
@@ -28,13 +27,12 @@ interface FichajeWidgetProps {
 
 type EstadoFichaje = 'sin_fichar' | 'trabajando' | 'en_pausa' | 'finalizado';
 
-// Usar FichajeEvento de Prisma en lugar de definir localmente
-
 interface Fichaje {
   id: string;
   fecha: string;
   estado: string;
   horasTrabajadas: number | null;
+  horasEsperadas?: number | string | null;
   eventos: Array<{
     id: string;
     tipo: string;
@@ -42,10 +40,18 @@ interface Fichaje {
   }>;
 }
 
+interface EmpleadoActualResponse {
+  id: string;
+  jornada?: {
+    horasSemanales?: number | string | null;
+    config?: Record<string, unknown> | null;
+  } | null;
+}
+
 interface FichajeWidgetState {
   status: EstadoFichaje;
   horaEntrada: Date | null;
-  eventos: FichajeEvento[];
+  horasAcumuladas: number;
   modalManual: boolean;
   loading: boolean;
   inicializando: boolean;
@@ -60,14 +66,14 @@ type FichajeWidgetAction =
       payload: {
         status: EstadoFichaje;
         horaEntrada: Date | null;
-        eventos: FichajeEvento[];
+        horasAcumuladas: number;
       };
     };
 
 const initialState: FichajeWidgetState = {
   status: 'sin_fichar',
   horaEntrada: null,
-  eventos: [],
+  horasAcumuladas: 0,
   modalManual: false,
   loading: false,
   inicializando: true,
@@ -89,7 +95,7 @@ function fichajeWidgetReducer(
         ...state,
         status: action.payload.status,
         horaEntrada: action.payload.horaEntrada,
-        eventos: action.payload.eventos,
+        horasAcumuladas: action.payload.horasAcumuladas,
         inicializando: false,
         loading: false,
       };
@@ -122,26 +128,13 @@ function deriveEstadoDesdeFichaje(fichaje: Fichaje): EstadoFichaje {
   }
 }
 
-function mapearEventosFichaje(fichaje: Fichaje): FichajeEvento[] {
-  return (fichaje.eventos || []).map((evento) => ({
-    id: evento.id,
-    tipo: evento.tipo as FichajeEvento['tipo'],
-    hora: new Date(evento.hora),
-    fichajeId: fichaje.id,
-    ubicacion: null,
-    editado: false,
-    motivoEdicion: null,
-    horaOriginal: null,
-    editadoPor: null,
-    createdAt: new Date(evento.hora),
-  }));
-}
 
 export function FichajeWidget({
   href = '/empleado/mi-espacio/fichajes',
 }: FichajeWidgetProps) {
   const [state, dispatch] = useReducer(fichajeWidgetReducer, initialState);
   const [tick, setTick] = useState(0);
+  const [horasObjetivoDia, setHorasObjetivoDia] = useState<number>(8);
 
   useEffect(() => {
     if (state.status !== 'trabajando' || !state.horaEntrada) {
@@ -155,17 +148,58 @@ export function FichajeWidget({
     return () => clearInterval(interval);
   }, [state.status, state.horaEntrada]);
 
-  const horasTotales = useMemo(() => {
-    if (state.eventos.length === 0) {
-      return 0;
+  useEffect(() => {
+    let cancelled = false;
+    async function cargarHorasObjetivo() {
+      try {
+        const response = await fetch('/api/empleados/me');
+        if (!response.ok) {
+          return;
+        }
+
+        const payload = await parseJson<EmpleadoActualResponse>(response).catch(() => null);
+        if (!payload?.jornada) {
+          return;
+        }
+
+        const horasCalculadas = calcularHorasObjetivoDesdeJornada({
+          jornada: {
+            config: payload.jornada.config,
+            horasSemanales: payload.jornada.horasSemanales,
+          },
+          fecha: toMadridDate(new Date()),
+        });
+
+        if (!cancelled && Number.isFinite(horasCalculadas) && horasCalculadas > 0) {
+          setHorasObjetivoDia(Number(horasCalculadas.toFixed(2)));
+        }
+      } catch (error) {
+        console.warn('[FichajeWidget] No se pudo cargar la jornada actual', error);
+      }
     }
 
-    return calcularHorasTrabajadas(state.eventos) ?? 0;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.eventos, tick]);
+    cargarHorasObjetivo();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const horasTotales = useMemo(() => {
+    if (state.status === 'trabajando' && state.horaEntrada) {
+      const diffHoras = (Date.now() - state.horaEntrada.getTime()) / (1000 * 60 * 60);
+      const total = state.horasAcumuladas + (Number.isFinite(diffHoras) ? Math.max(diffHoras, 0) : 0);
+      return Number(total.toFixed(2));
+    }
+
+    return Number(state.horasAcumuladas.toFixed(2));
+  }, [state.status, state.horaEntrada, state.horasAcumuladas, tick]);
 
   const horasHechas = useMemo(() => Math.round(horasTotales * 10) / 10, [horasTotales]);
-  const horasPorHacer = useMemo(() => Math.max(0, 8 - horasHechas), [horasHechas]);
+  const horasPorHacer = useMemo(
+    () => Math.max(0, Number(horasObjetivoDia.toFixed(2)) - horasHechas),
+    [horasHechas, horasObjetivoDia]
+  );
   const tiempoTrabajado = useMemo(
     () => formatTiempoTrabajado(horasTotales * 60 * 60 * 1000),
     [horasTotales]
@@ -179,7 +213,8 @@ export function FichajeWidget({
 
       try {
         const hoy = new Date();
-        const fechaLocal = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-${String(hoy.getDate()).padStart(2, '0')}`;
+        const madridDate = toMadridDate(hoy);
+        const fechaLocal = `${madridDate.getFullYear()}-${String(madridDate.getMonth() + 1).padStart(2, '0')}-${String(madridDate.getDate()).padStart(2, '0')}`;
 
         const response = await fetch(`/api/fichajes?fecha=${fechaLocal}&propios=1`, {
           cache: 'no-store',
@@ -194,33 +229,50 @@ export function FichajeWidget({
         if (fichajes.length === 0) {
           dispatch({
             type: 'SET_DATA',
-            payload: { status: 'sin_fichar', horaEntrada: null, eventos: [] },
+            payload: { status: 'sin_fichar', horaEntrada: null, horasAcumuladas: 0 },
           });
           return;
         }
 
         const fichajeHoy = fichajes[0];
-        const eventosFormateados = mapearEventosFichaje(fichajeHoy);
-        const entrada = fichajeHoy.eventos.find((e) => e.tipo === 'entrada');
+        const { horasAcumuladas, horaEnCurso } = calcularProgresoEventos(fichajeHoy.eventos);
+        const horasEsperadas =
+          typeof fichajeHoy.horasEsperadas === 'number'
+            ? fichajeHoy.horasEsperadas
+            : Number(fichajeHoy.horasEsperadas ?? 0);
+
+        if (Number.isFinite(horasEsperadas) && horasEsperadas > 0) {
+          setHorasObjetivoDia(Number(horasEsperadas.toFixed(2)));
+        }
 
         dispatch({
           type: 'SET_DATA',
           payload: {
             status: deriveEstadoDesdeFichaje(fichajeHoy),
-            horaEntrada: entrada ? new Date(entrada.hora) : null,
-            eventos: eventosFormateados,
+            horaEntrada: horaEnCurso,
+            horasAcumuladas,
           },
         });
       } catch (error) {
         console.error('[FichajeWidget] Error obteniendo estado:', error);
         dispatch({
           type: 'SET_DATA',
-          payload: { status: 'sin_fichar', horaEntrada: null, eventos: [] },
+          payload: { status: 'sin_fichar', horaEntrada: null, horasAcumuladas: 0 },
         });
       }
     },
     []
   );
+
+  // Escuchar eventos globales de actualización
+  useEffect(() => {
+    function handleUpdate() {
+      obtenerEstadoActual();
+    }
+    
+    window.addEventListener('fichaje-updated', handleUpdate);
+    return () => window.removeEventListener('fichaje-updated', handleUpdate);
+  }, [obtenerEstadoActual]);
 
   // Obtener estado actual y datos al cargar
   useEffect(() => {
@@ -264,6 +316,9 @@ export function FichajeWidget({
 
       // Actualizar estado después de fichar
       await obtenerEstadoActual();
+      
+      // Notificar a otros componentes (ej: tabla de fichajes)
+      window.dispatchEvent(new CustomEvent('fichaje-updated'));
     } catch (error) {
       console.error('[FichajeWidget] Error al fichar:', error);
       toast.error('Error al fichar. Intenta de nuevo.');
@@ -304,12 +359,12 @@ export function FichajeWidget({
   }
 
   const porcentajeProgreso = useMemo(() => {
-    const total = horasHechas + horasPorHacer;
-    if (total === 0) {
+    if (horasObjetivoDia <= 0) {
       return 0;
     }
-    return (horasHechas / total) * 100;
-  }, [horasHechas, horasPorHacer]);
+    const progreso = (horasHechas / horasObjetivoDia) * 100;
+    return Math.max(0, Math.min(100, progreso));
+  }, [horasHechas, horasObjetivoDia]);
   const circumference = 2 * Math.PI * 58;
 
   if (state.inicializando) {
@@ -522,6 +577,7 @@ export function FichajeWidget({
         onSuccess={() => {
           dispatch({ type: 'SET_MODAL', payload: false });
           obtenerEstadoActual();
+          window.dispatchEvent(new CustomEvent('fichaje-updated'));
         }}
         contexto="empleado"
         modo="crear"

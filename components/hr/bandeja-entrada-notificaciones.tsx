@@ -81,12 +81,14 @@ export function BandejaEntradaNotificaciones({
   return (
     <div>
       {notificaciones.length === 0 ? (
-        <EmptyState
-          layout="inline"
-          icon={Bell}
-          title="Sin notificaciones"
-          description="Te avisaremos aquí cuando haya novedades."
-        />
+        <div className="flex min-h-[320px] items-center justify-center">
+          <EmptyState
+            layout="inline"
+            icon={Bell}
+            title="Sin notificaciones"
+            description="Te avisaremos aquí cuando haya novedades."
+          />
+        </div>
       ) : (
         <div className="divide-y divide-gray-200 border border-gray-200 rounded-2xl overflow-hidden">
           {notificaciones.map((notificacion) => {

@@ -11,6 +11,7 @@ import {
   FileSignature,
   FileText,
   Folder,
+  Loader2,
   Settings,
   Trash2,
   Upload,
@@ -20,8 +21,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 import { SolicitarFirmaDialog } from '@/components/firma/solicitar-firma-dialog';
+import { DocumentViewerModal, useDocumentViewer } from '@/components/shared/document-viewer';
 import { EmptyState } from '@/components/shared/empty-state';
-import { FileUploadAdvanced } from '@/components/shared/file-upload-advanced';
 import { InfoTooltip } from '@/components/shared/info-tooltip';
 import { LoadingButton } from '@/components/shared/loading-button';
 import { SearchableMultiSelect } from '@/components/shared/searchable-multi-select';
@@ -44,9 +45,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { UploadHandler } from '@/lib/hooks/use-file-upload';
+import { uploadFilesToCarpeta } from '@/lib/documentos/client-upload';
 import { extractArrayFromResponse } from '@/lib/utils/api-response';
-import { parseJsonString } from '@/lib/utils/json';
 
 interface Documento {
   id: string;
@@ -95,8 +95,12 @@ interface CarpetaDetailClientProps {
 
 export function CarpetaDetailClient({ carpeta, empleados = [] }: CarpetaDetailClientProps) {
   const router = useRouter();
-  const maxUploadMB = Number(process.env.NEXT_PUBLIC_MAX_UPLOAD_MB ?? '10');
-  const uploadSectionRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const pendingEmpleadoGlobalRef = useRef<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgressText, setUploadProgressText] = useState<string | null>(null);
+  const [asignarEmpleadoDialog, setAsignarEmpleadoDialog] = useState(false);
+  const [empleadoSeleccionadoUpload, setEmpleadoSeleccionadoUpload] = useState<string>('');
   const [modalEliminar, setModalEliminar] = useState(false);
   const [eliminando, setEliminando] = useState(false);
   const [documentoAEliminar, setDocumentoAEliminar] = useState<string | null>(
@@ -118,6 +122,39 @@ export function CarpetaDetailClient({ carpeta, empleados = [] }: CarpetaDetailCl
   const [actualizandoAsignacion, setActualizandoAsignacion] = useState(false);
   const [documentoParaFirma, setDocumentoParaFirma] = useState<Documento | null>(null);
   const [modalSolicitarFirma, setModalSolicitarFirma] = useState(false);
+
+  // Document viewer state
+  const documentViewer = useDocumentViewer();
+
+  const openFilePicker = () => {
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+      fileInputRef.current.click();
+    }
+  };
+
+  const handleUploadButtonClick = useCallback(() => {
+    if (carpeta.esGlobal) {
+      if (empleados.length === 0) {
+        toast.error('No hay empleados activos para asignar este documento.');
+        return;
+      }
+      setAsignarEmpleadoDialog(true);
+      return;
+    }
+    openFilePicker();
+  }, [carpeta.esGlobal, empleados.length]);
+
+  const handleConfirmEmpleadoUpload = useCallback(() => {
+    if (!empleadoSeleccionadoUpload) {
+      toast.error('Selecciona un empleado para continuar.');
+      return;
+    }
+    pendingEmpleadoGlobalRef.current = empleadoSeleccionadoUpload;
+    setAsignarEmpleadoDialog(false);
+    // Timeout ensures dialog closes before opening file picker
+    setTimeout(() => openFilePicker(), 0);
+  }, [empleadoSeleccionadoUpload]);
 
   const parsearAsignadoA = useCallback(() => {
     if (!carpeta.asignadoA) {
@@ -245,59 +282,6 @@ export function CarpetaDetailClient({ carpeta, empleados = [] }: CarpetaDetailCl
     }
   };
 
-  const handleUpload: UploadHandler = useCallback(
-    ({ file, signal, onProgress }) =>
-      new Promise((resolve) => {
-        const formData = new FormData();
-        formData.append('file', file);
-        formData.append('carpetaId', carpeta.id);
-
-        const xhr = new XMLHttpRequest();
-        xhr.open('POST', '/api/documentos');
-
-        xhr.upload.onprogress = (event) => {
-          if (event.lengthComputable) {
-            onProgress?.(event.loaded, event.total);
-          }
-        };
-
-        xhr.onload = () => {
-          if (xhr.status >= 200 && xhr.status < 300) {
-            toast.success('Documento subido correctamente');
-            router.refresh();
-            resolve({ success: true });
-          } else {
-            let errorMessage = 'Error al subir archivo';
-            const response = parseJsonString<{ error?: string }>(xhr.responseText, {});
-            if (response.error) {
-              errorMessage = response.error;
-            }
-            resolve({ success: false, error: errorMessage });
-          }
-        };
-
-        xhr.onerror = () => {
-          resolve({ success: false, error: 'Error de red durante la subida' });
-        };
-
-        xhr.onabort = () => {
-          resolve({ success: false, error: 'Subida cancelada' });
-        };
-
-        if (signal.aborted) {
-          xhr.abort();
-        } else {
-          signal.addEventListener('abort', () => xhr.abort());
-        }
-
-        xhr.send(formData);
-      }),
-    [carpeta.id, router]
-  );
-
-  const scrollToUploader = useCallback(() => {
-    uploadSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }, []);
 
   const handleDescargar = async (documentoId: string, nombre: string) => {
     try {
@@ -325,11 +309,7 @@ export function CarpetaDetailClient({ carpeta, empleados = [] }: CarpetaDetailCl
   };
 
   const handleVerDocumento = (documento: Documento) => {
-    const url = `/api/documentos/${documento.id}?inline=1`;
-    const newWindow = window.open(url, '_blank', 'noopener,noreferrer');
-    if (!newWindow) {
-      toast.error('Tu navegador bloqueó la vista previa. Permite pop-ups para Clousadmin.');
-    }
+    documentViewer.openViewer(documento.id, documento.nombre, documento.mimeType);
   };
 
   const handleSolicitarFirma = (documento: Documento) => {
@@ -459,22 +439,94 @@ export function CarpetaDetailClient({ carpeta, empleados = [] }: CarpetaDetailCl
                   Editar Asignación
                 </Button>
               )}
-              <Button onClick={scrollToUploader}>
-                <Upload className="w-4 h-4 mr-2" />
-                Subir Documentos
+              <Button onClick={handleUploadButtonClick} disabled={isUploading}>
+                {isUploading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Subiendo...
+                  </>
+                ) : (
+                  <>
+                    <Upload className="w-4 h-4 mr-2" />
+                    Subir Documentos
+                  </>
+                )}
               </Button>
             </div>
           </div>
         </div>
 
-        <div ref={uploadSectionRef} className="mb-6">
-          <FileUploadAdvanced
-            onUpload={handleUpload}
-            allowMultiple
-            maxSizeMB={maxUploadMB}
-            className="bg-white/80 p-4 rounded-2xl border border-gray-100"
-          />
-        </div>
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          className="hidden"
+          onChange={async (event) => {
+            const fileList = event.target.files;
+            if (!fileList || fileList.length === 0) return;
+
+            const files = Array.from(fileList);
+            const extraFields =
+              carpeta.esGlobal && pendingEmpleadoGlobalRef.current
+                ? { empleadoId: pendingEmpleadoGlobalRef.current }
+                : undefined;
+
+            if (carpeta.esGlobal && !extraFields?.empleadoId) {
+              toast.error('Selecciona un empleado antes de subir.');
+              event.target.value = '';
+              return;
+            }
+
+            setIsUploading(true);
+            setUploadProgressText(`Subiendo 1/${files.length}`);
+
+            const result = await uploadFilesToCarpeta(
+              carpeta.id,
+              files,
+              {
+                onFileSuccess: (_file, index, total) => {
+                  const nextIndex = Math.min(index + 2, total);
+                  setUploadProgressText(index + 1 === total ? 'Procesando...' : `Subiendo ${nextIndex}/${total}`);
+                },
+                onFileError: (_file, index, total, errorMessage) => {
+                  const nextIndex = Math.min(index + 2, total);
+                  setUploadProgressText(index + 1 === total ? 'Procesando...' : `Subiendo ${nextIndex}/${total}`);
+                  if (errorMessage) {
+                    toast.error(errorMessage);
+                  }
+                },
+              },
+              { extraFields }
+            );
+
+            setIsUploading(false);
+            setUploadProgressText(null);
+            pendingEmpleadoGlobalRef.current = null;
+            setEmpleadoSeleccionadoUpload('');
+            event.target.value = '';
+
+            if (result.successes > 0) {
+              toast.success(
+                result.successes === 1
+                  ? 'Documento subido correctamente'
+                  : `${result.successes} documentos subidos correctamente`
+              );
+              router.refresh();
+            }
+
+            if (result.failures.length > 0) {
+              const firstError = result.failures[0];
+              toast.error(firstError.message || 'Algunos archivos no se pudieron subir');
+            }
+          }}
+        />
+
+        {(isUploading || uploadProgressText) && (
+          <p className="mb-4 text-sm text-blue-600 flex items-center gap-2">
+            <Loader2 className="w-4 h-4 animate-spin" />
+            {uploadProgressText ?? 'Procesando...'}
+          </p>
+        )}
 
         {/* Filtros (solo para carpetas globales) */}
         {carpeta.esGlobal && empleados.length > 0 && (
@@ -530,7 +582,7 @@ export function CarpetaDetailClient({ carpeta, empleados = [] }: CarpetaDetailCl
                 title="No hay documentos en esta carpeta"
                 description="Haz clic en 'Subir Documentos' para añadir archivos"
                 action={
-                  <Button onClick={scrollToUploader}>
+                  <Button onClick={handleUploadButtonClick}>
                     <Upload className="w-4 h-4 mr-2" />
                     Subir Documento
                   </Button>
@@ -749,6 +801,52 @@ export function CarpetaDetailClient({ carpeta, empleados = [] }: CarpetaDetailCl
         </DialogContent>
       </Dialog>
 
+      {/* Dialogo para asignar empleado en carpetas maestras */}
+      <Dialog
+        open={asignarEmpleadoDialog}
+        onOpenChange={(open) => {
+          setAsignarEmpleadoDialog(open);
+          if (!open && !isUploading) {
+            pendingEmpleadoGlobalRef.current = null;
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Asignar empleado</DialogTitle>
+            <DialogDescription>
+              Selecciona a qué empleado pertenece el documento que vas a subir a la carpeta global
+              <strong> {carpeta.nombre}</strong>.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-2 py-2">
+            <Label>Empleado</Label>
+            <Select value={empleadoSeleccionadoUpload} onValueChange={setEmpleadoSeleccionadoUpload}>
+              <SelectTrigger>
+                <SelectValue placeholder="Selecciona un empleado" />
+              </SelectTrigger>
+              <SelectContent>
+                {empleados.map((emp) => (
+                  <SelectItem key={emp.id} value={emp.id}>
+                    {emp.nombre} {emp.apellidos}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAsignarEmpleadoDialog(false)} disabled={isUploading}>
+              Cancelar
+            </Button>
+            <Button onClick={handleConfirmEmpleadoUpload} disabled={isUploading}>
+              Continuar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Modal Eliminar Documento */}
       <Dialog open={modalEliminar} onOpenChange={setModalEliminar}>
         <DialogContent>
@@ -796,6 +894,40 @@ export function CarpetaDetailClient({ carpeta, empleados = [] }: CarpetaDetailCl
             setDocumentoParaFirma(null);
             router.refresh();
           }}
+        />
+      )}
+
+      {/* Document Viewer Modal */}
+      {documentViewer.documentId && (
+        <DocumentViewerModal
+          open={documentViewer.isOpen}
+          onClose={documentViewer.closeViewer}
+          documentId={documentViewer.documentId}
+          title={documentViewer.documentTitle}
+          mimeType={documentViewer.documentMimeType ?? undefined}
+          onDownload={() => {
+            if (documentViewer.documentId) {
+              handleDescargar(documentViewer.documentId, documentViewer.documentTitle);
+            }
+          }}
+          actions={
+            documentViewer.documentMimeType === 'application/pdf' ? (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const doc = carpeta.documentos.find(d => d.id === documentViewer.documentId);
+                  if (doc) {
+                    documentViewer.closeViewer();
+                    handleSolicitarFirma(doc);
+                  }
+                }}
+              >
+                <FileSignature className="w-4 h-4 mr-2" />
+                Solicitar firma
+              </Button>
+            ) : undefined
+          }
         />
       )}
     </>

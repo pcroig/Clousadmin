@@ -26,6 +26,7 @@ export type TipoNotificacion =
   | 'fichaje_autocompletado'
   | 'fichaje_requiere_revision'
   | 'fichaje_resuelto'
+  | 'fichaje_modificado'
   // Equipos
   | 'cambio_manager'
   | 'asignado_equipo'
@@ -95,7 +96,8 @@ export function obtenerCategoria(tipo: TipoNotificacion): CategoriaNotificacion 
   if (
     tipo === 'fichaje_autocompletado' ||
     tipo === 'fichaje_requiere_revision' ||
-    tipo === 'fichaje_resuelto'
+    tipo === 'fichaje_resuelto' ||
+    tipo === 'fichaje_modificado'
   ) {
     return 'fichajes';
   }
@@ -160,10 +162,10 @@ async function obtenerUsuariosANotificar(
   // Manager
   if (roles.manager) {
     const manager = await prisma.empleado.findUnique({
-      where: { id: roles.manager },
-      select: { usuarioId: true },
+      where: { id: roles.manager, activo: true },
+      select: { usuarioId: true, usuario: { select: { activo: true } } },
     });
-    if (manager?.usuarioId && !usuarioIds.includes(manager.usuarioId)) {
+    if (manager?.usuarioId && manager.usuario.activo && !usuarioIds.includes(manager.usuarioId)) {
       usuarioIds.push(manager.usuarioId);
     }
   }
@@ -171,10 +173,10 @@ async function obtenerUsuariosANotificar(
   // Empleado
   if (roles.empleado) {
     const empleado = await prisma.empleado.findUnique({
-      where: { id: roles.empleado },
-      select: { usuarioId: true },
+      where: { id: roles.empleado, activo: true },
+      select: { usuarioId: true, usuario: { select: { activo: true } } },
     });
-    if (empleado?.usuarioId && !usuarioIds.includes(empleado.usuarioId)) {
+    if (empleado?.usuarioId && empleado.usuario.activo && !usuarioIds.includes(empleado.usuarioId)) {
       usuarioIds.push(empleado.usuarioId);
     }
   }
@@ -629,6 +631,47 @@ export async function crearNotificacionFichajeResuelto(
       prioridad: 'normal',
       accionUrl: '/empleado/horario/fichajes',
       accionTexto: 'Ver fichaje',
+    },
+  });
+}
+
+export async function crearNotificacionFichajeModificado(
+  prisma: PrismaClient,
+  params: {
+    fichajeId: string;
+    empresaId: string;
+    empleadoId: string;
+    modificadoPorNombre: string;
+    accion: 'creado' | 'editado' | 'eliminado';
+    fechaFichaje: Date;
+    detalles?: string;
+  }
+) {
+  const { fichajeId, empresaId, empleadoId, modificadoPorNombre, accion, fechaFichaje, detalles } = params;
+
+  const usuarioIds = await obtenerUsuariosANotificar(prisma, empresaId, {
+    empleado: empleadoId,
+  });
+
+  const accionTexto = {
+    creado: 'creado un evento',
+    editado: 'editado un evento',
+    eliminado: 'eliminado un evento',
+  }[accion];
+
+  await crearNotificaciones(prisma, {
+    empresaId,
+    usuarioIds,
+    tipo: 'fichaje_modificado',
+    titulo: 'Fichaje modificado',
+    mensaje: `${modificadoPorNombre} ha ${accionTexto} en tu fichaje del ${new Intl.DateTimeFormat('es-ES').format(fechaFichaje)}.${detalles ? ` Detalles: ${detalles}` : ''}`,
+    metadata: {
+      fichajeId,
+      fecha: fechaFichaje.toISOString(),
+      accion,
+      prioridad: 'normal',
+      accionUrl: '/empleado/horario/fichajes',
+      accionTexto: 'Ver cambios',
     },
   });
 }

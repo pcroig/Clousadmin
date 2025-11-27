@@ -23,6 +23,14 @@ export async function GET(req: NextRequest) {
         apellidos: true,
         email: true,
         empresaId: true,
+        jornada: {
+          select: {
+            id: true,
+            nombre: true,
+            horasSemanales: true,
+            config: true,
+          },
+        },
       },
     });
 

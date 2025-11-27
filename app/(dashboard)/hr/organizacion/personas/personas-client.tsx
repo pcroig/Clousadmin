@@ -15,10 +15,10 @@ import { DenunciasDetails } from '@/components/hr/denuncias-details';
 import { GestionarOnboardingModal } from '@/components/hr/gestionar-onboarding-modal';
 import { AddPersonaDialog } from '@/components/organizacion/add-persona-dialog';
 import { AvatarCell, Column, DataTable } from '@/components/shared/data-table';
+import { ExpandableSearch } from '@/components/shared/expandable-search';
 import { DetailsPanel } from '@/components/shared/details-panel';
+import { TextIconButton } from '@/components/shared/text-icon-button';
 import { TableHeader } from '@/components/shared/table-header';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { useIsMobile } from '@/lib/hooks/use-viewport';
 
 
@@ -193,26 +193,21 @@ export function PersonasClient({ empleados, initialPanel, initialDenunciaId }: P
               onClick: () => setGestionarOnboardingOpen(true),
               variant: 'outline',
             }}
+            rightContent={(
+              <div className="flex items-center gap-2">
+                <TextIconButton
+                  icon={Flag}
+                  label="Canal de denuncias"
+                  onClick={() => setDenunciasDetailsOpen(true)}
+                />
+                <ExpandableSearch
+                  value={searchTerm}
+                  onChange={setSearchTerm}
+                  placeholder="Buscar persona..."
+                />
+              </div>
+            )}
           />
-          <div className="flex items-center justify-between mb-6 gap-4">
-            <div className="flex items-center gap-3 flex-1">
-              <Input
-                placeholder="Buscar persona..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-[240px]"
-              />
-            </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setDenunciasDetailsOpen(true)}
-              className="rounded-lg"
-              title="Canal de denuncias"
-            >
-              <Flag className="h-4 w-4" />
-            </Button>
-          </div>
         </>
       )}
 

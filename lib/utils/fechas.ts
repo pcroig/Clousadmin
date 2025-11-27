@@ -72,5 +72,36 @@ export function ensureDate(value: FechaInput, fallback?: Date): Date {
   throw new TypeError(`[ensureDate] Valor de fecha inválido: ${value}`);
 }
 
+/**
+ * Formatea una fecha usando la zona horaria de Madrid (Europe/Madrid)
+ */
+export function formatFechaMadrid(fecha: Date | string, options?: Intl.DateTimeFormatOptions): string {
+  const date = typeof fecha === 'string' ? new Date(fecha) : fecha;
+  return new Intl.DateTimeFormat('es-ES', {
+    timeZone: 'Europe/Madrid',
+    ...options,
+  }).format(date);
+}
+
+/**
+ * Convierte una fecha a la fecha correspondiente en Madrid (para evitar desfases de día)
+ * Devuelve un Date normalizado a las 00:00 del día en Madrid
+ */
+export function toMadridDate(fecha: Date | string): Date {
+  const date = typeof fecha === 'string' ? new Date(fecha) : fecha;
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Europe/Madrid',
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric',
+  }).formatToParts(date);
+  
+  const year = parts.find(p => p.type === 'year')?.value;
+  const month = parts.find(p => p.type === 'month')?.value;
+  const day = parts.find(p => p.type === 'day')?.value;
+
+  return new Date(`${year}-${month?.padStart(2, '0')}-${day?.padStart(2, '0')}T00:00:00`);
+}
+
 
 

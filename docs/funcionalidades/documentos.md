@@ -1,8 +1,9 @@
 # 📁 Sistema de Gestión Documental
 
 **Estado**: ✅ Implementado y Funcional  
-**Versión**: 1.0.0 MVP  
-**Fecha de finalización**: 2 de Noviembre 2025
+**Versión**: 1.4.0  
+**Fecha de finalización**: 2 de Noviembre 2025  
+**Última actualización**: 27 de Noviembre 2025
 
 ---
 
@@ -11,9 +12,11 @@
 Sistema completo de gestión documental con:
 - ✅ Carpetas automáticas por empleado (Contratos, Nóminas, Personales, Médicos)
 - ✅ Upload y descarga de documentos con validaciones
+- ✅ **Visualización in-app** de PDF, Word (convertido a PDF) e imágenes
 - ✅ Sistema de permisos (HR, Empleados, Managers)
 - ✅ Vista jerárquica de carpetas y documentos
 - ✅ Carpetas compartidas (HR Admin)
+- ✅ **Carpetas maestras globales** para HR (vista unificada)
 - ✅ Preparado para IA en Fase 2
 - ✅ UI mobile-first con tabs, action bars y métricas contextuales (Nov 2025)
 
@@ -23,6 +26,30 @@ Sistema completo de gestión documental con:
 - **Tabs Documentos/Plantillas** renovados: botones contextuales (Crear carpeta / Subir plantilla) se actualizan dinámicamente por tab.
 - **Plantillas gestionadas**: `PlantillasList` y `SubirPlantillaModal` permiten uploads rápidos y refrescan la vista automáticamente.
 - **Compatibilidad responsive**: `CarpetasGrid` reutilizable en móvil y desktop, con contadores y estados vacíos coherentes.
+
+### 🆕 Novedades 2025-11-27
+
+- **📄 Visualización de Documentos In-App**: Sistema completo de visualización de documentos sin salir de la aplicación
+  - PDFs e imágenes se muestran directamente en modal
+  - Documentos Word (DOCX) se convierten automáticamente a PDF para visualización
+  - Caché inteligente de previews para optimizar rendimiento
+  - Integrado en todas las vistas de documentos, plantillas y firmas
+  
+- **📤 Sistema de Upload Simplificado**: Nueva experiencia de subida de documentos
+  - Modal unificado para subir documentos con selección de carpeta
+  - Creación rápida de carpetas desde el modal
+  - Upload inmediato sin colas complejas, con indicador de "Procesando"
+  - Componente reutilizable `DocumentUploadArea` para cualquier contexto
+
+- **🌍 Carpetas Maestras Globales**: Mejora en la organización para HR
+  - Vista HR muestra solo carpetas globales unificadas (ej: "Nóminas")
+  - Filtrado automático por empleado en carpetas globales
+  - Vista agregada de todos los documentos del mismo tipo en una sola carpeta
+
+- **👁️ Previsualización de Plantillas Mejorada**: Visualización directa en la interfaz
+  - Preview en PDF directamente en el panel de plantillas
+  - Generación bajo demanda con datos reales del empleado
+  - Selector de empleado para probar diferentes datos
 
 ---
 
@@ -207,6 +234,23 @@ Descargar documento (con validación de permisos)
 - Stream del archivo con headers apropiados
 - 403 si no tiene permisos
 
+#### `GET /api/documentos/[id]/preview`
+Vista previa del documento para visualización in-app
+
+**Query params:**
+- `regenerate=1`: Forzar regeneración del preview (solo para DOCX)
+
+**Response:**
+- Stream PDF del documento (convierte DOCX a PDF automáticamente)
+- Headers de seguridad y caché configurados
+- 403 si no tiene permisos
+- 415 si el tipo de archivo no es compatible con preview
+
+**Soporte de tipos:**
+- ✅ PDFs: Se sirven directamente
+- ✅ Imágenes (JPG, PNG, GIF, WebP): Se sirven directamente
+- ✅ DOCX: Se convierten a PDF automáticamente (con caché en S3)
+
 #### `DELETE /api/documentos/[id]`
 Eliminar documento (solo HR)
 
@@ -235,6 +279,25 @@ Ver contenido de carpeta
 - Agrega documentos de todos los empleados del mismo tipo
 - Vista HR incluye filtros por empleado y búsqueda
 - Tipos globales: Nóminas, Contratos, Justificantes
+- **Nota**: En la vista HR principal (`/hr/documentos`), solo se muestran carpetas globales y compartidas. Las carpetas individuales por empleado no aparecen en el listado principal.
+
+#### `GET /api/plantillas/[id]/preview`
+Previsualización PDF de plantilla con datos de empleado
+
+**Query params:**
+- `empleadoId`: ID del empleado para previsualizar con sus datos
+
+**Response:**
+- Stream PDF con la plantilla procesada y variables resueltas
+- Headers de seguridad configurados
+- 403 si no es HR Admin
+- 404 si la plantilla o empleado no existen
+- 415 si la plantilla no es DOCX
+
+**Características:**
+- Resuelve variables automáticamente con datos del empleado
+- Convierte DOCX a PDF en tiempo real
+- Caché temporal (5 minutos) para optimizar rendimiento
 
 #### `POST /api/carpetas`
 Crear carpeta (solo HR para carpetas compartidas)
@@ -264,12 +327,14 @@ Eliminar carpeta vacía (solo HR)
 #### Ver Documentos
 ```
 Navegar a: /hr/documentos
-- Verás todas las carpetas de la empresa
+- Verás las carpetas globales y compartidas de la empresa
 - Carpetas con ícono 🌍 son globales (agregan documentos de todos los empleados)
+- Carpetas individuales por empleado NO se muestran aquí (solo las globales)
 - Click en una carpeta para ver su contenido
 - Dentro de la carpeta podrás:
   • Ver todos los documentos en formato tabla
   • En carpetas globales: filtrar por empleado y buscar
+  • Visualizar documentos directamente en la app (botón "Ver")
   • Descargar documentos
   • Eliminar documentos
   • Subir nuevos documentos
@@ -295,21 +360,32 @@ Navegar a: /hr/documentos
 ```
 
 #### Subir Documentos
+
+**Desde el header principal:**
+```
+1. Click en "Subir Documentos" en el header
+2. Se abre modal con:
+   - Selector de carpeta destino (incluye opción de crear carpeta rápida)
+   - Área de drag & drop o click para seleccionar archivos
+3. Seleccionar carpeta y archivos
+4. Los archivos se procesan inmediatamente con indicador "Procesando..."
+5. Al completar, se cierra el modal y se actualiza la vista
+```
+
+**Desde dentro de una carpeta:**
 ```
 1. Navegar a la carpeta destino
-2. Click en "Subir Documentos" o arrastra archivos al área de drop
-3. Seleccionar archivos (múltiples archivos permitidos)
-4. Sistema muestra:
-   - Preview de archivos antes de subir
-   - Progreso de subida en tiempo real (porcentaje, velocidad, ETA)
-   - Estado de cada archivo (en cola, subiendo, completado, error)
-5. Validaciones automáticas:
-   - Tipo de archivo (PDF, JPG, PNG)
-   - Tamaño máximo (configurable, default: 10MB)
-   - Magic numbers (detección de archivos corruptos)
-6. Reintentos automáticos en caso de error (hasta 3 intentos)
-7. Cancelación de uploads en progreso disponible
+2. Click en "Subir Documentos"
+3. Seleccionar archivos (múltiples permitidos)
+4. Los archivos se procesan inmediatamente con indicador "Procesando..."
+5. Al completar, los documentos aparecen en la tabla
 ```
+
+**Características:**
+- Upload inmediato sin colas visibles
+- Indicador de progreso simple y claro
+- Validaciones automáticas (tipo, tamaño, magic numbers)
+- Feedback inmediato con toasts de éxito/error
 
 ### Para Empleados
 
@@ -346,14 +422,25 @@ Navegar a: /empleado/mi-espacio/documentos
 #### Subir Documentos Personales
 ```
 1. Click en carpeta "Personales" o "Médicos"
-2. Click en "Subir Documentos" o arrastra archivos al área de drop
+2. Click en "Subir Documentos"
 3. Seleccionar archivo(s) - múltiples archivos permitidos
-4. Sistema muestra progreso en tiempo real con:
-   - Barra de progreso por archivo
-   - Velocidad de subida y tiempo restante (ETA)
-   - Previsualización de imágenes antes de subir
-5. Validaciones automáticas antes y durante la subida
-6. Reintentos automáticos si hay error de red
+4. Sistema procesa inmediatamente con indicador "Procesando..."
+5. Al completar, los documentos aparecen en la lista
+6. Validaciones automáticas (tipo, tamaño)
+```
+
+#### Visualizar Documentos
+```
+1. Click en botón "Ver" (icono de ojo) junto a cualquier documento
+2. Se abre modal con visualización del documento:
+   - PDFs: Visualización nativa en el navegador
+   - Word (DOCX): Convertido automáticamente a PDF para visualización
+   - Imágenes: Visualización directa
+3. Desde el modal puedes:
+   - Ver el documento completo en pantalla completa
+   - Descargar el archivo original
+   - Abrir en nueva pestaña
+   - Cerrar y volver a la lista
 ```
 
 ---
@@ -417,12 +504,16 @@ s3://[STORAGE_BUCKET]/
   │   │   │   └─ medicos/
   │   │   └─ compartidos/
   │   │       └─ [carpetaId]/
+  └─ previews/
+      └─ [documentoId].pdf    # Previews cacheados de documentos DOCX
 ```
 
 **Características:**
 - URLs firmadas para descargas seguras
 - Eliminación automática al borrar documentos
 - Migración automática desde storage local (ver `scripts/migrate-documents-to-s3.ts`)
+- **Caché de previews**: Los documentos Word convertidos a PDF se cachean en `previews/[documentoId].pdf` para evitar reconversiones
+- Invalidación automática de caché cuando se actualiza el documento original
 
 ---
 
@@ -442,11 +533,25 @@ app/api/
 ├── documentos/
 │   ├── route.ts                               # POST (upload), GET (list)
 │   └── [id]/
-│       └── route.ts                           # GET (download), DELETE
+│       ├── route.ts                           # GET (download), DELETE
+│       └── preview/
+│           └── route.ts                       # GET (preview in-app)
+├── plantillas/
+│   └── [id]/
+│       └── preview/
+│           └── route.ts                       # GET (template preview PDF)
 └── carpetas/
     ├── route.ts                               # POST (create), GET (list)
     └── [id]/
         └── route.ts                           # GET (view), DELETE
+
+lib/
+├── documentos/
+│   ├── preview.ts                             # Servicio de generación de previews
+│   └── client-upload.ts                       # Helper para uploads desde cliente
+├── documentos.ts                              # Utilidades y funciones helper
+└── hooks/
+    └── use-crear-empleado.ts                  # Hook para integración
 
 scripts/
 └── crear-carpetas-empleados-existentes.ts     # Script de migración
@@ -457,11 +562,14 @@ scripts/
 app/(dashboard)/
 ├── hr/
 │   └── documentos/
-│       ├── page.tsx                           # Lista de carpetas
-│       ├── documentos-client.tsx              # Cliente con modal crear
-│       └── [id]/
-│           ├── page.tsx                       # Vista detalle carpeta
-│           └── carpeta-detail-client.tsx      # Cliente con upload/download/delete
+│       ├── page.tsx                           # Lista de carpetas (solo globales)
+│       ├── documentos-client.tsx              # Cliente con modal crear/subir
+│       ├── [id]/
+│       │   ├── page.tsx                       # Vista detalle carpeta
+│       │   └── carpeta-detail-client.tsx      # Cliente con upload/download/delete/view
+│       └── plantillas/
+│           └── [id]/
+│               └── plantilla-detail-client.tsx # Vista de plantilla con preview
 └── empleado/
     └── mi-espacio/
         └── documentos/
@@ -469,7 +577,15 @@ app/(dashboard)/
             ├── documentos-client.tsx          # Cliente con tabs personal/compartido
             └── [id]/
                 ├── page.tsx                   # Vista detalle carpeta
-                └── carpeta-detail-client.tsx  # Cliente con upload/download
+                └── carpeta-detail-client.tsx  # Cliente con upload/download/view
+
+components/
+├── hr/
+│   └── subir-documentos-modal.tsx             # Modal para subir documentos con selector de carpeta
+├── shared/
+│   ├── document-viewer.tsx                    # Modal reutilizable para visualizar documentos
+│   └── document-upload-area.tsx               # Componente de upload simplificado
+└── ...
 ```
 
 ---
@@ -646,11 +762,13 @@ curl http://localhost:3000/api/documentos
 - 🔜 Log de auditoría completo (quién, cuándo, qué)
 
 ### Fase 4: Funcionalidades Avanzadas
+- ✅ Visualización in-app de documentos (completado)
 - 🔜 Versionado de documentos
-- 🔜 Firma electrónica
+- ✅ Firma electrónica (integración básica existente, mejorar UX)
 - 🔜 Workflow de aprobación
 - 🔜 OCR para documentos escaneados
 - 🔜 CDN para descargas rápidas
+- 🔜 Anotaciones y comentarios en documentos
 
 ---
 
@@ -754,6 +872,13 @@ model contrato {
    - Sin errores de compilación en código nuevo
    - Compatible con Next.js 16 (async params)
 
+5. **Visualización de Documentos**
+   - PDFs e imágenes se visualizan directamente en el navegador
+   - DOCX se convierte automáticamente a PDF usando LibreOffice
+   - Previews se cachean en S3 para optimizar rendimiento
+   - Headers de seguridad estrictos en todos los endpoints de preview
+   - Requiere LibreOffice instalado en el servidor para conversión DOCX
+
 ---
 
 ## 🐛 Troubleshooting
@@ -773,6 +898,23 @@ npx tsx scripts/crear-carpetas-empleados-existentes.ts
 - Solo HR Admin puede crear carpetas compartidas
 - Verificar rol del usuario en sesión
 
+### Error al visualizar documento Word (DOCX)
+- Verificar que LibreOffice esté instalado en el servidor (`soffice` disponible en PATH)
+- El sistema mostrará un mensaje claro si la conversión no está disponible
+- En desarrollo local, puede que necesites instalar LibreOffice manualmente
+- Los previews se cachean automáticamente después de la primera conversión
+
+### El preview no se genera o muestra error
+- Verificar permisos de acceso a la carpeta del documento
+- Verificar que el documento exista y tenga `s3Key` válido
+- Revisar logs del servidor para errores de conversión
+- Intentar con `?regenerate=1` en la URL del preview para forzar regeneración
+
+### Las carpetas individuales no aparecen en la vista HR
+- **Es normal**: La vista HR principal solo muestra carpetas globales y compartidas
+- Las carpetas individuales por empleado se acceden desde las carpetas globales
+- Para ver carpetas de un empleado específico, usar la carpeta global correspondiente y filtrar por empleado
+
 ---
 
 ## 📞 Soporte
@@ -780,7 +922,9 @@ npx tsx scripts/crear-carpetas-empleados-existentes.ts
 Para dudas o mejoras:
 1. Revisar código en `lib/documentos.ts` (utilidades y constantes)
 2. Revisar APIs en `app/api/documentos` y `app/api/carpetas`
-3. Verificar logs de consola para errores
+3. Revisar `lib/documentos/preview.ts` para visualización
+4. Verificar logs de consola para errores
+5. Para problemas de conversión DOCX, verificar logs del servidor
 
 ---
 
@@ -790,8 +934,9 @@ Para dudas o mejoras:
 - [x] Schema Prisma actualizado
 - [x] Migraciones ejecutadas
 - [x] 5 carpetas del sistema (Contratos, Nóminas, Justificantes, Personales, Médicos)
-- [x] APIs de documentos (upload, download, delete)
+- [x] APIs de documentos (upload, download, delete, preview)
 - [x] APIs de carpetas (create, list, view, delete)
+- [x] API de preview de plantillas
 - [x] Sistema de permisos implementado
 - [x] Validaciones de archivos
 - [x] Script de migración ejecutado
@@ -799,7 +944,7 @@ Para dudas o mejoras:
 - [x] Compatible con Next.js 16
 
 ### Vistas y UI
-- [x] Vista HR de carpetas
+- [x] Vista HR de carpetas (solo globales y compartidas)
 - [x] Vista HR de detalle de carpeta
 - [x] Vista HR con carpetas globales agregadas
 - [x] Filtros por empleado en carpetas globales
@@ -807,6 +952,9 @@ Para dudas o mejoras:
 - [x] Columna "Empleado" en carpetas globales
 - [x] Vista Empleado de carpetas
 - [x] Vista Empleado de detalle de carpeta
+- [x] Modal de visualización de documentos
+- [x] Modal de subida de documentos con selector de carpeta
+- [x] Componente de upload simplificado
 
 ### Integraciones
 - [x] Integración con creación de empleados (carpetas automáticas)
@@ -821,9 +969,22 @@ Para dudas o mejoras:
 ### Utilidades y Helpers
 - [x] `obtenerOCrearCarpetaSistema()` - Crear/obtener carpeta de empleado
 - [x] `obtenerOCrearCarpetaGlobal()` - Crear/obtener carpeta global
+- [x] `getDocumentPreview()` - Generar preview de documento (con conversión DOCX)
+- [x] `uploadFilesToCarpeta()` - Helper para uploads desde cliente
 - [x] Constantes unificadas (CARPETAS_SISTEMA, TIPOS_DOCUMENTO)
 - [x] Validaciones de archivos y carpetas
 - [x] Hooks de integración
+- [x] Hook `useDocumentViewer` para gestión de visualización
+
+### Visualización y Preview
+- [x] Endpoint de preview de documentos (`/api/documentos/[id]/preview`)
+- [x] Conversión DOCX a PDF para preview
+- [x] Caché de previews en S3
+- [x] Componente `DocumentViewer` reutilizable
+- [x] Integración en listas de documentos
+- [x] Integración en flujo de firmas
+- [x] Preview de plantillas en PDF
+- [x] Headers de seguridad configurados
 
 ### Documentación
 - [x] Documentación completa actualizada
@@ -831,16 +992,99 @@ Para dudas o mejoras:
 - [x] Ejemplos de uso de APIs
 - [x] Guía de carpetas globales vs individuales
 - [x] Preparación para Fase 2 (IA)
+- [x] Documentación de visualización in-app
+- [x] Changelog actualizado con v1.4.0
 
 ---
 
-**Última actualización**: 2025-01-27  
-**Versión**: 1.3.0 MVP  
+**Última actualización**: 2025-11-27  
+**Versión**: 1.4.0  
 **Status**: ✅ COMPLETADO Y FUNCIONAL
 
 ---
 
 ## 🆕 Changelog
+
+### v1.4.0 (2025-11-27)
+
+#### ✨ Visualización de Documentos In-App
+- 📄 **Sistema completo de visualización**: Modal reutilizable `DocumentViewer` para visualizar documentos sin salir de la aplicación
+  - PDFs e imágenes se muestran directamente
+  - Documentos Word (DOCX) se convierten automáticamente a PDF
+  - Caché inteligente en S3 para optimizar rendimiento (previews de DOCX se cachean)
+  - Headers de seguridad estrictos (CSP, X-Content-Type-Options)
+  
+- 🔗 **Integración completa**:
+  - Visualización integrada en listas de documentos (HR y Empleado)
+  - Visualización en flujo de firmas (solicitar y firmar)
+  - Visualización en previsualización de plantillas
+
+#### 📤 Sistema de Upload Simplificado
+- 🎯 **Nuevo componente `DocumentUploadArea`**: Upload inmediato sin colas complejas
+  - Variantes: `minimal` (barra compacta) y `dropzone` (área de arrastrar)
+  - Indicador de "Procesando..." simple y claro
+  - Feedback inmediato con toasts
+  
+- 🔧 **Modal unificado `SubirDocumentosModal`**:
+  - Selector de carpeta destino con búsqueda
+  - Creación rápida de carpetas desde el modal
+  - Drag & drop nativo
+  - Upload secuencial para evitar saturación
+
+- 🧹 **Simplificación de UX**:
+  - Eliminado sistema de colas visible para el usuario
+  - Procesamiento inmediato con feedback claro
+  - Menos pasos, más intuitivo
+
+#### 🌍 Carpetas Maestras Globales
+- 📁 **Vista HR optimizada**:
+  - Solo muestra carpetas globales y compartidas en el listado principal
+  - Carpetas individuales por empleado no aparecen (evita miles de carpetas)
+  - Al entrar a carpeta global, se muestran todos los documentos agregados
+  - Filtros por empleado y búsqueda funcionan correctamente
+
+#### 👁️ Previsualización de Plantillas Mejorada
+- 📄 **Preview en PDF directo**:
+  - Generación bajo demanda con datos reales del empleado
+  - Visualización en iframe dentro del panel de plantillas
+  - Selector de empleado para probar diferentes datos
+  - Eliminado botón "Ver como PDF" (ahora es automático)
+  - Eliminado renderizador DOCX complejo
+
+- 🔧 **Mejoras técnicas**:
+  - Endpoint `/api/plantillas/[id]/preview` optimizado
+  - Manejo de errores mejorado
+  - Headers de seguridad configurados
+
+#### 🔐 Seguridad y Performance
+- 🛡️ **Headers de seguridad**:
+  - Content-Security-Policy estricto en endpoints de preview
+  - X-Content-Type-Options: nosniff
+  - Cache-Control configurado apropiadamente
+  
+- ⚡ **Optimizaciones**:
+  - Caché de previews DOCX en S3 (evita reconversiones)
+  - Generación lazy de previews (solo cuando se necesita)
+  - Invalidación de caché cuando se actualiza documento
+
+#### 🧩 Componentes y Arquitectura
+- 📦 **Componentes reutilizables**:
+  - `DocumentViewer`: Modal de visualización universal
+  - `useDocumentViewer`: Hook para gestión de estado del viewer
+  - `DocumentUploadArea`: Componente de upload simplificado
+  - `SubirDocumentosModal`: Modal completo para subir documentos
+
+- 🏗️ **Arquitectura mejorada**:
+  - Separación de lógica de negocio en `lib/documentos/preview.ts`
+  - Helper de upload en `lib/documentos/client-upload.ts`
+  - APIs RESTful consistentes
+
+#### 📚 Documentación
+- 📖 Documentación actualizada con todas las nuevas funcionalidades
+- 🔗 Ejemplos de uso de visualización y upload
+- 🗺️ Guía de carpetas maestras explicada
+
+---
 
 ### v1.3.0 (2025-01-27)
 

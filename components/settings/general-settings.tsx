@@ -32,6 +32,7 @@ export function GeneralSettings({ usuario }: GeneralSettingsProps) {
   const [showDerechoDialog, setShowDerechoDialog] = useState(false);
   const [isRequestingDerecho, setIsRequestingDerecho] = useState(false);
   const [isExportingDatos, setIsExportingDatos] = useState(false);
+  const [isExportingFichajes, setIsExportingFichajes] = useState(false);
 
   const formattedLastAccess = useMemo(() => {
     if (!usuario.ultimoAcceso) {
@@ -66,8 +67,45 @@ export function GeneralSettings({ usuario }: GeneralSettingsProps) {
     }
   };
 
+  const handleExportFichajes = async () => {
+    setIsExportingFichajes(true);
+    let url: string | null = null;
+    try {
+      const response = await fetch('/api/empleados/me/fichajes/export');
+
+      if (!response.ok) {
+        const payload = await parseJson<{ error?: string }>(response).catch(() => null);
+        throw new Error(payload?.error || 'No se pudo generar la exportación');
+      }
+
+      const blob = await response.blob();
+      url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `fichajes-${new Date().getFullYear()}.xlsx`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      toast.success('Historial de fichajes descargado correctamente');
+    } catch (error) {
+      console.error('Exportación fichajes:', error);
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : 'Hubo un error generando la exportación de fichajes'
+      );
+    } finally {
+      if (url) {
+        window.URL.revokeObjectURL(url);
+      }
+      setIsExportingFichajes(false);
+    }
+  };
+
   const handleExportDatos = async () => {
     setIsExportingDatos(true);
+    let url: string | null = null;
     try {
       const response = await fetch('/api/empleados/export/me');
 
@@ -77,14 +115,13 @@ export function GeneralSettings({ usuario }: GeneralSettingsProps) {
       }
 
       const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
+      url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
       link.download = `datos-personales-${new Date().toISOString().split('T')[0]}.xlsx`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
 
       toast.success('Exportación generada correctamente');
     } catch (error) {
@@ -95,6 +132,9 @@ export function GeneralSettings({ usuario }: GeneralSettingsProps) {
           : 'Hubo un error generando la exportación de datos'
       );
     } finally {
+      if (url) {
+        window.URL.revokeObjectURL(url);
+      }
       setIsExportingDatos(false);
     }
   };
@@ -204,13 +244,20 @@ export function GeneralSettings({ usuario }: GeneralSettingsProps) {
             El archivo incluye todas las tablas relevantes para el cumplimiento del derecho de acceso (GDPR).
             Guárdalo en un lugar seguro: contiene información sensible.
           </p>
-          <div className="flex justify-end">
+          <div className="flex justify-end gap-3">
+            <LoadingButton
+              variant="outline"
+              loading={isExportingFichajes}
+              onClick={handleExportFichajes}
+            >
+              Exportar Fichajes
+            </LoadingButton>
             <LoadingButton
               variant="outline"
               loading={isExportingDatos}
               onClick={handleExportDatos}
             >
-              Descargar Excel
+              Descargar Datos (GDPR)
             </LoadingButton>
           </div>
         </CardContent>

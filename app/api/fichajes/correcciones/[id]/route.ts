@@ -9,6 +9,7 @@ import {
   forbiddenResponse,
   handleApiError,
   isNextResponse,
+  methodNotAllowedResponse,
   notFoundResponse,
   requireAuthAsHROrManager,
   successResponse,
@@ -19,7 +20,10 @@ import {
   aplicarCorreccionFichaje,
   type CorreccionFichajePayload,
 } from '@/lib/fichajes/correcciones';
-import { crearNotificacionFichajeResuelto } from '@/lib/notificaciones';
+import {
+  crearNotificacionFichajeResuelto,
+  crearNotificacionSolicitudRechazada,
+} from '@/lib/notificaciones';
 import { prisma } from '@/lib/prisma';
 
 const accionSchema = z.object({
@@ -113,6 +117,15 @@ export async function PATCH(
         },
       });
 
+      // Notificar al empleado del rechazo (se convierte en DISCREPANCIA)
+      await crearNotificacionSolicitudRechazada(prisma, {
+        solicitudId: solicitud.id,
+        empresaId: solicitud.empresaId,
+        empleadoId: solicitud.empleadoId,
+        tipo: 'fichaje_correccion',
+        motivoRechazo: motivoRespuesta,
+      });
+
       return successResponse(actualizada);
     }
 
@@ -150,3 +163,9 @@ export async function PATCH(
   }
 }
 
+// DELETE /api/fichajes/correcciones/[id] - Bloqueado por auditoría
+export async function DELETE() {
+  return methodNotAllowedResponse(
+    'No se pueden eliminar las solicitudes de corrección. Quedan registradas como discrepancias si son rechazadas, por motivos de auditoría.'
+  );
+}

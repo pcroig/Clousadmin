@@ -124,16 +124,20 @@ export const NotificacionesWidget = memo(function NotificacionesWidget({
       href={href}
       contentClassName="overflow-y-auto"
     >
-      <div className="space-y-0">
+      <div className="flex h-full flex-col">
         {notificacionesMostradas.length === 0 ? (
-          <EmptyState
-            layout="widget"
-            icon={Bell}
-            title="Sin notificaciones"
-            description="Aquí verás las últimas novedades en cuanto aparezcan."
-          />
+          <div className="flex flex-1 items-center justify-center">
+            <EmptyState
+              layout="widget"
+              icon={Bell}
+              title="Sin notificaciones"
+              description="Aquí verás las últimas novedades en cuanto aparezcan."
+            />
+          </div>
         ) : (
-          notificacionesMostradas.map(renderNotificacion)
+          <div className="space-y-0">
+            {notificacionesMostradas.map(renderNotificacion)}
+          </div>
         )}
       </div>
     </WidgetCard>

@@ -4,6 +4,7 @@
 // Centraliza la lógica de transformación de fichajes API en datos listos para renderizar
 
 import { EstadoFichaje } from '@/lib/constants/enums';
+import { toMadridDate } from '@/lib/utils/fechas';
 
 const HORAS_OBJETIVO_POR_DEFECTO = 8;
 
@@ -116,23 +117,19 @@ function parseHorasTrabajadas(valor: number | string | null | undefined): number
 }
 
 function normalizarFecha(fecha: string | Date): { fechaISO: string; fechaDate: Date } {
-  const fechaRaw = fecha instanceof Date ? fecha.toISOString() : fecha;
+  const baseDate = fecha instanceof Date ? fecha : new Date(fecha);
 
-  const iso = new Date(fechaRaw);
-  if (Number.isNaN(iso.getTime())) {
+  if (Number.isNaN(baseDate.getTime())) {
     const hoy = new Date();
-    const fallback = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
-    const _fallbackISO = fallback.toISOString().split('T')[0];
-    return {
-      fechaISO: _fallbackISO,
-      fechaDate: fallback,
-    };
+    const fallback = toMadridDate(hoy);
+    const fallbackISO = fallback.toISOString().split('T')[0];
+    return { fechaISO: fallbackISO, fechaDate: fallback };
   }
 
-  const fechaISO = iso.toISOString().split('T')[0];
-  const fechaDate = new Date(`${fechaISO}T00:00:00`);
+  const madridDate = toMadridDate(baseDate);
+  const fechaISO = madridDate.toISOString().split('T')[0];
 
-  return { fechaISO, fechaDate };
+  return { fechaISO, fechaDate: madridDate };
 }
 
 function obtenerEntrada(eventos: FichajeEventoDTO[]): FichajeEventoDTO | undefined {

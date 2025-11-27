@@ -12,6 +12,7 @@ import { MobilePageHeader } from '@/components/adaptive/MobilePageHeader';
 import { ResponsiveContainer } from '@/components/adaptive/ResponsiveContainer';
 import { CrearCarpetaConDocumentosModal } from '@/components/hr/crear-carpeta-con-documentos-modal';
 import { PlantillasList } from '@/components/hr/plantillas-list';
+import { SubirDocumentosModal } from '@/components/hr/subir-documentos-modal';
 import { SubirPlantillaModal } from '@/components/hr/subir-plantilla-modal';
 import { type CarpetaCardData, CarpetasGrid } from '@/components/shared/carpetas-grid';
 import { Button } from '@/components/ui/button';
@@ -38,6 +39,7 @@ export function DocumentosClient({ carpetas }: DocumentosClientProps) {
   const [activeTab, setActiveTab] = useState('documentos');
   const [modalCrearCarpeta, setModalCrearCarpeta] = useState(false);
   const [modalSubirPlantilla, setModalSubirPlantilla] = useState(false);
+  const [modalSubirDocumentos, setModalSubirDocumentos] = useState(false);
 
   const handleAbrirCarpeta = useCallback(
     (carpetaId: string) => {
@@ -72,7 +74,7 @@ export function DocumentosClient({ carpetas }: DocumentosClientProps) {
                 <FolderPlus className="w-4 h-4 mr-2" />
                 Crear Carpeta
               </Button>
-              <Button variant="default" onClick={() => router.push('/hr/documentos/subir')}>
+              <Button variant="default" onClick={() => setModalSubirDocumentos(true)}>
                 <Upload className="w-4 h-4 mr-2" />
                 Subir Documentos
               </Button>
@@ -101,14 +103,24 @@ export function DocumentosClient({ carpetas }: DocumentosClientProps) {
             }
             actions={
               activeTab === 'documentos' ? (
-                <Button
-                  onClick={() => setModalCrearCarpeta(true)}
-                  size="sm"
-                  className={cn(MOBILE_DESIGN.button.secondary)}
-                >
-                  <FolderPlus className={cn(MOBILE_DESIGN.components.icon.small, 'mr-2')} />
-                  Crear
-                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    onClick={() => setModalCrearCarpeta(true)}
+                    size="sm"
+                    className={cn(MOBILE_DESIGN.button.secondary)}
+                  >
+                    <FolderPlus className={cn(MOBILE_DESIGN.components.icon.small, 'mr-2')} />
+                    Crear
+                  </Button>
+                  <Button
+                    onClick={() => setModalSubirDocumentos(true)}
+                    size="sm"
+                    className={cn(MOBILE_DESIGN.button.primary)}
+                  >
+                    <Upload className={cn(MOBILE_DESIGN.components.icon.small, 'mr-2')} />
+                    Subir
+                  </Button>
+                </div>
               ) : (
                 <Button
                   onClick={() => setModalSubirPlantilla(true)}
@@ -245,6 +257,14 @@ export function DocumentosClient({ carpetas }: DocumentosClientProps) {
         onOpenChange={setModalSubirPlantilla}
         onSuccess={() => {
           // Recargar página para mostrar nueva plantilla
+          router.refresh();
+        }}
+      />
+
+      <SubirDocumentosModal
+        open={modalSubirDocumentos}
+        onOpenChange={setModalSubirDocumentos}
+        onUploaded={() => {
           router.refresh();
         }}
       />

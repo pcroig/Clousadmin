@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 
 import { getSession } from '@/lib/auth';
+import { procesarFichajesDia } from '@/lib/calculos/fichajes';
 import { crearNotificacionFichajeResuelto } from '@/lib/notificaciones';
 import { prisma } from '@/lib/prisma';
 import { jornadaSelectCompleta } from '@/lib/prisma/selects';
@@ -42,6 +43,9 @@ interface ConfigJornada {
   [key: string]: ConfigDiaJornada | unknown;
 }
 
+const DEFAULT_LAZY_RECOVERY_DAYS = 3;
+const MAX_LAZY_RECOVERY_DAYS = 14;
+
 const revisionSchema = z.object({
   revisiones: z.array(
     z.object({
@@ -68,10 +72,33 @@ export async function GET(_request: NextRequest) {
 
     console.log('[API Revisión GET] EmpresaId:', session.user.empresaId);
 
-    // CAMBIO: Buscar directamente fichajes con estado 'pendiente' en tabla fichaje
-    // (en lugar de buscar en autoCompletado que el CRON no rellena)
     const hoy = new Date();
     hoy.setHours(0, 0, 0, 0);
+
+    const lazyDaysFromEnv = Number(process.env.FICHAJES_LAZY_DIAS ?? DEFAULT_LAZY_RECOVERY_DAYS);
+    const diasARecuperar =
+      Number.isFinite(lazyDaysFromEnv) && lazyDaysFromEnv > 0
+        ? Math.min(lazyDaysFromEnv, MAX_LAZY_RECOVERY_DAYS)
+        : DEFAULT_LAZY_RECOVERY_DAYS;
+
+    console.log(
+      `[API Revisión GET] Lazy recovery de fichajes para los últimos ${diasARecuperar} día(s) en empresa ${session.user.empresaId}`
+    );
+
+    for (let offset = 1; offset <= diasARecuperar; offset++) {
+      const fechaObjetivo = new Date(hoy);
+      fechaObjetivo.setDate(fechaObjetivo.getDate() - offset);
+
+      try {
+        await procesarFichajesDia(session.user.empresaId, fechaObjetivo, { notificar: false });
+      } catch (error) {
+        console.error(
+          '[API Revisión GET] Error procesando fallback de fichajes para el día',
+          fechaObjetivo.toISOString().split('T')[0],
+          error
+        );
+      }
+    }
 
     console.log('[API Revisión GET] Fecha hoy:', hoy.toISOString());
     console.log('[API Revisión GET] Buscando fichajes pendientes anteriores a hoy...');
@@ -158,24 +185,34 @@ export async function GET(_request: NextRequest) {
       let razon = 'Requiere revisión manual';
       if (fichaje.eventos.length === 0) {
         razon = 'Sin fichajes registrados en el día';
-      } else {
-        const tiposEventos = fichaje.eventos.map(e => e.tipo);
-        const eventosFaltantes: string[] = [];
-        
-        if (!tiposEventos.includes('entrada')) eventosFaltantes.push('entrada');
-        if (!tiposEventos.includes('salida')) eventosFaltantes.push('salida');
-        
-        if (eventosFaltantes.length > 0) {
-          razon = `Faltan eventos: ${eventosFaltantes.join(', ')}`;
-        }
+      } else if (fichaje.estado === 'en_curso') {
+        razon = 'Fichaje incompleto (dejado en curso)';
       }
 
-      // Determinar eventos faltantes
+      // Determinar eventos faltantes (lógica básica, idealmente usar validarFichajeCompleto)
       const tiposEventos = fichaje.eventos.map(e => e.tipo);
       const eventosFaltantes: string[] = [];
       
-      if (!tiposEventos.includes('entrada')) eventosFaltantes.push('entrada');
-      if (!tiposEventos.includes('salida')) eventosFaltantes.push('salida');
+      // Lógica mejorada para sugerir eventos faltantes basada en la jornada (si está disponible en preview)
+      if (previewEventos.length > 0) {
+        const tiposPreview = previewEventos.map(e => e.tipo);
+        for (const tipo of tiposPreview) {
+          if (!tiposEventos.includes(tipo)) {
+            eventosFaltantes.push(tipo);
+          }
+        }
+      } else {
+        // Fallback básico
+        if (!tiposEventos.includes('entrada')) eventosFaltantes.push('entrada');
+        if (!tiposEventos.includes('salida')) eventosFaltantes.push('salida');
+      }
+      
+      if (eventosFaltantes.length > 0) {
+         if (razon === 'Requiere revisión manual' || razon.includes('Fichaje incompleto')) {
+             const nombresEventos = eventosFaltantes.map(e => e.replace('_', ' '));
+             razon = `Faltan eventos: ${nombresEventos.join(', ')}`;
+         }
+      }
 
       return {
         id: fichaje.id, // Usar el ID del fichaje directamente

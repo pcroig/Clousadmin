@@ -4,6 +4,7 @@
 // Fichajes Client Component - Vista por Jornadas
 // ========================================
 
+import Link from 'next/link';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Calendar, Check, ChevronLeft, ChevronRight, Clock } from 'lucide-react';
@@ -32,10 +33,10 @@ import { EstadoFichaje } from '@/lib/constants/enums';
 import { useIsMobile } from '@/lib/hooks/use-viewport';
 import { extractArrayFromResponse } from '@/lib/utils/api-response';
 import { formatearHorasMinutos } from '@/lib/utils/formatters';
+import { toMadridDate } from '@/lib/utils/fechas';
 import { parseJson } from '@/lib/utils/json';
 
 import { JornadasModal } from './jornadas-modal';
-import { RevisionModal } from './revision-modal';
 
 
 
@@ -94,8 +95,6 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
   const [fechaBase, setFechaBase] = useState(new Date());
   const [busquedaEmpleado, setBusquedaEmpleado] = useState('');
   const [jornadasModal, setJornadasModal] = useState(false);
-  const [revisionModal, setRevisionModal] = useState(false);
-  const [cuadrandoFichajes, setCuadrandoFichajes] = useState(false);
   const [showCompensarHorasDialog, setShowCompensarHorasDialog] = useState(false);
   const [periodoCompensar, setPeriodoCompensar] = useState<{ mes: number; anio: number }>(() =>
     obtenerPeriodoDesdeFecha(new Date())
@@ -216,6 +215,15 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
     }).sort((a, b) => b.fecha.getTime() - a.fecha.getTime());
   }, [calcularHorasTrabajadas]);
 
+  // Listener para refrescar en tiempo real
+  useEffect(() => {
+    function handleRealtimeUpdate() {
+      fetchFichajes();
+    }
+    window.addEventListener('fichaje-updated', handleRealtimeUpdate);
+    return () => window.removeEventListener('fichaje-updated', handleRealtimeUpdate);
+  }, []);
+
   const fetchFichajes = useCallback(async () => {
     setLoading(true);
     try {
@@ -259,8 +267,9 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
   }, [fetchFichajes]);
 
   function calcularRangoFechas(fecha: Date, rango: 'dia' | 'semana' | 'mes') {
-    const inicio = new Date(fecha);
-    const fin = new Date(fecha);
+    const referencia = toMadridDate(fecha);
+    const inicio = new Date(referencia);
+    const fin = new Date(referencia);
 
     switch (rango) {
       case 'dia':
@@ -270,9 +279,9 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
         break;
       case 'semana':
         // Inicio de semana (lunes)
-        const diaSemana = fecha.getDay();
+        const diaSemana = referencia.getDay();
         const diffInicio = diaSemana === 0 ? -6 : 1 - diaSemana;
-        inicio.setDate(fecha.getDate() + diffInicio);
+        inicio.setDate(referencia.getDate() + diffInicio);
         inicio.setHours(0, 0, 0, 0);
         // Fin de semana (domingo)
         fin.setDate(inicio.getDate() + 6);
@@ -283,7 +292,7 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
         inicio.setDate(1);
         inicio.setHours(0, 0, 0, 0);
         // Último día del mes
-        fin.setMonth(fecha.getMonth() + 1, 0);
+        fin.setMonth(referencia.getMonth() + 1, 0);
         fin.setHours(23, 59, 59, 999);
         break;
     }
@@ -299,61 +308,6 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
   // useEffect(() => {
   //   fetchFichajes();
   // }, [filtroEstadoFichaje, rangoFechas, fechaBase]);
-
-  async function handleCuadrarFichajes() {
-    setCuadrandoFichajes(true);
-    
-    try {
-      console.log('[Cuadrar fichajes] Abriendo modal de revisión...');
-      
-      // Abrir modal de revisión directamente
-      setRevisionModal(true);
-      
-    } catch (error) {
-      console.error('[Cuadrar fichajes] Error:', error);
-      toast.error('Error al abrir cuadre de fichajes. Revisa la consola para más detalles.');
-    } finally {
-      setCuadrandoFichajes(false);
-    }
-  }
-
-  async function handleEditarFichajeDesdeRevision({ fichajeId, empleadoId, fecha }: { fichajeId: string; empleadoId: string; fecha: string }) {
-    setRevisionModal(false);
-
-    const fechaIso = new Date(fecha).toISOString();
-    const rowKey = `${empleadoId}_${fechaIso}`;
-
-    setTimeout(() => {
-      const rowElement = document.getElementById(rowKey);
-      rowElement?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }, 200);
-
-    try {
-      const response = await fetch(`/api/fichajes/${fichajeId}`);
-      if (!response.ok) {
-        return;
-      }
-
-      const data = await parseJson<Record<string, unknown>>(response).catch(() => null);
-      if (!data) {
-        return;
-      }
-      const eventos: FichajeEvento[] = Array.isArray(data.eventos)
-        ? (data.eventos as FichajeEvento[])
-        : [];
-      if (eventos.length === 0) {
-        return;
-      }
-
-      const eventoSalida = eventos.find((evento: FichajeEvento) => evento.tipo === 'salida');
-      setEditarFichajeModal({
-        open: true,
-        fichajeDiaId: fichajeId,
-      });
-    } catch (error) {
-      console.error('[Fichajes] Error al abrir edición desde revisión:', error);
-    }
-  }
 
   async function handleEditarFichaje(fichajeId: string, hora: string, tipo: string) {
     try {
@@ -538,7 +492,6 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
       <Button variant="outline" size="sm" onClick={resetToToday}>
         Hoy
       </Button>
-      {cuadrandoFichajes && <div className="text-sm text-gray-600 ml-2">Cuadrando...</div>}
     </div>
   );
 
@@ -567,7 +520,6 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
       <Button variant="ghost" onClick={resetToToday} className="w-full text-gray-600">
         Ir a hoy
       </Button>
-      {cuadrandoFichajes && <div className="text-sm text-gray-600">Cuadrando fichajes...</div>}
     </div>
   );
 
@@ -891,8 +843,8 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
                 <Clock className="w-4 h-4 mr-2" />
                 Compensar horas
               </Button>
-              <Button onClick={handleCuadrarFichajes} className="bg-gray-900 text-white hover:bg-gray-800">
-                + Cuadrar fichajes
+              <Button asChild className="bg-gray-900 text-white hover:bg-gray-800">
+                <Link href="/hr/horario/fichajes/cuadrar">+ Cuadrar fichajes</Link>
               </Button>
             </div>
           </div>
@@ -923,16 +875,6 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
         modo="editar"
       />
 
-      {/* Modal Revisión de Fichajes */}
-      <RevisionModal
-        open={revisionModal}
-        onClose={() => setRevisionModal(false)}
-        onReviewed={() => {
-          fetchFichajes(); // Recargar fichajes después de revisar
-        }}
-        onEditFichaje={handleEditarFichajeDesdeRevision}
-      />
-
       {showCompensarHorasDialog && (
         <CompensarHorasDialog
           context="fichajes"
@@ -947,7 +889,7 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
 }
 
 function obtenerPeriodoDesdeFecha(fecha: Date) {
-  const referencia = new Date(fecha);
+  const referencia = toMadridDate(fecha);
   return {
     mes: referencia.getMonth() + 1,
     anio: referencia.getFullYear(),

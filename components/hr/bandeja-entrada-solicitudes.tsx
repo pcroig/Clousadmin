@@ -290,12 +290,14 @@ export function BandejaEntradaSolicitudes({
 
       {/* Lista de solicitudes */}
       {solicitudesActuales.length === 0 ? (
-        <EmptyState
-          icon={ClipboardList}
-          title={emptyStateCopy.title}
-          description={emptyStateCopy.description}
-          className="py-10"
-        />
+        <div className="flex min-h-[320px] items-center justify-center">
+          <EmptyState
+            icon={ClipboardList}
+            title={emptyStateCopy.title}
+            description={emptyStateCopy.description}
+            className="py-10"
+          />
+        </div>
       ) : (
         <div className="space-y-3">
           {solicitudesActuales.map((solicitud) => {

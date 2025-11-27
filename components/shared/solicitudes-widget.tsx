@@ -130,17 +130,20 @@ export const SolicitudesWidget = memo(function SolicitudesWidget({
       badge={solicitudes.length > 0 ? solicitudes.length : undefined}
       contentClassName="overflow-y-auto"
     >
-      <div className="space-y-0">
+      <div className="flex h-full flex-col">
         {solicitudesMostradas.length === 0 ? (
-          <EmptyState
-            layout="widget"
-            icon={ClipboardList}
-            title="Sin solicitudes pendientes"
-            description="Todo al día por ahora."
-          />
+          <div className="flex flex-1 items-center justify-center">
+            <EmptyState
+              layout="widget"
+              icon={ClipboardList}
+              title="Sin solicitudes pendientes"
+              description="Todo al día por ahora."
+            />
+          </div>
         ) : (
-          solicitudesMostradas.map((solicitud) => {
-            const estaProcesando = accionEnCurso?.id === solicitud.id;
+          <div className="space-y-0">
+            {solicitudesMostradas.map((solicitud) => {
+              const estaProcesando = accionEnCurso?.id === solicitud.id;
 
             return (
               <div
@@ -189,7 +192,8 @@ export const SolicitudesWidget = memo(function SolicitudesWidget({
                 </div>
               </div>
             );
-          })
+            })}
+          </div>
         )}
       </div>
       {solicitudes.length > maxItems && (

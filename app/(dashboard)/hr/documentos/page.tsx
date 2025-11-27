@@ -27,6 +27,12 @@ export default async function DocumentosPage() {
     where: {
       empresaId: session.user.empresaId,
       parentId: null, // Solo carpetas de nivel superior
+      OR: [
+        { empleadoId: null },
+        {
+          esSistema: false,
+        },
+      ],
     },
     include: {
       documentos: true,

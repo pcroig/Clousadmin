@@ -14,6 +14,7 @@ import {
   validateRequest,
 } from '@/lib/api-handler';
 import { calcularHorasTrabajadas, calcularTiempoEnPausa } from '@/lib/calculos/fichajes';
+import { crearNotificacionFichajeModificado } from '@/lib/notificaciones';
 import { prisma } from '@/lib/prisma';
 
 const fichajeEventoSchema = z.object({
@@ -73,6 +74,26 @@ export async function POST(req: NextRequest) {
       where: { id: fichajeId },
       data: { horasTrabajadas, horasEnPausa },
     });
+
+    // Notificar si la edición la hace otro usuario (auditoría activa)
+    if (session.user.empleadoId && session.user.empleadoId !== fichaje.empleadoId) {
+      // Obtener nombre del editor
+      const editor = await prisma.empleado.findUnique({
+        where: { id: session.user.empleadoId },
+        select: { nombre: true, apellidos: true },
+      });
+      const nombreEditor = editor ? `${editor.nombre} ${editor.apellidos}` : 'Administrador';
+
+      await crearNotificacionFichajeModificado(prisma, {
+        fichajeId,
+        empresaId: session.user.empresaId,
+        empleadoId: fichaje.empleadoId,
+        modificadoPorNombre: nombreEditor,
+        accion: 'creado',
+        fechaFichaje: fichaje.fecha,
+        detalles: `Evento: ${tipo} a las ${new Date(hora).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}. ${motivoEdicion ? `Motivo: ${motivoEdicion}` : ''}`,
+      });
+    }
 
     return successResponse({ success: true, eventoId: evento.id });
   } catch (error) {

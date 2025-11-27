@@ -97,6 +97,23 @@ export function formatearHorasMinutos(horas: number | string | null | undefined)
 }
 
 /**
+ * Formatea una fecha a string en español (es-ES)
+ * Centraliza el formato para evitar duplicación
+ */
+export function formatFechaEs(fecha: Date | string, options?: Intl.DateTimeFormatOptions): string {
+  const date = typeof fecha === 'string' ? new Date(fecha) : fecha;
+  return date.toLocaleDateString('es-ES', options);
+}
+
+/**
+ * Formatea una hora a string en español (es-ES)
+ */
+export function formatHoraEs(fecha: Date | string, options?: Intl.DateTimeFormatOptions): string {
+  const date = typeof fecha === 'string' ? new Date(fecha) : fecha;
+  return date.toLocaleTimeString('es-ES', options || { hour: '2-digit', minute: '2-digit' });
+}
+
+/**
  * Obtiene la variante de badge según el estado de una solicitud
  */
 export function getSolicitudBadgeVariant(estado: string): 'warning' | 'success' | 'destructive' | 'secondary' {

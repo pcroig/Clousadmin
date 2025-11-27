@@ -112,8 +112,9 @@ export function SolicitarFirmaDialog({
     }
   };
 
+  // Use the new preview endpoint that converts DOCX to PDF for consistent viewing
   const previewUrl = useMemo(
-    () => `/api/documentos/${documentoId}?inline=1&ts=${open ? Date.now() : 0}`,
+    () => `/api/documentos/${documentoId}/preview?ts=${open ? Date.now() : 0}`,
     [documentoId, open]
   );
 

@@ -530,6 +530,13 @@ export function FichajeModal({
               className="bg-white"
             />
           </Field>
+
+          {/* Nota informativa para solicitudes (empleado) */}
+          {!operaDirecto && (
+            <div className="bg-blue-50 p-3 rounded-md text-xs text-blue-700 mt-2">
+              <strong>Nota:</strong> Si tu solicitud es rechazada por un administrador, quedará registrada permanentemente como una <strong>discrepancia</strong> en tu historial de fichajes.
+            </div>
+          )}
         </div>
 
         <DialogFooter>

@@ -13,9 +13,9 @@ import { ResponsiveContainer } from '@/components/adaptive/ResponsiveContainer';
 import { EquipoDetails } from '@/components/organizacion/equipo-details';
 import { EquipoFormModal } from '@/components/organizacion/equipo-form-modal';
 import { Column, DataTable } from '@/components/shared/data-table';
+import { ExpandableSearch } from '@/components/shared/expandable-search';
 import { DetailsPanel } from '@/components/shared/details-panel';
 import { TableHeader } from '@/components/shared/table-header';
-import { Input } from '@/components/ui/input';
 import { useIsMobile } from '@/lib/hooks/use-viewport';
 
 interface Equipo {
@@ -182,17 +182,6 @@ export function EquiposClient({ equipos: initialEquipos }: EquiposClientProps) {
     },
   ];
 
-  const FiltersForm = ({ layout }: { layout: 'desktop' | 'mobile' }) => (
-    <div className={layout === 'desktop' ? 'flex items-center gap-3 flex-1' : 'space-y-3'}>
-      <Input
-        placeholder="Buscar equipo..."
-        value={searchTerm}
-        onChange={(e) => setSearchTerm(e.target.value)}
-        className={layout === 'desktop' ? 'w-[240px]' : 'w-full'}
-      />
-    </div>
-  );
-
   return (
     <>
       <ResponsiveContainer variant="page" className="h-full w-full flex flex-col overflow-hidden">
@@ -225,10 +214,14 @@ export function EquiposClient({ equipos: initialEquipos }: EquiposClientProps) {
                 label: '+ Crear Equipo',
                 onClick: () => setShowCreateModal(true),
               }}
+              rightContent={(
+                <ExpandableSearch
+                  value={searchTerm}
+                  onChange={setSearchTerm}
+                  placeholder="Buscar equipo..."
+                />
+              )}
             />
-            <div className="flex items-center justify-between mb-6 gap-4">
-              <FiltersForm layout="desktop" />
-            </div>
           </>
         )}
 

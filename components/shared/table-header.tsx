@@ -4,6 +4,8 @@
 
 'use client';
 
+import type { ReactNode } from 'react';
+
 import { Button } from '@/components/ui/button';
 
 interface Tab {
@@ -26,6 +28,7 @@ interface TableHeaderProps {
     onClick: () => void;
     variant?: 'default' | 'outline';
   };
+  rightContent?: ReactNode;
 }
 
 export function TableHeader({
@@ -35,30 +38,36 @@ export function TableHeader({
   onTabChange,
   actionButton,
   secondaryActionButton,
+  rightContent,
 }: TableHeaderProps) {
+  const hasActions = Boolean(actionButton || secondaryActionButton || rightContent);
+
   return (
     <div className="mb-6">
       {/* Title + Action Button */}
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
         <h1 className="text-2xl font-bold text-gray-900">{title}</h1>
-        <div className="flex items-center gap-2">
-          {secondaryActionButton && (
-            <Button
-              onClick={secondaryActionButton.onClick}
-              variant={secondaryActionButton.variant || 'default'}
-            >
-              {secondaryActionButton.label}
-            </Button>
-          )}
-          {actionButton && (
-            <Button
-              onClick={actionButton.onClick}
-              variant={actionButton.variant || 'default'}
-            >
-              {actionButton.label}
-            </Button>
-          )}
-        </div>
+        {hasActions && (
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            {secondaryActionButton && (
+              <Button
+                onClick={secondaryActionButton.onClick}
+                variant={secondaryActionButton.variant || 'default'}
+              >
+                {secondaryActionButton.label}
+              </Button>
+            )}
+            {actionButton && (
+              <Button
+                onClick={actionButton.onClick}
+                variant={actionButton.variant || 'default'}
+              >
+                {actionButton.label}
+              </Button>
+            )}
+            {rightContent}
+          </div>
+        )}
       </div>
 
       {/* Tabs */}

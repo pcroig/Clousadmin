@@ -161,7 +161,7 @@ export function DataTable<T extends object>({
                   key={getRowId?.(row) || idx}
                   onClick={() => onRowClick?.(row)}
                   className={cn(
-                    onRowClick && 'cursor-pointer hover:bg-gray-50 active:bg-gray-100',
+                    onRowClick && 'group cursor-pointer hover:bg-gray-50 active:bg-gray-100',
                     'transition-colors'
                   )}
                 >
@@ -186,8 +186,10 @@ export function DataTable<T extends object>({
                           getAlignmentClasses(column.align),
                           // Visibilidad según prioridad
                           getPriorityClasses(column.priority),
-                          // Sticky
-                          column.sticky && 'sticky left-0 z-10 bg-white'
+                          // Sticky - heredar el fondo del hover del grupo
+                          column.sticky && 'sticky left-0 z-10 bg-white group-hover:bg-gray-50',
+                          // Asegurar que todas las celdas hereden el hover del grupo
+                          onRowClick && 'group-hover:bg-gray-50'
                         )}
                       >
                         {renderedCell}
