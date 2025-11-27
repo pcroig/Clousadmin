@@ -491,7 +491,6 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
         <Table className="min-w-full">
           <TableHeader>
             <TableRow>
-              <TableHead className="w-[40px]" />
               <TableHead>Empleado</TableHead>
               <TableHead>Fecha</TableHead>
               <TableHead>Horas Trabajadas</TableHead>
@@ -504,7 +503,7 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
           <TableBody>
             {jornadasFiltradas.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="h-24 text-center text-gray-500">
+                <TableCell colSpan={7} className="h-24 text-center text-gray-500">
                   {busquedaEmpleado ? 'No se encontraron empleados' : 'No hay fichajes'}
                 </TableCell>
               </TableRow>
@@ -517,15 +516,8 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
                   className="cursor-pointer hover:bg-gray-50 transition"
                   onClick={() => handleVerDetalles(jornada.fichaje.id)}
                 >
-                  <TableCell>
-                    {/* Avatar placeholder o componente Avatar */}
-                    <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-xs font-medium text-gray-600">
-                      {jornada.empleadoNombre.charAt(0)}
-                    </div>
-                  </TableCell>
                   <TableCell className="font-medium text-gray-900">
                     <div>{jornada.empleadoNombre}</div>
-                    <div className="text-xs text-gray-500">{jornada.equipoNombre}</div>
                   </TableCell>
                   <TableCell className="text-gray-500">
                     {format(jornada.fecha, 'dd MMM', { locale: es })}
@@ -540,7 +532,7 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
                   </TableCell>
                   <TableCell className="text-gray-500 text-xs">
                     {jornada.horarioEntrada ? (
-                      <span className="inline-flex items-center gap-1 bg-gray-50 px-2 py-1 rounded">
+                      <span>
                         {jornada.horarioEntrada} - {jornada.horarioSalida || '...'}
                       </span>
                     ) : (
@@ -548,16 +540,14 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
                     )}
                   </TableCell>
                   <TableCell>
-                    <Badge 
-                      variant="outline" 
-                      className={`${
+                    <span className={`text-sm ${
                         jornada.balance >= 0 
-                          ? 'bg-green-50 text-green-700 border-green-200' 
-                          : 'bg-red-50 text-red-700 border-red-200'
+                          ? 'text-green-600' 
+                          : 'text-red-600'
                       }`}
                     >
                       {jornada.balance > 0 ? '+' : ''}{formatearHorasMinutos(jornada.balance)}
-                    </Badge>
+                    </span>
                   </TableCell>
                   <TableCell>
                     <EstadoBadge estado={jornada.fichaje.estado} />
