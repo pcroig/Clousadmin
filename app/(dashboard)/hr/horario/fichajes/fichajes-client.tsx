@@ -182,10 +182,17 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
     const grupos: Record<string, Fichaje[]> = {};
 
     fichajes.forEach(f => {
-      if (!grupos[f.fecha]) {
-        grupos[f.fecha] = [];
+      // Normalizar fecha a string YYYY-MM-DD para usar como key
+      const fechaKey = f.fecha instanceof Date 
+        ? format(toMadridDate(f.fecha), 'yyyy-MM-dd')
+        : typeof f.fecha === 'string'
+        ? format(toMadridDate(f.fecha), 'yyyy-MM-dd')
+        : format(toMadridDate(new Date(f.fecha)), 'yyyy-MM-dd');
+      
+      if (!grupos[fechaKey]) {
+        grupos[fechaKey] = [];
       }
-      grupos[f.fecha].push(f);
+      grupos[fechaKey].push(f);
     });
 
     return Object.entries(grupos).map(([fecha, fichajesDelDia]) => {
@@ -233,12 +240,15 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
           : Math.round((horasTrabajadas - horasEsperadas) * 100) / 100;
       })();
 
+      // Convertir fecha string a Date usando toMadridDate para evitar desfases de zona horaria
+      const fechaDate = typeof fecha === 'string' ? toMadridDate(fecha) : fecha instanceof Date ? toMadridDate(fecha) : new Date(fecha);
+      
       return {
         empleadoId: fichaje.empleado.id,
         empleadoNombre: `${fichaje.empleado.nombre} ${fichaje.empleado.apellidos}`,
         equipoId: fichaje.empleado.equipoId ?? null,
         equipoNombre: fichaje.empleado.equipo?.nombre ?? null,
-        fecha: new Date(fecha),
+        fecha: fechaDate,
         fichaje,
         horasTrabajadas,
         horasEsperadas,
