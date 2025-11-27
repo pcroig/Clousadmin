@@ -487,7 +487,7 @@ Un único modal reutilizable para **crear** y **editar** fichajes con múltiples
    - Hora media de salida
    - Horas medias trabajadas
 
-**Tabla de fichajes**: Muestra todos los fichajes con columnas: Fecha, Entrada, Salida, Horas Trabajadas, Horas Esperadas, Balance, Estado
+**Tabla de fichajes**: Muestra todos los fichajes con columnas: Fecha, Entrada, Salida, Horas Trabajadas, Tiempo Pendiente (horas faltantes por trabajar), Balance, Estado
 
 ### Espacio HR (`/hr/organizacion/personas/[id]` → Tab Fichajes)
 
@@ -673,7 +673,7 @@ model Jornada {
 
 | Endpoint | Método | Descripción | Auth |
 |----------|--------|-------------|------|
-| `/api/fichajes` | GET | Lista fichajes con filtros (empleadoId, fecha, fechaInicio, fechaFin, estado, equipoId, propios). Incluye `horasEsperadas` y `balance` calculados. **Nuevo**: Filtro por `equipoId` para filtrar por equipo del empleado | ✅ |
+| `/api/fichajes` | GET | Lista fichajes con filtros (empleadoId, fecha, fechaInicio, fechaFin, estado, equipoId, propios). Incluye `horasEsperadas` y `balance` calculados. **Filtro por equipo**: Usa la relación `EmpleadoEquipo` (N:N) para filtrar correctamente. La respuesta incluye el primer equipo del empleado en `empleado.equipo` | ✅ |
 | `/api/fichajes` | POST | Crea evento en fichaje del día (entrada, pausa_inicio, pausa_fin, salida). Crea fichaje si no existe | ✅ |
 | `/api/fichajes/[id]` | GET | Obtiene fichaje específico con todos sus eventos | ✅ |
 | `/api/fichajes/[id]` | PATCH | Aprueba/rechaza fichaje (`accion: 'aprobar'|'rechazar'`) | HR/Manager |
@@ -943,7 +943,7 @@ Componente unificado para navegación de períodos de tiempo (Día/Semana/Mes).
 
 ---
 
-**Versión**: 3.5
+**Versión**: 3.6
 **Última actualización**: 27 enero 2025
 **Estado**: Sistema completo implementado:
 - ✅ Validación determinística de fichajes completos
@@ -956,7 +956,9 @@ Componente unificado para navegación de períodos de tiempo (Día/Semana/Mes).
 - ✅ **Edición sin auto-guardado**: Cambios se acumulan y se guardan solo al hacer click en "Guardar Cambios"
 - ✅ **Saldo de horas descuenta pausas**: Cálculo correcto que excluye tiempo en pausa
 - ✅ **Jornadas por defecto**: Todos los empleados activos tienen jornada asignada automáticamente
-- ✅ **Horas esperadas en tablas**: Columnas visibles en todas las vistas de fichajes
+- ✅ **Tiempo pendiente en tablas**: Columna "Tiempo pendiente" muestra horas faltantes por trabajar (horasEsperadas - horasTrabajadas) en lugar de "Horas esperadas"
+- ✅ **Fix filtro por equipo**: Corregido filtro por equipo para usar correctamente la relación N:N `EmpleadoEquipo` en lugar de campo inexistente `empleado.equipoId`
+- ✅ **Tabla optimizada**: Eliminada columna de acciones redundante; toda la fila es clicable para ver detalles
 - ✅ **Balance actualizado automáticamente**: Se recalcula al editar, cuadrar o crear fichajes
 - ✅ **Cards horizontales en vista individual**: Tiempo y Horarios en layout horizontal
 - ✅ **Renovar saldo de horas**: HR Admin puede resetear contador desde fecha específica

@@ -405,6 +405,18 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
     [jornadasFiltradas]
   );
 
+  const obtenerTiempoPendiente = useCallback(
+    (jornada: JornadaDia) => Math.max(jornada.horasEsperadas - jornada.horasTrabajadas, 0),
+    []
+  );
+
+  const handleVerDetalles = useCallback((fichajeId: string) => {
+    setEditarFichajeModal({
+      open: true,
+      fichajeDiaId: fichajeId,
+    });
+  }, [setEditarFichajeModal]);
+
   const handleAbrirCompensacion = () => {
     setPeriodoCompensar(obtenerPeriodoDesdeFecha(fechaBase));
     setShowCompensarHorasDialog(true);
@@ -417,8 +429,14 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
           {busquedaEmpleado ? 'No se encontraron empleados' : 'No hay fichajes'}
         </div>
       ) : (
-        jornadasFiltradas.map((jornada) => (
-          <Card key={`${jornada.empleadoId}-${jornada.fecha.toISOString()}`} className="p-4 space-y-3">
+        jornadasFiltradas.map((jornada) => {
+          const tiempoPendiente = obtenerTiempoPendiente(jornada);
+          return (
+          <Card
+            key={`${jornada.empleadoId}-${jornada.fecha.toISOString()}`}
+            className="p-4 space-y-3 cursor-pointer hover:bg-gray-50 transition"
+            onClick={() => handleVerDetalles(jornada.fichaje.id)}
+          >
             <div className="flex justify-between items-start">
               <div>
                 <h3 className="font-medium text-gray-900">{jornada.empleadoNombre}</h3>
@@ -437,10 +455,18 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
                   </span>
                 </div>
               </div>
-              <div>
-                <p className="text-xs text-gray-500 mb-1">Trabajado</p>
-                <div className="text-sm font-medium">
-                  {formatearHorasMinutos(jornada.horasTrabajadas)} / {formatearHorasMinutos(jornada.horasEsperadas)}
+              <div className="space-y-2">
+                <div>
+                  <p className="text-xs text-gray-500 mb-1">Trabajado</p>
+                  <div className="text-sm font-medium">
+                    {formatearHorasMinutos(jornada.horasTrabajadas)}
+                  </div>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500 mb-1">Tiempo pendiente</p>
+                  <div className={`text-sm font-medium ${tiempoPendiente > 0 ? 'text-red-600' : 'text-gray-900'}`}>
+                    {tiempoPendiente > 0 ? formatearHorasMinutos(tiempoPendiente) : 'Sin pendientes'}
+                  </div>
                 </div>
               </div>
             </div>
@@ -453,22 +479,8 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
                 </span>
               </div>
             )}
-
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              className="w-full mt-2 text-xs h-8"
-              onClick={() =>
-                setEditarFichajeModal({
-                  open: true,
-                  fichajeDiaId: jornada.fichaje.id,
-                })
-              }
-            >
-              Ver detalles
-            </Button>
           </Card>
-        ))
+        );})
       )}
     </div>
   );
@@ -483,23 +495,28 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
               <TableHead>Empleado</TableHead>
               <TableHead>Fecha</TableHead>
               <TableHead>Horas Trabajadas</TableHead>
-              <TableHead>Horas Esperadas</TableHead>
+              <TableHead>Tiempo pendiente</TableHead>
               <TableHead>Horario</TableHead>
               <TableHead>Balance</TableHead>
               <TableHead>Estado</TableHead>
-              <TableHead className="text-right">Acciones</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {jornadasFiltradas.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={9} className="h-24 text-center text-gray-500">
+                <TableCell colSpan={8} className="h-24 text-center text-gray-500">
                   {busquedaEmpleado ? 'No se encontraron empleados' : 'No hay fichajes'}
                 </TableCell>
               </TableRow>
             ) : (
-              jornadasFiltradas.map((jornada) => (
-                <TableRow key={`${jornada.empleadoId}-${jornada.fecha.toISOString()}`}>
+              jornadasFiltradas.map((jornada) => {
+                const tiempoPendiente = obtenerTiempoPendiente(jornada);
+                return (
+                <TableRow
+                  key={`${jornada.empleadoId}-${jornada.fecha.toISOString()}`}
+                  className="cursor-pointer hover:bg-gray-50 transition"
+                  onClick={() => handleVerDetalles(jornada.fichaje.id)}
+                >
                   <TableCell>
                     {/* Avatar placeholder o componente Avatar */}
                     <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-xs font-medium text-gray-600">
@@ -519,7 +536,7 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
                     </span>
                   </TableCell>
                   <TableCell className="text-gray-500">
-                    {formatearHorasMinutos(jornada.horasEsperadas)}
+                    {tiempoPendiente > 0 ? formatearHorasMinutos(tiempoPendiente) : 'Sin pendientes'}
                   </TableCell>
                   <TableCell className="text-gray-500 text-xs">
                     {jornada.horarioEntrada ? (
@@ -545,22 +562,8 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
                   <TableCell>
                     <EstadoBadge estado={jornada.fichaje.estado} />
                   </TableCell>
-                  <TableCell className="text-right">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() =>
-                        setEditarFichajeModal({
-                          open: true,
-                          fichajeDiaId: jornada.fichaje.id,
-                        })
-                      }
-                    >
-                      Detalles
-                    </Button>
-                  </TableCell>
                 </TableRow>
-              ))
+              );})
             )}
           </TableBody>
         </Table>

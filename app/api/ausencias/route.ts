@@ -85,9 +85,18 @@ export async function GET(req: NextRequest) {
 
     if (equipoId && equipoId !== 'todos') {
       andFilters.push({
-        empleado: {
-          equipoId,
-        },
+        OR: [
+          { equipoId },
+          {
+            empleado: {
+              equipos: {
+                some: {
+                  equipoId,
+                },
+              },
+            },
+          },
+        ],
       });
     }
 
@@ -169,12 +178,16 @@ export async function GET(req: NextRequest) {
               apellidos: true,
               puesto: true,
               fotoUrl: true,
-              equipoId: true,
-              equipo: {
+              equipos: {
                 select: {
-                  id: true,
-                  nombre: true,
+                  equipo: {
+                    select: {
+                      id: true,
+                      nombre: true,
+                    },
+                  },
                 },
+                take: 1,
               },
             },
           },
@@ -188,8 +201,31 @@ export async function GET(req: NextRequest) {
       prisma.ausencia.count({ where }),
     ]);
 
+    const ausenciasFormateadas = ausencias.map((ausencia) => {
+      if (!ausencia.empleado) return ausencia;
+
+      const equipoAsignado = ausencia.empleado.equipos?.[0]?.equipo ?? null;
+      const { equipos, ...empleadoBase } = ausencia.empleado as typeof ausencia.empleado & {
+        equipos?: Array<{ equipo: { id: string; nombre: string } | null }>;
+      };
+
+      return {
+        ...ausencia,
+        empleado: {
+          ...empleadoBase,
+          equipoId: equipoAsignado?.id ?? null,
+          equipo: equipoAsignado
+            ? {
+                id: equipoAsignado.id,
+                nombre: equipoAsignado.nombre,
+              }
+            : null,
+        },
+      };
+    });
+
     return successResponse({
-      data: ausencias,
+      data: ausenciasFormateadas,
       pagination: buildPaginationMeta(page, limit, total),
     });
   } catch (error) {

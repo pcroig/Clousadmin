@@ -139,7 +139,11 @@ export async function GET(request: NextRequest) {
 
       const empleadoWhere: Prisma.EmpleadoWhereInput = {};
       if (equipoId && equipoId !== 'todos') {
-        empleadoWhere.equipoId = equipoId;
+        empleadoWhere.equipos = {
+          some: {
+            equipoId,
+          },
+        };
       }
       if (search) {
         empleadoWhere.OR = [
@@ -166,12 +170,16 @@ export async function GET(request: NextRequest) {
               id: true,
               nombre: true,
               apellidos: true,
-              equipoId: true,
-              equipo: {
+              equipos: {
                 select: {
-                  id: true,
-                  nombre: true,
+                  equipo: {
+                    select: {
+                      id: true,
+                      nombre: true,
+                    },
+                  },
                 },
+                take: 1,
               },
               jornada: {
                 select: jornadaSelectCompleta,
@@ -292,14 +300,14 @@ export async function GET(request: NextRequest) {
          }
       }
 
-      const equipoInfo = fichaje.empleado?.equipo;
+      const equipoInfo = fichaje.empleado?.equipos?.[0]?.equipo ?? null;
 
       return {
         id: fichaje.id, // Usar el ID del fichaje directamente
         fichajeId: fichaje.id,
         empleadoId: fichaje.empleadoId,
         empleadoNombre: `${fichaje.empleado.nombre} ${fichaje.empleado.apellidos}`,
-        equipoId: equipoInfo?.id ?? fichaje.empleado?.equipoId ?? null,
+        equipoId: equipoInfo?.id ?? null,
         equipoNombre: equipoInfo?.nombre ?? null,
         fecha: fichaje.fecha.toISOString(),
         eventos: previewEventos.length > 0 ? previewEventos : eventosRegistrados,
