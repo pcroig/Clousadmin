@@ -4,11 +4,12 @@
 
 'use client';
 
-import { ArrowLeft, Download, FileText, Folder, Upload } from 'lucide-react';
+import { ArrowLeft, Download, Eye, FileText, Folder, Upload } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useCallback, useRef } from 'react';
 import { toast } from 'sonner';
 
+import { DocumentViewerModal, useDocumentViewer } from '@/components/shared/document-viewer';
 import { EmptyState } from '@/components/shared/empty-state';
 import { FileUploadAdvanced } from '@/components/shared/file-upload-advanced';
 import { Button } from '@/components/ui/button';
@@ -42,6 +43,13 @@ export function CarpetaDetailClientEmpleado({
   const router = useRouter();
   const uploadSectionRef = useRef<HTMLDivElement>(null);
   const maxUploadMB = Number(process.env.NEXT_PUBLIC_MAX_UPLOAD_MB ?? '10');
+  
+  // Document viewer state
+  const documentViewer = useDocumentViewer();
+  
+  const handleVerDocumento = (documento: CarpetaDocumento) => {
+    documentViewer.openViewer(documento.id, documento.nombre, documento.mimeType ?? undefined);
+  };
 
   const handleUpload: UploadHandler = useCallback(
     ({ file, signal, onProgress }) =>
@@ -282,6 +290,13 @@ export function CarpetaDetailClientEmpleado({
                     <td className="py-3 px-4">
                       <div className="flex items-center justify-end gap-2">
                         <button
+                          onClick={() => handleVerDocumento(documento)}
+                          className="p-2 rounded-full hover:bg-gray-100 transition-colors group"
+                          title="Ver documento"
+                        >
+                          <Eye className="w-4 h-4 text-gray-600 group-hover:text-blue-600" />
+                        </button>
+                        <button
                           onClick={() =>
                             handleDescargar(documento.id, documento.nombre)
                           }
@@ -299,6 +314,22 @@ export function CarpetaDetailClientEmpleado({
           </div>
         )}
       </div>
+
+      {/* Document Viewer Modal */}
+      {documentViewer.documentId && (
+        <DocumentViewerModal
+          open={documentViewer.isOpen}
+          onClose={documentViewer.closeViewer}
+          documentId={documentViewer.documentId}
+          title={documentViewer.documentTitle}
+          mimeType={documentViewer.documentMimeType ?? undefined}
+          onDownload={() => {
+            if (documentViewer.documentId) {
+              handleDescargar(documentViewer.documentId, documentViewer.documentTitle);
+            }
+          }}
+        />
+      )}
     </div>
   );
 }

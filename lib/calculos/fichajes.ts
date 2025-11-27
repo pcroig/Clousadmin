@@ -18,6 +18,7 @@ import {
   getFestivosActivosEnRango,
 } from '@/lib/calculos/dias-laborables';
 import { EstadoAusencia } from '@/lib/constants/enums';
+import { crearNotificacionFichajeRequiereRevision } from '@/lib/notificaciones';
 import { prisma } from '@/lib/prisma';
 import { obtenerNombreDia } from '@/lib/utils/fechas';
 import { redondearHoras } from '@/lib/utils/numeros';
@@ -1021,6 +1022,132 @@ export async function crearFichajesAutomaticos(
   }
 
   return { creados, errores };
+}
+
+export interface ProcesarFichajesDiaOptions {
+  /**
+   * Cuando es false, no se envían notificaciones a HR (útil para fallback manual)
+   */
+  notificar?: boolean;
+}
+
+export interface ProcesarFichajesDiaResult {
+  empleadosDisponibles: number;
+  fichajesCreados: number;
+  fichajesPendientes: number;
+  fichajesFinalizados: number;
+  errores: string[];
+}
+
+/**
+ * Procesa los fichajes de un día concreto replicando la lógica del CRON nocturno.
+ * - Crea fichajes pendientes para empleados que debían trabajar y no ficharon
+ * - Re-clasifica fichajes en curso como finalizados o pendientes según su jornada
+ */
+export async function procesarFichajesDia(
+  empresaId: string,
+  fecha: Date,
+  options: ProcesarFichajesDiaOptions = {}
+): Promise<ProcesarFichajesDiaResult> {
+  const fechaSinHora = normalizarFecha(fecha);
+  const notificar = options.notificar !== false;
+
+  const empleadosDisponibles = await obtenerEmpleadosDisponibles(empresaId, fechaSinHora);
+  const resultado: ProcesarFichajesDiaResult = {
+    empleadosDisponibles: empleadosDisponibles.length,
+    fichajesCreados: 0,
+    fichajesPendientes: 0,
+    fichajesFinalizados: 0,
+    errores: [],
+  };
+
+  for (const empleado of empleadosDisponibles) {
+    try {
+      let fichaje = await prisma.fichaje.findUnique({
+        where: {
+          empleadoId_fecha: {
+            empleadoId: empleado.id,
+            fecha: fechaSinHora,
+          },
+        },
+        include: {
+          eventos: true,
+        },
+      });
+
+      if (!fichaje) {
+        fichaje = await prisma.fichaje.create({
+          data: {
+            empresaId,
+            empleadoId: empleado.id,
+            fecha: fechaSinHora,
+            estado: PrismaEstadoFichaje.pendiente,
+          },
+          include: {
+            eventos: true,
+          },
+        });
+
+        resultado.fichajesCreados++;
+        resultado.fichajesPendientes++;
+
+        if (notificar) {
+          await crearNotificacionFichajeRequiereRevision(prisma, {
+            fichajeId: fichaje.id,
+            empresaId,
+            empleadoId: empleado.id,
+            empleadoNombre: `${empleado.nombre} ${empleado.apellidos}`,
+            fecha: fechaSinHora,
+            razon: 'No se registraron fichajes en el día',
+          });
+        }
+
+        continue;
+      }
+
+      if (fichaje.estado === PrismaEstadoFichaje.en_curso) {
+        const validacion = await validarFichajeCompleto(fichaje.id);
+        await actualizarCalculosFichaje(fichaje.id);
+
+        if (validacion.completo) {
+          await prisma.fichaje.update({
+            where: { id: fichaje.id },
+            data: {
+              estado: PrismaEstadoFichaje.finalizado,
+            },
+          });
+          resultado.fichajesFinalizados++;
+        } else {
+          await prisma.fichaje.update({
+            where: { id: fichaje.id },
+            data: {
+              estado: PrismaEstadoFichaje.pendiente,
+            },
+          });
+          resultado.fichajesPendientes++;
+
+          if (notificar) {
+            await crearNotificacionFichajeRequiereRevision(prisma, {
+              fichajeId: fichaje.id,
+              empresaId,
+              empleadoId: empleado.id,
+              empleadoNombre: `${empleado.nombre} ${empleado.apellidos}`,
+              fecha: fechaSinHora,
+              razon: validacion.razon ?? 'Faltan eventos por registrar',
+            });
+          }
+        }
+      }
+    } catch (error) {
+      const mensaje = `Error procesando empleado ${empleado.nombre} ${empleado.apellidos}: ${
+        error instanceof Error ? error.message : 'Error desconocido'
+      }`;
+      resultado.errores.push(mensaje);
+      console.error('[procesarFichajesDia]', mensaje, error);
+    }
+  }
+
+  return resultado;
 }
 
 /**

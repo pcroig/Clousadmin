@@ -8,8 +8,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 
 import { getSession } from '@/lib/auth';
+import { procesarFichajesDia } from '@/lib/calculos/fichajes';
 import { crearNotificacionFichajeResuelto } from '@/lib/notificaciones';
-import { prisma } from '@/lib/prisma';
+import { prisma, Prisma } from '@/lib/prisma';
 import { jornadaSelectCompleta } from '@/lib/prisma/selects';
 import { obtenerNombreDia } from '@/lib/utils/fechas';
 
@@ -42,16 +43,27 @@ interface ConfigJornada {
   [key: string]: ConfigDiaJornada | unknown;
 }
 
+const DEFAULT_LAZY_RECOVERY_DAYS = 3;
+const MAX_LAZY_RECOVERY_DAYS = 14;
+
 const revisionSchema = z.object({
-  revisiones: z.array(
-    z.object({
-      id: z.string(),
-      accion: z.literal('actualizar'),
-    })
-  ).min(1, 'Debe proporcionar al menos una revisión'),
+  revisiones: z
+    .array(
+      z.object({
+        id: z.string(),
+        accion: z.enum(['actualizar', 'descartar']),
+      })
+    )
+    .min(1, 'Debe proporcionar al menos una revisión'),
 });
 
-export async function GET(_request: NextRequest) {
+// Helper para parsear horas HH:mm a minutos desde media noche
+const getMinutesFromHHMM = (hhmm: string): number => {
+  const [h, m] = hhmm.split(':').map(Number);
+  return (h || 0) * 60 + (m || 0);
+};
+
+export async function GET(request: NextRequest) {
   try {
     console.log('[API Revisión GET] Iniciando...');
     const session = await getSession();
@@ -68,30 +80,99 @@ export async function GET(_request: NextRequest) {
 
     console.log('[API Revisión GET] EmpresaId:', session.user.empresaId);
 
-    // CAMBIO: Buscar directamente fichajes con estado 'pendiente' en tabla fichaje
-    // (en lugar de buscar en autoCompletado que el CRON no rellena)
+    const searchParams = request.nextUrl.searchParams;
+    const fechaInicioParam = searchParams.get('fechaInicio');
+    const fechaFinParam = searchParams.get('fechaFin');
+    const equipoId = searchParams.get('equipoId');
+    const search = searchParams.get('search');
+
     const hoy = new Date();
     hoy.setHours(0, 0, 0, 0);
+
+    const lazyDaysFromEnv = Number(process.env.FICHAJES_LAZY_DIAS ?? DEFAULT_LAZY_RECOVERY_DAYS);
+    const diasARecuperar =
+      Number.isFinite(lazyDaysFromEnv) && lazyDaysFromEnv > 0
+        ? Math.min(lazyDaysFromEnv, MAX_LAZY_RECOVERY_DAYS)
+        : DEFAULT_LAZY_RECOVERY_DAYS;
+
+    console.log(
+      `[API Revisión GET] Lazy recovery de fichajes para los últimos ${diasARecuperar} día(s) en empresa ${session.user.empresaId}`
+    );
+
+    for (let offset = 1; offset <= diasARecuperar; offset++) {
+      const fechaObjetivo = new Date(hoy);
+      fechaObjetivo.setDate(fechaObjetivo.getDate() - offset);
+
+      try {
+        await procesarFichajesDia(session.user.empresaId, fechaObjetivo, { notificar: false });
+      } catch (error) {
+        console.error(
+          '[API Revisión GET] Error procesando fallback de fichajes para el día',
+          fechaObjetivo.toISOString().split('T')[0],
+          error
+        );
+      }
+    }
 
     console.log('[API Revisión GET] Fecha hoy:', hoy.toISOString());
     console.log('[API Revisión GET] Buscando fichajes pendientes anteriores a hoy...');
 
     let fichajesPendientes;
     try {
+      const fechaWhere: Prisma.DateTimeFilter = { lt: hoy };
+
+      if (fechaInicioParam) {
+        const inicio = new Date(fechaInicioParam);
+        inicio.setHours(0, 0, 0, 0);
+        if (!Number.isNaN(inicio.getTime())) {
+          fechaWhere.gte = inicio;
+        }
+      }
+
+      if (fechaFinParam) {
+        const fin = new Date(fechaFinParam);
+        fin.setHours(23, 59, 59, 999);
+        if (!Number.isNaN(fin.getTime())) {
+          fechaWhere.lte = fin;
+        }
+      }
+
+      const empleadoWhere: Prisma.EmpleadoWhereInput = {};
+      if (equipoId && equipoId !== 'todos') {
+        empleadoWhere.equipoId = equipoId;
+      }
+      if (search) {
+        empleadoWhere.OR = [
+          { nombre: { contains: search, mode: 'insensitive' } },
+          { apellidos: { contains: search, mode: 'insensitive' } },
+        ];
+      }
+
+      const where: Prisma.FichajeWhereInput = {
+        empresaId: session.user.empresaId,
+        estado: 'pendiente',
+        fecha: fechaWhere,
+      };
+
+      if (Object.keys(empleadoWhere).length > 0) {
+        where.empleado = empleadoWhere;
+      }
+
       fichajesPendientes = await prisma.fichaje.findMany({
-        where: {
-          empresaId: session.user.empresaId,
-          estado: 'pendiente',
-          fecha: {
-            lt: hoy, // Solo fichajes de días anteriores
-          },
-        },
+        where,
         include: {
           empleado: {
             select: {
               id: true,
               nombre: true,
               apellidos: true,
+              equipoId: true,
+              equipo: {
+                select: {
+                  id: true,
+                  nombre: true,
+                },
+              },
               jornada: {
                 select: jornadaSelectCompleta,
               },
@@ -135,6 +216,7 @@ export async function GET(_request: NextRequest) {
           const nombreDia = dias[fechaBase.getDay()];
           const configJornada = (jornada.config as unknown) as ConfigJornada;
           const confDia = configJornada[nombreDia] as ConfigDiaJornada | undefined;
+          
           if (confDia?.activo && confDia.entrada && confDia.salida) {
             const setHora = (base: Date, hhmm: string) => {
               const [h, m] = hhmm.split(':').map(Number);
@@ -142,11 +224,34 @@ export async function GET(_request: NextRequest) {
               d.setHours(h || 0, m || 0, 0, 0);
               return d.toISOString();
             };
+
             previewEventos.push({ tipo: 'entrada', hora: setHora(fechaBase, confDia.entrada), origen: 'propuesto' });
+            
+            // Pausa dinámica
+            let duracionPausaMinutos = 0;
             if (confDia.pausa_inicio && confDia.pausa_fin) {
-              previewEventos.push({ tipo: 'pausa_inicio', hora: setHora(fechaBase, confDia.pausa_inicio), origen: 'propuesto' });
-              previewEventos.push({ tipo: 'pausa_fin', hora: setHora(fechaBase, confDia.pausa_fin), origen: 'propuesto' });
+              const ini = getMinutesFromHHMM(confDia.pausa_inicio);
+              const fin = getMinutesFromHHMM(confDia.pausa_fin);
+              duracionPausaMinutos = Math.max(0, fin - ini);
+            } else if (typeof (configJornada as any).descansoMinimo === 'string') {
+               duracionPausaMinutos = getMinutesFromHHMM((configJornada as any).descansoMinimo || '00:00');
             }
+
+            if (duracionPausaMinutos > 0) {
+               // Buscar si existe pausa_inicio registrada
+               const pausaInicioReal = fichaje.eventos.find(e => e.tipo === 'pausa_inicio');
+               
+               if (pausaInicioReal) {
+                 // Si existe inicio real, proponer fin relativo a la duración
+                 const finCalculado = new Date(pausaInicioReal.hora.getTime() + duracionPausaMinutos * 60000);
+                 previewEventos.push({ tipo: 'pausa_fin', hora: finCalculado.toISOString(), origen: 'propuesto' });
+               } else if (confDia.pausa_inicio && confDia.pausa_fin) {
+                 // Si no hay inicio real, y hay horario fijo, proponer ambos fijos
+                 previewEventos.push({ tipo: 'pausa_inicio', hora: setHora(fechaBase, confDia.pausa_inicio), origen: 'propuesto' });
+                 previewEventos.push({ tipo: 'pausa_fin', hora: setHora(fechaBase, confDia.pausa_fin), origen: 'propuesto' });
+               }
+            }
+
             previewEventos.push({ tipo: 'salida', hora: setHora(fechaBase, confDia.salida), origen: 'propuesto' });
           }
         }
@@ -158,36 +263,51 @@ export async function GET(_request: NextRequest) {
       let razon = 'Requiere revisión manual';
       if (fichaje.eventos.length === 0) {
         razon = 'Sin fichajes registrados en el día';
-      } else {
-        const tiposEventos = fichaje.eventos.map(e => e.tipo);
-        const eventosFaltantes: string[] = [];
-        
-        if (!tiposEventos.includes('entrada')) eventosFaltantes.push('entrada');
-        if (!tiposEventos.includes('salida')) eventosFaltantes.push('salida');
-        
-        if (eventosFaltantes.length > 0) {
-          razon = `Faltan eventos: ${eventosFaltantes.join(', ')}`;
-        }
+      } else if (fichaje.estado === 'en_curso') {
+        razon = 'Fichaje incompleto (dejado en curso)';
       }
 
-      // Determinar eventos faltantes
+      // Determinar eventos faltantes (lógica básica, idealmente usar validarFichajeCompleto)
       const tiposEventos = fichaje.eventos.map(e => e.tipo);
       const eventosFaltantes: string[] = [];
       
-      if (!tiposEventos.includes('entrada')) eventosFaltantes.push('entrada');
-      if (!tiposEventos.includes('salida')) eventosFaltantes.push('salida');
+      // Lógica mejorada para sugerir eventos faltantes basada en la jornada (si está disponible en preview)
+      if (previewEventos.length > 0) {
+        const tiposPreview = previewEventos.map(e => e.tipo);
+        for (const tipo of tiposPreview) {
+          if (!tiposEventos.includes(tipo)) {
+            eventosFaltantes.push(tipo);
+          }
+        }
+      } else {
+        // Fallback básico
+        if (!tiposEventos.includes('entrada')) eventosFaltantes.push('entrada');
+        if (!tiposEventos.includes('salida')) eventosFaltantes.push('salida');
+      }
+      
+      if (eventosFaltantes.length > 0) {
+         if (razon === 'Requiere revisión manual' || razon.includes('Fichaje incompleto')) {
+             const nombresEventos = eventosFaltantes.map(e => e.replace('_', ' '));
+             razon = `Faltan eventos: ${nombresEventos.join(', ')}`;
+         }
+      }
+
+      const equipoInfo = fichaje.empleado?.equipo;
 
       return {
         id: fichaje.id, // Usar el ID del fichaje directamente
         fichajeId: fichaje.id,
         empleadoId: fichaje.empleadoId,
         empleadoNombre: `${fichaje.empleado.nombre} ${fichaje.empleado.apellidos}`,
+        equipoId: equipoInfo?.id ?? fichaje.empleado?.equipoId ?? null,
+        equipoNombre: equipoInfo?.nombre ?? null,
         fecha: fichaje.fecha.toISOString(),
         eventos: previewEventos.length > 0 ? previewEventos : eventosRegistrados,
         eventosRegistrados, // Campo esperado por el modal
         razon,
         eventosFaltantes, // Campo esperado por el modal
         confianza: 0,
+        tieneEventosRegistrados: fichaje.eventos.length > 0,
       };
     });
 
@@ -237,6 +357,50 @@ export async function POST(request: NextRequest) {
         // CAMBIO: Ahora el 'id' es directamente el fichajeId
         const fichajeId = id;
 
+        if (accion === 'descartar') {
+          const fichaje = await prisma.fichaje.findUnique({
+            where: { id: fichajeId },
+            include: {
+              eventos: true,
+              empleado: {
+                select: {
+                  nombre: true,
+                  apellidos: true,
+                },
+              },
+            },
+          });
+
+          if (!fichaje) {
+            errores.push(`ID ${id}: Fichaje no encontrado`);
+            continue;
+          }
+
+          if (fichaje.empresaId !== session.user.empresaId) {
+            errores.push(`ID ${id}: No autorizado (diferente empresa)`);
+            continue;
+          }
+
+          if (fichaje.eventos.length > 0) {
+            errores.push(`ID ${id}: Solo se pueden descartar días sin fichajes`);
+            continue;
+          }
+
+          await prisma.fichaje.update({
+            where: { id: fichajeId },
+            data: {
+              estado: 'finalizado',
+              horasTrabajadas: 0,
+              horasEnPausa: 0,
+              autoCompletado: false,
+              fechaAprobacion: new Date(),
+            },
+          });
+
+          actualizados++;
+          continue;
+        }
+
         if (accion === 'actualizar') {
           const fichaje = await prisma.fichaje.findUnique({
             where: { id: fichajeId },
@@ -273,11 +437,32 @@ export async function POST(request: NextRequest) {
           const nombreDia = obtenerNombreDia(fechaDia);
 
           const eventosAcrear: { tipo: 'entrada'|'pausa_inicio'|'pausa_fin'|'salida'; hora: Date }[] = [];
+          const eventosExistentesOrdenados = [...fichaje.eventos].sort(
+            (a, b) => new Date(a.hora).getTime() - new Date(b.hora).getTime()
+          );
 
           const configJornadaEmpleado = jornadaEmpleado?.config ? (jornadaEmpleado.config as unknown) as ConfigJornada : null;
+          let descansoMs = 0;
           if (configJornadaEmpleado && configJornadaEmpleado[nombreDia]) {
             const confDia = configJornadaEmpleado[nombreDia] as ConfigDiaJornada;
             if (confDia.entrada && confDia.salida) {
+              if (confDia.pausa_inicio && confDia.pausa_fin) {
+                const [pInicioH, pInicioM] = confDia.pausa_inicio.split(':').map(Number);
+                const [pFinH, pFinM] = confDia.pausa_fin.split(':').map(Number);
+                const minutosDescanso = (pFinH * 60 + (pFinM ?? 0)) - (pInicioH * 60 + (pInicioM ?? 0));
+                if (minutosDescanso > 0) {
+                  descansoMs = minutosDescanso * 60 * 1000;
+                }
+              } else if (typeof (configJornadaEmpleado as Record<string, unknown>).descansoMinimo === 'string') {
+                const [descH, descM] = ((configJornadaEmpleado as Record<string, string>).descansoMinimo || '00:00')
+                  .split(':')
+                  .map(Number);
+                const minutosDescanso = descH * 60 + (descM ?? 0);
+                if (minutosDescanso > 0) {
+                  descansoMs = minutosDescanso * 60 * 1000;
+                }
+              }
+
               eventosAcrear.push({ tipo: 'entrada', hora: setHora(fechaDia, confDia.entrada) });
               // Pausa opcional si está definida
               if (confDia.pausa_inicio && confDia.pausa_fin) {
@@ -285,6 +470,24 @@ export async function POST(request: NextRequest) {
                 eventosAcrear.push({ tipo: 'pausa_fin', hora: setHora(fechaDia, confDia.pausa_fin) });
               }
               eventosAcrear.push({ tipo: 'salida', hora: setHora(fechaDia, confDia.salida) });
+            }
+          }
+
+          if (descansoMs > 0) {
+            const enCurso = eventosExistentesOrdenados
+              .filter((e) => e.tipo === 'pausa_inicio')
+              .slice()
+              .reverse()
+              .find((inicio) => {
+                const inicioHora = new Date(inicio.hora);
+                return !eventosExistentesOrdenados.some(
+                  (ev) => ev.tipo === 'pausa_fin' && new Date(ev.hora).getTime() > inicioHora.getTime()
+                );
+              });
+
+            if (enCurso) {
+              const finCalculado = new Date(new Date(enCurso.hora).getTime() + descansoMs);
+              eventosAcrear.push({ tipo: 'pausa_fin', hora: finCalculado });
             }
           }
 
@@ -368,4 +571,3 @@ export async function POST(request: NextRequest) {
     );
   }
 }
-

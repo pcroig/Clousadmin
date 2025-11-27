@@ -13,6 +13,10 @@ El sistema de fichajes permite a los empleados registrar su jornada laboral comp
 - **`autoCompletado`**: sigue alimentando dashboards y auditoría de otras funcionalidades (ausencias, solicitudes). Para fichajes, la revisión ahora busca directamente en tabla `fichaje` con estado `pendiente`.
 - **Slack y geolocalización**: mantienen estado “roadmap” (documentadas en esta guía), no hay código en producción que debamos retirar o activar.
 - **Entrada/salida múltiples**: `validarEvento` impide reabrir entradas mientras el estado no vuelva a `sin_fichar`, por lo que no se generan múltiples ciclos el mismo día.
+- **Discrepancias**: las solicitudes de corrección rechazadas permanecen visibles en el historial del fichaje para garantizar transparencia legal. No se permite su eliminación.
+- **Exportación Excel**: los empleados pueden descargar su historial completo de fichajes desde `Ajustes > General > Exportar Fichajes`. Incluye fechas, eventos, horas trabajadas/pausas y discrepancias.
+- **Sincronización en tiempo real**: el widget de fichaje y la tabla de registros se actualizan automáticamente cuando se ficha o se edita un evento gracias al evento global `fichaje-updated`.
+- **Auditoría de ediciones**: cada vez que HR/Manager crea, edita o elimina un evento en nombre del empleado se envía una notificación (`fichaje_modificado`) y se registra el cambio con motivo.
 
 ## Estados del Fichaje
 
@@ -790,6 +794,33 @@ model ProcesamientoMarcajes {
   "mensaje": "3 fichajes cuadrados correctamente"
 }
 ```
+
+---
+
+## 6. Discrepancias y Auditoría Legal
+
+- Las **solicitudes de corrección de fichaje** forman parte del cumplimiento legal. Cuando HR/Manager rechaza una solicitud, queda registrada como **discrepancia** y no puede eliminarse.
+- Esta discrepancia aparece en la revisión de fichajes y en el historial del empleado, garantizando trazabilidad frente a auditorías.
+- Los rechazos generan una notificación automática al empleado con el motivo indicado.
+- Las ediciones manuales creadas por HR/Manager disparan notificaciones `fichaje_modificado`, dejando constancia de qué usuario realizó la acción y por qué.
+
+## 7. Exportación del Historial de Fichajes
+
+- Desde `Ajustes > General > Exportar Fichajes`, el empleado puede descargar un Excel con todos sus fichajes del año seleccionado.
+- El archivo incluye: fecha, estado, eventos (entrada/pausas/salida), horas trabajadas, tiempo en pausa y discrepancias asociadas.
+- Endpoint: `GET /api/empleados/me/fichajes/export?anio=YYYY`. La generación se realiza con la librería `xlsx` y se actualiza al momento de la descarga.
+
+## 8. Sincronización en Tiempo Real
+
+- El widget de fichaje (`components/shared/fichaje-widget.tsx`) emite el evento global `fichaje-updated` cuando se ficha o se aprueban solicitudes manuales.
+- Las tablas y vistas (`fichajes-client.tsx`, etc.) se suscriben a este evento para refrescar datos inmediatamente, evitando esperar al siguiente render o polling.
+- Este mecanismo asegura que el semicírculo, cronómetro y listados representen siempre el estado real sin recargar la página.
+
+## 9. Zona Horaria (Europe/Madrid)
+
+- Todas las fechas mostradas al usuario se normalizan explícitamente a la zona horaria `Europe/Madrid` mediante los helpers `toMadridDate` y `formatFechaMadrid` (`lib/utils/fechas.ts`).
+- Esto evita desfases de “día anterior” cuando el navegador del empleado está en otra zona horaria o cuando la consulta ocurre cerca de medianoche UTC.
+- Las APIs continúan trabajando en UTC, pero la capa de presentación formatea y envía fechas ya convertidas al huso horario oficial.
 
 ---
 

@@ -73,6 +73,15 @@ export function FichajesTab({ empleadoId, empleado, contexto = 'empleado' }: Fic
     refetchFichajes(`/api/fichajes?empleadoId=${empleadoId}&propios=1`);
   }, [empleadoId, refetchFichajes]);
 
+  useEffect(() => {
+    function handleRealtimeUpdate() {
+      if (!empleadoId) return;
+      refetchFichajes(`/api/fichajes?empleadoId=${empleadoId}&propios=1`);
+    }
+    window.addEventListener('fichaje-updated', handleRealtimeUpdate);
+    return () => window.removeEventListener('fichaje-updated', handleRealtimeUpdate);
+  }, [empleadoId, refetchFichajes]);
+
   const resumen = useMemo(() => {
     // Si hay fecha de renovación, filtrar jornadas anteriores
     const jornadasFiltradas = fechaInicio 

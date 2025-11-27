@@ -13,6 +13,7 @@ import {
   successResponse,
   validateRequest,
 } from '@/lib/api-handler';
+import { crearNotificacionFichajeModificado } from '@/lib/notificaciones';
 import { prisma, Prisma } from '@/lib/prisma';
 
 const fichajeEventoUpdateSchema = z.object({
@@ -103,6 +104,25 @@ export async function DELETE(_req: NextRequest, context: { params: Promise<{ id:
       const horasTrabajadas = calcularHorasTrabajadas(actualizado.eventos) ?? 0;
       const horasEnPausa = calcularTiempoEnPausa(actualizado.eventos);
       await prisma.fichaje.update({ where: { id: evento.fichajeId }, data: { horasTrabajadas, horasEnPausa } });
+
+      // Notificar si la edición la hace otro usuario
+      if (session.user.empleadoId && session.user.empleadoId !== evento.fichaje.empleadoId) {
+        const editor = await prisma.empleado.findUnique({
+          where: { id: session.user.empleadoId },
+          select: { nombre: true, apellidos: true },
+        });
+        const nombreEditor = editor ? `${editor.nombre} ${editor.apellidos}` : 'Administrador';
+
+        await crearNotificacionFichajeModificado(prisma, {
+          fichajeId: evento.fichajeId,
+          empresaId: session.user.empresaId,
+          empleadoId: evento.fichaje.empleadoId,
+          modificadoPorNombre: nombreEditor,
+          accion: 'eliminado',
+          fechaFichaje: evento.fichaje.fecha,
+          detalles: `Evento ${evento.tipo} eliminado.`,
+        });
+      }
     }
 
     return successResponse({ success: true });

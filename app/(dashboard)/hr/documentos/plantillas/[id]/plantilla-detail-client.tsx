@@ -11,6 +11,7 @@ import {
   ArrowLeft,
   CheckCircle2,
   Download,
+  Eye,
   FileText,
   Loader2,
   Send,
@@ -20,6 +21,7 @@ import PizZip from 'pizzip';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
+import { DocumentViewerModal } from '@/components/shared/document-viewer';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
@@ -98,6 +100,9 @@ export function PlantillaDetailClient({ plantilla }: PlantillaDetailClientProps)
   const [variablesConValor, setVariablesConValor] = useState<string[]>([]);
   const [variablesSinValor, setVariablesSinValor] = useState<string[]>([]);
   const [variablesValores, setVariablesValores] = useState<Record<string, string>>({});
+  
+  // PDF Viewer state
+  const [showPdfViewer, setShowPdfViewer] = useState(false);
 
   const variablesDetectadas = useMemo(
     () => (Array.isArray(plantilla.variablesUsadas) ? plantilla.variablesUsadas : []),
@@ -495,6 +500,16 @@ export function PlantillaDetailClient({ plantilla }: PlantillaDetailClientProps)
                 <Button variant="ghost" size="sm" onClick={handleRefrescarPrevisualizacion}>
                   Reprocesar
                 </Button>
+                {empleadoPreviewId && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowPdfViewer(true)}
+                  >
+                    <Eye className="w-4 h-4 mr-2" />
+                    Ver como PDF
+                  </Button>
+                )}
                 {previewUrl && (
                   <Button
                     variant="outline"
@@ -756,6 +771,19 @@ export function PlantillaDetailClient({ plantilla }: PlantillaDetailClientProps)
           </div>
         </div>
       </div>
+
+      {/* PDF Preview Modal */}
+      {empleadoPreviewId && (
+        <DocumentViewerModal
+          open={showPdfViewer}
+          onClose={() => setShowPdfViewer(false)}
+          documentId={plantilla.id}
+          previewUrl={`/api/plantillas/${plantilla.id}/preview?empleadoId=${empleadoPreviewId}`}
+          title={`Previsualización: ${plantilla.nombre}`}
+          mimeType="application/pdf"
+          onDownload={previewUrl ? () => window.open(previewUrl, '_blank') : undefined}
+        />
+      )}
     </div>
   );
 }

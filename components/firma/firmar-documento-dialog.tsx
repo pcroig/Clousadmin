@@ -172,7 +172,7 @@ export function FirmarDocumentoDialog({
                   type="button"
                   variant="ghost"
                   size="sm"
-                  onClick={() => window.open(`/api/documentos/${firma.documento.id}?inline=1`, '_blank')}
+                  onClick={() => window.open(`/api/documentos/${firma.documento.id}/preview`, '_blank')}
                 >
                   Abrir documento
                 </Button>

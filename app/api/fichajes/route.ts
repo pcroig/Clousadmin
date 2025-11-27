@@ -65,6 +65,8 @@ export async function GET(req: NextRequest) {
     const fechaFin = searchParams.get('fechaFin');
     const estado = searchParams.get('estado');
     const propios = searchParams.get('propios');
+    const equipoId = searchParams.get('equipoId');
+    const search = searchParams.get('search');
 
     // 3. Construir filtros
     const where: Prisma.FichajeWhereInput = {
@@ -147,6 +149,31 @@ export async function GET(req: NextRequest) {
       }
     }
 
+    const andFilters: Prisma.FichajeWhereInput[] = [];
+
+    if (equipoId && equipoId !== 'todos') {
+      andFilters.push({
+        empleado: {
+          equipoId,
+        },
+      });
+    }
+
+    if (search) {
+      andFilters.push({
+        empleado: {
+          OR: [
+            { nombre: { contains: search, mode: 'insensitive' } },
+            { apellidos: { contains: search, mode: 'insensitive' } },
+          ],
+        },
+      });
+    }
+
+    if (andFilters.length > 0) {
+      where.AND = [...(where.AND ?? []), ...andFilters];
+    }
+
     // 4. Obtener fichajes con sus eventos
     const [fichajes, total] = await Promise.all([
       prisma.fichaje.findMany({
@@ -158,6 +185,13 @@ export async function GET(req: NextRequest) {
               nombre: true,
               apellidos: true,
               puesto: true,
+              equipoId: true,
+              equipo: {
+                select: {
+                  id: true,
+                  nombre: true,
+                },
+              },
             },
           },
           eventos: {

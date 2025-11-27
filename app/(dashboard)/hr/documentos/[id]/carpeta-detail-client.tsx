@@ -20,6 +20,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 import { SolicitarFirmaDialog } from '@/components/firma/solicitar-firma-dialog';
+import { DocumentViewerModal, useDocumentViewer } from '@/components/shared/document-viewer';
 import { EmptyState } from '@/components/shared/empty-state';
 import { FileUploadAdvanced } from '@/components/shared/file-upload-advanced';
 import { InfoTooltip } from '@/components/shared/info-tooltip';
@@ -118,6 +119,9 @@ export function CarpetaDetailClient({ carpeta, empleados = [] }: CarpetaDetailCl
   const [actualizandoAsignacion, setActualizandoAsignacion] = useState(false);
   const [documentoParaFirma, setDocumentoParaFirma] = useState<Documento | null>(null);
   const [modalSolicitarFirma, setModalSolicitarFirma] = useState(false);
+
+  // Document viewer state
+  const documentViewer = useDocumentViewer();
 
   const parsearAsignadoA = useCallback(() => {
     if (!carpeta.asignadoA) {
@@ -325,11 +329,7 @@ export function CarpetaDetailClient({ carpeta, empleados = [] }: CarpetaDetailCl
   };
 
   const handleVerDocumento = (documento: Documento) => {
-    const url = `/api/documentos/${documento.id}?inline=1`;
-    const newWindow = window.open(url, '_blank', 'noopener,noreferrer');
-    if (!newWindow) {
-      toast.error('Tu navegador bloqueó la vista previa. Permite pop-ups para Clousadmin.');
-    }
+    documentViewer.openViewer(documento.id, documento.nombre, documento.mimeType);
   };
 
   const handleSolicitarFirma = (documento: Documento) => {
@@ -796,6 +796,40 @@ export function CarpetaDetailClient({ carpeta, empleados = [] }: CarpetaDetailCl
             setDocumentoParaFirma(null);
             router.refresh();
           }}
+        />
+      )}
+
+      {/* Document Viewer Modal */}
+      {documentViewer.documentId && (
+        <DocumentViewerModal
+          open={documentViewer.isOpen}
+          onClose={documentViewer.closeViewer}
+          documentId={documentViewer.documentId}
+          title={documentViewer.documentTitle}
+          mimeType={documentViewer.documentMimeType ?? undefined}
+          onDownload={() => {
+            if (documentViewer.documentId) {
+              handleDescargar(documentViewer.documentId, documentViewer.documentTitle);
+            }
+          }}
+          actions={
+            documentViewer.documentMimeType === 'application/pdf' ? (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const doc = carpeta.documentos.find(d => d.id === documentViewer.documentId);
+                  if (doc) {
+                    documentViewer.closeViewer();
+                    handleSolicitarFirma(doc);
+                  }
+                }}
+              >
+                <FileSignature className="w-4 h-4 mr-2" />
+                Solicitar firma
+              </Button>
+            ) : undefined
+          }
         />
       )}
     </>

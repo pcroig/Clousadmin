@@ -48,6 +48,8 @@ interface SolicitarAusenciaModalProps {
   saldoDisponible?: number;
   contexto?: 'empleado' | 'manager' | 'hr_admin';
   empleadoIdDestino?: string;
+  defaultFechaInicio?: Date | string;
+  defaultFechaFin?: Date | string;
 }
 
 type TipoAusenciaOption = {
@@ -101,6 +103,8 @@ export function SolicitarAusenciaModal({
   saldoDisponible = 0,
   contexto = 'empleado',
   empleadoIdDestino,
+  defaultFechaInicio,
+  defaultFechaFin,
 }: SolicitarAusenciaModalProps) {
   const esHRAdmin = contexto === 'hr_admin';
   const [tipo, setTipo] = useState<string>('vacaciones');
@@ -139,6 +143,27 @@ export function SolicitarAusenciaModal({
       setMedioDia(false);
     }
   }, [medioDia, medioDiaDisponible]);
+
+  useEffect(() => {
+    if (!open) return;
+
+    if (defaultFechaInicio) {
+      const parsed = new Date(defaultFechaInicio);
+      if (!Number.isNaN(parsed.getTime())) {
+        setFechaInicio(parsed);
+        if (!defaultFechaFin) {
+          setFechaFin(parsed);
+        }
+      }
+    }
+
+    if (defaultFechaFin) {
+      const parsed = new Date(defaultFechaFin);
+      if (!Number.isNaN(parsed.getTime())) {
+        setFechaFin(parsed);
+      }
+    }
+  }, [open, defaultFechaInicio, defaultFechaFin]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

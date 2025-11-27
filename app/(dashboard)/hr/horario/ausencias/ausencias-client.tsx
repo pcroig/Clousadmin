@@ -6,13 +6,15 @@
 
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Calendar, Eye, Filter, Paperclip, Search, Settings } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
+import { Paperclip } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 import { CompactFilterBar } from '@/components/adaptive/CompactFilterBar';
 import { MobileActionBar } from '@/components/adaptive/MobileActionBar';
 import { ResponsiveContainer } from '@/components/adaptive/ResponsiveContainer';
+import { DataFilters, type FilterOption } from '@/components/shared/filters/data-filters';
+import { DateRangeControls } from '@/components/shared/filters/date-range-controls';
 import { TableHeader as PageHeader } from '@/components/shared/table-header';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -40,6 +42,7 @@ import { EstadoAusencia } from '@/lib/constants/enums';
 import { useIsMobile } from '@/lib/hooks/use-viewport';
 import { extractArrayFromResponse } from '@/lib/utils/api-response';
 import { getAusenciaEstadoLabel } from '@/lib/utils/formatters';
+import { parseJson } from '@/lib/utils/json';
 
 import { CrearCampanaModal } from './crear-campana-modal';
 import { GestionarAusenciasModal } from './gestionar-ausencias-modal';
@@ -105,16 +108,26 @@ interface AusenciasClientProps {
   initialCampanasExpanded?: boolean;
 }
 
+const ESTADO_OPTIONS: FilterOption[] = [
+  { value: EstadoAusencia.pendiente, label: getAusenciaEstadoLabel(EstadoAusencia.pendiente) },
+  { value: EstadoAusencia.confirmada, label: getAusenciaEstadoLabel(EstadoAusencia.confirmada) },
+  { value: EstadoAusencia.completada, label: getAusenciaEstadoLabel(EstadoAusencia.completada) },
+  { value: EstadoAusencia.rechazada, label: getAusenciaEstadoLabel(EstadoAusencia.rechazada) },
+];
+
 export function AusenciasClient({}: AusenciasClientProps) {
   const isMobile = useIsMobile();
-  const [_filtersOpen, _setFiltersOpen] = useState(false);
   const [ausencias, setAusencias] = useState<Ausencia[]>([]);
   const [campanaActiva, setCampanaActiva] = useState<Campana | null>(null);
   const [loading, setLoading] = useState(true);
+  
+  // Filters State
   const [filtroEstado, setFiltroEstado] = useState('todas');
-  const [filtroTipo, setFiltroTipo] = useState('todos');
+  const [filtroEquipo, setFiltroEquipo] = useState('todos');
+  const [equiposOptions, setEquiposOptions] = useState<FilterOption[]>([]);
   const [busquedaEmpleado, setBusquedaEmpleado] = useState('');
   
+  // Modals
   const [gestionarModal, setGestionarModal] = useState(false);
   const [crearCampanaModal, setCrearCampanaModal] = useState(false);
   const [rechazarModal, setRechazarModal] = useState<{ open: boolean; ausenciaId: string | null }>({
@@ -132,12 +145,36 @@ export function AusenciasClient({}: AusenciasClientProps) {
   const [editError, setEditError] = useState('');
   const [motivoRechazo, setMotivoRechazo] = useState('');
 
+  // Load Equipos
+  useEffect(() => {
+    async function loadEquipos() {
+      try {
+        const response = await fetch('/api/organizacion/equipos');
+        if (response.ok) {
+          const data = await parseJson<Array<{ id: string; nombre: string }>>(response).catch(() => []);
+          if (Array.isArray(data)) {
+            setEquiposOptions(data.map(e => ({ label: e.nombre, value: e.id })));
+          }
+        }
+      } catch (error) {
+        console.error('[Ausencias] Error cargando equipos', error);
+      }
+    }
+    loadEquipos();
+  }, []);
+
   const fetchAusencias = useCallback(async () => {
     setLoading(true);
     try {
       const params = new URLSearchParams();
       if (filtroEstado !== 'todas') {
         params.append('estado', filtroEstado);
+      }
+      if (filtroEquipo !== 'todos') {
+        params.append('equipoId', filtroEquipo);
+      }
+      if (busquedaEmpleado) {
+        params.append('search', busquedaEmpleado);
       }
 
       const response = await fetch(`/api/ausencias?${params}`);
@@ -157,7 +194,7 @@ export function AusenciasClient({}: AusenciasClientProps) {
     } finally {
       setLoading(false);
     }
-  }, [filtroEstado]);
+  }, [busquedaEmpleado, filtroEquipo, filtroEstado]);
 
   const fetchCampanaActiva = useCallback(async () => {
     try {
@@ -171,6 +208,12 @@ export function AusenciasClient({}: AusenciasClientProps) {
     }
   }, []);
 
+  useEffect(() => {
+    fetchAusencias();
+    fetchCampanaActiva();
+  }, [fetchAusencias, fetchCampanaActiva]);
+
+  // Edicion Effect
   useEffect(() => {
     if (editarModal.ausencia) {
       const ausencia = editarModal.ausencia;
@@ -197,11 +240,6 @@ export function AusenciasClient({}: AusenciasClientProps) {
       setSavingEdit(false);
     }
   }, [editarModal.ausencia]);
-
-  useEffect(() => {
-    fetchAusencias();
-    fetchCampanaActiva();
-  }, [fetchAusencias, fetchCampanaActiva]);
 
   async function _handleAprobar(id: string) {
     try {
@@ -256,33 +294,6 @@ export function AusenciasClient({}: AusenciasClientProps) {
     }
   }
 
-  function _handleCuadrarIA(_campanaId: string) {
-    // Refrescar campaña después de cuadrar con IA
-    fetchCampanaActiva();
-  }
-
-  function _handleCuadrarManual(_campanaId: string) {
-    // Refrescar campaña
-    fetchCampanaActiva();
-  }
-
-  const _hasActiveFilters = filtroEstado !== 'todas' || Boolean(busquedaEmpleado);
-
-  const estadoOptions = [
-    EstadoAusencia.pendiente,
-    EstadoAusencia.confirmada,
-    EstadoAusencia.completada,
-    EstadoAusencia.rechazada,
-  ];
-
-  const tipoOptions = [
-    { value: 'vacaciones', label: 'Vacaciones' },
-    { value: 'enfermedad', label: 'Enfermedad' },
-    { value: 'enfermedad_familiar', label: 'Enfermedad Familiar' },
-    { value: 'maternidad_paternidad', label: 'Maternidad/Paternidad' },
-    { value: 'otro', label: 'Otro' },
-  ];
-
   const closeEditarModal = () => {
     setEditarModal({ open: false, ausencia: null });
     setEditForm(createEmptyEditForm());
@@ -292,12 +303,6 @@ export function AusenciasClient({}: AusenciasClientProps) {
     setSavingEdit(false);
   };
 
-  /**
-   * Sube un justificante al servidor y retorna la URL y documentoId
-   * @param file - Archivo a subir
-   * @param empleadoId - ID del empleado asociado
-   * @returns Promise con { url, documentoId }
-   */
   const uploadJustificante = async (file: File, empleadoId: string): Promise<{ url: string; documentoId: string | null }> => {
     setUploadingEditJustificante(true);
     try {
@@ -440,200 +445,28 @@ export function AusenciasClient({}: AusenciasClientProps) {
     return tipos[tipo] || tipo;
   }
 
-  const ausenciasPendientes = ausencias.filter(a => a.estado === EstadoAusencia.pendiente).length;
-
-  // Filtros en cliente
-  const ausenciasFiltradas = ausencias.filter((ausencia) => {
-    // Buscar por empleado
-    if (busquedaEmpleado) {
-      const nombreCompleto = `${ausencia.empleado.nombre} ${ausencia.empleado.apellidos}`.toLowerCase();
-      if (!nombreCompleto.includes(busquedaEmpleado.toLowerCase())) return false;
-    }
-
-    return true;
-  });
-
-  const FiltersForm = ({ layout }: { layout: 'desktop' | 'mobile' }) => {
-    const searchWrapperClass =
-      layout === 'desktop' ? 'relative flex-1 max-w-xs' : 'relative w-full';
-    const selectClassName = layout === 'desktop' ? 'w-[180px]' : 'w-full';
-    return (
-      <div className={layout === 'desktop' ? 'flex items-center gap-3 flex-1' : 'space-y-3'}>
-        <div className={searchWrapperClass}>
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <Input
-            placeholder="Buscar empleado..."
-            value={busquedaEmpleado}
-            onChange={(e) => setBusquedaEmpleado(e.target.value)}
-            className="pl-10"
-          />
-        </div>
-        <Select value={filtroEstado} onValueChange={setFiltroEstado}>
-          <SelectTrigger className={selectClassName}>
-            <Filter className="w-4 h-4 mr-2" />
-            <SelectValue placeholder="Estado" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="todas">Todas</SelectItem>
-            <SelectItem value="pendiente">Pendientes</SelectItem>
-            <SelectItem value="confirmada">Confirmadas</SelectItem>
-            <SelectItem value="completada">Completadas</SelectItem>
-            <SelectItem value="rechazada">Rechazadas</SelectItem>
-          </SelectContent>
-        </Select>
-        <div className={layout === 'desktop' ? '' : 'flex flex-wrap gap-2'}>
-          {ausenciasPendientes > 0 && (
-            <Badge className="bg-yellow-100 text-yellow-800">
-              {ausenciasPendientes} pendientes
-            </Badge>
-          )}
-        </div>
-      </div>
-    );
-  };
-
-  const renderCampaignCard = () => {
-    if (!campanaActiva) return null;
-
-    const dateRange = `${format(new Date(campanaActiva.fechaInicioObjetivo), 'dd MMM', {
-      locale: es,
-    })} - ${format(new Date(campanaActiva.fechaFinObjetivo), 'dd MMM yyyy', { locale: es })}`;
-
-    return (
-      <Card className="mb-6 p-4">
-        <div className={isMobile ? 'flex flex-col gap-3' : 'flex items-center justify-between'}>
-          <div className={isMobile ? 'flex flex-col gap-3' : 'flex items-center gap-3 flex-1'}>
-            <div className="flex items-center gap-3">
-              <Calendar className="w-5 h-5 text-gray-600" />
-              <div>
-                <h3 className="font-semibold text-gray-900 mb-1">{campanaActiva.titulo}</h3>
-                <div className="text-sm text-gray-600">{dateRange}</div>
-              </div>
-            </div>
-            <div className="text-sm text-gray-600">
-              {campanaActiva.empleadosCompletados}/{campanaActiva.totalEmpleadosAsignados} completados
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <Badge className="bg-yellow-100 text-yellow-800 border-0">En curso</Badge>
-            <Button
-              variant="outline"
-              size={isMobile ? 'default' : 'sm'}
-              onClick={() => {
-                window.location.href = '/hr/horario/ausencias/campana';
-              }}
-              className="flex items-center gap-2"
-            >
-              <Eye className="w-4 h-4" />
-              Ver campaña
-            </Button>
-          </div>
-        </div>
-      </Card>
-    );
-  };
-
-  const renderDesktopTable = () => (
-    <Card className="overflow-hidden">
-      <div className="overflow-x-auto px-2 sm:px-4">
-        <Table className="min-w-full">
-          <TableHeader>
-            <TableRow>
-              <TableHead>Nombre</TableHead>
-              <TableHead>Días</TableHead>
-              <TableHead>Estado</TableHead>
-              <TableHead>Tipo de ausencia</TableHead>
-              <TableHead>Justificante</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {loading ? (
-              <TableRow>
-                <TableCell colSpan={5} className="text-center py-8 text-gray-500">
-                  Cargando...
-                </TableCell>
-              </TableRow>
-            ) : ausenciasFiltradas.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={5} className="text-center py-8 text-gray-500">
-                  {busquedaEmpleado ? 'No se encontraron ausencias' : 'No hay ausencias'}
-                </TableCell>
-              </TableRow>
-            ) : (
-              ausenciasFiltradas.map((ausencia) => (
-                <TableRow
-                  key={ausencia.id}
-                  className="cursor-pointer hover:bg-gray-50"
-                  onClick={() => setEditarModal({ open: true, ausencia })}
-                >
-                  <TableCell>
-                    <div className="font-medium text-gray-900">
-                      {ausencia.empleado.nombre} {ausencia.empleado.apellidos}
-                    </div>
-                  </TableCell>
-                  <TableCell>{ausencia.diasLaborables} días</TableCell>
-                  <TableCell>{getEstadoBadge(ausencia.estado)}</TableCell>
-                  <TableCell>{getTipoBadge(ausencia.tipo)}</TableCell>
-                  <TableCell className="text-sm">
-                    {ausencia.justificanteUrl ? (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="px-0 text-primary flex items-center gap-1"
-                        asChild
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <a href={ausencia.justificanteUrl} target="_blank" rel="noopener noreferrer">
-                          <Paperclip className="h-4 w-4" />
-                          Ver
-                        </a>
-                      </Button>
-                    ) : (
-                      <span className="text-gray-500">-</span>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
-    </Card>
-  );
-
+  // Mobile list renderer
   const renderMobileList = () => {
-    if (loading) {
+    if (ausencias.length === 0) {
       return (
-        <Card className="p-4">
-          <p className="text-sm text-gray-500">Cargando ausencias...</p>
-        </Card>
-      );
-    }
-
-    if (ausenciasFiltradas.length === 0) {
-      return (
-        <Card className="p-4">
-          <p className="text-sm text-gray-500">
+        <div className="flex flex-col items-center justify-center py-10 text-center">
+          <p className="text-gray-500">
             {busquedaEmpleado ? 'No se encontraron ausencias' : 'No hay ausencias registradas'}
           </p>
-        </Card>
+        </div>
       );
     }
 
     return (
-      <div className="space-y-3 pb-4">
-        {ausenciasFiltradas.map((ausencia) => (
-          <Card
-            key={ausencia.id}
-            className="p-4 space-y-3"
-            onClick={() => setEditarModal({ open: true, ausencia })}
-          >
-            <div className="flex items-start justify-between gap-3">
+      <div className="space-y-4 pb-20">
+        {ausencias.map((ausencia) => (
+          <Card key={ausencia.id} className="p-4 space-y-3">
+            <div className="flex justify-between items-start">
               <div>
-                <p className="text-base font-semibold text-gray-900">
+                <h3 className="font-medium text-gray-900">
                   {ausencia.empleado.nombre} {ausencia.empleado.apellidos}
-                </p>
-                <p className="text-sm text-gray-500">{ausencia.diasLaborables} días</p>
+                </h3>
+                <p className="text-xs text-gray-500">{ausencia.empleado.puesto}</p>
               </div>
               {getEstadoBadge(ausencia.estado)}
             </div>
@@ -676,6 +509,118 @@ export function AusenciasClient({}: AusenciasClientProps) {
     );
   };
 
+  const renderCampaignCard = () => {
+    if (!campanaActiva) return null;
+    return (
+      <Card className="mb-6 p-4 bg-blue-50 border-blue-100">
+        <div className="flex justify-between items-center mb-2">
+          <div>
+            <h3 className="font-medium text-blue-900">{campanaActiva.titulo}</h3>
+            <p className="text-sm text-blue-700">
+              Objetivo: {format(new Date(campanaActiva.fechaInicioObjetivo), 'd MMM')} -{' '}
+              {format(new Date(campanaActiva.fechaFinObjetivo), 'd MMM yyyy', { locale: es })}
+            </p>
+          </div>
+          <Badge className="bg-blue-200 text-blue-800 hover:bg-blue-300">Activa</Badge>
+        </div>
+        <div className="flex gap-4 text-sm text-blue-800">
+          <div>
+            <span className="font-bold">{campanaActiva._count.preferencias}</span> solicitudes
+          </div>
+          <div>
+            <span className="font-bold">
+              {Math.round((campanaActiva.empleadosCompletados / campanaActiva.totalEmpleadosAsignados) * 100) || 0}%
+            </span>{' '}
+            completado
+          </div>
+        </div>
+      </Card>
+    );
+  };
+
+  const renderDesktopTable = () => (
+    <Card className="overflow-hidden">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Empleado</TableHead>
+            <TableHead>Tipo</TableHead>
+            <TableHead>Fechas</TableHead>
+            <TableHead>Días</TableHead>
+            <TableHead>Motivo</TableHead>
+            <TableHead>Estado</TableHead>
+            <TableHead>Acciones</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {ausencias.length === 0 ? (
+            <TableRow>
+              <TableCell colSpan={7} className="h-24 text-center text-gray-500">
+                {busquedaEmpleado ? 'No se encontraron ausencias' : 'No hay ausencias registradas'}
+              </TableCell>
+            </TableRow>
+          ) : (
+            ausencias.map((ausencia) => (
+              <TableRow key={ausencia.id}>
+                <TableCell>
+                  <div className="font-medium">{ausencia.empleado.nombre} {ausencia.empleado.apellidos}</div>
+                  <div className="text-xs text-gray-500">{ausencia.empleado.puesto}</div>
+                </TableCell>
+                <TableCell>{getTipoBadge(ausencia.tipo)}</TableCell>
+                <TableCell>
+                  <div className="text-sm">
+                    {format(new Date(ausencia.fechaInicio), 'dd MMM yyyy', { locale: es })}
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    Hasta {format(new Date(ausencia.fechaFin), 'dd MMM yyyy', { locale: es })}
+                  </div>
+                </TableCell>
+                <TableCell>
+                  {ausencia.diasLaborables} {ausencia.medioDia ? '(Medio día)' : ''}
+                </TableCell>
+                <TableCell className="max-w-[200px] truncate" title={ausencia.motivo || ''}>
+                  {ausencia.motivo || '-'}
+                </TableCell>
+                <TableCell>{getEstadoBadge(ausencia.estado)}</TableCell>
+                <TableCell>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setEditarModal({ open: true, ausencia })}
+                    >
+                      Editar
+                    </Button>
+                    {ausencia.estado === EstadoAusencia.pendiente && (
+                      <>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                          onClick={() => _handleAprobar(ausencia.id)}
+                        >
+                          Aprobar
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          onClick={() => setRechazarModal({ open: true, ausenciaId: ausencia.id })}
+                        >
+                          Rechazar
+                        </Button>
+                      </>
+                    )}
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))
+          )}
+        </TableBody>
+      </Table>
+    </Card>
+  );
+
   return (
     <ResponsiveContainer variant="page" className="h-full w-full flex flex-col overflow-hidden">
       {isMobile ? (
@@ -689,7 +634,7 @@ export function AusenciasClient({}: AusenciasClientProps) {
             }}
             secondaryActions={[
               {
-                icon: Settings,
+                icon: <Settings className="w-4 h-4" />,
                 label: 'Gestionar ausencias',
                 onClick: () => setGestionarModal(true),
               },
@@ -697,62 +642,22 @@ export function AusenciasClient({}: AusenciasClientProps) {
             className="mb-3"
           />
 
-          {/* Búsqueda y filtros */}
           <div className="flex-shrink-0 mb-3">
-            <CompactFilterBar
-              searchValue={busquedaEmpleado}
+            <DataFilters
+              searchQuery={busquedaEmpleado}
               onSearchChange={setBusquedaEmpleado}
               searchPlaceholder="Buscar empleado..."
-              activeFiltersCount={
-                (filtroTipo !== 'todos' ? 1 : 0) + (filtroEstado !== 'todos' ? 1 : 0)
-              }
-              filtersContent={
-                <>
-                  <div className="space-y-3">
-                    <div>
-                      <label className="text-sm font-medium text-gray-700 mb-1.5 block">
-                        Tipo de ausencia
-                      </label>
-                      <Select value={filtroTipo} onValueChange={setFiltroTipo}>
-                        <SelectTrigger className="w-full">
-                          <SelectValue placeholder="Tipo" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="todos">Todos</SelectItem>
-                          <SelectItem value="vacaciones">Vacaciones</SelectItem>
-                          <SelectItem value="enfermedad">Enfermedad</SelectItem>
-                          <SelectItem value="permiso">Permiso</SelectItem>
-                          <SelectItem value="otro">Otro</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium text-gray-700 mb-1.5 block">
-                        Estado
-                      </label>
-                      <Select value={filtroEstado} onValueChange={setFiltroEstado}>
-                        <SelectTrigger className="w-full">
-                          <SelectValue placeholder="Estado" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="todos">Todos</SelectItem>
-                          <SelectItem value="pendiente">Pendiente</SelectItem>
-                          <SelectItem value="aprobada">Aprobada</SelectItem>
-                          <SelectItem value="rechazada">Rechazada</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                </>
-              }
-              filtersTitle="Filtros"
+              estadoValue={filtroEstado}
+              onEstadoChange={setFiltroEstado}
+              estadoOptions={ESTADO_OPTIONS}
+              equipoValue={filtroEquipo}
+              onEquipoChange={setFiltroEquipo}
+              equipoOptions={equiposOptions}
             />
           </div>
 
-          {/* Campaign Card (si existe) */}
           {renderCampaignCard()}
 
-          {/* Table - Ocupa el resto del viewport (70-80%) */}
           <div className="flex-1 min-h-0 overflow-y-auto">
             {renderMobileList()}
           </div>
@@ -771,10 +676,22 @@ export function AusenciasClient({}: AusenciasClientProps) {
               variant: 'outline',
             }}
           />
+          
           {renderCampaignCard()}
+          
           <div className="flex items-center justify-between mb-6 gap-4">
-            <FiltersForm layout="desktop" />
+            <DataFilters
+              searchQuery={busquedaEmpleado}
+              onSearchChange={setBusquedaEmpleado}
+              estadoValue={filtroEstado}
+              onEstadoChange={setFiltroEstado}
+              estadoOptions={ESTADO_OPTIONS}
+              equipoValue={filtroEquipo}
+              onEquipoChange={setFiltroEquipo}
+              equipoOptions={equiposOptions}
+            />
           </div>
+          
           <div className="flex-1 overflow-y-auto">{renderDesktopTable()}</div>
         </>
       )}
@@ -837,34 +754,34 @@ export function AusenciasClient({}: AusenciasClientProps) {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label>Tipo</Label>
-                  <Select
-                    value={editForm.tipo}
-                    onValueChange={(value) => setEditForm((prev) => ({ ...prev, tipo: value }))}
+                  <Select 
+                    value={editForm.tipo} 
+                    onValueChange={(val) => setEditForm(prev => ({ ...prev, tipo: val }))}
                   >
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {tipoOptions.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
+                      {/* Using hardcoded options to match the component context */}
+                      <SelectItem value="vacaciones">Vacaciones</SelectItem>
+                      <SelectItem value="enfermedad">Enfermedad</SelectItem>
+                      <SelectItem value="enfermedad_familiar">Enfermedad Familiar</SelectItem>
+                      <SelectItem value="maternidad_paternidad">Maternidad/Paternidad</SelectItem>
+                      <SelectItem value="otro">Otro</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
-
                 <div>
                   <Label>Estado</Label>
-                  <Select
-                    value={editForm.estado}
+                  <Select 
+                    value={editForm.estado} 
                     onValueChange={(value) => setEditForm((prev) => ({ ...prev, estado: value as EstadoAusencia }))}
                   >
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {estadoOptions.map((estado) => (
+                      {Object.values(EstadoAusencia).map((estado) => (
                         <SelectItem key={estado} value={estado}>
                           {getAusenciaEstadoLabel(estado)}
                         </SelectItem>
@@ -876,104 +793,51 @@ export function AusenciasClient({}: AusenciasClientProps) {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label>Fecha inicio</Label>
-                  <Input
-                    type="date"
+                  <Label>Fecha Inicio</Label>
+                  <Input 
+                    type="date" 
                     value={editForm.fechaInicio}
-                    onChange={(e) => setEditForm((prev) => ({ ...prev, fechaInicio: e.target.value }))}
+                    onChange={(e) => setEditForm(prev => ({ ...prev, fechaInicio: e.target.value }))}
                   />
                 </div>
                 <div>
-                  <Label>Fecha fin</Label>
-                  <Input
-                    type="date"
+                  <Label>Fecha Fin</Label>
+                  <Input 
+                    type="date" 
                     value={editForm.fechaFin}
-                    onChange={(e) => setEditForm((prev) => ({ ...prev, fechaFin: e.target.value }))}
+                    onChange={(e) => setEditForm(prev => ({ ...prev, fechaFin: e.target.value }))}
                   />
                 </div>
               </div>
 
-              <div className="flex items-center gap-2">
-                <input
-                  id="edit-medio-dia"
-                  type="checkbox"
-                  checked={editForm.medioDia}
-                  onChange={(e) => setEditForm((prev) => ({ ...prev, medioDia: e.target.checked }))}
-                  className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
-                />
-                <Label htmlFor="edit-medio-dia" className="cursor-pointer text-sm text-gray-700">
-                  Medio día
-                </Label>
-              </div>
-
-              <div className="col-span-2">
-                <Label>
-                  Motivo o detalles {editForm.tipo === 'otro' ? '*' : '(opcional)'}
-                </Label>
-                <Textarea
-                  placeholder="Describe el motivo o aporta detalles (requerido si el tipo es 'Otro')"
+              <div>
+                <Label>Motivo</Label>
+                <Textarea 
                   value={editForm.motivo}
-                  onChange={(e) => setEditForm((prev) => ({ ...prev, motivo: e.target.value }))}
-                  rows={3}
+                  onChange={(e) => setEditForm(prev => ({ ...prev, motivo: e.target.value }))}
+                  placeholder="Detalles de la ausencia..."
                 />
-              </div>
-
-              <div className="space-y-2">
-                <Label>Justificante</Label>
-                {editForm.justificanteUrl && (
-                  <Button variant="link" size="sm" asChild className="px-0">
-                    <a href={editForm.justificanteUrl} target="_blank" rel="noopener noreferrer">
-                      Ver justificante actual
-                    </a>
-                  </Button>
-                )}
-                <Input
-                  type="file"
-                  accept=".pdf,.jpg,.jpeg,.png"
-                  onChange={(e) => setEditJustificanteFile(e.target.files?.[0] || null)}
-                  disabled={uploadingEditJustificante || savingEdit}
-                />
-                <p className="text-xs text-gray-500">
-                  PDF, JPG o PNG. Máx. 5MB.
-                </p>
-                {editJustificanteFile && (
-                  <p className="text-xs text-gray-600">
-                    Archivo seleccionado: {editJustificanteFile.name}
-                  </p>
-                )}
               </div>
 
               {editError && (
-                <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-                  {editError}
-                </div>
+                <p className="text-sm text-red-600 bg-red-50 p-2 rounded">{editError}</p>
               )}
             </div>
           )}
 
           <DialogFooter>
-            <Button variant="outline" onClick={closeEditarModal} disabled={savingEdit}>
+            <Button variant="outline" onClick={closeEditarModal}>
               Cancelar
             </Button>
-            <Button
+            <LoadingButton 
+              loading={savingEdit || uploadingEditJustificante}
               onClick={handleGuardarEdicion}
-              disabled={savingEdit || uploadingEditJustificante}
             >
-              {savingEdit ? 'Guardando...' : 'Guardar cambios'}
-            </Button>
+              Guardar Cambios
+            </LoadingButton>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      {/* Modal Gestionar Ausencias */}
-      <GestionarAusenciasModal
-        open={gestionarModal}
-        onClose={() => setGestionarModal(false)}
-        onSaved={() => {
-          fetchAusencias();
-          setGestionarModal(false);
-        }}
-      />
 
       {/* Modal Crear Campaña */}
       <CrearCampanaModal
@@ -981,10 +845,19 @@ export function AusenciasClient({}: AusenciasClientProps) {
         onClose={() => setCrearCampanaModal(false)}
         onCreated={() => {
           fetchCampanaActiva();
-          setCrearCampanaModal(false);
+          toast.success('Campaña creada correctamente');
+        }}
+      />
+
+      {/* Modal Gestionar Ausencias */}
+      <GestionarAusenciasModal
+        open={gestionarModal}
+        onClose={() => setGestionarModal(false)}
+        onSaved={() => {
+          setGestionarModal(false);
+          fetchAusencias();
         }}
       />
     </ResponsiveContainer>
   );
 }
-
