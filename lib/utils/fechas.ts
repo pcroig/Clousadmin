@@ -100,8 +100,45 @@ export function toMadridDate(fecha: Date | string): Date {
   const month = parts.find(p => p.type === 'month')?.value;
   const day = parts.find(p => p.type === 'day')?.value;
 
-  return new Date(`${year}-${month?.padStart(2, '0')}-${day?.padStart(2, '0')}T00:00:00`);
+  if (!year || !month || !day) return new Date(date);
+
+  return new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
 }
 
+/**
+ * Calcula el rango de inicio y fin para un periodo dado (día, semana, mes)
+ * basado en una fecha de referencia.
+ */
+export function calcularRangoFechas(
+  fecha: Date,
+  rango: 'dia' | 'semana' | 'mes'
+): { inicio: Date; fin: Date } {
+  const referencia = toMadridDate(fecha);
+  const inicio = new Date(referencia);
+  const fin = new Date(referencia);
 
+  switch (rango) {
+    case 'dia':
+      inicio.setHours(0, 0, 0, 0);
+      fin.setHours(23, 59, 59, 999);
+      break;
+    case 'semana':
+      const diaSemana = referencia.getDay();
+      // Semana empieza en lunes (1)
+      // Si es domingo (0), diff es -6. Si es lunes (1), diff es 0.
+      const diffInicio = diaSemana === 0 ? -6 : 1 - diaSemana;
+      inicio.setDate(referencia.getDate() + diffInicio);
+      inicio.setHours(0, 0, 0, 0);
+      fin.setDate(inicio.getDate() + 6);
+      fin.setHours(23, 59, 59, 999);
+      break;
+    case 'mes':
+      inicio.setDate(1);
+      inicio.setHours(0, 0, 0, 0);
+      fin.setMonth(referencia.getMonth() + 1, 0);
+      fin.setHours(23, 59, 59, 999);
+      break;
+  }
 
+  return { inicio, fin };
+}

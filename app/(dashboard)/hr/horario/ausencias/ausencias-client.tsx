@@ -41,6 +41,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { EstadoAusencia } from '@/lib/constants/enums';
 import { useIsMobile } from '@/lib/hooks/use-viewport';
 import { extractArrayFromResponse } from '@/lib/utils/api-response';
+import { calcularRangoFechas } from '@/lib/utils/fechas';
 import { getAusenciaEstadoLabel } from '@/lib/utils/formatters';
 import { parseJson } from '@/lib/utils/json';
 
@@ -127,6 +128,10 @@ export function AusenciasClient({}: AusenciasClientProps) {
   const [equiposOptions, setEquiposOptions] = useState<FilterOption[]>([]);
   const [busquedaEmpleado, setBusquedaEmpleado] = useState('');
   
+  // Date State
+  const [rangoFechas, setRangoFechas] = useState<'dia' | 'semana' | 'mes'>('mes');
+  const [fechaBase, setFechaBase] = useState(new Date());
+  
   // Modals
   const [gestionarModal, setGestionarModal] = useState(false);
   const [crearCampanaModal, setCrearCampanaModal] = useState(false);
@@ -163,10 +168,49 @@ export function AusenciasClient({}: AusenciasClientProps) {
     loadEquipos();
   }, []);
 
+  const goToPreviousPeriod = useCallback(() => {
+    const nuevaFecha = new Date(fechaBase);
+    if (rangoFechas === 'dia') {
+      nuevaFecha.setDate(nuevaFecha.getDate() - 1);
+    } else if (rangoFechas === 'semana') {
+      nuevaFecha.setDate(nuevaFecha.getDate() - 7);
+    } else {
+      nuevaFecha.setMonth(nuevaFecha.getMonth() - 1);
+    }
+    setFechaBase(nuevaFecha);
+  }, [fechaBase, rangoFechas]);
+
+  const goToNextPeriod = useCallback(() => {
+    const nuevaFecha = new Date(fechaBase);
+    if (rangoFechas === 'dia') {
+      nuevaFecha.setDate(nuevaFecha.getDate() + 1);
+    } else if (rangoFechas === 'semana') {
+      nuevaFecha.setDate(nuevaFecha.getDate() + 7);
+    } else {
+      nuevaFecha.setMonth(nuevaFecha.getMonth() + 1);
+    }
+    setFechaBase(nuevaFecha);
+  }, [fechaBase, rangoFechas]);
+
+  const periodLabel = useMemo(() => {
+    switch (rangoFechas) {
+      case 'dia':
+        return format(fechaBase, 'dd MMM', { locale: es });
+      case 'semana':
+        return `Sem ${format(fechaBase, 'w', { locale: es })}`;
+      default:
+        return format(fechaBase, 'MMM yyyy', { locale: es });
+    }
+  }, [fechaBase, rangoFechas]);
+
   const fetchAusencias = useCallback(async () => {
     setLoading(true);
     try {
       const params = new URLSearchParams();
+      const { inicio, fin } = calcularRangoFechas(fechaBase, rangoFechas);
+      params.append('fechaInicio', format(inicio, 'yyyy-MM-dd'));
+      params.append('fechaFin', format(fin, 'yyyy-MM-dd'));
+
       if (filtroEstado !== 'todas') {
         params.append('estado', filtroEstado);
       }
@@ -194,7 +238,7 @@ export function AusenciasClient({}: AusenciasClientProps) {
     } finally {
       setLoading(false);
     }
-  }, [busquedaEmpleado, filtroEquipo, filtroEstado]);
+  }, [busquedaEmpleado, filtroEquipo, filtroEstado, fechaBase, rangoFechas]);
 
   const fetchCampanaActiva = useCallback(async () => {
     try {

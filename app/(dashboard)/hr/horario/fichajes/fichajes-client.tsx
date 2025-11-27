@@ -34,7 +34,7 @@ import { EstadoFichaje } from '@/lib/constants/enums';
 import { useIsMobile } from '@/lib/hooks/use-viewport';
 import { extractArrayFromResponse } from '@/lib/utils/api-response';
 import { formatearHorasMinutos } from '@/lib/utils/formatters';
-import { toMadridDate } from '@/lib/utils/fechas';
+import { calcularRangoFechas, toMadridDate } from '@/lib/utils/fechas';
 import { parseJson } from '@/lib/utils/json';
 
 import { JornadasModal } from './jornadas-modal';
@@ -265,8 +265,9 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
       
       // Calcular rango de fechas según selección
       const { inicio, fin } = calcularRangoFechas(fechaBase, rangoFechas);
-      params.append('fechaInicio', inicio.toISOString().split('T')[0]);
-      params.append('fechaFin', fin.toISOString().split('T')[0]);
+      // Usar format local para evitar desfases de zona horaria que introduce toISOString()
+      params.append('fechaInicio', format(inicio, 'yyyy-MM-dd'));
+      params.append('fechaFin', format(fin, 'yyyy-MM-dd'));
 
       if (filtroEstadoFichaje !== 'todos') {
         params.append('estado', filtroEstadoFichaje);
@@ -302,40 +303,6 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
   useEffect(() => {
     fetchFichajes();
   }, [fetchFichajes]);
-
-  function calcularRangoFechas(fecha: Date, rango: 'dia' | 'semana' | 'mes') {
-    const referencia = toMadridDate(fecha);
-    const inicio = new Date(referencia);
-    const fin = new Date(referencia);
-
-    switch (rango) {
-      case 'dia':
-        // Mismo día
-        inicio.setHours(0, 0, 0, 0);
-        fin.setHours(23, 59, 59, 999);
-        break;
-      case 'semana':
-        // Inicio de semana (lunes)
-        const diaSemana = referencia.getDay();
-        const diffInicio = diaSemana === 0 ? -6 : 1 - diaSemana;
-        inicio.setDate(referencia.getDate() + diffInicio);
-        inicio.setHours(0, 0, 0, 0);
-        // Fin de semana (domingo)
-        fin.setDate(inicio.getDate() + 6);
-        fin.setHours(23, 59, 59, 999);
-        break;
-      case 'mes':
-        // Primer día del mes
-        inicio.setDate(1);
-        inicio.setHours(0, 0, 0, 0);
-        // Último día del mes
-        fin.setMonth(referencia.getMonth() + 1, 0);
-        fin.setHours(23, 59, 59, 999);
-        break;
-    }
-
-    return { inicio, fin };
-  }
 
   const goToPreviousPeriod = useCallback(() => {
     const nuevaFecha = new Date(fechaBase);
@@ -580,7 +547,7 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
   }
 
   return (
-    <ResponsiveContainer variant="page" className="h-full w-full flex flex-col overflow-hidden">
+    <ResponsiveContainer variant="page" className="h-full w-full flex flex-col overflow-hidden p-4 md:p-6">
       {isMobile ? (
         <>
           <MobileActionBar
