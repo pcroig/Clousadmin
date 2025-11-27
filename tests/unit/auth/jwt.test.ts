@@ -4,7 +4,7 @@
  */
 
 import * as jose from 'jose';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { UsuarioRol } from '@/lib/constants/enums';
 
@@ -164,7 +164,7 @@ describe('JWT Token Management', () => {
   describe('Token expiration times', () => {
     it('debe crear token con expiración de 24 horas', async () => {
       const payload = { id: 'user-123' };
-      const ahora = Date.now();
+      const _ahora = Date.now();
 
       const token = await new jose.SignJWT(payload)
         .setProtectedHeader({ alg: 'HS256' })

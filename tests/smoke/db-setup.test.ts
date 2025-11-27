@@ -2,7 +2,7 @@
  * Smoke test: Validar que los helpers de BD funcionan correctamente
  */
 
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it } from 'vitest';
 
 import { cleanDatabase, getPrismaTest, teardownTestDatabase } from '../helpers/db';
 

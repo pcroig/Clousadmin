@@ -10,10 +10,8 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import {
   calcularSaldoDisponible,
-  determinarEstadoTrasAprobacion,
   validarSaldoSuficiente,
 } from '@/lib/calculos/ausencias';
-import { EstadoAusencia } from '@/lib/constants/enums';
 
 import {
   cleanDatabase,

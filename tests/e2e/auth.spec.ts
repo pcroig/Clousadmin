@@ -131,7 +131,7 @@ test.describe('Session Management', () => {
     await expect(page).toHaveURL(/\/login/, { timeout: 5000 });
   });
 
-  test('sesión debe persistir al recargar página', async ({ page, context }) => {
+  test('sesión debe persistir al recargar página', async ({ page, context: _context }) => {
     // Login
     await page.goto('/login');
     await page.getByLabel(/email/i).fill('ana.garcia@clousadmin.com');

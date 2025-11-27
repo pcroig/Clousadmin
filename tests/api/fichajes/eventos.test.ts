@@ -7,10 +7,12 @@
 
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { requireAuth } from '@/lib/api-handler';
 import { TipoFichajeEvento } from '@/lib/constants/enums';
+import { prisma } from '@/lib/prisma';
 import { createMockRequest, parseResponse } from '@/tests/helpers/api';
-import { createMockSession, mockUsers } from '@/tests/helpers/auth';
-import { empresaFactory, fichajeFactory } from '@/tests/helpers/factories';
+import { createMockSession } from '@/tests/helpers/auth';
+import { fichajeFactory } from '@/tests/helpers/factories';
 
 // Mock de dependencies
 vi.mock('@/lib/api-handler', async () => {
@@ -33,9 +35,6 @@ vi.mock('@/lib/prisma', () => ({
     },
   },
 }));
-
-import { requireAuth } from '@/lib/api-handler';
-import { prisma } from '@/lib/prisma';
 
 let POST: typeof import('@/app/api/fichajes/eventos/route').POST;
 

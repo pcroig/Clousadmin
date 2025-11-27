@@ -140,7 +140,7 @@ export const mockStripe = {
   },
 
   webhooks: {
-    constructEvent: vi.fn((payload, signature, secret) => {
+    constructEvent: vi.fn((_payload, _signature, _secret) => {
       // Mock de verificación de webhook
       return {
         id: 'evt_test123',

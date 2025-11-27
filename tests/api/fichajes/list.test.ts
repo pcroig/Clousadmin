@@ -8,9 +8,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { GET } from '@/app/api/fichajes/route';
+import { requireAuth } from '@/lib/api-handler';
 import { EstadoFichaje, UsuarioRol } from '@/lib/constants/enums';
+import { prisma } from '@/lib/prisma';
 import { createMockRequest, parseResponse } from '@/tests/helpers/api';
-import { createMockSession, mockUsers } from '@/tests/helpers/auth';
+import { createMockSession } from '@/tests/helpers/auth';
 import { fichajeFactory } from '@/tests/helpers/factories';
 
 // Mock de dependencies
@@ -34,9 +36,6 @@ vi.mock('@/lib/prisma', () => ({
   },
   Prisma: {},
 }));
-
-import { requireAuth } from '@/lib/api-handler';
-import { prisma } from '@/lib/prisma';
 
 describe('GET /api/fichajes', () => {
   const empresaId = 'empresa-test-id';

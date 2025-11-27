@@ -91,7 +91,7 @@ describe('Empleado Schemas', () => {
       });
 
       it('debe rechazar nombre sin proporcionar', () => {
-        const { nombre, ...empleadoSinNombre } = baseEmpleado;
+        const { nombre: _nombre, ...empleadoSinNombre } = baseEmpleado;
 
         const result = empleadoCreateSchema.safeParse(empleadoSinNombre);
 
@@ -187,7 +187,7 @@ describe('Empleado Schemas', () => {
       });
 
       it('debe rechazar email sin proporcionar', () => {
-        const { email, ...empleadoSinEmail } = baseEmpleado;
+        const { email: _email, ...empleadoSinEmail } = baseEmpleado;
 
         const result = empleadoCreateSchema.safeParse(empleadoSinEmail);
 

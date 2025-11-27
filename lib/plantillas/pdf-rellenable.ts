@@ -5,7 +5,7 @@
 
 import { PDFCheckBox, PDFDocument, PDFDropdown, PDFTextField } from 'pdf-lib';
 
-import { callFeatureAI, MessageRole, ContentType } from '@/lib/ia';
+import { callFeatureAI, ContentType, MessageRole } from '@/lib/ia';
 import { deleteOpenAIFile, uploadPDFToOpenAI } from '@/lib/ia/core/providers/openai';
 import {
   crearNotificacionDocumentoGeneradoEmpleado,

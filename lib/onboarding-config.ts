@@ -3,7 +3,7 @@
 // ========================================
 // Funciones para gestionar la configuración de onboarding de HR admins
 
-import { prisma, Prisma } from '@/lib/prisma';
+import { prisma } from '@/lib/prisma';
 import { asJsonValue } from '@/lib/prisma/json';
 
 /**
