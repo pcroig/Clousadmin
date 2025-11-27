@@ -26,6 +26,9 @@ import {
 import { useIsMobile } from '@/lib/hooks/use-viewport';
 import { parseJson } from '@/lib/utils/json';
 
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { ScrollArea } from '@/components/ui/scroll-area';
+
 interface EventoPropuesto {
   tipo: string;
   hora: string;
@@ -92,6 +95,11 @@ export function CuadrarFichajesClient() {
   });
   const [ausenciaModal, setAusenciaModal] = useState<{ open: boolean; empleadoId?: string; fecha?: Date }>({
     open: false,
+  });
+  
+  const [descartarModal, setDescartarModal] = useState<{ open: boolean; ids: string[] }>({
+    open: false,
+    ids: [],
   });
   
   const isMobile = useIsMobile();
@@ -285,19 +293,29 @@ export function CuadrarFichajesClient() {
     }
   }
 
-  async function handleDescartarDiasVacios() {
+  function handleAbrirDescartar() {
     const ids = fichajesFiltrados.filter((f) => f.eventosRegistrados.length === 0).map((f) => f.fichajeId);
 
     if (ids.length === 0) {
-      toast.info('No hay días sin fichajes para descartar');
+      toast.info('No hay días sin fichajes para descartar en la selección actual');
       return;
     }
 
+    setDescartarModal({ open: true, ids });
+  }
+
+  async function handleConfirmarDescarte(idsSeleccionados: string[]) {
+    if (idsSeleccionados.length === 0) {
+      setDescartarModal({ open: false, ids: [] });
+      return;
+    }
+
+    setProcessing(true);
     try {
       const response = await fetch('/api/fichajes/cuadrar', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ descartarIds: ids }),
+        body: JSON.stringify({ descartarIds: idsSeleccionados }),
       });
 
       if (!response.ok) {
@@ -305,11 +323,14 @@ export function CuadrarFichajesClient() {
         throw new Error(typeof error.error === 'string' ? error.error : 'No se pudieron descartar los días');
       }
 
-      toast.success(`${ids.length} día(s) sin fichajes descartados`);
-      fetchFichajesRevision();
+      toast.success(`${idsSeleccionados.length} día(s) sin fichajes descartados`);
+      setDescartarModal({ open: false, ids: [] });
+      await fetchFichajesRevision();
     } catch (error) {
       console.error('[Cuadrar fichajes] Error descartando días', error);
       toast.error(error instanceof Error ? error.message : 'Error al descartar días');
+    } finally {
+      setProcessing(false);
     }
   }
 
@@ -362,14 +383,7 @@ export function CuadrarFichajesClient() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2 text-sm text-gray-600">
-          <span>
-            Pendientes:{' '}
-            <span className="font-semibold text-gray-900">{fichajesFiltrados.length}</span>
-          </span>
-          <Button variant="ghost" size="sm" onClick={handleSeleccionarTodos}>
-            Seleccionar todos
-          </Button>
-          <Button variant="ghost" size="sm" onClick={handleDescartarDiasVacios}>
+          <Button variant="outline" size="sm" onClick={handleAbrirDescartar}>
             Descartar días vacíos
           </Button>
           <LoadingButton
@@ -435,7 +449,6 @@ export function CuadrarFichajesClient() {
                         onCheckedChange={handleSeleccionarTodos}
                       />
                     </TableHead>
-                    <TableHead>Estado</TableHead>
                     <TableHead>Empleado</TableHead>
                     <TableHead>Fecha</TableHead>
                     <TableHead>Eventos / Faltantes</TableHead>
@@ -444,7 +457,6 @@ export function CuadrarFichajesClient() {
                 </TableHeader>
                 <TableBody>
                   {fichajesFiltrados.map((fichaje) => {
-                    const esDiaVacio = fichaje.eventosRegistrados.length === 0;
                     const fecha = toDate(fichaje.fecha);
                     return (
                       <TableRow key={fichaje.id} className={seleccionados[fichaje.id] ? 'bg-blue-50/50' : ''}>
@@ -456,17 +468,6 @@ export function CuadrarFichajesClient() {
                           />
                         </TableCell>
                         <TableCell>
-                          <div className="flex items-center gap-2 text-sm font-semibold">
-                            {esDiaVacio ? (
-                              <CircleSlash2 className="w-4 h-4 text-orange-600" />
-                            ) : (
-                              <TriangleAlert className="w-4 h-4 text-yellow-600" />
-                            )}
-                            {esDiaVacio ? 'Sin fichajes' : 'Incompleto'}
-                          </div>
-                          <p className="text-xs text-gray-500 mt-1">{fichaje.razon}</p>
-                        </TableCell>
-                        <TableCell>
                           <div className="font-medium text-gray-900">{fichaje.empleadoNombre}</div>
                           <div className="text-xs text-gray-500">
                             {fichaje.equipoNombre ?? 'Sin equipo asignado'}
@@ -474,6 +475,7 @@ export function CuadrarFichajesClient() {
                         </TableCell>
                         <TableCell className="text-sm text-gray-900 font-medium">
                           {format(fecha, 'dd MMM', { locale: es })}
+                          <p className="text-xs text-gray-500 mt-1">{fichaje.razon}</p>
                         </TableCell>
                         <TableCell>
                           {fichaje.eventosRegistrados.length === 0 ? (
@@ -563,6 +565,46 @@ export function CuadrarFichajesClient() {
           fetchFichajesRevision();
         }}
       />
+
+      <Dialog open={descartarModal.open} onOpenChange={(open) => !open && setDescartarModal({ open: false, ids: [] })}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Descartar días vacíos</DialogTitle>
+            <DialogDescription>
+              Se han detectado {descartarModal.ids.length} días sin fichajes registrados.
+              Selecciona los días que deseas descartar. Esta acción no generará ausencias.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <ScrollArea className="h-[200px] w-full rounded-md border p-4 bg-gray-50/50">
+              <div className="space-y-2">
+                {descartarModal.ids.map((id) => {
+                  const fichaje = fichajesFiltrados.find((f) => f.fichajeId === id);
+                  if (!fichaje) return null;
+                  return (
+                    <div key={id} className="flex items-center justify-between text-sm p-2 bg-white rounded border shadow-sm">
+                      <span className="font-medium text-gray-700">{fichaje.empleadoNombre}</span>
+                      <span className="text-gray-500">{format(toDate(fichaje.fecha), 'd MMM', { locale: es })}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </ScrollArea>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDescartarModal({ open: false, ids: [] })}>
+              Cancelar
+            </Button>
+            <LoadingButton 
+              variant="default" 
+              loading={processing} 
+              onClick={() => handleConfirmarDescarte(descartarModal.ids)}
+            >
+              Confirmar descarte
+            </LoadingButton>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

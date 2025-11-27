@@ -195,9 +195,12 @@ export function FichajeWidget({
     return Number(state.horasAcumuladas.toFixed(2));
   }, [state.status, state.horaEntrada, state.horasAcumuladas, tick]);
 
-  const horasHechas = useMemo(() => Math.round(horasTotales * 10) / 10, [horasTotales]);
+  const horasHechas = useMemo(() => Math.round(horasTotales * 100) / 100, [horasTotales]);
   const horasPorHacer = useMemo(
-    () => Math.max(0, Number(horasObjetivoDia.toFixed(2)) - horasHechas),
+    () => {
+      const resto = Number(horasObjetivoDia.toFixed(2)) - horasHechas;
+      return Math.max(0, Math.round(resto * 100) / 100);
+    },
     [horasHechas, horasObjetivoDia]
   );
   const tiempoTrabajado = useMemo(
