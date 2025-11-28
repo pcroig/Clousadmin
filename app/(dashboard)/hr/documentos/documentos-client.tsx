@@ -104,14 +104,14 @@ export function DocumentosClient({ carpetas }: DocumentosClientProps) {
             actions={
               activeTab === 'documentos' ? (
                 <div className="flex gap-2">
-                  <Button
-                    onClick={() => setModalCrearCarpeta(true)}
-                    size="sm"
-                    className={cn(MOBILE_DESIGN.button.secondary)}
-                  >
-                    <FolderPlus className={cn(MOBILE_DESIGN.components.icon.small, 'mr-2')} />
-                    Crear
-                  </Button>
+                <Button
+                  onClick={() => setModalCrearCarpeta(true)}
+                  size="sm"
+                  className={cn(MOBILE_DESIGN.button.secondary)}
+                >
+                  <FolderPlus className={cn(MOBILE_DESIGN.components.icon.small, 'mr-2')} />
+                  Crear
+                </Button>
                   <Button
                     onClick={() => setModalSubirDocumentos(true)}
                     size="sm"

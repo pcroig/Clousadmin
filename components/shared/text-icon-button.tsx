@@ -34,7 +34,7 @@ export function TextIconButton({
       size={resolvedSize}
       variant={resolvedVariant}
       className={cn(
-        'gap-2 rounded-lg border border-gray-200 bg-white text-gray-700 shadow-sm hover:bg-gray-50 focus-visible:ring-gray-200',
+        'gap-2 rounded-md border border-gray-300 bg-transparent text-gray-700 hover:bg-gray-50 focus-visible:ring-gray-200',
         hideLabel && 'h-9 w-9 min-w-0',
         className,
       )}

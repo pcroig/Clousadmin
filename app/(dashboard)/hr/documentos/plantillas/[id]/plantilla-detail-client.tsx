@@ -377,14 +377,14 @@ export function PlantillaDetailClient({ plantilla }: PlantillaDetailClientProps)
                 <Button variant="outline" size="sm" onClick={handleRefreshPreview} disabled={viewerLoading}>
                   Refrescar
                 </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
+                  <Button
+                    variant="outline"
+                    size="sm"
                   onClick={() => window.open(previewFrameUrl, '_blank')}
-                >
-                  <Download className="w-4 h-4 mr-2" />
+                  >
+                    <Download className="w-4 h-4 mr-2" />
                   Descargar PDF
-                </Button>
+                  </Button>
               </div>
             </div>
 

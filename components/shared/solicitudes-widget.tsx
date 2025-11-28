@@ -192,8 +192,8 @@ export const SolicitudesWidget = memo(function SolicitudesWidget({
                 </div>
               </div>
             );
-            })}
-          </div>
+          })}
+        </div>
         )}
       </div>
       {solicitudes.length > maxItems && (

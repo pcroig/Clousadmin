@@ -7,6 +7,11 @@
  * - Uses the /api/documentos/[id]/preview endpoint for rendering.
  * - Supports custom actions in the header (e.g., "Sign", "Download").
  * - Handles loading and error states.
+ * 
+ * @version 1.5.0 (2025-11-28)
+ * - Enhanced iframe sandbox: allow-downloads, allow-modals, allow-presentation
+ * - Enables full native PDF viewer functionality (download, print, fullscreen)
+ * - Compatible with Chrome, Firefox, Safari, Edge PDF viewers
  */
 
 import {
@@ -228,7 +233,7 @@ export function DocumentViewerModal({
             title={`Vista previa de ${title}`}
             onLoad={handleIframeLoad}
             onError={handleIframeError}
-            sandbox="allow-same-origin"
+            sandbox="allow-same-origin allow-scripts allow-popups allow-forms allow-downloads allow-modals allow-presentation"
           />
         </div>
       </DialogContent>

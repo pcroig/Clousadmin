@@ -136,7 +136,7 @@ export const NotificacionesWidget = memo(function NotificacionesWidget({
           </div>
         ) : (
           <div className="space-y-0">
-            {notificacionesMostradas.map(renderNotificacion)}
+          {notificacionesMostradas.map(renderNotificacion)}
           </div>
         )}
       </div>

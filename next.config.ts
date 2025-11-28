@@ -100,7 +100,7 @@ const nextConfig: NextConfig = {
           // Prevenir clickjacking
           {
             key: 'X-Frame-Options',
-            value: 'DENY',
+            value: 'SAMEORIGIN',
           },
           // Prevenir MIME sniffing
           {
@@ -140,7 +140,7 @@ const nextConfig: NextConfig = {
               "font-src 'self' data:",
               "connect-src 'self' https://*.sentry.io",
               "worker-src 'self'",
-              "frame-ancestors 'none'",
+              "frame-ancestors 'self'",
             ].join('; '),
           },
         ],

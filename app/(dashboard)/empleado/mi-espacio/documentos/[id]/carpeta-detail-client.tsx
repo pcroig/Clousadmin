@@ -41,10 +41,10 @@ export function CarpetaDetailClientEmpleado({
   const router = useRouter();
   const uploadSectionRef = useRef<HTMLDivElement>(null);
   const maxUploadMB = Number(process.env.NEXT_PUBLIC_MAX_UPLOAD_MB ?? '10');
-  
+
   // Document viewer state
   const documentViewer = useDocumentViewer();
-  
+
   const handleVerDocumento = (documento: CarpetaDocumento) => {
     documentViewer.openViewer(documento.id, documento.nombre, documento.mimeType ?? undefined);
   };

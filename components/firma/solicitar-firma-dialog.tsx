@@ -1,5 +1,6 @@
 'use client';
 
+import { AlertCircle, Loader2 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -41,6 +42,11 @@ export function SolicitarFirmaDialog({
   const [cargandoEmpleados, setCargandoEmpleados] = useState(false);
   const [posicionFirma, setPosicionFirma] = useState<{ pagina: number; x: number; y: number } | null>(null);
   const [paginaSeleccionada, setPaginaSeleccionada] = useState<number>(-1);
+  
+  // Viewer state
+  const [previewLoading, setPreviewLoading] = useState(true);
+  const [previewError, setPreviewError] = useState(false);
+  
   const overlayRef = useRef<HTMLDivElement | null>(null);
   const PDF_WIDTH = 595;
   const PDF_HEIGHT = 842;
@@ -51,6 +57,8 @@ export function SolicitarFirmaDialog({
       setTitulo(`Firma de ${documentoNombre}`);
       setPosicionFirma(null);
       setPaginaSeleccionada(-1);
+      setPreviewLoading(true);
+      setPreviewError(false);
       return;
     }
 
@@ -183,7 +191,7 @@ export function SolicitarFirmaDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl">
+      <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Solicitar firma</DialogTitle>
         </DialogHeader>
@@ -240,7 +248,7 @@ export function SolicitarFirmaDialog({
                 Limpiar posición
               </Button>
             </div>
-            <div className="grid grid-cols-1 lg:grid-cols-[360px,1fr] gap-4">
+            <div className="grid grid-cols-1 lg:grid-cols-[240px,1fr] gap-4">
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
                   <Label htmlFor="pagina-firma" className="text-xs text-gray-600">
@@ -250,39 +258,67 @@ export function SolicitarFirmaDialog({
                     id="pagina-firma"
                     type="number"
                     min={-1}
-                    className="w-28"
+                    className="w-20"
                     value={paginaSeleccionada}
                     onChange={(e) => handlePaginaChange(e.target.value)}
                     disabled={loading}
                   />
-                  <span className="text-xs text-gray-500">Usa -1 para última página</span>
+                  <span className="text-xs text-gray-500">-1 es última</span>
                 </div>
                 {posicionFirma ? (
-                  <p className="text-xs text-gray-600">
-                    Coordenadas seleccionadas: X {Math.round(posicionFirma.x)} pt · Y {Math.round(posicionFirma.y)} pt
-                  </p>
+                  <div className="rounded bg-blue-50 p-2 border border-blue-100">
+                    <p className="text-xs text-blue-700 font-medium mb-1">Coordenadas</p>
+                    <p className="text-xs text-blue-600">
+                      X: {Math.round(posicionFirma.x)}<br />
+                      Y: {Math.round(posicionFirma.y)}
+                    </p>
+                  </div>
                 ) : (
-                  <p className="text-xs text-gray-500">Aún no has seleccionado una posición personalizada.</p>
+                  <p className="text-xs text-gray-500 italic">
+                    Sin posición personalizada. La firma se añadirá al final del documento.
+                  </p>
                 )}
               </div>
               <div className="space-y-2">
                 <div className="relative border rounded-lg overflow-hidden bg-gray-100 aspect-[3/4]">
                   {previewUrl && (
-                    <iframe
-                      src={previewUrl}
-                      className="absolute inset-0 w-full h-full border-0 pointer-events-none"
-                      title="Previsualización del documento"
-                    />
+                    <>
+                      {previewLoading && (
+                        <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-50 z-10">
+                          <Loader2 className="w-8 h-8 text-gray-400 animate-spin mb-2" />
+                          <p className="text-xs text-gray-500">Cargando vista previa...</p>
+                        </div>
+                      )}
+                      {previewError && (
+                        <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-50 z-10 px-4 text-center">
+                          <AlertCircle className="w-8 h-8 text-red-400 mb-2" />
+                          <p className="text-sm font-medium text-gray-900">Error al cargar documento</p>
+                          <p className="text-xs text-gray-500 mt-1">
+                            No se pudo generar la vista previa. Aún puedes solicitar la firma.
+                          </p>
+                        </div>
+                      )}
+                      <iframe
+                        src={previewUrl}
+                        className={`absolute inset-0 w-full h-full border-0 pointer-events-none transition-opacity duration-300 ${previewLoading ? 'opacity-0' : 'opacity-100'}`}
+                        title="Previsualización del documento"
+                        onLoad={() => setPreviewLoading(false)}
+                        onError={() => {
+                          setPreviewLoading(false);
+                          setPreviewError(true);
+                        }}
+                      />
+                    </>
                   )}
                   <div
                     ref={overlayRef}
-                    className="absolute inset-0 cursor-crosshair"
+                    className="absolute inset-0 cursor-crosshair z-20"
                     onClick={handlePosicionClick}
                     title="Haz clic para definir la posición de la firma"
                   >
                     {posicionFirma && (
                       <span
-                        className="absolute w-4 h-4 rounded-full border-2 border-white bg-gray-900 shadow"
+                        className="absolute w-4 h-4 rounded-full border-2 border-white bg-gray-900 shadow ring-2 ring-blue-500/50"
                         style={{
                           left: `${(posicionFirma.x / PDF_WIDTH) * 100}%`,
                           top: `${(1 - posicionFirma.y / PDF_HEIGHT) * 100}%`,

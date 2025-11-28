@@ -4,6 +4,11 @@
  *
  * This endpoint returns the actual PDF stream for in-app viewing.
  * For variable metadata (without PDF), use /api/plantillas/[id]/previsualizar
+ * 
+ * @version 1.5.0 (2025-11-28)
+ * - Uses centralized `getPreviewHeaders()` for consistent HTTP headers
+ * - Optimized CSP for PDF viewer compatibility in iframes
+ * - Explicit X-Frame-Options: SAMEORIGIN for security
  */
 
 import Docxtemplater from 'docxtemplater';
@@ -11,6 +16,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import PizZip from 'pizzip';
 
 import { getSession } from '@/lib/auth';
+import { getPreviewHeaders } from '@/lib/documentos/preview-headers';
 import { convertDocxBufferToPdf } from '@/lib/plantillas/docx-to-pdf';
 import { resolverVariables } from '@/lib/plantillas/ia-resolver';
 import { extraerVariablesDeTexto } from '@/lib/plantillas/sanitizar';
@@ -33,17 +39,8 @@ export async function GET(
 
     const { searchParams } = new URL(request.url);
     const empleadoId = searchParams.get('empleadoId');
-
-    if (!empleadoId) {
-      return NextResponse.json(
-        { error: 'Debes indicar un empleado para previsualizar' },
-        { status: 400 }
-      );
-    }
-
     const { id } = params;
 
-    // Fetch template
     const plantilla = await prisma.plantillaDocumento.findUnique({
       where: { id },
       select: {
@@ -63,14 +60,63 @@ export async function GET(
       return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
     }
 
-    if (plantilla.formato !== 'docx') {
+    const templateBuffer = await descargarDocumento(plantilla.s3Key);
+
+    if (!empleadoId) {
+      if (plantilla.formato === 'pdf') {
+        const headers = getPreviewHeaders({
+          mimeType: 'application/pdf',
+          fileName: plantilla.nombre,
+          wasConverted: false,
+          contentLength: templateBuffer.length,
+        });
+        
+        return new NextResponse(templateBuffer as BodyInit, { headers });
+      }
+
+      if (plantilla.formato === 'docx') {
+        let pdfBuffer: Buffer;
+        try {
+          pdfBuffer = await convertDocxBufferToPdf(templateBuffer);
+        } catch (conversionError) {
+          const message = conversionError instanceof Error ? conversionError.message : 'Error de conversión';
+
+          if (message.includes('LibreOffice no está disponible')) {
+            return NextResponse.json(
+              {
+                error: 'La conversión de documentos Word no está disponible en este momento.',
+                details: 'LibreOffice no está instalado en el servidor.',
+              },
+              { status: 503 }
+            );
+          }
+
+          throw conversionError;
+        }
+
+        const headers = getPreviewHeaders({
+          mimeType: 'application/pdf',
+          fileName: `${plantilla.nombre}.pdf`,
+          wasConverted: true, // DOCX convertido a PDF
+          contentLength: pdfBuffer.length,
+        });
+
+        return new NextResponse(pdfBuffer as BodyInit, { headers });
+      }
+
       return NextResponse.json(
-        { error: 'La previsualización PDF solo está disponible para plantillas DOCX' },
+        { error: 'La previsualización solo está disponible para plantillas DOCX o PDF' },
         { status: 400 }
       );
     }
 
-    // Fetch employee with all related data
+    if (plantilla.formato !== 'docx') {
+      return NextResponse.json(
+        { error: 'La previsualización con datos solo está disponible para plantillas DOCX' },
+        { status: 400 }
+      );
+    }
+
     const empleado = await prisma.empleado.findFirst({
       where: {
         id: empleadoId,
@@ -128,10 +174,6 @@ export async function GET(
       );
     }
 
-    // Download template
-    const templateBuffer = await descargarDocumento(plantilla.s3Key);
-
-    // Load as ZIP
     const zip = new PizZip(templateBuffer);
 
     // Extract variables from document
@@ -262,19 +304,17 @@ export async function GET(
       throw conversionError;
     }
 
-    // Return the PDF
+    // Return the PDF with optimized headers
     const fileName = `Preview_${plantilla.nombre.replace(/\.docx$/i, '')}_${empleado.apellidos}.pdf`;
 
-    return new NextResponse(pdfBuffer, {
-      headers: {
-        'Content-Type': 'application/pdf',
-        'Content-Disposition': `inline; filename="${encodeURIComponent(fileName)}"`,
-        'Content-Length': pdfBuffer.length.toString(),
-        'Cache-Control': 'private, max-age=300', // Cache for 5 minutes
-        'X-Content-Type-Options': 'nosniff',
-        'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'",
-      },
+    const headers = getPreviewHeaders({
+      mimeType: 'application/pdf',
+      fileName,
+      wasConverted: true, // Template con datos + conversión DOCX → PDF
+      contentLength: pdfBuffer.length,
     });
+
+    return new NextResponse(pdfBuffer as BodyInit, { headers });
   } catch (error) {
     console.error('[API Template Preview] Error:', error);
 

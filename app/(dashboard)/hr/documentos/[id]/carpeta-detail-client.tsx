@@ -11,16 +11,16 @@ import {
   FileSignature,
   FileText,
   Folder,
-  Loader2,
   Settings,
   Trash2,
   Upload,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
 import { SolicitarFirmaDialog } from '@/components/firma/solicitar-firma-dialog';
+import { DocumentUploadArea } from '@/components/shared/document-upload-area';
 import { DocumentViewerModal, useDocumentViewer } from '@/components/shared/document-viewer';
 import { EmptyState } from '@/components/shared/empty-state';
 import { InfoTooltip } from '@/components/shared/info-tooltip';
@@ -45,7 +45,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { uploadFilesToCarpeta } from '@/lib/documentos/client-upload';
 import { extractArrayFromResponse } from '@/lib/utils/api-response';
 
 interface Documento {
@@ -95,12 +94,8 @@ interface CarpetaDetailClientProps {
 
 export function CarpetaDetailClient({ carpeta, empleados = [] }: CarpetaDetailClientProps) {
   const router = useRouter();
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const pendingEmpleadoGlobalRef = useRef<string | null>(null);
-  const [isUploading, setIsUploading] = useState(false);
-  const [uploadProgressText, setUploadProgressText] = useState<string | null>(null);
-  const [asignarEmpleadoDialog, setAsignarEmpleadoDialog] = useState(false);
-  const [empleadoSeleccionadoUpload, setEmpleadoSeleccionadoUpload] = useState<string>('');
+  const [modalUploadOpen, setModalUploadOpen] = useState(false);
+  const [empleadoDestinoUpload, setEmpleadoDestinoUpload] = useState('');
   const [modalEliminar, setModalEliminar] = useState(false);
   const [eliminando, setEliminando] = useState(false);
   const [documentoAEliminar, setDocumentoAEliminar] = useState<string | null>(
@@ -126,35 +121,18 @@ export function CarpetaDetailClient({ carpeta, empleados = [] }: CarpetaDetailCl
   // Document viewer state
   const documentViewer = useDocumentViewer();
 
-  const openFilePicker = () => {
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-      fileInputRef.current.click();
-    }
-  };
-
   const handleUploadButtonClick = useCallback(() => {
     if (carpeta.esGlobal) {
       if (empleados.length === 0) {
         toast.error('No hay empleados activos para asignar este documento.');
         return;
       }
-      setAsignarEmpleadoDialog(true);
-      return;
+      setEmpleadoDestinoUpload((prev) => prev || empleados[0]?.id || '');
+    } else {
+      setEmpleadoDestinoUpload('');
     }
-    openFilePicker();
-  }, [carpeta.esGlobal, empleados.length]);
-
-  const handleConfirmEmpleadoUpload = useCallback(() => {
-    if (!empleadoSeleccionadoUpload) {
-      toast.error('Selecciona un empleado para continuar.');
-      return;
-    }
-    pendingEmpleadoGlobalRef.current = empleadoSeleccionadoUpload;
-    setAsignarEmpleadoDialog(false);
-    // Timeout ensures dialog closes before opening file picker
-    setTimeout(() => openFilePicker(), 0);
-  }, [empleadoSeleccionadoUpload]);
+    setModalUploadOpen(true);
+  }, [carpeta.esGlobal, empleados]);
 
   const parsearAsignadoA = useCallback(() => {
     if (!carpeta.asignadoA) {
@@ -439,94 +417,14 @@ export function CarpetaDetailClient({ carpeta, empleados = [] }: CarpetaDetailCl
                   Editar Asignación
                 </Button>
               )}
-              <Button onClick={handleUploadButtonClick} disabled={isUploading}>
-                {isUploading ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Subiendo...
-                  </>
-                ) : (
-                  <>
-                    <Upload className="w-4 h-4 mr-2" />
-                    Subir Documentos
-                  </>
-                )}
+              <Button onClick={handleUploadButtonClick}>
+                <Upload className="w-4 h-4 mr-2" />
+                Subir Documentos
               </Button>
             </div>
           </div>
         </div>
 
-        <input
-          ref={fileInputRef}
-          type="file"
-          multiple
-          className="hidden"
-          onChange={async (event) => {
-            const fileList = event.target.files;
-            if (!fileList || fileList.length === 0) return;
-
-            const files = Array.from(fileList);
-            const extraFields =
-              carpeta.esGlobal && pendingEmpleadoGlobalRef.current
-                ? { empleadoId: pendingEmpleadoGlobalRef.current }
-                : undefined;
-
-            if (carpeta.esGlobal && !extraFields?.empleadoId) {
-              toast.error('Selecciona un empleado antes de subir.');
-              event.target.value = '';
-              return;
-            }
-
-            setIsUploading(true);
-            setUploadProgressText(`Subiendo 1/${files.length}`);
-
-            const result = await uploadFilesToCarpeta(
-              carpeta.id,
-              files,
-              {
-                onFileSuccess: (_file, index, total) => {
-                  const nextIndex = Math.min(index + 2, total);
-                  setUploadProgressText(index + 1 === total ? 'Procesando...' : `Subiendo ${nextIndex}/${total}`);
-                },
-                onFileError: (_file, index, total, errorMessage) => {
-                  const nextIndex = Math.min(index + 2, total);
-                  setUploadProgressText(index + 1 === total ? 'Procesando...' : `Subiendo ${nextIndex}/${total}`);
-                  if (errorMessage) {
-                    toast.error(errorMessage);
-                  }
-                },
-              },
-              { extraFields }
-            );
-
-            setIsUploading(false);
-            setUploadProgressText(null);
-            pendingEmpleadoGlobalRef.current = null;
-            setEmpleadoSeleccionadoUpload('');
-            event.target.value = '';
-
-            if (result.successes > 0) {
-              toast.success(
-                result.successes === 1
-                  ? 'Documento subido correctamente'
-                  : `${result.successes} documentos subidos correctamente`
-              );
-              router.refresh();
-            }
-
-            if (result.failures.length > 0) {
-              const firstError = result.failures[0];
-              toast.error(firstError.message || 'Algunos archivos no se pudieron subir');
-            }
-          }}
-        />
-
-        {(isUploading || uploadProgressText) && (
-          <p className="mb-4 text-sm text-blue-600 flex items-center gap-2">
-            <Loader2 className="w-4 h-4 animate-spin" />
-            {uploadProgressText ?? 'Procesando...'}
-          </p>
-        )}
 
         {/* Filtros (solo para carpetas globales) */}
         {carpeta.esGlobal && empleados.length > 0 && (
@@ -801,49 +699,69 @@ export function CarpetaDetailClient({ carpeta, empleados = [] }: CarpetaDetailCl
         </DialogContent>
       </Dialog>
 
-      {/* Dialogo para asignar empleado en carpetas maestras */}
+      {/* Modal subir documentos */}
       <Dialog
-        open={asignarEmpleadoDialog}
+        open={modalUploadOpen}
         onOpenChange={(open) => {
-          setAsignarEmpleadoDialog(open);
-          if (!open && !isUploading) {
-            pendingEmpleadoGlobalRef.current = null;
+          setModalUploadOpen(open);
+          if (!open) {
+            setEmpleadoDestinoUpload('');
           }
         }}
       >
-        <DialogContent>
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Asignar empleado</DialogTitle>
+            <DialogTitle>Subir documentos</DialogTitle>
             <DialogDescription>
-              Selecciona a qué empleado pertenece el documento que vas a subir a la carpeta global
-              <strong> {carpeta.nombre}</strong>.
+              Selecciona los archivos que quieres añadir a la carpeta <strong>{carpeta.nombre}</strong>.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-2 py-2">
-            <Label>Empleado</Label>
-            <Select value={empleadoSeleccionadoUpload} onValueChange={setEmpleadoSeleccionadoUpload}>
-              <SelectTrigger>
-                <SelectValue placeholder="Selecciona un empleado" />
-              </SelectTrigger>
-              <SelectContent>
-                {empleados.map((emp) => (
-                  <SelectItem key={emp.id} value={emp.id}>
-                    {emp.nombre} {emp.apellidos}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          <div className="space-y-4">
+            {carpeta.esGlobal ? (
+              <div className="space-y-2">
+                <Label>Asignar a empleado</Label>
+                <Select
+                  value={empleadoDestinoUpload || undefined}
+                  onValueChange={setEmpleadoDestinoUpload}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecciona un empleado" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {empleados.map((empleado) => (
+                      <SelectItem key={empleado.id} value={empleado.id}>
+                        {empleado.nombre} {empleado.apellidos}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-gray-500">
+                  Esta carpeta es maestra. Cada documento debe asignarse a la subcarpeta del empleado correspondiente.
+                </p>
+              </div>
+            ) : (
+              <p className="text-xs text-gray-500">
+                Los documentos se guardarán en la carpeta individual asignada a{' '}
+                {carpeta.empleado ? `${carpeta.empleado.nombre} ${carpeta.empleado.apellidos}` : 'esta carpeta'}.
+              </p>
+            )}
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setAsignarEmpleadoDialog(false)} disabled={isUploading}>
-              Cancelar
-            </Button>
-            <Button onClick={handleConfirmEmpleadoUpload} disabled={isUploading}>
-              Continuar
-            </Button>
-          </DialogFooter>
+            <DocumentUploadArea
+              carpetaId={carpeta.id}
+              variant="dropzone"
+              description="PDF, JPG o PNG | Máx. 10MB"
+              onUploaded={() => {
+                setModalUploadOpen(false);
+                setEmpleadoDestinoUpload('');
+                router.refresh();
+              }}
+              disabled={carpeta.esGlobal && !empleadoDestinoUpload}
+              getExtraFormData={() =>
+                carpeta.esGlobal && empleadoDestinoUpload ? { empleadoId: empleadoDestinoUpload } : undefined
+              }
+            />
+          </div>
         </DialogContent>
       </Dialog>
 

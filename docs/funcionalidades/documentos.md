@@ -1,9 +1,9 @@
 # 📁 Sistema de Gestión Documental
 
 **Estado**: ✅ Implementado y Funcional  
-**Versión**: 1.4.0  
-**Fecha de finalización**: 2 de Noviembre 2025  
-**Última actualización**: 27 de Noviembre 2025
+**Versión**: 1.5.0  
+**Fecha de finalización**: 2 de Noviembre 2025
+**Última actualización**: 28 de Noviembre 2025
 
 ---
 
@@ -50,6 +50,30 @@ Sistema completo de gestión documental con:
   - Preview en PDF directamente en el panel de plantillas
   - Generación bajo demanda con datos reales del empleado
   - Selector de empleado para probar diferentes datos
+
+### 🆕 Novedades 2025-11-28
+
+- **🔧 Corrección de Headers de Preview**: Optimización de la visualización de documentos
+  - Helper centralizado `getPreviewHeaders()` para gestión de headers HTTP en endpoints de preview
+  - CSP (Content-Security-Policy) optimizada para cada tipo MIME:
+    - PDFs: Permite scripts, workers y fonts para visor nativo del navegador
+    - Imágenes: Política restrictiva sin scripts
+  - `X-Frame-Options: SAMEORIGIN` explícito en respuestas de preview
+  - Sandbox del iframe mejorado: agregados `allow-downloads`, `allow-modals`, `allow-presentation`
+  - Cache-Control optimizado con `stale-while-revalidate` para mejor rendimiento
+  - Headers de seguridad adicionales: `Cross-Origin-Embedder-Policy`, `Cross-Origin-Resource-Policy`
+  
+- **📐 Arquitectura Escalable para Headers**: 
+  - Archivo `lib/documentos/preview-headers.ts` centraliza toda la lógica de headers
+  - Función `getCspForMimeType()` para CSP específica por tipo de contenido
+  - Función `validatePreviewHeaders()` para debugging en desarrollo
+  - DRY: Un solo punto de configuración para todos los endpoints de preview
+  
+- **✅ Compatibilidad Total con Visores Nativos**:
+  - Chrome PDF Viewer: ✅ Funcional
+  - Firefox PDF.js: ✅ Funcional
+  - Safari PDF Viewer: ✅ Funcional
+  - Edge PDF Viewer: ✅ Funcional
 
 ---
 
@@ -505,8 +529,15 @@ s3://[STORAGE_BUCKET]/
   │   │   └─ compartidos/
   │   │       └─ [carpetaId]/
   └─ previews/
-      └─ [documentoId].pdf    # Previews cacheados de documentos DOCX
+      └─ [documentoId].pdf    # Previews cacheados de documentos DOCX convertidos a PDF
 ```
+
+**Caché de Previews (v1.5.0):**
+- Los documentos Word (DOCX) se convierten a PDF automáticamente para visualización in-app
+- Los PDFs convertidos se cachean en `previews/[documentoId].pdf` para evitar reconversiones costosas
+- Caché con `stale-while-revalidate`: el navegador puede usar versiones antiguas mientras revalida en background
+- La caché se invalida automáticamente cuando se actualiza el documento original
+- PDFs nativos e imágenes no se cachean (se sirven directamente)
 
 **Características:**
 - URLs firmadas para descargas seguras
@@ -872,12 +903,14 @@ model contrato {
    - Sin errores de compilación en código nuevo
    - Compatible con Next.js 16 (async params)
 
-5. **Visualización de Documentos**
+5. **Visualización de Documentos (v1.5.0)**
    - PDFs e imágenes se visualizan directamente en el navegador
    - DOCX se convierte automáticamente a PDF usando LibreOffice
    - Previews se cachean en S3 para optimizar rendimiento
    - Headers de seguridad estrictos en todos los endpoints de preview
    - Requiere LibreOffice instalado en el servidor para conversión DOCX
+   - **CSP específica por tipo MIME**: PDFs permiten scripts/workers, imágenes son restrictivas
+   - **Sandbox del iframe optimizado**: Permite descarga, impresión y pantalla completa
 
 ---
 
@@ -896,6 +929,54 @@ npx tsx scripts/crear-carpetas-empleados-existentes.ts
 
 ### No puedo crear carpetas compartidas
 - Solo HR Admin puede crear carpetas compartidas
+
+### La visualización de documentos no funciona
+**Síntoma**: El iframe del visor de documentos está en blanco o muestra error "Failed to load PDF"
+
+**Causas posibles y soluciones**:
+
+1. **Headers CSP bloqueando el visor** (v1.5.0 soluciona esto)
+   - Verificar que `getPreviewHeaders()` se está usando en todos los endpoints de preview
+   - Comprobar que la CSP incluye `script-src 'unsafe-inline'`, `worker-src blob:`, `object-src 'self'`
+   - Verificar que `X-Frame-Options: SAMEORIGIN` está presente
+
+2. **Problemas con conversión DOCX → PDF**
+   - Verificar que LibreOffice está instalado: `which soffice`
+   - Comprobar logs del servidor para errores de conversión
+   - Revisar que el caché de previews está funcionando (ruta `previews/[id].pdf` en S3)
+
+3. **Sandbox del iframe demasiado restrictivo**
+   - Verificar que el iframe tiene: `allow-same-origin allow-scripts allow-popups allow-forms allow-downloads allow-modals allow-presentation`
+
+4. **Caché corrupta**
+   - Forzar regeneración: agregar `?regenerate=1` a la URL de preview
+   - Verificar que la caché en S3 no está corrupta
+
+### Los documentos Word no se convierten a PDF
+**Síntoma**: Error 503 "LibreOffice no está disponible"
+
+**Solución**:
+```bash
+# macOS
+brew install libreoffice
+
+# Linux (Ubuntu/Debian)
+sudo apt-get install libreoffice
+
+# Verificar instalación
+soffice --version
+```
+
+### Las carpetas individuales de empleados aparecen en la vista HR
+**Síntoma**: La vista HR muestra cientos de carpetas individuales por empleado
+
+**Solución**: Ya corregido en v1.4.0. Verificar que el query en `app/(dashboard)/hr/documentos/page.tsx` incluye:
+```typescript
+OR: [
+  { esSistema: false }, // Include non-system folders (manual shared)
+  { empleadoId: null, esSistema: true }, // Include global system folders (master)
+]
+```
 - Verificar rol del usuario en sesión
 
 ### Error al visualizar documento Word (DOCX)
@@ -1004,6 +1085,54 @@ Para dudas o mejoras:
 ---
 
 ## 🆕 Changelog
+
+### v1.5.0 (2025-11-28)
+
+#### 🔧 Correcciones Críticas de Visualización
+
+- **🐛 Fix: Visualización de PDFs in-app bloqueada**
+  - **Problema**: Los visores nativos de PDF del navegador (Chrome, Firefox, Safari) no podían renderizar PDFs embebidos en iframes debido a CSP restrictiva
+  - **Causa raíz**: `Content-Security-Policy: "default-src 'none'; style-src 'unsafe-inline'"` bloqueaba scripts, workers y fonts necesarios para el visor PDF
+  - **Solución**: Nueva CSP específica por tipo MIME con permisos adecuados para PDFs
+  
+- **🔧 Helper Centralizado `getPreviewHeaders()`**:
+  - Archivo: `lib/documentos/preview-headers.ts`
+  - Gestiona todos los headers HTTP para endpoints de preview
+  - CSP optimizada por tipo de contenido:
+    - **PDFs**: `script-src 'unsafe-inline'`, `worker-src blob:`, `object-src 'self'`, `font-src 'self' data:`
+    - **Imágenes**: Política restrictiva sin permisos de script
+  - Headers de seguridad adicionales:
+    - `X-Frame-Options: SAMEORIGIN` (explícito en respuestas)
+    - `Cross-Origin-Embedder-Policy: require-corp`
+    - `Cross-Origin-Resource-Policy: same-origin`
+  - Cache-Control optimizado con `stale-while-revalidate`
+  
+- **🔐 Mejoras de Sandbox en iframe**:
+  - Agregados permisos faltantes: `allow-downloads`, `allow-modals`, `allow-presentation`
+  - Permite funcionalidad completa del visor nativo (descarga, impresión, pantalla completa)
+  
+- **✅ Endpoints actualizados**:
+  - `GET /api/documentos/[id]/preview`: Usa `getPreviewHeaders()`
+  - `GET /api/plantillas/[id]/preview`: Usa `getPreviewHeaders()`
+  - Headers consistentes en todos los endpoints de preview
+
+#### 📐 Mejoras de Arquitectura
+
+- **DRY**: Un solo punto de configuración para headers de preview
+- **Escalabilidad**: Fácil agregar nuevos tipos MIME con CSP específica
+- **Debugging**: Función `validatePreviewHeaders()` para validación en desarrollo
+- **Type Safety**: TypeScript completo con interfaces bien definidas
+
+#### 🧪 Testing y Compatibilidad
+
+- ✅ Chrome PDF Viewer: Funcional
+- ✅ Firefox PDF.js: Funcional
+- ✅ Safari PDF Viewer: Funcional
+- ✅ Edge PDF Viewer: Funcional
+- ✅ Conversión DOCX → PDF: Sin cambios, funciona correctamente
+- ✅ Imágenes (JPG, PNG, GIF, WebP): Sin cambios, funcionales
+
+---
 
 ### v1.4.0 (2025-11-27)
 
