@@ -15,6 +15,7 @@ import { MobileActionBar } from '@/components/adaptive/MobileActionBar';
 import { ResponsiveContainer } from '@/components/adaptive/ResponsiveContainer';
 import { DataFilters, type FilterOption } from '@/components/shared/filters/data-filters';
 import { DateRangeControls } from '@/components/shared/filters/date-range-controls';
+import { LoadingButton } from '@/components/shared/loading-button';
 import { TableHeader as PageHeader } from '@/components/shared/table-header';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
