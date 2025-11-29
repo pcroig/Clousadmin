@@ -64,7 +64,7 @@ export interface DatosTemporales {
   };
   datos_bancarios?: {
     iban: string;
-    titularCuenta: string;
+    bic: string;
   };
   datos_documentos?: {
     documentosSubidos: string[]; // Array de IDs de documentos
@@ -285,7 +285,7 @@ export async function guardarCredenciales(
       },
     });
 
-    return { success: true };
+    return { success: true, avatarUrl };
   } catch (error) {
     console.error('[guardarCredenciales] Error:', error);
     return {
@@ -618,7 +618,7 @@ export async function finalizarOnboarding(token: string) {
 
         // Datos bancarios
         iban: datos_bancarios.iban,
-        titularCuenta: datos_bancarios.titularCuenta,
+        bic: datos_bancarios.bic,
 
         // Marcar onboarding completo
         onboardingCompletado: true,

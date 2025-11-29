@@ -170,14 +170,18 @@ export async function POST(
         solicitudFirmaId = solicitud.id;
 
         if (documentoGenerado.empleado.usuarioId) {
-          await crearNotificacionFirmaPendiente(prisma, {
-            empresaId: documentoGenerado.empresaId,
-            empleadoId: documentoGenerado.empleadoId,
-            firmaId: solicitud.id,
-            solicitudId: solicitud.id,
-            documentoId: documentoGenerado.documentoId,
-            documentoNombre: documentoGenerado.documento.nombre,
-          });
+          await crearNotificacionFirmaPendiente(
+            prisma,
+            {
+              empresaId: documentoGenerado.empresaId,
+              empleadoId: documentoGenerado.empleadoId,
+              firmaId: solicitud.id,
+              solicitudId: solicitud.id,
+              documentoId: documentoGenerado.documentoId,
+              documentoNombre: documentoGenerado.documento.nombre,
+            },
+            { actorUsuarioId: session.user.id }
+          );
         }
       }
     }

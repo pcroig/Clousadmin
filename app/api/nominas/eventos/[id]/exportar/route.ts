@@ -57,7 +57,7 @@ export async function GET(
                 direccionProvincia: true,
                 fechaNacimiento: true,
                 iban: true,
-                titularCuenta: true,
+                bic: true,
                 jornada: {
                   select: {
                     horasSemanales: true,
@@ -71,7 +71,7 @@ export async function GET(
                 tipoContrato: true,
                 fechaInicio: true,
                 fechaFin: true,
-                salarioBrutoAnual: true,
+                salarioBaseAnual: true,
               },
             },
             complementosAsignados: {
@@ -141,7 +141,7 @@ export async function GET(
           : '',
         'NSS': empleado.nss || '',
         'IBAN': empleado.iban || '',
-        'Titular Cuenta': empleado.titularCuenta || '',
+        'BIC': empleado.bic || '',
 
         // Dirección
         'Dirección': direccionCompleta,
@@ -157,8 +157,8 @@ export async function GET(
         'Fecha Fin': contrato?.fechaFin
           ? contrato.fechaFin.toLocaleDateString('es-ES')
           : 'Indefinido',
-        'Salario Bruto Anual': parseFloat(
-          contrato?.salarioBrutoAnual?.toString() || '0'
+        'Salario Base Anual': parseFloat(
+          contrato?.salarioBaseAnual?.toString() || '0'
         ),
         'Horas/Semana': horasSemana ?? '',
 

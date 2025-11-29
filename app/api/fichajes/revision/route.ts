@@ -546,13 +546,17 @@ export async function POST(request: NextRequest) {
               },
             });
 
-            await crearNotificacionFichajeResuelto(prisma, {
-              fichajeId,
-              empresaId: session.user.empresaId,
-              empleadoId: fichaje.empleadoId,
-              empleadoNombre: `${fichaje.empleado.nombre} ${fichaje.empleado.apellidos}`,
-              fecha: fichaje.fecha,
-            });
+            await crearNotificacionFichajeResuelto(
+              prisma,
+              {
+                fichajeId,
+                empresaId: session.user.empresaId,
+                empleadoId: fichaje.empleadoId,
+                empleadoNombre: `${fichaje.empleado.nombre} ${fichaje.empleado.apellidos}`,
+                fecha: fichaje.fecha,
+              },
+              { actorUsuarioId: session.user.id }
+            );
           }
 
           actualizados++;

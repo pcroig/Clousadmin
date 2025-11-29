@@ -86,6 +86,32 @@ export function SedesForm({ sedesIniciales = [] }: SedesFormProps) {
   >({});
   const [asignandoSedeId, setAsignandoSedeId] = useState<string | null>(null);
   const [cargandoEquipos, setCargandoEquipos] = useState(false);
+  const [cargandoSedes, setCargandoSedes] = useState(false);
+
+  // Cargar sedes existentes al montar si no hay sedes iniciales
+  useEffect(() => {
+    const loadSedes = async () => {
+      if (sedesIniciales.length > 0) return; // Ya tenemos sedes iniciales
+
+      setCargandoSedes(true);
+      try {
+        const response = await fetch('/api/sedes');
+        if (response.ok) {
+          const data = await parseJson<{ sedes?: SedeApi[] } | SedeApi[]>(response);
+          const sedesList = Array.isArray(data) ? data : (data?.sedes ?? []);
+          const sedesNormalizadas = sedesList.map(normalizeSede);
+          setSedes(sedesNormalizadas);
+        }
+      } catch (err) {
+        console.error('Error cargando sedes:', err);
+        // No mostrar error, simplemente dejar el array vacío
+      } finally {
+        setCargandoSedes(false);
+      }
+    };
+
+    loadSedes();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const loadEquipos = async () => {
@@ -258,67 +284,64 @@ export function SedesForm({ sedesIniciales = [] }: SedesFormProps) {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h3 className="text-lg font-medium">Sedes de la empresa</h3>
-        <p className="text-sm text-gray-500">
-          Agrega las ubicaciones de tu empresa y decide si aplican a todo el equipo o a un equipo concreto.
-        </p>
-      </div>
-
       {/* Formulario para agregar sede */}
       <form onSubmit={handleAgregarSede} className="space-y-4">
         <div className="space-y-2">
-          <Label htmlFor="ciudad">Ciudad *</Label>
-          <Input
-            id="ciudad"
-            placeholder="Madrid"
-            value={ciudad}
-            onChange={(e) => setCiudad(e.target.value)}
-            required
-          />
+          <Label htmlFor="ciudad">Ciudad de la sede *</Label>
+          <div className="flex gap-2">
+            <Input
+              id="ciudad"
+              placeholder="ej. Madrid, Barcelona..."
+              value={ciudad}
+              onChange={(e) => setCiudad(e.target.value)}
+              required
+              className="flex-1"
+            />
+            <Button type="submit" disabled={loading || !ciudad.trim()}>
+              {loading ? 'Agregando...' : 'Agregar'}
+            </Button>
+          </div>
         </div>
 
-        <div className="space-y-3">
-          <Label>Asignación inicial</Label>
-          <RadioGroup
-            className="flex flex-col gap-2 sm:flex-row"
-            value={asignacionNueva}
-            onValueChange={(value) => setAsignacionNueva(value as TipoAsignacion)}
-          >
-            <div className="flex items-center space-x-2 rounded-md border p-3">
-              <RadioGroupItem value="empresa" id="asig-empresa" />
-              <Label htmlFor="asig-empresa" className="text-sm font-medium cursor-pointer">
-                Todos los empleados
-              </Label>
-            </div>
-            <div className="flex flex-col gap-2 rounded-md border p-3 sm:flex-row sm:items-center sm:gap-3">
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="equipo" id="asig-equipo" />
-                <Label htmlFor="asig-equipo" className="text-sm font-medium cursor-pointer">
-                  Equipo específico
-                </Label>
-              </div>
-              {asignacionNueva === 'equipo' && (
-                <Select
-                  value={equipoNuevo || 'none'}
-                  onValueChange={(value) => setEquipoNuevo(value === 'none' ? '' : value)}
-                  disabled={cargandoEquipos || equipos.length === 0}
-                >
-                  <SelectTrigger className="w-full sm:w-56">
-                    <SelectValue placeholder="Selecciona un equipo" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">Seleccionar equipo</SelectItem>
-                    {equipos.map((equipo) => (
-                      <SelectItem key={equipo.id} value={equipo.id}>
-                        {equipo.nombre}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-            </div>
-          </RadioGroup>
+        <div className="space-y-2">
+          <Label>Asignación predeterminada</Label>
+          <div className="flex gap-2">
+            <Select
+              value={asignacionNueva}
+              onValueChange={(value) => setAsignacionNueva(value as TipoAsignacion)}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Selecciona asignación" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="empresa">Todos los empleados</SelectItem>
+                <SelectItem value="equipo">Equipo específico</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {asignacionNueva === 'equipo' && (
+              <Select
+                value={equipoNuevo || 'none'}
+                onValueChange={(value) => setEquipoNuevo(value === 'none' ? '' : value)}
+                disabled={cargandoEquipos || equipos.length === 0}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Selecciona un equipo" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Seleccionar equipo</SelectItem>
+                  {equipos.map((equipo) => (
+                    <SelectItem key={equipo.id} value={equipo.id}>
+                      {equipo.nombre}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          </div>
+          <p className="text-xs text-gray-500">
+            Puedes cambiar la asignación de cada sede después de crearla
+          </p>
         </div>
 
         {error && (
@@ -326,101 +349,45 @@ export function SedesForm({ sedesIniciales = [] }: SedesFormProps) {
             <p className="text-sm text-red-600">{error}</p>
           </div>
         )}
-
-        <Button type="submit" disabled={loading}>
-          {loading ? 'Agregando...' : 'Agregar sede'}
-        </Button>
       </form>
 
       {/* Lista de sedes */}
       {sedes.length > 0 && (
         <div className="space-y-2">
           <h4 className="text-sm font-medium text-gray-700">Sedes agregadas</h4>
-          <div className="space-y-3">
+          <div className="space-y-2">
             {sedes.map((sede) => {
               const asignacion = asignaciones[sede.id] || { tipo: 'empresa' as TipoAsignacion };
-              const equiposAsignados = sede.equipos?.length ?? 0;
+              const equipoAsignado = asignacion.equipoId
+                ? equipos.find(e => e.id === asignacion.equipoId)
+                : null;
+              const textoAsignacion = asignacion.tipo === 'empresa'
+                ? 'Todos los empleados'
+                : equipoAsignado
+                  ? `Equipo: ${equipoAsignado.nombre}`
+                  : 'Equipo sin asignar';
 
               return (
-                <div key={sede.id} className="rounded-lg border p-4 space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
+                <div key={sede.id} className="rounded-lg border p-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3 flex-1">
                       <MapPin className="h-4 w-4 text-gray-400" />
-                      <div>
-                        <p className="font-medium text-sm">{sede.nombre}</p>
-                        <p className="text-xs text-gray-500">{sede.ciudad}</p>
+                      <div className="flex-1">
+                        <p className="font-medium text-sm">{sede.nombre}, {sede.ciudad}</p>
+                      </div>
+                      <div className="text-xs text-gray-600">
+                        {textoAsignacion}
                       </div>
                     </div>
+
                     <Button
                       variant="ghost"
                       size="sm"
                       onClick={() => handleEliminarSede(sede.id)}
+                      title="Eliminar sede"
                     >
                       <X className="h-4 w-4" />
                     </Button>
-                  </div>
-
-                  <div className="space-y-3">
-                    <RadioGroup
-                      value={asignacion.tipo}
-                      onValueChange={(value) => handleTipoAsignacionChange(sede.id, value as TipoAsignacion)}
-                      className="flex flex-col gap-2 sm:flex-row"
-                    >
-                      <div className="flex items-center space-x-2 rounded-md border p-3">
-                        <RadioGroupItem value="empresa" id={`empresa-${sede.id}`} />
-                        <Label htmlFor={`empresa-${sede.id}`} className="text-sm font-medium cursor-pointer">
-                          Todos los empleados
-                        </Label>
-                      </div>
-                      <div className="flex flex-col gap-2 rounded-md border p-3 sm:flex-row sm:items-center sm:gap-3">
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="equipo" id={`equipo-${sede.id}`} />
-                          <Label htmlFor={`equipo-${sede.id}`} className="text-sm font-medium cursor-pointer">
-                            Equipo específico
-                          </Label>
-                        </div>
-                        {asignacion.tipo === 'equipo' && (
-                          <Select
-                            value={asignacion.equipoId || 'none'}
-                            onValueChange={(value) => handleEquipoAsignacionChange(sede.id, value)}
-                            disabled={
-                              cargandoEquipos ||
-                              equipos.length === 0 ||
-                              asignandoSedeId === sede.id
-                            }
-                          >
-                            <SelectTrigger className="w-full sm:w-56">
-                              <SelectValue placeholder="Selecciona un equipo" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="none">Seleccionar equipo</SelectItem>
-                              {equipos.map((equipo) => (
-                                <SelectItem key={equipo.id} value={equipo.id}>
-                                  {equipo.nombre}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        )}
-                      </div>
-                    </RadioGroup>
-
-                    <div className="flex items-center justify-between text-xs text-gray-500">
-                      <span>
-                        Equipos asignados:{' '}
-                        {equiposAsignados > 0
-                          ? `${equiposAsignados} ${equiposAsignados === 1 ? 'equipo' : 'equipos'}`
-                          : 'Sin equipos asignados'}
-                      </span>
-                    </div>
-
-                    <div className="text-xs text-gray-500">
-                      {asignacion.tipo === 'equipo' && !asignacion.equipoId
-                        ? 'Selecciona un equipo para aplicar la asignación.'
-                        : asignandoSedeId === sede.id
-                        ? 'Aplicando cambios...'
-                        : 'Los cambios se guardan automáticamente.'}
-                    </div>
                   </div>
                 </div>
               );

@@ -129,7 +129,7 @@ export function EmpleadoDetailClient({ empleado, usuario }: EmpleadoDetailClient
         ))}
       </div>
 
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1">
         {activeTab === 'general' && (
           <GeneralTabShared
             empleado={empleado}

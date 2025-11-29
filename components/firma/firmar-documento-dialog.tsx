@@ -158,7 +158,7 @@ export function FirmarDocumentoDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl">
+      <DialogContent className="max-w-3xl" aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle>Firmar documento</DialogTitle>
         </DialogHeader>

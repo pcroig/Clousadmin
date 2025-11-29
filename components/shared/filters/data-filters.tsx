@@ -87,7 +87,7 @@ export function DataFilters({
       {onEstadoChange && estadoOptions.length > 0 && (
         <div className="w-full sm:w-[180px]">
           <Select value={estadoValue} onValueChange={onEstadoChange}>
-            <SelectTrigger>
+            <SelectTrigger className="w-full">
               <SelectValue placeholder={estadoLabel} />
             </SelectTrigger>
             <SelectContent>
@@ -106,7 +106,7 @@ export function DataFilters({
       {onEquipoChange && (
         <div className="w-full sm:w-[200px]">
           <Select value={equipoValue} onValueChange={onEquipoChange}>
-            <SelectTrigger>
+            <SelectTrigger className="w-full">
               <SelectValue placeholder={equipoLabel} />
             </SelectTrigger>
             <SelectContent>

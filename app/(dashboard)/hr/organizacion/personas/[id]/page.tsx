@@ -127,7 +127,7 @@ export default async function EmpleadoDetailPage(props: EmpleadoDetailPageProps)
           fechaInicio: true,
           fechaFin: true,
           tipoContrato: true,
-          salarioBrutoAnual: true,
+          salarioBaseAnual: true,
         },
         orderBy: {
           fechaInicio: 'desc',
@@ -218,7 +218,7 @@ export default async function EmpleadoDetailPage(props: EmpleadoDetailPageProps)
           fechaInicio: true,
           fechaFin: true,
           tipoContrato: true,
-          salarioBrutoAnual: true,
+          salarioBaseAnual: true,
         },
         orderBy: {
           fechaInicio: 'desc',
@@ -268,8 +268,8 @@ export default async function EmpleadoDetailPage(props: EmpleadoDetailPageProps)
         ? empleadoDesencriptado.fechaNacimiento.toISOString()
         : empleadoDesencriptado.fechaNacimiento ?? null,
     // Convertir campos Decimal a números para Client Components
-    salarioBrutoAnual: decimalToNumber(empleadoDesencriptado.salarioBrutoAnual),
-    salarioBrutoMensual: decimalToNumber(empleadoDesencriptado.salarioBrutoMensual),
+    salarioBaseAnual: decimalToNumber(empleadoDesencriptado.salarioBaseAnual),
+    salarioBaseMensual: decimalToNumber(empleadoDesencriptado.salarioBaseMensual),
     ausencias: empleadoActualizado.ausencias.map((a) => ({
       id: a.id,
       tipo: a.tipo,
@@ -298,7 +298,7 @@ export default async function EmpleadoDetailPage(props: EmpleadoDetailPageProps)
       fechaFin:
         c.fechaFin instanceof Date ? c.fechaFin.toISOString() : c.fechaFin,
       tipoContrato: c.tipoContrato,
-      salarioBrutoAnual: Number(c.salarioBrutoAnual),
+      salarioBaseAnual: Number(c.salarioBaseAnual),
     })),
     equipos: empleadoActualizado.equipos.map((eq) => ({
       equipoId: eq.equipo.id,

@@ -8,6 +8,8 @@ import { revalidatePath } from 'next/cache';
 import { headers } from 'next/headers';
 import { z } from 'zod';
 
+import { randomBytes } from 'crypto';
+
 import { createSession, getSession, hashPassword } from '@/lib/auth';
 import { DIAS_LABORABLES_DEFAULT } from '@/lib/calculos/dias-laborables';
 import { UsuarioRol } from '@/lib/constants/enums';
@@ -19,6 +21,7 @@ import { DEFAULT_JORNADA_FORM_VALUES } from '@/lib/jornadas/defaults';
 import { prisma } from '@/lib/prisma';
 import { asJsonValue } from '@/lib/prisma/json';
 import { getClientIP } from '@/lib/rate-limit';
+import { uploadToS3 } from '@/lib/s3';
 import {
   calendarioJornadaOnboardingSchema,
   integracionCreateSchema,
@@ -32,7 +35,7 @@ import {
  * REQUIERE: Token de invitación válido
  */
 export async function signupEmpresaAction(
-  data: z.infer<typeof signupSchema> & { token?: string }
+  data: z.infer<typeof signupSchema> & { token?: string; avatarFile?: File | null }
 ) {
   try {
     const headersList = await headers();
@@ -41,6 +44,7 @@ export async function signupEmpresaAction(
 
     // Validar datos
     const validatedData = signupSchema.parse(data);
+    const avatarFile = data.avatarFile;
 
     // Verificar invitación (requerida)
     if (!data.token) {
@@ -152,10 +156,37 @@ export async function signupEmpresaAction(
       return { usuario, empresa, empleado };
     });
 
-    // 5. Marcar invitación como usada
+    // 5. Subir avatar si se proporcionó
+    let avatarUrl: string | undefined;
+    if (avatarFile && avatarFile.size > 0) {
+      try {
+        const arrayBuffer = await avatarFile.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
+        const timestamp = Date.now();
+        const randomString = randomBytes(8).toString('hex');
+        const fileExtension = avatarFile.name.split('.').pop() || 'jpg';
+        const s3Key = `avatars/${result.empresa.id}/${result.empleado.id}/${timestamp}-${randomString}.${fileExtension}`;
+
+        avatarUrl = await uploadToS3(buffer, s3Key, avatarFile.type);
+
+        // Actualizar empleado con avatar
+        await prisma.empleado.update({
+          where: { id: result.empleado.id },
+          data: { fotoUrl: avatarUrl },
+        });
+
+        // Actualizar resultado local para la sesión
+        result.empleado.fotoUrl = avatarUrl;
+      } catch (avatarError) {
+        console.error('[signupEmpresaAction] Error subiendo avatar:', avatarError);
+        // No fallar el signup por error de avatar
+      }
+    }
+
+    // 6. Marcar invitación como usada
     await usarInvitacionSignup(data.token);
 
-    // 6. Crear sesión automáticamente (usuario autenticado tras signup)
+    // 7. Crear sesión automáticamente (usuario autenticado tras signup)
     await createSession({
       user: {
         id: result.usuario.id,
@@ -170,7 +201,7 @@ export async function signupEmpresaAction(
       },
     });
 
-    // 7. Mantener sincronizada la entrada en waitlist (si venía de ahí)
+    // 8. Mantener sincronizada la entrada en waitlist (si venía de ahí)
     if (waitlistEntry) {
       const nombreCompleto = `${validatedData.nombre} ${validatedData.apellidos}`.trim();
       try {

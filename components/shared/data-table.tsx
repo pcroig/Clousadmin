@@ -69,6 +69,9 @@ interface DataTableProps<T extends object> {
  * - Columnas priorizadas (high/medium/low)
  * - Primera columna sticky opcional
  * - Modo compacto en mobile
+ *
+ * IMPORTANTE: El scroll vertical siempre debe estar a nivel de página (layout),
+ * nunca a nivel de tabla. La tabla crece según su contenido.
  */
 export function DataTable<T extends object>({
   columns,
@@ -114,7 +117,10 @@ export function DataTable<T extends object>({
   };
 
   return (
-    <div className={cn('bg-white rounded-xl border border-gray-200 overflow-hidden', className)}>
+    <div className={cn(
+      'rounded-xl border border-gray-200 bg-white overflow-hidden',
+      className
+    )}>
       <div className="overflow-x-auto">
         <table className="w-full">
           <thead className="bg-gray-50 border-b border-gray-200">

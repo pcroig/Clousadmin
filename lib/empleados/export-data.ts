@@ -27,7 +27,7 @@ type ContratoResumen = {
   fechaInicio: Date | string | null;
   fechaFin: Date | string | null;
   tipoContrato: string;
-  salarioBrutoAnual: number | null;
+  salarioBaseAnual: number | null;
 };
 
 export interface EmpleadoExportData {
@@ -226,7 +226,7 @@ export async function loadEmpleadoExportData(
           fechaInicio: true,
           fechaFin: true,
           tipoContrato: true,
-          salarioBrutoAnual: true,
+          salarioBaseAnual: true,
           createdAt: true,
         },
         orderBy: {
@@ -288,7 +288,7 @@ export function buildEmpleadoExcelBuffer(data: EmpleadoExportData): Buffer {
     ['IBAN', empleado.iban || ''],
     ['NIF', empleado.nif || ''],
     ['NSS', empleado.nss || ''],
-    ['Salario bruto anual', normalizeValue(empleado.salarioBrutoAnual)],
+    ['Salario base anual', normalizeValue(empleado.salarioBaseAnual)],
     ['Teléfono', empleado.telefono || ''],
     ['Dirección', `${empleado.direccionCalle ?? ''} ${empleado.direccionNumero ?? ''}`.trim()],
     ['Ciudad', empleado.ciudad ?? ''],
@@ -376,9 +376,9 @@ export function buildEmpleadoExcelBuffer(data: EmpleadoExportData): Buffer {
         Tipo: contrato.tipoContrato,
         FechaInicio: contrato.fechaInicio,
         FechaFin: contrato.fechaFin,
-        SalarioBrutoAnual: contrato.salarioBrutoAnual,
-        SalarioBrutoMensual: contrato.salarioBrutoAnual
-          ? Number(contrato.salarioBrutoAnual) / 12
+        SalarioBrutoAnual: contrato.salarioBaseAnual,
+        SalarioBrutoMensual: contrato.salarioBaseAnual
+          ? Number(contrato.salarioBaseAnual) / 12
           : '',
       })
     ),

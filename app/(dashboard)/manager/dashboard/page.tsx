@@ -77,6 +77,8 @@ export default async function ManagerDashboardPage() {
           nombre: true,
           apellidos: true,
           fotoUrl: true,
+          email: true,
+          puesto: true,
         },
       },
     },
@@ -87,17 +89,28 @@ export default async function ManagerDashboardPage() {
   });
 
   // Convertir a formato de solicitudes
-  const solicitudes = ausenciasPendientes.map((aus) => ({
-    id: aus.id,
-    empleado: {
-      nombre: `${aus.empleado.nombre} ${aus.empleado.apellidos}`,
-      fotoUrl: aus.empleado.fotoUrl || undefined,
-    },
-    tipo: 'ausencia' as const,
-    descripcion: `${aus.tipo}`,
-    fecha: aus.createdAt,
-    prioridad: 'media' as const,
-  }));
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const solicitudes = ausenciasPendientes.map((aus: any) => {
+    const fechaInicio = new Date(aus.fechaInicio);
+    const fechaFin = new Date(aus.fechaFin);
+    const periodo = `${fechaInicio.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })} - ${fechaFin.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}`;
+
+    return {
+      id: aus.id,
+      empleado: {
+        nombre: aus.empleado.nombre,
+        apellidos: aus.empleado.apellidos,
+        fotoUrl: aus.empleado.fotoUrl || undefined,
+        email: aus.empleado.email || undefined,
+        puesto: aus.empleado.puesto || undefined,
+      },
+      tipo: 'ausencia' as const,
+      descripcion: `${aus.tipo} (${periodo})`,
+      fecha: aus.createdAt,
+      prioridad: 'media' as const,
+      estadoLabel: 'Pendiente de aprobación',
+    };
+  });
 
   // Notificaciones reales para el manager actual
   const notificacionesDb = await prisma.notificacion.findMany({
@@ -219,8 +232,10 @@ export default async function ManagerDashboardPage() {
         <div className="flex-1 min-h-0 pb-4 overflow-auto">
           <PlantillaWidget
             trabajando={plantillaResumenEquipo.trabajando}
+            enPausa={plantillaResumenEquipo.enPausa}
             ausentes={plantillaResumenEquipo.ausentes}
             sinFichar={plantillaResumenEquipo.sinFichar}
+            fueraDeHorario={plantillaResumenEquipo.fueraDeHorario}
             rol="manager"
             variant="compact"
           />
@@ -263,8 +278,10 @@ export default async function ManagerDashboardPage() {
             <div className="h-full min-h-[220px]">
               <PlantillaWidget
                 trabajando={plantillaResumenEquipo.trabajando}
+                enPausa={plantillaResumenEquipo.enPausa}
                 ausentes={plantillaResumenEquipo.ausentes}
                 sinFichar={plantillaResumenEquipo.sinFichar}
+                fueraDeHorario={plantillaResumenEquipo.fueraDeHorario}
                 rol="manager"
                 variant="card"
               />

@@ -181,7 +181,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"nombre\": \"Juan\",\n  \"apellidos\": \"Pérez Martínez\",\n  \"email\": \"juan.perez@empresa.com\",\n  \"dni\": \"12345678A\",\n  \"telefono\": \"+34612345678\",\n  \"fechaNacimiento\": \"1990-05-15\",\n  \"fechaIngreso\": \"2025-07-01\",\n  \"salarioBrutoAnual\": 35000,\n  \"numeroPagas\": 14,\n  \"diasVacacionesAnuales\": 22\n}"
+              "raw": "{\n  \"nombre\": \"Juan\",\n  \"apellidos\": \"Pérez Martínez\",\n  \"email\": \"juan.perez@empresa.com\",\n  \"dni\": \"12345678A\",\n  \"telefono\": \"+34612345678\",\n  \"fechaNacimiento\": \"1990-05-15\",\n  \"fechaIngreso\": \"2025-07-01\",\n  \"salarioBaseAnual\": 35000,\n  \"numeroPagas\": 14,\n  \"diasVacacionesAnuales\": 22\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/empleados",
@@ -202,7 +202,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"telefono\": \"+34612345679\",\n  \"salarioBrutoAnual\": 38000\n}"
+              "raw": "{\n  \"telefono\": \"+34612345679\",\n  \"salarioBaseAnual\": 38000\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/empleados/{{empleadoId}}",

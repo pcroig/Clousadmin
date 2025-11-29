@@ -101,8 +101,14 @@ export function DocumentViewerModal({
   }, []);
 
   // Check if the document is a Word file
+  const normalizedMime = mimeType?.toLowerCase() ?? null;
   const isWordDocument =
-    mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+    normalizedMime === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+  const isPdfDocument = normalizedMime === 'application/pdf';
+
+  const iframeSandbox = isPdfDocument
+    ? undefined
+    : 'allow-same-origin allow-scripts allow-popups allow-forms allow-downloads allow-modals allow-presentation';
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
@@ -114,6 +120,7 @@ export function DocumentViewerModal({
             : 'sm:max-w-5xl h-[90vh] max-h-[900px]'
         )}
         showCloseButton={false}
+        aria-describedby={undefined}
       >
         {/* Header */}
         <DialogHeader className="flex-shrink-0 flex flex-row items-center justify-between gap-4 px-4 py-3 border-b bg-gray-50/80">
@@ -233,7 +240,7 @@ export function DocumentViewerModal({
             title={`Vista previa de ${title}`}
             onLoad={handleIframeLoad}
             onError={handleIframeError}
-            sandbox="allow-same-origin allow-scripts allow-popups allow-forms allow-downloads allow-modals allow-presentation"
+            sandbox={iframeSandbox}
           />
         </div>
       </DialogContent>

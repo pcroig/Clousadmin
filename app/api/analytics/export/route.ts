@@ -79,8 +79,8 @@ export async function GET(request: NextRequest) {
         email: true,
         genero: true,
         fechaAlta: true,
-        salarioBrutoMensual: true,
-        salarioBrutoAnual: true,
+        salarioBaseMensual: true,
+        salarioBaseAnual: true,
         equipos: {
           select: {
             equipo: {
@@ -156,13 +156,13 @@ export async function GET(request: NextRequest) {
       Nombre: e.nombre,
       Apellidos: e.apellidos,
       Equipos: equiposToLabel(e.equipos),
-      'Salario Bruto Mensual': e.salarioBrutoMensual
-        ? `${Number(e.salarioBrutoMensual).toFixed(2)}€`
+      'Salario Base Mensual': e.salarioBaseMensual
+        ? `${Number(e.salarioBaseMensual).toFixed(2)}€`
         : 'N/A',
-      'Salario Bruto Anual': e.salarioBrutoAnual
-        ? `${Number(e.salarioBrutoAnual).toFixed(2)}€`
-        : e.salarioBrutoMensual
-        ? `${(Number(e.salarioBrutoMensual) * 12).toFixed(2)}€`
+      'Salario Base Anual': e.salarioBaseAnual
+        ? `${Number(e.salarioBaseAnual).toFixed(2)}€`
+        : e.salarioBaseMensual
+        ? `${(Number(e.salarioBaseMensual) * 12).toFixed(2)}€`
         : 'N/A',
     }));
 
@@ -172,8 +172,8 @@ export async function GET(request: NextRequest) {
       { wch: 15 }, // Nombre
       { wch: 20 }, // Apellidos
       { wch: 20 }, // Equipos
-      { wch: 20 }, // Salario Bruto Mensual
-      { wch: 20 }, // Salario Bruto Anual
+      { wch: 20 }, // Salario Base Mensual
+      { wch: 20 }, // Salario Base Anual
     ];
 
     XLSX.utils.book_append_sheet(workbook, wsCompensacion, 'Compensación');

@@ -794,15 +794,77 @@ Tailwind CSS 4 usa la nueva sintaxis `@theme inline` en lugar de `tailwind.confi
 </WidgetCard>
 ```
 
-### Tablas de datos
-- Usa `DataTable` (`components/shared/data-table.tsx`) con columnas tipadas.
-- Encabeza con `TableHeader` y filtros con `TableFilters`.
+### Tablas de datos unificadas ⭐ ESTÁNDAR
+- **Obligatorio**: Usa `DataTable` (`components/shared/data-table.tsx`) para todas las tablas del sistema.
+- **Propósito**: Garantiza estilo consistente, responsive design y EmptyState de shadcn en todas las vistas.
+- **AvatarCell**: Para columnas de empleados, usa el helper `AvatarCell` que integra avatar + nombre + puesto automáticamente.
 
 ```tsx
-<TableHeader title="Personas" actionButton={{ label: '+ Añadir', onClick: openModal }} />
-<TableFilters showDateNavigation onFilterClick={handleFilter} />
-<DataTable columns={columns} data={data} getRowId={(row) => row.id} />
+import { AvatarCell, DataTable, type Column } from '@/components/shared/data-table';
+import { EmptyState } from '@/components/shared/empty-state';
+import { CalendarIcon } from 'lucide-react';
+
+// Definir columnas tipadas
+const columns: Column<Ausencia>[] = [
+  {
+    id: 'empleado',
+    header: 'Empleado',
+    cell: (row) => (
+      <AvatarCell
+        nombre={row.empleado.nombre}
+        apellidos={row.empleado.apellidos}
+        fotoUrl={row.empleado.fotoUrl}
+        subtitle={row.empleado.puesto}
+      />
+    ),
+    sticky: true, // Primera columna sticky en mobile
+    priority: 'high', // Siempre visible
+  },
+  {
+    id: 'fecha',
+    header: 'Fechas',
+    align: 'center', // Headers centrados con contenido
+    cell: (row) => format(new Date(row.fechaInicio), 'dd MMM'),
+  },
+];
+
+// Usar en componente
+<DataTable
+  columns={columns}
+  data={ausencias}
+  getRowId={(row) => row.id}
+  onRowClick={(row) => handleOpenModal(row)}
+  emptyContent={
+    <EmptyState
+      layout="table"
+      icon={CalendarIcon}
+      title="No hay ausencias registradas"
+      description="Cambia el periodo o ajusta los filtros para ver registros."
+    />
+  }
+/>
 ```
+
+**Características del DataTable**:
+- ✅ Header grisaceo (`bg-gray-50`) con títulos centrados cuando el contenido está centrado
+- ✅ Filas ocupan todo el espacio con hover suave
+- ✅ EmptyState integrado de shadcn (layout `table`)
+- ✅ Responsive con columnas priorizadas (`priority: 'high' | 'medium' | 'low'`)
+- ✅ Primera columna sticky opcional en mobile
+- ✅ Scroll horizontal automático en mobile
+- ✅ Filas clicables con cursor pointer
+
+**AvatarCell**:
+- Muestra avatar + nombre + puesto (opcional) en una sola celda
+- Responsive: avatar más pequeño en mobile
+- Integra `EmployeeAvatar` y formateo automático
+- Usado en tablas de Ausencias, Fichajes, y otras vistas con empleados
+
+**Reglas importantes**:
+- ❌ **NO** uses `Table`, `TableRow`, `TableCell` de shadcn directamente en nuevas tablas
+- ✅ **SÍ** usa `DataTable` para unificar estilo y centralizar código
+- ✅ Todos los estados vacíos deben usar `EmptyState` de shadcn con layout `table`
+- ✅ Headers deben estar centrados cuando el contenido de la columna está centrado
 
 ### Botones
 - Usa `Button` de `components/ui/button.tsx`.
@@ -826,6 +888,350 @@ Tailwind CSS 4 usa la nueva sintaxis `@theme inline` en lugar de `tailwind.confi
 ### Modales y paneles
 - Formularios/confirmaciones: `Dialog` (`components/ui/dialog.tsx`).
 - Paneles de detalle: `DetailsPanel` (`components/shared/details-panel.tsx`).
+
+### Hover Cards para Empleados
+- Usa `EmpleadoHoverCard` (`components/empleado/empleado-hover-card.tsx`) para mostrar información contextual del empleado al hacer hover.
+- **Información uniforme**: Muestra rol, equipo, email y estado opcional de forma consistente en toda la plataforma.
+- **Uso en widgets y tablas**: Envuelve avatares o nombres de empleados para proporcionar contexto sin ocupar espacio.
+
+```tsx
+import { EmpleadoHoverCard } from '@/components/empleado/empleado-hover-card';
+import { EmployeeAvatar } from '@/components/shared/employee-avatar';
+
+// En widgets (con avatar)
+<EmpleadoHoverCard
+  empleado={{
+    nombre: empleado.nombre,
+    apellidos: empleado.apellidos,
+    puesto: empleado.puesto,
+    email: empleado.email,
+    equipoNombre: empleado.equipoNombre,
+    fotoUrl: empleado.fotoUrl,
+  }}
+  estado={{ label: 'Pendiente de aprobación' }}
+  triggerClassName="flex-shrink-0"
+>
+  <EmployeeAvatar nombre={empleado.nombre} fotoUrl={empleado.fotoUrl} size="sm" />
+</EmpleadoHoverCard>
+
+// En tablas (con nombre)
+<EmpleadoHoverCard
+  empleado={{
+    nombre: ausencia.empleado.nombre,
+    apellidos: ausencia.empleado.apellidos,
+    puesto: ausencia.empleado.puesto,
+    email: ausencia.empleado.email,
+    equipoNombre: ausencia.empleado.equipoNombre,
+    fotoUrl: ausencia.empleado.fotoUrl,
+  }}
+  estado={{
+    label: getAusenciaEstadoLabel(ausencia.estado),
+    description: getTipoBadge(ausencia.tipo),
+  }}
+  triggerClassName="font-medium text-gray-900"
+  side="right"
+>
+  {ausencia.empleado.nombre} {ausencia.empleado.apellidos}
+</EmpleadoHoverCard>
+```
+
+**Reglas importantes:**
+- El hover card muestra **siempre la misma información** (rol, equipo, email) independientemente del contexto.
+- El `estado` es opcional y se muestra en un bloque separado cuando está presente.
+- Usa `side="right"` en tablas para evitar que el card se salga de la pantalla.
+- No cambia de color al hacer hover (mantiene el estilo del trigger).
+
+**Componentes que usan hover cards:**
+- ✅ `SolicitudesWidget` - avatares y nombres
+- ✅ `PlantillaWidget` - avatares en categorías
+- ✅ Tablas de Ausencias - nombres en mobile y desktop
+- ✅ Tablas de Fichajes - nombres en mobile y desktop
+
+---
+
+## 📜 Scroll en Dialogs, Widgets y Tablas
+
+### ⚠️ Causa Raíz del Problema de Scroll
+
+**El problema fundamental**: ScrollArea de Radix UI es complejo y requiere configuración específica que puede fallar. La solución más simple y confiable es **usar scroll nativo del navegador** con estilos personalizados.
+
+**Por qué fallaba ScrollArea**:
+- Requiere altura explícita en el contenedor
+- `flex-1` solo no proporciona altura resuelta
+- Requiere configuración correcta del Viewport
+- Más complejo de depurar y mantener
+
+**La solución (scroll nativo)**:
+```tsx
+{/* ❌ NO FUNCIONA - ScrollArea complejo */}
+<div className="flex-1 overflow-hidden">
+  <ScrollArea className="h-full">
+    {contenido}
+  </ScrollArea>
+</div>
+
+{/* ✅ SÍ FUNCIONA - scroll nativo con estilos personalizados */}
+<div className="flex-1 min-h-0 overflow-y-auto scrollbar-thin">
+  {contenido}
+</div>
+```
+
+**Scrollbar personalizada embebida y auto-hide**:
+- Solo 4px de ancho (ultra delgada)
+- Track completamente transparente (sin fondo visible)
+- **Auto-hide**: invisible por defecto, solo aparece al hacer hover/scroll
+- Thumb pequeño (mínimo 40px) y semi-transparente
+- Completamente embebida sin espacio separado
+
+**Comportamiento**:
+- **Por defecto**: Completamente invisible
+- **Al hover del contenedor**: Aparece en gris claro (50% opacidad)
+- **Al hover sobre la barra**: Gris más oscuro (70% opacidad)
+- **Al arrastrar**: Más visible (90% opacidad)
+- **Durante scroll**: Visible y responsiva
+
+**Clases disponibles**:
+- `scrollbar-thin` - scrollbar delgada de 6px con auto-hide
+- `scrollbar-track-transparent` - track sin fondo (helper)
+- `scrollbar-thumb-gray-300` - thumb color gris (helper)
+- `hover:scrollbar-thumb-gray-400` - hover más oscuro (helper)
+
+**Patrón aplicado en:**
+- `DialogBody` - overflow-y-auto nativo con scrollbar delgada
+- `DataTable` (con `scrollable`) - scroll nativo embebido
+
+---
+
+### Dialogs con Scroll Correcto
+
+**Problema**: El scroll en modales debe mantener el header y footer fijos, permitiendo scroll solo en el contenido.
+
+**Solución**: Usar `DialogScrollableContent` + `DialogBody`
+
+```tsx
+import {
+  Dialog,
+  DialogScrollableContent,
+  DialogHeader,
+  DialogBody,
+  DialogFooter,
+  DialogTitle,
+} from '@/components/ui/dialog';
+
+<Dialog open={open} onOpenChange={onClose}>
+  <DialogScrollableContent className="max-w-4xl">
+    {/* Header fijo - NO hace scroll */}
+    <DialogHeader>
+      <DialogTitle>Título del Modal</DialogTitle>
+    </DialogHeader>
+
+    {/* Body con scroll automático */}
+    <DialogBody>
+      <div className="space-y-4">
+        {/* Contenido largo que hará scroll */}
+      </div>
+    </DialogBody>
+
+    {/* Footer fijo - NO hace scroll */}
+    <DialogFooter>
+      <Button variant="outline">Cancelar</Button>
+      <Button>Guardar</Button>
+    </DialogFooter>
+  </DialogScrollableContent>
+</Dialog>
+```
+
+**Componentes disponibles:**
+
+- `DialogContent` - Modal básico (con prop `scrollable` opcional)
+- `DialogScrollableContent` - Modal con estructura fija header/footer
+- `DialogBody` - Usa overflow-y-auto nativo con scrollbar delgada embebida
+- `DialogHeader` - Header fijo
+- `DialogFooter` - Footer fijo
+
+**Implementación de DialogBody:**
+```tsx
+function DialogBody({ className, children, ...props }) {
+  return (
+    <div
+      className={cn(
+        "flex-1 min-h-0 overflow-y-auto -mx-6 px-6",
+        // Scrollbar embebida delgada
+        "scrollbar-thin scrollbar-track-transparent scrollbar-thumb-gray-300 hover:scrollbar-thumb-gray-400",
+        className
+      )}
+      {...props}
+    >
+      {children}
+    </div>
+  )
+}
+```
+
+**Nota clave**: `min-h-0` es crítico para que `flex-1` permita el shrinking y active el scroll.
+
+**Modales actualizados:**
+- ✅ `add-persona-dialog.tsx` - con wrapper div para contenido de tabs
+- ✅ `solicitar-firma-dialog.tsx`
+- ✅ `fichaje-modal.tsx`
+- ✅ `editar-jornada-modal.tsx`
+- ✅ `gestionar-ausencias-modal.tsx` - footer fuera de DialogBody con condicional por tab
+- ✅ `preferencias-vacaciones-modal.tsx` - footer movido fuera de DialogBody
+
+**⚠️ IMPORTANTE**: El DialogFooter DEBE estar fuera de DialogBody, nunca dentro. Si tienes tabs con diferentes footers, usa renderizado condicional:
+
+```tsx
+<DialogBody>
+  <Tabs value={tab}>
+    <TabsContent value="tab1">...</TabsContent>
+    <TabsContent value="tab2">...</TabsContent>
+  </Tabs>
+</DialogBody>
+
+<DialogFooter>
+  {tab === 'tab1' ? (
+    <Button onClick={handleTab1}>Acción Tab 1</Button>
+  ) : (
+    <Button onClick={handleTab2}>Acción Tab 2</Button>
+  )}
+</DialogFooter>
+```
+
+### Widgets con Scroll
+
+**Problema**: Los widgets de dashboard necesitan scroll cuando el contenido excede la altura disponible.
+
+**Solución**: Usar prop `useScroll` en `WidgetCard`
+
+```tsx
+import { WidgetCard } from '@/components/shared/widget-card';
+
+{/* Widget SIN scroll (contenido estático) */}
+<WidgetCard
+  title="Plantilla"
+  href="/hr/organizacion/personas"
+  height="h-[280px]"
+>
+  <div>Contenido estático</div>
+</WidgetCard>
+
+{/* Widget CON scroll (lista larga) */}
+<WidgetCard
+  title="Solicitudes"
+  href="/hr/bandeja-entrada"
+  height="h-[280px]"
+  useScroll  // ← Activa ScrollArea automáticamente
+  badge={count}
+>
+  <div className="space-y-2">
+    {/* Lista de elementos que hará scroll */}
+  </div>
+</WidgetCard>
+```
+
+**Widgets actualizados:**
+- ✅ `plantilla-widget.tsx`
+- ✅ `solicitudes-widget.tsx`
+- ✅ `notificaciones-widget.tsx`
+
+**Notas técnicas:**
+- `useScroll={true}` envuelve el contenido en `<ScrollArea>`
+- El widget mantiene `height` fijo (ej: `h-[280px]`)
+- El `CardContent` tiene `flex-1 min-h-0` para que el scroll funcione
+
+### Tablas con Scroll
+
+**Problema**: Las tablas necesitan scroll vertical cuando hay muchas filas y están dentro de un contenedor con altura fija.
+
+**Solución**: Usar prop `scrollable` en `DataTable`
+
+```tsx
+import { DataTable } from '@/components/shared/data-table';
+
+<ResponsiveContainer variant="page" className="h-full flex flex-col overflow-hidden">
+  {/* Header and filters */}
+
+  {/* Content with height constraint */}
+  <div className="flex-1 min-h-0">
+    <DataTable
+      columns={columns}
+      data={data}
+      onRowClick={handleRowClick}
+      getRowId={(row) => row.id}
+      scrollable  // ← Activa overflow-y-auto y h-full
+    />
+  </div>
+</ResponsiveContainer>
+```
+
+**Tablas actualizadas:**
+- ✅ `personas-client.tsx` (org > personas)
+- ✅ `equipos-client.tsx` (org > equipos)
+- ✅ `puestos-client.tsx` (org > puestos)
+
+**Notas técnicas:**
+- `scrollable={true}` aplica `h-full overflow-y-auto` con scrollbar personalizada al contenedor interior
+- El `thead` tiene `sticky top-0 z-20` para permanecer fijo mientras el tbody hace scroll
+- La scrollbar es delgada (6px), con track transparente y thumb gris
+- Esto crea un scroll "embebido" sin fondo visible, solo la barra
+- El contenedor padre debe tener altura fija o `flex-1 min-h-0`
+- La tabla mantiene `overflow-x-auto` para scroll horizontal en mobile
+
+**Implementación:**
+```tsx
+{/* Contenedor exterior con bg-white */}
+<div className="h-full flex flex-col bg-white rounded-xl border">
+  {/* Wrapper que oculta el espacio de la scrollbar */}
+  <div className="flex-1 min-h-0 overflow-hidden">
+    {/* Scroll con padding trick: pr-4 -mr-4 */}
+    <div className="h-full overflow-y-auto scrollbar-thin pr-4 -mr-4">
+      <table className="w-full">
+        <thead className="sticky top-0 z-20 bg-gray-50">...</thead>
+        <tbody>...</tbody>
+      </table>
+    </div>
+  </div>
+</div>
+```
+
+**Por qué funciona el "padding trick":**
+- `pr-4`: Padding-right de 16px empuja el contenido hacia la izquierda
+- `-mr-4`: Margin-right negativo de -16px extiende el contenedor hacia la derecha
+- `overflow-hidden` en el wrapper corta la scrollbar que queda fuera
+- **Resultado**: La tabla ocupa todo el ancho, la scrollbar flota SOBRE el contenido
+- Scrollbar delgada (8px) sin fondo visible, completamente embebida
+
+---
+
+### Filtros en Tablas
+
+**Componente**: `DataFilters` (`components/shared/filters/data-filters.tsx`)
+
+**Problema**: Los selectores de filtro cambiaban de tamaño según el contenido seleccionado.
+
+**Solución**: Anchos fijos uniformes con `className="w-full"` en `SelectTrigger`
+
+```tsx
+<DataFilters
+  searchQuery={busqueda}
+  onSearchChange={setBusqueda}
+  estadoValue={filtroEstado}
+  onEstadoChange={setFiltroEstado}
+  estadoOptions={ESTADO_OPTIONS}
+  equipoValue={filtroEquipo}
+  onEquipoChange={setFiltroEquipo}
+  equipoOptions={equiposOptions}
+/>
+```
+
+**Layout responsivo:**
+- **Desktop**: `justify-between` - filtros a la izquierda, fechas a la derecha
+- **Mobile**: Stacked verticalmente
+- **Anchos**: Estado 180px, Equipo 200px (fijos en desktop)
+
+**Archivos actualizados:**
+- ✅ `fichajes-client.tsx`
+- ✅ `ausencias-client.tsx`
 
 ### Layouts recurrentes
 - Dashboards: `grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6`.
@@ -863,5 +1269,45 @@ Tailwind CSS 4 usa la nueva sintaxis `@theme inline` en lugar de `tailwind.confi
 
 ---
 
-**Versión**: 1.3.0  
-**Última actualización**: 7 de noviembre 2025
+**Versión**: 1.5.4
+**Última actualización**: 29 de noviembre 2025
+
+**Cambios en v1.5.4:**
+- ✅ **Scrollbar verdaderamente embebida**: Padding trick (pr-4 -mr-4) para overlay real
+- ✅ Tabla ocupa 100% del ancho sin espacio reservado para scroll
+- ✅ Scrollbar flota SOBRE el contenido, no al lado
+- ✅ Estructura de 3 capas: contenedor → wrapper overflow-hidden → scroll con padding trick
+
+**Cambios en v1.5.3:**
+- ⚠️ REVERTIDO - Enfoque incorrecto con scrollbar-gutter
+
+**Cambios en v1.5.2:**
+- ✅ **Auto-hide scrollbar**: Invisible por defecto, solo aparece al hover/scroll
+- ✅ Scrollbar semi-transparente para máxima discreción
+- ✅ Sin fondo visible - solo la banda delgada
+- ✅ Transiciones suaves entre estados (invisible → visible → hover)
+
+**Cambios en v1.5.1:**
+- ✅ Scroll del layout (main) con scrollbar delgada embebida
+- ✅ Eliminado doble scroll en páginas con tabs (empleado-detail-client)
+- ✅ DataTable con estructura de dos contenedores para scroll correcto
+- ✅ Scroll de página pegado al lateral de la pantalla (no al área de contenido)
+
+**Cambios en v1.5.0 - SCROLL NATIVO:**
+- 🚀 **BREAKING**: Reemplazado ScrollArea de Radix UI por scroll nativo del navegador
+- ✅ Scrollbar personalizada delgada (6px) y embebida sin fondo visible
+- ✅ DialogBody usa overflow-y-auto + min-h-0 para scroll confiable
+- ✅ DataTable usa scroll nativo con scrollbar delgada
+- ✅ Estilos de scrollbar añadidos a globals.css (`.scrollbar-thin`, etc.)
+- ✅ Eliminada dependencia de ScrollArea para dialogs y tablas
+
+**Cambios en v1.4.2:**
+- ✅ Scroll embebido en tablas con `thead` sticky (sin scrollbar separada visible)
+- ✅ Corregidos 3 modales con DialogFooter dentro de DialogBody (ahora fuera)
+- ✅ add-persona-dialog con wrapper div para que tabs funcionen con scroll
+- ✅ Documentado patrón para footers condicionales en tabs
+
+**Cambios en v1.4.1:**
+- ✅ Documentada causa raíz del problema de scroll (ScrollArea requiere altura explícita)
+- ✅ Añadida sección "Tablas con Scroll" con prop `scrollable` en DataTable
+- ✅ Actualizadas 3 tablas: personas-client, equipos-client, puestos-client

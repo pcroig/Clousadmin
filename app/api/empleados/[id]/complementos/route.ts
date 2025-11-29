@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 
 import { getSession } from '@/lib/auth';
+import { crearNotificacionComplementoAsignado } from '@/lib/notificaciones';
 import { prisma } from '@/lib/prisma';
 import { getJsonBody } from '@/lib/utils/json';
 
@@ -117,6 +118,12 @@ export async function POST(
         id,
         empresaId: session.user.empresaId,
       },
+      select: {
+        id: true,
+        empresaId: true,
+        nombre: true,
+        apellidos: true,
+      },
     });
 
     if (!empleado) {
@@ -197,6 +204,23 @@ export async function POST(
         },
       },
     });
+
+    // Notificar al empleado y su manager
+    try {
+      await crearNotificacionComplementoAsignado(
+        prisma,
+        {
+          empleadoId: id,
+          empleadoNombre: `${empleado.nombre} ${empleado.apellidos || ''}`.trim(),
+          empresaId: session.user.empresaId,
+          complementoNombre: tipoComplemento.nombre,
+          importe: data.importePersonalizado || tipoComplemento.importeBase,
+        },
+        { actorUsuarioId: session.user.id }
+      );
+    } catch (error) {
+      console.error('[Complementos] Error creando notificación:', error);
+    }
 
     return NextResponse.json({ complemento }, { status: 201 });
   } catch (error) {

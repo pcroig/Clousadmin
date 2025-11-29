@@ -274,20 +274,18 @@ export const JornadaStep = forwardRef<JornadaStepHandle, JornadaStepProps>(funct
 
   return (
     <div className="space-y-6">
-      <div className="space-y-2">
-        <h3 className="text-lg font-semibold text-gray-900">Define la jornada laboral</h3>
-        <p className="text-sm text-gray-500">
-          Configura el horario base de tu empresa. Podrás crear variaciones más adelante para equipos o personas específicas.
-        </p>
-      </div>
-
       <JornadaFormFields
         data={formData}
         onChange={setFormData}
         errors={errors}
         disabled={saving}
-        showAsignacion={false}
+        showNombre={false}
+        showAsignacion={true}
+        nivelAsignacion="empresa"
       />
+      <p className="text-sm text-gray-500">
+        Esta jornada se aplicará automáticamente a toda la empresa. Podrás crear variaciones específicas para equipos o empleados desde el panel de administración.
+      </p>
     </div>
   );
 });

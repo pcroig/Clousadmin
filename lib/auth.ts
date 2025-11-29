@@ -171,6 +171,41 @@ export async function getSession(): Promise<SessionData | null> {
 }
 
 /**
+ * Obtener avatar del usuario actual desde empleado.fotoUrl (fuente única de verdad)
+ * 
+ * @param session - Sesión del usuario (obtenida con getSession)
+ * @returns URL del avatar o null si no existe
+ * 
+ * @example
+ * ```ts
+ * const session = await getSession();
+ * if (session) {
+ *   const avatarUrl = await getCurrentUserAvatar(session);
+ * }
+ * ```
+ */
+export async function getCurrentUserAvatar(
+  session: SessionData
+): Promise<string | null> {
+  // Si no hay empleadoId (platform admin), usar avatar de sesión como fallback
+  if (!session.user.empleadoId) {
+    return session.user.avatar || null;
+  }
+
+  try {
+    const empleado = await prisma.empleado.findUnique({
+      where: { id: session.user.empleadoId },
+      select: { fotoUrl: true },
+    });
+    return empleado?.fotoUrl || null;
+  } catch (error) {
+    console.error('[Auth] Error obteniendo avatar del empleado:', error);
+    // Fallback a avatar de sesión si hay error
+    return session.user.avatar || null;
+  }
+}
+
+/**
  * Destruir sesión (logout)
  */
 export async function destroySession(): Promise<void> {

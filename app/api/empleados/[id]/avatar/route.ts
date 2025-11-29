@@ -4,6 +4,7 @@
 
 import { randomUUID } from 'node:crypto';
 
+import { revalidatePath } from 'next/cache';
 import { NextRequest } from 'next/server';
 
 import {
@@ -107,6 +108,9 @@ export async function POST(
       where: { id },
       data: { fotoUrl: avatarUrl },
     });
+
+    // Invalidar cache del layout para que se actualice el avatar en el sidebar
+    revalidatePath('/', 'layout');
 
     return successResponse({
       success: true,

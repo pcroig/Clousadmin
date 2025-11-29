@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 
 import { SearchableMultiSelect } from '@/components/shared/searchable-multi-select';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogBody, DialogFooter, DialogHeader, DialogScrollableContent, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
@@ -191,12 +191,13 @@ export function SolicitarFirmaDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+      <DialogScrollableContent className="max-w-5xl">
         <DialogHeader>
           <DialogTitle>Solicitar firma</DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-6">
+        <DialogBody>
+          <div className="space-y-6">
           <div className="space-y-2">
             <Label htmlFor="titulo">Título *</Label>
             <Input
@@ -332,6 +333,7 @@ export function SolicitarFirmaDialog({
             </div>
           </div>
         </div>
+        </DialogBody>
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={loading}>
@@ -347,7 +349,7 @@ export function SolicitarFirmaDialog({
             )}
           </Button>
         </DialogFooter>
-      </DialogContent>
+      </DialogScrollableContent>
     </Dialog>
   );
 }

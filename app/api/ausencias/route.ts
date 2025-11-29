@@ -72,7 +72,7 @@ export async function GET(req: NextRequest) {
     };
 
     // Filtrar por estado si se proporciona
-    if (estado && estado !== 'todas') {
+    if (estado && estado !== 'todos') {
       where.estado = estado as EstadoAusencia;
     }
 
@@ -177,6 +177,7 @@ export async function GET(req: NextRequest) {
               nombre: true,
               apellidos: true,
               puesto: true,
+              email: true,
               fotoUrl: true,
               equipos: {
                 select: {
@@ -214,6 +215,7 @@ export async function GET(req: NextRequest) {
         empleado: {
           ...empleadoBase,
           equipoId: equipoAsignado?.id ?? null,
+          equipoNombre: equipoAsignado?.nombre ?? null,
           equipo: equipoAsignado
             ? {
                 id: equipoAsignado.id,
@@ -538,16 +540,20 @@ export async function POST(req: NextRequest) {
     // Actualizar saldo y crear notificaciones según si fue auto-aprobada o requiere aprobación
     if (esAutoAprobable) {
       try {
-        await crearNotificacionAusenciaAutoAprobada(prisma, {
-          ausenciaId: ausencia.id,
-          empresaId: session.user.empresaId,
-          empleadoId,
-          empleadoNombre: `${ausencia.empleado.nombre} ${ausencia.empleado.apellidos}`,
-          managerId: ausencia.empleado.managerId,
-          tipo: ausencia.tipo,
-          fechaInicio: ausencia.fechaInicio,
-          fechaFin: ausencia.fechaFin,
-        });
+        await crearNotificacionAusenciaAutoAprobada(
+          prisma,
+          {
+            ausenciaId: ausencia.id,
+            empresaId: session.user.empresaId,
+            empleadoId,
+            empleadoNombre: `${ausencia.empleado.nombre} ${ausencia.empleado.apellidos}`,
+            managerId: ausencia.empleado.managerId,
+            tipo: ausencia.tipo,
+            fechaInicio: ausencia.fechaInicio,
+            fechaFin: ausencia.fechaFin,
+          },
+          { actorUsuarioId: session.user.id }
+        );
       } catch (error) {
         console.error('[Ausencias] Error creando notificación auto-aprobada:', error);
       }
@@ -565,16 +571,20 @@ export async function POST(req: NextRequest) {
       }
     } else {
       try {
-        await crearNotificacionAusenciaSolicitada(prisma, {
-          ausenciaId: ausencia.id,
-          empresaId: session.user.empresaId,
-          empleadoId,
-          empleadoNombre: `${ausencia.empleado.nombre} ${ausencia.empleado.apellidos}`,
-          tipo: ausencia.tipo,
-          fechaInicio: ausencia.fechaInicio,
-          fechaFin: ausencia.fechaFin,
-          diasSolicitados: diasSolicitadosFinal,
-        });
+        await crearNotificacionAusenciaSolicitada(
+          prisma,
+          {
+            ausenciaId: ausencia.id,
+            empresaId: session.user.empresaId,
+            empleadoId,
+            empleadoNombre: `${ausencia.empleado.nombre} ${ausencia.empleado.apellidos}`,
+            tipo: ausencia.tipo,
+            fechaInicio: ausencia.fechaInicio,
+            fechaFin: ausencia.fechaFin,
+            diasSolicitados: diasSolicitadosFinal,
+          },
+          { actorUsuarioId: session.user.id }
+        );
       } catch (error) {
         console.error('[Ausencias] Error creando notificación de solicitud:', error);
       }

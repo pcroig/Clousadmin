@@ -7,11 +7,12 @@ El sistema de fichajes permite a los empleados registrar su jornada laboral comp
 ### Estado actual de funcionalidades clave
 
 - **Horas extra**: ya existe el flujo completo (`GET /api/fichajes/bolsa-horas`, `POST /api/fichajes/compensar-horas`, `lib/services/compensacion-horas.ts`). No se requiere implementar nada nuevo, solo optimizaciones puntuales.
+- **Widget de plantilla**: ✅ Implementado con 5 estados (Trabajando, En pausa, Ausentes, Sin fichar, Fuera de horario). Muestra todos los empleados activos en tiempo real en dashboards de HR y Manager. Garantiza cobertura completa - todos los empleados aparecen en alguna categoría. Ver sección "1.1 Widget de Plantilla" para más detalles.
 - **Array duplicado de días**: el literal incorrecto en `app/api/fichajes/revision/route.ts` no se usa; el sistema emplea constantemente la constante correcta `dias`, por lo que no impacta cálculos.
 - **Finalizar desde pausa**: la validación (`lib/calculos/fichajes.ts`) permite cerrar jornada estando en pausa para garantizar que el tiempo en descanso no compute como trabajado. Cualquier cambio exigiría decisión de negocio.
 - **Correcciones de fichaje**: ✅ Implementado workflow formal con solicitud/aprobación. Empleados solicitan desde `/empleado/horario/fichajes`, HR/Manager aprueban desde la bandeja de entrada. Incluye notificaciones automáticas y auditoría completa.
 - **`autoCompletado`**: sigue alimentando dashboards y auditoría de otras funcionalidades (ausencias, solicitudes). Para fichajes, la revisión ahora busca directamente en tabla `fichaje` con estado `pendiente`.
-- **Slack y geolocalización**: mantienen estado “roadmap” (documentadas en esta guía), no hay código en producción que debamos retirar o activar.
+- **Slack y geolocalización**: mantienen estado "roadmap" (documentadas en esta guía), no hay código en producción que debamos retirar o activar.
 - **Entrada/salida múltiples**: `validarEvento` impide reabrir entradas mientras el estado no vuelva a `sin_fichar`, por lo que no se generan múltiples ciclos el mismo día.
 - **Discrepancias**: las solicitudes de corrección rechazadas permanecen visibles en el historial del fichaje para garantizar transparencia legal. No se permite su eliminación.
 - **Exportación Excel**: los empleados pueden descargar su historial completo de fichajes desde `Ajustes > General > Exportar Fichajes`. Incluye fechas, eventos, horas trabajadas/pausas y discrepancias.
@@ -45,7 +46,37 @@ Cada fichaje (día completo) tiene un único estado que refleja su ciclo de vida
 
 ## 1. Flujo Básico de Fichaje
 
-### Estados del Empleado
+### Estados del Empleado (Widget de Plantilla)
+
+El widget de plantilla en los dashboards (HR y Manager) muestra el estado actual de todos los empleados activos en **5 categorías**:
+
+1. **Trabajando**: Empleados que han fichado entrada, están dentro de su horario laboral, NO están en pausa, y NO han fichado salida.
+   - Último evento: `entrada` o `pausa_fin`
+   - Se excluyen empleados con ausencia de día completo
+
+2. **En pausa**: Empleados que han fichado entrada y están actualmente en pausa.
+   - Último evento: `pausa_inicio`
+   - Se muestra como categoría separada (no incluida en "Trabajando")
+
+3. **Ausentes**: Empleados con ausencia activa (confirmada o pendiente de aprobación) que cubre el día actual.
+   - Incluye ausencias de día completo y medio día
+   - Tiene prioridad sobre otros estados
+
+4. **Sin fichar**: Empleados cuyo horario de entrada **ya ha pasado**, deberían estar trabajando según su jornada, pero aún no han fichado.
+   - Requiere que sea día laboral para el empleado
+   - La hora actual debe estar dentro de su horario laboral configurado
+
+5. **Fuera de horario**: Empleados que no están en su horario laboral actual y no han fichado.
+   - Incluye empleados que aún no ha llegado su hora de entrada
+   - Incluye empleados cuyo horario ya pasó y no ficharon
+   - También incluye empleados sin jornada configurada o con día inactivo
+
+**Nota importante**: 
+- **Todos los empleados activos** siempre aparecen en alguna de estas categorías, incluso si no tienen jornada configurada o es un día no laboral
+- El sistema itera sobre **todos los empleados activos** de la empresa (o equipo en el caso de Managers), no solo sobre los "disponibles"
+- La lógica garantiza cobertura completa: si un empleado no está trabajando, ausente, ni en pausa, aparecerá como "Sin fichar" o "Fuera de horario" según corresponda
+
+### Estados del Fichaje (desde la perspectiva del empleado)
 
 - **Sin fichar**: Estado inicial, puede iniciar jornada
 - **Trabajando**: Ha fichado entrada, puede pausar o finalizar
@@ -85,6 +116,60 @@ El sistema actualiza en tiempo real:
 - Horas trabajadas hoy
 - Horas por hacer según jornada
 - Balance acumulado (si aplica)
+
+---
+
+## 1.1 Widget de Plantilla (Dashboard)
+
+El widget de plantilla proporciona una vista en tiempo real del estado de todos los empleados activos. Está disponible en los dashboards de HR y Manager.
+
+### Ubicación
+- **HR Dashboard**: `/hr/dashboard`
+- **Manager Dashboard**: `/manager/dashboard`
+
+### Funcionalidad
+
+**Implementación**: `lib/calculos/plantilla.ts`
+- `obtenerResumenPlantilla()`: Para HR, muestra todos los empleados de la empresa
+- `obtenerResumenPlantillaEquipo()`: Para Managers, muestra solo empleados de su equipo
+
+**Componente**: `components/dashboard/plantilla-widget.tsx`
+- Variante `card`: Desktop con WidgetCard
+- Variante `compact`: Mobile sin card, más compacto
+
+### Lógica de Clasificación
+
+El sistema clasifica **todos los empleados activos** en exactamente una de las 5 categorías:
+
+1. **Prioridad 1 - Ausentes**: Si tienen ausencia activa (confirmada o pendiente) → Categoría "Ausentes"
+2. **Prioridad 2 - Fichados**: Si han fichado entrada → Se evalúa estado actual:
+   - Si último evento es `pausa_inicio` → "En pausa"
+   - Si último evento es `entrada` o `pausa_fin` y no han fichado salida → "Trabajando"
+3. **Prioridad 3 - No fichados**: Empleados que no han fichado → Se evalúa horario:
+   - Si están programados para trabajar hoy Y su hora de entrada ya pasó Y están en horario → "Sin fichar"
+   - En cualquier otro caso (fuera de horario, sin jornada, día inactivo) → "Fuera de horario"
+
+### Cálculo de Horario Laboral
+
+La función `estaEnHorarioLaboral()` determina si un empleado está dentro de su horario:
+
+- **Jornada fija**: Compara hora actual con `entrada` y `salida` del día
+- **Jornada flexible**: Usa rango amplio por defecto (7:00 - 22:00)
+- **Sin jornada configurada**: Asume horario estándar (9:00 - 18:00)
+
+### Garantías del Sistema
+
+✅ **Cobertura completa**: Todos los empleados activos aparecen en alguna categoría
+✅ **Sin empleados perdidos**: Incluso si no tienen jornada configurada o es día no laboral
+✅ **Tiempo real**: Los estados se calculan en cada carga del dashboard
+✅ **Precisión**: Considera ausencias, fichajes, y horarios configurados
+
+### Navegación
+
+Cada categoría es clickeable y redirige a:
+- **Trabajando/En pausa/Sin fichar**: Página de fichajes (`/hr/horario/fichajes` o `/manager/horario/fichajes`)
+- **Ausentes**: Página de ausencias (`/hr/horario/ausencias?estado=confirmada`)
+- **Fuera de horario**: Página de personas (`/hr/organizacion/personas` o `/manager/horario/fichajes`)
 
 ---
 
@@ -413,8 +498,10 @@ Un único modal reutilizable para **crear** y **editar** fichajes con múltiples
 
 3. **Vista HR de Fichajes** (`app/(dashboard)/hr/horario/fichajes/fichajes-client.tsx`):
    - HR puede editar cualquier fichaje desde la tabla
+   - **Tabla unificada**: Usa `DataTable` compartido con `AvatarCell` para empleados
    - **Filtros avanzados**: Búsqueda por empleado, filtro por estado y por equipo
    - **Controles de fecha unificados**: Navegación por día/semana/mes con diseño compacto
+   - **EmptyState de shadcn**: Estados vacíos usan componente estándar con layout `table`
    - Contexto: `hr_admin`, modo: `editar`
 
 4. **Pantalla Cuadrar Fichajes** (`app/(dashboard)/hr/horario/fichajes/cuadrar/cuadrar-fichajes-client.tsx`):
@@ -943,8 +1030,8 @@ Componente unificado para navegación de períodos de tiempo (Día/Semana/Mes).
 
 ---
 
-**Versión**: 3.6
-**Última actualización**: 27 enero 2025
+**Versión**: 3.7
+**Última actualización**: Enero 2025
 **Estado**: Sistema completo implementado:
 - ✅ Validación determinística de fichajes completos
 - ✅ Campo `periodo` en ausencias de medio día (mañana/tarde)
@@ -974,3 +1061,6 @@ Componente unificado para navegación de períodos de tiempo (Día/Semana/Mes).
 - ✅ **Descartar días vacíos**: Funcionalidad para excluir masivamente días sin fichajes
 - ✅ **Botón Ausencia en cuadrar**: Permite crear ausencia directamente desde la revisión de fichajes
 - ✅ **Exportación Excel mejorada**: Formato optimizado con anchos de columna y manejo de casos vacíos
+- ✅ **Tabla unificada**: Migración a `DataTable` compartido con `AvatarCell` para empleados, estilo consistente (header grisaceo, filas completas, EmptyState de shadcn)
+- ✅ **Avatar en tabla**: Columna de empleado muestra avatar + nombre + puesto usando `AvatarCell`
+- ✅ **EmptyState de shadcn**: Estados vacíos usan componente estándar con layout `table` en lugar de texto plano

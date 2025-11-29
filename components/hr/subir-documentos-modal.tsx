@@ -181,7 +181,7 @@ export function SubirDocumentosModal({ open, onOpenChange, onUploaded }: SubirDo
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-2xl" aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Upload className="w-4 h-4" />

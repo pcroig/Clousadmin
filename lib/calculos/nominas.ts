@@ -269,7 +269,7 @@ export async function calcularResumenMensual(
   const empleado = await prisma.empleado.findUnique({
     where: { id: empleadoId },
     select: {
-      salarioBrutoMensual: true,
+      salarioBaseMensual: true,
     },
   });
 
@@ -299,7 +299,7 @@ export async function calcularResumenMensual(
     diasPermisosNoRetribuidos: ausencias.diasPermisosNoRetribuidos,
     horasTrabajadas: horas.horasTrabajadas,
     horasExtras: horas.horasExtras,
-    salarioBase: empleado?.salarioBrutoMensual ? Number(empleado.salarioBrutoMensual) : null,
+    salarioBase: empleado?.salarioBaseMensual ? Number(empleado.salarioBaseMensual) : null,
   };
 
   // Guardar/actualizar en la base de datos

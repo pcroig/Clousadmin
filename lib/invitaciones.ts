@@ -85,6 +85,7 @@ export interface InvitarEmpleadoParams {
   apellidos: string;
   tipoOnboarding?: TipoOnboarding;
   empresaNombre?: string;
+  baseUrl?: string;
 }
 
 export interface InvitarEmpleadoResult {
@@ -106,12 +107,14 @@ export async function invitarEmpleado({
   apellidos,
   tipoOnboarding = 'completo',
   empresaNombre,
+  baseUrl,
 }: InvitarEmpleadoParams): Promise<InvitarEmpleadoResult> {
   const invitacion = await crearInvitacion(
     empleadoId,
     empresaId,
     email,
-    tipoOnboarding
+    tipoOnboarding,
+    { baseUrl }
   );
 
   if (!invitacion.success || !invitacion.url) {

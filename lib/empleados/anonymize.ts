@@ -68,7 +68,7 @@ export async function anonymizeEmpleado(
     numeroHijos: 0,
     genero: null,
     iban: null,
-    titularCuenta: null,
+    bic: null,
     nif: null,
     nss: null,
     fechaNacimiento: null,

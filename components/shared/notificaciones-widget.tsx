@@ -122,7 +122,7 @@ export const NotificacionesWidget = memo(function NotificacionesWidget({
     <WidgetCard
       title="Notificaciones"
       href={href}
-      contentClassName="overflow-y-auto"
+      useScroll
     >
       <div className="flex h-full flex-col">
         {notificacionesMostradas.length === 0 ? (

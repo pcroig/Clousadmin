@@ -89,12 +89,16 @@ export async function POST(
 
     const empleadosIds = preferenciasConPropuesta.map((pref) => pref.empleado.id);
 
-    await crearNotificacionCampanaCuadrada(prisma, {
-      campanaId,
-      empresaId: session.user.empresaId,
-      empleadosIds,
-      titulo: campana.titulo,
-    });
+    await crearNotificacionCampanaCuadrada(
+      prisma,
+      {
+        campanaId,
+        empresaId: session.user.empresaId,
+        empleadosIds,
+        titulo: campana.titulo,
+      },
+      { actorUsuarioId: session.user.id }
+    );
 
     return successResponse({
       enviados: empleadosIds.length,

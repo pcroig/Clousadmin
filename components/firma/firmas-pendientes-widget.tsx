@@ -94,7 +94,7 @@ export function FirmasPendientesWidget() {
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4 space-y-3">
+        <div className="flex-1 overflow-y-auto scrollbar-thin p-4 space-y-3">
           {loading && (
             <div className="flex items-center justify-center py-10 text-gray-500">
               <Spinner className="w-4 h-4 mr-2" />

@@ -6,13 +6,16 @@
 
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Paperclip } from 'lucide-react';
+import { Calendar as CalendarIcon, Paperclip, Settings } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 import { CompactFilterBar } from '@/components/adaptive/CompactFilterBar';
 import { MobileActionBar } from '@/components/adaptive/MobileActionBar';
 import { ResponsiveContainer } from '@/components/adaptive/ResponsiveContainer';
+import { AvatarCell, DataTable, type Column } from '@/components/shared/data-table';
+import { EmpleadoHoverCard } from '@/components/empleado/empleado-hover-card';
+import { EmptyState } from '@/components/shared/empty-state';
 import { DataFilters, type FilterOption } from '@/components/shared/filters/data-filters';
 import { DateRangeControls } from '@/components/shared/filters/date-range-controls';
 import { LoadingButton } from '@/components/shared/loading-button';
@@ -27,17 +30,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  Field,
+  FieldLabel,
+} from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
 import { EstadoAusencia } from '@/lib/constants/enums';
 import { useIsMobile } from '@/lib/hooks/use-viewport';
@@ -55,6 +54,7 @@ interface Ausencia {
   tipo: string;
   fechaInicio: string;
   fechaFin: string;
+  createdAt: string;
   diasLaborables: number;
   diasSolicitados?: number;
   medioDia: boolean;
@@ -68,6 +68,10 @@ interface Ausencia {
     nombre: string;
     apellidos: string;
     puesto: string;
+    email?: string | null;
+    equipo?: { id: string; nombre: string } | null;
+    equipoNombre?: string | null;
+    fotoUrl?: string | null;
   };
 }
 
@@ -106,6 +110,13 @@ const createEmptyEditForm = (): EditFormState => ({
   documentoId: null,
 });
 
+const getInitialMonthDate = (): Date => {
+  const initialDate = new Date();
+  initialDate.setHours(0, 0, 0, 0);
+  initialDate.setDate(1);
+  return initialDate;
+};
+
 interface AusenciasClientProps {
   initialCampanasExpanded?: boolean;
 }
@@ -124,14 +135,14 @@ export function AusenciasClient({}: AusenciasClientProps) {
   const [loading, setLoading] = useState(true);
   
   // Filters State
-  const [filtroEstado, setFiltroEstado] = useState('todas');
+  const [filtroEstado, setFiltroEstado] = useState('todos');
   const [filtroEquipo, setFiltroEquipo] = useState('todos');
   const [equiposOptions, setEquiposOptions] = useState<FilterOption[]>([]);
   const [busquedaEmpleado, setBusquedaEmpleado] = useState('');
   
   // Date State
   const [rangoFechas, setRangoFechas] = useState<'dia' | 'semana' | 'mes'>('mes');
-  const [fechaBase, setFechaBase] = useState(new Date());
+  const [fechaBase, setFechaBase] = useState<Date>(() => getInitialMonthDate());
   
   // Modals
   const [gestionarModal, setGestionarModal] = useState(false);
@@ -212,7 +223,7 @@ export function AusenciasClient({}: AusenciasClientProps) {
       params.append('fechaInicio', format(inicio, 'yyyy-MM-dd'));
       params.append('fechaFin', format(fin, 'yyyy-MM-dd'));
 
-      if (filtroEstado !== 'todas') {
+      if (filtroEstado !== 'todos') {
         params.append('estado', filtroEstado);
       }
       if (filtroEquipo !== 'todos') {
@@ -490,28 +501,105 @@ export function AusenciasClient({}: AusenciasClientProps) {
     return tipos[tipo] || tipo;
   }
 
+const SOLICITUD_DATETIME_FORMAT = 'd MMM yyyy';
+
+const formatSolicitudFecha = (value?: string | null) => {
+  if (!value) {
+    return 'Fecha no disponible';
+  }
+  try {
+    return format(new Date(value), SOLICITUD_DATETIME_FORMAT, { locale: es });
+  } catch {
+    return 'Fecha no disponible';
+  }
+};
+
+const renderJustificanteLink = (
+  ausencia: Ausencia,
+  options: { stopPropagation?: boolean; size?: 'sm' | 'default' } = {}
+) => {
+  if (!ausencia.justificanteUrl) {
+    return <span className="text-xs text-gray-400">Sin justificante</span>;
+  }
+
+  const { stopPropagation = false, size = 'sm' } = options;
+  const handleClick = stopPropagation
+    ? (event: MouseEvent<HTMLButtonElement>) => {
+        event.stopPropagation();
+      }
+    : undefined;
+
+  return (
+    <Button
+      variant="link"
+      size={size}
+      className="px-0"
+      onClick={handleClick}
+      asChild
+    >
+      <a href={ausencia.justificanteUrl} target="_blank" rel="noopener noreferrer">
+        Ver justificante
+      </a>
+    </Button>
+  );
+};
+
   // Mobile list renderer
   const renderMobileList = () => {
     if (ausencias.length === 0) {
       return (
-        <div className="flex flex-col items-center justify-center py-10 text-center">
-          <p className="text-gray-500">
-            {busquedaEmpleado ? 'No se encontraron ausencias' : 'No hay ausencias registradas'}
-          </p>
-        </div>
+        <EmptyState
+          layout="inline"
+          icon={CalendarIcon}
+          title={busquedaEmpleado ? 'No se encontraron ausencias' : 'No hay ausencias registradas'}
+          description={
+            busquedaEmpleado
+              ? 'Prueba con otro nombre o restablece los filtros.'
+              : 'Cambia el periodo o ajusta los filtros para ver registros.'
+          }
+        />
       );
     }
 
     return (
       <div className="space-y-4 pb-20">
         {ausencias.map((ausencia) => (
-          <Card key={ausencia.id} className="p-4 space-y-3">
+          <Card
+            key={ausencia.id}
+            className="p-4 space-y-3 cursor-pointer focus-visible:ring-2 focus-visible:ring-gray-400 focus-visible:outline-none"
+            role="button"
+            tabIndex={0}
+            onClick={() => setEditarModal({ open: true, ausencia })}
+            onKeyDown={(event: KeyboardEvent<HTMLDivElement>) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                setEditarModal({ open: true, ausencia });
+              }
+            }}
+          >
             <div className="flex justify-between items-start">
               <div>
-                <h3 className="font-medium text-gray-900">
+          <EmpleadoHoverCard
+            empleado={{
+              id: ausencia.empleadoId,
+              nombre: ausencia.empleado.nombre,
+              apellidos: ausencia.empleado.apellidos,
+              puesto: ausencia.empleado.puesto,
+              email: ausencia.empleado.email,
+              equipoNombre: ausencia.empleado.equipoNombre ?? ausencia.empleado.equipo?.nombre ?? null,
+              fotoUrl: ausencia.empleado.fotoUrl,
+            }}
+                  estado={{
+                    label: getAusenciaEstadoLabel(ausencia.estado),
+                    description: getTipoBadge(ausencia.tipo),
+                  }}
+                  triggerClassName="text-gray-900 font-medium"
+                >
                   {ausencia.empleado.nombre} {ausencia.empleado.apellidos}
-                </h3>
-                <p className="text-xs text-gray-500">{ausencia.empleado.puesto}</p>
+                </EmpleadoHoverCard>
+                <p className="text-xs text-gray-500 mt-1">
+                  Solicitada {formatSolicitudFecha(ausencia.createdAt)}
+                </p>
               </div>
               {getEstadoBadge(ausencia.estado)}
             </div>
@@ -532,22 +620,10 @@ export function AusenciasClient({}: AusenciasClientProps) {
                 <p className="text-gray-800">{ausencia.motivo || 'Sin motivo'}</p>
               </div>
             </div>
-            {ausencia.justificanteUrl ? (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="px-0 text-primary flex items-center gap-1"
-                asChild
-                onClick={(e) => e.stopPropagation()}
-              >
-                <a href={ausencia.justificanteUrl} target="_blank" rel="noopener noreferrer">
-                  <Paperclip className="h-4 w-4" />
-                  Ver justificante
-                </a>
-              </Button>
-            ) : (
-              <p className="text-xs text-gray-500">Sin justificante</p>
-            )}
+            <div className="flex items-center gap-2 text-xs text-gray-500">
+              <Paperclip className="h-3.5 w-3.5" />
+              {renderJustificanteLink(ausencia, { stopPropagation: true })}
+            </div>
           </Card>
         ))}
       </div>
@@ -583,91 +659,122 @@ export function AusenciasClient({}: AusenciasClientProps) {
     );
   };
 
-  const renderDesktopTable = () => (
-    <Card className="overflow-hidden">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Empleado</TableHead>
-            <TableHead>Tipo</TableHead>
-            <TableHead>Fechas</TableHead>
-            <TableHead>Días</TableHead>
-            <TableHead>Motivo</TableHead>
-            <TableHead>Estado</TableHead>
-            <TableHead>Acciones</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {ausencias.length === 0 ? (
-            <TableRow>
-              <TableCell colSpan={7} className="h-24 text-center text-gray-500">
-                {busquedaEmpleado ? 'No se encontraron ausencias' : 'No hay ausencias registradas'}
-              </TableCell>
-            </TableRow>
-          ) : (
-            ausencias.map((ausencia) => (
-              <TableRow key={ausencia.id}>
-                <TableCell>
-                  <div className="font-medium">{ausencia.empleado.nombre} {ausencia.empleado.apellidos}</div>
-                  <div className="text-xs text-gray-500">{ausencia.empleado.puesto}</div>
-                </TableCell>
-                <TableCell>{getTipoBadge(ausencia.tipo)}</TableCell>
-                <TableCell>
-                  <div className="text-sm">
-                    {format(new Date(ausencia.fechaInicio), 'dd MMM yyyy', { locale: es })}
-                  </div>
-                  <div className="text-xs text-gray-500">
-                    Hasta {format(new Date(ausencia.fechaFin), 'dd MMM yyyy', { locale: es })}
-                  </div>
-                </TableCell>
-                <TableCell>
-                  {ausencia.diasLaborables} {ausencia.medioDia ? '(Medio día)' : ''}
-                </TableCell>
-                <TableCell className="max-w-[200px] truncate" title={ausencia.motivo || ''}>
-                  {ausencia.motivo || '-'}
-                </TableCell>
-                <TableCell>{getEstadoBadge(ausencia.estado)}</TableCell>
-                <TableCell>
-                  <div className="flex gap-2">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setEditarModal({ open: true, ausencia })}
-                    >
-                      Editar
-                    </Button>
-                    {ausencia.estado === EstadoAusencia.pendiente && (
-                      <>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-green-600 hover:text-green-700 hover:bg-green-50"
-                          onClick={() => _handleAprobar(ausencia.id)}
-                        >
-                          Aprobar
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                          onClick={() => setRechazarModal({ open: true, ausenciaId: ausencia.id })}
-                        >
-                          Rechazar
-                        </Button>
-                      </>
-                    )}
-                  </div>
-                </TableCell>
-              </TableRow>
-            ))
+  // Definición de columnas para DataTable
+  const columns: Column<Ausencia>[] = [
+    {
+      id: 'empleado',
+      header: 'Empleado',
+      priority: 'high',
+      cell: (ausencia) => (
+        <EmpleadoHoverCard
+          empleado={{
+            id: ausencia.empleadoId,
+            nombre: ausencia.empleado.nombre,
+            apellidos: ausencia.empleado.apellidos,
+            puesto: ausencia.empleado.puesto,
+            email: ausencia.empleado.email,
+            equipoNombre: ausencia.empleado.equipoNombre ?? ausencia.empleado.equipo?.nombre ?? null,
+            fotoUrl: ausencia.empleado.fotoUrl,
+          }}
+          estado={{
+            label: getAusenciaEstadoLabel(ausencia.estado),
+            description: getTipoBadge(ausencia.tipo),
+          }}
+          triggerClassName="block"
+          side="right"
+        >
+          <AvatarCell
+            nombre={ausencia.empleado.nombre}
+            apellidos={ausencia.empleado.apellidos}
+            fotoUrl={ausencia.empleado.fotoUrl ?? undefined}
+            subtitle={ausencia.empleado.puesto ?? undefined}
+            compact
+          />
+        </EmpleadoHoverCard>
+      ),
+    },
+    {
+      id: 'tipo',
+      header: 'Tipo',
+      priority: 'high',
+      cell: (ausencia) => (
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-semibold text-gray-900">{getTipoBadge(ausencia.tipo)}</span>
+          {ausencia.createdAt && (
+            <span className="text-xs text-gray-500">· {formatSolicitudFecha(ausencia.createdAt)}</span>
           )}
-        </TableBody>
-      </Table>
-    </Card>
-  );
+        </div>
+      ),
+    },
+    {
+      id: 'fechas',
+      header: 'Fechas',
+      align: 'center',
+      priority: 'medium',
+      cell: (ausencia) => (
+        <div className="text-sm font-medium text-gray-900">
+          {format(new Date(ausencia.fechaInicio), 'dd MMM', { locale: es })} -{' '}
+          {format(new Date(ausencia.fechaFin), 'dd MMM', { locale: es })}
+        </div>
+      ),
+    },
+    {
+      id: 'estado',
+      header: 'Estado',
+      align: 'center',
+      priority: 'medium',
+      cell: (ausencia) =>
+        ausencia.estado === EstadoAusencia.pendiente ? (
+          <div className="flex justify-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-green-600 hover:text-green-700 hover:bg-green-50"
+              onClick={(event) => {
+                event.stopPropagation();
+                _handleAprobar(ausencia.id);
+              }}
+            >
+              Aprobar
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-red-600 hover:text-red-700 hover:bg-red-50"
+              onClick={(event) => {
+                event.stopPropagation();
+                setRechazarModal({ open: true, ausenciaId: ausencia.id });
+              }}
+            >
+              Rechazar
+            </Button>
+          </div>
+        ) : (
+          getEstadoBadge(ausencia.estado)
+        ),
+    },
+    {
+      id: 'justificante',
+      header: 'Justificante',
+      align: 'center',
+      priority: 'low',
+      width: '140px',
+      cell: (ausencia) =>
+        ausencia.justificanteUrl ? (
+          renderJustificanteLink(ausencia, { stopPropagation: true, size: 'sm' })
+        ) : (
+          <span className="text-xs text-gray-400">Sin justificante</span>
+        ),
+    },
+  ];
+
+  const desktopEmptyTitle = busquedaEmpleado ? 'No se encontraron ausencias' : 'No hay ausencias registradas';
+  const desktopEmptyDescription = busquedaEmpleado
+    ? 'Prueba con otro nombre o restablece los filtros.'
+    : 'Cambia el periodo o ajusta los filtros para ver registros.';
 
   return (
-    <ResponsiveContainer variant="page" className="h-full w-full flex flex-col overflow-hidden">
+    <ResponsiveContainer variant="page" className="flex flex-col">
       {isMobile ? (
         <>
           <MobileActionBar
@@ -679,7 +786,7 @@ export function AusenciasClient({}: AusenciasClientProps) {
             }}
             secondaryActions={[
               {
-                icon: <Settings className="w-4 h-4" />,
+                icon: Settings,
                 label: 'Gestionar ausencias',
                 onClick: () => setGestionarModal(true),
               },
@@ -723,7 +830,7 @@ export function AusenciasClient({}: AusenciasClientProps) {
           />
           
           {renderCampaignCard()}
-          
+
           <div className="flex items-center justify-between mb-6 gap-4">
             <DataFilters
               searchQuery={busquedaEmpleado}
@@ -735,9 +842,31 @@ export function AusenciasClient({}: AusenciasClientProps) {
               onEquipoChange={setFiltroEquipo}
               equipoOptions={equiposOptions}
             />
+
+            <DateRangeControls
+              range={rangoFechas}
+              label={periodLabel}
+              onRangeChange={setRangoFechas}
+              onNavigate={(direction) => (direction === 'prev' ? goToPreviousPeriod() : goToNextPeriod())}
+            />
           </div>
-          
-          <div className="flex-1 overflow-y-auto">{renderDesktopTable()}</div>
+
+          <div className="flex-1 overflow-y-auto">
+            <DataTable
+              columns={columns}
+              data={ausencias}
+              onRowClick={(ausencia) => setEditarModal({ open: true, ausencia })}
+              getRowId={(ausencia) => ausencia.id}
+              emptyContent={
+                <EmptyState
+                  layout="table"
+                  icon={CalendarIcon}
+                  title={desktopEmptyTitle}
+                  description={desktopEmptyDescription}
+                />
+              }
+            />
+          </div>
         </>
       )}
 
@@ -787,7 +916,7 @@ export function AusenciasClient({}: AusenciasClientProps) {
             <DialogTitle>Editar Ausencia</DialogTitle>
           </DialogHeader>
           
-          {editarModal.ausencia && (
+            {editarModal.ausencia && (
             <div className="space-y-4">
               <div className="bg-gray-50 p-4 rounded-lg">
                 <p className="text-sm font-medium text-gray-900 mb-1">
@@ -796,9 +925,31 @@ export function AusenciasClient({}: AusenciasClientProps) {
                 <p className="text-xs text-gray-500">{editarModal.ausencia.empleado.puesto}</p>
               </div>
 
+              <div className="rounded-lg border border-gray-100 p-4 space-y-2 text-sm text-gray-600">
+                <p>
+                  <span className="font-medium text-gray-900">Solicitud creada:</span> {formatSolicitudFecha(editarModal.ausencia.createdAt)}
+                </p>
+                <div className="flex items-center gap-2">
+                  <span className="font-medium text-gray-900">Justificante:</span>
+                  {editarModal.ausencia.justificanteUrl ? (
+                    <Button variant="link" size="sm" className="px-0" asChild>
+                      <a
+                        href={editarModal.ausencia.justificanteUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        Ver justificante
+                      </a>
+                    </Button>
+                  ) : (
+                    <span className="text-sm text-gray-500">Sin justificante</span>
+                  )}
+                </div>
+              </div>
+
               <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label>Tipo</Label>
+                <Field>
+                  <FieldLabel>Tipo</FieldLabel>
                   <Select 
                     value={editForm.tipo} 
                     onValueChange={(val) => setEditForm(prev => ({ ...prev, tipo: val }))}
@@ -815,9 +966,9 @@ export function AusenciasClient({}: AusenciasClientProps) {
                       <SelectItem value="otro">Otro</SelectItem>
                     </SelectContent>
                   </Select>
-                </div>
-                <div>
-                  <Label>Estado</Label>
+                </Field>
+                <Field>
+                  <FieldLabel>Estado</FieldLabel>
                   <Select 
                     value={editForm.estado} 
                     onValueChange={(value) => setEditForm((prev) => ({ ...prev, estado: value as EstadoAusencia }))}
@@ -833,7 +984,7 @@ export function AusenciasClient({}: AusenciasClientProps) {
                       ))}
                     </SelectContent>
                   </Select>
-                </div>
+                </Field>
               </div>
 
               <div className="grid grid-cols-2 gap-4">

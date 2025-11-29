@@ -127,13 +127,17 @@ export async function POST(
       .join(' ')
       .trim() || session.user.email;
 
-    await crearNotificacionNominaValidada(prisma, {
-      empresaId: session.user.empresaId,
-      eventoNominaId: eventoId,
-      validadorNombre,
-      complementosCount: data.complementoIds.length,
-      accion: data.accion,
-    });
+    await crearNotificacionNominaValidada(
+      prisma,
+      {
+        empresaId: session.user.empresaId,
+        eventoNominaId: eventoId,
+        validadorNombre,
+        complementosCount: data.complementoIds.length,
+        accion: data.accion,
+      },
+      { actorUsuarioId: session.user.id }
+    );
 
     return NextResponse.json({
       success: true,

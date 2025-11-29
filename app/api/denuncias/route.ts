@@ -102,12 +102,16 @@ export async function POST(req: NextRequest) {
     });
 
     // Crear notificación para HR Admins
-    await crearNotificacionDenunciaRecibida(prisma, {
-      denunciaId: denuncia.id,
-      empresaId: session.user.empresaId,
-      esAnonima: data.esAnonima,
-      descripcionBreve: data.descripcion,
-    });
+    await crearNotificacionDenunciaRecibida(
+      prisma,
+      {
+        denunciaId: denuncia.id,
+        empresaId: session.user.empresaId,
+        esAnonima: data.esAnonima,
+        descripcionBreve: data.descripcion,
+      },
+      { actorUsuarioId: session.user.id }
+    );
 
     return createdResponse(denuncia);
   } catch (error) {

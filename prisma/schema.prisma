@@ -1,12 +1,3 @@
-// ========================================
-// Clousadmin - Prisma Schema (CORREGIDO según ANEXO)
-// ========================================
-// Database: PostgreSQL
-// ORM: Prisma
-// Naming: Singular table names, camelCase fields
-// Relations: Explicit foreign keys with cascade rules
-// Version: 2.0 - Actualizado según ANEXO_DECISIONES.md
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -16,88 +7,1423 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// ========================================
-// ENUMS
-// ========================================
+model accounts {
+  id                String   @id
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  usuarios          usuarios @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-/// Roles de usuario en el sistema
-enum UsuarioRol {
-  platform_admin // Admin de la plataforma (super admin)
-  hr_admin // Admin de RR.HH. de la empresa
-  manager // Manager de equipo
-  empleado // Empleado regular
+  @@unique([provider, providerAccountId])
+  @@index([userId])
 }
 
-/// Estados posibles de un empleado
-enum EstadoEmpleado {
-  activo // Empleado activo
-  baja // Empleado dado de baja
-  suspendido // Empleado suspendido temporalmente
+model alertas_nomina {
+  id              String     @id
+  empresaId       String
+  nominaId        String?
+  tipo            String     @db.VarChar(50)
+  mensaje         String
+  resuelta        Boolean    @default(false)
+  fechaResolucion DateTime?
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime
+  accionUrl       String?
+  categoria       String     @db.VarChar(100)
+  codigo          String     @db.VarChar(100)
+  detalles        Json?
+  empleadoId      String?
+  empleados       empleados? @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+  empresas        empresas   @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  nominas         nominas?   @relation(fields: [nominaId], references: [id], onDelete: Cascade)
+
+  @@index([categoria])
+  @@index([empleadoId])
+  @@index([empresaId])
+  @@index([nominaId])
+  @@index([resuelta])
+  @@index([tipo])
 }
 
-/// Tipos de contrato laboral (España)
-enum TipoContrato {
-  indefinido // Contrato indefinido
-  temporal // Contrato temporal
-  administrador // Administrador societario
-  fijo_discontinuo // Fijo discontinuo
-  becario // Becario
-  practicas // Prácticas
-  obra_y_servicio // Obra y servicio
+model asignaciones_complemento {
+  id                    String                @id
+  nominaId              String
+  empleadoComplementoId String
+  importe               Decimal               @db.Decimal(10, 2)
+  asignadoPor           String?
+  fechaAsignacion       DateTime              @default(now())
+  notas                 String?
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime
+  empleado_complementos empleado_complementos @relation(fields: [empleadoComplementoId], references: [id], onDelete: Cascade)
+  nominas               nominas               @relation(fields: [nominaId], references: [id], onDelete: Cascade)
+
+  @@unique([nominaId, empleadoComplementoId])
+  @@index([empleadoComplementoId])
+  @@index([nominaId])
 }
 
-/// Tipos de equipo
-enum TipoEquipo {
-  proyecto // Equipo de proyecto
-  squad // Squad ágil
-  temporal // Equipo temporal
+model auditoria_accesos {
+  id                 String   @id
+  empresaId          String
+  usuarioId          String
+  empleadoAccedidoId String?
+  accion             String   @db.VarChar(50)
+  recurso            String   @db.VarChar(100)
+  camposAccedidos    Json?
+  ipAddress          String?  @db.VarChar(50)
+  userAgent          String?
+  motivo             String?
+  createdAt          DateTime @default(now())
+  empresas           empresas @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  usuarios           usuarios @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@index([accion])
+  @@index([createdAt])
+  @@index([empleadoAccedidoId])
+  @@index([empresaId])
+  @@index([recurso])
+  @@index([usuarioId])
 }
 
-/// Estados del fichaje (día completo)
-enum EstadoFichaje {
-  en_curso // Fichaje iniciado, aún no completado
-  pendiente // Requiere revisión manual de HR
-  finalizado // Fichaje completo y aprobado
+model ausencias {
+  id                         String                      @id
+  empresaId                  String
+  empleadoId                 String
+  fechaInicio                DateTime                    @db.Date
+  fechaFin                   DateTime                    @db.Date
+  diasNaturales              Int
+  diasLaborables             Int
+  motivo                     String?
+  estado                     EstadoAusencia              @default(pendiente)
+  aprobadaPor                String?
+  aprobadaEn                 DateTime?
+  motivoRechazo              String?
+  documentoId                String?
+  optimizadaIA               Boolean                     @default(false)
+  notasIA                    String?
+  createdAt                  DateTime                    @default(now())
+  updatedAt                  DateTime
+  descuentaSaldo             Boolean                     @default(false)
+  diasAlternativos           Json?
+  diasIdeales                Json?
+  diasPrioritarios           Json?
+  diasSolicitados            Decimal                     @db.Decimal(4, 1)
+  equipoId                   String?
+  justificanteUrl            String?
+  medioDia                   Boolean                     @default(false)
+  revisionIA                 Json?
+  periodo                    PeriodoMedioDia?
+  tipo                       TipoAusencia
+  diasDesdeCarryOver         Decimal                     @default(0) @db.Decimal(4, 1)
+  documentos                 documentos?                 @relation(fields: [documentoId], references: [id])
+  empleados                  empleados                   @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+  empresas                   empresas                    @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  equipos                    equipos?                    @relation(fields: [equipoId], references: [id])
+  compensaciones_horas_extra compensaciones_horas_extra?
+
+  @@index([documentoId])
+  @@index([empleadoId])
+  @@index([empresaId, empleadoId, estado])
+  @@index([empresaId, estado])
+  @@index([empresaId])
+  @@index([empresaId, tipo, estado])
+  @@index([equipoId])
+  @@index([estado])
+  @@index([fechaInicio, fechaFin])
+  @@index([tipo])
 }
 
-/// Tipos de evento de fichaje
-enum TipoFichajeEvento {
-  entrada // Inicio de jornada
-  pausa_inicio // Inicio de pausa/descanso
-  pausa_fin // Fin de pausa/reanudación
-  salida // Fin de jornada
+model auto_completados {
+  id              String    @id
+  empresaId       String
+  empleadoId      String
+  tipo            String    @db.VarChar(50)
+  estado          String    @default("pendiente") @db.VarChar(50)
+  expiraEn        DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime
+  aprobadoEn      DateTime?
+  aprobadoPor     String?
+  datosOriginales Json
+  sugerencias     Json
+  empleados       empleados @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+  empresas        empresas  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+
+  @@index([empleadoId])
+  @@index([empresaId, estado, expiraEn])
+  @@index([empresaId])
+  @@index([empresaId, tipo, estado])
+  @@index([estado])
+  @@index([expiraEn])
+  @@index([tipo])
 }
 
-/// Tipos de ausencia (fijos, no configurables)
-enum TipoAusencia {
-  vacaciones // Vacaciones anuales
-  enfermedad // Baja por enfermedad propia
-  enfermedad_familiar // Cuidado familiar
-  maternidad_paternidad // Permisos parentales
-  otro // Otros permisos
+model billing_customers {
+  id            String          @id
+  empresaId     String          @unique
+  email         String          @db.VarChar(255)
+  nombre        String?         @db.VarChar(255)
+  direccion     Json?
+  taxId         String?         @db.VarChar(50)
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime
+  empresas      empresas        @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  subscriptions subscriptions[]
+
+  @@index([empresaId])
 }
 
-/// Estados de ausencia
+model billing_prices {
+  id               String           @id
+  productoId       String
+  unitAmount       Int
+  currency         String           @default("eur") @db.VarChar(3)
+  intervalo        BillingInterval  @default(month)
+  intervalCount    Int              @default(1)
+  trialDays        Int?
+  activo           Boolean          @default(true)
+  metadata         Json?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime
+  billing_products billing_products @relation(fields: [productoId], references: [id], onDelete: Cascade)
+  subscriptions    subscriptions[]
+
+  @@index([activo])
+  @@index([productoId])
+}
+
+model billing_products {
+  id             String           @id
+  nombre         String           @db.VarChar(255)
+  descripcion    String?
+  activo         Boolean          @default(true)
+  imagen         String?
+  features       Json             @default("[]")
+  orden          Int              @default(0)
+  metadata       Json?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime
+  billing_prices billing_prices[]
+
+  @@index([activo])
+  @@index([orden])
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model campanas_vacaciones {
+  id                      String                    @id
+  empresaId               String
+  titulo                  String                    @db.VarChar(200)
+  alcance                 String                    @default("todos") @db.VarChar(50)
+  equipoIds               Json?
+  estado                  String                    @default("abierta") @db.VarChar(50)
+  solapamientoMaximoPct   Int?
+  propuestaIA             Json?
+  totalEmpleadosAsignados Int                       @default(0)
+  empleadosCompletados    Int                       @default(0)
+  createdAt               DateTime                  @default(now())
+  updatedAt               DateTime
+  cerradaEn               DateTime?
+  cuadradaEn              DateTime?
+  fechaFinObjetivo        DateTime                  @db.Date
+  fechaInicioObjetivo     DateTime                  @db.Date
+  finalizadaEn            DateTime?
+  empresas                empresas                  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  preferencias_vacaciones preferencias_vacaciones[]
+
+  @@index([empresaId])
+  @@index([estado])
+}
+
+model carpetas {
+  id                    String       @id
+  empresaId             String
+  empleadoId            String?
+  nombre                String       @db.VarChar(255)
+  parentId              String?
+  esSistema             Boolean      @default(false)
+  createdAt             DateTime     @default(now())
+  updatedAt             DateTime
+  asignadoA             String?
+  compartida            Boolean      @default(false)
+  vinculadaAProceso     String?      @db.VarChar(50)
+  requiereFirma         Boolean      @default(false)
+  requiereRellenarDatos Boolean      @default(false)
+  camposRequeridos      Json?
+  empleados             empleados?   @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+  empresas              empresas     @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  carpetas              carpetas?    @relation("carpetasTocarpetas", fields: [parentId], references: [id], onDelete: Cascade)
+  other_carpetas        carpetas[]   @relation("carpetasTocarpetas")
+  documentos            documentos[]
+
+  @@index([compartida])
+  @@index([empleadoId])
+  @@index([empresaId])
+  @@index([parentId])
+  @@index([vinculadaAProceso])
+}
+
+model compensaciones_horas_extra {
+  id               String     @id
+  empresaId        String
+  empleadoId       String
+  horasBalance     Decimal    @db.Decimal(5, 2)
+  tipoCompensacion String     @db.VarChar(50)
+  estado           String     @default("pendiente") @db.VarChar(50)
+  diasAusencia     Decimal?   @db.Decimal(4, 1)
+  ausenciaId       String?    @unique
+  nominaId         String?
+  aprobadoPor      String?
+  aprobadoEn       DateTime?
+  motivoRechazo    String?
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime
+  ausencias        ausencias? @relation(fields: [ausenciaId], references: [id])
+  empleados        empleados  @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+  empresas         empresas   @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+
+  @@index([empleadoId])
+  @@index([empresaId])
+  @@index([estado])
+}
+
+model consentimientos {
+  id          String    @id
+  empresaId   String
+  empleadoId  String
+  tipo        String    @db.VarChar(100)
+  descripcion String
+  otorgado    Boolean   @default(false)
+  otorgadoEn  DateTime?
+  revocadoEn  DateTime?
+  version     String    @db.VarChar(50)
+  ipAddress   String?   @db.VarChar(50)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime
+  empleados   empleados @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+  empresas    empresas  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+
+  @@unique([empresaId, empleadoId, tipo])
+  @@index([empleadoId])
+  @@index([empresaId])
+  @@index([otorgado])
+  @@index([tipo])
+}
+
+model contratos {
+  id                    String                  @id
+  empleadoId            String
+  fechaInicio           DateTime                @db.Date
+  fechaFin              DateTime?               @db.Date
+  salarioBaseAnual      Decimal                 @db.Decimal(10, 2)
+  documentoId           String?                 @unique
+  datosExtraidosIA      Json?
+  verificado            Boolean                 @default(false)
+  createdAt             DateTime                @default(now())
+  updatedAt             DateTime
+  tipoContrato          TipoContrato
+  empleados             empleados               @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+  empleado_complementos empleado_complementos[]
+  nominas               nominas[]
+
+  @@index([empleadoId])
+  @@index([tipoContrato])
+}
+
+model denuncias {
+  id            String     @id
+  empresaId     String
+  denuncianteId String?
+  descripcion   String
+  esAnonima     Boolean    @default(false)
+  documentos    Json?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime
+  empleados     empleados? @relation(fields: [denuncianteId], references: [id])
+  empresas      empresas   @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+
+  @@index([createdAt])
+  @@index([denuncianteId])
+  @@index([empresaId])
+}
+
+model documentos {
+  id                     String                @id
+  empresaId              String
+  empleadoId             String?
+  carpetaId              String?
+  nombre                 String                @db.VarChar(255)
+  tipoDocumento          String                @db.VarChar(100)
+  mimeType               String                @db.VarChar(100)
+  tamano                 Int
+  s3Key                  String                @unique
+  s3Bucket               String                @db.VarChar(255)
+  procesadoIA            Boolean               @default(false)
+  datosExtraidos         Json?
+  createdAt              DateTime              @default(now())
+  updatedAt              DateTime
+  puestoId               String?
+  requiereFirma          Boolean               @default(false)
+  firmado                Boolean               @default(false)
+  firmadoEn              DateTime?
+  hashDocumento          String?
+  generadoDesdePlantilla Boolean               @default(false)
+  ausencias              ausencias[]
+  carpetas               carpetas?             @relation(fields: [carpetaId], references: [id])
+  empleados              empleados?            @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+  empresas               empresas              @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  puestos                puestos?              @relation(fields: [puestoId], references: [id], onDelete: Cascade)
+  documentos_generados   documentos_generados?
+  nominas                nominas?
+  solicitudes_firma      solicitudes_firma[]
+
+  @@index([carpetaId])
+  @@index([empleadoId])
+  @@index([empresaId])
+  @@index([generadoDesdePlantilla])
+  @@index([puestoId])
+  @@index([requiereFirma, firmado])
+  @@index([s3Key])
+  @@index([tipoDocumento])
+}
+
+model documentos_generados {
+  id                    String                @id
+  empresaId             String
+  empleadoId            String
+  plantillaId           String
+  documentoId           String                @unique
+  generadoPor           String?
+  generadoEn            DateTime              @default(now())
+  variablesUtilizadas   Json
+  usadaIA               Boolean               @default(false)
+  confianzaIA           Decimal?              @db.Decimal(3, 2)
+  tiempoGeneracion      Int?
+  notificado            Boolean               @default(false)
+  visto                 Boolean               @default(false)
+  vistoEn               DateTime?
+  requiereFirma         Boolean               @default(false)
+  firmado               Boolean               @default(false)
+  firmadoEn             DateTime?
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime
+  camposCompletados     Json?
+  pendienteRellenar     Boolean               @default(false)
+  rellenadoEn           DateTime?
+  documentos            documentos            @relation(fields: [documentoId], references: [id], onDelete: Cascade)
+  empleados             empleados             @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+  empresas              empresas              @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  plantillas_documentos plantillas_documentos @relation(fields: [plantillaId], references: [id], onDelete: Cascade)
+
+  @@index([documentoId])
+  @@index([empleadoId])
+  @@index([empresaId])
+  @@index([firmado])
+  @@index([generadoEn])
+  @@index([plantillaId])
+  @@index([usadaIA])
+}
+
+model empleado_complementos {
+  id                       String                     @id
+  empleadoId               String
+  tipoComplementoId        String
+  contratoId               String?
+  importePersonalizado     Decimal?                   @db.Decimal(10, 2)
+  activo                   Boolean                    @default(true)
+  validado                 Boolean                    @default(false)
+  validadoPor              String?
+  fechaValidacion          DateTime?
+  rechazado                Boolean                    @default(false)
+  motivoRechazo            String?
+  createdAt                DateTime                   @default(now())
+  updatedAt                DateTime
+  asignaciones_complemento asignaciones_complemento[]
+  contratos                contratos?                 @relation(fields: [contratoId], references: [id])
+  empleados                empleados                  @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+  tipos_complemento        tipos_complemento          @relation(fields: [tipoComplementoId], references: [id], onDelete: Cascade)
+
+  @@index([contratoId])
+  @@index([empleadoId, activo])
+  @@index([tipoComplementoId])
+}
+
+model empleado_equipos {
+  empleadoId         String
+  equipoId           String
+  fechaIncorporacion DateTime  @default(now())
+  empleados          empleados @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+  equipos            equipos   @relation(fields: [equipoId], references: [id], onDelete: Cascade)
+
+  @@id([empleadoId, equipoId])
+  @@index([empleadoId])
+  @@index([equipoId])
+}
+
+model empleado_saldo_ausencias {
+  id                  String    @id
+  empleadoId          String
+  empresaId           String
+  a_o                 Int       @map("año") @db.SmallInt
+  diasTotales         Int       @default(0)
+  diasUsados          Decimal   @default(0) @db.Decimal(4, 1)
+  diasPendientes      Decimal   @default(0) @db.Decimal(4, 1)
+  origen              String    @db.VarChar(50)
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime
+  carryOverAsignado   Decimal   @default(0) @db.Decimal(4, 1)
+  carryOverExpiraEn   DateTime?
+  carryOverFuenteAnio Int?      @db.SmallInt
+  carryOverPendiente  Decimal   @default(0) @db.Decimal(4, 1)
+  carryOverUsado      Decimal   @default(0) @db.Decimal(4, 1)
+  empleados           empleados @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+  empresas            empresas  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+
+  @@unique([empleadoId, a_o])
+  @@index([empleadoId, a_o])
+  @@index([empresaId])
+}
+
+model empleados {
+  id                                                                                   String                           @id
+  empresaId                                                                            String
+  usuarioId                                                                            String                           @unique
+  nombre                                                                               String                           @db.VarChar(100)
+  apellidos                                                                            String                           @db.VarChar(200)
+  email                                                                                String                           @unique @db.VarChar(255)
+  fotoUrl                                                                              String?
+  nif                                                                                  String?                          @unique
+  nss                                                                                  String?
+  fechaNacimiento                                                                      DateTime?
+  telefono                                                                             String?                          @db.VarChar(20)
+  codigoPostal                                                                         String?                          @db.VarChar(5)
+  ciudad                                                                               String?                          @db.VarChar(100)
+  estadoCivil                                                                          String?                          @db.VarChar(50)
+  numeroHijos                                                                          Int                              @default(0) @db.SmallInt
+  genero                                                                               String?                          @db.VarChar(50)
+  iban                                                                                 String?
+  bic                                                                                  String?                          @db.VarChar(11)
+  puesto                                                                               String?                          @db.VarChar(100)
+  fechaAlta                                                                            DateTime
+  fechaBaja                                                                            DateTime?
+  categoriaProfesional                                                                 String?                          @db.VarChar(50)
+  grupoCotizacion                                                                      Int?                             @db.SmallInt
+  managerId                                                                            String?
+  jornadaId                                                                            String?
+  salarioBaseAnual                                                                     Decimal?                         @db.Decimal(10, 2)
+  salarioBaseMensual                                                                   Decimal?                         @db.Decimal(10, 2)
+  diasVacaciones                                                                       Int                              @default(22)
+  onboardingCompletado                                                                 Boolean                          @default(false)
+  onboardingCompletadoEn                                                               DateTime?
+  documentosCompletos                                                                  Boolean                          @default(false)
+  documentosCompletadosEn                                                              DateTime?
+  activo                                                                               Boolean                          @default(true)
+  createdAt                                                                            DateTime                         @default(now())
+  updatedAt                                                                            DateTime
+  puestoId                                                                             String?
+  direccionCalle                                                                       String?                          @db.VarChar(200)
+  direccionNumero                                                                      String?                          @db.VarChar(10)
+  direccionPiso                                                                        String?                          @db.VarChar(100)
+  direccionProvincia                                                                   String?                          @db.VarChar(100)
+  firmaGuardada                                                                        Boolean                          @default(false)
+  firmaS3Key                                                                           String?
+  firmaGuardadaData                                                                    Json?
+  nivelEducacion                                                                       String?                          @db.VarChar(50)
+  tipoContrato                                                                         TipoContrato                     @default(indefinido)
+  estadoEmpleado                                                                       EstadoEmpleado                   @default(activo)
+  saldoRenovadoDesde                                                                   DateTime?
+  alertas_nomina                                                                       alertas_nomina[]
+  ausencias                                                                            ausencias[]
+  auto_completados                                                                     auto_completados[]
+  carpetas                                                                             carpetas[]
+  compensaciones_horas_extra                                                           compensaciones_horas_extra[]
+  consentimientos                                                                      consentimientos[]
+  contratos                                                                            contratos[]
+  denuncias                                                                            denuncias[]
+  documentos                                                                           documentos[]
+  documentos_generados                                                                 documentos_generados[]
+  empleado_complementos                                                                empleado_complementos[]
+  empleado_equipos                                                                     empleado_equipos[]
+  empleado_saldo_ausencias                                                             empleado_saldo_ausencias[]
+  empresas                                                                             empresas                         @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  jornadas                                                                             jornadas?                        @relation(fields: [jornadaId], references: [id])
+  empleados                                                                            empleados?                       @relation("empleadosToempleados", fields: [managerId], references: [id])
+  other_empleados                                                                      empleados[]                      @relation("empleadosToempleados")
+  puestos                                                                              puestos?                         @relation(fields: [puestoId], references: [id])
+  usuarios                                                                             usuarios                         @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  equipos                                                                              equipos[]
+  fichajes                                                                             fichajes[]
+  firmas                                                                               firmas[]
+  invitaciones_empleados                                                               invitaciones_empleados?
+  nominas                                                                              nominas[]
+  onboarding_empleados                                                                 onboarding_empleados?
+  preferencias_vacaciones                                                              preferencias_vacaciones[]
+  resumenes_mensuales_nomina                                                           resumenes_mensuales_nomina[]
+  solicitudes_cambio_solicitudes_cambio_aprobadorIdToempleados                         solicitudes_cambio[]             @relation("solicitudes_cambio_aprobadorIdToempleados")
+  solicitudes_cambio_solicitudes_cambio_empleadoIdToempleados                          solicitudes_cambio[]             @relation("solicitudes_cambio_empleadoIdToempleados")
+  solicitudes_correccion_fichaje_solicitudes_correccion_fichaje_empleadoIdToempleados  solicitudes_correccion_fichaje[] @relation("solicitudes_correccion_fichaje_empleadoIdToempleados")
+  solicitudes_correccion_fichaje_solicitudes_correccion_fichaje_revisadaPorToempleados solicitudes_correccion_fichaje[] @relation("solicitudes_correccion_fichaje_revisadaPorToempleados")
+  solicitudes_eliminacion_datos                                                        solicitudes_eliminacion_datos[]
+
+  @@index([email])
+  @@index([empresaId])
+  @@index([estadoEmpleado])
+  @@index([jornadaId])
+  @@index([managerId])
+  @@index([nif])
+  @@index([puestoId])
+  @@index([usuarioId])
+}
+
+model empresas {
+  id                             String                           @id
+  nombre                         String                           @db.VarChar(200)
+  cif                            String?                          @unique @db.VarChar(20)
+  email                          String?                          @db.VarChar(255)
+  telefono                       String?                          @db.VarChar(20)
+  direccion                      String?
+  logoUrl                        String?
+  config                         Json                             @default("{\"umbral_ia_nominas\": 0.8, \"umbral_ia_contratos\": 0.85, \"empleado_puede_ver_salario\": false, \"hora_cierre_fichaje_default\": \"18:00\", \"auto_completado_nominas_dias\": 7, \"auto_completado_fichajes_dias\": 7, \"auto_completado_contratos_dias\": 14, \"permitir_saldo_vacaciones_negativo\": true}")
+  createdAt                      DateTime                         @default(now())
+  updatedAt                      DateTime
+  web                            String?                          @db.VarChar(255)
+  activo                         Boolean                          @default(true)
+  alertas_nomina                 alertas_nomina[]
+  auditoria_accesos              auditoria_accesos[]
+  ausencias                      ausencias[]
+  auto_completados               auto_completados[]
+  billing_customers              billing_customers?
+  campanas_vacaciones            campanas_vacaciones[]
+  carpetas                       carpetas[]
+  compensaciones_horas_extra     compensaciones_horas_extra[]
+  consentimientos                consentimientos[]
+  denuncias                      denuncias[]
+  documentos                     documentos[]
+  documentos_generados           documentos_generados[]
+  empleado_saldo_ausencias       empleado_saldo_ausencias[]
+  empleados                      empleados[]
+  equipo_politica_ausencias      equipo_politica_ausencias[]
+  equipos                        equipos[]
+  eventos_nomina                 eventos_nomina[]
+  exports_gestoria               exports_gestoria[]
+  festivos                       festivos[]
+  fichajes                       fichajes[]
+  integraciones                  integraciones[]
+  invitaciones_empleados         invitaciones_empleados[]
+  jobs_generacion_documentos     jobs_generacion_documentos[]
+  jornadas                       jornadas[]
+  notificaciones                 notificaciones[]
+  onboarding_configs             onboarding_configs?
+  onboarding_empleados           onboarding_empleados[]
+  plantillas_documentos          plantillas_documentos[]
+  preferencias_vacaciones        preferencias_vacaciones[]
+  puestos                        puestos[]
+  resumenes_mensuales_nomina     resumenes_mensuales_nomina[]
+  sedes                          sedes[]
+  solicitudes_cambio             solicitudes_cambio[]
+  solicitudes_correccion_fichaje solicitudes_correccion_fichaje[]
+  solicitudes_eliminacion_datos  solicitudes_eliminacion_datos[]
+  solicitudes_firma              solicitudes_firma[]
+  subscriptions                  subscriptions[]
+  tipos_complemento              tipos_complemento[]
+  usuarios                       usuarios[]
+
+  @@index([cif])
+}
+
+model equipo_politica_ausencias {
+  equipoId               String   @id
+  empresaId              String
+  maxSolapamientoPct     Int      @default(50)
+  requiereAntelacionDias Int      @default(5)
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime
+  empresas               empresas @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  equipos                equipos  @relation(fields: [equipoId], references: [id], onDelete: Cascade)
+
+  @@index([empresaId])
+}
+
+model equipos {
+  id                        String                     @id
+  empresaId                 String
+  nombre                    String                     @db.VarChar(100)
+  managerId                 String?
+  descripcion               String?
+  activo                    Boolean                    @default(true)
+  createdAt                 DateTime                   @default(now())
+  updatedAt                 DateTime
+  sedeId                    String?
+  tipo                      TipoEquipo                 @default(proyecto)
+  ausencias                 ausencias[]
+  empleado_equipos          empleado_equipos[]
+  equipo_politica_ausencias equipo_politica_ausencias?
+  empresas                  empresas                   @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  empleados                 empleados?                 @relation(fields: [managerId], references: [id])
+  sedes                     sedes?                     @relation(fields: [sedeId], references: [id])
+
+  @@unique([empresaId, nombre])
+  @@index([empresaId])
+  @@index([managerId])
+  @@index([sedeId])
+}
+
+model eventos_nomina {
+  id                       String           @id
+  empresaId                String
+  mes                      Int              @db.SmallInt
+  anio                     Int              @db.SmallInt
+  estado                   String           @default("abierto") @db.VarChar(50)
+  fechaGeneracion          DateTime?
+  fechaLimiteComplementos  DateTime?
+  fechaExportacion         DateTime?
+  fechaImportacion         DateTime?
+  fechaPublicacion         DateTime?
+  fechaCierre              DateTime?
+  totalEmpleados           Int              @default(0)
+  empleadosConComplementos Int              @default(0)
+  complementosAsignados    Int              @default(0)
+  nominasImportadas        Int              @default(0)
+  createdAt                DateTime         @default(now())
+  updatedAt                DateTime
+  empresas                 empresas         @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  nominas                  nominas[]
+  notificaciones           notificaciones[]
+
+  @@unique([empresaId, mes, anio])
+  @@index([empresaId, estado])
+  @@index([empresaId, mes, anio])
+}
+
+model exports_gestoria {
+  id                 String   @id
+  empresaId          String
+  mes                Int      @db.SmallInt
+  anio               Int      @db.SmallInt
+  archivoUrl         String
+  archivoNombre      String   @db.VarChar(255)
+  generadoPor        String?
+  generadoEn         DateTime @default(now())
+  numEmpleados       Int?
+  numAlertasCriticas Int?
+  empresas           empresas @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+
+  @@index([empresaId, anio, mes])
+  @@index([generadoEn])
+}
+
+model festivos {
+  id                String   @id
+  empresaId         String
+  nombre            String   @db.VarChar(200)
+  fecha             DateTime @db.Date
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime
+  activo            Boolean  @default(true)
+  comunidadAutonoma String?  @db.VarChar(100)
+  origen            String   @default("manual") @db.VarChar(50)
+  tipo              String   @db.VarChar(50)
+  empresas          empresas @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+
+  @@unique([empresaId, fecha])
+  @@index([empresaId, fecha, activo])
+}
+
+model fichaje_eventos {
+  id            String            @id
+  fichajeId     String
+  hora          DateTime          @db.Timestamptz(6)
+  ubicacion     String?
+  editado       Boolean           @default(false)
+  motivoEdicion String?
+  horaOriginal  DateTime?         @db.Timestamptz(6)
+  editadoPor    String?
+  createdAt     DateTime          @default(now())
+  tipo          TipoFichajeEvento
+  fichajes      fichajes          @relation(fields: [fichajeId], references: [id], onDelete: Cascade)
+
+  @@index([fichajeId, hora])
+  @@index([fichajeId])
+  @@index([hora])
+  @@index([tipo])
+}
+
+model fichajes {
+  id                             String                           @id
+  empresaId                      String
+  empleadoId                     String
+  fecha                          DateTime                         @db.Date
+  autoCompletado                 Boolean                          @default(false)
+  createdAt                      DateTime                         @default(now())
+  updatedAt                      DateTime
+  fechaAprobacion                DateTime?
+  horasEnPausa                   Decimal?                         @db.Decimal(5, 2)
+  horasTrabajadas                Decimal?                         @db.Decimal(5, 2)
+  cuadradoMasivamente            Boolean                          @default(false)
+  cuadradoPor                    String?
+  cuadradoEn                     DateTime?
+  estado                         EstadoFichaje                    @default(en_curso)
+  fichaje_eventos                fichaje_eventos[]
+  empleados                      empleados                        @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+  empresas                       empresas                         @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  solicitudes_correccion_fichaje solicitudes_correccion_fichaje[]
+
+  @@unique([empleadoId, fecha])
+  @@index([empleadoId])
+  @@index([empresaId, empleadoId, fecha])
+  @@index([empresaId, estado])
+  @@index([empresaId, fecha])
+  @@index([empresaId])
+  @@index([estado])
+  @@index([fecha])
+}
+
+model firmas {
+  id                String            @id
+  solicitudFirmaId  String
+  empleadoId        String
+  estado            String            @default("pendiente") @db.VarChar(50)
+  enviadoEn         DateTime?
+  firmadoEn         DateTime?
+  rechazadoEn       DateTime?
+  ipAddress         String?           @db.VarChar(50)
+  userAgent         String?
+  ubicacion         Json?
+  certificado       String?
+  metodoFirma       String?           @db.VarChar(50)
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime
+  certificadoHash   String?
+  datosCapturados   Json?
+  firmado           Boolean           @default(false)
+  metodoCaptura     String            @default("click") @db.VarChar(50)
+  numRecordatorios  Int               @default(0)
+  orden             Int               @default(0)
+  tipo              String            @default("simple") @db.VarChar(50)
+  empleados         empleados         @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+  solicitudes_firma solicitudes_firma @relation(fields: [solicitudFirmaId], references: [id], onDelete: Cascade)
+
+  @@unique([solicitudFirmaId, empleadoId])
+  @@index([empleadoId, firmado])
+  @@index([empleadoId])
+  @@index([enviadoEn])
+  @@index([estado])
+  @@index([firmadoEn])
+  @@index([firmado])
+  @@index([solicitudFirmaId, firmado])
+  @@index([solicitudFirmaId])
+}
+
+model integraciones {
+  id         String   @id
+  empresaId  String
+  tipo       String   @db.VarChar(50)
+  proveedor  String   @db.VarChar(100)
+  config     Json?
+  activa     Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime
+  calendarId String?  @db.VarChar(255)
+  usuarioId  String?
+  empresas   empresas @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+
+  @@unique([empresaId, tipo, proveedor, usuarioId])
+  @@index([empresaId])
+  @@index([tipo])
+  @@index([usuarioId])
+}
+
+model invitaciones_empleados {
+  id         String    @id
+  empresaId  String
+  empleadoId String    @unique
+  email      String
+  token      String    @unique
+  expiraEn   DateTime
+  aceptada   Boolean   @default(false)
+  createdAt  DateTime  @default(now())
+  empleados  empleados @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+  empresas   empresas  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+
+  @@index([email])
+  @@index([empresaId])
+  @@index([token])
+}
+
+model invitaciones_signup {
+  id          String    @id
+  email       String    @unique
+  token       String    @unique
+  expiraEn    DateTime
+  usada       Boolean   @default(false)
+  usadoEn     DateTime?
+  invitadoPor String?
+  createdAt   DateTime  @default(now())
+
+  @@index([email])
+  @@index([token])
+  @@index([usada])
+}
+
+model jobs_generacion_documentos {
+  id                    String                @id
+  empresaId             String
+  plantillaId           String
+  solicitadoPor         String
+  empleadoIds           Json
+  configuracion         Json
+  estado                String                @default("en_cola") @db.VarChar(50)
+  progreso              Int                   @default(0) @db.SmallInt
+  totalEmpleados        Int
+  procesados            Int                   @default(0)
+  exitosos              Int                   @default(0)
+  fallidos              Int                   @default(0)
+  iniciadoEn            DateTime?
+  completadoEn          DateTime?
+  tiempoTotal           Int?
+  resultados            Json?
+  error                 String?
+  intentos              Int                   @default(0) @db.SmallInt
+  ultimoIntento         DateTime?
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime
+  empresas              empresas              @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  plantillas_documentos plantillas_documentos @relation(fields: [plantillaId], references: [id], onDelete: Cascade)
+
+  @@index([createdAt])
+  @@index([empresaId])
+  @@index([estado])
+  @@index([plantillaId])
+  @@index([solicitadoPor])
+}
+
+model jornadas {
+  id             String      @id
+  empresaId      String
+  nombre         String      @db.VarChar(100)
+  horasSemanales Decimal     @db.Decimal(5, 2)
+  config         Json
+  esPredefinida  Boolean     @default(false)
+  activa         Boolean     @default(true)
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime
+  empleados      empleados[]
+  empresas       empresas    @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+
+  @@index([empresaId])
+}
+
+model nominas {
+  id                       String                     @id
+  empleadoId               String
+  mes                      Int                        @db.SmallInt
+  anio                     Int                        @db.SmallInt
+  documentoId              String?                    @unique
+  datosExtraidosIA         Json?
+  verificado               Boolean                    @default(false)
+  tieneAnomalias           Boolean                    @default(false)
+  createdAt                DateTime                   @default(now())
+  updatedAt                DateTime
+  empleadoNotificado       Boolean                    @default(false)
+  empleadoVisto            Boolean                    @default(false)
+  estado                   String                     @default("pendiente") @db.VarChar(50)
+  fechaNotificacion        DateTime?
+  fechaPublicacion         DateTime?
+  fechaVisto               DateTime?
+  subidoPor                String?
+  complementosPendientes   Boolean                    @default(false)
+  contratoId               String?
+  diasAusencias            Int                        @default(0) @db.SmallInt
+  diasTrabajados           Int                        @default(0) @db.SmallInt
+  eventoNominaId           String?
+  exportadaEn              DateTime?
+  salarioBase              Decimal                    @db.Decimal(10, 2)
+  totalBruto               Decimal                    @db.Decimal(10, 2)
+  totalComplementos        Decimal                    @default(0) @db.Decimal(10, 2)
+  totalDeducciones         Decimal                    @default(0) @db.Decimal(10, 2)
+  totalNeto                Decimal                    @db.Decimal(10, 2)
+  alertas_nomina           alertas_nomina[]
+  asignaciones_complemento asignaciones_complemento[]
+  contratos                contratos?                 @relation(fields: [contratoId], references: [id])
+  documentos               documentos?                @relation(fields: [documentoId], references: [id])
+  empleados                empleados                  @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+  eventos_nomina           eventos_nomina?            @relation(fields: [eventoNominaId], references: [id])
+
+  @@unique([empleadoId, mes, anio])
+  @@index([contratoId])
+  @@index([documentoId])
+  @@index([empleadoId, estado])
+  @@index([empleadoId])
+  @@index([estado])
+  @@index([eventoNominaId, estado])
+  @@index([eventoNominaId])
+  @@index([mes, anio])
+}
+
+model notificaciones {
+  id             String          @id
+  empresaId      String
+  usuarioId      String
+  tipo           String          @db.VarChar(50)
+  titulo         String          @db.VarChar(255)
+  mensaje        String
+  metadata       Json?
+  leida          Boolean         @default(false)
+  createdAt      DateTime        @default(now())
+  eventoNominaId String?
+  empresas       empresas        @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  eventos_nomina eventos_nomina? @relation(fields: [eventoNominaId], references: [id])
+  usuarios       usuarios        @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@index([createdAt])
+  @@index([empresaId])
+  @@index([eventoNominaId])
+  @@index([usuarioId, leida])
+}
+
+model onboarding_configs {
+  id                   String   @id
+  empresaId            String   @unique
+  camposRequeridos     Json     @default("{\"datos_bancarios\": {\"bic\": true, \"iban\": true}, \"datos_personales\": {\"nif\": true, \"nss\": true, \"ciudad\": true, \"telefono\": true, \"estadoCivil\": false, \"numeroHijos\": false, \"codigoPostal\": true, \"direccionPiso\": false, \"direccionCalle\": true, \"direccionNumero\": true, \"direccionProvincia\": true}}")
+  documentosRequeridos Json     @default("[]")
+  plantillasDocumentos Json     @default("[]")
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime
+  empresas             empresas @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+
+  @@index([empresaId])
+}
+
+model onboarding_empleados {
+  id              String    @id
+  empresaId       String
+  empleadoId      String    @unique
+  token           String    @unique
+  tokenExpira     DateTime
+  completado      Boolean   @default(false)
+  fechaCompletado DateTime?
+  progreso        Json      @default("{\"datos_bancarios\": false, \"datos_documentos\": false, \"datos_personales\": false, \"credenciales_completadas\": false}")
+  datosTemporales Json?
+  createdAt       DateTime  @default(now())
+  tipoOnboarding  String    @default("completo") @db.VarChar(20)
+  empleados       empleados @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+  empresas        empresas  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+
+  @@index([empleadoId])
+  @@index([empresaId])
+  @@index([token])
+}
+
+model plantillas_documentos {
+  id                         String                       @id
+  empresaId                  String?
+  nombre                     String                       @db.VarChar(255)
+  descripcion                String?
+  categoria                  String                       @db.VarChar(100)
+  tipo                       String                       @db.VarChar(50)
+  formato                    String                       @db.VarChar(20)
+  s3Key                      String                       @unique
+  s3Bucket                   String                       @db.VarChar(255)
+  variablesUsadas            Json                         @default("[]")
+  activa                     Boolean                      @default(true)
+  esOficial                  Boolean                      @default(false)
+  requiereContrato           Boolean                      @default(false)
+  requiereFirma              Boolean                      @default(false)
+  carpetaDestinoDefault      String?                      @db.VarChar(50)
+  usarIAParaExtraer          Boolean                      @default(false)
+  configuracionIA            Json?
+  createdAt                  DateTime                     @default(now())
+  updatedAt                  DateTime
+  autoGenerarOffboarding     Boolean                      @default(false)
+  autoGenerarOnboarding      Boolean                      @default(false)
+  permiteRellenar            Boolean                      @default(false)
+  requiereRevision           Boolean                      @default(false)
+  documentos_generados       documentos_generados[]
+  jobs_generacion_documentos jobs_generacion_documentos[]
+  empresas                   empresas?                    @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+
+  @@index([activa])
+  @@index([categoria])
+  @@index([empresaId])
+  @@index([esOficial])
+  @@index([tipo])
+}
+
+model preferencias_vacaciones {
+  id                  String              @id
+  campanaId           String
+  empleadoId          String
+  empresaId           String
+  diasIdeales         Json
+  diasPrioritarios    Json?
+  diasAlternativos    Json?
+  completada          Boolean             @default(false)
+  aceptada            Boolean             @default(false)
+  propuestaIA         Json?
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime
+  propuestaEnviada    Boolean             @default(false)
+  cambioSolicitado    Boolean             @default(false)
+  propuestaEmpleado   Json?
+  campanas_vacaciones campanas_vacaciones @relation(fields: [campanaId], references: [id], onDelete: Cascade)
+  empleados           empleados           @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+  empresas            empresas            @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+
+  @@unique([campanaId, empleadoId])
+  @@index([campanaId])
+  @@index([completada])
+  @@index([empleadoId])
+  @@index([empresaId])
+}
+
+model puestos {
+  id          String       @id
+  empresaId   String
+  nombre      String       @db.VarChar(100)
+  descripcion String?
+  activo      Boolean      @default(true)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime
+  documentos  documentos[]
+  empleados   empleados[]
+  empresas    empresas     @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+
+  @@unique([empresaId, nombre])
+  @@index([empresaId])
+}
+
+model resumenes_mensuales_nomina {
+  id                        String    @id
+  empresaId                 String
+  empleadoId                String
+  mes                       Int       @db.SmallInt
+  anio                      Int       @db.SmallInt
+  diasLaborables            Int       @default(0)
+  diasTrabajados            Int       @default(0)
+  diasVacaciones            Int       @default(0)
+  diasBajaIT                Int       @default(0)
+  diasPermisosRetribuidos   Int       @default(0)
+  diasPermisosNoRetribuidos Int       @default(0)
+  horasTrabajadas           Decimal   @default(0) @db.Decimal(10, 2)
+  horasExtras               Decimal   @default(0) @db.Decimal(10, 2)
+  salarioBase               Decimal?  @db.Decimal(10, 2)
+  calculadoEn               DateTime  @default(now())
+  empleados                 empleados @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+  empresas                  empresas  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+
+  @@unique([empresaId, empleadoId, mes, anio])
+  @@index([empleadoId])
+  @@index([empresaId, anio, mes])
+}
+
+model sedes {
+  id        String    @id
+  empresaId String
+  nombre    String    @db.VarChar(200)
+  ciudad    String    @db.VarChar(100)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime
+  activo    Boolean   @default(true)
+  equipos   equipos[]
+  empresas  empresas  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+
+  @@index([empresaId])
+}
+
+model sesiones_activas {
+  id        String   @id
+  usuarioId String
+  tokenHash String   @unique
+  ipAddress String?  @db.VarChar(50)
+  userAgent String?
+  createdAt DateTime @default(now())
+  ultimoUso DateTime @default(now())
+  expiraEn  DateTime
+  usuarios  usuarios @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@index([expiraEn])
+  @@index([tokenHash])
+  @@index([usuarioId])
+}
+
+model sessions {
+  id           String   @id
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  usuarios     usuarios @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model solicitudes_cambio {
+  id                                                  String          @id
+  empresaId                                           String
+  empleadoId                                          String
+  aprobadorId                                         String?
+  tipo                                                String          @db.VarChar(100)
+  camposCambiados                                     Json
+  motivo                                              String?
+  motivoRechazo                                       String?
+  fechaRespuesta                                      DateTime?
+  createdAt                                           DateTime        @default(now())
+  updatedAt                                           DateTime
+  requiereAprobacionManual                            Boolean         @default(false)
+  revisadaPorIA                                       Boolean         @default(false)
+  revisionIA                                          Json?
+  estado                                              EstadoSolicitud @default(pendiente)
+  empleados_solicitudes_cambio_aprobadorIdToempleados empleados?      @relation("solicitudes_cambio_aprobadorIdToempleados", fields: [aprobadorId], references: [id])
+  empleados_solicitudes_cambio_empleadoIdToempleados  empleados       @relation("solicitudes_cambio_empleadoIdToempleados", fields: [empleadoId], references: [id], onDelete: Cascade)
+  empresas                                            empresas        @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+
+  @@index([aprobadorId])
+  @@index([empleadoId])
+  @@index([empresaId, estado])
+  @@index([empresaId])
+  @@index([estado])
+}
+
+model solicitudes_correccion_fichaje {
+  id                                                              String                           @id
+  empresaId                                                       String
+  fichajeId                                                       String
+  empleadoId                                                      String
+  estado                                                          EstadoSolicitudCorreccionFichaje @default(pendiente)
+  motivo                                                          String
+  detalles                                                        Json
+  respuesta                                                       String?
+  revisadaPor                                                     String?
+  revisadaEn                                                      DateTime?
+  createdAt                                                       DateTime                         @default(now())
+  updatedAt                                                       DateTime
+  empleados_solicitudes_correccion_fichaje_empleadoIdToempleados  empleados                        @relation("solicitudes_correccion_fichaje_empleadoIdToempleados", fields: [empleadoId], references: [id], onDelete: Cascade)
+  empresas                                                        empresas                         @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  fichajes                                                        fichajes                         @relation(fields: [fichajeId], references: [id], onDelete: Cascade)
+  empleados_solicitudes_correccion_fichaje_revisadaPorToempleados empleados?                       @relation("solicitudes_correccion_fichaje_revisadaPorToempleados", fields: [revisadaPor], references: [id])
+
+  @@index([empleadoId])
+  @@index([empresaId])
+  @@index([estado])
+  @@index([fichajeId])
+  @@index([revisadaPor])
+}
+
+model solicitudes_eliminacion_datos {
+  id             String    @id
+  empresaId      String
+  empleadoId     String
+  solicitantePor String
+  estado         String    @default("pendiente") @db.VarChar(50)
+  motivo         String?
+  respuesta      String?
+  completadaEn   DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime
+  empleados      empleados @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+  empresas       empresas  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+
+  @@index([empleadoId])
+  @@index([empresaId])
+  @@index([estado])
+}
+
+model solicitudes_firma {
+  id                     String     @id
+  empresaId              String
+  documentoId            String
+  solicitadoPor          String?    @db.VarChar(100)
+  solicitadoEn           DateTime?  @default(now())
+  mensaje                String?
+  fechaLimite            DateTime?
+  estado                 String     @default("pendiente") @db.VarChar(50)
+  tipo                   String     @default("individual") @db.VarChar(50)
+  proveedor              String     @default("interno") @db.VarChar(50)
+  completadaEn           DateTime?
+  expiradaEn             DateTime?
+  canceladaEn            DateTime?
+  createdAt              DateTime   @default(now())
+  updatedAt              DateTime
+  pdfFirmadoS3Key        String?
+  creadoPor              String?    @db.VarChar(100)
+  diasRecordatorio       Int        @default(3)
+  hashDocumento          String
+  motivoCancelacion      String?
+  nombreDocumento        String     @db.VarChar(255)
+  ordenFirma             Boolean    @default(false)
+  recordatorioAutomatico Boolean    @default(true)
+  titulo                 String     @db.VarChar(255)
+  posicionFirma          Json?
+  firmas                 firmas[]
+  documentos             documentos @relation(fields: [documentoId], references: [id], onDelete: Cascade)
+  empresas               empresas   @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+
+  @@index([documentoId])
+  @@index([empresaId, createdAt])
+  @@index([empresaId, estado])
+  @@index([empresaId])
+  @@index([estado])
+  @@index([fechaLimite])
+  @@index([solicitadoPor])
+  @@index([tipo])
+}
+
+model subscriptions {
+  id                 String             @id
+  empresaId          String
+  customerId         String
+  priceId            String
+  status             SubscriptionStatus @default(active)
+  currentPeriodStart DateTime
+  currentPeriodEnd   DateTime
+  trialStart         DateTime?
+  trialEnd           DateTime?
+  cancelAtPeriodEnd  Boolean            @default(false)
+  canceledAt         DateTime?
+  metadata           Json?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime
+  billing_customers  billing_customers  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  empresas           empresas           @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  billing_prices     billing_prices     @relation(fields: [priceId], references: [id], onDelete: Cascade)
+
+  @@index([customerId])
+  @@index([empresaId])
+  @@index([priceId])
+  @@index([status])
+}
+
+model tipos_complemento {
+  id                    String                  @id
+  empresaId             String
+  nombre                String                  @db.VarChar(200)
+  descripcion           String?
+  esImporteFijo         Boolean                 @default(true)
+  importeFijo           Decimal?                @db.Decimal(10, 2)
+  activo                Boolean                 @default(true)
+  createdAt             DateTime                @default(now())
+  updatedAt             DateTime
+  empleado_complementos empleado_complementos[]
+  empresas              empresas                @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+
+  @@index([empresaId, activo])
+}
+
+model usuarios {
+  id                String              @id
+  empresaId         String
+  empleadoId        String?             @unique
+  email             String              @unique @db.VarChar(255)
+  cognitoId         String?             @unique @db.VarChar(255)
+  nombre            String              @db.VarChar(100)
+  apellidos         String              @db.VarChar(200)
+  avatar            String?
+  activo            Boolean             @default(true)
+  emailVerificado   Boolean             @default(false)
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime
+  ultimoAcceso      DateTime?
+  password          String?             @db.VarChar(255)
+  googleId          String?             @unique @db.VarChar(255)
+  rol               UsuarioRol          @default(empleado)
+  backupCodes       Json?
+  totpEnabled       Boolean             @default(false)
+  totpEnabledAt     DateTime?
+  totpSecret        String?
+  accounts          accounts[]
+  auditoria_accesos auditoria_accesos[]
+  empleados         empleados?
+  notificaciones    notificaciones[]
+  sesiones_activas  sesiones_activas[]
+  sessions          sessions[]
+  empresas          empresas            @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+
+  @@index([cognitoId])
+  @@index([email])
+  @@index([empresaId])
+  @@index([googleId])
+}
+
+model variable_mappings {
+  id                 String   @id
+  variableName       String   @unique @db.VarChar(200)
+  jsonPath           String
+  requiresDecryption Boolean  @default(false)
+  requiresFormatting Boolean  @default(false)
+  formatType         String?  @db.VarChar(50)
+  formatPattern      String?  @db.VarChar(100)
+  generadoPorIA      Boolean  @default(true)
+  confianza          Decimal  @db.Decimal(3, 2)
+  verificado         Boolean  @default(false)
+  vecesUsado         Int      @default(0)
+  ultimoUso          DateTime @default(now())
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime
+
+  @@index([ultimoUso])
+  @@index([variableName])
+}
+
+model verification_tokens {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model waitlist {
+  id         String    @id
+  email      String    @unique
+  nombre     String?   @db.VarChar(200)
+  empresa    String?   @db.VarChar(200)
+  mensaje    String?
+  invitado   Boolean   @default(false)
+  invitadoEn DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([email])
+  @@index([invitado])
+}
+
+enum BillingInterval {
+  month
+  year
+}
+
 enum EstadoAusencia {
-  pendiente // Solicitud registrada y pendiente de revisión
-  confirmada // Aprobada y todavía vigente
-  completada // Finalizada (fechas pasadas)
-  rechazada // Rechazada por manager/HR
+  pendiente
+  confirmada
+  completada
+  rechazada
 }
 
-/// Periodo de ausencia de medio día
-enum PeriodoMedioDia {
-  manana // Ausencia en la mañana (no ficha entrada)
-  tarde // Ausencia en la tarde (no ficha salida)
+enum EstadoEmpleado {
+  activo
+  baja
+  suspendido
 }
 
-/// Estados de solicitud de cambio
+enum EstadoFichaje {
+  en_curso
+  pendiente
+  finalizado
+}
+
 enum EstadoSolicitud {
-  pendiente // Recién creada
-  requiere_revision // IA determina que necesita revisión manual
-  auto_aprobada // IA la aprobó tras 48h
-  aprobada_manual // HR/Manager la aprobó
-  rechazada // Rechazada por HR/Manager
+  pendiente
+  requiere_revision
+  auto_aprobada
+  aprobada_manual
+  rechazada
 }
 
 enum EstadoSolicitudCorreccionFichaje {
@@ -106,2159 +1432,56 @@ enum EstadoSolicitudCorreccionFichaje {
   rechazada
 }
 
-// ========================================
-// 1. CORE ENTITIES (Empresa, Usuario, Empleado)
-// ========================================
-
-/// Empresa - Multi-tenant root entity
-/// Each company has isolated data (employees, documents, etc.)
-model Empresa {
-  id        String  @id @default(uuid())
-  nombre    String  @db.VarChar(200)
-  cif       String? @unique @db.VarChar(20)
-  email     String? @db.VarChar(255)
-  telefono  String? @db.VarChar(20)
-  direccion String? @db.Text
-  logoUrl   String? @db.Text // S3 URL
-  web       String? @db.VarChar(255) // Website URL
-
-  // Configuration (JSONB for flexibility)
-  config Json @default("{\"hora_cierre_fichaje_default\":\"18:00\",\"auto_completado_fichajes_dias\":7,\"auto_completado_nominas_dias\":7,\"auto_completado_contratos_dias\":14,\"umbral_ia_nominas\":0.8,\"umbral_ia_contratos\":0.85,\"permitir_saldo_vacaciones_negativo\":true,\"empleado_puede_ver_salario\":false}")
-
-  // Estado
-  activo Boolean @default(true)
-
-  // Timestamps
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations (one-to-many)
-  usuarios                 Usuario[]
-  empleados                Empleado[]
-  equipos                  Equipo[]
-  puestos                  Puesto[]
-  ausencias                Ausencia[]
-  fichajes                 Fichaje[]
-  jornadas                 Jornada[]
-  documentos               Documento[]
-  carpetas                 Carpeta[]
-  alertasNomina            AlertaNomina[]
-  solicitudesCambio        SolicitudCambio[]
-  festivos                 Festivo[]
-  empleadoSaldos           EmpleadoSaldoAusencias[]
-  equipoPoliticas          EquipoPoliticaAusencias[]
-  autoCompletados          AutoCompletado[]
-  invitaciones             InvitacionEmpleado[]
-  onboardings              OnboardingEmpleado[]
-  onboardingConfig         OnboardingConfig?
-  notificaciones           Notificacion[]
-  campanasVacaciones       CampanaVacaciones[]
-  preferenciasVacaciones   PreferenciaVacaciones[]
-  sedes                    Sede[]
-  integraciones            Integracion[]
-  resumenesNomina          ResumenMensualNomina[]
-  eventosNomina            EventoNomina[]
-  tiposComplemento         TipoComplemento[]
-  exportsGestoria          ExportGestoria[]
-  auditoriaAccesos         AuditoriaAcceso[]
-  consentimientos          Consentimiento[]
-  solicitudesEliminacion   SolicitudEliminacionDatos[]
-  compensacionesHorasExtra CompensacionHoraExtra[]
-  denuncias                Denuncia[]
-  plantillasDocumentos     PlantillaDocumento[]
-  documentosGenerados      DocumentoGenerado[]
-  jobsGeneracionDocumentos JobGeneracionDocumentos[]
-  solicitudesFirma         SolicitudFirma[]
-  solicitudesCorreccionFichaje SolicitudCorreccionFichaje[]
-
-  // Billing & Subscriptions
-  billingCustomer          BillingCustomer?
-  subscriptions            Subscription[]
-
-  @@index([cif])
-  @@map("empresas")
+enum PeriodoMedioDia {
+  manana
+  tarde
 }
 
-/// Usuario - Authentication & authorization
-/// Separate from Empleado (HR admin may not be an employee)
-model Usuario {
-  id         String  @id @default(uuid())
-  empresaId  String
-  empleadoId String? @unique // NULL if admin without employee record
-
-  email     String  @unique @db.VarChar(255)
-  password  String? @db.VarChar(255) // Bcrypt hash (local auth)
-  cognitoId String? @unique @db.VarChar(255) // DEPRECADO: Campo legacy, nunca se usó (solo JWT)
-  googleId  String? @unique @db.VarChar(255) // Google OAuth sub
-
-  // Role-based access control
-  rol UsuarioRol @default(empleado)
-
-  // Profile
-  nombre    String  @db.VarChar(100)
-  apellidos String  @db.VarChar(200)
-  avatar    String? @db.Text // S3 URL
-
-  // Status
-  activo          Boolean @default(true)
-  emailVerificado Boolean @default(false)
-  totpEnabled     Boolean @default(false)
-  totpEnabledAt   DateTime?
-  totpSecret      String?  @db.Text
-  backupCodes     Json?
-
-  // Timestamps
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-  ultimoAcceso DateTime?
-
-  // Relations
-  empresa          Empresa           @relation(fields: [empresaId], references: [id], onDelete: Cascade)
-  empleado         Empleado? // One-to-one
-  accounts         Account[]
-  sessions         Session[]
-  sesionesActivas  SesionActiva[]
-  notificaciones   Notificacion[]
-  auditoriaAccesos AuditoriaAcceso[]
-
-  @@index([email])
-  @@index([cognitoId])
-  @@index([googleId])
-  @@index([empresaId])
-  @@map("usuarios")
-}
-
-// ========================================
-// 2. HR STRUCTURE (Empleado, Equipo)
-// ========================================
-// NOTA: Departamento y Puesto son campos TEXT, NO tablas
-
-/// Empleado - Employee master record
-/// Central entity linking all HR data
-model Empleado {
-  id        String @id @default(uuid())
-  empresaId String
-  usuarioId String @unique // One-to-one with Usuario
-
-  // Personal info
-  nombre    String  @db.VarChar(100)
-  apellidos String  @db.VarChar(200)
-  email     String  @unique @db.VarChar(255)
-  fotoUrl   String? @db.Text // S3 URL
-
-  // Identification
-  // NOTA: nif y nss son TEXT porque se encriptan (encrypt genera ~100+ caracteres)
-  nif             String?   @unique @db.Text
-  nss             String?   @db.Text // Número Seguridad Social (encriptado)
-  fechaNacimiento DateTime?
-
-  // Contact
-  telefono String? @db.VarChar(20)
-
-  // Address (STRUCTURED)
-  direccionCalle     String? @db.VarChar(200)
-  direccionNumero    String? @db.VarChar(10)
-  direccionPiso      String? @db.VarChar(100) // Increased from 10 to 100 to handle full addresses
-  codigoPostal       String? @db.VarChar(5)
-  ciudad             String? @db.VarChar(100)
-  direccionProvincia String? @db.VarChar(100)
-
-  // Family info
-  estadoCivil String? @db.VarChar(50) // 'soltero', 'casado', 'divorciado', 'viudo', 'pareja_hecho'
-  numeroHijos Int     @default(0) @db.SmallInt // 0-5 típicamente
-  genero      String? @db.VarChar(50) // 'hombre', 'mujer', 'otro', 'no_especificado'
-
-  // Banking (for payroll)
-  // NOTA: iban es TEXT porque se encripta (encrypt genera ~100+ caracteres)
-  iban          String? @db.Text
-  titularCuenta String? @db.VarChar(200)
-
-  // Employment info
-  puesto               String?        @db.VarChar(100) // DEPRECATED - use puestoId instead
-  puestoId             String? // Foreign key to Puesto
-  fechaAlta            DateTime
-  fechaBaja            DateTime?
-  tipoContrato         TipoContrato   @default(indefinido)
-  categoriaProfesional String?        @db.VarChar(50) // 'directivo', 'mando_intermedio', 'tecnico', 'trabajador_cualificado', 'trabajador_baja_cualificacion'
-  nivelEducacion       String?        @db.VarChar(50) // 'nivel_basico', 'eso_equivalente', 'bachillerato_grado_medio', 'formacion_profesional_superior', 'educacion_universitaria_postgrado'
-  grupoCotizacion      Int?           @db.SmallInt // 1-11 (Spanish social security groups)
-  estadoEmpleado       EstadoEmpleado @default(activo)
-
-  // Manager relationship (self-referencing)
-  managerId       String?
-  manager         Empleado?  @relation("ManagerEmpleados", fields: [managerId], references: [id], onDelete: SetNull)
-  empleadosACargo Empleado[] @relation("ManagerEmpleados")
-
-  // Jornada assignment
-  jornadaId String?
-  jornada   Jornada? @relation(fields: [jornadaId], references: [id], onDelete: SetNull)
-
-  // Puesto assignment
-  puestoRelacion Puesto? @relation(fields: [puestoId], references: [id], onDelete: SetNull)
-
-  // Compensation
-  salarioBrutoAnual   Decimal? @db.Decimal(10, 2)
-  salarioBrutoMensual Decimal? @db.Decimal(10, 2)
-
-  // Vacation days
-  diasVacaciones Int @default(22) // Spanish legal default
-
-  // Onboarding status
-  onboardingCompletado   Boolean   @default(false)
-  onboardingCompletadoEn DateTime?
-
-  // Documentation status
-  documentosCompletos     Boolean   @default(false)
-  documentosCompletadosEn DateTime?
-
-  // Firma guardada (para firma digital rápida)
-  firmaGuardada     Boolean @default(false) // Si el empleado tiene firma guardada
-  firmaS3Key        String? @db.Text // S3 key de la imagen de firma (PNG/SVG)
-  firmaGuardadaData Json? // Datos de trazo de firma manuscrita (opcional)
-
-  // Renovación de saldo de horas
-  saldoRenovadoDesde DateTime?
-
-  // Control
-  activo    Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
-  empresa Empresa @relation(fields: [empresaId], references: [id], onDelete: Cascade)
-  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
-
-  // Child relations
-  ausencias                  Ausencia[]
-  saldosAusencias            EmpleadoSaldoAusencias[]
-  fichajes                   Fichaje[]
-  documentos                 Documento[]
-  carpetas                   Carpeta[]
-  contratos                  Contrato[]
-  nominas                    Nomina[]
-  solicitudesCambio          SolicitudCambio[]
-  solicitudesCambioAprobadas SolicitudCambio[]           @relation("AprobadorSolicitud")
-  equipos                    EmpleadoEquipo[]
-  equiposGestionados         Equipo[]                    @relation("ManagerEquipo")
-  autoCompletados            AutoCompletado[]
-  invitacion                 InvitacionEmpleado?
-  onboarding                 OnboardingEmpleado?
-  preferenciasVacaciones     PreferenciaVacaciones[]
-  alertasNomina              AlertaNomina[]
-  resumenesNomina            ResumenMensualNomina[]
-  complementos               EmpleadoComplemento[]
-  consentimientos            Consentimiento[]
-  solicitudesEliminacion     SolicitudEliminacionDatos[]
-  compensacionesHorasExtra   CompensacionHoraExtra[]
-  denuncias                  Denuncia[]
-  documentosGenerados        DocumentoGenerado[]
-  firmas                     Firma[]
-  solicitudesCorreccionFichaje SolicitudCorreccionFichaje[]
-  solicitudesCorreccionGestionadas SolicitudCorreccionFichaje[] @relation("CorreccionFichajeAprobador")
-
-  @@index([empresaId])
-  @@index([usuarioId])
-  @@index([managerId])
-  @@index([jornadaId])
-  @@index([puestoId])
-  @@index([nif])
-  @@index([email])
-  @@index([estadoEmpleado])
-  @@map("empleados")
-}
-
-/// Equipo - Flexible team groupings (projects, squads)
-model Equipo {
-  id          String     @id @default(uuid())
-  empresaId   String
-  nombre      String     @db.VarChar(100)
-  managerId   String?
-  sedeId      String? // Sede donde opera el equipo
-  descripcion String?    @db.Text
-  tipo        TipoEquipo @default(proyecto)
-  activo      Boolean    @default(true)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
-  empresa   Empresa                  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
-  manager   Empleado?                @relation("ManagerEquipo", fields: [managerId], references: [id], onDelete: SetNull)
-  sede      Sede?                    @relation(fields: [sedeId], references: [id], onDelete: SetNull)
-  miembros  EmpleadoEquipo[]
-  ausencias Ausencia[]
-  politica  EquipoPoliticaAusencias?
-
-  @@unique([empresaId, nombre]) // Un equipo con el mismo nombre no puede repetirse en una empresa
-  @@index([empresaId])
-  @@index([managerId])
-  @@index([sedeId])
-  @@map("equipos")
-}
-
-/// EmpleadoEquipo - N:N relationship between Empleado and Equipo
-model EmpleadoEquipo {
-  empleadoId         String
-  equipoId           String
-  fechaIncorporacion DateTime @default(now())
-
-  // Relations
-  empleado Empleado @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
-  equipo   Equipo   @relation(fields: [equipoId], references: [id], onDelete: Cascade)
-
-  @@id([empleadoId, equipoId])
-  @@index([empleadoId])
-  @@index([equipoId])
-  @@map("empleado_equipos")
-}
-
-/// Puesto - Job positions
-model Puesto {
-  id          String  @id @default(uuid())
-  empresaId   String
-  nombre      String  @db.VarChar(100)
-  descripcion String? @db.Text
-  activo      Boolean @default(true)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
-  empresa    Empresa     @relation(fields: [empresaId], references: [id], onDelete: Cascade)
-  empleados  Empleado[]
-  documentos Documento[]
-
-  @@unique([empresaId, nombre]) // Un puesto con el mismo nombre no puede repetirse en una empresa
-  @@index([empresaId])
-  @@map("puestos")
-}
-
-/// Sede - Physical office locations
-/// Each company can have multiple locations (sedes)
-model Sede {
-  id        String  @id @default(uuid())
-  empresaId String
-  nombre    String  @db.VarChar(200) // Auto-generated from ciudad or custom
-  ciudad    String  @db.VarChar(100) // e.g., "Madrid", "Barcelona"
-  activo    Boolean @default(true)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
-  empresa Empresa  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
-  equipos Equipo[] // Teams assigned to this location
-
-  @@index([empresaId])
-  @@map("sedes")
-}
-
-/// Integracion - External integrations configuration
-/// Stores integration settings for calendar, communication, and payroll systems
-model Integracion {
-  id        String  @id @default(uuid())
-  empresaId String
-  usuarioId String? // NULL = integración a nivel de empresa, NOT NULL = integración personal
-
-  tipo      String @db.VarChar(50) // 'calendario', 'comunicacion', 'nominas'
-  proveedor String @db.VarChar(100) // 'google_calendar', 'outlook', 'slack', 'teams', etc.
-
-  // Configuration (JSONB for flexibility - credentials, API keys, etc.)
-  // For calendar: { "accessToken": "...", "refreshToken": "...", "expiresAt": 123456, "scope": "...", "channelId": "...", "resourceId": "..." }
-  config Json? // e.g., { "apiKey": "...", "webhookUrl": "...", "enabled_features": [...] }
-
-  // Calendar-specific fields
-  calendarId String? @db.VarChar(255) // ID del calendario en Google/Outlook
-
-  activa Boolean @default(true)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
-  empresa Empresa @relation(fields: [empresaId], references: [id], onDelete: Cascade)
-
-  @@unique([empresaId, tipo, proveedor, usuarioId]) // Only one integration per type, provider, and user
-  @@index([empresaId])
-  @@index([usuarioId])
-  @@index([tipo])
-  @@map("integraciones")
-}
-
-// ========================================
-// 3. TIME TRACKING (Jornada, Fichaje, Ausencia)
-// ========================================
-
-/// Jornada - Work schedule templates
-/// Defines expected work hours (e.g., "9-18h", "flexible")
-model Jornada {
-  id             String  @id @default(uuid())
-  empresaId      String
-  nombre         String  @db.VarChar(100) // e.g., "Jornada completa 40h"
-  horasSemanales Decimal @db.Decimal(5, 2) // e.g., 40.00 hours
-
-  // Schedule config (JSONB for flexibility)
-  // Example fija: { "tipo": "fija", "lunes": { "activo": true, "entrada": "09:00", "salida": "18:00", "pausa_inicio": "14:00", "pausa_fin": "15:00" }, ... }
-  // Example flexible: { "tipo": "flexible", "descansoMinimo": "00:30", "lunes": { "activo": true }, ... }
-  config Json
-
-  // Predefined by system (cannot be deleted)
-  esPredefinida Boolean @default(false)
-  activa        Boolean @default(true)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
-  empresa   Empresa    @relation(fields: [empresaId], references: [id], onDelete: Cascade)
-  empleados Empleado[]
-
-  @@index([empresaId])
-  @@map("jornadas")
-}
-
-/// Fichaje - Registro único por empleado por día
-/// Representa el ciclo completo de trabajo del día (entrada, pausas, salida)
-/// NUEVO DISEÑO: Un fichaje = un día completo, eventos separados en FichajeEvento
-model Fichaje {
-  id         String   @id @default(uuid())
-  empresaId  String
-  empleadoId String
-  fecha      DateTime @db.Date
-
-  // Estado del fichaje completo (UN SOLO ESTADO para todo el día)
-  estado EstadoFichaje @default(en_curso)
-
-  // Cálculos agregados (se actualizan al crear eventos)
-  horasTrabajadas Decimal? @db.Decimal(5, 2) // Horas netas trabajadas (sin pausas)
-  horasEnPausa    Decimal? @db.Decimal(5, 2) // Tiempo total en pausas
-
-  // Auditoría de cuadre masivo
-  cuadradoMasivamente Boolean   @default(false) // Marcado si fue cuadrado desde "Cuadrar fichajes"
-  cuadradoPor         String? // Usuario ID que cuadró masivamente
-  cuadradoEn          DateTime? // Fecha del cuadre masivo
-
-  // Legacy field (deprecated - no longer used)
-  autoCompletado  Boolean   @default(false)
-  fechaAprobacion DateTime? // Fecha en que fue aprobado/finalizado por HR
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
-  empresa  Empresa         @relation(fields: [empresaId], references: [id], onDelete: Cascade)
-  empleado Empleado        @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
-  eventos  FichajeEvento[] // Eventos del día (entrada, pausas, salida)
-  solicitudesCorreccion SolicitudCorreccionFichaje[]
-
-  @@unique([empleadoId, fecha]) // CRÍTICO: Un fichaje por empleado por día
-  @@index([empresaId])
-  @@index([empleadoId])
-  @@index([fecha])
-  @@index([estado])
-  @@index([empresaId, estado]) // Composite index for filtering by company and status
-  @@index([empresaId, fecha]) // Composite index for date range queries
-  @@index([empresaId, empleadoId, fecha]) // Composite index for employee-specific queries
-  @@map("fichajes")
-}
-
-/// FichajeEvento - Eventos individuales dentro de un fichaje
-/// Cada evento es una acción: entrada, pausa_inicio, pausa_fin, salida
-model FichajeEvento {
-  id        String @id @default(uuid())
-  fichajeId String
-
-  tipo TipoFichajeEvento
-  hora DateTime          @db.Timestamptz(6)
-
-  // Metadata del evento
-  ubicacion String? @db.Text // GPS coords o nombre oficina
-
-  // Edición (si el evento fue modificado después de crearse)
-  editado       Boolean   @default(false)
-  motivoEdicion String?   @db.Text
-  horaOriginal  DateTime? @db.Timestamptz(6) // Hora antes de editar (para auditoría)
-  editadoPor    String? // Usuario ID que editó
-
-  createdAt DateTime @default(now())
-
-  // Relations
-  fichaje Fichaje @relation(fields: [fichajeId], references: [id], onDelete: Cascade)
-
-  @@index([fichajeId])
-  @@index([tipo])
-  @@index([hora])
-  @@index([fichajeId, hora])
-  @@map("fichaje_eventos")
-}
-
-/// Ausencia - Absences (vacations, sick leave, permits)
-/// Tipos FIJOS (no configurables): vacaciones, enfermedad, enfermedad_familiar, maternidad_paternidad, otro
-model Ausencia {
-  id         String  @id @default(uuid())
-  empresaId  String
-  empleadoId String
-  equipoId   String? // Equipo del empleado (para cálculo solapamiento)
-
-  // Absence details (FIXED TYPES)
-  tipo        TipoAusencia
-  fechaInicio DateTime         @db.Date
-  fechaFin    DateTime         @db.Date
-  medioDia    Boolean          @default(false)
-  periodo     PeriodoMedioDia? // Solo cuando medioDia=true: 'manana' o 'tarde'
-
-  diasNaturales   Int // Total days (including weekends)
-  diasLaborables  Int // Working days only
-  diasSolicitados Decimal @db.Decimal(4, 1) // Días reales solicitados (excluye festivos)
-  diasDesdeCarryOver Decimal @default(0) @db.Decimal(4, 1) // Días cubiertos con saldo extendido
-
-  // Optional fields
-  motivo          String? @db.Text // Motivo o descripción (obligatorio para tipo 'otro')
-  justificanteUrl String? @db.Text // S3 path to uploaded document
-
-  // Saldo management
-  descuentaSaldo Boolean @default(false)
-
-  // Calendario inteligente (solo vacaciones)
-  diasIdeales      Json? // Array de fechas: ["2025-08-10", "2025-08-11", ...]
-  diasPrioritarios Json? // Array de fechas prioritarias
-  diasAlternativos Json? // Array de fechas alternativas
-
-  // Approval workflow
-  estado        EstadoAusencia @default(pendiente)
-  aprobadaPor   String? // Usuario ID
-  aprobadaEn    DateTime?
-  motivoRechazo String?        @db.Text
-
-  // Supporting documents (e.g., medical certificate)
-  documentoId String? // Link to Documento
-  documento   Documento? @relation("AusenciaJustificante", fields: [documentoId], references: [id], onDelete: SetNull)
-
-  // AI optimization
-  revisionIA   Json? // { auto_aprobada: boolean, motivo: string, score: 0-100 }
-  optimizadaIA Boolean @default(false)
-  notasIA      String? @db.Text
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
-  empresa               Empresa                @relation(fields: [empresaId], references: [id], onDelete: Cascade)
-  empleado              Empleado               @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
-  equipo                Equipo?                @relation(fields: [equipoId], references: [id], onDelete: SetNull)
-  compensacionHoraExtra CompensacionHoraExtra?
-
-  @@index([empresaId])
-  @@index([empleadoId])
-  @@index([equipoId])
-  @@index([tipo])
-  @@index([estado])
-  @@index([documentoId]) // Index for justificante lookup
-  @@index([fechaInicio, fechaFin])
-  @@index([empresaId, estado]) // Composite index for filtering by company and status
-  @@index([empresaId, tipo, estado]) // Composite index for combined filters
-  @@index([empresaId, empleadoId, estado]) // Composite index for employee absence queries
-  @@map("ausencias")
-}
-
-/// Festivo - Public holidays (national/regional/local)
-/// Loaded automatically or managed by HR per company
-model Festivo {
-  id        String @id @default(uuid())
-  empresaId String
-
-  fecha  DateTime @db.Date
-  nombre String   @db.VarChar(200)
-
-  tipo              String  @db.VarChar(50) // 'nacional', 'autonomico', 'local', 'empresa'
-  comunidadAutonoma String? @db.VarChar(100) // e.g., 'madrid', 'galicia'
-  origen            String  @default("manual") @db.VarChar(50) // 'api', 'manual'
-
-  activo Boolean @default(true) // HR puede desactivar
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
-  empresa Empresa @relation(fields: [empresaId], references: [id], onDelete: Cascade)
-
-  @@unique([empresaId, fecha]) // Prevent duplicate holidays per company
-  @@index([empresaId, fecha, activo])
-  @@map("festivos")
-}
-
-/// EmpleadoSaldoAusencias - Balance de días de vacaciones por empleado y año
-model EmpleadoSaldoAusencias {
-  id         String @id @default(uuid())
-  empleadoId String
-  empresaId  String
-  año       Int    @db.SmallInt // Año fiscal (2024-2099)
-
-  diasTotales    Int     @default(0) // Días asignados (desde contrato o manual)
-  diasUsados     Decimal @default(0) @db.Decimal(4, 1) // Días ya usados (ausencias aprobadas)
-  diasPendientes Decimal @default(0) @db.Decimal(4, 1) // Días en solicitudes pendientes
-  carryOverAsignado Decimal @default(0) @db.Decimal(4, 1) // Días arrastrados del año anterior
-  carryOverPendiente Decimal @default(0) @db.Decimal(4, 1) // Días arrastrados en solicitudes pendientes
-  carryOverUsado Decimal @default(0) @db.Decimal(4, 1) // Días arrastrados ya consumidos
-  carryOverExpiraEn DateTime?
-  carryOverFuenteAnio Int? @db.SmallInt
-
-  origen String @db.VarChar(50) // 'contrato', 'manual_hr'
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
-  empleado Empleado @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
-  empresa  Empresa  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
-
-  @@unique([empleadoId, año])
-  @@index([empleadoId, año])
-  @@index([empresaId])
-  @@map("empleado_saldo_ausencias")
-}
-
-/// CompensacionHoraExtra - Gestión de compensación de horas extra
-/// Permite a empleados solicitar compensación de balance positivo vía nómina o ausencia
-model CompensacionHoraExtra {
-  id         String @id @default(uuid())
-  empresaId  String
-  empleadoId String
-
-  // Horas a compensar
-  horasBalance Decimal @db.Decimal(5, 2) // Horas positivas del balance
-
-  // Decisión de compensación
-  tipoCompensacion String @db.VarChar(50) // 'nomina' | 'ausencia'
-  estado           String @default("pendiente") @db.VarChar(50) // 'pendiente', 'aprobada', 'rechazada'
-
-  // Si es ausencia
-  diasAusencia Decimal? @db.Decimal(4, 1) // Días convertidos (8h = 1 día)
-  ausenciaId   String?  @unique // Ausencia creada al aprobar
-
-  // Si es nómina
-  nominaId String? // ID de pre-nómina donde se incluye
-
-  // Auditoría
-  aprobadoPor   String? // HR admin que aprobó
-  aprobadoEn    DateTime?
-  motivoRechazo String?   @db.Text
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
-  empresa  Empresa   @relation(fields: [empresaId], references: [id], onDelete: Cascade)
-  empleado Empleado  @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
-  ausencia Ausencia? @relation(fields: [ausenciaId], references: [id])
-
-  @@index([empresaId])
-  @@index([empleadoId])
-  @@index([estado])
-  @@map("compensaciones_horas_extra")
-}
-
-/// EquipoPoliticaAusencias - Configuración de políticas de ausencias por equipo
-model EquipoPoliticaAusencias {
-  equipoId  String @id
-  empresaId String
-
-  maxSolapamientoPct     Int @default(50) // % máximo del equipo ausente simultáneamente
-  requiereAntelacionDias Int @default(5) // Días de antelación mínimos para ausencias que requieren aprobación
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
-  equipo  Equipo  @relation(fields: [equipoId], references: [id], onDelete: Cascade)
-  empresa Empresa @relation(fields: [empresaId], references: [id], onDelete: Cascade)
-
-  @@index([empresaId])
-  @@map("equipo_politica_ausencias")
-}
-
-// ========================================
-// 4. DOCUMENTS & FILES
-// ========================================
-
-/// Carpeta - Folder structure for documents
-/// Personal folders (per employee) and shared folders
-model Carpeta {
-  id         String  @id @default(uuid())
-  empresaId  String
-  empleadoId String? // NULL = shared folder
-
-  nombre   String  @db.VarChar(255)
-  parentId String? // Self-referencing for subfolders
-
-  // Predefined system folders (created on employee creation)
-  esSistema Boolean @default(false) // 'Contratos', 'Nóminas', 'Médicos', etc.
-
-  // Shared folders configuration
-  compartida Boolean @default(false) // true = accessible by multiple users
-  asignadoA  String? @db.Text // 'todos' | 'grupo:id' | 'empleado:id' (comma-separated for multiple)
-
-  // Process linking (onboarding/offboarding)
-  vinculadaAProceso     String? @db.VarChar(50) // 'onboarding' | 'offboarding' | null
-  requiereFirma         Boolean @default(false) // Si requiere firma digital (Fase 2)
-  requiereRellenarDatos Boolean @default(false) // Si requiere completar campos antes de generar documento
-  camposRequeridos      Json? // Array de campos requeridos: ["nif", "direccion", "iban"]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
-  empresa     Empresa     @relation(fields: [empresaId], references: [id], onDelete: Cascade)
-  empleado    Empleado?   @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
-  parent      Carpeta?    @relation("CarpetaHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
-  subcarpetas Carpeta[]   @relation("CarpetaHierarchy")
-  documentos  Documento[]
-
-  @@index([empresaId])
-  @@index([empleadoId])
-  @@index([parentId])
-  @@index([compartida])
-  @@index([vinculadaAProceso])
-  @@map("carpetas")
-}
-
-/// Documento - File storage metadata
-/// Actual files stored in S3
-model Documento {
-  id         String  @id @default(uuid())
-  empresaId  String
-  empleadoId String? // NULL = company-wide document
-  carpetaId  String?
-  puestoId   String? // NULL = not associated with a job position
-
-  nombre        String @db.VarChar(255)
-  tipoDocumento String @db.VarChar(100) // 'contrato', 'nomina', 'medico', 'certificado', 'otro'
-  mimeType      String @db.VarChar(100) // 'application/pdf', 'image/jpeg', etc.
-  tamano        Int // Size in bytes
-
-  // S3 storage
-  s3Key    String @unique @db.Text // S3 object key
-  s3Bucket String @db.VarChar(255)
-
-  // Digital signature fields
-  requiereFirma Boolean   @default(false)
-  firmado       Boolean   @default(false)
-  firmadoEn     DateTime?
-  hashDocumento String?   @db.Text // SHA-256 hash for integrity verification
-
-  // Template generation tracking
-  generadoDesdePlantilla Boolean @default(false)
-
-  // AI extraction flag
-  procesadoIA    Boolean @default(false)
-  datosExtraidos Json? // AI-extracted data (flexible schema)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
-  empresa             Empresa             @relation(fields: [empresaId], references: [id], onDelete: Cascade)
-  empleado            Empleado?           @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
-  carpeta             Carpeta?            @relation(fields: [carpetaId], references: [id], onDelete: SetNull)
-  puesto              Puesto?             @relation(fields: [puestoId], references: [id], onDelete: Cascade)
-  nomina              Nomina? // One-to-one relation: a document can be a payslip PDF
-  solicitudesFirma    SolicitudFirma[]
-  documentoGenerado   DocumentoGenerado?
-  ausenciasJustificantes Ausencia[] @relation("AusenciaJustificante")
-
-  @@index([empresaId])
-  @@index([empleadoId])
-  @@index([carpetaId])
-  @@index([puestoId])
-  @@index([tipoDocumento])
-  @@index([s3Key])
-  @@index([requiereFirma, firmado])
-  @@index([generadoDesdePlantilla])
-  @@map("documentos")
-}
-
-// ========================================
-// 5. PAYROLL (Contratos, Nóminas)
-// ========================================
-
-/// Contrato - Employment contracts
-/// Stores metadata + link to PDF in S3
-model Contrato {
-  id         String @id @default(uuid())
-  empleadoId String
-
-  // Contract details
-  tipoContrato      TipoContrato
-  fechaInicio       DateTime     @db.Date
-  fechaFin          DateTime?    @db.Date
-  salarioBrutoAnual Decimal      @db.Decimal(10, 2)
-
-  // Document reference
-  documentoId String? @unique // Link to Documento table
-
-  // AI extraction
-  datosExtraidosIA Json? // Full AI-extracted data
-  verificado       Boolean @default(false)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
-  empleado     Empleado              @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
-  complementos EmpleadoComplemento[]
-  nominas      Nomina[]
-
-  @@index([empleadoId])
-  @@index([tipoContrato])
-  @@map("contratos")
-}
-
-/// Nomina - Payslips
-/// Monthly payroll records
-model Nomina {
-  id             String  @id @default(uuid())
-  empleadoId     String
-  contratoId     String? // Contrato vigente en el momento de generación
-  eventoNominaId String? // Vinculado al ciclo mensual
-
-  // Period
-  mes  Int @db.SmallInt // 1-12
-  anio Int @db.SmallInt // 2024-2099
-
-  // Amounts (base)
-  salarioBase       Decimal @db.Decimal(10, 2) // Salario base del periodo
-  totalComplementos Decimal @default(0) @db.Decimal(10, 2) // Suma de complementos asignados
-  totalDeducciones  Decimal @default(0) @db.Decimal(10, 2) // Total deducciones (IRPF, SS)
-  totalBruto        Decimal @db.Decimal(10, 2) // Salario base + complementos
-  totalNeto         Decimal @db.Decimal(10, 2) // Total bruto - deducciones
-
-  // Días trabajados
-  diasTrabajados Int @default(0) @db.SmallInt // Días efectivamente trabajados
-  diasAusencias  Int @default(0) @db.SmallInt // Días de ausencias en el periodo
-
-  // Complementos
-  complementosPendientes Boolean @default(false) // true si faltan complementos por asignar
-
-  // Document reference
-  documentoId String? @unique // Link to Documento table (PDF)
-
-  // AI extraction & validation
-  datosExtraidosIA Json?
-  verificado       Boolean @default(false)
-  tieneAnomalias   Boolean @default(false)
-
-  // Upload & publishing workflow
-  // Estados: pendiente → completada (opcional) → publicada
-  // pendiente: Pre-nómina creada, puede tener complementos/alertas pendientes
-  // completada: Complementos y alertas resueltos (OPCIONAL, se puede saltar)
-  // publicada: PDF importado y notificado al empleado
-  estado           String    @default("pendiente") @db.VarChar(50)
-  fechaPublicacion DateTime?
-  subidoPor        String? // Usuario ID que subió la nómina
-
-  // Exportación
-  exportadaEn DateTime? // Cuando se incluyó en export para gestoría
-
-  // Employee notification tracking
-  empleadoNotificado Boolean   @default(false)
-  fechaNotificacion  DateTime?
-  empleadoVisto      Boolean   @default(false)
-  fechaVisto         DateTime?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
-  empleado              Empleado                @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
-  contrato              Contrato?               @relation(fields: [contratoId], references: [id], onDelete: SetNull)
-  eventoNomina          EventoNomina?           @relation(fields: [eventoNominaId], references: [id], onDelete: SetNull)
-  documento             Documento?              @relation(fields: [documentoId], references: [id], onDelete: SetNull)
-  alertas               AlertaNomina[]
-  complementosAsignados AsignacionComplemento[]
-
-  @@unique([empleadoId, mes, anio]) // One payslip per employee per month
-  @@index([empleadoId])
-  @@index([contratoId])
-  @@index([eventoNominaId])
-  @@index([documentoId])
-  @@index([mes, anio])
-  @@index([estado])
-  @@index([empleadoId, estado])
-  @@index([eventoNominaId, estado])
-  @@map("nominas")
-}
-
-/// AlertaNomina - Payroll anomalies detected by AI or validations
-model AlertaNomina {
-  id         String  @id @default(uuid())
-  empresaId  String
-  empleadoId String? // Empleado afectado (NULL para alertas generales)
-  nominaId   String? // Nómina relacionada (NULL para alertas pre-nómina)
-
-  // Clasificación de alerta
-  tipo      String @db.VarChar(50) // 'critico', 'advertencia', 'info' (severidad)
-  categoria String @db.VarChar(100) // 'datos_faltantes', 'fichajes', 'ausencias', 'horas'
-  codigo    String @db.VarChar(100) // 'NO_IBAN', 'FICHAJE_INCOMPLETO', 'HORAS_BAJAS', etc.
-
-  // Mensaje y detalles
-  mensaje   String  @db.Text
-  detalles  Json? // Detalles adicionales en JSON
-  accionUrl String? @db.Text // URL para resolver la alerta
-
-  // Status
-  resuelta        Boolean   @default(false)
-  fechaResolucion DateTime?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
-  empresa  Empresa   @relation(fields: [empresaId], references: [id], onDelete: Cascade)
-  empleado Empleado? @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
-  nomina   Nomina?   @relation(fields: [nominaId], references: [id], onDelete: Cascade)
-
-  @@index([empresaId])
-  @@index([empleadoId])
-  @@index([nominaId])
-  @@index([tipo])
-  @@index([categoria])
-  @@index([resuelta])
-  @@map("alertas_nomina")
-}
-
-/// ResumenMensualNomina - Monthly payroll summary cache
-/// Pre-calculated data for payroll preparation
-model ResumenMensualNomina {
-  id         String @id @default(uuid())
-  empresaId  String
-  empleadoId String
-
-  // Period
-  mes  Int @db.SmallInt // 1-12
-  anio Int @db.SmallInt // 2024-2099
-
-  // Working days
-  diasLaborables            Int @default(0) // Business days in month
-  diasTrabajados            Int @default(0) // Days with completed fichajes
-  diasVacaciones            Int @default(0) // Vacation days
-  diasBajaIT                Int @default(0) // Sick leave days
-  diasPermisosRetribuidos   Int @default(0) // Paid leave days
-  diasPermisosNoRetribuidos Int @default(0) // Unpaid leave days
-
-  // Hours
-  horasTrabajadas Decimal @default(0) @db.Decimal(10, 2) // Total hours worked
-  horasExtras     Decimal @default(0) @db.Decimal(10, 2) // Overtime hours
-
-  // Salary snapshot
-  salarioBase Decimal? @db.Decimal(10, 2)
-
-  calculadoEn DateTime @default(now())
-
-  // Relations
-  empresa  Empresa  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
-  empleado Empleado @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
-
-  @@unique([empresaId, empleadoId, mes, anio])
-  @@index([empresaId, anio, mes])
-  @@index([empleadoId])
-  @@map("resumenes_mensuales_nomina")
-}
-
-/// EventoNomina - Ciclo mensual de nóminas a nivel empresa
-/// Gestiona todo el workflow: generación → complementos → export → import → publicación
-model EventoNomina {
-  id        String @id @default(uuid())
-  empresaId String
-
-  // Periodo
-  mes  Int @db.SmallInt // 1-12
-  anio Int @db.SmallInt // 2024-2099
-
-  // Estados del evento (resumen de nóminas individuales)
-  // abierto: Evento activo, nóminas pueden modificarse
-  // cerrado: Mes cerrado, solo lectura
-  estado String @default("abierto") @db.VarChar(50)
-
-  // Fechas del ciclo
-  fechaGeneracion         DateTime? // Cuando se generaron las pre-nóminas
-  fechaLimiteComplementos DateTime? // Fecha límite para asignar complementos
-  fechaExportacion        DateTime? // Cuando se exportó para gestoría
-  fechaImportacion        DateTime? // Cuando se importaron las definitivas
-  fechaPublicacion        DateTime? // Cuando se notificó a empleados
-  fechaCierre             DateTime? // Cuando se cerró el periodo
-
-  // Tracking
-  totalEmpleados           Int @default(0)
-  empleadosConComplementos Int @default(0)
-  complementosAsignados    Int @default(0)
-  nominasImportadas        Int @default(0)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
-  empresa                Empresa        @relation(fields: [empresaId], references: [id], onDelete: Cascade)
-  nominas                Nomina[]
-  notificacionesEnviadas Notificacion[]
-
-  @@unique([empresaId, mes, anio])
-  @@index([empresaId, estado])
-  @@index([empresaId, mes, anio])
-  @@map("eventos_nomina")
-}
-
-/// TipoComplemento - Catálogo de tipos de complementos (definidos por HR)
-model TipoComplemento {
-  id        String @id @default(uuid())
-  empresaId String
-
-  nombre      String  @db.VarChar(200) // "Plus transporte", "Bonus objetivos"
-  descripcion String? @db.Text
-
-  // Tipo de importe
-  esImporteFijo Boolean  @default(true) // true = fijo, false = variable
-  importeFijo   Decimal? @db.Decimal(10, 2) // Si es fijo, el importe por defecto
-
-  activo Boolean @default(true)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
-  empresa              Empresa               @relation(fields: [empresaId], references: [id], onDelete: Cascade)
-  empleadoComplementos EmpleadoComplemento[]
-
-  @@index([empresaId, activo])
-  @@map("tipos_complemento")
-}
-
-/// EmpleadoComplemento - Complementos asignados a un empleado (parte del contrato)
-model EmpleadoComplemento {
-  id                String  @id @default(uuid())
-  empleadoId        String
-  tipoComplementoId String
-  contratoId        String? // Vinculado a un contrato específico
-
-  // Si es importe fijo, se puede override aquí
-  importePersonalizado Decimal? @db.Decimal(10, 2)
-
-  activo Boolean @default(true)
-
-  // Validación de complementos (para nóminas)
-  validado        Boolean   @default(false)
-  validadoPor     String? // Usuario ID que validó
-  fechaValidacion DateTime?
-  rechazado       Boolean   @default(false)
-  motivoRechazo   String?   @db.Text
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
-  empleado        Empleado                @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
-  tipoComplemento TipoComplemento         @relation(fields: [tipoComplementoId], references: [id], onDelete: Cascade)
-  contrato        Contrato?               @relation(fields: [contratoId], references: [id], onDelete: SetNull)
-  asignaciones    AsignacionComplemento[]
-
-  @@index([empleadoId, activo])
-  @@index([tipoComplementoId])
-  @@index([contratoId])
-  @@map("empleado_complementos")
-}
-
-/// AsignacionComplemento - Complemento asignado en una nómina específica
-model AsignacionComplemento {
-  id                    String @id @default(uuid())
-  nominaId              String
-  empleadoComplementoId String
-
-  // Importe asignado (puede ser el fijo o el variable introducido)
-  importe Decimal @db.Decimal(10, 2)
-
-  // Tracking
-  asignadoPor     String? // Usuario ID que asignó
-  fechaAsignacion DateTime @default(now()) // Fecha de asignación
-  notas           String?  @db.Text // Notas adicionales sobre la asignación
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
-  nomina              Nomina              @relation(fields: [nominaId], references: [id], onDelete: Cascade)
-  empleadoComplemento EmpleadoComplemento @relation(fields: [empleadoComplementoId], references: [id], onDelete: Cascade)
-
-  @@unique([nominaId, empleadoComplementoId]) // Un complemento solo se asigna una vez por nómina
-  @@index([nominaId])
-  @@index([empleadoComplementoId])
-  @@map("asignaciones_complemento")
-}
-
-/// ExportGestoria - Payroll exports tracking
-/// Tracks Excel exports generated for external payroll agencies
-model ExportGestoria {
-  id        String @id @default(uuid())
-  empresaId String
-
-  // Period
-  mes  Int @db.SmallInt // 1-12
-  anio Int @db.SmallInt // 2024-2099
-
-  // File reference
-  archivoUrl    String @db.Text // Local path or S3 URL
-  archivoNombre String @db.VarChar(255)
-
-  // Metadata
-  generadoPor        String? // Usuario ID
-  generadoEn         DateTime @default(now())
-  numEmpleados       Int?
-  numAlertasCriticas Int?
-
-  // Relations
-  empresa Empresa @relation(fields: [empresaId], references: [id], onDelete: Cascade)
-
-  @@index([empresaId, anio, mes])
-  @@index([generadoEn])
-  @@map("exports_gestoria")
-}
-
-// ========================================
-// 6. WORKFLOWS & APPROVALS
-// ========================================
-
-/// SolicitudCambio - Change requests (employee → HR approval)
-/// e.g., Update personal data, change IBAN, etc.
-model SolicitudCambio {
-  id          String  @id @default(uuid())
-  empresaId   String
-  empleadoId  String
-  aprobadorId String? // HR admin who approved/rejected
-
-  tipo            String @db.VarChar(100) // 'datos_personales', 'datos_bancarios', 'documento'
-  camposCambiados Json // { "iban": "ES12...", "direccion": "..." }
-
-  // Optional reason
-  motivo String? @db.Text
-
-  // Approval workflow
-  estado         EstadoSolicitud @default(pendiente)
-  motivoRechazo  String?         @db.Text
-  fechaRespuesta DateTime?
-
-  // AI classification
-  revisionIA               Json? // Análisis del clasificador IA
-  revisadaPorIA            Boolean @default(false)
-  requiereAprobacionManual Boolean @default(false)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
-  empresa   Empresa   @relation(fields: [empresaId], references: [id], onDelete: Cascade)
-  empleado  Empleado  @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
-  aprobador Empleado? @relation("AprobadorSolicitud", fields: [aprobadorId], references: [id], onDelete: SetNull)
-
-  @@index([empresaId])
-  @@index([empleadoId])
-  @@index([aprobadorId])
-  @@index([estado])
-  @@index([empresaId, estado]) // Composite index for filtering by company and status
-  @@map("solicitudes_cambio")
-}
-
-model SolicitudCorreccionFichaje {
-  id         String @id @default(uuid())
-  empresaId  String
-  fichajeId  String
-  empleadoId String
-
-  estado    EstadoSolicitudCorreccionFichaje @default(pendiente)
-  motivo    String  @db.Text
-  detalles  Json
-  respuesta String? @db.Text
-
-  revisadaPor String?
-  revisadaEn  DateTime?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  empresa  Empresa  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
-  fichaje  Fichaje  @relation(fields: [fichajeId], references: [id], onDelete: Cascade)
-  empleado Empleado @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
-  aprobador Empleado? @relation("CorreccionFichajeAprobador", fields: [revisadaPor], references: [id], onDelete: SetNull)
-
-  @@index([empresaId])
-  @@index([fichajeId])
-  @@index([empleadoId])
-  @@index([estado])
-  @@index([revisadaPor])
-  @@map("solicitudes_correccion_fichaje")
-}
-
-// ========================================
-// 7. AUTO-COMPLETADOS (Auditoría y aprobación)
-// ========================================
-
-/// AutoCompletado - Registro de acciones automáticas del sistema
-/// Requires HR review and approval (or auto-approval after N days)
-model AutoCompletado {
-  id         String @id @default(uuid())
-  empresaId  String
-  empleadoId String
-
-  // Type of auto-completion
-  tipo String @db.VarChar(50) // 'fichaje_completado', 'fichaje_revision', 'nomina_extraida', 'contrato_extraido'
-
-  // Data storage for audit
-  datosOriginales Json // Original data before auto-completion
-  sugerencias     Json // Suggestions/changes applied
-
-  // Approval workflow
-  estado      String    @default("pendiente") @db.VarChar(50) // 'pendiente', 'aprobado', 'rechazado'
-  aprobadoPor String? // Usuario ID que aprobó
-  aprobadoEn  DateTime?
-
-  // Auto-approval expiry (optional)
-  expiraEn DateTime? // After this date, auto-approve (for fichajes can be 7 days)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
-  empresa  Empresa  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
-  empleado Empleado @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
-
-  @@index([empresaId])
-  @@index([empleadoId])
-  @@index([tipo])
-  @@index([estado])
-  @@index([expiraEn])
-  @@index([empresaId, tipo, estado]) // Composite index for combined filters
-  @@index([empresaId, estado, expiraEn]) // Composite index for auto-approval queries
-  @@map("auto_completados")
-}
-
-// ========================================
-// 13. NEXTAUTH MODELS (OAuth & Session Management)
-// ========================================
-
-/// Account - OAuth provider accounts (Google, Microsoft, etc.)
-model Account {
-  id                String  @id @default(uuid())
-  userId            String
-  type              String
-  provider          String
-  providerAccountId String
-  refresh_token     String? @db.Text
-  access_token      String? @db.Text
-  expires_at        Int?
-  token_type        String?
-  scope             String?
-  id_token          String? @db.Text
-  session_state     String?
-
-  user Usuario @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([provider, providerAccountId])
-  @@index([userId])
-  @@map("accounts")
-}
-
-/// Session - NextAuth sessions
-model Session {
-  id           String   @id @default(uuid())
-  sessionToken String   @unique
-  userId       String
-  expires      DateTime
-
-  user Usuario @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-  @@map("sessions")
-}
-
-/// SesionActiva - Active JWT sessions tracking
-/// Used for session invalidation on password change, logout, and security audits
-model SesionActiva {
-  id        String   @id @default(uuid())
-  usuarioId String
-  tokenHash String   @unique // SHA-256 hash of JWT token
-  ipAddress String?  @db.VarChar(50)
-  userAgent String?  @db.Text
-  createdAt DateTime @default(now())
-  ultimoUso DateTime @default(now())
-  expiraEn  DateTime
-
-  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
-
-  @@index([usuarioId])
-  @@index([tokenHash])
-  @@index([expiraEn])
-  @@map("sesiones_activas")
-}
-
-/// VerificationToken - Email verification and password reset tokens
-model VerificationToken {
-  identifier String
-  token      String   @unique
-  expires    DateTime
-
-  @@unique([identifier, token])
-  @@map("verification_tokens")
-}
-
-// ========================================
-// 14. INVITACIONES (Employee Onboarding)
-// ========================================
-
-/// InvitacionEmpleado - Employee invitation tokens
-model InvitacionEmpleado {
-  id         String   @id @default(uuid())
-  empresaId  String
-  empleadoId String   @unique
-  email      String
-  token      String   @unique
-  expiraEn   DateTime
-  aceptada   Boolean  @default(false)
-  createdAt  DateTime @default(now())
-
-  empresa  Empresa  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
-  empleado Empleado @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
-
-  @@index([token])
-  @@index([email])
-  @@index([empresaId])
-  @@map("invitaciones_empleados")
-}
-
-/// OnboardingEmpleado - Employee onboarding process tracking
-/// Manages multi-step onboarding with temporary data storage and progress tracking
-model OnboardingEmpleado {
-  id         String @id @default(uuid())
-  empresaId  String
-  empleadoId String @unique
-
-  // Onboarding type: 'completo' (new employees with full onboarding) or 'simplificado' (existing employees with credentials + integrations only)
-  tipoOnboarding String @default("completo") @db.VarChar(20) // 'completo' | 'simplificado'
-
-  // Token management
-  token       String   @unique @db.Text
-  tokenExpira DateTime
-
-  // Completion status
-  completado      Boolean   @default(false)
-  fechaCompletado DateTime?
-
-  // Progress tracking (JSONB)
-  // For 'completo': { "credenciales_completadas": boolean, "datos_personales": boolean, "datos_bancarios": boolean, "datos_documentos": boolean, "pwa_explicacion": boolean }
-  // For 'simplificado': { "credenciales_completadas": boolean, "integraciones": boolean, "pwa_explicacion": boolean }
-  progreso Json @default("{\"credenciales_completadas\": false, \"datos_personales\": false, \"datos_bancarios\": false, \"datos_documentos\": false}")
-
-  // Temporary data storage (JSONB) until onboarding is completed
-  // Stores form data from each step before final commit to Empleado
-  // datos_documentos: array of document IDs uploaded during onboarding
-  datosTemporales Json?
-
-  createdAt DateTime @default(now())
-
-  // Relations
-  empresa  Empresa  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
-  empleado Empleado @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
-
-  @@index([token])
-  @@index([empleadoId])
-  @@index([empresaId])
-  @@map("onboarding_empleados")
-}
-
-/// OnboardingConfig - Onboarding configuration per company
-/// HR can customize required fields and documents for employee onboarding
-model OnboardingConfig {
-  id        String @id @default(uuid())
-  empresaId String @unique
-
-  // Required/optional fields configuration (JSONB)
-  // { "datos_personales": { "nif": true, "nss": true, ... }, "datos_bancarios": { "iban": true, ... } }
-  camposRequeridos Json @default("{\"datos_personales\":{\"nif\":true,\"nss\":true,\"telefono\":true,\"direccionCalle\":true,\"direccionNumero\":true,\"codigoPostal\":true,\"ciudad\":true,\"direccionProvincia\":true,\"direccionPiso\":false,\"estadoCivil\":false,\"numeroHijos\":false},\"datos_bancarios\":{\"iban\":true,\"titularCuenta\":true}}")
-
-  // Required documents list (JSONB array)
-  // [{ "id": "dni", "nombre": "DNI/NIE", "descripcion": "...", "requerido": true }, ...]
-  documentosRequeridos Json @default("[]")
-
-  // Document templates (JSONB array)
-  // [{ "id": "contrato", "nombre": "Contrato", "s3Key": "...", "tipoDocumento": "contrato" }, ...]
-  plantillasDocumentos Json @default("[]")
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
-  empresa Empresa @relation(fields: [empresaId], references: [id], onDelete: Cascade)
-
-  @@index([empresaId])
-  @@map("onboarding_configs")
-}
-
-// ========================================
-// 15. NOTIFICACIONES
-// ========================================
-
-/// Notificacion - Sistema de notificaciones para usuarios
-model Notificacion {
-  id             String  @id @default(uuid())
-  empresaId      String
-  usuarioId      String
-  eventoNominaId String? // Vinculado a evento de nómina (opcional)
-
-  tipo    String @db.VarChar(50) // 'info', 'success', 'warning', 'error', 'ausencia_aprobada', 'ausencia_rechazada', 'nomina_complementos', etc.
-  titulo  String @db.VarChar(255)
-  mensaje String @db.Text
-
-  // Metadata adicional (JSON flexible)
-  metadata Json? // Puede contener ausenciaId, fichajeId, etc.
-
-  // Estado
-  leida Boolean @default(false)
-
-  // Timestamps
-  createdAt DateTime @default(now())
-
-  // Relations
-  empresa      Empresa       @relation(fields: [empresaId], references: [id], onDelete: Cascade)
-  usuario      Usuario       @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
-  eventoNomina EventoNomina? @relation(fields: [eventoNominaId], references: [id], onDelete: SetNull)
-
-  @@index([usuarioId, leida])
-  @@index([empresaId])
-  @@index([eventoNominaId])
-  @@index([createdAt])
-  @@map("notificaciones")
-}
-
-/// Denuncia - Canal de denuncias internas
-/// Permite a empleados reportar situaciones irregulares de forma anónima o identificada
-model Denuncia {
-  id            String  @id @default(uuid())
-  empresaId     String
-  denuncianteId String? // NULL si es anónima
-
-  // Contenido de la denuncia
-  descripcion String  @db.Text
-  esAnonima   Boolean @default(false)
-
-  // Documentos adjuntos (S3 keys en JSON)
-  documentos Json? // Array de { id, nombre, s3Key, mimeType, tamano, uploadedAt }
-
-  // Timestamps
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
-  empresa     Empresa   @relation(fields: [empresaId], references: [id], onDelete: Cascade)
-  denunciante Empleado? @relation(fields: [denuncianteId], references: [id], onDelete: SetNull)
-
-  @@index([empresaId])
-  @@index([denuncianteId])
-  @@index([createdAt])
-  @@map("denuncias")
-}
-
-// ========================================
-// 16. CAMPAÑAS DE VACACIONES (Cuadrado Inteligente)
-// ========================================
-
-/// CampanaVacaciones - Campañas para cuadrar vacaciones con IA
-model CampanaVacaciones {
-  id        String @id @default(uuid())
-  empresaId String
-
-  // Configuración de campaña
-  titulo    String @db.VarChar(200)
-  alcance   String @default("todos") @db.VarChar(50) // 'todos' | 'equipos'
-  equipoIds Json? // Array de equipo IDs si alcance='equipos'
-
-  // Estado de la campaña
-  estado String @default("abierta") @db.VarChar(50) // 'abierta', 'borrador_generado', 'propuesta_enviada', 'finalizada'
-
-  // Configuración de solapamiento (opcional por equipo)
-  solapamientoMaximoPct Int? // % máximo de miembros de un equipo de vacaciones simultáneamente
-
-  // Período objetivo de vacaciones
-  fechaInicioObjetivo DateTime @db.Date
-  fechaFinObjetivo    DateTime @db.Date
-
-  // Resultado de la IA
-  propuestaIA Json? // JSON con propuestas de ausencias por empleado
-
-  // Tracking de empleados asignados
-  totalEmpleadosAsignados Int @default(0)
-  empleadosCompletados    Int @default(0)
-
-  // Timestamps
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
-  cerradaEn  DateTime?
-  cuadradaEn DateTime?
-  finalizadaEn DateTime?
-
-  // Relations
-  empresa      Empresa                 @relation(fields: [empresaId], references: [id], onDelete: Cascade)
-  preferencias PreferenciaVacaciones[]
-
-  @@index([empresaId])
-  @@index([estado])
-  @@map("campanas_vacaciones")
-}
-
-/// PreferenciaVacaciones - Preferencias de vacaciones de empleados por campaña
-model PreferenciaVacaciones {
-  id         String @id @default(uuid())
-  campanaId  String
-  empleadoId String
-  empresaId  String
-
-  // Preferencias del empleado (arrays de fechas ISO)
-  diasIdeales      Json // ["2025-08-10", "2025-08-11", ...]
-  diasPrioritarios Json? // Fechas prioritarias (opcional)
-  diasAlternativos Json? // Fechas alternativas (opcional)
-
-  // Estado
-  completada Boolean @default(false)
-  aceptada   Boolean @default(false) // Si aceptó la propuesta de la IA
-  propuestaEnviada Boolean @default(false)
-  cambioSolicitado Boolean @default(false)
-  propuestaEmpleado Json?
-
-  // Propuesta individual de la IA para este empleado
-  propuestaIA Json? // { fechaInicio, fechaFin, tipo, motivo }
-
-  // Timestamps
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
-  campana  CampanaVacaciones @relation(fields: [campanaId], references: [id], onDelete: Cascade)
-  empleado Empleado          @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
-  empresa  Empresa           @relation(fields: [empresaId], references: [id], onDelete: Cascade)
-
-  @@unique([campanaId, empleadoId])
-  @@index([campanaId])
-  @@index([empleadoId])
-  @@index([empresaId])
-  @@index([completada])
-  @@map("preferencias_vacaciones")
-}
-
-// ========================================
-// 17. INVITACIONES DE SIGNUP Y WAITLIST
-// ========================================
-
-/// InvitacionSignup - Invitaciones para crear cuenta y empresa
-/// Solo usuarios invitados por el admin de la plataforma pueden hacer signup
-model InvitacionSignup {
-  id          String    @id @default(uuid())
-  email       String    @unique
-  token       String    @unique
-  expiraEn    DateTime
-  usada       Boolean   @default(false)
-  usadoEn     DateTime?
-  invitadoPor String? // Email del admin que envió la invitación
-  createdAt   DateTime  @default(now())
-
-  @@index([token])
-  @@index([email])
-  @@index([usada])
-  @@map("invitaciones_signup")
-}
-
-/// Waitlist - Lista de espera para usuarios que quieren unirse pero no están invitados
-model Waitlist {
-  id         String    @id @default(uuid())
-  email      String    @unique
-  nombre     String?   @db.VarChar(200)
-  empresa    String?   @db.VarChar(200) // Nombre de la empresa que quieren crear
-  mensaje    String?   @db.Text
-  invitado   Boolean   @default(false) // Si se convierte en invitación
-  invitadoEn DateTime?
-  createdAt  DateTime  @default(now())
-
-  @@index([email])
-  @@index([invitado])
-  @@map("waitlist")
-}
-
-// ========================================
-// 18. AUDITORÍA Y GDPR
-// ========================================
-
-/// AuditoriaAcceso - Registro de accesos a datos sensibles
-/// Cumplimiento GDPR/LOPD - Trazabilidad de accesos
-model AuditoriaAcceso {
-  id                 String  @id @default(uuid())
-  empresaId          String
-  usuarioId          String
-  empleadoAccedidoId String? // Empleado cuyos datos fueron accedidos
-
-  // Tipo de acceso
-  accion          String @db.VarChar(50) // 'lectura', 'modificacion', 'exportacion', 'eliminacion'
-  recurso         String @db.VarChar(100) // 'empleado', 'nomina', 'contrato', etc.
-  camposAccedidos Json? // Array de campos accedidos (ej: ['iban', 'nif', 'salarioBrutoAnual'])
-
-  // Metadata de contexto
-  ipAddress String? @db.VarChar(50)
-  userAgent String? @db.Text
-  motivo    String? @db.Text // Razón del acceso (opcional)
-
-  // Timestamps
-  createdAt DateTime @default(now())
-
-  // Relations
-  empresa Empresa @relation(fields: [empresaId], references: [id], onDelete: Cascade)
-  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
-
-  @@index([empresaId])
-  @@index([usuarioId])
-  @@index([empleadoAccedidoId])
-  @@index([accion])
-  @@index([recurso])
-  @@index([createdAt])
-  @@map("auditoria_accesos")
-}
-
-/// Consentimiento - Gestión de consentimientos GDPR
-/// Artículo 6 y 7 GDPR - Legitimación y consentimiento
-model Consentimiento {
-  id         String @id @default(uuid())
-  empresaId  String
-  empleadoId String
-
-  // Tipo de consentimiento
-  tipo        String @db.VarChar(100) // 'tratamiento_datos', 'comunicaciones_marketing', 'transferencia_internacional', etc.
-  descripcion String @db.Text
-
-  // Estado del consentimiento
-  otorgado   Boolean   @default(false)
-  otorgadoEn DateTime?
-  revocadoEn DateTime?
-
-  // Metadata
-  version   String  @db.VarChar(50) // Versión de la política de privacidad
-  ipAddress String? @db.VarChar(50) // IP desde donde se otorgó
-
-  // Timestamps
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
-  empresa  Empresa  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
-  empleado Empleado @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
-
-  @@unique([empresaId, empleadoId, tipo])
-  @@index([empresaId])
-  @@index([empleadoId])
-  @@index([tipo])
-  @@index([otorgado])
-  @@map("consentimientos")
-}
-
-/// SolicitudEliminacionDatos - Derecho al olvido (Artículo 17 GDPR)
-/// Solicitudes de eliminación de datos personales
-model SolicitudEliminacionDatos {
-  id             String @id @default(uuid())
-  empresaId      String
-  empleadoId     String
-  solicitantePor String // Usuario ID que solicitó (puede ser el propio empleado o HR)
-
-  // Estado de la solicitud
-  estado       String    @default("pendiente") @db.VarChar(50) // 'pendiente', 'aprobada', 'rechazada', 'completada'
-  motivo       String?   @db.Text // Motivo de la solicitud
-  respuesta    String?   @db.Text // Respuesta/justificación de HR
-  completadaEn DateTime?
-
-  // Timestamps
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
-  empresa  Empresa  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
-  empleado Empleado @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
-
-  @@index([empresaId])
-  @@index([empleadoId])
-  @@index([estado])
-  @@map("solicitudes_eliminacion_datos")
-}
-
-// ========================================
-// 19. PLANTILLAS DE DOCUMENTOS Y FIRMA DIGITAL
-// ========================================
-
-/// PlantillaDocumento - Template storage and metadata
-/// Stores document templates with variables for auto-generation
-model PlantillaDocumento {
-  id        String  @id @default(uuid())
-  empresaId String? // NULL = plantilla oficial (todas empresas), NOT NULL = personalizada por empresa
-
-  // Metadata
-  nombre      String  @db.VarChar(255) // "Contrato Indefinido", "Modelo 145"
-  descripcion String? @db.Text
-  categoria   String  @db.VarChar(100) // 'contrato', 'fiscal', 'ausencia', 'personal'
-
-  // Template type
-  tipo    String @db.VarChar(50) // 'oficial' | 'personalizada'
-  formato String @db.VarChar(20) // 'docx' | 'pdf_rellenable'
-
-  // File storage
-  s3Key    String @unique @db.Text // S3 key to template file
-  s3Bucket String @db.VarChar(255)
-
-  // Variables used in template (JSON array of variable names)
-  // Example: ["empleado_nombre", "empleado_nif", "contrato_fecha_inicio"]
-  // NOTE: Solo almacena KEYS, no valores (por seguridad GDPR)
-  variablesUsadas Json @default("[]")
-
-  // Configuration
-  activa           Boolean @default(true)
-  esOficial        Boolean @default(false) // Sistema predefinida
-  requiereContrato Boolean @default(false) // Necesita datos de contrato
-  requiereFirma    Boolean @default(false) // Requiere firma digital
-
-  // Folder destination default
-  carpetaDestinoDefault String? @db.VarChar(50) // 'Contratos', 'Personales', etc.
-
-  // AI configuration
-  usarIAParaExtraer Boolean @default(false) // Usar IA para extraer campos de PDF
-  configuracionIA   Json? // Configuración específica de IA para esta plantilla
-
-  // Auto-generation configuration (Fase 4)
-  autoGenerarOnboarding  Boolean @default(false) // Auto-generar al crear empleado (onboarding)
-  autoGenerarOffboarding Boolean @default(false) // Auto-generar al dar de baja empleado (offboarding)
-  requiereRevision       Boolean @default(false) // HR debe revisar antes de enviar a empleado
-  permiteRellenar        Boolean @default(false) // Empleado puede rellenar campos antes de firmar
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
-  empresa             Empresa?              @relation(fields: [empresaId], references: [id], onDelete: Cascade)
-  documentosGenerados DocumentoGenerado[]
-  jobsGeneracion      JobGeneracionDocumentos[]
-
-  @@index([empresaId])
-  @@index([tipo])
-  @@index([categoria])
-  @@index([activa])
-  @@index([esOficial])
-  @@map("plantillas_documentos")
-}
-
-/// DocumentoGenerado - Documents generated from templates
-/// Tracking de documentos generados a partir de plantillas
-model DocumentoGenerado {
-  id          String @id @default(uuid())
-  empresaId   String
-  empleadoId  String
-  plantillaId String
-  documentoId String @unique // Link to Documento table (final PDF/DOCX)
-
-  // Generation metadata
-  generadoPor String? // Usuario ID (HR Admin)
-  generadoEn  DateTime @default(now())
-
-  // Variables used (SOLO KEYS, no valores por seguridad)
-  // Example: ["empleado_nombre", "empleado_nif", "contrato_fecha_inicio"]
-  variablesUtilizadas Json // Array de strings con nombres de variables
-
-  // AI extraction metadata (si se usó IA)
-  usadaIA         Boolean @default(false)
-  confianzaIA     Decimal? @db.Decimal(3, 2) // 0.00-1.00
-  tiempoGeneracion Int? // Milliseconds
-
-  // Delivery tracking
-  notificado Boolean @default(false)
-  visto      Boolean @default(false)
-  vistoEn    DateTime?
-  pendienteRellenar Boolean @default(false)
-  camposCompletados Json?
-  rellenadoEn DateTime?
-
-  // Firma digital (integración con sistema de firma)
-  requiereFirma Boolean   @default(false)
-  firmado       Boolean   @default(false)
-  firmadoEn     DateTime?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
-  empresa   Empresa            @relation(fields: [empresaId], references: [id], onDelete: Cascade)
-  empleado  Empleado           @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
-  plantilla PlantillaDocumento @relation(fields: [plantillaId], references: [id], onDelete: Cascade)
-  documento Documento          @relation(fields: [documentoId], references: [id], onDelete: Cascade)
-
-  @@index([empresaId])
-  @@index([empleadoId])
-  @@index([plantillaId])
-  @@index([documentoId])
-  @@index([generadoEn])
-  @@index([firmado])
-  @@index([usadaIA])
-  @@map("documentos_generados")
-}
-
-/// VariableMapping - Cache de mappings de variables resueltos por IA
-/// Almacena el resultado de la IA para evitar llamadas repetidas
-model VariableMapping {
-  id           String @id @default(uuid())
-  variableName String @unique @db.VarChar(200) // "empleado_nombre", "contrato_salario_mensual"
-
-  // Mapping configuration (resultado de IA)
-  jsonPath            String  @db.Text // "empleado.nombre", "contratos[0].salarioBrutoAnual"
-  requiresDecryption  Boolean @default(false)
-  requiresFormatting  Boolean @default(false)
-  formatType          String? @db.VarChar(50) // 'date', 'currency', 'number', null
-  formatPattern       String? @db.VarChar(100) // 'dd/MM/yyyy', 'EUR', etc.
-
-  // AI metadata
-  generadoPorIA Boolean   @default(true)
-  confianza     Decimal   @db.Decimal(3, 2) // 0.00-1.00
-  verificado    Boolean   @default(false) // Verificado manualmente por developer
-  vecesUsado    Int       @default(0) // Contador de uso
-
-  // Cache control
-  ultimoUso DateTime @default(now())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([variableName])
-  @@index([ultimoUso])
-  @@map("variable_mappings")
-}
-
-/// JobGeneracionDocumentos - Background jobs para generación asíncrona
-/// Gestiona la generación masiva de documentos con tracking de progreso
-model JobGeneracionDocumentos {
-  id          String @id @default(uuid())
-  empresaId   String
-  plantillaId String
-  solicitadoPor String // Usuario ID que solicitó la generación
-
-  // Configuration
-  empleadoIds    Json // Array de empleado IDs
-  configuracion  Json // { nombreDocumento, carpetaDestino, notificar, requiereFirma }
-
-  // Status tracking
-  estado           String @default("en_cola") @db.VarChar(50) // 'en_cola', 'procesando', 'completado', 'fallido'
-  progreso         Int    @default(0) @db.SmallInt // 0-100
-  totalEmpleados   Int
-  procesados       Int    @default(0)
-  exitosos         Int    @default(0)
-  fallidos         Int    @default(0)
-
-  // Timing
-  iniciadoEn    DateTime?
-  completadoEn  DateTime?
-  tiempoTotal   Int? // Milliseconds
-
-  // Results (JSON array de resultados por empleado)
-  resultados Json? // [{ empleadoId, success, documentoId?, error? }]
-
-  // Error handling
-  error      String? @db.Text
-  intentos   Int     @default(0) @db.SmallInt
-  ultimoIntento DateTime?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
-  empresa   Empresa            @relation(fields: [empresaId], references: [id], onDelete: Cascade)
-  plantilla PlantillaDocumento @relation(fields: [plantillaId], references: [id], onDelete: Cascade)
-
-  @@index([empresaId])
-  @@index([plantillaId])
-  @@index([estado])
-  @@index([solicitadoPor])
-  @@index([createdAt])
-  @@map("jobs_generacion_documentos")
-}
-
-/// SolicitudFirma - Workflow de firma digital para documentos
-/// Gestiona el proceso completo de firma: creación, envío, recordatorios, y seguimiento
-model SolicitudFirma {
-  id          String @id @default(uuid())
-  empresaId   String
-  documentoId String
-
-  // Solicitante/Creador
-  solicitadoPor String?   @db.VarChar(100) // Usuario ID (HR Admin) - alias de creadoPor
-  creadoPor     String?   @db.VarChar(100) // Usuario ID que creó la solicitud
-  solicitadoEn  DateTime? @default(now())
-
-  // Configuración de la solicitud
-  titulo      String  @db.VarChar(255)
-  mensaje     String? @db.Text // Mensaje opcional al empleado
-  fechaLimite DateTime? // Fecha límite para firmar (opcional)
-  ordenFirma  Boolean @default(false) // Si true, firmantes deben firmar en orden secuencial (alias de requiereOrden)
-
-  // Proveedor de firma
-  proveedor String @default("interno") @db.VarChar(50) // 'interno' | 'lleidanetworks' (Fase 2)
-
-  // Recordatorios automáticos
-  recordatorioAutomatico Boolean @default(true)
-  diasRecordatorio       Int     @default(3) // Días entre recordatorios
-
-  // Snapshot del documento (para verificación de integridad)
-  nombreDocumento String @db.VarChar(255)
-  hashDocumento   String @db.Text // SHA-256 del documento original
-
-  posicionFirma Json?
-
-  // PDF firmado con marcas visuales (generado al completar todas las firmas)
-  pdfFirmadoS3Key String? @db.Text // S3 key del PDF con marcas de firma
-
-  // Estado del workflow
-  // Estados: pendiente, en_proceso, completada, expirada, cancelada
-  estado String @default("pendiente") @db.VarChar(50)
-
-  // Tipo de solicitud (para tracking)
-  tipo String @default("individual") @db.VarChar(50) // individual, masiva, automatica
-
-  // Timestamps
-  completadaEn      DateTime? // Cuando todos firmaron
-  expiradaEn        DateTime? // Cuando expiró
-  canceladaEn       DateTime? // Cuando HR canceló
-  motivoCancelacion String?   @db.Text
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
-  empresa   Empresa   @relation(fields: [empresaId], references: [id], onDelete: Cascade)
-  documento Documento @relation(fields: [documentoId], references: [id], onDelete: Cascade)
-  firmas    Firma[] // Array de firmas individuales
-
-  @@index([empresaId])
-  @@index([documentoId])
-  @@index([estado])
-  @@index([fechaLimite])
-  @@index([tipo])
-  @@index([solicitadoPor])
-  @@index([empresaId, estado])
-  @@index([empresaId, createdAt])
-  @@map("solicitudes_firma")
-}
-
-/// Firma - Tracking individual de firma por empleado
-/// Cada empleado tiene su propio registro de firma con certificado digital
-model Firma {
-  id               String @id @default(uuid())
-  solicitudFirmaId String
-  empleadoId       String
-
-  // Orden de firma (solo si ordenFirma=true en SolicitudFirma)
-  orden Int @default(0) // 0 = sin orden, 1+ = secuencia de firma
-
-  // Tipo de firma
-  tipo          String @default("simple") @db.VarChar(50) // 'simple', 'avanzada', 'cualificada'
-  metodoCaptura String @default("click") @db.VarChar(50) // 'click', 'manuscrita', 'certificado' (alias de metodoFirma)
-
-  // Estado individual de esta firma
-  // Estados: pendiente, visto, firmado, rechazado, expirado
-  estado String @default("pendiente") @db.VarChar(50)
-  firmado   Boolean   @default(false)
-  firmadoEn DateTime?
-
-  // Tracking de eventos
-  enviadoEn   DateTime? // Cuando se envió la solicitud
-  rechazadoEn DateTime? // Si rechazó (Fase 2)
-
-  // Datos de firma capturados (para auditoría y validez legal)
-  datosCapturados Json? // { tipo: 'click', ip: '...', userAgent: '...', coords: [...] }
-  ipAddress       String? @db.VarChar(50) // IP desde donde firmó
-  userAgent       String? @db.Text // Navegador usado
-  ubicacion       Json? // Geolocation opcional (lat, lon, city)
-
-  // Certificado de firma digital
-  certificado     String? @db.Text // Hash SHA-256 del documento + timestamp (alias de certificadoHash)
-  certificadoHash String? @db.Text // Hash SHA-256 del certificado de firma (si aplica)
-  metodoFirma     String? @db.VarChar(50) // click, biometrica, otp, certificado (alias de metodoCaptura)
-
-  // Recordatorios enviados (tracking general)
-  numRecordatorios Int @default(0)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
-  solicitudFirma SolicitudFirma @relation(fields: [solicitudFirmaId], references: [id], onDelete: Cascade)
-  empleado       Empleado       @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
-
-  @@unique([solicitudFirmaId, empleadoId]) // Un empleado solo firma una vez por solicitud
-  @@index([solicitudFirmaId])
-  @@index([empleadoId])
-  @@index([estado])
-  @@index([firmado])
-  @@index([firmadoEn])
-  @@index([enviadoEn])
-  @@index([solicitudFirmaId, firmado])
-  @@index([empleadoId, firmado])
-  @@map("firmas")
-}
-
-// ========================================
-// 20. BILLING & SUBSCRIPTIONS (Stripe)
-// ========================================
-
-/// Estado de la suscripción
 enum SubscriptionStatus {
-  trialing // En periodo de prueba
-  active // Activa y pagando
-  canceled // Cancelada (sigue activa hasta fin de periodo)
-  incomplete // Pago inicial fallido
-  incomplete_expired // Pago inicial expirado
-  past_due // Pago vencido (reintentando)
-  unpaid // Impagada (sin acceso)
-  paused // Pausada
+  trialing
+  active
+  canceled
+  incomplete
+  incomplete_expired
+  past_due
+  unpaid
+  paused
 }
 
-/// Intervalo de facturación
-enum BillingInterval {
-  month
-  year
+enum TipoAusencia {
+  vacaciones
+  enfermedad
+  enfermedad_familiar
+  maternidad_paternidad
+  otro
 }
 
-/// BillingProduct - Productos/Planes sincronizados desde Stripe
-/// Los productos se crean en Stripe Dashboard y se sincronizan via webhook
-model BillingProduct {
-  id          String  @id // Stripe product ID (prod_xxx)
-  nombre      String  @db.VarChar(255)
-  descripcion String? @db.Text
-
-  // Metadata del producto
-  activo      Boolean @default(true)
-  imagen      String? @db.Text // URL de imagen del producto
-
-  // Features del plan (JSON array)
-  // Example: ["Hasta 50 empleados", "Soporte por email", "Firma digital"]
-  features    Json    @default("[]")
-
-  // Orden de visualización en pricing page
-  orden       Int     @default(0)
-
-  // Metadata adicional de Stripe
-  metadata    Json?
-
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  // Relations
-  precios     BillingPrice[]
-
-  @@index([activo])
-  @@index([orden])
-  @@map("billing_products")
+enum TipoContrato {
+  indefinido
+  temporal
+  administrador
+  fijo_discontinuo
+  becario
+  practicas
+  obra_y_servicio
 }
 
-/// BillingPrice - Precios de productos sincronizados desde Stripe
-/// Un producto puede tener múltiples precios (mensual, anual, etc.)
-model BillingPrice {
-  id          String          @id // Stripe price ID (price_xxx)
-  productoId  String
-
-  // Precio
-  unitAmount  Int             // Cantidad en céntimos (ej: 2900 = 29.00€)
-  currency    String          @default("eur") @db.VarChar(3)
-
-  // Recurrencia
-  intervalo   BillingInterval @default(month)
-  intervalCount Int           @default(1) // Cada cuántos intervalos (1 = cada mes/año)
-
-  // Periodo de prueba
-  trialDays   Int?            // Días de prueba (null = sin trial)
-
-  // Estado
-  activo      Boolean         @default(true)
-
-  // Metadata adicional de Stripe
-  metadata    Json?
-
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
-
-  // Relations
-  producto    BillingProduct  @relation(fields: [productoId], references: [id], onDelete: Cascade)
-  subscriptions Subscription[]
-
-  @@index([productoId])
-  @@index([activo])
-  @@map("billing_prices")
+enum TipoEquipo {
+  proyecto
+  squad
+  temporal
 }
 
-/// BillingCustomer - Cliente de Stripe vinculado a una Empresa
-/// Se crea cuando la empresa inicia el proceso de suscripción
-model BillingCustomer {
-  id              String  @id // Stripe customer ID (cus_xxx)
-  empresaId       String  @unique
-
-  // Información de facturación
-  email           String  @db.VarChar(255) // Email de facturación
-  nombre          String? @db.VarChar(255) // Nombre para facturas
-
-  // Dirección de facturación (opcional)
-  direccion       Json?   // { line1, line2, city, state, postal_code, country }
-
-  // Número de IVA/CIF para facturas
-  taxId           String? @db.VarChar(50)
-
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  // Relations
-  empresa         Empresa @relation(fields: [empresaId], references: [id], onDelete: Cascade)
-  subscriptions   Subscription[]
-
-  @@index([empresaId])
-  @@map("billing_customers")
+enum TipoFichajeEvento {
+  entrada
+  pausa_inicio
+  pausa_fin
+  salida
 }
 
-/// Subscription - Suscripciones de empresas
-/// Sincronizada con Stripe via webhooks
-model Subscription {
-  id                  String             @id // Stripe subscription ID (sub_xxx)
-  empresaId           String
-  customerId          String
-  priceId             String
-
-  // Estado de la suscripción
-  status              SubscriptionStatus @default(active)
-
-  // Fechas del ciclo
-  currentPeriodStart  DateTime
-  currentPeriodEnd    DateTime
-
-  // Periodo de prueba
-  trialStart          DateTime?
-  trialEnd            DateTime?
-
-  // Cancelación
-  cancelAtPeriodEnd   Boolean            @default(false) // Si se cancela al final del periodo
-  canceledAt          DateTime?
-
-  // Metadata
-  metadata            Json?
-
-  createdAt           DateTime           @default(now())
-  updatedAt           DateTime           @updatedAt
-
-  // Relations
-  empresa             Empresa            @relation(fields: [empresaId], references: [id], onDelete: Cascade)
-  customer            BillingCustomer    @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  price               BillingPrice       @relation(fields: [priceId], references: [id], onDelete: Cascade)
-
-  @@index([empresaId])
-  @@index([customerId])
-  @@index([priceId])
-  @@index([status])
-  @@map("subscriptions")
+enum UsuarioRol {
+  platform_admin
+  hr_admin
+  manager
+  empleado
 }

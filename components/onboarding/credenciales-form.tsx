@@ -32,6 +32,7 @@ export function CredencialesForm({ token, empleado, onComplete, initialProgress 
   interface CredencialesResponse {
     success?: boolean;
     error?: string;
+    avatarUrl?: string | null;
   }
 
   const [password, setPassword] = useState('');
@@ -97,6 +98,10 @@ export function CredencialesForm({ token, empleado, onComplete, initialProgress 
       const data = await parseJson<CredencialesResponse>(res);
 
       if (res.ok && data.success) {
+        // Actualizar el preview del avatar con la URL del servidor si existe
+        if (data.avatarUrl) {
+          setAvatarPreview(data.avatarUrl);
+        }
         setSuccess('Credenciales guardadas correctamente');
         toast.success('Credenciales guardadas correctamente');
         setTimeout(() => {

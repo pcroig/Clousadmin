@@ -152,8 +152,8 @@ async function main() {
       puesto: 'HR Administrator',
       fechaAlta: new Date('2024-01-01'),
       jornadaId: jornadaCompleta.id,
-      salarioBrutoAnual: 45000,
-      salarioBrutoMensual: 3750,
+      salarioBaseAnual: 45000,
+      salarioBaseMensual: 3750,
       onboardingCompletado: true,
       onboardingCompletadoEn: new Date(),
       documentosCompletos: true,
@@ -182,7 +182,7 @@ async function main() {
       nif: '11111111A',
       equipo: 'Tech',
       puesto: 'Software Engineer',
-      salarioBrutoAnual: 42000,
+      salarioBaseAnual: 42000,
       rol: UsuarioRol.empleado as const,
     },
     {
@@ -192,7 +192,7 @@ async function main() {
       nif: '22222222B',
       equipo: 'Producto',
       puesto: 'Product Manager',
-      salarioBrutoAnual: 48000,
+      salarioBaseAnual: 48000,
       rol: UsuarioRol.manager as const, // Carlos es manager de equipos
     },
     {
@@ -202,7 +202,7 @@ async function main() {
       nif: '33333333C',
       equipo: 'Diseño',
       puesto: 'UX Designer',
-      salarioBrutoAnual: 38000,
+      salarioBaseAnual: 38000,
       rol: UsuarioRol.empleado as const,
     },
     {
@@ -212,7 +212,7 @@ async function main() {
       nif: '44444444D',
       equipo: 'Tech',
       puesto: 'DevOps Engineer',
-      salarioBrutoAnual: 45000,
+      salarioBaseAnual: 45000,
       rol: UsuarioRol.empleado as const,
     },
     {
@@ -222,7 +222,7 @@ async function main() {
       nif: '55555555E',
       equipo: 'Tech',
       puesto: 'QA Engineer',
-      salarioBrutoAnual: 38000,
+      salarioBaseAnual: 38000,
       rol: UsuarioRol.empleado as const,
     },
   ];
@@ -261,8 +261,8 @@ async function main() {
         nombre: empData.nombre,
         apellidos: empData.apellidos,
         puesto: empData.puesto,
-        salarioBrutoAnual: empData.salarioBrutoAnual,
-        salarioBrutoMensual: Math.round(empData.salarioBrutoAnual / 12),
+        salarioBaseAnual: empData.salarioBaseAnual,
+        salarioBaseMensual: Math.round(empData.salarioBaseAnual / 12),
         activo: true,
         jornadaId: jornadaCompleta.id, // Asegurar que se asigna jornada también en update
       },
@@ -282,8 +282,8 @@ async function main() {
         fechaAlta: new Date('2024-03-01'),
         managerId: empleadoAdmin.id,
         jornadaId: jornadaCompleta.id,
-        salarioBrutoAnual: empData.salarioBrutoAnual,
-        salarioBrutoMensual: Math.round(empData.salarioBrutoAnual / 12),
+        salarioBaseAnual: empData.salarioBaseAnual,
+        salarioBaseMensual: Math.round(empData.salarioBaseAnual / 12),
         onboardingCompletado: false,
         documentosCompletos: false,
       },

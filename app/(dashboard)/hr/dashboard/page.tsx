@@ -41,28 +41,46 @@ export default async function HRDashboardPage() {
   // Combinar solicitudes
   const solicitudes = [
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ...(Array.isArray(ausenciasPendientes) ? ausenciasPendientes as any : []).map((aus: any) => ({
-      id: aus.id,
-      empleado: {
-        nombre: `${aus.empleado.nombre} ${aus.empleado.apellidos}`,
-        fotoUrl: aus.empleado.fotoUrl || undefined,
-      },
-      tipo: 'ausencia' as const,
-      descripcion: `${aus.empleado.nombre} ${aus.empleado.apellidos} solicita ${aus.tipo}`,
-      fecha: ensureDate(aus.createdAt),
-      prioridad: 'media' as const,
-    })),
+    ...(Array.isArray(ausenciasPendientes) ? ausenciasPendientes as any : []).map((aus: any) => {
+      const fechaInicio = ensureDate(aus.fechaInicio);
+      const fechaFin = ensureDate(aus.fechaFin);
+      const periodo = `${fechaInicio.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })} - ${fechaFin.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}`;
+
+      return {
+        id: aus.id,
+        empleado: {
+          nombre: aus.empleado.nombre,
+          apellidos: aus.empleado.apellidos,
+          fotoUrl: aus.empleado.fotoUrl || undefined,
+          email: aus.empleado.email || undefined,
+          puesto: aus.empleado.puesto || undefined,
+        },
+        tipo: 'ausencia' as const,
+        descripcion: `${aus.tipo} (${periodo})`,
+        fecha: ensureDate(aus.createdAt),
+        prioridad: 'media' as const,
+        estadoLabel: 'Pendiente de aprobación',
+      };
+    }),
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     ...(solicitudesCambioPendientes as any).map((sol: any) => ({
       id: sol.id,
       empleado: {
-        nombre: `${sol.empleado.nombre} ${sol.empleado.apellidos}`,
+        nombre: sol.empleado.nombre,
+        apellidos: sol.empleado.apellidos,
         fotoUrl: sol.empleado.fotoUrl || undefined,
+        email: sol.empleado.email || undefined,
+        puesto: sol.empleado.puesto || undefined,
+        equipoNombre:
+          Array.isArray(sol.empleado.equipos) && sol.empleado.equipos.length > 0
+            ? sol.empleado.equipos[0]?.equipo?.nombre
+            : undefined,
       },
       tipo: 'cambio_datos' as const,
-      descripcion: `Solicitud de cambio de ${sol.tipo}`,
+      descripcion: `cambio de ${sol.tipo}`,
       fecha: ensureDate(sol.createdAt),
       prioridad: 'baja' as const,
+      estadoLabel: 'Pendiente de aprobación',
     })),
   ].sort((a, b) => b.fecha.getTime() - a.fecha.getTime());
 
@@ -107,8 +125,10 @@ export default async function HRDashboardPage() {
         <div className="flex-1 min-h-0 pb-4 overflow-auto">
           <PlantillaWidget
             trabajando={plantillaResumen.trabajando}
+            enPausa={plantillaResumen.enPausa}
             ausentes={plantillaResumen.ausentes}
             sinFichar={plantillaResumen.sinFichar}
+            fueraDeHorario={plantillaResumen.fueraDeHorario}
             variant="compact"
           />
           <ScrollIndicator />
@@ -146,9 +166,11 @@ export default async function HRDashboardPage() {
           <div className="h-full min-h-[220px]">
             <PlantillaWidget
               trabajando={plantillaResumen.trabajando}
+              enPausa={plantillaResumen.enPausa}
               ausentes={plantillaResumen.ausentes}
               sinFichar={plantillaResumen.sinFichar}
-                variant="card"
+              fueraDeHorario={plantillaResumen.fueraDeHorario}
+              variant="card"
             />
           </div>
 

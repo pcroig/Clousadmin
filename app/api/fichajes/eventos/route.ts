@@ -84,15 +84,19 @@ export async function POST(req: NextRequest) {
       });
       const nombreEditor = editor ? `${editor.nombre} ${editor.apellidos}` : 'Administrador';
 
-      await crearNotificacionFichajeModificado(prisma, {
-        fichajeId,
-        empresaId: session.user.empresaId,
-        empleadoId: fichaje.empleadoId,
-        modificadoPorNombre: nombreEditor,
-        accion: 'creado',
-        fechaFichaje: fichaje.fecha,
-        detalles: `Evento: ${tipo} a las ${new Date(hora).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}. ${motivoEdicion ? `Motivo: ${motivoEdicion}` : ''}`,
-      });
+      await crearNotificacionFichajeModificado(
+        prisma,
+        {
+          fichajeId,
+          empresaId: session.user.empresaId,
+          empleadoId: fichaje.empleadoId,
+          modificadoPorNombre: nombreEditor,
+          accion: 'creado',
+          fechaFichaje: fichaje.fecha,
+          detalles: `Evento: ${tipo} a las ${new Date(hora).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}. ${motivoEdicion ? `Motivo: ${motivoEdicion}` : ''}`,
+        },
+        { actorUsuarioId: session.user.id }
+      );
     }
 
     return successResponse({ success: true, eventoId: evento.id });

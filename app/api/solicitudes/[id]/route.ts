@@ -156,21 +156,29 @@ export async function PATCH(
 
     // Crear notificación fuera de la transacción
     if (accion === 'aprobar') {
-      await crearNotificacionSolicitudAprobada(prisma, {
-        solicitudId: solicitud.id,
-        empresaId: session.user.empresaId,
-        empleadoId: solicitud.empleadoId,
-        tipo: solicitud.tipo,
-        aprobadoPor: 'manual',
-      });
+      await crearNotificacionSolicitudAprobada(
+        prisma,
+        {
+          solicitudId: solicitud.id,
+          empresaId: session.user.empresaId,
+          empleadoId: solicitud.empleadoId,
+          tipo: solicitud.tipo,
+          aprobadoPor: 'manual',
+        },
+        { actorUsuarioId: session.user.id }
+      );
     } else {
-      await crearNotificacionSolicitudRechazada(prisma, {
-        solicitudId: solicitud.id,
-        empresaId: session.user.empresaId,
-        empleadoId: solicitud.empleadoId,
-        tipo: solicitud.tipo,
-        motivoRechazo,
-      });
+      await crearNotificacionSolicitudRechazada(
+        prisma,
+        {
+          solicitudId: solicitud.id,
+          empresaId: session.user.empresaId,
+          empleadoId: solicitud.empleadoId,
+          tipo: solicitud.tipo,
+          motivoRechazo,
+        },
+        { actorUsuarioId: session.user.id }
+      );
     }
 
     return successResponse(result);

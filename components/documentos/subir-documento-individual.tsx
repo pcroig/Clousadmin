@@ -26,7 +26,7 @@ interface DatosExtraidos {
   fechaNacimiento?: string;
   puesto?: string;
   fechaAlta?: string;
-  salarioBrutoAnual?: string;
+  salarioBaseAnual?: string;
   tipoContrato?: string;
   direccionCalle?: string;
   direccionNumero?: string;
@@ -294,14 +294,14 @@ export function SubirDocumentoIndividual({ onSuccess, onCancel }: SubirDocumento
                 />
               </div>
 
-              {/* Salario bruto anual */}
+              {/* Salario base anual */}
               <div>
-                <Label htmlFor="salarioBrutoAnual">Salario bruto anual</Label>
+                <Label htmlFor="salarioBaseAnual">Salario base anual</Label>
                 <Input
-                  id="salarioBrutoAnual"
+                  id="salarioBaseAnual"
                   type="number"
-                  value={datosExtraidos.salarioBrutoAnual || ''}
-                  onChange={(e) => setDatosExtraidos({ ...datosExtraidos, salarioBrutoAnual: e.target.value })}
+                  value={datosExtraidos.salarioBaseAnual || ''}
+                  onChange={(e) => setDatosExtraidos({ ...datosExtraidos, salarioBaseAnual: e.target.value })}
                 />
               </div>
 

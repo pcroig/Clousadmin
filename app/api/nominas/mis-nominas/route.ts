@@ -84,7 +84,7 @@ export async function GET(req: NextRequest) {
       id: nomina.id,
       mes: nomina.mes,
       anio: nomina.anio,
-      salarioBruto: Number(nomina.totalBruto), // Mantener nombre para compatibilidad frontend
+      salarioBase: Number(nomina.salarioBase),
       deducciones: Number(nomina.totalDeducciones),
       salarioNeto: Number(nomina.totalNeto),
       fechaPublicacion: nomina.fechaPublicacion,

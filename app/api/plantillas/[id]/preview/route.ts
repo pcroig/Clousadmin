@@ -161,7 +161,7 @@ export async function GET(
             tipoContrato: true,
             fechaInicio: true,
             fechaFin: true,
-            salarioBrutoAnual: true,
+            salarioBaseAnual: true,
           },
         },
       },
@@ -213,16 +213,16 @@ export async function GET(
       numeroHijos: empleado.numeroHijos ?? undefined,
       genero: empleado.genero ?? undefined,
       iban: empleado.iban ?? undefined,
-      titularCuenta: empleado.titularCuenta ?? undefined,
+      bic: empleado.bic ?? undefined,
       puesto: empleado.puesto ?? undefined,
       fechaAlta: empleado.fechaAlta,
       fechaBaja: empleado.fechaBaja ?? undefined,
       tipoContrato: empleado.tipoContrato ?? undefined,
-      salarioBrutoAnual: empleado.salarioBrutoAnual
-        ? Number(empleado.salarioBrutoAnual)
+      salarioBaseAnual: empleado.salarioBaseAnual
+        ? Number(empleado.salarioBaseAnual)
         : undefined,
-      salarioBrutoMensual: empleado.salarioBrutoMensual
-        ? Number(empleado.salarioBrutoMensual)
+      salarioBaseMensual: empleado.salarioBaseMensual
+        ? Number(empleado.salarioBaseMensual)
         : undefined,
       empresa: empresaData,
       jornada: empleado.jornada
@@ -249,8 +249,8 @@ export async function GET(
         tipoContrato: contrato.tipoContrato,
         fechaInicio: contrato.fechaInicio,
         fechaFin: contrato.fechaFin ?? undefined,
-        salarioBrutoAnual: contrato.salarioBrutoAnual
-          ? Number(contrato.salarioBrutoAnual)
+        salarioBaseAnual: contrato.salarioBaseAnual
+          ? Number(contrato.salarioBaseAnual)
           : 0,
       })),
     };

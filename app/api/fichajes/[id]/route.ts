@@ -19,6 +19,7 @@ import {
   validarFichajeCompleto,
 } from '@/lib/calculos/fichajes';
 import { EstadoFichaje, UsuarioRol } from '@/lib/constants/enums';
+import { crearNotificacionFichajeAprobado, crearNotificacionFichajeModificado, crearNotificacionFichajeRechazado } from '@/lib/notificaciones';
 import { prisma } from '@/lib/prisma';
 import { getJsonBody } from '@/lib/utils/json';
 
@@ -169,6 +170,22 @@ export async function PATCH(
           },
         });
 
+        // Notificar al empleado
+        try {
+          await crearNotificacionFichajeAprobado(
+            prisma,
+            {
+              fichajeId: fichaje.id,
+              empresaId: session.user.empresaId,
+              empleadoId: fichaje.empleadoId,
+              fecha: fichaje.fecha,
+            },
+            { actorUsuarioId: session.user.id }
+          );
+        } catch (error) {
+          console.error('[Fichajes] Error creando notificación de aprobación:', error);
+        }
+
         return successResponse(actualizado);
       } else if (accion === 'rechazar') {
         const actualizado = await prisma.fichaje.update({
@@ -177,6 +194,23 @@ export async function PATCH(
             estado: EstadoFichaje.pendiente, // Rechazado pasa a pendiente
           },
         });
+
+        // Notificar al empleado
+        try {
+          await crearNotificacionFichajeRechazado(
+            prisma,
+            {
+              fichajeId: fichaje.id,
+              empresaId: session.user.empresaId,
+              empleadoId: fichaje.empleadoId,
+              fecha: fichaje.fecha,
+              motivoRechazo,
+            },
+            { actorUsuarioId: session.user.id }
+          );
+        } catch (error) {
+          console.error('[Fichajes] Error creando notificación de rechazo:', error);
+        }
 
         return successResponse(actualizado);
       }
@@ -208,11 +242,11 @@ export async function PATCH(
 
       if (eventos.length > 0) {
         const evento = eventos[0];
-        
+
         await prisma.fichajeEvento.update({
           where: { id: evento.id },
           data: {
-            ...(validatedData.hora && { 
+            ...(validatedData.hora && {
               hora: new Date(validatedData.hora),
               horaOriginal: evento.hora, // Audit: save original time
             }),
@@ -225,6 +259,30 @@ export async function PATCH(
 
         // Recalcular horas trabajadas
         await actualizarCalculosFichaje(id);
+
+        // Notificar al empleado del cambio
+        try {
+          const modificadorNombre = session.user.nombre || 'RR.HH.';
+          const detalles = validatedData.motivoEdicion
+            ? `Motivo: ${validatedData.motivoEdicion}`
+            : undefined;
+
+          await crearNotificacionFichajeModificado(
+            prisma,
+            {
+              fichajeId: fichaje.id,
+              empresaId: session.user.empresaId,
+              empleadoId: fichaje.empleadoId,
+              modificadoPorNombre: modificadorNombre,
+              accion: 'editado',
+              fechaFichaje: fichaje.fecha,
+              detalles,
+            },
+            { actorUsuarioId: session.user.id }
+          );
+        } catch (error) {
+          console.error('[Fichajes] Error creando notificación de edición:', error);
+        }
       }
     }
 

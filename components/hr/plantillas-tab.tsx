@@ -121,10 +121,10 @@ const VARIABLE_TO_CAMPO: Record<
     label: 'Número de hijos',
   },
   empleado_iban: { grupo: 'datos_bancarios', campo: 'iban', label: 'IBAN' },
-  empleado_titular_cuenta: {
+  empleado_bic: {
     grupo: 'datos_bancarios',
-    campo: 'titularCuenta',
-    label: 'Titular de la cuenta',
+    campo: 'bic',
+    label: 'Código BIC',
   },
 };
 

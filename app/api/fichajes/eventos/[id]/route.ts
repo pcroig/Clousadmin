@@ -113,15 +113,19 @@ export async function DELETE(_req: NextRequest, context: { params: Promise<{ id:
         });
         const nombreEditor = editor ? `${editor.nombre} ${editor.apellidos}` : 'Administrador';
 
-        await crearNotificacionFichajeModificado(prisma, {
-          fichajeId: evento.fichajeId,
-          empresaId: session.user.empresaId,
-          empleadoId: evento.fichaje.empleadoId,
-          modificadoPorNombre: nombreEditor,
-          accion: 'eliminado',
-          fechaFichaje: evento.fichaje.fecha,
-          detalles: `Evento ${evento.tipo} eliminado.`,
-        });
+        await crearNotificacionFichajeModificado(
+          prisma,
+          {
+            fichajeId: evento.fichajeId,
+            empresaId: session.user.empresaId,
+            empleadoId: evento.fichaje.empleadoId,
+            modificadoPorNombre: nombreEditor,
+            accion: 'eliminado',
+            fechaFichaje: evento.fichaje.fecha,
+            detalles: `Evento ${evento.tipo} eliminado.`,
+          },
+          { actorUsuarioId: session.user.id }
+        );
       }
     }
 

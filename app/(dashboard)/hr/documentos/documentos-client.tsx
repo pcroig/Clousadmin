@@ -92,7 +92,7 @@ export function DocumentosClient({ carpetas }: DocumentosClientProps) {
 
   return (
     <>
-      <ResponsiveContainer variant="page" className="h-full w-full flex flex-col overflow-hidden">
+      <ResponsiveContainer variant="page" className="flex flex-col">
         {isMobile ? (
           <MobilePageHeader
             title="Documentos"

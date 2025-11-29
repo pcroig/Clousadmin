@@ -87,12 +87,12 @@ const getDiaEstado = (date: Date): string | null => {
 ### 🟡 IMPORTANTE - Campos duplicados
 
 #### Requisito original:
-> "Informacion laboral (quitalo de general) ya está en contratos. También quita el salario de general, es en contrato. Y quita salario bruto mensual!"
+> "Informacion laboral (quitalo de general) ya está en contratos. También quita el salario de general, es en contrato. Y quita salario base mensual!"
 
 #### Estado actual:
 - ❌ Salario sigue en General Tab
 - ❌ Información laboral duplicada
-- ❌ Salario bruto mensual no eliminado
+- ❌ Salario base mensual no eliminado
 - ❌ Complementos NO implementados dentro de salarios
 
 **ACCIÓN NECESARIA**: Auditoría completa de campos en `general-tab.tsx` y `contratos-tab.tsx`
@@ -207,7 +207,7 @@ const [showPopover, setShowPopover] = useState(false);
 
 #### 3.3 Limpiar campos duplicados (1-2 horas)
 1. Auditar `FORM_FIELDS` en `general-tab.tsx`
-2. Eliminar: salario, información laboral, salario bruto mensual
+2. Eliminar: salario, información laboral, salario base mensual
 3. Agregar complementos en `contratos-tab.tsx`
 
 #### 3.4 Sincronizar jornada (2-3 horas)

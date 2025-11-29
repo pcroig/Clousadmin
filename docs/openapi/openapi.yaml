@@ -314,7 +314,7 @@ paths:
                   puestoId: 550e8400-e29b-41d4-a716-446655440001
                   equipoId: 550e8400-e29b-41d4-a716-446655440002
                   sedeId: 550e8400-e29b-41d4-a716-446655440003
-                  salarioBrutoAnual: 35000
+                  salarioBaseAnual: 35000
                   numeroPagas: 14
                   jornadaId: 550e8400-e29b-41d4-a716-446655440004
                   diasVacacionesAnuales: 22
@@ -1211,7 +1211,7 @@ components:
                   type: string
                 horasSemanales:
                   type: number
-            salarioBrutoAnual:
+            salarioBaseAnual:
               type: number
               nullable: true
             numeroPagas:
@@ -1267,7 +1267,7 @@ components:
           type: string
           format: uuid
           nullable: true
-        salarioBrutoAnual:
+        salarioBaseAnual:
           type: number
           minimum: 0
           nullable: true
@@ -1306,7 +1306,7 @@ components:
         jornadaId:
           type: string
           format: uuid
-        salarioBrutoAnual:
+        salarioBaseAnual:
           type: number
         numeroPagas:
           type: integer
@@ -1546,7 +1546,7 @@ components:
         estado:
           type: string
           enum: [borrador, generada, enviada, pagada]
-        salarioBruto:
+        salarioBase:
           type: number
         deducciones:
           type: number

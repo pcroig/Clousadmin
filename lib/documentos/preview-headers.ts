@@ -45,24 +45,25 @@ export function getPreviewHeaders(options: PreviewHeadersOptions): Record<string
     ? 'private, max-age=3600, stale-while-revalidate=86400' // 1h cache, 24h stale
     : 'private, max-age=1800, must-revalidate'; // 30min cache, validación estricta
   
-  return {
+  const headers: Record<string, string> = {
     // Content headers
     'Content-Type': mimeType,
     'Content-Disposition': `inline; filename="${encodeURIComponent(fileName)}"`,
     'Content-Length': contentLength.toString(),
     
     // Security headers
-    'Content-Security-Policy': csp,
     'X-Content-Type-Options': 'nosniff',
     'X-Frame-Options': 'SAMEORIGIN', // Permitir embed en mismo origen
     
     // Cache control
     'Cache-Control': cacheControl,
-    
-    // Additional security
-    'Cross-Origin-Embedder-Policy': 'require-corp',
-    'Cross-Origin-Resource-Policy': 'same-origin',
   };
+
+  if (csp) {
+    headers['Content-Security-Policy'] = csp;
+  }
+
+  return headers;
 }
 
 /**
@@ -74,21 +75,13 @@ export function getPreviewHeaders(options: PreviewHeadersOptions): Record<string
  * @param mimeType - Tipo MIME del contenido
  * @returns String de CSP
  */
-function getCspForMimeType(mimeType: string): string {
+function getCspForMimeType(mimeType: string): string | null {
   const lowerMimeType = mimeType.toLowerCase();
   
-  // PDFs requieren permisos especiales para el visor nativo del navegador
+  // PDFs requieren ejecutar el visor nativo del navegador (chrome-extension://).
+  // Para evitar bloqueos de Chrome/Firefox, no enviamos CSP en este caso.
   if (lowerMimeType === 'application/pdf') {
-    return [
-      "default-src 'none'",
-      "script-src 'unsafe-inline'", // Motor del visor PDF
-      "worker-src blob:", // Web Workers para renderizado
-      "object-src 'self'", // Plugin fallback
-      "font-src 'self' data:", // Fuentes embebidas en PDF
-      "img-src 'self' data: blob:", // Imágenes en PDF
-      "style-src 'unsafe-inline'", // Estilos del visor
-      "frame-ancestors 'self'", // Solo puede ser embebido por mismo origen
-    ].join('; ');
+    return null;
   }
   
   // Imágenes: política muy restrictiva
@@ -117,7 +110,7 @@ function getCspForMimeType(mimeType: string): string {
  * @returns true si son válidos, string con error si no
  */
 export function validatePreviewHeaders(headers: Record<string, string>): true | string {
-  const required = ['Content-Type', 'Content-Disposition', 'Content-Security-Policy'];
+  const required = ['Content-Type', 'Content-Disposition'];
   
   for (const header of required) {
     if (!headers[header]) {
@@ -126,10 +119,14 @@ export function validatePreviewHeaders(headers: Record<string, string>): true | 
   }
   
   // Validar que CSP incluya frame-ancestors para prevenir clickjacking
-  if (!headers['Content-Security-Policy'].includes('frame-ancestors')) {
+  if (
+    headers['Content-Security-Policy'] &&
+    !headers['Content-Security-Policy'].includes('frame-ancestors')
+  ) {
     return 'CSP debe incluir frame-ancestors para seguridad';
   }
   
   return true;
 }
+
 

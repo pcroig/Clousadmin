@@ -1,20 +1,35 @@
 'use client';
 
-import { Lock, Unlock } from 'lucide-react';
+import { Check, Copy, HelpCircle, Lock, Unlock } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 import { SensitiveUnlockDialog } from '@/components/shared/sensitive-unlock-dialog';
+import { SearchableSelect } from '@/components/shared/searchable-select';
+import { ResponsiveDatePicker } from '@/components/shared/responsive-date-picker';
 import { Button } from '@/components/ui/button';
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupButton,
+  InputGroupInput,
+} from '@/components/ui/input-group';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { UsuarioRol } from '@/lib/constants/enums';
 import { MOBILE_DESIGN } from '@/lib/constants/mobile-design';
+import { useCopyToClipboard } from '@/lib/hooks/use-copy-to-clipboard';
 import { type SensitiveFieldKey, useSensitiveUnlock } from '@/lib/hooks/useSensitiveUnlock';
 import { cn } from '@/lib/utils';
 import { parseJson } from '@/lib/utils/json';
+import { format } from 'date-fns';
 
 import type { MiEspacioEmpleado, Usuario } from '@/types/empleado';
 
@@ -35,7 +50,7 @@ type GeneralFormData = {
   ciudad: string;
   direccionProvincia: string;
   iban: string;
-  titularCuenta: string;
+  bic: string;
 };
 
 const FORM_FIELDS: Array<keyof GeneralFormData> = [
@@ -54,7 +69,7 @@ const FORM_FIELDS: Array<keyof GeneralFormData> = [
   'ciudad',
   'direccionProvincia',
   'iban',
-  'titularCuenta',
+  'bic',
 ];
 
 const SENSITIVE_FIELD_LABELS: Record<SensitiveFieldKey, string> = {
@@ -79,7 +94,7 @@ const buildInitialFormData = (empleado: MiEspacioEmpleado, usuario: Usuario): Ge
   ciudad: empleado.ciudad ?? '',
   direccionProvincia: empleado.direccionProvincia ?? '',
   iban: empleado.iban ?? '',
-  titularCuenta: empleado.titularCuenta ?? '',
+  bic: empleado.bic ?? '',
 });
 
 const normalizeValue = (value: string) => value.trim();
@@ -100,6 +115,10 @@ const prepareValueForPayload = (field: keyof GeneralFormData, value: string): st
   }
 
   if (field === 'iban') {
+    return trimmed.replace(/\s+/g, '').toUpperCase();
+  }
+
+  if (field === 'bic') {
     return trimmed.replace(/\s+/g, '').toUpperCase();
   }
 
@@ -140,7 +159,36 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado', onFieldUpdate,
 
   const labelClass = MOBILE_DESIGN.components.form.label;
   const inputClass = MOBILE_DESIGN.components.form.input;
-  const selectTriggerClass = MOBILE_DESIGN.components.form.select;
+
+  const {
+    copyToClipboard: copyIban,
+    isCopied: isIbanCopied,
+  } = useCopyToClipboard();
+  const {
+    copyToClipboard: copyBic,
+    isCopied: isBicCopied,
+  } = useCopyToClipboard();
+
+  const estadoCivilItems = useMemo(
+    () => [
+      { value: 'soltero', label: 'Soltero/a' },
+      { value: 'casado', label: 'Casado/a' },
+      { value: 'divorciado', label: 'Divorciado/a' },
+      { value: 'viudo', label: 'Viudo/a' },
+      { value: 'pareja_hecho', label: 'Pareja de hecho' },
+    ],
+    []
+  );
+
+  const generoItems = useMemo(
+    () => [
+      { value: 'hombre', label: 'Hombre' },
+      { value: 'mujer', label: 'Mujer' },
+      { value: 'otro', label: 'Otro' },
+      { value: 'no_especificado', label: 'Prefiero no especificar' },
+    ],
+    []
+  );
 
   const {
     isUnlocked,
@@ -161,6 +209,9 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado', onFieldUpdate,
   // Estados de carga
   const [saving, setSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
+  const fechaNacimientoDate = formData.fechaNacimiento
+    ? new Date(`${formData.fechaNacimiento}T00:00:00`)
+    : undefined;
 
   // Sincronizar estado inicial cuando cambian los datos externos
   useEffect(() => {
@@ -202,6 +253,21 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado', onFieldUpdate,
     }
   };
 
+  const handleFechaNacimientoSelect = (selectedDate: Date | undefined) => {
+    const formatted = selectedDate ? format(selectedDate, 'yyyy-MM-dd') : '';
+    setFieldValue('fechaNacimiento', formatted);
+
+    if (isHrAdmin && onFieldUpdate) {
+      const newValue = formatted || null;
+      const currentValue = empleado.fechaNacimiento
+        ? new Date(empleado.fechaNacimiento).toISOString().split('T')[0]
+        : null;
+      if (newValue !== currentValue) {
+        void handleFieldUpdate('fechaNacimiento', newValue);
+      }
+    }
+  };
+
   const renderSensitiveInput = (
     field: SensitiveFieldKey,
     {
@@ -223,8 +289,57 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado', onFieldUpdate,
     }
   ) => {
     const unlocked = isUnlocked();
+    const isIban = field === 'iban';
 
     if (!hasStoredValue) {
+      if (isIban) {
+        return (
+          <div>
+            <Label htmlFor={id} className={labelClass}>
+              {label}
+            </Label>
+            <InputGroup>
+              <InputGroupInput
+                id={id}
+                value={value}
+                onChange={(event) => onChange(event.target.value.toUpperCase())}
+                onBlur={(event) => onBlur?.(event.target.value)}
+                placeholder={placeholder}
+              />
+              <InputGroupAddon align="inline-end" className="gap-1">
+                <TooltipProvider delayDuration={0}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <InputGroupButton
+                        variant="ghost"
+                        aria-label="Información IBAN"
+                        size="icon-xs"
+                        type="button"
+                      >
+                        <HelpCircle className="h-4 w-4" />
+                      </InputGroupButton>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Formato: ES seguido de 22 dígitos (ej: ES9121000418450200051332)</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+                <InputGroupButton
+                  variant="ghost"
+                  aria-label="Copiar IBAN"
+                  size="icon-xs"
+                  type="button"
+                  disabled={!value}
+                  onClick={() => value && copyIban(value)}
+                >
+                  {isIbanCopied ? <Check className="h-4 w-4 text-emerald-600" /> : <Copy className="h-4 w-4" />}
+                </InputGroupButton>
+              </InputGroupAddon>
+            </InputGroup>
+            <p className="mt-1 text-xs text-gray-500">Aún no hay datos guardados para este campo.</p>
+          </div>
+        );
+      }
       return (
         <div>
           <Label htmlFor={id} className={labelClass}>
@@ -239,6 +354,83 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado', onFieldUpdate,
             className={inputClass}
           />
           <p className="mt-1 text-xs text-gray-500">Aún no hay datos guardados para este campo.</p>
+        </div>
+      );
+    }
+
+    if (isIban) {
+      return (
+        <div>
+          <Label htmlFor={id} className={labelClass}>
+            {label}
+          </Label>
+          <div className="relative">
+            <InputGroup className={cn('pr-24', !unlocked && 'opacity-50')}>
+              <InputGroupInput
+                id={id}
+                type={unlocked ? 'text' : 'password'}
+                value={value}
+                onChange={(event) => {
+                  if (!unlocked) return;
+                  onChange(event.target.value.toUpperCase());
+                }}
+                onBlur={(event) => {
+                  if (!unlocked) return;
+                  onBlur?.(event.target.value);
+                }}
+                readOnly={!unlocked}
+                placeholder={unlocked ? placeholder : 'Desbloquea para ver'}
+              />
+              {unlocked && (
+                <InputGroupAddon align="inline-end" className="gap-1">
+                  <TooltipProvider delayDuration={0}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <InputGroupButton
+                          variant="ghost"
+                          aria-label="Información IBAN"
+                          size="icon-xs"
+                          type="button"
+                        >
+                          <HelpCircle className="h-4 w-4" />
+                        </InputGroupButton>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Formato: ES seguido de 22 dígitos (ej: ES9121000418450200051332)</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                  <InputGroupButton
+                    variant="ghost"
+                    aria-label="Copiar IBAN"
+                    size="icon-xs"
+                    type="button"
+                    disabled={!value}
+                    onClick={() => value && copyIban(value)}
+                  >
+                    {isIbanCopied ? <Check className="h-4 w-4 text-emerald-600" /> : <Copy className="h-4 w-4" />}
+                  </InputGroupButton>
+                </InputGroupAddon>
+              )}
+            </InputGroup>
+            {unlocked ? (
+              <div className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs text-emerald-600">
+                <Unlock className="mr-1 h-3.5 w-3.5" />
+                Visible
+              </div>
+            ) : (
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                className="absolute inset-y-1 right-1 px-3 text-xs"
+                onClick={() => requestUnlock(field)}
+              >
+                <Lock className="mr-1 h-3.5 w-3.5" />
+                Desbloquear
+              </Button>
+            )}
+          </div>
         </div>
       );
     }
@@ -425,32 +617,21 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado', onFieldUpdate,
               <Label htmlFor="fechaNacimiento" className={labelClass}>
                 Fecha de Nacimiento
               </Label>
-              <Input
-                id="fechaNacimiento"
-                type="date"
-                value={formData.fechaNacimiento}
-                onChange={(e) => setFieldValue('fechaNacimiento', e.target.value)}
-                onBlur={(e) => {
-                  if (isHrAdmin && onFieldUpdate) {
-                    const newValue = e.target.value || null;
-                    const currentValue = empleado.fechaNacimiento 
-                      ? new Date(empleado.fechaNacimiento).toISOString().split('T')[0] 
-                      : null;
-                    if (newValue !== currentValue) {
-                      handleFieldUpdate('fechaNacimiento', newValue);
-                    }
-                  }
-                }}
-                className={inputClass}
+              <ResponsiveDatePicker
+                date={fechaNacimientoDate}
+                onSelect={handleFechaNacimientoSelect}
+                placeholder="Seleccionar fecha"
+                label="Seleccionar fecha de nacimiento"
               />
             </div>
             <div>
               <Label htmlFor="estadoCivil" className={labelClass}>
                 Estado Civil
               </Label>
-              <Select
+              <SearchableSelect
+                items={estadoCivilItems}
                 value={formData.estadoCivil}
-                onValueChange={(value) => {
+                onChange={(value) => {
                   setFieldValue('estadoCivil', value);
                   if (isHrAdmin && onFieldUpdate) {
                     const newValue = value || null;
@@ -459,18 +640,9 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado', onFieldUpdate,
                     }
                   }
                 }}
-              >
-                <SelectTrigger className={selectTriggerClass}>
-                  <SelectValue placeholder="Seleccionar" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="soltero">Soltero/a</SelectItem>
-                  <SelectItem value="casado">Casado/a</SelectItem>
-                  <SelectItem value="divorciado">Divorciado/a</SelectItem>
-                  <SelectItem value="viudo">Viudo/a</SelectItem>
-                  <SelectItem value="pareja_hecho">Pareja de hecho</SelectItem>
-                </SelectContent>
-              </Select>
+                placeholder="Seleccionar estado civil"
+                label="Seleccionar estado civil"
+              />
             </div>
             <div>
               <Label htmlFor="numeroHijos" className={labelClass}>
@@ -498,9 +670,10 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado', onFieldUpdate,
               <Label htmlFor="genero" className={labelClass}>
                 Género
               </Label>
-              <Select
+              <SearchableSelect
+                items={generoItems}
                 value={formData.genero}
-                onValueChange={(value) => {
+                onChange={(value) => {
                   setFieldValue('genero', value);
                   if (isHrAdmin && onFieldUpdate) {
                     const newValue = value || null;
@@ -509,17 +682,9 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado', onFieldUpdate,
                     }
                   }
                 }}
-              >
-                <SelectTrigger className={selectTriggerClass}>
-                  <SelectValue placeholder="Seleccionar" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="hombre">Hombre</SelectItem>
-                  <SelectItem value="mujer">Mujer</SelectItem>
-                  <SelectItem value="otro">Otro</SelectItem>
-                  <SelectItem value="no_especificado">Prefiero no especificar</SelectItem>
-                </SelectContent>
-              </Select>
+                placeholder="Seleccionar género"
+                label="Seleccionar género"
+              />
             </div>
           </div>
         </div>
@@ -710,24 +875,58 @@ export function GeneralTab({ empleado, usuario, rol = 'empleado', onFieldUpdate,
               },
             })}
             <div>
-              <Label htmlFor="titularCuenta" className={labelClass}>
-                Titular de la Cuenta
+              <Label htmlFor="bic" className={labelClass}>
+                Código BIC
               </Label>
-              <Input
-                id="titularCuenta"
-                value={formData.titularCuenta}
-                onChange={(e) => setFieldValue('titularCuenta', e.target.value)}
-                onBlur={(e) => {
-                  if (isHrAdmin && onFieldUpdate) {
-                    const newValue = e.target.value || null;
-                    if (newValue !== (empleado.titularCuenta || null)) {
-                      handleFieldUpdate('titularCuenta', newValue);
-                    }
+              <InputGroup>
+                <InputGroupInput
+                  id="bic"
+                  value={formData.bic}
+                  maxLength={11}
+                  onChange={(event) =>
+                    setFieldValue('bic', event.target.value.replace(/\s+/g, '').toUpperCase())
                   }
-                }}
-                placeholder="Nombre del titular"
-                className={inputClass}
-              />
+                  onBlur={(event) => {
+                    if (isHrAdmin && onFieldUpdate) {
+                      const newValue = event.target.value || null;
+                      if (newValue !== (empleado.bic || null)) {
+                        handleFieldUpdate('bic', newValue);
+                      }
+                    }
+                  }}
+                  placeholder="Ej: BBVAESMMXXX"
+                  className={inputClass}
+                />
+                <InputGroupAddon align="inline-end" className="gap-1">
+                  <TooltipProvider delayDuration={0}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <InputGroupButton
+                          variant="ghost"
+                          aria-label="Información BIC"
+                          size="icon-xs"
+                          type="button"
+                        >
+                          <HelpCircle className="h-4 w-4" />
+                        </InputGroupButton>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Código identificador del banco (8 u 11 caracteres)</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                  <InputGroupButton
+                    variant="ghost"
+                    aria-label="Copiar BIC"
+                    size="icon-xs"
+                    type="button"
+                    disabled={!formData.bic}
+                    onClick={() => formData.bic && copyBic(formData.bic)}
+                  >
+                    {isBicCopied ? <Check className="h-4 w-4 text-emerald-600" /> : <Copy className="h-4 w-4" />}
+                  </InputGroupButton>
+                </InputGroupAddon>
+              </InputGroup>
             </div>
           </div>
         </div>

@@ -15,14 +15,14 @@ const HORAS_SEMANALES_DEFAULT = 40;
 
 type EmpleadoParaPrenomina = {
   id: string;
-  salarioBrutoMensual: Prisma.Decimal | null;
-  salarioBrutoAnual: Prisma.Decimal | null;
+  salarioBaseMensual: Prisma.Decimal | null;
+  salarioBaseAnual: Prisma.Decimal | null;
   jornada: {
     horasSemanales: Prisma.Decimal | null;
   } | null;
   contratos: Array<{
     id: string;
-    salarioBrutoAnual: Prisma.Decimal | null;
+    salarioBaseAnual: Prisma.Decimal | null;
     fechaInicio: Date;
     fechaFin: Date | null;
   }>;
@@ -101,8 +101,8 @@ export async function generarPrenominasEvento(
     },
     select: {
       id: true,
-      salarioBrutoMensual: true,
-      salarioBrutoAnual: true,
+      salarioBaseMensual: true,
+      salarioBaseAnual: true,
       jornada: {
         select: {
           horasSemanales: true,
@@ -128,7 +128,7 @@ export async function generarPrenominasEvento(
         take: 1,
         select: {
           id: true,
-          salarioBrutoAnual: true,
+          salarioBaseAnual: true,
           fechaInicio: true,
           fechaFin: true,
         },
@@ -389,7 +389,7 @@ export async function generarPrenominasEvento(
 }
 
 function calcularDatosBaseNomina(
-  empleado: Pick<EmpleadoParaPrenomina, 'contratos' | 'ausencias' | 'complementos' | 'salarioBrutoAnual' | 'salarioBrutoMensual'>,
+  empleado: Pick<EmpleadoParaPrenomina, 'contratos' | 'ausencias' | 'complementos' | 'salarioBaseAnual' | 'salarioBaseMensual'>,
   inicioMes: Date,
   finMes: Date
 ): DatosBaseNomina {
@@ -419,19 +419,19 @@ function calcularDatosBaseNomina(
 }
 
 function calcularSalarioMensual(
-  empleado: Pick<EmpleadoParaPrenomina, 'salarioBrutoMensual' | 'salarioBrutoAnual'>,
-  contrato?: { salarioBrutoAnual: Prisma.Decimal | null }
+  empleado: Pick<EmpleadoParaPrenomina, 'salarioBaseMensual' | 'salarioBaseAnual'>,
+  contrato?: { salarioBaseAnual: Prisma.Decimal | null }
 ): Decimal {
-  if (contrato?.salarioBrutoAnual) {
-    return new Decimal(contrato.salarioBrutoAnual).div(12).toDecimalPlaces(2);
+  if (contrato?.salarioBaseAnual) {
+    return new Decimal(contrato.salarioBaseAnual).div(12).toDecimalPlaces(2);
   }
 
-  if (empleado.salarioBrutoMensual) {
-    return new Decimal(empleado.salarioBrutoMensual).toDecimalPlaces(2);
+  if (empleado.salarioBaseMensual) {
+    return new Decimal(empleado.salarioBaseMensual).toDecimalPlaces(2);
   }
 
-  if (empleado.salarioBrutoAnual) {
-    return new Decimal(empleado.salarioBrutoAnual).div(12).toDecimalPlaces(2);
+  if (empleado.salarioBaseAnual) {
+    return new Decimal(empleado.salarioBaseAnual).div(12).toDecimalPlaces(2);
   }
 
   return new Decimal(0);

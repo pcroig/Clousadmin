@@ -25,9 +25,9 @@ export interface Empleado {
   numeroHijos?: number | null;
   fotoUrl?: string | null;
   iban?: string | null;
-  titularCuenta?: string | null;
-  salarioBrutoAnual?: number | null;
-  salarioBrutoMensual?: number | null;
+  bic?: string | null;
+  salarioBaseAnual?: number | null;
+  salarioBaseMensual?: number | null;
   tipoContrato?: string | null;
   puestoId?: string | null;
   categoriaProfesional?: string | null;
@@ -118,7 +118,7 @@ export interface MiEspacioContratoResumen {
   tipoContrato: string | null;
   fechaInicio: string;
   fechaFin?: string | null;
-  salarioBrutoAnual?: number | null;
+  salarioBaseAnual?: number | null;
   documentoId?: string | null;
 }
 
@@ -180,7 +180,7 @@ export interface MiEspacioEmpleado {
   numeroHijos?: number | null;
   genero?: string | null;
   iban?: string | null;
-  titularCuenta?: string | null;
+  bic?: string | null;
   puesto?: string | null;
   puestoId?: string | null;
   puestoRelacion?: MiEspacioPuesto | null;
@@ -193,8 +193,8 @@ export interface MiEspacioEmpleado {
   grupoCotizacion?: number | null;
   estadoEmpleado?: string | null;
   activo: boolean;
-  salarioBrutoAnual?: number | null;
-  salarioBrutoMensual?: number | null;
+  salarioBaseAnual?: number | null;
+  salarioBaseMensual?: number | null;
   numPagas?: number | string | null;
   complementos?: MiEspacioComplementoResumen[];
   contratos?: MiEspacioContratoResumen[];

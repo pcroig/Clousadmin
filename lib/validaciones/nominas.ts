@@ -52,7 +52,7 @@ async function detectarAlertasCriticas(
       apellidos: true,
       iban: true,
       nss: true,
-      salarioBrutoMensual: true,
+      salarioBaseMensual: true,
     },
   });
 
@@ -91,7 +91,7 @@ async function detectarAlertasCriticas(
   }
 
   // 3. NO_SALARIO: Salario no configurado
-  if (!empleado.salarioBrutoMensual) {
+  if (!empleado.salarioBaseMensual) {
     alertas.push({
       empleadoId,
       tipo: 'critico',

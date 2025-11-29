@@ -16,9 +16,10 @@ import { LoadingButton } from '@/components/shared/loading-button';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
-  DialogContent,
+  DialogBody,
   DialogFooter,
   DialogHeader,
+  DialogScrollableContent,
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Field, FieldLabel } from '@/components/ui/field';
@@ -399,13 +400,14 @@ export function FichajeModal({
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogScrollableContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle>{titulo}</DialogTitle>
           <p className="text-sm text-gray-500">{descripcion}</p>
         </DialogHeader>
 
-        <div className="space-y-4 py-2">
+        <DialogBody>
+          <div className="space-y-4 py-2">
           {/* Info del empleado (solo en modo editar) */}
           {modo === 'editar' && empleadoNombre && (
             <div className="space-y-1 pb-3 border-b">
@@ -538,6 +540,7 @@ export function FichajeModal({
             </div>
           )}
         </div>
+        </DialogBody>
 
         <DialogFooter>
           <Button
@@ -556,7 +559,7 @@ export function FichajeModal({
                 : 'Crear solicitud'}
           </LoadingButton>
         </DialogFooter>
-      </DialogContent>
+      </DialogScrollableContent>
     </Dialog>
   );
 }

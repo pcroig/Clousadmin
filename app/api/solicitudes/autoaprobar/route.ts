@@ -165,15 +165,19 @@ export async function POST(req: NextRequest) {
         });
 
         // Notificar al empleado que su ausencia fue aprobada
-        await crearNotificacionAusenciaAprobada(prisma, {
-          ausenciaId: ausencia.id,
-          empresaId: session.user.empresaId,
-          empleadoId: ausencia.empleadoId,
-          empleadoNombre: `${ausencia.empleado.nombre} ${ausencia.empleado.apellidos}`,
-          tipo: ausencia.tipo,
-          fechaInicio: ausencia.fechaInicio,
-          fechaFin: ausencia.fechaFin,
-        });
+        await crearNotificacionAusenciaAprobada(
+          prisma,
+          {
+            ausenciaId: ausencia.id,
+            empresaId: session.user.empresaId,
+            empleadoId: ausencia.empleadoId,
+            empleadoNombre: `${ausencia.empleado.nombre} ${ausencia.empleado.apellidos}`,
+            tipo: ausencia.tipo,
+            fechaInicio: ausencia.fechaInicio,
+            fechaFin: ausencia.fechaFin,
+          },
+          { actorUsuarioId: session.user.id }
+        );
 
         ausenciasAprobadas++;
       } catch (error) {
@@ -220,13 +224,17 @@ export async function POST(req: NextRequest) {
         });
 
         // Notificar al empleado que su solicitud fue aprobada
-        await crearNotificacionSolicitudAprobada(prisma, {
-          solicitudId: solicitud.id,
-          empresaId: session.user.empresaId,
-          empleadoId: solicitud.empleadoId,
-          tipo: solicitud.tipo,
-          aprobadoPor: 'manual', // Aprobada por HR/Admin manualmente
-        });
+        await crearNotificacionSolicitudAprobada(
+          prisma,
+          {
+            solicitudId: solicitud.id,
+            empresaId: session.user.empresaId,
+            empleadoId: solicitud.empleadoId,
+            tipo: solicitud.tipo,
+            aprobadoPor: 'manual', // Aprobada por HR/Admin manualmente
+          },
+          { actorUsuarioId: session.user.id }
+        );
 
         solicitudesAprobadas++;
       } catch (error) {

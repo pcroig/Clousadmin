@@ -74,7 +74,7 @@ export const AusenciasWidget = memo(function AusenciasWidget({
             </div>
 
             {/* Lista de próximas ausencias */}
-            <div className="flex-1 overflow-y-auto space-y-2 -mx-4 px-4">
+            <div className="flex-1 overflow-y-auto scrollbar-thin space-y-2 -mx-4 px-4">
               {proximasAusencias.length === 0 ? (
                 <p className={`${MOBILE_DESIGN.text.body} text-gray-400 text-center py-8`}>No hay próximas ausencias</p>
               ) : (
@@ -113,7 +113,7 @@ export const AusenciasWidget = memo(function AusenciasWidget({
           title="Ausencias"
           href="/empleado/mi-espacio/ausencias"
           className="relative"
-          contentClassName="overflow-y-auto px-6"
+          contentClassName="overflow-y-auto scrollbar-thin px-6"
           headerAction={
             onOpenModal && (
               <Button

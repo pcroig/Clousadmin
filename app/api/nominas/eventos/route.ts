@@ -260,14 +260,18 @@ export async function POST(req: NextRequest) {
     if (resultadoGeneracion.empleadosConComplementos > 0) {
       await Promise.all(
         managers.map((manager) =>
-          crearNotificacionComplementosPendientes(prisma, {
-            nominaId: evento.id,
-            empresaId: session.user.empresaId,
-            managerId: manager.id,
-            empleadosCount: resultadoGeneracion.empleadosConComplementos,
-            mes: data.mes,
-            año: data.anio,
-          })
+          crearNotificacionComplementosPendientes(
+            prisma,
+            {
+              nominaId: evento.id,
+              empresaId: session.user.empresaId,
+              managerId: manager.id,
+              empleadosCount: resultadoGeneracion.empleadosConComplementos,
+              mes: data.mes,
+              año: data.anio,
+            },
+            { actorUsuarioId: session.user.id }
+          )
         )
       );
     }

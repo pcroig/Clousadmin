@@ -10,13 +10,20 @@ import { LoadingButton } from '@/components/shared/loading-button';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
-  DialogContent,
+  DialogBody,
   DialogFooter,
   DialogHeader,
+  DialogScrollableContent,
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Field, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
+  InputGroupText,
+} from '@/components/ui/input-group';
 import {
   Select,
   SelectContent,
@@ -286,12 +293,13 @@ export function GestionarAusenciasModal({ open, onClose, onSaved }: GestionarAus
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogScrollableContent className="max-w-4xl">
         <DialogHeader>
           <DialogTitle>Gestionar Ausencias</DialogTitle>
         </DialogHeader>
 
-        <Tabs
+        <DialogBody>
+          <Tabs
           value={tab}
           onValueChange={(value) => {
             if (value === 'politicas' || value === 'calendario') {
@@ -423,17 +431,19 @@ export function GestionarAusenciasModal({ open, onClose, onSaved }: GestionarAus
                     />
                   </div>
                   
-                  <div className="flex items-center gap-3 mt-3">
-                    <Input
+                  <InputGroup className="mt-3">
+                    <InputGroupInput
                       type="number"
                       value={antelacionDias}
                       onChange={(e) => setAntelacionDias(e.target.value)}
                       min="0"
                       max="365"
-                      className="w-full"
+                      inputMode="numeric"
                     />
-                    <span className="text-sm text-gray-600 shrink-0">días</span>
-                  </div>
+                    <InputGroupAddon align="inline-end">
+                      <InputGroupText>días</InputGroupText>
+                    </InputGroupAddon>
+                  </InputGroup>
                 </Field>
 
                 <Field>
@@ -454,33 +464,22 @@ export function GestionarAusenciasModal({ open, onClose, onSaved }: GestionarAus
                     />
                   </div>
                   
-                  <div className="flex items-center gap-3 mt-3">
-                    <Input
+                  <InputGroup className="mt-3">
+                    <InputGroupInput
                       type="number"
                       value={solapamientoPct}
                       onChange={(e) => setSolapamientoPct(e.target.value)}
                       min="0"
                       max="100"
-                      className="w-full"
+                      inputMode="numeric"
                     />
-                    <span className="text-sm text-gray-600 shrink-0">%</span>
-                  </div>
+                    <InputGroupAddon align="inline-end">
+                      <InputGroupText>%</InputGroupText>
+                    </InputGroupAddon>
+                  </InputGroup>
                 </Field>
               </div>
             </div>
-
-            <DialogFooter>
-              <Button variant="outline" onClick={onClose}>
-                Cancelar
-              </Button>
-              <LoadingButton
-                onClick={handleGuardarPoliticaYSaldo}
-                loading={savingPolitica}
-                disabled={savingPolitica}
-              >
-                {savingPolitica ? 'Guardando...' : 'Guardar Configuración'}
-              </LoadingButton>
-            </DialogFooter>
           </TabsContent>
 
           {/* Tab: Calendario */}
@@ -576,22 +575,33 @@ export function GestionarAusenciasModal({ open, onClose, onSaved }: GestionarAus
                 />
               </TabsContent>
             </Tabs>
-
-            <DialogFooter className="border-t pt-4">
-              <Button variant="outline" onClick={onClose}>
-                Cancelar
-              </Button>
-              <LoadingButton
-                onClick={handleGuardarCalendario}
-                loading={savingCalendario}
-                disabled={savingCalendario}
-              >
-                {savingCalendario ? 'Guardando...' : 'Guardar Calendario'}
-              </LoadingButton>
-            </DialogFooter>
           </TabsContent>
         </Tabs>
-      </DialogContent>
+        </DialogBody>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
+            Cancelar
+          </Button>
+          {tab === 'politicas' ? (
+            <LoadingButton
+              onClick={handleGuardarPoliticaYSaldo}
+              loading={savingPolitica}
+              disabled={savingPolitica}
+            >
+              {savingPolitica ? 'Guardando...' : 'Guardar Configuración'}
+            </LoadingButton>
+          ) : (
+            <LoadingButton
+              onClick={handleGuardarCalendario}
+              loading={savingCalendario}
+              disabled={savingCalendario}
+            >
+              {savingCalendario ? 'Guardando...' : 'Guardar Calendario'}
+            </LoadingButton>
+          )}
+        </DialogFooter>
+      </DialogScrollableContent>
     </Dialog>
   );
 }

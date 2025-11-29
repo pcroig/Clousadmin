@@ -59,12 +59,32 @@ export function CalendarioFestivos({
   const cargarFestivos = useCallback(async () => {
     setCargando(true);
     try {
-      const año = mesActual.getFullYear();
-      const response = await fetch(`/api/festivos?año=${año}`);
-      if (response.ok) {
-        const data = await parseJson<FestivosResponse>(response);
-        setFestivos(Array.isArray(data?.festivos) ? data.festivos : []);
+      const añoActual = mesActual.getFullYear();
+      // Calcular año del mes siguiente para obtener festivos de ambos años si cruzan
+      const mesSiguiente = new Date(mesActual);
+      mesSiguiente.setMonth(mesSiguiente.getMonth() + 1);
+      const añoSiguiente = mesSiguiente.getFullYear();
+
+      // Cargar festivos de ambos años si cruzan el año
+      const años = añoActual === añoSiguiente
+        ? [añoActual]
+        : [añoActual, añoSiguiente];
+
+      const responses = await Promise.all(
+        años.map(año => fetch(`/api/festivos?año=${año}`))
+      );
+
+      const allFestivos: Festivo[] = [];
+      for (const response of responses) {
+        if (response.ok) {
+          const data = await parseJson<FestivosResponse>(response);
+          if (Array.isArray(data?.festivos)) {
+            allFestivos.push(...data.festivos);
+          }
+        }
       }
+
+      setFestivos(allFestivos);
     } catch (error) {
       console.error('Error cargando festivos:', error);
     } finally {
@@ -110,6 +130,7 @@ export function CalendarioFestivos({
             onSelect={handleDiaClick}
             month={mesActual}
             onMonthChange={setMesActual}
+            numberOfMonths={2}
             modifiers={{
               festivo: festivosDates,
               noLaborable: (date: Date) => !esDiaLaborable(date),
@@ -121,7 +142,7 @@ export function CalendarioFestivos({
                   className={cn(
                     props.className,
                     props.modifiers?.noLaborable && 'text-gray-400 bg-muted/40',
-                    props.modifiers?.festivo && 'bg-red-100 text-red-900 font-semibold'
+                    props.modifiers?.festivo && 'bg-red-100 text-red-900 font-semibold hover:bg-red-200'
                   )}
                 />
               ),
@@ -130,6 +151,19 @@ export function CalendarioFestivos({
           />
         )}
       </div>
+
+      {!cargando && (
+        <div className="flex items-center gap-4 text-xs text-muted-foreground">
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded-sm bg-red-100 border border-red-200" />
+            <span>Festivos</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded-sm bg-muted/40" />
+            <span>No laborable</span>
+          </div>
+        </div>
+      )}
 
       {onUpdate && (
         <div className="text-xs text-muted-foreground">

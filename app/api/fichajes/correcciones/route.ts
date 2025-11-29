@@ -78,14 +78,18 @@ export async function POST(req: NextRequest) {
     });
 
     if (empleadoSolicitante) {
-      await crearNotificacionFichajeRequiereRevision(prisma, {
-        fichajeId,
-        empresaId: session.user.empresaId,
-        empleadoId: session.user.empleadoId,
-        empleadoNombre: `${empleadoSolicitante.nombre} ${empleadoSolicitante.apellidos}`,
-        fecha: fichaje.fecha,
-        razon: motivo,
-      });
+      await crearNotificacionFichajeRequiereRevision(
+        prisma,
+        {
+          fichajeId,
+          empresaId: session.user.empresaId,
+          empleadoId: session.user.empleadoId,
+          empleadoNombre: `${empleadoSolicitante.nombre} ${empleadoSolicitante.apellidos}`,
+          fecha: fichaje.fecha,
+          razon: motivo,
+        },
+        { actorUsuarioId: session.user.id }
+      );
     }
 
     return createdResponse(solicitud);

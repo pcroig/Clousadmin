@@ -52,7 +52,7 @@ export const COMPENSACION_METRICS: MetricDefinition[] = [
   {
     id: 'salarioPromedio',
     label: 'Salario promedio',
-    description: 'Media de salario bruto mensual por empleado.',
+    description: 'Media de salario base mensual por empleado.',
   },
   {
     id: 'brechaSalarialGenero',

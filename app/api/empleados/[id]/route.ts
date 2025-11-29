@@ -51,9 +51,9 @@ const empleadoUpdateSchema = z.object({
 
   // Información Bancaria
   iban: z.string().optional(),
-  titularCuenta: z.string().optional(),
-  salarioBrutoAnual: z.number().optional(),
-  salarioBrutoMensual: z.number().optional(),
+  bic: z.string().optional(),
+  salarioBaseAnual: z.number().optional(),
+  salarioBaseMensual: z.number().optional(),
 });
 
 // GET /api/empleados/[id] - Obtener empleado por ID
@@ -141,7 +141,13 @@ export async function PATCH(
     const { data: validatedData } = validationResult;
 
     // Extraer equipoIds para manejar relación many-to-many
-    const { equipoIds, ...empleadoData } = validatedData;
+    const { equipoIds, ...rawEmpleadoData } = validatedData;
+    const empleadoData = {
+      ...rawEmpleadoData,
+      ...(rawEmpleadoData.bic
+        ? { bic: rawEmpleadoData.bic.replace(/\s+/g, '').toUpperCase() }
+        : {}),
+    };
 
     // Validar foreign keys antes de actualizar
     // Validar managerId si se proporciona
@@ -258,11 +264,11 @@ export async function PATCH(
         return badRequestResponse('La fecha de alta es requerida');
       }
     }
-    if (empleadoData.salarioBrutoAnual !== undefined) {
-      datosParaActualizar.salarioBrutoAnual = new Prisma.Decimal(empleadoData.salarioBrutoAnual);
+    if (empleadoData.salarioBaseAnual !== undefined) {
+      datosParaActualizar.salarioBaseAnual = new Prisma.Decimal(empleadoData.salarioBaseAnual);
     }
-    if (empleadoData.salarioBrutoMensual !== undefined) {
-      datosParaActualizar.salarioBrutoMensual = new Prisma.Decimal(empleadoData.salarioBrutoMensual);
+    if (empleadoData.salarioBaseMensual !== undefined) {
+      datosParaActualizar.salarioBaseMensual = new Prisma.Decimal(empleadoData.salarioBaseMensual);
     }
     
     // Incluir otros campos que no sean undefined
@@ -270,8 +276,8 @@ export async function PATCH(
       if (
         key !== 'fechaNacimiento' &&
         key !== 'fechaAlta' &&
-        key !== 'salarioBrutoAnual' &&
-        key !== 'salarioBrutoMensual' &&
+        key !== 'salarioBaseAnual' &&
+        key !== 'salarioBaseMensual' &&
         empleadoData[key as keyof typeof empleadoData] !== undefined
       ) {
         (datosParaActualizar as Record<string, unknown>)[key] =
@@ -342,17 +348,21 @@ export async function PATCH(
         });
 
         if (nuevoManager) {
-          await crearNotificacionCambioManager(prisma, {
-            empleadoId: id,
-            empresaId: session.user.empresaId,
-            empleadoNombre: `${empleadoActual.nombre} ${empleadoActual.apellidos}`,
-            nuevoManagerId: empleadoData.managerId,
-            nuevoManagerNombre: `${nuevoManager.nombre} ${nuevoManager.apellidos}`,
-            anteriorManagerId: oldManagerId || undefined,
-            anteriorManagerNombre: empleadoActual.manager
-              ? `${empleadoActual.manager.nombre} ${empleadoActual.manager.apellidos}`
-              : undefined,
-          });
+          await crearNotificacionCambioManager(
+            prisma,
+            {
+              empleadoId: id,
+              empresaId: session.user.empresaId,
+              empleadoNombre: `${empleadoActual.nombre} ${empleadoActual.apellidos}`,
+              nuevoManagerId: empleadoData.managerId,
+              nuevoManagerNombre: `${nuevoManager.nombre} ${nuevoManager.apellidos}`,
+              anteriorManagerId: oldManagerId || undefined,
+              anteriorManagerNombre: empleadoActual.manager
+                ? `${empleadoActual.manager.nombre} ${empleadoActual.manager.apellidos}`
+                : undefined,
+            },
+            { actorUsuarioId: session.user.id }
+          );
         }
       }
 
@@ -367,11 +377,15 @@ export async function PATCH(
         });
 
         if (nuevaJornada) {
-          await crearNotificacionJornadaAsignada(prisma, {
-            empleadoId: id,
-            empresaId: session.user.empresaId,
-            jornadaNombre: nuevaJornada.nombre,
-          });
+          await crearNotificacionJornadaAsignada(
+            prisma,
+            {
+              empleadoId: id,
+              empresaId: session.user.empresaId,
+              jornadaNombre: nuevaJornada.nombre,
+            },
+            { actorUsuarioId: session.user.id }
+          );
         }
       }
 
@@ -390,12 +404,16 @@ export async function PATCH(
         });
 
         if (puestoNuevo) {
-          await crearNotificacionCambioPuesto(prisma, {
-            empleadoId: id,
-            empresaId: session.user.empresaId,
-            puestoAnterior: puestoAnterior?.nombre || null,
-            puestoNuevo: puestoNuevo.nombre,
-          });
+          await crearNotificacionCambioPuesto(
+            prisma,
+            {
+              empleadoId: id,
+              empresaId: session.user.empresaId,
+              puestoAnterior: puestoAnterior?.nombre || null,
+              puestoNuevo: puestoNuevo.nombre,
+            },
+            { actorUsuarioId: session.user.id }
+          );
         }
       }
     } catch (error) {
@@ -414,13 +432,17 @@ export async function PATCH(
         });
 
         if (equipo) {
-          await crearNotificacionAsignadoEquipo(prisma, {
-            empleadoId: id,
-            empresaId: session.user.empresaId,
-            empleadoNombre: `${empleadoActual.nombre} ${empleadoActual.apellidos}`,
-            equipoId,
-            equipoNombre: equipo.nombre,
-          });
+          await crearNotificacionAsignadoEquipo(
+            prisma,
+            {
+              empleadoId: id,
+              empresaId: session.user.empresaId,
+              empleadoNombre: `${empleadoActual.nombre} ${empleadoActual.apellidos}`,
+              equipoId,
+              equipoNombre: equipo.nombre,
+            },
+            { actorUsuarioId: session.user.id }
+          );
         }
       }
     }

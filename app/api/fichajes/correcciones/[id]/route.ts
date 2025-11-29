@@ -118,13 +118,17 @@ export async function PATCH(
       });
 
       // Notificar al empleado del rechazo (se convierte en DISCREPANCIA)
-      await crearNotificacionSolicitudRechazada(prisma, {
-        solicitudId: solicitud.id,
-        empresaId: solicitud.empresaId,
-        empleadoId: solicitud.empleadoId,
-        tipo: 'fichaje_correccion',
-        motivoRechazo: motivoRespuesta,
-      });
+      await crearNotificacionSolicitudRechazada(
+        prisma,
+        {
+          solicitudId: solicitud.id,
+          empresaId: solicitud.empresaId,
+          empleadoId: solicitud.empleadoId,
+          tipo: 'fichaje_correccion',
+          motivoRechazo: motivoRespuesta,
+        },
+        { actorUsuarioId: session.user.id }
+      );
 
       return successResponse(actualizada);
     }
@@ -146,13 +150,17 @@ export async function PATCH(
       },
     });
 
-    await crearNotificacionFichajeResuelto(prisma, {
-      fichajeId: solicitud.fichajeId,
-      empresaId: solicitud.empresaId,
-      empleadoId: solicitud.empleadoId,
-      empleadoNombre: `${solicitud.empleado.nombre} ${solicitud.empleado.apellidos}`,
-      fecha: solicitud.fichaje.fecha,
-    });
+    await crearNotificacionFichajeResuelto(
+      prisma,
+      {
+        fichajeId: solicitud.fichajeId,
+        empresaId: solicitud.empresaId,
+        empleadoId: solicitud.empleadoId,
+        empleadoNombre: `${solicitud.empleado.nombre} ${solicitud.empleado.apellidos}`,
+        fecha: solicitud.fichaje.fecha,
+      },
+      { actorUsuarioId: session.user.id }
+    );
 
     return successResponse(actualizada);
   } catch (error) {

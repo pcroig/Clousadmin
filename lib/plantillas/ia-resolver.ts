@@ -60,11 +60,11 @@ function getSchemaStructure(_empleadoData: DatosEmpleado): Record<string, Schema
     estadoCivil: 'string',
     numeroHijos: 'number',
     iban: 'string (encriptado)',
-    titularCuenta: 'string',
+    bic: 'string',
     puesto: 'string',
     fechaAlta: 'Date',
-    salarioBrutoAnual: 'Decimal',
-    salarioBrutoMensual: 'Decimal',
+    salarioBaseAnual: 'Decimal',
+    salarioBaseMensual: 'Decimal',
     diasVacaciones: 'number',
     empresa: {
       nombre: 'string',
@@ -92,7 +92,7 @@ function getSchemaStructure(_empleadoData: DatosEmpleado): Record<string, Schema
         tipoContrato: 'string',
         fechaInicio: 'Date',
         fechaFin: 'Date',
-        salarioBrutoAnual: 'Decimal',
+        salarioBaseAnual: 'Decimal',
       },
     ],
     ausencias: [
@@ -288,7 +288,7 @@ function resolverVariableComputada(variableName: string, empleadoData: DatosEmpl
     }
 
     case 'contrato_salario_bruto_mensual_palabras': {
-      const salario = empleadoData.contratos?.[0]?.salarioBrutoAnual;
+      const salario = empleadoData.contratos?.[0]?.salarioBaseAnual;
       if (!salario) return '';
       const mensual = Number(salario) / 12;
       return numeroAPalabras(Math.round(mensual)) + ' euros';

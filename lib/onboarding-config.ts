@@ -25,7 +25,7 @@ export interface CamposRequeridos {
   };
   datos_bancarios: {
     iban: boolean;
-    titularCuenta: boolean;
+    bic: boolean;
   };
 }
 
@@ -82,7 +82,7 @@ const DEFAULT_CONFIG: OnboardingConfigData = {
     },
     datos_bancarios: {
       iban: true,
-      titularCuenta: true,
+      bic: true,
     },
   },
   documentosRequeridos: [],

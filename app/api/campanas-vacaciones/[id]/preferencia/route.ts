@@ -178,12 +178,16 @@ export async function PATCH(
         campanaActualizada.totalEmpleadosAsignados > 0 &&
         campanaActualizada.empleadosCompletados >= campanaActualizada.totalEmpleadosAsignados
       ) {
-        await crearNotificacionCampanaCompletada(prisma, {
-          campanaId,
-          empresaId: session.user.empresaId,
-          titulo: campanaActualizada.titulo,
-          totalEmpleados: campanaActualizada.totalEmpleadosAsignados,
-        });
+        await crearNotificacionCampanaCompletada(
+          prisma,
+          {
+            campanaId,
+            empresaId: session.user.empresaId,
+            titulo: campanaActualizada.titulo,
+            totalEmpleados: campanaActualizada.totalEmpleadosAsignados,
+          },
+          { actorUsuarioId: session.user.id }
+        );
       }
     } else if (body.completada === false && preferenciaExistente.completada) {
       await prisma.campanaVacaciones.update({

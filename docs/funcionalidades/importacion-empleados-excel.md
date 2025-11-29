@@ -153,7 +153,7 @@ FormData {
         "equipo": "Desarrollo",
         "manager": "María López",
         "fechaAlta": "2025-01-01",
-        "salarioBrutoAnual": 50000,
+        "salarioBaseAnual": 50000,
         "valido": true,
         "errores": []
       }
@@ -215,7 +215,7 @@ FormData {
         "puesto": "Desarrollador Senior",
         "equipo": "Desarrollo",
         "fechaAlta": "2025-01-01T00:00:00Z",
-        "salarioBrutoAnual": 50000,
+        "salarioBaseAnual": 50000,
         "invitacionEnviada": true
       }
     ]
@@ -250,7 +250,7 @@ El sistema puede detectar automáticamente:
 - ✅ Manager
 - ✅ Fecha de alta
 - ✅ Tipo de contrato
-- ✅ Salario bruto anual/mensual
+- ✅ Salario base anual/mensual
 - ✅ Dirección completa (calle, número, piso, ciudad, código postal, provincia)
 
 ### Validación Automática

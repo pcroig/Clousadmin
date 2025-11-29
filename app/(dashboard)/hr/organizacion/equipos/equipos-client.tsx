@@ -184,7 +184,7 @@ export function EquiposClient({ equipos: initialEquipos }: EquiposClientProps) {
 
   return (
     <>
-      <ResponsiveContainer variant="page" className="h-full w-full flex flex-col overflow-hidden">
+      <ResponsiveContainer variant="page" className="flex flex-col">
         {isMobile ? (
           <>
             <MobileActionBar
@@ -226,15 +226,13 @@ export function EquiposClient({ equipos: initialEquipos }: EquiposClientProps) {
         )}
 
         {/* Content */}
-        <div className="flex-1 min-h-0">
-          <DataTable
-            columns={columns}
-            data={equiposFiltrados}
-            onRowClick={(row) => setSelectedEquipo(row)}
-            getRowId={(row) => row.id}
-            emptyMessage="No hay equipos creados"
-          />
-        </div>
+        <DataTable
+          columns={columns}
+          data={equiposFiltrados}
+          onRowClick={(row) => setSelectedEquipo(row)}
+          getRowId={(row) => row.id}
+          emptyMessage="No hay equipos creados"
+        />
 
         {/* Details Panel */}
         <DetailsPanel

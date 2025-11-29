@@ -146,7 +146,7 @@ export function PersonasClient({ empleados, initialPanel, initialDenunciaId }: P
   ];
 
   return (
-    <ResponsiveContainer variant="page" className="h-full w-full flex flex-col overflow-hidden">
+    <ResponsiveContainer variant="page" className="flex flex-col">
       {isMobile ? (
         <>
           <MobileActionBar
@@ -212,15 +212,13 @@ export function PersonasClient({ empleados, initialPanel, initialDenunciaId }: P
       )}
 
       {/* Content */}
-      <div className="flex-1 min-h-0">
-        <DataTable
-          columns={columns}
-          data={empleadosFiltrados}
-          onRowClick={(row) => router.push(`/hr/organizacion/personas/${row.id}`)}
-          getRowId={(row) => row.id}
-          emptyMessage="No hay personas registradas"
-        />
-      </div>
+      <DataTable
+        columns={columns}
+        data={empleadosFiltrados}
+        onRowClick={(row) => router.push(`/hr/organizacion/personas/${row.id}`)}
+        getRowId={(row) => row.id}
+        emptyMessage="No hay personas registradas"
+      />
 
       {/* Dialog para añadir persona */}
       <AddPersonaDialog

@@ -295,13 +295,17 @@ export async function POST(request: NextRequest) {
       // Notificar a HR cuando un empleado sube un documento
       if (session.user.rol !== UsuarioRol.hr_admin && empleadoId && documento.empleado) {
         try {
-          await crearNotificacionDocumentoSubido(prisma, {
-            documentoId: documento.id,
-            empresaId: session.user.empresaId,
-            empleadoId,
-            empleadoNombre: `${documento.empleado.nombre} ${documento.empleado.apellidos}`,
-            tipoDocumento: tipoDocumentoFinal,
-          });
+          await crearNotificacionDocumentoSubido(
+            prisma,
+            {
+              documentoId: documento.id,
+              empresaId: session.user.empresaId,
+              empleadoId,
+              empleadoNombre: `${documento.empleado.nombre} ${documento.empleado.apellidos}`,
+              tipoDocumento: tipoDocumentoFinal,
+            },
+            { actorUsuarioId: session.user.id }
+          );
         } catch (notifError) {
           console.error('[Documentos] Error creando notificación:', notifError);
           // No fallar la subida si falla la notificación

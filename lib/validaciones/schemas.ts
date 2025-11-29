@@ -15,12 +15,21 @@ export const signupSchema = z.object({
   nombreEmpresa: z.string().min(1, 'Nombre de empresa requerido'),
   webEmpresa: z
     .union([
-      z.string().url('URL inválida'),
+      z.string(),
       z.literal(''),
       z.null(),
     ])
-    .optional(),
-  
+    .optional()
+    .transform((val) => {
+      if (!val || val === '') return null;
+      // Normalizar URL: agregar https:// si no tiene protocolo
+      let url = val.trim();
+      if (url && !url.startsWith('http://') && !url.startsWith('https://')) {
+        url = `https://${url}`;
+      }
+      return url;
+    }),
+
   // Datos del primer HR admin
   nombre: z.string().min(1, 'Nombre requerido'),
   apellidos: z.string().min(1, 'Apellidos requeridos'),

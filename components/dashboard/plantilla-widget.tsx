@@ -6,29 +6,14 @@
 
 import Link from 'next/link';
 
+import { EmpleadoHoverCard } from '@/components/empleado/empleado-hover-card';
 import { EmployeeAvatar } from '@/components/shared/employee-avatar';
 import { WidgetCard } from '@/components/shared/widget-card';
+import type { PlantillaResumen } from '@/lib/calculos/plantilla';
 import { MOBILE_DESIGN } from '@/lib/constants/mobile-design';
 import { cn } from '@/lib/utils';
 
-interface EmpleadoResumen {
-  nombre: string;
-  avatar?: string;
-}
-
-interface PlantillaWidgetProps {
-  trabajando: {
-    count: number;
-    empleados: EmpleadoResumen[];
-  };
-  ausentes: {
-    count: number;
-    empleados: EmpleadoResumen[];
-  };
-  sinFichar: {
-    count: number;
-    empleados: EmpleadoResumen[];
-  };
+type PlantillaWidgetProps = PlantillaResumen & {
   rol?: 'hr_admin' | 'manager' | 'empleado'; // Para personalizar URLs según rol
   /**
    * Variante de visualización
@@ -36,12 +21,14 @@ interface PlantillaWidgetProps {
    * - compact: Sin card, más compacto (mobile)
    */
   variant?: 'card' | 'compact';
-}
+};
 
 export function PlantillaWidget({ 
   trabajando, 
+  enPausa, 
   ausentes, 
   sinFichar, 
+  fueraDeHorario, 
   rol = 'hr_admin',
   variant = 'card',
 }: PlantillaWidgetProps) {
@@ -57,21 +44,30 @@ export function PlantillaWidget({
       count: trabajando.count,
       empleados: trabajando.empleados,
       href: hrefFichajes,
-      color: 'accent',
+    },
+    {
+      label: 'En pausa',
+      count: enPausa.count,
+      empleados: enPausa.empleados,
+      href: hrefFichajes,
     },
     {
       label: 'Ausentes',
       count: ausentes.count,
       empleados: ausentes.empleados,
       href: hrefAusencias,
-      color: 'warning',
     },
     {
       label: 'Sin fichar',
       count: sinFichar.count,
       empleados: sinFichar.empleados,
       href: hrefFichajes,
-      color: 'error',
+    },
+    {
+      label: 'Fuera de horario',
+      count: fueraDeHorario.count,
+      empleados: fueraDeHorario.empleados,
+      href: hrefPersonas,
     },
   ];
 
@@ -88,15 +84,28 @@ export function PlantillaWidget({
                 <p className={cn(MOBILE_DESIGN.text.tiny)}>{item.count} personas</p>
               </div>
               <div className="flex -space-x-1.5 flex-shrink-0 ml-2">
-                {item.empleados.slice(0, 3).map((emp, idx) => (
-                  <EmployeeAvatar
-                    key={idx}
-                    nombre={emp.nombre}
-                    fotoUrl={emp.avatar ?? null}
-                    size="sm"
-                    className={cn(MOBILE_DESIGN.components.avatar.small, 'border border-white')}
-                    fallbackClassName="text-[9px]"
-                  />
+                {item.empleados.slice(0, 3).map((emp) => (
+                  <EmpleadoHoverCard
+                    key={`${item.label}-${emp.id}`}
+                    empleado={{
+                      nombre: emp.primerNombre ?? emp.nombre,
+                      apellidos: emp.apellidos,
+                      email: emp.email,
+                      puesto: emp.puesto,
+                      equipoNombre: emp.equipoNombre,
+                      fotoUrl: emp.avatar,
+                    }}
+                    estado={{ label: item.label }}
+                    triggerClassName="inline-flex gap-0"
+                  >
+                    <EmployeeAvatar
+                      nombre={emp.nombre}
+                      fotoUrl={emp.avatar ?? null}
+                      size="sm"
+                      className={cn(MOBILE_DESIGN.components.avatar.small, 'border border-white')}
+                      fallbackClassName="text-[9px]"
+                    />
+                  </EmpleadoHoverCard>
                 ))}
                 {item.count > 3 && (
                   <div className={cn(
@@ -120,88 +129,51 @@ export function PlantillaWidget({
       title="Plantilla"
       href={hrefPersonas}
       contentClassName="px-6 pb-6"
+      useScroll
     >
         <div className="space-y-2.5">
-          {/* Trabajando */}
-          <Link href={hrefFichajes} className="block">
+          {items.map((item) => (
+            <Link key={item.label} href={item.href} className="block">
             <div className="flex items-center justify-between p-2 rounded-lg border border-gray-200 bg-white transition-all hover:border-gray-300 hover:shadow-sm cursor-pointer group">
               <div className="flex-1 min-w-0">
-                <p className="text-[13px] font-semibold text-gray-900 group-hover:text-gray-700">Trabajando</p>
-                <p className="text-[11px] text-gray-500">{trabajando.count} personas</p>
+                  <p className="text-[13px] font-semibold text-gray-900 group-hover:text-gray-700">
+                    {item.label}
+                  </p>
+                  <p className="text-[11px] text-gray-500">{item.count} personas</p>
               </div>
               <div className="flex -space-x-2 flex-shrink-0 ml-3">
-                {trabajando.empleados.slice(0, 4).map((emp, idx) => (
-                  <EmployeeAvatar
-                    key={idx}
-                    nombre={emp.nombre}
-                    fotoUrl={emp.avatar ?? null}
-                    size="sm"
-                    className="h-8 w-8 border-2 border-white"
-                    fallbackClassName="text-[11px]"
-                  />
+                  {item.empleados.slice(0, 4).map((emp) => (
+                  <EmpleadoHoverCard
+                    key={`${item.label}-${emp.id}`}
+                    empleado={{
+                      nombre: emp.primerNombre ?? emp.nombre,
+                      apellidos: emp.apellidos,
+                      email: emp.email,
+                      puesto: emp.puesto,
+                      equipoNombre: emp.equipoNombre,
+                      fotoUrl: emp.avatar,
+                    }}
+                    estado={{ label: item.label }}
+                    triggerClassName="inline-flex gap-0"
+                  >
+                    <EmployeeAvatar
+                      nombre={emp.nombre}
+                      fotoUrl={emp.avatar ?? null}
+                      size="sm"
+                      className="h-8 w-8 border-2 border-white"
+                      fallbackClassName="text-[11px]"
+                    />
+                  </EmpleadoHoverCard>
                 ))}
-                {trabajando.count > 4 && (
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-white bg-accent-light text-[11px] font-semibold text-accent">
-                    +{trabajando.count - 4}
+                  {item.count > 4 && (
+                    <div className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-white bg-gray-100 text-[11px] font-semibold text-gray-600">
+                      +{item.count - 4}
                   </div>
                 )}
               </div>
             </div>
           </Link>
-
-          {/* Ausentes */}
-          <Link href={hrefAusencias} className="block">
-            <div className="flex items-center justify-between p-2 rounded-lg border border-gray-200 bg-white transition-all hover:border-gray-300 hover:shadow-sm cursor-pointer group">
-              <div className="flex-1 min-w-0">
-                <p className="text-[13px] font-semibold text-gray-900 group-hover:text-gray-700">Ausentes</p>
-                <p className="text-[11px] text-gray-500">{ausentes.count} personas</p>
-              </div>
-              <div className="flex -space-x-2 flex-shrink-0 ml-3">
-                {ausentes.empleados.slice(0, 4).map((emp, idx) => (
-                  <EmployeeAvatar
-                    key={idx}
-                    nombre={emp.nombre}
-                    fotoUrl={emp.avatar ?? null}
-                    size="sm"
-                    className="h-8 w-8 border-2 border-white"
-                    fallbackClassName="text-[11px]"
-                  />
-                ))}
-                {ausentes.count > 4 && (
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-white bg-warning-light text-[11px] font-semibold text-warning">
-                    +{ausentes.count - 4}
-                  </div>
-                )}
-              </div>
-            </div>
-          </Link>
-
-          {/* Sin fichar */}
-          <Link href={hrefFichajes} className="block">
-            <div className="flex items-center justify-between p-2 rounded-lg border border-gray-200 bg-white transition-all hover:border-gray-300 hover:shadow-sm cursor-pointer group">
-              <div className="flex-1 min-w-0">
-                <p className="text-[13px] font-semibold text-gray-900 group-hover:text-gray-700">Sin fichar</p>
-                <p className="text-[11px] text-gray-500">{sinFichar.count} personas</p>
-              </div>
-              <div className="flex -space-x-2 flex-shrink-0 ml-3">
-                {sinFichar.empleados.slice(0, 4).map((emp, idx) => (
-                  <EmployeeAvatar
-                    key={idx}
-                    nombre={emp.nombre}
-                    fotoUrl={emp.avatar ?? null}
-                    size="sm"
-                    className="h-8 w-8 border-2 border-white"
-                    fallbackClassName="text-[11px]"
-                  />
-                ))}
-                {sinFichar.count > 4 && (
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-white bg-error-light text-[11px] font-semibold text-error">
-                    +{sinFichar.count - 4}
-                  </div>
-                )}
-              </div>
-            </div>
-          </Link>
+          ))}
         </div>
     </WidgetCard>
   );

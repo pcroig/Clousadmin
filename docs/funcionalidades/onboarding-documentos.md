@@ -29,7 +29,7 @@ El sistema de onboarding permite a HR crear nuevos empleados y activar un proces
 **Pasos del empleado:**
 1. **Paso 0 - Credenciales:** Establece contraseña y sube avatar (opcional)
 2. **Paso 1 - Datos Personales:** Completa NIF, NSS, dirección, etc.
-3. **Paso 2 - Datos Bancarios:** Completa IBAN y titular de cuenta
+3. **Paso 2 - Datos Bancarios:** Completa IBAN y código BIC
 4. **Paso 3 - Documentos:** Puede subir documentos adicionales o ver los ya subidos por HR
 5. **Finalizar:** Traspasa todos los datos a los registros permanentes y activa el empleado
 

@@ -66,7 +66,7 @@ export function GestionarOnboardingModal({
     },
     datos_bancarios: {
       iban: true,
-      titularCuenta: true,
+      bic: true,
     },
   });
 
@@ -298,7 +298,7 @@ export function GestionarOnboardingModal({
                             }}
                           />
                           <Label htmlFor={`banco-${campo}`} className="cursor-pointer">
-                            {campo === 'iban' ? 'IBAN' : 'Titular de la cuenta'}
+                            {campo === 'iban' ? 'IBAN' : 'Código BIC'}
                           </Label>
                         </div>
                       ))}

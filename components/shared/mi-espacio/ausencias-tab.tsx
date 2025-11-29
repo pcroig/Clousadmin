@@ -2,7 +2,7 @@
 
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Calendar as CalendarIcon, ChevronRight, Info } from 'lucide-react';
+import { Calendar as CalendarIcon, ChevronRight, Info, Paperclip } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { SolicitarAusenciaModal } from '@/components/empleado/solicitar-ausencia-modal';
@@ -27,6 +27,9 @@ interface Ausencia {
   diasLaborables: number;
   estado: string;
   motivo: string | null;
+  justificanteUrl?: string | null;
+  documentoId?: string | null;
+  createdAt?: string;
 }
 
 interface SaldoResponse {
@@ -390,8 +393,8 @@ export function AusenciasTab({ empleadoId, contexto = 'empleado' }: MiEspacioAus
   const renderAusenciaCard = (ausencia: Ausencia, isPast = false) => (
     <div
       key={ausencia.id}
-      className={`flex items-center gap-3 rounded-xl border border-gray-100 bg-white px-3 py-3 transition hover:border-gray-200 ${
-        isPast ? 'opacity-70 hover:opacity-100' : ''
+      className={`flex w-full items-center gap-3 rounded-xl border border-gray-100 bg-white px-3 py-3 text-left transition ${
+        isPast ? 'opacity-70' : ''
       }`}
     >
       <div className="flex items-center gap-2">
@@ -411,7 +414,10 @@ export function AusenciasTab({ empleadoId, contexto = 'empleado' }: MiEspacioAus
           {ausencia.diasLaborables} {ausencia.diasLaborables === 1 ? 'día' : 'días'}
         </p>
       </div>
-      {getEstadoBadge(ausencia.estado)}
+      <div className="flex items-center gap-2">
+        {ausencia.justificanteUrl ? <Paperclip className="h-4 w-4 text-gray-400" /> : null}
+        {getEstadoBadge(ausencia.estado)}
+      </div>
     </div>
   );
 
@@ -646,6 +652,7 @@ export function AusenciasTab({ empleadoId, contexto = 'empleado' }: MiEspacioAus
           empleadoIdDestino={puedeRegistrar ? empleadoId : undefined}
         />
       )}
+
     </div>
   );
 }

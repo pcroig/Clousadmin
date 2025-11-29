@@ -44,16 +44,8 @@ Se ha corregido un problema crítico que impedía la visualización de documento
 **CSP por Tipo de Contenido**:
 
 **PDFs**:
-```
-default-src 'none';
-script-src 'unsafe-inline';        // Motor del visor
-worker-src blob:;                  // Web Workers para renderizado
-object-src 'self';                 // Plugin fallback
-font-src 'self' data:;             // Fuentes embebidas
-img-src 'self' data: blob:;        // Imágenes en PDF
-style-src 'unsafe-inline';         // Estilos del visor
-frame-ancestors 'self';            // Solo mismo origen
-```
+- ⚠️ No aplicamos CSP y excluimos estos endpoints de la política global para permitir que el visor nativo del navegador renderice el documento sin bloqueos.
+- Se mantiene `X-Frame-Options: SAMEORIGIN` y el sandbox estricto del iframe para proteger la carga.
 
 **Imágenes**:
 ```
@@ -372,4 +364,5 @@ Los headers configurados en `next.config.ts` NO se aplican automáticamente a re
 **Autor**: Claude Sonnet 4.5  
 **Revisión**: 28 de Noviembre 2025  
 **Status**: ✅ COMPLETADO Y FUNCIONAL
+
 

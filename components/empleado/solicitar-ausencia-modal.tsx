@@ -72,26 +72,20 @@ const TIPOS_AUSENCIA: TipoAusenciaOption[] = [
 }));
 
 const getApprovalCopy = (needsApproval: boolean) =>
-  needsApproval ? '⏱ Necesita aprobación' : '✓ No necesita aprobación';
+  needsApproval ? 'Necesita aprobación' : 'Sin aprobación manual';
 
 const getBalanceCopy = (descuentaSaldo: boolean) =>
-  descuentaSaldo ? '📊 Descuenta saldo' : 'No descuenta saldo';
+  descuentaSaldo ? 'Descuenta saldo' : 'No descuenta saldo';
 
 const TipoOptionContent = ({
   label,
   needsApproval,
   descuentaSaldo,
 }: Pick<TipoAusenciaOption, 'label' | 'needsApproval' | 'descuentaSaldo'>) => (
-  <span className="flex min-w-0 flex-wrap items-center gap-2">
-    <span className="font-medium">{label}</span>
-    <span className="flex min-w-0 items-center gap-1 text-xs text-gray-500">
-      <span className={needsApproval ? 'text-yellow-600' : 'text-green-600'}>
-        {getApprovalCopy(needsApproval)}
-      </span>
-      <span className="text-gray-400">•</span>
-      <span className={descuentaSaldo ? 'text-orange-600' : 'text-gray-500'}>
-        {getBalanceCopy(descuentaSaldo)}
-      </span>
+  <span className="flex min-w-0 items-center gap-3">
+    <span className="font-medium text-gray-900">{label}</span>
+    <span className="flex-1 truncate text-right text-xs text-gray-500">
+      {getApprovalCopy(needsApproval)} · {getBalanceCopy(descuentaSaldo)}
     </span>
   </span>
 );

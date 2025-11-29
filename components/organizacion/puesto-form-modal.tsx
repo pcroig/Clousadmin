@@ -4,18 +4,30 @@
 
 'use client';
 
-import { Check, ChevronDown } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
+import { Check, ChevronsUpDown } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 import { LoadingButton } from '@/components/shared/loading-button';
 import { Button } from '@/components/ui/button';
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command';
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  Field,
+  FieldLabel,
+} from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -55,6 +67,8 @@ export function PuestoFormModal({
   const [loading, setLoading] = useState(false);
   const [empleados, setEmpleados] = useState<Array<{ id: string; nombre: string; apellidos: string }>>([]);
   const [empleadosSeleccionados, setEmpleadosSeleccionados] = useState<string[]>([]);
+  const [openEmpleados, setOpenEmpleados] = useState(false);
+  const [searchEmpleados, setSearchEmpleados] = useState('');
   const [formData, setFormData] = useState({
     nombre: '',
     descripcion: '',
@@ -141,6 +155,17 @@ export function PuestoFormModal({
       setEmpleadosSeleccionados([...empleadosSeleccionados, empleadoId]);
     }
   };
+
+  const empleadosFiltrados = useMemo(() => {
+    if (!searchEmpleados.trim()) return empleados;
+    const searchLower = searchEmpleados.toLowerCase();
+    return empleados.filter(
+      (emp) =>
+        emp.nombre.toLowerCase().includes(searchLower) ||
+        emp.apellidos.toLowerCase().includes(searchLower) ||
+        `${emp.nombre} ${emp.apellidos}`.toLowerCase().includes(searchLower)
+    );
+  }, [empleados, searchEmpleados]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -237,17 +262,17 @@ export function PuestoFormModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>{isEditing ? 'Editar Puesto' : 'Crear Puesto'}</DialogTitle>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Nombre del Puesto */}
-          <div className="space-y-2">
-            <Label htmlFor="nombre">
+          <Field>
+            <FieldLabel htmlFor="nombre">
               Nombre del Puesto <span className="text-red-500">*</span>
-            </Label>
+            </FieldLabel>
             <Input
               id="nombre"
               value={formData.nombre}
@@ -255,11 +280,11 @@ export function PuestoFormModal({
               placeholder="Ej: Desarrollador Senior, Gerente de Ventas"
               required
             />
-          </div>
+          </Field>
 
           {/* Descripción */}
-          <div className="space-y-2">
-            <Label htmlFor="descripcion">Descripción</Label>
+          <Field>
+            <FieldLabel htmlFor="descripcion">Descripción</FieldLabel>
             <Textarea
               id="descripcion"
               value={formData.descripcion}
@@ -267,17 +292,18 @@ export function PuestoFormModal({
               placeholder="Describe las responsabilidades y requisitos del puesto..."
               rows={4}
             />
-          </div>
+          </Field>
 
           {/* Asignar Empleados */}
-          <div className="space-y-2">
-            <Label>Asignar Empleados</Label>
-            <Popover>
+          <Field>
+            <FieldLabel>Asignar Empleados</FieldLabel>
+            <Popover open={openEmpleados} onOpenChange={setOpenEmpleados}>
               <PopoverTrigger asChild>
                 <Button
                   variant="outline"
                   className="w-full justify-between"
                   role="combobox"
+                  aria-expanded={openEmpleados}
                 >
                   <span className="truncate">
                     {empleadosSeleccionados.length === 0
@@ -286,46 +312,48 @@ export function PuestoFormModal({
                       ? empleados.find((e) => e.id === empleadosSeleccionados[0])?.nombre + ' ' + empleados.find((e) => e.id === empleadosSeleccionados[0])?.apellidos || '1 empleado seleccionado'
                       : `${empleadosSeleccionados.length} empleados seleccionados`}
                   </span>
-                  <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-full p-0" align="start">
-                <div className="p-2 space-y-1 max-h-64 overflow-y-auto">
-                  {empleados.length === 0 ? (
-                    <p className="text-sm text-gray-500 p-2">No hay empleados disponibles</p>
-                  ) : (
-                    empleados.map((empleado) => (
-                      <label
-                        key={empleado.id}
-                        className={cn(
-                          "flex items-center space-x-2 cursor-pointer hover:bg-gray-50 p-2 rounded",
-                          empleadosSeleccionados.includes(empleado.id) && "bg-primary/5"
-                        )}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={empleadosSeleccionados.includes(empleado.id)}
-                          onChange={() => toggleEmpleado(empleado.id)}
-                          className="rounded border-gray-300"
-                        />
-                        <span className="text-sm flex-1">
-                          {empleado.nombre} {empleado.apellidos}
-                        </span>
-                        {empleadosSeleccionados.includes(empleado.id) && (
-                          <Check className="h-4 w-4 text-primary" />
-                        )}
-                      </label>
-                    ))
-                  )}
-                </div>
+              <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+                <Command>
+                  <CommandInput
+                    placeholder="Buscar empleados..."
+                    value={searchEmpleados}
+                    onValueChange={setSearchEmpleados}
+                  />
+                  <CommandList>
+                    <CommandEmpty>No se encontraron empleados.</CommandEmpty>
+                    <CommandGroup>
+                      {empleadosFiltrados.map((empleado) => {
+                        const isSelected = empleadosSeleccionados.includes(empleado.id);
+                        return (
+                          <CommandItem
+                            key={empleado.id}
+                            value={empleado.id}
+                            onSelect={() => toggleEmpleado(empleado.id)}
+                          >
+                            <Check
+                              className={cn(
+                                "mr-2 h-4 w-4",
+                                isSelected ? "opacity-100" : "opacity-0"
+                              )}
+                            />
+                            {empleado.nombre} {empleado.apellidos}
+                          </CommandItem>
+                        );
+                      })}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
               </PopoverContent>
             </Popover>
             {empleadosSeleccionados.length > 0 && (
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-gray-500 mt-1">
                 {empleadosSeleccionados.length} empleado{empleadosSeleccionados.length !== 1 ? 's' : ''} seleccionado{empleadosSeleccionados.length !== 1 ? 's' : ''}
               </p>
             )}
-          </div>
+          </Field>
 
           {/* Actions */}
           <div className="flex gap-2 justify-end pt-4">

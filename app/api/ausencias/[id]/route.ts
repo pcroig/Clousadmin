@@ -208,15 +208,19 @@ export async function PATCH(
       // Crear notificación usando el servicio centralizado
       if (accion === 'aprobar') {
         try {
-          await crearNotificacionAusenciaAprobada(prisma, {
-            ausenciaId: result.id,
-            empresaId: session.user.empresaId,
-            empleadoId: ausencia.empleadoId,
-            empleadoNombre: `${result.empleado.nombre} ${result.empleado.apellidos}`,
-            tipo: ausencia.tipo,
-            fechaInicio: ausencia.fechaInicio,
-            fechaFin: ausencia.fechaFin,
-          });
+          await crearNotificacionAusenciaAprobada(
+            prisma,
+            {
+              ausenciaId: result.id,
+              empresaId: session.user.empresaId,
+              empleadoId: ausencia.empleadoId,
+              empleadoNombre: `${result.empleado.nombre} ${result.empleado.apellidos}`,
+              tipo: ausencia.tipo,
+              fechaInicio: ausencia.fechaInicio,
+              fechaFin: ausencia.fechaFin,
+            },
+            { actorUsuarioId: session.user.id }
+          );
         } catch (error) {
           console.error('[Ausencias] Error creando notificación de aprobación:', error);
         }
@@ -236,16 +240,20 @@ export async function PATCH(
         }
       } else {
         try {
-          await crearNotificacionAusenciaRechazada(prisma, {
-            ausenciaId: result.id,
-            empresaId: session.user.empresaId,
-            empleadoId: ausencia.empleadoId,
-            empleadoNombre: `${result.empleado.nombre} ${result.empleado.apellidos}`,
-            tipo: ausencia.tipo,
-            fechaInicio: ausencia.fechaInicio,
-            fechaFin: ausencia.fechaFin,
-            motivoRechazo,
-          });
+          await crearNotificacionAusenciaRechazada(
+            prisma,
+            {
+              ausenciaId: result.id,
+              empresaId: session.user.empresaId,
+              empleadoId: ausencia.empleadoId,
+              empleadoNombre: `${result.empleado.nombre} ${result.empleado.apellidos}`,
+              tipo: ausencia.tipo,
+              fechaInicio: ausencia.fechaInicio,
+              fechaFin: ausencia.fechaFin,
+              motivoRechazo,
+            },
+            { actorUsuarioId: session.user.id }
+          );
         } catch (error) {
           console.error('[Ausencias] Error creando notificación de rechazo:', error);
         }
@@ -612,15 +620,19 @@ export async function DELETE(
     // Crear notificación de cancelación
     if (empleado) {
       try {
-        await crearNotificacionAusenciaCancelada(prisma, {
-          ausenciaId: ausencia.id,
-          empresaId: session.user.empresaId,
-          empleadoId: ausencia.empleadoId,
-          empleadoNombre: `${empleado.nombre} ${empleado.apellidos}`,
-          tipo: ausencia.tipo,
-          fechaInicio: ausencia.fechaInicio,
-          fechaFin: ausencia.fechaFin,
-        });
+        await crearNotificacionAusenciaCancelada(
+          prisma,
+          {
+            ausenciaId: ausencia.id,
+            empresaId: session.user.empresaId,
+            empleadoId: ausencia.empleadoId,
+            empleadoNombre: `${empleado.nombre} ${empleado.apellidos}`,
+            tipo: ausencia.tipo,
+            fechaInicio: ausencia.fechaInicio,
+            fechaFin: ausencia.fechaFin,
+          },
+          { actorUsuarioId: session.user.id }
+        );
       } catch (error) {
         console.error('[Ausencias] Error creando notificación de cancelación:', error);
       }

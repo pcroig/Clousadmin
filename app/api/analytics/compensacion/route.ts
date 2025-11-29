@@ -22,8 +22,8 @@ import {
 
 const empleadoConEquiposSelect = Prisma.validator<Prisma.EmpleadoSelect>()({
   id: true,
-  salarioBrutoMensual: true,
-  salarioBrutoAnual: true,
+  salarioBaseMensual: true,
+  salarioBaseAnual: true,
   fechaAlta: true,
   genero: true,
   equipos: {
@@ -167,7 +167,7 @@ export async function GET(request: NextRequest) {
     // 1. Coste total nómina mensual
     const costeTotalNomina = empleados.reduce(
       (sum: number, empleado: EmpleadoConEquipos) =>
-        sum + Number(empleado.salarioBrutoMensual || 0),
+        sum + Number(empleado.salarioBaseMensual || 0),
       0
     );
 
@@ -183,15 +183,15 @@ export async function GET(request: NextRequest) {
         OR: [{ fechaBaja: null }, { fechaBaja: { gt: mesAnterior } }],
       },
       select: {
-        salarioBrutoMensual: true,
+        salarioBaseMensual: true,
       },
     });
 
     const costeMesAnterior = empleadosMesAnterior.reduce<number>(
       (
         sum: number,
-        empleado: { salarioBrutoMensual: Prisma.Decimal | number | null }
-      ) => sum + Number(empleado.salarioBrutoMensual || 0),
+        empleado: { salarioBaseMensual: Prisma.Decimal | number | null }
+      ) => sum + Number(empleado.salarioBaseMensual || 0),
       0
     );
 
@@ -205,7 +205,7 @@ export async function GET(request: NextRequest) {
     const salariosPorEquipo: Record<string, { total: number; count: number }> = {};
 
     empleados.forEach((empleado: EmpleadoConEquipos) => {
-      const salario = Number(empleado.salarioBrutoMensual || 0);
+      const salario = Number(empleado.salarioBaseMensual || 0);
 
       if (empleado.equipos.length === 0) {
         if (!salariosPorEquipo['Sin equipo']) {
@@ -242,7 +242,7 @@ export async function GET(request: NextRequest) {
         salariosPorGenero[generoKey] = { total: 0, count: 0 };
       }
       salariosPorGenero[generoKey].total += Number(
-        empleado.salarioBrutoMensual || 0
+        empleado.salarioBaseMensual || 0
       );
       salariosPorGenero[generoKey].count += 1;
     });
@@ -339,9 +339,9 @@ export async function GET(request: NextRequest) {
 
     empleados.forEach((empleado: EmpleadoConEquipos) => {
       const salarioAnual = Number(
-        empleado.salarioBrutoAnual ||
-          (empleado.salarioBrutoMensual
-            ? Number(empleado.salarioBrutoMensual) * 12
+        empleado.salarioBaseAnual ||
+          (empleado.salarioBaseMensual
+            ? Number(empleado.salarioBaseMensual) * 12
             : 0)
       );
       if (salarioAnual < 20000) rangos['Menos de 20k']++;

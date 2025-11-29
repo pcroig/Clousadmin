@@ -351,6 +351,94 @@ await prisma.$transaction(async (tx) => {
 
 ---
 
+## 👤 Hover Cards para Empleados
+
+### Patrón: Información Contextual Uniforme
+
+Usa `EmpleadoHoverCard` para mostrar información del empleado (rol, equipo, email, estado) de forma consistente en toda la plataforma.
+
+```typescript
+import { EmpleadoHoverCard } from '@/components/empleado/empleado-hover-card';
+import { EmployeeAvatar } from '@/components/shared/employee-avatar';
+
+// ✅ GOOD: En widgets con avatar
+<EmpleadoHoverCard
+  empleado={{
+    nombre: solicitud.empleado.nombre,
+    apellidos: solicitud.empleado.apellidos,
+    puesto: solicitud.empleado.puesto,
+    email: solicitud.empleado.email,
+    equipoNombre: solicitud.empleado.equipoNombre,
+    fotoUrl: solicitud.empleado.fotoUrl,
+  }}
+  estado={{ label: 'Pendiente de aprobación' }}
+>
+  <EmployeeAvatar nombre={solicitud.empleado.nombre} fotoUrl={solicitud.empleado.fotoUrl} size="sm" />
+</EmpleadoHoverCard>
+
+// ✅ GOOD: En tablas con nombre
+<EmpleadoHoverCard
+  empleado={{
+    nombre: ausencia.empleado.nombre,
+    apellidos: ausencia.empleado.apellidos,
+    puesto: ausencia.empleado.puesto,
+    email: ausencia.empleado.email,
+    equipoNombre: ausencia.empleado.equipoNombre,
+    fotoUrl: ausencia.empleado.fotoUrl,
+  }}
+  estado={{
+    label: getAusenciaEstadoLabel(ausencia.estado),
+    description: getTipoBadge(ausencia.tipo),
+  }}
+  side="right"
+>
+  {ausencia.empleado.nombre} {ausencia.empleado.apellidos}
+</EmpleadoHoverCard>
+```
+
+**Reglas importantes:**
+- ✅ El hover card muestra **siempre la misma información** (rol, equipo, email) independientemente del contexto
+- ✅ El `estado` es opcional y contextual (ausencia, fichaje, solicitud)
+- ✅ Usa `side="right"` en tablas para evitar que el card se salga de la pantalla
+- ✅ No cambia de color al hacer hover (mantiene el estilo del trigger)
+- ❌ No uses metadatos específicos del contexto (fechas, horas, etc.) - solo información del empleado
+
+**Queries que deben incluir datos del empleado:**
+```typescript
+// ✅ GOOD: Incluir email, puesto, equipos en queries
+const ausencias = await prisma.ausencia.findMany({
+  include: {
+    empleado: {
+      select: {
+        nombre: true,
+        apellidos: true,
+        puesto: true,
+        email: true,
+        fotoUrl: true,
+        equipos: {
+          select: {
+            equipo: {
+              select: {
+                nombre: true,
+              },
+            },
+          },
+          take: 1,
+        },
+      },
+    },
+  },
+});
+```
+
+**Componentes que usan hover cards:**
+- `SolicitudesWidget` - avatares y nombres
+- `PlantillaWidget` - avatares en categorías
+- Tablas de Ausencias - nombres en mobile y desktop
+- Tablas de Fichajes - nombres en mobile y desktop
+
+---
+
 ## 🎨 shadcn/ui Patterns
 
 ### Installation
@@ -364,6 +452,7 @@ npx shadcn@latest add form
 npx shadcn@latest add table
 npx shadcn@latest add dialog
 npx shadcn@latest add calendar
+npx shadcn@latest add hover-card  # Para EmpleadoHoverCard
 ```
 
 ### Component Patterns
@@ -588,6 +677,31 @@ const empleado = await prisma.empleado.findUnique({
 />
 ```
 
+**Obtener avatar del usuario actual (Server Components):**
+- Usa la función helper `getCurrentUserAvatar(session)` para obtener el avatar del usuario actual
+- Esta función consulta `empleado.fotoUrl` de forma eficiente y maneja fallbacks automáticamente
+
+```typescript
+// ✅ GOOD: Usar helper para obtener avatar del usuario actual
+import { getSession, getCurrentUserAvatar } from '@/lib/auth';
+
+export default async function MyPage() {
+  const session = await getSession();
+  if (!session) redirect('/login');
+  
+  const avatarUrl = await getCurrentUserAvatar(session);
+  // avatarUrl es string | null, obtenido desde empleado.fotoUrl
+  
+  return <EmployeeAvatar fotoUrl={avatarUrl} />;
+}
+
+// ❌ BAD: Consultar directamente sin helper (duplica lógica)
+const empleado = await prisma.empleado.findUnique({
+  where: { id: session.user.empleadoId },
+  select: { fotoUrl: true },
+});
+```
+
 **AvatarCell (Para tablas):**
 Para celdas de tabla con avatar + nombre, usa `AvatarCell`:
 
@@ -629,6 +743,239 @@ const response = await fetch(`/api/empleados/${empleadoId}/avatar`, {
 const { url } = await response.json();
 // El avatar se actualiza automáticamente en empleado.fotoUrl
 ```
+
+---
+
+## 📊 Tablas Unificadas (DataTable Pattern)
+
+### Regla Principal: Siempre usar DataTable
+
+**Todas las tablas del sistema deben usar el componente `DataTable` compartido** para garantizar:
+- ✅ Estilo visual consistente (header grisaceo, filas completas)
+- ✅ EmptyState de shadcn integrado
+- ✅ Responsive design con columnas priorizadas
+- ✅ Código centralizado y reutilizable
+
+```typescript
+// ✅ GOOD: Usar DataTable con columnas tipadas
+import { AvatarCell, DataTable, type Column } from '@/components/shared/data-table';
+import { EmptyState } from '@/components/shared/empty-state';
+import { CalendarIcon } from 'lucide-react';
+
+interface Ausencia {
+  id: string;
+  empleado: {
+    nombre: string;
+    apellidos: string;
+    puesto: string;
+    fotoUrl: string | null;
+  };
+  tipo: string;
+  fechaInicio: string;
+  fechaFin: string;
+  estado: string;
+}
+
+const columns: Column<Ausencia>[] = [
+  {
+    id: 'empleado',
+    header: 'Empleado',
+    cell: (row) => (
+      <AvatarCell
+        nombre={row.empleado.nombre}
+        apellidos={row.empleado.apellidos}
+        fotoUrl={row.empleado.fotoUrl}
+        subtitle={row.empleado.puesto}
+      />
+    ),
+    sticky: true, // Primera columna sticky en mobile
+    priority: 'high', // Siempre visible
+  },
+  {
+    id: 'tipo',
+    header: 'Tipo',
+    cell: (row) => <Badge>{getTipoBadge(row.tipo)}</Badge>,
+    priority: 'high',
+  },
+  {
+    id: 'fechas',
+    header: 'Fechas',
+    align: 'center', // Header centrado con contenido
+    cell: (row) => (
+      <div className="text-center">
+        {format(new Date(row.fechaInicio), 'dd MMM')} - {format(new Date(row.fechaFin), 'dd MMM')}
+      </div>
+    ),
+    priority: 'medium', // Oculta en mobile pequeño
+  },
+  {
+    id: 'estado',
+    header: 'Estado',
+    align: 'center',
+    cell: (row) => {
+      if (row.estado === 'pendiente') {
+        return (
+          <div className="flex justify-center gap-2">
+            <Button variant="ghost" size="sm">Aprobar</Button>
+            <Button variant="ghost" size="sm">Rechazar</Button>
+          </div>
+        );
+      }
+      return <Badge>{getEstadoBadge(row.estado)}</Badge>;
+    },
+    priority: 'high',
+  },
+];
+
+// Usar en componente
+<DataTable
+  columns={columns}
+  data={ausencias}
+  getRowId={(row) => row.id}
+  onRowClick={(row) => handleOpenModal(row)}
+  emptyContent={
+    <EmptyState
+      layout="table"
+      icon={CalendarIcon}
+      title="No hay ausencias registradas"
+      description="Cambia el periodo o ajusta los filtros para ver registros."
+    />
+  }
+/>
+```
+
+### AvatarCell para Columnas de Empleados
+
+**Siempre usa `AvatarCell`** para mostrar empleados en tablas. Integra avatar + nombre + puesto automáticamente.
+
+```typescript
+// ✅ GOOD: Usar AvatarCell
+{
+  id: 'empleado',
+  header: 'Empleado',
+  cell: (row) => (
+    <AvatarCell
+      nombre={row.empleado.nombre}
+      apellidos={row.empleado.apellidos}
+      fotoUrl={row.empleado.fotoUrl}
+      subtitle={row.empleado.puesto} // Opcional: muestra debajo del nombre
+    />
+  ),
+  sticky: true,
+  priority: 'high',
+}
+```
+
+**Características de AvatarCell:**
+- Muestra avatar + nombre + puesto en una sola celda
+- Responsive: avatar más pequeño en mobile
+- Integra `EmployeeAvatar` automáticamente
+- Soporta `subtitle` para mostrar información adicional (puesto, equipo, etc.)
+
+### EmptyState Obligatorio
+
+**Todos los estados vacíos deben usar `EmptyState` de shadcn** con layout `table`.
+
+```typescript
+// ✅ GOOD: EmptyState de shadcn
+import { EmptyState } from '@/components/shared/empty-state';
+import { CalendarIcon } from 'lucide-react';
+
+<DataTable
+  columns={columns}
+  data={ausencias}
+  emptyContent={
+    <EmptyState
+      layout="table"
+      icon={CalendarIcon}
+      title="No hay ausencias registradas"
+      description="Cambia el periodo o ajusta los filtros para ver registros."
+    />
+  }
+/>
+
+// ❌ BAD: Texto plano o estilos custom
+{data.length === 0 && (
+  <div className="text-center py-10 text-gray-500">
+    No hay datos
+  </div>
+)}
+```
+
+### Prioridades de Columnas
+
+```typescript
+type ColumnPriority = 'high' | 'medium' | 'low';
+
+// high: Siempre visible (mobile + desktop)
+// medium: Oculta en mobile pequeño, visible en tablet+
+// low: Solo visible en desktop
+```
+
+**Regla general:**
+- Primera columna (empleado): `priority: 'high'`, `sticky: true`
+- Columnas importantes (tipo, estado): `priority: 'high'`
+- Columnas secundarias (fechas, detalles): `priority: 'medium'`
+- Columnas opcionales (acciones complejas): `priority: 'low'`
+
+### Alineación de Headers
+
+**Los headers deben estar centrados cuando el contenido de la columna está centrado.**
+
+```typescript
+{
+  id: 'fechas',
+  header: 'Fechas',
+  align: 'center', // Header centrado con contenido
+  cell: (row) => (
+    <div className="text-center">
+      {format(new Date(row.fechaInicio), 'dd MMM')}
+    </div>
+  ),
+}
+```
+
+### Filas Clicables
+
+**Las filas deben ser clicables para abrir modales de edición/detalle.**
+
+```typescript
+<DataTable
+  columns={columns}
+  data={ausencias}
+  onRowClick={(row) => handleOpenModal(row)}
+  // ... otros props
+/>
+```
+
+**Nota importante:** Si tienes botones de acción inline (como "Aprobar"/"Rechazar"), usa `event.stopPropagation()` para evitar que el click en el botón abra el modal:
+
+```typescript
+<Button
+  onClick={(event) => {
+    event.stopPropagation(); // Previene que se abra el modal
+    handleAprobar(row.id);
+  }}
+>
+  Aprobar
+</Button>
+```
+
+### Tablas Migradas
+
+Las siguientes tablas ya usan el patrón unificado:
+- ✅ `/hr/horario/ausencias` - Tabla de ausencias
+- ✅ `/hr/horario/fichajes` - Tabla de fichajes
+- ✅ `/hr/organizacion/personas` - Tabla de empleados (si aplica)
+
+### Eliminación de Estilos Alternativos
+
+**No uses componentes de tabla alternativos:**
+- ❌ `Table`, `TableRow`, `TableCell` de shadcn directamente en nuevas tablas
+- ❌ Estilos custom de tabla (deben venir de `DataTable`)
+- ❌ Empty states con texto plano
+
+**Motivo:** Unificar estilos y centralizar código para mantener consistencia visual y facilitar mantenimiento.
 
 ---
 

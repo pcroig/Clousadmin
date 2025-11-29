@@ -287,14 +287,18 @@ interface EmpleadoAsignado {
     // Crear notificaciones para cada empleado usando la función tipada
     try {
       const empleadosIds = empleadosAsignados.map(emp => emp.id);
-      await crearNotificacionCampanaCreada(prisma, {
-        campanaId: campana.id,
-        empresaId: session.user.empresaId,
-        empleadosIds,
-        fechaInicio: fechaInicioObjetivo,
-        fechaFin: fechaFinObjetivo,
-        titulo: data.titulo,
-      });
+      await crearNotificacionCampanaCreada(
+        prisma,
+        {
+          campanaId: campana.id,
+          empresaId: session.user.empresaId,
+          empleadosIds,
+          fechaInicio: fechaInicioObjetivo,
+          fechaFin: fechaFinObjetivo,
+          titulo: data.titulo,
+        },
+        { actorUsuarioId: session.user.id }
+      );
       console.info(`[Campaña] Notificaciones enviadas a ${empleadosIds.length} empleados`);
     } catch (error) {
       console.error('[Campaña] Error creando notificaciones:', error);

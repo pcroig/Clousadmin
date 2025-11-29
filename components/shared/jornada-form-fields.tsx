@@ -45,6 +45,7 @@ interface JornadaFormFieldsProps {
   onChange: (data: JornadaFormData) => void;
   errors?: Record<string, string>;
   disabled?: boolean;
+  showNombre?: boolean;
   showAsignacion?: boolean;
   nivelAsignacion?: 'empresa' | 'equipo' | 'individual';
   onNivelAsignacionChange?: (nivel: 'empresa' | 'equipo' | 'individual') => void;
@@ -71,6 +72,7 @@ export function JornadaFormFields({
   onChange,
   errors = {},
   disabled = false,
+  showNombre = true,
   showAsignacion = false,
   nivelAsignacion = 'empresa',
   onNivelAsignacionChange,
@@ -109,61 +111,9 @@ export function JornadaFormFields({
 
   return (
     <div className="space-y-4">
-      {/* Nombre y configuración básica */}
-      <Field>
-        <FieldLabel htmlFor="nombre">Nombre de la jornada (opcional)</FieldLabel>
-        <Input
-          id="nombre"
-          value={data.nombre}
-          onChange={(e) => updateData({ nombre: e.target.value })}
-          placeholder="Ej: Jornada Completa 40h"
-          aria-invalid={!!errors.nombre}
-          disabled={disabled}
-        />
-        {errors.nombre && <FieldError>{errors.nombre}</FieldError>}
-      </Field>
-
-      <div className="grid grid-cols-2 gap-4">
-        <Field>
-          <FieldLabel htmlFor="tipo">Tipo de jornada</FieldLabel>
-          <Select
-            value={data.tipoJornada}
-            onValueChange={(v) => {
-              updateData({ 
-                tipoJornada: v as 'fija' | 'flexible',
-                descansoMinutos: '', // Limpiar descanso al cambiar tipo
-              });
-            }}
-            disabled={disabled}
-          >
-            <SelectTrigger id="tipo">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="flexible">Flexible</SelectItem>
-              <SelectItem value="fija">Fija</SelectItem>
-            </SelectContent>
-          </Select>
-        </Field>
-
-        <Field>
-          <FieldLabel htmlFor="horas">Horas semanales *</FieldLabel>
-          <Input
-            id="horas"
-            type="number"
-            value={data.horasSemanales}
-            onChange={(e) => updateData({ horasSemanales: e.target.value })}
-            placeholder="40"
-            aria-invalid={!!errors.horasSemanales}
-            disabled={disabled}
-          />
-          {errors.horasSemanales && <FieldError>{errors.horasSemanales}</FieldError>}
-        </Field>
-      </div>
-
-      {/* Asignación */}
+      {/* Asignación - VA PRIMERO */}
       {showAsignacion && (
-        <div className="pt-4 border-t">
+        <div className="pb-4 border-b">
           <h3 className="text-base font-semibold text-gray-900 mb-3">¿A quién aplicar esta jornada?</h3>
           
           <Field>
@@ -227,6 +177,60 @@ export function JornadaFormFields({
           )}
         </div>
       )}
+
+      {/* Nombre (opcional - controlado por showNombre) */}
+      {showNombre && (
+        <Field>
+          <FieldLabel htmlFor="nombre">Nombre de la jornada (opcional)</FieldLabel>
+          <Input
+            id="nombre"
+            value={data.nombre}
+            onChange={(e) => updateData({ nombre: e.target.value })}
+            placeholder="Ej: Jornada Completa 40h"
+            aria-invalid={!!errors.nombre}
+            disabled={disabled}
+          />
+          {errors.nombre && <FieldError>{errors.nombre}</FieldError>}
+        </Field>
+      )}
+
+      <div className="grid grid-cols-2 gap-4">
+        <Field>
+          <FieldLabel htmlFor="tipo">Tipo de jornada</FieldLabel>
+          <Select
+            value={data.tipoJornada}
+            onValueChange={(v) => {
+              updateData({
+                tipoJornada: v as 'fija' | 'flexible',
+                descansoMinutos: '', // Limpiar descanso al cambiar tipo
+              });
+            }}
+            disabled={disabled}
+          >
+            <SelectTrigger id="tipo">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="flexible">Flexible</SelectItem>
+              <SelectItem value="fija">Fija</SelectItem>
+            </SelectContent>
+          </Select>
+        </Field>
+
+        <Field>
+          <FieldLabel htmlFor="horas">Horas semanales *</FieldLabel>
+          <Input
+            id="horas"
+            type="number"
+            value={data.horasSemanales}
+            onChange={(e) => updateData({ horasSemanales: e.target.value })}
+            placeholder="40"
+            aria-invalid={!!errors.horasSemanales}
+            disabled={disabled}
+          />
+          {errors.horasSemanales && <FieldError>{errors.horasSemanales}</FieldError>}
+        </Field>
+      </div>
 
       {/* Días laborables */}
       <div className="pt-4 border-t">

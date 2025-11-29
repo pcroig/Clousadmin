@@ -35,7 +35,7 @@ const camposRequeridosSchema = z.object({
   }),
   datos_bancarios: z.object({
     iban: z.boolean(),
-    titularCuenta: z.boolean(),
+    bic: z.boolean(),
   }),
 });
 

@@ -159,12 +159,16 @@ export async function POST(
       });
     });
 
-    await crearNotificacionCampanaCuadrada(prisma, {
-      campanaId,
-      empresaId: session.user.empresaId,
-      empleadosIds: ausenciasPayload.map((p) => p.empleadoId),
-      titulo: campana.titulo,
-    });
+    await crearNotificacionCampanaCuadrada(
+      prisma,
+      {
+        campanaId,
+        empresaId: session.user.empresaId,
+        empleadosIds: ausenciasPayload.map((p) => p.empleadoId),
+        titulo: campana.titulo,
+      },
+      { actorUsuarioId: session.user.id }
+    );
 
     return successResponse({
       ausenciasCreadas: ausenciasCreadas.length,

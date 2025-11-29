@@ -187,7 +187,7 @@ curl -X GET 'https://api.clousadmin.com/api/empleados/550e8400-e29b-41d4-a716-44
     "nombre": "Jornada completa (40h)",
     "horasSemanales": 40
   },
-  "salarioBrutoAnual": 35000,
+  "salarioBaseAnual": 35000,
   "numeroPagas": 14,
   "diasVacacionesAnuales": 22,
   "createdAt": "2023-01-01T09:00:00.000Z",
@@ -225,7 +225,7 @@ Crea un nuevo empleado.
   "equipoId": "770e8400-e29b-41d4-a716-446655440002",
   "sedeId": "880e8400-e29b-41d4-a716-446655440003",
   "jornadaId": "990e8400-e29b-41d4-a716-446655440005",
-  "salarioBrutoAnual": 35000,
+  "salarioBaseAnual": 35000,
   "numeroPagas": 14,
   "diasVacacionesAnuales": 22
 }
@@ -251,7 +251,7 @@ Crea un nuevo empleado.
 | equipoId | uuid | ID del equipo |
 | sedeId | uuid | ID de la sede física |
 | jornadaId | uuid | ID de la jornada laboral |
-| salarioBrutoAnual | number | Salario bruto anual en euros |
+| salarioBaseAnual | number | Salario base anual en euros |
 | numeroPagas | integer | Número de pagas (12 o 14 típicamente) |
 | diasVacacionesAnuales | integer | Días de vacaciones al año (default: 22) |
 
@@ -268,7 +268,7 @@ curl -X POST 'https://api.clousadmin.com/api/empleados' \
     "dni": "12345678A",
     "fechaIngreso": "2025-07-01",
     "puestoId": "660e8400-e29b-41d4-a716-446655440001",
-    "salarioBrutoAnual": 35000,
+    "salarioBaseAnual": 35000,
     "numeroPagas": 14,
     "diasVacacionesAnuales": 22
   }'
@@ -359,7 +359,7 @@ Todos los campos son opcionales. Solo incluye los campos que quieres actualizar.
   "equipoId": "771e8400-e29b-41d4-a716-446655440002",
   "sedeId": "881e8400-e29b-41d4-a716-446655440003",
   "jornadaId": "991e8400-e29b-41d4-a716-446655440005",
-  "salarioBrutoAnual": 38000,
+  "salarioBaseAnual": 38000,
   "numeroPagas": 14,
   "diasVacacionesAnuales": 23
 }
@@ -382,7 +382,7 @@ curl -X PATCH 'https://api.clousadmin.com/api/empleados/550e8400-e29b-41d4-a716-
   -H 'Content-Type: application/json' \
   -d '{
     "puestoId": "661e8400-e29b-41d4-a716-446655440001",
-    "salarioBrutoAnual": 38000
+    "salarioBaseAnual": 38000
   }'
 ```
 
@@ -592,7 +592,7 @@ interface EmpleadoDetalle extends Empleado {
     nombre: string;
     horasSemanales: number;
   } | null;
-  salarioBrutoAnual: number | null;
+  salarioBaseAnual: number | null;
   numeroPagas: number | null;
   diasVacacionesAnuales: number | null;
 }
@@ -732,7 +732,7 @@ curl -X PATCH 'https://api.clousadmin.com/api/empleados/550e8400-e29b-41d4-a716-
   -H 'Authorization: Bearer YOUR_TOKEN' \
   -H 'Content-Type: application/json' \
   -d '{
-    "salarioBrutoAnual": 42000
+    "salarioBaseAnual": 42000
   }'
 ```
 

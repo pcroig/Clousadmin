@@ -88,13 +88,17 @@ export async function POST(req: NextRequest) {
 
     await Promise.all(
       nominasBorrador.map((nomina) =>
-        crearNotificacionNominaDisponible(prisma, {
-          nominaId: nomina.id,
-          empresaId: session.user.empresaId,
-          empleadoId: nomina.empleadoId,
-          mes,
-          año: anio,
-        })
+        crearNotificacionNominaDisponible(
+          prisma,
+          {
+            nominaId: nomina.id,
+            empresaId: session.user.empresaId,
+            empleadoId: nomina.empleadoId,
+            mes,
+            año: anio,
+          },
+          { actorUsuarioId: session.user.id }
+        )
       )
     );
 

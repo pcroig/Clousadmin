@@ -10,6 +10,7 @@ import Link from 'next/link';
 import { memo } from 'react';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface WidgetCardProps {
   title: string;
@@ -23,6 +24,7 @@ interface WidgetCardProps {
   badge?: string | number;
   headerAction?: React.ReactNode;
   showHeader?: boolean;
+  useScroll?: boolean;
 }
 
 export const WidgetCard = memo(function WidgetCard({
@@ -37,7 +39,16 @@ export const WidgetCard = memo(function WidgetCard({
   badge,
   headerAction,
   showHeader = true,
+  useScroll = false,
 }: WidgetCardProps) {
+  const content = useScroll ? (
+    <ScrollArea className="h-full">
+      {children}
+    </ScrollArea>
+  ) : (
+    children
+  );
+
   return (
     <Card className={`${height} flex flex-col overflow-hidden font-inter ${className}`}>
       {showHeader && (
@@ -71,7 +82,7 @@ export const WidgetCard = memo(function WidgetCard({
         </CardHeader>
       )}
       <CardContent className={`flex-1 min-h-0 pb-4 sm:pb-6 ${contentClassName}`}>
-        {children}
+        {content}
       </CardContent>
     </Card>
   );

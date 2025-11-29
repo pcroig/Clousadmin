@@ -27,6 +27,8 @@ export const getSolicitudesAusenciasPendientes = cachedQuery(
             nombre: true,
             apellidos: true,
             fotoUrl: true,
+            email: true,
+            puesto: true,
           },
         },
       },
@@ -60,6 +62,19 @@ export const getSolicitudesCambioPendientes = cachedQuery(
             nombre: true,
             apellidos: true,
             fotoUrl: true,
+            email: true,
+            puesto: true,
+            equipos: {
+              select: {
+                equipoId: true,
+                equipo: {
+                  select: {
+                    nombre: true,
+                  },
+                },
+              },
+              take: 1,
+            },
           },
         },
       },

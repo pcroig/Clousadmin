@@ -39,6 +39,7 @@ Las notificaciones se organizan en **5 categorías principales**, cada una con s
   - Fichajes autocompletados
   - Fichajes que requieren revisión
   - Fichajes resueltos
+  - Fichajes aprobados/rechazados
 
 ### 3. **Nóminas** 💰
 - **Icono**: `DollarSign`
@@ -46,11 +47,12 @@ Las notificaciones se organizan en **5 categorías principales**, cada una con s
   - Nóminas disponibles
   - Errores en nóminas
   - **Especial**: Complementos pendientes (managers)
+  - Complementos asignados
 
 ### 4. **Fichas** 📄
 - **Icono**: `FileText`
 - **Incluye**:
-  - Documentos (solicitar/subir/rechazar)
+  - Documentos (solicitar/subir/rechazar/eliminar)
   - **Especial**: Firmas digitales pendientes
   - Cambios de puesto/jornada
   - Alta de nuevos empleados
@@ -120,12 +122,12 @@ Algunos tipos requieren **acciones específicas** del usuario:
 
 ## 📊 Estadísticas
 
-- **Total Implementado**: 25 tipos de notificaciones activas
+- **Total Implementado**: 37 tipos de notificaciones activas
 - **Categorías**: 5 (Ausencias, Fichajes, Nóminas, Fichas, Generales)
 - **Tipos Especiales**: 5 (con acciones requeridas)
 - **Prioridades**:
-  - Alta: 4 tipos
-  - Normal: 11 tipos
+  - Alta: 6 tipos
+  - Normal: 31 tipos
 
 ---
 
@@ -143,15 +145,20 @@ Algunos tipos requieren **acciones específicas** del usuario:
 | `fichaje_autocompletado` | Fichajes | ❌ | `Clock` |
 | `fichaje_requiere_revision` | Fichajes | ❌ | `Clock` |
 | `fichaje_resuelto` | Fichajes | ❌ | `Clock` |
+| `fichaje_aprobado` | Fichajes | ❌ | `Clock` |
+| `fichaje_rechazado` | Fichajes | ❌ | `Clock` |
+| `fichaje_modificado` | Fichajes | ❌ | `Clock` |
 | `nomina_disponible` | Nóminas | ❌ | `DollarSign` |
 | `nomina_error` | Nóminas | ❌ | `AlertCircle` |
 | `nomina_validada` | Nóminas | ❌ | `DollarSign` |
 | `complementos_pendientes` | Nóminas | ✅ Modal | `DollarSign` |
+| `complemento_asignado` | Nóminas | ❌ | `DollarSign` |
 | `documento_solicitado` | Fichas | ✅ Subir | `FileText` |
 | `documento_subido` | Fichas | ❌ | `FileText` |
 | `documento_rechazado` | Fichas | ❌ | `FileText` |
 | `documento_generado` | Fichas | ❌ | `FileText` |
 | `documento_pendiente_rellenar` | Fichas | ✅ Modal | `FileText` |
+| `documento_eliminado` | Fichas | ❌ | `FileText` |
 | `firma_pendiente` | Fichas | ✅ Firma | `FileSignature` |
 | `firma_completada` | Fichas | ❌ | `FileSignature` |
 | `empleado_creado` | Fichas | ❌ | `FileText` |
@@ -182,6 +189,63 @@ El servicio distingue dos casuísticas para mantener consistencia en UI y audito
 - Registrar en `auto_completados` **solo** cuando el sistema toma una decisión de aprobación en nombre de HR/Manager.
 - Las ausencias que nunca requirieron aprobación se notifican a HR/Manager pero no se registran como auto-completadas.
 - Los widgets consumen `auto_completados`, por lo que cualquier nueva feature de auto-aprobación debe utilizar `lib/auto-completado.ts`.
+
+---
+
+## 🚫 Exclusión de Auto-Notificaciones
+
+El sistema evita automáticamente que los usuarios reciban notificaciones de acciones que ellos mismos realizaron. Esto mejora la experiencia de usuario eliminando notificaciones redundantes.
+
+### Cómo Funciona
+
+Todas las funciones de creación de notificaciones aceptan un parámetro opcional `options` de tipo `NotificacionEnvioOptions`:
+
+```typescript
+type NotificacionEnvioOptions = {
+  actorUsuarioId?: string;      // ID del usuario que realiza la acción
+  omitUsuarioIds?: readonly string[];  // IDs adicionales a excluir
+};
+```
+
+### Ejemplo de Uso
+
+```typescript
+// Cuando un HR Admin crea una ausencia para sí mismo
+await crearNotificacionAusenciaSolicitada(
+  prisma,
+  {
+    ausenciaId: ausencia.id,
+    empresaId: session.user.empresaId,
+    empleadoId: session.user.empleadoId,
+    // ... otros parámetros
+  },
+  { actorUsuarioId: session.user.id }  // ← Excluye al creador
+);
+```
+
+### Comportamiento
+
+- **Con `actorUsuarioId`**: El usuario especificado será excluido de la lista de destinatarios, incluso si está incluido por rol (HR Admin, Manager, etc.).
+- **Sin `options`**: Se comporta como antes, notificando a todos los destinatarios según roles.
+
+### Casos de Uso
+
+| Escenario | ¿Se notifica al actor? | Ejemplo |
+|-----------|------------------------|---------|
+| HR Admin crea ausencia para sí mismo | ❌ No | HR Admin solicita vacaciones → Solo notifica a Manager |
+| Manager aprueba ausencia de su equipo | ❌ No | Manager aprueba → Solo notifica al empleado |
+| Empleado sube documento | ❌ No | Empleado sube → Solo notifica a HR Admin |
+| Sistema auto-aprueba (cron) | ✅ Sí | Cron ejecuta → Notifica al empleado afectado |
+
+### Implementación Técnica
+
+La función `filtrarDestinatarios()` en `lib/notificaciones.ts` se encarga de:
+1. Eliminar duplicados de la lista de destinatarios
+2. Excluir `actorUsuarioId` si está presente
+3. Excluir cualquier ID en `omitUsuarioIds`
+4. Retornar la lista filtrada
+
+**Importante**: Todas las llamadas desde APIs interactivas deben incluir `{ actorUsuarioId: session.user.id }` para evitar auto-notificaciones.
 
 ---
 
@@ -255,16 +319,21 @@ import { crearNotificacionAusenciaSolicitada } from '@/lib/notificaciones';
 import prisma from '@/lib/prisma';
 
 // En un API route o Server Action
-await crearNotificacionAusenciaSolicitada(prisma, {
-  ausenciaId: ausencia.id,
-  empresaId: session.user.empresaId,
-  empleadoId: session.user.empleadoId,
-  empleadoNombre: `${empleado.nombre} ${empleado.apellidos}`,
-  tipo: 'vacaciones',
-  fechaInicio: new Date('2025-07-01'),
-  fechaFin: new Date('2025-07-15'),
-  diasSolicitados: 10,
-});
+// ⚠️ IMPORTANTE: Siempre incluir actorUsuarioId para evitar auto-notificaciones
+await crearNotificacionAusenciaSolicitada(
+  prisma,
+  {
+    ausenciaId: ausencia.id,
+    empresaId: session.user.empresaId,
+    empleadoId: session.user.empleadoId,
+    empleadoNombre: `${empleado.nombre} ${empleado.apellidos}`,
+    tipo: 'vacaciones',
+    fechaInicio: new Date('2025-07-01'),
+    fechaFin: new Date('2025-07-15'),
+    diasSolicitados: 10,
+  },
+  { actorUsuarioId: session.user.id }  // ← Excluye al usuario que realiza la acción
+);
 ```
 
 ### 2. Mostrar Notificaciones (Frontend)
@@ -419,7 +488,8 @@ export function obtenerCategoria(tipo: TipoNotificacion): CategoriaNotificacion 
 ```typescript
 export async function crearNotificacionMiNuevoTipo(
   prisma: PrismaClient,
-  params: { ... }
+  params: { ... },
+  options?: NotificacionEnvioOptions  // ← Aceptar options para excluir auto-notificaciones
 ) {
   await crearNotificaciones(prisma, {
     empresaId,
@@ -428,11 +498,21 @@ export async function crearNotificacionMiNuevoTipo(
     titulo: '...',
     mensaje: '...',
     metadata: { ... },
-  });
+  }, options);  // ← Pasar options a crearNotificaciones
 }
 ```
 
-4. **(Opcional) Icono específico en `lib/notificaciones/helpers.ts`**:
+4. **Usar en API routes con exclusión de auto-notificaciones**:
+```typescript
+// En tu API route
+await crearNotificacionMiNuevoTipo(
+  prisma,
+  { /* parámetros */ },
+  { actorUsuarioId: session.user.id }  // ← Siempre incluir esto
+);
+```
+
+5. **(Opcional) Icono específico en `lib/notificaciones/helpers.ts`**:
 ```typescript
 const iconosEspecificos: Partial<Record<TipoNotificacion, LucideIcon>> = {
   mi_nuevo_tipo: MiIcono,
@@ -467,6 +547,7 @@ Ver `/docs/notificaciones/sugerencias-futuras.md` para:
 - ✅ Los managers solo reciben notificaciones de sus equipos
 - ✅ Los empleados solo reciben notificaciones que les conciernen directamente
 - ✅ Validación de `empresaId` en todas las consultas (multi-tenant)
+- ✅ **Exclusión automática de auto-notificaciones**: Los usuarios no reciben notificaciones de acciones que ellos mismos realizaron
 
 ### Quién Recibe Cada Tipo
 
@@ -507,6 +588,7 @@ Ver `/docs/notificaciones/sugerencias-futuras.md` para:
 - ✅ Helpers separados para lógica de UI
 - ✅ Sin duplicación de código
 - ✅ Funciones especializadas por tipo
+- ✅ Filtrado centralizado de destinatarios (evita auto-notificaciones)
 
 ### Mantenibilidad
 - ✅ Documentación completa
@@ -516,5 +598,12 @@ Ver `/docs/notificaciones/sugerencias-futuras.md` para:
 
 ---
 
-**Versión**: 2.2.0  
-**Última actualización**: 2025-01-27
+**Versión**: 2.3.0  
+**Última actualización**: 2025-01-28
+
+### Cambios en v2.3.0
+
+- ✅ **Sistema de exclusión de auto-notificaciones**: Los usuarios ya no reciben notificaciones de acciones que ellos mismos realizaron
+- ✅ **Nuevos tipos de notificaciones**: `fichaje_aprobado`, `fichaje_rechazado`, `complemento_asignado`, `documento_eliminado`
+- ✅ **Mejoras en textos**: Mensajes más claros y consistentes en todas las notificaciones
+- ✅ **Arquitectura mejorada**: Sistema centralizado de filtrado de destinatarios con `NotificacionEnvioOptions`

@@ -122,13 +122,17 @@ export async function POST(request: NextRequest) {
     });
 
     // Crear notificación de solicitud creada
-    await crearNotificacionSolicitudCreada(prisma, {
-      solicitudId: solicitud.id,
-      empresaId: session.user.empresaId,
-      empleadoId: session.user.empleadoId,
-      empleadoNombre: `${solicitud.empleado.nombre} ${solicitud.empleado.apellidos}`,
-      tipo: solicitud.tipo,
-    });
+    await crearNotificacionSolicitudCreada(
+      prisma,
+      {
+        solicitudId: solicitud.id,
+        empresaId: session.user.empresaId,
+        empleadoId: session.user.empleadoId,
+        empleadoNombre: `${solicitud.empleado.nombre} ${solicitud.empleado.apellidos}`,
+        tipo: solicitud.tipo,
+      },
+      { actorUsuarioId: session.user.id }
+    );
 
     return createdResponse(solicitud);
   } catch (error) {

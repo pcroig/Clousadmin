@@ -114,11 +114,11 @@ export function sanitizeEmpleadoForLogs<T extends Partial<Empleado>>(
   }
 
   // También sanitizar salarios si existen
-  if ('salarioBrutoAnual' in sanitized) {
-    (sanitized as Partial<Empleado>).salarioBrutoAnual = '[REDACTED]' as unknown as Empleado['salarioBrutoAnual'];
+  if ('salarioBaseAnual' in sanitized) {
+    (sanitized as Partial<Empleado>).salarioBaseAnual = '[REDACTED]' as unknown as Empleado['salarioBaseAnual'];
   }
-  if ('salarioBrutoMensual' in sanitized) {
-    (sanitized as Partial<Empleado>).salarioBrutoMensual = '[REDACTED]' as unknown as Empleado['salarioBrutoMensual'];
+  if ('salarioBaseMensual' in sanitized) {
+    (sanitized as Partial<Empleado>).salarioBaseMensual = '[REDACTED]' as unknown as Empleado['salarioBaseMensual'];
   }
 
   return sanitized;

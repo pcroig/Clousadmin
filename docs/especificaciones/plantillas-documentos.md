@@ -185,7 +185,7 @@
 {{empleado_estado_civil}}
 {{empleado_numero_hijos}}
 {{empleado_iban}}
-{{empleado_titular_cuenta}}
+{{empleado_bic}}
 
 // Contrato
 {{contrato_tipo}}
@@ -1162,7 +1162,7 @@ await prisma.auditoriaAcceso.create({
     empleadoAccedidoId: empleadoId,
     accion: 'generacion_documento',
     recurso: 'plantilla_documento',
-    camposAccedidos: ['nif', 'nss', 'iban', 'salarioBrutoAnual'],
+    camposAccedidos: ['nif', 'nss', 'iban', 'salarioBaseAnual'],
     ipAddress: req.ip,
     userAgent: req.headers['user-agent'],
     motivo: `Generación de documento: ${plantilla.nombre}`

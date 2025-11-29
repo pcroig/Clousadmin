@@ -27,6 +27,8 @@ export type TipoNotificacion =
   | 'fichaje_requiere_revision'
   | 'fichaje_resuelto'
   | 'fichaje_modificado'
+  | 'fichaje_aprobado'
+  | 'fichaje_rechazado'
   // Equipos
   | 'cambio_manager'
   | 'asignado_equipo'
@@ -42,12 +44,14 @@ export type TipoNotificacion =
   | 'nomina_error'
   | 'nomina_validada'
   | 'complementos_pendientes'
+  | 'complemento_asignado'
   // Documentos
   | 'documento_solicitado'
   | 'documento_subido'
   | 'documento_rechazado'
   | 'documento_generado'
   | 'documento_pendiente_rellenar'
+  | 'documento_eliminado'
   // Firmas digitales
   | 'firma_pendiente'
   | 'firma_completada'
@@ -69,6 +73,11 @@ type NotificacionMetadataBase = {
 
 export type NotificacionMetadata = NotificacionMetadataBase & {
   [key: string]: Prisma.JsonValue | undefined;
+};
+
+export type NotificacionEnvioOptions = {
+  actorUsuarioId?: string;
+  omitUsuarioIds?: readonly string[];
 };
 
 // ========================================
@@ -196,14 +205,17 @@ async function crearNotificaciones(
     titulo: string;
     mensaje: string;
     metadata: NotificacionMetadata;
-  }
+  },
+  options?: NotificacionEnvioOptions
 ) {
   const { empresaId, usuarioIds, tipo, titulo, mensaje, metadata } = params;
 
-  if (usuarioIds.length === 0) return;
+  const destinatarios = filtrarDestinatarios(usuarioIds, options);
+
+  if (destinatarios.length === 0) return;
 
   await prisma.notificacion.createMany({
-    data: usuarioIds.map(usuarioId => ({
+    data: destinatarios.map(usuarioId => ({
       empresaId,
       usuarioId,
       tipo,
@@ -213,6 +225,31 @@ async function crearNotificaciones(
       leida: false,
     })),
   });
+}
+
+function filtrarDestinatarios(usuarioIds: string[], options?: NotificacionEnvioOptions): string[] {
+  const unicos = Array.from(new Set(usuarioIds));
+  if (!options) {
+    return unicos;
+  }
+
+  const exclusiones = new Set<string>();
+  if (options.omitUsuarioIds) {
+    for (const id of options.omitUsuarioIds) {
+      if (id) {
+        exclusiones.add(id);
+      }
+    }
+  }
+  if (options.actorUsuarioId) {
+    exclusiones.add(options.actorUsuarioId);
+  }
+
+  if (exclusiones.size === 0) {
+    return unicos;
+  }
+
+  return unicos.filter(id => !exclusiones.has(id));
 }
 
 const humanizeTexto = (value: string) =>
@@ -250,9 +287,13 @@ export async function crearNotificacionAusenciaSolicitada(
     fechaInicio: Date;
     fechaFin: Date;
     diasSolicitados: number;
-  }
+  },
+  options?: NotificacionEnvioOptions
 ) {
   const { ausenciaId, empresaId, empleadoId, empleadoNombre, tipo, fechaInicio, fechaFin, diasSolicitados } = params;
+  const tipoLabel = formatLabel(tipo);
+  const rangoFechas = formatRange(fechaInicio, fechaFin);
+  const diasLabel = formatDias(diasSolicitados);
 
   // Obtener manager del empleado
   const empleado = await prisma.empleado.findUnique({
@@ -269,8 +310,8 @@ export async function crearNotificacionAusenciaSolicitada(
     empresaId,
     usuarioIds,
     tipo: 'ausencia_solicitada',
-    titulo: `${empleadoNombre} solicita ${formatDias(diasSolicitados)} de ${formatLabel(tipo)}`,
-    mensaje: `${empleadoNombre} ha solicitado ${formatDias(diasSolicitados)} de ${formatLabel(tipo)} (${formatRange(fechaInicio, fechaFin)}).`,
+    titulo: `Nueva solicitud: ${tipoLabel}`,
+    mensaje: `${empleadoNombre} solicita ${diasLabel} de ${tipoLabel} del ${rangoFechas}.`,
     metadata: {
       ausenciaId,
       tipo,
@@ -283,7 +324,7 @@ export async function crearNotificacionAusenciaSolicitada(
       accionUrl: '/hr/horario/ausencias',
       accionTexto: 'Revisar solicitud',
     },
-  });
+  }, options);
 }
 
 export async function crearNotificacionAusenciaAprobada(
@@ -296,9 +337,12 @@ export async function crearNotificacionAusenciaAprobada(
     tipo: string;
     fechaInicio: Date;
     fechaFin: Date;
-  }
+  },
+  options?: NotificacionEnvioOptions
 ) {
   const { ausenciaId, empresaId, empleadoId, tipo, fechaInicio, fechaFin } = params;
+  const tipoLabel = formatLabel(tipo);
+  const rangoFechas = formatRange(fechaInicio, fechaFin);
 
   const usuarioIds = await obtenerUsuariosANotificar(prisma, empresaId, {
     empleado: empleadoId,
@@ -308,8 +352,8 @@ export async function crearNotificacionAusenciaAprobada(
     empresaId,
     usuarioIds,
     tipo: 'ausencia_aprobada',
-    titulo: `${formatLabel(tipo)} aprobada`,
-    mensaje: `Tu solicitud de ${formatLabel(tipo)} (${formatRange(fechaInicio, fechaFin)}) ha sido aprobada.`,
+    titulo: `${tipoLabel} aprobada`,
+    mensaje: `Tu ausencia del ${rangoFechas} ha sido aprobada.`,
     metadata: {
       ausenciaId,
       tipo,
@@ -319,7 +363,7 @@ export async function crearNotificacionAusenciaAprobada(
       accionUrl: '/empleado/horario/ausencias',
       accionTexto: 'Ver ausencia',
     },
-  });
+  }, options);
 }
 
 export async function crearNotificacionAusenciaRechazada(
@@ -333,9 +377,12 @@ export async function crearNotificacionAusenciaRechazada(
     fechaInicio: Date;
     fechaFin: Date;
     motivoRechazo?: string;
-  }
+  },
+  options?: NotificacionEnvioOptions
 ) {
   const { ausenciaId, empresaId, empleadoId, tipo, fechaInicio, fechaFin, motivoRechazo } = params;
+  const tipoLabel = formatLabel(tipo);
+  const rangoFechas = formatRange(fechaInicio, fechaFin);
 
   const usuarioIds = await obtenerUsuariosANotificar(prisma, empresaId, {
     empleado: empleadoId,
@@ -345,8 +392,8 @@ export async function crearNotificacionAusenciaRechazada(
     empresaId,
     usuarioIds,
     tipo: 'ausencia_rechazada',
-    titulo: `${formatLabel(tipo)} rechazada`,
-    mensaje: `Tu solicitud de ${formatLabel(tipo)} (${formatRange(fechaInicio, fechaFin)}) ha sido rechazada${motivoRechazo ? `: ${motivoRechazo}` : '.'}`,
+    titulo: `${tipoLabel} rechazada`,
+    mensaje: `Tu solicitud del ${rangoFechas} no ha sido aprobada${motivoRechazo ? `. Motivo: ${motivoRechazo}` : '.'}`,
     metadata: {
       ausenciaId,
       tipo,
@@ -357,7 +404,7 @@ export async function crearNotificacionAusenciaRechazada(
       accionUrl: '/empleado/horario/ausencias',
       accionTexto: 'Ver detalles',
     },
-  });
+  }, options);
 }
 
 export async function crearNotificacionAusenciaCancelada(
@@ -370,9 +417,12 @@ export async function crearNotificacionAusenciaCancelada(
     tipo: string;
     fechaInicio: Date;
     fechaFin: Date;
-  }
+  },
+  options?: NotificacionEnvioOptions
 ) {
   const { empresaId, empleadoId, empleadoNombre, tipo, fechaInicio, fechaFin } = params;
+  const tipoLabel = formatLabel(tipo);
+  const rangoFechas = formatRange(fechaInicio, fechaFin);
 
   const empleado = await prisma.empleado.findUnique({
     where: { id: empleadoId },
@@ -388,8 +438,8 @@ export async function crearNotificacionAusenciaCancelada(
     empresaId,
     usuarioIds,
     tipo: 'ausencia_cancelada',
-    titulo: `${empleadoNombre} canceló ${formatLabel(tipo).toLocaleLowerCase('es-ES')}`,
-    mensaje: `Periodo cancelado: ${formatRange(fechaInicio, fechaFin)}.`,
+    titulo: `${tipoLabel} cancelada`,
+    mensaje: `${empleadoNombre} ha cancelado su ${tipoLabel.toLocaleLowerCase('es-ES')} del ${rangoFechas}.`,
     metadata: {
       tipo,
       fechaInicio: fechaInicio.toISOString(),
@@ -398,7 +448,7 @@ export async function crearNotificacionAusenciaCancelada(
       empleadoNombre,
       prioridad: 'normal',
     },
-  });
+  }, options);
 }
 
 /**
@@ -417,9 +467,12 @@ export async function crearNotificacionAusenciaAutoAprobada(
     tipo: string;
     fechaInicio: Date;
     fechaFin: Date;
-  }
+  },
+  options?: NotificacionEnvioOptions
 ) {
   const { ausenciaId, empresaId, empleadoId, empleadoNombre, managerId, tipo, fechaInicio, fechaFin } = params;
+  const tipoLabel = formatLabel(tipo);
+  const rangoFechas = formatRange(fechaInicio, fechaFin);
 
   // Notificar a HR/Admin y Manager (NO al empleado)
   const usuarioIds = await obtenerUsuariosANotificar(prisma, empresaId, {
@@ -431,8 +484,8 @@ export async function crearNotificacionAusenciaAutoAprobada(
     empresaId,
     usuarioIds,
     tipo: 'ausencia_aprobada',
-    titulo: `${formatLabel(tipo)} auto-aprobada`,
-    mensaje: `${empleadoNombre} registró ${formatLabel(tipo)} (${formatRange(fechaInicio, fechaFin)}) que fue aprobada automáticamente.`,
+    titulo: `${empleadoNombre} registró ${tipoLabel}`,
+    mensaje: `Ausencia registrada para ${empleadoNombre} del ${rangoFechas}.`,
     metadata: {
       ausenciaId,
       empleadoId,
@@ -444,7 +497,7 @@ export async function crearNotificacionAusenciaAutoAprobada(
       accionUrl: `/hr/horario/ausencias`,
       accionTexto: 'Ver ausencia',
     },
-  });
+  }, options);
 }
 
 // ========================================
@@ -460,7 +513,8 @@ export async function crearNotificacionFirmaPendiente(
     solicitudId: string;
     documentoId: string;
     documentoNombre: string;
-  }
+  },
+  options?: NotificacionEnvioOptions
 ) {
   const { empresaId, empleadoId, firmaId, solicitudId, documentoId, documentoNombre } = params;
 
@@ -485,7 +539,7 @@ export async function crearNotificacionFirmaPendiente(
       accionUrl: '/empleado/mi-espacio/documentos?tab=firmas',
       url: '/empleado/mi-espacio/documentos?tab=firmas',
     },
-  });
+  }, options);
 }
 
 export async function crearNotificacionFirmaCompletada(
@@ -497,7 +551,8 @@ export async function crearNotificacionFirmaCompletada(
     documentoNombre: string;
     usuarioDestinoId?: string | null;
     pdfFirmadoS3Key?: string | null;
-  }
+  },
+  options?: NotificacionEnvioOptions
 ) {
   const { empresaId, solicitudId, documentoId, documentoNombre, usuarioDestinoId, pdfFirmadoS3Key } = params;
 
@@ -524,7 +579,7 @@ export async function crearNotificacionFirmaCompletada(
       accionUrl: '/hr/documentos',
       url: '/hr/documentos',
     },
-  });
+  }, options);
 }
 
 // ========================================
@@ -541,7 +596,8 @@ export async function crearNotificacionFichajeAutocompletado(
     fecha: Date;
     salidaSugerida: Date;
     razon: string;
-  }
+  },
+  options?: NotificacionEnvioOptions
 ) {
   const { fichajeId, empresaId, empleadoId, fecha, salidaSugerida, razon } = params;
 
@@ -554,8 +610,8 @@ export async function crearNotificacionFichajeAutocompletado(
     empresaId,
     usuarioIds,
     tipo: 'fichaje_autocompletado',
-    titulo: 'Fichaje autocompletado',
-    mensaje: `Tu fichaje del ${fecha.toLocaleDateString('es-ES')} ha sido completado automáticamente. Salida: ${salidaSugerida.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}. Razón: ${razon}.`,
+    titulo: 'Fichaje completado',
+    mensaje: `Tu fichaje del ${fecha.toLocaleDateString('es-ES')} se completó automáticamente con salida a las ${salidaSugerida.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}. Motivo: ${razon}.`,
     metadata: {
       fichajeId,
       fecha: fecha.toISOString(),
@@ -565,7 +621,7 @@ export async function crearNotificacionFichajeAutocompletado(
       accionUrl: '/empleado/horario/fichajes',
       accionTexto: 'Ver fichaje',
     },
-  });
+  }, options);
 }
 
 export async function crearNotificacionFichajeRequiereRevision(
@@ -577,7 +633,8 @@ export async function crearNotificacionFichajeRequiereRevision(
     empleadoNombre: string;
     fecha: Date;
     razon: string;
-  }
+  },
+  options?: NotificacionEnvioOptions
 ) {
   const { fichajeId, empresaId, empleadoNombre, fecha, razon } = params;
 
@@ -590,8 +647,8 @@ export async function crearNotificacionFichajeRequiereRevision(
     empresaId,
     usuarioIds,
     tipo: 'fichaje_requiere_revision',
-    titulo: 'Fichaje requiere revisión',
-    mensaje: `Fichaje de ${empleadoNombre} del ${fecha.toLocaleDateString('es-ES')} requiere revisión manual. Motivo: ${razon}.`,
+    titulo: `Fichaje pendiente de revisión`,
+    mensaje: `${empleadoNombre} - ${fecha.toLocaleDateString('es-ES')}. Motivo: ${razon}.`,
     metadata: {
       fichajeId,
       fecha: fecha.toISOString(),
@@ -600,7 +657,7 @@ export async function crearNotificacionFichajeRequiereRevision(
       accionUrl: '/hr/horario/fichajes',
       accionTexto: 'Revisar ahora',
     },
-  });
+  }, options);
 }
 
 export async function crearNotificacionFichajeResuelto(
@@ -611,7 +668,8 @@ export async function crearNotificacionFichajeResuelto(
     empleadoId: string;
     empleadoNombre: string;
     fecha: Date;
-  }
+  },
+  options?: NotificacionEnvioOptions
 ) {
   const { fichajeId, empresaId, empleadoId, fecha } = params;
 
@@ -632,7 +690,7 @@ export async function crearNotificacionFichajeResuelto(
       accionUrl: '/empleado/horario/fichajes',
       accionTexto: 'Ver fichaje',
     },
-  });
+  }, options);
 }
 
 export async function crearNotificacionFichajeModificado(
@@ -645,7 +703,8 @@ export async function crearNotificacionFichajeModificado(
     accion: 'creado' | 'editado' | 'eliminado';
     fechaFichaje: Date;
     detalles?: string;
-  }
+  },
+  options?: NotificacionEnvioOptions
 ) {
   const { fichajeId, empresaId, empleadoId, modificadoPorNombre, accion, fechaFichaje, detalles } = params;
 
@@ -673,7 +732,73 @@ export async function crearNotificacionFichajeModificado(
       accionUrl: '/empleado/horario/fichajes',
       accionTexto: 'Ver cambios',
     },
+  }, options);
+}
+
+export async function crearNotificacionFichajeAprobado(
+  prisma: PrismaClient,
+  params: {
+    fichajeId: string;
+    empresaId: string;
+    empleadoId: string;
+    fecha: Date;
+  },
+  options?: NotificacionEnvioOptions
+) {
+  const { fichajeId, empresaId, empleadoId, fecha } = params;
+
+  const usuarioIds = await obtenerUsuariosANotificar(prisma, empresaId, {
+    empleado: empleadoId,
   });
+
+  await crearNotificaciones(prisma, {
+    empresaId,
+    usuarioIds,
+    tipo: 'fichaje_aprobado',
+    titulo: 'Fichaje aprobado',
+    mensaje: `Tu fichaje del ${fecha.toLocaleDateString('es-ES')} ha sido aprobado y finalizado.`,
+    metadata: {
+      fichajeId,
+      fecha: fecha.toISOString(),
+      prioridad: 'normal',
+      accionUrl: '/empleado/horario/fichajes',
+      accionTexto: 'Ver fichaje',
+    },
+  }, options);
+}
+
+export async function crearNotificacionFichajeRechazado(
+  prisma: PrismaClient,
+  params: {
+    fichajeId: string;
+    empresaId: string;
+    empleadoId: string;
+    fecha: Date;
+    motivoRechazo?: string;
+  },
+  options?: NotificacionEnvioOptions
+) {
+  const { fichajeId, empresaId, empleadoId, fecha, motivoRechazo } = params;
+
+  const usuarioIds = await obtenerUsuariosANotificar(prisma, empresaId, {
+    empleado: empleadoId,
+  });
+
+  await crearNotificaciones(prisma, {
+    empresaId,
+    usuarioIds,
+    tipo: 'fichaje_rechazado',
+    titulo: 'Fichaje requiere corrección',
+    mensaje: `Tu fichaje del ${fecha.toLocaleDateString('es-ES')} necesita ser corregido${motivoRechazo ? `. Motivo: ${motivoRechazo}` : '.'}`,
+    metadata: {
+      fichajeId,
+      fecha: fecha.toISOString(),
+      ...(motivoRechazo && { motivoRechazo }),
+      prioridad: 'alta',
+      accionUrl: '/empleado/horario/fichajes',
+      accionTexto: 'Corregir fichaje',
+    },
+  }, options);
 }
 
 // ========================================
@@ -690,7 +815,8 @@ export async function crearNotificacionCambioManager(
     nuevoManagerNombre: string;
     anteriorManagerId?: string;
     anteriorManagerNombre?: string;
-  }
+  },
+  options?: NotificacionEnvioOptions
 ) {
   const { empresaId, empleadoId, empleadoNombre, nuevoManagerId, nuevoManagerNombre, anteriorManagerId, anteriorManagerNombre } = params;
 
@@ -721,8 +847,8 @@ export async function crearNotificacionCambioManager(
       empresaId,
       usuarioIds: empleadoUsuarioIds,
       tipo: 'cambio_manager',
-      titulo: 'Cambio de manager',
-      mensaje: `Tu manager ahora es ${nuevoManagerNombre}.${anteriorManagerNombre ? ` Antes: ${anteriorManagerNombre}.` : ''}`,
+      titulo: 'Nuevo manager asignado',
+      mensaje: `${nuevoManagerNombre} es ahora tu manager${anteriorManagerNombre ? ` (anteriormente ${anteriorManagerNombre})` : ''}.`,
       metadata: {
         nuevoManagerId,
         nuevoManagerNombre,
@@ -730,7 +856,7 @@ export async function crearNotificacionCambioManager(
         anteriorManagerNombre,
         prioridad: 'alta',
       },
-    });
+    }, options);
   }
 
   // Notificación al nuevo manager
@@ -752,7 +878,7 @@ export async function crearNotificacionCambioManager(
         accionUrl: '/manager/equipo',
         accionTexto: 'Ver equipo',
       },
-    });
+    }, options);
   }
 }
 
@@ -764,7 +890,8 @@ export async function crearNotificacionCambioPuesto(
     empleadoNombre?: string;
     puestoAnterior: string | null;
     puestoNuevo: string;
-  }
+  },
+  options?: NotificacionEnvioOptions
 ) {
   const { empresaId, empleadoId, empleadoNombre, puestoAnterior, puestoNuevo } = params;
 
@@ -797,7 +924,7 @@ export async function crearNotificacionCambioPuesto(
         puestoNuevo,
         prioridad: 'normal',
       },
-    });
+    }, options);
   }
 
   // Notificar a HR
@@ -819,7 +946,7 @@ export async function crearNotificacionCambioPuesto(
         puestoNuevo,
         prioridad: 'baja',
       },
-    });
+    }, options);
   }
 
   // Notificar al manager actual si existe
@@ -842,7 +969,7 @@ export async function crearNotificacionCambioPuesto(
           puestoNuevo,
           prioridad: 'normal',
         },
-      });
+      }, options);
     }
   }
 }
@@ -853,7 +980,8 @@ export async function crearNotificacionJornadaAsignada(
     empresaId: string;
     empleadoId: string;
     jornadaNombre: string;
-  }
+  },
+  options?: NotificacionEnvioOptions
 ) {
   const { empresaId, empleadoId, jornadaNombre } = params;
 
@@ -885,7 +1013,7 @@ export async function crearNotificacionJornadaAsignada(
         jornadaNombre,
         prioridad: 'normal',
       },
-    });
+    }, options);
   }
 
   // Notificar a HR
@@ -906,7 +1034,7 @@ export async function crearNotificacionJornadaAsignada(
         jornadaNombre,
         prioridad: 'baja',
       },
-    });
+    }, options);
   }
 
   // Notificar al manager actual si existe
@@ -928,7 +1056,7 @@ export async function crearNotificacionJornadaAsignada(
           jornadaNombre,
           prioridad: 'baja',
         },
-      });
+      }, options);
     }
   }
 }
@@ -943,7 +1071,8 @@ export async function crearNotificacionEmpleadoCreado(
     empleadoId: string;
     empresaId: string;
     empleadoNombre: string;
-  }
+  },
+  options?: NotificacionEnvioOptions
 ) {
   const { empleadoId, empresaId, empleadoNombre } = params;
 
@@ -981,7 +1110,7 @@ export async function crearNotificacionEmpleadoCreado(
       accionUrl: `/hr/organizacion/personas/${empleadoId}`,
       accionTexto: 'Revisar ficha',
     },
-  });
+  }, options);
 }
 
 export async function crearNotificacionAsignadoEquipo(
@@ -992,7 +1121,8 @@ export async function crearNotificacionAsignadoEquipo(
     empleadoNombre: string;
     equipoId: string;
     equipoNombre: string;
-  }
+  },
+  options?: NotificacionEnvioOptions
 ) {
   const { empresaId, empleadoId, empleadoNombre, equipoId, equipoNombre } = params;
 
@@ -1012,7 +1142,7 @@ export async function crearNotificacionAsignadoEquipo(
       equipoNombre,
       prioridad: 'normal',
     },
-  });
+  }, options);
 
   // Notificar al manager del equipo (si tiene)
   const equipo = await prisma.equipo.findUnique({
@@ -1040,7 +1170,7 @@ export async function crearNotificacionAsignadoEquipo(
         accionUrl: '/manager/equipo',
         accionTexto: 'Ver equipo',
       },
-    });
+    }, options);
   }
 }
 
@@ -1056,7 +1186,8 @@ export async function crearNotificacionSolicitudCreada(
     empleadoId: string;
     empleadoNombre: string;
     tipo: string;
-  }
+  },
+  options?: NotificacionEnvioOptions
 ) {
   const { solicitudId, empresaId, empleadoNombre, tipo } = params;
 
@@ -1075,8 +1206,8 @@ export async function crearNotificacionSolicitudCreada(
     empresaId,
     usuarioIds,
     tipo: 'solicitud_creada',
-    titulo: `${empleadoNombre} solicita ${tipoDescripcion}`,
-    mensaje: 'Revisa los cambios propuestos antes de la fecha límite.',
+    titulo: `Nueva solicitud de ${tipoDescripcion}`,
+    mensaje: `${empleadoNombre} ha enviado una solicitud de ${tipoDescripcion}.`,
     metadata: {
       solicitudId,
       tipo,
@@ -1084,7 +1215,7 @@ export async function crearNotificacionSolicitudCreada(
       accionUrl: '/hr/solicitudes',
       accionTexto: 'Revisar solicitud',
     },
-  });
+  }, options);
 }
 
 export async function crearNotificacionSolicitudAprobada(
@@ -1095,7 +1226,8 @@ export async function crearNotificacionSolicitudAprobada(
     empleadoId: string;
     tipo: string;
     aprobadoPor: 'ia' | 'manual';
-  }
+  },
+  options?: NotificacionEnvioOptions
 ) {
   const { solicitudId, empresaId, empleadoId, tipo, aprobadoPor } = params;
 
@@ -1126,7 +1258,7 @@ export async function crearNotificacionSolicitudAprobada(
       accionUrl: '/empleado/bandeja-entrada',
       accionTexto: 'Ver detalles',
     },
-  });
+  }, options);
 }
 
 export async function crearNotificacionSolicitudRechazada(
@@ -1137,7 +1269,8 @@ export async function crearNotificacionSolicitudRechazada(
     empleadoId: string;
     tipo: string;
     motivoRechazo?: string;
-  }
+  },
+  options?: NotificacionEnvioOptions
 ) {
   const { solicitudId, empresaId, empleadoId, tipo, motivoRechazo } = params;
 
@@ -1168,7 +1301,7 @@ export async function crearNotificacionSolicitudRechazada(
       accionUrl: '/empleado/bandeja-entrada',
       accionTexto: 'Ver detalles',
     },
-  });
+  }, options);
 }
 
 export async function crearNotificacionSolicitudRequiereRevision(
@@ -1179,7 +1312,8 @@ export async function crearNotificacionSolicitudRequiereRevision(
     empleadoId: string;
     empleadoNombre: string;
     tipo: string;
-  }
+  },
+  options?: NotificacionEnvioOptions
 ) {
   const { solicitudId, empresaId, empleadoNombre, tipo } = params;
 
@@ -1208,7 +1342,7 @@ export async function crearNotificacionSolicitudRequiereRevision(
       accionUrl: '/hr/bandeja-entrada',
       accionTexto: 'Revisar ahora',
     },
-  });
+  }, options);
 }
 
 // ========================================
@@ -1223,7 +1357,8 @@ export async function crearNotificacionNominaDisponible(
     empleadoId: string;
     mes: number;
     año: number;
-  }
+  },
+  options?: NotificacionEnvioOptions
 ) {
   const { nominaId, empresaId, empleadoId, mes, año } = params;
 
@@ -1247,7 +1382,7 @@ export async function crearNotificacionNominaDisponible(
       accionUrl: '/empleado/nominas',
       accionTexto: 'Ver nómina',
     },
-  });
+  }, options);
 }
 
 /**
@@ -1265,7 +1400,8 @@ export async function crearNotificacionNominaError(
     empleadoId: string;
     empleadoNombre: string;
     error: string;
-  }
+  },
+  options?: NotificacionEnvioOptions
 ) {
   // Función deprecada - no usar
   console.warn('[DEPRECATED] crearNotificacionNominaError no debería usarse. Los errores de nómina se gestionan como alertas directas.');
@@ -1289,7 +1425,7 @@ export async function crearNotificacionNominaError(
       accionUrl: '/hr/nominas',
       accionTexto: 'Revisar',
     },
-  });
+  }, options);
 }
 
 export async function crearNotificacionNominaValidada(
@@ -1300,7 +1436,8 @@ export async function crearNotificacionNominaValidada(
     validadorNombre: string;
     complementosCount: number;
     accion: 'validar' | 'rechazar';
-  }
+  },
+  options?: NotificacionEnvioOptions
 ) {
   const { empresaId, eventoNominaId, validadorNombre, complementosCount, accion } = params;
 
@@ -1335,7 +1472,7 @@ export async function crearNotificacionNominaValidada(
       accionUrl: '/hr/payroll/eventos',
       accionTexto: 'Revisar evento',
     },
-  });
+  }, options);
 }
 
 // ========================================
@@ -1350,7 +1487,8 @@ export async function crearNotificacionDocumentoSolicitado(
     empleadoId: string;
     tipoDocumento: string;
     fechaLimite?: Date;
-  }
+  },
+  options?: NotificacionEnvioOptions
 ) {
   const { documentoId, empresaId, empleadoId, tipoDocumento, fechaLimite } = params;
 
@@ -1366,8 +1504,8 @@ export async function crearNotificacionDocumentoSolicitado(
     empresaId,
     usuarioIds,
     tipo: 'documento_solicitado',
-    titulo: 'Documento solicitado',
-    mensaje: `Se te ha solicitado el documento: ${tipoDocumento}.${mensajeLimite}`,
+    titulo: `Documento requerido: ${tipoDocumento}`,
+    mensaje: `Por favor, sube el documento solicitado.${mensajeLimite}`,
     metadata: {
       documentoId,
       tipoDocumento,
@@ -1376,7 +1514,7 @@ export async function crearNotificacionDocumentoSolicitado(
       accionUrl: '/empleado/mi-espacio/documentos',
       accionTexto: 'Subir documento',
     },
-  });
+  }, options);
 }
 
 export async function crearNotificacionDocumentoSubido(
@@ -1387,7 +1525,8 @@ export async function crearNotificacionDocumentoSubido(
     empleadoId: string;
     empleadoNombre: string;
     tipoDocumento: string;
-  }
+  },
+  options?: NotificacionEnvioOptions
 ) {
   const { documentoId, empresaId, empleadoNombre, tipoDocumento } = params;
 
@@ -1399,8 +1538,8 @@ export async function crearNotificacionDocumentoSubido(
     empresaId,
     usuarioIds,
     tipo: 'documento_subido',
-    titulo: 'Documento subido',
-    mensaje: `${empleadoNombre} ha subido el documento: ${tipoDocumento}.`,
+    titulo: `Nuevo documento: ${tipoDocumento}`,
+    mensaje: `${empleadoNombre} ha subido un documento para revisión.`,
     metadata: {
       documentoId,
       tipoDocumento,
@@ -1408,7 +1547,7 @@ export async function crearNotificacionDocumentoSubido(
       accionUrl: '/hr/documentos',
       accionTexto: 'Revisar documento',
     },
-  });
+  }, options);
 }
 
 export async function crearNotificacionDocumentoRechazado(
@@ -1419,7 +1558,8 @@ export async function crearNotificacionDocumentoRechazado(
     empleadoId: string;
     tipoDocumento: string;
     motivo: string;
-  }
+  },
+  options?: NotificacionEnvioOptions
 ) {
   const { documentoId, empresaId, empleadoId, tipoDocumento, motivo } = params;
 
@@ -1431,8 +1571,8 @@ export async function crearNotificacionDocumentoRechazado(
     empresaId,
     usuarioIds,
     tipo: 'documento_rechazado',
-    titulo: 'Documento rechazado',
-    mensaje: `Tu documento ${tipoDocumento} ha sido rechazado. Motivo: ${motivo}`,
+    titulo: `${tipoDocumento} rechazado`,
+    mensaje: `Tu documento no ha sido aceptado. Motivo: ${motivo}`,
     metadata: {
       documentoId,
       tipoDocumento,
@@ -1441,7 +1581,39 @@ export async function crearNotificacionDocumentoRechazado(
       accionUrl: '/empleado/mi-espacio/documentos',
       accionTexto: 'Volver a subir',
     },
+  }, options);
+}
+
+export async function crearNotificacionDocumentoEliminado(
+  prisma: PrismaClient,
+  params: {
+    documentoNombre: string;
+    tipoDocumento: string;
+    empresaId: string;
+    empleadoId: string;
+  },
+  options?: NotificacionEnvioOptions
+) {
+  const { documentoNombre, tipoDocumento, empresaId, empleadoId } = params;
+
+  const usuarioIds = await obtenerUsuariosANotificar(prisma, empresaId, {
+    empleado: empleadoId,
   });
+
+  await crearNotificaciones(prisma, {
+    empresaId,
+    usuarioIds,
+    tipo: 'documento_eliminado',
+    titulo: `Documento eliminado: ${tipoDocumento}`,
+    mensaje: `El documento "${documentoNombre}" ha sido eliminado de tu expediente por el departamento de RR.HH.`,
+    metadata: {
+      documentoNombre,
+      tipoDocumento,
+      prioridad: 'normal',
+      accionUrl: '/empleado/mi-espacio/documentos',
+      accionTexto: 'Ver documentos',
+    },
+  }, options);
 }
 
 /**
@@ -1456,7 +1628,8 @@ export async function crearNotificacionDocumentoGeneradoEmpleado(
     documentoNombre: string;
     documentoGeneradoId: string;
     plantillaId?: string;
-  }
+  },
+  options?: NotificacionEnvioOptions
 ) {
   const { empresaId, empleadoId, documentoId, documentoNombre, documentoGeneradoId, plantillaId } = params;
 
@@ -1478,7 +1651,7 @@ export async function crearNotificacionDocumentoGeneradoEmpleado(
       accionUrl: '/empleado/mi-espacio/documentos',
       accionTexto: 'Ver documento',
     },
-  });
+  }, options);
 }
 
 /**
@@ -1493,7 +1666,8 @@ export async function crearNotificacionDocumentoPendienteRellenar(
     documentoGeneradoId: string;
     documentoId: string;
     documentoNombre: string;
-  }
+  },
+  options?: NotificacionEnvioOptions
 ) {
   const { empresaId, empleadoId, documentoGeneradoId, documentoId, documentoNombre } = params;
 
@@ -1516,7 +1690,7 @@ export async function crearNotificacionDocumentoPendienteRellenar(
       accionTexto: 'Completar documento',
       requiresModal: true,
     },
-  });
+  }, options);
 }
 
 /**
@@ -1532,7 +1706,8 @@ export async function crearNotificacionDocumentoGeneracionLote(
     fallidos: number;
     jobId: string;
     mensajePersonalizado?: string;
-  }
+  },
+  options?: NotificacionEnvioOptions
 ) {
   const { empresaId, usuarioId, total, exitosos, fallidos, jobId, mensajePersonalizado } = params;
 
@@ -1578,7 +1753,7 @@ export async function crearNotificacionDocumentoGeneracionLote(
       accionUrl: '/hr/organizacion/personas?panel=documentos',
       accionTexto: 'Ver documentos',
     },
-  });
+  }, options);
 }
 
 // ========================================
@@ -1594,7 +1769,8 @@ export async function crearNotificacionCampanaCreada(
     fechaInicio: Date;
     fechaFin: Date;
     titulo: string;
-  }
+  },
+  options?: NotificacionEnvioOptions
 ) {
   const { campanaId, empresaId, empleadosIds, fechaInicio, fechaFin, titulo } = params;
 
@@ -1609,8 +1785,8 @@ export async function crearNotificacionCampanaCreada(
         empresaId,
         usuarioIds,
         tipo: 'campana_vacaciones_creada',
-        titulo: 'Nueva campaña de vacaciones',
-        mensaje: `Se ha iniciado la campaña "${titulo}" para planificar tus vacaciones del ${fechaInicio.toLocaleDateString('es-ES')} al ${fechaFin.toLocaleDateString('es-ES')}. Por favor, indica tus preferencias.`,
+        titulo: `Campaña de vacaciones: ${titulo}`,
+        mensaje: `Planifica tus vacaciones del ${fechaInicio.toLocaleDateString('es-ES')} al ${fechaFin.toLocaleDateString('es-ES')}. Indica tus preferencias para coordinar con tu equipo.`,
         metadata: {
           campanaId,
           fechaInicio: fechaInicio.toISOString(),
@@ -1619,7 +1795,7 @@ export async function crearNotificacionCampanaCreada(
           accionUrl: `/empleado/vacaciones/campanas/${campanaId}`,
           accionTexto: 'Ver campaña',
         },
-      });
+      }, options);
     }
   }
 }
@@ -1631,7 +1807,8 @@ export async function crearNotificacionCampanaCompletada(
     empresaId: string;
     titulo: string;
     totalEmpleados: number;
-  }
+  },
+  options?: NotificacionEnvioOptions
 ) {
   const { campanaId, empresaId, titulo, totalEmpleados } = params;
 
@@ -1644,8 +1821,8 @@ export async function crearNotificacionCampanaCompletada(
     empresaId,
     usuarioIds,
     tipo: 'campana_vacaciones_completada',
-    titulo: 'Campaña de vacaciones completada',
-    mensaje: `Todos los empleados (${totalEmpleados}) han completado sus preferencias para la campaña "${titulo}". Ya puedes cuadrar las vacaciones.`,
+    titulo: `Campaña "${titulo}" lista para cuadrar`,
+    mensaje: `Todos los empleados (${totalEmpleados}) han enviado sus preferencias. Procede a asignar las fechas finales.`,
     metadata: {
       campanaId,
       totalEmpleados,
@@ -1653,7 +1830,7 @@ export async function crearNotificacionCampanaCompletada(
       accionUrl: `/hr/vacaciones/campanas/${campanaId}`,
       accionTexto: 'Cuadrar vacaciones',
     },
-  });
+  }, options);
 }
 
 /**
@@ -1667,7 +1844,8 @@ export async function crearNotificacionCampanaCuadrada(
     empresaId: string;
     empleadosIds: string[];
     titulo: string;
-  }
+  },
+  options?: NotificacionEnvioOptions
 ) {
   const { campanaId, empresaId, empleadosIds, titulo } = params;
 
@@ -1696,7 +1874,7 @@ export async function crearNotificacionCampanaCuadrada(
       accionTexto: 'Ver vacaciones',
       requiresModal: true,
     },
-  });
+  }, options);
 }
 
 // ========================================
@@ -1709,7 +1887,8 @@ export async function crearNotificacionOnboardingCompletado(
     empleadoId: string;
     empresaId: string;
     empleadoNombre: string;
-  }
+  },
+  options?: NotificacionEnvioOptions
 ) {
   const { empleadoId, empresaId, empleadoNombre } = params;
 
@@ -1738,7 +1917,7 @@ export async function crearNotificacionOnboardingCompletado(
       accionUrl: `/hr/empleados/${empleadoId}`,
       accionTexto: 'Ver empleado',
     },
-  });
+  }, options);
 }
 
 // ========================================
@@ -1754,7 +1933,8 @@ export async function crearNotificacionComplementosPendientes(
     empleadosCount: number;
     mes: number;
     año: number;
-  }
+  },
+  options?: NotificacionEnvioOptions
 ) {
   const { nominaId, empresaId, managerId, empleadosCount, mes, año } = params;
 
@@ -1784,7 +1964,72 @@ export async function crearNotificacionComplementosPendientes(
       accionTexto: 'Completar complementos',
       requiresModal: true, // Flag especial para abrir modal
     },
+  }, options);
+}
+
+export async function crearNotificacionComplementoAsignado(
+  prisma: PrismaClient,
+  params: {
+    empleadoId: string;
+    empleadoNombre: string;
+    empresaId: string;
+    complementoNombre: string;
+    importe?: number;
+  },
+  options?: NotificacionEnvioOptions
+) {
+  const { empleadoId, empleadoNombre, empresaId, complementoNombre, importe } = params;
+
+  // Notificar al empleado
+  const empleadoUsuarioIds = await obtenerUsuariosANotificar(prisma, empresaId, {
+    empleado: empleadoId,
   });
+
+  if (empleadoUsuarioIds.length > 0) {
+    await crearNotificaciones(prisma, {
+      empresaId,
+      usuarioIds: empleadoUsuarioIds,
+      tipo: 'complemento_asignado',
+      titulo: `Nuevo complemento: ${complementoNombre}`,
+      mensaje: `Se te ha asignado el complemento "${complementoNombre}"${importe ? ` por ${importe.toFixed(2)}€` : ''}. Se aplicará en tus próximas nóminas.`,
+      metadata: {
+        complementoNombre,
+        ...(importe && { importe }),
+        prioridad: 'normal',
+        accionUrl: '/empleado/mi-espacio',
+        accionTexto: 'Ver detalles',
+      },
+    }, options);
+  }
+
+  // Notificar al manager del empleado
+  const empleado = await prisma.empleado.findUnique({
+    where: { id: empleadoId },
+    select: { managerId: true },
+  });
+
+  if (empleado?.managerId) {
+    const managerUsuarioIds = await obtenerUsuariosANotificar(prisma, empresaId, {
+      manager: empleado.managerId,
+    });
+
+    if (managerUsuarioIds.length > 0) {
+      await crearNotificaciones(prisma, {
+        empresaId,
+        usuarioIds: managerUsuarioIds,
+        tipo: 'complemento_asignado',
+        titulo: `Complemento asignado a ${empleadoNombre}`,
+        mensaje: `Se ha asignado el complemento "${complementoNombre}" a ${empleadoNombre}${importe ? ` por ${importe.toFixed(2)}€` : ''}.`,
+        metadata: {
+          empleadoId,
+          empleadoNombre,
+          complementoNombre,
+          ...(importe && { importe }),
+          prioridad: 'normal',
+        },
+      }, options);
+    }
+  }
 }
 
 // ========================================
@@ -1801,7 +2046,8 @@ export async function crearNotificacionDenunciaRecibida(
     empresaId: string;
     esAnonima: boolean;
     descripcionBreve: string;
-  }
+  },
+  options?: NotificacionEnvioOptions
 ) {
   const { denunciaId, empresaId, esAnonima, descripcionBreve } = params;
 
@@ -1823,7 +2069,7 @@ export async function crearNotificacionDenunciaRecibida(
       accionUrl: `/hr/organizacion/personas?panel=denuncias&denunciaId=${denunciaId}`,
       accionTexto: 'Revisar denuncia',
     },
-  });
+  }, options);
 }
 
 /**
@@ -1837,7 +2083,8 @@ export async function crearNotificacionDenunciaActualizada(
     empleadoId: string; // Denunciante
     nuevoEstado: string;
     mensaje: string;
-  }
+  },
+  options?: NotificacionEnvioOptions
 ) {
   const { denunciaId, empresaId, empleadoId, nuevoEstado, mensaje } = params;
 
@@ -1858,5 +2105,5 @@ export async function crearNotificacionDenunciaActualizada(
       accionUrl: `/empleado/mi-perfil?modal=denuncias`,
       accionTexto: 'Ver denuncia',
     },
-  });
+  }, options);
 }

@@ -219,9 +219,9 @@ export async function uploadToS3(
         Body: file,
         ContentType: contentType,
         ACL: acl,
-        CacheControl: options?.cacheControl,
-        ContentDisposition: options?.contentDisposition,
-        ContentLength: options?.contentLength,
+        ...(options?.cacheControl ? { CacheControl: options.cacheControl } : {}),
+        ...(options?.contentDisposition ? { ContentDisposition: options.contentDisposition } : {}),
+        ...(typeof options?.contentLength === 'number' ? { ContentLength: options.contentLength } : {}),
       })
     );
 

@@ -12,6 +12,7 @@ import { logAccesoSensibles } from '@/lib/auditoria';
 import { getSession } from '@/lib/auth';
 import { UsuarioRol } from '@/lib/constants/enums';
 import { puedeAccederACarpeta } from '@/lib/documentos';
+import { crearNotificacionDocumentoEliminado } from '@/lib/notificaciones';
 import { prisma } from '@/lib/prisma';
 import { deleteFromS3, getSignedDownloadUrl } from '@/lib/s3';
 
@@ -151,6 +152,15 @@ export async function DELETE(
 
     const documento = await prisma.documento.findUnique({
       where: { id },
+      select: {
+        id: true,
+        s3Key: true,
+        s3Bucket: true,
+        nombre: true,
+        tipoDocumento: true,
+        empleadoId: true,
+        empresaId: true,
+      },
     });
 
     if (!documento) {
@@ -191,6 +201,24 @@ export async function DELETE(
       empleadoAccedidoId: documento.empleadoId ?? undefined,
       camposAccedidos: [documento.tipoDocumento ?? 'documento'],
     });
+
+    // Notificar al empleado si el documento le pertenecía
+    if (documento.empleadoId) {
+      try {
+        await crearNotificacionDocumentoEliminado(
+          prisma,
+          {
+            documentoNombre: documento.nombre,
+            tipoDocumento: documento.tipoDocumento || 'Documento',
+            empresaId: documento.empresaId,
+            empleadoId: documento.empleadoId,
+          },
+          { actorUsuarioId: session.user.id }
+        );
+      } catch (error) {
+        console.error('[Documentos] Error creando notificación de eliminación:', error);
+      }
+    }
 
     return NextResponse.json({
       success: true,

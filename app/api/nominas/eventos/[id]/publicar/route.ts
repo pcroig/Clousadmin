@@ -104,13 +104,17 @@ export async function POST(
 
     await Promise.all(
       nominasPublicables.map((nomina) =>
-        crearNotificacionNominaDisponible(prisma, {
-          nominaId: nomina.id,
-          empresaId: session.user.empresaId,
-          empleadoId: nomina.empleadoId,
-          mes: evento.mes,
-          año: evento.anio,
-        })
+        crearNotificacionNominaDisponible(
+          prisma,
+          {
+            nominaId: nomina.id,
+            empresaId: session.user.empresaId,
+            empleadoId: nomina.empleadoId,
+            mes: evento.mes,
+            año: evento.anio,
+          },
+          { actorUsuarioId: session.user.id }
+        )
       )
     );
 

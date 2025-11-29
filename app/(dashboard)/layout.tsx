@@ -7,7 +7,7 @@ import { redirect } from 'next/navigation';
 import { BottomNavigation } from '@/components/layout/bottom-navigation';
 import { Sidebar } from '@/components/layout/sidebar';
 import { PWAInstallBanner } from '@/components/shared/pwa-install-banner';
-import { getSession } from '@/lib/auth';
+import { getCurrentUserAvatar, getSession } from '@/lib/auth';
 import { UsuarioRol } from '@/lib/constants/enums';
 
 export default async function DashboardLayout({
@@ -24,6 +24,9 @@ export default async function DashboardLayout({
   const rol = session.user.rol as UsuarioRol;
   const showMobileNav = rol !== UsuarioRol.platform_admin;
 
+  // Obtener avatar desde empleado.fotoUrl (fuente única de verdad)
+  const avatarUrl = await getCurrentUserAvatar(session);
+
   return (
     <div className="flex h-screen bg-[#FAF9F5] overflow-hidden">
       {/* Sidebar - Hidden on mobile, visible on desktop */}
@@ -33,14 +36,14 @@ export default async function DashboardLayout({
           usuario={{
             nombre: session.user.nombre,
             apellidos: session.user.apellidos,
-            avatar: session.user.avatar,
+            avatar: avatarUrl,
           }}
         />
       </div>
 
       {/* Main Content Area - Full height, no header */}
       <div className="flex-1 overflow-hidden flex flex-col">
-        <main className="flex-1 overflow-y-auto pb-16 sm:pb-0">
+        <main className="flex-1 overflow-y-auto pb-16 sm:pb-0 scrollbar-thin">
           <div className="h-full max-w-[1800px] mx-auto px-4 py-4 sm:px-8 sm:py-6">
             {children}
           </div>

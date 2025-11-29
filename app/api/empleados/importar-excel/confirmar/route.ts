@@ -137,7 +137,7 @@ export async function POST(req: NextRequest) {
         puesto: string | null;
         equipo: string | null;
         fechaAlta: string | null;
-        salarioBrutoAnual: number | null;
+        salarioBaseAnual: number | null;
         invitacionEnviada: boolean;
       }>,
     };
@@ -275,13 +275,13 @@ export async function POST(req: NextRequest) {
               }
 
               // Preparar datos del empleado
-              const salarioBrutoAnual =
-                empleadoData.salarioBrutoAnual !== undefined && empleadoData.salarioBrutoAnual !== null
-                  ? new Prisma.Decimal(empleadoData.salarioBrutoAnual)
+              const salarioBaseAnual =
+                empleadoData.salarioBaseAnual !== undefined && empleadoData.salarioBaseAnual !== null
+                  ? new Prisma.Decimal(empleadoData.salarioBaseAnual)
                   : null;
-              const salarioBrutoMensual =
-                empleadoData.salarioBrutoMensual !== undefined && empleadoData.salarioBrutoMensual !== null
-                  ? new Prisma.Decimal(empleadoData.salarioBrutoMensual)
+              const salarioBaseMensual =
+                empleadoData.salarioBaseMensual !== undefined && empleadoData.salarioBaseMensual !== null
+                  ? new Prisma.Decimal(empleadoData.salarioBaseMensual)
                   : null;
 
               const datosEmpleado = {
@@ -303,8 +303,8 @@ export async function POST(req: NextRequest) {
                 fechaAlta: empleadoData.fechaAlta
                   ? new Date(empleadoData.fechaAlta)
                   : new Date(),
-                salarioBrutoAnual,
-                salarioBrutoMensual,
+                salarioBaseAnual,
+                salarioBaseMensual,
                 direccionCalle: sanitizeOptionalString(empleadoData.direccionCalle),
                 direccionNumero: sanitizeOptionalString(empleadoData.direccionNumero),
                 direccionPiso: sanitizeOptionalString(empleadoData.direccionPiso),
@@ -357,7 +357,7 @@ export async function POST(req: NextRequest) {
                 puesto: empleado.puesto,
                 equipo: empleadoData.equipo || null,
                 fechaAlta: empleado.fechaAlta ? empleado.fechaAlta.toISOString() : null,
-                salarioBrutoAnual: empleado.salarioBrutoAnual ? parseFloat(empleado.salarioBrutoAnual.toString()) : null,
+                salarioBaseAnual: empleado.salarioBaseAnual ? parseFloat(empleado.salarioBaseAnual.toString()) : null,
               };
             }, { 
               timeout: 60000, // 60s timeout para permitir encriptación de datos sensibles
@@ -452,7 +452,7 @@ export async function POST(req: NextRequest) {
                 puesto: result.value.empleado.puesto,
                 equipo: result.value.empleado.equipo,
                 fechaAlta: result.value.empleado.fechaAlta,
-                salarioBrutoAnual: result.value.empleado.salarioBrutoAnual,
+                salarioBaseAnual: result.value.empleado.salarioBaseAnual,
                 invitacionEnviada: result.value.invitacionEnviada || false,
               });
             }

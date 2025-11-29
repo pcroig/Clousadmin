@@ -120,7 +120,7 @@ export async function POST(
             tipoContrato: empleado.tipoContrato || 'indefinido',
             fechaInicio: fechaAlta,
             fechaFin,
-            salarioBrutoAnual: empleado.salarioBrutoAnual || 0,
+            salarioBaseAnual: empleado.salarioBaseAnual || 0,
           },
         });
       }

@@ -26,9 +26,10 @@ import {
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
-  DialogContent,
+  DialogBody,
   DialogFooter,
   DialogHeader,
+  DialogScrollableContent,
   DialogTitle,
 } from '@/components/ui/dialog';
 import { extractArrayFromResponse } from '@/lib/utils/api-response';
@@ -502,28 +503,30 @@ export function EditarJornadaModal({ open, modo, jornada, onClose }: EditarJorna
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+      <DialogScrollableContent className="max-w-5xl">
         <DialogHeader>
           <DialogTitle>
             {modo === 'crear' ? 'Nueva Jornada' : `Editar ${jornada?.nombre}`}
           </DialogTitle>
         </DialogHeader>
 
-        <JornadaFormFields
-          data={formData}
-          onChange={setFormData}
-          errors={errors}
-          disabled={esPredefinida}
-          showAsignacion={true}
-          nivelAsignacion={nivelAsignacion}
-          onNivelAsignacionChange={setNivelAsignacion}
-          empleados={empleados}
-          empleadosSeleccionados={empleadosSeleccionados}
-          onEmpleadosSeleccionChange={setEmpleadosSeleccionados}
-          equipos={equipos}
-          equipoSeleccionado={equipoSeleccionado}
-          onEquipoSeleccionadoChange={setEquipoSeleccionado}
-        />
+        <DialogBody>
+          <JornadaFormFields
+            data={formData}
+            onChange={setFormData}
+            errors={errors}
+            disabled={esPredefinida}
+            showAsignacion={true}
+            nivelAsignacion={nivelAsignacion}
+            onNivelAsignacionChange={setNivelAsignacion}
+            empleados={empleados}
+            empleadosSeleccionados={empleadosSeleccionados}
+            onEmpleadosSeleccionChange={setEmpleadosSeleccionados}
+            equipos={equipos}
+            equipoSeleccionado={equipoSeleccionado}
+            onEquipoSeleccionadoChange={setEquipoSeleccionado}
+          />
+        </DialogBody>
 
         <DialogFooter className="gap-2">
           {modo === 'editar' && !esPredefinida && (
@@ -546,7 +549,7 @@ export function EditarJornadaModal({ open, modo, jornada, onClose }: EditarJorna
             </LoadingButton>
           )}
         </DialogFooter>
-      </DialogContent>
+      </DialogScrollableContent>
 
       {/* Alert Dialog para confirmar reemplazo de jornadas previas */}
       <AlertDialog open={mostrarAlertaJornadas} onOpenChange={setMostrarAlertaJornadas}>

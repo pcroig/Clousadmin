@@ -176,7 +176,7 @@ export async function generarDocumentoDesdePlantilla(
             tipoContrato: true,
             fechaInicio: true,
             fechaFin: true,
-            salarioBrutoAnual: true,
+            salarioBaseAnual: true,
           },
         },
         ausencias: {
@@ -209,11 +209,11 @@ export async function generarDocumentoDesdePlantilla(
     // 5. Resolver todas las variables usando el sistema de IA
     // Obtener salario del contrato más reciente
     const contratoActual = empleado.contratos?.[0];
-    const salarioBrutoAnual = contratoActual?.salarioBrutoAnual
-      ? Number(contratoActual.salarioBrutoAnual)
+    const salarioBaseAnual = contratoActual?.salarioBaseAnual
+      ? Number(contratoActual.salarioBaseAnual)
       : undefined;
-    const salarioBrutoMensual = salarioBrutoAnual
-      ? Math.round((salarioBrutoAnual / 12) * 100) / 100
+    const salarioBaseMensual = salarioBaseAnual
+      ? Math.round((salarioBaseAnual / 12) * 100) / 100
       : undefined;
 
     const empresaNormalizada: DatosEmpleado['empresa'] = {
@@ -242,7 +242,7 @@ export async function generarDocumentoDesdePlantilla(
       numeroHijos: empleado.numeroHijos ?? undefined,
       genero: empleado.genero ?? undefined,
       iban: empleado.iban ?? undefined,
-      titularCuenta: empleado.titularCuenta ?? undefined,
+      bic: empleado.bic ?? undefined,
       puesto: empleado.puesto ?? undefined,
       fechaBaja: empleado.fechaBaja ?? undefined,
       tipoContrato: empleado.tipoContrato ?? undefined,
@@ -252,8 +252,8 @@ export async function generarDocumentoDesdePlantilla(
 
     const empleadoData: DatosEmpleado = {
       ...empleadoSanitizado,
-      salarioBrutoAnual,
-      salarioBrutoMensual,
+      salarioBaseAnual,
+      salarioBaseMensual,
       empresa: empresaNormalizada,
       jornada: empleado.jornada
         ? {
@@ -279,7 +279,7 @@ export async function generarDocumentoDesdePlantilla(
         tipoContrato: contrato.tipoContrato,
         fechaInicio: contrato.fechaInicio,
         fechaFin: contrato.fechaFin ?? undefined,
-        salarioBrutoAnual: Number(contrato.salarioBrutoAnual),
+        salarioBaseAnual: Number(contrato.salarioBaseAnual),
       })),
     };
 

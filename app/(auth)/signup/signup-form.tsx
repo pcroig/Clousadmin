@@ -4,11 +4,14 @@
 // Signup Form Component - Multi-Step with Onboarding
 // ========================================
 
-import { Loader2 } from 'lucide-react';
+import { Loader2, Upload, User } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
+
+import { EmployeeAvatar } from '@/components/shared/employee-avatar';
+import { getAvatarStyle } from '@/lib/design-system';
 
 import {
   CalendarioStep,
@@ -65,6 +68,10 @@ export function SignupForm({ token, emailInvitacion, prefill }: SignupFormProps)
     password: '',
     consentimientoTratamiento: false,
   }));
+
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
   
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -125,6 +132,27 @@ export function SignupForm({ token, emailInvitacion, prefill }: SignupFormProps)
     }));
   };
 
+  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (!file.type.startsWith('image/')) {
+        setError('Por favor, selecciona una imagen');
+        return;
+      }
+      if (file.size > 2 * 1024 * 1024) { // 2MB limit
+        setError('La imagen no puede superar 2MB');
+        return;
+      }
+      setAvatarFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setAvatarPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+      setError('');
+    }
+  };
+
   const handleSubmitPaso0 = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -140,6 +168,7 @@ export function SignupForm({ token, emailInvitacion, prefill }: SignupFormProps)
       const result = await signupEmpresaAction({
         ...formData,
         token, // Incluir token en la acción
+        avatarFile, // Incluir archivo de avatar si existe
       });
 
       if (result.success) {
@@ -320,13 +349,57 @@ export function SignupForm({ token, emailInvitacion, prefill }: SignupFormProps)
             <Input
               id="webEmpresa"
               name="webEmpresa"
-              type="url"
-              placeholder="https://www.tuempresa.com"
+              type="text"
+              placeholder="ej. tuempresa.com o www.tuempresa.com"
               value={formData.webEmpresa}
               onChange={handleChange}
             />
+            <p className="text-xs text-gray-500">
+              Puedes incluir o no https:// y www
+            </p>
           </div>
+        </div>
 
+        {/* Avatar Section */}
+        <div className="space-y-2">
+          <Label>Tu foto de perfil (opcional)</Label>
+          <div className="flex items-center gap-4">
+            <EmployeeAvatar
+              nombre={formData.nombre}
+              apellidos={formData.apellidos}
+              fotoUrl={avatarPreview}
+              size="xl"
+              className="h-20 w-20"
+              fallbackClassName="flex items-center justify-center"
+              fallbackContent={<User className="h-10 w-10 opacity-70" />}
+              fallbackStyle={getAvatarStyle(`${formData.nombre} ${formData.apellidos}`)}
+            />
+            <div className="space-y-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => avatarInputRef.current?.click()}
+                className="flex items-center gap-2"
+              >
+                <Upload className="h-4 w-4" />
+                {avatarFile ? 'Cambiar foto' : 'Subir foto'}
+              </Button>
+              <input
+                ref={avatarInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleAvatarChange}
+                className="hidden"
+              />
+              {avatarFile && (
+                <p className="text-xs text-gray-500">{avatarFile.name}</p>
+              )}
+              <p className="text-xs text-gray-500">Máximo 2MB</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <div className="space-y-2">
             <Label htmlFor="nombre">Tu nombre *</Label>
             <Input

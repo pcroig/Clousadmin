@@ -93,7 +93,8 @@ export async function POST(req: NextRequest) {
 
     // Subir a S3/local
     const s3Key = `uploads/${session.user.empresaId}/${tipo || 'general'}/${fileName}`;
-    const url = await uploadToS3(storageBody, s3Key, file.type);
+    const uploadOptions = Number.isFinite(file.size) ? { contentLength: file.size } : undefined;
+    const url = await uploadToS3(storageBody, s3Key, file.type, uploadOptions);
 
     let documento = null;
 

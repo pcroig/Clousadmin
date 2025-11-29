@@ -168,7 +168,7 @@ export function PuestosClient({ puestos: initialPuestos }: PuestosClientProps) {
 
   return (
     <>
-      <ResponsiveContainer variant="page" className="h-full w-full flex flex-col overflow-hidden">
+      <ResponsiveContainer variant="page" className="flex flex-col">
         {isMobile ? (
           <>
             <MobileActionBar
@@ -209,15 +209,13 @@ export function PuestosClient({ puestos: initialPuestos }: PuestosClientProps) {
           </>
         )}
 
-        <div className="flex-1 min-h-0">
-          <DataTable
-            columns={columns}
-            data={puestosFiltrados}
-            onRowClick={(row) => setSelectedPuesto(row)}
-            getRowId={(row) => row.id}
-            emptyMessage="No hay puestos creados"
-          />
-        </div>
+        <DataTable
+          columns={columns}
+          data={puestosFiltrados}
+          onRowClick={(row) => setSelectedPuesto(row)}
+          getRowId={(row) => row.id}
+          emptyMessage="No hay puestos creados"
+        />
 
         {/* Details Panel */}
         <DetailsPanel

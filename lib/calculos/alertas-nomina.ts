@@ -127,7 +127,7 @@ export async function generarAlertasParaNomina(
 
   // 3. Salario no configurado
   const contratoActual = empleado.contratos[0];
-  if (!contratoActual || !contratoActual.salarioBrutoAnual) {
+  if (!contratoActual || !contratoActual.salarioBaseAnual) {
     alertas.push({
       tipo: ALERT_TYPES.CRITICO,
       categoria: ALERT_CATEGORIES.DATOS_FALTANTES,

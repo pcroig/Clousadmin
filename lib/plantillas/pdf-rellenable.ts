@@ -445,7 +445,7 @@ export async function generarDocumentoDesdePDFRellenable(
       numeroHijos: empleado.numeroHijos ?? undefined,
       genero: empleado.genero ?? undefined,
       iban: empleado.iban ?? undefined,
-      titularCuenta: empleado.titularCuenta ?? undefined,
+      bic: empleado.bic ?? undefined,
       puesto: empleado.puesto ?? undefined,
       fechaBaja: empleado.fechaBaja ?? undefined,
       tipoContrato: empleado.tipoContrato ?? undefined,
@@ -455,8 +455,8 @@ export async function generarDocumentoDesdePDFRellenable(
 
     const empleadoData: DatosEmpleado = {
       ...empleadoSanitizado,
-      salarioBrutoAnual: empleado.salarioBrutoAnual ? Number(empleado.salarioBrutoAnual) : undefined,
-      salarioBrutoMensual: empleado.salarioBrutoMensual ? Number(empleado.salarioBrutoMensual) : undefined,
+      salarioBaseAnual: empleado.salarioBaseAnual ? Number(empleado.salarioBaseAnual) : undefined,
+      salarioBaseMensual: empleado.salarioBaseMensual ? Number(empleado.salarioBaseMensual) : undefined,
       empresa: empresaNormalizada,
       jornada: empleado.jornada
         ? {
@@ -482,7 +482,7 @@ export async function generarDocumentoDesdePDFRellenable(
         tipoContrato: contrato.tipoContrato,
         fechaInicio: contrato.fechaInicio,
         fechaFin: contrato.fechaFin ?? undefined,
-        salarioBrutoAnual: Number(contrato.salarioBrutoAnual),
+        salarioBaseAnual: Number(contrato.salarioBaseAnual),
       })),
     };
 

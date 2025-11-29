@@ -182,10 +182,10 @@ export const VARIABLES_DISPONIBLES: VariableDefinicion[] = [
     encriptado: true,
   },
   {
-    key: 'empleado_titular_cuenta',
-    label: 'Titular de la cuenta bancaria',
+    key: 'empleado_bic',
+    label: 'Código BIC',
     tipo: 'string',
-    ejemplo: 'Juan García López',
+    ejemplo: 'BBVAESMMXXX',
     categoria: 'empleado',
   },
   {
@@ -289,21 +289,21 @@ export const VARIABLES_DISPONIBLES: VariableDefinicion[] = [
   },
   {
     key: 'contrato_salario_bruto_anual',
-    label: 'Salario bruto anual',
+    label: 'Salario base anual',
     tipo: 'currency',
     ejemplo: '45.000,00 €',
     categoria: 'contrato',
   },
   {
     key: 'contrato_salario_bruto_mensual',
-    label: 'Salario bruto mensual',
+    label: 'Salario base mensual',
     tipo: 'currency',
     ejemplo: '3.000,00 €',
     categoria: 'contrato',
   },
   {
     key: 'contrato_salario_bruto_mensual_palabras',
-    label: 'Salario bruto mensual en palabras',
+    label: 'Salario base mensual en palabras',
     tipo: 'string',
     ejemplo: 'tres mil euros',
     categoria: 'contrato',
