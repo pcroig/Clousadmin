@@ -54,7 +54,7 @@ export async function GET(req: NextRequest) {
 
     // Obtener datos de empleados
     const empleadosIds = resumenes.map((r) => r.empleadoId);
-    const empleados = await prisma.empleado.findMany({
+    const empleados = await prisma.empleados.findMany({
       where: {
         id: {
           in: empleadosIds,

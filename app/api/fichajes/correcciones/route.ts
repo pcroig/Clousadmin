@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
       return badRequestResponse('Debes indicar la nueva fecha, la nueva hora o ambas.');
     }
 
-    const fichaje = await prisma.fichaje.findFirst({
+    const fichaje = await prisma.fichajes.findFirst({
       where: {
         id: fichajeId,
         empleadoId: session.user.empleadoId,
@@ -56,7 +56,7 @@ export async function POST(req: NextRequest) {
       return badRequestResponse('No se encontró el fichaje seleccionado.');
     }
 
-    const solicitud = await prisma.solicitudCorreccionFichaje.create({
+    const solicitud = await prisma.solicitudes_correccion_fichaje.create({
       data: {
         empresaId: session.user.empresaId,
         empleadoId: session.user.empleadoId,
@@ -69,7 +69,7 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    const empleadoSolicitante = await prisma.empleado.findUnique({
+    const empleadoSolicitante = await prisma.empleados.findUnique({
       where: { id: session.user.empleadoId },
       select: {
         nombre: true,
@@ -108,7 +108,7 @@ const obtenerCorreccionesSchema = z.object({
 });
 
 async function getManagerEmpleadoIds(managerEmpleadoId: string) {
-  const empleados = await prisma.empleado.findMany({
+  const empleados = await prisma.empleados.findMany({
     where: {
       managerId: managerEmpleadoId,
       activo: true,
@@ -136,7 +136,7 @@ export async function GET(req: NextRequest) {
 
     const { estado, propias } = paramsValidation.data;
 
-    const where: Prisma.SolicitudCorreccionFichajeWhereInput = {
+    const where: Prisma.solicitudes_correccion_fichajeWhereInput = {
       empresaId: session.user.empresaId,
     };
 
@@ -159,10 +159,10 @@ export async function GET(req: NextRequest) {
       };
     }
 
-    const solicitudes = await prisma.solicitudCorreccionFichaje.findMany({
+    const solicitudesRaw = await prisma.solicitudes_correccion_fichaje.findMany({
       where,
       include: {
-        empleado: {
+        empleados_solicitudes_correccion_fichaje_empleadoIdToempleados: {
           select: {
             id: true,
             nombre: true,
@@ -182,6 +182,12 @@ export async function GET(req: NextRequest) {
       },
       take: 100,
     });
+
+    const solicitudes = solicitudesRaw.map((solicitud) => ({
+      ...solicitud,
+      empleado:
+        solicitud.empleados_solicitudes_correccion_fichaje_empleadoIdToempleados,
+    }));
 
     return successResponse(solicitudes);
   } catch (error) {

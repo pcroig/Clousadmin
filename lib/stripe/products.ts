@@ -32,12 +32,12 @@ export interface ProductWithPrices {
  * Ordenados por el campo "orden" para mostrar en pricing page
  */
 export async function getActiveProducts(): Promise<ProductWithPrices[]> {
-  const products = await prisma.billingProduct.findMany({
+  const products = await prisma.billing_products.findMany({
     where: {
       activo: true,
     },
     include: {
-      precios: {
+      billing_prices: {
         where: {
           activo: true,
         },
@@ -59,7 +59,7 @@ export async function getActiveProducts(): Promise<ProductWithPrices[]> {
     features: (product.features as string[]) || [],
     orden: product.orden,
     metadata: product.metadata as Record<string, unknown> | null,
-    precios: product.precios.map((price) => ({
+    precios: product.billing_prices.map((price) => ({
       id: price.id,
       unitAmount: price.unitAmount,
       currency: price.currency,
@@ -74,10 +74,10 @@ export async function getActiveProducts(): Promise<ProductWithPrices[]> {
  * Obtiene un producto por ID
  */
 export async function getProductById(productId: string) {
-  return prisma.billingProduct.findUnique({
+  return prisma.billing_products.findUnique({
     where: { id: productId },
     include: {
-      precios: {
+      billing_prices: {
         where: { activo: true },
       },
     },
@@ -88,10 +88,10 @@ export async function getProductById(productId: string) {
  * Obtiene un precio por ID
  */
 export async function getPriceById(priceId: string) {
-  return prisma.billingPrice.findUnique({
+  return prisma.billing_prices.findUnique({
     where: { id: priceId },
     include: {
-      producto: true,
+      billing_products: true,
     },
   });
 }

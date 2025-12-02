@@ -27,7 +27,7 @@ export async function GET(_req: NextRequest) {
     }
 
     // Buscar todas las ausencias aprobadas del usuario
-    const ausencias = await prisma.ausencia.findMany({
+    const ausencias = await prisma.ausencias.findMany({
       where: {
         empleadoId: session.user.empleadoId,
         estado: {

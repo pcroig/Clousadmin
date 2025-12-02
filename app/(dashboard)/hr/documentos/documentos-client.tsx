@@ -4,12 +4,13 @@
 
 'use client';
 
-import { FileText, Folder, FolderPlus, Upload } from 'lucide-react';
+import { FileSignature, FileText, Folder, FolderPlus, Upload } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useCallback, useState } from 'react';
 
-import { MobilePageHeader } from '@/components/adaptive/MobilePageHeader';
-import { ResponsiveContainer } from '@/components/adaptive/ResponsiveContainer';
+import { PageLayout } from '@/components/layout/page-layout';
+import { PageMobileHeader } from '@/components/layout/page-mobile-header';
+import { FirmasIconButton } from '@/components/firma/firmas-icon-button';
 import { CrearCarpetaConDocumentosModal } from '@/components/hr/crear-carpeta-con-documentos-modal';
 import { PlantillasList } from '@/components/hr/plantillas-list';
 import { SubirDocumentosModal } from '@/components/hr/subir-documentos-modal';
@@ -67,7 +68,10 @@ export function DocumentosClient({ carpetas }: DocumentosClientProps) {
               : 'Gestiona plantillas de documentos con variables'}
           </p>
         </div>
-        <div className="flex gap-3">
+        <div className="flex items-center gap-3">
+          {/* Icono de Firmas */}
+          <FirmasIconButton isHRView={true} />
+
           {activeTab === 'documentos' ? (
             <>
               <Button variant="outline" onClick={() => setModalCrearCarpeta(true)}>
@@ -92,88 +96,87 @@ export function DocumentosClient({ carpetas }: DocumentosClientProps) {
 
   return (
     <>
-      <ResponsiveContainer variant="page" className="flex flex-col">
+      <PageLayout>
         {isMobile ? (
-          <MobilePageHeader
-            title="Documentos"
-            subtitle={
-              activeTab === 'documentos'
-                ? `${carpetas.length} ${carpetas.length === 1 ? 'carpeta' : 'carpetas'}`
-                : 'Plantillas de documentos'
-            }
-            actions={
-              activeTab === 'documentos' ? (
-                <div className="flex gap-2">
-                <Button
-                  onClick={() => setModalCrearCarpeta(true)}
-                  size="sm"
-                  className={cn(MOBILE_DESIGN.button.secondary)}
-                >
-                  <FolderPlus className={cn(MOBILE_DESIGN.components.icon.small, 'mr-2')} />
-                  Crear
-                </Button>
-                  <Button
-                    onClick={() => setModalSubirDocumentos(true)}
-                    size="sm"
-                    className={cn(MOBILE_DESIGN.button.primary)}
-                  >
-                    <Upload className={cn(MOBILE_DESIGN.components.icon.small, 'mr-2')} />
-                    Subir
-                  </Button>
+          <>
+            <PageMobileHeader
+              title="Documentos"
+              subtitle={
+                activeTab === 'documentos'
+                  ? `${carpetas.length} ${carpetas.length === 1 ? 'carpeta' : 'carpetas'}`
+                  : 'Plantillas de documentos'
+              }
+              actionsNode={
+                <div className="flex items-center gap-1">
+                  {/* Icono de Firmas */}
+                  <FirmasIconButton isHRView={true} />
+
+                  {/* Botones según el tab activo */}
+                  {activeTab === 'documentos' ? (
+                    <>
+                      <Button
+                        onClick={() => setModalCrearCarpeta(true)}
+                        size="sm"
+                        className={cn(MOBILE_DESIGN.button.secondary)}
+                      >
+                        <FolderPlus className={cn(MOBILE_DESIGN.components.icon.small, 'mr-2')} />
+                        Crear
+                      </Button>
+                      <Button
+                        onClick={() => setModalSubirDocumentos(true)}
+                        size="sm"
+                        className={cn(MOBILE_DESIGN.button.primary)}
+                      >
+                        <Upload className={cn(MOBILE_DESIGN.components.icon.small, 'mr-2')} />
+                        Subir
+                      </Button>
+                    </>
+                  ) : (
+                    <Button
+                      onClick={() => setModalSubirPlantilla(true)}
+                      size="sm"
+                      className={cn(MOBILE_DESIGN.button.secondary)}
+                    >
+                      <Upload className={cn(MOBILE_DESIGN.components.icon.small, 'mr-2')} />
+                      Subir
+                    </Button>
+                  )}
                 </div>
-              ) : (
-                <Button
-                  onClick={() => setModalSubirPlantilla(true)}
-                  size="sm"
-                  className={cn(MOBILE_DESIGN.button.secondary)}
-                >
-                  <Upload className={cn(MOBILE_DESIGN.components.icon.small, 'mr-2')} />
-                  Subir
-                </Button>
-              )
-            }
-          />
-        ) : (
-          desktopHeader
-        )}
+              }
+            />
 
-        <Tabs
-          value={activeTab}
-          onValueChange={setActiveTab}
-          className="flex-1 flex flex-col min-h-0"
-        >
-          <TabsList
-            className={cn(
-              isMobile
-                ? 'mb-3 grid w-full grid-cols-2 gap-2'
-                : 'mb-6 flex-shrink-0 w-fit'
-            )}
-          >
-            <TabsTrigger
-              value="documentos"
-              className={cn(
-                isMobile && MOBILE_DESIGN.text.bodyMedium,
-                isMobile && 'data-[state=active]:bg-white'
-              )}
+            <Tabs
+              value={activeTab}
+              onValueChange={setActiveTab}
+              className="flex-1 flex flex-col min-h-0"
             >
-              <Folder className={cn(MOBILE_DESIGN.components.icon.small, 'mr-2')} />
-              Documentos
-            </TabsTrigger>
-            <TabsTrigger
-              value="plantillas"
-              className={cn(
-                isMobile && MOBILE_DESIGN.text.bodyMedium,
-                isMobile && 'data-[state=active]:bg-white'
-              )}
-            >
-              <FileText className={cn(MOBILE_DESIGN.components.icon.small, 'mr-2')} />
-              Plantillas
-            </TabsTrigger>
-          </TabsList>
+              <div>
+                <TabsList className="mb-3 grid w-full grid-cols-2 gap-2">
+                  <TabsTrigger
+                    value="documentos"
+                    className={cn(
+                      MOBILE_DESIGN.text.bodyMedium,
+                      'data-[state=active]:bg-white'
+                    )}
+                  >
+                    <Folder className={cn(MOBILE_DESIGN.components.icon.small, 'mr-2')} />
+                    Documentos
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="plantillas"
+                    className={cn(
+                      MOBILE_DESIGN.text.bodyMedium,
+                      'data-[state=active]:bg-white'
+                    )}
+                  >
+                    <FileText className={cn(MOBILE_DESIGN.components.icon.small, 'mr-2')} />
+                    Plantillas
+                  </TabsTrigger>
+                </TabsList>
+              </div>
 
-          <TabsContent value="documentos" className="flex-1 flex flex-col min-h-0 mt-0">
-            {isMobile ? (
-              <div className="flex-1 min-h-0 overflow-auto pb-4">
+              <TabsContent value="documentos" className="flex-1 flex flex-col min-h-0 mt-0">
+                <div className="flex-1 min-h-0 overflow-auto pb-4">
                 {carpetas.length === 0 ? (
                   <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-gray-200 bg-white py-12 text-center">
                     <Folder className="mb-3 h-12 w-12 text-gray-300" strokeWidth={1.5} />
@@ -199,48 +202,77 @@ export function DocumentosClient({ carpetas }: DocumentosClientProps) {
                     emptyStateDescription="Crea tu primera carpeta para organizar los documentos de la empresa"
                   />
                 )}
-              </div>
-            ) : (
-              <>
-                <div className="mb-6 flex-shrink-0">
-                  <p className="text-sm text-gray-700 font-medium">
-                    {carpetas.length} {carpetas.length === 1 ? 'carpeta' : 'carpetas'}
-                  </p>
                 </div>
-                <div className="flex-1 min-h-0 overflow-y-auto pb-6">
-                  {carpetas.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center rounded-3xl border border-dashed border-gray-200 bg-white py-12 text-center">
-                      <Folder className="mb-3 h-12 w-12 text-gray-300" strokeWidth={1.5} />
-                      <p className="text-sm font-medium text-gray-700">No hay carpetas creadas</p>
-                      <p className="mt-1 text-xs text-gray-500">
-                        Crea tu primera carpeta para organizar los documentos de la empresa
-                      </p>
-                      <Button onClick={() => setModalCrearCarpeta(true)} className="mt-4">
-                        <FolderPlus className="w-4 h-4 mr-2" />
-                        Crear Carpeta
-                      </Button>
-                    </div>
-                  ) : (
-                    <CarpetasGrid
-                      carpetas={carpetasFormateadas}
-                      onCarpetaClick={handleAbrirCarpeta}
-                      emptyStateTitle="No hay carpetas creadas"
-                      emptyStateDescription="Crea tu primera carpeta para organizar los documentos de la empresa"
-                    />
-                  )}
-                </div>
-              </>
-            )}
-          </TabsContent>
+              </TabsContent>
 
-          <TabsContent
-            value="plantillas"
-            className={cn('flex-1 min-h-0 mt-0', isMobile && 'overflow-auto')}
-          >
-            <PlantillasList />
-          </TabsContent>
-        </Tabs>
-      </ResponsiveContainer>
+              <TabsContent
+                value="plantillas"
+                className="flex-1 min-h-0 mt-0 overflow-auto"
+              >
+                <PlantillasList />
+              </TabsContent>
+            </Tabs>
+          </>
+        ) : (
+          <>
+            {desktopHeader}
+
+            <Tabs
+              value={activeTab}
+              onValueChange={setActiveTab}
+              className="flex-1 flex flex-col min-h-0"
+            >
+              <TabsList className="mb-6 flex-shrink-0 w-fit">
+                <TabsTrigger value="documentos">
+                  <Folder className={cn(MOBILE_DESIGN.components.icon.small, 'mr-2')} />
+                  Documentos
+                </TabsTrigger>
+                <TabsTrigger value="plantillas">
+                  <FileText className={cn(MOBILE_DESIGN.components.icon.small, 'mr-2')} />
+                  Plantillas
+                </TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="documentos" className="flex-1 flex flex-col min-h-0 mt-0">
+                <div className="flex-1 min-h-0 overflow-y-auto pb-6">
+                  <div>
+                    <p className="text-sm text-gray-700 font-medium mb-4">
+                      {carpetas.length} {carpetas.length === 1 ? 'carpeta' : 'carpetas'}
+                    </p>
+                    {carpetas.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center rounded-3xl border border-dashed border-gray-200 bg-white py-12 text-center">
+                        <Folder className="mb-3 h-12 w-12 text-gray-300" strokeWidth={1.5} />
+                        <p className="text-sm font-medium text-gray-700">No hay carpetas creadas</p>
+                        <p className="mt-1 text-xs text-gray-500">
+                          Crea tu primera carpeta para organizar los documentos de la empresa
+                        </p>
+                        <Button onClick={() => setModalCrearCarpeta(true)} className="mt-4">
+                          <FolderPlus className="w-4 h-4 mr-2" />
+                          Crear Carpeta
+                        </Button>
+                      </div>
+                    ) : (
+                      <CarpetasGrid
+                        carpetas={carpetasFormateadas}
+                        onCarpetaClick={handleAbrirCarpeta}
+                        emptyStateTitle="No hay carpetas creadas"
+                        emptyStateDescription="Crea tu primera carpeta para organizar los documentos de la empresa"
+                      />
+                    )}
+                  </div>
+                </div>
+              </TabsContent>
+
+              <TabsContent
+                value="plantillas"
+                className="flex-1 min-h-0 mt-0"
+              >
+                <PlantillasList />
+              </TabsContent>
+            </Tabs>
+          </>
+        )}
+      </PageLayout>
       {/* Modal Crear Carpeta con Documentos */}
       <CrearCarpetaConDocumentosModal
         open={modalCrearCarpeta}

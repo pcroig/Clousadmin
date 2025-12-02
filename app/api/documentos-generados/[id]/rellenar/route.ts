@@ -34,11 +34,11 @@ export async function POST(
 
     const { id } = await context.params;
 
-    const documentoGenerado = await prisma.documentoGenerado.findUnique({
+    const documentoGenerado = await prisma.documentosGenerado.findUnique({
       where: { id },
       include: {
         documento: true,
-        plantilla: true,
+        plantillas_documentos: true,
         empleado: {
           select: {
             id: true,
@@ -56,8 +56,8 @@ export async function POST(
     }
 
     if (
-      !documentoGenerado.plantilla.permiteRellenar ||
-      documentoGenerado.plantilla.formato !== 'pdf_rellenable'
+      !documentoGenerado.plantillas_documentos.permiteRellenar ||
+      documentoGenerado.plantillas_documentos.formato !== 'pdf_rellenable'
     ) {
       return NextResponse.json(
         { error: 'Este documento no permite rellenar campos' },
@@ -65,7 +65,7 @@ export async function POST(
       );
     }
 
-    const configuracionIA = documentoGenerado.plantilla
+    const configuracionIA = documentoGenerado.plantillas_documentos
       .configuracionIA as Record<string, unknown> | null;
     const camposFusionados = Array.isArray(configuracionIA?.camposFusionados)
       ? (configuracionIA?.camposFusionados as Array<{ nombre: string }>)
@@ -118,14 +118,14 @@ export async function POST(
       'application/pdf'
     );
 
-    await prisma.documento.update({
+    await prisma.documentos.update({
       where: { id: documentoGenerado.documentoId },
       data: {
         tamano: pdfActualizado.length,
       },
     });
 
-    await prisma.documentoGenerado.update({
+    await prisma.documentosGenerado.update({
       where: { id: documentoGenerado.id },
       data: {
         camposCompletados: valoresNormalizados,
@@ -137,7 +137,7 @@ export async function POST(
     let solicitudFirmaId: string | null = null;
 
     if (documentoGenerado.documento.requiereFirma) {
-      const solicitudExistente = await prisma.solicitudFirma.findFirst({
+      const solicitudExistente = await prisma.solicitudes_firma.findFirst({
         where: {
           documentoId: documentoGenerado.documentoId,
           estado: {

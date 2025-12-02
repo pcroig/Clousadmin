@@ -24,7 +24,7 @@ export default async function PersonasPage(props: {
   }
 
   // Obtener todos los empleados
-  const empleados = await prisma.empleado.findMany({
+  const empleados = await prisma.empleados.findMany({
     where: {
       empresaId: session.user.empresaId,
     },

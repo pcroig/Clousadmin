@@ -2,6 +2,7 @@
 // API Route: Ausencias [ID]
 // ========================================
 
+import { Prisma } from '@prisma/client';
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
 
@@ -11,16 +12,25 @@ import {
   handleApiError,
   notFoundResponse,
   requireAuth,
-  requireAuthAsHROrManager,
   successResponse,
 } from '@/lib/api-handler';
-import { actualizarSaldo, calcularDias, validarPoliticasEquipo, validarSaldoSuficiente } from '@/lib/calculos/ausencias';
+import {
+  actualizarSaldo,
+  calcularDias,
+  determinarEstadoTrasAprobacion,
+  validarPoliticasEquipo,
+  validarSaldoSuficiente,
+} from '@/lib/calculos/ausencias';
+import { TIPOS_AUTO_APROBABLES } from '@/lib/constants/ausencias';
 import { EstadoAusencia, TipoAusencia, UsuarioRol } from '@/lib/constants/enums';
 import { CalendarManager } from '@/lib/integrations/calendar/calendar-manager';
 import {
   crearNotificacionAusenciaAprobada,
+  crearNotificacionAusenciaAutoAprobada,
   crearNotificacionAusenciaCancelada,
+  crearNotificacionAusenciaModificada,
   crearNotificacionAusenciaRechazada,
+  crearNotificacionAusenciaSolicitada,
 } from '@/lib/notificaciones';
 import { prisma } from '@/lib/prisma';
 import { getJsonBody } from '@/lib/utils/json';
@@ -41,22 +51,22 @@ const ausenciaAccionSchema = z.object({
   motivoRechazo: z.string().optional(),
 });
 
-// PATCH /api/ausencias/[id] - Aprobar/Rechazar o Editar ausencia (HR Admin o Manager)
+// PATCH /api/ausencias/[id] - Aprobar/Rechazar o Editar ausencia
 export async function PATCH(
   req: NextRequest,
   context: { params: Promise<{ id: string }> }
 ) {
     const params = await context.params;
   try {
-    // Verificar autenticación y rol HR Admin o Manager
-    const authResult = await requireAuthAsHROrManager(req);
+    // Verificar autenticación básica
+    const authResult = await requireAuth(req);
     if (authResult instanceof Response) return authResult;
     const { session } = authResult;
 
     const { id } = await params;
 
     // Verificar que la ausencia existe y es de la misma empresa
-    const ausencia = await prisma.ausencia.findFirst({
+    const ausencia = await prisma.ausencias.findFirst({
       where: {
         id,
         empresaId: session.user.empresaId,
@@ -67,27 +77,31 @@ export async function PATCH(
       return notFoundResponse('Ausencia no encontrada');
     }
 
-    // Si es manager, verificar que la ausencia es de un empleado a su cargo
-    if (session.user.rol === UsuarioRol.manager) {
-      if (!session.user.empleadoId) {
-        return forbiddenResponse('No tienes un empleado asignado. Contacta con HR.');
-      }
-
-      const empleado = await prisma.empleado.findUnique({
-        where: { id: ausencia.empleadoId },
-        select: { managerId: true },
-      });
-
-      if (!empleado || empleado.managerId !== session.user.empleadoId) {
-        return forbiddenResponse('Solo puedes aprobar ausencias de empleados a tu cargo');
-      }
-    }
-
     // Leer body para determinar el tipo de operación
     const body = await getJsonBody<Record<string, unknown>>(req);
 
     // Detectar si es aprobar/rechazar o edición
     if (body.accion && (body.accion === 'aprobar' || body.accion === 'rechazar')) {
+      // MODO 1: Aprobar/Rechazar - Solo HR Admin o Manager
+      if (session.user.rol !== UsuarioRol.hr_admin && session.user.rol !== UsuarioRol.manager) {
+        return forbiddenResponse('No tienes permisos para aprobar/rechazar ausencias');
+      }
+
+      // Si es manager, verificar que la ausencia es de un empleado a su cargo
+      if (session.user.rol === UsuarioRol.manager) {
+        if (!session.user.empleadoId) {
+          return forbiddenResponse('No tienes un empleado asignado. Contacta con HR.');
+        }
+
+        const empleado = await prisma.empleados.findUnique({
+          where: { id: ausencia.empleadoId },
+          select: { managerId: true },
+        });
+
+        if (!empleado || empleado.managerId !== session.user.empleadoId) {
+          return forbiddenResponse('Solo puedes aprobar ausencias de empleados a tu cargo');
+        }
+      }
       // MODO 1: Aprobar/Rechazar
       const validationResult = ausenciaAccionSchema.safeParse(body);
       if (!validationResult.success) {
@@ -148,7 +162,7 @@ export async function PATCH(
         }
 
     // Actualizar ausencia
-        const updatedAusencia = await tx.ausencia.update({
+        const updatedAusencia = await tx.ausencias.update({
       where: { id },
       data: {
         estado: nuevoEstado,
@@ -273,7 +287,44 @@ export async function PATCH(
 
       return successResponse(result);
     } else {
-      // MODO 2: Editar ausencia
+      // MODO 2: Editar ausencia - Solo empleado dueño, HR Admin o Manager
+      const esEmpleadoDueno = session.user.empleadoId === ausencia.empleadoId;
+      const esHRAdmin = session.user.rol === UsuarioRol.hr_admin;
+      const esManager = session.user.rol === UsuarioRol.manager;
+      const resetWorkflow = esEmpleadoDueno && !esHRAdmin && !esManager;
+
+      // Verificar permisos para editar
+      if (!esEmpleadoDueno && !esHRAdmin) {
+        if (!esManager) {
+          return forbiddenResponse('No tienes permisos para editar esta ausencia');
+        }
+
+        // Si es manager, verificar que el empleado está a su cargo
+        if (!session.user.empleadoId) {
+          return forbiddenResponse('No tienes un empleado asignado. Contacta con HR.');
+        }
+
+        const empleado = await prisma.empleados.findUnique({
+          where: { id: ausencia.empleadoId },
+          select: { managerId: true },
+        });
+
+        if (!empleado || empleado.managerId !== session.user.empleadoId) {
+          return forbiddenResponse('Solo puedes editar ausencias de empleados a tu cargo');
+        }
+      }
+
+      // Empleados solo pueden editar ausencias que aún no han comenzado
+      if (resetWorkflow) {
+        const hoy = new Date();
+        hoy.setHours(0, 0, 0, 0);
+        const fechaInicio = new Date(ausencia.fechaInicio);
+        fechaInicio.setHours(0, 0, 0, 0);
+        if (fechaInicio < hoy) {
+          return forbiddenResponse('No puedes editar ausencias que ya han comenzado');
+        }
+      }
+
       // Validar campos de edición
       const validationResult = z.object({
         tipo: z.enum(['vacaciones', 'enfermedad', 'enfermedad_familiar', 'maternidad_paternidad', 'otro']).optional(),
@@ -316,6 +367,46 @@ export async function PATCH(
         ? new Date(dataEdicion.fechaFin)
         : new Date(ausencia.fechaFin);
 
+      // Validar que no se solape con otras ausencias del mismo empleado
+      const ausenciasSolapadas = await prisma.ausencias.findMany({
+        where: {
+          empleadoId: ausencia.empleadoId,
+          id: { not: ausencia.id },
+          estado: {
+            in: [EstadoAusencia.pendiente, EstadoAusencia.confirmada, EstadoAusencia.completada],
+          },
+          OR: [
+            {
+              AND: [{ fechaInicio: { lte: nuevaFechaInicio } }, { fechaFin: { gte: nuevaFechaInicio } }],
+            },
+            {
+              AND: [{ fechaInicio: { lte: nuevaFechaFin } }, { fechaFin: { gte: nuevaFechaFin } }],
+            },
+            {
+              AND: [{ fechaInicio: { gte: nuevaFechaInicio } }, { fechaFin: { lte: nuevaFechaFin } }],
+            },
+          ],
+        },
+        select: {
+          id: true,
+          tipo: true,
+          fechaInicio: true,
+          fechaFin: true,
+          estado: true,
+        },
+        take: 1,
+      });
+
+      if (ausenciasSolapadas.length > 0) {
+        const conflicto = ausenciasSolapadas[0];
+        const formatFecha = (date: Date) =>
+          date.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        return badRequestResponse(
+          `Ya tienes una ausencia de tipo "${conflicto.tipo}" en este período (${formatFecha(conflicto.fechaInicio)} - ${formatFecha(conflicto.fechaFin)}). No puedes solapar ausencias.`,
+          { ausenciaSolapada: conflicto }
+        );
+      }
+
       // Recalcular días si cambiaron las fechas o medioDia
       const recalcularDias =
         dataEdicion.fechaInicio ||
@@ -345,7 +436,8 @@ export async function PATCH(
         const calculoDias = await calcularDias(
           nuevaFechaInicio,
           nuevaFechaFin,
-          session.user.empresaId
+          session.user.empresaId,
+          ausencia.empleadoId
         );
         
         diasNaturales = calculoDias.diasNaturales;
@@ -393,7 +485,7 @@ export async function PATCH(
           } else if (ausencia.estado === EstadoAusencia.confirmada || ausencia.estado === EstadoAusencia.completada) {
             // Devolver días usados
             await prisma.empleadoSaldoAusencias.updateMany({
-              where: { empleadoId: ausencia.empleadoId, año },
+              where: { empleadoId: ausencia.empleadoId, anio: año },
               data: {
                 diasUsados: { decrement: diasAnteriores },
                 ...(diasDesdeCarryActual > 0 && {
@@ -426,7 +518,7 @@ export async function PATCH(
           } else if (ausencia.estado === EstadoAusencia.confirmada || ausencia.estado === EstadoAusencia.completada) {
             // Marcar como usados
             await prisma.empleadoSaldoAusencias.updateMany({
-              where: { empleadoId: ausencia.empleadoId, año },
+              where: { empleadoId: ausencia.empleadoId, anio: año },
               data: { diasUsados: { increment: nuevosDiasSolicitados } },
             });
           }
@@ -493,7 +585,7 @@ export async function PATCH(
           }
         } else if (ausencia.estado === EstadoAusencia.confirmada || ausencia.estado === EstadoAusencia.completada) {
           await prisma.empleadoSaldoAusencias.updateMany({
-            where: { empleadoId: ausencia.empleadoId, año },
+            where: { empleadoId: ausencia.empleadoId, anio: año },
             data: {
               diasUsados: { increment: diferenciaDias },
               ...(diferenciaDias < 0 &&
@@ -513,39 +605,140 @@ export async function PATCH(
         }
       }
 
-      // Actualizar ausencia
-      const updatedAusencia = await prisma.ausencia.update({
+      const esAutoAprobableEdicion = TIPOS_AUTO_APROBABLES.includes(
+        nuevoTipo as (typeof TIPOS_AUTO_APROBABLES)[number]
+      );
+
+      const updateData: Prisma.ausenciasUpdateInput = {
+        ...(dataEdicion.tipo && { tipo: dataEdicion.tipo }),
+        ...(dataEdicion.fechaInicio && { fechaInicio: nuevaFechaInicio }),
+        ...(dataEdicion.justificanteUrl !== undefined && { justificanteUrl: dataEdicion.justificanteUrl }),
+        ...(dataEdicion.documentoId !== undefined && { documentoId: dataEdicion.documentoId || null }),
+        ...(dataEdicion.fechaFin && { fechaFin: nuevaFechaFin }),
+        ...(dataEdicion.medioDia !== undefined && { medioDia: nuevoMedioDia }),
+        ...(debeActualizarPeriodo && {
+          periodo: nuevoMedioDia ? nuevoPeriodo : null,
+        }),
+        ...(dataEdicion.motivo !== undefined && { motivo: dataEdicion.motivo }),
+        ...(recalcularDias && {
+          diasNaturales,
+          diasLaborables,
+          diasSolicitados: nuevosDiasSolicitados,
+        }),
+        diasDesdeCarryOver: diasDesdeCarryActual,
+        descuentaSaldo: nuevoDescuentaSaldo,
+      };
+
+      if (resetWorkflow) {
+        updateData.estado = esAutoAprobableEdicion
+          ? determinarEstadoTrasAprobacion(nuevaFechaFin)
+          : EstadoAusencia.pendiente;
+        updateData.aprobadaPor = null;
+        updateData.aprobadaEn = null;
+        updateData.motivoRechazo = null;
+      } else if (dataEdicion.estado) {
+        updateData.estado = dataEdicion.estado;
+      }
+
+      const updatedAusencia = await prisma.ausencias.update({
         where: { id },
-        data: {
-          ...(dataEdicion.tipo && { tipo: dataEdicion.tipo }),
-          ...(dataEdicion.fechaInicio && { fechaInicio: nuevaFechaInicio }),
-          ...(dataEdicion.justificanteUrl !== undefined && { justificanteUrl: dataEdicion.justificanteUrl }),
-          ...(dataEdicion.documentoId !== undefined && { documentoId: dataEdicion.documentoId || null }),
-          ...(dataEdicion.fechaFin && { fechaFin: nuevaFechaFin }),
-          ...(dataEdicion.medioDia !== undefined && { medioDia: nuevoMedioDia }),
-          ...(debeActualizarPeriodo && {
-            periodo: nuevoMedioDia ? nuevoPeriodo : null,
-          }),
-          ...(dataEdicion.motivo !== undefined && { motivo: dataEdicion.motivo }),
-          ...(dataEdicion.estado && { estado: dataEdicion.estado }),
-          ...(recalcularDias && {
-            diasNaturales,
-            diasLaborables,
-            diasSolicitados: nuevosDiasSolicitados,
-          }),
-          diasDesdeCarryOver: diasDesdeCarryActual,
-          descuentaSaldo: nuevoDescuentaSaldo,
-        },
+        data: updateData,
         include: {
           empleado: {
             select: {
               nombre: true,
               apellidos: true,
               email: true,
-            }
+              managerId: true,
+            },
+          },
+        },
+      });
+
+      if (resetWorkflow) {
+        if (esAutoAprobableEdicion) {
+          try {
+            await crearNotificacionAusenciaAutoAprobada(
+              prisma,
+              {
+                ausenciaId: updatedAusencia.id,
+                empresaId: session.user.empresaId,
+                empleadoId: updatedAusencia.empleadoId,
+                empleadoNombre: `${updatedAusencia.empleado.nombre} ${updatedAusencia.empleado.apellidos}`,
+                managerId: updatedAusencia.empleado.managerId,
+                tipo: updatedAusencia.tipo,
+                fechaInicio: updatedAusencia.fechaInicio,
+                fechaFin: updatedAusencia.fechaFin,
+              },
+              { actorUsuarioId: session.user.id }
+            );
+          } catch (error) {
+            console.error('[Ausencias] Error creando notificación auto-aprobada tras edición:', error);
+          }
+
+          try {
+            await CalendarManager.syncAusenciaToCalendars({
+              ...updatedAusencia,
+              empleado: {
+                nombre: updatedAusencia.empleado.nombre,
+                apellidos: updatedAusencia.empleado.apellidos,
+              },
+            });
+          } catch (error) {
+            console.error('[Ausencias] Error sincronizando ausencia editada auto-aprobable:', error);
+          }
+        } else {
+          try {
+            await crearNotificacionAusenciaSolicitada(
+              prisma,
+              {
+                ausenciaId: updatedAusencia.id,
+                empresaId: session.user.empresaId,
+                empleadoId: updatedAusencia.empleadoId,
+                empleadoNombre: `${updatedAusencia.empleado.nombre} ${updatedAusencia.empleado.apellidos}`,
+                tipo: updatedAusencia.tipo,
+                fechaInicio: updatedAusencia.fechaInicio,
+                fechaFin: updatedAusencia.fechaFin,
+                diasSolicitados: Number(updatedAusencia.diasSolicitados ?? nuevosDiasSolicitados),
+              },
+              { actorUsuarioId: session.user.id }
+            );
+          } catch (error) {
+            console.error('[Ausencias] Error creando notificación de edición pendiente:', error);
+          }
+
+          try {
+            await CalendarManager.deleteAusenciaFromCalendars(
+              updatedAusencia.id,
+              session.user.empresaId,
+              updatedAusencia.empleadoId
+            );
+          } catch (error) {
+            console.error('[Ausencias] Error eliminando evento tras edición pendiente:', error);
           }
         }
-      });
+      } else {
+        // Cuando HR/Manager edita directamente, notificar a HR admins y managers
+        try {
+          await crearNotificacionAusenciaModificada(
+            prisma,
+            {
+              ausenciaId: updatedAusencia.id,
+              empresaId: session.user.empresaId,
+              empleadoId: updatedAusencia.empleadoId,
+              empleadoNombre: `${updatedAusencia.empleado.nombre} ${updatedAusencia.empleado.apellidos}`,
+              tipo: updatedAusencia.tipo,
+              fechaInicio: updatedAusencia.fechaInicio,
+              fechaFin: updatedAusencia.fechaFin,
+              diasSolicitados: Number(updatedAusencia.diasSolicitados ?? nuevosDiasSolicitados),
+              modificadoPor: session.user.id,
+            },
+            { actorUsuarioId: session.user.id }
+          );
+        } catch (error) {
+          console.error('[Ausencias] Error creando notificación de modificación:', error);
+        }
+      }
 
     return successResponse(updatedAusencia);
     }
@@ -574,7 +767,7 @@ export async function DELETE(
     const { id } = await params;
 
     // Verificar que la ausencia es del empleado y está pendiente
-    const ausencia = await prisma.ausencia.findFirst({
+    const ausencia = await prisma.ausencias.findFirst({
       where: {
         id,
         empleadoId: session.user.empleadoId,
@@ -607,13 +800,13 @@ export async function DELETE(
     }
 
     // Obtener información del empleado antes de eliminar
-    const empleado = await prisma.empleado.findUnique({
+    const empleado = await prisma.empleados.findUnique({
       where: { id: ausencia.empleadoId },
       select: { nombre: true, apellidos: true },
     });
 
     // Eliminar ausencia
-    await prisma.ausencia.delete({
+    await prisma.ausencias.delete({
       where: { id }
     });
 

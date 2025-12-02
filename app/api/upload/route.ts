@@ -124,7 +124,7 @@ export async function POST(req: NextRequest) {
       const tipoDocumentoBD = inferirTipoDocumento(carpetaNombre, tipo);
 
       // Crear documento en BD
-      documento = await prisma.documento.create({
+      documento = await prisma.documentos.create({
         data: {
           empresaId: session.user.empresaId,
           empleadoId,
@@ -141,6 +141,7 @@ export async function POST(req: NextRequest) {
 
     return successResponse({
       url,
+      s3Key,
       fileName,
       size: file.size,
       type: file.type,

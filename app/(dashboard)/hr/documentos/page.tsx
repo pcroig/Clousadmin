@@ -23,7 +23,7 @@ export default async function DocumentosPage() {
   await asegurarCarpetasGlobales(session.user.empresaId);
 
   // Obtener todas las carpetas de nivel superior (sin parent)
-  const carpetas = await prisma.carpeta.findMany({
+  const carpetas = await prisma.carpetas.findMany({
     where: {
       empresaId: session.user.empresaId,
       parentId: null, // Solo carpetas de nivel superior

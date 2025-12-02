@@ -65,7 +65,7 @@ export async function POST(
     }
 
     // Verificar que la plantilla existe
-    const plantilla = await prisma.plantillaDocumento.findUnique({
+    const plantilla = await prisma.plantillas_documentos.findUnique({
       where: { id },
       select: {
         id: true,
@@ -89,7 +89,7 @@ export async function POST(
     }
 
     // Verificar que todos los empleados existen y pertenecen a la empresa
-    const empleados = await prisma.empleado.findMany({
+    const empleados = await prisma.empleados.findMany({
       where: {
         id: { in: ids },
         empresaId: session.user.empresaId,

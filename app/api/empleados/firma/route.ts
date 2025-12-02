@@ -25,7 +25,7 @@ export async function GET(_request: NextRequest) {
     }
 
     // Obtener empleado autenticado
-    const empleado = await prisma.empleado.findUnique({
+    const empleado = await prisma.empleados.findUnique({
       where: { usuarioId: session.user.id },
       select: {
         id: true,
@@ -82,7 +82,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Obtener empleado autenticado
-    const empleado = await prisma.empleado.findUnique({
+    const empleado = await prisma.empleados.findUnique({
       where: { usuarioId: session.user.id },
       select: {
         id: true,
@@ -162,7 +162,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Actualizar empleado
-    const empleadoActualizado = await prisma.empleado.update({
+    const empleadoActualizado = await prisma.empleados.update({
       where: { id: empleado.id },
       data: {
         firmaGuardada: true,
@@ -205,7 +205,7 @@ export async function DELETE(_request: NextRequest) {
     }
 
     // Obtener empleado autenticado
-    const empleado = await prisma.empleado.findUnique({
+    const empleado = await prisma.empleados.findUnique({
       where: { usuarioId: session.user.id },
       select: {
         id: true,
@@ -231,7 +231,7 @@ export async function DELETE(_request: NextRequest) {
     }
 
     // Actualizar empleado
-    await prisma.empleado.update({
+    await prisma.empleados.update({
       where: { id: empleado.id },
       data: {
         firmaGuardada: false,

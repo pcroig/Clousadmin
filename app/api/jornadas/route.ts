@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
     const { session } = authResult;
 
     // Obtener jornadas de la empresa
-    const jornadas = await prisma.jornada.findMany({
+    const jornadas = await prisma.jornadas.findMany({
       where: {
         empresaId: session.user.empresaId,
         activa: true,
@@ -111,7 +111,7 @@ export async function POST(req: NextRequest) {
     // (esto se validará al asignar, pero es bueno tenerlo aquí también)
     
     // Crear jornada
-    const jornada = await prisma.jornada.create({
+    const jornada = await prisma.jornadas.create({
       data: {
         nombre: validatedData.nombre,
         empresaId: empresaId,

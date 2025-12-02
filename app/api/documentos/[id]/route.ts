@@ -31,7 +31,7 @@ export async function GET(
 
     const { id } = await params;
 
-    const documento = await prisma.documento.findUnique({
+    const documento = await prisma.documentos.findUnique({
       where: { id },
       include: {
         carpeta: true,
@@ -47,12 +47,9 @@ export async function GET(
       return NextResponse.json({ error: 'Documento no encontrado' }, { status: 404 });
     }
 
-    if (!documento.s3Key) {
-      return NextResponse.json(
-        { error: 'Documento sin ruta de almacenamiento' },
-        { status: 500 }
-      );
-    }
+    const searchParams = request.nextUrl.searchParams;
+    const metaParam = searchParams.get('meta') ?? searchParams.get('metadata');
+    const wantsMetadata = metaParam === '1' || metaParam === 'true';
 
     // Validar permisos de acceso a la carpeta
     if (documento.carpetaId) {
@@ -68,17 +65,44 @@ export async function GET(
           { status: 403 }
         );
       }
-    } else {
+    } else if (session.user.rol !== UsuarioRol.hr_admin) {
       // Documento sin carpeta: solo HR puede acceder
-      if (session.user.rol !== UsuarioRol.hr_admin) {
-        return NextResponse.json(
-          { error: 'No tienes permisos para acceder a este documento' },
-          { status: 403 }
-        );
-      }
+      return NextResponse.json(
+        { error: 'No tienes permisos para acceder a este documento' },
+        { status: 403 }
+      );
     }
 
-    const searchParams = request.nextUrl.searchParams;
+    if (wantsMetadata) {
+      return NextResponse.json({
+        success: true,
+        documento: {
+          id: documento.id,
+          nombre: documento.nombre,
+          carpetaId: documento.carpetaId,
+          empleadoId: documento.empleadoId,
+          tipoDocumento: documento.tipoDocumento,
+          carpeta: documento.carpeta
+            ? {
+                id: documento.carpeta.id,
+                nombre: documento.carpeta.nombre,
+                compartida: documento.carpeta.compartida,
+                asignadoA: documento.carpeta.asignadoA,
+                empleadoId: documento.carpeta.empleadoId,
+                esSistema: documento.carpeta.esSistema,
+              }
+            : null,
+        },
+      });
+    }
+
+    if (!documento.s3Key) {
+      return NextResponse.json(
+        { error: 'Documento sin ruta de almacenamiento' },
+        { status: 500 }
+      );
+    }
+
     const inlineParam = searchParams.get('inline') ?? searchParams.get('preview');
     const isInline = inlineParam === '1' || inlineParam === 'true';
     const dispositionType = isInline ? 'inline' : 'attachment';
@@ -150,7 +174,7 @@ export async function DELETE(
 
     const { id } = await params;
 
-    const documento = await prisma.documento.findUnique({
+    const documento = await prisma.documentos.findUnique({
       where: { id },
       select: {
         id: true,
@@ -189,7 +213,7 @@ export async function DELETE(
     }
 
     // Eliminar registro de DB
-    await prisma.documento.delete({
+    await prisma.documentos.delete({
       where: { id },
     });
 

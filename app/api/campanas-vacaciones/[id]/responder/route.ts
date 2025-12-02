@@ -54,13 +54,13 @@ export async function POST(
       return badRequestResponse('Acción inválida');
     }
 
-    const preferencia = await prisma.preferenciaVacaciones.findFirst({
+    const preferencia = await prisma.preferencias_vacaciones.findFirst({
       where: {
         campanaId,
         empleadoId: session.user.empleadoId,
       },
       include: {
-        campana: true,
+        campana_vacaciones: true,
         empleado: {
           select: {
             id: true,
@@ -98,10 +98,11 @@ export async function POST(
       const { diasNaturales, diasLaborables, diasSolicitados } = await calcularDias(
         fechaInicio,
         fechaFin,
-        session.user.empresaId
+        session.user.empresaId,
+        session.user.empleadoId || undefined
       );
 
-      const ausencia = await prisma.ausencia.create({
+      const ausencia = await prisma.ausencias.create({
         data: {
           empresaId: session.user.empresaId,
           empleadoId: session.user.empleadoId,
@@ -113,7 +114,7 @@ export async function POST(
           diasNaturales,
           diasLaborables,
           diasSolicitados,
-          motivo: `Vacaciones de campaña: ${preferencia.campana.titulo}`,
+          motivo: `Vacaciones de campaña: ${preferencia.campana_vacaciones.titulo}`,
           descuentaSaldo: true,
           estado: EstadoAusencia.pendiente,
           diasIdeales: asJsonValue(preferencia.diasIdeales),
@@ -122,7 +123,7 @@ export async function POST(
         },
       });
 
-      await prisma.preferenciaVacaciones.update({
+      await prisma.preferencias_vacaciones.update({
         where: { id: preferencia.id },
         data: {
           aceptada: true,
@@ -159,7 +160,7 @@ export async function POST(
       }
     }
 
-    await prisma.preferenciaVacaciones.update({
+    await prisma.preferencias_vacaciones.update({
       where: { id: preferencia.id },
       data: {
         propuestaEmpleado: asJsonValue({

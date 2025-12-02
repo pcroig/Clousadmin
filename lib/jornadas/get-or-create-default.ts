@@ -12,7 +12,7 @@ export async function getPredefinedJornada(
   client: JornadaClient,
   empresaId: string
 ) {
-  return client.jornada.findFirst({
+  return (client as PrismaClient).jornadas.findFirst({
     where: {
       empresaId,
       esPredefinida: true,
@@ -30,7 +30,7 @@ export async function getOrCreateDefaultJornada(
     return jornadaExistente;
   }
 
-  return client.jornada.create({
+  return (client as PrismaClient).jornadas.create({
     data: {
       empresaId,
       nombre: 'Jornada por Defecto',

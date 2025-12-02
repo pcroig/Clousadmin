@@ -4,7 +4,7 @@
 // Helper centralizado para aplicar cambios de solicitudes al empleado
 // Garantiza que campos sensibles (iban) se cifran antes de guardar
 
-import { type Empleado, Prisma, PrismaClient } from '@prisma/client';
+import { type empleados as Empleado, Prisma, PrismaClient } from '@prisma/client';
 
 import { esCampoPermitido } from '@/lib/constants/whitelist-campos';
 import { encryptEmpleadoData } from '@/lib/empleado-crypto';
@@ -53,9 +53,9 @@ export async function aplicarCambiosSolicitud(
     // Cifrar campos sensibles (iban, nif, nss) antes de guardar
     const cambiosEncriptados = encryptEmpleadoData(cambiosValidados);
     
-    await tx.empleado.update({
+    await tx.empleados.update({
       where: { id: empleadoId },
-      data: cambiosEncriptados as Prisma.EmpleadoUpdateInput,
+      data: cambiosEncriptados as Prisma.empleadosUpdateInput,
     });
 
     console.log(

@@ -71,7 +71,7 @@ export async function POST(
       return badRequestResponse('El archivo es demasiado grande. Máximo 2MB');
     }
 
-    const empleado = await prisma.empleado.findUnique({
+    const empleado = await prisma.empleados.findUnique({
       where: { id },
       select: {
         nombre: true,
@@ -104,7 +104,7 @@ export async function POST(
     });
 
     // Actualizar solo empleado.fotoUrl como fuente única de verdad
-    await prisma.empleado.update({
+    await prisma.empleados.update({
       where: { id },
       data: { fotoUrl: avatarUrl },
     });

@@ -41,7 +41,7 @@ export async function GET(
     const empleadoId = searchParams.get('empleadoId');
     const { id } = params;
 
-    const plantilla = await prisma.plantillaDocumento.findUnique({
+    const plantilla = await prisma.plantillas_documentos.findUnique({
       where: { id },
       select: {
         id: true,
@@ -117,7 +117,7 @@ export async function GET(
       );
     }
 
-    const empleado = await prisma.empleado.findFirst({
+    const empleado = await prisma.empleados.findFirst({
       where: {
         id: empleadoId,
         empresaId: session.user.empresaId,

@@ -41,7 +41,7 @@ export async function GET(
     // Await params en Next.js 15+
     const { id } = await params;
 
-    const plantilla = await prisma.plantillaDocumento.findUnique({
+    const plantilla = await prisma.plantillas_documentos.findUnique({
       where: { id },
       select: {
         id: true,
@@ -60,7 +60,7 @@ export async function GET(
       return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
     }
 
-    const empleado = await prisma.empleado.findFirst({
+    const empleado = await prisma.empleados.findFirst({
       where: {
         id: empleadoId,
         empresaId: session.user.empresaId,

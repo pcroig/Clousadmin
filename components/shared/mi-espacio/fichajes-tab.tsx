@@ -2,25 +2,18 @@
 
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { CalendarDays, Clock, RotateCcw } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { CalendarDays, ChevronDown, ChevronUp, Clock, RotateCcw } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
-
+import { DataTable, type Column } from '@/components/shared/data-table';
+import { EmptyState } from '@/components/shared/empty-state';
 import { FichajeModal } from '@/components/shared/fichajes/fichaje-modal';
+import { MetricsCard } from '@/components/shared/metrics-card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { useApi } from '@/lib/hooks';
-import { cn } from '@/lib/utils';
 import {
   agruparFichajesEnJornadas,
   calcularResumenJornadas,
@@ -43,13 +36,35 @@ interface FichajesTabProps {
   empleadoId: string;
   empleado?: MiEspacioEmpleado;
   contexto?: 'empleado' | 'manager' | 'hr_admin';
+  manualModalOpen?: boolean;
+  onManualModalOpenChange?: (open: boolean) => void;
+  showManualActionButton?: boolean;
 }
 
-export function FichajesTab({ empleadoId, empleado, contexto = 'empleado' }: FichajesTabProps) {
+export function FichajesTab({
+  empleadoId,
+  empleado,
+  contexto = 'empleado',
+  manualModalOpen: manualModalOpenProp,
+  onManualModalOpenChange,
+  showManualActionButton = true,
+}: FichajesTabProps) {
   const [jornadas, setJornadas] = useState<JornadaUI[]>([]);
   const [fichajeEditando, setFichajeEditando] = useState<FichajeNormalizado | null>(null);
-  const [fichajeManualModalOpen, setFichajeManualModalOpen] = useState(false);
+  const [internalManualModalOpen, setInternalManualModalOpen] = useState(false);
   const [fechaInicio, setFechaInicio] = useState<Date | null>(null);
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+  const manualModalOpen = manualModalOpenProp ?? internalManualModalOpen;
+
+  const handleManualModalChange = useCallback(
+    (open: boolean) => {
+      onManualModalOpenChange?.(open);
+      if (manualModalOpenProp === undefined) {
+        setInternalManualModalOpen(open);
+      }
+    },
+    [manualModalOpenProp, onManualModalOpenChange],
+  );
 
   // Obtener horas objetivo desde jornada del empleado
   const horasObjetivo = useMemo(() => {
@@ -144,6 +159,72 @@ export function FichajesTab({ empleadoId, empleado, contexto = 'empleado' }: Fic
     };
   }, [jornadas, fechaInicio]);
 
+  const columns = useMemo<Column<JornadaUI>[]>(() => [
+    {
+      id: 'fecha',
+      header: 'Fecha',
+      priority: 'high',
+      cell: (row) => (
+        <div className="min-w-[140px]">
+          <p className="text-sm font-semibold text-gray-900 capitalize">
+            {format(row.fecha, "d 'de' MMMM", { locale: es })}
+          </p>
+          <p className="text-xs text-gray-500 capitalize">
+            {format(row.fecha, 'EEEE', { locale: es })}
+          </p>
+        </div>
+      ),
+    },
+    {
+      id: 'horas',
+      header: 'Horas',
+      priority: 'high',
+      cell: (row) => (
+        <div className="text-sm text-gray-900">
+          <span className="font-semibold">{row.horasTrabajadas.toFixed(1)}h</span>
+          <span className="text-gray-500"> / {row.horasObjetivo.toFixed(1)}h</span>
+        </div>
+      ),
+    },
+    {
+      id: 'horario',
+      header: 'Horario',
+      priority: 'medium',
+      cell: (row) => (
+        <span className="text-sm text-gray-600">
+          {row.entrada && row.salida
+            ? `${format(row.entrada, 'HH:mm')} - ${format(row.salida, 'HH:mm')}`
+            : row.entrada
+            ? `${format(row.entrada, 'HH:mm')} - ...`
+            : 'Sin datos'}
+        </span>
+      ),
+    },
+    {
+      id: 'estado',
+      header: 'Estado',
+      priority: 'medium',
+      align: 'right',
+      cell: (row) => getEstadoBadge(row.estado),
+    },
+  ], []);
+
+  const displayedJornadas = useMemo(() => jornadas.slice(0, MAX_FILAS), [jornadas]);
+  const manualActionLabel = contexto === 'hr_admin' ? 'Añadir fichaje' : 'Solicitar fichaje manual';
+  const manualActionVisible = (puedeCrearManual || puedeEditar) && showManualActionButton;
+  const headerDescription = useMemo(() => {
+    if (loading) {
+      return 'Cargando tus fichajes...';
+    }
+    if (jornadas.length === 0) {
+      return '';
+    }
+    if (jornadas.length <= MAX_FILAS) {
+      return `${jornadas.length} jornadas registradas`;
+    }
+    return `Mostrando ${MAX_FILAS} de ${jornadas.length} jornadas`;
+  }, [jornadas.length, loading]);
+
   // Cargar fecha de inicio (última renovación o fecha de alta)
   useEffect(() => {
     async function cargarFechaInicio() {
@@ -202,9 +283,28 @@ export function FichajesTab({ empleadoId, empleado, contexto = 'empleado' }: Fic
   };
 
   return (
-    <div className="space-y-6">
-      {/* Cards de Resumen */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+    <div className="space-y-3 sm:space-y-6">
+      {/* Cards de Resumen - MOBILE: Métricas prominentes */}
+      <div className="sm:hidden">
+        <MetricsCard
+          metrics={[
+            {
+              value: `${resumen.totalHoras.toFixed(0)}h`,
+              label: 'Horas Trabajadas',
+              size: 'large',
+            },
+            {
+              value: `${resumen.balanceAcumulado >= 0 ? '+' : ''}${Math.floor(resumen.balanceAcumulado)}h ${Math.abs(Math.round((resumen.balanceAcumulado % 1) * 60))}m`,
+              label: 'Saldo de Horas',
+              color: resumen.balanceAcumulado >= 0 ? 'green' : 'red',
+              size: 'large',
+            },
+          ]}
+        />
+      </div>
+
+      {/* Cards de Resumen - DESKTOP: Grid original */}
+      <div className="hidden sm:grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Card 1: Tiempo */}
         <Card>
           <CardHeader className="pb-3">
@@ -294,95 +394,138 @@ export function FichajesTab({ empleadoId, empleado, contexto = 'empleado' }: Fic
         </Card>
       </div>
 
-      {/* Tabla de fichajes */}
-      <Card className="p-0">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 px-6 py-4">
-          <h3 className="text-sm font-semibold text-gray-900">Historial por jornadas</h3>
-          {(puedeCrearManual || puedeEditar) && (
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => setFichajeManualModalOpen(true)}
-            >
-              {contexto === 'hr_admin' ? 'Añadir fichaje' : 'Solicitar fichaje manual'}
+      {/* Tabla de fichajes - MOBILE: Colapsable */}
+      <div className="sm:hidden space-y-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-sm font-semibold text-gray-900">Historial</h3>
+            {headerDescription && <p className="text-xs text-gray-500">{headerDescription}</p>}
+          </div>
+        </div>
+
+        {loading ? (
+          <div className="py-8 text-center text-sm text-gray-500">Cargando...</div>
+        ) : displayedJornadas.length === 0 ? (
+          <div className="py-8 text-center">
+            <Clock className="w-8 h-8 text-gray-300 mx-auto mb-2" />
+            <p className="text-sm text-gray-500">No hay fichajes registrados</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {displayedJornadas.map((jornada) => {
+              const rowId = `${jornada.fichaje.id}-${jornada.fecha.toISOString()}`;
+              const isExpanded = expandedRows.has(rowId);
+
+              return (
+                <Card key={rowId} className="overflow-hidden">
+                  <CardContent className="p-3">
+                    {/* Info básica - siempre visible */}
+                    <button
+                      onClick={() => {
+                        const newExpanded = new Set(expandedRows);
+                        if (isExpanded) {
+                          newExpanded.delete(rowId);
+                        } else {
+                          newExpanded.add(rowId);
+                        }
+                        setExpandedRows(newExpanded);
+                      }}
+                      className="w-full"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1 text-left">
+                          <div className="font-semibold text-sm text-gray-900 capitalize">
+                            {format(jornada.fecha, "d 'de' MMMM", { locale: es })}
+                          </div>
+                          <div className="text-xs text-gray-500 capitalize">
+                            {format(jornada.fecha, 'EEEE', { locale: es })}
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <div className="text-right mr-2">
+                            <div className="text-sm font-semibold text-gray-900">
+                              {jornada.horasTrabajadas.toFixed(1)}h
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              {jornada.horasObjetivo.toFixed(1)}h objetivo
+                            </div>
+                          </div>
+                          {isExpanded ? (
+                            <ChevronUp className="w-4 h-4 text-gray-400" />
+                          ) : (
+                            <ChevronDown className="w-4 h-4 text-gray-400" />
+                          )}
+                        </div>
+                      </div>
+                    </button>
+
+                    {/* Detalles - expandible */}
+                    {isExpanded && (
+                      <div className="mt-3 pt-3 border-t space-y-2">
+                        <div className="grid grid-cols-2 gap-2 text-xs">
+                          <div>
+                            <div className="text-gray-500">Horario</div>
+                            <div className="font-medium text-gray-900">
+                              {jornada.entrada && jornada.salida
+                                ? `${format(jornada.entrada, 'HH:mm')} - ${format(jornada.salida, 'HH:mm')}`
+                                : jornada.entrada
+                                ? `${format(jornada.entrada, 'HH:mm')} - ...`
+                                : 'Sin datos'}
+                            </div>
+                          </div>
+                          <div>
+                            <div className="text-gray-500">Estado</div>
+                            <div className="mt-0.5">{getEstadoBadge(jornada.estado)}</div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Tabla de fichajes - DESKTOP: DataTable original */}
+      <div className="hidden sm:block space-y-4">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h3 className="text-base font-semibold text-gray-900">Historial por jornadas</h3>
+            {headerDescription && <p className="text-sm text-gray-500">{headerDescription}</p>}
+          </div>
+          {manualActionVisible && (
+            <Button size="sm" onClick={() => handleManualModalChange(true)}>
+              {manualActionLabel}
             </Button>
           )}
         </div>
-        <div className="overflow-x-auto px-6">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Fecha</TableHead>
-                <TableHead>Horas trabajadas</TableHead>
-                <TableHead>Horas esperadas</TableHead>
-                <TableHead>Horario</TableHead>
-                <TableHead>Balance</TableHead>
-                <TableHead>Estado</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="py-8 text-center text-gray-500">
-                    Cargando...
-                  </TableCell>
-                </TableRow>
-              ) : jornadas.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="py-8 text-center text-gray-500">
-                    No tienes fichajes registrados
-                  </TableCell>
-                </TableRow>
-              ) : (
-                jornadas.slice(0, MAX_FILAS).map((jornada) => {
-                  const key = `${jornada.fichaje.id}-${jornada.fecha.toISOString()}`;
-                  const balancePositivo = jornada.balance >= 0;
 
-                  return (
-                    <TableRow
-                      key={key}
-                      className={cn(puedeEditar ? 'cursor-pointer hover:bg-gray-50' : 'cursor-default')}
-                      onClick={puedeEditar ? () => setFichajeEditando(jornada.fichaje) : undefined}
-                    >
-                      <TableCell>
-                        <span className="text-sm font-medium">
-                          {format(jornada.fecha, "d 'de' MMMM", { locale: es })}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <span className="text-sm font-medium">{jornada.horasTrabajadas.toFixed(1)}h</span>
-                      </TableCell>
-                      <TableCell>
-                        <span className="text-sm text-gray-600">{jornada.horasObjetivo.toFixed(1)}h</span>
-                      </TableCell>
-                      <TableCell>
-                        <span className="text-sm text-gray-600">
-                          {jornada.entrada && jornada.salida
-                            ? `${format(jornada.entrada, 'HH:mm')} - ${format(jornada.salida, 'HH:mm')}`
-                            : jornada.entrada
-                            ? `${format(jornada.entrada, 'HH:mm')} - ...`
-                            : 'Sin datos'}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <span
-                          className={`text-sm font-medium ${
-                            balancePositivo ? 'text-green-600' : 'text-red-600'
-                          }`}
-                        >
-                          {balancePositivo ? '+' : ''}
-                          {jornada.balance.toFixed(1)}h
-                        </span>
-                      </TableCell>
-                      <TableCell>{getEstadoBadge(jornada.estado)}</TableCell>
-                    </TableRow>
-                  );
-                })
-              )}
-            </TableBody>
-          </Table>
-        </div>
-      </Card>
+        <DataTable
+          columns={columns}
+          data={loading ? [] : displayedJornadas}
+          onRowClick={
+            puedeEditar
+              ? (row) => setFichajeEditando(row.fichaje)
+              : undefined
+          }
+          getRowId={(row) => `${row.fichaje.id}-${row.fecha.toISOString()}`}
+          emptyContent={
+            loading ? (
+              <div className="py-12 text-center text-sm text-gray-500">Cargando fichajes...</div>
+            ) : (
+              <EmptyState
+                layout="table"
+                icon={Clock}
+                title="No hay fichajes registrados"
+                description="Comienza a fichar para ver tu historial de jornadas."
+              />
+            )
+          }
+        />
+      </div>
 
       {/* Modal Editar Fichaje */}
       {puedeEditar && fichajeEditando && (
@@ -403,10 +546,10 @@ export function FichajesTab({ empleadoId, empleado, contexto = 'empleado' }: Fic
       {/* Modal Crear Fichaje */}
       {(puedeCrearManual || puedeEditar) && (
         <FichajeModal
-          open={fichajeManualModalOpen}
-          onClose={() => setFichajeManualModalOpen(false)}
+          open={manualModalOpen}
+          onClose={() => handleManualModalChange(false)}
           onSuccess={() => {
-            setFichajeManualModalOpen(false);
+            handleManualModalChange(false);
             refetchFichajes(`/api/fichajes?empleadoId=${empleadoId}&propios=1`);
           }}
           contexto={contexto}

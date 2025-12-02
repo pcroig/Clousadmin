@@ -33,7 +33,7 @@ export async function GET(
     const { id: campanaId } = await params;
 
     // Obtener empleado del usuario
-    const empleado = await prisma.empleado.findFirst({
+    const empleado = await prisma.empleados.findFirst({
       where: {
         usuarioId: session.user.id,
         empresaId: session.user.empresaId,
@@ -45,7 +45,7 @@ export async function GET(
     }
 
     // Buscar preferencia
-    let preferencia = await prisma.preferenciaVacaciones.findFirst({
+    let preferencia = await prisma.preferencias_vacaciones.findFirst({
       where: {
         campanaId,
         empleadoId: empleado.id,
@@ -54,7 +54,7 @@ export async function GET(
     });
 
     if (!preferencia) {
-      const campana = await prisma.campanaVacaciones.findFirst({
+      const campana = await prisma.campanas_vacaciones.findFirst({
         where: {
           id: campanaId,
           empresaId: session.user.empresaId,
@@ -66,7 +66,7 @@ export async function GET(
         return badRequestResponse('Campaña no encontrada');
       }
 
-      preferencia = await prisma.preferenciaVacaciones.create({
+      preferencia = await prisma.preferencias_vacaciones.create({
         data: {
           campanaId,
           empleadoId: empleado.id,
@@ -101,7 +101,7 @@ export async function PATCH(
     const body = await getJsonBody<PreferenciaPayload>(req);
 
     // Obtener empleado del usuario
-    const empleado = await prisma.empleado.findFirst({
+    const empleado = await prisma.empleados.findFirst({
       where: {
         usuarioId: session.user.id,
         empresaId: session.user.empresaId,
@@ -132,7 +132,7 @@ export async function PATCH(
     }
 
     // Buscar preferencia existente
-    const preferenciaExistente = await prisma.preferenciaVacaciones.findFirst({
+    const preferenciaExistente = await prisma.preferencias_vacaciones.findFirst({
       where: {
         campanaId,
         empleadoId: empleado.id,
@@ -145,7 +145,7 @@ export async function PATCH(
     }
 
     // Actualizar preferencia
-    const preferenciaActualizada = await prisma.preferenciaVacaciones.update({
+    const preferenciaActualizada = await prisma.preferencias_vacaciones.update({
       where: { id: preferenciaExistente.id },
       data: {
         diasIdeales: asJsonValue(diasIdeales),
@@ -160,7 +160,7 @@ export async function PATCH(
 
     // Si se marcó como completada, actualizar contador de la campaña
     if (body.completada === true && !preferenciaExistente.completada) {
-      const campanaActualizada = await prisma.campanaVacaciones.update({
+      const campanaActualizada = await prisma.campanas_vacaciones.update({
         where: { id: campanaId },
         data: {
           empleadosCompletados: {
@@ -190,7 +190,7 @@ export async function PATCH(
         );
       }
     } else if (body.completada === false && preferenciaExistente.completada) {
-      await prisma.campanaVacaciones.update({
+      await prisma.campanas_vacaciones.update({
         where: { id: campanaId },
         data: {
           empleadosCompletados: {

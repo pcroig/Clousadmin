@@ -248,6 +248,7 @@ export const CalendarioStep = forwardRef<CalendarioStepHandle, CalendarioStepPro
               refreshToken={festivosRefreshKey}
               onRequestCreate={handleCreateFestivoInline}
               onRequestEdit={handleEditFestivoInline}
+              numberOfMonths={2}
             />
           </TabsContent>
 

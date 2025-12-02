@@ -19,7 +19,6 @@ import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
-import { SolicitarFirmaDialog } from '@/components/firma/solicitar-firma-dialog';
 import { DocumentUploadArea } from '@/components/shared/document-upload-area';
 import { DocumentViewerModal, useDocumentViewer } from '@/components/shared/document-viewer';
 import { EmptyState } from '@/components/shared/empty-state';
@@ -115,8 +114,6 @@ export function CarpetaDetailClient({ carpeta, empleados = [] }: CarpetaDetailCl
   const [empleadosList, setEmpleadosList] = useState<Empleado[]>([]);
   const [cargandoDatos, setCargandoDatos] = useState(false);
   const [actualizandoAsignacion, setActualizandoAsignacion] = useState(false);
-  const [documentoParaFirma, setDocumentoParaFirma] = useState<Documento | null>(null);
-  const [modalSolicitarFirma, setModalSolicitarFirma] = useState(false);
 
   // Document viewer state
   const documentViewer = useDocumentViewer();
@@ -295,8 +292,8 @@ export function CarpetaDetailClient({ carpeta, empleados = [] }: CarpetaDetailCl
       toast.error('Solo los documentos PDF pueden enviarse a firma.');
       return;
     }
-    setDocumentoParaFirma(documento);
-    setModalSolicitarFirma(true);
+    // Navegar a la página de solicitar firma (fuera del dashboard)
+    router.push(`/firma/solicitar/${documento.id}`);
   };
 
   const handleEliminar = async () => {
@@ -797,23 +794,6 @@ export function CarpetaDetailClient({ carpeta, empleados = [] }: CarpetaDetailCl
         </DialogContent>
       </Dialog>
 
-      {documentoParaFirma && (
-        <SolicitarFirmaDialog
-          open={modalSolicitarFirma}
-          onOpenChange={(open) => {
-            setModalSolicitarFirma(open);
-            if (!open) {
-              setDocumentoParaFirma(null);
-            }
-          }}
-          documentoId={documentoParaFirma.id}
-          documentoNombre={documentoParaFirma.nombre}
-          onSuccess={() => {
-            setDocumentoParaFirma(null);
-            router.refresh();
-          }}
-        />
-      )}
 
       {/* Document Viewer Modal */}
       {documentViewer.documentId && (

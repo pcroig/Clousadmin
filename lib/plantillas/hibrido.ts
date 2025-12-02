@@ -82,7 +82,7 @@ export async function generarDocumentoHibrido(
     const { pdfS3Key } = await convertDocxFromS3ToPdf(resultadoDOCX.s3Key);
 
     // 3. Actualizar registro del documento con el PDF
-    const documento = await prisma.documento.update({
+    const documento = await prisma.documentos.update({
       where: { id: resultadoDOCX.documentoId },
       data: {
         s3Key: pdfS3Key,
@@ -176,7 +176,7 @@ export async function crearPlantillaHibridaConfig(
 ): Promise<void> {
   console.log(`[Plantilla Híbrida] Configurando plantilla ${plantillaId} como híbrida`);
 
-  await prisma.plantillaDocumento.update({
+  await prisma.plantillas_documentos.update({
     where: { id: plantillaId },
     data: {
       tipo: 'hibrida',

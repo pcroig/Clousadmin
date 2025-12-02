@@ -3,16 +3,17 @@
 // ========================================
 
 import { AusenciaItem } from '@/components/shared/ausencias-widget';
-import { getSession } from '@/lib/auth';
+import { getCurrentUserAvatar, getSession } from '@/lib/auth';
 import { calcularSaldoDisponible } from '@/lib/calculos/ausencias';
-import { EstadoAusencia, UsuarioRol } from '@/lib/constants/enums';
+import { obtenerResumenPlantillaEquipo, type PlantillaResumen } from '@/lib/calculos/plantilla';
+import { EstadoAusencia, PeriodoMedioDiaValue, UsuarioRol } from '@/lib/constants/enums';
 import { prisma } from '@/lib/prisma';
 import { obtenerCampanaPendiente, obtenerPropuestaPendiente } from '@/lib/services/campanas-vacaciones';
 
 import { EmpleadoDashboardClient } from './dashboard-client';
 
 import type { NotificacionUI } from '@/types/Notificacion';
-import type { Ausencia } from '@prisma/client';
+import type { ausencias } from '@prisma/client';
 
 
 const ESTADOS_AUSENCIAS_ABIERTAS: EstadoAusencia[] = [
@@ -25,13 +26,19 @@ const ESTADO_AUSENCIA_COMPLETADA = EstadoAusencia.completada;
 interface DashboardData {
   empleado: {
     id: string;
+    nombre: string;
+    apellidos: string;
+    puesto: string | null;
     empresaId: string;
+    managerId: string | null;
   };
   notificaciones: NotificacionUI[];
   saldoFinal: {
     diasTotales: number;
     diasUsados: number;
     diasPendientes: number;
+    diasDesdeHorasCompensadas: number;
+    horasCompensadas: number;
   };
   ausenciasProximas: AusenciaItem[];
   ausenciasPasadasItems: AusenciaItem[];
@@ -54,6 +61,7 @@ interface DashboardData {
       motivo: string;
     };
   } | null;
+  equipoResumen: PlantillaResumen | null;
 }
 
 async function obtenerDatosDashboard(session: { user: { id: string; empresaId: string } }): Promise<DashboardData> {
@@ -63,13 +71,17 @@ async function obtenerDatosDashboard(session: { user: { id: string; empresaId: s
   }
 
   // Obtener empleado (solo campos necesarios)
-  const empleado = await prisma.empleado.findUnique({
+  const empleado = await prisma.empleados.findUnique({
     where: {
       usuarioId: session.user.id,
     },
     select: {
       id: true,
+      nombre: true,
+      apellidos: true,
+      puesto: true,
       empresaId: true,
+      managerId: true,
     },
   });
 
@@ -77,8 +89,28 @@ async function obtenerDatosDashboard(session: { user: { id: string; empresaId: s
     throw new Error('Empleado no encontrado');
   }
 
+  // Resumen del equipo del empleado (si tiene manager asignado)
+  let equipoResumen: PlantillaResumen | null = null;
+  if (empleado.managerId) {
+    try {
+      equipoResumen = await obtenerResumenPlantillaEquipo(
+        session.user.empresaId,
+        empleado.managerId
+      );
+    } catch (error) {
+      console.error('[EmpleadoDashboard] Error obteniendo resumen de equipo:', {
+        empleadoId: empleado.id,
+        managerId: empleado.managerId,
+        error:
+          error instanceof Error
+            ? { message: error.message, stack: error.stack }
+            : error,
+      });
+    }
+  }
+
   // Notificaciones del empleado
-  const notificacionesDb = await prisma.notificacion.findMany({
+  const notificacionesDb = await prisma.notificaciones.findMany({
     where: {
       empresaId: session.user.empresaId,
       usuarioId: session.user.id,
@@ -112,6 +144,8 @@ async function obtenerDatosDashboard(session: { user: { id: string; empresaId: s
       diasTotales: saldo.diasTotales,
       diasUsados: saldo.diasUsados,
       diasPendientes: saldo.diasPendientes,
+      diasDesdeHorasCompensadas: saldo.diasDesdeHorasCompensadas ?? 0,
+      horasCompensadas: saldo.horasCompensadas ?? 0,
     };
   } catch (error) {
     console.error('[EmpleadoDashboard] Error obteniendo saldo de ausencias:', {
@@ -123,12 +157,14 @@ async function obtenerDatosDashboard(session: { user: { id: string; empresaId: s
       diasTotales: 22,
       diasUsados: 0,
       diasPendientes: 0,
+      diasDesdeHorasCompensadas: 0,
+      horasCompensadas: 0,
     };
   }
 
   // Próximas ausencias
   const hoy = new Date();
-  const proximasAusencias = await prisma.ausencia.findMany({
+  const proximasAusencias = await prisma.ausencias.findMany({
     where: {
       empleadoId: empleado.id,
       fechaInicio: {
@@ -144,17 +180,24 @@ async function obtenerDatosDashboard(session: { user: { id: string; empresaId: s
     take: 5,
   });
 
-  const ausenciasProximas: AusenciaItem[] = proximasAusencias.map((aus: Ausencia) => ({
+  const ausenciasProximas: AusenciaItem[] = proximasAusencias.map((aus: ausencias) => ({
     id: aus.id,
     fecha: aus.fechaInicio,
     fechaFin: aus.fechaFin,
     tipo: aus.tipo,
     dias: Number(aus.diasSolicitados),
-    estado: aus.estado as 'pendiente' | 'confirmada' | 'rechazada',
+    estado: aus.estado as EstadoAusencia,
+    justificanteUrl: aus.justificanteUrl,
+    medioDia: aus.medioDia ?? false,
+    periodo: (aus.periodo as PeriodoMedioDiaValue | null) ?? null,
+    motivo: aus.motivo,
+    documentoId: aus.documentoId,
+    createdAt: aus.createdAt?.toISOString() ?? new Date().toISOString(),
+    empleadoId: aus.empleadoId,
   }));
 
   // Ausencias pasadas
-  const ausenciasPasadas = await prisma.ausencia.findMany({
+  const ausenciasPasadas = await prisma.ausencias.findMany({
     where: {
       empleadoId: empleado.id,
       fechaFin: {
@@ -168,13 +211,20 @@ async function obtenerDatosDashboard(session: { user: { id: string; empresaId: s
     take: 3,
   });
 
-  const ausenciasPasadasItems: AusenciaItem[] = ausenciasPasadas.map((aus: Ausencia) => ({
+  const ausenciasPasadasItems: AusenciaItem[] = ausenciasPasadas.map((aus: ausencias) => ({
     id: aus.id,
     fecha: aus.fechaInicio,
     fechaFin: aus.fechaFin,
     tipo: aus.tipo,
     dias: Number(aus.diasSolicitados),
     estado: EstadoAusencia.completada,
+    justificanteUrl: aus.justificanteUrl,
+    medioDia: aus.medioDia ?? false,
+    periodo: (aus.periodo as PeriodoMedioDiaValue | null) ?? null,
+    motivo: aus.motivo,
+    documentoId: aus.documentoId,
+    createdAt: aus.createdAt?.toISOString() ?? new Date().toISOString(),
+    empleadoId: aus.empleadoId,
   }));
 
   return {
@@ -185,13 +235,14 @@ async function obtenerDatosDashboard(session: { user: { id: string; empresaId: s
     ausenciasPasadasItems,
     campanaPendiente,
     campanaPropuesta,
+    equipoResumen,
   };
 }
 
 export default async function EmpleadoDashboardPage() {
   // El middleware ya verifica autenticación
   const session = await getSession();
-  
+
   // Verificación defensiva: si no hay sesión, el middleware ya habrá redirigido
   if (!session) {
     return null;
@@ -202,6 +253,15 @@ export default async function EmpleadoDashboardPage() {
   if (session.user.rol !== UsuarioRol.empleado && session.user.rol !== UsuarioRol.manager) {
     return null;
   }
+
+  // Obtener avatar y notificaciones count
+  const avatarUrl = await getCurrentUserAvatar(session);
+  const notificacionesCount = await prisma.notificaciones.count({
+    where: {
+      usuarioId: session.user.id,
+      leida: false,
+    },
+  });
 
   // Obtener datos del dashboard
   let dashboardData: DashboardData;
@@ -227,12 +287,22 @@ export default async function EmpleadoDashboardPage() {
   return (
     <EmpleadoDashboardClient
       userName={session.user.nombre}
+      userEmail={session.user.email}
+      userAvatar={avatarUrl}
+      empleado={{
+        nombre: dashboardData.empleado.nombre,
+        apellidos: dashboardData.empleado.apellidos,
+        puesto: dashboardData.empleado.puesto,
+        id: dashboardData.empleado.id,
+      }}
       notificaciones={dashboardData.notificaciones}
+      notificacionesCount={notificacionesCount}
       saldoFinal={dashboardData.saldoFinal}
       ausenciasProximas={dashboardData.ausenciasProximas}
       ausenciasPasadas={dashboardData.ausenciasPasadasItems}
       campanaPendiente={dashboardData.campanaPendiente}
       campanaPropuesta={dashboardData.campanaPropuesta}
+      equipoResumen={dashboardData.equipoResumen}
     />
   );
 }

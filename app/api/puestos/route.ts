@@ -24,7 +24,7 @@ export async function GET(_request: NextRequest) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
 
-    const puestos = await prisma.puesto.findMany({
+    const puestos = await prisma.puestos.findMany({
       where: {
         empresaId: session.user.empresaId,
         activo: true,
@@ -94,7 +94,7 @@ export async function POST(request: NextRequest) {
     const validatedData = puestoCreateSchema.parse(body);
 
     // Verificar que no exista un puesto con el mismo nombre
-    const existingPuesto = await prisma.puesto.findFirst({
+    const existingPuesto = await prisma.puestos.findFirst({
       where: {
         empresaId: session.user.empresaId,
         nombre: validatedData.nombre,
@@ -115,7 +115,7 @@ export async function POST(request: NextRequest) {
     // Crear puesto en una transacción
     const puesto = await prisma.$transaction(async (tx) => {
       // Crear el puesto
-      const nuevoPuesto = await tx.puesto.create({
+      const nuevoPuesto = await tx.puestos.create({
         data: {
           empresaId: session.user.empresaId,
           nombre: puestoData.nombre,
@@ -126,7 +126,7 @@ export async function POST(request: NextRequest) {
       // Asignar empleados si se proporcionaron
       if (empleadoIds && empleadoIds.length > 0) {
         // Validar que los empleados existen y pertenecen a la empresa
-        const empleadosExistentes = await tx.empleado.findMany({
+        const empleadosExistentes = await tx.empleados.findMany({
           where: {
             id: { in: empleadoIds },
             empresaId: session.user.empresaId,
@@ -138,7 +138,7 @@ export async function POST(request: NextRequest) {
         }
 
         // Actualizar empleados para asignarles el puesto
-        await tx.empleado.updateMany({
+        await tx.empleados.updateMany({
           where: {
             id: { in: empleadoIds },
             empresaId: session.user.empresaId,

@@ -166,7 +166,9 @@ useEffect(() => {
 
 **Acción al guardar:**
 - Crea o actualiza la jornada predefinida
-- **Asigna automáticamente** a toda la empresa (nivel empresa)
+- **Verifica primero** si existen jornadas distintas ya asignadas (`/api/jornadas/verificar-previas`)
+- Si no hay jornadas previas, asigna automáticamente a toda la empresa
+- Si se detectan jornadas previas, muestra un diálogo de confirmación con el listado de jornadas que se reemplazarán y bloquea el paso hasta confirmar
 - El nombre se establece internamente como "Jornada base"
 - No requiere selección manual de asignación (simplificado para onboarding)
 

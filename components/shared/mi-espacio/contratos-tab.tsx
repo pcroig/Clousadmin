@@ -115,8 +115,25 @@ export function ContratosTab({ empleado, rol = 'empleado' }: ContratosTabProps) 
     label: `Grupo ${index + 1}`,
   }));
 
+  // Helper functions para obtener labels
+  const getCategoriaLabel = (value: string | null | undefined): string => {
+    if (!value) return 'No informado';
+    const option = categoriaProfesionalOptions.find((opt) => opt.value === value);
+    return option?.label ?? value;
+  };
+
+  const getNivelEducacionLabel = (value: string | null | undefined): string => {
+    if (!value) return 'No informado';
+    const option = nivelEducacionOptions.find((opt) => opt.value === value);
+    return option?.label ?? value;
+  };
+
   const contratoActual = empleado.contratos?.[0];
   const tipoContrato = empleado.tipoContrato || 'indefinido';
+  const tipoContratoLabel = useMemo(() => {
+    const tipo = (tipoContratoSeleccionado || tipoContrato) as TipoContrato;
+    return TIPO_CONTRATO_LABELS[tipo] ?? tipo;
+  }, [tipoContratoSeleccionado, tipoContrato]);
   const fechaInicioContrato = contratoActual?.fechaInicio ?? empleado.fechaAlta ?? null;
   const fechaFinContrato = contratoActual?.fechaFin ?? null;
   const fechaFin = fechaFinContrato ? new Date(fechaFinContrato).toISOString().split('T')[0] : '';

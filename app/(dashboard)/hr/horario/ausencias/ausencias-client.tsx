@@ -11,10 +11,9 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 import { CompactFilterBar } from '@/components/adaptive/CompactFilterBar';
-import { MobileActionBar } from '@/components/adaptive/MobileActionBar';
-import { ResponsiveContainer } from '@/components/adaptive/ResponsiveContainer';
-import { AvatarCell, DataTable, type Column } from '@/components/shared/data-table';
 import { EmpleadoHoverCard } from '@/components/empleado/empleado-hover-card';
+import { PageMobileHeader } from '@/components/layout/page-mobile-header';
+import { AvatarCell, type Column, DataTable } from '@/components/shared/data-table';
 import { EmptyState } from '@/components/shared/empty-state';
 import { DataFilters, type FilterOption } from '@/components/shared/filters/data-filters';
 import { DateRangeControls } from '@/components/shared/filters/date-range-controls';
@@ -519,12 +518,12 @@ const renderJustificanteLink = (
   options: { stopPropagation?: boolean; size?: 'sm' | 'default' } = {}
 ) => {
   if (!ausencia.justificanteUrl) {
-    return <span className="text-xs text-gray-400">Sin justificante</span>;
+    return null;
   }
 
   const { stopPropagation = false, size = 'sm' } = options;
   const handleClick = stopPropagation
-    ? (event: MouseEvent<HTMLButtonElement>) => {
+    ? (event: React.MouseEvent<HTMLButtonElement>) => {
         event.stopPropagation();
       }
     : undefined;
@@ -570,7 +569,7 @@ const renderJustificanteLink = (
             role="button"
             tabIndex={0}
             onClick={() => setEditarModal({ open: true, ausencia })}
-            onKeyDown={(event: KeyboardEvent<HTMLDivElement>) => {
+            onKeyDown={(event: React.KeyboardEvent<HTMLDivElement>) => {
               if (event.key === 'Enter' || event.key === ' ') {
                 event.preventDefault();
                 setEditarModal({ open: true, ausencia });
@@ -597,9 +596,6 @@ const renderJustificanteLink = (
                 >
                   {ausencia.empleado.nombre} {ausencia.empleado.apellidos}
                 </EmpleadoHoverCard>
-                <p className="text-xs text-gray-500 mt-1">
-                  Solicitada {formatSolicitudFecha(ausencia.createdAt)}
-                </p>
               </div>
               {getEstadoBadge(ausencia.estado)}
             </div>
@@ -613,6 +609,11 @@ const renderJustificanteLink = (
                 <p>
                   {format(new Date(ausencia.fechaInicio), 'dd MMM', { locale: es })} -{' '}
                   {format(new Date(ausencia.fechaFin), 'dd MMM', { locale: es })}
+                  {ausencia.createdAt && (
+                    <span className="text-xs text-gray-500 ml-2">
+                      Solicitada {format(new Date(ausencia.createdAt), 'd MMM', { locale: es })}
+                    </span>
+                  )}
                 </p>
               </div>
               <div className="col-span-2">
@@ -620,10 +621,12 @@ const renderJustificanteLink = (
                 <p className="text-gray-800">{ausencia.motivo || 'Sin motivo'}</p>
               </div>
             </div>
-            <div className="flex items-center gap-2 text-xs text-gray-500">
-              <Paperclip className="h-3.5 w-3.5" />
-              {renderJustificanteLink(ausencia, { stopPropagation: true })}
-            </div>
+            {ausencia.justificanteUrl && (
+              <div className="flex items-center gap-2 text-xs text-gray-500">
+                <Paperclip className="h-3.5 w-3.5" />
+                {renderJustificanteLink(ausencia, { stopPropagation: true })}
+              </div>
+            )}
           </Card>
         ))}
       </div>
@@ -697,13 +700,9 @@ const renderJustificanteLink = (
       id: 'tipo',
       header: 'Tipo',
       priority: 'high',
+      width: '150px',
       cell: (ausencia) => (
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-semibold text-gray-900">{getTipoBadge(ausencia.tipo)}</span>
-          {ausencia.createdAt && (
-            <span className="text-xs text-gray-500">· {formatSolicitudFecha(ausencia.createdAt)}</span>
-          )}
-        </div>
+        <span className="text-sm font-semibold text-gray-900">{getTipoBadge(ausencia.tipo)}</span>
       ),
     },
     {
@@ -711,10 +710,18 @@ const renderJustificanteLink = (
       header: 'Fechas',
       align: 'center',
       priority: 'medium',
+      width: '280px',
       cell: (ausencia) => (
-        <div className="text-sm font-medium text-gray-900">
-          {format(new Date(ausencia.fechaInicio), 'dd MMM', { locale: es })} -{' '}
-          {format(new Date(ausencia.fechaFin), 'dd MMM', { locale: es })}
+        <div className="flex items-center justify-center gap-2">
+          <div className="text-sm font-medium text-gray-900">
+            {format(new Date(ausencia.fechaInicio), 'dd MMM', { locale: es })} -{' '}
+            {format(new Date(ausencia.fechaFin), 'dd MMM', { locale: es })}
+          </div>
+          {ausencia.createdAt && (
+            <span className="text-xs text-gray-500">
+              Solicitada {format(new Date(ausencia.createdAt), 'd MMM', { locale: es })}
+            </span>
+          )}
         </div>
       ),
     },
@@ -725,11 +732,11 @@ const renderJustificanteLink = (
       priority: 'medium',
       cell: (ausencia) =>
         ausencia.estado === EstadoAusencia.pendiente ? (
-          <div className="flex justify-center gap-2">
+          <div className="flex justify-center items-center gap-2 h-6">
             <Button
               variant="ghost"
               size="sm"
-              className="text-green-600 hover:text-green-700 hover:bg-green-50"
+              className="h-6 px-2 text-xs text-green-600 hover:text-green-700 hover:bg-green-50"
               onClick={(event) => {
                 event.stopPropagation();
                 _handleAprobar(ausencia.id);
@@ -740,7 +747,7 @@ const renderJustificanteLink = (
             <Button
               variant="ghost"
               size="sm"
-              className="text-red-600 hover:text-red-700 hover:bg-red-50"
+              className="h-6 px-2 text-xs text-red-600 hover:text-red-700 hover:bg-red-50"
               onClick={(event) => {
                 event.stopPropagation();
                 setRechazarModal({ open: true, ausenciaId: ausencia.id });
@@ -750,7 +757,9 @@ const renderJustificanteLink = (
             </Button>
           </div>
         ) : (
-          getEstadoBadge(ausencia.estado)
+          <div className="flex justify-center items-center h-6">
+            {getEstadoBadge(ausencia.estado)}
+          </div>
         ),
     },
     {
@@ -762,9 +771,7 @@ const renderJustificanteLink = (
       cell: (ausencia) =>
         ausencia.justificanteUrl ? (
           renderJustificanteLink(ausencia, { stopPropagation: true, size: 'sm' })
-        ) : (
-          <span className="text-xs text-gray-400">Sin justificante</span>
-        ),
+        ) : null,
     },
   ];
 
@@ -774,26 +781,26 @@ const renderJustificanteLink = (
     : 'Cambia el periodo o ajusta los filtros para ver registros.';
 
   return (
-    <ResponsiveContainer variant="page" className="flex flex-col">
+    <div className="h-full w-full flex flex-col sm:max-w-[1800px] sm:mx-auto sm:px-8 sm:py-6">
       {isMobile ? (
         <>
-          <MobileActionBar
+          <PageMobileHeader
             title="Ausencias"
-            primaryAction={{
-              label: 'Campaña',
-              onClick: () => setCrearCampanaModal(true),
-              display: 'label',
-            }}
-            secondaryActions={[
+            actions={[
+              {
+                label: 'Campaña',
+                onClick: () => setCrearCampanaModal(true),
+                isPrimary: true,
+              },
               {
                 icon: Settings,
                 label: 'Gestionar ausencias',
                 onClick: () => setGestionarModal(true),
               },
             ]}
-            className="mb-3"
           />
 
+          {/* Filtros */}
           <div className="flex-shrink-0 mb-3">
             <DataFilters
               searchQuery={busquedaEmpleado}
@@ -931,7 +938,7 @@ const renderJustificanteLink = (
                 </p>
                 <div className="flex items-center gap-2">
                   <span className="font-medium text-gray-900">Justificante:</span>
-                  {editarModal.ausencia.justificanteUrl ? (
+                  {editarModal.ausencia.justificanteUrl && (
                     <Button variant="link" size="sm" className="px-0" asChild>
                       <a
                         href={editarModal.ausencia.justificanteUrl}
@@ -941,8 +948,6 @@ const renderJustificanteLink = (
                         Ver justificante
                       </a>
                     </Button>
-                  ) : (
-                    <span className="text-sm text-gray-500">Sin justificante</span>
                   )}
                 </div>
               </div>
@@ -1054,6 +1059,6 @@ const renderJustificanteLink = (
           fetchAusencias();
         }}
       />
-    </ResponsiveContainer>
+    </div>
   );
 }

@@ -44,12 +44,14 @@ export type {
  * @param input - Datos para crear la solicitud
  * @returns Solicitud de firma creada con sus firmantes
  *
+ * NOTA: El título se genera automáticamente del nombre del documento si no se proporciona.
+ *
  * @example
  * ```ts
  * const solicitud = await crearSolicitudFirma({
  *   documentoId: 'doc-123',
  *   empresaId: 'emp-456',
- *   titulo: 'Firma de Contrato',
+ *   // titulo es opcional - se usa el nombre del documento
  *   firmantes: [
  *     { empleadoId: 'emp-789', orden: 1 }
  *   ],
@@ -73,7 +75,7 @@ export async function crearSolicitudFirma(input: CrearSolicitudFirmaInput) {
   } = input;
 
   // 1. Obtener documento y generar hash
-  const documento = await prisma.documento.findUnique({
+  const documento = await prisma.documentos.findUnique({
     where: { id: documentoId },
     select: {
       id: true,
@@ -101,11 +103,11 @@ export async function crearSolicitudFirma(input: CrearSolicitudFirmaInput) {
   const hashDocumento = generarHashDocumento(documentoBuffer);
 
   // 2. Crear solicitud de firma
-  const solicitud = await prisma.solicitudFirma.create({
+  const solicitud = await prisma.solicitudes_firma.create({
     data: {
       empresaId,
       documentoId,
-      titulo,
+      titulo: titulo ?? documento.nombre, // Usar nombre del documento si no se proporciona título
       mensaje,
       ordenFirma,
       proveedor,
@@ -129,11 +131,11 @@ export async function crearSolicitudFirma(input: CrearSolicitudFirmaInput) {
     enviadoEn: ahora,
   }));
 
-  await prisma.firma.createMany({
+  await prisma.firmas.createMany({
     data: firmasData,
   });
 
-  const firmasCreadas = await prisma.firma.findMany({
+  const firmasCreadas = await prisma.firmas.findMany({
     where: { solicitudFirmaId: solicitud.id },
     select: {
       id: true,
@@ -155,7 +157,7 @@ export async function crearSolicitudFirma(input: CrearSolicitudFirmaInput) {
   );
 
   // 4. Actualizar documento para indicar que requiere firma
-  await prisma.documento.update({
+  await prisma.documentos.update({
     where: { id: documentoId },
     data: {
       requiereFirma: true,
@@ -164,7 +166,7 @@ export async function crearSolicitudFirma(input: CrearSolicitudFirmaInput) {
   });
 
   // 5. Retornar solicitud con firmas
-  const solicitudCompleta = await prisma.solicitudFirma.findUnique({
+  const solicitudCompleta = await prisma.solicitudes_firma.findUnique({
     where: { id: solicitud.id },
     include: {
       firmas: {
@@ -180,7 +182,7 @@ export async function crearSolicitudFirma(input: CrearSolicitudFirmaInput) {
         },
         orderBy: { orden: 'asc' },
       },
-      documento: {
+      documentos: {
         select: {
           id: true,
           nombre: true,
@@ -222,12 +224,12 @@ export async function firmarDocumento(
   datosCapturados: DatosCapturadosFirma
 ) {
   // 1. Obtener firma con solicitud y documento
-  const firma = await prisma.firma.findUnique({
+  const firma = await prisma.firmas.findUnique({
     where: { id: firmaId },
     include: {
-      solicitudFirma: {
+      solicitudes_firma: {
         include: {
-          documento: true,
+          documentos: true,
           firmas: {
             orderBy: { orden: 'asc' },
           },
@@ -257,13 +259,13 @@ export async function firmarDocumento(
   }
 
   // 2. Validar que la solicitud no esté cancelada
-  if (firma.solicitudFirma.estado === 'cancelada') {
+  if (firma.solicitudes_firma.estado === 'cancelada') {
     throw new Error('Esta solicitud de firma ha sido cancelada');
   }
 
   // 3. Si hay orden de firma, validar que sea el turno de este empleado
-  if (firma.solicitudFirma.ordenFirma && firma.orden > 0) {
-    const firmasAnteriores = firma.solicitudFirma.firmas.filter(
+  if (firma.solicitudes_firma.ordenFirma && firma.orden > 0) {
+    const firmasAnteriores = firma.solicitudes_firma.firmas.filter(
       (f) => f.orden < firma.orden && f.orden > 0
     );
 
@@ -276,15 +278,15 @@ export async function firmarDocumento(
     }
   }
 
-  if (firma.solicitudFirma.documento.mimeType !== 'application/pdf') {
+  if (firma.solicitudes_firma.documentos.mimeType !== 'application/pdf') {
     throw new Error('Solo se pueden firmar documentos PDF generados desde plantillas.');
   }
 
   // 4. Validar integridad del documento
-  const documentoBuffer = await downloadFromS3(firma.solicitudFirma.documento.s3Key);
+  const documentoBuffer = await downloadFromS3(firma.solicitudes_firma.documentos.s3Key);
   const validacion = validarIntegridadDocumento(
     documentoBuffer,
-    firma.solicitudFirma.hashDocumento
+    firma.solicitudes_firma.hashDocumento
   );
 
   if (!validacion.valida) {
@@ -300,15 +302,15 @@ export async function firmarDocumento(
     empleadoId: firma.empleadoId,
     empleadoNombre: `${firma.empleado.nombre} ${firma.empleado.apellidos}`,
     empleadoEmail: firma.empleado.email,
-    documentoId: firma.solicitudFirma.documentoId,
-    documentoNombre: firma.solicitudFirma.nombreDocumento,
-    documentoHash: firma.solicitudFirma.hashDocumento,
+    documentoId: firma.solicitudes_firma.documentoId,
+    documentoNombre: firma.solicitudes_firma.nombreDocumento,
+    documentoHash: firma.solicitudes_firma.hashDocumento,
     datosCapturados,
   });
 
   // 6. Actualizar firma
   const ahora = new Date();
-  const firmaActualizada = await prisma.firma.update({
+  const firmaActualizada = await prisma.firmas.update({
     where: { id: firmaId },
     data: {
       firmado: true,
@@ -322,7 +324,7 @@ export async function firmarDocumento(
   });
 
   // 7. Verificar si todas las firmas están completadas
-  const todasLasFirmas = await prisma.firma.findMany({
+  const todasLasFirmas = await prisma.firmas.findMany({
     where: { solicitudFirmaId: firma.solicitudFirmaId },
     select: { firmado: true },
   });
@@ -331,7 +333,7 @@ export async function firmarDocumento(
 
   // 8. Actualizar estado de solicitud si todas firmaron
   if (estadoComplecion.completo) {
-    await prisma.solicitudFirma.update({
+    await prisma.solicitudes_firma.update({
       where: { id: firma.solicitudFirmaId },
       data: {
         estado: 'completada',
@@ -340,8 +342,8 @@ export async function firmarDocumento(
     });
 
     // Actualizar documento como firmado
-    await prisma.documento.update({
-      where: { id: firma.solicitudFirma.documentoId },
+    await prisma.documentos.update({
+      where: { id: firma.solicitudes_firma.documentoId },
       data: {
         firmado: true,
         firmadoEn: ahora,
@@ -354,7 +356,7 @@ export async function firmarDocumento(
 
       if (esPDF) {
         // Obtener todas las firmas completadas con información de empleados
-        const firmasCompletadas = await prisma.firma.findMany({
+        const firmasCompletadas = await prisma.firmas.findMany({
           where: {
             solicitudFirmaId: firma.solicitudFirmaId,
             firmado: true,
@@ -375,10 +377,11 @@ export async function firmarDocumento(
         });
 
         // Generar marcas de firma para cada firmante (incluyendo imagen manuscrita si existe)
-        const posicionBase = (firma.solicitudFirma.posicionFirma as PosicionFirma | null) ?? null;
-
+        // NO usamos posicionBase - dejamos que anadirMarcasFirmasPDF calcule automáticamente
+        // las posiciones para apilar las firmas correctamente
+        
         const marcas = await Promise.all(
-          firmasCompletadas.map(async (f, index) => {
+          firmasCompletadas.map(async (f) => {
             const capturados = (f.datosCapturados as DatosCapturadosFirma | null) ?? null;
             let firmaImagenBuffer: Buffer | undefined;
             const firmaImagenWidth = capturados?.firmaImagenWidth;
@@ -403,13 +406,8 @@ export async function firmarDocumento(
                 }) || 'N/A',
               tipoFirma: f.tipo as TipoFirma,
               certificadoHash: f.certificadoHash ?? undefined,
-               posicion: posicionBase
-                ? {
-                    pagina: posicionBase.pagina,
-                    x: posicionBase.x,
-                    y: posicionBase.y + index * 140,
-                  }
-                : undefined,
+              // No especificamos posición - anadirMarcasFirmasPDF las calculará automáticamente
+              posicion: undefined,
               firmaImagen: firmaImagenBuffer
                 ? {
                     buffer: firmaImagenBuffer,
@@ -426,24 +424,61 @@ export async function firmarDocumento(
         const pdfConMarcas = await anadirMarcasFirmasPDF(documentoBuffer, marcas);
 
         // Subir PDF firmado a S3
-        const extension = firma.solicitudFirma.documento.nombre.split('.').pop() || 'pdf';
-        const pdfFirmadoS3Key = `documentos-firmados/${firma.solicitudFirma.empresaId}/${firma.solicitudFirma.id}/firmado.${extension}`;
+        const extension = firma.solicitudes_firma.documentos.nombre.split('.').pop() || 'pdf';
+        const pdfFirmadoS3Key = `documentos-firmados/${firma.solicitudes_firma.empresaId}/${firma.solicitudes_firma.id}/firmado.${extension}`;
 
         await uploadToS3(pdfConMarcas, pdfFirmadoS3Key, 'application/pdf');
 
         // Actualizar solicitud con ubicación del PDF firmado
-        const solicitudActualizada = await prisma.solicitudFirma.update({
+        const solicitudActualizada = await prisma.solicitudes_firma.update({
           where: { id: firma.solicitudFirmaId },
           data: {
             pdfFirmadoS3Key,
           },
         });
 
+        // Crear nuevo documento con el PDF firmado
+        const documentoOriginal = firma.solicitudes_firma.documentos;
+        const nombreDocumentoFirmado = documentoOriginal.nombre.replace(/\.pdf$/i, '_firmado.pdf');
+        
+        const nuevoDocumentoFirmado = await prisma.documentos.create({
+          data: {
+            empresaId: documentoOriginal.empresaId,
+            empleadoId: documentoOriginal.empleadoId,
+            carpetaId: documentoOriginal.carpetaId,
+            nombre: nombreDocumentoFirmado,
+            tipoDocumento: documentoOriginal.tipoDocumento,
+            mimeType: 'application/pdf',
+            tamano: pdfConMarcas.length,
+            s3Key: pdfFirmadoS3Key,
+            s3Bucket: documentoOriginal.s3Bucket,
+            firmado: true,
+            firmadoEn: ahora,
+            generadoDesdePlantilla: documentoOriginal.generadoDesdePlantilla,
+            hashDocumento: generarHashDocumento(pdfConMarcas),
+          },
+        });
+
+        // Si el documento original fue generado desde plantilla, actualizar la referencia
+        const docGenerado = await prisma.documentosGenerado.findUnique({
+          where: { documentoId: documentoOriginal.id },
+        });
+
+        if (docGenerado) {
+          await prisma.documentosGenerado.update({
+            where: { documentoId: documentoOriginal.id },
+            data: {
+              firmado: true,
+              firmadoEn: ahora,
+            },
+          });
+        }
+
         await crearNotificacionFirmaCompletada(prisma, {
           empresaId: solicitudActualizada.empresaId,
           solicitudId: solicitudActualizada.id,
-          documentoId: solicitudActualizada.documentoId,
-          documentoNombre: solicitudActualizada.nombreDocumento,
+          documentoId: nuevoDocumentoFirmado.id,
+          documentoNombre: nombreDocumentoFirmado,
           usuarioDestinoId: solicitudActualizada.creadoPor,
           pdfFirmadoS3Key,
         });
@@ -455,7 +490,7 @@ export async function firmarDocumento(
     }
   } else {
     // Actualizar estado a 'en_proceso' si es la primera firma
-    await prisma.solicitudFirma.update({
+    await prisma.solicitudes_firma.update({
       where: { id: firma.solicitudFirmaId },
       data: {
         estado: 'en_proceso',
@@ -481,11 +516,11 @@ export async function obtenerFirmasPendientes(
   empleadoId: string,
   empresaId: string
 ) {
-  const firmasPendientes = await prisma.firma.findMany({
+  const firmasPendientes = await prisma.firmas.findMany({
     where: {
       empleadoId,
       firmado: false,
-      solicitudFirma: {
+      solicitudes_firma: {
         empresaId,
         estado: {
           in: ['pendiente', 'en_proceso'],
@@ -493,14 +528,15 @@ export async function obtenerFirmasPendientes(
       },
     },
     include: {
-      solicitudFirma: {
+      solicitudes_firma: {
         include: {
-          documento: {
+          documentos: {
             select: {
               id: true,
               nombre: true,
               tipoDocumento: true,
               s3Key: true,
+              carpetaId: true,
             },
           },
         },
@@ -525,10 +561,10 @@ export async function obtenerEstadoSolicitud(
   solicitudId: string,
   empresaId: string
 ): Promise<EstadoSolicitudFirmaDetallado> {
-  const solicitud = await prisma.solicitudFirma.findUnique({
+  const solicitud = await prisma.solicitudes_firma.findUnique({
     where: { id: solicitudId, empresaId },
     include: {
-      documento: {
+      documentos: {
         select: {
           id: true,
           nombre: true,
@@ -596,7 +632,7 @@ export async function listarSolicitudesFirma(
     empleadoId?: string;
   }
 ) {
-  const where: Prisma.SolicitudFirmaWhereInput = { empresaId };
+  const where: Prisma.solicitudes_firmaWhereInput = { empresaId };
 
   if (filtros?.estado) {
     where.estado = filtros.estado;
@@ -614,22 +650,33 @@ export async function listarSolicitudesFirma(
     };
   }
 
-  const solicitudes = await prisma.solicitudFirma.findMany({
+  const solicitudes = await prisma.solicitudes_firma.findMany({
     where,
     include: {
-      documento: {
+      documentos: {
         select: {
           id: true,
           nombre: true,
           tipoDocumento: true,
+          carpetaId: true,
         },
       },
       firmas: {
         select: {
           id: true,
-          empleadoId: true,
+          orden: true,
           firmado: true,
           firmadoEn: true,
+          empleado: {
+            select: {
+              nombre: true,
+              apellidos: true,
+              email: true,
+            },
+          },
+        },
+        orderBy: {
+          orden: 'asc',
         },
       },
     },

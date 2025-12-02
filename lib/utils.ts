@@ -218,8 +218,16 @@ const mapSaldosAusencias = (input: unknown): MiEspacioSaldoAusencia[] | undefine
     .filter(isRecord)
     .map<MiEspacioSaldoAusencia>((saldo) => ({
       id: typeof saldo.id === 'string' ? saldo.id : '',
-      año: typeof saldo.año === 'number' ? saldo.año : Number(saldo.año) || new Date().getFullYear(),
-      diasTotales: typeof saldo.diasTotales === 'number' ? saldo.diasTotales : Number(saldo.diasTotales) || 0,
+      anio:
+        typeof (saldo as { anio?: unknown }).anio === 'number'
+          ? (saldo as { anio?: number }).anio!
+          : typeof (saldo as { anio?: unknown }).anio === 'string'
+            ? Number((saldo as { anio?: string }).anio) || new Date().getFullYear()
+            : typeof (saldo as { año?: unknown }).año === 'number'
+              ? (saldo as { año?: number }).año!
+              : Number((saldo as { año?: string }).año) || new Date().getFullYear(),
+      diasTotales:
+        typeof saldo.diasTotales === 'number' ? saldo.diasTotales : Number(saldo.diasTotales) || 0,
       diasUsados: decimalToNumber(saldo.diasUsados as DecimalLike) ?? 0,
       diasPendientes: decimalToNumber(saldo.diasPendientes as DecimalLike) ?? 0,
       origen: typeof saldo.origen === 'string' ? saldo.origen : undefined,

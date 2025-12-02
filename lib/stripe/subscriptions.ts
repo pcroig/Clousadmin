@@ -23,7 +23,7 @@ export async function getOrCreateStripeCustomer(
   const stripe = getStripe();
 
   // Verificar si ya existe un customer
-  const existingCustomer = await prisma.billingCustomer.findUnique({
+  const existingCustomer = await prisma.billing_customers.findUnique({
     where: { empresaId },
   });
 
@@ -41,7 +41,7 @@ export async function getOrCreateStripeCustomer(
   });
 
   // Guardar en base de datos
-  await prisma.billingCustomer.create({
+  await prisma.billing_customers.create({
     data: {
       id: customer.id,
       empresaId,
@@ -71,7 +71,7 @@ export async function createCheckoutSession(params: {
   const customerId = await getOrCreateStripeCustomer(empresaId, email, nombreEmpresa);
 
   // Obtener información del precio para determinar trial
-  const price = await prisma.billingPrice.findUnique({
+  const price = await prisma.billing_prices.findUnique({
     where: { id: priceId },
   });
 
@@ -125,7 +125,7 @@ export async function createBillingPortalSession(
   const stripe = getStripe();
 
   // Obtener customer ID
-  const customer = await prisma.billingCustomer.findUnique({
+  const customer = await prisma.billing_customers.findUnique({
     where: { empresaId },
   });
 
@@ -146,7 +146,7 @@ export async function createBillingPortalSession(
  * Obtiene la suscripción activa de una empresa
  */
 export async function getActiveSubscription(empresaId: string) {
-  const subscription = await prisma.subscription.findFirst({
+  const subscription = await prisma.subscriptions.findFirst({
     where: {
       empresaId,
       status: {
@@ -154,9 +154,9 @@ export async function getActiveSubscription(empresaId: string) {
       },
     },
     include: {
-      price: {
+      billing_prices: {
         include: {
-          producto: true,
+          billing_products: true,
         },
       },
     },
@@ -198,22 +198,22 @@ export async function getSubscriptionStatus(empresaId: string) {
   return {
     hasSubscription: true,
     status: subscription.status,
-    plan: subscription.price.producto
+    plan: subscription.billing_prices.billing_products
       ? {
-          id: subscription.price.producto.id,
-          nombre: subscription.price.producto.nombre,
-          descripcion: subscription.price.producto.descripcion,
-          features: Array.isArray(subscription.price.producto.features)
-            ? (subscription.price.producto.features as string[])
+          id: subscription.billing_prices.billing_products.id,
+          nombre: subscription.billing_prices.billing_products.nombre,
+          descripcion: subscription.billing_prices.billing_products.descripcion,
+          features: Array.isArray(subscription.billing_prices.billing_products.features)
+            ? (subscription.billing_prices.billing_products.features as string[])
             : [],
         }
       : null,
-    price: subscription.price
+    price: subscription.billing_prices
       ? {
-          id: subscription.price.id,
-          unitAmount: subscription.price.unitAmount,
-          currency: subscription.price.currency,
-          intervalo: subscription.price.intervalo,
+          id: subscription.billing_prices.id,
+          unitAmount: subscription.billing_prices.unitAmount,
+          currency: subscription.billing_prices.currency,
+          intervalo: subscription.billing_prices.intervalo,
         }
       : null,
     currentPeriodEnd: subscription.currentPeriodEnd,
@@ -236,7 +236,7 @@ export async function cancelSubscriptionAtPeriodEnd(
   });
 
   // Actualizar en base de datos
-  await prisma.subscription.update({
+  await prisma.subscriptions.update({
     where: { id: subscriptionId },
     data: {
       cancelAtPeriodEnd: true,
@@ -260,7 +260,7 @@ export async function reactivateSubscription(
   });
 
   // Actualizar en base de datos
-  await prisma.subscription.update({
+  await prisma.subscriptions.update({
     where: { id: subscriptionId },
     data: {
       cancelAtPeriodEnd: false,

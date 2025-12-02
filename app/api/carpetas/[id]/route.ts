@@ -39,7 +39,7 @@ export async function GET(
       );
     }
 
-    const carpeta = await prisma.carpeta.findUnique({
+    const carpeta = await prisma.carpetas.findUnique({
       where: { id },
       include: {
         documentos: {
@@ -102,7 +102,7 @@ export async function DELETE(
 
     const { id } = await params;
 
-    const carpeta = await prisma.carpeta.findUnique({
+    const carpeta = await prisma.carpetas.findUnique({
       where: { id },
       include: {
         documentos: true,
@@ -130,7 +130,7 @@ export async function DELETE(
       );
     }
 
-    await prisma.carpeta.delete({
+    await prisma.carpetas.delete({
       where: { id },
     });
 
@@ -168,7 +168,7 @@ export async function PATCH(
     const { compartida, asignadoA } = body;
 
     // Buscar carpeta
-    const carpeta = await prisma.carpeta.findUnique({
+    const carpeta = await prisma.carpetas.findUnique({
       where: { id },
     });
 
@@ -193,7 +193,7 @@ export async function PATCH(
     }
 
     // Construir datos de actualización
-    const dataToUpdate: Prisma.CarpetaUpdateInput = {};
+    const dataToUpdate: Prisma.carpetasUpdateInput = {};
 
     if (compartida !== undefined) {
       dataToUpdate.compartida = compartida as boolean;
@@ -209,7 +209,7 @@ export async function PATCH(
     }
 
     // Actualizar carpeta
-    const carpetaActualizada = await prisma.carpeta.update({
+    const carpetaActualizada = await prisma.carpetas.update({
       where: { id },
       data: dataToUpdate,
       include: {

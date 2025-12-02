@@ -26,7 +26,7 @@ export default async function HrSectionLayout({
   const empleadoId = session.user.empleadoId;
 
   if (empleadoId) {
-    const empleado = await prisma.empleado.findUnique({
+    const empleado = await prisma.empleados.findUnique({
       where: { id: empleadoId },
       select: { onboardingCompletado: true },
     });

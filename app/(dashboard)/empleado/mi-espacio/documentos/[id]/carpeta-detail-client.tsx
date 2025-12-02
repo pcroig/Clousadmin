@@ -4,7 +4,7 @@
 
 'use client';
 
-import { ArrowLeft, Download, Eye, FileText, Folder, Upload } from 'lucide-react';
+import { ArrowLeft, Download, Eye, FileSignature, FileText, Folder, Upload } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useCallback, useRef } from 'react';
 import { toast } from 'sonner';
@@ -12,15 +12,24 @@ import { toast } from 'sonner';
 import { DocumentUploadArea } from '@/components/shared/document-upload-area';
 import { DocumentViewerModal, useDocumentViewer } from '@/components/shared/document-viewer';
 import { EmptyState } from '@/components/shared/empty-state';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 
 import type { MiEspacioCarpeta, MiEspacioDocumento } from '@/types/empleado';
 
-type CarpetaDocumento = MiEspacioDocumento & {
-  tipoDocumento: string;
-  tamano: number;
-  createdAt: string;
+type CarpetaDocumento = {
+  id: string;
+  nombre: string;
+  tipoDocumento?: string | null;
+  tamano?: number | null;
+  createdAt?: string | null;
   mimeType?: string | null;
+  firmaInfo?: {
+    tieneSolicitud: boolean;
+    firmado: boolean;
+    firmaId?: string;
+    estadoSolicitud: string;
+  } | null;
 };
 
 type CarpetaDetalle = MiEspacioCarpeta & {
@@ -199,6 +208,9 @@ export function CarpetaDetailClientEmpleado({
                     Tipo
                   </th>
                   <th className="text-left py-3 px-4 text-xs font-medium text-gray-600 uppercase">
+                    Estado
+                  </th>
+                  <th className="text-left py-3 px-4 text-xs font-medium text-gray-600 uppercase">
                     Tamaño
                   </th>
                   <th className="text-left py-3 px-4 text-xs font-medium text-gray-600 uppercase">
@@ -227,6 +239,32 @@ export function CarpetaDetailClientEmpleado({
                       <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">
                         {documento.tipoDocumento}
                       </span>
+                    </td>
+                    <td className="py-3 px-4">
+                      {documento.firmaInfo?.tieneSolicitud ? (
+                        documento.firmaInfo.firmado ? (
+                          <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                            <FileSignature className="w-3 h-3 mr-1" />
+                            Firmado
+                          </Badge>
+                        ) : (
+                          <button
+                            onClick={() => {
+                              if (documento.firmaInfo?.firmaId) {
+                                router.push(`/firma/firmar/${documento.firmaInfo.firmaId}`);
+                              }
+                            }}
+                            className="inline-flex items-center"
+                          >
+                            <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100 cursor-pointer">
+                              <FileSignature className="w-3 h-3 mr-1" />
+                              Pendiente firma
+                            </Badge>
+                          </button>
+                        )
+                      ) : (
+                        <span className="text-xs text-gray-400">-</span>
+                      )}
                     </td>
                     <td className="py-3 px-4 text-sm text-gray-600">
                       {formatearTamano(documento.tamano ?? 0)}

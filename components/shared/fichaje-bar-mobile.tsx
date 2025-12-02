@@ -16,7 +16,7 @@ import { extractArrayFromResponse } from '@/lib/utils/api-response';
 import { formatTiempoTrabajado } from '@/lib/utils/formatters';
 import { parseJson } from '@/lib/utils/json';
 
-import type { FichajeEvento } from '@prisma/client';
+import type { fichaje_eventos as FichajeEvento } from '@prisma/client';
 
 type EstadoFichaje = 'sin_fichar' | 'trabajando' | 'en_pausa' | 'finalizado';
 

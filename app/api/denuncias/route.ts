@@ -44,12 +44,12 @@ export async function GET(req: NextRequest) {
     }
 
     // Filtros
-    const where: Prisma.DenunciaWhereInput = {
+    const where: Prisma.denunciasWhereInput = {
       empresaId: session.user.empresaId,
     };
 
     // Obtener denuncias
-    const denuncias = await prisma.denuncia.findMany({
+    const denuncias = await prisma.denuncias.findMany({
       where,
       include: {
         denunciante: {
@@ -91,7 +91,7 @@ export async function POST(req: NextRequest) {
     const data = validationResult.data;
 
     // Crear la denuncia
-    const denuncia = await prisma.denuncia.create({
+    const denuncia = await prisma.denuncias.create({
       data: {
         empresaId: session.user.empresaId,
         denuncianteId: data.esAnonima ? null : session.user.empleadoId,

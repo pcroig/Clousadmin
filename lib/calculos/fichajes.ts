@@ -4,10 +4,10 @@
 // NUEVO MODELO: Fichaje = día completo, FichajeEvento = eventos individuales
 
 import {
-  Ausencia,
-  Empleado,
-  Fichaje,
-  FichajeEvento,
+  ausencias as Ausencia,
+  empleados as Empleado,
+  fichajes as Fichaje,
+  fichaje_eventos as FichajeEvento,
   EstadoFichaje as PrismaEstadoFichaje,
 } from '@prisma/client';
 
@@ -170,7 +170,7 @@ export async function obtenerEstadoFichaje(empleadoId: string): Promise<EstadoFi
   const fechaHoy = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
 
   // Buscar el fichaje del día (único por empleado + fecha)
-  const fichajeHoy = await prisma.fichaje.findUnique({
+  const fichajeHoy = await prisma.fichajes.findUnique({
     where: {
       empleadoId_fecha: {
         empleadoId,
@@ -487,7 +487,7 @@ export async function validarLimitesJornada(
   empleadoId: string,
   hora: Date
 ): Promise<{ valido: boolean; error?: string }> {
-  const empleado = await prisma.empleado.findUnique({
+  const empleado = await prisma.empleados.findUnique({
     where: { id: empleadoId },
     include: {
       jornada: true,
@@ -532,7 +532,7 @@ export async function obtenerFichaje(
 ): Promise<FichajeConEventos | null> {
   const fechaSinHora = new Date(fecha.getFullYear(), fecha.getMonth(), fecha.getDate());
   
-  return prisma.fichaje.findUnique({
+  return prisma.fichajes.findUnique({
     where: {
       empleadoId_fecha: {
         empleadoId,
@@ -557,7 +557,7 @@ export async function obtenerFichajes(
   fechaInicio: Date,
   fechaFin: Date
 ): Promise<FichajeConEventos[]> {
-  return prisma.fichaje.findMany({
+  return prisma.fichajes.findMany({
     where: {
       empleadoId,
       fecha: {
@@ -681,7 +681,7 @@ export async function obtenerHorasEsperadas(
   empleadoId: string,
   fecha: Date
 ): Promise<number> {
-  const empleado = await prisma.empleado.findUnique({
+  const empleado = await prisma.empleados.findUnique({
     where: { id: empleadoId },
     include: {
       jornada: true,
@@ -708,7 +708,7 @@ export async function obtenerHorasEsperadasBatch(
   const uniqueEmpleadoIds = Array.from(new Set(entradas.map((entrada) => entrada.empleadoId)));
 
   const empleados =
-    (await prisma.empleado.findMany({
+    (await prisma.empleados.findMany({
     where: {
       id: {
         in: uniqueEmpleadoIds,
@@ -752,7 +752,7 @@ export async function obtenerHorasEsperadasBatch(
  * Se llama después de crear/editar un evento
  */
 export async function actualizarCalculosFichaje(fichajeId: string): Promise<void> {
-  const fichaje = await prisma.fichaje.findUnique({
+  const fichaje = await prisma.fichajes.findUnique({
     where: { id: fichajeId },
     include: {
       eventos: {
@@ -770,7 +770,7 @@ export async function actualizarCalculosFichaje(fichajeId: string): Promise<void
   const horasTrabajadas = calcularHorasTrabajadas(fichaje.eventos) ?? 0;
   const horasEnPausa = calcularTiempoEnPausa(fichaje.eventos);
 
-  await prisma.fichaje.update({
+  await prisma.fichajes.update({
     where: { id: fichajeId },
     data: {
       horasTrabajadas,
@@ -790,7 +790,7 @@ export async function actualizarCalculosFichaje(fichajeId: string): Promise<void
 export async function esDiaLaboral(empleadoId: string, fecha: Date): Promise<boolean> {
   const fechaSinHora = normalizarFecha(fecha);
 
-  const empleado = await prisma.empleado.findUnique({
+  const empleado = await prisma.empleados.findUnique({
     where: { id: empleadoId },
     select: {
       id: true,
@@ -812,7 +812,7 @@ export async function esDiaLaboral(empleadoId: string, fecha: Date): Promise<boo
   const [diasLaborables, festivos, ausencia] = await Promise.all([
     getDiasLaborablesEmpresa(empleado.empresaId),
     getFestivosActivosEnRango(empleado.empresaId, fechaSinHora, fechaSinHora),
-    prisma.ausencia.findFirst({
+    prisma.ausencias.findFirst({
       where: {
         empleadoId,
         medioDia: false,
@@ -869,7 +869,7 @@ async function calcularEmpleadosDisponibles(
   fecha: Date
 ): Promise<EmpleadoDisponible[]> {
   const [empleados, diasLaborables, festivos, ausenciasDiaCompleto] = await Promise.all([
-    prisma.empleado.findMany({
+    prisma.empleados.findMany({
       where: {
         empresaId,
         activo: true,
@@ -891,7 +891,7 @@ async function calcularEmpleadosDisponibles(
     }),
     getDiasLaborablesEmpresa(empresaId),
     getFestivosActivosEnRango(empresaId, fecha, fecha),
-    prisma.ausencia.findMany({
+    prisma.ausencias.findMany({
       where: {
         empresaId,
         medioDia: false,
@@ -988,7 +988,7 @@ export async function crearFichajesAutomaticos(
   // Para cada empleado, verificar si ya tiene fichaje
   for (const empleado of empleadosDisponibles) {
     try {
-      const fichajeExistente = await prisma.fichaje.findUnique({
+      const fichajeExistente = await prisma.fichajes.findUnique({
         where: {
           empleadoId_fecha: {
             empleadoId: empleado.id,
@@ -999,7 +999,7 @@ export async function crearFichajesAutomaticos(
 
       if (!fichajeExistente) {
         // Crear fichaje vacío en estado "en_curso"
-        await prisma.fichaje.create({
+        await prisma.fichajes.create({
           data: {
             empresaId,
             empleadoId: empleado.id,
@@ -1063,7 +1063,7 @@ export async function procesarFichajesDia(
 
   for (const empleado of empleadosDisponibles) {
     try {
-      let fichaje = await prisma.fichaje.findUnique({
+      let fichaje = await prisma.fichajes.findUnique({
         where: {
           empleadoId_fecha: {
             empleadoId: empleado.id,
@@ -1076,7 +1076,7 @@ export async function procesarFichajesDia(
       });
 
       if (!fichaje) {
-        fichaje = await prisma.fichaje.create({
+        fichaje = await prisma.fichajes.create({
           data: {
             empresaId,
             empleadoId: empleado.id,
@@ -1110,7 +1110,7 @@ export async function procesarFichajesDia(
         await actualizarCalculosFichaje(fichaje.id);
 
         if (validacion.completo) {
-          await prisma.fichaje.update({
+          await prisma.fichajes.update({
             where: { id: fichaje.id },
             data: {
               estado: PrismaEstadoFichaje.finalizado,
@@ -1118,7 +1118,7 @@ export async function procesarFichajesDia(
           });
           resultado.fichajesFinalizados++;
         } else {
-          await prisma.fichaje.update({
+          await prisma.fichajes.update({
             where: { id: fichaje.id },
             data: {
               estado: PrismaEstadoFichaje.pendiente,
@@ -1168,7 +1168,7 @@ export async function obtenerAusenciaMedioDia(
 ): Promise<AusenciaMedioDia> {
   const fechaSinHora = new Date(fecha.getFullYear(), fecha.getMonth(), fecha.getDate());
   
-  const ausencia = await prisma.ausencia.findFirst({
+  const ausencia = await prisma.ausencias.findFirst({
     where: {
       empleadoId,
       medioDia: true,
@@ -1219,7 +1219,7 @@ export interface ValidacionFichajeCompleto {
 export async function validarFichajeCompleto(
   fichajeId: string
 ): Promise<ValidacionFichajeCompleto> {
-  const fichaje = await prisma.fichaje.findUnique({
+  const fichaje = await prisma.fichajes.findUnique({
     where: { id: fichajeId },
     include: {
       empleado: {

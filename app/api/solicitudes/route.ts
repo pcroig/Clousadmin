@@ -43,7 +43,7 @@ export async function GET(request: NextRequest) {
 
     // Si es empleado, solo ver sus propias solicitudes
     // Si es HR Admin o Manager, ver todas las solicitudes
-    const where: Prisma.SolicitudCambioWhereInput = {
+    const where: Prisma.solicitudes_cambioWhereInput = {
       empresaId: session.user.empresaId,
       ...(estado ? { estado } : {}),
     };
@@ -52,7 +52,7 @@ export async function GET(request: NextRequest) {
       where.empleadoId = session.user.empleadoId;
     }
 
-    const solicitudes = await prisma.solicitudCambio.findMany({
+    const solicitudes = await prisma.solicitudes_cambio.findMany({
       where,
       include: {
         empleado: {
@@ -101,7 +101,7 @@ export async function POST(request: NextRequest) {
     if (isNextResponse(validationResult)) return validationResult;
     const { data: validatedData } = validationResult;
 
-    const solicitud = await prisma.solicitudCambio.create({
+    const solicitud = await prisma.solicitudes_cambio.create({
       data: {
         empresaId: session.user.empresaId,
         empleadoId: session.user.empleadoId,

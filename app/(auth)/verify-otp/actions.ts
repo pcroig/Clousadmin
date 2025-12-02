@@ -61,7 +61,7 @@ export async function verifyOtpAction(
       return { success: false, error: 'La sesión de verificación expiró. Inicia sesión de nuevo.' };
     }
 
-    const usuario = await prisma.usuario.findUnique({
+    const usuario = await prisma.usuarios.findUnique({
       where: { id: challenge.usuarioId },
       include: {
         empleado: {
@@ -85,7 +85,7 @@ export async function verifyOtpAction(
       if (valid) {
         verified = true;
         backupCodes = remaining;
-        await prisma.usuario.update({
+        await prisma.usuarios.update({
           where: { id: usuario.id },
           data: { backupCodes },
         });
@@ -99,7 +99,7 @@ export async function verifyOtpAction(
     await consumeTwoFactorChallenge(pendingToken);
     cookieStore.delete(TWO_FACTOR_COOKIE);
 
-    await prisma.usuario.update({
+    await prisma.usuarios.update({
       where: { id: usuario.id },
       data: { ultimoAcceso: new Date() },
     });

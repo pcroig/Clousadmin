@@ -29,7 +29,7 @@ export async function GET(request: NextRequest, context: RouteParams) {
     const { id } = params;
 
     // Verificar que el puesto pertenece a la empresa
-    const puesto = await prisma.puesto.findFirst({
+    const puesto = await prisma.puestos.findFirst({
       where: {
         id,
         empresaId: session.user.empresaId,
@@ -44,7 +44,7 @@ export async function GET(request: NextRequest, context: RouteParams) {
     }
 
     // Obtener documentos
-    const documentos = await prisma.documento.findMany({
+    const documentos = await prisma.documentos.findMany({
       where: {
         puestoId: id,
         empresaId: session.user.empresaId,
@@ -90,7 +90,7 @@ export async function POST(request: NextRequest, context: RouteParams) {
     const { id: puestoId } = params;
 
     // Verificar que el puesto pertenece a la empresa
-    const puesto = await prisma.puesto.findFirst({
+    const puesto = await prisma.puestos.findFirst({
       where: {
         id: puestoId,
         empresaId: session.user.empresaId,
@@ -148,7 +148,7 @@ export async function POST(request: NextRequest, context: RouteParams) {
     const _s3Url = await uploadToS3(buffer, s3Key, file.type);
 
     // Guardar metadata en la base de datos
-    const documento = await prisma.documento.create({
+    const documento = await prisma.documentos.create({
       data: {
         empresaId: session.user.empresaId,
         puestoId,
@@ -192,7 +192,7 @@ export async function DELETE(request: NextRequest, context: RouteParams) {
     }
 
     // Verificar que el documento existe y pertenece al puesto y empresa
-    const documento = await prisma.documento.findFirst({
+    const documento = await prisma.documentos.findFirst({
       where: {
         id: documentoId,
         puestoId,
@@ -208,7 +208,7 @@ export async function DELETE(request: NextRequest, context: RouteParams) {
     }
 
     // Eliminar de la base de datos (el archivo en Blob permanece)
-    await prisma.documento.delete({
+    await prisma.documentos.delete({
       where: { id: documentoId },
     });
 

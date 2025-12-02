@@ -3,9 +3,8 @@
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
-
-import { FirmasTab } from '@/components/firma/firmas-tab';
 import { type CarpetaCardData, CarpetasGrid } from '@/components/shared/carpetas-grid';
+import { FirmasCardCompact } from '@/components/firma/firmas-card-compact';
 
 import type { MiEspacioCarpeta, MiEspacioEmpleado } from '@/types/empleado';
 
@@ -13,7 +12,7 @@ interface DocumentosTabProps {
   empleado: MiEspacioEmpleado;
 }
 
-type DocumentosTabKey = 'personales' | 'compartidos' | 'firmas';
+type DocumentosTabKey = 'personales' | 'compartidos';
 
 export function DocumentosTab({ empleado }: DocumentosTabProps) {
   const router = useRouter();
@@ -22,7 +21,7 @@ export function DocumentosTab({ empleado }: DocumentosTabProps) {
 
   const initialTab = useMemo<DocumentosTabKey>(() => {
     const tabParam = searchParams.get('tab');
-    if (tabParam === 'compartidos' || tabParam === 'firmas') {
+    if (tabParam === 'compartidos') {
       return tabParam;
     }
     return 'personales';
@@ -89,18 +88,13 @@ export function DocumentosTab({ empleado }: DocumentosTabProps) {
   }, [activeDocTab]);
 
   return (
-    <div className="space-y-8">
-      <div className="flex flex-col gap-2">
-        <div>
-          <p className="text-sm uppercase tracking-wide text-gray-500">Documentos</p>
-          <h2 className="text-2xl font-semibold text-gray-900">Mis carpetas</h2>
-        </div>
-        <p className="text-sm text-gray-500">
-          Accede a tus documentos personales, compartidos y solicitudes de firma
-        </p>
+    <div className="space-y-4 sm:space-y-6">
+      {/* Firmas Card - compacto en mobile */}
+      <div className="sm:mt-2">
+        <FirmasCardCompact />
       </div>
 
-      {/* Toggle Personales/Compartidos/Firmas */}
+      {/* Toggle Personales/Compartidos */}
       <div className="inline-flex flex-wrap items-center gap-2 rounded-2xl border border-gray-200/80 bg-white/60 p-1 shadow-sm">
         <button
           onClick={() => handleChangeTab('personales')}
@@ -122,35 +116,21 @@ export function DocumentosTab({ empleado }: DocumentosTabProps) {
         >
           Compartidos
         </button>
-        <button
-          onClick={() => handleChangeTab('firmas')}
-          className={`rounded-xl px-4 py-2 text-sm font-medium transition ${
-            activeDocTab === 'firmas'
-              ? 'bg-gray-900 text-white shadow-sm'
-              : 'text-gray-600 hover:text-gray-900'
-          }`}
-        >
-          Firmas
-        </button>
       </div>
 
-      {activeDocTab === 'firmas' ? (
-        <FirmasTab />
-      ) : (
-        <div className="space-y-4">
-          <p className="text-sm font-medium text-gray-600">
-            {activeDocTab === 'personales'
-              ? `${carpetasPersonales.length} ${carpetasPersonales.length === 1 ? 'carpeta personal' : 'carpetas personales'}`
-              : `${carpetasCompartidas.length} ${carpetasCompartidas.length === 1 ? 'carpeta compartida' : 'carpetas compartidas'}`}
-          </p>
-          <CarpetasGrid
-            carpetas={carpetasVisibles}
-            onCarpetaClick={handleCarpetaClick}
-            emptyStateTitle={emptyStateConfig.title}
-            emptyStateDescription={emptyStateConfig.description}
-          />
-        </div>
-      )}
+      <div className="space-y-4">
+        <p className="text-sm font-medium text-gray-600">
+          {activeDocTab === 'personales'
+            ? `${carpetasPersonales.length} ${carpetasPersonales.length === 1 ? 'carpeta personal' : 'carpetas personales'}`
+            : `${carpetasCompartidas.length} ${carpetasCompartidas.length === 1 ? 'carpeta compartida' : 'carpetas compartidas'}`}
+        </p>
+        <CarpetasGrid
+          carpetas={carpetasVisibles}
+          onCarpetaClick={handleCarpetaClick}
+          emptyStateTitle={emptyStateConfig.title}
+          emptyStateDescription={emptyStateConfig.description}
+        />
+      </div>
     </div>
   );
 }

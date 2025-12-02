@@ -178,7 +178,7 @@ Responde SOLO en JSON:
     const confianzaDecimal = new Prisma.Decimal(fullMapping.confianza ?? 0);
 
     // Guardar en BD para persistencia
-    await prisma.variableMapping.create({
+    await prisma.variable_mappings.create({
       data: {
         variableName,
         jsonPath: fullMapping.jsonPath,
@@ -376,7 +376,7 @@ export async function getVariableMapping(
 
   // Nivel 4: Base de datos (<50ms)
   try {
-    const dbMapping = await prisma.variableMapping.findUnique({
+    const dbMapping = await prisma.variable_mappings.findUnique({
       where: { variableName },
     });
 
@@ -400,7 +400,7 @@ export async function getVariableMapping(
       };
 
       // Actualizar contador de uso
-      await prisma.variableMapping.update({
+      await prisma.variable_mappings.update({
         where: { variableName },
         data: {
           vecesUsado: { increment: 1 },

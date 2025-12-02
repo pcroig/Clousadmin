@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
     const { session } = authResult;
 
     // Marcar todas las notificaciones del usuario como leídas
-    const resultado = await prisma.notificacion.updateMany({
+    const resultado = await prisma.notificaciones.updateMany({
       where: {
         usuarioId: session.user.id,
         leida: false,

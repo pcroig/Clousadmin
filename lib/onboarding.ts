@@ -113,13 +113,13 @@ export async function crearOnboarding(
     // Usar transacción para evitar condiciones de carrera
     const onboarding = await prisma.$transaction(async (tx) => {
       // Verificar si ya existe un onboarding activo
-      const onboardingExistente = await tx.onboardingEmpleado.findUnique({
+      const onboardingExistente = await tx.onboarding_empleados.findUnique({
         where: { empleadoId },
       });
 
       if (onboardingExistente && !onboardingExistente.completado) {
         // Si existe y no está completado, eliminar para crear uno nuevo
-        await tx.onboardingEmpleado.delete({
+        await tx.onboarding_empleados.delete({
           where: { id: onboardingExistente.id },
         });
       }
@@ -139,7 +139,7 @@ export async function crearOnboarding(
             pwa_explicacion: false,
           };
 
-      return await tx.onboardingEmpleado.create({
+      return await tx.onboarding_empleados.create({
         data: {
           empresaId,
           empleadoId,
@@ -175,7 +175,7 @@ export async function crearOnboarding(
  */
 export async function verificarTokenOnboarding(token: string) {
   try {
-    const onboarding = await prisma.onboardingEmpleado.findUnique({
+    const onboarding = await prisma.onboarding_empleados.findUnique({
       where: { token },
       include: {
         empleado: {
@@ -252,7 +252,7 @@ export async function guardarCredenciales(
     }
 
     // Actualizar usuario con contraseña (avatar se almacena solo en empleado.fotoUrl)
-    await prisma.usuario.update({
+    await prisma.usuarios.update({
       where: { id: onboarding.empleado.usuarioId },
       data: {
         password: hashedPassword,
@@ -263,7 +263,7 @@ export async function guardarCredenciales(
 
     // Guardar avatar en empleado.fotoUrl como fuente única de verdad
     if (avatarUrl) {
-      await prisma.empleado.update({
+      await prisma.empleados.update({
         where: { id: onboarding.empleadoId },
         data: {
           fotoUrl: avatarUrl,
@@ -278,7 +278,7 @@ export async function guardarCredenciales(
       credenciales_completadas: true,
     };
 
-    await prisma.onboardingEmpleado.update({
+    await prisma.onboarding_empleados.update({
       where: { id: onboarding.id },
       data: {
         progreso: asJsonValue(progresoNuevo),
@@ -330,7 +330,7 @@ export async function guardarDatosPersonales(
     };
 
     // Guardar en la base de datos
-    await prisma.onboardingEmpleado.update({
+    await prisma.onboarding_empleados.update({
       where: { id: onboarding.id },
       data: {
         datosTemporales: asJsonValue(datosTemporalesNuevos),
@@ -383,7 +383,7 @@ export async function guardarDatosBancarios(
     };
 
     // Guardar en la base de datos
-    await prisma.onboardingEmpleado.update({
+    await prisma.onboarding_empleados.update({
       where: { id: onboarding.id },
       data: {
         datosTemporales: asJsonValue(datosTemporalesNuevos),
@@ -426,7 +426,7 @@ export async function guardarProgresoDocumentos(token: string) {
     };
 
     // Guardar en la base de datos
-    await prisma.onboardingEmpleado.update({
+    await prisma.onboarding_empleados.update({
       where: { id: onboarding.id },
       data: {
         progreso: asJsonValue(progresoNuevo),
@@ -484,7 +484,7 @@ export function calcularEstadoActivoSegunFechas(
  */
 export async function actualizarEstadoActivoPorFechas(empleadoId: string): Promise<boolean> {
   try {
-    const empleado = await prisma.empleado.findUnique({
+    const empleado = await prisma.empleados.findUnique({
       where: { id: empleadoId },
       select: {
         fechaAlta: true,
@@ -506,12 +506,12 @@ export async function actualizarEstadoActivoPorFechas(empleadoId: string): Promi
 
     // Solo actualizar si el estado cambió
     if (empleado.activo !== debeEstarActivo) {
-      await prisma.empleado.update({
+      await prisma.empleados.update({
         where: { id: empleadoId },
         data: { activo: debeEstarActivo },
       });
 
-      await prisma.usuario.update({
+      await prisma.usuarios.update({
         where: { id: empleado.usuarioId },
         data: { activo: debeEstarActivo },
       });
@@ -626,7 +626,7 @@ export async function finalizarOnboarding(token: string) {
       };
 
       // Obtener empleado para verificar fechas de contrato
-      const empleado = await prisma.empleado.findUnique({
+      const empleado = await prisma.empleados.findUnique({
         where: { id: onboarding.empleadoId },
         select: {
           fechaAlta: true,
@@ -652,7 +652,7 @@ export async function finalizarOnboarding(token: string) {
       const datosEmpleadoEncriptados = encryptEmpleadoData(datosEmpleado);
 
       // Traspasar datos encriptados a Empleado y actualizar estado activo
-      await prisma.empleado.update({
+      await prisma.empleados.update({
         where: { id: onboarding.empleadoId },
         data: {
           ...datosEmpleadoEncriptados,
@@ -661,7 +661,7 @@ export async function finalizarOnboarding(token: string) {
       });
 
       // Actualizar también el estado activo del usuario
-      await prisma.usuario.update({
+      await prisma.usuarios.update({
         where: { id: empleado.usuarioId },
         data: {
           empleadoId: onboarding.empleadoId,
@@ -682,7 +682,7 @@ export async function finalizarOnboarding(token: string) {
 
       // Para onboarding simplificado, solo marcar como completado
       // Los datos ya están en el empleado, solo falta activar
-      const empleado = await prisma.empleado.findUnique({
+      const empleado = await prisma.empleados.findUnique({
         where: { id: onboarding.empleadoId },
         select: {
           fechaAlta: true,
@@ -705,7 +705,7 @@ export async function finalizarOnboarding(token: string) {
       );
 
       // Actualizar empleado con onboarding completado
-      await prisma.empleado.update({
+      await prisma.empleados.update({
         where: { id: onboarding.empleadoId },
         data: {
           onboardingCompletado: true,
@@ -715,7 +715,7 @@ export async function finalizarOnboarding(token: string) {
       });
 
       // Actualizar también el estado activo del usuario
-      await prisma.usuario.update({
+      await prisma.usuarios.update({
         where: { id: empleado.usuarioId },
         data: {
           empleadoId: onboarding.empleadoId,
@@ -725,7 +725,7 @@ export async function finalizarOnboarding(token: string) {
     }
 
     // Marcar onboarding como completado
-    await prisma.onboardingEmpleado.update({
+    await prisma.onboarding_empleados.update({
       where: { id: onboarding.id },
       data: {
         completado: true,
@@ -734,7 +734,7 @@ export async function finalizarOnboarding(token: string) {
     });
 
     // Obtener datos del empleado para la notificación
-    const empleadoData = await prisma.empleado.findUnique({
+    const empleadoData = await prisma.empleados.findUnique({
       where: { id: onboarding.empleadoId },
       select: {
         nombre: true,
@@ -777,7 +777,7 @@ export async function crearNotificacionOnboarding(
 ) {
   try {
     // Obtener empleado
-    const empleado = await prisma.empleado.findUnique({
+    const empleado = await prisma.empleados.findUnique({
       where: { id: empleadoId },
       select: {
         nombre: true,
@@ -805,7 +805,7 @@ export async function crearNotificacionOnboarding(
  */
 export async function obtenerOnboardingPorEmpleado(empleadoId: string) {
   try {
-    const onboarding = await prisma.onboardingEmpleado.findUnique({
+    const onboarding = await prisma.onboarding_empleados.findUnique({
       where: { empleadoId },
       include: {
         empleado: true,
@@ -836,7 +836,7 @@ export async function guardarProgresoIntegraciones(token: string) {
     const { onboarding } = verificacion;
     const progreso = onboarding.progreso as unknown as ProgresoOnboardingSimplificado;
 
-    await prisma.onboardingEmpleado.update({
+    await prisma.onboarding_empleados.update({
       where: { id: onboarding.id },
       data: {
         progreso: asJsonValue({
@@ -872,7 +872,7 @@ export async function guardarProgresoPWA(token: string) {
     const { onboarding } = verificacion;
     const progreso = onboarding.progreso as unknown as ProgresoOnboarding;
 
-    await prisma.onboardingEmpleado.update({
+    await prisma.onboarding_empleados.update({
       where: { id: onboarding.id },
       data: {
         progreso: asJsonValue({

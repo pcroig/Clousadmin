@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const { page, limit, skip } = parsePaginationParams(searchParams);
 
-    const where: Prisma.EmpleadoWhereInput = {
+    const where: Prisma.empleadosWhereInput = {
       empresaId: session.user.empresaId,
     };
 
@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
     }
 
     const [empleados, total] = await Promise.all([
-      prisma.empleado.findMany({
+      prisma.empleados.findMany({
         where,
         select: empleadoSelectListado,
         orderBy: {
@@ -58,7 +58,7 @@ export async function GET(request: NextRequest) {
         skip,
         take: limit,
       }),
-      prisma.empleado.count({ where }),
+      prisma.empleados.count({ where }),
     ]);
 
     const empleadosDesencriptados = decryptEmpleadoList(empleados);
@@ -133,7 +133,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Verificar que el email no exista
-    const existingUsuario = await prisma.usuario.findUnique({
+    const existingUsuario = await prisma.usuarios.findUnique({
       where: { email },
       include: {
         empleado: {
@@ -173,7 +173,7 @@ export async function POST(request: NextRequest) {
     // Crear usuario y empleado en transacción
     const result = await prisma.$transaction(async (tx) => {
       // Crear usuario
-      const usuario = await tx.usuario.create({
+      const usuario = await tx.usuarios.create({
         data: {
           email,
           password: await hash(Math.random().toString(36).slice(-8), 10), // Password temporal
@@ -240,20 +240,20 @@ export async function POST(request: NextRequest) {
       };
 
       // Crear empleado con datos encriptados
-      const empleado = await tx.empleado.create({
+      const empleado = await tx.empleados.create({
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         data: empleadoCreateData as any,
       });
 
       // Garantizar vínculo bidireccional usuario <-> empleado
-      await tx.usuario.update({
+      await tx.usuarios.update({
         where: { id: usuario.id },
         data: { empleadoId: empleado.id },
       });
 
       // Asignar equipos si se proporcionaron
       if (equipoIdsInput.length > 0) {
-        await tx.empleadoEquipo.createMany({
+        await tx.empleado_equipos.createMany({
           data: equipoIdsInput.map((equipoId) => ({
             empleadoId: empleado.id,
             equipoId,
@@ -262,7 +262,7 @@ export async function POST(request: NextRequest) {
       }
 
       // Crear carpetas del sistema automáticamente usando constante
-      await tx.carpeta.createMany({
+      await tx.carpetas.createMany({
         data: CARPETAS_SISTEMA.map((nombreCarpeta) => ({
           empresaId: session.user.empresaId,
           empleadoId: empleado.id,

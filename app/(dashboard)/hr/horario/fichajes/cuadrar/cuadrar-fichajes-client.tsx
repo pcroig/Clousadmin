@@ -1,20 +1,22 @@
 'use client';
 
-import Link from 'next/link';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { CheckCircle2, CircleSlash2, Clock, Edit2, TriangleAlert } from 'lucide-react';
+import { CheckCircle2, Clock, Edit2 } from 'lucide-react';
+import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 import { SolicitarAusenciaModal } from '@/components/empleado/solicitar-ausencia-modal';
+import { FichajeModal } from '@/components/shared/fichajes/fichaje-modal';
 import { DataFilters, type FilterOption } from '@/components/shared/filters/data-filters';
 import { DateRangeControls } from '@/components/shared/filters/date-range-controls';
-import { FichajeModal } from '@/components/shared/fichajes/fichaje-modal';
 import { LoadingButton } from '@/components/shared/loading-button';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   Table,
   TableBody,
@@ -24,13 +26,10 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { useIsMobile } from '@/lib/hooks/use-viewport';
+import { calcularRangoFechas } from '@/lib/utils/fechas';
 import { parseJson } from '@/lib/utils/json';
-import { calcularRangoFechas, toMadridDate } from '@/lib/utils/fechas';
 
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { ScrollArea } from '@/components/ui/scroll-area';
-
-interface EventoPropuesto {
+interface EventoRevision {
   tipo: string;
   hora: string;
   origen: 'registrado' | 'propuesto';
@@ -44,16 +43,18 @@ interface FichajeRevision {
   equipoId?: string | null;
   equipoNombre?: string | null;
   fecha: string;
-  eventos: EventoPropuesto[];
-  eventosRegistrados: EventoPropuesto[];
+  eventosRegistrados: EventoRevision[];
+  eventosPropuestos: EventoRevision[]; // NUEVO: Eventos propuestos separados
   razon: string;
   eventosFaltantes: string[];
   tieneEventosRegistrados?: boolean;
+  ausenciaMedioDia?: 'manana' | 'tarde' | null; // NUEVO: Info de ausencia media jornada
 }
 
 interface EditarFichajeModalState {
   open: boolean;
   fichajeDiaId: string | null;
+  fichaje: FichajeRevision | null; // NUEVO: Guardar el fichaje completo para pasar datos al modal
 }
 
 const EVENT_LABELS: Record<string, string> = {
@@ -93,6 +94,7 @@ export function CuadrarFichajesClient() {
   const [editarFichajeModal, setEditarFichajeModal] = useState<EditarFichajeModalState>({
     open: false,
     fichajeDiaId: null,
+    fichaje: null,
   });
   const [ausenciaModal, setAusenciaModal] = useState<{ open: boolean; empleadoId?: string; fecha?: Date }>({
     open: false,
@@ -197,7 +199,7 @@ export function CuadrarFichajesClient() {
     } finally {
       setLoading(false);
     }
-  }, [busquedaEmpleado, calcularRangoFechas, fechaBase, filtroEquipo, rangoFechas]);
+  }, [busquedaEmpleado, fechaBase, filtroEquipo, rangoFechas]);
 
   useEffect(() => {
     fetchFichajesRevision();
@@ -243,7 +245,7 @@ export function CuadrarFichajesClient() {
       });
 
       if (!response.ok) {
-        const error = await response.json();
+        const error = await response.json() as Record<string, unknown>;
         throw new Error(typeof error.error === 'string' ? error.error : 'Error al actualizar fichajes');
       }
 
@@ -290,7 +292,7 @@ export function CuadrarFichajesClient() {
       });
 
       if (!response.ok) {
-        const error = await response.json();
+        const error = await response.json() as Record<string, unknown>;
         throw new Error(typeof error.error === 'string' ? error.error : 'No se pudieron descartar los días');
       }
 
@@ -446,31 +448,55 @@ export function CuadrarFichajesClient() {
                         </TableCell>
                         <TableCell className="text-sm text-gray-900 font-medium">
                           {format(fecha, 'dd MMM', { locale: es })}
-                          <p className="text-xs text-gray-500 mt-1">{fichaje.razon}</p>
+                          {fichaje.razon && (
+                            <p className="text-xs text-gray-500 mt-1">{fichaje.razon}</p>
+                          )}
                         </TableCell>
                         <TableCell>
-                          {fichaje.eventosRegistrados.length === 0 ? (
-                            <span className="text-xs text-gray-400 italic">Sin eventos registrados</span>
-                          ) : (
-                            <div className="space-y-1">
-                              {fichaje.eventosRegistrados.map((evento, idx) => (
-                                <div key={`${fichaje.id}-${idx}`} className="flex items-center gap-2 text-xs">
-                                  <Clock className="w-3 h-3 text-gray-400" />
-                                  <span className="font-medium">{EVENT_LABELS[evento.tipo] || evento.tipo}</span>
-                                  <span className="text-gray-500">
-                                    {format(toDate(evento.hora), 'HH:mm', { locale: es })}
-                                  </span>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                          {fichaje.eventosFaltantes && fichaje.eventosFaltantes.length > 0 && (
-                            <div className="mt-2 flex flex-wrap gap-1">
-                              {fichaje.eventosFaltantes.map((faltante) => (
-                                <Badge key={faltante} variant="outline" className="text-[11px]">
-                                  Falta {EVENT_LABELS[faltante] || faltante}
+                          <div className="space-y-1">
+                            {/* PUNTO 6: Mostrar eventos registrados (blanco) */}
+                            {fichaje.eventosRegistrados.map((evento, idx) => (
+                              <div 
+                                key={`reg-${fichaje.id}-${idx}`} 
+                                className="flex items-center gap-2 text-xs bg-white border border-gray-200 rounded px-2 py-1"
+                              >
+                                <Clock className="w-3 h-3 text-gray-500" />
+                                <span className="font-medium text-gray-900">{EVENT_LABELS[evento.tipo] || evento.tipo}</span>
+                                <span className="text-gray-600">
+                                  {format(toDate(evento.hora), 'HH:mm', { locale: es })}
+                                </span>
+                              </div>
+                            ))}
+                            
+                            {/* PUNTO 6: Mostrar eventos propuestos (color terciario) */}
+                            {fichaje.eventosPropuestos?.map((evento, idx) => (
+                              <div 
+                                key={`prop-${fichaje.id}-${idx}`} 
+                                className="flex items-center gap-2 text-xs bg-tertiary-50 border border-tertiary-200 rounded px-2 py-1"
+                              >
+                                <Clock className="w-3 h-3 text-tertiary-500" />
+                                <span className="font-medium text-tertiary-700">{EVENT_LABELS[evento.tipo] || evento.tipo}</span>
+                                <span className="text-tertiary-600">
+                                  {format(toDate(evento.hora), 'HH:mm', { locale: es })}
+                                </span>
+                                <Badge variant="outline" className="text-[9px] py-0 px-1 border-tertiary-300 text-tertiary-600">
+                                  Propuesto
                                 </Badge>
-                              ))}
+                              </div>
+                            ))}
+                            
+                            {/* Si no hay eventos de ningún tipo */}
+                            {fichaje.eventosRegistrados.length === 0 && (!fichaje.eventosPropuestos || fichaje.eventosPropuestos.length === 0) && (
+                              <span className="text-xs text-gray-400 italic">Sin eventos</span>
+                            )}
+                          </div>
+                          
+                          {/* Info de ausencia de media jornada si aplica */}
+                          {fichaje.ausenciaMedioDia && (
+                            <div className="mt-1">
+                              <Badge variant="outline" className="text-[10px] bg-amber-50 border-amber-200 text-amber-700">
+                                Ausencia {fichaje.ausenciaMedioDia === 'manana' ? 'mañana' : 'tarde'}
+                              </Badge>
                             </div>
                           )}
                         </TableCell>
@@ -482,6 +508,7 @@ export function CuadrarFichajesClient() {
                               setEditarFichajeModal({
                                 open: true,
                                 fichajeDiaId: fichaje.fichajeId,
+                                fichaje: fichaje, // PUNTO 6: Pasar fichaje completo para eventos propuestos
                               })
                             }
                           >
@@ -515,13 +542,17 @@ export function CuadrarFichajesClient() {
       <FichajeModal
         open={editarFichajeModal.open}
         fichajeDiaId={editarFichajeModal.fichajeDiaId ?? undefined}
-        onClose={() => setEditarFichajeModal({ open: false, fichajeDiaId: null })}
+        onClose={() => setEditarFichajeModal({ open: false, fichajeDiaId: null, fichaje: null })}
         onSuccess={() => {
-          setEditarFichajeModal({ open: false, fichajeDiaId: null });
+          setEditarFichajeModal({ open: false, fichajeDiaId: null, fichaje: null });
           fetchFichajesRevision();
         }}
         contexto="hr_admin"
         modo="editar"
+        // PUNTO 6: Pasar eventos propuestos al modal
+        eventosPropuestos={editarFichajeModal.fichaje?.eventosPropuestos}
+        fechaFichaje={editarFichajeModal.fichaje?.fecha}
+        empleadoNombreProp={editarFichajeModal.fichaje?.empleadoNombre}
       />
 
       <SolicitarAusenciaModal

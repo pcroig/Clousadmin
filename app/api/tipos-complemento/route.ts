@@ -37,7 +37,7 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const incluirInactivos = searchParams.get('incluirInactivos') === 'true';
 
-    const tipos = await prisma.tipoComplemento.findMany({
+    const tipos = await prisma.tipos_complemento.findMany({
       where: {
         empresaId: session.user.empresaId,
         ...(incluirInactivos ? {} : { activo: true }),
@@ -47,7 +47,7 @@ export async function GET(req: NextRequest) {
       },
       include: {
         _count: {
-          select: { empleadoComplementos: true },
+          select: { empleado_complementos: true },
         },
       },
     });
@@ -89,7 +89,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const tipoComplemento = await prisma.tipoComplemento.create({
+    const tipoComplemento = await prisma.tipos_complemento.create({
       data: {
         empresaId: session.user.empresaId,
         nombre: data.nombre,

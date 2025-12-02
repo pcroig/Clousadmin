@@ -19,9 +19,7 @@ import { prisma } from '@/lib/prisma';
 import { asJsonValue } from '@/lib/prisma/json';
 
 const saldoSchema = z.object({
-  nivel: z.enum(['empresa', 'equipo']),
   diasTotales: z.number().int().min(0).max(365),
-  equipoIds: z.array(z.string().uuid()).optional(),
 });
 
 // GET /api/ausencias/saldo - Obtener saldo de ausencias de un empleado
@@ -45,7 +43,7 @@ export async function GET(req: NextRequest) {
     }
 
     // Verificar que el empleado pertenece a la misma empresa
-    const empleado = await prisma.empleado.findFirst({
+    const empleado = await prisma.empleados.findFirst({
       where: {
         id: empleadoId,
         empresaId: session.user.empresaId,
@@ -85,26 +83,12 @@ export async function POST(req: NextRequest) {
     const { data: validatedData } = validationResult;
 
     const añoActual = new Date().getFullYear();
-    let empleadosIds: string[] = [];
+    const empleados = await prisma.empleados.findMany({
+      where: { empresaId: session.user.empresaId },
+      select: { id: true },
+    });
 
-    if (validatedData.nivel === 'empresa') {
-      // Todos los empleados de la empresa
-      const empleados = await prisma.empleado.findMany({
-        where: { empresaId: session.user.empresaId },
-        select: { id: true },
-      });
-      empleadosIds = empleados.map((e: { id: string }) => e.id);
-    } else if (validatedData.nivel === 'equipo' && validatedData.equipoIds && validatedData.equipoIds.length > 0) {
-      // Empleados de los equipos seleccionados
-      const empleadoEquipos = await prisma.empleadoEquipo.findMany({
-        where: {
-          equipoId: { in: validatedData.equipoIds },
-        },
-        select: { empleadoId: true },
-        distinct: ['empleadoId'],
-      });
-      empleadosIds = empleadoEquipos.map((ee: { empleadoId: string }) => ee.empleadoId);
-    }
+    const empleadosIds = empleados.map((empleado) => empleado.id);
 
     if (empleadosIds.length === 0) {
       return badRequestResponse('No se encontraron empleados para asignar el saldo');
@@ -116,7 +100,7 @@ export async function POST(req: NextRequest) {
         empleadosIds.map((empleadoId) =>
           tx.empleadoSaldoAusencias.upsert({
             where: {
-              empleadoId_año: { empleadoId, año: añoActual },
+          empleadoId_anio: { empleadoId, anio: añoActual },
             },
             update: {
               diasTotales: validatedData.diasTotales,
@@ -124,7 +108,7 @@ export async function POST(req: NextRequest) {
             create: {
               empleadoId,
               empresaId: session.user.empresaId,
-              año: añoActual,
+            anio: añoActual,
               diasTotales: validatedData.diasTotales,
               diasUsados: 0,
               diasPendientes: 0,
@@ -134,7 +118,7 @@ export async function POST(req: NextRequest) {
         )
       );
 
-      await tx.empleado.updateMany({
+      await tx.empleados.updateMany({
         where: {
           id: {
             in: empleadosIds,
@@ -145,7 +129,7 @@ export async function POST(req: NextRequest) {
         },
       });
 
-      const empresa = await tx.empresa.findUnique({
+      const empresa = await tx.empresas.findUnique({
         where: { id: session.user.empresaId },
         select: { config: true },
       });
@@ -155,7 +139,7 @@ export async function POST(req: NextRequest) {
           ? (empresa.config as Record<string, unknown>)
           : {}) || {};
 
-      await tx.empresa.update({
+      await tx.empresas.update({
         where: { id: session.user.empresaId },
         data: {
           config: asJsonValue({
@@ -169,7 +153,7 @@ export async function POST(req: NextRequest) {
     return successResponse({
       success: true,
       empleadosActualizados: empleadosIds.length,
-      año: añoActual,
+      anio: añoActual,
     });
   } catch (error) {
     return handleApiError(error, 'API POST /api/ausencias/saldo');

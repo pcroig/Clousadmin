@@ -8,13 +8,12 @@ import { Plus } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 import { CompactFilterBar } from '@/components/adaptive/CompactFilterBar';
-import { MobileActionBar } from '@/components/adaptive/MobileActionBar';
-import { ResponsiveContainer } from '@/components/adaptive/ResponsiveContainer';
+import { PageMobileHeader } from '@/components/layout/page-mobile-header';
 import { EquipoDetails } from '@/components/organizacion/equipo-details';
 import { EquipoFormModal } from '@/components/organizacion/equipo-form-modal';
 import { Column, DataTable } from '@/components/shared/data-table';
-import { ExpandableSearch } from '@/components/shared/expandable-search';
 import { DetailsPanel } from '@/components/shared/details-panel';
+import { ExpandableSearch } from '@/components/shared/expandable-search';
 import { TableHeader } from '@/components/shared/table-header';
 import { useIsMobile } from '@/lib/hooks/use-viewport';
 
@@ -184,17 +183,19 @@ export function EquiposClient({ equipos: initialEquipos }: EquiposClientProps) {
 
   return (
     <>
-      <ResponsiveContainer variant="page" className="flex flex-col">
+      <div className="h-full w-full flex flex-col px-1 py-1 sm:max-w-[1800px] sm:mx-auto sm:px-8 sm:py-6">
         {isMobile ? (
           <>
-            <MobileActionBar
+            <PageMobileHeader
               title="Equipos"
-              primaryAction={{
-                icon: Plus,
-                label: 'Crear equipo',
-                onClick: () => setShowCreateModal(true),
-              }}
-              className="mb-3"
+              actions={[
+                {
+                  icon: Plus,
+                  label: 'Crear equipo',
+                  onClick: () => setShowCreateModal(true),
+                  isPrimary: true,
+                },
+              ]}
             />
 
             {/* Búsqueda */}
@@ -203,6 +204,17 @@ export function EquiposClient({ equipos: initialEquipos }: EquiposClientProps) {
                 searchValue={searchTerm}
                 onSearchChange={setSearchTerm}
                 searchPlaceholder="Buscar equipo..."
+              />
+            </div>
+
+            {/* Table */}
+            <div className="flex-1 min-h-0 overflow-y-auto">
+              <DataTable
+                columns={columns}
+                data={equiposFiltrados}
+                onRowClick={(row) => setSelectedEquipo(row)}
+                getRowId={(row) => row.id}
+                emptyMessage="No hay equipos creados"
               />
             </div>
           </>
@@ -222,17 +234,19 @@ export function EquiposClient({ equipos: initialEquipos }: EquiposClientProps) {
                 />
               )}
             />
+
+            {/* Desktop table */}
+            <div className="flex-1 overflow-y-auto">
+              <DataTable
+                columns={columns}
+                data={equiposFiltrados}
+                onRowClick={(row) => setSelectedEquipo(row)}
+                getRowId={(row) => row.id}
+                emptyMessage="No hay equipos creados"
+              />
+            </div>
           </>
         )}
-
-        {/* Content */}
-        <DataTable
-          columns={columns}
-          data={equiposFiltrados}
-          onRowClick={(row) => setSelectedEquipo(row)}
-          getRowId={(row) => row.id}
-          emptyMessage="No hay equipos creados"
-        />
 
         {/* Details Panel */}
         <DetailsPanel
@@ -248,7 +262,7 @@ export function EquiposClient({ equipos: initialEquipos }: EquiposClientProps) {
             />
           )}
         </DetailsPanel>
-      </ResponsiveContainer>
+      </div>
 
       {/* Create Team Modal */}
       <EquipoFormModal

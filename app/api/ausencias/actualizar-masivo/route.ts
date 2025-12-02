@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
     // Obtener información del empleado si es manager
     let empleadoManager = null;
     if (session.user.rol === UsuarioRol.manager && session.user.empleadoId) {
-      empleadoManager = await prisma.empleado.findUnique({
+      empleadoManager = await prisma.empleados.findUnique({
         where: { id: session.user.empleadoId },
         include: { equipos: { include: { equipo: true } } }
       });
@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 3. Obtener todas las ausencias
-    const ausencias = await prisma.ausencia.findMany({
+    const ausencias = await prisma.ausencias.findMany({
       where: {
         id: { in: validatedData.ausenciasIds },
         empresaId: session.user.empresaId,
@@ -118,7 +118,7 @@ export async function POST(req: NextRequest) {
           });
 
           if (idsConfirmadas.length > 0) {
-            await tx.ausencia.updateMany({
+            await tx.ausencias.updateMany({
               where: { id: { in: idsConfirmadas } },
               data: {
                 estado: EstadoAusencia.confirmada,
@@ -130,7 +130,7 @@ export async function POST(req: NextRequest) {
           }
 
           if (idsCompletadas.length > 0) {
-            await tx.ausencia.updateMany({
+            await tx.ausencias.updateMany({
               where: { id: { in: idsCompletadas } },
               data: {
                 estado: EstadoAusencia.completada,
@@ -155,7 +155,7 @@ export async function POST(req: NextRequest) {
             }
           }
         } else {
-          await tx.ausencia.updateMany({
+          await tx.ausencias.updateMany({
             where: { id: { in: ausenciasProcesables.map((a) => a.id) } },
             data: {
               estado: EstadoAusencia.rechazada,

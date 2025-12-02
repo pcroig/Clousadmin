@@ -36,7 +36,7 @@ export async function GET(
 
     const { id } = await params;
 
-    const jornada = await prisma.jornada.findUnique({
+    const jornada = await prisma.jornadas.findUnique({
       where: {
         id,
         empresaId: session.user.empresaId,
@@ -82,7 +82,7 @@ export async function PATCH(
     const { data: validatedData } = validationResult;
 
     // Verificar que la jornada pertenece a la empresa
-    const jornadaExistente = await prisma.jornada.findUnique({
+    const jornadaExistente = await prisma.jornadas.findUnique({
       where: { id, empresaId: session.user.empresaId },
     });
 
@@ -95,7 +95,7 @@ export async function PATCH(
       return badRequestResponse('No se pueden editar jornadas predefinidas');
     }
 
-    const dataToUpdate: Prisma.JornadaUpdateInput = {
+    const dataToUpdate: Prisma.jornadasUpdateInput = {
       nombre: validatedData.nombre,
       horasSemanales: validatedData.horasSemanales,
     };
@@ -105,7 +105,7 @@ export async function PATCH(
     }
 
     // Actualizar jornada
-    const jornadaActualizada = await prisma.jornada.update({
+    const jornadaActualizada = await prisma.jornadas.update({
       where: { id },
       data: dataToUpdate,
     });
@@ -131,7 +131,7 @@ export async function DELETE(
     const { id } = await params;
 
     // Verificar que la jornada pertenece a la empresa
-    const jornada = await prisma.jornada.findUnique({
+    const jornada = await prisma.jornadas.findUnique({
       where: { id, empresaId: session.user.empresaId },
       include: {
         empleados: true,
@@ -155,7 +155,7 @@ export async function DELETE(
     }
 
     // Marcar como inactiva en lugar de eliminar
-    await prisma.jornada.update({
+    await prisma.jornadas.update({
       where: { id },
       data: { activa: false },
     });

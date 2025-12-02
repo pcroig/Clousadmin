@@ -35,7 +35,7 @@ export async function GET(
     const { id } = await params;
 
     // Verificar que el equipo existe y pertenece a la empresa
-    const equipo = await prisma.equipo.findFirst({
+    const equipo = await prisma.equipos.findFirst({
       where: {
         id,
         empresaId: session.user.empresaId,
@@ -47,7 +47,7 @@ export async function GET(
     }
 
     // Obtener política o devolver valores por defecto
-    const politica = await prisma.equipoPoliticaAusencias.findUnique({
+    const politica = await prisma.equipo_politica_ausencias.findUnique({
       where: { equipoId: id },
     });
 
@@ -84,7 +84,7 @@ export async function PUT(
     const { id } = await params;
 
     // Verificar que el equipo existe y pertenece a la empresa
-    const equipo = await prisma.equipo.findFirst({
+    const equipo = await prisma.equipos.findFirst({
       where: {
         id,
         empresaId: session.user.empresaId,
@@ -107,7 +107,7 @@ export async function PUT(
     const { data } = validationResult;
 
     // Crear o actualizar política
-    const politica = await prisma.equipoPoliticaAusencias.upsert({
+    const politica = await prisma.equipo_politica_ausencias.upsert({
       where: { equipoId: id },
       create: {
         equipoId: id,

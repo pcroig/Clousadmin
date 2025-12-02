@@ -29,7 +29,7 @@ export async function GET(
 
     const { id } = await params;
 
-    const plantilla = await prisma.plantillaDocumento.findUnique({
+    const plantilla = await prisma.plantillas_documentos.findUnique({
       where: { id },
       include: {
         _count: {
@@ -89,7 +89,7 @@ export async function PATCH(
     const body = await request.json() as Record<string, unknown>;
 
     // Verificar que la plantilla existe y pertenece a su empresa
-    const plantillaExistente = await prisma.plantillaDocumento.findUnique({
+    const plantillaExistente = await prisma.plantillas_documentos.findUnique({
       where: { id },
     });
 
@@ -142,7 +142,7 @@ export async function PATCH(
       });
     }
 
-    const plantillaActualizada = await prisma.plantillaDocumento.update({
+    const plantillaActualizada = await prisma.plantillas_documentos.update({
       where: { id },
       data: updateData,
     });
@@ -182,7 +182,7 @@ export async function DELETE(
     const { id } = await params;
 
     // Verificar que la plantilla existe
-    const plantilla = await prisma.plantillaDocumento.findUnique({
+    const plantilla = await prisma.plantillas_documentos.findUnique({
       where: { id },
     });
 
@@ -204,7 +204,7 @@ export async function DELETE(
     }
 
     // Eliminar plantilla (los documentos generados se mantienen por integridad)
-    await prisma.plantillaDocumento.delete({
+    await prisma.plantillas_documentos.delete({
       where: { id },
     });
 

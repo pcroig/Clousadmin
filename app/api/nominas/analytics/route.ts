@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
     const anio = parseInt(searchParams.get('anio') || new Date().getFullYear().toString());
 
     // Obtener todas las nóminas del año de la empresa
-    const nominas = await prisma.nomina.findMany({
+    const nominas = await prisma.nominas.findMany({
       where: {
         anio,
         empleado: {
@@ -54,9 +54,9 @@ export async function GET(req: NextRequest) {
         },
         complementosAsignados: {
           include: {
-            empleadoComplemento: {
+            empleado_complementos: {
               include: {
-                tipoComplemento: {
+                tipos_complemento: {
                   select: {
                     nombre: true,
                   },
@@ -130,7 +130,7 @@ export async function GET(req: NextRequest) {
     }));
 
     // Comparación con año anterior (opcional)
-    const nominasAnioAnterior = await prisma.nomina.findMany({
+    const nominasAnioAnterior = await prisma.nominas.findMany({
       where: {
         anio: anio - 1,
         empleado: {
@@ -228,7 +228,7 @@ export async function GET(req: NextRequest) {
 
     for (const nomina of nominas) {
       nomina.complementosAsignados.forEach((comp) => {
-        const nombre = comp.empleadoComplemento.tipoComplemento.nombre;
+        const nombre = comp.empleado_complementos.tipos_complemento.nombre;
         if (!complementosStats[nombre]) {
           complementosStats[nombre] = { count: 0, totalImporte: 0 };
         }

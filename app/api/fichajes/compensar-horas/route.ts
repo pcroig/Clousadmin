@@ -16,14 +16,28 @@ import {
   procesarCompensacionHorasExtra,
 } from '@/lib/services/compensacion-horas';
 
-const CompensarHorasSchema = z.object({
-  mes: z.number().int().min(1).max(12),
-  anio: z.number().int().min(2020).max(2100),
-  empleadoIds: z.array(z.string()).min(1),
-  tipoCompensacion: z.enum(['ausencia', 'nomina']),
-  usarTodasLasHoras: z.boolean().default(true),
-  horasPorEmpleado: z.record(z.string(), z.number()).optional(),
-});
+const CompensarHorasSchema = z
+  .object({
+    mes: z.union([z.number().int().min(1).max(12), z.literal('all')]),
+    anio: z.number().int().min(2020).max(2100),
+    empleadoIds: z.array(z.string()).min(1),
+    tipoCompensacion: z.enum(['ausencia', 'nomina', 'combinado']),
+    usarTodasLasHoras: z.boolean().default(true),
+    horasPorEmpleado: z.record(z.string(), z.number()).optional(),
+    porcentajeAusencia: z.number().min(0).max(100).optional(),
+    porcentajeNomina: z.number().min(0).max(100).optional(),
+    maxHorasPorEmpleado: z.number().positive().optional(),
+  })
+  .refine(
+    (values) =>
+      values.tipoCompensacion !== 'combinado' ||
+      (typeof values.porcentajeAusencia === 'number' ||
+        typeof values.porcentajeNomina === 'number'),
+    {
+      message: 'Debes indicar porcentaje para distribución combinada',
+      path: ['porcentajeAusencia'],
+    }
+  );
 
 export async function POST(request: NextRequest) {
   try {
@@ -34,7 +48,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json() as Record<string, unknown>;
     const data = CompensarHorasSchema.parse(body);
 
-    const empleados = await prisma.empleado.findMany({
+    const empleados = await prisma.empleados.findMany({
       where: {
         empresaId: session.user.empresaId,
         id: { in: data.empleadoIds },
@@ -42,10 +56,10 @@ export async function POST(request: NextRequest) {
       select: {
         ...empleadoCompensacionSelect,
         saldosAusencias: {
-          where: { año: data.anio },
+          where: { anio: data.anio },
           select: {
             id: true,
-            año: true,
+            anio: true,
             diasTotales: true,
           },
         },
@@ -70,6 +84,9 @@ export async function POST(request: NextRequest) {
       horasPorEmpleado: data.horasPorEmpleado,
       origen: 'fichajes',
       empleadosPreCargados: empleados,
+      porcentajeAusencia: data.porcentajeAusencia,
+      porcentajeNomina: data.porcentajeNomina,
+      maxHorasPorEmpleado: data.maxHorasPorEmpleado,
     });
 
     return NextResponse.json({

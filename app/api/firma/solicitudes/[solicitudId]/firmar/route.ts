@@ -15,18 +15,23 @@ import { prisma } from '@/lib/prisma';
 import { uploadToS3 } from '@/lib/s3';
 
 /**
- * POST /api/firma/solicitudes/[id]/firmar - Firmar documento
+ * POST /api/firma/solicitudes/[solicitudId]/firmar - Firmar documento
  *
  * Permite a un empleado firmar un documento que le ha sido solicitado
+ * El empleado debe tener una firma pendiente en la solicitud
  *
  * Body:
  * {
  *   tipo: 'click' | 'manuscrita' | 'digital';  // MVP solo soporta 'click'
+ *   usarFirmaGuardada?: boolean;
+ *   firmaImagen?: string;  // Data URL de la firma manuscrita
+ *   firmaImagenWidth?: number;
+ *   firmaImagenHeight?: number;
  * }
  */
 export async function POST(
   request: NextRequest,
-  context: { params: Promise<{ id: string }> }
+  context: { params: Promise<{ solicitudId: string }> }
 ) {
   try {
     const session = await getSession();
@@ -35,7 +40,7 @@ export async function POST(
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
 
-    const { id: firmaId } = await context.params;
+    const { solicitudId } = await context.params;
     const body = await request.json() as Record<string, unknown>;
 
     const firmaImagen: string | undefined = typeof body.firmaImagen === 'string' ? body.firmaImagen : undefined;
@@ -43,7 +48,7 @@ export async function POST(
     const firmaImagenHeight: number | undefined = typeof body.firmaImagenHeight === 'number' ? body.firmaImagenHeight : undefined;
 
     // Obtener empleado asociado al usuario autenticado
-    const empleado = await prisma.empleado.findUnique({
+    const empleado = await prisma.empleados.findUnique({
       where: { usuarioId: session.user.id },
       select: {
         id: true,
@@ -58,6 +63,27 @@ export async function POST(
         { status: 404 }
       );
     }
+
+    // Buscar la firma pendiente del empleado en esta solicitud
+    const firma = await prisma.firmas.findFirst({
+      where: {
+        solicitudFirmaId: solicitudId,
+        empleadoId: empleado.id,
+        firmado: false,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (!firma) {
+      return NextResponse.json(
+        { error: 'No tienes una firma pendiente en esta solicitud o ya la has firmado' },
+        { status: 404 }
+      );
+    }
+
+    const firmaId = firma.id;
 
     // Capturar datos de la firma
     let metodoCaptura: DatosCapturadosFirma['tipo'] = 'click';
@@ -109,7 +135,7 @@ export async function POST(
         : 'Documento firmado correctamente.',
     });
   } catch (error: unknown) {
-    console.error('[POST /api/firma/solicitudes/:id/firmar] Error:', error);
+    console.error('[POST /api/firma/solicitudes/:solicitudId/firmar] Error:', error);
 
     // Manejar errores de validación de negocio
     const errorMessage = error instanceof Error ? error.message : String(error);

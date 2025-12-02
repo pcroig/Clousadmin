@@ -71,7 +71,7 @@ export default async function EmpleadoDetailPage(props: EmpleadoDetailPageProps)
   const { id } = params;
 
   // Obtener empleado con todas las relaciones
-  const empleado = await prisma.empleado.findUnique({
+  const empleado = await prisma.empleados.findUnique({
     where: {
       id,
       empresaId: session.user.empresaId, // Seguridad: solo de la misma empresa
@@ -162,7 +162,7 @@ export default async function EmpleadoDetailPage(props: EmpleadoDetailPageProps)
   await asegurarCarpetasSistemaParaEmpleado(empleado.id, session.user.empresaId);
 
   // Re-obtener empleado para incluir posibles nuevas carpetas
-  const empleadoActualizado = await prisma.empleado.findUnique({
+  const empleadoActualizado = await prisma.empleados.findUnique({
     where: {
       id: empleado.id,
       empresaId: session.user.empresaId,

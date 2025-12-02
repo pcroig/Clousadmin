@@ -36,7 +36,7 @@ export async function POST(
     }
 
     // Verificar que el evento existe y pertenece a la empresa
-    const evento = await prisma.eventoNomina.findFirst({
+    const evento = await prisma.eventos_nomina.findFirst({
       where: {
         id,
         empresaId: session.user.empresaId,
@@ -88,7 +88,7 @@ export async function POST(
 
     const ahora = new Date();
 
-    await prisma.nomina.updateMany({
+    await prisma.nominas.updateMany({
       where: {
         id: {
           in: nominasPublicables.map((n) => n.id),

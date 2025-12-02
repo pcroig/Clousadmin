@@ -28,7 +28,7 @@ export async function GET(
 
     const { id: campanaId } = await params;
 
-    const campana = await prisma.campanaVacaciones.findFirst({
+    const campana = await prisma.campanas_vacaciones.findFirst({
       where: {
         id: campanaId,
         empresaId: session.user.empresaId,

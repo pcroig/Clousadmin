@@ -17,6 +17,7 @@ export type TipoNotificacion =
   | 'ausencia_aprobada'
   | 'ausencia_rechazada'
   | 'ausencia_cancelada'
+  | 'ausencia_modificada'
   | 'campana_vacaciones_creada'
   | 'campana_vacaciones_cuadrada'
   | 'campana_vacaciones_completada'
@@ -161,7 +162,7 @@ async function obtenerUsuariosANotificar(
 
   // HR Admins
   if (roles.hrAdmin) {
-    const hrAdmins = await prisma.usuario.findMany({
+    const hrAdmins = await prisma.usuarios.findMany({
       where: { empresaId, rol: UsuarioRol.hr_admin, activo: true },
       select: { id: true },
     });
@@ -170,7 +171,7 @@ async function obtenerUsuariosANotificar(
 
   // Manager
   if (roles.manager) {
-    const manager = await prisma.empleado.findUnique({
+    const manager = await prisma.empleados.findUnique({
       where: { id: roles.manager, activo: true },
       select: { usuarioId: true, usuario: { select: { activo: true } } },
     });
@@ -181,7 +182,7 @@ async function obtenerUsuariosANotificar(
 
   // Empleado
   if (roles.empleado) {
-    const empleado = await prisma.empleado.findUnique({
+    const empleado = await prisma.empleados.findUnique({
       where: { id: roles.empleado, activo: true },
       select: { usuarioId: true, usuario: { select: { activo: true } } },
     });
@@ -214,7 +215,7 @@ async function crearNotificaciones(
 
   if (destinatarios.length === 0) return;
 
-  await prisma.notificacion.createMany({
+  await prisma.notificaciones.createMany({
     data: destinatarios.map(usuarioId => ({
       empresaId,
       usuarioId,
@@ -296,7 +297,7 @@ export async function crearNotificacionAusenciaSolicitada(
   const diasLabel = formatDias(diasSolicitados);
 
   // Obtener manager del empleado
-  const empleado = await prisma.empleado.findUnique({
+  const empleado = await prisma.empleados.findUnique({
     where: { id: empleadoId },
     select: { managerId: true },
   });
@@ -424,7 +425,7 @@ export async function crearNotificacionAusenciaCancelada(
   const tipoLabel = formatLabel(tipo);
   const rangoFechas = formatRange(fechaInicio, fechaFin);
 
-  const empleado = await prisma.empleado.findUnique({
+  const empleado = await prisma.empleados.findUnique({
     where: { id: empleadoId },
     select: { managerId: true },
   });
@@ -500,6 +501,68 @@ export async function crearNotificacionAusenciaAutoAprobada(
   }, options);
 }
 
+/**
+ * Notifica a HR/Admin y Manager cuando se modifica una ausencia
+ */
+export async function crearNotificacionAusenciaModificada(
+  prisma: PrismaClient,
+  params: {
+    ausenciaId: string;
+    empresaId: string;
+    empleadoId: string;
+    empleadoNombre: string;
+    tipo: string;
+    fechaInicio: Date;
+    fechaFin: Date;
+    diasSolicitados: number;
+    modificadoPor?: string | null;
+  },
+  options?: NotificacionEnvioOptions
+) {
+  const { ausenciaId, empresaId, empleadoId, empleadoNombre, tipo, fechaInicio, fechaFin, diasSolicitados, modificadoPor } = params;
+  const tipoLabel = formatLabel(tipo);
+  const rangoFechas = formatRange(fechaInicio, fechaFin);
+  const diasLabel = formatDias(diasSolicitados);
+
+  // Obtener manager del empleado
+  const empleado = await prisma.empleados.findUnique({
+    where: { id: empleadoId },
+    select: { managerId: true },
+  });
+
+  const usuarioIds = await obtenerUsuariosANotificar(prisma, empresaId, {
+    hrAdmin: true,
+    manager: empleado?.managerId,
+  });
+
+  // Excluir al usuario que hizo la modificación si es HR/Manager
+  const usuarioIdsFinal = modificadoPor 
+    ? usuarioIds.filter(id => id !== modificadoPor)
+    : usuarioIds;
+
+  if (usuarioIdsFinal.length === 0) return;
+
+  await crearNotificaciones(prisma, {
+    empresaId,
+    usuarioIds: usuarioIdsFinal,
+    tipo: 'ausencia_modificada',
+    titulo: `Ausencia modificada: ${tipoLabel}`,
+    mensaje: `Se modificó la ausencia de ${empleadoNombre} (${diasLabel}, ${rangoFechas}).`,
+    metadata: {
+      ausenciaId,
+      tipo,
+      fechaInicio: fechaInicio.toISOString(),
+      fechaFin: fechaFin.toISOString(),
+      diasSolicitados,
+      empleadoId,
+      empleadoNombre,
+      prioridad: 'alta',
+      accionUrl: '/hr/horario/ausencias',
+      accionTexto: 'Revisar cambios',
+    },
+  }, options);
+}
+
 // ========================================
 // FIRMAS DIGITALES
 // ========================================
@@ -536,8 +599,9 @@ export async function crearNotificacionFirmaPendiente(
       prioridad: 'alta',
       icono: 'firma',
       accionTexto: 'Firmar documento',
-      accionUrl: '/empleado/mi-espacio/documentos?tab=firmas',
-      url: '/empleado/mi-espacio/documentos?tab=firmas',
+      accionUrl: `/firma/firmar/${firmaId}`,
+      url: `/firma/firmar/${firmaId}`,
+      requiresSignature: true,
     },
   }, options);
 }
@@ -828,7 +892,7 @@ export async function crearNotificacionCambioManager(
 
   // Agregar anterior manager si existe
   if (anteriorManagerId) {
-    const anteriorManager = await prisma.empleado.findUnique({
+    const anteriorManager = await prisma.empleados.findUnique({
       where: { id: anteriorManagerId },
       select: { usuarioId: true },
     });
@@ -895,7 +959,7 @@ export async function crearNotificacionCambioPuesto(
 ) {
   const { empresaId, empleadoId, empleadoNombre, puestoAnterior, puestoNuevo } = params;
 
-  const empleado = await prisma.empleado.findUnique({
+  const empleado = await prisma.empleados.findUnique({
     where: { id: empleadoId },
     select: {
       usuarioId: true,
@@ -985,7 +1049,7 @@ export async function crearNotificacionJornadaAsignada(
 ) {
   const { empresaId, empleadoId, jornadaNombre } = params;
 
-  const empleado = await prisma.empleado.findUnique({
+  const empleado = await prisma.empleados.findUnique({
     where: { id: empleadoId },
     select: {
       usuarioId: true,
@@ -1076,7 +1140,7 @@ export async function crearNotificacionEmpleadoCreado(
 ) {
   const { empleadoId, empresaId, empleadoNombre } = params;
 
-  const empleado = await prisma.empleado.findUnique({
+  const empleado = await prisma.empleados.findUnique({
     where: { id: empleadoId },
     select: {
       managerId: true,
@@ -1145,7 +1209,7 @@ export async function crearNotificacionAsignadoEquipo(
   }, options);
 
   // Notificar al manager del equipo (si tiene)
-  const equipo = await prisma.equipo.findUnique({
+  const equipo = await prisma.equipos.findUnique({
     where: { id: equipoId },
     select: { managerId: true },
   });
@@ -1850,7 +1914,7 @@ export async function crearNotificacionCampanaCuadrada(
   const { campanaId, empresaId, empleadosIds, titulo } = params;
 
   // Obtener IDs de usuarios de los empleados
-  const empleados = await prisma.empleado.findMany({
+  const empleados = await prisma.empleados.findMany({
     where: {
       id: { in: empleadosIds },
     },
@@ -1893,7 +1957,7 @@ export async function crearNotificacionOnboardingCompletado(
   const { empleadoId, empresaId, empleadoNombre } = params;
 
   // Obtener manager del empleado
-  const empleado = await prisma.empleado.findUnique({
+  const empleado = await prisma.empleados.findUnique({
     where: { id: empleadoId },
     select: { managerId: true },
   });
@@ -2003,7 +2067,7 @@ export async function crearNotificacionComplementoAsignado(
   }
 
   // Notificar al manager del empleado
-  const empleado = await prisma.empleado.findUnique({
+  const empleado = await prisma.empleados.findUnique({
     where: { id: empleadoId },
     select: { managerId: true },
   });

@@ -151,8 +151,8 @@ type NominaWithEquipos = {
 type NominaWithComplementos = NominaWithEquipos & {
   complementosAsignados: Array<{
     importe: Prisma.Decimal | number;
-    empleadoComplemento: {
-      tipoComplemento: {
+    empleado_complementos: {
+      tipos_complemento: {
         nombre: string;
       };
     };
@@ -184,7 +184,7 @@ function toNominaDetalle(nomina: NominaWithComplementos): NominaDetalle {
   return {
     ...toNominaMetric(nomina),
     complementos: nomina.complementosAsignados.map((asignacion) => ({
-      nombre: asignacion.empleadoComplemento.tipoComplemento.nombre,
+      nombre: asignacion.empleado_complementos.tipos_complemento.nombre,
       importe: Number(asignacion.importe),
     })),
   };
@@ -253,17 +253,17 @@ async function generarComparativa(empresaId: string, anioActual: number, formato
         },
       },
     },
-  } satisfies Prisma.NominaInclude;
+  } satisfies Prisma.nominasInclude;
 
   const [nominasActualRaw, nominasAnteriorRaw] = await Promise.all([
-    prisma.nomina.findMany({
+    prisma.nominas.findMany({
       where: {
         empleado: { empresaId },
         anio: anioActual,
       },
       include: includeEmpleado,
     }),
-    prisma.nomina.findMany({
+    prisma.nominas.findMany({
       where: {
         empleado: { empresaId },
         anio: anioAnterior,
@@ -385,7 +385,7 @@ async function generarResumen(empresaId: string, anio: number, mes: number | nul
     ...(mes ? { mes } : {}),
   };
 
-  const nominas = await prisma.nomina.findMany({
+  const nominas = await prisma.nominas.findMany({
     where,
     include: {
       empleado: {
@@ -403,9 +403,9 @@ async function generarResumen(empresaId: string, anio: number, mes: number | nul
       },
       complementosAsignados: {
         include: {
-          empleadoComplemento: {
+          empleado_complementos: {
             include: {
-              tipoComplemento: true,
+              tipos_complemento: true,
             },
           },
         },
@@ -488,7 +488,7 @@ async function generarResumen(empresaId: string, anio: number, mes: number | nul
 }
 
 async function generarPorEquipos(empresaId: string, anio: number, formato: FormatoReporte) {
-  const nominasRaw = await prisma.nomina.findMany({
+  const nominasRaw = await prisma.nominas.findMany({
     where: {
       empleado: { empresaId },
       anio,
@@ -574,7 +574,7 @@ async function generarPorEquipos(empresaId: string, anio: number, formato: Forma
 }
 
 async function generarTendencia(empresaId: string, anio: number, formato: FormatoReporte) {
-  const nominas = await prisma.nomina.findMany({
+  const nominas = await prisma.nominas.findMany({
     where: {
       empleado: { empresaId },
       anio,

@@ -41,7 +41,7 @@ export default async function DashboardLayout({
         />
       </div>
 
-      {/* Main Content Area - Full height, no header */}
+      {/* Main Content Area - Full height */}
       <div className="flex-1 overflow-hidden flex flex-col">
         <main className="flex-1 overflow-y-auto pb-16 sm:pb-0 scrollbar-thin">
           <div className="h-full max-w-[1800px] mx-auto px-4 py-4 sm:px-8 sm:py-6">

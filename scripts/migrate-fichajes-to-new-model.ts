@@ -113,7 +113,7 @@ async function migrateFichajes() {
 
       try {
         // Crear Fichaje nuevo
-        const nuevoFichaje = await prisma.fichaje.create({
+        const nuevoFichaje = await prisma.fichajes.create({
           data: {
             empresaId,
             empleadoId,
@@ -134,7 +134,7 @@ async function migrateFichajes() {
 
         // Crear eventos asociados
         for (const evento of eventosOrdenados) {
-          await prisma.fichajeEvento.create({
+          await prisma.fichaje_eventos.create({
             data: {
               fichajeId: nuevoFichaje.id,
               tipo: evento.tipo,

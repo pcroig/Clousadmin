@@ -33,7 +33,7 @@ export async function handleProductChange(product: Stripe.Product) {
     }
   }
 
-  await prisma.billingProduct.upsert({
+  await prisma.billing_products.upsert({
     where: { id: product.id },
     create: {
       id: product.id,
@@ -61,7 +61,7 @@ export async function handleProductChange(product: Stripe.Product) {
  * Maneja la eliminación de un producto
  */
 export async function handleProductDeletion(productId: string) {
-  await prisma.billingProduct.update({
+  await prisma.billing_products.update({
     where: { id: productId },
     data: { activo: false },
   });
@@ -77,7 +77,7 @@ export async function handlePriceChange(price: Stripe.Price) {
   }
 
   // Verificar que el producto existe
-  const product = await prisma.billingProduct.findUnique({
+  const product = await prisma.billing_products.findUnique({
     where: { id: price.product },
   });
 
@@ -89,7 +89,7 @@ export async function handlePriceChange(price: Stripe.Price) {
   const interval =
     price.recurring?.interval === 'year' ? BillingInterval.year : BillingInterval.month;
 
-  await prisma.billingPrice.upsert({
+  await prisma.billing_prices.upsert({
     where: { id: price.id },
     create: {
       id: price.id,
@@ -118,7 +118,7 @@ export async function handlePriceChange(price: Stripe.Price) {
  * Maneja la eliminación de un precio
  */
 export async function handlePriceDeletion(priceId: string) {
-  await prisma.billingPrice.update({
+  await prisma.billing_prices.update({
     where: { id: priceId },
     data: { activo: false },
   });
@@ -148,7 +148,7 @@ export async function handleCustomerChange(customer: Stripe.Customer) {
     };
   }
 
-  await prisma.billingCustomer.upsert({
+  await prisma.billing_customers.upsert({
     where: { id: customer.id },
     create: {
       id: customer.id,
@@ -172,7 +172,7 @@ export async function handleCustomerChange(customer: Stripe.Customer) {
  */
 export async function handleCustomerDeletion(customerId: string) {
   // No eliminamos, solo desvinculamos las suscripciones
-  await prisma.subscription.updateMany({
+  await prisma.subscriptions.updateMany({
     where: { customerId },
     data: { status: 'canceled' },
   });
@@ -188,7 +188,7 @@ export async function handleSubscriptionChange(subscription: Stripe.Subscription
 
   if (!empresaId) {
     // Intentar obtener empresaId del customer
-    const customer = await prisma.billingCustomer.findUnique({
+    const customer = await prisma.billing_customers.findUnique({
       where: { id: customerId },
     });
 
@@ -216,7 +216,7 @@ async function upsertSubscription(
   }
 
   // Verificar que el precio existe
-  const price = await prisma.billingPrice.findUnique({
+  const price = await prisma.billing_prices.findUnique({
     where: { id: priceId },
   });
 
@@ -225,7 +225,7 @@ async function upsertSubscription(
     return;
   }
 
-  await prisma.subscription.upsert({
+  await prisma.subscriptions.upsert({
     where: { id: subscription.id },
     create: {
       id: subscription.id,
@@ -259,7 +259,7 @@ async function upsertSubscription(
  * Maneja la eliminación/cancelación de una suscripción
  */
 export async function handleSubscriptionDeletion(subscription: Stripe.Subscription) {
-  await prisma.subscription.update({
+  await prisma.subscriptions.update({
     where: { id: subscription.id },
     data: {
       status: 'canceled',
@@ -295,7 +295,7 @@ export async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
 
   // Obtener la suscripción y actualizar estado si es necesario
   if (invoice.subscription && typeof invoice.subscription === 'string') {
-    await prisma.subscription.update({
+    await prisma.subscriptions.update({
       where: { id: invoice.subscription },
       data: { status: 'past_due' },
     });

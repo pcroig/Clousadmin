@@ -37,7 +37,7 @@ export async function GET(
     const { id } = params;
 
     // Quick check if document exists and supports preview
-    const documento = await prisma.documento.findUnique({
+    const documento = await prisma.documentos.findUnique({
       where: { id },
       select: {
         id: true,

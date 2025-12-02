@@ -10,14 +10,14 @@ import { prisma } from '@/lib/prisma';
 import { downloadFromS3 } from '@/lib/s3';
 
 /**
- * GET /api/firma/solicitudes/[id]/pdf-firmado - Descargar PDF con marcas de firma
+ * GET /api/firma/solicitudes/[solicitudId]/pdf-firmado - Descargar PDF con marcas de firma
  *
  * Descarga el PDF firmado con todas las marcas visuales de firma aplicadas
  * Solo disponible cuando la solicitud está completada
  */
 export async function GET(
   request: NextRequest,
-  context: { params: Promise<{ id: string }> }
+  context: { params: Promise<{ solicitudId: string }> }
 ) {
     const params = await context.params;
   try {
@@ -27,10 +27,10 @@ export async function GET(
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
 
-    const solicitudId = params.id;
+    const solicitudId = params.solicitudId;
 
     // Obtener solicitud con verificación de empresa
-    const solicitud = await prisma.solicitudFirma.findUnique({
+    const solicitud = await prisma.solicitudes_firma.findUnique({
       where: {
         id: solicitudId,
         empresaId: session.user.empresaId,
@@ -41,7 +41,7 @@ export async function GET(
             empleadoId: true,
           },
         },
-        documento: {
+        documentos: {
           select: {
             nombre: true,
           },
@@ -58,7 +58,7 @@ export async function GET(
 
     // Si no es HR admin, validar que es uno de los firmantes
     if (session.user.rol !== UsuarioRol.hr_admin) {
-      const empleado = await prisma.empleado.findUnique({
+      const empleado = await prisma.empleados.findUnique({
         where: { usuarioId: session.user.id },
         select: { id: true },
       });
@@ -105,7 +105,7 @@ export async function GET(
     const pdfBuffer = await downloadFromS3(solicitud.pdfFirmadoS3Key);
 
     // Generar nombre de archivo para descarga
-    const nombreBase = solicitud.documento.nombre.replace(/\.[^/.]+$/, ''); // Eliminar extensión
+    const nombreBase = solicitud.documentos.nombre.replace(/\.[^/.]+$/, ''); // Eliminar extensión
     const nombreArchivo = `${nombreBase}_firmado.pdf`;
 
     // Retornar PDF como archivo descargable
@@ -120,7 +120,7 @@ export async function GET(
       },
     });
   } catch (error: unknown) {
-    console.error('[GET /api/firma/solicitudes/:id/pdf-firmado] Error:', error);
+    console.error('[GET /api/firma/solicitudes/:solicitudId/pdf-firmado] Error:', error);
 
     // Manejar error de archivo no encontrado en S3
     const errorMessage = error instanceof Error ? error.message : String(error);

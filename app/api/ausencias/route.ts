@@ -34,7 +34,7 @@ import {
 import { ausenciaCreateSchema } from '@/lib/validaciones/schemas';
 
 
-const ausenciaConEmpleadoInclude = Prisma.validator<Prisma.AusenciaInclude>()({
+const ausenciaConEmpleadoInclude = Prisma.validator<Prisma.ausenciasInclude>()({
   empleado: {
     select: {
       nombre: true,
@@ -46,7 +46,7 @@ const ausenciaConEmpleadoInclude = Prisma.validator<Prisma.AusenciaInclude>()({
   },
 });
 
-type AusenciaConEmpleado = Prisma.AusenciaGetPayload<{
+type AusenciaConEmpleado = Prisma.ausenciasGetPayload<{
   include: typeof ausenciaConEmpleadoInclude;
 }>;
 
@@ -67,7 +67,7 @@ export async function GET(req: NextRequest) {
     const search = searchParams.get('search');
 
     // Filtros base
-    const where: Prisma.AusenciaWhereInput = {
+    const where: Prisma.ausenciasWhereInput = {
       empresaId: session.user.empresaId,
     };
 
@@ -81,7 +81,7 @@ export async function GET(req: NextRequest) {
       where.empleadoId = empleadoId;
     }
 
-    const andFilters: Prisma.AusenciaWhereInput[] = [];
+    const andFilters: Prisma.ausenciasWhereInput[] = [];
 
     if (equipoId && equipoId !== 'todos') {
       andFilters.push({
@@ -139,7 +139,7 @@ export async function GET(req: NextRequest) {
       }
 
       // Obtener IDs de empleados a cargo
-      const empleadosACargo = await prisma.empleado.findMany({
+      const empleadosACargo = await prisma.empleados.findMany({
         where: {
           managerId: session.user.empleadoId,
           empresaId: session.user.empresaId,
@@ -163,13 +163,18 @@ export async function GET(req: NextRequest) {
     }
 
     if (andFilters.length > 0) {
-      where.AND = [...(where.AND ?? []), ...andFilters];
+      const existingAnd = Array.isArray(where.AND)
+        ? where.AND
+        : where.AND
+          ? [where.AND]
+          : [];
+      where.AND = [...existingAnd, ...andFilters];
     }
 
     const { page, limit, skip } = parsePaginationParams(searchParams);
 
     const [ausencias, total] = await Promise.all([
-      prisma.ausencia.findMany({
+      prisma.ausencias.findMany({
         where,
         include: {
           empleado: {
@@ -199,7 +204,7 @@ export async function GET(req: NextRequest) {
         skip,
         take: limit,
       }),
-      prisma.ausencia.count({ where }),
+      prisma.ausencias.count({ where }),
     ]);
 
     const ausenciasFormateadas = ausencias.map((ausencia) => {
@@ -265,7 +270,7 @@ export async function POST(req: NextRequest) {
       return badRequestResponse('No tienes un empleado asignado. Contacta con HR.');
     }
 
-    const empleadoDestino = await prisma.empleado.findFirst({
+    const empleadoDestino = await prisma.empleados.findFirst({
       where: {
         id: empleadoIdDestino,
         empresaId: session.user.empresaId,
@@ -289,13 +294,13 @@ export async function POST(req: NextRequest) {
       if (!session.user.empleadoId) {
         return badRequestResponse('No tienes permisos para registrar esta ausencia');
       }
-      const equiposManager = await prisma.empleadoEquipo.findMany({
+      const equiposManager = await prisma.empleado_equipos.findMany({
         where: {
           empleadoId: session.user.empleadoId,
         },
         select: { equipoId: true },
       });
-      const equiposDestino = await prisma.empleadoEquipo.findMany({
+      const equiposDestino = await prisma.empleado_equipos.findMany({
         where: {
           empleadoId: empleadoDestino.id,
         },
@@ -347,7 +352,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const ausenciasSolapadas = await prisma.ausencia.findMany({
+    const ausenciasSolapadas = await prisma.ausencias.findMany({
       where: {
         empleadoId,
         estado: {
@@ -400,7 +405,8 @@ export async function POST(req: NextRequest) {
     const { diasNaturales, diasLaborables, diasSolicitados } = await calcularDias(
       new Date(validatedData.fechaInicio),
       new Date(validatedData.fechaFin),
-      session.user.empresaId
+      session.user.empresaId,
+      empleadoId
     );
 
     // Aplicar medio día si corresponde
@@ -414,7 +420,7 @@ export async function POST(req: NextRequest) {
     // Obtener equipoId del empleado si no se proporcionó
     let equipoId: string | null = validatedData.equipoId || null;
     if (!equipoId) {
-      const empleadoEquipo = await prisma.empleadoEquipo.findFirst({
+      const empleadoEquipo = await prisma.empleado_equipos.findFirst({
         where: { empleadoId },
         orderBy: { fechaIncorporacion: 'desc' },
       });
@@ -494,7 +500,7 @@ export async function POST(req: NextRequest) {
           diasDesdeCarryOver = saldoResult.diasDesdeCarryOver;
         }
 
-        return tx.ausencia.create({
+        return tx.ausencias.create({
           data: {
             empleadoId,
             empresaId: session.user.empresaId,

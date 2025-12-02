@@ -39,7 +39,7 @@ export async function getFestivosActivosEnRango(
   fechaInicio: Date,
   fechaFin: Date
 ) {
-  return prisma.festivo.findMany({
+  return prisma.festivos.findMany({
     where: {
       empresaId,
       fecha: {
@@ -55,12 +55,50 @@ export async function getFestivosActivosEnRango(
 }
 
 /**
+ * Obtiene festivos de empresa + festivos personalizados de un empleado
+ */
+export async function getFestivosActivosParaEmpleado(
+  empresaId: string,
+  empleadoId: string | null | undefined,
+  fechaInicio: Date,
+  fechaFin: Date
+): Promise<FestivoConFecha[]> {
+  // Siempre obtener festivos de empresa
+  const festivosEmpresa = await getFestivosActivosEnRango(empresaId, fechaInicio, fechaFin);
+  
+  // Si no hay empleadoId, solo retornar festivos de empresa
+  if (!empleadoId) {
+    return festivosEmpresa;
+  }
+
+  // Obtener festivos personalizados del empleado
+  const festivosEmpleado = await prisma.empleado_festivos.findMany({
+    where: {
+      empleadoId,
+      fecha: {
+        gte: normalizarInicioDeDia(fechaInicio),
+        lte: normalizarFinDeDia(fechaFin),
+      },
+      activo: true,
+    },
+    orderBy: {
+      fecha: 'asc',
+    },
+  });
+
+  // Combinar ambos (los festivos personalizados sobrescriben los de empresa si hay conflicto)
+  const festivos = [...festivosEmpresa, ...festivosEmpleado];
+  
+  return festivos;
+}
+
+/**
  * Obtiene la configuración de días laborables de una empresa
  * Si no existe configuración, retorna L-V por defecto
  */
 export async function getDiasLaborablesEmpresa(empresaId: string): Promise<DiasLaborables> {
   try {
-    const empresa = await prisma.empresa.findUnique({
+    const empresa = await prisma.empresas.findUnique({
       where: { id: empresaId },
       select: { config: true },
     });
@@ -145,7 +183,7 @@ export function esDiaLaborableSync(
 async function esFestivoActivo(fecha: Date, empresaId: string): Promise<boolean> {
   try {
     const fechaNormalizada = normalizarInicioDeDia(fecha);
-    const festivo = await prisma.festivo.findFirst({
+    const festivo = await prisma.festivos.findFirst({
       where: {
         empresaId,
         fecha: {

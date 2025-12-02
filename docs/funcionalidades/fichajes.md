@@ -44,6 +44,13 @@ Cada fichaje (día completo) tiene un único estado que refleja su ciclo de vida
 
 ---
 
+## Notas de implementación
+
+- **IDs automáticos**: Prisma maneja los identificadores de `fichajes`, `fichaje_eventos` y tablas relacionadas mediante `@default(cuid())` en el esquema (`prisma/schema.prisma`). Las rutas y servicios no deben generar `id` manualmente: basta con enviar los campos de negocio a `prisma.<modelo>.create()`.
+- **Flujo consistente**: Cualquier cambio que afecte la creación de fichajes debe validar que las funciones reutilizan las mismas funciones de cálculo (`lib/calculos/fichajes.ts`) para evitar lógica duplicada y mantener los estados sincronizados.
+- **Normalización horaria**: Para eliminar desfases entre la zona UTC de los eventos y la vista del navegador se introdujo el helper `extraerHoraDeISO()` en `lib/utils/formatters.ts`. Todas las vistas (tablas, listas y modal) usan esta función en lugar de instanciar `Date` directamente, y hay tests de Vitest que cubren sus casos válidos/inválidos (`lib/utils/__tests__/formatters.test.ts`).
+
+
 ## 1. Flujo Básico de Fichaje
 
 ### Estados del Empleado (Widget de Plantilla)

@@ -8,7 +8,7 @@ datasource db {
 }
 
 model accounts {
-  id                String   @id
+  id                String   @id @default(cuid())
   userId            String
   type              String
   provider          String
@@ -20,14 +20,14 @@ model accounts {
   scope             String?
   id_token          String?
   session_state     String?
-  usuarios          usuarios @relation(fields: [userId], references: [id], onDelete: Cascade)
+  usuario           usuarios @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerAccountId])
   @@index([userId])
 }
 
 model alertas_nomina {
-  id              String     @id
+  id              String     @id @default(cuid())
   empresaId       String
   nominaId        String?
   tipo            String     @db.VarChar(50)
@@ -35,15 +35,15 @@ model alertas_nomina {
   resuelta        Boolean    @default(false)
   fechaResolucion DateTime?
   createdAt       DateTime   @default(now())
-  updatedAt       DateTime
+  updatedAt       DateTime   @updatedAt
   accionUrl       String?
   categoria       String     @db.VarChar(100)
   codigo          String     @db.VarChar(100)
   detalles        Json?
   empleadoId      String?
-  empleados       empleados? @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
-  empresas        empresas   @relation(fields: [empresaId], references: [id], onDelete: Cascade)
-  nominas         nominas?   @relation(fields: [nominaId], references: [id], onDelete: Cascade)
+  empleado        empleados? @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+  empresa         empresas   @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  nomina          nominas?   @relation(fields: [nominaId], references: [id], onDelete: Cascade)
 
   @@index([categoria])
   @@index([empleadoId])
@@ -54,7 +54,7 @@ model alertas_nomina {
 }
 
 model asignaciones_complemento {
-  id                    String                @id
+  id                    String                @id @default(cuid())
   nominaId              String
   empleadoComplementoId String
   importe               Decimal               @db.Decimal(10, 2)
@@ -62,9 +62,9 @@ model asignaciones_complemento {
   fechaAsignacion       DateTime              @default(now())
   notas                 String?
   createdAt             DateTime              @default(now())
-  updatedAt             DateTime
+  updatedAt             DateTime              @updatedAt
   empleado_complementos empleado_complementos @relation(fields: [empleadoComplementoId], references: [id], onDelete: Cascade)
-  nominas               nominas               @relation(fields: [nominaId], references: [id], onDelete: Cascade)
+  nomina                nominas               @relation(fields: [nominaId], references: [id], onDelete: Cascade)
 
   @@unique([nominaId, empleadoComplementoId])
   @@index([empleadoComplementoId])
@@ -72,7 +72,7 @@ model asignaciones_complemento {
 }
 
 model auditoria_accesos {
-  id                 String   @id
+  id                 String   @id @default(cuid())
   empresaId          String
   usuarioId          String
   empleadoAccedidoId String?
@@ -83,8 +83,8 @@ model auditoria_accesos {
   userAgent          String?
   motivo             String?
   createdAt          DateTime @default(now())
-  empresas           empresas @relation(fields: [empresaId], references: [id], onDelete: Cascade)
-  usuarios           usuarios @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  empresa            empresas @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  usuario            usuarios @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
 
   @@index([accion])
   @@index([createdAt])
@@ -95,7 +95,7 @@ model auditoria_accesos {
 }
 
 model ausencias {
-  id                         String                      @id
+  id                         String                      @id @default(cuid())
   empresaId                  String
   empleadoId                 String
   fechaInicio                DateTime                    @db.Date
@@ -111,7 +111,7 @@ model ausencias {
   optimizadaIA               Boolean                     @default(false)
   notasIA                    String?
   createdAt                  DateTime                    @default(now())
-  updatedAt                  DateTime
+  updatedAt                  DateTime                    @updatedAt
   descuentaSaldo             Boolean                     @default(false)
   diasAlternativos           Json?
   diasIdeales                Json?
@@ -124,10 +124,10 @@ model ausencias {
   periodo                    PeriodoMedioDia?
   tipo                       TipoAusencia
   diasDesdeCarryOver         Decimal                     @default(0) @db.Decimal(4, 1)
-  documentos                 documentos?                 @relation(fields: [documentoId], references: [id])
-  empleados                  empleados                   @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
-  empresas                   empresas                    @relation(fields: [empresaId], references: [id], onDelete: Cascade)
-  equipos                    equipos?                    @relation(fields: [equipoId], references: [id])
+  documento                  documentos?                 @relation(fields: [documentoId], references: [id])
+  empleado                   empleados                   @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+  empresa                    empresas                    @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  equipo                     equipos?                    @relation(fields: [equipoId], references: [id])
   compensaciones_horas_extra compensaciones_horas_extra?
 
   @@index([documentoId])
@@ -143,20 +143,20 @@ model ausencias {
 }
 
 model auto_completados {
-  id              String    @id
+  id              String    @id @default(cuid())
   empresaId       String
   empleadoId      String
   tipo            String    @db.VarChar(50)
   estado          String    @default("pendiente") @db.VarChar(50)
   expiraEn        DateTime?
   createdAt       DateTime  @default(now())
-  updatedAt       DateTime
+  updatedAt       DateTime  @updatedAt
   aprobadoEn      DateTime?
   aprobadoPor     String?
   datosOriginales Json
   sugerencias     Json
-  empleados       empleados @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
-  empresas        empresas  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  empleado        empleados @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+  empresa         empresas  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
 
   @@index([empleadoId])
   @@index([empresaId, estado, expiraEn])
@@ -168,22 +168,22 @@ model auto_completados {
 }
 
 model billing_customers {
-  id            String          @id
+  id            String          @id @default(cuid())
   empresaId     String          @unique
   email         String          @db.VarChar(255)
   nombre        String?         @db.VarChar(255)
   direccion     Json?
   taxId         String?         @db.VarChar(50)
   createdAt     DateTime        @default(now())
-  updatedAt     DateTime
-  empresas      empresas        @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  updatedAt     DateTime        @updatedAt
+  empresa       empresas        @relation(fields: [empresaId], references: [id], onDelete: Cascade)
   subscriptions subscriptions[]
 
   @@index([empresaId])
 }
 
 model billing_prices {
-  id               String           @id
+  id               String           @id @default(cuid())
   productoId       String
   unitAmount       Int
   currency         String           @default("eur") @db.VarChar(3)
@@ -193,7 +193,7 @@ model billing_prices {
   activo           Boolean          @default(true)
   metadata         Json?
   createdAt        DateTime         @default(now())
-  updatedAt        DateTime
+  updatedAt        DateTime         @updatedAt
   billing_products billing_products @relation(fields: [productoId], references: [id], onDelete: Cascade)
   subscriptions    subscriptions[]
 
@@ -202,7 +202,7 @@ model billing_prices {
 }
 
 model billing_products {
-  id             String           @id
+  id             String           @id @default(cuid())
   nombre         String           @db.VarChar(255)
   descripcion    String?
   activo         Boolean          @default(true)
@@ -211,7 +211,7 @@ model billing_products {
   orden          Int              @default(0)
   metadata       Json?
   createdAt      DateTime         @default(now())
-  updatedAt      DateTime
+  updatedAt      DateTime         @updatedAt
   billing_prices billing_prices[]
 
   @@index([activo])
@@ -220,7 +220,7 @@ model billing_products {
 
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model campanas_vacaciones {
-  id                      String                    @id
+  id                      String                    @id @default(cuid())
   empresaId               String
   titulo                  String                    @db.VarChar(200)
   alcance                 String                    @default("todos") @db.VarChar(50)
@@ -231,38 +231,38 @@ model campanas_vacaciones {
   totalEmpleadosAsignados Int                       @default(0)
   empleadosCompletados    Int                       @default(0)
   createdAt               DateTime                  @default(now())
-  updatedAt               DateTime
+  updatedAt               DateTime                  @updatedAt
   cerradaEn               DateTime?
   cuadradaEn              DateTime?
   fechaFinObjetivo        DateTime                  @db.Date
   fechaInicioObjetivo     DateTime                  @db.Date
   finalizadaEn            DateTime?
-  empresas                empresas                  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
-  preferencias_vacaciones preferencias_vacaciones[]
+  empresa                 empresas                  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  preferencias            preferencias_vacaciones[]
 
   @@index([empresaId])
   @@index([estado])
 }
 
 model carpetas {
-  id                    String       @id
+  id                    String       @id @default(cuid())
   empresaId             String
   empleadoId            String?
   nombre                String       @db.VarChar(255)
   parentId              String?
   esSistema             Boolean      @default(false)
   createdAt             DateTime     @default(now())
-  updatedAt             DateTime
+  updatedAt             DateTime     @updatedAt
   asignadoA             String?
   compartida            Boolean      @default(false)
   vinculadaAProceso     String?      @db.VarChar(50)
   requiereFirma         Boolean      @default(false)
   requiereRellenarDatos Boolean      @default(false)
   camposRequeridos      Json?
-  empleados             empleados?   @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
-  empresas              empresas     @relation(fields: [empresaId], references: [id], onDelete: Cascade)
-  carpetas              carpetas?    @relation("carpetasTocarpetas", fields: [parentId], references: [id], onDelete: Cascade)
-  other_carpetas        carpetas[]   @relation("carpetasTocarpetas")
+  empleado              empleados?   @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+  empresa               empresas     @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  parent                carpetas?    @relation("carpetasTocarpetas", fields: [parentId], references: [id], onDelete: Cascade)
+  subcarpetas           carpetas[]   @relation("carpetasTocarpetas")
   documentos            documentos[]
 
   @@index([compartida])
@@ -273,7 +273,7 @@ model carpetas {
 }
 
 model compensaciones_horas_extra {
-  id               String     @id
+  id               String     @id @default(cuid())
   empresaId        String
   empleadoId       String
   horasBalance     Decimal    @db.Decimal(5, 2)
@@ -286,10 +286,10 @@ model compensaciones_horas_extra {
   aprobadoEn       DateTime?
   motivoRechazo    String?
   createdAt        DateTime   @default(now())
-  updatedAt        DateTime
-  ausencias        ausencias? @relation(fields: [ausenciaId], references: [id])
-  empleados        empleados  @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
-  empresas         empresas   @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  updatedAt        DateTime   @updatedAt
+  ausencia         ausencias? @relation(fields: [ausenciaId], references: [id])
+  empleado         empleados  @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+  empresa          empresas   @relation(fields: [empresaId], references: [id], onDelete: Cascade)
 
   @@index([empleadoId])
   @@index([empresaId])
@@ -297,7 +297,7 @@ model compensaciones_horas_extra {
 }
 
 model consentimientos {
-  id          String    @id
+  id          String    @id @default(cuid())
   empresaId   String
   empleadoId  String
   tipo        String    @db.VarChar(100)
@@ -308,9 +308,9 @@ model consentimientos {
   version     String    @db.VarChar(50)
   ipAddress   String?   @db.VarChar(50)
   createdAt   DateTime  @default(now())
-  updatedAt   DateTime
-  empleados   empleados @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
-  empresas    empresas  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  updatedAt   DateTime  @updatedAt
+  empleado    empleados @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+  empresa     empresas  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
 
   @@unique([empresaId, empleadoId, tipo])
   @@index([empleadoId])
@@ -320,7 +320,7 @@ model consentimientos {
 }
 
 model contratos {
-  id                    String                  @id
+  id                    String                  @id @default(cuid())
   empleadoId            String
   fechaInicio           DateTime                @db.Date
   fechaFin              DateTime?               @db.Date
@@ -329,9 +329,9 @@ model contratos {
   datosExtraidosIA      Json?
   verificado            Boolean                 @default(false)
   createdAt             DateTime                @default(now())
-  updatedAt             DateTime
+  updatedAt             DateTime                @updatedAt
   tipoContrato          TipoContrato
-  empleados             empleados               @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+  empleado              empleados               @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
   empleado_complementos empleado_complementos[]
   nominas               nominas[]
 
@@ -340,16 +340,16 @@ model contratos {
 }
 
 model denuncias {
-  id            String     @id
+  id            String     @id @default(cuid())
   empresaId     String
   denuncianteId String?
   descripcion   String
   esAnonima     Boolean    @default(false)
   documentos    Json?
   createdAt     DateTime   @default(now())
-  updatedAt     DateTime
-  empleados     empleados? @relation(fields: [denuncianteId], references: [id])
-  empresas      empresas   @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  updatedAt     DateTime   @updatedAt
+  denunciante   empleados? @relation(fields: [denuncianteId], references: [id])
+  empresa       empresas   @relation(fields: [empresaId], references: [id], onDelete: Cascade)
 
   @@index([createdAt])
   @@index([denuncianteId])
@@ -357,32 +357,32 @@ model denuncias {
 }
 
 model documentos {
-  id                     String                @id
+  id                     String              @id @default(cuid())
   empresaId              String
   empleadoId             String?
   carpetaId              String?
-  nombre                 String                @db.VarChar(255)
-  tipoDocumento          String                @db.VarChar(100)
-  mimeType               String                @db.VarChar(100)
+  nombre                 String              @db.VarChar(255)
+  tipoDocumento          String              @db.VarChar(100)
+  mimeType               String              @db.VarChar(100)
   tamano                 Int
-  s3Key                  String                @unique
-  s3Bucket               String                @db.VarChar(255)
-  procesadoIA            Boolean               @default(false)
+  s3Key                  String              @unique
+  s3Bucket               String              @db.VarChar(255)
+  procesadoIA            Boolean             @default(false)
   datosExtraidos         Json?
-  createdAt              DateTime              @default(now())
-  updatedAt              DateTime
+  createdAt              DateTime            @default(now())
+  updatedAt              DateTime            @updatedAt
   puestoId               String?
-  requiereFirma          Boolean               @default(false)
-  firmado                Boolean               @default(false)
+  requiereFirma          Boolean             @default(false)
+  firmado                Boolean             @default(false)
   firmadoEn              DateTime?
   hashDocumento          String?
-  generadoDesdePlantilla Boolean               @default(false)
+  generadoDesdePlantilla Boolean             @default(false)
   ausencias              ausencias[]
-  carpetas               carpetas?             @relation(fields: [carpetaId], references: [id])
-  empleados              empleados?            @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
-  empresas               empresas              @relation(fields: [empresaId], references: [id], onDelete: Cascade)
-  puestos                puestos?              @relation(fields: [puestoId], references: [id], onDelete: Cascade)
-  documentos_generados   documentos_generados?
+  carpeta                carpetas?           @relation(fields: [carpetaId], references: [id])
+  empleado               empleados?          @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+  empresa                empresas            @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  puestoRelacion         puestos?            @relation(fields: [puestoId], references: [id], onDelete: Cascade)
+  documentoGenerado      documentosGenerado?
   nominas                nominas?
   solicitudes_firma      solicitudes_firma[]
 
@@ -396,8 +396,8 @@ model documentos {
   @@index([tipoDocumento])
 }
 
-model documentos_generados {
-  id                    String                @id
+model documentosGenerado {
+  id                    String                @id @default(cuid())
   empresaId             String
   empleadoId            String
   plantillaId           String
@@ -415,13 +415,13 @@ model documentos_generados {
   firmado               Boolean               @default(false)
   firmadoEn             DateTime?
   createdAt             DateTime              @default(now())
-  updatedAt             DateTime
+  updatedAt             DateTime              @updatedAt
   camposCompletados     Json?
   pendienteRellenar     Boolean               @default(false)
   rellenadoEn           DateTime?
-  documentos            documentos            @relation(fields: [documentoId], references: [id], onDelete: Cascade)
-  empleados             empleados             @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
-  empresas              empresas              @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  documento             documentos            @relation(fields: [documentoId], references: [id], onDelete: Cascade)
+  empleado              empleados             @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+  empresa               empresas              @relation(fields: [empresaId], references: [id], onDelete: Cascade)
   plantillas_documentos plantillas_documentos @relation(fields: [plantillaId], references: [id], onDelete: Cascade)
 
   @@index([documentoId])
@@ -431,10 +431,11 @@ model documentos_generados {
   @@index([generadoEn])
   @@index([plantillaId])
   @@index([usadaIA])
+  @@map("documentos_generados")
 }
 
 model empleado_complementos {
-  id                       String                     @id
+  id                       String                     @id @default(cuid())
   empleadoId               String
   tipoComplementoId        String
   contratoId               String?
@@ -446,10 +447,10 @@ model empleado_complementos {
   rechazado                Boolean                    @default(false)
   motivoRechazo            String?
   createdAt                DateTime                   @default(now())
-  updatedAt                DateTime
+  updatedAt                DateTime                   @updatedAt
   asignaciones_complemento asignaciones_complemento[]
-  contratos                contratos?                 @relation(fields: [contratoId], references: [id])
-  empleados                empleados                  @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+  contrato                 contratos?                 @relation(fields: [contratoId], references: [id])
+  empleado                 empleados                  @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
   tipos_complemento        tipos_complemento          @relation(fields: [tipoComplementoId], references: [id], onDelete: Cascade)
 
   @@index([contratoId])
@@ -461,40 +462,41 @@ model empleado_equipos {
   empleadoId         String
   equipoId           String
   fechaIncorporacion DateTime  @default(now())
-  empleados          empleados @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
-  equipos            equipos   @relation(fields: [equipoId], references: [id], onDelete: Cascade)
+  empleado           empleados @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+  equipo             equipos   @relation(fields: [equipoId], references: [id], onDelete: Cascade)
 
   @@id([empleadoId, equipoId])
   @@index([empleadoId])
   @@index([equipoId])
 }
 
-model empleado_saldo_ausencias {
-  id                  String    @id
+model empleadoSaldoAusencias {
+  id                  String    @id @default(cuid())
   empleadoId          String
   empresaId           String
-  a_o                 Int       @map("año") @db.SmallInt
+  anio                Int       @map("año") @db.SmallInt
   diasTotales         Int       @default(0)
   diasUsados          Decimal   @default(0) @db.Decimal(4, 1)
   diasPendientes      Decimal   @default(0) @db.Decimal(4, 1)
   origen              String    @db.VarChar(50)
   createdAt           DateTime  @default(now())
-  updatedAt           DateTime
+  updatedAt           DateTime  @updatedAt
   carryOverAsignado   Decimal   @default(0) @db.Decimal(4, 1)
   carryOverExpiraEn   DateTime?
   carryOverFuenteAnio Int?      @db.SmallInt
   carryOverPendiente  Decimal   @default(0) @db.Decimal(4, 1)
   carryOverUsado      Decimal   @default(0) @db.Decimal(4, 1)
-  empleados           empleados @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
-  empresas            empresas  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  empleado            empleados @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+  empresa             empresas  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
 
-  @@unique([empleadoId, a_o])
-  @@index([empleadoId, a_o])
+  @@unique([empleadoId, anio], map: "empleado_saldo_ausencias_empleadoId_año_key")
+  @@index([empleadoId, anio], map: "empleado_saldo_ausencias_empleadoId_año_idx")
   @@index([empresaId])
+  @@map("empleado_saldo_ausencias")
 }
 
 model empleados {
-  id                                                                                   String                           @id
+  id                                                                                   String                           @id @default(cuid())
   empresaId                                                                            String
   usuarioId                                                                            String                           @unique
   nombre                                                                               String                           @db.VarChar(100)
@@ -528,7 +530,7 @@ model empleados {
   documentosCompletadosEn                                                              DateTime?
   activo                                                                               Boolean                          @default(true)
   createdAt                                                                            DateTime                         @default(now())
-  updatedAt                                                                            DateTime
+  updatedAt                                                                            DateTime                         @updatedAt
   puestoId                                                                             String?
   direccionCalle                                                                       String?                          @db.VarChar(200)
   direccionNumero                                                                      String?                          @db.VarChar(10)
@@ -541,6 +543,7 @@ model empleados {
   tipoContrato                                                                         TipoContrato                     @default(indefinido)
   estadoEmpleado                                                                       EstadoEmpleado                   @default(activo)
   saldoRenovadoDesde                                                                   DateTime?
+  diasAusenciasPersonalizados                                                          Int?
   alertas_nomina                                                                       alertas_nomina[]
   ausencias                                                                            ausencias[]
   auto_completados                                                                     auto_completados[]
@@ -550,17 +553,18 @@ model empleados {
   contratos                                                                            contratos[]
   denuncias                                                                            denuncias[]
   documentos                                                                           documentos[]
-  documentos_generados                                                                 documentos_generados[]
+  documentosGenerados                                                                  documentosGenerado[]
   empleado_complementos                                                                empleado_complementos[]
-  empleado_equipos                                                                     empleado_equipos[]
-  empleado_saldo_ausencias                                                             empleado_saldo_ausencias[]
-  empresas                                                                             empresas                         @relation(fields: [empresaId], references: [id], onDelete: Cascade)
-  jornadas                                                                             jornadas?                        @relation(fields: [jornadaId], references: [id])
-  empleados                                                                            empleados?                       @relation("empleadosToempleados", fields: [managerId], references: [id])
+  saldosAusencias                                                                      empleadoSaldoAusencias[]
+  empleado_festivos                                                                    empleado_festivos[]
+  empresa                                                                              empresas                         @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  jornada                                                                              jornadas?                        @relation(fields: [jornadaId], references: [id])
+  manager                                                                              empleados?                       @relation("empleadosToempleados", fields: [managerId], references: [id])
   other_empleados                                                                      empleados[]                      @relation("empleadosToempleados")
-  puestos                                                                              puestos?                         @relation(fields: [puestoId], references: [id])
-  usuarios                                                                             usuarios                         @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
-  equipos                                                                              equipos[]
+  puestoRelacion                                                                       puestos?                         @relation(fields: [puestoId], references: [id])
+  usuario                                                                              usuarios                         @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  equipos                                                                              empleado_equipos[]
+  equiposGestionados                                                                   equipos[]                        @relation("EquiposManager")
   fichajes                                                                             fichajes[]
   firmas                                                                               firmas[]
   invitaciones_empleados                                                               invitaciones_empleados?
@@ -585,7 +589,7 @@ model empleados {
 }
 
 model empresas {
-  id                             String                           @id
+  id                             String                           @id @default(cuid())
   nombre                         String                           @db.VarChar(200)
   cif                            String?                          @unique @db.VarChar(20)
   email                          String?                          @db.VarChar(255)
@@ -594,7 +598,7 @@ model empresas {
   logoUrl                        String?
   config                         Json                             @default("{\"umbral_ia_nominas\": 0.8, \"umbral_ia_contratos\": 0.85, \"empleado_puede_ver_salario\": false, \"hora_cierre_fichaje_default\": \"18:00\", \"auto_completado_nominas_dias\": 7, \"auto_completado_fichajes_dias\": 7, \"auto_completado_contratos_dias\": 14, \"permitir_saldo_vacaciones_negativo\": true}")
   createdAt                      DateTime                         @default(now())
-  updatedAt                      DateTime
+  updatedAt                      DateTime                         @updatedAt
   web                            String?                          @db.VarChar(255)
   activo                         Boolean                          @default(true)
   alertas_nomina                 alertas_nomina[]
@@ -608,8 +612,8 @@ model empresas {
   consentimientos                consentimientos[]
   denuncias                      denuncias[]
   documentos                     documentos[]
-  documentos_generados           documentos_generados[]
-  empleado_saldo_ausencias       empleado_saldo_ausencias[]
+  documentosGenerados            documentosGenerado[]
+  empleadoSaldoAusencias         empleadoSaldoAusencias[]
   empleados                      empleados[]
   equipo_politica_ausencias      equipo_politica_ausencias[]
   equipos                        equipos[]
@@ -641,35 +645,35 @@ model empresas {
 }
 
 model equipo_politica_ausencias {
-  equipoId               String   @id
+  equipoId               String   @id @default(cuid())
   empresaId              String
   maxSolapamientoPct     Int      @default(50)
   requiereAntelacionDias Int      @default(5)
   createdAt              DateTime @default(now())
-  updatedAt              DateTime
-  empresas               empresas @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  updatedAt              DateTime @updatedAt
+  empresa                empresas @relation(fields: [empresaId], references: [id], onDelete: Cascade)
   equipos                equipos  @relation(fields: [equipoId], references: [id], onDelete: Cascade)
 
   @@index([empresaId])
 }
 
 model equipos {
-  id                        String                     @id
+  id                        String                     @id @default(cuid())
   empresaId                 String
   nombre                    String                     @db.VarChar(100)
   managerId                 String?
   descripcion               String?
   activo                    Boolean                    @default(true)
   createdAt                 DateTime                   @default(now())
-  updatedAt                 DateTime
+  updatedAt                 DateTime                   @updatedAt
   sedeId                    String?
   tipo                      TipoEquipo                 @default(proyecto)
   ausencias                 ausencias[]
   empleado_equipos          empleado_equipos[]
   equipo_politica_ausencias equipo_politica_ausencias?
-  empresas                  empresas                   @relation(fields: [empresaId], references: [id], onDelete: Cascade)
-  empleados                 empleados?                 @relation(fields: [managerId], references: [id])
-  sedes                     sedes?                     @relation(fields: [sedeId], references: [id])
+  empresa                   empresas                   @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  empleados                 empleados?                 @relation("EquiposManager", fields: [managerId], references: [id])
+  sede                      sedes?                     @relation(fields: [sedeId], references: [id])
 
   @@unique([empresaId, nombre])
   @@index([empresaId])
@@ -678,7 +682,7 @@ model equipos {
 }
 
 model eventos_nomina {
-  id                       String           @id
+  id                       String           @id @default(cuid())
   empresaId                String
   mes                      Int              @db.SmallInt
   anio                     Int              @db.SmallInt
@@ -694,8 +698,8 @@ model eventos_nomina {
   complementosAsignados    Int              @default(0)
   nominasImportadas        Int              @default(0)
   createdAt                DateTime         @default(now())
-  updatedAt                DateTime
-  empresas                 empresas         @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  updatedAt                DateTime         @updatedAt
+  empresa                  empresas         @relation(fields: [empresaId], references: [id], onDelete: Cascade)
   nominas                  nominas[]
   notificaciones           notificaciones[]
 
@@ -705,7 +709,7 @@ model eventos_nomina {
 }
 
 model exports_gestoria {
-  id                 String   @id
+  id                 String   @id @default(cuid())
   empresaId          String
   mes                Int      @db.SmallInt
   anio               Int      @db.SmallInt
@@ -715,31 +719,46 @@ model exports_gestoria {
   generadoEn         DateTime @default(now())
   numEmpleados       Int?
   numAlertasCriticas Int?
-  empresas           empresas @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  empresa            empresas @relation(fields: [empresaId], references: [id], onDelete: Cascade)
 
   @@index([empresaId, anio, mes])
   @@index([generadoEn])
 }
 
 model festivos {
-  id                String   @id
+  id                String   @id @default(cuid())
   empresaId         String
   nombre            String   @db.VarChar(200)
   fecha             DateTime @db.Date
   createdAt         DateTime @default(now())
-  updatedAt         DateTime
+  updatedAt         DateTime @updatedAt
   activo            Boolean  @default(true)
   comunidadAutonoma String?  @db.VarChar(100)
   origen            String   @default("manual") @db.VarChar(50)
   tipo              String   @db.VarChar(50)
-  empresas          empresas @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  empresa           empresas @relation(fields: [empresaId], references: [id], onDelete: Cascade)
 
   @@unique([empresaId, fecha])
   @@index([empresaId, fecha, activo])
 }
 
+model empleado_festivos {
+  id         String    @id @default(cuid())
+  empleadoId String
+  nombre     String    @db.VarChar(200)
+  fecha      DateTime  @db.Date
+  activo     Boolean   @default(true)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  empleado   empleados @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+
+  @@unique([empleadoId, fecha])
+  @@index([empleadoId])
+  @@index([fecha])
+}
+
 model fichaje_eventos {
-  id            String            @id
+  id            String            @id @default(cuid())
   fichajeId     String
   hora          DateTime          @db.Timestamptz(6)
   ubicacion     String?
@@ -749,7 +768,7 @@ model fichaje_eventos {
   editadoPor    String?
   createdAt     DateTime          @default(now())
   tipo          TipoFichajeEvento
-  fichajes      fichajes          @relation(fields: [fichajeId], references: [id], onDelete: Cascade)
+  fichaje       fichajes          @relation("eventos", fields: [fichajeId], references: [id], onDelete: Cascade)
 
   @@index([fichajeId, hora])
   @@index([fichajeId])
@@ -758,13 +777,13 @@ model fichaje_eventos {
 }
 
 model fichajes {
-  id                             String                           @id
+  id                             String                           @id @default(cuid())
   empresaId                      String
   empleadoId                     String
   fecha                          DateTime                         @db.Date
   autoCompletado                 Boolean                          @default(false)
   createdAt                      DateTime                         @default(now())
-  updatedAt                      DateTime
+  updatedAt                      DateTime                         @updatedAt
   fechaAprobacion                DateTime?
   horasEnPausa                   Decimal?                         @db.Decimal(5, 2)
   horasTrabajadas                Decimal?                         @db.Decimal(5, 2)
@@ -772,9 +791,9 @@ model fichajes {
   cuadradoPor                    String?
   cuadradoEn                     DateTime?
   estado                         EstadoFichaje                    @default(en_curso)
-  fichaje_eventos                fichaje_eventos[]
-  empleados                      empleados                        @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
-  empresas                       empresas                         @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  eventos                        fichaje_eventos[]                @relation("eventos")
+  empleado                       empleados                        @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+  empresa                        empresas                         @relation(fields: [empresaId], references: [id], onDelete: Cascade)
   solicitudes_correccion_fichaje solicitudes_correccion_fichaje[]
 
   @@unique([empleadoId, fecha])
@@ -788,7 +807,7 @@ model fichajes {
 }
 
 model firmas {
-  id                String            @id
+  id                String            @id @default(cuid())
   solicitudFirmaId  String
   empleadoId        String
   estado            String            @default("pendiente") @db.VarChar(50)
@@ -801,7 +820,7 @@ model firmas {
   certificado       String?
   metodoFirma       String?           @db.VarChar(50)
   createdAt         DateTime          @default(now())
-  updatedAt         DateTime
+  updatedAt         DateTime          @updatedAt
   certificadoHash   String?
   datosCapturados   Json?
   firmado           Boolean           @default(false)
@@ -809,7 +828,7 @@ model firmas {
   numRecordatorios  Int               @default(0)
   orden             Int               @default(0)
   tipo              String            @default("simple") @db.VarChar(50)
-  empleados         empleados         @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+  empleado          empleados         @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
   solicitudes_firma solicitudes_firma @relation(fields: [solicitudFirmaId], references: [id], onDelete: Cascade)
 
   @@unique([solicitudFirmaId, empleadoId])
@@ -824,17 +843,17 @@ model firmas {
 }
 
 model integraciones {
-  id         String   @id
+  id         String   @id @default(cuid())
   empresaId  String
   tipo       String   @db.VarChar(50)
   proveedor  String   @db.VarChar(100)
   config     Json?
   activa     Boolean  @default(true)
   createdAt  DateTime @default(now())
-  updatedAt  DateTime
+  updatedAt  DateTime @updatedAt
   calendarId String?  @db.VarChar(255)
   usuarioId  String?
-  empresas   empresas @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  empresa    empresas @relation(fields: [empresaId], references: [id], onDelete: Cascade)
 
   @@unique([empresaId, tipo, proveedor, usuarioId])
   @@index([empresaId])
@@ -843,7 +862,7 @@ model integraciones {
 }
 
 model invitaciones_empleados {
-  id         String    @id
+  id         String    @id @default(cuid())
   empresaId  String
   empleadoId String    @unique
   email      String
@@ -851,8 +870,8 @@ model invitaciones_empleados {
   expiraEn   DateTime
   aceptada   Boolean   @default(false)
   createdAt  DateTime  @default(now())
-  empleados  empleados @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
-  empresas   empresas  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  empleado   empleados @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+  empresa    empresas  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
 
   @@index([email])
   @@index([empresaId])
@@ -860,7 +879,7 @@ model invitaciones_empleados {
 }
 
 model invitaciones_signup {
-  id          String    @id
+  id          String    @id @default(cuid())
   email       String    @unique
   token       String    @unique
   expiraEn    DateTime
@@ -875,7 +894,7 @@ model invitaciones_signup {
 }
 
 model jobs_generacion_documentos {
-  id                    String                @id
+  id                    String                @id @default(cuid())
   empresaId             String
   plantillaId           String
   solicitadoPor         String
@@ -895,8 +914,8 @@ model jobs_generacion_documentos {
   intentos              Int                   @default(0) @db.SmallInt
   ultimoIntento         DateTime?
   createdAt             DateTime              @default(now())
-  updatedAt             DateTime
-  empresas              empresas              @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  updatedAt             DateTime              @updatedAt
+  empresa               empresas              @relation(fields: [empresaId], references: [id], onDelete: Cascade)
   plantillas_documentos plantillas_documentos @relation(fields: [plantillaId], references: [id], onDelete: Cascade)
 
   @@index([createdAt])
@@ -907,7 +926,7 @@ model jobs_generacion_documentos {
 }
 
 model jornadas {
-  id             String      @id
+  id             String      @id @default(cuid())
   empresaId      String
   nombre         String      @db.VarChar(100)
   horasSemanales Decimal     @db.Decimal(5, 2)
@@ -915,48 +934,48 @@ model jornadas {
   esPredefinida  Boolean     @default(false)
   activa         Boolean     @default(true)
   createdAt      DateTime    @default(now())
-  updatedAt      DateTime
+  updatedAt      DateTime    @updatedAt
   empleados      empleados[]
-  empresas       empresas    @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  empresa        empresas    @relation(fields: [empresaId], references: [id], onDelete: Cascade)
 
   @@index([empresaId])
 }
 
 model nominas {
-  id                       String                     @id
-  empleadoId               String
-  mes                      Int                        @db.SmallInt
-  anio                     Int                        @db.SmallInt
-  documentoId              String?                    @unique
-  datosExtraidosIA         Json?
-  verificado               Boolean                    @default(false)
-  tieneAnomalias           Boolean                    @default(false)
-  createdAt                DateTime                   @default(now())
-  updatedAt                DateTime
-  empleadoNotificado       Boolean                    @default(false)
-  empleadoVisto            Boolean                    @default(false)
-  estado                   String                     @default("pendiente") @db.VarChar(50)
-  fechaNotificacion        DateTime?
-  fechaPublicacion         DateTime?
-  fechaVisto               DateTime?
-  subidoPor                String?
-  complementosPendientes   Boolean                    @default(false)
-  contratoId               String?
-  diasAusencias            Int                        @default(0) @db.SmallInt
-  diasTrabajados           Int                        @default(0) @db.SmallInt
-  eventoNominaId           String?
-  exportadaEn              DateTime?
-  salarioBase              Decimal                    @db.Decimal(10, 2)
-  totalBruto               Decimal                    @db.Decimal(10, 2)
-  totalComplementos        Decimal                    @default(0) @db.Decimal(10, 2)
-  totalDeducciones         Decimal                    @default(0) @db.Decimal(10, 2)
-  totalNeto                Decimal                    @db.Decimal(10, 2)
-  alertas_nomina           alertas_nomina[]
-  asignaciones_complemento asignaciones_complemento[]
-  contratos                contratos?                 @relation(fields: [contratoId], references: [id])
-  documentos               documentos?                @relation(fields: [documentoId], references: [id])
-  empleados                empleados                  @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
-  eventos_nomina           eventos_nomina?            @relation(fields: [eventoNominaId], references: [id])
+  id                     String                     @id @default(cuid())
+  empleadoId             String
+  mes                    Int                        @db.SmallInt
+  anio                   Int                        @db.SmallInt
+  documentoId            String?                    @unique
+  datosExtraidosIA       Json?
+  verificado             Boolean                    @default(false)
+  tieneAnomalias         Boolean                    @default(false)
+  createdAt              DateTime                   @default(now())
+  updatedAt              DateTime                   @updatedAt
+  empleadoNotificado     Boolean                    @default(false)
+  empleadoVisto          Boolean                    @default(false)
+  estado                 String                     @default("pendiente") @db.VarChar(50)
+  fechaNotificacion      DateTime?
+  fechaPublicacion       DateTime?
+  fechaVisto             DateTime?
+  subidoPor              String?
+  complementosPendientes Boolean                    @default(false)
+  contratoId             String?
+  diasAusencias          Int                        @default(0) @db.SmallInt
+  diasTrabajados         Int                        @default(0) @db.SmallInt
+  eventoNominaId         String?
+  exportadaEn            DateTime?
+  salarioBase            Decimal                    @db.Decimal(10, 2)
+  totalBruto             Decimal                    @db.Decimal(10, 2)
+  totalComplementos      Decimal                    @default(0) @db.Decimal(10, 2)
+  totalDeducciones       Decimal                    @default(0) @db.Decimal(10, 2)
+  totalNeto              Decimal                    @db.Decimal(10, 2)
+  alertas                alertas_nomina[]
+  complementosAsignados  asignaciones_complemento[]
+  contrato               contratos?                 @relation(fields: [contratoId], references: [id])
+  documento              documentos?                @relation(fields: [documentoId], references: [id])
+  empleado               empleados                  @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+  eventoNomina           eventos_nomina?            @relation(fields: [eventoNominaId], references: [id])
 
   @@unique([empleadoId, mes, anio])
   @@index([contratoId])
@@ -970,7 +989,7 @@ model nominas {
 }
 
 model notificaciones {
-  id             String          @id
+  id             String          @id @default(cuid())
   empresaId      String
   usuarioId      String
   tipo           String          @db.VarChar(50)
@@ -980,9 +999,9 @@ model notificaciones {
   leida          Boolean         @default(false)
   createdAt      DateTime        @default(now())
   eventoNominaId String?
-  empresas       empresas        @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  empresa        empresas        @relation(fields: [empresaId], references: [id], onDelete: Cascade)
   eventos_nomina eventos_nomina? @relation(fields: [eventoNominaId], references: [id])
-  usuarios       usuarios        @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  usuario        usuarios        @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
 
   @@index([createdAt])
   @@index([empresaId])
@@ -991,20 +1010,20 @@ model notificaciones {
 }
 
 model onboarding_configs {
-  id                   String   @id
+  id                   String   @id @default(cuid())
   empresaId            String   @unique
   camposRequeridos     Json     @default("{\"datos_bancarios\": {\"bic\": true, \"iban\": true}, \"datos_personales\": {\"nif\": true, \"nss\": true, \"ciudad\": true, \"telefono\": true, \"estadoCivil\": false, \"numeroHijos\": false, \"codigoPostal\": true, \"direccionPiso\": false, \"direccionCalle\": true, \"direccionNumero\": true, \"direccionProvincia\": true}}")
   documentosRequeridos Json     @default("[]")
   plantillasDocumentos Json     @default("[]")
   createdAt            DateTime @default(now())
-  updatedAt            DateTime
-  empresas             empresas @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  updatedAt            DateTime @updatedAt
+  empresa              empresas @relation(fields: [empresaId], references: [id], onDelete: Cascade)
 
   @@index([empresaId])
 }
 
 model onboarding_empleados {
-  id              String    @id
+  id              String    @id @default(cuid())
   empresaId       String
   empleadoId      String    @unique
   token           String    @unique
@@ -1015,8 +1034,8 @@ model onboarding_empleados {
   datosTemporales Json?
   createdAt       DateTime  @default(now())
   tipoOnboarding  String    @default("completo") @db.VarChar(20)
-  empleados       empleados @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
-  empresas        empresas  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  empleado        empleados @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+  empresa         empresas  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
 
   @@index([empleadoId])
   @@index([empresaId])
@@ -1024,7 +1043,7 @@ model onboarding_empleados {
 }
 
 model plantillas_documentos {
-  id                         String                       @id
+  id                         String                       @id @default(cuid())
   empresaId                  String?
   nombre                     String                       @db.VarChar(255)
   descripcion                String?
@@ -1042,12 +1061,12 @@ model plantillas_documentos {
   usarIAParaExtraer          Boolean                      @default(false)
   configuracionIA            Json?
   createdAt                  DateTime                     @default(now())
-  updatedAt                  DateTime
+  updatedAt                  DateTime                     @updatedAt
   autoGenerarOffboarding     Boolean                      @default(false)
   autoGenerarOnboarding      Boolean                      @default(false)
   permiteRellenar            Boolean                      @default(false)
   requiereRevision           Boolean                      @default(false)
-  documentos_generados       documentos_generados[]
+  documentosGenerados        documentosGenerado[]
   jobs_generacion_documentos jobs_generacion_documentos[]
   empresas                   empresas?                    @relation(fields: [empresaId], references: [id], onDelete: Cascade)
 
@@ -1059,24 +1078,24 @@ model plantillas_documentos {
 }
 
 model preferencias_vacaciones {
-  id                  String              @id
-  campanaId           String
-  empleadoId          String
-  empresaId           String
-  diasIdeales         Json
-  diasPrioritarios    Json?
-  diasAlternativos    Json?
-  completada          Boolean             @default(false)
-  aceptada            Boolean             @default(false)
-  propuestaIA         Json?
-  createdAt           DateTime            @default(now())
-  updatedAt           DateTime
-  propuestaEnviada    Boolean             @default(false)
-  cambioSolicitado    Boolean             @default(false)
-  propuestaEmpleado   Json?
-  campanas_vacaciones campanas_vacaciones @relation(fields: [campanaId], references: [id], onDelete: Cascade)
-  empleados           empleados           @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
-  empresas            empresas            @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  id                 String              @id @default(cuid())
+  campanaId          String
+  empleadoId         String
+  empresaId          String
+  diasIdeales        Json
+  diasPrioritarios   Json?
+  diasAlternativos   Json?
+  completada         Boolean             @default(false)
+  aceptada           Boolean             @default(false)
+  propuestaIA        Json?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  propuestaEnviada   Boolean             @default(false)
+  cambioSolicitado   Boolean             @default(false)
+  propuestaEmpleado  Json?
+  campana_vacaciones campanas_vacaciones @relation(fields: [campanaId], references: [id], onDelete: Cascade)
+  empleado           empleados           @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+  empresa            empresas            @relation(fields: [empresaId], references: [id], onDelete: Cascade)
 
   @@unique([campanaId, empleadoId])
   @@index([campanaId])
@@ -1086,23 +1105,23 @@ model preferencias_vacaciones {
 }
 
 model puestos {
-  id          String       @id
+  id          String       @id @default(cuid())
   empresaId   String
   nombre      String       @db.VarChar(100)
   descripcion String?
   activo      Boolean      @default(true)
   createdAt   DateTime     @default(now())
-  updatedAt   DateTime
+  updatedAt   DateTime     @updatedAt
   documentos  documentos[]
   empleados   empleados[]
-  empresas    empresas     @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  empresa     empresas     @relation(fields: [empresaId], references: [id], onDelete: Cascade)
 
   @@unique([empresaId, nombre])
   @@index([empresaId])
 }
 
 model resumenes_mensuales_nomina {
-  id                        String    @id
+  id                        String    @id @default(cuid())
   empresaId                 String
   empleadoId                String
   mes                       Int       @db.SmallInt
@@ -1117,8 +1136,8 @@ model resumenes_mensuales_nomina {
   horasExtras               Decimal   @default(0) @db.Decimal(10, 2)
   salarioBase               Decimal?  @db.Decimal(10, 2)
   calculadoEn               DateTime  @default(now())
-  empleados                 empleados @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
-  empresas                  empresas  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  empleado                  empleados @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+  empresa                   empresas  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
 
   @@unique([empresaId, empleadoId, mes, anio])
   @@index([empleadoId])
@@ -1126,21 +1145,21 @@ model resumenes_mensuales_nomina {
 }
 
 model sedes {
-  id        String    @id
+  id        String    @id @default(cuid())
   empresaId String
   nombre    String    @db.VarChar(200)
   ciudad    String    @db.VarChar(100)
   createdAt DateTime  @default(now())
-  updatedAt DateTime
+  updatedAt DateTime  @updatedAt
   activo    Boolean   @default(true)
   equipos   equipos[]
-  empresas  empresas  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  empresa   empresas  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
 
   @@index([empresaId])
 }
 
 model sesiones_activas {
-  id        String   @id
+  id        String   @id @default(cuid())
   usuarioId String
   tokenHash String   @unique
   ipAddress String?  @db.VarChar(50)
@@ -1148,7 +1167,7 @@ model sesiones_activas {
   createdAt DateTime @default(now())
   ultimoUso DateTime @default(now())
   expiraEn  DateTime
-  usuarios  usuarios @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  usuario   usuarios @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
 
   @@index([expiraEn])
   @@index([tokenHash])
@@ -1156,34 +1175,34 @@ model sesiones_activas {
 }
 
 model sessions {
-  id           String   @id
+  id           String   @id @default(cuid())
   sessionToken String   @unique
   userId       String
   expires      DateTime
-  usuarios     usuarios @relation(fields: [userId], references: [id], onDelete: Cascade)
+  usuario      usuarios @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
 }
 
 model solicitudes_cambio {
-  id                                                  String          @id
-  empresaId                                           String
-  empleadoId                                          String
-  aprobadorId                                         String?
-  tipo                                                String          @db.VarChar(100)
-  camposCambiados                                     Json
-  motivo                                              String?
-  motivoRechazo                                       String?
-  fechaRespuesta                                      DateTime?
-  createdAt                                           DateTime        @default(now())
-  updatedAt                                           DateTime
-  requiereAprobacionManual                            Boolean         @default(false)
-  revisadaPorIA                                       Boolean         @default(false)
-  revisionIA                                          Json?
-  estado                                              EstadoSolicitud @default(pendiente)
-  empleados_solicitudes_cambio_aprobadorIdToempleados empleados?      @relation("solicitudes_cambio_aprobadorIdToempleados", fields: [aprobadorId], references: [id])
-  empleados_solicitudes_cambio_empleadoIdToempleados  empleados       @relation("solicitudes_cambio_empleadoIdToempleados", fields: [empleadoId], references: [id], onDelete: Cascade)
-  empresas                                            empresas        @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  id                       String          @id @default(cuid())
+  empresaId                String
+  empleadoId               String
+  aprobadorId              String?
+  tipo                     String          @db.VarChar(100)
+  camposCambiados          Json
+  motivo                   String?
+  motivoRechazo            String?
+  fechaRespuesta           DateTime?
+  createdAt                DateTime        @default(now())
+  updatedAt                DateTime        @updatedAt
+  requiereAprobacionManual Boolean         @default(false)
+  revisadaPorIA            Boolean         @default(false)
+  revisionIA               Json?
+  estado                   EstadoSolicitud @default(pendiente)
+  aprobador                empleados?      @relation("solicitudes_cambio_aprobadorIdToempleados", fields: [aprobadorId], references: [id])
+  empleado                 empleados       @relation("solicitudes_cambio_empleadoIdToempleados", fields: [empleadoId], references: [id], onDelete: Cascade)
+  empresa                  empresas        @relation(fields: [empresaId], references: [id], onDelete: Cascade)
 
   @@index([aprobadorId])
   @@index([empleadoId])
@@ -1193,7 +1212,7 @@ model solicitudes_cambio {
 }
 
 model solicitudes_correccion_fichaje {
-  id                                                              String                           @id
+  id                                                              String                           @id @default(cuid())
   empresaId                                                       String
   fichajeId                                                       String
   empleadoId                                                      String
@@ -1204,10 +1223,10 @@ model solicitudes_correccion_fichaje {
   revisadaPor                                                     String?
   revisadaEn                                                      DateTime?
   createdAt                                                       DateTime                         @default(now())
-  updatedAt                                                       DateTime
+  updatedAt                                                       DateTime                         @updatedAt
   empleados_solicitudes_correccion_fichaje_empleadoIdToempleados  empleados                        @relation("solicitudes_correccion_fichaje_empleadoIdToempleados", fields: [empleadoId], references: [id], onDelete: Cascade)
-  empresas                                                        empresas                         @relation(fields: [empresaId], references: [id], onDelete: Cascade)
-  fichajes                                                        fichajes                         @relation(fields: [fichajeId], references: [id], onDelete: Cascade)
+  empresa                                                         empresas                         @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  fichaje                                                         fichajes                         @relation(fields: [fichajeId], references: [id], onDelete: Cascade)
   empleados_solicitudes_correccion_fichaje_revisadaPorToempleados empleados?                       @relation("solicitudes_correccion_fichaje_revisadaPorToempleados", fields: [revisadaPor], references: [id])
 
   @@index([empleadoId])
@@ -1218,7 +1237,7 @@ model solicitudes_correccion_fichaje {
 }
 
 model solicitudes_eliminacion_datos {
-  id             String    @id
+  id             String    @id @default(cuid())
   empresaId      String
   empleadoId     String
   solicitantePor String
@@ -1227,9 +1246,9 @@ model solicitudes_eliminacion_datos {
   respuesta      String?
   completadaEn   DateTime?
   createdAt      DateTime  @default(now())
-  updatedAt      DateTime
-  empleados      empleados @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
-  empresas       empresas  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  updatedAt      DateTime  @updatedAt
+  empleado       empleados @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+  empresa        empresas  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
 
   @@index([empleadoId])
   @@index([empresaId])
@@ -1237,7 +1256,7 @@ model solicitudes_eliminacion_datos {
 }
 
 model solicitudes_firma {
-  id                     String     @id
+  id                     String     @id @default(cuid())
   empresaId              String
   documentoId            String
   solicitadoPor          String?    @db.VarChar(100)
@@ -1251,7 +1270,7 @@ model solicitudes_firma {
   expiradaEn             DateTime?
   canceladaEn            DateTime?
   createdAt              DateTime   @default(now())
-  updatedAt              DateTime
+  updatedAt              DateTime   @updatedAt
   pdfFirmadoS3Key        String?
   creadoPor              String?    @db.VarChar(100)
   diasRecordatorio       Int        @default(3)
@@ -1264,7 +1283,7 @@ model solicitudes_firma {
   posicionFirma          Json?
   firmas                 firmas[]
   documentos             documentos @relation(fields: [documentoId], references: [id], onDelete: Cascade)
-  empresas               empresas   @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  empresa                empresas   @relation(fields: [empresaId], references: [id], onDelete: Cascade)
 
   @@index([documentoId])
   @@index([empresaId, createdAt])
@@ -1277,7 +1296,7 @@ model solicitudes_firma {
 }
 
 model subscriptions {
-  id                 String             @id
+  id                 String             @id @default(cuid())
   empresaId          String
   customerId         String
   priceId            String
@@ -1290,9 +1309,9 @@ model subscriptions {
   canceledAt         DateTime?
   metadata           Json?
   createdAt          DateTime           @default(now())
-  updatedAt          DateTime
-  billing_customers  billing_customers  @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  empresas           empresas           @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  updatedAt          DateTime           @updatedAt
+  billing_customer   billing_customers  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  empresa            empresas           @relation(fields: [empresaId], references: [id], onDelete: Cascade)
   billing_prices     billing_prices     @relation(fields: [priceId], references: [id], onDelete: Cascade)
 
   @@index([customerId])
@@ -1302,7 +1321,7 @@ model subscriptions {
 }
 
 model tipos_complemento {
-  id                    String                  @id
+  id                    String                  @id @default(cuid())
   empresaId             String
   nombre                String                  @db.VarChar(200)
   descripcion           String?
@@ -1310,15 +1329,15 @@ model tipos_complemento {
   importeFijo           Decimal?                @db.Decimal(10, 2)
   activo                Boolean                 @default(true)
   createdAt             DateTime                @default(now())
-  updatedAt             DateTime
+  updatedAt             DateTime                @updatedAt
   empleado_complementos empleado_complementos[]
-  empresas              empresas                @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  empresa               empresas                @relation(fields: [empresaId], references: [id], onDelete: Cascade)
 
   @@index([empresaId, activo])
 }
 
 model usuarios {
-  id                String              @id
+  id                String              @id @default(cuid())
   empresaId         String
   empleadoId        String?             @unique
   email             String              @unique @db.VarChar(255)
@@ -1329,7 +1348,7 @@ model usuarios {
   activo            Boolean             @default(true)
   emailVerificado   Boolean             @default(false)
   createdAt         DateTime            @default(now())
-  updatedAt         DateTime
+  updatedAt         DateTime            @updatedAt
   ultimoAcceso      DateTime?
   password          String?             @db.VarChar(255)
   googleId          String?             @unique @db.VarChar(255)
@@ -1340,11 +1359,11 @@ model usuarios {
   totpSecret        String?
   accounts          accounts[]
   auditoria_accesos auditoria_accesos[]
-  empleados         empleados?
+  empleado          empleados?
   notificaciones    notificaciones[]
   sesiones_activas  sesiones_activas[]
   sessions          sessions[]
-  empresas          empresas            @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  empresa           empresas            @relation(fields: [empresaId], references: [id], onDelete: Cascade)
 
   @@index([cognitoId])
   @@index([email])
@@ -1353,7 +1372,7 @@ model usuarios {
 }
 
 model variable_mappings {
-  id                 String   @id
+  id                 String   @id @default(cuid())
   variableName       String   @unique @db.VarChar(200)
   jsonPath           String
   requiresDecryption Boolean  @default(false)
@@ -1366,7 +1385,7 @@ model variable_mappings {
   vecesUsado         Int      @default(0)
   ultimoUso          DateTime @default(now())
   createdAt          DateTime @default(now())
-  updatedAt          DateTime
+  updatedAt          DateTime @updatedAt
 
   @@index([ultimoUso])
   @@index([variableName])
@@ -1381,7 +1400,7 @@ model verification_tokens {
 }
 
 model waitlist {
-  id         String    @id
+  id         String    @id @default(cuid())
   email      String    @unique
   nombre     String?   @db.VarChar(200)
   empresa    String?   @db.VarChar(200)

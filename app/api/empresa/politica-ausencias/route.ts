@@ -26,7 +26,7 @@ export async function GET(_req: NextRequest) {
     }
 
     // Obtener configuración de la empresa
-    const empresa = await prisma.empresa.findUnique({
+    const empresa = await prisma.empresas.findUnique({
       where: { id: session.user.empresaId },
       select: {
         config: true,
@@ -131,7 +131,7 @@ export async function PATCH(req: NextRequest) {
     }
 
     // Obtener configuración actual
-    const empresa = await prisma.empresa.findUnique({
+    const empresa = await prisma.empresas.findUnique({
       where: { id: session.user.empresaId },
       select: { config: true },
     });
@@ -157,7 +157,7 @@ export async function PATCH(req: NextRequest) {
           };
 
     // Actualizar config
-    await prisma.empresa.update({
+    await prisma.empresas.update({
       where: { id: session.user.empresaId },
       data: {
         config: asJsonValue({

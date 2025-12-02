@@ -144,7 +144,7 @@ export async function obtenerResumenPlantilla(
 
   const [empleadosDisponibles, fichajesHoy, ausenciasActivas, todosEmpleados] = await Promise.all([
     obtenerEmpleadosDisponibles(empresaId, fecha),
-    prisma.fichaje.findMany({
+    prisma.fichajes.findMany({
       where: {
         empresaId,
         fecha,
@@ -181,7 +181,7 @@ export async function obtenerResumenPlantilla(
         },
       },
     }),
-    prisma.ausencia.findMany({
+    prisma.ausencias.findMany({
       where: {
         empresaId,
         estado: {
@@ -218,7 +218,7 @@ export async function obtenerResumenPlantilla(
       },
     }),
     // Obtener todos los empleados activos con su jornada para calcular horarios
-    prisma.empleado.findMany({
+    prisma.empleados.findMany({
       where: {
         empresaId,
         activo: true,
@@ -383,7 +383,7 @@ export async function obtenerResumenPlantillaEquipo(
   const horaActual = new Date();
 
   // Obtener empleados del equipo del manager (solo activos)
-  const empleadosEquipo = await prisma.empleado.findMany({
+  const empleadosEquipo = await prisma.empleados.findMany({
     where: {
       empresaId,
       managerId,
@@ -434,7 +434,7 @@ export async function obtenerResumenPlantillaEquipo(
   );
 
   const [fichajesHoy, ausenciasActivas] = await Promise.all([
-    prisma.fichaje.findMany({
+    prisma.fichajes.findMany({
       where: {
         empresaId,
         fecha,
@@ -474,7 +474,7 @@ export async function obtenerResumenPlantillaEquipo(
         },
       },
     }),
-    prisma.ausencia.findMany({
+    prisma.ausencias.findMany({
       where: {
         empresaId,
         estado: {

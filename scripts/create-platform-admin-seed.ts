@@ -15,7 +15,7 @@ const ADMIN_PASSWORD = process.env.PLATFORM_ADMIN_PASSWORD || 'Admin123!';
 async function main() {
   console.log('🚀 Creando empresa base y admin de plataforma...');
 
-  const empresa = await prisma.empresa.upsert({
+  const empresa = await prisma.empresas.upsert({
     where: { cif: 'PLATFORM-0001' },
     update: {},
     create: {
@@ -29,13 +29,13 @@ async function main() {
 
   console.log(`✅ Empresa base lista (ID: ${empresa.id})`);
 
-  const existingUser = await prisma.usuario.findUnique({
+  const existingUser = await prisma.usuarios.findUnique({
     where: { email: ADMIN_EMAIL },
   });
 
   if (existingUser) {
     console.log('ℹ️  El usuario ya existía. Actualizando rol y estado...');
-    await prisma.usuario.update({
+    await prisma.usuarios.update({
       where: { id: existingUser.id },
       data: {
         rol: UsuarioRol.platform_admin,
@@ -50,7 +50,7 @@ async function main() {
 
   const hashedPassword = await hash(ADMIN_PASSWORD, 12);
 
-  await prisma.usuario.create({
+  await prisma.usuarios.create({
     data: {
       email: ADMIN_EMAIL,
       password: hashedPassword,

@@ -31,6 +31,7 @@ interface FirmarSolicitudResponse {
 
 export interface FirmaPendiente {
   id: string;
+  solicitudId: string;
   orden?: number;
   solicitudTitulo: string;
   solicitudMensaje?: string;
@@ -135,7 +136,7 @@ export function FirmarDocumentoDialog({
         firmaImagenHeight: 180,
       };
 
-      const res = await fetch(`/api/firma/solicitudes/${firma.id}/firmar`, {
+      const res = await fetch(`/api/firma/solicitudes/${firma.solicitudId}/firmar`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),

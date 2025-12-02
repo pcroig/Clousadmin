@@ -27,7 +27,7 @@ export async function crearCarpetasOnboardingDocumento(
     // 1. Crear/obtener carpeta generalizada para HR
     const nombreCarpetaHR = `Onboarding - ${nombreDocumento}`;
     
-    let carpetaHR = await prisma.carpeta.findFirst({
+    let carpetaHR = await prisma.carpetas.findFirst({
       where: {
         empresaId,
         nombre: nombreCarpetaHR,
@@ -37,7 +37,7 @@ export async function crearCarpetasOnboardingDocumento(
     });
 
     if (!carpetaHR) {
-      carpetaHR = await prisma.carpeta.create({
+      carpetaHR = await prisma.carpetas.create({
         data: {
           empresaId,
           nombre: nombreCarpetaHR,
@@ -49,7 +49,7 @@ export async function crearCarpetasOnboardingDocumento(
     }
 
     // 2. Crear/obtener carpeta de onboarding personalizada del empleado
-    let carpetaEmpleadoOnboarding = await prisma.carpeta.findFirst({
+    let carpetaEmpleadoOnboarding = await prisma.carpetas.findFirst({
       where: {
         empresaId,
         empleadoId,
@@ -59,7 +59,7 @@ export async function crearCarpetasOnboardingDocumento(
     });
 
     if (!carpetaEmpleadoOnboarding) {
-      carpetaEmpleadoOnboarding = await prisma.carpeta.create({
+      carpetaEmpleadoOnboarding = await prisma.carpetas.create({
         data: {
           empresaId,
           empleadoId,
@@ -71,7 +71,7 @@ export async function crearCarpetasOnboardingDocumento(
     }
 
     // 3. Crear subcarpeta específica para el tipo de documento
-    let subcarpetaDocumento = await prisma.carpeta.findFirst({
+    let subcarpetaDocumento = await prisma.carpetas.findFirst({
       where: {
         empresaId,
         empleadoId,
@@ -81,7 +81,7 @@ export async function crearCarpetasOnboardingDocumento(
     });
 
     if (!subcarpetaDocumento) {
-      subcarpetaDocumento = await prisma.carpeta.create({
+      subcarpetaDocumento = await prisma.carpetas.create({
         data: {
           empresaId,
           empleadoId,
@@ -115,7 +115,7 @@ export async function obtenerCarpetaOnboardingEmpleado(
   empleadoId: string
 ) {
   try {
-    let carpeta = await prisma.carpeta.findFirst({
+    let carpeta = await prisma.carpetas.findFirst({
       where: {
         empresaId,
         empleadoId,
@@ -129,7 +129,7 @@ export async function obtenerCarpetaOnboardingEmpleado(
     });
 
     if (!carpeta) {
-      carpeta = await prisma.carpeta.create({
+      carpeta = await prisma.carpetas.create({
         data: {
           empresaId,
           empleadoId,
@@ -175,7 +175,7 @@ export async function listarDocumentosOnboarding(
     }
 
     // Obtener todos los documentos de la carpeta de onboarding y sus subcarpetas
-    const documentos = await prisma.documento.findMany({
+    const documentos = await prisma.documentos.findMany({
       where: {
         empresaId,
         OR: [
@@ -284,7 +284,7 @@ export async function subirDocumentoOnboarding(
 
     if (carpetaId) {
       // Verificar que la carpeta existe y pertenece al empleado o es compartida
-      carpetaDestino = await prisma.carpeta.findFirst({
+      carpetaDestino = await prisma.carpetas.findFirst({
         where: {
           id: carpetaId,
           empresaId,
@@ -310,7 +310,7 @@ export async function subirDocumentoOnboarding(
           carpetaSistema
         );
       } else {
-        carpetaDestino = await prisma.carpeta.findFirst({
+        carpetaDestino = await prisma.carpetas.findFirst({
           where: {
             empresaId,
             empleadoId,
@@ -319,7 +319,7 @@ export async function subirDocumentoOnboarding(
         });
 
         if (!carpetaDestino) {
-          carpetaDestino = await prisma.carpeta.create({
+          carpetaDestino = await prisma.carpetas.create({
             data: {
               empresaId,
               empleadoId,
@@ -360,7 +360,7 @@ export async function subirDocumentoOnboarding(
     }
 
     // Crear documento en carpeta del empleado
-    const documento = await prisma.documento.create({
+    const documento = await prisma.documentos.create({
       data: {
         empresaId,
         empleadoId,

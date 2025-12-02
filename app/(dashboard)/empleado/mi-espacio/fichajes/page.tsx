@@ -14,7 +14,7 @@ export default async function EmpleadoFichajesPage() {
     redirect('/login');
   }
 
-  const empleado = await prisma.empleado.findUnique({
+  const empleado = await prisma.empleados.findUnique({
     where: {
       usuarioId: session.user.id,
     },

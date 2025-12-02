@@ -25,6 +25,7 @@ interface CalendarioFestivosProps {
   refreshToken?: number;
   onRequestCreate: (fecha: string) => void;
   onRequestEdit: (festivo: Festivo) => void;
+  numberOfMonths?: number;
 }
 
 const DIA_SEMANA_KEYS: Array<keyof DiasLaborables> = [
@@ -43,6 +44,7 @@ export function CalendarioFestivos({
   refreshToken = 0,
   onRequestCreate,
   onRequestEdit,
+  numberOfMonths = 2,
 }: CalendarioFestivosProps) {
   const [mesActual, setMesActual] = useState(new Date());
   const [festivos, setFestivos] = useState<Festivo[]>([]);
@@ -120,9 +122,22 @@ export function CalendarioFestivos({
 
   return (
     <div className="space-y-4">
-      <div className="rounded-md border p-4">
+      {!cargando && (
+        <div className="flex items-center gap-4 text-xs text-muted-foreground">
+          <div className="flex items-center gap-2">
+            <div className="h-3 w-3 rounded-sm border border-red-200 bg-red-100" />
+            <span>Festivos</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="h-3 w-3 rounded-sm bg-muted/40" />
+            <span>No laborable</span>
+          </div>
+        </div>
+      )}
+
+      <div>
         {cargando ? (
-          <div className="text-center py-8 text-gray-500">Cargando calendario...</div>
+          <div className="py-8 text-center text-gray-500">Cargando calendario...</div>
         ) : (
           <Calendar
             mode="single"
@@ -130,7 +145,7 @@ export function CalendarioFestivos({
             onSelect={handleDiaClick}
             month={mesActual}
             onMonthChange={setMesActual}
-            numberOfMonths={2}
+            numberOfMonths={numberOfMonths}
             modifiers={{
               festivo: festivosDates,
               noLaborable: (date: Date) => !esDiaLaborable(date),
@@ -141,7 +156,7 @@ export function CalendarioFestivos({
                   {...props}
                   className={cn(
                     props.className,
-                    props.modifiers?.noLaborable && 'text-gray-400 bg-muted/40',
+                    props.modifiers?.noLaborable && 'bg-muted/40 text-gray-400',
                     props.modifiers?.festivo && 'bg-red-100 text-red-900 font-semibold hover:bg-red-200'
                   )}
                 />
@@ -151,26 +166,6 @@ export function CalendarioFestivos({
           />
         )}
       </div>
-
-      {!cargando && (
-        <div className="flex items-center gap-4 text-xs text-muted-foreground">
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-sm bg-red-100 border border-red-200" />
-            <span>Festivos</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-sm bg-muted/40" />
-            <span>No laborable</span>
-          </div>
-        </div>
-      )}
-
-      {onUpdate && (
-        <div className="text-xs text-muted-foreground">
-          Las actualizaciones desde la lista de festivos se sincronizan automáticamente con este
-          calendario.
-        </div>
-      )}
     </div>
   );
 }

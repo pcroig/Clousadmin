@@ -17,7 +17,7 @@ async function verificarCrons() {
     ayer.setDate(ayer.getDate() - 1);
     ayer.setHours(0, 0, 0, 0);
 
-    const fichajesPendientes = await prisma.fichaje.findMany({
+    const fichajesPendientes = await prisma.fichajes.findMany({
       where: {
         estado: 'pendiente',
         fecha: {
@@ -33,7 +33,7 @@ async function verificarCrons() {
       take: 10,
     });
 
-    const fichajesFinalizados = await prisma.fichaje.findMany({
+    const fichajesFinalizados = await prisma.fichajes.findMany({
       where: {
         estado: 'finalizado',
         fecha: {
@@ -73,7 +73,7 @@ async function verificarCrons() {
     const hace48h = new Date();
     hace48h.setHours(hace48h.getHours() - 48);
 
-    const solicitudesPendientes = await prisma.solicitudCambio.findMany({
+    const solicitudesPendientes = await prisma.solicitudes_cambio.findMany({
       where: {
         estado: 'pendiente',
         revisadaPorIA: false,
@@ -95,7 +95,7 @@ async function verificarCrons() {
       take: 10,
     });
 
-    const solicitudesRevisadasIA = await prisma.solicitudCambio.findMany({
+    const solicitudesRevisadasIA = await prisma.solicitudes_cambio.findMany({
       where: {
         revisadaPorIA: true,
         createdAt: {

@@ -33,7 +33,7 @@ export async function POST(
     const { id } = params;
 
     // Obtener plantilla
-    const plantilla = await prisma.plantillaDocumento.findUnique({
+    const plantilla = await prisma.plantillas_documentos.findUnique({
       where: { id },
     });
 
@@ -92,7 +92,7 @@ export async function POST(
       metodoDeteccion: camposNativos.length > 0 ? 'hibrido' : 'vision',
     };
 
-    await prisma.plantillaDocumento.update({
+    await prisma.plantillas_documentos.update({
       where: { id },
       data: {
         configuracionIA: asJsonValue(configuracionIA),

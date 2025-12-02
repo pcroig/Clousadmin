@@ -19,7 +19,7 @@ export default async function AuditoriaPage() {
     redirect('/empleado/mi-espacio');
   }
 
-  const logs = await prisma.auditoriaAcceso.findMany({
+  const logs = await prisma.auditoria_accesos.findMany({
     where: { empresaId: session.user.empresaId },
     orderBy: { createdAt: 'desc' },
     take: 50,

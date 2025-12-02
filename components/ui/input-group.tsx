@@ -74,8 +74,8 @@ const inputGroupAddonVariants = cva(
   {
     variants: {
       align: {
-        "inline-start": "border-r border-input",
-        "inline-end": "border-l border-input",
+        "inline-start": "",
+        "inline-end": "",
       },
     },
   }

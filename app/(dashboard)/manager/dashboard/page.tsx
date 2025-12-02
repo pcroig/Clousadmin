@@ -29,7 +29,7 @@ export default async function ManagerDashboardPage() {
   }
 
   // Obtener empleado del manager (solo campos necesarios)
-  const manager = await prisma.empleado.findUnique({
+  const manager = await prisma.empleados.findUnique({
     where: {
       usuarioId: session.user.id,
     },
@@ -63,7 +63,7 @@ export default async function ManagerDashboardPage() {
     : null;
 
   // Obtener solicitudes pendientes del equipo del manager
-  const ausenciasPendientes = await prisma.ausencia.findMany({
+  const ausenciasPendientes = await prisma.ausencias.findMany({
     where: {
       empresaId: session.user.empresaId,
       estado: EstadoAusencia.pendiente,
@@ -113,7 +113,7 @@ export default async function ManagerDashboardPage() {
   });
 
   // Notificaciones reales para el manager actual
-  const notificacionesDb = await prisma.notificacion.findMany({
+  const notificacionesDb = await prisma.notificaciones.findMany({
     where: {
       empresaId: session.user.empresaId,
       usuarioId: session.user.id,
@@ -142,7 +142,7 @@ export default async function ManagerDashboardPage() {
   ayerDate.setDate(ayerDate.getDate() - 1);
 
   // Empleados del manager (activos) para filtrar métricas
-  const empleadosEquipo = await prisma.empleado.findMany({
+  const empleadosEquipo = await prisma.empleados.findMany({
     where: {
       managerId: manager.id,
       activo: true,
@@ -154,7 +154,7 @@ export default async function ManagerDashboardPage() {
   const empleadoIds = empleadosEquipo.map((empleado) => empleado.id);
 
   const fichajesHoy = empleadoIds.length
-    ? await prisma.fichaje.count({
+    ? await prisma.fichajes.count({
         where: {
           empresaId: session.user.empresaId,
           empleadoId: {
@@ -166,7 +166,7 @@ export default async function ManagerDashboardPage() {
     : 0;
 
   const fichajesAyer = empleadoIds.length
-    ? await prisma.fichaje.count({
+    ? await prisma.fichajes.count({
         where: {
           empresaId: session.user.empresaId,
           empleadoId: {
@@ -188,7 +188,7 @@ export default async function ManagerDashboardPage() {
 
   // Auto-completed stats
   const pendientes = empleadoIds.length
-    ? await prisma.autoCompletado.count({
+    ? await prisma.auto_completados.count({
         where: {
           empresaId: session.user.empresaId,
           estado: 'pendiente',
@@ -200,7 +200,7 @@ export default async function ManagerDashboardPage() {
     : 0;
 
   const aprobados = empleadoIds.length
-    ? await prisma.autoCompletado.count({
+    ? await prisma.auto_completados.count({
         where: {
           empresaId: session.user.empresaId,
           estado: 'aprobado',

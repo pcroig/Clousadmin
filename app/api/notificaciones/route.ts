@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
     const countOnly = searchParams.get('count') === 'true';
 
     // Construir filtros
-    const where: Prisma.NotificacionWhereInput = {
+    const where: Prisma.notificacionesWhereInput = {
       usuarioId: session.user.id,
       empresaId: session.user.empresaId,
     };
@@ -48,14 +48,14 @@ export async function GET(request: NextRequest) {
       where.tipo = tipo;
     }
 
-    const noLeidasWhere: Prisma.NotificacionWhereInput = {
+    const noLeidasWhere: Prisma.notificacionesWhereInput = {
       usuarioId: session.user.id,
       empresaId: session.user.empresaId,
       leida: false,
     };
 
     if (countOnly) {
-      const count = await prisma.notificacion.count({
+      const count = await prisma.notificaciones.count({
         where: noLeidasWhere,
       });
       return successResponse({ count });
@@ -64,7 +64,7 @@ export async function GET(request: NextRequest) {
     const { page, limit, skip } = parsePaginationParams(searchParams);
 
     const [notificaciones, total, noLeidas] = await Promise.all([
-      prisma.notificacion.findMany({
+      prisma.notificaciones.findMany({
         where,
         orderBy: {
           createdAt: 'desc',
@@ -72,8 +72,8 @@ export async function GET(request: NextRequest) {
         skip,
         take: limit,
       }),
-      prisma.notificacion.count({ where }),
-      prisma.notificacion.count({
+      prisma.notificaciones.count({ where }),
+      prisma.notificaciones.count({
         where: noLeidasWhere,
       }),
     ]);

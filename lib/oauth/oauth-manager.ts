@@ -25,7 +25,7 @@ export class OAuthManager {
     tokens: OAuthTokens
   ): Promise<void> {
     try {
-      await prisma.account.upsert({
+      await prisma.accounts.upsert({
         where: {
           provider_providerAccountId: {
             provider,
@@ -67,7 +67,7 @@ export class OAuthManager {
     provider: OAuthProviderName
   ): Promise<StoredOAuthData | null> {
     try {
-      const account = await prisma.account.findFirst({
+      const account = await prisma.accounts.findFirst({
         where: {
           userId: usuarioId,
           provider,
@@ -176,7 +176,7 @@ export class OAuthManager {
       }
 
       // Eliminar de la base de datos
-      await prisma.account.deleteMany({
+      await prisma.accounts.deleteMany({
         where: {
           userId: usuarioId,
           provider,
@@ -196,7 +196,7 @@ export class OAuthManager {
     provider: OAuthProviderName
   ): Promise<boolean> {
     try {
-      const account = await prisma.account.findFirst({
+      const account = await prisma.accounts.findFirst({
         where: {
           userId: usuarioId,
           provider,

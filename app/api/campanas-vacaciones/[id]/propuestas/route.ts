@@ -61,7 +61,7 @@ export async function PATCH(
       return badRequestResponse('Debes indicar al menos un ajuste');
     }
 
-    const campana = await prisma.campanaVacaciones.findFirst({
+    const campana = await prisma.campanas_vacaciones.findFirst({
       where: {
         id: campanaId,
         empresaId: session.user.empresaId,
@@ -78,7 +78,7 @@ export async function PATCH(
     }
 
     const preferenciaIds = ajustes.map((ajuste) => ajuste.preferenciaId);
-    const preferencias = await prisma.preferenciaVacaciones.findMany({
+    const preferencias = await prisma.preferencias_vacaciones.findMany({
       where: {
         id: { in: preferenciaIds },
         campanaId,
@@ -150,7 +150,7 @@ export async function PATCH(
 
     await prisma.$transaction(async (tx) => {
       for (const propuesta of nuevasPropuestas) {
-        await tx.preferenciaVacaciones.update({
+        await tx.preferencias_vacaciones.update({
           where: { id: propuesta.preferenciaId },
           data: {
             propuestaIA: asJsonValue(propuesta.propuesta),
@@ -180,7 +180,7 @@ export async function PATCH(
         }
       }
 
-      await tx.campanaVacaciones.update({
+      await tx.campanas_vacaciones.update({
         where: { id: campanaId },
         data: {
           propuestaIA: asJsonValue({

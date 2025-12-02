@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
     );
 
     // Obtener solicitudes pendientes elegibles
-    const solicitudesPendientes = await prisma.solicitudCambio.findMany({
+    const solicitudesPendientes = await prisma.solicitudes_cambio.findMany({
       where: {
         estado: EstadoSolicitud.pendiente,
         revisadaPorIA: false,
@@ -112,7 +112,7 @@ export async function POST(request: NextRequest) {
         console.log(`[CRON Revisar Solicitudes] Razonamiento: ${clasificacion.razonamiento}`);
 
         // Actualizar solicitud con resultado de IA
-        await prisma.solicitudCambio.update({
+        await prisma.solicitudes_cambio.update({
           where: { id: solicitud.id },
           data: {
             revisadaPorIA: true,
@@ -128,7 +128,7 @@ export async function POST(request: NextRequest) {
 
         if (clasificacion.requiereRevisionManual) {
           // Marcar como requiere revisión y notificar a HR/Manager
-          await prisma.solicitudCambio.update({
+          await prisma.solicitudes_cambio.update({
             where: { id: solicitud.id },
             data: {
               estado: EstadoSolicitud.requiere_revision,
@@ -149,7 +149,7 @@ export async function POST(request: NextRequest) {
           // Auto-aprobar solicitud en transacción
           await prisma.$transaction(async (tx) => {
             // Actualizar solicitud
-            await tx.solicitudCambio.update({
+            await tx.solicitudes_cambio.update({
               where: { id: solicitud.id },
               data: {
                 estado: EstadoSolicitud.auto_aprobada,
@@ -186,7 +186,7 @@ export async function POST(request: NextRequest) {
         // En caso de error, marcar como revisada para no volver a procesarla
         // pero dejar en estado pendiente para revisión manual
         try {
-          await prisma.solicitudCambio.update({
+          await prisma.solicitudes_cambio.update({
             where: { id: solicitud.id },
             data: {
               revisadaPorIA: true,

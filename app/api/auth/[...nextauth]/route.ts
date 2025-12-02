@@ -75,7 +75,7 @@ const authHandler = NextAuth({
 
         const email = profile.email.toLowerCase();
 
-        let usuario = await prisma.usuario.findUnique({
+        let usuario = await prisma.usuarios.findUnique({
           where: { email },
           include: {
             empleado: {
@@ -94,7 +94,7 @@ const authHandler = NextAuth({
 
         if (!usuario.googleId || usuario.googleId !== account.providerAccountId) {
           try {
-            usuario = await prisma.usuario.update({
+            usuario = await prisma.usuarios.update({
               where: { id: usuario.id },
               data: { googleId: account.providerAccountId },
               include: {
@@ -125,7 +125,7 @@ const authHandler = NextAuth({
         }
 
         // Actualizar último acceso
-        await prisma.usuario.update({
+        await prisma.usuarios.update({
           where: { id: usuario.id },
           data: { ultimoAcceso: new Date() },
         });

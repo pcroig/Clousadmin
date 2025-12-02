@@ -43,7 +43,7 @@ export async function GET(request: NextRequest) {
     const antiguedad = searchParams.get('antiguedad');
 
     // Construir filtros base (igual que en otros endpoints)
-    const where: Prisma.EmpleadoWhereInput = {
+    const where: Prisma.empleadosWhereInput = {
       empresaId: session.user.empresaId,
       estadoEmpleado: 'activo',
     };
@@ -70,7 +70,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Obtener empleados con filtros aplicados en BD
-    const empleados = await prisma.empleado.findMany({
+    const empleados = await prisma.empleados.findMany({
       where,
       select: {
         id: true,
@@ -187,7 +187,7 @@ export async function GET(request: NextRequest) {
     const inicioMesActual = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
     const finMesActual = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0);
 
-    const fichajesMes = await prisma.fichaje.findMany({
+    const fichajesMes = await prisma.fichajes.findMany({
       where: {
         empresaId: session.user.empresaId,
         empleadoId: { in: empleadoIds },

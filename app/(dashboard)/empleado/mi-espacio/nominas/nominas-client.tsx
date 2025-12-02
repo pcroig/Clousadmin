@@ -3,7 +3,7 @@
 interface Nomina {
   id: number;
   mes: string;
-  año: number;
+  anio: number;
   importe: number;
   fecha: string;
 }
@@ -40,7 +40,7 @@ export function MiEspacioNominasClient({ nominas = [] }: MiEspacioNominasClientP
               {nominas.map((nomina) => (
                 <tr key={nomina.id} className="hover:bg-gray-50 transition-colors">
                   <td className="py-4 px-6">
-                    <p className="text-sm font-medium text-gray-900">{nomina.mes} {nomina.año}</p>
+                    <p className="text-sm font-medium text-gray-900">{nomina.mes} {nomina.anio}</p>
                   </td>
                   <td className="py-4 px-6">
                     <p className="text-sm text-gray-500">

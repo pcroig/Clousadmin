@@ -27,7 +27,7 @@ export async function sincronizarEstadoEvento(
 ): Promise<{ previo: string; nuevo: string; cambio: boolean }> {
 
   // 1. Obtener el evento y todas sus nóminas
-  const evento = await prisma.eventoNomina.findUnique({
+  const evento = await prisma.eventos_nomina.findUnique({
     where: { id: eventoNominaId },
     include: {
       nominas: {
@@ -58,7 +58,7 @@ export async function sincronizarEstadoEvento(
 
   // 4. Actualizar evento si hay cambio
   if (estadoCalculado !== estadoPrevio) {
-    await prisma.eventoNomina.update({
+    await prisma.eventos_nomina.update({
       where: { id: eventoNominaId },
       data: { estado: estadoCalculado },
     });
@@ -83,7 +83,7 @@ export async function actualizarEstadoNomina(
 ): Promise<void> {
 
   // 1. Actualizar la nómina
-  const nomina = await prisma.nomina.update({
+  const nomina = await prisma.nominas.update({
     where: { id: nominaId },
     data: {
       estado: nuevoEstado,
@@ -114,7 +114,7 @@ export async function actualizarEstadosNominasLote(
 ): Promise<number> {
   return await prisma.$transaction(async (tx) => {
     // 1. Actualizar todas las nóminas del evento
-    const result = await tx.nomina.updateMany({
+    const result = await tx.nominas.updateMany({
       where: {
         eventoNominaId,
       },
@@ -130,7 +130,7 @@ export async function actualizarEstadosNominasLote(
         ? EVENTO_ESTADOS.PUBLICADO
         : EVENTO_ESTADOS.ABIERTO;
 
-    await tx.eventoNomina.update({
+    await tx.eventos_nomina.update({
       where: { id: eventoNominaId },
       data: {
         estado: estadoEvento,
@@ -167,7 +167,7 @@ export async function recalcularEstadisticasEvento(
   eventoNominaId: string
 ): Promise<void> {
 
-  const nominas = await prisma.nomina.findMany({
+  const nominas = await prisma.nominas.findMany({
     where: { eventoNominaId },
     include: {
       complementosAsignados: true,
@@ -185,7 +185,7 @@ export async function recalcularEstadisticasEvento(
     0
   );
 
-  await prisma.eventoNomina.update({
+  await prisma.eventos_nomina.update({
     where: { id: eventoNominaId },
     data: {
       totalEmpleados: nominas.length,

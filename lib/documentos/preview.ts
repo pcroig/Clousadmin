@@ -142,7 +142,7 @@ export async function getDocumentPreview(
   const { documentoId, userId, userRole, empresaId, options = {} } = params;
 
   // Fetch document from database
-  const documento = await prisma.documento.findUnique({
+  const documento = await prisma.documentos.findUnique({
     where: { id: documentoId },
     include: {
       carpeta: true,

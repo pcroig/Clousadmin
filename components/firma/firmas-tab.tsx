@@ -16,7 +16,8 @@ interface FirmasPendientesResponse {
 interface ApiFirmaPendiente {
   id: string;
   orden: number;
-  solicitudFirma: {
+  firmado: boolean; // Importante: indica si ya está firmada o no
+  solicitudes_firma: {
     id: string;
     titulo: string;
     mensaje?: string;
@@ -49,17 +50,26 @@ export function FirmasTab() {
       })
       .then((data) => {
         const items: ApiFirmaPendiente[] = data?.firmasPendientes ?? [];
-        const formateadas: FirmaPendiente[] = items.map((item) => ({
+        
+        // FILTRAR solo las firmas que NO están firmadas (firmado: false)
+        // La API retorna tanto pendientes como completadas recientes
+        const firmasPendientesSolo = items.filter((item) => item.firmado === false);
+        
+        const formateadas: FirmaPendiente[] = firmasPendientesSolo.map((item) => ({
           id: item.id,
+          solicitudId: item.solicitudes_firma.id,
           orden: item.orden,
-          requiereOrden: item.solicitudFirma.ordenFirma,
-          solicitudTitulo: item.solicitudFirma.titulo,
-          solicitudMensaje: item.solicitudFirma.mensaje,
+          requiereOrden: item.solicitudes_firma.ordenFirma,
+          solicitudTitulo: item.solicitudes_firma.titulo,
+          solicitudMensaje: item.solicitudes_firma.mensaje,
           documento: {
-            id: item.solicitudFirma.documento.id,
-            nombre: item.solicitudFirma.documento.nombre,
+            id: item.solicitudes_firma.documento.id,
+            nombre: item.solicitudes_firma.documento.nombre,
           },
         }));
+        
+        // Debug: console.log('[FirmasTab] Firmas pendientes cargadas:', formateadas.length, 'de', items.length, 'totales');
+        
         setFirmas(formateadas);
         setSelectedFirmaId((prev) => {
           if (formateadas.length === 0) {

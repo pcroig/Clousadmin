@@ -40,7 +40,7 @@ export async function GET(
     const { id } = await params;
 
     // Verificar que la nómina pertenece a la empresa
-    const nomina = await prisma.nomina.findFirst({
+    const nomina = await prisma.nominas.findFirst({
       where: {
         id,
       },
@@ -55,9 +55,9 @@ export async function GET(
         },
         complementosAsignados: {
           include: {
-            empleadoComplemento: {
+            empleado_complementos: {
               include: {
-                tipoComplemento: true,
+                tipos_complemento: true,
               },
             },
           },
@@ -74,13 +74,13 @@ export async function GET(
     }
 
     // Obtener complementos disponibles del empleado que aún no están asignados
-    const complementosEmpleado = await prisma.empleadoComplemento.findMany({
+    const complementosEmpleado = await prisma.empleado_complementos.findMany({
       where: {
         empleadoId: nomina.empleadoId,
         activo: true,
       },
       include: {
-        tipoComplemento: true,
+        tipos_complemento: true,
       },
     });
 
@@ -140,7 +140,7 @@ export async function POST(
     }
 
     // Verificar que la nómina existe y pertenece a la empresa
-    const nomina = await prisma.nomina.findFirst({
+    const nomina = await prisma.nominas.findFirst({
       where: {
         id,
       },
@@ -174,14 +174,14 @@ export async function POST(
 
     // Verificar que todos los complementos pertenecen al empleado
     const empleadoComplementosIds = complementos.map((c) => c.empleadoComplementoId);
-    const empleadoComplementos = await prisma.empleadoComplemento.findMany({
+    const empleadoComplementos = await prisma.empleado_complementos.findMany({
       where: {
         id: { in: empleadoComplementosIds },
         empleadoId: nomina.empleadoId,
         activo: true,
       },
       include: {
-        tipoComplemento: true,
+        tipos_complemento: true,
       },
     });
 
@@ -200,7 +200,7 @@ export async function POST(
         )!;
 
         // Verificar que no existe ya una asignación
-        const existente = await prisma.asignacionComplemento.findUnique({
+        const existente = await prisma.asignaciones_complemento.findUnique({
           where: {
             nominaId_empleadoComplementoId: {
               nominaId: id,
@@ -211,11 +211,11 @@ export async function POST(
 
         if (existente) {
           throw new Error(
-            `El complemento '${empleadoComp.tipoComplemento.nombre}' ya está asignado a esta nómina`
+            `El complemento '${empleadoComp.tipos_complemento.nombre}' ya está asignado a esta nómina`
           );
         }
 
-        return prisma.asignacionComplemento.create({
+        return prisma.asignaciones_complemento.create({
           data: {
             nominaId: id,
             empleadoComplementoId: comp.empleadoComplementoId,
@@ -224,9 +224,9 @@ export async function POST(
             notas: comp.notas || null,
           },
           include: {
-            empleadoComplemento: {
+            empleado_complementos: {
               include: {
-                tipoComplemento: true,
+                tipos_complemento: true,
               },
             },
           },
@@ -248,14 +248,14 @@ export async function POST(
     const totalNeto = totalBruto;
 
     // Verificar si quedan complementos pendientes
-    const todosLosComplementos = await prisma.empleadoComplemento.count({
+    const todosLosComplementos = await prisma.empleado_complementos.count({
       where: {
         empleadoId: nomina.empleadoId,
         activo: true,
       },
     });
 
-    const complementosAsignadosTotal = await prisma.asignacionComplemento.count({
+    const complementosAsignadosTotal = await prisma.asignaciones_complemento.count({
       where: {
         nominaId: id,
       },
@@ -263,7 +263,7 @@ export async function POST(
 
     const complementosPendientes = todosLosComplementos > complementosAsignadosTotal;
 
-    await prisma.nomina.update({
+    await prisma.nominas.update({
       where: { id },
       data: {
         totalComplementos,

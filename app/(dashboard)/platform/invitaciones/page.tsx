@@ -38,11 +38,11 @@ async function getPlatformMetrics(): Promise<PlatformMetrics> {
     totalInvitationsPending,
     totalWaitlistEntries,
   ] = await Promise.all([
-    prisma.empresa.count({ where: { activo: true } }),
-    prisma.empresa.count({ where: { activo: true, createdAt: { gte: monthStart } } }),
-    prisma.usuario.count({ where: { activo: true } }),
-    prisma.usuario.count({ where: { activo: true, createdAt: { gte: monthStart } } }),
-    prisma.invitacionSignup.count({
+    prisma.empresas.count({ where: { activo: true } }),
+    prisma.empresas.count({ where: { activo: true, createdAt: { gte: monthStart } } }),
+    prisma.usuarios.count({ where: { activo: true } }),
+    prisma.usuarios.count({ where: { activo: true, createdAt: { gte: monthStart } } }),
+    prisma.invitaciones_signup.count({
       where: {
         usada: false,
         expiraEn: { gt: now },
@@ -82,7 +82,7 @@ async function getCompanyRows(): Promise<CompanyStatusRow[]> {
   const includeSubscriptions = await hasSubscriptionTable();
 
   const [companies, activeEmployees] = await Promise.all([
-    prisma.empresa
+    prisma.empresas
       .findMany({
         orderBy: { createdAt: 'desc' },
         take: 25,
@@ -108,7 +108,7 @@ async function getCompanyRows(): Promise<CompanyStatusRow[]> {
         },
       })
       .then((rows) => rows as CompanyQueryRow[]),
-    prisma.empleado.groupBy({
+    prisma.empleados.groupBy({
       by: ['empresaId'],
       where: {
         estadoEmpleado: 'activo',
@@ -157,7 +157,7 @@ export default async function PlatformInvitationsPage() {
   const [metrics, companyRows, invitaciones, waitlist] = await Promise.all([
     getPlatformMetrics(),
     getCompanyRows(),
-    prisma.invitacionSignup.findMany({
+    prisma.invitaciones_signup.findMany({
       orderBy: { createdAt: 'desc' },
       take: 100,
       select: {

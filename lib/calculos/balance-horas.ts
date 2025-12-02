@@ -22,7 +22,7 @@ import {
   obtenerHorasEsperadasBatch,
 } from './fichajes';
 
-import type { FichajeEvento, PrismaClient } from '@prisma/client';
+import type { fichaje_eventos as FichajeEvento, PrismaClient } from '@prisma/client';
 
 const prismaClient = prisma as PrismaClient;
 
@@ -114,7 +114,7 @@ export async function calcularBalanceDiario(
   fechaInicio.setHours(0, 0, 0, 0);
 
   // Obtener fichajes del día
-  const fichajes = await prismaClient.fichaje.findMany({
+  const fichajes = await prismaClient.fichajes.findMany({
     where: {
       empleadoId,
       fecha: fechaInicio,
@@ -200,7 +200,7 @@ export async function calcularBalanceMensualBatch(
   const diasDelPeriodo = generarDiasDelPeriodo(fechaInicio, fechaFin);
 
   const [fichajes, festivos, diasLaborablesConfig] = await Promise.all([
-    prismaClient.fichaje.findMany({
+    prismaClient.fichajes.findMany({
       where: {
         empleadoId: { in: uniqueEmpleadoIds },
         fecha: {
@@ -305,7 +305,7 @@ export async function calcularBalancePeriodo(
   const fechaInicioNormalizada = normalizarInicioDeDia(fechaInicio);
   const fechaFinNormalizada = normalizarFinDeDia(fechaFin);
 
-  const empleado = await prismaClient.empleado.findUnique({
+  const empleado = await prismaClient.empleados.findUnique({
     where: { id: empleadoId },
     select: {
       empresaId: true,
@@ -337,7 +337,7 @@ export async function calcularBalancePeriodo(
   }
 
   // Obtener todos los fichajes del período efectivo
-  const fichajes = await prismaClient.fichaje.findMany({
+  const fichajes = await prismaClient.fichajes.findMany({
     where: {
       empleadoId,
       fecha: {
@@ -472,6 +472,61 @@ export async function obtenerResumenBalance(empleadoId: string) {
     semanal: Math.round(balanceSemanal.balanceTotal * 100) / 100,
     mensual: Math.round(balanceMensual.balanceTotal * 100) / 100,
     acumulado: Math.round(balanceAcumulado * 100) / 100,
+  };
+}
+
+/**
+ * Calcula las horas pendientes de compensar de un empleado
+ * Las horas pendientes son el balance acumulado positivo menos las horas ya compensadas
+ */
+export async function calcularHorasPendientesCompensar(
+  empleadoId: string,
+  año?: number
+): Promise<{
+  horasPendientes: number;
+  horasCompensadas: number;
+  balanceTotal: number;
+  diasEquivalentes: number;
+}> {
+  const añoActual = año ?? new Date().getFullYear();
+  const inicioAño = new Date(añoActual, 0, 1);
+  const finAño = new Date(añoActual, 11, 31, 23, 59, 59, 999);
+
+  // Calcular balance acumulado del año
+  const balanceAño = await calcularBalancePeriodo(empleadoId, inicioAño, finAño);
+
+  // Obtener horas ya compensadas (aprobadas) en el año
+  const compensacionesAprobadas = await prismaClient.compensaciones_horas_extra.findMany({
+    where: {
+      empleadoId,
+      estado: 'aprobada',
+      createdAt: {
+        gte: inicioAño,
+        lte: finAño,
+      },
+    },
+    select: {
+      horasBalance: true,
+    },
+  });
+
+  const horasCompensadas = compensacionesAprobadas.reduce(
+    (total, comp) => total + Number(comp.horasBalance),
+    0
+  );
+
+  // Solo contamos las horas positivas (extras trabajadas)
+  const balancePositivo = Math.max(0, balanceAño.balanceTotal);
+  const horasPendientes = Math.max(0, balancePositivo - horasCompensadas);
+
+  // Convertir a días (8 horas = 1 día)
+  const diasEquivalentes = Math.round((horasPendientes / 8) * 10) / 10;
+
+  return {
+    horasPendientes: Math.round(horasPendientes * 100) / 100,
+    horasCompensadas: Math.round(horasCompensadas * 100) / 100,
+    balanceTotal: Math.round(balanceAño.balanceTotal * 100) / 100,
+    diasEquivalentes,
   };
 }
 

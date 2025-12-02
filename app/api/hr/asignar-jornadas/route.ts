@@ -20,7 +20,7 @@ export async function POST(_request: NextRequest) {
     console.log('[API Asignar Jornadas] Iniciando proceso...');
 
     // 1. Obtener jornadas de la empresa
-    const jornadas = await prisma.jornada.findMany({
+    const jornadas = await prisma.jornadas.findMany({
       where: {
         empresaId: session.user.empresaId,
         activa: true,
@@ -42,7 +42,7 @@ export async function POST(_request: NextRequest) {
     console.log(`[API Asignar Jornadas] Jornada por defecto: ${jornadaPorDefecto.nombre}`);
 
     // 2. Obtener empleados activos sin jornada
-    const empleadosSinJornada = await prisma.empleado.findMany({
+    const empleadosSinJornada = await prisma.empleados.findMany({
       where: {
         empresaId: session.user.empresaId,
         activo: true,
@@ -69,7 +69,7 @@ export async function POST(_request: NextRequest) {
     // 3. Asignar jornada a cada empleado
     const actualizados: string[] = [];
     for (const empleado of empleadosSinJornada) {
-      await prisma.empleado.update({
+      await prisma.empleados.update({
         where: { id: empleado.id },
         data: { jornadaId: jornadaPorDefecto.id },
       });

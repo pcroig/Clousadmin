@@ -74,15 +74,14 @@ const getDatabaseUrl = () => {
 const prismaClientSingleton =
   globalForPrisma.prisma ??
   new PrismaClient({
-    log: process.env.NODE_ENV === 'development' 
-      ? [
-          { level: 'query', emit: 'event' },
-          { level: 'error', emit: 'stdout' },
-          { level: 'warn', emit: 'stdout' },
-        ]
-      : [
-          { level: 'error', emit: 'stdout' },
-        ],
+    log:
+      process.env.NODE_ENV === 'development'
+        ? [
+            { level: 'query', emit: 'event' },
+            { level: 'error', emit: 'stdout' },
+            { level: 'warn', emit: 'stdout' },
+          ]
+        : [{ level: 'error', emit: 'stdout' }],
     datasources: {
       db: {
         url: getDatabaseUrl(),
@@ -132,5 +131,84 @@ if (
   );
 }
 
-export const prisma = prismaClientSingleton;
+const toCamelCase = (value: string): string =>
+  value
+    .split('_')
+    .map((segment, index) =>
+      index === 0 ? segment : segment.charAt(0).toUpperCase() + segment.slice(1)
+    )
+    .join('');
+
+const vowelRegex = /[aeiouáéíóú]$/i;
+
+const getSingularForms = (word: string): string[] => {
+  if (word.endsWith('ces')) {
+    return [`${word.slice(0, -3)}z`];
+  }
+
+  if (word.endsWith('iones')) {
+    return [word.slice(0, -2)];
+  }
+
+  if (word.endsWith('es')) {
+    const base = word.slice(0, -2);
+    if (vowelRegex.test(base)) {
+      return [base];
+    }
+    return [base, `${base}e`];
+  }
+
+  if (word.endsWith('s')) {
+    return [word.slice(0, -1)];
+  }
+
+  return [word];
+};
+
+const cartesian = (lists: string[][]): string[][] =>
+  lists.reduce<string[][]>(
+    (acc, curr) => acc.flatMap((item) => curr.map((value) => [...item, value])),
+    [[]]
+  );
+
+const buildAliasMap = () => {
+  const map = new Map<string, string>();
+  const modelNames = Prisma.ModelName as Record<string, string>;
+
+  Object.values(modelNames).forEach((modelName) => {
+    const camel = toCamelCase(modelName);
+    map.set(camel, modelName);
+
+    const parts = modelName.split('_').map((segment) => getSingularForms(segment));
+    const variants = cartesian(parts);
+
+    variants.forEach((variant) => {
+      const alias = toCamelCase(variant.join('_'));
+      map.set(alias, modelName);
+    });
+  });
+
+  return map;
+};
+
+const prismaAliasMap = buildAliasMap();
+
+const prismaWithAliases = new Proxy(prismaClientSingleton, {
+  get(target, prop, receiver) {
+    if (typeof prop === 'string') {
+      if (Reflect.has(target, prop)) {
+        return Reflect.get(target, prop, receiver);
+      }
+
+      const alias = prismaAliasMap.get(prop);
+      if (alias && Reflect.has(target, alias)) {
+        return Reflect.get(target, alias as keyof typeof target, receiver);
+      }
+    }
+
+    return Reflect.get(target, prop, receiver);
+  },
+});
+
+export const prisma = prismaWithAliases as PrismaClient;
 export { Prisma };

@@ -75,6 +75,14 @@ Sistema completo de gestión documental con:
   - Safari PDF Viewer: ✅ Funcional
   - Edge PDF Viewer: ✅ Funcional
 
+### 🖋️ Firma digital y gestión de documentos firmados
+
+- ✅ **Marca visual profesional**: Cuando el documento se firma, solo se dibuja la imagen de la firma capturada y, si queda espacio, el nombre del firmante en texto gris muy tenue. Se eliminan bordes, sombreado y etiquetas adicionales para que el PDF firmado luzca limpio.
+- ✅ **Nuevo documento firmado**: El PDF final se guarda como un nuevo `documentos` (mismas carpeta/empleado originales) y se enlaza al registro `documentosGenerado` cuando procede, de forma que siempre haya disponible una copia firmada junto al original.
+- ✅ **Multi-firmantes ordenados**: Si una solicitud incluye varios firmantes, cada entrada se procesa y se apilan verticalmente en la última página del PDF con espaciado automático. El API y la UI ahora filtran los registros con `firmado=false` para mostrar solo los pendientes por firmar.
+- ✅ **Firmantes autorizados**: El diálogo de firma (`SolicitarFirmaDialog`) consulta `/api/carpetas/[id]/empleados-con-acceso` para asegurarse de que solo los empleados con permiso sobre la carpeta aparecen como posibles firmantes.
+- ✅ **Endpoint `/api/firma/pendientes` mejorado**: Retorna todos los firmantes (pendientes y completados recientes) con un flag `firmado`, de modo que el frontend puede filtrar correctamente y evitar mostrar firmas ya realizadas.
+
 ---
 
 ## 📊 Arquitectura

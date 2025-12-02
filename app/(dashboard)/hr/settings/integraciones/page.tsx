@@ -27,7 +27,7 @@ export default async function IntegrationsPage() {
   const googleConfigured = isGoogleOAuthConfigured();
 
   // Obtener integraciones activas de la empresa y del usuario
-  const integraciones = await prisma.integracion.findMany({
+  const integraciones = await prisma.integraciones.findMany({
     where: {
       empresaId: session.user.empresaId,
       tipo: 'calendario',

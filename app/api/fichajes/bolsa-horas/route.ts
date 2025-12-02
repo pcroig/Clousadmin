@@ -12,10 +12,14 @@ import {
   requireAuthAsHR,
   successResponse,
 } from '@/lib/api-handler';
-import { calcularBalanceMensualBatch } from '@/lib/calculos/balance-horas';
+import {
+  type BalancePeriodo,
+  calcularBalanceMensualBatch,
+  calcularBalancePeriodo,
+} from '@/lib/calculos/balance-horas';
 import { prisma } from '@/lib/prisma';
 
-const empleadoSelect = Prisma.validator<Prisma.EmpleadoSelect>()({
+const empleadoSelect = Prisma.validator<Prisma.empleadosSelect>()({
   id: true,
   nombre: true,
   apellidos: true,
@@ -32,6 +36,10 @@ const empleadoSelect = Prisma.validator<Prisma.EmpleadoSelect>()({
   },
 });
 
+type EmpleadoResumen = Prisma.empleadosGetPayload<{
+  select: typeof empleadoSelect;
+}>;
+
 export async function GET(request: NextRequest) {
   try {
     const authResult = await requireAuthAsHR(request);
@@ -41,10 +49,12 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const periodoDefault = obtenerMesTrabajo();
 
-    const mes = Number(searchParams.get('mes') ?? periodoDefault.mes);
+    const mesParam = searchParams.get('mes');
+    const totalMode = mesParam === null || mesParam === 'all';
+    const mes = totalMode ? periodoDefault.mes : Number(mesParam);
     const anio = Number(searchParams.get('anio') ?? periodoDefault.anio);
 
-    if (!Number.isInteger(mes) || mes < 1 || mes > 12) {
+    if (!totalMode && (!Number.isInteger(mes) || mes < 1 || mes > 12)) {
       return badRequestResponse('Mes inválido');
     }
 
@@ -52,7 +62,7 @@ export async function GET(request: NextRequest) {
       return badRequestResponse('Año inválido');
     }
 
-    const empleados = await prisma.empleado.findMany({
+    const empleados: EmpleadoResumen[] = await prisma.empleados.findMany({
       where: {
         empresaId: session.user.empresaId,
         estadoEmpleado: 'activo',
@@ -72,33 +82,60 @@ export async function GET(request: NextRequest) {
     }
 
     const empleadoIds = empleados.map((empleado) => empleado.id);
-    const balancesPorEmpleado = await calcularBalanceMensualBatch(
-      session.user.empresaId,
-      empleadoIds,
-      mes,
-      anio
-    );
+    const balances: Array<{ empleado: EmpleadoResumen; balance: BalancePeriodo }> = [];
 
-    const balances = [];
+    if (totalMode) {
+      const fechaInicio = new Date(anio, 0, 1);
+      const fechaFin = new Date(anio, 11, 31, 23, 59, 59, 999);
 
-    for (const empleado of empleados) {
-      const balanceMensual = balancesPorEmpleado.get(empleado.id);
-      if (!balanceMensual) {
-        continue;
-      }
+      const balancesPromesas = await Promise.all(
+        empleados.map(async (empleado) => {
+          const balancePeriodo = await calcularBalancePeriodo(empleado.id, fechaInicio, fechaFin);
+          const balanceTotal = Math.round(balancePeriodo.balanceTotal * 100) / 100;
+          return {
+            empleado,
+            balance: balancePeriodo,
+            balanceTotal,
+          };
+        })
+      );
 
-      const balanceTotal = Math.round(balanceMensual.balanceTotal * 100) / 100;
-      if (balanceTotal > 0) {
-        balances.push({
-          empleado,
-          balance: balanceMensual,
+      balancesPromesas
+        .filter((item) => item.balanceTotal > 0)
+        .forEach((item) => {
+          balances.push({
+            empleado: item.empleado,
+            balance: item.balance,
+          });
         });
+    } else {
+      const balancesPorEmpleado = await calcularBalanceMensualBatch(
+        session.user.empresaId,
+        empleadoIds,
+        mes,
+        anio
+      );
+
+      for (const empleado of empleados) {
+        const balanceMensual = balancesPorEmpleado.get(empleado.id);
+        if (!balanceMensual) {
+          continue;
+        }
+
+        const balanceTotal = Math.round(balanceMensual.balanceTotal * 100) / 100;
+        if (balanceTotal > 0) {
+          balances.push({
+            empleado,
+            balance: balanceMensual,
+          });
+        }
       }
     }
 
     return successResponse({
-      mes,
+      mes: totalMode ? null : mes,
       anio,
+      scope: totalMode ? 'total' : 'mensual',
       balances,
     });
   } catch (error) {

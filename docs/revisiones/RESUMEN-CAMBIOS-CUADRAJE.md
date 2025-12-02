@@ -227,6 +227,19 @@ FICHAJES_LAZY_DIAS=3  # Días a recuperar en lazy loading
 
 ---
 
+## 🧱 ACTUALIZACIÓN FEB 2025
+
+1. **Revisión y cuadrado comparten la misma fecha precisa**: los eventos propuestos y los registros creados usan `fecha.setHours(0,0,0,0)` para garantizar que pertenezcan al día del fichaje, y la tabla excluye ausencias de día completo.
+2. **Se muestran fichajes parcialmente incompletos** y se mantiene cualquier evento ya registrado; el procesamiento solo crea los eventos faltantes (incluidas pausas) sin duplicar los existentes.
+3. **El frontend ya no repite la razón en la columna `Fecha`** y el modal ahora filtra correctamente por estado, mostrando el detalle en la columna `Eventos / Faltantes`.
+4. **Ausencias de día completo no aparecen en el cuadraje** y las ausencias de medio día siguen influyendo en qué eventos se generan.
+
+### Verificación
+- `npm run build` → pasa (advertencias conocidas que no bloquean)
+- `npm run test` → falla en `tests/api/fichajes/eventos.test.ts` por configuración previa de Prisma/ioredis; no hay cambios en esos tests, se preservan fallos existentes.
+
+---
+
 ## 📝 DOCUMENTACIÓN COMPLETA
 
 Para detalles técnicos completos, ver:

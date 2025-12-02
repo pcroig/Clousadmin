@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Obtener nóminas en borrador
-    const nominasBorrador = await prisma.nomina.findMany({
+    const nominasBorrador = await prisma.nominas.findMany({
       where: {
         empleado: {
           empresaId: session.user.empresaId,
@@ -71,7 +71,7 @@ export async function POST(req: NextRequest) {
     const empleadosIds = nominasBorrador.map((n) => n.empleadoId);
 
     // Actualizar nóminas a estado publicada
-    await prisma.nomina.updateMany({
+    await prisma.nominas.updateMany({
       where: {
         empleadoId: {
           in: empleadosIds,

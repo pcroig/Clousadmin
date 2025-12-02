@@ -115,7 +115,7 @@ export async function GET(req: NextRequest) {
     };
 
     // Buscar integración existente
-    const existingIntegration = await prisma.integracion.findFirst({
+    const existingIntegration = await prisma.integraciones.findFirst({
       where: {
         empresaId: session.user.empresaId,
         tipo: "calendario",
@@ -126,7 +126,7 @@ export async function GET(req: NextRequest) {
 
     if (existingIntegration) {
       // Actualizar integración existente
-      await prisma.integracion.update({
+      await prisma.integraciones.update({
         where: { id: existingIntegration.id },
         data: {
           config: asJsonValue(integrationConfig),
@@ -136,7 +136,7 @@ export async function GET(req: NextRequest) {
       });
     } else {
       // Crear nueva integración
-      await prisma.integracion.create({
+      await prisma.integraciones.create({
         data: {
           empresaId: session.user.empresaId,
           usuarioId: integrationType === "personal" ? session.user.id : null,

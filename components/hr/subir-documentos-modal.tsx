@@ -85,8 +85,18 @@ export function SubirDocumentosModal({ open, onOpenChange, onUploaded }: SubirDo
     try {
       const response = await fetch('/api/empleados?activos=true');
       const data = await parseJson<Record<string, unknown>>(response);
-      const lista = Array.isArray(data?.empleados) ? (data?.empleados as Record<string, unknown>[]) :
-        Array.isArray(data?.data) ? (data?.data as Record<string, unknown>[]) : [];
+      const lista = Array.isArray(data?.empleados) ? (data?.empleados as Array<{
+        id: string;
+        nombre?: string;
+        apellidos?: string;
+        usuario?: { nombre?: string; apellidos?: string };
+      }>) :
+        Array.isArray(data?.data) ? (data?.data as Array<{
+          id: string;
+          nombre?: string;
+          apellidos?: string;
+          usuario?: { nombre?: string; apellidos?: string };
+        }>) : [];
       const mapped = lista.map((item) => ({
         id: String(item.id),
         nombre: String(item.nombre ?? item.usuario?.nombre ?? ''),
@@ -197,11 +207,11 @@ export function SubirDocumentosModal({ open, onOpenChange, onUploaded }: SubirDo
             <Label>Carpeta destino</Label>
             <SearchableSelect
               items={carpetaItems}
-              loading={loadingCarpetas}
               placeholder={loadingCarpetas ? 'Cargando...' : 'Selecciona una carpeta'}
               value={selectedCarpeta}
               onChange={setSelectedCarpeta}
               emptyMessage="No hay carpetas disponibles"
+              disabled={loadingCarpetas}
             />
             <div className="flex gap-2 items-end">
               <div className="flex-1 space-y-1">

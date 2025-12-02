@@ -40,7 +40,7 @@ export async function GET(
     }
 
     // Verificar que el empleado pertenece a la empresa
-    const empleado = await prisma.empleado.findFirst({
+    const empleado = await prisma.empleados.findFirst({
       where: {
         id,
         empresaId: session.user.empresaId,
@@ -54,13 +54,13 @@ export async function GET(
     const { searchParams } = new URL(req.url);
     const incluirInactivos = searchParams.get('incluirInactivos') === 'true';
 
-    const complementos = await prisma.empleadoComplemento.findMany({
+    const complementos = await prisma.empleado_complementos.findMany({
       where: {
         empleadoId: id,
         ...(incluirInactivos ? {} : { activo: true }),
       },
       include: {
-        tipoComplemento: true,
+        tipos_complemento: true,
         contrato: {
           select: {
             id: true,
@@ -69,7 +69,7 @@ export async function GET(
           },
         },
         _count: {
-          select: { asignaciones: true },
+          select: { asignaciones_complemento: true },
         },
       },
       orderBy: {
@@ -113,7 +113,7 @@ export async function POST(
     const data = AsignarComplementoSchema.parse(body);
 
     // Verificar que el empleado pertenece a la empresa
-    const empleado = await prisma.empleado.findFirst({
+    const empleado = await prisma.empleados.findFirst({
       where: {
         id,
         empresaId: session.user.empresaId,
@@ -131,7 +131,7 @@ export async function POST(
     }
 
     // Verificar que el tipo de complemento existe y pertenece a la empresa
-    const tipoComplemento = await prisma.tipoComplemento.findFirst({
+    const tipoComplemento = await prisma.tipos_complemento.findFirst({
       where: {
         id: data.tipoComplementoId,
         empresaId: session.user.empresaId,
@@ -148,7 +148,7 @@ export async function POST(
 
     // Verificar que el contrato existe si se especificó
     if (data.contratoId) {
-      const contrato = await prisma.contrato.findFirst({
+      const contrato = await prisma.contratos.findFirst({
         where: {
           id: data.contratoId,
           empleadoId: id,
@@ -161,7 +161,7 @@ export async function POST(
     }
 
     // Verificar que no existe ya este complemento activo para el empleado
-    const existente = await prisma.empleadoComplemento.findFirst({
+    const existente = await prisma.empleado_complementos.findFirst({
       where: {
         empleadoId: id,
         tipoComplementoId: data.tipoComplementoId,
@@ -186,7 +186,7 @@ export async function POST(
       }
     }
 
-    const complemento = await prisma.empleadoComplemento.create({
+    const complemento = await prisma.empleado_complementos.create({
       data: {
         empleadoId: id,
         tipoComplementoId: data.tipoComplementoId,
@@ -194,7 +194,7 @@ export async function POST(
         importePersonalizado: data.importePersonalizado || null,
       },
       include: {
-        tipoComplemento: true,
+        tipos_complemento: true,
         contrato: {
           select: {
             id: true,
@@ -214,7 +214,7 @@ export async function POST(
           empleadoNombre: `${empleado.nombre} ${empleado.apellidos || ''}`.trim(),
           empresaId: session.user.empresaId,
           complementoNombre: tipoComplemento.nombre,
-          importe: data.importePersonalizado || tipoComplemento.importeBase,
+          importe: data.importePersonalizado || Number(tipoComplemento.importeFijo ?? 0),
         },
         { actorUsuarioId: session.user.id }
       );

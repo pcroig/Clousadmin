@@ -7,6 +7,7 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
 
+import { FileAttachment } from '@/components/shared/file-attachment';
 import { LoadingButton } from '@/components/shared/loading-button';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -25,12 +26,30 @@ interface DenunciaDialogProps {
   onClose: () => void;
 }
 
+interface UploadFileResponse {
+  url: string;
+  s3Key?: string;
+  size?: number;
+  type?: string;
+  createdAt?: string;
+}
+
+interface DenunciaDocumentoPayload {
+  id: string;
+  nombre: string;
+  s3Key: string;
+  mimeType: string;
+  tamano: number;
+  uploadedAt: string;
+}
+
 export function DenunciaDialog({ isOpen, onClose }: DenunciaDialogProps) {
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     descripcion: '',
     esAnonima: false,
   });
+  const [attachments, setAttachments] = useState<File[]>([]);
 
   const handleClose = () => {
     if (!loading) {
@@ -38,8 +57,52 @@ export function DenunciaDialog({ isOpen, onClose }: DenunciaDialogProps) {
         descripcion: '',
         esAnonima: false,
       });
+      setAttachments([]);
       onClose();
     }
+  };
+
+  const generateAttachmentId = () => {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+      return crypto.randomUUID();
+    }
+    return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  };
+
+  const uploadAttachments = async (): Promise<DenunciaDocumentoPayload[]> => {
+    if (attachments.length === 0) {
+      return [];
+    }
+
+    const uploaded: DenunciaDocumentoPayload[] = [];
+
+    for (const file of attachments) {
+      const formDataUpload = new FormData();
+      formDataUpload.append('file', file);
+      formDataUpload.append('tipo', 'denuncias');
+
+      const response = await fetch('/api/upload', {
+        method: 'POST',
+        body: formDataUpload,
+      });
+
+      const data = await parseJson<UploadFileResponse>(response).catch(() => null);
+
+      if (!response.ok || !data?.s3Key) {
+        throw new Error(`No se pudo subir el archivo ${file.name}`);
+      }
+
+      uploaded.push({
+        id: generateAttachmentId(),
+        nombre: file.name,
+        s3Key: data.s3Key,
+        mimeType: data.type ?? file.type,
+        tamano: data.size ?? file.size,
+        uploadedAt: data.createdAt ?? new Date().toISOString(),
+      });
+    }
+
+    return uploaded;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -53,12 +116,19 @@ export function DenunciaDialog({ isOpen, onClose }: DenunciaDialogProps) {
     setLoading(true);
 
     try {
+      let documentosPayload: DenunciaDocumentoPayload[] | undefined;
+
+      if (attachments.length > 0) {
+        documentosPayload = await uploadAttachments();
+      }
+
       const response = await fetch('/api/denuncias', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           descripcion: formData.descripcion.trim(),
           esAnonima: formData.esAnonima,
+          documentos: documentosPayload && documentosPayload.length > 0 ? documentosPayload : undefined,
         }),
       });
 
@@ -119,6 +189,18 @@ export function DenunciaDialog({ isOpen, onClose }: DenunciaDialogProps) {
               Enviar de forma anónima
             </Label>
           </div>
+
+          <FileAttachment
+            label="Adjuntar archivos (opcional)"
+            description="Evidencias o documentos"
+            files={attachments}
+            onFilesChange={setAttachments}
+            multiple
+            maxFiles={5}
+            maxSizeMB={10}
+            acceptedTypes={['application/pdf', 'image/jpeg', 'image/png', 'image/jpg']}
+            disabled={loading}
+          />
 
           <div className="flex justify-end gap-3 pt-2">
             <Button

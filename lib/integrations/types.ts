@@ -5,7 +5,7 @@
 
 import { getAusenciaEstadoLabel } from "@/lib/utils/formatters";
 
-import type { Ausencia } from "@prisma/client";
+import type { ausencias as Ausencia } from "@prisma/client";
 
 /**
  * Evento de calendario

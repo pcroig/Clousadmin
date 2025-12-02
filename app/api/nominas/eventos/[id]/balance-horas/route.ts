@@ -24,7 +24,7 @@ async function balanceHorasHandler(
 
     const { id: eventoId } = await params;
 
-    const evento = await prisma.eventoNomina.findFirst({
+    const evento = await prisma.eventos_nomina.findFirst({
       where: {
         id: eventoId,
         empresaId: session.user.empresaId,

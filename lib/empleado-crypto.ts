@@ -5,7 +5,7 @@
 
 import { decrypt, encrypt } from '@/lib/crypto';
 
-import type { Empleado } from '@prisma/client';
+import type { empleados as Empleado } from '@prisma/client';
 
 // Campos sensibles que se encriptan
 const SENSITIVE_FIELDS = ['iban', 'nif', 'nss'] as const;

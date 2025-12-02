@@ -41,7 +41,7 @@ export async function GET(
       return NextResponse.json({ error: 'Acceso denegado' }, { status: 403 });
     }
 
-    const evento = await prisma.eventoNomina.findFirst({
+    const evento = await prisma.eventos_nomina.findFirst({
       where: {
         id,
         empresaId: session.user.empresaId,
@@ -60,9 +60,9 @@ export async function GET(
             },
             complementosAsignados: {
               include: {
-                empleadoComplemento: {
+                empleado_complementos: {
                   include: {
-                    tipoComplemento: true,
+                    tipos_complemento: true,
                   },
                 },
               },
@@ -83,7 +83,7 @@ export async function GET(
           ],
         },
         _count: {
-          select: { notificacionesEnviadas: true },
+          select: { notificaciones: true },
         },
       },
     });
@@ -133,7 +133,7 @@ export async function PATCH(
     const data = UpdateEventoSchema.parse(payload);
 
     // Verificar que el evento pertenece a la empresa
-    const evento = await prisma.eventoNomina.findFirst({
+    const evento = await prisma.eventos_nomina.findFirst({
       where: {
         id,
         empresaId: session.user.empresaId,
@@ -147,7 +147,7 @@ export async function PATCH(
     // Validaciones de transiciones de estado
     if (data.estado && data.estado !== evento.estado) {
       if (data.estado === EVENTO_ESTADOS.CERRADO) {
-        const pendientes = await prisma.nomina.count({
+        const pendientes = await prisma.nominas.count({
           where: {
             eventoNominaId: id,
             estado: {
@@ -168,7 +168,7 @@ export async function PATCH(
       }
     }
 
-    const updated = await prisma.eventoNomina.update({
+    const updated = await prisma.eventos_nomina.update({
       where: { id },
       data: {
         ...(data.estado && { estado: data.estado }),

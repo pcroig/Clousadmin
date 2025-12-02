@@ -4,18 +4,19 @@
 
 'use client';
 
-import { format } from 'date-fns';
+import { format, isValid } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { AlertCircle, ChevronRight, FileText, X } from 'lucide-react';
+import { AlertCircle, ChevronRight, FileText, Flag, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
+import { EmptyState } from '@/components/shared/empty-state';
 import { EmployeeAvatar } from '@/components/shared/employee-avatar';
 import { parseJson } from '@/lib/utils/json';
 interface Denuncia {
   id: string;
   descripcion: string;
-  fecha: string;
+  fecha?: string | null;
   esAnonima: boolean;
   createdAt: string;
   denunciante: {
@@ -38,6 +39,19 @@ interface DenunciasDetailsProps {
   onClose: () => void;
   initialDenunciaId?: string;
 }
+
+const formatDateSafe = (value: string | Date | null | undefined, formatPattern: string) => {
+  if (!value) {
+    return null;
+  }
+
+  const date = typeof value === 'string' ? new Date(value) : value;
+  if (!isValid(date)) {
+    return null;
+  }
+
+  return format(date, formatPattern, { locale: es });
+};
 
 export function DenunciasDetails({ onClose, initialDenunciaId }: DenunciasDetailsProps) {
   const [denuncias, setDenuncias] = useState<Denuncia[]>([]);
@@ -92,6 +106,13 @@ export function DenunciasDetails({ onClose, initialDenunciaId }: DenunciasDetail
   }
 
   if (selectedDenuncia) {
+    const incidentDate =
+      formatDateSafe(selectedDenuncia.fecha ?? selectedDenuncia.createdAt, "d 'de' MMMM 'de' yyyy") ??
+      'Fecha no disponible';
+    const reportedDate =
+      formatDateSafe(selectedDenuncia.createdAt, "d 'de' MMMM 'de' yyyy, HH:mm") ??
+      'Fecha no disponible';
+
     return (
       <div className="space-y-6">
         {/* Header con ID y botones */}
@@ -121,7 +142,7 @@ export function DenunciasDetails({ onClose, initialDenunciaId }: DenunciasDetail
             Fecha del incidente
           </h4>
           <p className="text-sm text-gray-900">
-            {format(new Date(selectedDenuncia.fecha), "d 'de' MMMM 'de' yyyy", { locale: es })}
+            {incidentDate}
           </p>
         </div>
 
@@ -131,7 +152,7 @@ export function DenunciasDetails({ onClose, initialDenunciaId }: DenunciasDetail
             Reportada el
           </h4>
           <p className="text-sm text-gray-900">
-            {format(new Date(selectedDenuncia.createdAt), "d 'de' MMMM 'de' yyyy, HH:mm", { locale: es })}
+            {reportedDate}
           </p>
         </div>
 
@@ -213,19 +234,21 @@ export function DenunciasDetails({ onClose, initialDenunciaId }: DenunciasDetail
 
   return (
     <div className="space-y-6">
-      {/* Header simple */}
-      <div className="flex items-center justify-between pb-4 border-b border-gray-200">
-        <div>
-          <h3 className="text-lg font-semibold text-gray-900">Canal de Denuncias</h3>
-          <p className="text-sm text-gray-500 mt-1">{denunciasNuevas} denuncias nuevas</p>
+      {/* Stats */}
+      {denuncias.length > 0 && (
+        <div className="flex items-center justify-between pb-4 border-b border-gray-200">
+          <p className="text-sm text-gray-500">{denunciasNuevas} denuncia{denunciasNuevas !== 1 ? 's' : ''} registrada{denunciasNuevas !== 1 ? 's' : ''}</p>
         </div>
-      </div>
+      )}
 
       {/* Lista de denuncias */}
       {denuncias.length === 0 ? (
-        <p className="text-sm text-gray-500 text-center py-8">
-          No hay denuncias registradas
-        </p>
+        <EmptyState
+          layout="card"
+          icon={Flag}
+          title="No hay denuncias registradas"
+          description="Las denuncias realizadas por los empleados aparecerán aquí."
+        />
       ) : (
         <div className="space-y-2">
           {denuncias.map((denuncia) => {
@@ -260,7 +283,7 @@ export function DenunciasDetails({ onClose, initialDenunciaId }: DenunciasDetail
                     </p>
                   </div>
                   <p className="text-xs text-gray-500 mb-1">
-                    {format(new Date(denuncia.createdAt), "d 'de' MMMM 'de' yyyy, HH:mm", { locale: es })}
+                    {formatDateSafe(denuncia.createdAt, "d 'de' MMMM 'de' yyyy, HH:mm") ?? 'Fecha no disponible'}
                   </p>
                   <p className="text-sm text-gray-600 truncate">
                     {denuncia.descripcion}

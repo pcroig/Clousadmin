@@ -114,7 +114,7 @@ export async function procesarNominas(
   }
 
   // Obtener empleados activos de la empresa
-  const empleados = await prisma.empleado.findMany({
+  const empleados = await prisma.empleados.findMany({
     where: {
       empresaId,
       activo: true,
@@ -251,7 +251,7 @@ export async function confirmarUpload(
       }
 
       // Verificar que no existe ya nómina para este empleado/mes
-      const nominaExistente = await prisma.nomina.findUnique({
+      const nominaExistente = await prisma.nominas.findUnique({
         where: {
           empleadoId_mes_anio: {
             empleadoId,
@@ -299,7 +299,7 @@ export async function confirmarUpload(
       }
 
       // Crear documento
-      const documento = await prisma.documento.create({
+      const documento = await prisma.documentos.create({
         data: {
           empresaId: session.empresaId,
           empleadoId,
@@ -314,7 +314,7 @@ export async function confirmarUpload(
       });
 
       // Crear nómina
-      await prisma.nomina.create({
+      await prisma.nominas.create({
         data: {
           empleadoId,
           mes: session.mes,

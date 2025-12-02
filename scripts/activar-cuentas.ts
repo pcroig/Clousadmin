@@ -11,7 +11,7 @@ async function main() {
   console.log('🔧 Activando todas las cuentas...\n');
 
   // Actualizar todos los usuarios a activo
-  const usuariosActualizados = await prisma.usuario.updateMany({
+  const usuariosActualizados = await prisma.usuarios.updateMany({
     where: {
       activo: false,
     },
@@ -23,7 +23,7 @@ async function main() {
   console.log(`✅ Usuarios actualizados: ${usuariosActualizados.count}`);
 
   // Actualizar todos los empleados a activo
-  const empleadosActualizados = await prisma.empleado.updateMany({
+  const empleadosActualizados = await prisma.empleados.updateMany({
     where: {
       activo: false,
     },
@@ -35,13 +35,13 @@ async function main() {
   console.log(`✅ Empleados actualizados: ${empleadosActualizados.count}`);
 
   // Actualizar TODAS las cuentas a activo (por si acaso)
-  const todosUsuarios = await prisma.usuario.updateMany({
+  const todosUsuarios = await prisma.usuarios.updateMany({
     data: {
       activo: true,
     },
   });
 
-  const todosEmpleados = await prisma.empleado.updateMany({
+  const todosEmpleados = await prisma.empleados.updateMany({
     data: {
       activo: true,
     },
@@ -62,7 +62,7 @@ async function main() {
 
   console.log('\n📋 Verificando cuentas del seed:');
   for (const email of emailsSeed) {
-    const usuario = await prisma.usuario.findUnique({
+    const usuario = await prisma.usuarios.findUnique({
       where: { email },
       include: { empleado: true },
     });
@@ -72,7 +72,7 @@ async function main() {
       
       // Forzar actualización si no está activo
       if (!usuario.activo) {
-        await prisma.usuario.update({
+        await prisma.usuarios.update({
           where: { email },
           data: { activo: true },
         });
@@ -80,7 +80,7 @@ async function main() {
       }
 
       if (usuario.empleado && !usuario.empleado.activo) {
-        await prisma.empleado.update({
+        await prisma.empleados.update({
           where: { id: usuario.empleado.id },
           data: { activo: true },
         });

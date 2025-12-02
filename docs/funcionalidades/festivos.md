@@ -123,6 +123,8 @@ Listar festivos de la empresa.
 }
 ```
 
+**Nota**: la propiedad `fecha` siempre se normaliza a `YYYY-MM-DD` sin componente horario, de modo que los calendarios visuales (onboarding, dialog de ausencias, etc.) pueden marcar correctamente los festivos existentes.
+
 #### POST /api/festivos
 Crear festivo personalizado.
 

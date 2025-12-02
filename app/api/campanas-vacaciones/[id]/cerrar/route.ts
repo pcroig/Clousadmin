@@ -34,7 +34,7 @@ export async function POST(
     const { id: campanaId } = await params;
 
     // Verificar que la campaña existe y pertenece a la empresa
-    const campana = await prisma.campanaVacaciones.findFirst({
+    const campana = await prisma.campanas_vacaciones.findFirst({
       where: {
         id: campanaId,
         empresaId: session.user.empresaId,
@@ -72,7 +72,7 @@ export async function POST(
     }
 
     // Cerrar campaña
-    await prisma.campanaVacaciones.update({
+    await prisma.campanas_vacaciones.update({
       where: { id: campanaId },
       data: {
         estado: 'cerrada',

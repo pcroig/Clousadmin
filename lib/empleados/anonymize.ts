@@ -37,7 +37,7 @@ export async function anonymizeEmpleado(
   tx: TransactionClient,
   { empleadoId, empresaId }: AnonymizeEmpleadoParams
 ): Promise<AnonymizeEmpleadoResult> {
-  const empleado = await tx.empleado.findFirst({
+  const empleado = await tx.empleados.findFirst({
     where: { id: empleadoId, empresaId },
     select: {
       id: true,
@@ -52,7 +52,7 @@ export async function anonymizeEmpleado(
 
   const anonymizedEmail = buildAnonEmail(empleado.id);
 
-  const empleadoData: Prisma.EmpleadoUpdateInput = {
+  const empleadoData: Prisma.empleadosUpdateInput = {
     nombre: 'Empleado',
     apellidos: 'Anonimizado',
     email: anonymizedEmail,
@@ -90,13 +90,13 @@ export async function anonymizeEmpleado(
     activo: false,
   };
 
-  await tx.empleado.update({
+  await tx.empleados.update({
     where: { id: empleado.id },
     data: empleadoData,
   });
 
   if (empleado.usuarioId) {
-    await tx.usuario.update({
+    await tx.usuarios.update({
       where: { id: empleado.usuarioId },
       data: {
         email: anonymizedEmail,
@@ -111,11 +111,11 @@ export async function anonymizeEmpleado(
     });
   }
 
-  await tx.empleadoEquipo.deleteMany({
+  await tx.empleado_equipos.deleteMany({
     where: { empleadoId: empleado.id },
   });
 
-  await tx.consentimiento.deleteMany({
+  await tx.consentimientos.deleteMany({
     where: { empleadoId: empleado.id },
   });
 

@@ -29,7 +29,7 @@ export async function GET(req: NextRequest) {
     const { session } = authResult;
 
     // Solo retornar la campaña activa (estado='abierta')
-    const campana = await prisma.campanaVacaciones.findFirst({
+    const campana = await prisma.campanas_vacaciones.findFirst({
       where: {
         empresaId: session.user.empresaId,
         estado: 'abierta',
@@ -103,7 +103,7 @@ interface EmpleadoAsignado {
 
     if (data.alcance === 'todos') {
       // Todos los empleados activos de la empresa
-      empleadosAsignados = await prisma.empleado.findMany({
+      empleadosAsignados = await prisma.empleados.findMany({
         where: {
           empresaId: session.user.empresaId,
           estadoEmpleado: 'activo',
@@ -119,13 +119,13 @@ interface EmpleadoAsignado {
       });
     } else if (data.alcance === 'equipos' && data.equipoIds && data.equipoIds.length > 0) {
       // Empleados de equipos seleccionados
-      const equipos = await prisma.equipo.findMany({
+      const equipos = await prisma.equipos.findMany({
         where: {
           id: { in: data.equipoIds },
           empresaId: session.user.empresaId,
         },
         include: {
-          manager: {
+          empleados: {
             select: {
               id: true,
               usuarioId: true,
@@ -135,7 +135,7 @@ interface EmpleadoAsignado {
               estadoEmpleado: true,
             },
           },
-          miembros: {
+          empleado_equipos: {
             include: {
               empleado: {
                 select: {
@@ -157,7 +157,7 @@ interface EmpleadoAsignado {
       empleadosAsignados = [];
 
       for (const equipo of equipos) {
-        for (const miembro of equipo.miembros) {
+        for (const miembro of equipo.empleado_equipos) {
           if (
             miembro.empleado.estadoEmpleado === 'activo' &&
             !empleadosSet.has(miembro.empleado.id)
@@ -167,13 +167,14 @@ interface EmpleadoAsignado {
           }
         }
 
+        const manager = equipo.empleados;
         if (
-          equipo.manager &&
-          equipo.manager.estadoEmpleado === 'activo' &&
-          !empleadosSet.has(equipo.manager.id)
+          manager &&
+          manager.estadoEmpleado === 'activo' &&
+          !empleadosSet.has(manager.id)
         ) {
-          empleadosSet.add(equipo.manager.id);
-          empleadosAsignados.push(equipo.manager);
+          empleadosSet.add(manager.id);
+          empleadosAsignados.push(manager);
         }
       }
     } else {
@@ -230,7 +231,7 @@ interface EmpleadoAsignado {
     });
 
     // Enforce single active campaign: Close any existing "abierta" campaigns
-    const campanasAbiertas = await prisma.campanaVacaciones.findMany({
+    const campanasAbiertas = await prisma.campanas_vacaciones.findMany({
       where: {
         empresaId: session.user.empresaId,
         estado: 'abierta',
@@ -240,7 +241,7 @@ interface EmpleadoAsignado {
 
     if (campanasAbiertas.length > 0) {
       console.info(`[Campaña] Cerrando ${campanasAbiertas.length} campaña(s) abierta(s) existente(s)`);
-      await prisma.campanaVacaciones.updateMany({
+      await prisma.campanas_vacaciones.updateMany({
         where: {
           empresaId: session.user.empresaId,
           estado: 'abierta',
@@ -252,7 +253,7 @@ interface EmpleadoAsignado {
     }
 
     // Crear campaña
-    const campana = await prisma.campanaVacaciones.create({
+    const campana = await prisma.campanas_vacaciones.create({
       data: {
         empresaId: session.user.empresaId,
         titulo: data.titulo,
@@ -268,7 +269,7 @@ interface EmpleadoAsignado {
 
     // Crear preferencias vacías para cada empleado
     try {
-      await prisma.preferenciaVacaciones.createMany({
+      await prisma.preferencias_vacaciones.createMany({
         data: empleadosAsignados.map(emp => ({
           campanaId: campana.id,
           empleadoId: emp.id,

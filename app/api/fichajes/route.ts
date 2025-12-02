@@ -69,7 +69,7 @@ export async function GET(req: NextRequest) {
     const search = searchParams.get('search');
 
     // 3. Construir filtros
-    const where: Prisma.FichajeWhereInput = {
+    const where: Prisma.fichajesWhereInput = {
       empresaId: session.user.empresaId,
     };
 
@@ -101,7 +101,7 @@ export async function GET(req: NextRequest) {
       }
 
       // Obtener IDs de empleados a cargo
-      const empleadosACargo = await prisma.empleado.findMany({
+      const empleadosACargo = await prisma.empleados.findMany({
         where: {
           managerId: session.user.empleadoId,
           empresaId: session.user.empresaId,
@@ -149,7 +149,7 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    const andFilters: Prisma.FichajeWhereInput[] = [];
+    const andFilters: Prisma.fichajesWhereInput[] = [];
 
     if (equipoId && equipoId !== 'todos') {
       andFilters.push({
@@ -175,12 +175,15 @@ export async function GET(req: NextRequest) {
     }
 
     if (andFilters.length > 0) {
-      where.AND = [...(where.AND ?? []), ...andFilters];
+      where.AND = [
+        ...(Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : []),
+        ...andFilters
+      ];
     }
 
     // 4. Obtener fichajes con sus eventos
     const [fichajes, total] = await Promise.all([
-      prisma.fichaje.findMany({
+      prisma.fichajes.findMany({
         where,
         include: {
           empleado: {
@@ -214,7 +217,7 @@ export async function GET(req: NextRequest) {
         skip,
         take: limit,
       }),
-      prisma.fichaje.count({ where }),
+      prisma.fichajes.count({ where }),
     ]);
 
     if (fichajes.length === 0) {
@@ -319,7 +322,7 @@ export async function POST(req: NextRequest) {
           return forbiddenResponse('No tienes un empleado asignado. Contacta con HR.');
         }
 
-        const empleadosACargo = await prisma.empleado.findMany({
+        const empleadosACargo = await prisma.empleados.findMany({
           where: {
             managerId: sessionEmpleadoId,
             empresaId: session.user.empresaId,
@@ -341,7 +344,7 @@ export async function POST(req: NextRequest) {
     const hora = validatedData.hora ? new Date(validatedData.hora) : new Date();
 
     // Validar que el empleado tiene jornada asignada
-    const empleado = await prisma.empleado.findUnique({
+    const empleado = await prisma.empleados.findUnique({
       where: { id: targetEmpleadoId, empresaId: session.user.empresaId },
       select: {
         empresaId: true,
@@ -386,7 +389,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 6. Buscar o crear fichaje del día
-    let fichaje = await prisma.fichaje.findUnique({
+    let fichaje = await prisma.fichajes.findUnique({
       where: {
         empleadoId_fecha: {
           empleadoId: targetEmpleadoId,
@@ -404,7 +407,7 @@ export async function POST(req: NextRequest) {
         return badRequestResponse('Debes iniciar la jornada primero (entrada)');
       }
 
-      fichaje = await prisma.fichaje.create({
+      fichaje = await prisma.fichajes.create({
         data: {
           empresaId: empleado.empresaId,
           empleadoId: targetEmpleadoId,
@@ -418,7 +421,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 7. Crear evento dentro del fichaje
-    const _evento = await prisma.fichajeEvento.create({
+    const _evento = await prisma.fichaje_eventos.create({
       data: {
         fichajeId: fichaje.id,
         tipo: validatedData.tipo,
@@ -429,7 +432,7 @@ export async function POST(req: NextRequest) {
 
     // 8. Actualizar cálculos del fichaje
     // Obtener todos los eventos incluyendo el recién creado
-    const todosEventos = await prisma.fichajeEvento.findMany({
+    const todosEventos = await prisma.fichaje_eventos.findMany({
       where: { fichajeId: fichaje.id },
       orderBy: { hora: 'asc' },
     });
@@ -450,7 +453,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 10. Actualizar fichaje con cálculos y estado
-    const fichajeActualizado = await prisma.fichaje.update({
+    const fichajeActualizado = await prisma.fichajes.update({
       where: { id: fichaje.id },
       data: {
         horasTrabajadas,

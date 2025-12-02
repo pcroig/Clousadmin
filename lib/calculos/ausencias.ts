@@ -11,9 +11,10 @@ import {
   formatearClaveFecha,
   getDiasLaborablesEmpresa,
   getFestivosActivosEnRango,
+  getFestivosActivosParaEmpleado,
 } from './dias-laborables';
 
-import type { EmpleadoSaldoAusencias, Prisma } from '@prisma/client';
+import type { empleadoSaldoAusencias as EmpleadoSaldoAusencias, Prisma } from '@prisma/client';
 
 const CARRY_OVER_DEFAULT_MONTHS = 4;
 
@@ -94,7 +95,7 @@ async function calcularDatosCarryOverParaNuevoSaldo(params: {
   empresaConfig: Record<string, unknown> | null;
   executor: PrismaTx | typeof prisma;
 }): Promise<Pick<
-  Prisma.EmpleadoSaldoAusenciasCreateInput,
+  Prisma.empleadoSaldoAusenciasCreateInput,
   'carryOverAsignado' | 'carryOverPendiente' | 'carryOverUsado' | 'carryOverExpiraEn' | 'carryOverFuenteAnio'
 >> {
   const policy = parseCarryOverPolicy(params.empresaConfig);
@@ -110,9 +111,9 @@ async function calcularDatosCarryOverParaNuevoSaldo(params: {
 
   const saldoAnterior = await params.executor.empleadoSaldoAusencias.findUnique({
     where: {
-      empleadoId_año: {
+      empleadoId_anio: {
         empleadoId: params.empleadoId,
-        año: params.año - 1,
+        anio: params.año - 1,
       },
     },
   });
@@ -202,7 +203,7 @@ export function esFinDeSemana(fecha: Date): boolean {
  * Verifica si una fecha es festivo para una empresa
  */
 export async function esFestivo(fecha: Date, empresaId: string): Promise<boolean> {
-  const count = await prisma.festivo.count({
+  const count = await prisma.festivos.count({
     where: {
       empresaId,
       fecha: fecha,
@@ -219,17 +220,19 @@ export async function esFestivo(fecha: Date, empresaId: string): Promise<boolean
  * @param fechaFin Fecha de fin de la ausencia
  * @param empresaId ID de la empresa (para obtener festivos y config días laborables)
  * @param medioDia Si es medio día (divide el resultado por 2)
+ * @param empleadoId ID del empleado (opcional, para incluir festivos personalizados)
  * @returns Número de días laborables solicitados
  */
 export async function calcularDiasSolicitados(
   fechaInicio: Date,
   fechaFin: Date,
   empresaId: string,
-  medioDia: boolean = false
+  medioDia: boolean = false,
+  empleadoId?: string
 ): Promise<number> {
   const [diasLaborables, festivos] = await Promise.all([
     getDiasLaborablesEmpresa(empresaId),
-    getFestivosActivosEnRango(empresaId, fechaInicio, fechaFin),
+    getFestivosActivosParaEmpleado(empresaId, empleadoId, fechaInicio, fechaFin),
   ]);
   const festivosSet = crearSetFestivos(festivos);
 
@@ -256,7 +259,8 @@ export async function calcularDiasSolicitados(
 export async function calcularDias(
   fechaInicio: Date,
   fechaFin: Date,
-  empresaId: string
+  empresaId: string,
+  empleadoId?: string
 ): Promise<{
   diasNaturales: number;
   diasLaborables: number;
@@ -268,7 +272,7 @@ export async function calcularDias(
 
   const [diasLaborablesConfig, festivos] = await Promise.all([
     getDiasLaborablesEmpresa(empresaId),
-    getFestivosActivosEnRango(empresaId, fechaInicio, fechaFin),
+    getFestivosActivosParaEmpleado(empresaId, empleadoId, fechaInicio, fechaFin),
   ]);
   const festivosSet = crearSetFestivos(festivos);
 
@@ -329,15 +333,16 @@ export async function getSaldoEmpleado(
   let saldo = await executor.empleadoSaldoAusencias.findFirst({
     where: {
       empleadoId,
-      año,
+      anio: año,
     },
   });
 
   if (!saldo) {
-    const empleado = await executor.empleado.findUnique({
+    const empleado = await executor.empleados.findUnique({
       where: { id: empleadoId },
       select: {
         diasVacaciones: true,
+        diasAusenciasPersonalizados: true,
         empresaId: true,
         empresa: {
           select: {
@@ -351,6 +356,9 @@ export async function getSaldoEmpleado(
       throw new Error('Empleado no encontrado');
     }
 
+    // Usar días personalizados si están definidos, si no usar el mínimo global (diasVacaciones)
+    const diasAsignados = empleado.diasAusenciasPersonalizados ?? empleado.diasVacaciones;
+
     const carryOverData = await calcularDatosCarryOverParaNuevoSaldo({
       empleadoId,
       año,
@@ -362,16 +370,16 @@ export async function getSaldoEmpleado(
     // Usar upsert para evitar race conditions con unique constraint
     saldo = await executor.empleadoSaldoAusencias.upsert({
       where: {
-        empleadoId_año: {
+        empleadoId_anio: {
           empleadoId,
-          año,
+          anio: año,
         },
       },
       create: {
         empleadoId,
         empresaId: empleado.empresaId,
-        año,
-        diasTotales: empleado.diasVacaciones,
+        anio: año,
+        diasTotales: diasAsignados,
         diasUsados: 0,
         diasPendientes: 0,
         origen: 'manual_hr',
@@ -395,6 +403,8 @@ export async function getSaldoEmpleado(
  * IMPORTANTE: Cuando se usa dentro de una transacción (`tx` presente), 
  * confía en los valores de la tabla para evitar race conditions.
  * Fuera de transacción, recalcula desde ausencias para verificación.
+ * 
+ * Las horas compensadas aprobadas se suman automáticamente a diasTotales.
  */
 export async function calcularSaldoDisponible(
   empleadoId: string,
@@ -408,6 +418,8 @@ export async function calcularSaldoDisponible(
   diasDisponibles: number;
   carryOverDisponible: number;
   carryOverExpiraEn: Date | null;
+  diasDesdeHorasCompensadas: number;
+  horasCompensadas: number;
 }> {
   const executor = tx ?? prisma;
   let saldo = await getSaldoEmpleado(empleadoId, año, tx, options);
@@ -416,6 +428,38 @@ export async function calcularSaldoDisponible(
   const referencia = new Date();
   const carryInfo = obtenerCarryOverDisponible(saldo, referencia);
 
+  // Calcular días de horas compensadas aprobadas
+  const inicioAño = new Date(año, 0, 1);
+  const finAño = new Date(año, 11, 31, 23, 59, 59, 999);
+  
+  const compensacionesAprobadas = await executor.compensaciones_horas_extra.findMany({
+    where: {
+      empleadoId,
+      estado: 'aprobada',
+      tipoCompensacion: 'ausencia',
+      createdAt: {
+        gte: inicioAño,
+        lte: finAño,
+      },
+    },
+    select: {
+      horasBalance: true,
+      diasAusencia: true,
+    },
+  });
+
+  const horasCompensadas = compensacionesAprobadas.reduce(
+    (total, comp) => total + Number(comp.horasBalance),
+    0
+  );
+
+  const diasDesdeHorasCompensadas = compensacionesAprobadas.reduce(
+    (total, comp) => total + (comp.diasAusencia ? Number(comp.diasAusencia) : 0),
+    0
+  );
+
+  // Los días totales YA incluyen los días de compensación
+  // porque se añaden al saldo cuando HR aprueba la compensación
   const diasTotales = saldo.diasTotales;
   const diasUsados = decimalToNumber(saldo.diasUsados);
   const diasPendientes = decimalToNumber(saldo.diasPendientes);
@@ -428,6 +472,8 @@ export async function calcularSaldoDisponible(
     diasDisponibles,
     carryOverDisponible: carryInfo.disponible,
     carryOverExpiraEn: carryInfo.expiraEn ?? saldo.carryOverExpiraEn ?? null,
+    diasDesdeHorasCompensadas: Math.round(diasDesdeHorasCompensadas * 10) / 10,
+    horasCompensadas: Math.round(horasCompensadas * 100) / 100,
   };
 }
 
@@ -582,7 +628,7 @@ export async function calcularSolapamientoEquipo(
   }>
 > {
   // Obtener total de miembros del equipo
-  const totalEquipo = await prisma.empleadoEquipo.count({
+  const totalEquipo = await prisma.empleado_equipos.count({
     where: { equipoId },
   });
 
@@ -591,7 +637,7 @@ export async function calcularSolapamientoEquipo(
   }
 
   // Obtener ausencias del equipo en el período (aprobadas o pendientes)
-  const ausencias = await prisma.ausencia.findMany({
+  const ausencias = await prisma.ausencias.findMany({
     where: {
       equipoId,
       estado: {
@@ -674,7 +720,7 @@ export async function getDisponibilidadCalendario(
   const festivosSet = crearSetFestivos(festivos);
 
   // Obtener política del equipo si existe
-  const politica = await prisma.equipoPoliticaAusencias.findUnique({
+  const politica = await prisma.equipo_politica_ausencias.findUnique({
     where: { equipoId },
   });
   const maxSolapamientoPct = politica?.maxSolapamientoPct || 50;
@@ -715,7 +761,7 @@ export async function getPoliticaEquipo(equipoId: string | null) {
     return null;
   }
 
-  return await prisma.equipoPoliticaAusencias.findUnique({
+  return await prisma.equipo_politica_ausencias.findUnique({
     where: { equipoId },
   });
 }
@@ -801,7 +847,7 @@ export async function validarSolapamientoMaximo(
     return { valida: true };
   }
 
-  const totalEquipo = await prisma.empleadoEquipo.count({
+  const totalEquipo = await prisma.empleado_equipos.count({
     where: { equipoId },
   });
 
@@ -809,7 +855,7 @@ export async function validarSolapamientoMaximo(
     return { valida: true, maxPorcentaje: politica.maxSolapamientoPct };
   }
 
-  const ausenciasEquipo = await prisma.ausencia.findMany({
+  const ausenciasEquipo = await prisma.ausencias.findMany({
     where: {
       equipoId,
       estado: {

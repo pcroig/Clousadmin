@@ -20,7 +20,7 @@ export async function GET(
 
     const { id } = await params;
 
-    const empleadoWhere: Prisma.EmpleadoWhereInput = {
+    const empleadoWhere: Prisma.empleadosWhereInput = {
       empresaId: session.user.empresaId,
     };
 
@@ -31,7 +31,7 @@ export async function GET(
       empleadoWhere.id = session.user.empleadoId;
     }
 
-    const nomina = await prisma.nomina.findFirst({
+    const nomina = await prisma.nominas.findFirst({
       where: {
         id,
         empleado: empleadoWhere,
@@ -67,9 +67,9 @@ export async function GET(
         },
         complementosAsignados: {
           include: {
-            empleadoComplemento: {
+            empleado_complementos: {
               include: {
-                tipoComplemento: {
+                tipos_complemento: {
                   select: {
                     nombre: true,
                     descripcion: true,

@@ -39,7 +39,7 @@ type EmpleadoParaPrenomina = {
   }>;
 };
 
-type NominaExistente = Prisma.NominaGetPayload<{
+type NominaExistente = Prisma.nominasGetPayload<{
   select: {
     id: true;
     empleadoId: true;
@@ -51,7 +51,7 @@ type NominaExistente = Prisma.NominaGetPayload<{
   };
 }>;
 
-type CompensacionPendiente = Prisma.CompensacionHoraExtraGetPayload<{
+type CompensacionPendiente = Prisma.compensaciones_horas_extraGetPayload<{
   select: {
     id: true;
     empleadoId: true;
@@ -94,7 +94,7 @@ export async function generarPrenominasEvento(
   const finMes = new Date(anio, mes, 0);
   finMes.setHours(23, 59, 59, 999);
 
-  const empleados = (await prisma.empleado.findMany({
+  const empleadosRaw = await prisma.empleados.findMany({
     where: {
       empresaId,
       activo: true,
@@ -133,14 +133,14 @@ export async function generarPrenominasEvento(
           fechaFin: true,
         },
       },
-      complementos: {
+      empleado_complementos: {
         where: {
           activo: true,
         },
         select: {
           id: true,
           importePersonalizado: true,
-          tipoComplemento: {
+          tipos_complemento: {
             select: {
               importeFijo: true,
             },
@@ -165,10 +165,28 @@ export async function generarPrenominasEvento(
         },
       },
     },
-  })) as EmpleadoParaPrenomina[];
+  });
+
+  const empleados: EmpleadoParaPrenomina[] = empleadosRaw.map((empleado) => ({
+    id: empleado.id,
+    salarioBaseMensual: empleado.salarioBaseMensual,
+    salarioBaseAnual: empleado.salarioBaseAnual,
+    jornada: empleado.jornada,
+    contratos: empleado.contratos,
+    complementos: empleado.empleado_complementos.map((comp) => ({
+      id: comp.id,
+      importePersonalizado: comp.importePersonalizado,
+      tipoComplemento: comp.tipos_complemento
+        ? {
+            importeFijo: comp.tipos_complemento.importeFijo,
+          }
+        : null,
+    })),
+    ausencias: empleado.ausencias,
+  }));
 
   if (empleados.length === 0) {
-    await prisma.eventoNomina.update({
+    await prisma.eventos_nomina.update({
       where: { id: eventoId },
       data: {
         fechaGeneracion: new Date(),
@@ -191,7 +209,7 @@ export async function generarPrenominasEvento(
   const empleadoIds = empleados.map((empleado) => empleado.id);
 
   const [nominasExistentes, compensacionesPendientes] = await Promise.all([
-    prisma.nomina.findMany({
+    prisma.nominas.findMany({
       where: {
         empleadoId: { in: empleadoIds },
         mes,
@@ -207,7 +225,7 @@ export async function generarPrenominasEvento(
         complementosPendientes: true,
       },
     }),
-    prisma.compensacionHoraExtra.findMany({
+    prisma.compensaciones_horas_extra.findMany({
       where: {
         empresaId,
         empleadoId: { in: empleadoIds },
@@ -268,7 +286,7 @@ export async function generarPrenominasEvento(
     const nominaExistente = nominasPorEmpleado.get(empleado.id);
 
     if (nominaExistente) {
-      const updateData: Prisma.NominaUpdateInput = {};
+      const updateData: Prisma.nominasUpdateInput = {};
       if (nominaExistente.eventoNominaId !== eventoId) {
         updateData.eventoNomina = { connect: { id: eventoId } };
         prenominasVinculadas += 1;
@@ -293,7 +311,7 @@ export async function generarPrenominasEvento(
       }
 
       if (Object.keys(updateData).length > 0) {
-        await prisma.nomina.update({
+        await prisma.nominas.update({
           where: { id: nominaExistente.id },
           data: updateData,
         });
@@ -314,7 +332,7 @@ export async function generarPrenominasEvento(
     const totalBruto = datosBase.salarioBase.plus(totalComplementos);
 
     // Crear la nómina primero en estado pendiente
-    const nuevaNomina = await prisma.nomina.create({
+    const nuevaNomina = await prisma.nominas.create({
       data: {
         empleadoId: empleado.id,
         contratoId: datosBase.contratoId,
@@ -344,7 +362,7 @@ export async function generarPrenominasEvento(
     await generarAlertasParaNomina(nuevaNomina.id, empleado.id, empresaId, mes, anio);
 
     // Determinar estado final: "completada" si no hay complementos pendientes NI alertas críticas
-    const alertasCriticas = await prisma.alertaNomina.count({
+    const alertasCriticas = await prisma.alertas_nomina.count({
       where: {
         nominaId: nuevaNomina.id,
         tipo: 'critico',
@@ -357,18 +375,18 @@ export async function generarPrenominasEvento(
 
     // Actualizar estado si es necesario
     if (estadoFinal !== 'pendiente') {
-      await prisma.nomina.update({
+      await prisma.nominas.update({
         where: { id: nuevaNomina.id },
         data: { estado: estadoFinal },
       });
     }
   }
 
-  const totalNominasEvento = await prisma.nomina.count({
+  const totalNominasEvento = await prisma.nominas.count({
     where: { eventoNominaId: eventoId },
   });
 
-  await prisma.eventoNomina.update({
+  await prisma.eventos_nomina.update({
     where: { id: eventoId },
     data: {
       fechaGeneracion: new Date(),
@@ -492,7 +510,7 @@ async function asignarCompensacionesANomina(
   nominaId: string
 ) {
   const ids = compensaciones.map((comp) => comp.id);
-  await prisma.compensacionHoraExtra.updateMany({
+  await prisma.compensaciones_horas_extra.updateMany({
     where: {
       id: { in: ids },
     },

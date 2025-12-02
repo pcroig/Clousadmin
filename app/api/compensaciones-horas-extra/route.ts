@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
     const estado = searchParams.get('estado');
 
     // Construir filtros
-    const where: Prisma.CompensacionHoraExtraWhereInput = {
+    const where: Prisma.compensaciones_horas_extraWhereInput = {
       empresaId: session.user.empresaId,
     };
 
@@ -55,7 +55,7 @@ export async function GET(request: NextRequest) {
       where.estado = estado;
     }
 
-    const compensaciones = await prisma.compensacionHoraExtra.findMany({
+    const compensaciones = await prisma.compensaciones_horas_extra.findMany({
       where,
       include: {
         empleado: {
@@ -110,7 +110,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Crear solicitud de compensación
-    const compensacion = await prisma.compensacionHoraExtra.create({
+    const compensacion = await prisma.compensaciones_horas_extra.create({
       data: {
         empresaId: session.user.empresaId,
         empleadoId: session.user.empleadoId,

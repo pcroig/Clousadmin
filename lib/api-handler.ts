@@ -263,6 +263,13 @@ export function forbiddenResponse(message: string = 'No autorizado'): NextRespon
   return NextResponse.json({ error: message, message }, { status: 403 });
 }
 
+/**
+ * Respuesta de método no permitido (405)
+ */
+export function methodNotAllowedResponse(message: string = 'Método no permitido'): NextResponse {
+  return NextResponse.json({ error: message, message }, { status: 405 });
+}
+
 // ========================================
 // Rate Limiting Helpers
 // ========================================

@@ -57,7 +57,7 @@ export async function POST(
     const validatedData = validation.data;
 
     // Obtener contrato y empleado con todas las relaciones necesarias
-    const contrato = await prisma.contrato.findUnique({
+    const contrato = await prisma.contratos.findUnique({
       where: { id },
       include: {
         empleado: {
@@ -100,7 +100,7 @@ export async function POST(
     // Proceso completo de offboarding en una transacción
     const result = await prisma.$transaction(async (tx) => {
       // 1. Actualizar fecha fin del contrato
-      await tx.contrato.update({
+      await tx.contratos.update({
         where: { id },
         data: {
           fechaFin,
@@ -108,7 +108,7 @@ export async function POST(
       });
 
       // 2. Desactivar empleado y establecer fecha de baja
-      await tx.empleado.update({
+      await tx.empleados.update({
         where: { id: contrato.empleadoId },
         data: {
           activo: false,
@@ -118,7 +118,7 @@ export async function POST(
       });
 
       // 3. Desactivar usuario (deshabilitar acceso a la plataforma)
-      await tx.usuario.update({
+      await tx.usuarios.update({
         where: { id: contrato.empleado.usuarioId },
         data: {
           activo: false,
@@ -131,7 +131,7 @@ export async function POST(
         let carpetaOffboarding = contrato.empleado.carpetas[0];
         
         if (!carpetaOffboarding) {
-          carpetaOffboarding = await tx.carpeta.create({
+          carpetaOffboarding = await tx.carpetas.create({
             data: {
               empresaId: session.user.empresaId,
               empleadoId: contrato.empleadoId,
@@ -142,7 +142,7 @@ export async function POST(
         }
 
         // Asociar documentos a la carpeta de offboarding
-        await tx.documento.updateMany({
+        await tx.documentos.updateMany({
           where: {
             id: { in: validatedData.documentosIds },
             empresaId: session.user.empresaId,

@@ -60,7 +60,7 @@ export function MiEspacioHRClient({ empleado, usuario }: MiEspacioHRClientProps)
   ];
 
   return (
-    <div className="h-full w-full flex flex-col">
+    <div className="h-full w-full flex flex-col px-1 py-1 sm:max-w-[1800px] sm:mx-auto sm:px-8 sm:py-6">
       {/* Header con avatar y nombre */}
       <div className="mb-6">
         <div className="flex items-center justify-between">

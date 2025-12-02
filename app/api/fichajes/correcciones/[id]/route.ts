@@ -44,7 +44,7 @@ async function ensureManagerAccess(
     throw forbiddenResponse('No tienes permiso para revisar esta corrección');
   }
 
-  const empleado = await prisma.empleado.findFirst({
+  const empleado = await prisma.empleados.findFirst({
     where: {
       id: empleadoObjetivoId,
       managerId: usuarioEmpleadoId,
@@ -72,10 +72,10 @@ export async function PATCH(
 
     const { accion, motivoRespuesta } = validation.data;
 
-    const solicitud = await prisma.solicitudCorreccionFichaje.findUnique({
+    const solicitud = await prisma.solicitudes_correccion_fichaje.findUnique({
       where: { id: params.id },
       include: {
-        empleado: {
+        empleados_solicitudes_correccion_fichaje_empleadoIdToempleados: {
           select: {
             id: true,
             nombre: true,
@@ -107,7 +107,7 @@ export async function PATCH(
     );
 
     if (accion === 'rechazar') {
-      const actualizada = await prisma.solicitudCorreccionFichaje.update({
+      const actualizada = await prisma.solicitudes_correccion_fichaje.update({
         where: { id: solicitud.id },
         data: {
           estado: EstadoSolicitudCorreccionFichaje.rechazada,
@@ -140,7 +140,7 @@ export async function PATCH(
       usuarioId: session.user.id,
     });
 
-    const actualizada = await prisma.solicitudCorreccionFichaje.update({
+    const actualizada = await prisma.solicitudes_correccion_fichaje.update({
       where: { id: solicitud.id },
       data: {
         estado: EstadoSolicitudCorreccionFichaje.aprobada,
@@ -150,13 +150,18 @@ export async function PATCH(
       },
     });
 
+    const empleadoSolicitud =
+      solicitud.empleados_solicitudes_correccion_fichaje_empleadoIdToempleados;
+
     await crearNotificacionFichajeResuelto(
       prisma,
       {
         fichajeId: solicitud.fichajeId,
         empresaId: solicitud.empresaId,
         empleadoId: solicitud.empleadoId,
-        empleadoNombre: `${solicitud.empleado.nombre} ${solicitud.empleado.apellidos}`,
+        empleadoNombre: empleadoSolicitud
+          ? `${empleadoSolicitud.nombre} ${empleadoSolicitud.apellidos}`
+          : '',
         fecha: solicitud.fichaje.fecha,
       },
       { actorUsuarioId: session.user.id }

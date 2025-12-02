@@ -22,7 +22,7 @@ export async function GET(
     const { id: eventoId } = await params;
 
     // Verificar que el evento existe y pertenece a la empresa
-    const evento = await prisma.eventoNomina.findFirst({
+    const evento = await prisma.eventos_nomina.findFirst({
       where: {
         id: eventoId,
         empresaId: session.user.empresaId,
@@ -43,7 +43,7 @@ export async function GET(
     const empleadoIds = evento.nominas.map((n) => n.empleadoId);
 
     // Obtener complementos de los empleados del evento
-    const complementos = (await prisma.empleadoComplemento.findMany({
+    const complementosRaw = await prisma.empleado_complementos.findMany({
       where: {
         empleadoId: { in: empleadoIds },
         activo: true,
@@ -68,7 +68,7 @@ export async function GET(
             },
           },
         },
-        tipoComplemento: {
+        tipos_complemento: {
           select: {
             id: true,
             nombre: true,
@@ -82,40 +82,12 @@ export async function GET(
         { empleado: { apellidos: 'asc' } },
         { empleado: { nombre: 'asc' } },
       ],
-    })) as Array<
-      Prisma.EmpleadoComplementoGetPayload<{
-        include: {
-          empleado: {
-            select: {
-              id: true;
-              nombre: true;
-              apellidos: true;
-              email: true;
-              equipos: {
-                include: {
-                  equipo: {
-                    select: {
-                      id: true;
-                      nombre: true;
-                      managerId: true;
-                    };
-                  };
-                };
-              };
-            };
-          };
-          tipoComplemento: {
-            select: {
-              id: true;
-              nombre: true;
-              descripcion: true;
-              importeFijo: true;
-              esImporteFijo: true;
-            };
-          };
-        };
-      }>
-    >;
+    });
+
+    const complementos = complementosRaw.map(({ tipos_complemento, ...rest }) => ({
+      ...rest,
+      tipoComplemento: tipos_complemento,
+    }));
 
     // Filtrar si es manager (solo ver complementos de su equipo)
     let complementosFiltrados = complementos;

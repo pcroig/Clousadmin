@@ -29,7 +29,7 @@ export async function DELETE(req: NextRequest) {
     }
 
     // Obtener integración
-    const integracion = await prisma.integracion.findUnique({
+    const integracion = await prisma.integraciones.findUnique({
       where: { id: integrationId },
     });
 
@@ -65,7 +65,7 @@ export async function DELETE(req: NextRequest) {
     }
 
     // Eliminar integración
-    await prisma.integracion.delete({
+    await prisma.integraciones.delete({
       where: { id: integrationId },
     });
 

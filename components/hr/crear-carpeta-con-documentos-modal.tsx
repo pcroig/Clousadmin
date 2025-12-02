@@ -3,6 +3,7 @@
 import { FolderPlus, Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import { toast } from 'sonner';
 
 import { DocumentUploaderInline } from '@/components/shared/document-uploader-inline';
 import { InfoTooltip } from '@/components/shared/info-tooltip';
@@ -319,7 +320,7 @@ export function CrearCarpetaConDocumentosModal({
             <div className="space-y-2">
               <Label>Empleados</Label>
               <SearchableMultiSelect
-                options={empleadosList.map((empleado) => ({
+                items={empleadosList.map((empleado) => ({
                   label: `${empleado.nombre} ${empleado.apellidos}`,
                   value: empleado.id,
                 }))}

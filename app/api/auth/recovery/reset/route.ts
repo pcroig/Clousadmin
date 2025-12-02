@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const usuario = await prisma.usuario.findUnique({
+    const usuario = await prisma.usuarios.findUnique({
       where: { id: validation.usuarioId },
       select: { id: true, email: true },
     });
@@ -46,7 +46,7 @@ export async function POST(req: NextRequest) {
 
     const hashedPassword = await hashPassword(password);
 
-    await prisma.usuario.update({
+    await prisma.usuarios.update({
       where: { id: usuario.id },
       data: { password: hashedPassword },
     });

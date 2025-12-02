@@ -52,7 +52,7 @@ export async function GET(
 
     const { id } = await params;
 
-    const fichaje = await prisma.fichaje.findUnique({
+    const fichaje = await prisma.fichajes.findUnique({
       where: {
         id,
         empresaId: session.user.empresaId,
@@ -106,7 +106,7 @@ export async function PATCH(
     const { id } = await params;
 
     // Obtener fichaje
-    const fichaje = await prisma.fichaje.findUnique({
+    const fichaje = await prisma.fichajes.findUnique({
       where: {
         id,
         empresaId: session.user.empresaId,
@@ -139,12 +139,12 @@ export async function PATCH(
         rawBody !== null &&
         'motivoRechazo' in rawBody &&
         typeof (rawBody as Record<string, unknown>).motivoRechazo === 'string'
-          ? (rawBody as Record<string, unknown>).motivoRechazo
+          ? ((rawBody as Record<string, unknown>).motivoRechazo as string)
           : undefined;
 
       if (accion === 'aprobar') {
         // Validar que el fichaje tiene los eventos mínimos requeridos (entrada y salida)
-        const eventos = await prisma.fichajeEvento.findMany({
+        const eventos = await prisma.fichaje_eventos.findMany({
           where: { fichajeId: fichaje.id },
           orderBy: { hora: 'asc' },
         });
@@ -163,7 +163,7 @@ export async function PATCH(
           );
         }
 
-        const actualizado = await prisma.fichaje.update({
+        const actualizado = await prisma.fichajes.update({
           where: { id },
           data: {
             estado: EstadoFichaje.finalizado,
@@ -188,7 +188,7 @@ export async function PATCH(
 
         return successResponse(actualizado);
       } else if (accion === 'rechazar') {
-        const actualizado = await prisma.fichaje.update({
+        const actualizado = await prisma.fichajes.update({
           where: { id },
           data: {
             estado: EstadoFichaje.pendiente, // Rechazado pasa a pendiente
@@ -234,7 +234,7 @@ export async function PATCH(
     // Actualizar evento del fichaje (por ahora solo actualizar la hora si se proporciona)
     if (validatedData.hora || validatedData.tipo) {
       // Buscar el evento a editar (por defecto el último evento del día)
-      const eventos = await prisma.fichajeEvento.findMany({
+      const eventos = await prisma.fichaje_eventos.findMany({
         where: { fichajeId: id },
         orderBy: { hora: 'desc' },
         take: 1,
@@ -243,7 +243,7 @@ export async function PATCH(
       if (eventos.length > 0) {
         const evento = eventos[0];
 
-        await prisma.fichajeEvento.update({
+        await prisma.fichaje_eventos.update({
           where: { id: evento.id },
           data: {
             ...(validatedData.hora && {
@@ -288,7 +288,7 @@ export async function PATCH(
 
     // Actualizar fecha del fichaje si se proporciona
     if (validatedData.fecha) {
-      await prisma.fichaje.update({
+      await prisma.fichajes.update({
         where: { id },
         data: {
           fecha: new Date(validatedData.fecha),
@@ -306,13 +306,13 @@ export async function PATCH(
       fichaje.estado === EstadoFichaje.pendiente &&
       (session.user.rol === UsuarioRol.hr_admin || session.user.rol === UsuarioRol.manager)
     ) {
-      await prisma.fichaje.update({
+      await prisma.fichajes.update({
         where: { id },
         data: { estado: EstadoFichaje.finalizado },
       });
     }
 
-    const fichajeActualizado = await prisma.fichaje.findUnique({
+    const fichajeActualizado = await prisma.fichajes.findUnique({
       where: { id },
       include: {
         eventos: {
@@ -341,7 +341,7 @@ export async function DELETE(
 
     const { id } = await params;
 
-    await prisma.fichaje.delete({
+    await prisma.fichajes.delete({
       where: {
         id,
         empresaId: session.user.empresaId,

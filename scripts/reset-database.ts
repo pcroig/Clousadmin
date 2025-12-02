@@ -18,24 +18,24 @@ async function main() {
 
     // 1. Borrar relaciones many-to-many primero
     console.log('1. Borrando relaciones empleado-equipo...');
-    const empleadoEquipos = await prisma.empleadoEquipo.deleteMany({});
+    const empleadoEquipos = await prisma.empleado_equipos.deleteMany({});
     console.log(`   ✅ ${empleadoEquipos.count} relaciones eliminadas`);
 
     // 2. Borrar datos dependientes
     console.log('\n2. Borrando notificaciones...');
-    const notificaciones = await prisma.notificacion.deleteMany({});
+    const notificaciones = await prisma.notificaciones.deleteMany({});
     console.log(`   ✅ ${notificaciones.count} notificaciones eliminadas`);
 
     console.log('\n3. Borrando auto-completados...');
-    const autoCompletados = await prisma.autoCompletado.deleteMany({});
+    const autoCompletados = await prisma.auto_completados.deleteMany({});
     console.log(`   ✅ ${autoCompletados.count} auto-completados eliminados`);
 
     console.log('\n4. Borrando ausencias...');
-    const ausencias = await prisma.ausencia.deleteMany({});
+    const ausencias = await prisma.ausencias.deleteMany({});
     console.log(`   ✅ ${ausencias.count} ausencias eliminadas`);
 
     console.log('\n5. Borrando fichajes...');
-    const fichajes = await prisma.fichaje.deleteMany({});
+    const fichajes = await prisma.fichajes.deleteMany({});
     console.log(`   ✅ ${fichajes.count} fichajes eliminados`);
 
     console.log('\n6. Borrando solicitudes...');
@@ -43,49 +43,49 @@ async function main() {
     console.log(`   ✅ ${solicitudes.count} solicitudes eliminadas`);
 
     console.log('\n7. Borrando documentos...');
-    const documentos = await prisma.documento.deleteMany({});
+    const documentos = await prisma.documentos.deleteMany({});
     console.log(`   ✅ ${documentos.count} documentos eliminados`);
 
     console.log('\n8. Borrando firmas digitales...');
-    const firmas = await prisma.firmaDigital.deleteMany({});
+    const firmas = await prisma.firmasDigital.deleteMany({});
     console.log(`   ✅ ${firmas.count} firmas eliminadas`);
 
     console.log('\n9. Borrando nóminas...');
-    const nominas = await prisma.nomina.deleteMany({});
+    const nominas = await prisma.nominas.deleteMany({});
     console.log(`   ✅ ${nominas.count} nóminas eliminadas`);
 
     console.log('\n10. Borrando denuncias...');
-    const denuncias = await prisma.denuncia.deleteMany({});
+    const denuncias = await prisma.denuncias.deleteMany({});
     console.log(`   ✅ ${denuncias.count} denuncias eliminadas`);
 
     console.log('\n11. Borrando equipos...');
-    const equipos = await prisma.equipo.deleteMany({});
+    const equipos = await prisma.equipos.deleteMany({});
     console.log(`   ✅ ${equipos.count} equipos eliminados`);
 
     console.log('\n12. Borrando jornadas...');
-    const jornadas = await prisma.jornada.deleteMany({});
+    const jornadas = await prisma.jornadas.deleteMany({});
     console.log(`   ✅ ${jornadas.count} jornadas eliminadas`);
 
     console.log('\n13. Borrando empleados...');
-    const empleados = await prisma.empleado.deleteMany({});
+    const empleados = await prisma.empleados.deleteMany({});
     console.log(`   ✅ ${empleados.count} empleados eliminados`);
 
     console.log('\n14. Borrando usuarios...');
-    const usuarios = await prisma.usuario.deleteMany({});
+    const usuarios = await prisma.usuarios.deleteMany({});
     console.log(`   ✅ ${usuarios.count} usuarios eliminados`);
 
     console.log('\n15. Borrando empresas...');
-    const empresas = await prisma.empresa.deleteMany({});
+    const empresas = await prisma.empresas.deleteMany({});
     console.log(`   ✅ ${empresas.count} empresas eliminadas`);
 
     console.log('\n16. Borrando invitaciones...');
-    const invitacionesSignup = await prisma.invitacionSignup.deleteMany({});
-    const invitacionesEmpleado = await prisma.invitacionEmpleado.deleteMany({});
+    const invitacionesSignup = await prisma.invitaciones_signup.deleteMany({});
+    const invitacionesEmpleado = await prisma.invitaciones_empleados.deleteMany({});
     console.log(`   ✅ ${invitacionesSignup.count} invitaciones signup eliminadas`);
     console.log(`   ✅ ${invitacionesEmpleado.count} invitaciones empleado eliminadas`);
 
     console.log('\n17. Borrando sesiones activas...');
-    const sesiones = await prisma.sesionActiva.deleteMany({});
+    const sesiones = await prisma.sesiones_activas.deleteMany({});
     console.log(`   ✅ ${sesiones.count} sesiones eliminadas`);
 
     console.log('\n18. Borrando tokens de recuperación...');
@@ -97,7 +97,7 @@ async function main() {
     console.log(`   ✅ ${plantillas.count} plantillas eliminadas`);
 
     console.log('\n20. Borrando festivos...');
-    const festivos = await prisma.festivo.deleteMany({});
+    const festivos = await prisma.festivos.deleteMany({});
     console.log(`   ✅ ${festivos.count} festivos eliminados`);
 
     console.log('\n✅ ¡Todos los datos han sido borrados exitosamente!\n');

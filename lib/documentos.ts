@@ -152,7 +152,7 @@ export async function crearCarpetasSistemaParaEmpleado(
   const carpetas = [];
 
   for (const nombreCarpeta of CARPETAS_SISTEMA) {
-    const carpeta = await prisma.carpeta.create({
+    const carpeta = await prisma.carpetas.create({
       data: {
         empresaId,
         empleadoId,
@@ -201,7 +201,7 @@ export async function obtenerCarpetasEmpleado(
     );
   }
 
-  return prisma.carpeta.findMany({
+  return prisma.carpetas.findMany({
     where: whereClause,
     include: {
       documentos: {
@@ -233,7 +233,7 @@ export async function puedeAccederACarpeta(
     return true;
   }
 
-  const carpeta = await prisma.carpeta.findUnique({
+  const carpeta = await prisma.carpetas.findUnique({
     where: { id: carpetaId },
     include: {
       empleado: {
@@ -258,19 +258,66 @@ export async function puedeAccederACarpeta(
     return true;
   }
 
-  // Si es carpeta compartida asignada específicamente al empleado
+  // Si es carpeta compartida asignada específicamente
   if (carpeta.compartida && carpeta.asignadoA) {
     // Obtener empleado del usuario
-    const empleado = await prisma.empleado.findUnique({
+    const empleado = await prisma.empleados.findUnique({
       where: { usuarioId },
+      include: {
+        equipos: {
+          include: {
+            equipo: true,
+          },
+        },
+      },
     });
 
-    if (empleado && carpeta.asignadoA.includes(`empleado:${empleado.id}`)) {
+    if (!empleado) {
+      return false;
+    }
+
+    const asignadoAString = carpeta.asignadoA;
+
+    // Verificar si es un empleado específico
+    if (asignadoAString.includes(`empleado:${empleado.id}`)) {
       return true;
+    }
+
+    // Verificar si está asignado a un equipo del empleado
+    if (asignadoAString.startsWith('equipo:')) {
+      const equipoId = asignadoAString.replace('equipo:', '');
+      const perteneceAlEquipo = empleado.equipos.some((ee) => ee.equipoId === equipoId);
+      if (perteneceAlEquipo) {
+        return true;
+      }
     }
   }
 
-  // TODO: Implementar permisos para managers (ver equipo)
+  // Permisos para managers: pueden ver carpetas de empleados de su equipo
+  if (rol === UsuarioRol.manager) {
+    const manager = await prisma.empleados.findUnique({
+      where: { usuarioId },
+      select: { id: true },
+    });
+
+    if (manager && carpeta.empleadoId) {
+      // Verificar si el empleado de la carpeta está en algún equipo donde este usuario es manager
+      const equiposComoManager = await prisma.equipos.findFirst({
+        where: {
+          managerId: manager.id,
+          empleado_equipos: {
+            some: {
+              empleadoId: carpeta.empleadoId,
+            },
+          },
+        },
+      });
+
+      if (equiposComoManager) {
+        return true;
+      }
+    }
+  }
 
   return false;
 }
@@ -288,7 +335,7 @@ export async function puedeSubirACarpeta(
     return true;
   }
 
-  const carpeta = await prisma.carpeta.findUnique({
+  const carpeta = await prisma.carpetas.findUnique({
     where: { id: carpetaId },
     include: {
       empleado: {
@@ -343,7 +390,7 @@ export async function generarNombreUnico(
   let contador = 1;
 
   while (true) {
-    const existente = await prisma.documento.findFirst({
+    const existente = await prisma.documentos.findFirst({
       where: {
         carpetaId,
         nombre: nombreFinal,
@@ -418,7 +465,7 @@ export async function obtenerOCrearCarpetaSistema(
   nombreCarpeta: CarpetaSistema
 ) {
   // Buscar carpeta existente
-  let carpeta = await prisma.carpeta.findFirst({
+  let carpeta = await prisma.carpetas.findFirst({
     where: {
       empresaId,
       empleadoId,
@@ -429,7 +476,7 @@ export async function obtenerOCrearCarpetaSistema(
 
   // Si no existe, crearla
   if (!carpeta) {
-    carpeta = await prisma.carpeta.create({
+    carpeta = await prisma.carpetas.create({
       data: {
         empresaId,
         empleadoId,
@@ -481,7 +528,7 @@ export async function obtenerOCrearCarpetaGlobal(
   nombreCarpeta: string
 ) {
   // Buscar carpeta global existente
-  let carpeta = await prisma.carpeta.findFirst({
+  let carpeta = await prisma.carpetas.findFirst({
     where: {
       empresaId,
       empleadoId: null,
@@ -493,7 +540,7 @@ export async function obtenerOCrearCarpetaGlobal(
 
   // Si no existe, crearla
   if (!carpeta) {
-    carpeta = await prisma.carpeta.create({
+    carpeta = await prisma.carpetas.create({
       data: {
         empresaId,
         empleadoId: null,
@@ -524,7 +571,7 @@ export async function asegurarCarpetasGlobales(empresaId: string) {
 }
 
 export async function eliminarDocumentoPorId(documentoId: string) {
-  const documento = await prisma.documento.findUnique({
+  const documento = await prisma.documentos.findUnique({
     where: { id: documentoId },
   });
 
@@ -544,7 +591,7 @@ export async function eliminarDocumentoPorId(documentoId: string) {
     }
   }
 
-  await prisma.documento.delete({
+  await prisma.documentos.delete({
     where: { id: documentoId },
   });
 }

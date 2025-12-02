@@ -313,6 +313,48 @@ export type FestivoUpdateInput = z.infer<typeof festivoUpdateSchema>;
 export type ImportarFestivosInput = z.infer<typeof importarFestivosSchema>;
 
 // ========================================
+// FESTIVOS PERSONALIZADOS POR EMPLEADO
+// ========================================
+
+export const empleadoFestivoCreateSchema = z.object({
+  empleadoId: z.string().uuid(),
+  fecha: z.string().or(z.date()),
+  nombre: z.string().min(1, 'Nombre requerido').max(200),
+  activo: z.boolean().default(true),
+});
+
+export const empleadoFestivoUpdateSchema = z.object({
+  nombre: z.string().min(1, 'Nombre requerido').max(200).optional(),
+  fecha: z.string().or(z.date()).optional(),
+  activo: z.boolean().optional(),
+});
+
+export type EmpleadoFestivoCreateInput = z.infer<typeof empleadoFestivoCreateSchema>;
+export type EmpleadoFestivoUpdateInput = z.infer<typeof empleadoFestivoUpdateSchema>;
+
+// ========================================
+// DÍAS PERSONALIZADOS DE AUSENCIAS
+// ========================================
+
+export const empleadoDiasAusenciasUpdateSchema = z.object({
+  diasAusenciasPersonalizados: z.number().int().min(0).max(365).nullable(),
+}).refine(
+  (data) => {
+    // Si es null, es válido (usa el mínimo global)
+    if (data.diasAusenciasPersonalizados === null) {
+      return true;
+    }
+    // Si es un número, debe ser al menos el mínimo (validación adicional en API)
+    return data.diasAusenciasPersonalizados >= 0;
+  },
+  {
+    message: 'Los días personalizados deben ser un número positivo o null para usar el mínimo global',
+  }
+);
+
+export type EmpleadoDiasAusenciasUpdateInput = z.infer<typeof empleadoDiasAusenciasUpdateSchema>;
+
+// ========================================
 // CALENDARIO LABORAL
 // ========================================
 

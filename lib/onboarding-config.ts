@@ -97,13 +97,13 @@ const DEFAULT_CONFIG: OnboardingConfigData = {
  */
 export async function obtenerOnboardingConfig(empresaId: string) {
   try {
-    let config = await prisma.onboardingConfig.findUnique({
+    let config = await prisma.onboarding_configs.findUnique({
       where: { empresaId },
     });
 
     // Si no existe configuración, crear una con valores por defecto
     if (!config) {
-      config = await prisma.onboardingConfig.create({
+      config = await prisma.onboarding_configs.create({
         data: {
           empresaId,
           camposRequeridos: asJsonValue(DEFAULT_CONFIG.camposRequeridos),
@@ -152,7 +152,7 @@ export async function actualizarCamposRequeridos(
     }
 
     // Actualizar campos requeridos
-    const updated = await prisma.onboardingConfig.update({
+    const updated = await prisma.onboarding_configs.update({
       where: { empresaId },
       data: {
         camposRequeridos: asJsonValue(camposRequeridos),
@@ -190,7 +190,7 @@ export async function actualizarDocumentosRequeridos(
     }
 
     // Actualizar documentos requeridos
-    const updated = await prisma.onboardingConfig.update({
+    const updated = await prisma.onboarding_configs.update({
       where: { empresaId },
       data: {
         documentosRequeridos: asJsonValue(documentosRequeridos),
@@ -228,7 +228,7 @@ export async function actualizarPlantillasDocumentos(
     }
 
     // Actualizar plantillas
-    const updated = await prisma.onboardingConfig.update({
+    const updated = await prisma.onboarding_configs.update({
       where: { empresaId },
       data: {
         plantillasDocumentos: asJsonValue(plantillasDocumentos),

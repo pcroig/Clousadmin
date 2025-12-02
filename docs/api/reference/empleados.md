@@ -365,6 +365,12 @@ Todos los campos son opcionales. Solo incluye los campos que quieres actualizar.
 }
 ```
 
+**Query Parameters adicionales (solo para reemplazo de jornada):**
+
+| Parámetro | Tipo | Descripción |
+|-----------|------|-------------|
+| confirmar | boolean | Debe usarse cuando se está reemplazando la jornada actual del empleado. Si no se incluye y ya existe una jornada diferente, la API responde con `409 Conflict` y detalles de la jornada previa. |
+
 **Ejemplo de Request:**
 
 ```bash
@@ -415,6 +421,26 @@ curl -X PATCH 'https://api.clousadmin.com/api/empleados/550e8400-e29b-41d4-a716-
 - `401 Unauthorized`: Token inválido
 - `403 Forbidden`: Sin permisos
 - `404 Not Found`: Empleado no existe
+- `409 Conflict`: Se detectó que el empleado ya tiene una jornada distinta. Reenviar la llamada con `?confirmar=true` para reemplazarla.
+
+**Ejemplo de Error (409):**
+
+```json
+{
+  "error": "El empleado ya tiene una jornada asignada",
+  "code": "JORNADA_PREVIA_DETECTADA",
+  "requiereConfirmacion": true,
+  "jornadaPrevia": {
+    "id": "88a4c0e9-1234-4f56-abcdef012345",
+    "nombre": "Jornada completa 40h"
+  },
+  "jornadaNueva": {
+    "id": "99b5d1f0-5678-4e01-abcdef987654",
+    "nombre": "Jornada flexible 20h"
+  },
+  "mensaje": "El empleado tiene asignada la jornada \"Jornada completa 40h\". ¿Deseas reemplazarla por \"Jornada flexible 20h\"?"
+}
+```
 
 ---
 

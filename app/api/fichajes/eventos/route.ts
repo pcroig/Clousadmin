@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
     const { fichajeId, tipo, hora, motivoEdicion } = validatedData;
 
     // Verificar que el fichaje existe y pertenece a la empresa
-    const fichaje = await prisma.fichaje.findFirst({
+    const fichaje = await prisma.fichajes.findFirst({
       where: { id: fichajeId, empresaId: session.user.empresaId },
       include: {
         eventos: {
@@ -54,7 +54,7 @@ export async function POST(req: NextRequest) {
       return notFoundResponse('Fichaje no encontrado');
     }
 
-    const evento = await prisma.fichajeEvento.create({
+    const evento = await prisma.fichaje_eventos.create({
       data: {
         fichajeId,
         tipo,
@@ -70,7 +70,7 @@ export async function POST(req: NextRequest) {
     );
     const horasTrabajadas = calcularHorasTrabajadas(eventosParaCalculo) ?? 0;
     const horasEnPausa = calcularTiempoEnPausa(eventosParaCalculo);
-    await prisma.fichaje.update({
+    await prisma.fichajes.update({
       where: { id: fichajeId },
       data: { horasTrabajadas, horasEnPausa },
     });
@@ -78,7 +78,7 @@ export async function POST(req: NextRequest) {
     // Notificar si la edición la hace otro usuario (auditoría activa)
     if (session.user.empleadoId && session.user.empleadoId !== fichaje.empleadoId) {
       // Obtener nombre del editor
-      const editor = await prisma.empleado.findUnique({
+      const editor = await prisma.empleados.findUnique({
         where: { id: session.user.empleadoId },
         select: { nombre: true, apellidos: true },
       });

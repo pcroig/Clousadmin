@@ -11,6 +11,16 @@ import {
   type JornadaFormData,
   JornadaFormFields,
 } from '@/components/shared/jornada-form-fields';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { type JornadaConfig } from '@/lib/calculos/fichajes-helpers';
 import { parseJson } from '@/lib/utils/json';
 
@@ -70,6 +80,14 @@ export const JornadaStep = forwardRef<JornadaStepHandle, JornadaStepProps>(funct
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [existingJornadaId, setExistingJornadaId] = useState<string | null>(null);
+  
+  // Estado para el diálogo de confirmación
+  const [mostrarAlertaJornadas, setMostrarAlertaJornadas] = useState(false);
+  const [jornadasPreviasInfo, setJornadasPreviasInfo] = useState<{
+    tieneJornadas: boolean;
+    jornadas: Array<{ nombre: string; cantidad: number }>;
+    jornadaId: string;
+  } | null>(null);
 
   // Load Data
   useEffect(() => {
@@ -167,6 +185,55 @@ export const JornadaStep = forwardRef<JornadaStepHandle, JornadaStepProps>(funct
     return Object.keys(newErrors).length === 0;
   }
 
+  async function verificarJornadasPrevias(): Promise<{
+    tieneJornadasPrevias: boolean;
+    jornadas: Array<{ nombre: string; cantidad: number }>;
+  } | null> {
+    try {
+      const response = await fetch(
+        `/api/jornadas/verificar-previas?nivel=empresa`,
+        { method: 'GET' }
+      );
+
+      if (!response.ok) {
+        console.error('Error verificando jornadas previas');
+        return null;
+      }
+
+      const data = await response.json() as {
+        tieneJornadasPrevias: boolean;
+        totalEmpleados: number;
+        jornadas: Array<{ nombre: string; cantidad: number; empleadoIds: string[] }>;
+      };
+
+      return {
+        tieneJornadasPrevias: data.tieneJornadasPrevias,
+        jornadas: data.jornadas,
+      };
+    } catch (error) {
+      console.error('Error verificando jornadas previas:', error);
+      return null;
+    }
+  }
+
+  async function realizarAsignacion(jornadaId: string): Promise<boolean> {
+    try {
+      const response = await fetch('/api/jornadas/asignar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          jornadaId: jornadaId,
+          nivel: 'empresa',
+        }),
+      });
+
+      return response.ok;
+    } catch (error) {
+      console.error('Error asignando jornada:', error);
+      return false;
+    }
+  }
+
   const guardar = async (): Promise<boolean> => {
     if (!validarFormulario()) return false;
     setSaving(true);
@@ -243,17 +310,26 @@ export const JornadaStep = forwardRef<JornadaStepHandle, JornadaStepProps>(funct
       const jornadaGuardada = await response.json() as { id: string };
       setExistingJornadaId(jornadaGuardada.id);
 
-      // Assign jornada to entire company by default
-      const asignacionResponse = await fetch('/api/jornadas/asignar', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      // Verificar si hay jornadas previas antes de asignar
+      const previasInfo = await verificarJornadasPrevias();
+
+      if (previasInfo?.tieneJornadasPrevias && previasInfo.jornadas.length > 0) {
+        // Mostrar alerta de confirmación
+        setJornadasPreviasInfo({
+          tieneJornadas: true,
+          jornadas: previasInfo.jornadas,
           jornadaId: jornadaGuardada.id,
-          nivel: 'empresa',
-        }),
-      });
-      if (!asignacionResponse.ok) {
-        console.warn('No se pudo asignar la jornada a la empresa en onboarding.');
+        });
+        setMostrarAlertaJornadas(true);
+        setSaving(false);
+        return false; // No continuar hasta que confirme
+      } else {
+        // No hay jornadas previas, asignar directamente
+        const asignado = await realizarAsignacion(jornadaGuardada.id);
+        if (!asignado) {
+          toast.error('Error al asignar la jornada');
+          return false;
+        }
       }
 
       toast.success('Jornada guardada correctamente');
@@ -268,25 +344,90 @@ export const JornadaStep = forwardRef<JornadaStepHandle, JornadaStepProps>(funct
     }
   };
 
+  async function handleConfirmarAsignacion() {
+    if (!jornadasPreviasInfo) return;
+
+    setSaving(true);
+    try {
+      const asignado = await realizarAsignacion(jornadasPreviasInfo.jornadaId);
+      if (asignado) {
+        toast.success(`Jornada asignada exitosamente. ${jornadasPreviasInfo.jornadas.length} jornada(s) anterior(es) fueron reemplazadas.`);
+        setMostrarAlertaJornadas(false);
+        setJornadasPreviasInfo(null);
+        // La función guardar ya completó, solo cerramos el modal
+      } else {
+        toast.error('Error al asignar la jornada');
+      }
+    } catch (error) {
+      console.error('Error asignando jornada:', error);
+      toast.error('Error al asignar la jornada');
+    } finally {
+      setSaving(false);
+    }
+  }
+
   useImperativeHandle(ref, () => ({
     guardar
   }));
 
   return (
-    <div className="space-y-6">
-      <JornadaFormFields
-        data={formData}
-        onChange={setFormData}
-        errors={errors}
-        disabled={saving}
-        showNombre={false}
-        showAsignacion={true}
-        nivelAsignacion="empresa"
-      />
-      <p className="text-sm text-gray-500">
-        Esta jornada se aplicará automáticamente a toda la empresa. Podrás crear variaciones específicas para equipos o empleados desde el panel de administración.
-      </p>
-    </div>
+    <>
+      <div className="space-y-6">
+        <JornadaFormFields
+          data={formData}
+          onChange={setFormData}
+          errors={errors}
+          disabled={saving}
+          showNombre={false}
+          showAsignacion={true}
+          nivelAsignacion="empresa"
+        />
+        <p className="text-sm text-gray-500">
+          Esta jornada se aplicará automáticamente a toda la empresa. Podrás crear variaciones específicas para equipos o empleados desde el panel de administración.
+        </p>
+      </div>
+
+      {/* Alert Dialog para confirmar reemplazo de jornadas previas */}
+      <AlertDialog open={mostrarAlertaJornadas} onOpenChange={setMostrarAlertaJornadas}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Jornadas previas detectadas</AlertDialogTitle>
+            <AlertDialogDescription>
+              <p className="mb-2">
+                La empresa ya tiene empleados con jornadas asignadas. Al aplicar esta nueva jornada a toda la empresa, se reemplazarán las jornadas anteriores.
+              </p>
+              
+              <div className="mt-3">
+                <p className="font-medium mb-2">Jornadas que serán reemplazadas:</p>
+                <ul className="list-disc list-inside space-y-1 text-sm">
+                  {jornadasPreviasInfo?.jornadas.map((j, idx) => (
+                    <li key={idx}>
+                      <strong>{j.nombre}</strong> - {j.cantidad} empleado{j.cantidad !== 1 ? 's' : ''}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              
+              <p className="mt-4 text-sm font-medium">
+                ¿Deseas continuar y reemplazar las jornadas anteriores?
+              </p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => {
+              setMostrarAlertaJornadas(false);
+              setJornadasPreviasInfo(null);
+              setSaving(false);
+            }}>
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmarAsignacion} disabled={saving}>
+              {saving ? 'Asignando...' : 'Sí, reemplazar'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 });
 

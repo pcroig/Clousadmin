@@ -139,6 +139,13 @@ export interface MiEspacioDocumento {
   tipoDocumento?: string | null;
   tamano?: number | null;
   createdAt?: string | null;
+  mimeType?: string | null;
+  firmaInfo?: {
+    tieneSolicitud: boolean;
+    firmado: boolean;
+    firmaId?: string;
+    estadoSolicitud: string;
+  } | null;
 }
 
 export interface MiEspacioCarpeta {
@@ -151,7 +158,7 @@ export interface MiEspacioCarpeta {
 
 export interface MiEspacioSaldoAusencia {
   id: string;
-  año: number;
+  anio: number;
   diasTotales: number;
   diasUsados: number;
   diasPendientes: number;

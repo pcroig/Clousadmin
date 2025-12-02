@@ -39,7 +39,7 @@ export async function POST(
     const { id: empleadoId } = params;
 
     // Verificar que el empleado existe y pertenece a la empresa
-    const empleado = await prisma.empleado.findFirst({
+    const empleado = await prisma.empleados.findFirst({
       where: {
         id: empleadoId,
         empresaId: session.user.empresaId,
@@ -52,7 +52,7 @@ export async function POST(
 
     const fechaRenovacion = new Date();
 
-    await prisma.empleado.update({
+    await prisma.empleados.update({
       where: { id: empleadoId },
       data: {
         saldoRenovadoDesde: fechaRenovacion,
@@ -84,7 +84,7 @@ export async function GET(
     const { id: empleadoId } = params;
 
     // Verificar que el empleado existe y pertenece a la empresa
-    const empleado = await prisma.empleado.findFirst({
+    const empleado = await prisma.empleados.findFirst({
       where: {
         id: empleadoId,
         empresaId: session.user.empresaId,

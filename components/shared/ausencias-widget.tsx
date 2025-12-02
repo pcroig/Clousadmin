@@ -5,14 +5,20 @@
 
 'use client';
 
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Info, Paperclip } from 'lucide-react';
 import { memo } from 'react';
 
 import { FechaCalendar } from '@/components/shared/fecha-calendar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { EstadoAusencia } from '@/lib/constants/enums';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import { EstadoAusencia, PeriodoMedioDiaValue } from '@/lib/constants/enums';
 import { MOBILE_DESIGN } from '@/lib/constants/mobile-design';
 import {
   getAusenciaBadgeVariant,
@@ -28,12 +34,21 @@ export interface AusenciaItem {
   tipo: string;
   dias: number;
   estado: EstadoAusencia;
+  justificanteUrl?: string | null;
+  medioDia?: boolean;
+  periodo?: PeriodoMedioDiaValue | null;
+  motivo?: string | null;
+  documentoId?: string | null;
+  createdAt?: string;
+  empleadoId?: string;
 }
 
 interface AusenciasWidgetProps {
   diasAcumulados: number;
   diasDisponibles: number;
   diasUtilizados: number;
+  diasDesdeHorasCompensadas?: number;
+  horasCompensadas?: number;
   proximasAusencias?: AusenciaItem[];
   ausenciasPasadas?: AusenciaItem[];
   periodo?: string;
@@ -45,12 +60,21 @@ export const AusenciasWidget = memo(function AusenciasWidget({
   diasAcumulados,
   diasDisponibles,
   diasUtilizados,
+  diasDesdeHorasCompensadas = 0,
+  horasCompensadas = 0,
   proximasAusencias = [],
   ausenciasPasadas = [],
   periodo = 'De enero de 2024 a diciembre de 2024',
   onOpenModal,
   onClickAusencia,
 }: AusenciasWidgetProps) {
+  const tieneCompensaciones = diasDesdeHorasCompensadas > 0;
+
+  const formatearHoras = (horas: number) => {
+    const h = Math.floor(Math.abs(horas));
+    const m = Math.round((Math.abs(horas) - h) * 60);
+    return `${h}h${m > 0 ? ` ${m}m` : ''}`;
+  };
 
   return (
     <div className="h-full">
@@ -99,6 +123,24 @@ export const AusenciasWidget = memo(function AusenciasWidget({
                       <p className={`${MOBILE_DESIGN.text.body} font-medium text-gray-900 truncate`}>{ausencia.tipo}</p>
                       <p className={MOBILE_DESIGN.text.caption}>{ausencia.dias} {ausencia.dias === 1 ? 'día' : 'días'}</p>
                     </div>
+                    <div className="flex items-center gap-1">
+                      {ausencia.justificanteUrl && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-gray-400 hover:text-gray-600"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            window.open(ausencia.justificanteUrl!, '_blank', 'noopener,noreferrer');
+                          }}
+                        >
+                          <Paperclip className="h-4 w-4" />
+                        </Button>
+                      )}
+                      <Badge variant={getAusenciaBadgeVariant(ausencia.estado)} className="text-[10px] px-2 py-0.5 flex-shrink-0">
+                        {getAusenciaEstadoLabel(ausencia.estado)}
+                      </Badge>
+                    </div>
                   </div>
                 ))
               )}
@@ -142,7 +184,32 @@ export const AusenciasWidget = memo(function AusenciasWidget({
             {/* Estadísticas principales */}
             <div className="grid grid-cols-3 gap-3">
               <div className="text-center">
-                <div className="text-3xl font-bold text-gray-900">{diasAcumulados.toFixed(1)}</div>
+                <div className="flex items-center justify-center gap-1.5">
+                  <div className="text-3xl font-bold text-gray-900">{diasAcumulados.toFixed(1)}</div>
+                  {tieneCompensaciones && (
+                    <>
+                      <span className="text-sm font-medium text-gray-500">
+                        (+{diasDesdeHorasCompensadas.toFixed(1)})
+                      </span>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button
+                              className="text-blue-600 hover:text-blue-700"
+                              aria-label="Detalles de horas compensadas"
+                            >
+                              <Info className="h-4 w-4" />
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-xs text-[12px] leading-tight">
+                            Incluye {diasDesdeHorasCompensadas.toFixed(1)} días ({formatearHoras(horasCompensadas)})
+                            añadidos al saldo tras compensar horas extra.
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </>
+                  )}
+                </div>
                 <div className="text-[11px] text-gray-500 mt-1 uppercase">Días acumulados</div>
               </div>
               <div className="text-center">
@@ -182,9 +249,24 @@ export const AusenciasWidget = memo(function AusenciasWidget({
                       <p className="text-[13px] font-medium text-gray-900 truncate">{ausencia.tipo}</p>
                       <p className="text-[11px] text-gray-500">{ausencia.dias} {ausencia.dias === 1 ? 'día' : 'días'}</p>
                     </div>
-                    <Badge variant={getAusenciaBadgeVariant(ausencia.estado)} className="text-[10px] px-2 py-0.5 flex-shrink-0">
-                      {getAusenciaEstadoLabel(ausencia.estado)}
-                    </Badge>
+                    <div className="flex items-center gap-1">
+                      {ausencia.justificanteUrl && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 text-gray-400 hover:text-gray-600"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            window.open(ausencia.justificanteUrl!, '_blank', 'noopener,noreferrer');
+                          }}
+                        >
+                          <Paperclip className="h-3.5 w-3.5" />
+                        </Button>
+                      )}
+                      <Badge variant={getAusenciaBadgeVariant(ausencia.estado)} className="text-[10px] px-2 py-0.5 flex-shrink-0">
+                        {getAusenciaEstadoLabel(ausencia.estado)}
+                      </Badge>
+                    </div>
                   </div>
                 ))
               )}
@@ -217,9 +299,24 @@ export const AusenciasWidget = memo(function AusenciasWidget({
                       <p className="text-[13px] font-medium text-gray-900 truncate">{ausencia.tipo}</p>
                       <p className="text-[11px] text-gray-500">{ausencia.dias} {ausencia.dias === 1 ? 'día' : 'días'}</p>
                     </div>
-                    <Badge variant={getAusenciaBadgeVariant(ausencia.estado)} className="text-[10px] px-2 py-0.5 flex-shrink-0">
-                      {getAusenciaEstadoLabel(ausencia.estado)}
-                    </Badge>
+                    <div className="flex items-center gap-1">
+                      {ausencia.justificanteUrl && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 text-gray-400 hover:text-gray-600"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            window.open(ausencia.justificanteUrl!, '_blank', 'noopener,noreferrer');
+                          }}
+                        >
+                          <Paperclip className="h-3.5 w-3.5" />
+                        </Button>
+                      )}
+                      <Badge variant={getAusenciaBadgeVariant(ausencia.estado)} className="text-[10px] px-2 py-0.5 flex-shrink-0">
+                        {getAusenciaEstadoLabel(ausencia.estado)}
+                      </Badge>
+                    </div>
                   </div>
                 ))
               )}

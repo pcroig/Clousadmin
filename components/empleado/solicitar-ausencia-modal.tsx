@@ -2,12 +2,12 @@
 
 import { useEffect, useMemo, useState } from 'react';
 
+import { FileAttachment } from '@/components/shared/file-attachment';
 import { InfoTooltip } from '@/components/shared/info-tooltip';
 import { LoadingButton } from '@/components/shared/loading-button';
 import { ResponsiveDatePicker } from '@/components/shared/responsive-date-picker';
 import { ResponsiveDialog } from '@/components/shared/responsive-dialog';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
@@ -36,6 +36,10 @@ interface EmpleadoMeResponse {
 
 interface UploadApiResponse {
   url: string;
+  s3Key?: string;
+  size?: number;
+  type?: string;
+  createdAt?: string;
   documento?: {
     id: string;
   } | null;
@@ -50,6 +54,16 @@ interface SolicitarAusenciaModalProps {
   empleadoIdDestino?: string;
   defaultFechaInicio?: Date | string;
   defaultFechaFin?: Date | string;
+  ausenciaInicial?: {
+    id: string;
+    tipo: string;
+    fechaInicio: string;
+    fechaFin: string;
+    motivo?: string | null;
+    justificanteUrl?: string | null;
+    medioDia?: boolean;
+    periodo?: PeriodoMedioDiaValue | null;
+  };
 }
 
 type TipoAusenciaOption = {
@@ -99,15 +113,19 @@ export function SolicitarAusenciaModal({
   empleadoIdDestino,
   defaultFechaInicio,
   defaultFechaFin,
+  ausenciaInicial,
 }: SolicitarAusenciaModalProps) {
   const esHRAdmin = contexto === 'hr_admin';
+  const isEditing = Boolean(ausenciaInicial);
+  const submitLabel = isEditing ? 'Guardar cambios' : esHRAdmin ? 'Registrar' : 'Solicitar';
+  const submitLoadingLabel = isEditing ? 'Guardando...' : esHRAdmin ? 'Registrando...' : 'Enviando...';
   const [tipo, setTipo] = useState<string>('vacaciones');
   const [fechaInicio, setFechaInicio] = useState<Date>();
   const [fechaFin, setFechaFin] = useState<Date>();
   const [medioDia, setMedioDia] = useState(false);
   const [periodo, setPeriodo] = useState<PeriodoMedioDiaValue>('manana');
   const [motivo, setMotivo] = useState('');
-  const [justificante, setJustificante] = useState<File | null>(null);
+  const [justificantes, setJustificantes] = useState<File[]>([]);
   const [uploadingJustificante, setUploadingJustificante] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -141,6 +159,20 @@ export function SolicitarAusenciaModal({
   useEffect(() => {
     if (!open) return;
 
+    if (ausenciaInicial) {
+      setTipo(ausenciaInicial.tipo);
+      setFechaInicio(new Date(ausenciaInicial.fechaInicio));
+      setFechaFin(new Date(ausenciaInicial.fechaFin));
+      setMotivo(ausenciaInicial.motivo || '');
+      setMedioDia(Boolean(ausenciaInicial.medioDia));
+      setPeriodo(
+        ausenciaInicial.medioDia ? ausenciaInicial.periodo ?? 'manana' : 'manana'
+      );
+      setJustificantes([]);
+      setError('');
+      return;
+    }
+
     if (defaultFechaInicio) {
       const parsed = new Date(defaultFechaInicio);
       if (!Number.isNaN(parsed.getTime())) {
@@ -157,7 +189,7 @@ export function SolicitarAusenciaModal({
         setFechaFin(parsed);
       }
     }
-  }, [open, defaultFechaInicio, defaultFechaFin]);
+  }, [open, defaultFechaInicio, defaultFechaFin, ausenciaInicial]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -189,11 +221,11 @@ export function SolicitarAusenciaModal({
     }
 
     try {
-      // Subir justificante a S3 si hay archivo y crear documento en BD
+      // Subir justificante a S3 si hay archivos y crear documento en BD
       let justificanteUrl: string | undefined;
       let documentoId: string | undefined;
       
-      if (justificante) {
+      if (justificantes.length > 0) {
         setUploadingJustificante(true);
         
         // Obtener empleadoId para asociar documento
@@ -204,8 +236,9 @@ export function SolicitarAusenciaModal({
           empleadoIdDocumento = empleadoData?.id;
         }
 
+        // Subir solo el primer archivo como justificante (compatible con modelo actual)
         const formData = new FormData();
-        formData.append('file', justificante);
+        formData.append('file', justificantes[0]);
         formData.append('tipo', 'justificante');
         formData.append('crearDocumento', 'true');
         if (empleadoIdDocumento) {
@@ -271,11 +304,14 @@ export function SolicitarAusenciaModal({
         payload.documentoId = documentoId;
       }
 
-      const response = await fetch('/api/ausencias', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
+      const response = await fetch(
+        ausenciaInicial ? `/api/ausencias/${ausenciaInicial.id}` : '/api/ausencias',
+        {
+          method: ausenciaInicial ? 'PATCH' : 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        }
+      );
 
       const data = await parseJson<ApiErrorResponse | { success: boolean }>(response);
 
@@ -288,7 +324,7 @@ export function SolicitarAusenciaModal({
           ).join(', ');
           throw new Error(apiError.error + ': ' + errores);
         }
-        throw new Error(apiError.error || 'Error al crear solicitud');
+        throw new Error(apiError.error || (ausenciaInicial ? 'Error al actualizar ausencia' : 'Error al crear solicitud'));
       }
 
       onSuccess();
@@ -300,7 +336,7 @@ export function SolicitarAusenciaModal({
       setFechaFin(undefined);
       setMedioDia(false);
       setMotivo('');
-      setJustificante(null);
+      setJustificantes([]);
     } catch (err) {
       const error = err instanceof Error ? err : new Error('Error desconocido');
       setError(error.message || 'Error al crear solicitud');
@@ -313,7 +349,13 @@ export function SolicitarAusenciaModal({
     <ResponsiveDialog
       open={open}
       onOpenChange={(isOpen) => !isOpen && onClose()}
-      title={esHRAdmin ? 'Registrar ausencia' : 'Solicitar Ausencia'}
+      title={
+        ausenciaInicial
+          ? 'Editar ausencia'
+          : esHRAdmin
+            ? 'Registrar ausencia'
+            : 'Solicitar Ausencia'
+      }
       complexity="complex"
       footer={
         <div className="flex gap-2 w-full">
@@ -336,10 +378,8 @@ export function SolicitarAusenciaModal({
             {uploadingJustificante
               ? 'Subiendo...'
               : loading
-                ? esHRAdmin ? 'Registrando...' : 'Enviando...'
-                : esHRAdmin
-                  ? 'Registrar'
-                  : 'Solicitar'}
+                ? submitLoadingLabel
+                : submitLabel}
           </LoadingButton>
         </div>
       }
@@ -489,30 +529,36 @@ export function SolicitarAusenciaModal({
 
 
           {/* Justificante (opcional) */}
-          <div>
-            <Label htmlFor="justificante">
-              Justificante (opcional)
-              {(tipo === 'enfermedad' || tipo === 'enfermedad_familiar' || tipo === 'maternidad_paternidad') && (
-                <span className="text-xs text-gray-500 ml-2">Recomendado para estos tipos de ausencia</span>
-              )}
-            </Label>
-            <Input
-              id="justificante"
-              type="file"
-              accept=".pdf,.jpg,.jpeg,.png"
-              onChange={(e) => setJustificante(e.target.files?.[0] || null)}
+          <div className="space-y-2">
+            <FileAttachment
+              label={
+                tipo === 'enfermedad' || tipo === 'enfermedad_familiar' || tipo === 'maternidad_paternidad'
+                  ? 'Justificante (recomendado para este tipo de ausencia)'
+                  : 'Justificante (opcional)'
+              }
+              description="Documentación médica o justificante"
+              files={justificantes}
+              onFilesChange={setJustificantes}
+              multiple={false}
+              maxFiles={1}
+              maxSizeMB={10}
+              acceptedTypes={['application/pdf', 'image/jpeg', 'image/png', 'image/jpg']}
               disabled={loading || uploadingJustificante}
-              className="cursor-pointer"
             />
-            {justificante && (
-              <p className="text-xs text-gray-500 mt-1">
-                Archivo seleccionado: {justificante.name} ({(justificante.size / 1024).toFixed(1)} KB)
-              </p>
-            )}
             {uploadingJustificante && (
-              <p className="text-xs text-gray-500 mt-2 flex items-center gap-2">
+              <p className="text-xs text-gray-500 flex items-center gap-2">
                 <Spinner className="size-3 text-gray-400" />
                 Subiendo justificante...
+              </p>
+            )}
+            {justificantes.length === 0 && ausenciaInicial?.justificanteUrl && (
+              <p className="text-xs text-gray-500 flex items-center gap-2">
+                <Button variant="link" className="px-0 h-auto text-xs" asChild>
+                  <a href={ausenciaInicial.justificanteUrl} target="_blank" rel="noopener noreferrer">
+                    Ver justificante actual
+                  </a>
+                </Button>
+                (se mantendrá si no adjuntas uno nuevo)
               </p>
             )}
           </div>

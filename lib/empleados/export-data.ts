@@ -235,9 +235,9 @@ export async function loadEmpleadoExportData(
         take: 50,
       },
     },
-  } satisfies Prisma.EmpleadoFindFirstArgs;
+  } satisfies Prisma.empleadosFindFirstArgs;
 
-  const empleado = await prisma.empleado.findFirst(empleadoQuery);
+  const empleado = await prisma.empleados.findFirst(empleadoQuery);
 
   if (!empleado) {
     return null;
@@ -274,7 +274,7 @@ export function buildEmpleadoExcelBuffer(data: EmpleadoExportData): Buffer {
   const workbook = XLSX.utils.book_new();
 
   // Perfil Sheet
-  const empleado = data.empleado as Partial<import('@prisma/client').Empleado>;
+  const empleado = data.empleado as Partial<import('@prisma/client').empleados>;
   const perfilEntries: (string | number | null | undefined)[][] = [
     ['ID', empleado.id],
     ['Nombre', empleado.nombre],

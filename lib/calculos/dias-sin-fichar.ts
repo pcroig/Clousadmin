@@ -34,7 +34,7 @@ export async function calcularDiasSinFichar(empleadoId: string): Promise<number>
     }
     
     // Verificar si tiene fichaje ese día
-    const fichaje = await prisma.fichaje.findUnique({
+    const fichaje = await prisma.fichajes.findUnique({
       where: {
         empleadoId_fecha: {
           empleadoId,

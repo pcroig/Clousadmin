@@ -8,7 +8,7 @@ import { sendOnboardingEmail } from '@/lib/email';
 import { crearOnboarding, type TipoOnboarding } from '@/lib/onboarding';
 import { prisma } from '@/lib/prisma';
 
-import type { InvitacionEmpleado } from '@prisma/client';
+import type { invitaciones_empleados as InvitacionEmpleado } from '@prisma/client';
 
 /**
  * Crear invitación para un empleado
@@ -22,13 +22,13 @@ export async function crearInvitacion(
 ) {
   try {
     // Verificar si ya existe una invitación activa
-    const invitacionExistente = await prisma.invitacionEmpleado.findUnique({
+    const invitacionExistente = await prisma.invitaciones_empleados.findUnique({
       where: { empleadoId },
     });
 
     if (invitacionExistente && !invitacionExistente.aceptada) {
       // Si existe y no ha sido aceptada, eliminarla para crear una nueva
-      await prisma.invitacionEmpleado.delete({
+      await prisma.invitaciones_empleados.delete({
         where: { id: invitacionExistente.id },
       });
     }
@@ -50,7 +50,7 @@ export async function crearInvitacion(
         ? new Date(tokenExpiraValue as string | number)
         : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
-    const invitacion = await prisma.invitacionEmpleado.create({
+    const invitacion = await prisma.invitaciones_empleados.create({
       data: {
         empresaId,
         empleadoId,
@@ -128,7 +128,7 @@ export async function invitarEmpleado({
   let nombreEmpresa = empresaNombre;
   try {
     if (!nombreEmpresa) {
-      const empresa = await prisma.empresa.findUnique({
+      const empresa = await prisma.empresas.findUnique({
         where: { id: empresaId },
         select: { nombre: true },
       });
@@ -172,7 +172,7 @@ export async function invitarEmpleado({
  */
 export async function verificarInvitacion(token: string) {
   try {
-    const invitacion = await prisma.invitacionEmpleado.findUnique({
+    const invitacion = await prisma.invitaciones_empleados.findUnique({
       where: { token },
       include: {
         empleado: {
@@ -227,7 +227,7 @@ export async function aceptarInvitacion(token: string, password: string) {
     const hashedPassword = await hashPassword(password);
 
     // Actualizar usuario con contraseña y marcar como verificado
-    const usuario = await prisma.usuario.update({
+    const usuario = await prisma.usuarios.update({
       where: { id: invitacion.empleado.usuarioId },
       data: {
         password: hashedPassword,
@@ -237,7 +237,7 @@ export async function aceptarInvitacion(token: string, password: string) {
     });
 
     // Marcar empleado como onboarding completado
-    await prisma.empleado.update({
+    await prisma.empleados.update({
       where: { id: invitacion.empleadoId },
       data: {
         onboardingCompletado: true,
@@ -246,7 +246,7 @@ export async function aceptarInvitacion(token: string, password: string) {
     });
 
     // Marcar invitación como aceptada
-    await prisma.invitacionEmpleado.update({
+    await prisma.invitaciones_empleados.update({
       where: { id: invitacion.id },
       data: { aceptada: true },
     });
@@ -270,7 +270,7 @@ export async function aceptarInvitacion(token: string, password: string) {
  */
 export async function obtenerInvitacionPorEmpleado(empleadoId: string) {
   try {
-    const invitacion = await prisma.invitacionEmpleado.findUnique({
+    const invitacion = await prisma.invitaciones_empleados.findUnique({
       where: { empleadoId },
     });
 

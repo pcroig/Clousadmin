@@ -31,7 +31,7 @@ export async function GET(request: NextRequest, context: RouteParams) {
 
     const { id } = params;
 
-    const puesto = await prisma.puesto.findFirst({
+    const puesto = await prisma.puestos.findFirst({
       where: {
         id,
         empresaId: session.user.empresaId,
@@ -98,7 +98,7 @@ export async function PATCH(request: NextRequest, context: RouteParams) {
     const validatedData = puestoUpdateSchema.parse(body);
 
     // Verificar que el puesto existe y pertenece a la empresa
-    const puesto = await prisma.puesto.findFirst({
+    const puesto = await prisma.puestos.findFirst({
       where: {
         id,
         empresaId: session.user.empresaId,
@@ -114,7 +114,7 @@ export async function PATCH(request: NextRequest, context: RouteParams) {
 
     // Si se está cambiando el nombre, verificar que no exista otro con ese nombre
     if (validatedData.nombre && validatedData.nombre !== puesto.nombre) {
-      const existingPuesto = await prisma.puesto.findFirst({
+      const existingPuesto = await prisma.puestos.findFirst({
         where: {
           empresaId: session.user.empresaId,
           nombre: validatedData.nombre,
@@ -132,7 +132,7 @@ export async function PATCH(request: NextRequest, context: RouteParams) {
     }
 
     // Actualizar puesto
-    const updatedPuesto = await prisma.puesto.update({
+    const updatedPuesto = await prisma.puestos.update({
       where: { id },
       data: {
         nombre: validatedData.nombre,
@@ -168,7 +168,7 @@ export async function DELETE(request: NextRequest, context: RouteParams) {
     const { id } = params;
 
     // Verificar que el puesto existe y pertenece a la empresa
-    const puesto = await prisma.puesto.findFirst({
+    const puesto = await prisma.puestos.findFirst({
       where: {
         id,
         empresaId: session.user.empresaId,
@@ -198,7 +198,7 @@ export async function DELETE(request: NextRequest, context: RouteParams) {
     }
 
     // Soft delete: marcar como inactivo
-    await prisma.puesto.update({
+    await prisma.puestos.update({
       where: { id },
       data: { activo: false },
     });

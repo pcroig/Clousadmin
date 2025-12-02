@@ -38,7 +38,7 @@ export async function PATCH(
     const data = UpdateSchema.parse(payload);
 
     // Verificar que el tipo pertenece a la empresa
-    const tipo = await prisma.tipoComplemento.findFirst({
+    const tipo = await prisma.tipos_complemento.findFirst({
       where: {
         id,
         empresaId: session.user.empresaId,
@@ -49,7 +49,7 @@ export async function PATCH(
       return NextResponse.json({ error: 'Tipo de complemento no encontrado' }, { status: 404 });
     }
 
-    const updated = await prisma.tipoComplemento.update({
+    const updated = await prisma.tipos_complemento.update({
       where: { id },
       data,
     });
@@ -83,13 +83,13 @@ export async function DELETE(
     const { id } = await params;
 
     // Verificar que el tipo pertenece a la empresa
-    const tipo = await prisma.tipoComplemento.findFirst({
+    const tipo = await prisma.tipos_complemento.findFirst({
       where: {
         id,
         empresaId: session.user.empresaId,
       },
       include: {
-        _count: { select: { empleadoComplementos: true } },
+        _count: { select: { empleado_complementos: true } },
       },
     });
 
@@ -98,8 +98,8 @@ export async function DELETE(
     }
 
     // Si tiene empleados asignados, solo desactivar
-    if (tipo._count.empleadoComplementos > 0) {
-      await prisma.tipoComplemento.update({
+    if (tipo._count.empleado_complementos > 0) {
+      await prisma.tipos_complemento.update({
         where: { id },
         data: { activo: false },
       });
@@ -111,7 +111,7 @@ export async function DELETE(
     }
 
     // Si no tiene asignaciones, eliminar físicamente
-    await prisma.tipoComplemento.delete({
+    await prisma.tipos_complemento.delete({
       where: { id },
     });
 

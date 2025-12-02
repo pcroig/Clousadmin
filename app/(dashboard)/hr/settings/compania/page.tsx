@@ -22,7 +22,7 @@ export default async function CompanySettingsPage() {
     redirect('/hr/dashboard');
   }
 
-  const empresa = await prisma.empresa.findUnique({
+  const empresa = await prisma.empresas.findUnique({
     where: { id: session.user.empresaId },
     select: {
       id: true,

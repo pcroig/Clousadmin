@@ -64,7 +64,7 @@ export async function GET(req: NextRequest) {
     if (authResult instanceof Response) return authResult;
     const { session } = authResult;
 
-    const empresa = await prisma.empresa.findUnique({
+    const empresa = await prisma.empresas.findUnique({
       where: { id: session.user.empresaId },
       select: { config: true },
     });

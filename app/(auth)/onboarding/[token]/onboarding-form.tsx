@@ -4,7 +4,7 @@
 // Onboarding Form - Multi-Step Employee Data Collection
 // ========================================
 
-import { Empleado } from '@prisma/client';
+import type { empleados } from '@prisma/client';
 import { Check, ChevronLeft, ChevronRight, Copy, HelpCircle, Upload, User } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
@@ -50,7 +50,7 @@ import type { DocumentoRequerido as ConfigDocumentoRequerido, OnboardingConfigDa
 
 interface OnboardingFormProps {
   token: string;
-  empleado: Empleado;
+  empleado: empleados;
   progreso: ProgresoOnboarding;
   datosTemporales: DatosTemporales | null;
   nombreEmpresa: string;

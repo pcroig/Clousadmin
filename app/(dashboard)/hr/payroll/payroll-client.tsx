@@ -23,7 +23,8 @@ import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
-import { MobilePageHeader } from '@/components/adaptive/MobilePageHeader';
+import { PageLayout } from '@/components/layout/page-layout';
+import { PageMobileHeader } from '@/components/layout/page-mobile-header';
 import { AlertasSummary } from '@/components/payroll/alertas-summary';
 import { UploadNominasModal } from '@/components/payroll/upload-nominas-modal';
 import { ValidarComplementosDialog } from '@/components/payroll/validar-complementos-dialog';
@@ -518,10 +519,10 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
   );
 
   const headerMobile = (
-    <MobilePageHeader
+    <PageMobileHeader
       title="Nóminas"
       subtitle={`${eventos.length} ${eventos.length === 1 ? 'evento' : 'eventos'}`}
-      actions={
+      actionsNode={
         <Button
           onClick={() => setShowCreateEventDialog(true)}
           size="sm"
@@ -535,7 +536,7 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
   );
 
   const content = (
-    <div className="h-full w-full flex flex-col">
+    <PageLayout>
       {isMobile ? headerMobile : headerDesktop}
 
       {/* Content */}
@@ -1016,7 +1017,7 @@ export function PayrollClient({ mesActual, anioActual }: PayrollClientProps) {
           onClose={() => setSelectedNominaId(null)}
         />
       )}
-    </div>
+    </PageLayout>
   );
 
   return content;

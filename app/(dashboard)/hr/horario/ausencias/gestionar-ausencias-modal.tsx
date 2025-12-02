@@ -3,9 +3,11 @@
 import { type ChangeEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
+import { CalendarPlus } from 'lucide-react';
+
 import { CalendarioFestivos } from '@/components/hr/calendario-festivos';
 import { ListaFestivos } from '@/components/hr/lista-festivos';
-import { InfoTooltip } from '@/components/shared/info-tooltip';
+import { SwitchWithTooltip } from '@/components/shared/switch-with-tooltip';
 import { LoadingButton } from '@/components/shared/loading-button';
 import { Button } from '@/components/ui/button';
 import {
@@ -17,21 +19,12 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Field, FieldLabel } from '@/components/ui/field';
-import { Input } from '@/components/ui/input';
 import {
   InputGroup,
   InputGroupAddon,
   InputGroupInput,
   InputGroupText,
 } from '@/components/ui/input-group';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { parseJson } from '@/lib/utils/json';
 
@@ -43,32 +36,12 @@ interface GestionarAusenciasModalProps {
   onSaved: () => void;
 }
 
-interface Equipo {
-  id: string;
-  nombre: string;
-}
-
-interface _PoliticaEquipo {
-  equipoId: string;
-  maxSolapamientoPct: number;
-  requiereAntelacionDias: number;
-}
-
 export function GestionarAusenciasModal({ open, onClose, onSaved }: GestionarAusenciasModalProps) {
-  const [savingPolitica, setSavingPolitica] = useState(false);
-  const [savingCalendario, setSavingCalendario] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [processingFestivos, setProcessingFestivos] = useState(false);
-  const [tab, setTab] = useState<'politicas' | 'calendario'>('politicas');
 
-  // Saldo y Políticas (ahora juntos)
-  const [nivel, setNivel] = useState<'empresa' | 'equipo'>('empresa');
+  // Saldo de ausencias
   const [diasTotales, setDiasTotales] = useState('22');
-  const [equipos, setEquipos] = useState<Equipo[]>([]);
-  const [equiposSeleccionados, setEquiposSeleccionados] = useState<string[]>([]);
-  
-  // Políticas de Ausencia - Para toda la empresa
-  const [solapamientoPct, setSolapamientoPct] = useState('50');
-  const [antelacionDias, setAntelacionDias] = useState('5');
   const [carryOverMode, setCarryOverMode] = useState<'limpiar' | 'extender'>('limpiar');
   
   // Calendario laboral
@@ -88,13 +61,6 @@ export function GestionarAusenciasModal({ open, onClose, onSaved }: GestionarAus
 
   const cargarDatos = useCallback(async () => {
     try {
-      // Cargar equipos
-      const resEquipos = await fetch('/api/organizacion/equipos');
-      if (resEquipos.ok) {
-        const dataEquipos = await parseJson<Equipo[]>(resEquipos);
-        setEquipos(Array.isArray(dataEquipos) ? dataEquipos : []);
-      }
-      
       // Cargar configuración de calendario laboral
       const resCalendario = await fetch('/api/empresa/calendario-laboral');
       if (resCalendario.ok) {
@@ -116,12 +82,6 @@ export function GestionarAusenciasModal({ open, onClose, onSaved }: GestionarAus
           carryOverModo?: 'limpiar' | 'extender';
           carryOverMeses?: number;
         }>(resPoliticas);
-        if (dataPoliticas.maxSolapamientoPct !== undefined) {
-          setSolapamientoPct(dataPoliticas.maxSolapamientoPct.toString());
-        }
-        if (dataPoliticas.requiereAntelacionDias !== undefined) {
-          setAntelacionDias(dataPoliticas.requiereAntelacionDias.toString());
-        }
         if (dataPoliticas.diasVacacionesDefault !== undefined) {
           setDiasTotales(dataPoliticas.diasVacacionesDefault.toString());
         }
@@ -142,32 +102,40 @@ export function GestionarAusenciasModal({ open, onClose, onSaved }: GestionarAus
     }
   }, [open, cargarDatos]);
 
-  async function handleGuardarPoliticaYSaldo() {
-    setSavingPolitica(true);
+  async function handleGuardar() {
+    setSaving(true);
     try {
-      // Validar datos de política
-      const pct = parseInt(solapamientoPct, 10);
-      const dias = parseInt(antelacionDias, 10);
-      
-      if (isNaN(pct) || pct < 0 || pct > 100) {
-        toast.error('El porcentaje de solapamiento debe estar entre 0 y 100');
-        setSavingPolitica(false);
-        return;
-      }
-      
-      if (isNaN(dias) || dias < 0 || dias > 365) {
-        toast.error('Los días de antelación deben estar entre 0 y 365');
-        setSavingPolitica(false);
+      // Validar días mínimos globales
+      const diasMinimos = parseInt(diasTotales, 10);
+      if (Number.isNaN(diasMinimos) || diasMinimos < 0 || diasMinimos > 365) {
+        toast.error('El saldo anual debe estar entre 0 y 365 días');
+        setSaving(false);
         return;
       }
 
-      // Guardar política de ausencias (nivel empresa)
+      // Guardar saldo mínimo global
+      const resSaldo = await fetch('/api/ausencias/saldo', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          diasTotales: diasMinimos,
+        }),
+      });
+
+      if (!resSaldo.ok) {
+        const error = await parseJson<{ error?: string }>(resSaldo).catch(() => ({
+          error: 'Error desconocido',
+        }));
+        toast.error(error.error || 'Error al guardar saldo');
+        setSaving(false);
+        return;
+      }
+
+      // Guardar política de carry-over
       const resPolitica = await fetch('/api/empresa/politica-ausencias', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          maxSolapamientoPct: pct,
-          requiereAntelacionDias: dias,
           carryOverModo: carryOverMode,
           carryOverMeses: carryOverMode === 'extender' ? 4 : 0,
         }),
@@ -178,63 +146,33 @@ export function GestionarAusenciasModal({ open, onClose, onSaved }: GestionarAus
           error: 'Error desconocido',
         }));
         toast.error(error.error || 'Error al guardar política');
-        setSavingPolitica(false);
+        setSaving(false);
         return;
       }
 
-      // Guardar saldo
-      const resSaldo = await fetch('/api/ausencias/saldo', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          nivel,
-          diasTotales: parseInt(diasTotales),
-          equipoIds: nivel === 'equipo' ? equiposSeleccionados : undefined,
-        }),
-      });
-
-      if (!resSaldo.ok) {
-        const error = await parseJson<{ error?: string }>(resSaldo).catch(() => ({
-          error: 'Error desconocido',
-        }));
-        toast.error(error.error || 'Error al guardar saldo');
-        setSavingPolitica(false);
-        return;
-      }
-
-      toast.success('Política de ausencias y saldo guardados correctamente');
-      if (onSaved) onSaved();
-    } catch (e) {
-      console.error('Error guardando configuración:', e);
-      toast.error('Error al guardar la configuración');
-    } finally {
-      setSavingPolitica(false);
-    }
-  }
-  
-  async function handleGuardarCalendario() {
-    setSavingCalendario(true);
-    try {
-      const response = await fetch('/api/empresa/calendario-laboral', {
+      // Guardar calendario laboral
+      const resCalendario = await fetch('/api/empresa/calendario-laboral', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(diasLaborables),
       });
 
-      if (response.ok) {
-        toast.success('Calendario laboral guardado correctamente');
-        if (onSaved) onSaved();
-      } else {
-        const error = await parseJson<{ error?: string }>(response).catch(() => ({
+      if (!resCalendario.ok) {
+        const error = await parseJson<{ error?: string }>(resCalendario).catch(() => ({
           error: 'Error desconocido',
         }));
         toast.error(error.error || 'Error al guardar calendario');
+        setSaving(false);
+        return;
       }
+
+      toast.success('Configuración guardada correctamente');
+      if (onSaved) onSaved();
     } catch (e) {
-      console.error('Error guardando calendario:', e);
-      toast.error('Error al guardar calendario');
+      console.error('Error guardando configuración:', e);
+      toast.error('Error al guardar la configuración');
     } finally {
-      setSavingCalendario(false);
+      setSaving(false);
     }
   }
   
@@ -298,196 +236,49 @@ export function GestionarAusenciasModal({ open, onClose, onSaved }: GestionarAus
           <DialogTitle>Gestionar Ausencias</DialogTitle>
         </DialogHeader>
 
-        <DialogBody>
-          <Tabs
-          value={tab}
-          onValueChange={(value) => {
-            if (value === 'politicas' || value === 'calendario') {
-              setTab(value);
-            }
-          }}
-        >
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="politicas">Política de ausencias</TabsTrigger>
-            <TabsTrigger value="calendario">Calendario Laboral</TabsTrigger>
-          </TabsList>
-
-          {/* Tab: Política de ausencias (Saldo + Políticas) */}
-          <TabsContent value="politicas" className="space-y-6">
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-gray-900">Saldo Anual de Vacaciones</h3>
-              
-              <Field>
-                <FieldLabel>Nivel de asignación</FieldLabel>
-                <Select
-                  value={nivel}
-                  onValueChange={(value) => {
-                    if (value === 'empresa' || value === 'equipo') {
-                      setNivel(value);
-                    }
-                  }}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="empresa">Toda la empresa</SelectItem>
-                    <SelectItem value="equipo">Por equipos</SelectItem>
-                  </SelectContent>
-                </Select>
-              </Field>
-
-              {nivel === 'equipo' && (
-                <Field>
-                  <FieldLabel>Equipos</FieldLabel>
-                  <div className="space-y-2 max-h-48 overflow-y-auto border border-gray-200 rounded-lg p-3">
-                    {equipos.length === 0 ? (
-                      <p className="text-sm text-gray-500">No hay equipos disponibles</p>
-                    ) : (
-                      equipos.map((equipo) => (
-                        <div key={equipo.id} className="flex items-center gap-2">
-                          <input
-                            type="checkbox"
-                            id={`equipo-${equipo.id}`}
-                            checked={equiposSeleccionados.includes(equipo.id)}
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                setEquiposSeleccionados([...equiposSeleccionados, equipo.id]);
-                              } else {
-                                setEquiposSeleccionados(equiposSeleccionados.filter((id) => id !== equipo.id));
-                              }
-                            }}
-                            className="w-4 h-4"
-                          />
-                          <label htmlFor={`equipo-${equipo.id}`} className="text-sm text-gray-900 cursor-pointer">
-                            {equipo.nombre}
-                          </label>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </Field>
-              )}
-
-              <Field>
-                <FieldLabel>Días totales anuales</FieldLabel>
-                <Input
-                  type="number"
-                  value={diasTotales}
-                  onChange={(e) => setDiasTotales(e.target.value)}
-                  min="0"
-                  max="365"
-                  placeholder="22"
-                />
-              </Field>
-
-              <Field>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <FieldLabel>Saldo al cierre</FieldLabel>
-                    <p className="text-xs text-gray-500">
-                      El saldo pendiente se limpia al cerrar el año o se extiende automáticamente 4 meses más.
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-gray-500">Limpiar</span>
-                    <Switch
-                      checked={carryOverMode === 'extender'}
-                      onCheckedChange={(checked) =>
-                        setCarryOverMode(checked ? 'extender' : 'limpiar')
-                      }
-                    />
-                    <span className="text-xs text-gray-500">Extender 4 meses</span>
-                  </div>
-                </div>
-              </Field>
-            </div>
-
-            <div className="border-t pt-6 space-y-4">
-              <div className="flex items-start gap-2">
-                <h3 className="text-lg font-semibold text-gray-900 flex-1">Reglas y límites</h3>
-                <InfoTooltip
-                  content="Estas políticas se aplican a toda la empresa. La antelación sólo afecta a vacaciones y ausencias 'otro', y el solapamiento se aplica únicamente a vacaciones."
-                  side="left"
-                />
+        <DialogBody className="space-y-8">
+          {/* Saldo Anual */}
+          <div className="space-y-3">
+            <div className="flex items-start gap-6">
+              <div className="flex-1 space-y-1">
+                <FieldLabel>Saldo Anual de ausencias</FieldLabel>
+                <p className="text-xs text-gray-500">
+                  Puedes asignar más días a empleados específicos desde su perfil.
+                </p>
               </div>
-              
-              <div className="grid gap-4 md:grid-cols-2">
-                <Field>
-                  <div className="flex items-center gap-2">
-                    <FieldLabel>Antelación mínima</FieldLabel>
-                    <InfoTooltip
-                      content={(
-                        <div className="space-y-2 text-sm">
-                          <p className="font-medium">¿Qué es la antelación mínima?</p>
-                          <p className="text-xs">
-                            Días mínimos entre la solicitud de ausencia y su inicio (solo para vacaciones y «otro»).
-                          </p>
-                          <p className="text-xs mt-2">
-                            Ejemplo: con 5 días, una ausencia que empieza el 15/01 debe pedirse antes del 10/01.
-                          </p>
-                        </div>
-                      )}
-                    />
-                  </div>
-                  
-                  <InputGroup className="mt-3">
-                    <InputGroupInput
-                      type="number"
-                      value={antelacionDias}
-                      onChange={(e) => setAntelacionDias(e.target.value)}
-                      min="0"
-                      max="365"
-                      inputMode="numeric"
-                    />
-                    <InputGroupAddon align="inline-end">
-                      <InputGroupText>días</InputGroupText>
-                    </InputGroupAddon>
-                  </InputGroup>
-                </Field>
-
-                <Field>
-                  <div className="flex items-center gap-2">
-                    <FieldLabel>Solapamiento máximo</FieldLabel>
-                    <InfoTooltip
-                      content={(
-                        <div className="space-y-2 text-sm">
-                          <p className="font-medium">¿Qué significa el solapamiento?</p>
-                          <p className="text-xs">
-                            Porcentaje máximo de empleados que pueden estar de vacaciones al mismo tiempo.
-                          </p>
-                          <p className="text-xs mt-2">
-                            Ejemplo: con 50%, en un equipo de 10, solo 5 pueden coincidir de vacaciones.
-                          </p>
-                        </div>
-                      )}
-                    />
-                  </div>
-                  
-                  <InputGroup className="mt-3">
-                    <InputGroupInput
-                      type="number"
-                      value={solapamientoPct}
-                      onChange={(e) => setSolapamientoPct(e.target.value)}
-                      min="0"
-                      max="100"
-                      inputMode="numeric"
-                    />
-                    <InputGroupAddon align="inline-end">
-                      <InputGroupText>%</InputGroupText>
-                    </InputGroupAddon>
-                  </InputGroup>
-                </Field>
+              <div className="w-40">
+                <InputGroup>
+                  <InputGroupInput
+                    type="number"
+                    value={diasTotales}
+                    onChange={(e) => setDiasTotales(e.target.value)}
+                    min="0"
+                    max="365"
+                    placeholder="22"
+                    inputMode="numeric"
+                  />
+                  <InputGroupAddon align="inline-end">
+                    <InputGroupText>días</InputGroupText>
+                  </InputGroupAddon>
+                </InputGroup>
               </div>
             </div>
-          </TabsContent>
 
-          {/* Tab: Calendario */}
-          <TabsContent value="calendario" className="space-y-6">
+            <SwitchWithTooltip
+              label="Extender compensación 4 meses"
+              tooltipContent="Si está activo, el saldo pendiente se puede usar durante 4 meses tras cerrar el año."
+              checked={carryOverMode === 'extender'}
+              onCheckedChange={(checked) => setCarryOverMode(checked ? 'extender' : 'limpiar')}
+              disabled={saving}
+            />
+          </div>
+
+          {/* Calendario Laboral */}
+          <div className="space-y-4 pt-4">
             <Field>
               <FieldLabel>Días laborables de la semana</FieldLabel>
               
-              <div className="flex gap-2 mt-3">
+              <div className="flex gap-2 mt-2 mb-6">
                 {[
                   { key: 'lunes', label: 'Lun' },
                   { key: 'martes', label: 'Mar' },
@@ -531,36 +322,49 @@ export function GestionarAusenciasModal({ open, onClose, onSaved }: GestionarAus
               }}
               className="space-y-4"
             >
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="calendario">Calendario visual</TabsTrigger>
-                <TabsTrigger value="lista">Lista de festivos</TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="calendario" className="space-y-4">
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".ics,.csv"
-                  className="hidden"
-                  onChange={handleArchivoFestivosChange}
-                />
-                <div className="flex justify-end">
+              <div className="flex items-center justify-between">
+                <TabsList className="w-auto">
+                  <TabsTrigger value="calendario">Calendario</TabsTrigger>
+                  <TabsTrigger value="lista">Festivos</TabsTrigger>
+                </TabsList>
+                
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="icon"
+                    variant="outline"
+                    onClick={() => handleCreateFestivoInline()}
+                    aria-label="Añadir festivo"
+                    title="Añadir festivo"
+                  >
+                    <CalendarPlus className="h-4 w-4" />
+                  </Button>
                   <Button
                     size="sm"
                     variant="outline"
                     onClick={() => fileInputRef.current?.click()}
                     disabled={processingFestivos}
                   >
-                    {processingFestivos ? 'Importando...' : 'Importar calendario'}
+                    {processingFestivos ? 'Importando...' : 'Importar'}
                   </Button>
                 </div>
+              </div>
 
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".ics,.csv"
+                className="hidden"
+                onChange={handleArchivoFestivosChange}
+              />
+
+              <TabsContent value="calendario" className="space-y-4">
                 <CalendarioFestivos
                   diasLaborables={diasLaborables}
                   onUpdate={cargarDatos}
                   refreshToken={festivosRefreshKey}
                   onRequestCreate={handleCreateFestivoInline}
                   onRequestEdit={handleEditFestivoInline}
+                  numberOfMonths={1}
                 />
               </TabsContent>
 
@@ -572,34 +376,24 @@ export function GestionarAusenciasModal({ open, onClose, onSaved }: GestionarAus
                   onEditorClose={handleCloseEditor}
                   onCreateRequest={() => handleCreateFestivoInline()}
                   onEditRequest={handleEditFestivoInline}
+                  showCreateButton={false}
                 />
               </TabsContent>
             </Tabs>
-          </TabsContent>
-        </Tabs>
+          </div>
         </DialogBody>
 
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>
             Cancelar
           </Button>
-          {tab === 'politicas' ? (
-            <LoadingButton
-              onClick={handleGuardarPoliticaYSaldo}
-              loading={savingPolitica}
-              disabled={savingPolitica}
-            >
-              {savingPolitica ? 'Guardando...' : 'Guardar Configuración'}
-            </LoadingButton>
-          ) : (
-            <LoadingButton
-              onClick={handleGuardarCalendario}
-              loading={savingCalendario}
-              disabled={savingCalendario}
-            >
-              {savingCalendario ? 'Guardando...' : 'Guardar Calendario'}
-            </LoadingButton>
-          )}
+          <LoadingButton
+            onClick={handleGuardar}
+            loading={saving}
+            disabled={saving}
+          >
+            {saving ? 'Guardando...' : 'Guardar Configuración'}
+          </LoadingButton>
         </DialogFooter>
       </DialogScrollableContent>
     </Dialog>

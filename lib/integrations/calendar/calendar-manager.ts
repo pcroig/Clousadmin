@@ -18,7 +18,7 @@ import { createCalendarProvider } from "./providers";
 
 import type {
   CalendarProviderName} from "./providers";
-import type { Ausencia } from "@prisma/client";
+import type { ausencias as Ausencia } from "@prisma/client";
 
 export class CalendarManager {
   /**
@@ -32,13 +32,13 @@ export class CalendarManager {
 
     try {
       // 1. Obtener el usuarioId del empleado
-      const empleado = await prisma.empleado.findUnique({
+      const empleado = await prisma.empleados.findUnique({
         where: { id: ausencia.empleadoId },
         select: { usuarioId: true },
       });
 
       // 2. Buscar integraciones de calendario activas
-      const integraciones = await prisma.integracion.findMany({
+      const integraciones = await prisma.integraciones.findMany({
         where: {
           empresaId: ausencia.empresaId,
           tipo: "calendario",
@@ -95,7 +95,7 @@ export class CalendarManager {
   ): Promise<SyncResult> {
     try {
       // 1. Obtener integración
-      const integracion = await prisma.integracion.findUnique({
+      const integracion = await prisma.integraciones.findUnique({
         where: { id: integracionId },
       });
 
@@ -173,7 +173,7 @@ export class CalendarManager {
           },
         };
 
-        await prisma.integracion.update({
+        await prisma.integraciones.update({
           where: { id: integracionId },
           data: { config: asJsonValue(updatedConfig) },
         });
@@ -201,13 +201,13 @@ export class CalendarManager {
   ): Promise<void> {
     try {
       // Obtener el usuarioId del empleado
-      const empleado = await prisma.empleado.findUnique({
+      const empleado = await prisma.empleados.findUnique({
         where: { id: empleadoId },
         select: { usuarioId: true },
       });
 
       // Buscar integraciones que puedan tener el evento
-      const integraciones = await prisma.integracion.findMany({
+      const integraciones = await prisma.integraciones.findMany({
         where: {
           empresaId,
           tipo: "calendario",
@@ -256,7 +256,7 @@ export class CalendarManager {
           const { ausenciaEventMap = {}, ...restConfig } = config;
           delete ausenciaEventMap[ausenciaId];
 
-          await prisma.integracion.update({
+          await prisma.integraciones.update({
             where: { id: integracion.id },
             data: {
               config: asJsonValue({

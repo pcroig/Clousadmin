@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
     console.log(`[CRON Cerrar Jornadas] Procesando día: ${ayer.toISOString().split('T')[0]}`);
 
     // Obtener todas las empresas
-    const empresas = await prisma.empresa.findMany();
+    const empresas = await prisma.empresas.findMany();
 
     let fichajesCreados = 0;
     let fichajesPendientes = 0;
@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
         for (const empleado of empleadosDisponibles) {
           try {
             // Buscar fichaje del día anterior
-            let fichaje = await prisma.fichaje.findUnique({
+            let fichaje = await prisma.fichajes.findUnique({
               where: {
                 empleadoId_fecha: {
                   empleadoId: empleado.id,
@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
 
             // Si no existe fichaje, crear uno en estado pendiente
             if (!fichaje) {
-              fichaje = await prisma.fichaje.create({
+              fichaje = await prisma.fichajes.create({
                 data: {
                   empresaId: empresa.id,
                   empleadoId: empleado.id,
@@ -117,7 +117,7 @@ export async function POST(request: NextRequest) {
 
               if (validacion.completo) {
                 // Fichaje completo: finalizar
-                await prisma.fichaje.update({
+                await prisma.fichajes.update({
                   where: { id: fichaje.id },
                   data: {
                     estado: EstadoFichaje.finalizado,
@@ -128,7 +128,7 @@ export async function POST(request: NextRequest) {
                 fichajesFinalizados++;
               } else {
                 // Fichaje incompleto: pendiente de cuadrar
-                await prisma.fichaje.update({
+                await prisma.fichajes.update({
                   where: { id: fichaje.id },
                   data: {
                     estado: EstadoFichaje.pendiente,

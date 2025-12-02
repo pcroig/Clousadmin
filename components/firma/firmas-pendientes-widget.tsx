@@ -1,6 +1,7 @@
 'use client';
 
 import { AlertCircle } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 
 import { Badge } from '@/components/ui/badge';
@@ -8,8 +9,6 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Spinner } from '@/components/ui/spinner';
 import { parseJson } from '@/lib/utils/json';
-
-import { FirmaPendiente, FirmarDocumentoDialog } from './firmar-documento-dialog';
 interface FirmasPendientesResponse {
   firmasPendientes: ApiFirmaPendiente[];
 }
@@ -17,7 +16,7 @@ interface FirmasPendientesResponse {
 interface ApiFirmaPendiente {
   id: string;
   orden: number;
-  solicitudFirma: {
+  solicitudes_firma: {
     id: string;
     titulo: string;
     mensaje?: string;
@@ -30,12 +29,20 @@ interface ApiFirmaPendiente {
   };
 }
 
+interface FirmaDisplay {
+  id: string;
+  orden: number;
+  requiereOrden: boolean;
+  solicitudTitulo: string;
+  solicitudMensaje?: string;
+  documentoNombre: string;
+}
+
 export function FirmasPendientesWidget() {
+  const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [firmas, setFirmas] = useState<FirmaPendiente[]>([]);
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [firmaSeleccionada, setFirmaSeleccionada] = useState<FirmaPendiente | null>(null);
+  const [firmas, setFirmas] = useState<FirmaDisplay[]>([]);
 
   const cargarFirmas = useCallback(() => {
     setLoading(true);
@@ -49,16 +56,13 @@ export function FirmasPendientesWidget() {
       })
       .then((data) => {
         const items: ApiFirmaPendiente[] = data?.firmasPendientes ?? [];
-        const formateadas: FirmaPendiente[] = items.map((item) => ({
+        const formateadas: FirmaDisplay[] = items.map((item) => ({
           id: item.id,
           orden: item.orden,
-          requiereOrden: item.solicitudFirma.ordenFirma,
-          solicitudTitulo: item.solicitudFirma.titulo,
-          solicitudMensaje: item.solicitudFirma.mensaje,
-          documento: {
-            id: item.solicitudFirma.documento.id,
-            nombre: item.solicitudFirma.documento.nombre,
-          },
+          requiereOrden: item.solicitudes_firma.ordenFirma,
+          solicitudTitulo: item.solicitudes_firma.titulo,
+          solicitudMensaje: item.solicitudes_firma.mensaje,
+          documentoNombre: item.solicitudes_firma.documento.nombre,
         }));
         setFirmas(formateadas);
       })
@@ -72,9 +76,8 @@ export function FirmasPendientesWidget() {
     cargarFirmas();
   }, [cargarFirmas]);
 
-  const handleFirmarClick = (firma: FirmaPendiente) => {
-    setFirmaSeleccionada(firma);
-    setDialogOpen(true);
+  const handleFirmarClick = (firmaId: string) => {
+    router.push(`/firma/firmar/${firmaId}`);
   };
 
   const totalPendientes = firmas.length;
@@ -127,7 +130,7 @@ export function FirmasPendientesWidget() {
               >
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="font-medium text-sm text-gray-900">{firma.documento.nombre}</p>
+                    <p className="font-medium text-sm text-gray-900">{firma.documentoNombre}</p>
                     <p className="text-xs text-gray-500">{firma.solicitudTitulo}</p>
                   </div>
                   {firma.requiereOrden && (
@@ -137,28 +140,13 @@ export function FirmasPendientesWidget() {
                 {firma.solicitudMensaje && (
                   <p className="text-xs text-gray-500 whitespace-pre-line">{firma.solicitudMensaje}</p>
                 )}
-                <Button size="sm" className="mt-1 w-full" onClick={() => handleFirmarClick(firma)}>
+                <Button size="sm" className="mt-1 w-full" onClick={() => handleFirmarClick(firma.id)}>
                   Firmar ahora
                 </Button>
               </div>
             ))}
         </div>
       </Card>
-
-      <FirmarDocumentoDialog
-        open={dialogOpen}
-        onOpenChange={(openState) => {
-          setDialogOpen(openState);
-          if (!openState) {
-            setFirmaSeleccionada(null);
-          }
-        }}
-        firma={firmaSeleccionada}
-        onSigned={() => {
-          cargarFirmas();
-          setFirmaSeleccionada(null);
-        }}
-      />
     </>
   );
 }

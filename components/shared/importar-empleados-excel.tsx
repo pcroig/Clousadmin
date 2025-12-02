@@ -192,14 +192,18 @@ export function ImportarEmpleadosExcel({
               salarioBaseAnual: number | null;
               onboardingCompletado: boolean;
               createdAt?: string;
+              usuario?: {
+                rol: string;
+              };
             }>;
           }>(response);
 
           const empleados = data?.data ?? [];
 
           // Filtrar empleados sin onboarding completado (creados durante este flujo)
+          // Excluir HR admins (son parte del signup inicial, no empleados importados)
           const empleadosSinOnboarding = empleados.filter(
-            (emp) => !emp.onboardingCompletado
+            (emp) => !emp.onboardingCompletado && emp.usuario?.rol !== 'hr_admin'
           );
 
           if (empleadosSinOnboarding.length > 0) {

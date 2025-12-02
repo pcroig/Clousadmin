@@ -39,11 +39,11 @@ export async function POST(req: NextRequest, context: RouteParams) {
     const { id: empleadoId } = params;
 
     // Verificar que el empleado existe y pertenece a la misma empresa
-    const empleado = await prisma.empleado.findUnique({
+    const empleado = await prisma.empleados.findUnique({
       where: { id: empleadoId },
       include: {
         empresa: true,
-        onboarding: true,
+        onboarding_empleados: true,
       },
     });
 
@@ -56,7 +56,7 @@ export async function POST(req: NextRequest, context: RouteParams) {
     }
 
     // Verificar que existe un onboarding activo
-    if (!empleado.onboarding || empleado.onboarding.completado) {
+    if (!empleado.onboarding_empleados || empleado.onboarding_empleados.completado) {
       return badRequestResponse(
         'El empleado no tiene un onboarding activo. Debes activar el onboarding primero.'
       );
@@ -150,7 +150,7 @@ export async function POST(req: NextRequest, context: RouteParams) {
 
         // Si todos los documentos requeridos están completos, actualizar progreso
         if (validacionDocs.success && validacionDocs.completo) {
-          await guardarProgresoDocumentos(empleado.onboarding.token);
+          await guardarProgresoDocumentos(empleado.onboarding_empleados.token);
         }
       }
     }
@@ -183,10 +183,10 @@ export async function GET(req: NextRequest, context: RouteParams) {
     const { id: empleadoId } = params;
 
     // Verificar que el empleado existe y pertenece a la misma empresa
-    const empleado = await prisma.empleado.findUnique({
+    const empleado = await prisma.empleados.findUnique({
       where: { id: empleadoId },
       include: {
-        onboarding: true,
+        onboarding_empleados: true,
       },
     });
 

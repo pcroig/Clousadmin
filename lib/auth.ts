@@ -75,7 +75,7 @@ export async function createSession(
   
   // Guardar sesión en BD (tabla sesionesActivas)
   try {
-    await prisma.sesionActiva.create({
+    await prisma.sesiones_activas.create({
       data: {
         usuarioId: sessionData.user.id,
         tokenHash,
@@ -122,7 +122,7 @@ export async function getSession(): Promise<SessionData | null> {
   // Verificar que la sesión existe en BD y no ha sido invalidada
   const tokenHash = await hashToken(tokenValue);
   try {
-    const sesionActiva = await prisma.sesionActiva.findUnique({
+    const sesionActiva = await prisma.sesiones_activas.findUnique({
       where: { tokenHash },
     });
 
@@ -134,19 +134,19 @@ export async function getSession(): Promise<SessionData | null> {
     // Verificar expiración
     if (sesionActiva.expiraEn < new Date()) {
       // Sesión expirada, eliminar de BD
-      await prisma.sesionActiva.delete({ where: { tokenHash } });
+      await prisma.sesiones_activas.delete({ where: { tokenHash } });
       return null;
     }
 
     // Actualizar último uso
-    await prisma.sesionActiva.update({
+    await prisma.sesiones_activas.update({
       where: { tokenHash },
       data: { ultimoUso: new Date() },
     });
 
     // Verificar que usuario sigue activo (cada request)
     await ensureEmpresaActivoColumn();
-    const usuario = await prisma.usuario.findUnique({
+    const usuario = await prisma.usuarios.findUnique({
       where: { id: sessionData.user.id },
       select: {
         activo: true,
@@ -158,7 +158,7 @@ export async function getSession(): Promise<SessionData | null> {
 
     if (!usuario || !usuario.activo || usuario.empresa?.activo === false) {
       // Usuario desactivado, invalidar sesión
-      await prisma.sesionActiva.delete({ where: { tokenHash } });
+      await prisma.sesiones_activas.delete({ where: { tokenHash } });
       return null;
     }
 
@@ -193,7 +193,7 @@ export async function getCurrentUserAvatar(
   }
 
   try {
-    const empleado = await prisma.empleado.findUnique({
+    const empleado = await prisma.empleados.findUnique({
       where: { id: session.user.empleadoId },
       select: { fotoUrl: true },
     });
@@ -217,7 +217,7 @@ export async function destroySession(): Promise<void> {
   if (tokenValue) {
     const tokenHash = await hashToken(tokenValue);
     try {
-      await prisma.sesionActiva.delete({
+      await prisma.sesiones_activas.delete({
         where: { tokenHash },
       });
     } catch (error) {
@@ -234,7 +234,7 @@ export async function destroySession(): Promise<void> {
  */
 export async function invalidateAllUserSessions(usuarioId: string): Promise<void> {
   try {
-    await prisma.sesionActiva.deleteMany({
+    await prisma.sesiones_activas.deleteMany({
       where: { usuarioId },
     });
   } catch (error) {
@@ -247,7 +247,7 @@ export async function invalidateAllUserSessions(usuarioId: string): Promise<void
  * Listar sesiones activas de un usuario
  */
 export async function getUserActiveSessions(usuarioId: string) {
-  return prisma.sesionActiva.findMany({
+  return prisma.sesiones_activas.findMany({
     where: {
       usuarioId,
       expiraEn: { gt: new Date() },
@@ -261,7 +261,7 @@ export async function getUserActiveSessions(usuarioId: string) {
  */
 export async function cleanupExpiredSessions(): Promise<number> {
   try {
-    const result = await prisma.sesionActiva.deleteMany({
+    const result = await prisma.sesiones_activas.deleteMany({
       where: {
         expiraEn: { lt: new Date() },
       },
@@ -284,11 +284,11 @@ export async function generateRecoveryToken(
   const identifier = `${PASSWORD_RECOVERY_PREFIX}${usuarioId}`;
   const expires = new Date(Date.now() + RECOVERY_TOKEN_TTL_MS);
 
-  await prisma.verificationToken.deleteMany({
+  await prisma.verification_tokens.deleteMany({
     where: { identifier },
   });
 
-  await prisma.verificationToken.create({
+  await prisma.verification_tokens.create({
     data: {
       identifier,
       token: tokenHash,
@@ -306,7 +306,7 @@ export async function validateRecoveryToken(
   rawToken: string
 ): Promise<ValidatedTokenPayload | null> {
   const tokenHash = await hashToken(rawToken);
-  const tokenRecord = await prisma.verificationToken.findUnique({
+  const tokenRecord = await prisma.verification_tokens.findUnique({
     where: { token: tokenHash },
   });
 
@@ -315,7 +315,7 @@ export async function validateRecoveryToken(
   }
 
   if (tokenRecord.expires < new Date()) {
-    await prisma.verificationToken.delete({ where: { token: tokenHash } });
+    await prisma.verification_tokens.delete({ where: { token: tokenHash } });
     return null;
   }
 
@@ -339,7 +339,7 @@ export async function consumeRecoveryToken(
     return null;
   }
 
-  await prisma.verificationToken.delete({
+  await prisma.verification_tokens.delete({
     where: { token: validation.tokenHash },
   });
 
@@ -357,11 +357,11 @@ export async function createTwoFactorChallenge(
   const identifier = `${TWO_FACTOR_CHALLENGE_PREFIX}${usuarioId}`;
   const expires = new Date(Date.now() + TWO_FACTOR_TOKEN_TTL_MS);
 
-  await prisma.verificationToken.deleteMany({
+  await prisma.verification_tokens.deleteMany({
     where: { identifier },
   });
 
-  await prisma.verificationToken.create({
+  await prisma.verification_tokens.create({
     data: {
       identifier,
       token: tokenHash,
@@ -379,7 +379,7 @@ export async function validateTwoFactorChallenge(
   rawToken: string
 ): Promise<ValidatedTokenPayload | null> {
   const tokenHash = await hashToken(rawToken);
-  const tokenRecord = await prisma.verificationToken.findUnique({
+  const tokenRecord = await prisma.verification_tokens.findUnique({
     where: { token: tokenHash },
   });
 
@@ -388,7 +388,7 @@ export async function validateTwoFactorChallenge(
   }
 
   if (tokenRecord.expires < new Date()) {
-    await prisma.verificationToken.delete({ where: { token: tokenHash } });
+    await prisma.verification_tokens.delete({ where: { token: tokenHash } });
     return null;
   }
 
@@ -415,7 +415,7 @@ export async function consumeTwoFactorChallenge(
     return null;
   }
 
-  await prisma.verificationToken.delete({
+  await prisma.verification_tokens.delete({
     where: { token: validation.tokenHash },
   });
 
@@ -430,7 +430,7 @@ export async function authenticate(
   password: string
 ): Promise<UsuarioAutenticado | null> {
   // Buscar usuario por email
-  const usuario = await prisma.usuario.findUnique({
+  const usuario = await prisma.usuarios.findUnique({
     where: { email: email.toLowerCase() },
     include: {
       empleado: true,
@@ -458,7 +458,7 @@ export async function authenticate(
   }
 
   await ensureEmpresaActivoColumn();
-  const empresa = await prisma.empresa.findUnique({
+  const empresa = await prisma.empresas.findUnique({
     where: { id: usuario.empresaId },
     select: { activo: true },
   });
@@ -468,7 +468,7 @@ export async function authenticate(
   }
 
   // Actualizar último acceso
-  await prisma.usuario.update({
+  await prisma.usuarios.update({
     where: { id: usuario.id },
     data: { ultimoAcceso: new Date() },
   });
@@ -498,7 +498,7 @@ export async function registerUser(data: {
       : UsuarioRol.empleado;
 
   // Crear usuario
-  const usuario = await prisma.usuario.create({
+  const usuario = await prisma.usuarios.create({
     data: {
       email: data.email.toLowerCase(),
       password: hashedPassword,
@@ -524,7 +524,7 @@ export async function registerUser(data: {
 export async function getUserById(
   userId: string
 ): Promise<UsuarioAutenticado | null> {
-  const usuario = await prisma.usuario.findUnique({
+  const usuario = await prisma.usuarios.findUnique({
     where: { id: userId },
     include: {
       empleado: true,
@@ -584,7 +584,7 @@ export async function canAccessEmpleado(
 
   // HR Admin puede acceder a todos los empleados de su empresa
   if (isHRAdmin(session)) {
-    const empleado = await prisma.empleado.findUnique({
+    const empleado = await prisma.empleados.findUnique({
       where: { id: empleadoId },
       select: { empresaId: true },
     });
@@ -594,7 +594,7 @@ export async function canAccessEmpleado(
 
   // Manager puede acceder a sus empleados a cargo
   if (isManager(session) && session.user.empleadoId) {
-    const empleado = await prisma.empleado.findUnique({
+    const empleado = await prisma.empleados.findUnique({
       where: { id: empleadoId },
       select: { managerId: true, empresaId: true },
     });

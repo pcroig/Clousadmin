@@ -181,6 +181,19 @@ export async function solicitarAusencia(formData: FormData) {
 ## 💾 Prisma Patterns
 
 ### Schema Conventions
+
+**⚠️ IMPORTANTE: Convención de Nombres de Relaciones**
+
+El proyecto sigue una convención específica para nombres de relaciones que debe respetarse:
+
+1. **Modelos**: Plural y snake_case (`empleados`, `ausencias`, `fichajes`, `eventos_nomina`)
+2. **Relaciones many-to-one / one-to-one**: **SINGULAR** (`empleado`, `empresa`, `equipo`, `documento`)
+3. **Relaciones one-to-many**: **PLURAL** (`ausencias`, `fichajes`, `contratos`)
+
+**Razón**: Hace el código más semántico y legible:
+- `ausencia.empleado` → "una ausencia pertenece a UN empleado" ✅
+- `empleado.ausencias` → "un empleado tiene MUCHAS ausencias" ✅
+
 ```prisma
 // prisma/schema.prisma
 
@@ -193,61 +206,70 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// ✅ GOOD: Singular table names, camelCase fields
-model empleado {
-  id        String   @id @default(uuid())
+// ✅ GOOD: Modelos en plural y snake_case
+model empleados {
+  id        String   @id
   nombre    String
   apellidos String
   email     String   @unique
   nif       String?  @unique
+  empresaId String
 
   // Timestamps
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  // Relations (plural for one-to-many)
-  ausencias Ausencia[]
-  fichajes  Fichaje[]
-  documentos Documento[]
+  // ✅ Relaciones one-to-many: PLURAL
+  ausencias ausencias[]
+  fichajes  fichajes[]
+  contratos contratos[]
 
-  // Foreign keys
-  empresaId String
-  empresa   Empresa @relation(fields: [empresaId], references: [id])
+  // ✅ Relaciones many-to-one: SINGULAR
+  empresa   empresas @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  jornada   jornadas? @relation(fields: [jornadaId], references: [id])
+  puestoRelacion puestos? @relation(fields: [puestoId], references: [id])
 
   @@index([empresaId])
   @@index([email])
-  @@map("empleados") // Maps to plural table name in DB
 }
 
-model ausencia {
-  id           String   @id @default(uuid())
-  tipo         String   // 'vacaciones', 'baja_medica', 'permiso'
-  fechaInicio  DateTime
-  fechaFin     DateTime
-  estado       String   @default("pendiente") // 'pendiente', 'aprobada', 'rechazada'
-
+model ausencias {
+  id           String   @id
+  tipo         TipoAusencia
+  fechaInicio  DateTime @db.Date
+  fechaFin     DateTime @db.Date
+  estado       EstadoAusencia @default(pendiente)
   empleadoId   String
-  empleado     Empleado @relation(fields: [empleadoId], references: [id])
+  empresaId    String
+
+  // ✅ Relación many-to-one: SINGULAR
+  empleado     empleados @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+  empresa      empresas  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  equipo       equipos?  @relation(fields: [equipoId], references: [id])
 
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
   @@index([empleadoId])
-  @@index([fechaInicio, fechaFin])
-  @@map("ausencias")
+  @@index([empresaId, estado])
 }
 ```
+
+**Nota sobre el Proxy de Prisma:**
+
+El archivo `lib/prisma.ts` incluye un proxy que resuelve nombres de **modelos** (ej. `prisma.empleado` → `prisma.empleados`), pero **NO resuelve nombres de relaciones** dentro de `include`/`select`. Por eso es crítico que las relaciones en el schema coincidan exactamente con cómo se usan en el código.
 
 ### Query Patterns
 ```typescript
 // ✅ GOOD: Use Prisma client singleton
 import { prisma } from '@/lib/prisma';
 
-// ✅ GOOD: Avoid N+1 queries with include/select
-const empleados = await prisma.empleado.findMany({
+// ✅ GOOD: El proxy resuelve nombres de modelos (empleado → empleados)
+// Pero las relaciones deben coincidir exactamente con el schema
+const empleados = await prisma.empleados.findMany({
   include: {
-    departamento: true,
-    ausencias: {
+    empresa: true, // ✅ Relación many-to-one: SINGULAR
+    ausencias: {   // ✅ Relación one-to-many: PLURAL
       where: { estado: 'aprobada' },
       orderBy: { fechaInicio: 'desc' }
     }
@@ -257,26 +279,65 @@ const empleados = await prisma.empleado.findMany({
 // ✅ GOOD: Use selects reutilizables from lib/prisma/selects.ts
 import { empleadoSelectListado } from '@/lib/prisma/selects';
 
-const empleados = await prisma.empleado.findMany({
+const empleados = await prisma.empleados.findMany({
   where: { empresaId, activo: true },
   select: empleadoSelectListado, // Evita cargar relaciones innecesarias
   orderBy: { apellidos: 'asc' }
 });
 
+// ✅ GOOD: Incluir relaciones en queries de ausencias
+const ausencias = await prisma.ausencias.findMany({
+  where: { empresaId, estado: 'pendiente' },
+  include: {
+    empleado: { // ✅ SINGULAR: una ausencia pertenece a UN empleado
+      select: {
+        id: true,
+        nombre: true,
+        apellidos: true,
+        email: true,
+        puesto: true,
+        fotoUrl: true,
+        equipos: { // ✅ PLURAL: un empleado tiene MUCHOS equipos
+          select: {
+            equipo: { // ✅ SINGULAR: cada relación empleado_equipos apunta a UN equipo
+              select: {
+                id: true,
+                nombre: true,
+              },
+            },
+          },
+          take: 1,
+        },
+      },
+    },
+    empresa: true, // ✅ SINGULAR
+  },
+  orderBy: { createdAt: 'desc' },
+});
+
 // ✅ GOOD: Batch processing instead of loops with queries
 // ❌ BAD: N+1 query problem
-const empleados = await prisma.empleado.findMany();
+const empleados = await prisma.empleados.findMany();
 for (const emp of empleados) {
-  const ausencias = await prisma.ausencia.findMany({
+  const ausencias = await prisma.ausencias.findMany({
     where: { empleadoId: emp.id }
   });
 }
 
 // ✅ GOOD: Precarga con findMany + Map para lookups O(1)
 const fichajeIds = autoCompletados.map(ac => ac.fichajeId).filter(Boolean);
-const fichajesBatch = await prisma.fichaje.findMany({
+const fichajesBatch = await prisma.fichajes.findMany({
   where: { id: { in: fichajeIds } },
-  include: { empleado: { include: { jornada: true } } }
+  include: { 
+    empleado: { // ✅ SINGULAR
+      include: { 
+        jornada: true // ✅ SINGULAR
+      } 
+    },
+    eventos: { // ✅ PLURAL: un fichaje tiene MUCHOS eventos
+      orderBy: { hora: 'asc' }
+    }
+  }
 });
 const fichajesMap = new Map(fichajesBatch.map(f => [f.id, f]));
 
@@ -308,9 +369,9 @@ for (const empleado of empleados) {
 
 // ✅ GOOD: Query única por rango + agrupación en memoria
 // ❌ BAD: Query por cada evento
-const eventos = await prisma.eventoNomina.findMany();
+const eventos = await prisma.eventos_nomina.findMany();
 for (const evento of eventos) {
-  const compensaciones = await prisma.compensacionHoraExtra.findMany({
+  const compensaciones = await prisma.compensaciones_horas_extra.findMany({
     where: { 
       empresaId,
       createdAt: { gte: inicioMes, lt: finMes } // Query x evento
@@ -321,7 +382,7 @@ for (const evento of eventos) {
 // ✅ GOOD: Una query con rango completo + agrupación
 const rangoInicio = eventos[0] ? calcularInicioPrimerEvento() : null;
 const rangoFin = eventos[eventos.length - 1] ? calcularFinUltimoEvento() : null;
-const compensacionesBatch = await prisma.compensacionHoraExtra.findMany({
+const compensacionesBatch = await prisma.compensaciones_horas_extra.findMany({
   where: {
     empresaId,
     createdAt: { gte: rangoInicio, lt: rangoFin } // ✅ Una sola query
@@ -337,17 +398,179 @@ const compensacionesPorMes = compensacionesBatch.reduce((acc, comp) => {
 }, {} as Record<string, typeof compensacionesBatch>);
 
 // ✅ GOOD: Use transactions for multi-step operations
+// ⚠️ IMPORTANTE: Dentro de transacciones, el proxy NO funciona
+// Debes usar los nombres reales de los modelos (plural)
 await prisma.$transaction(async (tx) => {
-  const empleado = await tx.empleado.create({ data: empleadoData });
-  await tx.documento.createMany({
+  const empleado = await tx.empleados.create({ data: empleadoData });
+  await tx.documentos.createMany({
     data: carpetasDefecto.map(nombre => ({
+      id: cuid(),
       nombre,
       tipo: 'carpeta',
-      empleadoId: empleado.id
+      empleadoId: empleado.id,
+      empresaId: empleado.empresaId,
+      createdAt: new Date(),
+      updatedAt: new Date(),
     }))
   });
 });
+
+// ✅ GOOD: Ejemplo con relaciones en transacciones
+await prisma.$transaction(async (tx) => {
+  const ausencia = await tx.ausencias.create({
+    data: {
+      id: cuid(),
+      empleadoId,
+      empresaId,
+      tipo: 'vacaciones',
+      fechaInicio: new Date('2025-01-01'),
+      fechaFin: new Date('2025-01-05'),
+      // ... otros campos
+    },
+    include: {
+      empleado: true, // ✅ Relación: SINGULAR
+      empresa: true,  // ✅ Relación: SINGULAR
+    },
+  });
+  
+  // Actualizar saldo de ausencias
+  await tx.empleado_saldo_ausencias.upsert({
+    where: {
+      empleadoId_a_o: {
+        empleadoId,
+        a_o: new Date().getFullYear(),
+      },
+    },
+    update: {
+      diasUsados: { increment: 5 },
+    },
+    create: {
+      id: cuid(),
+      empleadoId,
+      empresaId,
+      a_o: new Date().getFullYear(),
+      diasTotales: 22,
+      diasUsados: 5,
+      origen: 'manual',
+    },
+  });
+});
 ```
+
+**Reglas Críticas para Relaciones:**
+
+1. **Nunca uses plural en relaciones many-to-one**: 
+   - ❌ `include: { empleados: true }` → Error: `Unknown field 'empleados'`
+   - ✅ `include: { empleado: true }` → Correcto
+
+2. **Nunca uses singular en relaciones one-to-many**:
+   - ❌ `include: { ausencia: true }` → Error
+   - ✅ `include: { ausencias: true }` → Correcto
+
+3. **En transacciones, usa nombres reales de modelos**:
+   - ✅ `tx.empleados.findMany()` (no `tx.empleado`)
+   - ✅ `tx.ausencias.create()` (no `tx.ausencia`)
+
+4. **Verifica siempre el schema antes de usar relaciones**:
+   - Revisa `prisma/schema.prisma` para confirmar el nombre exacto de la relación
+   - Si hay dudas, ejecuta `npx prisma generate` y revisa los tipos generados
+
+### ⚠️ Lecciones Aprendidas: Migración Singular → Plural (Enero 2025)
+
+**Contexto**: El schema de Prisma fue actualizado para usar nombres de modelos en **plural** (siguiendo convenciones de bases de datos). Esta migración afectó a más de 100 archivos.
+
+**Lecciones Críticas**:
+
+1. **Imports de Tipos desde @prisma/client**:
+   ```typescript
+   // ❌ INCORRECTO (después de la migración)
+   import { Empleado, Usuario, Ausencia } from '@prisma/client';
+   
+   // ✅ CORRECTO
+   import { 
+     empleados as Empleado, 
+     usuarios as Usuario, 
+     ausencias as Ausencia 
+   } from '@prisma/client';
+   ```
+
+2. **Tipos de Prisma (WhereInput, Select, Include, etc.)**:
+   ```typescript
+   // ❌ INCORRECTO
+   Prisma.EmpleadoWhereInput
+   Prisma.JornadaSelect
+   Prisma.AusenciaInclude
+   
+   // ✅ CORRECTO
+   Prisma.empleadosWhereInput
+   Prisma.jornadasSelect
+   Prisma.ausenciasInclude
+   ```
+
+3. **Relaciones Especiales** (verificar siempre en el schema):
+   ```typescript
+   // ❌ INCORRECTO
+   include: {
+     manager: true,           // ❌
+     miembros: true,          // ❌
+     empleadoComplemento: true, // ❌
+     tipoComplemento: true,   // ❌
+     campana: true,           // ❌
+     documento: true,         // ❌
+     solicitudFirma: true,    // ❌
+   }
+   
+   // ✅ CORRECTO
+   include: {
+     empleados: true,              // manager → empleados
+     empleado_equipos: true,       // miembros → empleado_equipos
+     empleado_complementos: true,  // empleadoComplemento → empleado_complementos
+     tipos_complemento: true,      // tipoComplemento → tipos_complemento
+     campana_vacaciones: true,     // campana → campana_vacaciones
+     documentos: true,             // documento → documentos
+     solicitudes_firma: true,     // solicitudFirma → solicitudes_firma
+   }
+   ```
+
+4. **Counts en _count.select**:
+   ```typescript
+   // ❌ INCORRECTO
+   _count: {
+     select: {
+       empleadoComplementos: true,
+       asignaciones: true,
+       notificacionesEnviadas: true,
+     }
+   }
+   
+   // ✅ CORRECTO
+   _count: {
+     select: {
+       empleado_complementos: true,
+       asignaciones_complemento: true,
+       notificaciones: true,
+     }
+   }
+   ```
+
+5. **En Transacciones, Siempre Usar Nombres Reales**:
+   ```typescript
+   // ⚠️ IMPORTANTE: El proxy NO funciona dentro de transacciones
+   await prisma.$transaction(async (tx) => {
+     // ❌ INCORRECTO (aunque el proxy funcione fuera)
+     const empleado = await tx.empleado.findUnique(...);
+     
+     // ✅ CORRECTO (usar nombres reales del schema)
+     const empleado = await tx.empleados.findUnique(...);
+   });
+   ```
+
+6. **Validación de Relaciones en Runtime**:
+   - TypeScript puede no detectar errores de relaciones hasta runtime
+   - Siempre verificar el schema antes de usar relaciones nuevas
+   - Los errores de Prisma son claros: `Unknown field 'X' for include statement`
+
+**Referencia Completa**: Ver `docs/historial/MIGRACION_PRISMA_SINGULAR_PLURAL_2025-01.md` para detalles completos de la migración.
 
 ---
 
@@ -406,19 +629,20 @@ import { EmployeeAvatar } from '@/components/shared/employee-avatar';
 **Queries que deben incluir datos del empleado:**
 ```typescript
 // ✅ GOOD: Incluir email, puesto, equipos en queries
-const ausencias = await prisma.ausencia.findMany({
+const ausencias = await prisma.ausencias.findMany({
   include: {
-    empleado: {
+    empleado: { // ✅ SINGULAR: una ausencia pertenece a UN empleado
       select: {
         nombre: true,
         apellidos: true,
         puesto: true,
         email: true,
         fotoUrl: true,
-        equipos: {
+        equipos: { // ✅ PLURAL: un empleado tiene MUCHOS equipos (a través de empleado_equipos)
           select: {
-            equipo: {
+            equipo: { // ✅ SINGULAR: cada relación empleado_equipos apunta a UN equipo
               select: {
+                id: true,
                 nombre: true,
               },
             },
@@ -1001,5 +1225,14 @@ const empleado = await prisma.empleado.findUnique({ where: { id } });
 
 ---
 
-**Versión**: 1.1  
-**Última actualización**: 27 de enero 2025
+**Versión**: 1.3  
+**Última actualización**: Enero 2025
+
+**Cambios recientes:**
+- ✅ Actualizada convención de nombres de relaciones Prisma (many-to-one en singular, one-to-many en plural)
+- ✅ Documentados ejemplos con schema real (`empleados`, `ausencias`, etc.)
+- ✅ Agregadas reglas críticas para evitar errores de validación de Prisma
+- ✅ Actualizados ejemplos de transacciones con nombres correctos de modelos
+- ✅ Añadidas lecciones aprendidas de la migración Prisma Singular → Plural (Enero 2025)
+- ✅ Corregidos ejemplos de código para usar nombres plurales correctos
+- ✅ Documentadas relaciones especiales y sus nombres correctos

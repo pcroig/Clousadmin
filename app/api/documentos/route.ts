@@ -68,13 +68,13 @@ export async function GET(request: NextRequest) {
     const tipoDocumento = searchParams.get('tipoDocumento');
 
     // Construir where clause
-    const where: Prisma.DocumentoWhereInput = {
+    const where: Prisma.documentosWhereInput = {
       empresaId: session.user.empresaId,
     };
 
     // Si no es HR admin, solo puede ver sus propios documentos
     if (session.user.rol !== UsuarioRol.hr_admin) {
-      const empleado = await prisma.empleado.findUnique({
+      const empleado = await prisma.empleados.findUnique({
         where: { usuarioId: session.user.id },
       });
 
@@ -99,7 +99,7 @@ export async function GET(request: NextRequest) {
     const { page, limit, skip } = parsePaginationParams(searchParams);
 
     const [documentos, total] = await Promise.all([
-      prisma.documento.findMany({
+      prisma.documentos.findMany({
         where,
         include: {
           carpeta: true,
@@ -115,7 +115,7 @@ export async function GET(request: NextRequest) {
         skip,
         take: limit,
       }),
-      prisma.documento.count({ where }),
+      prisma.documentos.count({ where }),
     ]);
 
     return NextResponse.json({
@@ -156,7 +156,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Obtener carpeta
-    const carpeta = await prisma.carpeta.findUnique({
+    const carpeta = await prisma.carpetas.findUnique({
       where: { id: carpetaId },
       include: { empleado: true },
     });
@@ -265,7 +265,7 @@ export async function POST(request: NextRequest) {
 
       // Crear registro en DB
       const documento = await prisma.$transaction(async (tx) => {
-        return tx.documento.create({
+        return tx.documentos.create({
           data: {
             empresaId: session.user.empresaId,
             empleadoId,

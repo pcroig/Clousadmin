@@ -12,6 +12,7 @@ import { Plus, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
+
 import { LoadingButton } from '@/components/shared/loading-button';
 import { Button } from '@/components/ui/button';
 import {
@@ -32,6 +33,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { extraerHoraDeISO } from '@/lib/utils/formatters';
 import { parseJson } from '@/lib/utils/json';
 
 export type TipoEventoFichaje = 'entrada' | 'pausa_inicio' | 'pausa_fin' | 'salida';
@@ -49,6 +51,14 @@ interface EventoFichaje {
   hora: string; // HH:mm
   editado?: boolean;
   isNew?: boolean;
+  origen?: 'registrado' | 'propuesto'; // Para diferenciar visualmente
+}
+
+// Evento propuesto que viene de la API (puede ser propuesto o registrado para flexibilidad)
+export interface EventoPropuesto {
+  tipo: string;
+  hora: string;
+  origen: 'registrado' | 'propuesto';
 }
 
 interface FichajeModalProps {
@@ -67,6 +77,15 @@ interface FichajeModalProps {
   
   // Modo: si no se pasa fichajeDiaId, es creación; si se pasa, es edición
   modo?: 'crear' | 'editar';
+  
+  // NUEVO: Eventos propuestos para pre-cargar (desde cuadrar fichajes)
+  eventosPropuestos?: EventoPropuesto[];
+  
+  // NUEVO: Fecha del fichaje (para cuadrar fichajes)
+  fechaFichaje?: string;
+  
+  // NUEVO: Nombre del empleado (para mostrar en cuadrar fichajes)
+  empleadoNombreProp?: string;
 }
 
 export function FichajeModal({
@@ -77,6 +96,9 @@ export function FichajeModal({
   fichajeDiaId,
   empleadoId,
   modo: modoExplicito,
+  eventosPropuestos,
+  fechaFichaje,
+  empleadoNombreProp,
 }: FichajeModalProps) {
   const modo = modoExplicito ?? (fichajeDiaId ? 'editar' : 'crear');
   const operaDirecto = contexto === 'hr_admin' || contexto === 'manager';
@@ -116,23 +138,40 @@ export function FichajeModal({
           eventos?: Array<{ id: string; tipo: string; hora: string; editado?: boolean }>;
         }>(res);
 
-        setFecha(data.fecha.split('T')[0]);
+        // Usar fecha proporcionada si existe (para cuadrar fichajes), o la del fichaje
+        setFecha(fechaFichaje || data.fecha.split('T')[0]);
+        
+        // Usar nombre proporcionado si existe (para cuadrar fichajes)
         setEmpleadoNombre(
-          data.empleado
+          empleadoNombreProp || (data.empleado
             ? `${data.empleado.nombre} ${data.empleado.apellidos}`.trim()
-            : ''
+            : '')
         );
         setEmpleadoPuesto(data.empleado?.puesto || '');
 
-        const evs = (data.eventos || []).map((e) => ({
+        // Eventos registrados (existentes en BD)
+        const eventosRegistrados = (data.eventos || []).map((e) => ({
           id: e.id,
           tipo: e.tipo as TipoEventoFichaje,
-          hora: format(new Date(e.hora), 'HH:mm'),
+          hora: extraerHoraDeISO(e.hora) || '00:00',
           editado: e.editado,
+          origen: 'registrado' as const,
         }));
         
-        setEventos(evs);
-        setEventosOriginales(evs);
+        // PUNTO 6: Pre-cargar eventos propuestos si se proporcionan
+        const eventosPropuestosFormateados: EventoFichaje[] = (eventosPropuestos || []).map((ep, idx) => ({
+          id: `propuesto_${Date.now()}_${idx}`,
+          tipo: ep.tipo as TipoEventoFichaje,
+          hora: extraerHoraDeISO(ep.hora) || '00:00',
+          isNew: true, // Marcar como nuevo para que se cree al guardar
+          origen: 'propuesto' as const,
+        }));
+        
+        // Combinar: primero registrados, luego propuestos
+        const todosEventos = [...eventosRegistrados, ...eventosPropuestosFormateados];
+        
+        setEventos(todosEventos);
+        setEventosOriginales(eventosRegistrados); // Solo los registrados son "originales"
         setEventosEliminados([]);
       } catch (error) {
         console.error('[FichajeModal] Error cargando fichaje:', error);
@@ -143,7 +182,7 @@ export function FichajeModal({
     }
     
     cargarFichaje();
-  }, [modo, fichajeDiaId, open]);
+  }, [modo, fichajeDiaId, open, eventosPropuestos, fechaFichaje, empleadoNombreProp]);
 
   // Resetear al abrir en modo crear
   useEffect(() => {
@@ -456,66 +495,90 @@ export function FichajeModal({
               </div>
             ) : (
               <div className="space-y-2">
-                {eventos.map((ev) => (
-                  <div
-                    key={ev.id}
-                    className="flex items-center gap-3 p-3 border rounded-lg bg-gray-50"
-                  >
-                    {/* Tipo */}
-                    <div className="flex-1">
-                      <Select
-                        value={ev.tipo}
-                        onValueChange={(valor) =>
-                          actualizarEvento(ev.id, 'tipo', valor as TipoEventoFichaje)
-                        }
-                        disabled={cargando}
-                      >
-                        <SelectTrigger className="h-9 bg-white">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {EVENT_OPTIONS.map((opt) => (
-                            <SelectItem key={opt.value} value={opt.value}>
-                              {opt.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    {/* Hora */}
-                    <div className="flex-1">
-                      <Input
-                        type="time"
-                        value={ev.hora}
-                        onChange={(e) =>
-                          actualizarEvento(ev.id, 'hora', e.target.value)
-                        }
-                        disabled={cargando}
-                        className="h-9 bg-white"
-                      />
-                    </div>
-
-                    {/* Indicador editado */}
-                    {ev.editado && (
-                      <span className="text-xs text-amber-600 whitespace-nowrap">
-                        Editado
-                      </span>
-                    )}
-
-                    {/* Botón eliminar */}
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleEliminarEvento(ev.id)}
-                      disabled={cargando}
-                      className="text-red-600 hover:text-red-700 hover:bg-red-50 h-9 w-9"
+                {eventos.map((ev) => {
+                  // PUNTO 6: Diferenciar visualmente eventos registrados vs propuestos
+                  const esPropuesto = ev.origen === 'propuesto';
+                  const esRegistrado = ev.origen === 'registrado' || (!ev.origen && !ev.isNew);
+                  
+                  return (
+                    <div
+                      key={ev.id}
+                      className={`flex items-center gap-3 p-3 border rounded-lg ${
+                        esPropuesto 
+                          ? 'bg-tertiary-50 border-tertiary-200' // Color terciario para propuestos
+                          : esRegistrado
+                            ? 'bg-white border-gray-200' // Blanco para registrados
+                            : 'bg-gray-50 border-gray-200' // Gris para nuevos añadidos manualmente
+                      }`}
                     >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  </div>
-                ))}
+                      {/* Indicador de origen */}
+                      {esPropuesto && (
+                        <span className="text-[10px] font-medium text-tertiary-600 bg-tertiary-100 px-1.5 py-0.5 rounded whitespace-nowrap">
+                          Propuesto
+                        </span>
+                      )}
+                      {esRegistrado && (
+                        <span className="text-[10px] font-medium text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded whitespace-nowrap">
+                          Registrado
+                        </span>
+                      )}
+                      
+                      {/* Tipo */}
+                      <div className="flex-1">
+                        <Select
+                          value={ev.tipo}
+                          onValueChange={(valor) =>
+                            actualizarEvento(ev.id, 'tipo', valor as TipoEventoFichaje)
+                          }
+                          disabled={cargando}
+                        >
+                          <SelectTrigger className={`h-9 ${esPropuesto ? 'bg-tertiary-50' : 'bg-white'}`}>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {EVENT_OPTIONS.map((opt) => (
+                              <SelectItem key={opt.value} value={opt.value}>
+                                {opt.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {/* Hora */}
+                      <div className="flex-1">
+                        <Input
+                          type="time"
+                          value={ev.hora}
+                          onChange={(e) =>
+                            actualizarEvento(ev.id, 'hora', e.target.value)
+                          }
+                          disabled={cargando}
+                          className={`h-9 ${esPropuesto ? 'bg-tertiary-50' : 'bg-white'}`}
+                        />
+                      </div>
+
+                      {/* Indicador editado */}
+                      {ev.editado && (
+                        <span className="text-xs text-amber-600 whitespace-nowrap">
+                          Editado
+                        </span>
+                      )}
+
+                      {/* Botón eliminar */}
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleEliminarEvento(ev.id)}
+                        disabled={cargando}
+                        className="text-red-600 hover:text-red-700 hover:bg-red-50 h-9 w-9"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>

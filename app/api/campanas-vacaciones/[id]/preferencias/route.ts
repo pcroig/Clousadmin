@@ -46,7 +46,7 @@ export async function POST(
     const data = validationResult.data;
 
     // Verificar que la campaña existe y está abierta
-    const campana = await prisma.campanaVacaciones.findFirst({
+    const campana = await prisma.campanas_vacaciones.findFirst({
       where: {
         id: campanaId,
         empresaId: session.user.empresaId,
@@ -59,7 +59,7 @@ export async function POST(
     }
 
     // Verificar que existe una preferencia para este empleado en esta campaña
-    const preferenciaExistente = await prisma.preferenciaVacaciones.findFirst({
+    const preferenciaExistente = await prisma.preferencias_vacaciones.findFirst({
       where: {
         campanaId,
         empleadoId: session.user.empleadoId,
@@ -71,7 +71,7 @@ export async function POST(
     }
 
     // Actualizar preferencias
-    const preferenciaActualizada = await prisma.preferenciaVacaciones.update({
+    const preferenciaActualizada = await prisma.preferencias_vacaciones.update({
       where: {
         id: preferenciaExistente.id,
       },
@@ -84,14 +84,14 @@ export async function POST(
     });
 
     // Actualizar contador de empleados completados en la campaña
-    const empleadosCompletados = await prisma.preferenciaVacaciones.count({
+    const empleadosCompletados = await prisma.preferencias_vacaciones.count({
       where: {
         campanaId,
         completada: true,
       },
     });
 
-    await prisma.campanaVacaciones.update({
+    await prisma.campanas_vacaciones.update({
       where: { id: campanaId },
       data: {
         empleadosCompletados,

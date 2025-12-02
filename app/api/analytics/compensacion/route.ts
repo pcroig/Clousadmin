@@ -20,7 +20,7 @@ import {
   toNumber,
 } from '@/lib/utils/analytics-helpers';
 
-const empleadoConEquiposSelect = Prisma.validator<Prisma.EmpleadoSelect>()({
+const empleadoConEquiposSelect = Prisma.validator<Prisma.empleadosSelect>()({
   id: true,
   salarioBaseMensual: true,
   salarioBaseAnual: true,
@@ -38,11 +38,11 @@ const empleadoConEquiposSelect = Prisma.validator<Prisma.EmpleadoSelect>()({
   },
 });
 
-type EmpleadoConEquipos = Prisma.EmpleadoGetPayload<{
+type EmpleadoConEquipos = Prisma.empleadosGetPayload<{
   select: typeof empleadoConEquiposSelect;
 }>;
 
-const nominaConEquiposSelect = Prisma.validator<Prisma.NominaSelect>()({
+const nominaConEquiposSelect = Prisma.validator<Prisma.nominasSelect>()({
   id: true,
   totalNeto: true,
   totalComplementos: true,
@@ -61,16 +61,16 @@ const nominaConEquiposSelect = Prisma.validator<Prisma.NominaSelect>()({
   },
 });
 
-type NominaConEquipos = Prisma.NominaGetPayload<{
+type NominaConEquipos = Prisma.nominasGetPayload<{
   select: typeof nominaConEquiposSelect;
 }>;
 
 const asignacionComplementoSelect =
-  Prisma.validator<Prisma.AsignacionComplementoSelect>()({
+  Prisma.validator<Prisma.asignaciones_complementoSelect>()({
     importe: true,
-    empleadoComplemento: {
+    empleado_complementos: {
       select: {
-        tipoComplemento: {
+        tipos_complemento: {
           select: {
             nombre: true,
           },
@@ -79,7 +79,7 @@ const asignacionComplementoSelect =
     },
   });
 
-type AsignacionComplementoDetalle = Prisma.AsignacionComplementoGetPayload<{
+type AsignacionComplementoDetalle = Prisma.asignaciones_complementoGetPayload<{
   select: typeof asignacionComplementoSelect;
 }>;
 
@@ -130,7 +130,7 @@ export async function GET(request: NextRequest) {
     const antiguedad = searchParams.get('antiguedad');
 
     // Construir filtros base
-    const where: Prisma.EmpleadoWhereInput = {
+    const where: Prisma.empleadosWhereInput = {
       empresaId: session.user.empresaId,
       estadoEmpleado: 'activo',
     };
@@ -157,7 +157,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Obtener empleados con salarios y equipos
-    const empleados = await prisma.empleado.findMany({
+    const empleados = await prisma.empleados.findMany({
       where,
       select: empleadoConEquiposSelect,
     });
@@ -176,7 +176,7 @@ export async function GET(request: NextRequest) {
     mesAnterior.setMonth(mesAnterior.getMonth() - 1);
     mesAnterior.setHours(0, 0, 0, 0);
 
-    const empleadosMesAnterior = await prisma.empleado.findMany({
+    const empleadosMesAnterior = await prisma.empleados.findMany({
       where: {
         ...where,
         fechaAlta: { lte: mesAnterior },
@@ -285,12 +285,12 @@ export async function GET(request: NextRequest) {
     hace6Meses.setDate(1);
     hace6Meses.setHours(0, 0, 0, 0);
 
-    const nominaHistoricoWhere: Prisma.NominaWhereInput = {
+    const nominaHistoricoWhere: Prisma.nominasWhereInput = {
       empleadoId: { in: empleadosIds },
       anio: { gte: hace6Meses.getFullYear() },
     };
 
-    const nominaHistoricoArgs = Prisma.validator<Prisma.NominaGroupByArgs>()({
+    const nominaHistoricoArgs = Prisma.validator<Prisma.nominasGroupByArgs>()({
       by: ['anio', 'mes'],
       where: nominaHistoricoWhere,
       _sum: {
@@ -298,7 +298,7 @@ export async function GET(request: NextRequest) {
       },
       orderBy: [{ anio: 'asc' }, { mes: 'asc' }],
     });
-    const nominasHistorico = await prisma.nomina.groupBy(nominaHistoricoArgs);
+    const nominasHistorico = await prisma.nominas.groupBy(nominaHistoricoArgs);
 
     // Construir evolución de costes desde datos históricos
     const evolucionCoste = [];
@@ -381,7 +381,7 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    const resumenPorAnioArgs = Prisma.validator<Prisma.NominaGroupByArgs>()({
+    const resumenPorAnioArgs = Prisma.validator<Prisma.nominasGroupByArgs>()({
       by: ['anio'],
       where: {
         anio: { in: [previousYear, currentYear] },
@@ -396,7 +396,7 @@ export async function GET(request: NextRequest) {
         _all: true,
       },
     });
-    const tendenciaMensualArgs = Prisma.validator<Prisma.NominaGroupByArgs>()({
+    const tendenciaMensualArgs = Prisma.validator<Prisma.nominasGroupByArgs>()({
       by: ['anio', 'mes'],
       where: {
         anio: currentYear,
@@ -414,19 +414,19 @@ export async function GET(request: NextRequest) {
         mes: 'asc',
       },
     });
-    const resumenPorAnioPromise = prisma.nomina.groupBy(resumenPorAnioArgs);
-    const tendenciaMensualPromise = prisma.nomina.groupBy(tendenciaMensualArgs);
+    const resumenPorAnioPromise = prisma.nominas.groupBy(resumenPorAnioArgs);
+    const tendenciaMensualPromise = prisma.nominas.groupBy(tendenciaMensualArgs);
 
-    const nominasEquiposArgs = Prisma.validator<Prisma.NominaFindManyArgs>()({
+    const nominasEquiposArgs = Prisma.validator<Prisma.nominasFindManyArgs>()({
       where: {
         anio: currentYear,
         empleadoId: { in: empleadosIds },
       },
       select: nominaConEquiposSelect,
     });
-    const nominasEquiposPromise = prisma.nomina.findMany(nominasEquiposArgs);
+    const nominasEquiposPromise = prisma.nominas.findMany(nominasEquiposArgs);
 
-    const _complementosAsignadosArgs: Prisma.AsignacionComplementoFindManyArgs = {
+    const _complementosAsignadosArgs: Prisma.asignaciones_complementoFindManyArgs = {
       where: {
         nomina: {
           is: {
@@ -451,7 +451,7 @@ export async function GET(request: NextRequest) {
     const complementosAsignados =
       nominaIds.length === 0
         ? []
-        : await prisma.asignacionComplemento.findMany({
+        : await prisma.asignaciones_complemento.findMany({
             where: {
               nominaId: { in: nominaIds },
             },
@@ -617,7 +617,7 @@ export async function GET(request: NextRequest) {
     complementosAsignados.forEach(
       (asignacion: AsignacionComplementoDetalle) => {
         const nombre =
-          asignacion.empleadoComplemento?.tipoComplemento?.nombre ?? 'Sin tipo';
+          asignacion.empleado_complementos?.tipos_complemento?.nombre ?? 'Sin tipo';
 
         if (!complementosMap.has(nombre)) {
           complementosMap.set(nombre, { totalImporte: 0, count: 0 });

@@ -303,8 +303,10 @@ Durante el onboarding inicial de la empresa en `/signup`, la jornada y el calend
    - Seleccionar tipo de jornada (Fija o Flexible)
 
 3. Al guardar:
-   - Se crea/actualiza la jornada predefinida
-   - **Se asigna automáticamente** a todos los empleados que no tienen jornada (importados en el paso 1)
+-   - Se crea/actualiza la jornada predefinida
+-   - Verifica si hay empleados con jornadas diferentes (`/api/jornadas/verificar-previas`)
+-     y, si las hay, obliga al HR a confirmar el reemplazo antes de continuar
+-   - Se asigna automáticamente a todos los empleados que no tienen jornada (importados en el paso 1) una vez se confirma
 
 #### Paso 4 - Calendario Laboral:
 

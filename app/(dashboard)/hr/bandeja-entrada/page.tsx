@@ -23,7 +23,7 @@ export default async function HRBandejaEntradaPage(props: {
   }
 
   // Obtener solicitudes pendientes de ausencia
-  const ausenciasPendientes = await prisma.ausencia.findMany({
+  const ausenciasPendientes = await prisma.ausencias.findMany({
     where: {
       empresaId: session.user.empresaId,
       estado: EstadoAusencia.pendiente,
@@ -43,7 +43,7 @@ export default async function HRBandejaEntradaPage(props: {
   });
 
   // Obtener solicitudes resueltas de ausencia (aprobadas/rechazadas)
-  const ausenciasResueltas = await prisma.ausencia.findMany({
+  const ausenciasResueltas = await prisma.ausencias.findMany({
     where: {
       empresaId: session.user.empresaId,
       estado: {
@@ -66,7 +66,7 @@ export default async function HRBandejaEntradaPage(props: {
   });
 
   // Obtener solicitudes de cambio pendientes
-  const solicitudesCambioPendientes = await prisma.solicitudCambio.findMany({
+  const solicitudesCambioPendientes = await prisma.solicitudes_cambio.findMany({
     where: {
       empresaId: session.user.empresaId,
       estado: {
@@ -88,7 +88,7 @@ export default async function HRBandejaEntradaPage(props: {
   });
 
   // Obtener solicitudes de cambio resueltas
-  const solicitudesCambioResueltas = await prisma.solicitudCambio.findMany({
+  const solicitudesCambioResueltas = await prisma.solicitudes_cambio.findMany({
     where: {
       empresaId: session.user.empresaId,
       estado: {
@@ -192,7 +192,7 @@ export default async function HRBandejaEntradaPage(props: {
   ].sort((a, b) => (b.fechaResolucion?.getTime() || 0) - (a.fechaResolucion?.getTime() || 0));
 
   // Obtener elementos resueltos (auto-completados)
-  const itemsResueltos = await prisma.autoCompletado.findMany({
+  const itemsResueltos = await prisma.auto_completados.findMany({
     where: {
       empresaId: session.user.empresaId,
       estado: {
@@ -214,7 +214,7 @@ export default async function HRBandejaEntradaPage(props: {
   });
 
   // Estadísticas de items resueltos
-  const fichajesActualizados = await prisma.autoCompletado.count({
+  const fichajesActualizados = await prisma.auto_completados.count({
     where: {
       empresaId: session.user.empresaId,
       tipo: 'fichaje_cerrado',
@@ -227,7 +227,7 @@ export default async function HRBandejaEntradaPage(props: {
   const treintaDiasAtras = new Date();
   treintaDiasAtras.setDate(treintaDiasAtras.getDate() - 30);
 
-  const ausenciasRevisadas = await prisma.ausencia.count({
+  const ausenciasRevisadas = await prisma.ausencias.count({
     where: {
       empresaId: session.user.empresaId,
       estado: {
@@ -239,7 +239,7 @@ export default async function HRBandejaEntradaPage(props: {
     },
   });
 
-  const nominasRevisadas = await prisma.autoCompletado.count({
+  const nominasRevisadas = await prisma.auto_completados.count({
     where: {
       empresaId: session.user.empresaId,
       tipo: 'nomina_extraida',
@@ -274,7 +274,7 @@ export default async function HRBandejaEntradaPage(props: {
   }));
 
   // Obtener notificaciones reales del HR Admin
-  const notificacionesRaw = await prisma.notificacion.findMany({
+  const notificacionesRaw = await prisma.notificaciones.findMany({
     where: {
       usuarioId: session.user.id,
       empresaId: session.user.empresaId,

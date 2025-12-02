@@ -11,12 +11,26 @@ import { prisma } from '@/lib/prisma';
 import { procesarCompensacionHorasExtra } from '@/lib/services/compensacion-horas';
 import { getJsonBody } from '@/lib/utils/json';
 
-const CompensarHorasMasivoSchema = z.object({
-  empleadoIds: z.array(z.string()),
-  tipoCompensacion: z.enum(['ausencia', 'nomina']),
-  horasPorEmpleado: z.record(z.string(), z.number()).optional(), // { empleadoId: horas }
-  usarTodasLasHoras: z.boolean().default(true),
-});
+const CompensarHorasMasivoSchema = z
+  .object({
+    empleadoIds: z.array(z.string()),
+    tipoCompensacion: z.enum(['ausencia', 'nomina', 'combinado']),
+    horasPorEmpleado: z.record(z.string(), z.number()).optional(), // { empleadoId: horas }
+    usarTodasLasHoras: z.boolean().default(true),
+    porcentajeAusencia: z.number().min(0).max(100).optional(),
+    porcentajeNomina: z.number().min(0).max(100).optional(),
+    maxHorasPorEmpleado: z.number().positive().optional(),
+  })
+  .refine(
+    (values) =>
+      values.tipoCompensacion !== 'combinado' ||
+      (typeof values.porcentajeAusencia === 'number' ||
+        typeof values.porcentajeNomina === 'number'),
+    {
+      message: 'Debes indicar porcentajes para compensación combinada',
+      path: ['porcentajeAusencia'],
+    }
+  );
 
 export async function POST(
   req: NextRequest,
@@ -32,7 +46,7 @@ export async function POST(
     const { id: eventoId } = await params;
 
     // Verificar que el evento existe y pertenece a la empresa
-    const evento = await prisma.eventoNomina.findFirst({
+    const evento = await prisma.eventos_nomina.findFirst({
       where: {
         id: eventoId,
         empresaId: session.user.empresaId,
@@ -47,7 +61,7 @@ export async function POST(
     const data = CompensarHorasMasivoSchema.parse(payload);
 
     // Verificar que los empleados pertenecen a la empresa
-    const empleadosValidos = await prisma.empleado.findMany({
+    const empleadosValidos = await prisma.empleados.findMany({
       where: {
         id: { in: data.empleadoIds },
         empresaId: session.user.empresaId,
@@ -72,6 +86,9 @@ export async function POST(
       usarTodasLasHoras: data.usarTodasLasHoras,
       horasPorEmpleado: data.horasPorEmpleado,
       origen: 'nominas',
+      porcentajeAusencia: data.porcentajeAusencia,
+      porcentajeNomina: data.porcentajeNomina,
+      maxHorasPorEmpleado: data.maxHorasPorEmpleado,
     });
 
     return NextResponse.json({

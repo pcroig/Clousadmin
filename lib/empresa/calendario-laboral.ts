@@ -11,7 +11,7 @@ export async function persistDiasLaborables(
   empresaId: string,
   diasLaborables: DiasLaborables
 ) {
-  const empresa = await client.empresa.findUnique({
+  const empresa = await client.empresas.findUnique({
     where: { id: empresaId },
     select: { config: true },
   });
@@ -29,7 +29,7 @@ export async function persistDiasLaborables(
     diasLaborables,
   });
 
-  await client.empresa.update({
+  await client.empresas.update({
     where: { id: empresaId },
     data: {
       config: nuevaConfig,

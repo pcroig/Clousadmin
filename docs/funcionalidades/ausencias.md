@@ -19,6 +19,7 @@
 - **InputGroup en reglas**: Inputs de "Gestionar Ausencias" muestran unidades (días, %) dentro del campo usando `InputGroup`
 - **Notificaciones mejoradas**: Títulos y descripciones más descriptivos con rango de fechas y tipo de ausencia
 - **Corrección de filtros**: Unificación de estado 'todos' en frontend y backend
+- **Política de carry-over UI**: El toggle ahora se presenta como una sola línea con tooltip "i" y switch, reutilizando el nuevo patrón `SwitchWithTooltip` sin bordes para ofrecer contexto inmediato
 - **Fix upload S3**: Corrección del header `ContentLength` para evitar errores al subir justificantes
 - **Mi Espacio simplificado**: Cards de ausencias ya no son clicables, icono de archivo junto al estado si hay justificante
 

@@ -22,7 +22,7 @@ export default async function PlantillaDetailPage(context: { params: Promise<{ i
   const { id } = await params;
 
   // Obtener plantilla con datos completos
-  const plantilla = await prisma.plantillaDocumento.findUnique({
+  const plantilla = await prisma.plantillas_documentos.findUnique({
     where: { id },
     include: {
       documentosGenerados: {

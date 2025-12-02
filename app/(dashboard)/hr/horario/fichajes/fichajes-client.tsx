@@ -13,8 +13,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 import { CompactFilterBar } from '@/components/adaptive/CompactFilterBar';
-import { MobileActionBar } from '@/components/adaptive/MobileActionBar';
-import { ResponsiveContainer } from '@/components/adaptive/ResponsiveContainer';
+import { PageMobileHeader } from '@/components/layout/page-mobile-header';
 import { EmpleadoHoverCard } from '@/components/empleado/empleado-hover-card';
 import { AvatarCell, DataTable, type Column } from '@/components/shared/data-table';
 import { CompensarHorasDialog } from '@/components/shared/compensar-horas-dialog';
@@ -29,7 +28,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { EstadoFichaje } from '@/lib/constants/enums';
 import { useIsMobile } from '@/lib/hooks/use-viewport';
 import { extractArrayFromResponse } from '@/lib/utils/api-response';
-import { formatearHorasMinutos } from '@/lib/utils/formatters';
+import { extraerHoraDeISO, formatearHorasMinutos } from '@/lib/utils/formatters';
 import { calcularRangoFechas, toMadridDate } from '@/lib/utils/fechas';
 import { parseJson } from '@/lib/utils/json';
 
@@ -235,8 +234,9 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
       const entrada = eventosOrdenados.find(e => e.tipo === 'entrada');
       const salida = eventosOrdenados.find(e => e.tipo === 'salida');
 
-      const horarioEntrada = entrada ? format(new Date(entrada.hora), 'HH:mm') : null;
-      const horarioSalida = salida ? format(new Date(salida.hora), 'HH:mm') : null;
+      // Extraer hora directamente del ISO string para evitar desfases de zona horaria
+      const horarioEntrada = entrada ? extraerHoraDeISO(entrada.hora) : null;
+      const horarioSalida = salida ? extraerHoraDeISO(salida.hora) : null;
 
       const horasEsperadas = (() => {
         const valor = (fichaje as { horasEsperadas?: number | string | null }).horasEsperadas;
@@ -400,10 +400,6 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
     [jornadasFiltradas]
   );
 
-  const obtenerTiempoPendiente = useCallback(
-    (jornada: JornadaDia) => Math.max(jornada.horasEsperadas - jornada.horasTrabajadas, 0),
-    []
-  );
 
   const resolveEmpleadoHoverInfo = useCallback((jornada: JornadaDia) => {
     const empleado = jornada.fichaje?.empleado;
@@ -446,7 +442,6 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
         />
       ) : (
         jornadasFiltradas.map((jornada) => {
-          const tiempoPendiente = obtenerTiempoPendiente(jornada);
           return (
           <Card
             key={`${jornada.empleadoId}-${jornada.fecha.toISOString()}`}
@@ -477,18 +472,11 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
                   </span>
                 </div>
               </div>
-              <div className="space-y-2">
-                <div>
-                  <p className="text-xs text-gray-500 mb-1">Trabajado</p>
-                  <div className="text-sm font-medium">
-                    {formatearHorasMinutos(jornada.horasTrabajadas)}
-                  </div>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-500 mb-1">Tiempo pendiente</p>
-                  <div className={`text-sm font-medium ${tiempoPendiente > 0 ? 'text-red-600' : 'text-gray-900'}`}>
-                    {tiempoPendiente > 0 ? formatearHorasMinutos(tiempoPendiente) : 'Sin pendientes'}
-                  </div>
+              <div>
+                <p className="text-xs text-gray-500 mb-1">Horas</p>
+                <div className="text-sm">
+                  <span className="font-bold text-gray-900">{formatearHorasMinutos(jornada.horasTrabajadas)}</span>
+                  <span className="text-gray-600"> / {formatearHorasMinutos(jornada.horasEsperadas)}</span>
                 </div>
               </div>
             </div>
@@ -542,28 +530,15 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
     },
     {
       id: 'horas',
-      header: 'Horas trabajadas',
+      header: 'Horas',
       align: 'center',
       cell: (jornada) => (
-        <span className="font-medium text-gray-900">
-          {formatearHorasMinutos(jornada.horasTrabajadas)}
+        <span className="text-sm text-gray-600">
+          <span className="font-bold text-gray-900">{formatearHorasMinutos(jornada.horasTrabajadas)}</span>
+          {' / '}
+          {formatearHorasMinutos(jornada.horasEsperadas)}
         </span>
       ),
-    },
-    {
-      id: 'pendiente',
-      header: 'Tiempo pendiente',
-      align: 'center',
-      cell: (jornada) => {
-        const tiempoPendiente = obtenerTiempoPendiente(jornada);
-        return (
-          <span
-            className={`text-sm ${tiempoPendiente > 0 ? 'text-red-600 font-medium' : 'text-gray-600'}`}
-          >
-            {tiempoPendiente > 0 ? formatearHorasMinutos(tiempoPendiente) : 'Sin pendientes'}
-          </span>
-        );
-      },
     },
     {
       id: 'horario',
@@ -597,7 +572,7 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
       align: 'center',
       cell: (jornada) => <EstadoBadge estado={jornada.fichaje.estado} />,
     },
-  ], [obtenerTiempoPendiente, resolveEmpleadoHoverInfo]);
+  ], [resolveEmpleadoHoverInfo]);
 
   const desktopEmptyTitle = busquedaEmpleado ? 'No se encontraron empleados' : 'No hay fichajes';
   const desktopEmptyDescription = busquedaEmpleado
@@ -614,17 +589,19 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
   }
 
   return (
-    <ResponsiveContainer variant="page" className="flex flex-col">
+    <div className="h-full w-full flex flex-col px-1 py-1 sm:max-w-[1800px] sm:mx-auto sm:px-8 sm:py-6">
       {isMobile ? (
         <>
-          <MobileActionBar
+          <PageMobileHeader
             title="Fichajes"
-            primaryAction={{
-              label: 'Cuadrar',
-              onClick: () => router.push('/hr/horario/fichajes/cuadrar'),
-              display: 'label',
-            }}
-            secondaryActions={[
+            actions={[
+              {
+                label: 'Cuadrar',
+                onClick: () => router.push('/hr/horario/fichajes/cuadrar'),
+                icon: Check,
+                isPrimary: true,
+                isSpecialAction: true,
+              },
               {
                 icon: Calendar,
                 label: 'Gestionar jornadas',
@@ -636,10 +613,9 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
                 onClick: handleAbrirCompensacion,
               },
             ]}
-            className="mb-3"
           />
 
-          {/* Navegación de período + filtros en una línea */}
+          {/* Navegación de período + filtros */}
           <div className="flex-shrink-0 mb-3 space-y-3">
             <DateRangeControls
               variant="mobile"
@@ -818,7 +794,7 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
           onClose={() => setShowCompensarHorasDialog(false)}
         />
       )}
-    </ResponsiveContainer>
+    </div>
   );
 }
 

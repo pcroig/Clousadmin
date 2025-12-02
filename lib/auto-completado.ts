@@ -40,7 +40,7 @@ export async function registrarAutoCompletado(
     aprobadoEn,
   }: RegistrarAutoCompletadoParams
 ) {
-  await prisma.autoCompletado.create({
+  await prisma.auto_completados.create({
     data: {
       empresaId,
       empleadoId,

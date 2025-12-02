@@ -10,7 +10,7 @@ import { calcularBalanceMensual } from '@/lib/calculos/balance-horas';
 import { prisma } from '@/lib/prisma';
 import { redondearHoras } from '@/lib/utils/numeros';
 
-export const empleadoCompensacionSelect = Prisma.validator<Prisma.EmpleadoSelect>()({
+export const empleadoCompensacionSelect = Prisma.validator<Prisma.empleadosSelect>()({
   id: true,
   empresaId: true,
   nombre: true,
@@ -19,13 +19,13 @@ export const empleadoCompensacionSelect = Prisma.validator<Prisma.EmpleadoSelect
   saldosAusencias: {
     select: {
       id: true,
-      año: true,
+      anio: true,
       diasTotales: true,
     },
   },
 });
 
-export type EmpleadoCompensacion = Prisma.EmpleadoGetPayload<{
+export type EmpleadoCompensacion = Prisma.empleadosGetPayload<{
   select: typeof empleadoCompensacionSelect;
 }>;
 
@@ -33,13 +33,16 @@ export interface ProcesarCompensacionHorasOptions {
   empresaId: string;
   usuarioId: string;
   empleadoIds: string[];
-  tipoCompensacion: 'ausencia' | 'nomina';
-  mes: number;
+  tipoCompensacion: 'ausencia' | 'nomina' | 'combinado';
+  mes: number | 'all';
   anio: number;
   usarTodasLasHoras: boolean;
   horasPorEmpleado?: Record<string, number>;
   origen: 'nominas' | 'fichajes';
   empleadosPreCargados?: EmpleadoCompensacion[];
+  porcentajeAusencia?: number;
+  porcentajeNomina?: number;
+  maxHorasPorEmpleado?: number;
 }
 
 export interface ProcesarCompensacionHorasResultado {
@@ -59,11 +62,14 @@ export async function procesarCompensacionHorasExtra(
     usarTodasLasHoras,
     horasPorEmpleado,
     origen,
+    maxHorasPorEmpleado,
+    porcentajeAusencia,
+    porcentajeNomina,
   } = options;
 
   const empleados: EmpleadoCompensacion[] =
     options.empleadosPreCargados ??
-    (await prisma.empleado.findMany({
+    (await prisma.empleados.findMany({
       where: {
         empresaId,
         id: { in: options.empleadoIds },
@@ -71,10 +77,10 @@ export async function procesarCompensacionHorasExtra(
       select: {
         ...empleadoCompensacionSelect,
         saldosAusencias: {
-          where: { año: anio },
+          where: { anio },
           select: {
             id: true,
-            año: true,
+            anio: true,
             diasTotales: true,
           },
         },
@@ -84,10 +90,23 @@ export async function procesarCompensacionHorasExtra(
   const compensaciones: string[] = [];
   const errores: Array<{ empleadoId: string; error: string }> = [];
 
+  const clamp = (value: number, min: number, max: number): number =>
+    Math.min(Math.max(value, min), max);
+
   for (const empleado of empleados) {
     try {
-      const balanceMensual = await calcularBalanceMensual(empleado.id, mes, anio);
-      const balanceDisponible = redondearHoras(balanceMensual.balanceTotal);
+      let balanceDisponible: number;
+
+      if (mes === 'all') {
+        const { calcularBalancePeriodo } = await import('@/lib/calculos/balance-horas');
+        const fechaInicio = new Date(anio, 0, 1);
+        const fechaFin = new Date(anio, 11, 31, 23, 59, 59, 999);
+        const balancePeriodo = await calcularBalancePeriodo(empleado.id, fechaInicio, fechaFin);
+        balanceDisponible = redondearHoras(balancePeriodo.balanceTotal);
+      } else {
+        const balanceMensual = await calcularBalanceMensual(empleado.id, mes, anio);
+        balanceDisponible = redondearHoras(balanceMensual.balanceTotal);
+      }
 
       if (balanceDisponible <= 0) {
         errores.push({
@@ -97,11 +116,11 @@ export async function procesarCompensacionHorasExtra(
         continue;
       }
 
-      const horasACompensar = usarTodasLasHoras
+      const horasSolicitadas = usarTodasLasHoras
         ? balanceDisponible
         : Number(horasPorEmpleado?.[empleado.id] ?? 0);
 
-      if (horasACompensar <= 0) {
+      if (horasSolicitadas <= 0) {
         errores.push({
           empleadoId: empleado.id,
           error: 'Horas a compensar inválidas',
@@ -109,7 +128,7 @@ export async function procesarCompensacionHorasExtra(
         continue;
       }
 
-      if (horasACompensar > balanceDisponible) {
+      if (horasSolicitadas > balanceDisponible) {
         errores.push({
           empleadoId: empleado.id,
           error: 'Las horas exceden el balance disponible',
@@ -117,15 +136,29 @@ export async function procesarCompensacionHorasExtra(
         continue;
       }
 
-      const horasDecimal = new Decimal(horasACompensar);
+      const limite = maxHorasPorEmpleado
+        ? Math.min(maxHorasPorEmpleado, balanceDisponible)
+        : balanceDisponible;
+      const horasValidadas = Math.min(horasSolicitadas, limite);
 
-      if (tipoCompensacion === 'ausencia') {
-        const diasAusencia = horasDecimal.div(8).toDP(2);
+      if (horasValidadas <= 0) {
+        errores.push({
+          empleadoId: empleado.id,
+          error: 'El máximo permitido deja las horas en 0',
+        });
+        continue;
+      }
+
+      const horasDecimal = new Decimal(horasValidadas);
+
+      const aplicarAusencia = async (horas: Decimal) => {
+        if (horas.lte(0)) return;
+        const diasAusencia = horas.div(8).toDP(2);
         const fechaInicio = new Date();
         fechaInicio.setDate(fechaInicio.getDate() + 1);
         const fechaFin = new Date(fechaInicio);
 
-        const ausencia = await prisma.ausencia.create({
+        const ausencia = await prisma.ausencias.create({
           data: {
             empresaId,
             empleadoId: empleado.id,
@@ -138,7 +171,7 @@ export async function procesarCompensacionHorasExtra(
             diasSolicitados: diasAusencia.toNumber(),
             descuentaSaldo: false,
             estado: determinarEstadoTrasAprobacion(fechaFin),
-            motivo: `Compensación de ${horasDecimal.toFixed(2)} horas extra (${mes}/${anio})`,
+            motivo: `Compensación de ${horas.toFixed(2)} horas extra (${mes === 'all' ? 'total' : `${mes}/${anio}`})`,
             aprobadaPor: usuarioId,
             aprobadaEn: new Date(),
           },
@@ -146,9 +179,9 @@ export async function procesarCompensacionHorasExtra(
 
         await prisma.empleadoSaldoAusencias.upsert({
           where: {
-            empleadoId_año: {
+            empleadoId_anio: {
               empleadoId: empleado.id,
-              año: anio,
+              anio,
             },
           },
           update: {
@@ -159,7 +192,7 @@ export async function procesarCompensacionHorasExtra(
           create: {
             empresaId,
             empleadoId: empleado.id,
-            año: anio,
+            anio,
             diasTotales: diasAusencia.toNumber(),
             diasUsados: 0,
             diasPendientes: 0,
@@ -167,12 +200,12 @@ export async function procesarCompensacionHorasExtra(
           },
         });
 
-        await prisma.compensacionHoraExtra.create({
+        await prisma.compensaciones_horas_extra.create({
           data: {
             empresaId,
             empleadoId: empleado.id,
-            horasBalance: horasDecimal,
-            tipoCompensacion,
+            horasBalance: horas,
+            tipoCompensacion: 'ausencia',
             estado: 'aprobada',
             diasAusencia,
             ausenciaId: ausencia.id,
@@ -180,18 +213,42 @@ export async function procesarCompensacionHorasExtra(
             aprobadoEn: new Date(),
           },
         });
-      } else {
-        await prisma.compensacionHoraExtra.create({
+      };
+
+      const aplicarNomina = async (horas: Decimal) => {
+        if (horas.lte(0)) return;
+        await prisma.compensaciones_horas_extra.create({
           data: {
             empresaId,
             empleadoId: empleado.id,
-            horasBalance: horasDecimal,
-            tipoCompensacion,
+            horasBalance: horas,
+            tipoCompensacion: 'nomina',
             estado: 'aprobada',
             aprobadoPor: usuarioId,
             aprobadoEn: new Date(),
           },
         });
+      };
+
+      if (tipoCompensacion === 'combinado') {
+        const porcentajeAusenciaNormalizado = clamp(porcentajeAusencia ?? 50, 0, 100);
+        const porcentajeNominaNormalizado = clamp(
+          porcentajeNomina ?? 100 - porcentajeAusenciaNormalizado,
+          0,
+          100
+        );
+        const totalPorcentaje =
+          porcentajeAusenciaNormalizado + porcentajeNominaNormalizado || 100;
+
+        const factorAusencia = porcentajeAusenciaNormalizado / totalPorcentaje;
+        const factorNomina = porcentajeNominaNormalizado / totalPorcentaje;
+
+        await aplicarAusencia(horasDecimal.mul(factorAusencia));
+        await aplicarNomina(horasDecimal.mul(factorNomina));
+      } else if (tipoCompensacion === 'ausencia') {
+        await aplicarAusencia(horasDecimal);
+      } else {
+        await aplicarNomina(horasDecimal);
       }
 
       compensaciones.push(empleado.id);

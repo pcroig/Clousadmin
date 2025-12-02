@@ -38,7 +38,7 @@ export default async function ManagerEquipoPage() {
   }
 
   // Obtener empleados a cargo del manager
-  const empleadosACargo = await prisma.empleado.findMany({
+  const empleadosACargo = await prisma.empleados.findMany({
     where: {
       managerId: session.user.empleadoId,
       empresaId: session.user.empresaId,
@@ -75,7 +75,7 @@ export default async function ManagerEquipoPage() {
   });
 
   // Obtener información del manager
-  const managerInfo = await prisma.empleado.findUnique({
+  const managerInfo = await prisma.empleados.findUnique({
     where: {
       id: session.user.empleadoId,
     },

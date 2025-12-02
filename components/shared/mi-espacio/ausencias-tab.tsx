@@ -2,25 +2,26 @@
 
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Calendar as CalendarIcon, ChevronRight, Info, Paperclip } from 'lucide-react';
+import { Calendar as CalendarIcon, ChevronRight, Edit, Info, Paperclip, Settings } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { toast } from 'sonner';
 
+import { EditarAusenciaModal, type EditarAusencia } from '@/components/ausencias/editar-ausencia-modal';
+import { FestivosPersonalizadosModal } from '@/components/ausencias/festivos-personalizados-modal';
 import { SolicitarAusenciaModal } from '@/components/empleado/solicitar-ausencia-modal';
 import { FechaCalendar } from '@/components/shared/fecha-calendar';
+import { MetricsCard } from '@/components/shared/metrics-card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { PeriodoMedioDiaValue } from '@/lib/constants/enums';
 import { obtenerNombreDia } from '@/lib/utils/fechas';
 import { parseJson } from '@/lib/utils/json';
 
 interface Ausencia {
   id: string;
+  empleadoId?: string;
   tipo: string;
   fechaInicio: string;
   fechaFin: string;
@@ -30,6 +31,13 @@ interface Ausencia {
   justificanteUrl?: string | null;
   documentoId?: string | null;
   createdAt?: string;
+  medioDia?: boolean;
+  periodo?: PeriodoMedioDiaValue | null;
+  empleado?: {
+    nombre: string;
+    apellidos: string;
+    puesto: string;
+  };
 }
 
 interface SaldoResponse {
@@ -39,6 +47,8 @@ interface SaldoResponse {
   diasDisponibles: number;
   carryOverDisponible?: number;
   carryOverExpiraEn?: string | Date | null;
+  diasDesdeHorasCompensadas?: number;
+  horasCompensadas?: number;
 }
 
 interface AusenciasResponse {
@@ -55,6 +65,8 @@ interface SaldoApiResponse {
   diasDisponibles?: number;
   carryOverDisponible?: number;
   carryOverExpiraEn?: string | Date | null;
+  diasDesdeHorasCompensadas?: number;
+  horasCompensadas?: number;
 }
 
 interface CalendarioLaboralResponse {
@@ -78,9 +90,16 @@ type DiasLaborables = {
 interface MiEspacioAusenciasTabProps {
   empleadoId: string;
   contexto?: 'empleado' | 'manager' | 'hr_admin';
+  externalModalOpen?: boolean;
+  onExternalModalOpenChange?: (open: boolean) => void;
 }
 
-export function AusenciasTab({ empleadoId, contexto = 'empleado' }: MiEspacioAusenciasTabProps) {
+export function AusenciasTab({
+  empleadoId,
+  contexto = 'empleado',
+  externalModalOpen,
+  onExternalModalOpenChange,
+}: MiEspacioAusenciasTabProps) {
   const [ausencias, setAusencias] = useState<Ausencia[]>([]);
   const [saldo, setSaldo] = useState<SaldoResponse | null>(null);
   const [diasLaborables, setDiasLaborables] = useState<DiasLaborables>({
@@ -100,8 +119,39 @@ export function AusenciasTab({ empleadoId, contexto = 'empleado' }: MiEspacioAus
     ausencia: Ausencia | null;
     position: { top: number; left: number };
   } | null>(null);
-  const [solicitudModalOpen, setSolicitudModalOpen] = useState(false);
+  const [internalModalOpen, setInternalModalOpen] = useState(false);
+  const solicitudModalOpen = externalModalOpen ?? internalModalOpen;
   const [listaAusenciasTab, setListaAusenciasTab] = useState<'proximas' | 'pasadas'>('proximas');
+  const [ausenciaParaEditar, setAusenciaParaEditar] = useState<Ausencia | null>(null);
+  const [editandoDiasPersonalizados, setEditandoDiasPersonalizados] = useState(false);
+  const [diasPersonalizadosInput, setDiasPersonalizadosInput] = useState<string>('');
+  const [festivosModalOpen, setFestivosModalOpen] = useState(false);
+  const [empleadoNombre, setEmpleadoNombre] = useState<string>('');
+  const ausenciaModalData = useMemo<EditarAusencia | null>(() => {
+    if (!ausenciaParaEditar) {
+      return null;
+    }
+
+    return {
+      id: ausenciaParaEditar.id,
+      empleadoId: ausenciaParaEditar.empleadoId ?? empleadoId,
+      tipo: ausenciaParaEditar.tipo,
+      fechaInicio: ausenciaParaEditar.fechaInicio,
+      fechaFin: ausenciaParaEditar.fechaFin,
+      createdAt: ausenciaParaEditar.createdAt ?? new Date().toISOString(),
+      medioDia: Boolean(ausenciaParaEditar.medioDia),
+      periodo: ausenciaParaEditar.periodo ?? null,
+      estado: ausenciaParaEditar.estado,
+      motivo: ausenciaParaEditar.motivo ?? null,
+      justificanteUrl: ausenciaParaEditar.justificanteUrl ?? null,
+      documentoId: ausenciaParaEditar.documentoId ?? null,
+      empleado: ausenciaParaEditar.empleado ?? {
+        nombre: empleadoNombre || '',
+        apellidos: '',
+        puesto: '',
+      },
+    };
+  }, [ausenciaParaEditar, empleadoId, empleadoNombre]);
 
   const calendarContainerRef = useRef<HTMLDivElement>(null);
   const puedeSolicitar = contexto === 'empleado' || contexto === 'manager';
@@ -156,6 +206,8 @@ export function AusenciasTab({ empleadoId, contexto = 'empleado' }: MiEspacioAus
             ...payload.data,
             carryOverDisponible: payload.data.carryOverDisponible ?? 0,
             carryOverExpiraEn: payload.data.carryOverExpiraEn ?? null,
+            diasDesdeHorasCompensadas: payload.data.diasDesdeHorasCompensadas ?? 0,
+            horasCompensadas: payload.data.horasCompensadas ?? 0,
           });
         } else if (
           typeof payload?.diasTotales === 'number' &&
@@ -168,6 +220,8 @@ export function AusenciasTab({ empleadoId, contexto = 'empleado' }: MiEspacioAus
             diasDisponibles: payload.diasDisponibles ?? 0,
             carryOverDisponible: payload.carryOverDisponible ?? 0,
             carryOverExpiraEn: payload.carryOverExpiraEn ?? null,
+            diasDesdeHorasCompensadas: payload.diasDesdeHorasCompensadas ?? 0,
+            horasCompensadas: payload.horasCompensadas ?? 0,
           });
         }
       } catch (error: unknown) {
@@ -184,6 +238,24 @@ export function AusenciasTab({ empleadoId, contexto = 'empleado' }: MiEspacioAus
     cargarSaldo(controller.signal);
     return () => controller.abort();
   }, [cargarSaldo]);
+
+  // Cargar nombre del empleado si es HR Admin
+  useEffect(() => {
+    if (contexto === 'hr_admin' && empleadoId) {
+      const cargarEmpleado = async () => {
+        try {
+          const response = await fetch(`/api/empleados/${empleadoId}`);
+          const data = await parseJson<{ nombre?: string; apellidos?: string }>(response);
+          if (data.nombre && data.apellidos) {
+            setEmpleadoNombre(`${data.nombre} ${data.apellidos}`);
+          }
+        } catch (error) {
+          console.error('Error cargando empleado:', error);
+        }
+      };
+      cargarEmpleado();
+    }
+  }, [contexto, empleadoId]);
 
   // Cargar calendario laboral y festivos
   useEffect(() => {
@@ -241,6 +313,8 @@ export function AusenciasTab({ empleadoId, contexto = 'empleado' }: MiEspacioAus
       diasDisponibles,
       carryOverDisponible: 0,
       carryOverExpiraEn: null,
+      diasDesdeHorasCompensadas: 0,
+      horasCompensadas: 0,
     };
   }, [ausencias]);
 
@@ -250,10 +324,19 @@ export function AusenciasTab({ empleadoId, contexto = 'empleado' }: MiEspacioAus
         ...saldo,
         carryOverDisponible: saldo.carryOverDisponible ?? 0,
         carryOverExpiraEn: saldo.carryOverExpiraEn ?? null,
+        diasDesdeHorasCompensadas: saldo.diasDesdeHorasCompensadas ?? 0,
+        horasCompensadas: saldo.horasCompensadas ?? 0,
       };
     }
     return calcularSaldo();
   }, [saldo, calcularSaldo]);
+
+  // Formatear horas para mostrar
+  const formatearHoras = (horas: number) => {
+    const h = Math.floor(Math.abs(horas));
+    const m = Math.round((Math.abs(horas) - h) * 60);
+    return `${h}h ${m > 0 ? ` ${m}m` : ''}`;
+  };
 
   // Próximas ausencias
   const proximasAusencias = ausencias
@@ -387,7 +470,51 @@ export function AusenciasTab({ empleadoId, contexto = 'empleado' }: MiEspacioAus
       return;
     }
     setTooltipData(null);
-    setSolicitudModalOpen(true);
+    if (onExternalModalOpenChange) {
+      onExternalModalOpenChange(true);
+    } else {
+      setInternalModalOpen(true);
+    }
+  };
+
+  const handleEditarDiasPersonalizados = async () => {
+    if (!editandoDiasPersonalizados) {
+      setDiasPersonalizadosInput(saldo?.diasTotales?.toString() || '');
+      setEditandoDiasPersonalizados(true);
+      return;
+    }
+
+    try {
+      const dias = diasPersonalizadosInput.trim() === '' ? null : parseInt(diasPersonalizadosInput, 10);
+      
+      if (dias !== null && (isNaN(dias) || dias < 0 || dias > 365)) {
+        toast.error('Los días deben estar entre 0 y 365');
+        return;
+      }
+
+      const response = await fetch(`/api/empleados/${empleadoId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ diasAusenciasPersonalizados: dias }),
+      });
+
+      if (!response.ok) {
+        const error = await parseJson<{ error?: string }>(response).catch(() => ({ error: 'Error desconocido' }));
+        throw new Error(error.error || 'Error al actualizar días personalizados');
+      }
+
+      toast.success(dias === null ? 'Días personalizados eliminados. Se usará el mínimo global.' : 'Días personalizados actualizados correctamente');
+      setEditandoDiasPersonalizados(false);
+      cargarSaldo();
+    } catch (error) {
+      console.error('Error actualizando días personalizados:', error);
+      toast.error(error instanceof Error ? error.message : 'Error al actualizar días personalizados');
+    }
+  };
+
+  const handleCancelarEdicion = () => {
+    setEditandoDiasPersonalizados(false);
+    setDiasPersonalizadosInput('');
   };
 
   const renderAusenciaCard = (ausencia: Ausencia, isPast = false) => (
@@ -410,12 +537,31 @@ export function AusenciasTab({ empleadoId, contexto = 'empleado' }: MiEspacioAus
         <p className="truncate text-sm font-semibold text-gray-900">
           {ausencia.tipo || 'Ausencia'}
         </p>
-        <p className="text-xs text-gray-500">
-          {ausencia.diasLaborables} {ausencia.diasLaborables === 1 ? 'día' : 'días'}
-        </p>
       </div>
       <div className="flex items-center gap-2">
-        {ausencia.justificanteUrl ? <Paperclip className="h-4 w-4 text-gray-400" /> : null}
+        {puedeAccionar && new Date(ausencia.fechaInicio) > new Date() && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7 text-gray-500 hover:text-gray-700"
+            onClick={() => setAusenciaParaEditar(ausencia)}
+          >
+            <Edit className="h-4 w-4" />
+          </Button>
+        )}
+        {ausencia.justificanteUrl && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7 text-gray-400 hover:text-gray-600"
+            onClick={(e) => {
+              e.stopPropagation();
+              window.open(ausencia.justificanteUrl!, '_blank', 'noopener,noreferrer');
+            }}
+          >
+            <Paperclip className="h-4 w-4" />
+          </Button>
+        )}
         {getEstadoBadge(ausencia.estado)}
       </div>
     </div>
@@ -427,54 +573,181 @@ export function AusenciasTab({ empleadoId, contexto = 'empleado' }: MiEspacioAus
       : { data: ausenciasPasadas, empty: 'No hay ausencias pasadas recientes', isPast: true };
 
   return (
-    <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-      {/* Columna izquierda */}
-      <div className="space-y-6">
-        {/* Card de saldo */}
-        <div className="bg-white rounded-lg border border-gray-200 p-6">
+    <>
+      {/* MOBILE VERSION */}
+      <div className="sm:hidden space-y-3">
+        {/* Métricas de Saldo */}
+        <MetricsCard
+          metrics={[
+            {
+              value: saldoResumen.diasDisponibles.toFixed(0),
+              label: 'Días Disponibles',
+              color: 'green',
+              size: 'large',
+            },
+            {
+              value: saldoResumen.diasTotales,
+              label: 'Acumulados',
+            },
+            {
+              value: saldoResumen.diasUsados.toFixed(0),
+              label: 'Utilizados',
+            },
+            ...(saldoResumen.horasCompensadas && saldoResumen.horasCompensadas > 0
+              ? [
+                  {
+                    value: `+${saldoResumen.diasDesdeHorasCompensadas?.toFixed(1)} días`,
+                    label: 'De horas compensadas',
+                    color: 'blue' as const,
+                  },
+                ]
+              : []),
+          ]}
+        />
+
+        {/* Lista de Ausencias - Mobile */}
+        <div className="bg-white rounded-lg border border-gray-200 p-4">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-semibold text-gray-900">Ausencias</h3>
+            <div className="inline-flex rounded-full border border-gray-200 p-0.5 text-xs font-medium">
+              <button
+                onClick={() => setListaAusenciasTab('proximas')}
+                className={`rounded-full px-2 py-0.5 transition ${
+                  listaAusenciasTab === 'proximas'
+                    ? 'bg-gray-900 text-white shadow-sm'
+                    : 'text-gray-600'
+                }`}
+              >
+                Próximas
+              </button>
+              <button
+                onClick={() => setListaAusenciasTab('pasadas')}
+                className={`rounded-full px-2 py-0.5 transition ${
+                  listaAusenciasTab === 'pasadas'
+                    ? 'bg-gray-900 text-white shadow-sm'
+                    : 'text-gray-600'
+                }`}
+              >
+                Historial
+              </button>
+            </div>
+          </div>
+          <div className="space-y-2">
+            {listaActual.data.length === 0 ? (
+              <p className="py-4 text-center text-xs text-gray-500">{listaActual.empty}</p>
+            ) : (
+              listaActual.data.map((ausencia) => renderAusenciaCard(ausencia, listaActual.isPast))
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* DESKTOP VERSION */}
+      <div className="hidden sm:grid grid-cols-1 gap-6 lg:grid-cols-2">
+        {/* Columna izquierda */}
+        <div className="space-y-6">
+          {/* Card de saldo */}
+          <div className="bg-white rounded-lg border border-gray-200 p-6">
           <div className="flex items-start justify-between gap-4 mb-4">
             <div className="flex items-center gap-2">
               <svg className="w-5 h-5 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
               <h3 className="text-sm font-semibold text-gray-900">Saldo de ausencias</h3>
+              {contexto === 'hr_admin' && !editandoDiasPersonalizados && (
+                <>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6 text-gray-500 hover:text-gray-700"
+                    onClick={handleEditarDiasPersonalizados}
+                    title="Editar días personalizados"
+                  >
+                    <Settings className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6 text-gray-500 hover:text-gray-700"
+                    onClick={() => setFestivosModalOpen(true)}
+                    title="Gestionar festivos personalizados"
+                  >
+                    <CalendarIcon className="h-4 w-4" />
+                  </Button>
+                </>
+              )}
             </div>
-            <div className="flex items-center gap-2">
             <span className="text-xs text-gray-500">
               Ene {new Date().getFullYear()} - Dic {new Date().getFullYear()}
             </span>
-              {saldoResumen.carryOverDisponible && saldoResumen.carryOverDisponible > 0 && saldoResumen.carryOverExpiraEn && (
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <button className="text-[#d97757] hover:text-[#c26847]">
-                        <Info className="h-4 w-4" />
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p className="text-sm">
-                        Tienes {saldoResumen.carryOverDisponible} días del año anterior que caducan el{' '}
-                        {typeof saldoResumen.carryOverExpiraEn === 'string'
-                          ? format(new Date(saldoResumen.carryOverExpiraEn), "d 'de' MMMM", { locale: es })
-                          : format(saldoResumen.carryOverExpiraEn, "d 'de' MMMM", { locale: es })}
-                      </p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              )}
-            </div>
           </div>
+          {editandoDiasPersonalizados && contexto === 'hr_admin' && (
+            <div className="mb-4 rounded-md border border-blue-200 bg-blue-50 p-3">
+              <p className="text-xs text-gray-700 mb-2">
+                Editar días personalizados para este empleado (deja vacío para usar el mínimo global)
+              </p>
+              <div className="flex gap-2">
+                <input
+                  type="number"
+                  value={diasPersonalizadosInput}
+                  onChange={(e) => setDiasPersonalizadosInput(e.target.value)}
+                  className="flex-1 rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  placeholder="Días personalizados"
+                  min="0"
+                  max="365"
+                />
+                <Button
+                  size="sm"
+                  onClick={handleEditarDiasPersonalizados}
+                  className="bg-blue-600 hover:bg-blue-700"
+                >
+                  Guardar
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={handleCancelarEdicion}
+                >
+                  Cancelar
+                </Button>
+              </div>
+            </div>
+          )}
           <div className="grid grid-cols-3 gap-4">
             <div>
-              <div className="text-2xl font-bold text-gray-900">{saldoResumen.diasTotales}</div>
-              <div className="text-xs text-gray-500 mt-1">Días acumulados</div>
+              <div className="flex items-center justify-center gap-1.5">
+                <div className="text-2xl font-bold text-gray-900">{saldoResumen.diasTotales}</div>
+                {(saldoResumen.diasDesdeHorasCompensadas ?? 0) > 0 && (
+                  <>
+                    <span className="text-base font-normal text-gray-500">
+                      (+{saldoResumen.diasDesdeHorasCompensadas?.toFixed(1)})
+                    </span>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button className="text-blue-600 hover:text-blue-700">
+                            <Info className="h-4 w-4" />
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-xs">
+                          <p className="text-sm">
+                            Incluye {saldoResumen.diasDesdeHorasCompensadas?.toFixed(1)} días ({formatearHoras(saldoResumen.horasCompensadas ?? 0)}) 
+                            de horas extra compensadas por HR como días de ausencia.
+                          </p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </>
+                )}
+              </div>
+              <div className="text-xs text-gray-500 mt-1 text-center">Días acumulados</div>
             </div>
-            <div>
-              <div className="text-2xl font-bold text-green-600">{saldoResumen.diasDisponibles}</div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-green-600">{saldoResumen.diasDisponibles.toFixed(1)}</div>
               <div className="text-xs text-gray-500 mt-1">Días disponibles</div>
             </div>
-            <div>
-              <div className="text-2xl font-bold text-gray-600">{saldoResumen.diasUsados}</div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-gray-600">{saldoResumen.diasUsados.toFixed(1)}</div>
               <div className="text-xs text-gray-500 mt-1">Días utilizados</div>
             </div>
           </div>
@@ -640,19 +913,51 @@ export function AusenciasTab({ empleadoId, contexto = 'empleado' }: MiEspacioAus
       </div>
 
       {puedeAccionar && (
-        <SolicitarAusenciaModal
-          open={solicitudModalOpen}
-          onClose={() => setSolicitudModalOpen(false)}
-          onSuccess={async () => {
-            setSolicitudModalOpen(false);
-            await Promise.all([cargarAusencias(), cargarSaldo()]);
-          }}
-          saldoDisponible={saldoResumen.diasDisponibles}
-          contexto={contexto}
-          empleadoIdDestino={puedeRegistrar ? empleadoId : undefined}
-        />
-      )}
+        <>
+          <SolicitarAusenciaModal
+            open={solicitudModalOpen}
+            onClose={() => {
+              if (onExternalModalOpenChange) {
+                onExternalModalOpenChange(false);
+              } else {
+                setInternalModalOpen(false);
+              }
+            }}
+            onSuccess={async () => {
+              if (onExternalModalOpenChange) {
+                onExternalModalOpenChange(false);
+              } else {
+                setInternalModalOpen(false);
+              }
+              await Promise.all([cargarAusencias(), cargarSaldo()]);
+            }}
+            saldoDisponible={saldoResumen.diasDisponibles}
+            contexto={contexto}
+            empleadoIdDestino={puedeRegistrar ? empleadoId : undefined}
+          />
+          
+          <EditarAusenciaModal
+            open={Boolean(ausenciaModalData)}
+            ausencia={ausenciaModalData}
+            onClose={() => setAusenciaParaEditar(null)}
+            onSuccess={async () => {
+              setAusenciaParaEditar(null);
+              await Promise.all([cargarAusencias(), cargarSaldo()]);
+            }}
+            contexto={contexto}
+          />
 
-    </div>
+          {contexto === 'hr_admin' && (
+            <FestivosPersonalizadosModal
+              open={festivosModalOpen}
+              onClose={() => setFestivosModalOpen(false)}
+              empleadoId={empleadoId}
+              empleadoNombre={empleadoNombre}
+            />
+          )}
+        </>
+      )}
+      </div>
+    </>
   );
 }

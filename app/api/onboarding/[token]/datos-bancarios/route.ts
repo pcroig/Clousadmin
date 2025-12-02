@@ -37,7 +37,11 @@ export async function POST(
     const datosValidados = validacion.data;
 
     // Guardar datos temporalmente
-    const resultado = await guardarDatosBancarios(token, datosValidados);
+    // Asegurar que el tipo coincida con lo esperado por guardarDatosBancarios
+    const resultado = await guardarDatosBancarios(token, {
+      iban: datosValidados.iban,
+      bic: datosValidados.bic,
+    });
 
     if (!resultado.success) {
       return NextResponse.json(

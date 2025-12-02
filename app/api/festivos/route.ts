@@ -34,7 +34,7 @@ export async function GET(req: NextRequest) {
     const activoParam = searchParams.get('activo');
 
     // Construir filtros
-    const where: Prisma.FestivoWhereInput = {
+    const where: Prisma.festivosWhereInput = {
       empresaId: session.user.empresaId,
     };
 
@@ -57,18 +57,23 @@ export async function GET(req: NextRequest) {
       where.activo = activoParam === 'true';
     }
 
-    const festivos = await prisma.festivo.findMany({
+    const festivos = await prisma.festivos.findMany({
       where,
       orderBy: {
         fecha: 'asc',
       },
     });
 
+    const festivosNormalizados = festivos.map((festivo) => ({
+      ...festivo,
+      fecha: festivo.fecha.toISOString().split('T')[0],
+    }));
+
     // Calcular metadatos
     const total = festivos.length;
     const añoActual = new Date().getFullYear();
     
-    const festivosAñoActual = await prisma.festivo.count({
+    const festivosAñoActual = await prisma.festivos.count({
       where: {
         empresaId: session.user.empresaId,
         fecha: {
@@ -78,7 +83,7 @@ export async function GET(req: NextRequest) {
       },
     });
 
-    const festivosAñoProximo = await prisma.festivo.count({
+    const festivosAñoProximo = await prisma.festivos.count({
       where: {
         empresaId: session.user.empresaId,
         fecha: {
@@ -89,7 +94,7 @@ export async function GET(req: NextRequest) {
     });
 
     return successResponse({
-      festivos,
+      festivos: festivosNormalizados,
       meta: {
         total,
         año: añoParam ? parseInt(añoParam) : null,
@@ -135,7 +140,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Verificar que no exista un festivo en esa fecha
-    const festivoExistente = await prisma.festivo.findFirst({
+    const festivoExistente = await prisma.festivos.findFirst({
       where: {
         empresaId: session.user.empresaId,
         fecha,
@@ -147,7 +152,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Crear festivo
-    const festivo = await prisma.festivo.create({
+    const festivo = await prisma.festivos.create({
       data: {
         empresaId: session.user.empresaId,
         fecha,
