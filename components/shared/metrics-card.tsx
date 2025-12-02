@@ -31,19 +31,19 @@ export function MetricsCard({ metrics, layout = 'horizontal', className = '' }: 
   const gridCols = layout === 'horizontal' ? `grid-cols-${metrics.length}` : 'grid-cols-1';
 
   return (
-    <div className={`bg-white rounded-lg p-3 shadow-sm border border-gray-100 ${className}`}>
-      <div className={`grid ${gridCols} gap-3`}>
+    <div className={`bg-white rounded-lg p-2.5 shadow-sm border border-gray-100 ${className}`}>
+      <div className={`grid ${gridCols} gap-2`}>
         {metrics.map((metric, idx) => {
           const isLarge = metric.size === 'large';
-          // Números grandes pero labels MUY pequeños
-          const valueSize = isLarge ? 'text-2xl' : 'text-xl';
-          const labelSize = 'text-[10px]'; // Más pequeño que text-xs
+          // Números más compactos
+          const valueSize = isLarge ? 'text-xl' : 'text-lg';
+          const labelSize = 'text-[9px]'; // Aún más pequeño
 
           return (
             <div
               key={idx}
               className={`text-center ${
-                layout === 'vertical' && idx < metrics.length - 1 ? 'pb-3 border-b' : ''
+                layout === 'vertical' && idx < metrics.length - 1 ? 'pb-2 border-b' : ''
               }`}
             >
               <div className={`${valueSize} font-bold ${colorClasses[metric.color || 'default']} mb-0.5`}>

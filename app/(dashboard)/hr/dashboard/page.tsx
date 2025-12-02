@@ -94,7 +94,6 @@ export default async function HRDashboardPage() {
   const notificaciones: NotificacionUI[] = (notificacionesDb as any).map((notif: any) => ({
     id: notif.id,
     tipo: notif.tipo as TipoNotificacion,
-    titulo: notif.titulo,
     mensaje: notif.mensaje,
     fecha: notif.createdAt,
     leida: notif.leida,

@@ -20,11 +20,10 @@ export function MiEspacioAusenciasClient({ empleadoId }: MiEspacioAusenciasClien
         title="Ausencias"
         actions={[
           {
-            label: 'Solicitar',
+            label: 'Solicitar ausencia',
             onClick: () => setSolicitudModalOpen(true),
             icon: Plus,
             isPrimary: true,
-            isSpecialAction: true,
           },
         ]}
       />

@@ -6,52 +6,25 @@
 import { prisma } from '@/lib/prisma';
 import { asJsonValue } from '@/lib/prisma/json';
 
-/**
- * Configuración de campos requeridos
- */
-export interface CamposRequeridos {
-  datos_personales: {
-    nif: boolean;
-    nss: boolean;
-    telefono: boolean;
-    direccionCalle: boolean;
-    direccionNumero: boolean;
-    direccionPiso: boolean;
-    codigoPostal: boolean;
-    ciudad: boolean;
-    direccionProvincia: boolean;
-    estadoCivil: boolean;
-    numeroHijos: boolean;
-  };
-  datos_bancarios: {
-    iban: boolean;
-    bic: boolean;
-  };
-}
+// Importar tipos para uso interno
+import type {
+  CamposRequeridos,
+  DocumentoRequerido,
+  PlantillaDocumento,
+} from './onboarding-config-types';
 
-/**
- * Documento requerido
- */
-export interface DocumentoRequerido {
-  id: string;
-  nombre: string;
-  descripcion?: string;
-  requerido: boolean;
-  requiereVisualizacion: boolean;
-  requiereFirma: boolean;
-  carpetaDestino?: string | null;
-}
+// Re-exportar tipos desde el archivo de tipos (para compatibilidad)
+export type {
+  CamposRequeridos,
+  DocumentoRequerido,
+  PlantillaDocumento,
+} from './onboarding-config-types';
 
-/**
- * Plantilla de documento
- */
-export interface PlantillaDocumento {
-  id: string;
-  nombre: string;
-  s3Key: string;
-  tipoDocumento: string;
-  descripcion?: string;
-}
+// Re-exportar funciones helper (son seguras en cliente porque no usan Prisma)
+export {
+  filtrarDocumentosPorEquipo,
+  obtenerDocumentosAsincronicos,
+} from './onboarding-config-types';
 
 /**
  * Configuración completa de onboarding
@@ -285,6 +258,7 @@ export function validarDocumentosRequeridos(
     documentosFaltantes,
   };
 }
+
 
 
 

@@ -26,7 +26,7 @@ import { parseJson } from '@/lib/utils/json';
 import type {
   CamposRequeridos,
   PlantillaDocumento as ConfigPlantilla,
-} from '@/lib/onboarding-config';
+} from '@/lib/onboarding-config-types';
 
 
 interface Plantilla {

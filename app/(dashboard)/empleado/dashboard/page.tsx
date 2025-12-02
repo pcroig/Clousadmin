@@ -115,6 +115,17 @@ async function obtenerDatosDashboard(session: { user: { id: string; empresaId: s
       empresaId: session.user.empresaId,
       usuarioId: session.user.id,
     },
+    select: {
+      id: true,
+      empresaId: true,
+      usuarioId: true,
+      tipo: true,
+      mensaje: true,
+      metadata: true,
+      leida: true,
+      createdAt: true,
+      eventoNominaId: true,
+    },
     orderBy: {
       createdAt: 'desc',
     },
@@ -128,7 +139,6 @@ async function obtenerDatosDashboard(session: { user: { id: string; empresaId: s
   const notificaciones: NotificacionUI[] = notificacionesDb.map((notif) => ({
     id: notif.id,
     tipo: notif.tipo as NotificacionUI['tipo'],
-    titulo: notif.titulo,
     mensaje: notif.mensaje,
     fecha: notif.createdAt,
     leida: notif.leida,

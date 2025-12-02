@@ -110,20 +110,14 @@ export function BandejaEntradaNotificaciones({
 
                   <div className="flex-1 min-w-0 space-y-1.5">
                     <div className="flex items-start justify-between gap-3">
-                      <p className="text-sm font-semibold text-gray-900">
-                        {notificacion.titulo || 'Notificación'}
+                      <p className="text-sm text-gray-900 leading-relaxed flex-1">
+                        {notificacion.mensaje}
                       </p>
                       <div className="flex items-center gap-2 text-xs text-gray-500 shrink-0">
                         <span>{formatRelativeTimeShort(notificacion.fecha)}</span>
                         {!notificacion.leida && <span className="w-2 h-2 rounded-full bg-amber-500" />}
                       </div>
                     </div>
-
-                    {notificacion.mensaje && (
-                      <p className="text-sm text-gray-600 leading-relaxed">
-                        {notificacion.mensaje}
-                      </p>
-                    )}
 
                     {renderAccion(notificacion)}
                   </div>

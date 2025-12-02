@@ -91,10 +91,11 @@ export async function GET(request: NextRequest) {
         : DEFAULT_LAZY_RECOVERY_DAYS;
 
     console.log(
-      `[API Revisión GET] Lazy recovery de fichajes para los últimos ${diasARecuperar} día(s) en empresa ${session.user.empresaId}`
+      `[API Revisión GET] Lazy recovery de fichajes para los últimos ${diasARecuperar} día(s) (incluyendo hoy) en empresa ${session.user.empresaId}`
     );
 
-    for (let offset = 1; offset <= diasARecuperar; offset++) {
+    // FIX: Cambiar offset de 1 a 0 para incluir el día de hoy
+    for (let offset = 0; offset <= diasARecuperar; offset++) {
       const fechaObjetivo = new Date(hoy);
       fechaObjetivo.setDate(fechaObjetivo.getDate() - offset);
 
@@ -110,14 +111,15 @@ export async function GET(request: NextRequest) {
     }
 
     console.log('[API Revisión GET] Fecha hoy:', hoy.toISOString());
-    console.log('[API Revisión GET] Buscando fichajes pendientes anteriores a hoy...');
+    console.log('[API Revisión GET] Buscando fichajes pendientes (incluyendo hoy)...');
 
     let fichajesPendientes;
     // Declarar mapas fuera del try para que estén disponibles en el formateo
     let ausenciasMedioDiaPorFecha = new Map<string, AusenciaMedioDia>();
     
     try {
-      const fechaWhere: Prisma.DateTimeFilter = { lt: hoy };
+      // FIX: Cambiar lt a lte para incluir fichajes del día de hoy
+      const fechaWhere: Prisma.DateTimeFilter = { lte: hoy };
 
       if (fechaInicioParam) {
         const inicio = new Date(fechaInicioParam);

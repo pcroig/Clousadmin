@@ -172,12 +172,14 @@ export function Sidebar({ rol, usuario }: SidebarProps) {
       ],
     },
     {
-      name: 'Horario',
+      name: 'Fichaje',
+      href: '/hr/horario/fichajes',
       icon: Clock,
-      children: [
-        { name: 'Fichajes', href: '/hr/horario/fichajes' },
-        { name: 'Ausencias', href: '/hr/horario/ausencias' },
-      ],
+    },
+    {
+      name: 'Ausencia',
+      href: '/hr/horario/ausencias',
+      icon: Calendar,
     },
     {
       name: 'Organización',
@@ -227,12 +229,14 @@ export function Sidebar({ rol, usuario }: SidebarProps) {
       ],
     },
     {
-      name: 'Horario',
+      name: 'Fichaje',
+      href: '/manager/horario/fichajes',
       icon: Clock,
-      children: [
-        { name: 'Fichajes', href: '/manager/horario/fichajes' },
-        { name: 'Ausencias', href: '/manager/horario/ausencias' },
-      ],
+    },
+    {
+      name: 'Ausencia',
+      href: '/manager/horario/ausencias',
+      icon: Calendar,
     },
     {
       name: 'Mi espacio',

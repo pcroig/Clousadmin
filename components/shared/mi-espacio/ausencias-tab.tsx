@@ -17,6 +17,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { PeriodoMedioDiaValue } from '@/lib/constants/enums';
 import { obtenerNombreDia } from '@/lib/utils/fechas';
+import { getAusenciaBadgeVariant, getAusenciaEstadoLabel } from '@/lib/utils/formatters';
 import { parseJson } from '@/lib/utils/json';
 
 interface Ausencia {
@@ -518,53 +519,68 @@ export function AusenciasTab({
   };
 
   const renderAusenciaCard = (ausencia: Ausencia, isPast = false) => (
-    <div
+    <button
       key={ausencia.id}
-      className={`flex w-full items-center gap-3 rounded-xl border border-gray-100 bg-white px-3 py-3 text-left transition ${
+      onClick={() => setAusenciaParaEditar(ausencia)}
+      className={`flex w-full items-center gap-2 rounded-lg border border-gray-100 bg-white px-2.5 py-2 text-left transition hover:bg-gray-50 ${
         isPast ? 'opacity-70' : ''
       }`}
     >
-      <div className="flex items-center gap-2">
-        <FechaCalendar date={new Date(ausencia.fechaInicio)} />
+      {/* Fechas con diseño de calendario pequeño */}
+      <div className="flex items-center gap-1 flex-shrink-0">
+        <div className="w-9 h-9 bg-white rounded-md shadow-sm border border-gray-200 overflow-hidden flex flex-col">
+          <div className="w-full h-1/4 flex items-center justify-center" style={{ backgroundColor: '#F4564D' }}>
+            <span className="text-[7px] font-semibold text-white leading-none">
+              {format(new Date(ausencia.fechaInicio), 'MMM', { locale: es }).toUpperCase()}
+            </span>
+          </div>
+          <div className="flex-1 flex items-center justify-center bg-white">
+            <span className="text-sm font-bold text-gray-900">{format(new Date(ausencia.fechaInicio), 'd')}</span>
+          </div>
+        </div>
         {new Date(ausencia.fechaFin).toDateString() !== new Date(ausencia.fechaInicio).toDateString() && (
           <>
-            <ChevronRight className="h-4 w-4 text-gray-400" />
-            <FechaCalendar date={new Date(ausencia.fechaFin)} />
+            <ChevronRight className="h-3 w-3 text-gray-400" />
+            <div className="w-9 h-9 bg-white rounded-md shadow-sm border border-gray-200 overflow-hidden flex flex-col">
+              <div className="w-full h-1/4 flex items-center justify-center" style={{ backgroundColor: '#F4564D' }}>
+                <span className="text-[7px] font-semibold text-white leading-none">
+                  {format(new Date(ausencia.fechaFin), 'MMM', { locale: es }).toUpperCase()}
+                </span>
+              </div>
+              <div className="flex-1 flex items-center justify-center bg-white">
+                <span className="text-sm font-bold text-gray-900">{format(new Date(ausencia.fechaFin), 'd')}</span>
+              </div>
+            </div>
           </>
         )}
       </div>
+      
+      {/* Info de la ausencia */}
       <div className="flex-1 min-w-0">
-        <p className="truncate text-sm font-semibold text-gray-900">
+        <p className="truncate text-xs font-medium text-gray-900">
           {ausencia.tipo || 'Ausencia'}
         </p>
+        <p className="text-[10px] text-gray-500">{ausencia.diasLaborables} días</p>
       </div>
-      <div className="flex items-center gap-2">
-        {puedeAccionar && new Date(ausencia.fechaInicio) > new Date() && (
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-7 w-7 text-gray-500 hover:text-gray-700"
-            onClick={() => setAusenciaParaEditar(ausencia)}
-          >
-            <Edit className="h-4 w-4" />
-          </Button>
-        )}
+      
+      {/* Badge de estado */}
+      <div className="flex items-center gap-1 flex-shrink-0">
         {ausencia.justificanteUrl && (
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-7 w-7 text-gray-400 hover:text-gray-600"
+          <button
+            className="p-1 text-gray-400 hover:text-gray-600"
             onClick={(e) => {
               e.stopPropagation();
               window.open(ausencia.justificanteUrl!, '_blank', 'noopener,noreferrer');
             }}
           >
-            <Paperclip className="h-4 w-4" />
-          </Button>
+            <Paperclip className="h-3.5 w-3.5" />
+          </button>
         )}
-        {getEstadoBadge(ausencia.estado)}
+        <Badge variant={getAusenciaBadgeVariant(ausencia.estado)} className="text-[9px] px-1.5 py-0">
+          {getAusenciaEstadoLabel(ausencia.estado)}
+        </Badge>
       </div>
-    </div>
+    </button>
   );
 
   const listaActual =
@@ -575,15 +591,14 @@ export function AusenciasTab({
   return (
     <>
       {/* MOBILE VERSION */}
-      <div className="sm:hidden space-y-3">
-        {/* Métricas de Saldo */}
+      <div className="sm:hidden space-y-2">
+        {/* Métricas de Saldo - Más compactas */}
         <MetricsCard
           metrics={[
             {
               value: saldoResumen.diasDisponibles.toFixed(0),
-              label: 'Días Disponibles',
+              label: 'Disponibles',
               color: 'green',
-              size: 'large',
             },
             {
               value: saldoResumen.diasTotales,
@@ -593,52 +608,40 @@ export function AusenciasTab({
               value: saldoResumen.diasUsados.toFixed(0),
               label: 'Utilizados',
             },
-            ...(saldoResumen.horasCompensadas && saldoResumen.horasCompensadas > 0
-              ? [
-                  {
-                    value: `+${saldoResumen.diasDesdeHorasCompensadas?.toFixed(1)} días`,
-                    label: 'De horas compensadas',
-                    color: 'blue' as const,
-                  },
-                ]
-              : []),
           ]}
         />
 
-        {/* Lista de Ausencias - Mobile */}
-        <div className="bg-white rounded-lg border border-gray-200 p-4">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-semibold text-gray-900">Ausencias</h3>
-            <div className="inline-flex rounded-full border border-gray-200 p-0.5 text-xs font-medium">
-              <button
-                onClick={() => setListaAusenciasTab('proximas')}
-                className={`rounded-full px-2 py-0.5 transition ${
-                  listaAusenciasTab === 'proximas'
-                    ? 'bg-gray-900 text-white shadow-sm'
-                    : 'text-gray-600'
-                }`}
-              >
-                Próximas
-              </button>
-              <button
-                onClick={() => setListaAusenciasTab('pasadas')}
-                className={`rounded-full px-2 py-0.5 transition ${
-                  listaAusenciasTab === 'pasadas'
-                    ? 'bg-gray-900 text-white shadow-sm'
-                    : 'text-gray-600'
-                }`}
-              >
-                Historial
-              </button>
-            </div>
-          </div>
-          <div className="space-y-2">
-            {listaActual.data.length === 0 ? (
-              <p className="py-4 text-center text-xs text-gray-500">{listaActual.empty}</p>
-            ) : (
-              listaActual.data.map((ausencia) => renderAusenciaCard(ausencia, listaActual.isPast))
-            )}
-          </div>
+        {/* Pestañas - Similar a documentos */}
+        <div className="flex items-center justify-center gap-1 p-1 bg-gray-100 rounded-lg">
+          <button
+            onClick={() => setListaAusenciasTab('proximas')}
+            className={`flex-1 text-xs font-medium py-1.5 rounded transition ${
+              listaAusenciasTab === 'proximas'
+                ? 'bg-white text-gray-900 shadow-sm'
+                : 'text-gray-600'
+            }`}
+          >
+            Próximas
+          </button>
+          <button
+            onClick={() => setListaAusenciasTab('pasadas')}
+            className={`flex-1 text-xs font-medium py-1.5 rounded transition ${
+              listaAusenciasTab === 'pasadas'
+                ? 'bg-white text-gray-900 shadow-sm'
+                : 'text-gray-600'
+            }`}
+          >
+            Pasadas
+          </button>
+        </div>
+
+        {/* Lista de Ausencias - Sin card contenedor extra */}
+        <div className="space-y-2">
+          {listaActual.data.length === 0 ? (
+            <p className="py-6 text-center text-xs text-gray-500">{listaActual.empty}</p>
+          ) : (
+            listaActual.data.map((ausencia) => renderAusenciaCard(ausencia, listaActual.isPast))
+          )}
         </div>
       </div>
 

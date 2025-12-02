@@ -24,11 +24,10 @@ export function MiEspacioFichajesClient({ empleadoId, empleado }: MiEspacioFicha
         title="Fichajes"
         actions={[
           {
-            label: 'Solicitar',
-            onClick: () => setManualModalOpen(true),
             icon: Plus,
+            label: 'Solicitar fichaje manual',
+            onClick: () => setManualModalOpen(true),
             isPrimary: true,
-            isSpecialAction: true,
           },
         ]}
       />

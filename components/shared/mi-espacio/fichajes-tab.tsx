@@ -284,20 +284,18 @@ export function FichajesTab({
 
   return (
     <div className="space-y-3 sm:space-y-6">
-      {/* Cards de Resumen - MOBILE: Métricas prominentes */}
+      {/* Cards de Resumen - MOBILE: Métricas compactas */}
       <div className="sm:hidden">
         <MetricsCard
           metrics={[
             {
               value: `${resumen.totalHoras.toFixed(0)}h`,
-              label: 'Horas Trabajadas',
-              size: 'large',
+              label: 'Trabajadas',
             },
             {
               value: `${resumen.balanceAcumulado >= 0 ? '+' : ''}${Math.floor(resumen.balanceAcumulado)}h ${Math.abs(Math.round((resumen.balanceAcumulado % 1) * 60))}m`,
-              label: 'Saldo de Horas',
+              label: 'Saldo',
               color: resumen.balanceAcumulado >= 0 ? 'green' : 'red',
-              size: 'large',
             },
           ]}
         />
@@ -396,13 +394,6 @@ export function FichajesTab({
 
       {/* Tabla de fichajes - MOBILE: Colapsable */}
       <div className="sm:hidden space-y-3">
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="text-sm font-semibold text-gray-900">Historial</h3>
-            {headerDescription && <p className="text-xs text-gray-500">{headerDescription}</p>}
-          </div>
-        </div>
-
         {loading ? (
           <div className="py-8 text-center text-sm text-gray-500">Cargando...</div>
         ) : displayedJornadas.length === 0 ? (
@@ -417,8 +408,8 @@ export function FichajesTab({
               const isExpanded = expandedRows.has(rowId);
 
               return (
-                <Card key={rowId} className="overflow-hidden">
-                  <CardContent className="p-3">
+                <Card key={rowId} className="overflow-hidden border-gray-200 shadow-sm">
+                  <CardContent className="p-0">
                     {/* Info básica - siempre visible */}
                     <button
                       onClick={() => {
@@ -430,43 +421,39 @@ export function FichajesTab({
                         }
                         setExpandedRows(newExpanded);
                       }}
-                      className="w-full"
+                      className="w-full min-h-[50px] px-2.5 py-2 flex items-center justify-between gap-2 text-left transition-colors active:bg-gray-50"
                     >
-                      <div className="flex items-center justify-between">
-                        <div className="flex-1 text-left">
-                          <div className="font-semibold text-sm text-gray-900 capitalize">
-                            {format(jornada.fecha, "d 'de' MMMM", { locale: es })}
-                          </div>
-                          <div className="text-xs text-gray-500 capitalize">
-                            {format(jornada.fecha, 'EEEE', { locale: es })}
-                          </div>
+                      {/* Izquierda: Fecha más compacta */}
+                      <div className="flex-1 min-w-0">
+                        <div className="text-xs font-semibold text-gray-900 capitalize">
+                          {format(jornada.fecha, "d MMM", { locale: es })}
                         </div>
+                        <div className="text-[10px] text-gray-500 capitalize">
+                          {format(jornada.fecha, 'EEE', { locale: es })}
+                        </div>
+                      </div>
 
-                        <div className="flex items-center gap-2">
-                          <div className="text-right mr-2">
-                            <div className="text-sm font-semibold text-gray-900">
-                              {jornada.horasTrabajadas.toFixed(1)}h
-                            </div>
-                            <div className="text-xs text-gray-500">
-                              {jornada.horasObjetivo.toFixed(1)}h objetivo
-                            </div>
-                          </div>
-                          {isExpanded ? (
-                            <ChevronUp className="w-4 h-4 text-gray-400" />
-                          ) : (
-                            <ChevronDown className="w-4 h-4 text-gray-400" />
-                          )}
+                      {/* Derecha: Horas + Chevron */}
+                      <div className="flex items-center gap-1.5">
+                        <div className="text-xs font-medium text-gray-700">
+                          {jornada.horasTrabajadas.toFixed(1)}h / {jornada.horasObjetivo.toFixed(1)}h
                         </div>
+                        
+                        {isExpanded ? (
+                          <ChevronUp className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                        ) : (
+                          <ChevronDown className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                        )}
                       </div>
                     </button>
 
-                    {/* Detalles - expandible */}
+                    {/* Detalles expandidos */}
                     {isExpanded && (
-                      <div className="mt-3 pt-3 border-t space-y-2">
-                        <div className="grid grid-cols-2 gap-2 text-xs">
-                          <div>
-                            <div className="text-gray-500">Horario</div>
-                            <div className="font-medium text-gray-900">
+                      <div className="px-2.5 pb-2 pt-0 border-t bg-gray-50/50">
+                        <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 mt-2">
+                          <div className="col-span-2">
+                            <div className="text-[10px] text-gray-500 mb-0.5">Horario</div>
+                            <div className="text-xs text-gray-900">
                               {jornada.entrada && jornada.salida
                                 ? `${format(jornada.entrada, 'HH:mm')} - ${format(jornada.salida, 'HH:mm')}`
                                 : jornada.entrada
@@ -474,9 +461,9 @@ export function FichajesTab({
                                 : 'Sin datos'}
                             </div>
                           </div>
-                          <div>
-                            <div className="text-gray-500">Estado</div>
-                            <div className="mt-0.5">{getEstadoBadge(jornada.estado)}</div>
+                          <div className="col-span-2">
+                            <div className="text-[10px] text-gray-500 mb-0.5">Estado</div>
+                            <div className="text-xs text-gray-900">{getEstadoBadge(jornada.estado)}</div>
                           </div>
                         </div>
                       </div>

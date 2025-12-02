@@ -118,6 +118,17 @@ export default async function ManagerDashboardPage() {
       empresaId: session.user.empresaId,
       usuarioId: session.user.id,
     },
+    select: {
+      id: true,
+      empresaId: true,
+      usuarioId: true,
+      tipo: true,
+      mensaje: true,
+      metadata: true,
+      leida: true,
+      createdAt: true,
+      eventoNominaId: true,
+    },
     orderBy: {
       createdAt: 'desc',
     },
@@ -127,7 +138,6 @@ export default async function ManagerDashboardPage() {
   const notificaciones: NotificacionUI[] = notificacionesDb.map((notif) => ({
     id: notif.id,
     tipo: notif.tipo as TipoNotificacion,
-    titulo: notif.titulo,
     mensaje: notif.mensaje,
     fecha: notif.createdAt,
     leida: notif.leida,

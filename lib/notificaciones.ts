@@ -203,13 +203,12 @@ async function crearNotificaciones(
     empresaId: string;
     usuarioIds: string[];
     tipo: TipoNotificacion;
-    titulo: string;
     mensaje: string;
     metadata: NotificacionMetadata;
   },
   options?: NotificacionEnvioOptions
 ) {
-  const { empresaId, usuarioIds, tipo, titulo, mensaje, metadata } = params;
+  const { empresaId, usuarioIds, tipo, mensaje, metadata } = params;
 
   const destinatarios = filtrarDestinatarios(usuarioIds, options);
 
@@ -220,7 +219,6 @@ async function crearNotificaciones(
       empresaId,
       usuarioId,
       tipo,
-      titulo,
       mensaje,
       metadata,
       leida: false,
@@ -268,8 +266,27 @@ const formatLabel = (value: string) => {
   return humanized.charAt(0).toLocaleUpperCase('es-ES') + humanized.slice(1);
 };
 
-const formatRange = (inicio: Date, fin: Date) =>
-  `${inicio.toLocaleDateString('es-ES')} al ${fin.toLocaleDateString('es-ES')}`;
+/**
+ * Formatea una fecha en formato corto español: "15 dic"
+ */
+const formatFechaCorta = (fecha: Date) => {
+  const meses = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+  const dia = fecha.getDate();
+  const mes = meses[fecha.getMonth()];
+  return `${dia} ${mes}`;
+};
+
+const formatRange = (inicio: Date, fin: Date) => {
+  const inicioStr = formatFechaCorta(inicio);
+  const finStr = formatFechaCorta(fin);
+
+  // Si es el mismo día, solo mostrar una fecha
+  if (inicio.toDateString() === fin.toDateString()) {
+    return inicioStr;
+  }
+
+  return `${inicioStr} al ${finStr}`;
+};
 
 const formatDias = (dias: number) => (dias === 1 ? '1 día' : `${dias} días`);
 
@@ -311,8 +328,7 @@ export async function crearNotificacionAusenciaSolicitada(
     empresaId,
     usuarioIds,
     tipo: 'ausencia_solicitada',
-    titulo: `Nueva solicitud: ${tipoLabel}`,
-    mensaje: `${empleadoNombre} solicita ${diasLabel} de ${tipoLabel} del ${rangoFechas}.`,
+    mensaje: `${empleadoNombre} ha solicitado ${diasLabel} de ${tipoLabel.toLowerCase()} del ${rangoFechas}`,
     metadata: {
       ausenciaId,
       tipo,
@@ -338,12 +354,17 @@ export async function crearNotificacionAusenciaAprobada(
     tipo: string;
     fechaInicio: Date;
     fechaFin: Date;
+    diasSolicitados?: number;
   },
   options?: NotificacionEnvioOptions
 ) {
-  const { ausenciaId, empresaId, empleadoId, tipo, fechaInicio, fechaFin } = params;
+  const { ausenciaId, empresaId, empleadoId, tipo, fechaInicio, fechaFin, diasSolicitados } = params;
   const tipoLabel = formatLabel(tipo);
   const rangoFechas = formatRange(fechaInicio, fechaFin);
+
+  // Calcular días si no se proporcionan
+  const dias = diasSolicitados ?? Math.ceil((fechaFin.getTime() - fechaInicio.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+  const diasLabel = formatDias(dias);
 
   const usuarioIds = await obtenerUsuariosANotificar(prisma, empresaId, {
     empleado: empleadoId,
@@ -353,13 +374,13 @@ export async function crearNotificacionAusenciaAprobada(
     empresaId,
     usuarioIds,
     tipo: 'ausencia_aprobada',
-    titulo: `${tipoLabel} aprobada`,
-    mensaje: `Tu ausencia del ${rangoFechas} ha sido aprobada.`,
+    mensaje: `Tu solicitud de ${diasLabel} de ${tipoLabel.toLowerCase()} (${rangoFechas}) ha sido aprobada`,
     metadata: {
       ausenciaId,
       tipo,
       fechaInicio: fechaInicio.toISOString(),
       fechaFin: fechaFin.toISOString(),
+      diasSolicitados: dias,
       prioridad: 'normal',
       accionUrl: '/empleado/horario/ausencias',
       accionTexto: 'Ver ausencia',
@@ -377,13 +398,18 @@ export async function crearNotificacionAusenciaRechazada(
     tipo: string;
     fechaInicio: Date;
     fechaFin: Date;
+    diasSolicitados?: number;
     motivoRechazo?: string;
   },
   options?: NotificacionEnvioOptions
 ) {
-  const { ausenciaId, empresaId, empleadoId, tipo, fechaInicio, fechaFin, motivoRechazo } = params;
+  const { ausenciaId, empresaId, empleadoId, tipo, fechaInicio, fechaFin, diasSolicitados, motivoRechazo } = params;
   const tipoLabel = formatLabel(tipo);
   const rangoFechas = formatRange(fechaInicio, fechaFin);
+
+  // Calcular días si no se proporcionan
+  const dias = diasSolicitados ?? Math.ceil((fechaFin.getTime() - fechaInicio.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+  const diasLabel = formatDias(dias);
 
   const usuarioIds = await obtenerUsuariosANotificar(prisma, empresaId, {
     empleado: empleadoId,
@@ -393,13 +419,13 @@ export async function crearNotificacionAusenciaRechazada(
     empresaId,
     usuarioIds,
     tipo: 'ausencia_rechazada',
-    titulo: `${tipoLabel} rechazada`,
-    mensaje: `Tu solicitud del ${rangoFechas} no ha sido aprobada${motivoRechazo ? `. Motivo: ${motivoRechazo}` : '.'}`,
+    mensaje: `Tu solicitud de ${diasLabel} de ${tipoLabel.toLowerCase()} (${rangoFechas}) no ha sido aprobada${motivoRechazo ? `. Motivo: ${motivoRechazo}` : ''}`,
     metadata: {
       ausenciaId,
       tipo,
       fechaInicio: fechaInicio.toISOString(),
       fechaFin: fechaFin.toISOString(),
+      diasSolicitados: dias,
       ...(motivoRechazo && { motivoRechazo }),
       prioridad: 'normal',
       accionUrl: '/empleado/horario/ausencias',
@@ -418,12 +444,17 @@ export async function crearNotificacionAusenciaCancelada(
     tipo: string;
     fechaInicio: Date;
     fechaFin: Date;
+    diasSolicitados?: number;
   },
   options?: NotificacionEnvioOptions
 ) {
-  const { empresaId, empleadoId, empleadoNombre, tipo, fechaInicio, fechaFin } = params;
+  const { empresaId, empleadoId, empleadoNombre, tipo, fechaInicio, fechaFin, diasSolicitados } = params;
   const tipoLabel = formatLabel(tipo);
   const rangoFechas = formatRange(fechaInicio, fechaFin);
+
+  // Calcular días si no se proporcionan
+  const dias = diasSolicitados ?? Math.ceil((fechaFin.getTime() - fechaInicio.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+  const diasLabel = formatDias(dias);
 
   const empleado = await prisma.empleados.findUnique({
     where: { id: empleadoId },
@@ -439,12 +470,12 @@ export async function crearNotificacionAusenciaCancelada(
     empresaId,
     usuarioIds,
     tipo: 'ausencia_cancelada',
-    titulo: `${tipoLabel} cancelada`,
-    mensaje: `${empleadoNombre} ha cancelado su ${tipoLabel.toLocaleLowerCase('es-ES')} del ${rangoFechas}.`,
+    mensaje: `${empleadoNombre} ha cancelado ${diasLabel} de ${tipoLabel.toLowerCase()} (${rangoFechas})`,
     metadata: {
       tipo,
       fechaInicio: fechaInicio.toISOString(),
       fechaFin: fechaFin.toISOString(),
+      diasSolicitados: dias,
       empleadoId,
       empleadoNombre,
       prioridad: 'normal',
@@ -468,12 +499,17 @@ export async function crearNotificacionAusenciaAutoAprobada(
     tipo: string;
     fechaInicio: Date;
     fechaFin: Date;
+    diasSolicitados?: number;
   },
   options?: NotificacionEnvioOptions
 ) {
-  const { ausenciaId, empresaId, empleadoId, empleadoNombre, managerId, tipo, fechaInicio, fechaFin } = params;
+  const { ausenciaId, empresaId, empleadoId, empleadoNombre, managerId, tipo, fechaInicio, fechaFin, diasSolicitados } = params;
   const tipoLabel = formatLabel(tipo);
   const rangoFechas = formatRange(fechaInicio, fechaFin);
+
+  // Calcular días si no se proporcionan
+  const dias = diasSolicitados ?? Math.ceil((fechaFin.getTime() - fechaInicio.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+  const diasLabel = formatDias(dias);
 
   // Notificar a HR/Admin y Manager (NO al empleado)
   const usuarioIds = await obtenerUsuariosANotificar(prisma, empresaId, {
@@ -485,14 +521,14 @@ export async function crearNotificacionAusenciaAutoAprobada(
     empresaId,
     usuarioIds,
     tipo: 'ausencia_aprobada',
-    titulo: `${empleadoNombre} registró ${tipoLabel}`,
-    mensaje: `Ausencia registrada para ${empleadoNombre} del ${rangoFechas}.`,
+    mensaje: `${empleadoNombre} ha registrado ${diasLabel} de ${tipoLabel.toLowerCase()} (${rangoFechas}) con aprobación automática`,
     metadata: {
       ausenciaId,
       empleadoId,
       tipo,
       fechaInicio: fechaInicio.toISOString(),
       fechaFin: fechaFin.toISOString(),
+      diasSolicitados: dias,
       autoAprobada: true,
       prioridad: 'normal',
       accionUrl: `/hr/horario/ausencias`,
@@ -546,8 +582,7 @@ export async function crearNotificacionAusenciaModificada(
     empresaId,
     usuarioIds: usuarioIdsFinal,
     tipo: 'ausencia_modificada',
-    titulo: `Ausencia modificada: ${tipoLabel}`,
-    mensaje: `Se modificó la ausencia de ${empleadoNombre} (${diasLabel}, ${rangoFechas}).`,
+    mensaje: `Se ha modificado la ausencia de ${empleadoNombre}: ${diasLabel} de ${tipoLabel.toLowerCase()} del ${rangoFechas}`,
     metadata: {
       ausenciaId,
       tipo,
@@ -589,8 +624,7 @@ export async function crearNotificacionFirmaPendiente(
     empresaId,
     usuarioIds,
     tipo: 'firma_pendiente',
-    titulo: 'Documento pendiente de firma',
-    mensaje: `Tienes un documento pendiente: ${documentoNombre}.`,
+    mensaje: `Tienes pendiente firmar el documento "${documentoNombre}"`,
     metadata: {
       firmaId,
       solicitudId,
@@ -630,8 +664,7 @@ export async function crearNotificacionFirmaCompletada(
     empresaId,
     usuarioIds,
     tipo: 'firma_completada',
-    titulo: 'Documento firmado',
-    mensaje: `El documento ${documentoNombre} ya fue firmado por todos los participantes.`,
+    mensaje: `El documento "${documentoNombre}" ha sido firmado por todos los participantes`,
     metadata: {
       solicitudId,
       documentoId,
@@ -674,8 +707,7 @@ export async function crearNotificacionFichajeAutocompletado(
     empresaId,
     usuarioIds,
     tipo: 'fichaje_autocompletado',
-    titulo: 'Fichaje completado',
-    mensaje: `Tu fichaje del ${fecha.toLocaleDateString('es-ES')} se completó automáticamente con salida a las ${salidaSugerida.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}. Motivo: ${razon}.`,
+    mensaje: `Tu fichaje del ${formatFechaCorta(fecha)} se ha completado automáticamente con salida a las ${salidaSugerida.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}. Motivo: ${razon}`,
     metadata: {
       fichajeId,
       fecha: fecha.toISOString(),
@@ -711,8 +743,7 @@ export async function crearNotificacionFichajeRequiereRevision(
     empresaId,
     usuarioIds,
     tipo: 'fichaje_requiere_revision',
-    titulo: `Fichaje pendiente de revisión`,
-    mensaje: `${empleadoNombre} - ${fecha.toLocaleDateString('es-ES')}. Motivo: ${razon}.`,
+    mensaje: `El fichaje de ${empleadoNombre} del ${formatFechaCorta(fecha)} requiere revisión. Motivo: ${razon}`,
     metadata: {
       fichajeId,
       fecha: fecha.toISOString(),
@@ -745,8 +776,7 @@ export async function crearNotificacionFichajeResuelto(
     empresaId,
     usuarioIds,
     tipo: 'fichaje_resuelto',
-    titulo: 'Fichaje completado',
-    mensaje: `Tu fichaje del ${fecha.toLocaleDateString('es-ES')} ha sido revisado y completado.`,
+    mensaje: `Tu fichaje del ${formatFechaCorta(fecha)} ha sido revisado y completado`,
     metadata: {
       fichajeId,
       fecha: fecha.toISOString(),
@@ -786,8 +816,7 @@ export async function crearNotificacionFichajeModificado(
     empresaId,
     usuarioIds,
     tipo: 'fichaje_modificado',
-    titulo: 'Fichaje modificado',
-    mensaje: `${modificadoPorNombre} ha ${accionTexto} en tu fichaje del ${new Intl.DateTimeFormat('es-ES').format(fechaFichaje)}.${detalles ? ` Detalles: ${detalles}` : ''}`,
+    mensaje: `${modificadoPorNombre} ha ${accionTexto} en tu fichaje del ${formatFechaCorta(fechaFichaje)}${detalles ? `. Detalles: ${detalles}` : ''}`,
     metadata: {
       fichajeId,
       fecha: fechaFichaje.toISOString(),
@@ -819,8 +848,7 @@ export async function crearNotificacionFichajeAprobado(
     empresaId,
     usuarioIds,
     tipo: 'fichaje_aprobado',
-    titulo: 'Fichaje aprobado',
-    mensaje: `Tu fichaje del ${fecha.toLocaleDateString('es-ES')} ha sido aprobado y finalizado.`,
+    mensaje: `Tu fichaje del ${formatFechaCorta(fecha)} ha sido aprobado y finalizado`,
     metadata: {
       fichajeId,
       fecha: fecha.toISOString(),
@@ -852,8 +880,7 @@ export async function crearNotificacionFichajeRechazado(
     empresaId,
     usuarioIds,
     tipo: 'fichaje_rechazado',
-    titulo: 'Fichaje requiere corrección',
-    mensaje: `Tu fichaje del ${fecha.toLocaleDateString('es-ES')} necesita ser corregido${motivoRechazo ? `. Motivo: ${motivoRechazo}` : '.'}`,
+    mensaje: `Tu fichaje del ${formatFechaCorta(fecha)} necesita ser corregido${motivoRechazo ? `. Motivo: ${motivoRechazo}` : ''}`,
     metadata: {
       fichajeId,
       fecha: fecha.toISOString(),
@@ -911,8 +938,7 @@ export async function crearNotificacionCambioManager(
       empresaId,
       usuarioIds: empleadoUsuarioIds,
       tipo: 'cambio_manager',
-      titulo: 'Nuevo manager asignado',
-      mensaje: `${nuevoManagerNombre} es ahora tu manager${anteriorManagerNombre ? ` (anteriormente ${anteriorManagerNombre})` : ''}.`,
+      mensaje: `${nuevoManagerNombre} es ahora tu manager${anteriorManagerNombre ? ` (anteriormente ${anteriorManagerNombre})` : ''}`,
       metadata: {
         nuevoManagerId,
         nuevoManagerNombre,
@@ -933,8 +959,7 @@ export async function crearNotificacionCambioManager(
       empresaId,
       usuarioIds: nuevoManagerUsuarioIds,
       tipo: 'nuevo_empleado_equipo',
-      titulo: 'Nuevo miembro en tu equipo',
-      mensaje: `${empleadoNombre} ahora está bajo tu supervisión.`,
+      mensaje: `${empleadoNombre} ahora está bajo tu supervisión`,
       metadata: {
         empleadoId,
         empleadoNombre,
@@ -981,8 +1006,7 @@ export async function crearNotificacionCambioPuesto(
       empresaId,
       usuarioIds: empleadoUsuarioIds,
       tipo: 'cambio_puesto',
-      titulo: 'Actualización de puesto',
-      mensaje: `Tu puesto ha cambiado a ${puestoNuevo}.${puestoAnterior ? ` Antes: ${puestoAnterior}.` : ''}`,
+      mensaje: `Tu puesto ha cambiado a ${puestoNuevo.toLowerCase()}${puestoAnterior ? ` (antes: ${puestoAnterior.toLowerCase()})` : ''}`,
       metadata: {
         puestoAnterior,
         puestoNuevo,
@@ -1001,8 +1025,7 @@ export async function crearNotificacionCambioPuesto(
       empresaId,
       usuarioIds: hrUsuarioIds,
       tipo: 'cambio_puesto',
-      titulo: 'Cambio de puesto registrado',
-      mensaje: `${nombreCompleto || 'El empleado'} ahora ocupa el puesto ${puestoNuevo}.`,
+      mensaje: `${nombreCompleto || 'El empleado'} ahora ocupa el puesto de ${puestoNuevo.toLowerCase()}`,
       metadata: {
         empleadoId,
         empleadoNombre: nombreCompleto || undefined,
@@ -1024,8 +1047,7 @@ export async function crearNotificacionCambioPuesto(
         empresaId,
         usuarioIds: managerUsuarioIds,
         tipo: 'cambio_puesto',
-        titulo: 'Cambio de puesto en tu equipo',
-        mensaje: `${nombreCompleto || 'Un miembro de tu equipo'} ahora ocupa el puesto ${puestoNuevo}.`,
+        mensaje: `${nombreCompleto || 'Un miembro de tu equipo'} ahora ocupa el puesto de ${puestoNuevo.toLowerCase()}`,
         metadata: {
           empleadoId,
           empleadoNombre: nombreCompleto || undefined,
@@ -1071,8 +1093,7 @@ export async function crearNotificacionJornadaAsignada(
       empresaId,
       usuarioIds: empleadoUsuarioIds,
       tipo: 'jornada_asignada',
-      titulo: 'Nueva jornada asignada',
-      mensaje: `Se te ha asignado la jornada: ${jornadaNombre}.`,
+      mensaje: `Se te ha asignado la jornada ${jornadaNombre}`,
       metadata: {
         jornadaNombre,
         prioridad: 'normal',
@@ -1090,8 +1111,7 @@ export async function crearNotificacionJornadaAsignada(
       empresaId,
       usuarioIds: hrUsuarioIds,
       tipo: 'jornada_asignada',
-      titulo: 'Jornada actualizada',
-      mensaje: `${nombreCompleto || 'El empleado'} ahora tiene asignada la jornada ${jornadaNombre}.`,
+      mensaje: `${nombreCompleto || 'El empleado'} ahora tiene asignada la jornada ${jornadaNombre}`,
       metadata: {
         empleadoId,
         empleadoNombre: nombreCompleto || undefined,
@@ -1112,8 +1132,7 @@ export async function crearNotificacionJornadaAsignada(
         empresaId,
         usuarioIds: managerUsuarioIds,
         tipo: 'jornada_asignada',
-        titulo: 'Actualización de jornada en tu equipo',
-        mensaje: `${nombreCompleto || 'Un miembro de tu equipo'} ahora tiene la jornada ${jornadaNombre}.`,
+        mensaje: `${nombreCompleto || 'Un miembro de tu equipo'} ahora tiene la jornada ${jornadaNombre}`,
         metadata: {
           empleadoId,
           empleadoNombre: nombreCompleto || undefined,
@@ -1164,8 +1183,7 @@ export async function crearNotificacionEmpleadoCreado(
     empresaId,
     usuarioIds,
     tipo: 'empleado_creado',
-    titulo: 'Nuevo empleado registrado',
-    mensaje: `${empleadoNombre} se ha incorporado a la empresa.`,
+    mensaje: `${empleadoNombre} se ha incorporado a la empresa`,
     metadata: {
       empleadoId,
       empleadoNombre,
@@ -1199,8 +1217,7 @@ export async function crearNotificacionAsignadoEquipo(
     empresaId,
     usuarioIds: empleadoUsuarioIds,
     tipo: 'asignado_equipo',
-    titulo: 'Asignado a equipo',
-    mensaje: `Has sido asignado al equipo: ${equipoNombre}.`,
+    mensaje: `Has sido asignado al equipo ${equipoNombre}`,
     metadata: {
       equipoId,
       equipoNombre,
@@ -1223,8 +1240,7 @@ export async function crearNotificacionAsignadoEquipo(
       empresaId,
       usuarioIds: managerUsuarioIds,
       tipo: 'nuevo_empleado_equipo',
-      titulo: 'Nuevo miembro en tu equipo',
-      mensaje: `${empleadoNombre} se ha unido a tu equipo: ${equipoNombre}.`,
+      mensaje: `${empleadoNombre} se ha unido a tu equipo ${equipoNombre}`,
       metadata: {
         equipoId,
         equipoNombre,
@@ -1270,8 +1286,7 @@ export async function crearNotificacionSolicitudCreada(
     empresaId,
     usuarioIds,
     tipo: 'solicitud_creada',
-    titulo: `Nueva solicitud de ${tipoDescripcion}`,
-    mensaje: `${empleadoNombre} ha enviado una solicitud de ${tipoDescripcion}.`,
+    mensaje: `${empleadoNombre} ha enviado una solicitud de ${tipoDescripcion}`,
     metadata: {
       solicitudId,
       tipo,
@@ -1312,8 +1327,7 @@ export async function crearNotificacionSolicitudAprobada(
     empresaId,
     usuarioIds,
     tipo: 'solicitud_aprobada',
-    titulo: `Tu solicitud de ${tipoDescripcion} fue aprobada`,
-    mensaje: `Los cambios solicitados han sido aceptados${mensajeExtra}.`,
+    mensaje: `Tu solicitud de ${tipoDescripcion} ha sido aprobada${mensajeExtra}`,
     metadata: {
       solicitudId,
       tipo,
@@ -1353,10 +1367,9 @@ export async function crearNotificacionSolicitudRechazada(
     empresaId,
     usuarioIds,
     tipo: 'solicitud_rechazada',
-    titulo: `Tu solicitud de ${tipoDescripcion} fue rechazada`,
     mensaje: motivoRechazo
-      ? `Motivo proporcionado: ${motivoRechazo}.`
-      : 'No se ha indicado un motivo. Contacta con RR.HH. para más detalles.',
+      ? `Tu solicitud de ${tipoDescripcion} no ha sido aprobada. Motivo: ${motivoRechazo}`
+      : `Tu solicitud de ${tipoDescripcion} no ha sido aprobada. Contacta con RR.HH. para más detalles`,
     metadata: {
       solicitudId,
       tipo,
@@ -1396,8 +1409,7 @@ export async function crearNotificacionSolicitudRequiereRevision(
     empresaId,
     usuarioIds,
     tipo: 'solicitud_creada', // Reutilizamos el tipo pero con prioridad crítica
-    titulo: `${empleadoNombre} solicita ${tipoDescripcion} - revisión manual necesaria`,
-    mensaje: 'La IA no pudo validar los datos. Revisa la solicitud manualmente.',
+    mensaje: `${empleadoNombre} solicita ${tipoDescripcion} - la IA no pudo validar los datos y requiere revisión manual`,
     metadata: {
       solicitudId,
       tipo,
@@ -1430,14 +1442,13 @@ export async function crearNotificacionNominaDisponible(
     empleado: empleadoId,
   });
 
-  const meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+  const meses = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
 
   await crearNotificaciones(prisma, {
     empresaId,
     usuarioIds,
     tipo: 'nomina_disponible',
-    titulo: 'Nómina disponible',
-    mensaje: `Tu nómina de ${meses[mes - 1]} ${año} está disponible.`,
+    mensaje: `Tu nómina de ${meses[mes - 1]} ${año} está disponible`,
     metadata: {
       nominaId,
       mes,
@@ -1480,7 +1491,6 @@ export async function crearNotificacionNominaError(
     empresaId,
     usuarioIds,
     tipo: 'nomina_error',
-    titulo: 'Error en nómina',
     mensaje: `Error al procesar la nómina de ${empleadoNombre}: ${error}`,
     metadata: {
       nominaId,
@@ -1513,20 +1523,16 @@ export async function crearNotificacionNominaValidada(
     return;
   }
 
-  const titulo =
-    accion === 'validar'
-      ? 'Complementos validados'
-      : 'Complementos rechazados';
+  const complementoTexto = complementosCount === 1 ? 'complemento' : 'complementos';
   const mensaje =
     accion === 'validar'
-      ? `${validadorNombre} ha validado ${complementosCount} complemento(s) en el evento de nómina.`
-      : `${validadorNombre} ha rechazado ${complementosCount} complemento(s) en el evento de nómina.`;
+      ? `${validadorNombre} ha validado ${complementosCount} ${complementoTexto} en el evento de nómina`
+      : `${validadorNombre} ha rechazado ${complementosCount} ${complementoTexto} en el evento de nómina`;
 
   await crearNotificaciones(prisma, {
     empresaId,
     usuarioIds,
     tipo: 'nomina_validada',
-    titulo,
     mensaje,
     metadata: {
       eventoNominaId,
@@ -1561,15 +1567,14 @@ export async function crearNotificacionDocumentoSolicitado(
   });
 
   const mensajeLimite = fechaLimite
-    ? ` Fecha límite: ${fechaLimite.toLocaleDateString('es-ES')}.`
+    ? `. Fecha límite: ${formatFechaCorta(fechaLimite)}`
     : '';
 
   await crearNotificaciones(prisma, {
     empresaId,
     usuarioIds,
     tipo: 'documento_solicitado',
-    titulo: `Documento requerido: ${tipoDocumento}`,
-    mensaje: `Por favor, sube el documento solicitado.${mensajeLimite}`,
+    mensaje: `Se te ha solicitado el documento ${tipoDocumento}${mensajeLimite}`,
     metadata: {
       documentoId,
       tipoDocumento,
@@ -1602,8 +1607,7 @@ export async function crearNotificacionDocumentoSubido(
     empresaId,
     usuarioIds,
     tipo: 'documento_subido',
-    titulo: `Nuevo documento: ${tipoDocumento}`,
-    mensaje: `${empleadoNombre} ha subido un documento para revisión.`,
+    mensaje: `${empleadoNombre} ha subido el documento ${tipoDocumento} para revisión`,
     metadata: {
       documentoId,
       tipoDocumento,
@@ -1635,8 +1639,7 @@ export async function crearNotificacionDocumentoRechazado(
     empresaId,
     usuarioIds,
     tipo: 'documento_rechazado',
-    titulo: `${tipoDocumento} rechazado`,
-    mensaje: `Tu documento no ha sido aceptado. Motivo: ${motivo}`,
+    mensaje: `Tu documento ${tipoDocumento} no ha sido aceptado. Motivo: ${motivo}`,
     metadata: {
       documentoId,
       tipoDocumento,
@@ -1668,8 +1671,7 @@ export async function crearNotificacionDocumentoEliminado(
     empresaId,
     usuarioIds,
     tipo: 'documento_eliminado',
-    titulo: `Documento eliminado: ${tipoDocumento}`,
-    mensaje: `El documento "${documentoNombre}" ha sido eliminado de tu expediente por el departamento de RR.HH.`,
+    mensaje: `El documento "${documentoNombre}" (${tipoDocumento}) ha sido eliminado de tu expediente por el departamento de RR.HH.`,
     metadata: {
       documentoNombre,
       tipoDocumento,
@@ -1705,8 +1707,7 @@ export async function crearNotificacionDocumentoGeneradoEmpleado(
     empresaId,
     usuarioIds,
     tipo: 'documento_generado',
-    titulo: 'Documento disponible',
-    mensaje: `Se ha generado el documento "${documentoNombre}".`,
+    mensaje: `Se ha generado el documento "${documentoNombre}"`,
     metadata: {
       documentoId,
       documentoGeneradoId,
@@ -1743,8 +1744,7 @@ export async function crearNotificacionDocumentoPendienteRellenar(
     empresaId,
     usuarioIds,
     tipo: 'documento_pendiente_rellenar',
-    titulo: 'Documento pendiente de completar',
-    mensaje: `Tienes que completar los campos del documento "${documentoNombre}".`,
+    mensaje: `Tienes pendiente completar los campos del documento "${documentoNombre}"`,
     metadata: {
       documentoId,
       documentoNombre,
@@ -1776,7 +1776,6 @@ export async function crearNotificacionDocumentoGeneracionLote(
   const { empresaId, usuarioId, total, exitosos, fallidos, jobId, mensajePersonalizado } = params;
 
   // Determinar tipo de notificación según resultado
-  let titulo: string;
   let mensaje: string;
   let tipo: TipoNotificacion;
   let prioridad: PrioridadNotificacion;
@@ -1784,20 +1783,17 @@ export async function crearNotificacionDocumentoGeneracionLote(
   if (fallidos === 0) {
     // Todo exitoso
     tipo = 'documento_generado';
-    titulo = 'Documentos generados exitosamente';
-    mensaje = `Se han generado ${exitosos} documento${exitosos !== 1 ? 's' : ''} correctamente.`;
+    mensaje = `Se han generado ${exitosos} documento${exitosos !== 1 ? 's' : ''} correctamente`;
     prioridad = 'normal';
   } else if (exitosos === 0) {
     // Todo falló
     tipo = 'documento_generado';
-    titulo = 'Error en generación de documentos';
-    mensaje = mensajePersonalizado || `No se pudo generar ninguno de los ${total} documentos solicitados.`;
+    mensaje = mensajePersonalizado || `No se pudo generar ninguno de los ${total} documentos solicitados`;
     prioridad = 'alta';
   } else {
     // Parcialmente exitoso
     tipo = 'documento_generado';
-    titulo = 'Documentos generados parcialmente';
-    mensaje = `Se generaron ${exitosos} de ${total} documentos. ${fallidos} fallaron.`;
+    mensaje = `Se generaron ${exitosos} de ${total} documentos (${fallidos} fallaron)`;
     prioridad = 'alta';
   }
 
@@ -1805,7 +1801,6 @@ export async function crearNotificacionDocumentoGeneracionLote(
     empresaId,
     usuarioIds: [usuarioId],
     tipo,
-    titulo,
     mensaje,
     metadata: {
       jobId,
@@ -1849,8 +1844,7 @@ export async function crearNotificacionCampanaCreada(
         empresaId,
         usuarioIds,
         tipo: 'campana_vacaciones_creada',
-        titulo: `Campaña de vacaciones: ${titulo}`,
-        mensaje: `Planifica tus vacaciones del ${fechaInicio.toLocaleDateString('es-ES')} al ${fechaFin.toLocaleDateString('es-ES')}. Indica tus preferencias para coordinar con tu equipo.`,
+        mensaje: `Campaña "${titulo}": planifica tus vacaciones del ${formatFechaCorta(fechaInicio)} al ${formatFechaCorta(fechaFin)} e indica tus preferencias para coordinar con tu equipo`,
         metadata: {
           campanaId,
           fechaInicio: fechaInicio.toISOString(),
@@ -1885,8 +1879,7 @@ export async function crearNotificacionCampanaCompletada(
     empresaId,
     usuarioIds,
     tipo: 'campana_vacaciones_completada',
-    titulo: `Campaña "${titulo}" lista para cuadrar`,
-    mensaje: `Todos los empleados (${totalEmpleados}) han enviado sus preferencias. Procede a asignar las fechas finales.`,
+    mensaje: `La campaña "${titulo}" está lista para cuadrar - todos los empleados (${totalEmpleados}) han enviado sus preferencias`,
     metadata: {
       campanaId,
       totalEmpleados,
@@ -1929,8 +1922,7 @@ export async function crearNotificacionCampanaCuadrada(
     empresaId,
     usuarioIds,
     tipo: 'campana_vacaciones_cuadrada',
-    titulo: 'Vacaciones asignadas',
-    mensaje: `Las vacaciones de la campaña "${titulo}" han sido cuadradas. Ya puedes ver tus fechas asignadas.`,
+    mensaje: `Las vacaciones de la campaña "${titulo}" han sido cuadradas - ya puedes ver tus fechas asignadas`,
     metadata: {
       campanaId,
       prioridad: 'alta',
@@ -1972,8 +1964,7 @@ export async function crearNotificacionOnboardingCompletado(
     empresaId,
     usuarioIds,
     tipo: 'onboarding_completado',
-    titulo: 'Onboarding completado',
-    mensaje: `${empleadoNombre} ha completado su proceso de onboarding y está listo para comenzar.`,
+    mensaje: `${empleadoNombre} ha completado su proceso de onboarding y está listo para comenzar`,
     metadata: {
       empleadoId,
       empleadoNombre,
@@ -2010,14 +2001,13 @@ export async function crearNotificacionComplementosPendientes(
     manager: managerId,
   });
 
-  const meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+  const meses = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
 
   await crearNotificaciones(prisma, {
     empresaId,
     usuarioIds,
     tipo: 'complementos_pendientes',
-    titulo: 'Complementos de nómina pendientes',
-    mensaje: `Tienes ${empleadosCount} empleado(s) en tu equipo que requieren complementos de nómina para ${meses[mes - 1]} ${año}. Por favor, completa la información.`,
+    mensaje: `Tienes ${empleadosCount} ${empleadosCount === 1 ? 'empleado' : 'empleados'} en tu equipo que ${empleadosCount === 1 ? 'requiere' : 'requieren'} complementos de nómina para ${meses[mes - 1]} ${año}`,
     metadata: {
       nominaId,
       mes,
@@ -2054,8 +2044,7 @@ export async function crearNotificacionComplementoAsignado(
       empresaId,
       usuarioIds: empleadoUsuarioIds,
       tipo: 'complemento_asignado',
-      titulo: `Nuevo complemento: ${complementoNombre}`,
-      mensaje: `Se te ha asignado el complemento "${complementoNombre}"${importe ? ` por ${importe.toFixed(2)}€` : ''}. Se aplicará en tus próximas nóminas.`,
+      mensaje: `Se te ha asignado el complemento "${complementoNombre}"${importe ? ` de ${importe.toFixed(2)}€` : ''} que se aplicará en tus próximas nóminas`,
       metadata: {
         complementoNombre,
         ...(importe && { importe }),
@@ -2082,8 +2071,7 @@ export async function crearNotificacionComplementoAsignado(
         empresaId,
         usuarioIds: managerUsuarioIds,
         tipo: 'complemento_asignado',
-        titulo: `Complemento asignado a ${empleadoNombre}`,
-        mensaje: `Se ha asignado el complemento "${complementoNombre}" a ${empleadoNombre}${importe ? ` por ${importe.toFixed(2)}€` : ''}.`,
+        mensaje: `Se ha asignado el complemento "${complementoNombre}" a ${empleadoNombre}${importe ? ` por ${importe.toFixed(2)}€` : ''}`,
         metadata: {
           empleadoId,
           empleadoNombre,
@@ -2124,8 +2112,7 @@ export async function crearNotificacionDenunciaRecibida(
     empresaId,
     usuarioIds,
     tipo: 'denuncia_recibida',
-    titulo: 'Nueva denuncia recibida',
-    mensaje: `Se ha recibido una denuncia ${esAnonima ? 'anónima' : ''} en el canal de denuncias. ${descripcionBreve.substring(0, 100)}${descripcionBreve.length > 100 ? '...' : ''}`,
+    mensaje: `Se ha recibido una denuncia ${esAnonima ? 'anónima' : ''} en el canal de denuncias: ${descripcionBreve.substring(0, 100)}${descripcionBreve.length > 100 ? '...' : ''}`,
     metadata: {
       denunciaId,
       esAnonima,
@@ -2160,7 +2147,6 @@ export async function crearNotificacionDenunciaActualizada(
     empresaId,
     usuarioIds,
     tipo: 'denuncia_actualizada',
-    titulo: 'Actualización en tu denuncia',
     mensaje,
     metadata: {
       denunciaId,

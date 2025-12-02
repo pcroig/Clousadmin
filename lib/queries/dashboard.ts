@@ -102,6 +102,17 @@ export const getNotificacionesUsuario = cachedQuery(
         empresaId,
         usuarioId,
       },
+      select: {
+        id: true,
+        empresaId: true,
+        usuarioId: true,
+        tipo: true,
+        mensaje: true,
+        metadata: true,
+        leida: true,
+        createdAt: true,
+        eventoNominaId: true,
+      },
       orderBy: {
         createdAt: 'desc',
       },

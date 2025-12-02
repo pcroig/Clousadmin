@@ -440,7 +440,8 @@ export async function firmarDocumento(
         // Crear nuevo documento con el PDF firmado
         const documentoOriginal = firma.solicitudes_firma.documentos;
         const nombreDocumentoFirmado = documentoOriginal.nombre.replace(/\.pdf$/i, '_firmado.pdf');
-        
+
+        // Crear documento firmado global (mantiene el empleadoId del original si existe)
         const nuevoDocumentoFirmado = await prisma.documentos.create({
           data: {
             empresaId: documentoOriginal.empresaId,
@@ -458,6 +459,63 @@ export async function firmarDocumento(
             hashDocumento: generarHashDocumento(pdfConMarcas),
           },
         });
+
+        // Si el documento original NO tenía empleado asignado (era global),
+        // crear copias individuales del documento firmado para cada firmante
+        if (!documentoOriginal.empleadoId && firmasCompletadas.length > 0) {
+          // Obtener empleados de las firmas
+          const firmasConEmpleado = await prisma.firmas.findMany({
+            where: {
+              solicitudFirmaId: firma.solicitudFirmaId,
+              firmado: true,
+            },
+            select: {
+              empleadoId: true,
+              empleado: {
+                select: {
+                  id: true,
+                  nombre: true,
+                  apellidos: true,
+                },
+              },
+            },
+          });
+
+          // Crear una copia individual para cada empleado que firmó
+          for (const firmaConEmpleado of firmasConEmpleado) {
+            // Buscar carpeta individual del empleado del mismo tipo
+            const carpetaIndividual = await prisma.carpetas.findFirst({
+              where: {
+                empresaId: documentoOriginal.empresaId,
+                empleadoId: firmaConEmpleado.empleadoId,
+                nombre: documentoOriginal.tipoDocumento,
+                esSistema: true,
+              },
+            });
+
+            // Si no existe carpeta individual, usar la misma carpeta del documento original
+            const carpetaIdDestino = carpetaIndividual?.id || documentoOriginal.carpetaId;
+
+            // Crear documento individual asignado al empleado
+            await prisma.documentos.create({
+              data: {
+                empresaId: documentoOriginal.empresaId,
+                empleadoId: firmaConEmpleado.empleadoId,
+                carpetaId: carpetaIdDestino,
+                nombre: nombreDocumentoFirmado,
+                tipoDocumento: documentoOriginal.tipoDocumento,
+                mimeType: 'application/pdf',
+                tamano: pdfConMarcas.length,
+                s3Key: pdfFirmadoS3Key, // Mismo S3Key - documento compartido
+                s3Bucket: documentoOriginal.s3Bucket,
+                firmado: true,
+                firmadoEn: ahora,
+                generadoDesdePlantilla: documentoOriginal.generadoDesdePlantilla,
+                hashDocumento: generarHashDocumento(pdfConMarcas),
+              },
+            });
+          }
+        }
 
         // Si el documento original fue generado desde plantilla, actualizar la referencia
         const docGenerado = await prisma.documentosGenerado.findUnique({

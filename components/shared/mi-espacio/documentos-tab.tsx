@@ -1,10 +1,11 @@
 'use client';
 
+import { FileText, Folder } from 'lucide-react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { type CarpetaCardData, CarpetasGrid } from '@/components/shared/carpetas-grid';
-import { FirmasCardCompact } from '@/components/firma/firmas-card-compact';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 import type { MiEspacioCarpeta, MiEspacioEmpleado } from '@/types/empleado';
 
@@ -89,48 +90,53 @@ export function DocumentosTab({ empleado }: DocumentosTabProps) {
 
   return (
     <div className="space-y-4 sm:space-y-6">
-      {/* Firmas Card - compacto en mobile */}
-      <div className="sm:mt-2">
-        <FirmasCardCompact />
-      </div>
+      <Tabs
+        value={activeDocTab}
+        onValueChange={(value) => handleChangeTab(value as DocumentosTabKey)}
+        className="flex-1 flex flex-col min-h-0"
+      >
+        <div className="mb-3">
+          {/* Mobile: Full width con iconos | Desktop: Solo ancho del contenido sin iconos */}
+          <TabsList className="grid w-full grid-cols-2 gap-2 sm:inline-flex sm:w-auto">
+            <TabsTrigger value="personales" className="text-sm">
+              <Folder className="h-4 w-4 mr-2 sm:hidden" />
+              Personales
+            </TabsTrigger>
+            <TabsTrigger value="compartidos" className="text-sm">
+              <FileText className="h-4 w-4 mr-2 sm:hidden" />
+              Compartidos
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
-      {/* Toggle Personales/Compartidos */}
-      <div className="inline-flex flex-wrap items-center gap-2 rounded-2xl border border-gray-200/80 bg-white/60 p-1 shadow-sm">
-        <button
-          onClick={() => handleChangeTab('personales')}
-          className={`rounded-xl px-4 py-2 text-sm font-medium transition ${
-            activeDocTab === 'personales'
-              ? 'bg-gray-900 text-white shadow-sm'
-              : 'text-gray-600 hover:text-gray-900'
-          }`}
-        >
-          Personales
-        </button>
-        <button
-          onClick={() => handleChangeTab('compartidos')}
-          className={`rounded-xl px-4 py-2 text-sm font-medium transition ${
-            activeDocTab === 'compartidos'
-              ? 'bg-gray-900 text-white shadow-sm'
-              : 'text-gray-600 hover:text-gray-900'
-          }`}
-        >
-          Compartidos
-        </button>
-      </div>
+        <TabsContent value="personales" className="flex-1 min-h-0 mt-0">
+          <div className="space-y-4">
+          <p className="text-sm font-medium text-gray-600">
+            {`${carpetasPersonales.length} ${carpetasPersonales.length === 1 ? 'carpeta personal' : 'carpetas personales'}`}
+          </p>
+          <CarpetasGrid
+            carpetas={carpetasVisibles}
+            onCarpetaClick={handleCarpetaClick}
+            emptyStateTitle={emptyStateConfig.title}
+            emptyStateDescription={emptyStateConfig.description}
+          />
+        </div>
+      </TabsContent>
 
-      <div className="space-y-4">
-        <p className="text-sm font-medium text-gray-600">
-          {activeDocTab === 'personales'
-            ? `${carpetasPersonales.length} ${carpetasPersonales.length === 1 ? 'carpeta personal' : 'carpetas personales'}`
-            : `${carpetasCompartidas.length} ${carpetasCompartidas.length === 1 ? 'carpeta compartida' : 'carpetas compartidas'}`}
-        </p>
-        <CarpetasGrid
-          carpetas={carpetasVisibles}
-          onCarpetaClick={handleCarpetaClick}
-          emptyStateTitle={emptyStateConfig.title}
-          emptyStateDescription={emptyStateConfig.description}
-        />
-      </div>
+      <TabsContent value="compartidos" className="flex-1 min-h-0 mt-0">
+        <div className="space-y-4">
+          <p className="text-sm font-medium text-gray-600">
+            {`${carpetasCompartidas.length} ${carpetasCompartidas.length === 1 ? 'carpeta compartida' : 'carpetas compartidas'}`}
+          </p>
+          <CarpetasGrid
+            carpetas={carpetasVisibles}
+            onCarpetaClick={handleCarpetaClick}
+            emptyStateTitle={emptyStateConfig.title}
+            emptyStateDescription={emptyStateConfig.description}
+          />
+        </div>
+      </TabsContent>
+    </Tabs>
     </div>
   );
 }

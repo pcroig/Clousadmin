@@ -22,31 +22,48 @@ export default async function CompanySettingsPage() {
     redirect('/hr/dashboard');
   }
 
-  const empresa = await prisma.empresas.findUnique({
-    where: { id: session.user.empresaId },
-    select: {
-      id: true,
-      nombre: true,
-      cif: true,
-      email: true,
-      telefono: true,
-      createdAt: true,
-      usuarios: {
-        where: { rol: UsuarioRol.hr_admin },
-        select: {
-          id: true,
-          nombre: true,
-          apellidos: true,
-          email: true,
-          activo: true,
-          ultimoAcceso: true,
-        },
-        orderBy: {
-          nombre: 'asc',
+  const [empresa, sedes] = await Promise.all([
+    prisma.empresas.findUnique({
+      where: { id: session.user.empresaId },
+      select: {
+        id: true,
+        nombre: true,
+        cif: true,
+        email: true,
+        telefono: true,
+        createdAt: true,
+        usuarios: {
+          where: { rol: UsuarioRol.hr_admin },
+          select: {
+            id: true,
+            nombre: true,
+            apellidos: true,
+            email: true,
+            activo: true,
+            ultimoAcceso: true,
+          },
+          orderBy: {
+            nombre: 'asc',
+          },
         },
       },
-    },
-  });
+    }),
+    prisma.sedes.findMany({
+      where: {
+        empresaId: session.user.empresaId,
+        activo: true,
+      },
+      select: {
+        id: true,
+        nombre: true,
+        ciudad: true,
+        activo: true,
+      },
+      orderBy: {
+        nombre: 'asc',
+      },
+    }),
+  ]);
 
   if (!empresa) {
     redirect('/hr/dashboard');
@@ -62,6 +79,7 @@ export default async function CompanySettingsPage() {
         createdAt: empresa.createdAt,
         hrAdmins: empresa.usuarios,
       }}
+      sedes={sedes}
     />
   );
 }

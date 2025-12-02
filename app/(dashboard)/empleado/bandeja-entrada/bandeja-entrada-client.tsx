@@ -24,7 +24,6 @@ interface Solicitud {
 interface Notificacion {
   id: string;
   tipo: 'aprobada' | 'rechazada' | 'pendiente' | 'info';
-  titulo: string;
   mensaje: string;
   fecha: Date;
   leida: boolean;
@@ -265,8 +264,7 @@ export function BandejaEntradaEmpleadoClient({
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-gray-900">{notif.titulo}</p>
-                        <p className="text-sm text-gray-600 mt-1">{notif.mensaje}</p>
+                        <p className="text-sm text-gray-900">{notif.mensaje}</p>
                         {renderAccion(notif.metadata)}
                       </div>
                       {!notif.leida && (

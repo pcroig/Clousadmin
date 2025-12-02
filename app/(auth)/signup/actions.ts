@@ -137,6 +137,25 @@ export async function signupEmpresaAction(
         data: { empleadoId: empleado.id },
       });
 
+      // 5. Crear equipo "Admin" por defecto y asignar al HR admin
+      const equipoAdmin = await tx.equipos.create({
+        data: {
+          nombre: 'Admin',
+          descripcion: 'Equipo de administración de recursos humanos',
+          empresaId: empresa.id,
+          managerId: empleado.id,
+        },
+      });
+
+      // Asignar el HR admin al equipo Admin
+      await tx.empleado_equipos.create({
+        data: {
+          empleadoId: empleado.id,
+          equipoId: equipoAdmin.id,
+          fechaIncorporacion: new Date(),
+        },
+      });
+
       if (validatedData.consentimientoTratamiento) {
         await tx.consentimientos.create({
           data: {

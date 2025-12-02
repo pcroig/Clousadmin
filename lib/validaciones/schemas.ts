@@ -169,7 +169,7 @@ export const ausenciaCreateSchema = z.object({
   periodo: z.enum(['manana', 'tarde']).optional(), // Solo cuando medioDia=true
   motivo: z.string().optional(),
   justificanteUrl: z.string().url().optional(),
-  documentoId: z.string().uuid().optional(), // ID del documento justificante
+  documentoId: z.string().uuid().optional().or(z.literal('')).transform(val => val === '' ? undefined : val), // ID del documento justificante
   diasIdeales: z.array(z.string()).optional(),
   diasPrioritarios: z.array(z.string()).optional(),
   diasAlternativos: z.array(z.string()).optional(),

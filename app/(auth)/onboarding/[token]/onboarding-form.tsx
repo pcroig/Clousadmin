@@ -1334,77 +1334,109 @@ export function OnboardingForm({
             </div>
           ) : (
             <div className="space-y-6">
-              {/* Lista de documentos requeridos */}
-              {documentosRequeridos.length > 0 && (
+              {/* Documentos para visualizar/descargar */}
+              {documentosRequeridos.filter((d) => d.tipo === 'visualizar').length > 0 && (
                 <div className="space-y-4">
-                  <h3 className="font-medium">Documentos requeridos:</h3>
-                  {documentosRequeridos.map((docReq: DocumentoRequeridoUI) => {
-                    const docSubido = documentos.find((d) =>
-                      documentoCumpleRequerimiento(d, docReq)
-                    );
-                    
-                    return (
-                      <div key={docReq.id} className="border rounded-lg p-4">
-                        <div className="flex items-center justify-between mb-3">
-                          <div>
+                  <h3 className="font-medium">Documentos para descargar:</h3>
+                  <div className="space-y-2">
+                    {documentosRequeridos
+                      .filter((d) => d.tipo === 'visualizar')
+                      .map((docReq: DocumentoRequeridoUI) => (
+                        <div key={docReq.id} className="border rounded-lg p-4 bg-blue-50 border-blue-200">
+                          <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
-                              <h4 className="font-medium">{docReq.nombre}</h4>
-                              {docReq.requerido && (
-                                <span className="text-xs font-semibold uppercase text-red-600">
-                                  Obligatorio
-                                </span>
-                              )}
+                              <h4 className="font-medium text-blue-900">{docReq.nombre}</h4>
                             </div>
-                            {docReq.descripcion && (
-                              <p className="text-sm text-gray-600">
-                                {docReq.descripcion}
-                              </p>
-                            )}
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                // Aquí se debería obtener la URL del documento
+                                console.log('Descargar documento:', docReq.documentoId);
+                              }}
+                            >
+                              Descargar
+                            </Button>
                           </div>
-                          {docSubido && (
-                            <span className="text-sm text-green-600 font-medium">
-                              ✓ Subido
-                            </span>
-                          )}
                         </div>
-                        
-                        {!docSubido ? (
-                          <>
-                            <DocumentUploader
-                              onUpload={(file) =>
-                                handleUploadDocumento(
-                                  file,
-                                  docReq.id,
-                                  docReq.nombre,
-                                  docReq.carpetaDestino
-                                )
-                              }
-                              label=""
-                              description="PDF, JPG o PNG (máx. 5MB)"
-                            />
-                            {docReq.carpetaDestino && (
-                              <p className="text-xs text-gray-500 mt-2">
-                                Se guardará en la carpeta &quot;{docReq.carpetaDestino}&quot;.
-                              </p>
-                            )}
-                          </>
-                        ) : (
-                          <div className="bg-green-50 border border-green-200 rounded p-3">
-                            <p className="text-sm text-green-800">
-                              Documento subido correctamente
-                            </p>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
+                      ))}
+                  </div>
                 </div>
               )}
 
-              {/* Documentos ya subidos */}
+              {/* Documentos que el empleado debe subir */}
+              {documentosRequeridos.filter((d) => d.tipo === 'solicitar').length > 0 && (
+                <div className="space-y-4">
+                  <h3 className="font-medium">Documentos a subir:</h3>
+                  {documentosRequeridos
+                    .filter((d) => d.tipo === 'solicitar')
+                    .map((docReq: DocumentoRequeridoUI) => {
+                      const docSubido = documentos.find((d) =>
+                        documentoCumpleRequerimiento(d, docReq)
+                      );
+                      
+                      return (
+                        <div key={docReq.id} className="border rounded-lg p-4 bg-amber-50 border-amber-200">
+                          <div className="flex items-center justify-between mb-3">
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <h4 className="font-medium">{docReq.nombre}</h4>
+                                {docReq.requerido && (
+                                  <span className="text-xs font-semibold uppercase text-red-600">
+                                    Obligatorio
+                                  </span>
+                                )}
+                              </div>
+                              {docReq.descripcion && (
+                                <p className="text-sm text-gray-600">
+                                  {docReq.descripcion}
+                                </p>
+                              )}
+                            </div>
+                            {docSubido && (
+                              <span className="text-sm text-green-600 font-medium">
+                                ✓ Subido
+                              </span>
+                            )}
+                          </div>
+                          
+                          {!docSubido ? (
+                            <>
+                              <DocumentUploader
+                                onUpload={(file) =>
+                                  handleUploadDocumento(
+                                    file,
+                                    docReq.id,
+                                    docReq.nombre,
+                                    docReq.carpetaDestino
+                                  )
+                                }
+                                label=""
+                                description="PDF, JPG o PNG (máx. 5MB)"
+                              />
+                              {docReq.carpetaDestino && (
+                                <p className="text-xs text-gray-500 mt-2">
+                                  Se guardará en la carpeta &quot;{docReq.carpetaDestino}&quot;.
+                                </p>
+                              )}
+                            </>
+                          ) : (
+                            <div className="bg-green-50 border border-green-200 rounded p-3">
+                              <p className="text-sm text-green-800">
+                                Documento subido correctamente
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                </div>
+              )}
+
+              {/* Documentos ya subidos (adicionales) */}
               {documentos.length > 0 && (
                 <div className="space-y-4">
-                  <h3 className="font-medium">Documentos subidos:</h3>
+                  <h3 className="font-medium">Otros documentos subidos:</h3>
                   <DocumentList
                     documentos={documentos}
                     onDownload={(doc) => {

@@ -252,7 +252,9 @@ export function SolicitarAusenciaModal({
           });
 
           if (!uploadResponse.ok) {
-            throw new Error('Error al subir el justificante');
+            const errorData = await uploadResponse.json().catch(() => ({}));
+            const errorMessage = (errorData as { error?: string }).error || 'Error al subir el justificante';
+            throw new Error(errorMessage);
           }
 
           const uploadData = await parseJson<UploadApiResponse>(uploadResponse);

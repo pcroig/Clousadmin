@@ -66,6 +66,17 @@ export async function GET(request: NextRequest) {
     const [notificaciones, total, noLeidas] = await Promise.all([
       prisma.notificaciones.findMany({
         where,
+        select: {
+          id: true,
+          empresaId: true,
+          usuarioId: true,
+          tipo: true,
+          mensaje: true,
+          metadata: true,
+          leida: true,
+          createdAt: true,
+          eventoNominaId: true,
+        },
         orderBy: {
           createdAt: 'desc',
         },

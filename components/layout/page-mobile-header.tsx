@@ -179,61 +179,44 @@ export function PageMobileHeader({
               : 'flex-1'
           )}
         >
-          <h1 className="text-sm font-medium text-gray-900 truncate">{title}</h1>
+          <h1 className="text-[17.6px] leading-[24px] font-medium text-gray-900 truncate">{title}</h1>
           {subtitle && (
             <p className="text-xs text-gray-500 mt-0.5 truncate">{subtitle}</p>
           )}
         </div>
 
-        {/* Right: Actions */}
+        {/* Right: Actions - SOLO ICONOS */}
         {(actions.length > 0 || actionsNode) && (
-          <div className="flex items-center gap-1 ml-auto">
+          <div className="flex items-center gap-2 ml-auto">
             {/* Si hay actionsNode, usarlo directamente */}
             {actionsNode ? (
               actionsNode
             ) : (
               <>
-                {/* Primary action - full button si es especial, sino icon button */}
-                {primaryAction &&
-                  (primaryAction.isSpecialAction ? (
-                    <Button
-                      size="sm"
-                      variant={primaryAction.variant || 'default'}
-                      onClick={primaryAction.onClick}
-                      className="h-8 text-xs px-3 gap-1.5"
-                    >
-                      {primaryAction.icon && <primaryAction.icon className="h-3.5 w-3.5" />}
-                      <span>{primaryAction.label}</span>
-                    </Button>
-                  ) : primaryAction.icon ? (
+                {/* Mostrar hasta 2 iconos principales, resto en menú */}
+                {actions.slice(0, 2).map((action, idx) => (
+                  action.icon && (
                     <button
-                      onClick={primaryAction.onClick}
-                      className="p-2 hover:bg-gray-100 rounded-md transition"
-                      aria-label={primaryAction.label}
+                      key={idx}
+                      onClick={action.onClick}
+                      className="flex items-center justify-center h-6 w-6 hover:bg-gray-100 rounded-md transition"
+                      aria-label={action.label}
                     >
-                      <primaryAction.icon className="h-5 w-5 text-gray-700" />
+                      <action.icon className="h-[17.6px] w-[17.6px] text-gray-700" />
                     </button>
-                  ) : (
-                    <Button
-                      size="sm"
-                      variant={primaryAction.variant || 'default'}
-                      onClick={primaryAction.onClick}
-                      className="h-8 text-xs px-3"
-                    >
-                      <span>{primaryAction.label}</span>
-                    </Button>
-                  ))}
+                  )
+                ))}
 
-                {/* Secondary actions - menu con icon button */}
-                {secondaryActions.length > 0 && (
+                {/* Si hay más de 2 acciones, menú con "..." */}
+                {actions.length > 2 && (
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <button className="p-2 hover:bg-gray-100 rounded-md transition">
-                        <MoreVertical className="h-5 w-5 text-gray-700" />
+                      <button className="flex items-center justify-center h-6 w-6 hover:bg-gray-100 rounded-md transition">
+                        <MoreVertical className="h-[17.6px] w-[17.6px] text-gray-700" />
                       </button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      {secondaryActions.map((action, idx) => (
+                      {actions.slice(2).map((action, idx) => (
                         <DropdownMenuItem key={idx} onClick={action.onClick}>
                           {action.icon && <action.icon className="h-4 w-4 mr-2" />}
                           {action.label}

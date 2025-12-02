@@ -164,21 +164,6 @@ export function EmpleadoDashboardClient({
                 />
               </div>
             )}
-
-            {/* Ausencias Widget - versión mobile simplificada */}
-            <div>
-              <AusenciasWidget
-                diasAcumulados={saldoFinal.diasTotales}
-                diasDisponibles={saldoFinal.diasTotales - Number(saldoFinal.diasUsados)}
-                diasUtilizados={Number(saldoFinal.diasUsados)}
-                diasDesdeHorasCompensadas={saldoFinal.diasDesdeHorasCompensadas}
-                horasCompensadas={saldoFinal.horasCompensadas}
-                proximasAusencias={ausenciasProximas}
-                ausenciasPasadas={ausenciasPasadas}
-                onOpenModal={() => setModalAusencia(true)}
-                onClickAusencia={handleClickAusencia}
-              />
-            </div>
           </div>
 
           {/* DESKTOP Grid Layout */}
@@ -197,7 +182,7 @@ export function EmpleadoDashboardClient({
               />
             </div>
 
-            {/* Ausencias Widget */}
+            {/* Ausencias Widget - Solo Desktop */}
             <div className="row-span-1 lg:row-span-2 min-h-[480px] h-full">
               <AusenciasWidget
                 diasAcumulados={saldoFinal.diasTotales}

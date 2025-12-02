@@ -993,8 +993,7 @@ model notificaciones {
   empresaId      String
   usuarioId      String
   tipo           String          @db.VarChar(50)
-  titulo         String          @db.VarChar(255)
-  mensaje        String
+  mensaje        String          @db.Text
   metadata       Json?
   leida          Boolean         @default(false)
   createdAt      DateTime        @default(now())

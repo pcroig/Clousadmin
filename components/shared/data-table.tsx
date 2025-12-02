@@ -255,7 +255,7 @@ export function AvatarCell({
           'font-medium block truncate',
           compact && 'text-xs sm:text-sm'
         )}>
-          {resolvedNombre}
+          {apellidos ? `${resolvedNombre} ${apellidos}` : resolvedNombre}
         </span>
         {subtitle && (
           <span className={cn(

@@ -84,18 +84,14 @@ interface JornadaDia {
 
 const ESTADO_OPTIONS: FilterOption[] = [
   { value: 'en_curso', label: 'En curso' },
-  { value: 'finalizado', label: 'Finalizado' },
-  { value: 'revisado', label: 'Revisado' },
   { value: 'pendiente', label: 'Pendiente' },
+  { value: 'finalizado', label: 'Finalizado' },
 ];
 
 const FICHAJE_ESTADO_VARIANTS: Record<string, { label: string; className: string }> = {
   en_curso: { label: 'En curso', className: 'bg-blue-100 text-blue-800' },
-  finalizado: { label: 'Finalizado', className: 'bg-gray-100 text-gray-800' },
-  revisado: { label: 'Revisado', className: 'bg-green-100 text-green-800' },
   pendiente: { label: 'Pendiente', className: 'bg-yellow-100 text-yellow-800' },
-  rechazado: { label: 'Rechazado', className: 'bg-red-100 text-red-800' },
-  pendiente_revision: { label: 'Pendiente Rev.', className: 'bg-orange-100 text-orange-800' },
+  finalizado: { label: 'Finalizado', className: 'bg-gray-100 text-gray-800' },
 };
 
 const getFichajeEstadoLabel = (estado: string): string =>
@@ -277,15 +273,6 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
     }).sort((a, b) => b.fecha.getTime() - a.fecha.getTime());
   }, [calcularHorasTrabajadas, obtenerFechaReferencia]);
 
-  // Listener para refrescar en tiempo real
-  useEffect(() => {
-    function handleRealtimeUpdate() {
-      fetchFichajes();
-    }
-    window.addEventListener('fichaje-updated', handleRealtimeUpdate);
-    return () => window.removeEventListener('fichaje-updated', handleRealtimeUpdate);
-  }, []);
-
   const fetchFichajes = useCallback(async () => {
     setLoading(true);
     try {
@@ -332,6 +319,15 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
     fetchFichajes();
   }, [fetchFichajes]);
 
+  // Listener para refrescar en tiempo real
+  useEffect(() => {
+    function handleRealtimeUpdate() {
+      fetchFichajes();
+    }
+    window.addEventListener('fichaje-updated', handleRealtimeUpdate);
+    return () => window.removeEventListener('fichaje-updated', handleRealtimeUpdate);
+  }, [fetchFichajes]);
+
   const goToPreviousPeriod = useCallback(() => {
     const nuevaFecha = new Date(fechaBase);
     if (rangoFechas === 'dia') {
@@ -360,8 +356,18 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
     switch (rangoFechas) {
       case 'dia':
         return format(fechaBase, 'dd MMM', { locale: es });
-      case 'semana':
-        return `Sem ${format(fechaBase, 'w', { locale: es })}`;
+      case 'semana': {
+        const { inicio, fin } = calcularRangoFechas(fechaBase, 'semana');
+        const mesInicio = format(inicio, 'MMM', { locale: es });
+        const mesFin = format(fin, 'MMM', { locale: es });
+        const anio = format(fin, 'yyyy', { locale: es });
+
+        if (mesInicio === mesFin) {
+          return `${mesInicio} ${anio}`;
+        } else {
+          return `${mesInicio} - ${mesFin} ${anio}`;
+        }
+      }
       default:
         return format(fechaBase, 'MMM yyyy', { locale: es });
     }
@@ -383,23 +389,6 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
     
     return filtradas;
   }, [jornadas, busquedaEmpleado]);
-
-  // Stats Counters
-  const fichajesRevisados = useMemo(() =>
-    jornadasFiltradas.filter(j => j.fichaje.estado === 'revisado').length,
-    [jornadasFiltradas]
-  );
-
-  const fichajesPendientesRevision = useMemo(() =>
-    jornadasFiltradas.filter(j =>
-      j.fichaje.estado === EstadoFichaje.pendiente ||
-      j.fichaje.estado === 'pendiente_revision' || // Legacy
-      j.fichaje.estado === EstadoFichaje.en_curso ||
-      j.fichaje.estado === 'rechazado' // Legacy - tratar como pendiente
-    ).length,
-    [jornadasFiltradas]
-  );
-
 
   const resolveEmpleadoHoverInfo = useCallback((jornada: JornadaDia) => {
     const empleado = jornada.fichaje?.empleado;
@@ -670,22 +659,6 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
                       </SelectContent>
                     </Select>
                   </div>
-                  {fichajesRevisados > 0 && (
-                    <div className="flex items-center gap-2 p-3 bg-green-50 rounded-lg">
-                      <Check className="h-4 w-4 text-green-600" />
-                      <span className="text-sm text-green-700 font-medium">
-                        {fichajesRevisados} fichajes revisados
-                      </span>
-                    </div>
-                  )}
-                  {fichajesPendientesRevision > 0 && (
-                    <div className="flex items-center gap-2 p-3 bg-yellow-50 rounded-lg">
-                      <Clock className="h-4 w-4 text-yellow-600" />
-                      <span className="text-sm text-yellow-700 font-medium">
-                        {fichajesPendientesRevision} pendientes de revisión
-                      </span>
-                    </div>
-                  )}
                 </div>
               }
               filtersTitle="Filtros"
@@ -725,20 +698,7 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
               equipoValue={filtroEquipo}
               onEquipoChange={setFiltroEquipo}
               equipoOptions={equiposOptions}
-            >
-              <div className="flex items-center gap-2">
-                {fichajesRevisados > 0 && (
-                  <Badge className="bg-green-50 text-green-700 border border-green-200">
-                    {fichajesRevisados} revisados
-                  </Badge>
-                )}
-                {fichajesPendientesRevision > 0 && (
-                  <Badge className="bg-yellow-100 text-yellow-800">
-                    {fichajesPendientesRevision} pendientes
-                  </Badge>
-                )}
-              </div>
-            </DataFilters>
+            />
 
             <DateRangeControls
               range={rangoFechas}

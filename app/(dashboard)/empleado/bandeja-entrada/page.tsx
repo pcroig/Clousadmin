@@ -7,6 +7,7 @@ import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/auth';
 import { EstadoAusencia, EstadoSolicitud, UsuarioRol } from '@/lib/constants/enums';
 import { prisma, Prisma } from '@/lib/prisma';
+import { formatAusenciaTipo } from '@/lib/utils/formatters';
 
 import { BandejaEntradaEmpleadoClient } from './bandeja-entrada-client';
 
@@ -58,7 +59,7 @@ export default async function EmpleadoBandejaEntradaPage() {
     ...ausencias.map((aus) => ({
       id: aus.id,
       tipo: 'ausencia' as const,
-      titulo: `Ausencia: ${aus.tipo}`,
+      titulo: `Ausencia: ${formatAusenciaTipo(aus.tipo)}`,
       detalles: `${aus.fechaInicio.toLocaleDateString('es-ES')} - ${aus.fechaFin.toLocaleDateString('es-ES')}`,
       estado: aus.estado,
       fechaCreacion: aus.createdAt,
@@ -67,8 +68,8 @@ export default async function EmpleadoBandejaEntradaPage() {
     ...solicitudesCambio.map((sol) => ({
       id: sol.id,
       tipo: 'cambio_datos' as const,
-      titulo: `Cambio de ${sol.tipo}`,
-      detalles: sol.motivo || `Solicitud de cambio de ${sol.tipo}`,
+      titulo: `Cambio de ${formatAusenciaTipo(sol.tipo)}`,
+      detalles: sol.motivo || `Solicitud de cambio de ${formatAusenciaTipo(sol.tipo)}`,
       estado:
         sol.estado === EstadoSolicitud.aprobada_manual || sol.estado === EstadoSolicitud.auto_aprobada
           ? EstadoAusencia.confirmada
@@ -85,6 +86,17 @@ export default async function EmpleadoBandejaEntradaPage() {
     where: {
       usuarioId: session.user.id,
       empresaId: session.user.empresaId,
+    },
+    select: {
+      id: true,
+      empresaId: true,
+      usuarioId: true,
+      tipo: true,
+      mensaje: true,
+      metadata: true,
+      leida: true,
+      createdAt: true,
+      eventoNominaId: true,
     },
     orderBy: {
       createdAt: 'desc',
@@ -127,7 +139,6 @@ export default async function EmpleadoBandejaEntradaPage() {
     return {
       id: notif.id,
       tipo: tipoUI,
-      titulo: notif.titulo,
       mensaje: notif.mensaje,
       fecha: notif.createdAt,
       leida: notif.leida,

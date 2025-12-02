@@ -479,8 +479,7 @@ export const documentosWorker = new Worker(
         empresaId: config.empresaId,
         usuarioId: config.solicitadoPor,
         tipo: exitosos === total ? 'success' : fallidos > 0 ? 'warning' : 'info',
-        titulo: 'Generación de documentos completada',
-        mensaje: `Se generaron ${exitosos} documentos exitosamente${fallidos > 0 ? `, ${fallidos} fallidos` : ''}.`,
+        mensaje: `Se han generado ${exitosos} documento${exitosos !== 1 ? 's' : ''} exitosamente${fallidos > 0 ? ` (${fallidos} fallido${fallidos !== 1 ? 's' : ''})` : ''}`,
         metadata: {
           jobId,
           totalEmpleados: total,
@@ -559,8 +558,7 @@ documentosWorker.on('failed', async (job, error) => {
         empresaId: config.empresaId,
         usuarioId: config.solicitadoPor,
         tipo: 'error',
-        titulo: 'Error en generación de documentos',
-        mensaje: `Ocurrió un error al generar los documentos: ${error.message}`,
+        mensaje: `Error al generar los documentos: ${error.message}`,
         metadata: {
           jobId: config.jobId,
           error: error.message,

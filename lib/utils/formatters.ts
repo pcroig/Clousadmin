@@ -155,14 +155,29 @@ export function extraerHoraDeISO(isoString: string | null | undefined): string |
   if (!isoString || typeof isoString !== 'string' || isoString.length < 16) {
     return null;
   }
-  
+
   // Verificar que tiene el formato básico de ISO string (contiene 'T')
   if (!isoString.includes('T')) {
     return null;
   }
-  
+
   // Extraer la parte de hora (caracteres 11-16: "HH:mm")
   return isoString.substring(11, 16);
+}
+
+/**
+ * Formatea el tipo de ausencia para mostrar en UI
+ * Convierte guiones bajos y guiones a espacios y capitaliza
+ * Ejemplo: "enfermedad_familiar" → "Enfermedad familiar"
+ */
+export function formatAusenciaTipo(tipo: string): string {
+  if (!tipo) return '';
+
+  // Reemplazar guiones bajos y guiones con espacios
+  const conEspacios = tipo.replace(/[_-]+/g, ' ');
+
+  // Capitalizar la primera letra y convertir el resto a minúsculas
+  return conEspacios.charAt(0).toUpperCase() + conEspacios.slice(1).toLowerCase();
 }
 
 

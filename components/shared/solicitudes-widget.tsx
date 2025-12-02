@@ -129,16 +129,72 @@ export const SolicitudesWidget = memo(function SolicitudesWidget({
     [ejecutarAccion]
   );
 
+  const handleAprobarTodas = useCallback(async () => {
+    if (solicitudes.length === 0) return;
+
+    const confirmacion = window.confirm(
+      `¿Estás seguro de que quieres aprobar todas las ${solicitudes.length} solicitudes pendientes?`
+    );
+
+    if (!confirmacion) return;
+
+    setAccionEnCurso({ id: 'todas', accion: 'aprobar' });
+    let aprobadas = 0;
+    let errores = 0;
+
+    for (const solicitud of solicitudes) {
+      try {
+        const resultado = await ejecutarAccionSolicitud({
+          solicitudId: solicitud.id,
+          tipo: solicitud.tipo,
+          accion: 'aprobar',
+        });
+
+        if (resultado.ok) {
+          aprobadas++;
+        } else {
+          errores++;
+        }
+      } catch (error) {
+        console.error('[SolicitudesWidget] Error al aprobar solicitud:', error);
+        errores++;
+      }
+    }
+
+    setAccionEnCurso(null);
+
+    if (aprobadas > 0) {
+      toast.success(`${aprobadas} solicitudes aprobadas correctamente`);
+    }
+    if (errores > 0) {
+      toast.error(`${errores} solicitudes no pudieron ser aprobadas`);
+    }
+
+    router.refresh();
+  }, [solicitudes, router]);
+
   return (
     <WidgetCard
       title="Solicitudes"
       href={dashboardHref}
       badge={solicitudes.length > 0 ? solicitudes.length : undefined}
       useScroll
+      headerAction={
+        solicitudes.length > 0 ? (
+          <button
+            onClick={handleAprobarTodas}
+            disabled={accionEnCurso !== null}
+            className="px-2 py-1 text-[11px] sm:text-xs font-medium text-gray-700 border border-gray-300 bg-white hover:bg-gray-50 rounded-md transition-colors disabled:opacity-50 disabled:pointer-events-none"
+            title="Aprobar todas"
+          >
+            Aprobar todas
+          </button>
+        ) : undefined
+      }
     >
       <div className="flex h-full flex-col">
         {solicitudesMostradas.length === 0 ? (
-          <div className="flex flex-1 items-center justify-center">
+          <div className="flex flex-1 items-center justify-center min-h-[200px]">
             <EmptyState
               layout="widget"
               icon={ClipboardList}

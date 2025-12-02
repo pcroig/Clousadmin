@@ -10,10 +10,10 @@ import { useCallback, useState } from 'react';
 
 import { PageLayout } from '@/components/layout/page-layout';
 import { PageMobileHeader } from '@/components/layout/page-mobile-header';
-import { FirmasIconButton } from '@/components/firma/firmas-icon-button';
+import { FirmasDetails } from '@/components/firma/firmas-details';
+import { DetailsPanel } from '@/components/shared/details-panel';
 import { CrearCarpetaConDocumentosModal } from '@/components/hr/crear-carpeta-con-documentos-modal';
 import { PlantillasList } from '@/components/hr/plantillas-list';
-import { SubirDocumentosModal } from '@/components/hr/subir-documentos-modal';
 import { SubirPlantillaModal } from '@/components/hr/subir-plantilla-modal';
 import { type CarpetaCardData, CarpetasGrid } from '@/components/shared/carpetas-grid';
 import { Button } from '@/components/ui/button';
@@ -32,15 +32,17 @@ interface Carpeta {
 
 interface DocumentosClientProps {
   carpetas: Carpeta[];
+  plantillasEnabled: boolean;
 }
 
-export function DocumentosClient({ carpetas }: DocumentosClientProps) {
+export function DocumentosClient({ carpetas, plantillasEnabled }: DocumentosClientProps) {
   const router = useRouter();
   const isMobile = useIsMobile();
-  const [activeTab, setActiveTab] = useState('documentos');
+  const [activeTab, setActiveTab] = useState<'documentos' | 'plantillas'>('documentos');
   const [modalCrearCarpeta, setModalCrearCarpeta] = useState(false);
   const [modalSubirPlantilla, setModalSubirPlantilla] = useState(false);
-  const [modalSubirDocumentos, setModalSubirDocumentos] = useState(false);
+  const [firmasDetailsOpen, setFirmasDetailsOpen] = useState(false);
+  const showPlantillasSection = plantillasEnabled;
 
   const handleAbrirCarpeta = useCallback(
     (carpetaId: string) => {
@@ -57,32 +59,42 @@ export function DocumentosClient({ carpetas }: DocumentosClientProps) {
     numeroDocumentos: c.numeroDocumentos,
   }));
 
+  const handleTabChange = useCallback(
+    (value: string) => {
+      const nextValue: 'documentos' | 'plantillas' = value === 'plantillas' ? 'plantillas' : 'documentos';
+      if (nextValue === 'plantillas' && !plantillasEnabled) {
+        return;
+      }
+      setActiveTab(nextValue);
+    },
+    [plantillasEnabled]
+  );
+
+  const documentosSubtitle = `${carpetas.length} ${carpetas.length === 1 ? 'carpeta' : 'carpetas'}`;
+  const desktopDescription =
+    !showPlantillasSection || activeTab === 'documentos'
+      ? 'Gestiona documentos y carpetas de la empresa'
+      : 'Gestiona plantillas de documentos con variables';
+
   const desktopHeader = (
     <div className="mb-6 flex-shrink-0">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Documentos</h1>
-          <p className="text-sm text-gray-600 mt-1">
-            {activeTab === 'documentos'
-              ? 'Gestiona documentos y carpetas de la empresa'
-              : 'Gestiona plantillas de documentos con variables'}
-          </p>
+          <p className="text-sm text-gray-600 mt-1">{desktopDescription}</p>
         </div>
         <div className="flex items-center gap-3">
-          {/* Icono de Firmas */}
-          <FirmasIconButton isHRView={true} />
+          {/* Botón de Firmas */}
+          <Button variant="outline" onClick={() => setFirmasDetailsOpen(true)}>
+            <FileSignature className="w-4 h-4 mr-2" />
+            Firmas
+          </Button>
 
-          {activeTab === 'documentos' ? (
-            <>
-              <Button variant="outline" onClick={() => setModalCrearCarpeta(true)}>
-                <FolderPlus className="w-4 h-4 mr-2" />
-                Crear Carpeta
-              </Button>
-              <Button variant="default" onClick={() => setModalSubirDocumentos(true)}>
-                <Upload className="w-4 h-4 mr-2" />
-                Subir Documentos
-              </Button>
-            </>
+          {activeTab === 'documentos' || !showPlantillasSection ? (
+            <Button variant="outline" onClick={() => setModalCrearCarpeta(true)}>
+              <FolderPlus className="w-4 h-4 mr-2" />
+              Crear Carpeta
+            </Button>
           ) : (
             <Button variant="default" onClick={() => setModalSubirPlantilla(true)}>
               <Upload className="w-4 h-4 mr-2" />
@@ -102,35 +114,31 @@ export function DocumentosClient({ carpetas }: DocumentosClientProps) {
             <PageMobileHeader
               title="Documentos"
               subtitle={
-                activeTab === 'documentos'
-                  ? `${carpetas.length} ${carpetas.length === 1 ? 'carpeta' : 'carpetas'}`
+                !showPlantillasSection || activeTab === 'documentos'
+                  ? documentosSubtitle
                   : 'Plantillas de documentos'
               }
               actionsNode={
                 <div className="flex items-center gap-1">
-                  {/* Icono de Firmas */}
-                  <FirmasIconButton isHRView={true} />
+                  {/* Botón de Firmas */}
+                  <button
+                    onClick={() => setFirmasDetailsOpen(true)}
+                    className="p-2 hover:bg-gray-100 rounded-md transition"
+                    aria-label="Firmas"
+                  >
+                    <FileSignature className="h-5 w-5 text-gray-700" />
+                  </button>
 
                   {/* Botones según el tab activo */}
-                  {activeTab === 'documentos' ? (
-                    <>
-                      <Button
-                        onClick={() => setModalCrearCarpeta(true)}
-                        size="sm"
-                        className={cn(MOBILE_DESIGN.button.secondary)}
-                      >
-                        <FolderPlus className={cn(MOBILE_DESIGN.components.icon.small, 'mr-2')} />
-                        Crear
-                      </Button>
-                      <Button
-                        onClick={() => setModalSubirDocumentos(true)}
-                        size="sm"
-                        className={cn(MOBILE_DESIGN.button.primary)}
-                      >
-                        <Upload className={cn(MOBILE_DESIGN.components.icon.small, 'mr-2')} />
-                        Subir
-                      </Button>
-                    </>
+                  {activeTab === 'documentos' || !showPlantillasSection ? (
+                    <Button
+                      onClick={() => setModalCrearCarpeta(true)}
+                      size="sm"
+                      className={cn(MOBILE_DESIGN.button.secondary)}
+                    >
+                      <FolderPlus className={cn(MOBILE_DESIGN.components.icon.small, 'mr-2')} />
+                      Crear
+                    </Button>
                   ) : (
                     <Button
                       onClick={() => setModalSubirPlantilla(true)}
@@ -147,11 +155,16 @@ export function DocumentosClient({ carpetas }: DocumentosClientProps) {
 
             <Tabs
               value={activeTab}
-              onValueChange={setActiveTab}
+              onValueChange={handleTabChange}
               className="flex-1 flex flex-col min-h-0"
             >
               <div>
-                <TabsList className="mb-3 grid w-full grid-cols-2 gap-2">
+                <TabsList
+                  className={cn(
+                    'mb-3 grid w-full gap-2',
+                    showPlantillasSection ? 'grid-cols-2' : 'grid-cols-1'
+                  )}
+                >
                   <TabsTrigger
                     value="documentos"
                     className={cn(
@@ -162,16 +175,18 @@ export function DocumentosClient({ carpetas }: DocumentosClientProps) {
                     <Folder className={cn(MOBILE_DESIGN.components.icon.small, 'mr-2')} />
                     Documentos
                   </TabsTrigger>
-                  <TabsTrigger
-                    value="plantillas"
-                    className={cn(
-                      MOBILE_DESIGN.text.bodyMedium,
-                      'data-[state=active]:bg-white'
-                    )}
-                  >
-                    <FileText className={cn(MOBILE_DESIGN.components.icon.small, 'mr-2')} />
-                    Plantillas
-                  </TabsTrigger>
+                  {showPlantillasSection && (
+                    <TabsTrigger
+                      value="plantillas"
+                      className={cn(
+                        MOBILE_DESIGN.text.bodyMedium,
+                        'data-[state=active]:bg-white'
+                      )}
+                    >
+                      <FileText className={cn(MOBILE_DESIGN.components.icon.small, 'mr-2')} />
+                      Plantillas
+                    </TabsTrigger>
+                  )}
                 </TabsList>
               </div>
 
@@ -205,12 +220,14 @@ export function DocumentosClient({ carpetas }: DocumentosClientProps) {
                 </div>
               </TabsContent>
 
-              <TabsContent
-                value="plantillas"
-                className="flex-1 min-h-0 mt-0 overflow-auto"
-              >
-                <PlantillasList />
-              </TabsContent>
+              {showPlantillasSection && (
+                <TabsContent
+                  value="plantillas"
+                  className="flex-1 min-h-0 mt-0 overflow-auto"
+                >
+                  <PlantillasList />
+                </TabsContent>
+              )}
             </Tabs>
           </>
         ) : (
@@ -219,7 +236,7 @@ export function DocumentosClient({ carpetas }: DocumentosClientProps) {
 
             <Tabs
               value={activeTab}
-              onValueChange={setActiveTab}
+              onValueChange={handleTabChange}
               className="flex-1 flex flex-col min-h-0"
             >
               <TabsList className="mb-6 flex-shrink-0 w-fit">
@@ -227,10 +244,12 @@ export function DocumentosClient({ carpetas }: DocumentosClientProps) {
                   <Folder className={cn(MOBILE_DESIGN.components.icon.small, 'mr-2')} />
                   Documentos
                 </TabsTrigger>
-                <TabsTrigger value="plantillas">
-                  <FileText className={cn(MOBILE_DESIGN.components.icon.small, 'mr-2')} />
-                  Plantillas
-                </TabsTrigger>
+                {showPlantillasSection && (
+                  <TabsTrigger value="plantillas">
+                    <FileText className={cn(MOBILE_DESIGN.components.icon.small, 'mr-2')} />
+                    Plantillas
+                  </TabsTrigger>
+                )}
               </TabsList>
 
               <TabsContent value="documentos" className="flex-1 flex flex-col min-h-0 mt-0">
@@ -263,12 +282,14 @@ export function DocumentosClient({ carpetas }: DocumentosClientProps) {
                 </div>
               </TabsContent>
 
-              <TabsContent
-                value="plantillas"
-                className="flex-1 min-h-0 mt-0"
-              >
-                <PlantillasList />
-              </TabsContent>
+              {showPlantillasSection && (
+                <TabsContent
+                  value="plantillas"
+                  className="flex-1 min-h-0 mt-0"
+                >
+                  <PlantillasList />
+                </TabsContent>
+              )}
             </Tabs>
           </>
         )}
@@ -284,22 +305,28 @@ export function DocumentosClient({ carpetas }: DocumentosClientProps) {
       />
 
       {/* Modal Subir Plantilla */}
-      <SubirPlantillaModal
-        open={modalSubirPlantilla}
-        onOpenChange={setModalSubirPlantilla}
-        onSuccess={() => {
-          // Recargar página para mostrar nueva plantilla
-          router.refresh();
-        }}
-      />
+      {showPlantillasSection && (
+        <SubirPlantillaModal
+          open={modalSubirPlantilla}
+          onOpenChange={setModalSubirPlantilla}
+          onSuccess={() => {
+            // Recargar página para mostrar nueva plantilla
+            router.refresh();
+          }}
+        />
+      )}
 
-      <SubirDocumentosModal
-        open={modalSubirDocumentos}
-        onOpenChange={setModalSubirDocumentos}
-        onUploaded={() => {
-          router.refresh();
-        }}
-      />
+      {/* Panel de Firmas */}
+      <DetailsPanel
+        isOpen={firmasDetailsOpen}
+        onClose={() => setFirmasDetailsOpen(false)}
+        title="Firmas"
+      >
+        <FirmasDetails
+          isHRView={true}
+          onClose={() => setFirmasDetailsOpen(false)}
+        />
+      </DetailsPanel>
     </>
   );
 }

@@ -163,10 +163,17 @@ export async function PATCH(
           );
         }
 
+        // FIX: Recalcular horas trabajadas y en pausa antes de aprobar
+        const { calcularHorasTrabajadas, calcularTiempoEnPausa } = await import('@/lib/calculos/fichajes');
+        const horasTrabajadas = calcularHorasTrabajadas(eventos) ?? 0;
+        const horasEnPausa = calcularTiempoEnPausa(eventos);
+
         const actualizado = await prisma.fichajes.update({
           where: { id },
           data: {
             estado: EstadoFichaje.finalizado,
+            horasTrabajadas,
+            horasEnPausa,
           },
         });
 
@@ -188,10 +195,22 @@ export async function PATCH(
 
         return successResponse(actualizado);
       } else if (accion === 'rechazar') {
+        // FIX: También recalcular al rechazar para mantener datos actualizados
+        const eventos = await prisma.fichaje_eventos.findMany({
+          where: { fichajeId: fichaje.id },
+          orderBy: { hora: 'asc' },
+        });
+
+        const { calcularHorasTrabajadas, calcularTiempoEnPausa } = await import('@/lib/calculos/fichajes');
+        const horasTrabajadas = calcularHorasTrabajadas(eventos) ?? 0;
+        const horasEnPausa = calcularTiempoEnPausa(eventos);
+
         const actualizado = await prisma.fichajes.update({
           where: { id },
           data: {
             estado: EstadoFichaje.pendiente, // Rechazado pasa a pendiente
+            horasTrabajadas,
+            horasEnPausa,
           },
         });
 

@@ -274,6 +274,11 @@ Se calcula para:
   - Cuadrar fichajes pendientes
   - Crear nuevos eventos
   - Modificar fichajes desde cualquier flujo
+  - Aprobar/rechazar fichajes (✅ Actualizado 2025-12-02)
+- **Actualización en tiempo real**: ✅ La tabla se actualiza automáticamente mediante eventos `fichaje-updated`
+  - Los cambios se reflejan instantáneamente sin necesidad de refrescar manualmente
+  - El sistema escucha eventos del widget de fichaje y otros componentes
+  - Garantiza que los datos mostrados siempre reflejen el estado actual de la base de datos
 
 ### Renovar Saldo de Horas
 
@@ -405,6 +410,10 @@ enum PeriodoMedioDia {
 
 **Funcionalidad:**
 1. **Listado inteligente**: Muestra fichajes `pendiente` con filtros avanzados (equipo, búsqueda, rango de fechas)
+   - ✅ **Corrección 2025-12-02**: Ahora incluye fichajes del día actual (HOY)
+   - ✅ Lazy recovery procesa desde `offset = 0` (incluye hoy)
+   - ✅ Los empleados que no fichan hoy aparecen inmediatamente en cuadrar
+   - ✅ Fallback robusto si el CRON nocturno falla
 2. **Vista descriptiva**: Para cada fichaje muestra:
    - **Indicador visual**: Icono diferenciando días vacíos (sin eventos) vs incompletos (con eventos parciales)
    - Eventos registrados (si existen) con hora formateada

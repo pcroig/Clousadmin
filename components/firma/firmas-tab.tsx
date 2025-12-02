@@ -1,6 +1,6 @@
 'use client';
 
-import { AlertCircle, FileText, Signature } from 'lucide-react';
+import { AlertCircle, FileText, Plus, Signature } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
 import { Badge } from '@/components/ui/badge';
@@ -9,6 +9,7 @@ import { Spinner } from '@/components/ui/spinner';
 import { parseJson } from '@/lib/utils/json';
 
 import { type FirmaPendiente, FirmarDocumentoDialog } from './firmar-documento-dialog';
+import { SolicitarFirmaDialog } from './solicitar-firma-dialog';
 interface FirmasPendientesResponse {
   firmasPendientes: ApiFirmaPendiente[];
 }
@@ -36,6 +37,7 @@ export function FirmasTab() {
   const [firmas, setFirmas] = useState<FirmaPendiente[]>([]);
   const [selectedFirmaId, setSelectedFirmaId] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [solicitarFirmaOpen, setSolicitarFirmaOpen] = useState(false);
   const [cacheBuster] = useState(() => Date.now());
 
   const cargarFirmas = () => {
@@ -103,28 +105,32 @@ export function FirmasTab() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-base font-semibold text-gray-900">Firmas pendientes</p>
-          <p className="text-sm text-gray-500">
-            Selecciona un documento para revisarlo y firmarlo cuando estés listo.
-          </p>
-        </div>
-        <Badge variant={firmas.length > 0 ? 'default' : 'secondary'}>
-          {firmas.length} pendiente{firmas.length === 1 ? '' : 's'}
-        </Badge>
-      </div>
-
       <div className="grid grid-cols-1 lg:grid-cols-[320px,1fr] gap-4 lg:gap-6">
         <div className="border border-gray-200 rounded-lg bg-white overflow-hidden flex flex-col">
           <div className="px-4 py-3 border-b flex items-center justify-between">
-            <div className="flex items-center gap-2 text-sm font-semibold text-gray-800">
-              <Signature className="w-4 h-4" />
-              Solicitudes
+            <div className="flex items-center gap-2">
+              <Signature className="w-4 h-4 text-gray-800" />
+              <span className="text-sm font-semibold text-gray-800">Firmas pendientes</span>
+              <Badge variant={firmas.length > 0 ? 'default' : 'secondary'} className="text-xs">
+                {firmas.length}
+              </Badge>
             </div>
-            <Button variant="ghost" size="sm" onClick={cargarFirmas}>
-              Refrescar
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  if (selectedFirma) {
+                    setSolicitarFirmaOpen(true);
+                  } else {
+                    window.location.href = '/hr/documentos';
+                  }
+                }}
+              >
+                <Plus className="w-4 h-4 mr-1" />
+                Solicitar
+              </Button>
+            </div>
           </div>
 
           <div className="flex-1 overflow-y-auto divide-y">
@@ -216,6 +222,19 @@ export function FirmasTab() {
           setDialogOpen(false);
         }}
       />
+
+      {selectedFirma && (
+        <SolicitarFirmaDialog
+          open={solicitarFirmaOpen}
+          onOpenChange={setSolicitarFirmaOpen}
+          documentoId={selectedFirma.documento.id}
+          documentoNombre={selectedFirma.documento.nombre}
+          onSuccess={() => {
+            setSolicitarFirmaOpen(false);
+            cargarFirmas();
+          }}
+        />
+      )}
     </div>
   );
 }

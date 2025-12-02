@@ -8,6 +8,7 @@ import { type BandejaEntradaTab, BandejaEntradaTabs } from '@/components/hr/band
 import { getSession } from '@/lib/auth';
 import { EstadoAusencia, EstadoSolicitud, UsuarioRol } from '@/lib/constants/enums';
 import { prisma } from '@/lib/prisma';
+import { formatAusenciaTipo } from '@/lib/utils/formatters';
 
 import type { TipoNotificacion } from '@/lib/notificaciones';
 import type { NotificacionUI } from '@/types/Notificacion';
@@ -167,7 +168,7 @@ export default async function ManagerBandejaEntradaPage(props: {
         fotoUrl: aus.empleado.fotoUrl || undefined,
       },
       tipo: 'ausencia',
-      detalles: `Solicitud de ${aus.tipo}`,
+      detalles: `Solicitud de ${formatAusenciaTipo(aus.tipo)}`,
       fechaCreacion: aus.createdAt,
       estado: EstadoAusencia.pendiente,
       metadata: {
@@ -184,7 +185,7 @@ export default async function ManagerBandejaEntradaPage(props: {
         fotoUrl: sol.empleado.fotoUrl || undefined,
       },
       tipo: 'cambio_datos',
-      detalles: `Solicitud de cambio de ${sol.tipo}`,
+      detalles: `Solicitud de cambio de ${formatAusenciaTipo(sol.tipo)}`,
       fechaCreacion: sol.createdAt,
       estado: EstadoAusencia.pendiente,
       metadata: {
@@ -204,7 +205,7 @@ export default async function ManagerBandejaEntradaPage(props: {
         fotoUrl: aus.empleado.fotoUrl || undefined,
       },
       tipo: 'ausencia',
-      detalles: `Solicitud de ${aus.tipo}`,
+      detalles: `Solicitud de ${formatAusenciaTipo(aus.tipo)}`,
       fechaCreacion: aus.createdAt,
       estado: aus.estado,
       fechaResolucion: aus.aprobadaEn || undefined,
@@ -222,7 +223,7 @@ export default async function ManagerBandejaEntradaPage(props: {
         fotoUrl: sol.empleado.fotoUrl || undefined,
       },
       tipo: 'cambio_datos',
-      detalles: `Solicitud de cambio de ${sol.tipo}`,
+      detalles: `Solicitud de cambio de ${formatAusenciaTipo(sol.tipo)}`,
       fechaCreacion: sol.createdAt,
       estado:
         sol.estado === EstadoSolicitud.aprobada_manual || sol.estado === EstadoSolicitud.auto_aprobada
@@ -338,6 +339,17 @@ export default async function ManagerBandejaEntradaPage(props: {
       usuarioId: session.user.id,
       empresaId: session.user.empresaId,
     },
+    select: {
+      id: true,
+      empresaId: true,
+      usuarioId: true,
+      tipo: true,
+      mensaje: true,
+      metadata: true,
+      leida: true,
+      createdAt: true,
+      eventoNominaId: true,
+    },
     orderBy: {
       createdAt: 'desc',
     },
@@ -347,7 +359,6 @@ export default async function ManagerBandejaEntradaPage(props: {
   const notificaciones: NotificacionUI[] = notificacionesRaw.map((n) => ({
     id: n.id,
     tipo: n.tipo as TipoNotificacion,
-    titulo: n.titulo,
     mensaje: n.mensaje,
     fecha: n.createdAt,
     leida: n.leida,

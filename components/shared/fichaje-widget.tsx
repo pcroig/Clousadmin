@@ -383,38 +383,48 @@ export function FichajeWidget({
 
   return (
     <div className="h-full">
-      {/* Mobile: Todo en una card compacta */}
+      {/* Mobile: Card de fichaje mejorada */}
       <div className="sm:hidden">
-        <div className="bg-white rounded-lg p-3 shadow-sm border border-gray-100 space-y-3">
-          {/* Estado + Crono + Icono */}
-          <div className="flex items-center justify-between">
+        <div className="bg-white rounded-lg p-3 shadow-sm border border-gray-100">
+          {/* Estado + Cronómetro en misma altura */}
+          <div className="flex items-center justify-between mb-3">
+            {/* Izquierda: Icono + Estado + Tiempo restante (vertical) */}
             <div className="flex items-center gap-2">
-              <Clock className="h-4 w-4 text-gray-600" />
-              <div>
-                <div className="text-xs font-medium text-gray-900">{getTituloEstado()}</div>
+              <Clock className="h-4 w-4 text-[#d97757] flex-shrink-0" />
+              <div className="flex flex-col">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs font-semibold text-gray-900">{getTituloEstado()}</span>
+                  {state.status === 'trabajando' && (
+                    <div className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />
+                  )}
+                </div>
                 {state.status === 'trabajando' && (
-                  <div className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse mt-0.5" />
+                  <span className="text-[10px] text-gray-500">
+                    {formatearHorasMinutos(horasPorHacer)} restantes
+                  </span>
                 )}
               </div>
             </div>
-            <div className="text-2xl font-bold text-gray-900">{tiempoTrabajado}</div>
+
+            {/* Derecha: Cronómetro (menos grande, menos bold) */}
+            <div className="text-xl font-medium text-gray-900">{tiempoTrabajado}</div>
           </div>
 
-          {/* Botones de acción - más compactos */}
+          {/* Botones de acción más compactos */}
           <div className="grid grid-cols-2 gap-2">
             {state.status === 'trabajando' ? (
               <>
                 <Button
                   variant="outline"
-                  className="h-11 text-sm font-medium"
+                  className="h-11 text-xs font-medium border-2"
                   onClick={() => handleFichar('pausa_inicio')}
                   disabled={state.loading}
                 >
-                  ⏸ Pausar
+                  Tienda
                 </Button>
                 <Button
                   variant="default"
-                  className="h-11 text-sm font-medium bg-gray-900 hover:bg-gray-800"
+                  className="h-11 text-xs font-medium bg-gray-900 hover:bg-gray-800"
                   onClick={() => handleFichar('salida')}
                   disabled={state.loading}
                 >
@@ -425,15 +435,15 @@ export function FichajeWidget({
               <>
                 <Button
                   variant="default"
-                  className="h-11 text-sm font-medium"
+                  className="h-11 text-xs font-medium"
                   onClick={() => handleFichar('pausa_fin')}
                   disabled={state.loading}
                 >
-                  ▶ Reanudar
+                  Reanudar
                 </Button>
                 <Button
                   variant="outline"
-                  className="h-11 text-sm font-medium"
+                  className="h-11 text-xs font-medium border-2"
                   onClick={() => handleFichar('salida')}
                   disabled={state.loading}
                 >
@@ -443,7 +453,7 @@ export function FichajeWidget({
             ) : (
               <Button
                 variant="default"
-                className="col-span-2 h-11 text-sm font-medium"
+                className="col-span-2 h-11 text-xs font-medium"
                 onClick={() => handleFichar()}
                 disabled={state.loading}
               >

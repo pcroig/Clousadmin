@@ -6,6 +6,7 @@ import { redirect } from 'next/navigation';
 
 import { getSession } from '@/lib/auth';
 import { UsuarioRol } from '@/lib/constants/enums';
+import { PLANTILLAS_ENABLED } from '@/lib/constants/feature-flags';
 import { prisma } from '@/lib/prisma';
 
 import { PlantillaDetailClient } from './plantilla-detail-client';
@@ -17,6 +18,10 @@ export default async function PlantillaDetailPage(context: { params: Promise<{ i
 
   if (!session || session.user.rol !== UsuarioRol.hr_admin) {
     redirect('/login');
+  }
+
+  if (!PLANTILLAS_ENABLED) {
+    redirect('/hr/documentos');
   }
 
   const { id } = await params;
