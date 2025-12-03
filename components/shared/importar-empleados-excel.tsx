@@ -159,6 +159,7 @@ export function ImportarEmpleadosExcel({
   const [error, setError] = useState('');
   const [empleadosExpandidos, setEmpleadosExpandidos] = useState<Set<string>>(new Set());
   const [cargandoEmpleados, setCargandoEmpleados] = useState(false);
+  const [invitarEmpleados, setInvitarEmpleados] = useState(true); // Enviar invitaciones por defecto
   const fileInputRef = useRef<HTMLInputElement>(null);
   const resumenStats = buildResumenStats(previewData);
 
@@ -330,7 +331,7 @@ export function ImportarEmpleadosExcel({
           empleados: data.empleados,
           equiposDetectados: data.equiposDetectados,
           managersDetectados: data.managersDetectados,
-          invitarEmpleados: true,
+          invitarEmpleados, // Usar estado del checkbox
         }),
       });
 

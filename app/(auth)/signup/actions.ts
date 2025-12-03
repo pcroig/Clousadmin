@@ -202,10 +202,8 @@ export async function signupEmpresaAction(
       }
     }
 
-    // 6. Marcar invitación como usada
-    await usarInvitacionSignup(data.token);
-
-    // 7. Crear sesión automáticamente (usuario autenticado tras signup)
+    // 6. Crear sesión automáticamente (usuario autenticado tras signup)
+    // IMPORTANTE: Esto debe ir ANTES de marcar la invitación como usada para evitar estado inconsistente
     await createSession({
       user: {
         id: result.usuario.id,
@@ -219,6 +217,11 @@ export async function signupEmpresaAction(
         activo: result.usuario.activo,
       },
     });
+
+    // 7. Marcar invitación como usada (DESPUÉS de crear sesión exitosamente)
+    // Esto garantiza atomicidad: si createSession falla, la invitación NO se marca como usada
+    // y el usuario puede reintentar sin caer en bucle infinito
+    await usarInvitacionSignup(data.token);
 
     // 8. Mantener sincronizada la entrada en waitlist (si venía de ahí)
     if (waitlistEntry) {
