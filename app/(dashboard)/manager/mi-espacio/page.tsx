@@ -40,7 +40,6 @@ export default async function MiEspacioManagerPage() {
       jornada: {
         select: {
           id: true,
-          nombre: true,
           horasSemanales: true,
         },
       },

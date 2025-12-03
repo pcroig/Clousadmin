@@ -49,7 +49,6 @@ export const empleadoSelectDashboard = Prisma.validator<Prisma.empleadosSelect>(
   jornada: {
     select: {
       id: true,
-      nombre: true,
       horasSemanales: true,
     },
   },
@@ -111,7 +110,6 @@ export const empleadoSelectListado = Prisma.validator<Prisma.empleadosSelect>()(
 
 export const jornadaSelectResumida = Prisma.validator<Prisma.jornadasSelect>()({
   id: true,
-  nombre: true,
   horasSemanales: true,
 });
 

@@ -63,7 +63,7 @@ export async function PATCH(req: NextRequest) {
     const limitesGlobales = limitesValidation.data;
 
     // Get current empresa config
-    const empresa = await prisma.empresa.findUnique({
+    const empresa = await prisma.empresas.findUnique({
       where: { id: session.user.empresaId },
       select: { config: true },
     });
@@ -85,7 +85,7 @@ export async function PATCH(req: NextRequest) {
       ...(limitesGlobales.limiteSuperiorFichaje && { limiteSuperiorFichaje: limitesGlobales.limiteSuperiorFichaje }),
     };
 
-    await prisma.empresa.update({
+    await prisma.empresas.update({
       where: { id: session.user.empresaId },
       data: {
         config: asJsonValue(nuevaConfig),

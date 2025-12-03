@@ -22,7 +22,6 @@ export default async function EmpleadoFichajesPage() {
       jornada: {
         select: {
           id: true,
-          nombre: true,
           horasSemanales: true,
         },
       },

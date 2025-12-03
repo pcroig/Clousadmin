@@ -11,6 +11,7 @@ import { CalendarioFestivos } from '@/components/hr/calendario-festivos';
 import { ListaFestivos } from '@/components/hr/lista-festivos';
 import { Button } from '@/components/ui/button';
 import { Field, FieldLabel } from '@/components/ui/field';
+import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { parseJson } from '@/lib/utils/json';
 import { type Festivo, type FestivoEditorState } from '@/types/festivos';

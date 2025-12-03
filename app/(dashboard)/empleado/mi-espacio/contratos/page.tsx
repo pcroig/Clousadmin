@@ -38,7 +38,6 @@ export default async function MiEspacioContratosPage() {
       jornada: {
         select: {
           id: true,
-          nombre: true,
           horasSemanales: true,
         },
       },
