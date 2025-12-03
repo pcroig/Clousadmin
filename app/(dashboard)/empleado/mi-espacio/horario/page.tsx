@@ -10,7 +10,7 @@ import { prisma } from '@/lib/prisma';
 
 import { HorarioMiEspacioClient } from './horario-mi-espacio-client';
 
-import type { Ausencia } from '@prisma/client';
+import type { ausencias } from '@prisma/client';
 
 export default async function HorarioMiEspacioPage() {
   const session = await getSession();
@@ -34,7 +34,7 @@ export default async function HorarioMiEspacioPage() {
   }
 
   // Obtener fichajes recientes con sus eventos
-  const fichajesRaw = await prisma.fichaje.findMany({
+  const fichajesRaw = await prisma.fichajes.findMany({
     where: {
       empleadoId: session.user.empleadoId,
     },
@@ -59,7 +59,7 @@ export default async function HorarioMiEspacioPage() {
   }));
 
   // Obtener ausencias recientes
-  const ausenciasRaw = await prisma.ausencia.findMany({
+  const ausenciasRaw = await prisma.ausencias.findMany({
     where: {
       empleadoId: session.user.empleadoId,
     },
@@ -69,7 +69,7 @@ export default async function HorarioMiEspacioPage() {
     take: 10,
   });
 
-  const ausencias = ausenciasRaw.map((a: Ausencia) => ({
+  const ausencias = ausenciasRaw.map((a: ausencias) => ({
     ...a,
     diasSolicitados: a.diasSolicitados != null ? Number(a.diasSolicitados) : 0,
   }));

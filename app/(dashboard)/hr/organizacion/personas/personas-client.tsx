@@ -9,16 +9,15 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
 import { CompactFilterBar } from '@/components/adaptive/CompactFilterBar';
-import { MobileActionBar } from '@/components/adaptive/MobileActionBar';
-import { ResponsiveContainer } from '@/components/adaptive/ResponsiveContainer';
 import { DenunciasDetails } from '@/components/hr/denuncias-details';
 import { GestionarOnboardingModal } from '@/components/hr/gestionar-onboarding-modal';
+import { PageMobileHeader } from '@/components/layout/page-mobile-header';
 import { AddPersonaDialog } from '@/components/organizacion/add-persona-dialog';
 import { AvatarCell, Column, DataTable } from '@/components/shared/data-table';
 import { DetailsPanel } from '@/components/shared/details-panel';
+import { ExpandableSearch } from '@/components/shared/expandable-search';
 import { TableHeader } from '@/components/shared/table-header';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { useIsMobile } from '@/lib/hooks/use-viewport';
 
 
@@ -146,17 +145,18 @@ export function PersonasClient({ empleados, initialPanel, initialDenunciaId }: P
   ];
 
   return (
-    <ResponsiveContainer variant="page" className="h-full w-full flex flex-col overflow-hidden">
+    <div className="h-full w-full flex flex-col px-1 py-1 sm:max-w-[1800px] sm:mx-auto sm:px-8 sm:py-6">
       {isMobile ? (
         <>
-          <MobileActionBar
+          <PageMobileHeader
             title="Personas"
-            primaryAction={{
-              icon: Plus,
-              label: 'Añadir persona',
-              onClick: () => setAddPersonaDialogOpen(true),
-            }}
-            secondaryActions={[
+            actions={[
+              {
+                icon: Plus,
+                label: 'Añadir persona',
+                onClick: () => setAddPersonaDialogOpen(true),
+                isPrimary: true,
+              },
               {
                 icon: Flag,
                 label: 'Canal de denuncias',
@@ -168,7 +168,6 @@ export function PersonasClient({ empleados, initialPanel, initialDenunciaId }: P
                 onClick: () => setGestionarOnboardingOpen(true),
               },
             ]}
-            className="mb-3"
           />
 
           {/* Búsqueda */}
@@ -177,6 +176,17 @@ export function PersonasClient({ empleados, initialPanel, initialDenunciaId }: P
               searchValue={searchTerm}
               onSearchChange={setSearchTerm}
               searchPlaceholder="Buscar por nombre, email..."
+            />
+          </div>
+
+          {/* Table */}
+          <div className="flex-1 min-h-0 overflow-y-auto">
+            <DataTable
+              columns={columns}
+              data={empleadosFiltrados}
+              onRowClick={(row) => router.push(`/hr/organizacion/personas/${row.id}`)}
+              getRowId={(row) => row.id}
+              emptyMessage="No hay personas registradas"
             />
           </div>
         </>
@@ -193,39 +203,38 @@ export function PersonasClient({ empleados, initialPanel, initialDenunciaId }: P
               onClick: () => setGestionarOnboardingOpen(true),
               variant: 'outline',
             }}
+            rightContent={(
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setDenunciasDetailsOpen(true)}
+                  className="gap-2"
+                >
+                  <Flag className="h-4 w-4" />
+                  <span>Canal de denuncias</span>
+                </Button>
+                <ExpandableSearch
+                  value={searchTerm}
+                  onChange={setSearchTerm}
+                  placeholder="Buscar persona..."
+                />
+              </div>
+            )}
           />
-          <div className="flex items-center justify-between mb-6 gap-4">
-            <div className="flex items-center gap-3 flex-1">
-              <Input
-                placeholder="Buscar persona..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-[240px]"
-              />
-            </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setDenunciasDetailsOpen(true)}
-              className="rounded-lg"
-              title="Canal de denuncias"
-            >
-              <Flag className="h-4 w-4" />
-            </Button>
+
+          {/* Desktop table */}
+          <div className="flex-1 overflow-y-auto">
+            <DataTable
+              columns={columns}
+              data={empleadosFiltrados}
+              onRowClick={(row) => router.push(`/hr/organizacion/personas/${row.id}`)}
+              getRowId={(row) => row.id}
+              emptyMessage="No hay personas registradas"
+            />
           </div>
         </>
       )}
-
-      {/* Content */}
-      <div className="flex-1 min-h-0">
-        <DataTable
-          columns={columns}
-          data={empleadosFiltrados}
-          onRowClick={(row) => router.push(`/hr/organizacion/personas/${row.id}`)}
-          getRowId={(row) => row.id}
-          emptyMessage="No hay personas registradas"
-        />
-      </div>
 
       {/* Dialog para añadir persona */}
       <AddPersonaDialog
@@ -254,6 +263,6 @@ export function PersonasClient({ empleados, initialPanel, initialDenunciaId }: P
           initialDenunciaId={initialDenunciaId}
         />
       </DetailsPanel>
-    </ResponsiveContainer>
+    </div>
   );
 }

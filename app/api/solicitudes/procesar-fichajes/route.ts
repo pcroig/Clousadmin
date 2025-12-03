@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
     console.info('[Procesar Fichajes] Iniciando procesamiento de solicitudes pendientes');
 
     // Buscar solicitudes de fichaje manual pendientes
-    const solicitudesPendientes = await prisma.solicitudCambio.findMany({
+    const solicitudesPendientes = await prisma.solicitudes_cambio.findMany({
       where: {
         tipo: 'fichaje_manual',
         estado: EstadoSolicitud.pendiente,
@@ -105,7 +105,7 @@ export async function POST(request: NextRequest) {
         console.info(`[Procesar Fichajes] Procesando solicitud ${solicitud.id}: ${tipo} a las ${horaCompleta.toISOString()}`);
 
         // 1. Buscar o crear fichaje del día
-        let fichaje = await prisma.fichaje.findUnique({
+        let fichaje = await prisma.fichajes.findUnique({
           where: {
             empleadoId_fecha: {
               empleadoId: solicitud.empleadoId,
@@ -123,7 +123,7 @@ export async function POST(request: NextRequest) {
 
         if (!fichaje) {
           console.info(`[Procesar Fichajes] Creando nuevo fichaje para ${solicitud.empleado.nombre} ${solicitud.empleado.apellidos}`);
-          fichaje = await prisma.fichaje.create({
+          fichaje = await prisma.fichajes.create({
             data: {
               empresaId: solicitud.empleado.empresaId,
               empleadoId: solicitud.empleadoId,
@@ -137,7 +137,7 @@ export async function POST(request: NextRequest) {
         }
 
         // 2. Crear evento
-        await prisma.fichajeEvento.create({
+        await prisma.fichaje_eventos.create({
           data: {
             fichajeId: fichaje.id,
             tipo: tipo as 'entrada' | 'pausa_inicio' | 'pausa_fin' | 'salida',
@@ -153,7 +153,7 @@ export async function POST(request: NextRequest) {
         await actualizarCalculosFichaje(fichaje.id);
 
         // 4. Actualizar solicitud a auto_aprobada
-        await prisma.solicitudCambio.update({
+        await prisma.solicitudes_cambio.update({
           where: { id: solicitud.id },
           data: {
             estado: EstadoSolicitud.auto_aprobada,

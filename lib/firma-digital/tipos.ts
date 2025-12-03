@@ -45,11 +45,14 @@ export type MetodoCaptura = typeof MetodoCaptura[keyof typeof MetodoCaptura];
 
 /**
  * Configuración para crear una solicitud de firma
+ *
+ * NOTA: El título se genera automáticamente del nombre del documento.
+ * No es necesario proporcionarlo manualmente.
  */
 export interface CrearSolicitudFirmaInput {
   documentoId: string;
   empresaId: string;
-  titulo: string;
+  titulo?: string; // Opcional - se usa el nombre del documento si no se proporciona
   mensaje?: string;
   firmantes: FirmanteInput[];
   ordenFirma?: boolean;
@@ -88,9 +91,16 @@ export interface DatosCapturadosFirma {
 }
 
 export interface PosicionFirma {
+  /** Número de página (1-indexed, o -1 para última página) */
   pagina: number;
+  /** Coordenada X en puntos PDF (origin bottom-left) */
   x: number;
+  /** Coordenada Y en puntos PDF (origin bottom-left) */
   y: number;
+  /** Ancho del recuadro en puntos PDF (opcional, default: 180) */
+  width?: number;
+  /** Alto del recuadro en puntos PDF (opcional, default: 60) */
+  height?: number;
 }
 
 /**

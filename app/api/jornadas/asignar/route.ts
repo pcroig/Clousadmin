@@ -47,7 +47,7 @@ export async function POST(req: NextRequest) {
     const { data: validatedData } = validationResult;
 
     // Verificar que la jornada existe y pertenece a la empresa
-    const jornada = await prisma.jornada.findFirst({
+    const jornada = await prisma.jornadas.findFirst({
       where: {
         id: validatedData.jornadaId,
         empresaId: session.user.empresaId,
@@ -65,7 +65,7 @@ export async function POST(req: NextRequest) {
     switch (validatedData.nivel) {
       case 'empresa':
         // Obtener empleados con jornadas diferentes
-        empleadosConJornadasPrevias = await prisma.empleado.findMany({
+        empleadosConJornadasPrevias = await prisma.empleados.findMany({
           where: {
             empresaId: session.user.empresaId,
             activo: true,
@@ -94,7 +94,7 @@ export async function POST(req: NextRequest) {
           return badRequestResponse('Debes especificar al menos un equipo');
         }
         // Obtener empleados de los equipos con jornadas diferentes
-        const miembrosEquipos = await prisma.empleadoEquipo.findMany({
+        const miembrosEquipos = await prisma.empleado_equipos.findMany({
           where: {
             equipoId: { in: validatedData.equipoIds },
           },
@@ -105,7 +105,7 @@ export async function POST(req: NextRequest) {
         const empleadoIdsEquipos = [...new Set(miembrosEquipos.map((m) => m.empleadoId))];
         
         if (empleadoIdsEquipos.length > 0) {
-          empleadosConJornadasPrevias = await prisma.empleado.findMany({
+          empleadosConJornadasPrevias = await prisma.empleados.findMany({
             where: {
               id: { in: empleadoIdsEquipos },
               empresaId: session.user.empresaId,
@@ -136,7 +136,7 @@ export async function POST(req: NextRequest) {
           return badRequestResponse('Debes especificar al menos un empleado');
         }
         // Obtener empleados específicos con jornadas diferentes
-        empleadosConJornadasPrevias = await prisma.empleado.findMany({
+        empleadosConJornadasPrevias = await prisma.empleados.findMany({
           where: {
             id: { in: validatedData.empleadoIds },
             empresaId: session.user.empresaId,
@@ -174,7 +174,7 @@ export async function POST(req: NextRequest) {
     switch (validatedData.nivel) {
       case 'empresa':
         // Asignar a todos los empleados de la empresa
-        const resultEmpresa = await prisma.empleado.updateMany({
+        const resultEmpresa = await prisma.empleados.updateMany({
           where: {
             empresaId: session.user.empresaId,
             activo: true,
@@ -192,7 +192,7 @@ export async function POST(req: NextRequest) {
         }
 
         // Obtener empleados de los equipos especificados
-        const miembrosEquipos = await prisma.empleadoEquipo.findMany({
+        const miembrosEquipos = await prisma.empleado_equipos.findMany({
           where: {
             equipoId: { in: validatedData.equipoIds },
           },
@@ -204,7 +204,7 @@ export async function POST(req: NextRequest) {
         const empleadoIdsEquipos = [...new Set(miembrosEquipos.map((m) => m.empleadoId))];
 
         if (empleadoIdsEquipos.length > 0) {
-          const resultEquipos = await prisma.empleado.updateMany({
+          const resultEquipos = await prisma.empleados.updateMany({
             where: {
               id: { in: empleadoIdsEquipos },
               empresaId: session.user.empresaId,
@@ -223,7 +223,7 @@ export async function POST(req: NextRequest) {
           return badRequestResponse('Debes especificar al menos un empleado');
         }
 
-        const resultIndividual = await prisma.empleado.updateMany({
+        const resultIndividual = await prisma.empleados.updateMany({
           where: {
             id: { in: validatedData.empleadoIds },
             empresaId: session.user.empresaId,

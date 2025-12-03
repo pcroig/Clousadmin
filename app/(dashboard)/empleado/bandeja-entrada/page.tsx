@@ -5,8 +5,9 @@
 import { redirect } from 'next/navigation';
 
 import { getSession } from '@/lib/auth';
-import { UsuarioRol } from '@/lib/constants/enums';
+import { EstadoAusencia, EstadoSolicitud, UsuarioRol } from '@/lib/constants/enums';
 import { prisma, Prisma } from '@/lib/prisma';
+import { formatAusenciaTipo } from '@/lib/utils/formatters';
 
 import { BandejaEntradaEmpleadoClient } from './bandeja-entrada-client';
 
@@ -29,11 +30,73 @@ export default async function EmpleadoBandejaEntradaPage() {
     );
   }
 
+  // Obtener ausencias del empleado
+  const ausencias = await prisma.ausencias.findMany({
+    where: {
+      empleadoId: session.user.empleadoId,
+      empresaId: session.user.empresaId,
+    },
+    orderBy: {
+      createdAt: 'desc',
+    },
+    take: 30,
+  });
+
+  // Obtener solicitudes de cambio del empleado
+  const solicitudesCambio = await prisma.solicitudes_cambio.findMany({
+    where: {
+      empleadoId: session.user.empleadoId,
+      empresaId: session.user.empresaId,
+    },
+    orderBy: {
+      createdAt: 'desc',
+    },
+    take: 30,
+  });
+
+  // Combinar y formatear solicitudes
+  const solicitudes = [
+    ...ausencias.map((aus) => ({
+      id: aus.id,
+      tipo: 'ausencia' as const,
+      titulo: `Ausencia: ${formatAusenciaTipo(aus.tipo)}`,
+      detalles: `${aus.fechaInicio.toLocaleDateString('es-ES')} - ${aus.fechaFin.toLocaleDateString('es-ES')}`,
+      estado: aus.estado,
+      fechaCreacion: aus.createdAt,
+      fechaResolucion: aus.aprobadaEn,
+    })),
+    ...solicitudesCambio.map((sol) => ({
+      id: sol.id,
+      tipo: 'cambio_datos' as const,
+      titulo: `Cambio de ${formatAusenciaTipo(sol.tipo)}`,
+      detalles: sol.motivo || `Solicitud de cambio de ${formatAusenciaTipo(sol.tipo)}`,
+      estado:
+        sol.estado === EstadoSolicitud.aprobada_manual || sol.estado === EstadoSolicitud.auto_aprobada
+          ? EstadoAusencia.confirmada
+          : sol.estado === EstadoSolicitud.rechazada
+            ? EstadoAusencia.rechazada
+            : EstadoAusencia.pendiente,
+      fechaCreacion: sol.createdAt,
+      fechaResolucion: sol.fechaRespuesta,
+    })),
+  ].sort((a, b) => b.fechaCreacion.getTime() - a.fechaCreacion.getTime());
+
   // Obtener notificaciones reales del empleado
-  const notificaciones = await prisma.notificacion.findMany({
+  const notificaciones = await prisma.notificaciones.findMany({
     where: {
       usuarioId: session.user.id,
       empresaId: session.user.empresaId,
+    },
+    select: {
+      id: true,
+      empresaId: true,
+      usuarioId: true,
+      tipo: true,
+      mensaje: true,
+      metadata: true,
+      leida: true,
+      createdAt: true,
+      eventoNominaId: true,
     },
     orderBy: {
       createdAt: 'desc',
@@ -76,7 +139,6 @@ export default async function EmpleadoBandejaEntradaPage() {
     return {
       id: notif.id,
       tipo: tipoUI,
-      titulo: notif.titulo,
       mensaje: notif.mensaje,
       fecha: notif.createdAt,
       leida: notif.leida,
@@ -85,5 +147,10 @@ export default async function EmpleadoBandejaEntradaPage() {
     };
   });
 
-  return <BandejaEntradaEmpleadoClient notificaciones={notificacionesFormateadas} />;
+  return (
+    <BandejaEntradaEmpleadoClient
+      solicitudes={solicitudes}
+      notificaciones={notificacionesFormateadas}
+    />
+  );
 }

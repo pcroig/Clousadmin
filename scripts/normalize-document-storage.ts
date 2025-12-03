@@ -108,7 +108,7 @@ const DOC_TYPE_NORMALIZATION: Record<string, string> = {
 async function migrateFolders() {
   console.info('🔄 Normalizando carpetas legacy...');
   for (const mapping of LEGACY_FOLDER_MAPPINGS) {
-    const legacyFolders = await prisma.carpeta.findMany({
+    const legacyFolders = await prisma.carpetas.findMany({
       where: { nombre: mapping.legacyName },
       select: {
         id: true,
@@ -128,7 +128,7 @@ async function migrateFolders() {
     );
 
     for (const folder of legacyFolders) {
-      const target = await prisma.carpeta.findFirst({
+      const target = await prisma.carpetas.findFirst({
         where: {
           empresaId: folder.empresaId,
           empleadoId: folder.empleadoId,
@@ -139,7 +139,7 @@ async function migrateFolders() {
       });
 
       if (!target) {
-        await prisma.carpeta.update({
+        await prisma.carpetas.update({
           where: { id: folder.id },
           data: { nombre: mapping.targetName },
         });
@@ -147,15 +147,15 @@ async function migrateFolders() {
       }
 
       await prisma.$transaction([
-        prisma.documento.updateMany({
+        prisma.documentos.updateMany({
           where: { carpetaId: folder.id },
           data: { carpetaId: target.id },
         }),
-        prisma.carpeta.updateMany({
+        prisma.carpetas.updateMany({
           where: { parentId: folder.id },
           data: { parentId: target.id },
         }),
-        prisma.carpeta.delete({ where: { id: folder.id } }),
+        prisma.carpetas.delete({ where: { id: folder.id } }),
       ]);
     }
   }
@@ -166,7 +166,7 @@ async function migrateDocumentTypes() {
 
   const validTypes = Object.values(TIPOS_DOCUMENTO);
 
-  const documentos = await prisma.documento.findMany({
+  const documentos = await prisma.documentos.findMany({
     where: {
       NOT: {
         tipoDocumento: {
@@ -206,7 +206,7 @@ async function migrateDocumentTypes() {
           ? mapped
           : inferirTipoDocumento(doc.carpeta?.nombre ?? 'Otros', rawTipo);
 
-        return prisma.documento.update({
+        return prisma.documentos.update({
           where: { id: doc.id },
           data: { tipoDocumento: inferred },
         });

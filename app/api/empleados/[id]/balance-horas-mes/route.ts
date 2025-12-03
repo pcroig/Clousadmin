@@ -30,7 +30,7 @@ export async function GET(
     }
 
     // Verificar permisos
-    const empleado = await prisma.empleado.findFirst({
+    const empleado = await prisma.empleados.findFirst({
       where: {
         id: empleadoId,
         empresaId: session.user.empresaId,

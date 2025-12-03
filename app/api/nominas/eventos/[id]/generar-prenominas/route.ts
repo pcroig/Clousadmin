@@ -22,7 +22,7 @@ export async function POST(
 
     const { id } = await params;
 
-    const evento = await prisma.eventoNomina.findFirst({
+    const evento = await prisma.eventos_nomina.findFirst({
       where: {
         id,
         empresaId: session.user.empresaId,
@@ -47,7 +47,7 @@ export async function POST(
       anio: evento.anio,
     });
 
-    const eventoActualizado = await prisma.eventoNomina.findUnique({
+    const eventoActualizado = await prisma.eventos_nomina.findUnique({
       where: { id: evento.id },
     });
 

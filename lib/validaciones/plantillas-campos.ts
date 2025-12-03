@@ -58,10 +58,10 @@ const DEPENDENCIAS_VARIABLES: DependenciaVariable[] = [
   },
   { variable: 'empleado_iban', grupo: 'datos_bancarios', campo: 'iban', label: 'IBAN' },
   {
-    variable: 'empleado_titular_cuenta',
+    variable: 'empleado_bic',
     grupo: 'datos_bancarios',
-    campo: 'titularCuenta',
-    label: 'Titular de la cuenta',
+    campo: 'bic',
+    label: 'Código BIC',
   },
 ];
 

@@ -51,7 +51,7 @@ export async function obtenerCampanaPendiente(
   empleadoId: string,
   empresaId: string
 ): Promise<CampanaPendiente | null> {
-  const preferenciaPendiente = await prisma.preferenciaVacaciones.findFirst({
+  const preferenciaPendiente = await prisma.preferencias_vacaciones.findFirst({
     where: {
       empleadoId,
       empresaId,
@@ -59,7 +59,7 @@ export async function obtenerCampanaPendiente(
     },
     select: {
       id: true,
-      campana: {
+      campana_vacaciones: {
         select: {
           id: true,
           titulo: true,
@@ -74,19 +74,19 @@ export async function obtenerCampanaPendiente(
     },
   });
 
-  if (!preferenciaPendiente?.campana) {
+  if (!preferenciaPendiente?.campana_vacaciones) {
     return null;
   }
 
-  if (preferenciaPendiente.campana.estado !== 'abierta') {
+  if (preferenciaPendiente.campana_vacaciones.estado !== 'abierta') {
     return null;
   }
 
   return {
-    id: preferenciaPendiente.campana.id,
-    titulo: preferenciaPendiente.campana.titulo,
-    fechaInicioObjetivo: preferenciaPendiente.campana.fechaInicioObjetivo,
-    fechaFinObjetivo: preferenciaPendiente.campana.fechaFinObjetivo,
+    id: preferenciaPendiente.campana_vacaciones.id,
+    titulo: preferenciaPendiente.campana_vacaciones.titulo,
+    fechaInicioObjetivo: preferenciaPendiente.campana_vacaciones.fechaInicioObjetivo,
+    fechaFinObjetivo: preferenciaPendiente.campana_vacaciones.fechaFinObjetivo,
   };
 }
 
@@ -95,7 +95,7 @@ export async function obtenerPropuestaPendiente(
   empresaId: string
 ): Promise<CampanaPropuestaPendiente | null> {
   try {
-    const preferencia = await prisma.preferenciaVacaciones.findFirst({
+    const preferencia = await prisma.preferencias_vacaciones.findFirst({
       where: {
         empleadoId,
         empresaId,
@@ -105,7 +105,7 @@ export async function obtenerPropuestaPendiente(
       select: {
         id: true,
         propuestaIA: true,
-        campana: {
+        campana_vacaciones: {
           select: {
             id: true,
             titulo: true,
@@ -119,17 +119,17 @@ export async function obtenerPropuestaPendiente(
       },
     });
 
-    if (!preferencia?.campana || !preferencia.propuestaIA) {
+    if (!preferencia?.campana_vacaciones || !preferencia.propuestaIA) {
       return null;
     }
 
     const propuesta = preferencia.propuestaIA as CampanaPropuestaPendiente['propuesta'];
 
     return {
-      id: preferencia.campana.id,
-      titulo: preferencia.campana.titulo,
-      fechaInicioObjetivo: preferencia.campana.fechaInicioObjetivo,
-      fechaFinObjetivo: preferencia.campana.fechaFinObjetivo,
+      id: preferencia.campana_vacaciones.id,
+      titulo: preferencia.campana_vacaciones.titulo,
+      fechaInicioObjetivo: preferencia.campana_vacaciones.fechaInicioObjetivo,
+      fechaFinObjetivo: preferencia.campana_vacaciones.fechaFinObjetivo,
       propuesta,
     };
   } catch (error: unknown) {

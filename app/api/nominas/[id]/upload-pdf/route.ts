@@ -23,7 +23,7 @@ export async function POST(
     const { id } = await params;
 
     // Obtener la nómina
-    const nomina = await prisma.nomina.findFirst({
+    const nomina = await prisma.nominas.findFirst({
       where: {
         id,
         empleado: {
@@ -68,7 +68,7 @@ export async function POST(
 
     if (nomina.documentoId) {
       // Actualizar documento existente
-      documento = await prisma.documento.update({
+      documento = await prisma.documentos.update({
         where: { id: nomina.documentoId },
         data: {
           nombre: file.name,
@@ -80,7 +80,7 @@ export async function POST(
       });
     } else {
       // Crear nuevo documento
-      documento = await prisma.documento.create({
+      documento = await prisma.documentos.create({
         data: {
           empresaId: session.user.empresaId,
           empleadoId: nomina.empleadoId,
@@ -94,7 +94,7 @@ export async function POST(
       });
 
       // Vincular documento a la nómina
-      await prisma.nomina.update({
+      await prisma.nominas.update({
         where: { id: nomina.id },
         data: {
           documentoId: documento.id,
@@ -103,7 +103,7 @@ export async function POST(
     }
 
     // Actualizar estado de la nómina (publicada)
-    await prisma.nomina.update({
+    await prisma.nominas.update({
       where: { id: nomina.id },
       data: {
         estado: NOMINA_ESTADOS.PUBLICADA,

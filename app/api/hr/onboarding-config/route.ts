@@ -35,7 +35,7 @@ const camposRequeridosSchema = z.object({
   }),
   datos_bancarios: z.object({
     iban: z.boolean(),
-    titularCuenta: z.boolean(),
+    bic: z.boolean(),
   }),
 });
 
@@ -48,6 +48,11 @@ const documentoRequeridoSchema = z.object({
   requiereVisualizacion: z.boolean().optional().default(false),
   requiereFirma: z.boolean().optional().default(false),
   carpetaDestino: z.string().optional().nullable(),
+  esAsincronico: z.boolean().optional(),
+  asignadoA: z.enum(['todos', 'equipos']).optional(),
+  equipoIds: z.array(z.string()).optional(),
+  tipo: z.enum(['visualizar', 'solicitar', 'firma']).optional(),
+  documentoId: z.string().optional(), // ID del documento existente (para tipo 'visualizar')
 });
 
 // Schema de validación para plantilla de documento

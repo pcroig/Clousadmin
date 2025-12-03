@@ -31,7 +31,7 @@ interface AusenciaPayload {
   preferenciaId: string;
   empleadoId: string;
   equipoId: string | null;
-  data: Prisma.AusenciaUncheckedCreateInput;
+  data: Prisma.ausenciasUncheckedCreateInput;
 }
 
 export async function POST(
@@ -50,7 +50,7 @@ export async function POST(
 
     const { id: campanaId } = await params;
 
-    const campana = await prisma.campanaVacaciones.findFirst({
+    const campana = await prisma.campanas_vacaciones.findFirst({
       where: {
         id: campanaId,
         empresaId: session.user.empresaId,
@@ -102,7 +102,7 @@ export async function POST(
       }
 
       const equipoId = pref.empleado.equipos[0]?.equipoId || null;
-      const diasCalculados = await calcularDias(fechaInicio, fechaFin, session.user.empresaId);
+      const diasCalculados = await calcularDias(fechaInicio, fechaFin, session.user.empresaId, pref.empleado.id);
 
       ausenciasPayload.push({
         preferenciaId: pref.id,
@@ -133,12 +133,12 @@ export async function POST(
 
     await prisma.$transaction(async (tx) => {
       for (const payload of ausenciasPayload) {
-        const ausencia = await tx.ausencia.create({
+        const ausencia = await tx.ausencias.create({
           data: payload.data,
         });
         ausenciasCreadas.push(ausencia.id);
 
-        await tx.preferenciaVacaciones.update({
+        await tx.preferencias_vacaciones.update({
           where: { id: payload.preferenciaId },
           data: {
             aceptada: true,
@@ -149,7 +149,7 @@ export async function POST(
         });
       }
 
-      await tx.campanaVacaciones.update({
+      await tx.campanas_vacaciones.update({
         where: { id: campanaId },
         data: {
           estado: 'finalizada',
@@ -159,12 +159,16 @@ export async function POST(
       });
     });
 
-    await crearNotificacionCampanaCuadrada(prisma, {
-      campanaId,
-      empresaId: session.user.empresaId,
-      empleadosIds: ausenciasPayload.map((p) => p.empleadoId),
-      titulo: campana.titulo,
-    });
+    await crearNotificacionCampanaCuadrada(
+      prisma,
+      {
+        campanaId,
+        empresaId: session.user.empresaId,
+        empleadosIds: ausenciasPayload.map((p) => p.empleadoId),
+        titulo: campana.titulo,
+      },
+      { actorUsuarioId: session.user.id }
+    );
 
     return successResponse({
       ausenciasCreadas: ausenciasCreadas.length,

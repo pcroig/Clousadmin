@@ -19,6 +19,7 @@ Este documento sirve como índice rápido y apunta a la guía principal del sist
 3. **Botones unificados**: Uso exclusivo del componente `Button` con variantes `default`, `outline`, `destructive`, `ghost`.
 4. **Animaciones coherentes**: Hover con `-translate-y-0.5` y `shadow-md` para botones principales.
 5. **Cabeceras mobile**: Uso de `MobilePageHeader` y `MobileActionBar`.
+6. **Hover Cards para empleados**: `EmpleadoHoverCard` muestra información uniforme (rol, equipo, email, estado) en widgets y tablas de forma consistente.
 
 ---
 

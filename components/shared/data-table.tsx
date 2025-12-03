@@ -69,6 +69,9 @@ interface DataTableProps<T extends object> {
  * - Columnas priorizadas (high/medium/low)
  * - Primera columna sticky opcional
  * - Modo compacto en mobile
+ *
+ * IMPORTANTE: El scroll vertical siempre debe estar a nivel de página (layout),
+ * nunca a nivel de tabla. La tabla crece según su contenido.
  */
 export function DataTable<T extends object>({
   columns,
@@ -114,7 +117,10 @@ export function DataTable<T extends object>({
   };
 
   return (
-    <div className={cn('bg-white rounded-xl border border-gray-200 overflow-hidden', className)}>
+    <div className={cn(
+      'rounded-xl border border-gray-200 bg-white overflow-hidden',
+      className
+    )}>
       <div className="overflow-x-auto">
         <table className="w-full">
           <thead className="bg-gray-50 border-b border-gray-200">
@@ -161,7 +167,7 @@ export function DataTable<T extends object>({
                   key={getRowId?.(row) || idx}
                   onClick={() => onRowClick?.(row)}
                   className={cn(
-                    onRowClick && 'cursor-pointer hover:bg-gray-50 active:bg-gray-100',
+                    onRowClick && 'group cursor-pointer hover:bg-gray-50 active:bg-gray-100',
                     'transition-colors'
                   )}
                 >
@@ -186,8 +192,10 @@ export function DataTable<T extends object>({
                           getAlignmentClasses(column.align),
                           // Visibilidad según prioridad
                           getPriorityClasses(column.priority),
-                          // Sticky
-                          column.sticky && 'sticky left-0 z-10 bg-white'
+                          // Sticky - heredar el fondo del hover del grupo
+                          column.sticky && 'sticky left-0 z-10 bg-white group-hover:bg-gray-50',
+                          // Asegurar que todas las celdas hereden el hover del grupo
+                          onRowClick && 'group-hover:bg-gray-50'
                         )}
                       >
                         {renderedCell}
@@ -247,7 +255,7 @@ export function AvatarCell({
           'font-medium block truncate',
           compact && 'text-xs sm:text-sm'
         )}>
-          {resolvedNombre}
+          {apellidos ? `${resolvedNombre} ${apellidos}` : resolvedNombre}
         </span>
         {subtitle && (
           <span className={cn(

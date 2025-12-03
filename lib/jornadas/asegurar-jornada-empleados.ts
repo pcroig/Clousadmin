@@ -15,7 +15,7 @@ export async function asegurarJornadaEmpleados(empresaId: string): Promise<{
   jornadaAsignada: { id: string; nombre: string } | null;
 }> {
   // 1. Obtener empleados activos sin jornada
-  const empleadosSinJornada = await prisma.empleado.findMany({
+  const empleadosSinJornada = await prisma.empleados.findMany({
     where: {
       empresaId,
       activo: true,
@@ -39,7 +39,7 @@ export async function asegurarJornadaEmpleados(empresaId: string): Promise<{
   const jornadaDefault = await getOrCreateDefaultJornada(prisma, empresaId);
 
   // 3. Asignar jornada a todos los empleados sin jornada
-  const resultado = await prisma.empleado.updateMany({
+  const resultado = await prisma.empleados.updateMany({
     where: {
       empresaId,
       activo: true,
@@ -72,7 +72,7 @@ export async function asegurarJornadaEmpleado(
   empresaId: string
 ): Promise<{ actualizado: boolean; jornadaId: string }> {
   // Verificar si el empleado ya tiene jornada
-  const empleado = await prisma.empleado.findUnique({
+  const empleado = await prisma.empleados.findUnique({
     where: { id: empleadoId },
     select: { jornadaId: true, activo: true },
   });
@@ -92,7 +92,7 @@ export async function asegurarJornadaEmpleado(
   const jornadaDefault = await getOrCreateDefaultJornada(prisma, empresaId);
 
   // Asignar jornada
-  await prisma.empleado.update({
+  await prisma.empleados.update({
     where: { id: empleadoId },
     data: { jornadaId: jornadaDefault.id },
   });

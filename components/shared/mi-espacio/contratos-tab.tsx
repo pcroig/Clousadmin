@@ -1,14 +1,19 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 import { DarDeBajaModal } from '@/components/hr/DarDeBajaModal';
+import { SearchableMultiSelect } from '@/components/shared/searchable-multi-select';
+import { SearchableSelect } from '@/components/shared/searchable-select';
+import { ResponsiveDatePicker } from '@/components/shared/responsive-date-picker';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { TIPO_CONTRATO_LABELS, TipoContrato } from '@/lib/constants/enums';
 import { parseJson } from '@/lib/utils/json';
+import { format } from 'date-fns';
 
 
 import type { MiEspacioEmpleado } from '@/types/empleado';
@@ -47,9 +52,88 @@ export function ContratosTab({ empleado, rol = 'empleado' }: ContratosTabProps) 
   const [addingComplemento, setAddingComplemento] = useState(false);
   const [complementoTipo, setComplementoTipo] = useState('');
   const [complementoImporte, setComplementoImporte] = useState('');
+  const [tipoContratoSeleccionado, setTipoContratoSeleccionado] = useState<TipoContrato>(
+    (empleado.tipoContrato as TipoContrato) || 'indefinido'
+  );
+  const [categoriaProfesional, setCategoriaProfesional] = useState(empleado.categoriaProfesional || '');
+  const [nivelEducacion, setNivelEducacion] = useState(empleado.nivelEducacion || '');
+  const [grupoCotizacion, setGrupoCotizacion] = useState(
+    empleado.grupoCotizacion ? String(empleado.grupoCotizacion) : ''
+  );
+  const [jornadaSeleccionada, setJornadaSeleccionada] = useState(empleado.jornadaId ?? '');
+  const [puestoSeleccionado, setPuestoSeleccionado] = useState(empleado.puestoId ?? '');
+  const initialEquiposDisponibles = useMemo(
+    () =>
+      (empleado.equipos ?? [])
+        .map((eq) => ({
+          id: eq.equipoId ?? eq.equipo?.id ?? '',
+          nombre: eq.equipo?.nombre || eq.nombre || 'Equipo sin nombre',
+        }))
+        .filter((equipo): equipo is { id: string; nombre: string } => Boolean(equipo.id)),
+    [empleado.equipos]
+  );
+  const [equiposDisponibles, setEquiposDisponibles] = useState<Array<{ id: string; nombre: string }>>(
+    initialEquiposDisponibles
+  );
+  const [equiposSeleccionados, setEquiposSeleccionados] = useState<string[]>(
+    (empleado.equipos ?? [])
+      .map((eq) => eq.equipoId)
+      .filter((id): id is string => Boolean(id))
+  );
+  const [managerOptions, setManagerOptions] = useState<Array<{ value: string; label: string }>>([]);
+  const [managerSeleccionado, setManagerSeleccionado] = useState(empleado.manager?.id ?? '');
+  const [updatingField, setUpdatingField] = useState<string | null>(null);
+  const isHrAdmin = rol === 'hr_admin';
+
+  const tipoContratoOptions = useMemo(
+    () =>
+      Object.entries(TIPO_CONTRATO_LABELS).map(([value, label]) => ({
+        value,
+        label,
+      })),
+    []
+  );
+
+  const categoriaProfesionalOptions = [
+    { value: 'directivo', label: 'Directivo' },
+    { value: 'mando_intermedio', label: 'Mando intermedio' },
+    { value: 'tecnico', label: 'Técnico' },
+    { value: 'trabajador_cualificado', label: 'Trabajador cualificado' },
+    { value: 'trabajador_baja_cualificacion', label: 'Trabajador baja cualificación' },
+  ] as const;
+
+  const nivelEducacionOptions = [
+    { value: 'nivel_basico', label: 'Nivel básico' },
+    { value: 'eso_equivalente', label: 'ESO o equivalente' },
+    { value: 'bachillerato_grado_medio', label: 'Bachillerato / Grado medio' },
+    { value: 'formacion_profesional_superior', label: 'Formación profesional superior' },
+    { value: 'educacion_universitaria_postgrado', label: 'Universitaria / Postgrado' },
+  ] as const;
+
+  const grupoCotizacionOptions = Array.from({ length: 11 }, (_value, index) => ({
+    value: String(index + 1),
+    label: `Grupo ${index + 1}`,
+  }));
+
+  // Helper functions para obtener labels
+  const getCategoriaLabel = (value: string | null | undefined): string => {
+    if (!value) return 'No informado';
+    const option = categoriaProfesionalOptions.find((opt) => opt.value === value);
+    return option?.label ?? value;
+  };
+
+  const getNivelEducacionLabel = (value: string | null | undefined): string => {
+    if (!value) return 'No informado';
+    const option = nivelEducacionOptions.find((opt) => opt.value === value);
+    return option?.label ?? value;
+  };
 
   const contratoActual = empleado.contratos?.[0];
   const tipoContrato = empleado.tipoContrato || 'indefinido';
+  const tipoContratoLabel = useMemo(() => {
+    const tipo = (tipoContratoSeleccionado || tipoContrato) as TipoContrato;
+    return TIPO_CONTRATO_LABELS[tipo] ?? tipo;
+  }, [tipoContratoSeleccionado, tipoContrato]);
   const fechaInicioContrato = contratoActual?.fechaInicio ?? empleado.fechaAlta ?? null;
   const fechaFinContrato = contratoActual?.fechaFin ?? null;
   const fechaFin = fechaFinContrato ? new Date(fechaFinContrato).toISOString().split('T')[0] : '';
@@ -58,7 +142,19 @@ export function ContratosTab({ empleado, rol = 'empleado' }: ContratosTabProps) 
   const contratoActualId = contratoActual?.id ?? null;
 
   useEffect(() => {
-    if (rol !== 'hr_admin') {
+    setEquiposSeleccionados(
+      (empleado.equipos ?? [])
+        .map((eq) => eq.equipoId)
+        .filter((id): id is string => Boolean(id))
+    );
+  }, [empleado.equipos]);
+
+  useEffect(() => {
+    setManagerSeleccionado(empleado.manager?.id ?? '');
+  }, [empleado.manager?.id]);
+
+  useEffect(() => {
+    if (!isHrAdmin) {
       return;
     }
 
@@ -66,9 +162,11 @@ export function ContratosTab({ empleado, rol = 'empleado' }: ContratosTabProps) 
 
     const fetchAdminData = async () => {
       try {
-        const [jornadasResponse, puestosResponse] = await Promise.allSettled([
+        const [jornadasResponse, puestosResponse, equiposResponse, managersResponse] = await Promise.allSettled([
           fetch('/api/jornadas'),
           fetch('/api/organizacion/puestos'),
+          fetch('/api/organizacion/equipos'),
+          fetch('/api/empleados?activos=true&limit=200'),
         ]);
 
         if (!isMounted) return;
@@ -96,6 +194,37 @@ export function ContratosTab({ empleado, rol = 'empleado' }: ContratosTabProps) 
             : [];
           setPuestos(lista);
         }
+
+        if (equiposResponse.status === 'fulfilled' && equiposResponse.value.ok) {
+          const payload = await parseJson<Array<{ id: string; nombre: string }> | { equipos?: Array<{ id: string; nombre: string }> }>(
+            equiposResponse.value
+          ).catch(() => null);
+          const lista = Array.isArray(payload)
+            ? payload
+            : Array.isArray(payload?.equipos)
+            ? payload?.equipos
+            : [];
+          setEquiposDisponibles(lista);
+        }
+
+        if (managersResponse.status === 'fulfilled' && managersResponse.value.ok) {
+          const payload = await parseJson<
+            Array<{ id: string; nombre?: string | null; apellidos?: string | null }> | { empleados?: Array<{ id: string; nombre?: string | null; apellidos?: string | null }> }
+          >(managersResponse.value).catch(() => null);
+          const lista = Array.isArray(payload)
+            ? payload
+            : Array.isArray(payload?.empleados)
+            ? payload?.empleados
+            : [];
+          setManagerOptions(
+            lista
+              .filter((manager) => manager.id !== empleado.id)
+              .map((manager) => ({
+                value: manager.id,
+                label: `${manager.nombre ?? ''}${manager.apellidos ? ` ${manager.apellidos}` : ''}`.trim() || 'Sin nombre',
+              }))
+          );
+        }
       } catch (error) {
         console.error('[ContratosTab] Error fetching admin data', error);
       }
@@ -106,7 +235,7 @@ export function ContratosTab({ empleado, rol = 'empleado' }: ContratosTabProps) 
     return () => {
       isMounted = false;
     };
-  }, [rol]);
+  }, [isHrAdmin, empleado.id]);
 
   // Escuchar evento de "Dar de Baja" desde el header
   useEffect(() => {
@@ -151,8 +280,140 @@ export function ContratosTab({ empleado, rol = 'empleado' }: ContratosTabProps) 
     ? `${empleado.manager.nombre}${empleado.manager.apellidos ? ` ${empleado.manager.apellidos}` : ''}`.trim()
     : 'Sin manager';
 
+  const updateEmpleadoField = async (
+    payload: Record<string, unknown>,
+    successMessage = 'Cambios guardados'
+  ) => {
+    try {
+      const fieldBeingUpdated = Object.keys(payload)[0] ?? null;
+      setUpdatingField(fieldBeingUpdated);
+      const response = await fetch(`/api/empleados/${empleado.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const error = await parseJson<{ error?: string }>(response).catch(() => null);
+        throw new Error(error?.error || 'Error al guardar cambios');
+      }
+
+      toast.success(successMessage);
+      router.refresh();
+      return true;
+    } catch (error) {
+      console.error('[ContratosTab] Error updating field', error);
+      toast.error(error instanceof Error ? error.message : 'Error al guardar cambios');
+      return false;
+    } finally {
+      setUpdatingField(null);
+    }
+  };
+
+  const handleTipoContratoChange = async (value: TipoContrato) => {
+    const previous = tipoContratoSeleccionado;
+    setTipoContratoSeleccionado(value);
+    const success = await updateEmpleadoField({ tipoContrato: value }, 'Tipo de contrato actualizado');
+    if (!success) {
+      setTipoContratoSeleccionado(previous);
+    }
+  };
+
+  const handleCategoriaProfesionalChange = async (value: string) => {
+    const previous = categoriaProfesional;
+    const nextValue = value || '';
+    setCategoriaProfesional(nextValue);
+    const success = await updateEmpleadoField(
+      nextValue ? { categoriaProfesional: nextValue } : { categoriaProfesional: null },
+      nextValue ? 'Categoría profesional actualizada' : 'Categoría profesional eliminada'
+    );
+    if (!success) {
+      setCategoriaProfesional(previous);
+    }
+  };
+
+  const handleNivelEducacionChange = async (value: string) => {
+    const previous = nivelEducacion;
+    const nextValue = value || '';
+    setNivelEducacion(nextValue);
+    const success = await updateEmpleadoField(
+      nextValue ? { nivelEducacion: nextValue } : { nivelEducacion: null },
+      nextValue ? 'Nivel de educación actualizado' : 'Nivel de educación eliminado'
+    );
+    if (!success) {
+      setNivelEducacion(previous);
+    }
+  };
+
+  const handleGrupoCotizacionChange = async (value: string) => {
+    const previous = grupoCotizacion;
+    const nextValue = value || '';
+    setGrupoCotizacion(nextValue);
+    const success = await updateEmpleadoField(
+      nextValue ? { grupoCotizacion: Number(nextValue) } : { grupoCotizacion: null },
+      nextValue ? 'Grupo de cotización actualizado' : 'Grupo de cotización eliminado'
+    );
+    if (!success) {
+      setGrupoCotizacion(previous);
+    }
+  };
+
+  const handleJornadaChange = async (value: string) => {
+    const previous = jornadaSeleccionada;
+    const nextValue = value || '';
+    setJornadaSeleccionada(nextValue);
+    const success = await updateEmpleadoField(
+      nextValue ? { jornadaId: nextValue } : { jornadaId: null },
+      nextValue ? 'Jornada actualizada' : 'Jornada eliminada'
+    );
+    if (!success) {
+      setJornadaSeleccionada(previous);
+    }
+  };
+
+  const handlePuestoChange = async (value: string) => {
+    const previous = puestoSeleccionado;
+    const nextValue = value || '';
+    setPuestoSeleccionado(nextValue);
+    const success = await updateEmpleadoField(
+      nextValue ? { puestoId: nextValue } : { puestoId: null },
+      nextValue ? 'Puesto actualizado' : 'Puesto eliminado'
+    );
+    if (!success) {
+      setPuestoSeleccionado(previous);
+    }
+  };
+
+  const fechaCambioDate = fechaCambio ? new Date(`${fechaCambio}T00:00:00`) : undefined;
+
+  const handleEquiposChange = (values: string[]) => {
+    const previous = equiposSeleccionados;
+    setEquiposSeleccionados(values);
+    void (async () => {
+      const success = await updateEmpleadoField({ equipoIds: values }, 'Equipos actualizados');
+      if (!success) {
+        setEquiposSeleccionados(previous);
+      }
+    })();
+  };
+
+  const handleManagerChange = (value: string) => {
+    const previous = managerSeleccionado;
+    const nextValue = value || '';
+    setManagerSeleccionado(nextValue);
+    void (async () => {
+      const success = await updateEmpleadoField(
+        nextValue ? { managerId: nextValue } : { managerId: null },
+        nextValue ? 'Manager actualizado' : 'Manager eliminado'
+      );
+      if (!success) {
+        setManagerSeleccionado(previous);
+      }
+    })();
+  };
+
   return (
-    <div className="space-y-6 max-w-6xl">
+    <div className="space-y-6 w-full">
       {/* Información básica y Jurídico y laboral - lado a lado */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Información básica */}
@@ -177,28 +438,21 @@ export function ContratosTab({ empleado, rol = 'empleado' }: ContratosTabProps) 
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de contrato</label>
-              <Input
-                type="text"
-                value={
-                  tipoContrato === 'administrador'
-                    ? 'Administrador'
-                    : tipoContrato === 'fijo_discontinuo'
-                      ? 'Fijo discontinuo'
-                      : tipoContrato === 'indefinido'
-                        ? 'Indefinido'
-                        : tipoContrato === 'temporal'
-                          ? 'Temporal'
-                          : tipoContrato === 'becario'
-                            ? 'Becario'
-                            : tipoContrato === 'practicas'
-                              ? 'Prácticas'
-                              : tipoContrato === 'obra_y_servicio'
-                                ? 'Obra y servicio'
-                                : tipoContrato
-                }
-                readOnly
-                className="bg-gray-50"
-              />
+              {isHrAdmin ? (
+                <SearchableSelect
+                  items={tipoContratoOptions}
+                  value={tipoContratoSeleccionado}
+                  onChange={(value) => {
+                    if (!value) return;
+                    handleTipoContratoChange(value as TipoContrato);
+                  }}
+                  placeholder="Seleccionar tipo de contrato"
+                  label="Seleccionar tipo de contrato"
+                  disabled={updatingField === 'tipoContrato'}
+                />
+              ) : (
+                <Input type="text" value={tipoContratoLabel} readOnly className="bg-gray-50" />
+              )}
             </div>
             {tipoContrato === 'temporal' && fechaFin && (
               <div>
@@ -214,30 +468,86 @@ export function ContratosTab({ empleado, rol = 'empleado' }: ContratosTabProps) 
             )}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Puesto</label>
-              <Input
-                type="text"
-                value={puestoActual?.nombre || empleado.puesto || 'No asignado'}
-                readOnly
-                className="bg-gray-50"
-              />
+              {isHrAdmin ? (
+                puestos.length === 0 ? (
+                  <Input
+                    type="text"
+                    value={puestoActual?.nombre || 'Sin puestos disponibles'}
+                    readOnly
+                    className="bg-gray-50"
+                  />
+                ) : (
+                  <SearchableSelect
+                    items={puestos.map((puesto) => ({
+                      value: puesto.id,
+                      label: puesto.nombre,
+                    }))}
+                    value={puestoSeleccionado}
+                    onChange={handlePuestoChange}
+                    placeholder="Seleccionar puesto"
+                    label="Seleccionar puesto"
+                    disabled={updatingField === 'puestoId'}
+                  />
+                )
+              ) : (
+                <Input
+                  type="text"
+                  value={puestoActual?.nombre || empleado.puesto || 'No asignado'}
+                  readOnly
+                  className="bg-gray-50"
+                />
+              )}
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Equipos</label>
-              <Input
-                type="text"
-                value={equiposEmpleado}
-                readOnly
-                className="bg-gray-50"
-              />
+              {isHrAdmin ? (
+                equiposDisponibles.length === 0 ? (
+                  <Input type="text" value="Sin equipos disponibles" readOnly className="bg-gray-50" />
+                ) : (
+                  <SearchableMultiSelect
+                    items={equiposDisponibles.map((equipo) => ({
+                      value: equipo.id,
+                      label: equipo.nombre,
+                    }))}
+                    values={equiposSeleccionados}
+                    onChange={handleEquiposChange}
+                    placeholder="Seleccionar equipos"
+                    label="Seleccionar equipos"
+                    disabled={updatingField === 'equipoIds'}
+                  />
+                )
+              ) : (
+                <Input
+                  type="text"
+                  value={equiposEmpleado}
+                  readOnly
+                  className="bg-gray-50"
+                />
+              )}
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Manager</label>
-              <Input
-                type="text"
-                value={managerEmpleado}
-                readOnly
-                className="bg-gray-50"
-              />
+              {isHrAdmin ? (
+                managerOptions.length === 0 ? (
+                  <Input type="text" value={managerEmpleado} readOnly className="bg-gray-50" />
+                ) : (
+                  <SearchableSelect
+                    items={managerOptions}
+                    value={managerSeleccionado}
+                    onChange={handleManagerChange}
+                    placeholder="Seleccionar manager"
+                    label="Seleccionar manager"
+                    disabled={updatingField === 'managerId'}
+                  />
+                )
+              ) : (
+                <Input
+                  type="text"
+                  value={managerEmpleado}
+                  readOnly
+                  className="bg-gray-50"
+                />
+              )}
             </div>
           </div>
         </div>
@@ -254,58 +564,73 @@ export function ContratosTab({ empleado, rol = 'empleado' }: ContratosTabProps) 
           <div className="space-y-3">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Categoría profesional</label>
-              <Input
-                type="text"
-                value={
-                  empleado.categoriaProfesional === 'directivo'
-                    ? 'Directivo'
-                    : empleado.categoriaProfesional === 'mando_intermedio'
-                      ? 'Mando intermedio'
-                      : empleado.categoriaProfesional === 'tecnico'
-                        ? 'Técnico'
-                        : empleado.categoriaProfesional === 'trabajador_cualificado'
-                          ? 'Trabajador cualificado'
-                          : empleado.categoriaProfesional === 'trabajador_baja_cualificacion'
-                            ? 'Trabajador con baja cualificación'
-                            : empleado.categoriaProfesional || 'No informado'
-                }
-                readOnly
-                className="bg-gray-50"
-              />
+              {isHrAdmin ? (
+                <SearchableSelect
+                  items={categoriaProfesionalOptions.map((option) => ({
+                    value: option.value,
+                    label: option.label,
+                  }))}
+                  value={categoriaProfesional}
+                  onChange={handleCategoriaProfesionalChange}
+                  placeholder="Seleccionar categoría"
+                  label="Seleccionar categoría profesional"
+                  disabled={updatingField === 'categoriaProfesional'}
+                />
+              ) : (
+                <Input
+                  type="text"
+                  value={getCategoriaLabel(empleado.categoriaProfesional)}
+                  readOnly
+                  className="bg-gray-50"
+                />
+              )}
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Grupo de cotización</label>
-              <Input
-                type="text"
-                value={
-                  empleado.grupoCotizacion !== null && empleado.grupoCotizacion !== undefined
-                    ? empleado.grupoCotizacion.toString()
-                    : 'No informado'
-                }
-                readOnly
-                className="bg-gray-50"
-              />
+              {isHrAdmin ? (
+                <SearchableSelect
+                  items={grupoCotizacionOptions}
+                  value={grupoCotizacion}
+                  onChange={handleGrupoCotizacionChange}
+                  placeholder="Seleccionar grupo"
+                  label="Seleccionar grupo de cotización"
+                  disabled={updatingField === 'grupoCotizacion'}
+                />
+              ) : (
+                <Input
+                  type="text"
+                  value={
+                    empleado.grupoCotizacion !== null && empleado.grupoCotizacion !== undefined
+                      ? empleado.grupoCotizacion.toString()
+                      : 'No informado'
+                  }
+                  readOnly
+                  className="bg-gray-50"
+                />
+              )}
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Nivel de educación</label>
-              <Input
-                type="text"
-                value={
-                  empleado.nivelEducacion === 'nivel_basico'
-                    ? 'Nivel Básico'
-                    : empleado.nivelEducacion === 'eso_equivalente'
-                      ? 'ESO o Equivalente'
-                      : empleado.nivelEducacion === 'bachillerato_grado_medio'
-                        ? 'Bachillerato o Grado Medio'
-                        : empleado.nivelEducacion === 'formacion_profesional_superior'
-                          ? 'Formación Profesional Superior'
-                          : empleado.nivelEducacion === 'educacion_universitaria_postgrado'
-                            ? 'Educación Universitaria y Postgrado'
-                            : empleado.nivelEducacion || 'No informado'
-                }
-                readOnly
-                className="bg-gray-50"
-              />
+              {isHrAdmin ? (
+                <SearchableSelect
+                  items={nivelEducacionOptions.map((option) => ({
+                    value: option.value,
+                    label: option.label,
+                  }))}
+                  value={nivelEducacion}
+                  onChange={handleNivelEducacionChange}
+                  placeholder="Seleccionar nivel"
+                  label="Seleccionar nivel de educación"
+                  disabled={updatingField === 'nivelEducacion'}
+                />
+              ) : (
+                <Input
+                  type="text"
+                  value={getNivelEducacionLabel(empleado.nivelEducacion)}
+                  readOnly
+                  className="bg-gray-50"
+                />
+              )}
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Contrato a distancia</label>
@@ -325,12 +650,12 @@ export function ContratosTab({ empleado, rol = 'empleado' }: ContratosTabProps) 
             {/* Salario Base */}
             <div className="space-y-3">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Salario bruto anual</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Salario base anual</label>
                 <Input
                   type="text"
                   value={`${
-                    typeof empleado.salarioBrutoAnual === 'number'
-                      ? empleado.salarioBrutoAnual.toLocaleString('es-ES')
+                    typeof empleado.salarioBaseAnual === 'number'
+                      ? empleado.salarioBaseAnual.toLocaleString('es-ES')
                       : '0'
                   } €`}
                   readOnly
@@ -461,16 +786,45 @@ export function ContratosTab({ empleado, rol = 'empleado' }: ContratosTabProps) 
           <div className="space-y-3">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Jornada asignada</label>
-              <Input
-                type="text"
-                value={
-                  jornadaActual
-                    ? `${jornadaActual.nombre} (${jornadaActual.horasSemanales}h/semana)`
-                    : 'No asignada'
-                }
-                readOnly
-                className="bg-gray-50"
-              />
+              {isHrAdmin ? (
+                jornadas.length === 0 ? (
+                  <Input
+                    type="text"
+                    value={
+                      jornadaActual
+                        ? `${jornadaActual.nombre} (${jornadaActual.horasSemanales}h/semana)`
+                        : 'Sin jornadas disponibles'
+                    }
+                    readOnly
+                    className="bg-gray-50"
+                  />
+                ) : (
+                  <SearchableSelect
+                    items={jornadas.map((jornada) => ({
+                      value: jornada.id,
+                      label: jornada.horasSemanales
+                        ? `${jornada.nombre} (${jornada.horasSemanales}h/semana)`
+                        : jornada.nombre,
+                    }))}
+                    value={jornadaSeleccionada}
+                    onChange={handleJornadaChange}
+                    placeholder="Seleccionar jornada"
+                    label="Seleccionar jornada"
+                    disabled={updatingField === 'jornadaId'}
+                  />
+                )
+              ) : (
+                <Input
+                  type="text"
+                  value={
+                    jornadaActual
+                      ? `${jornadaActual.nombre} (${jornadaActual.horasSemanales}h/semana)`
+                      : 'No asignada'
+                  }
+                  readOnly
+                  className="bg-gray-50"
+                />
+              )}
             </div>
 
             <div className="grid grid-cols-2 gap-4">
@@ -588,10 +942,11 @@ export function ContratosTab({ empleado, rol = 'empleado' }: ContratosTabProps) 
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Fecha de cambio</label>
-                <Input
-                  type="date"
-                  value={fechaCambio}
-                  onChange={(e) => setFechaCambio(e.target.value)}
+                <ResponsiveDatePicker
+                  date={fechaCambioDate}
+                  onSelect={(date) => setFechaCambio(date ? format(date, 'yyyy-MM-dd') : '')}
+                  placeholder="Seleccionar fecha"
+                  label="Seleccionar fecha de cambio"
                 />
               </div>
             </div>

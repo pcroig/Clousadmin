@@ -14,7 +14,7 @@ ALTER TABLE "sedes" ALTER COLUMN "ciudad" SET NOT NULL;
 CREATE TABLE "onboarding_configs" (
     "id" TEXT NOT NULL,
     "empresaId" TEXT NOT NULL,
-    "camposRequeridos" JSONB NOT NULL DEFAULT '{"datos_personales":{"nif":true,"nss":true,"telefono":true,"direccionCalle":true,"direccionNumero":true,"codigoPostal":true,"ciudad":true,"direccionProvincia":true,"direccionPiso":false,"estadoCivil":false,"numeroHijos":false},"datos_bancarios":{"iban":true,"titularCuenta":true}}',
+    "camposRequeridos" JSONB NOT NULL DEFAULT '{"datos_personales":{"nif":true,"nss":true,"telefono":true,"direccionCalle":true,"direccionNumero":true,"codigoPostal":true,"ciudad":true,"direccionProvincia":true,"direccionPiso":false,"estadoCivil":false,"numeroHijos":false},"datos_bancarios":{"iban":true,"bic":true}}',
     "documentosRequeridos" JSONB NOT NULL DEFAULT '[]',
     "plantillasDocumentos" JSONB NOT NULL DEFAULT '[]',
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,

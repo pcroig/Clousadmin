@@ -51,7 +51,7 @@ interface MigrationStats {
  */
 async function findLegacyDocuments() {
   // Nota: s3Bucket es NOT NULL en el esquema, así que filtramos por 'local'
-  const documentos = await prisma.documento.findMany({
+  const documentos = await prisma.documentos.findMany({
     where: {
       s3Bucket: 'local',
     },
@@ -137,7 +137,7 @@ async function migrateDocument(
     // Nota: En producción podrías usar headObject para verificar sin descargar
 
     // Actualizar registro en DB
-    await prisma.documento.update({
+    await prisma.documentos.update({
       where: { id: documento.id },
       data: {
         s3Key: newS3Key,

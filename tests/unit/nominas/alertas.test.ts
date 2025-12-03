@@ -83,7 +83,7 @@ describe('Sistema de Alertas de Nóminas', () => {
         const empleado = {
           iban: null,
           nss: '281234567890',
-          salarioBrutoMensual: 30000,
+          salarioBaseMensual: 30000,
         };
 
         expect(empleado.iban).toBeNull();
@@ -93,7 +93,7 @@ describe('Sistema de Alertas de Nóminas', () => {
         const empleado = {
           iban: undefined,
           nss: '281234567890',
-          salarioBrutoMensual: 30000,
+          salarioBaseMensual: 30000,
         };
 
         expect(empleado.iban).toBeUndefined();
@@ -110,7 +110,7 @@ describe('Sistema de Alertas de Nóminas', () => {
         const empleado = {
           iban: 'ES9121000418450200051332',
           nss: null,
-          salarioBrutoMensual: 30000,
+          salarioBaseMensual: 30000,
         };
 
         expect(empleado.nss).toBeNull();
@@ -135,10 +135,10 @@ describe('Sistema de Alertas de Nóminas', () => {
         const empleado = {
           iban: 'ES9121000418450200051332',
           nss: '281234567890',
-          salarioBrutoMensual: null,
+          salarioBaseMensual: null,
         };
 
-        expect(empleado.salarioBrutoMensual).toBeNull();
+        expect(empleado.salarioBaseMensual).toBeNull();
       });
 
       it('debe detectar salario cero como inválido', () => {

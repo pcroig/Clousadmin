@@ -20,7 +20,7 @@ import {
 } from '@/lib/notificaciones';
 import { prisma, Prisma } from '@/lib/prisma';
 
-import type { Empleado } from '@prisma/client';
+import type { empleados } from '@prisma/client';
 
 // Schema de validación para actualizar empleado
 const empleadoUpdateSchema = z.object({
@@ -51,9 +51,12 @@ const empleadoUpdateSchema = z.object({
 
   // Información Bancaria
   iban: z.string().optional(),
-  titularCuenta: z.string().optional(),
-  salarioBrutoAnual: z.number().optional(),
-  salarioBrutoMensual: z.number().optional(),
+  bic: z.string().optional(),
+  salarioBaseAnual: z.number().optional(),
+  salarioBaseMensual: z.number().optional(),
+
+  // Días personalizados de ausencias
+  diasAusenciasPersonalizados: z.number().int().min(0).max(365).nullable().optional(),
 });
 
 // GET /api/empleados/[id] - Obtener empleado por ID
@@ -70,7 +73,7 @@ export async function GET(
 
     const { id } = await params;
 
-    const empleado = await prisma.empleado.findUnique({
+    const empleado = await prisma.empleados.findUnique({
       where: {
         id,
         empresaId: session.user.empresaId,
@@ -141,12 +144,18 @@ export async function PATCH(
     const { data: validatedData } = validationResult;
 
     // Extraer equipoIds para manejar relación many-to-many
-    const { equipoIds, ...empleadoData } = validatedData;
+    const { equipoIds, ...rawEmpleadoData } = validatedData;
+    const empleadoData = {
+      ...rawEmpleadoData,
+      ...(rawEmpleadoData.bic
+        ? { bic: rawEmpleadoData.bic.replace(/\s+/g, '').toUpperCase() }
+        : {}),
+    };
 
     // Validar foreign keys antes de actualizar
     // Validar managerId si se proporciona
     if (empleadoData.managerId) {
-      const managerExiste = await prisma.empleado.findUnique({
+      const managerExiste = await prisma.empleados.findUnique({
         where: {
           id: empleadoData.managerId,
           empresaId: session.user.empresaId,
@@ -165,7 +174,7 @@ export async function PATCH(
 
     // Validar puestoId si se proporciona
     if (empleadoData.puestoId) {
-      const puestoExiste = await prisma.puesto.findUnique({
+      const puestoExiste = await prisma.puestos.findUnique({
         where: {
           id: empleadoData.puestoId,
           empresaId: session.user.empresaId,
@@ -179,7 +188,7 @@ export async function PATCH(
 
     // Validar jornadaId si se proporciona
     if (empleadoData.jornadaId) {
-      const jornadaExiste = await prisma.jornada.findUnique({
+      const jornadaExiste = await prisma.jornadas.findUnique({
         where: {
           id: empleadoData.jornadaId,
           empresaId: session.user.empresaId,
@@ -198,7 +207,7 @@ export async function PATCH(
 
     // Validar equipoIds si se proporcionan
     if (equipoIds && equipoIds.length > 0) {
-      const equiposExistentes = await prisma.equipo.findMany({
+      const equiposExistentes = await prisma.equipos.findMany({
         where: {
           id: { in: equipoIds },
           empresaId: session.user.empresaId,
@@ -210,8 +219,28 @@ export async function PATCH(
       }
     }
 
+    // Validar diasAusenciasPersonalizados si se proporcionan
+    if (empleadoData.diasAusenciasPersonalizados !== undefined && empleadoData.diasAusenciasPersonalizados !== null) {
+      // Obtener el mínimo global de la empresa
+      const empleadoParaValidar = await prisma.empleados.findUnique({
+        where: { id, empresaId: session.user.empresaId },
+        select: { diasVacaciones: true },
+      });
+
+      if (!empleadoParaValidar) {
+        return notFoundResponse('Empleado no encontrado');
+      }
+
+      // Los días personalizados deben ser >= al mínimo global
+      if (empleadoData.diasAusenciasPersonalizados < empleadoParaValidar.diasVacaciones) {
+        return badRequestResponse(
+          `Los días personalizados deben ser al menos ${empleadoParaValidar.diasVacaciones} (mínimo global de la empresa)`
+        );
+      }
+    }
+
     // Obtener datos actuales del empleado antes de actualizar
-    const empleadoActual = await prisma.empleado.findUnique({
+    const empleadoActual = await prisma.empleados.findUnique({
       where: { id, empresaId: session.user.empresaId },
       include: {
         equipos: { select: { equipoId: true } },
@@ -228,7 +257,7 @@ export async function PATCH(
 
     // Preparar datos para actualización
     // Limpiar campos undefined para evitar errores de Prisma
-    const datosParaActualizar: Prisma.EmpleadoUpdateInput = {};
+    const datosParaActualizar: Prisma.empleadosUpdateInput = {};
     
     // Solo incluir campos que tienen valores definidos y válidos
     if (empleadoData.fechaNacimiento !== undefined) {
@@ -258,11 +287,11 @@ export async function PATCH(
         return badRequestResponse('La fecha de alta es requerida');
       }
     }
-    if (empleadoData.salarioBrutoAnual !== undefined) {
-      datosParaActualizar.salarioBrutoAnual = new Prisma.Decimal(empleadoData.salarioBrutoAnual);
+    if (empleadoData.salarioBaseAnual !== undefined) {
+      datosParaActualizar.salarioBaseAnual = new Prisma.Decimal(empleadoData.salarioBaseAnual);
     }
-    if (empleadoData.salarioBrutoMensual !== undefined) {
-      datosParaActualizar.salarioBrutoMensual = new Prisma.Decimal(empleadoData.salarioBrutoMensual);
+    if (empleadoData.salarioBaseMensual !== undefined) {
+      datosParaActualizar.salarioBaseMensual = new Prisma.Decimal(empleadoData.salarioBaseMensual);
     }
     
     // Incluir otros campos que no sean undefined
@@ -270,8 +299,8 @@ export async function PATCH(
       if (
         key !== 'fechaNacimiento' &&
         key !== 'fechaAlta' &&
-        key !== 'salarioBrutoAnual' &&
-        key !== 'salarioBrutoMensual' &&
+        key !== 'salarioBaseAnual' &&
+        key !== 'salarioBaseMensual' &&
         empleadoData[key as keyof typeof empleadoData] !== undefined
       ) {
         (datosParaActualizar as Record<string, unknown>)[key] =
@@ -281,8 +310,8 @@ export async function PATCH(
 
     // Encriptar campos sensibles antes de guardar
     const datosEncriptados = encryptEmpleadoData(
-      datosParaActualizar as Partial<Empleado>
-    ) as Prisma.EmpleadoUpdateInput;
+      datosParaActualizar as Partial<empleados>
+    ) as Prisma.empleadosUpdateInput;
 
     // Actualizar empleado y relaciones en una transacción
     const empleado = await prisma.$transaction(async (tx) => {
@@ -294,13 +323,13 @@ export async function PATCH(
       
       // Si no hay datos para actualizar, retornar el empleado actual
       if (Object.keys(datosLimpios).length === 0) {
-        return await tx.empleado.findUnique({
+        return await tx.empleados.findUnique({
           where: { id, empresaId: session.user.empresaId },
           include: { usuario: { select: { id: true } } },
         });
       }
       
-      const updatedEmpleado = await tx.empleado.update({
+      const updatedEmpleado = await tx.empleados.update({
         where: {
           id,
           empresaId: session.user.empresaId,
@@ -314,13 +343,13 @@ export async function PATCH(
       // Actualizar equipos si se proporcionaron
       if (equipoIds !== undefined) {
         // Eliminar todas las relaciones existentes
-        await tx.empleadoEquipo.deleteMany({
+        await tx.empleado_equipos.deleteMany({
           where: { empleadoId: id },
         });
 
         // Crear nuevas relaciones
         if (equipoIds.length > 0) {
-          await tx.empleadoEquipo.createMany({
+          await tx.empleado_equipos.createMany({
             data: equipoIds.map((equipoId) => ({
               empleadoId: id,
               equipoId,
@@ -336,23 +365,27 @@ export async function PATCH(
     try {
       // 1. Cambio de manager
       if (empleadoData.managerId && empleadoData.managerId !== oldManagerId) {
-        const nuevoManager = await prisma.empleado.findUnique({
+        const nuevoManager = await prisma.empleados.findUnique({
           where: { id: empleadoData.managerId },
           select: { nombre: true, apellidos: true },
         });
 
         if (nuevoManager) {
-          await crearNotificacionCambioManager(prisma, {
-            empleadoId: id,
-            empresaId: session.user.empresaId,
-            empleadoNombre: `${empleadoActual.nombre} ${empleadoActual.apellidos}`,
-            nuevoManagerId: empleadoData.managerId,
-            nuevoManagerNombre: `${nuevoManager.nombre} ${nuevoManager.apellidos}`,
-            anteriorManagerId: oldManagerId || undefined,
-            anteriorManagerNombre: empleadoActual.manager
-              ? `${empleadoActual.manager.nombre} ${empleadoActual.manager.apellidos}`
-              : undefined,
-          });
+          await crearNotificacionCambioManager(
+            prisma,
+            {
+              empleadoId: id,
+              empresaId: session.user.empresaId,
+              empleadoNombre: `${empleadoActual.nombre} ${empleadoActual.apellidos}`,
+              nuevoManagerId: empleadoData.managerId,
+              nuevoManagerNombre: `${nuevoManager.nombre} ${nuevoManager.apellidos}`,
+              anteriorManagerId: oldManagerId || undefined,
+              anteriorManagerNombre: empleadoActual.manager
+                ? `${empleadoActual.manager.nombre} ${empleadoActual.manager.apellidos}`
+                : undefined,
+            },
+            { actorUsuarioId: session.user.id }
+          );
         }
       }
 
@@ -361,41 +394,49 @@ export async function PATCH(
         empleadoData.jornadaId &&
         empleadoData.jornadaId !== empleadoActual.jornadaId
       ) {
-        const nuevaJornada = await prisma.jornada.findUnique({
+        const nuevaJornada = await prisma.jornadas.findUnique({
           where: { id: empleadoData.jornadaId },
           select: { nombre: true },
         });
 
         if (nuevaJornada) {
-          await crearNotificacionJornadaAsignada(prisma, {
-            empleadoId: id,
-            empresaId: session.user.empresaId,
-            jornadaNombre: nuevaJornada.nombre,
-          });
+          await crearNotificacionJornadaAsignada(
+            prisma,
+            {
+              empleadoId: id,
+              empresaId: session.user.empresaId,
+              jornadaNombre: nuevaJornada.nombre,
+            },
+            { actorUsuarioId: session.user.id }
+          );
         }
       }
 
       // 3. Cambio de puesto
       if (empleadoData.puestoId && empleadoData.puestoId !== empleadoActual.puestoId) {
         const puestoAnterior = empleadoActual.puestoId
-          ? await prisma.puesto.findUnique({
+          ? await prisma.puestos.findUnique({
               where: { id: empleadoActual.puestoId },
               select: { nombre: true },
             })
           : null;
 
-        const puestoNuevo = await prisma.puesto.findUnique({
+        const puestoNuevo = await prisma.puestos.findUnique({
           where: { id: empleadoData.puestoId },
           select: { nombre: true },
         });
 
         if (puestoNuevo) {
-          await crearNotificacionCambioPuesto(prisma, {
-            empleadoId: id,
-            empresaId: session.user.empresaId,
-            puestoAnterior: puestoAnterior?.nombre || null,
-            puestoNuevo: puestoNuevo.nombre,
-          });
+          await crearNotificacionCambioPuesto(
+            prisma,
+            {
+              empleadoId: id,
+              empresaId: session.user.empresaId,
+              puestoAnterior: puestoAnterior?.nombre || null,
+              puestoNuevo: puestoNuevo.nombre,
+            },
+            { actorUsuarioId: session.user.id }
+          );
         }
       }
     } catch (error) {
@@ -408,19 +449,23 @@ export async function PATCH(
       const nuevosEquipos = equipoIds.filter(id => !oldEquipoIds.includes(id));
 
       for (const equipoId of nuevosEquipos) {
-        const equipo = await prisma.equipo.findUnique({
+        const equipo = await prisma.equipos.findUnique({
           where: { id: equipoId },
           select: { nombre: true },
         });
 
         if (equipo) {
-          await crearNotificacionAsignadoEquipo(prisma, {
-            empleadoId: id,
-            empresaId: session.user.empresaId,
-            empleadoNombre: `${empleadoActual.nombre} ${empleadoActual.apellidos}`,
-            equipoId,
-            equipoNombre: equipo.nombre,
-          });
+          await crearNotificacionAsignadoEquipo(
+            prisma,
+            {
+              empleadoId: id,
+              empresaId: session.user.empresaId,
+              empleadoNombre: `${empleadoActual.nombre} ${empleadoActual.apellidos}`,
+              equipoId,
+              equipoNombre: equipo.nombre,
+            },
+            { actorUsuarioId: session.user.id }
+          );
         }
       }
     }

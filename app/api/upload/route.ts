@@ -93,7 +93,8 @@ export async function POST(req: NextRequest) {
 
     // Subir a S3/local
     const s3Key = `uploads/${session.user.empresaId}/${tipo || 'general'}/${fileName}`;
-    const url = await uploadToS3(storageBody, s3Key, file.type);
+    const uploadOptions = Number.isFinite(file.size) ? { contentLength: file.size } : undefined;
+    const url = await uploadToS3(storageBody, s3Key, file.type, uploadOptions);
 
     let documento = null;
 
@@ -123,7 +124,7 @@ export async function POST(req: NextRequest) {
       const tipoDocumentoBD = inferirTipoDocumento(carpetaNombre, tipo);
 
       // Crear documento en BD
-      documento = await prisma.documento.create({
+      documento = await prisma.documentos.create({
         data: {
           empresaId: session.user.empresaId,
           empleadoId,
@@ -140,6 +141,7 @@ export async function POST(req: NextRequest) {
 
     return successResponse({
       url,
+      s3Key,
       fileName,
       size: file.size,
       type: file.type,

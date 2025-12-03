@@ -34,6 +34,7 @@ interface ListaFestivosProps {
   onEditorClose: () => void;
   onCreateRequest: () => void;
   onEditRequest: (festivo: Festivo) => void;
+  showCreateButton?: boolean;
 }
 
 export function ListaFestivos({
@@ -44,6 +45,7 @@ export function ListaFestivos({
   onEditorClose,
   onCreateRequest,
   onEditRequest,
+  showCreateButton = true,
 }: ListaFestivosProps) {
   const [festivos, setFestivos] = useState<Festivo[]>([]);
   const [cargando, setCargando] = useState(true);
@@ -187,12 +189,14 @@ export function ListaFestivos({
 
   return (
     <div className="space-y-3">
-      <div className="flex justify-end">
-        <Button size="icon" variant="outline" onClick={onCreateRequest} title="Añadir festivo">
-          <CalendarPlus className="h-4 w-4" />
-          <span className="sr-only">Añadir festivo</span>
-        </Button>
-      </div>
+      {showCreateButton && (
+        <div className="flex justify-end">
+          <Button size="icon" variant="outline" onClick={onCreateRequest} title="Añadir festivo">
+            <CalendarPlus className="h-4 w-4" />
+            <span className="sr-only">Añadir festivo</span>
+          </Button>
+        </div>
+      )}
 
       {cargando ? (
         <div className="text-center py-4 text-gray-500">Cargando festivos...</div>

@@ -19,19 +19,19 @@ export default async function EquiposPage() {
   }
 
   // Obtener todos los equipos con sus empleados
-  const equipos = await prisma.equipo.findMany({
+  const equipos = await prisma.equipos.findMany({
     where: {
       empresaId: session.user.empresaId,
     },
     include: {
-      manager: {
+      empleados: {
         select: {
           id: true,
           nombre: true,
           apellidos: true,
         },
       },
-      miembros: {
+      empleado_equipos: {
         include: {
           empleado: {
             select: {
@@ -60,12 +60,12 @@ export default async function EquiposPage() {
     id: equipo.id,
     nombre: equipo.nombre,
     descripcion: equipo.descripcion || '',
-    responsable: equipo.manager
-      ? `${equipo.manager.nombre} ${equipo.manager.apellidos}`
+    responsable: equipo.empleados
+      ? `${equipo.empleados.nombre} ${equipo.empleados.apellidos}`
       : 'Sin responsable',
     responsableId: equipo.managerId,
-    numeroEmpleados: equipo.miembros.length,
-    empleados: equipo.miembros.map((miembro) => ({
+    numeroEmpleados: equipo.empleado_equipos.length,
+    empleados: equipo.empleado_equipos.map((miembro) => ({
       id: miembro.empleado.id,
       nombre: `${miembro.empleado.nombre} ${miembro.empleado.apellidos}`,
       avatar: miembro.empleado.fotoUrl || undefined,

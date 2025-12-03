@@ -10,7 +10,7 @@ export default async function SeguridadPage() {
     redirect('/login');
   }
 
-  const usuario = await prisma.usuario.findUnique({
+  const usuario = await prisma.usuarios.findUnique({
     where: { id: session.user.id },
     select: {
       email: true,

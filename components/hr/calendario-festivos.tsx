@@ -25,6 +25,7 @@ interface CalendarioFestivosProps {
   refreshToken?: number;
   onRequestCreate: (fecha: string) => void;
   onRequestEdit: (festivo: Festivo) => void;
+  numberOfMonths?: number;
 }
 
 const DIA_SEMANA_KEYS: Array<keyof DiasLaborables> = [
@@ -43,6 +44,7 @@ export function CalendarioFestivos({
   refreshToken = 0,
   onRequestCreate,
   onRequestEdit,
+  numberOfMonths = 2,
 }: CalendarioFestivosProps) {
   const [mesActual, setMesActual] = useState(new Date());
   const [festivos, setFestivos] = useState<Festivo[]>([]);
@@ -59,12 +61,32 @@ export function CalendarioFestivos({
   const cargarFestivos = useCallback(async () => {
     setCargando(true);
     try {
-      const año = mesActual.getFullYear();
-      const response = await fetch(`/api/festivos?año=${año}`);
-      if (response.ok) {
-        const data = await parseJson<FestivosResponse>(response);
-        setFestivos(Array.isArray(data?.festivos) ? data.festivos : []);
+      const añoActual = mesActual.getFullYear();
+      // Calcular año del mes siguiente para obtener festivos de ambos años si cruzan
+      const mesSiguiente = new Date(mesActual);
+      mesSiguiente.setMonth(mesSiguiente.getMonth() + 1);
+      const añoSiguiente = mesSiguiente.getFullYear();
+
+      // Cargar festivos de ambos años si cruzan el año
+      const años = añoActual === añoSiguiente
+        ? [añoActual]
+        : [añoActual, añoSiguiente];
+
+      const responses = await Promise.all(
+        años.map(año => fetch(`/api/festivos?año=${año}`))
+      );
+
+      const allFestivos: Festivo[] = [];
+      for (const response of responses) {
+        if (response.ok) {
+          const data = await parseJson<FestivosResponse>(response);
+          if (Array.isArray(data?.festivos)) {
+            allFestivos.push(...data.festivos);
+          }
+        }
       }
+
+      setFestivos(allFestivos);
     } catch (error) {
       console.error('Error cargando festivos:', error);
     } finally {
@@ -100,9 +122,22 @@ export function CalendarioFestivos({
 
   return (
     <div className="space-y-4">
-      <div className="rounded-md border p-4">
+      {!cargando && (
+        <div className="flex items-center gap-4 text-xs text-muted-foreground">
+          <div className="flex items-center gap-2">
+            <div className="h-3 w-3 rounded-sm border border-red-200 bg-red-100" />
+            <span>Festivos</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="h-3 w-3 rounded-sm bg-muted/40" />
+            <span>No laborable</span>
+          </div>
+        </div>
+      )}
+
+      <div>
         {cargando ? (
-          <div className="text-center py-8 text-gray-500">Cargando calendario...</div>
+          <div className="py-8 text-center text-gray-500">Cargando calendario...</div>
         ) : (
           <Calendar
             mode="single"
@@ -110,6 +145,7 @@ export function CalendarioFestivos({
             onSelect={handleDiaClick}
             month={mesActual}
             onMonthChange={setMesActual}
+            numberOfMonths={numberOfMonths}
             modifiers={{
               festivo: festivosDates,
               noLaborable: (date: Date) => !esDiaLaborable(date),
@@ -120,8 +156,8 @@ export function CalendarioFestivos({
                   {...props}
                   className={cn(
                     props.className,
-                    props.modifiers?.noLaborable && 'text-gray-400 bg-muted/40',
-                    props.modifiers?.festivo && 'bg-red-100 text-red-900 font-semibold'
+                    props.modifiers?.noLaborable && 'bg-muted/40 text-gray-400',
+                    props.modifiers?.festivo && 'bg-red-100 text-red-900 font-semibold hover:bg-red-200'
                   )}
                 />
               ),
@@ -130,13 +166,6 @@ export function CalendarioFestivos({
           />
         )}
       </div>
-
-      {onUpdate && (
-        <div className="text-xs text-muted-foreground">
-          Las actualizaciones desde la lista de festivos se sincronizan automáticamente con este
-          calendario.
-        </div>
-      )}
     </div>
   );
 }

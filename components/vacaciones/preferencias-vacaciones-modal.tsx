@@ -14,7 +14,7 @@ import { LoadingButton } from '@/components/shared/loading-button';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogBody, DialogFooter, DialogHeader, DialogScrollableContent, DialogTitle } from '@/components/ui/dialog';
 import { useMutation } from '@/lib/hooks';
 import { cn, toDateOnlyString } from '@/lib/utils';
 import { parseJson, parseJsonSafe } from '@/lib/utils/json';
@@ -228,7 +228,7 @@ export function PreferenciasVacacionesModal({
 
   return (
     <Dialog open={open} onOpenChange={handleDialogChange}>
-      <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+      <DialogScrollableContent className="max-w-5xl">
         <DialogHeader>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
@@ -266,7 +266,8 @@ export function PreferenciasVacacionesModal({
           </div>
         </DialogHeader>
 
-        <div className="space-y-6 py-4">
+        <DialogBody>
+          <div className="space-y-6 py-4">
           <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
             {modosOrdenados.map((modo) => {
               const config = modoConfig[modo];
@@ -364,9 +365,10 @@ export function PreferenciasVacacionesModal({
             )}
           </div>
         </div>
+        </DialogBody>
 
-        <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
-          <div className="flex-1 text-sm text-gray-500 self-center">
+        <DialogFooter className="flex-wrap gap-2">
+          <div className="flex-1 text-sm text-gray-500 self-center min-w-[200px]">
             {diasIdeales.length > 0 && (
               <span>
                 Recordatorio: necesitamos al menos {alternativosRequeridos} días alternativos para garantizar
@@ -378,16 +380,16 @@ export function PreferenciasVacacionesModal({
           <Button variant="outline" onClick={onClose} disabled={guardando}>
             Cancelar
           </Button>
-          <LoadingButton 
-            onClick={handleGuardar} 
+          <LoadingButton
+            onClick={handleGuardar}
             loading={guardando}
             disabled={!puedeGuardar || guardando}
             className="min-w-[160px]"
           >
             {guardando ? 'Guardando...' : 'Guardar preferencias'}
           </LoadingButton>
-        </div>
-      </DialogContent>
+        </DialogFooter>
+      </DialogScrollableContent>
     </Dialog>
   );
 }

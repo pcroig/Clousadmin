@@ -36,7 +36,7 @@ export async function PATCH(
     const data = UpdateAsignacionSchema.parse(payload);
 
     // Verificar que la asignación existe y pertenece a la nómina
-    const asignacion = await prisma.asignacionComplemento.findFirst({
+    const asignacion = await prisma.asignaciones_complemento.findFirst({
       where: {
         id: asignacionId,
         nominaId: id,
@@ -49,9 +49,9 @@ export async function PATCH(
             },
           },
         },
-        empleadoComplemento: {
+        empleado_complementos: {
           include: {
-            tipoComplemento: true,
+            tipos_complemento: true,
           },
         },
       },
@@ -82,7 +82,7 @@ export async function PATCH(
     const nuevoImporte = data.importe ? new Decimal(data.importe) : importeAnterior;
 
     // Actualizar asignación
-    const updated = await prisma.asignacionComplemento.update({
+    const updated = await prisma.asignaciones_complemento.update({
       where: { id: asignacionId },
       data: {
         ...(data.importe && { importe: nuevoImporte }),
@@ -91,9 +91,9 @@ export async function PATCH(
         fechaAsignacion: new Date(),
       },
       include: {
-        empleadoComplemento: {
+        empleado_complementos: {
           include: {
-            tipoComplemento: true,
+            tipos_complemento: true,
           },
         },
       },
@@ -107,7 +107,7 @@ export async function PATCH(
         .add(nuevoTotalComplementos)
         .sub(asignacion.nomina.totalDeducciones);
 
-      await prisma.nomina.update({
+      await prisma.nominas.update({
         where: { id },
         data: {
           totalComplementos: nuevoTotalComplementos,
@@ -151,7 +151,7 @@ export async function DELETE(
     const { id, asignacionId } = await params;
 
     // Verificar que la asignación existe
-    const asignacion = await prisma.asignacionComplemento.findFirst({
+    const asignacion = await prisma.asignaciones_complemento.findFirst({
       where: {
         id: asignacionId,
         nominaId: id,
@@ -189,7 +189,7 @@ export async function DELETE(
     }
 
     // Eliminar asignación
-    await prisma.asignacionComplemento.delete({
+    await prisma.asignaciones_complemento.delete({
       where: { id: asignacionId },
     });
 
@@ -200,7 +200,7 @@ export async function DELETE(
       .sub(asignacion.nomina.totalDeducciones);
 
     // Marcar como complementos pendientes si se eliminó una asignación
-    await prisma.nomina.update({
+    await prisma.nominas.update({
       where: { id },
       data: {
         totalComplementos: nuevoTotalComplementos,

@@ -123,9 +123,9 @@ const CAMPO_CAMBIO_LABELS: Record<string, string> = {
   iban: 'IBAN',
   entidad: 'entidad bancaria',
   banco: 'banco',
-  titularCuenta: 'titular de la cuenta',
-  salarioBrutoAnual: 'salario bruto anual',
-  salarioBrutoMensual: 'salario bruto mensual',
+  bic: 'código BIC',
+  salarioBaseAnual: 'salario base anual',
+  salarioBaseMensual: 'salario base mensual',
   categoriaProfesional: 'categoría profesional',
   grupoCotizacion: 'grupo de cotización',
   puestoId: 'puesto',
@@ -290,12 +290,14 @@ export function BandejaEntradaSolicitudes({
 
       {/* Lista de solicitudes */}
       {solicitudesActuales.length === 0 ? (
-        <EmptyState
-          icon={ClipboardList}
-          title={emptyStateCopy.title}
-          description={emptyStateCopy.description}
-          className="py-10"
-        />
+        <div className="flex min-h-[320px] items-center justify-center">
+          <EmptyState
+            icon={ClipboardList}
+            title={emptyStateCopy.title}
+            description={emptyStateCopy.description}
+            className="py-10"
+          />
+        </div>
       ) : (
         <div className="space-y-3">
           {solicitudesActuales.map((solicitud) => {

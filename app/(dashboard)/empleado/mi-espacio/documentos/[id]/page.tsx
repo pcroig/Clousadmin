@@ -21,7 +21,7 @@ export default async function EmpleadoCarpetaDetailPage(context: { params: Promi
   const { id } = await params;
 
   // Obtener empleado
-  const empleado = await prisma.empleado.findUnique({
+  const empleado = await prisma.empleados.findUnique({
     where: {
       email: session.user.email,
     },
@@ -32,7 +32,7 @@ export default async function EmpleadoCarpetaDetailPage(context: { params: Promi
   }
 
   // Obtener carpeta con documentos
-  const carpeta = await prisma.carpeta.findUnique({
+  const carpeta = await prisma.carpetas.findUnique({
     where: {
       id: id,
     },
@@ -72,20 +72,61 @@ export default async function EmpleadoCarpetaDetailPage(context: { params: Promi
   const puedeSubir =
     carpeta.empleadoId === empleado.id && allowedUploadFolders.has(carpeta.nombre);
 
+  // Obtener información de firmas para cada documento
+  const documentIds = carpeta.documentos.map(d => d.id);
+  const solicitudesFirma = await prisma.solicitudes_firma.findMany({
+    where: {
+      documentoId: { in: documentIds },
+      empresaId: session.user.empresaId,
+    },
+    include: {
+      firmas: {
+        where: {
+          empleadoId: empleado.id,
+        },
+      },
+    },
+  });
+
+  // Crear un mapa de documentoId -> estado de firma
+  const firmasPorDocumento = new Map(
+    solicitudesFirma.map(sol => {
+      const firmaEmpleado = sol.firmas[0]; // Solo debería haber una firma por empleado por solicitud
+      return [
+        sol.documentoId,
+        {
+          tieneSolicitud: true,
+          firmado: firmaEmpleado?.firmado ?? false,
+          firmaId: firmaEmpleado?.id,
+          estadoSolicitud: sol.estado,
+        },
+      ];
+    })
+  );
+
   // Serializar datos para evitar problemas con Date
   const carpetaData = {
     id: carpeta.id,
     nombre: carpeta.nombre,
     esSistema: carpeta.esSistema,
     compartida: carpeta.compartida,
-    documentos: carpeta.documentos.map((doc) => ({
-      id: doc.id,
-      nombre: doc.nombre,
-      tipoDocumento: doc.tipoDocumento,
-      mimeType: doc.mimeType,
-      tamano: doc.tamano,
-      createdAt: doc.createdAt.toISOString(),
-    })),
+    documentos: carpeta.documentos.map((doc) => {
+      const firmaInfo = firmasPorDocumento.get(doc.id);
+      return {
+        id: doc.id,
+        nombre: doc.nombre,
+        tipoDocumento: doc.tipoDocumento,
+        mimeType: doc.mimeType,
+        tamano: doc.tamano,
+        createdAt: doc.createdAt.toISOString(),
+        firmaInfo: firmaInfo ? {
+          tieneSolicitud: firmaInfo.tieneSolicitud,
+          firmado: firmaInfo.firmado,
+          firmaId: firmaInfo.firmaId,
+          estadoSolicitud: firmaInfo.estadoSolicitud,
+        } : null,
+      };
+    }),
   };
 
   return (

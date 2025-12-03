@@ -11,7 +11,7 @@ async function main() {
   console.log('🔧 Iniciando fix de usuarios sin empleadoId...\n');
 
   // Buscar todos los usuarios sin empleadoId
-  const usuariosSinEmpleado = await prisma.usuario.findMany({
+  const usuariosSinEmpleado = await prisma.usuarios.findMany({
     where: {
       empleadoId: null,
     },
@@ -28,13 +28,13 @@ async function main() {
   for (const usuario of usuariosSinEmpleado) {
     try {
       // Buscar si existe un empleado con este usuarioId
-      const empleado = await prisma.empleado.findUnique({
+      const empleado = await prisma.empleados.findUnique({
         where: { usuarioId: usuario.id },
       });
 
       if (empleado) {
         // Vincular usuario con empleado
-        await prisma.usuario.update({
+        await prisma.usuarios.update({
           where: { id: usuario.id },
           data: { empleadoId: empleado.id },
         });

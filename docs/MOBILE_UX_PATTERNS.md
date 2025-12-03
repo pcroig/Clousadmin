@@ -1,7 +1,7 @@
 # Patrones UX Mobile - Clousadmin
 
-**Versión**: 2.2.0  
-**Fecha**: 2025-01-27  
+**Versión**: 2.3.0
+**Fecha**: 2025-12-02
 **Autor**: Equipo de Desarrollo
 
 ---
@@ -441,6 +441,103 @@ const activeFiltersCount = useMemo(() => {
 
 ---
 
+## Patrón: Sheet/Panel para Detalles
+
+### Descripción
+
+Patrón establecido para mostrar información auxiliar o acciones secundarias que no requieren estar siempre visibles en el contenido principal.
+
+### Componentes del Patrón
+
+**1. Trigger (Botón/Icono)**:
+- Mobile: Icono en header (17.6px equilibrado con título)
+- Desktop: Botón con icono + texto
+
+**2. DetailsPanel** (componente reutilizable):
+- Slide-over desde la derecha
+- Ancho: ~1/3 de pantalla en desktop
+- Full screen en mobile
+- Overlay oscuro de fondo
+
+**3. Details Component** (contenido específico):
+- Header con título y acciones
+- Contenido scrollable
+- Botones de acción según contexto
+
+### Implementación
+
+```tsx
+// 1. Estado
+const [detailsOpen, setDetailsOpen] = useState(false);
+
+// 2. Trigger en header
+<PageMobileHeader
+  title="Página"
+  actions={[
+    {
+      icon: FileSignature,
+      label: 'Detalles',
+      onClick: () => setDetailsOpen(true),
+    },
+  ]}
+/>
+
+// Desktop
+<Button onClick={() => setDetailsOpen(true)}>
+  <FileSignature className="h-4 w-4" />
+  <span>Detalles</span>
+</Button>
+
+// 3. Panel lateral
+<DetailsPanel
+  isOpen={detailsOpen}
+  onClose={() => setDetailsOpen(false)}
+  title="Detalles"
+>
+  <MyDetailsComponent
+    onClose={() => setDetailsOpen(false)}
+  />
+</DetailsPanel>
+```
+
+### Casos de Uso
+
+**Canal de Denuncias**:
+- Lista de denuncias recientes
+- Estados y seguimiento
+- Navegación a detalles
+- Archivo: `components/denuncias/denuncias-details.tsx`
+
+**Firmas**:
+- Lista de firmas pendientes y completadas
+- Stats de pendientes/completadas
+- Acciones: Firmar / Ver
+- Archivo: `components/firma/firmas-details.tsx`
+
+### Ventajas
+
+1. **Espacio Optimizado**: No ocupa espacio permanente en el contenido principal
+2. **Contexto Preservado**: El usuario no pierde su ubicación
+3. **Acceso Rápido**: Siempre disponible desde el header
+4. **Consistencia**: Mismo patrón en toda la app
+5. **Mobile-Friendly**: Se adapta perfectamente a pantallas pequeñas
+
+### Cuándo Usar Este Patrón
+
+✅ **Usar cuando**:
+- Información auxiliar consultada ocasionalmente
+- Listados de notificaciones/alertas/pendientes
+- Acciones secundarias que no requieren visibilidad constante
+- Detalles complementarios a la vista principal
+
+❌ **No usar cuando**:
+- Información crítica que debe estar siempre visible
+- Flujo principal de la aplicación
+- Formularios de creación/edición principales
+- Datos que requieren comparación con contenido principal
+
+---
+
 ## Mantenimiento
 
 ### Checklist para Nuevas Páginas
@@ -472,6 +569,6 @@ const activeFiltersCount = useMemo(() => {
 
 ---
 
-**Última actualización**: 2025-01-27  
-**Próxima revisión**: 2025-02-27
+**Última actualización**: 2025-12-02
+**Próxima revisión**: 2026-01-02
 

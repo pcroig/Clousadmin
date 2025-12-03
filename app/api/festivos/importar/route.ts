@@ -71,7 +71,7 @@ export async function POST(req: NextRequest) {
 
       for (const festivo of festivosArchivo) {
         try {
-          const resultado = await tx.festivo.upsert({
+          const resultado = await tx.festivos.upsert({
             where: {
               empresaId_fecha: {
                 empresaId: session.user.empresaId,

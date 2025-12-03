@@ -24,7 +24,7 @@ export async function crearInvitacionSignup(
     const shouldSendEmail = options?.enviarEmail ?? true;
 
     // Verificar si ya existe una invitación activa
-    const invitacionExistente = await prisma.invitacionSignup.findUnique({
+    const invitacionExistente = await prisma.invitaciones_signup.findUnique({
       where: { email: email.toLowerCase() },
     });
 
@@ -33,7 +33,7 @@ export async function crearInvitacionSignup(
       const token = randomBytes(32).toString('hex');
       const expiraEn = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 días
 
-      const invitacion = await prisma.invitacionSignup.update({
+      const invitacion = await prisma.invitaciones_signup.update({
         where: { id: invitacionExistente.id },
         data: {
           token,
@@ -65,7 +65,7 @@ export async function crearInvitacionSignup(
     const token = randomBytes(32).toString('hex');
     const expiraEn = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 días
 
-    const invitacion = await prisma.invitacionSignup.create({
+    const invitacion = await prisma.invitaciones_signup.create({
       data: {
         email: email.toLowerCase(),
         token,
@@ -118,7 +118,7 @@ export async function verificarInvitacionSignup(token: string) {
       };
     }
 
-    const invitacion = await prisma.invitacionSignup.findUnique({
+    const invitacion = await prisma.invitaciones_signup.findUnique({
       where: { token },
     });
 
@@ -179,7 +179,7 @@ export async function obtenerInvitacionSignupPorToken(token: string) {
   }
 
   try {
-    return await prisma.invitacionSignup.findUnique({
+    return await prisma.invitaciones_signup.findUnique({
       where: { token },
     });
   } catch (error) {
@@ -193,7 +193,7 @@ export async function obtenerInvitacionSignupPorToken(token: string) {
  */
 export async function usarInvitacionSignup(token: string) {
   try {
-    const invitacion = await prisma.invitacionSignup.update({
+    const invitacion = await prisma.invitaciones_signup.update({
       where: { token },
       data: {
         usada: true,
@@ -237,7 +237,7 @@ export async function agregarAWaitlist(
     }
 
     // Verificar si ya tiene una invitación
-    const invitacion = await prisma.invitacionSignup.findUnique({
+    const invitacion = await prisma.invitaciones_signup.findUnique({
       where: { email: email.toLowerCase() },
     });
 

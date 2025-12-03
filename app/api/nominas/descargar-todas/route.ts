@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
     }
 
     // Obtener empleado del usuario
-    const empleado = await prisma.empleado.findUnique({
+    const empleado = await prisma.empleados.findUnique({
       where: { usuarioId: session.user.id },
       select: {
         id: true,
@@ -59,7 +59,7 @@ export async function GET(req: NextRequest) {
     });
 
     // Obtener nóminas publicadas del año
-    const nominas = await prisma.nomina.findMany({
+    const nominas = await prisma.nominas.findMany({
       where: {
         empleadoId: empleado.id,
         anio,

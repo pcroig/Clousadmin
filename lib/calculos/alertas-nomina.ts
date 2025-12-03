@@ -89,9 +89,9 @@ export async function generarAlertasParaNomina(
         take: 1,
       },
     },
-  } satisfies Prisma.EmpleadoFindUniqueArgs;
+  } satisfies Prisma.empleadosFindUniqueArgs;
 
-  const empleado = await prisma.empleado.findUnique(empleadoQuery);
+  const empleado = await prisma.empleados.findUnique(empleadoQuery);
 
   if (!empleado) {
     return 0;
@@ -127,7 +127,7 @@ export async function generarAlertasParaNomina(
 
   // 3. Salario no configurado
   const contratoActual = empleado.contratos[0];
-  if (!contratoActual || !contratoActual.salarioBrutoAnual) {
+  if (!contratoActual || !contratoActual.salarioBaseAnual) {
     alertas.push({
       tipo: ALERT_TYPES.CRITICO,
       categoria: ALERT_CATEGORIES.DATOS_FALTANTES,
@@ -144,7 +144,7 @@ export async function generarAlertasParaNomina(
   const finMes = new Date(anio, mes, 0, 23, 59, 59);
 
   // 4. Ausencias pendientes de aprobación
-  const ausenciasPendientes = await prisma.ausencia.count({
+  const ausenciasPendientes = await prisma.ausencias.count({
     where: {
       empleadoId,
       estado: 'pendiente',
@@ -184,7 +184,7 @@ export async function generarAlertasParaNomina(
     if (jornada) {
       const horasEsperadasMes = Number(jornada.horasSemanales ?? 0) * 4.33; // Promedio semanas por mes
       
-      const fichajes = await prisma.fichaje.findMany({
+      const fichajes = await prisma.fichajes.findMany({
         where: {
           empleadoId,
           fecha: {
@@ -274,7 +274,7 @@ export async function generarAlertasParaNomina(
   // === CREAR ALERTAS EN LA BD ===
   
   if (alertas.length > 0) {
-    await prisma.alertaNomina.createMany({
+    await prisma.alertas_nomina.createMany({
       data: alertas.map((alerta) => ({
         empresaId,
         empleadoId,
@@ -297,7 +297,7 @@ export async function generarAlertasParaNomina(
  * Verifica si una nómina tiene alertas críticas que bloquean la exportación
  */
 export async function tieneAlertasCriticas(nominaId: string): Promise<boolean> {
-  const count = await prisma.alertaNomina.count({
+  const count = await prisma.alertas_nomina.count({
     where: {
       nominaId,
       tipo: ALERT_TYPES.CRITICO,
@@ -313,7 +313,7 @@ export async function tieneAlertasCriticas(nominaId: string): Promise<boolean> {
  */
 export async function recalcularAlertasEvento(eventoNominaId: string): Promise<number> {
 
-  const evento = await prisma.eventoNomina.findUnique({
+  const evento = await prisma.eventos_nomina.findUnique({
     where: { id: eventoNominaId },
     include: {
       nominas: {
@@ -330,7 +330,7 @@ export async function recalcularAlertasEvento(eventoNominaId: string): Promise<n
   }
 
   // Eliminar alertas anteriores del evento
-  await prisma.alertaNomina.deleteMany({
+  await prisma.alertas_nomina.deleteMany({
     where: {
       nominaId: {
         in: evento.nominas.map((n) => n.id),

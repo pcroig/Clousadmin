@@ -145,6 +145,41 @@ export function getSolicitudEstadoLabel(estado: string): string {
   }
 }
 
+/**
+ * Extrae la hora (HH:mm) de un ISO string de forma segura
+ * Evita problemas de zona horaria al extraer directamente del string
+ * @param isoString - String en formato ISO 8601 (ej: "2024-12-02T09:30:00.000Z")
+ * @returns String en formato HH:mm (ej: "09:30") o null si el formato es inválido
+ */
+export function extraerHoraDeISO(isoString: string | null | undefined): string | null {
+  if (!isoString || typeof isoString !== 'string' || isoString.length < 16) {
+    return null;
+  }
+
+  // Verificar que tiene el formato básico de ISO string (contiene 'T')
+  if (!isoString.includes('T')) {
+    return null;
+  }
+
+  // Extraer la parte de hora (caracteres 11-16: "HH:mm")
+  return isoString.substring(11, 16);
+}
+
+/**
+ * Formatea el tipo de ausencia para mostrar en UI
+ * Convierte guiones bajos y guiones a espacios y capitaliza
+ * Ejemplo: "enfermedad_familiar" → "Enfermedad familiar"
+ */
+export function formatAusenciaTipo(tipo: string): string {
+  if (!tipo) return '';
+
+  // Reemplazar guiones bajos y guiones con espacios
+  const conEspacios = tipo.replace(/[_-]+/g, ' ');
+
+  // Capitalizar la primera letra y convertir el resto a minúsculas
+  return conEspacios.charAt(0).toUpperCase() + conEspacios.slice(1).toLowerCase();
+}
+
 
 
 

@@ -23,9 +23,15 @@ interface CompanyClientProps {
       ultimoAcceso: Date | string | null;
     }[];
   };
+  sedes: {
+    id: string;
+    nombre: string;
+    ciudad: string;
+    activo: boolean;
+  }[];
 }
 
-export function CompanyClient({ empresa }: CompanyClientProps) {
+export function CompanyClient({ empresa, sedes }: CompanyClientProps) {
   return (
     <SettingsLayout rol="hr_admin">
       <CompanySettings
@@ -37,6 +43,7 @@ export function CompanyClient({ empresa }: CompanyClientProps) {
           createdAt: empresa.createdAt,
         }}
         hrAdmins={empresa.hrAdmins}
+        sedes={sedes}
       />
     </SettingsLayout>
   );

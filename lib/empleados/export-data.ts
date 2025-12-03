@@ -27,7 +27,7 @@ type ContratoResumen = {
   fechaInicio: Date | string | null;
   fechaFin: Date | string | null;
   tipoContrato: string;
-  salarioBrutoAnual: number | null;
+  salarioBaseAnual: number | null;
 };
 
 export interface EmpleadoExportData {
@@ -226,7 +226,7 @@ export async function loadEmpleadoExportData(
           fechaInicio: true,
           fechaFin: true,
           tipoContrato: true,
-          salarioBrutoAnual: true,
+          salarioBaseAnual: true,
           createdAt: true,
         },
         orderBy: {
@@ -235,9 +235,9 @@ export async function loadEmpleadoExportData(
         take: 50,
       },
     },
-  } satisfies Prisma.EmpleadoFindFirstArgs;
+  } satisfies Prisma.empleadosFindFirstArgs;
 
-  const empleado = await prisma.empleado.findFirst(empleadoQuery);
+  const empleado = await prisma.empleados.findFirst(empleadoQuery);
 
   if (!empleado) {
     return null;
@@ -274,7 +274,7 @@ export function buildEmpleadoExcelBuffer(data: EmpleadoExportData): Buffer {
   const workbook = XLSX.utils.book_new();
 
   // Perfil Sheet
-  const empleado = data.empleado as Partial<import('@prisma/client').Empleado>;
+  const empleado = data.empleado as Partial<import('@prisma/client').empleados>;
   const perfilEntries: (string | number | null | undefined)[][] = [
     ['ID', empleado.id],
     ['Nombre', empleado.nombre],
@@ -288,7 +288,7 @@ export function buildEmpleadoExcelBuffer(data: EmpleadoExportData): Buffer {
     ['IBAN', empleado.iban || ''],
     ['NIF', empleado.nif || ''],
     ['NSS', empleado.nss || ''],
-    ['Salario bruto anual', normalizeValue(empleado.salarioBrutoAnual)],
+    ['Salario base anual', normalizeValue(empleado.salarioBaseAnual)],
     ['Teléfono', empleado.telefono || ''],
     ['Dirección', `${empleado.direccionCalle ?? ''} ${empleado.direccionNumero ?? ''}`.trim()],
     ['Ciudad', empleado.ciudad ?? ''],
@@ -376,9 +376,9 @@ export function buildEmpleadoExcelBuffer(data: EmpleadoExportData): Buffer {
         Tipo: contrato.tipoContrato,
         FechaInicio: contrato.fechaInicio,
         FechaFin: contrato.fechaFin,
-        SalarioBrutoAnual: contrato.salarioBrutoAnual,
-        SalarioBrutoMensual: contrato.salarioBrutoAnual
-          ? Number(contrato.salarioBrutoAnual) / 12
+        SalarioBrutoAnual: contrato.salarioBaseAnual,
+        SalarioBrutoMensual: contrato.salarioBaseAnual
+          ? Number(contrato.salarioBaseAnual) / 12
           : '',
       })
     ),

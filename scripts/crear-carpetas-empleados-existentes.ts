@@ -11,7 +11,7 @@ async function crearCarpetasParaEmpleadosExistentes() {
   console.log('🚀 Iniciando creación de carpetas para empleados existentes...\n');
 
   // Obtener todos los empleados activos
-  const empleados = await prisma.empleado.findMany({
+  const empleados = await prisma.empleados.findMany({
     where: {
       activo: true,
     },
@@ -47,7 +47,7 @@ async function crearCarpetasParaEmpleadosExistentes() {
     // Crear carpetas faltantes
     for (const nombreCarpeta of CARPETAS_SISTEMA) {
       if (!nombresExistentes.includes(nombreCarpeta)) {
-        await prisma.carpeta.create({
+        await prisma.carpetas.create({
           data: {
             empresaId: empleado.empresaId,
             empleadoId: empleado.id,

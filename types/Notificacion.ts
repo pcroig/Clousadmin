@@ -19,7 +19,6 @@ export interface NotificacionMetadata {
 export interface NotificacionUI {
   id: string;
   tipo: TipoNotificacion;
-  titulo?: string | null;
   mensaje: string;
   fecha: Date;
   leida?: boolean;

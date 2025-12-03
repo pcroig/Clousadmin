@@ -16,7 +16,7 @@ export default async function MiEspacioDocumentosPage() {
     redirect('/login');
   }
 
-  const empleado = await prisma.empleado.findUnique({
+  const empleado = await prisma.empleados.findUnique({
     where: {
       usuarioId: session.user.id,
     },
@@ -38,7 +38,7 @@ export default async function MiEspacioDocumentosPage() {
   await asegurarCarpetasSistemaParaEmpleado(empleado.id, session.user.empresaId);
 
   // Re-obtener empleado con carpetas actualizadas
-  const empleadoActualizado = await prisma.empleado.findUnique({
+  const empleadoActualizado = await prisma.empleados.findUnique({
     where: {
       usuarioId: session.user.id,
     },

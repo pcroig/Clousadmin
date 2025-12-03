@@ -23,9 +23,23 @@
 
 import 'dotenv/config';
 import { hash } from 'bcryptjs';
+import { PrismaClient } from '@prisma/client';
+import { randomUUID } from 'crypto';
 
 import { UsuarioRol } from '../lib/constants/enums';
-import { prisma } from '../lib/prisma';
+
+// Crear instancia de Prisma directamente para evitar problemas de importación
+if (!process.env.DATABASE_URL) {
+  throw new Error('DATABASE_URL no está definida. Asegúrate de tener .env.local configurado.');
+}
+
+const prisma = new PrismaClient({
+  datasources: {
+    db: {
+      url: process.env.DATABASE_URL,
+    },
+  },
+});
 
 function getArgValue(key: string): string | undefined {
   const prefix = `--${key}=`;
@@ -52,7 +66,7 @@ async function resolveEmpresa() {
     process.env.PLATFORM_ADMIN_EMPRESA_ID;
 
   if (empresaIdArg) {
-    const empresa = await prisma.empresa.findUnique({
+    const empresa = await prisma.empresass.findUnique({
       where: { id: empresaIdArg },
     });
 
@@ -65,7 +79,7 @@ async function resolveEmpresa() {
     return empresa;
   }
 
-  const empresas = await prisma.empresa.findMany({
+  const empresas = await prisma.empresass.findMany({
     orderBy: { createdAt: 'asc' },
     take: 2,
   });
@@ -74,7 +88,7 @@ async function resolveEmpresa() {
     return empresas[0];
   }
 
-  const existingPlatformEmpresa = await prisma.empresa.findFirst({
+  const existingPlatformEmpresa = await prisma.empresass.findFirst({
     where: {
       OR: [
         { nombre: 'Clousadmin Platform' },
@@ -87,13 +101,15 @@ async function resolveEmpresa() {
     return existingPlatformEmpresa;
   }
 
-  return prisma.empresa.create({
+  return prisma.empresass.create({
     data: {
+      id: randomUUID(),
       nombre: 'Clousadmin Platform',
       cif: 'PLATFORM-ADMIN',
       email: 'platform@clousadmin.com',
       web: 'https://clousadmin.com',
       activo: true,
+      updatedAt: new Date(),
     },
   });
 }
@@ -123,7 +139,7 @@ async function main() {
   }
 
   const normalizedEmail = email.toLowerCase();
-  const existingUser = await prisma.usuario.findUnique({
+  const existingUser = await prisma.usuarioss.findUnique({
     where: { email: normalizedEmail },
   });
 
@@ -145,8 +161,9 @@ async function main() {
   const hashedPassword = password ? await hash(password, 12) : undefined;
 
   if (!existingUser) {
-    const created = await prisma.usuario.create({
+    const created = await prisma.usuarioss.create({
       data: {
+        id: randomUUID(),
         email: normalizedEmail,
         password: hashedPassword!,
         nombre,
@@ -155,6 +172,7 @@ async function main() {
         activo: true,
         emailVerificado: true,
         empresaId: empresa.id,
+        updatedAt: new Date(),
       },
     });
 
@@ -187,7 +205,7 @@ async function main() {
     updateData.empresaId = empresa.id;
   }
 
-  const updated = await prisma.usuario.update({
+  const updated = await prisma.usuarioss.update({
     where: { id: existingUser.id },
     data: updateData,
   });

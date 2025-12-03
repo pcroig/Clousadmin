@@ -20,23 +20,23 @@ export type ViewportSize = 'mobile' | 'tablet' | 'desktop';
 
 export const MOBILE_DESIGN = {
   /**
-   * Tamaños de texto - Compactos para mobile
+   * Tamaños de texto - MÁS COMPACTOS para mobile
    */
   text: {
     // Títulos
-    pageTitle: 'text-lg font-bold', // Buenos días (solo desktop)
-    widgetTitle: 'text-sm font-semibold', // Título de widget
-    sectionTitle: 'text-sm font-semibold', // Próximas ausencias
-    cardTitle: 'text-xs font-semibold',
+    pageTitle: 'text-base font-bold', // Buenos días (solo desktop)
+    widgetTitle: 'text-xs font-semibold', // Título de widget
+    sectionTitle: 'text-xs font-semibold', // Próximas ausencias
+    cardTitle: 'text-[11px] font-semibold',
 
     // Contenido
-    display: 'text-xl font-bold', // Cronómetro principal - compacto para mobile
-    displayLarge: 'text-2xl font-bold', // Números grandes
-    body: 'text-xs', // Texto del cuerpo más pequeño
-    bodyMedium: 'text-sm',
-    caption: 'text-[11px] text-gray-500',
-    tiny: 'text-[10px] text-gray-500',
-    label: 'text-xs font-medium text-gray-700',
+    display: 'text-lg font-bold', // Cronómetro principal - más compacto
+    displayLarge: 'text-xl font-bold', // Números grandes
+    body: 'text-[11px]', // Texto del cuerpo más pequeño
+    bodyMedium: 'text-xs',
+    caption: 'text-[10px] text-gray-500',
+    tiny: 'text-[9px] text-gray-500',
+    label: 'text-[11px] font-medium text-gray-700',
   },
 
   /**
@@ -44,39 +44,39 @@ export const MOBILE_DESIGN = {
    */
   button: {
     // Altura mínima para touch targets
-    primary: 'min-h-[44px] text-sm font-semibold py-2.5 px-4',
-    secondary: 'min-h-[40px] text-xs font-medium py-2 px-3',
-    compact: 'min-h-[36px] text-[11px] py-1.5 px-2.5',
-    icon: 'h-11 w-11 min-h-[44px]', // Touch target para iconos
-    iconSmall: 'h-9 w-9 min-h-[36px]',
+    primary: 'min-h-[44px] text-xs font-semibold py-2.5 px-3',
+    secondary: 'min-h-[40px] text-[11px] font-medium py-2 px-2.5',
+    compact: 'min-h-[36px] text-[10px] py-1.5 px-2',
+    icon: 'h-10 w-10 min-h-[40px]', // Touch target para iconos
+    iconSmall: 'h-8 w-8 min-h-[32px]',
   },
 
   /**
-   * Espaciado - Reducido para mobile pero manteniendo usabilidad
+   * Espaciado - MÁS REDUCIDO para mobile pero manteniendo usabilidad
    */
   spacing: {
     // Padding de contenedores
-    page: 'px-4 py-4',
-    pageTop: 'pt-4',
-    pageBottom: 'pb-4',
-    pageHorizontal: 'px-4',
+    page: 'px-3 py-3',
+    pageTop: 'pt-3',
+    pageBottom: 'pb-3',
+    pageHorizontal: 'px-3',
     
     // Padding de widgets y cards
-    widget: 'p-3',
+    widget: 'p-2.5',
     widgetCompact: 'p-2',
-    card: 'p-2.5',
-    cardLarge: 'p-4',
+    card: 'p-2',
+    cardLarge: 'p-3',
     
     // Spacing entre elementos
-    section: 'space-y-2',
-    sectionLarge: 'space-y-3',
-    items: 'space-y-1.5',
-    itemsCompact: 'space-y-1',
+    section: 'space-y-1.5',
+    sectionLarge: 'space-y-2',
+    items: 'space-y-1',
+    itemsCompact: 'space-y-0.5',
     
     // Gaps para grid/flex
-    gap: 'gap-2',
-    gapLarge: 'gap-3',
-    gapSmall: 'gap-1.5',
+    gap: 'gap-1.5',
+    gapLarge: 'gap-2',
+    gapSmall: 'gap-1',
   },
 
   /**
@@ -113,22 +113,22 @@ export const MOBILE_DESIGN = {
   },
 
   /**
-   * Tamaños de componentes específicos
+   * Tamaños de componentes específicos - MÁS PEQUEÑOS
    */
   components: {
     avatar: {
-      small: 'h-6 w-6',
-      medium: 'h-8 w-8',
-      large: 'h-10 w-10',
+      small: 'h-5 w-5',
+      medium: 'h-7 w-7',
+      large: 'h-9 w-9',
     },
     badge: {
-      small: 'text-[10px] px-1.5 py-0.5',
-      medium: 'text-xs px-2 py-1',
+      small: 'text-[9px] px-1.5 py-0',
+      medium: 'text-[10px] px-1.5 py-0.5',
     },
     icon: {
-      small: 'h-4 w-4',
-      medium: 'h-5 w-5',
-      large: 'h-6 w-6',
+      small: 'h-3.5 w-3.5',
+      medium: 'h-4 w-4',
+      large: 'h-5 w-5',
     },
     input: {
       height: 'min-h-[44px]', // Touch target

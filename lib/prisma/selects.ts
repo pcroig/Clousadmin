@@ -1,6 +1,6 @@
 import { Prisma } from '@prisma/client';
 
-const empleadoBaseSelect: Prisma.EmpleadoSelect = {
+const empleadoBaseSelect: Prisma.empleadosSelect = {
   id: true,
   nombre: true,
   apellidos: true,
@@ -9,11 +9,11 @@ const empleadoBaseSelect: Prisma.EmpleadoSelect = {
   fotoUrl: true,
 };
 
-export const empleadoSelectBasico = Prisma.validator<Prisma.EmpleadoSelect>()({
+export const empleadoSelectBasico = Prisma.validator<Prisma.empleadosSelect>()({
   ...empleadoBaseSelect,
 });
 
-export const empleadoSelectConUsuario = Prisma.validator<Prisma.EmpleadoSelect>()({
+export const empleadoSelectConUsuario = Prisma.validator<Prisma.empleadosSelect>()({
   ...empleadoBaseSelect,
   usuario: {
     select: {
@@ -27,7 +27,7 @@ export const empleadoSelectConUsuario = Prisma.validator<Prisma.EmpleadoSelect>(
   },
 });
 
-export const empleadoSelectConPuesto = Prisma.validator<Prisma.EmpleadoSelect>()({
+export const empleadoSelectConPuesto = Prisma.validator<Prisma.empleadosSelect>()({
   ...empleadoBaseSelect,
   puestoRelacion: {
     select: {
@@ -37,7 +37,7 @@ export const empleadoSelectConPuesto = Prisma.validator<Prisma.EmpleadoSelect>()
   },
 });
 
-export const empleadoSelectDashboard = Prisma.validator<Prisma.EmpleadoSelect>()({
+export const empleadoSelectDashboard = Prisma.validator<Prisma.empleadosSelect>()({
   ...empleadoBaseSelect,
   manager: {
     select: {
@@ -71,8 +71,10 @@ export const empleadoSelectDashboard = Prisma.validator<Prisma.EmpleadoSelect>()
   },
 });
 
-export const empleadoSelectListado = Prisma.validator<Prisma.EmpleadoSelect>()({
+export const empleadoSelectListado = Prisma.validator<Prisma.empleadosSelect>()({
   ...empleadoBaseSelect,
+  onboardingCompletado: true,
+  onboardingCompletadoEn: true,
   usuario: {
     select: {
       id: true,
@@ -107,18 +109,18 @@ export const empleadoSelectListado = Prisma.validator<Prisma.EmpleadoSelect>()({
   },
 });
 
-export const jornadaSelectResumida = Prisma.validator<Prisma.JornadaSelect>()({
+export const jornadaSelectResumida = Prisma.validator<Prisma.jornadasSelect>()({
   id: true,
   nombre: true,
   horasSemanales: true,
 });
 
-export const jornadaSelectCompleta = Prisma.validator<Prisma.JornadaSelect>()({
+export const jornadaSelectCompleta = Prisma.validator<Prisma.jornadasSelect>()({
   ...jornadaSelectResumida,
   config: true,
 });
 
-const fichajeBaseSelect: Prisma.FichajeSelect = {
+const fichajeBaseSelect: Prisma.fichajesSelect = {
   id: true,
   empleadoId: true,
   fecha: true,
@@ -127,11 +129,11 @@ const fichajeBaseSelect: Prisma.FichajeSelect = {
   horasEnPausa: true,
 };
 
-export const fichajeSelectBasico = Prisma.validator<Prisma.FichajeSelect>()({
+export const fichajeSelectBasico = Prisma.validator<Prisma.fichajesSelect>()({
   ...fichajeBaseSelect,
 });
 
-export const fichajeSelectConEventos = Prisma.validator<Prisma.FichajeSelect>()({
+export const fichajeSelectConEventos = Prisma.validator<Prisma.fichajesSelect>()({
   ...fichajeBaseSelect,
   eventos: {
     orderBy: {

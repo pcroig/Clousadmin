@@ -15,7 +15,7 @@ export default async function MiEspacioContratosPage() {
     redirect('/login');
   }
 
-  const empleado = await prisma.empleado.findUnique({
+  const empleado = await prisma.empleados.findUnique({
     where: {
       usuarioId: session.user.id,
     },
@@ -25,9 +25,9 @@ export default async function MiEspacioContratosPage() {
           fechaInicio: 'desc',
         },
       },
-      complementos: {
+      empleado_complementos: {
         include: {
-          tipoComplemento: {
+          tipos_complemento: {
             select: {
               id: true,
               nombre: true,

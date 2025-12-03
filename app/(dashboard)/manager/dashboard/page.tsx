@@ -29,7 +29,7 @@ export default async function ManagerDashboardPage() {
   }
 
   // Obtener empleado del manager (solo campos necesarios)
-  const manager = await prisma.empleado.findUnique({
+  const manager = await prisma.empleados.findUnique({
     where: {
       usuarioId: session.user.id,
     },
@@ -63,7 +63,7 @@ export default async function ManagerDashboardPage() {
     : null;
 
   // Obtener solicitudes pendientes del equipo del manager
-  const ausenciasPendientes = await prisma.ausencia.findMany({
+  const ausenciasPendientes = await prisma.ausencias.findMany({
     where: {
       empresaId: session.user.empresaId,
       estado: EstadoAusencia.pendiente,
@@ -77,6 +77,8 @@ export default async function ManagerDashboardPage() {
           nombre: true,
           apellidos: true,
           fotoUrl: true,
+          email: true,
+          puesto: true,
         },
       },
     },
@@ -87,23 +89,45 @@ export default async function ManagerDashboardPage() {
   });
 
   // Convertir a formato de solicitudes
-  const solicitudes = ausenciasPendientes.map((aus) => ({
-    id: aus.id,
-    empleado: {
-      nombre: `${aus.empleado.nombre} ${aus.empleado.apellidos}`,
-      fotoUrl: aus.empleado.fotoUrl || undefined,
-    },
-    tipo: 'ausencia' as const,
-    descripcion: `${aus.tipo}`,
-    fecha: aus.createdAt,
-    prioridad: 'media' as const,
-  }));
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const solicitudes = ausenciasPendientes.map((aus: any) => {
+    const fechaInicio = new Date(aus.fechaInicio);
+    const fechaFin = new Date(aus.fechaFin);
+    const periodo = `${fechaInicio.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })} - ${fechaFin.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}`;
+
+    return {
+      id: aus.id,
+      empleado: {
+        nombre: aus.empleado.nombre,
+        apellidos: aus.empleado.apellidos,
+        fotoUrl: aus.empleado.fotoUrl || undefined,
+        email: aus.empleado.email || undefined,
+        puesto: aus.empleado.puesto || undefined,
+      },
+      tipo: 'ausencia' as const,
+      descripcion: `${aus.tipo} (${periodo})`,
+      fecha: aus.createdAt,
+      prioridad: 'media' as const,
+      estadoLabel: 'Pendiente de aprobación',
+    };
+  });
 
   // Notificaciones reales para el manager actual
-  const notificacionesDb = await prisma.notificacion.findMany({
+  const notificacionesDb = await prisma.notificaciones.findMany({
     where: {
       empresaId: session.user.empresaId,
       usuarioId: session.user.id,
+    },
+    select: {
+      id: true,
+      empresaId: true,
+      usuarioId: true,
+      tipo: true,
+      mensaje: true,
+      metadata: true,
+      leida: true,
+      createdAt: true,
+      eventoNominaId: true,
     },
     orderBy: {
       createdAt: 'desc',
@@ -114,7 +138,6 @@ export default async function ManagerDashboardPage() {
   const notificaciones: NotificacionUI[] = notificacionesDb.map((notif) => ({
     id: notif.id,
     tipo: notif.tipo as TipoNotificacion,
-    titulo: notif.titulo,
     mensaje: notif.mensaje,
     fecha: notif.createdAt,
     leida: notif.leida,
@@ -129,7 +152,7 @@ export default async function ManagerDashboardPage() {
   ayerDate.setDate(ayerDate.getDate() - 1);
 
   // Empleados del manager (activos) para filtrar métricas
-  const empleadosEquipo = await prisma.empleado.findMany({
+  const empleadosEquipo = await prisma.empleados.findMany({
     where: {
       managerId: manager.id,
       activo: true,
@@ -141,7 +164,7 @@ export default async function ManagerDashboardPage() {
   const empleadoIds = empleadosEquipo.map((empleado) => empleado.id);
 
   const fichajesHoy = empleadoIds.length
-    ? await prisma.fichaje.count({
+    ? await prisma.fichajes.count({
         where: {
           empresaId: session.user.empresaId,
           empleadoId: {
@@ -153,7 +176,7 @@ export default async function ManagerDashboardPage() {
     : 0;
 
   const fichajesAyer = empleadoIds.length
-    ? await prisma.fichaje.count({
+    ? await prisma.fichajes.count({
         where: {
           empresaId: session.user.empresaId,
           empleadoId: {
@@ -175,7 +198,7 @@ export default async function ManagerDashboardPage() {
 
   // Auto-completed stats
   const pendientes = empleadoIds.length
-    ? await prisma.autoCompletado.count({
+    ? await prisma.auto_completados.count({
         where: {
           empresaId: session.user.empresaId,
           estado: 'pendiente',
@@ -187,7 +210,7 @@ export default async function ManagerDashboardPage() {
     : 0;
 
   const aprobados = empleadoIds.length
-    ? await prisma.autoCompletado.count({
+    ? await prisma.auto_completados.count({
         where: {
           empresaId: session.user.empresaId,
           estado: 'aprobado',
@@ -219,8 +242,10 @@ export default async function ManagerDashboardPage() {
         <div className="flex-1 min-h-0 pb-4 overflow-auto">
           <PlantillaWidget
             trabajando={plantillaResumenEquipo.trabajando}
+            enPausa={plantillaResumenEquipo.enPausa}
             ausentes={plantillaResumenEquipo.ausentes}
             sinFichar={plantillaResumenEquipo.sinFichar}
+            fueraDeHorario={plantillaResumenEquipo.fueraDeHorario}
             rol="manager"
             variant="compact"
           />
@@ -263,8 +288,10 @@ export default async function ManagerDashboardPage() {
             <div className="h-full min-h-[220px]">
               <PlantillaWidget
                 trabajando={plantillaResumenEquipo.trabajando}
+                enPausa={plantillaResumenEquipo.enPausa}
                 ausentes={plantillaResumenEquipo.ausentes}
                 sinFichar={plantillaResumenEquipo.sinFichar}
+                fueraDeHorario={plantillaResumenEquipo.fueraDeHorario}
                 rol="manager"
                 variant="card"
               />

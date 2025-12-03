@@ -25,9 +25,9 @@ export interface Empleado {
   numeroHijos?: number | null;
   fotoUrl?: string | null;
   iban?: string | null;
-  titularCuenta?: string | null;
-  salarioBrutoAnual?: number | null;
-  salarioBrutoMensual?: number | null;
+  bic?: string | null;
+  salarioBaseAnual?: number | null;
+  salarioBaseMensual?: number | null;
   tipoContrato?: string | null;
   puestoId?: string | null;
   categoriaProfesional?: string | null;
@@ -118,7 +118,7 @@ export interface MiEspacioContratoResumen {
   tipoContrato: string | null;
   fechaInicio: string;
   fechaFin?: string | null;
-  salarioBrutoAnual?: number | null;
+  salarioBaseAnual?: number | null;
   documentoId?: string | null;
 }
 
@@ -139,6 +139,13 @@ export interface MiEspacioDocumento {
   tipoDocumento?: string | null;
   tamano?: number | null;
   createdAt?: string | null;
+  mimeType?: string | null;
+  firmaInfo?: {
+    tieneSolicitud: boolean;
+    firmado: boolean;
+    firmaId?: string;
+    estadoSolicitud: string;
+  } | null;
 }
 
 export interface MiEspacioCarpeta {
@@ -151,7 +158,7 @@ export interface MiEspacioCarpeta {
 
 export interface MiEspacioSaldoAusencia {
   id: string;
-  año: number;
+  anio: number;
   diasTotales: number;
   diasUsados: number;
   diasPendientes: number;
@@ -180,7 +187,7 @@ export interface MiEspacioEmpleado {
   numeroHijos?: number | null;
   genero?: string | null;
   iban?: string | null;
-  titularCuenta?: string | null;
+  bic?: string | null;
   puesto?: string | null;
   puestoId?: string | null;
   puestoRelacion?: MiEspacioPuesto | null;
@@ -193,8 +200,8 @@ export interface MiEspacioEmpleado {
   grupoCotizacion?: number | null;
   estadoEmpleado?: string | null;
   activo: boolean;
-  salarioBrutoAnual?: number | null;
-  salarioBrutoMensual?: number | null;
+  salarioBaseAnual?: number | null;
+  salarioBaseMensual?: number | null;
   numPagas?: number | string | null;
   complementos?: MiEspacioComplementoResumen[];
   contratos?: MiEspacioContratoResumen[];

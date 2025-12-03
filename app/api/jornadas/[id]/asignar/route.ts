@@ -47,7 +47,7 @@ export async function POST(
     const { empleadoIds, equipoId, aplicarATodos } = validatedData;
 
     // Verificar que la jornada existe y pertenece a la empresa
-    const jornada = await prisma.jornada.findUnique({
+    const jornada = await prisma.jornadas.findUnique({
       where: {
         id: jornadaId,
         empresaId: session.user.empresaId,
@@ -62,7 +62,7 @@ export async function POST(
 
     if (aplicarATodos) {
       // Aplicar a todos los empleados de la empresa
-      const result = await prisma.empleado.updateMany({
+      const result = await prisma.empleados.updateMany({
         where: {
           empresaId: session.user.empresaId,
           activo: true,
@@ -74,7 +74,7 @@ export async function POST(
       empleadosActualizados = result.count;
     } else if (equipoId) {
       // Aplicar a todos los empleados de un equipo
-      const result = await prisma.empleado.updateMany({
+      const result = await prisma.empleados.updateMany({
         where: {
           empresaId: session.user.empresaId,
           equipos: {
@@ -91,7 +91,7 @@ export async function POST(
       empleadosActualizados = result.count;
     } else if (empleadoIds && empleadoIds.length > 0) {
       // Aplicar a empleados específicos
-      const result = await prisma.empleado.updateMany({
+      const result = await prisma.empleados.updateMany({
         where: {
           id: {
             in: empleadoIds,

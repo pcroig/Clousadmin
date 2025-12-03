@@ -4,7 +4,7 @@
 // Importante: este archivo NO debe importar `prisma` ni usar APIs de Node.
 // Solo contiene lógica pura que puede ejecutarse en el navegador.
 
-import type { FichajeEvento } from '@prisma/client';
+import type { fichaje_eventos as FichajeEvento } from '@prisma/client';
 
 import { obtenerNombreDia } from '@/lib/utils/fechas';
 

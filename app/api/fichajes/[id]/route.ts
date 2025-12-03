@@ -19,6 +19,7 @@ import {
   validarFichajeCompleto,
 } from '@/lib/calculos/fichajes';
 import { EstadoFichaje, UsuarioRol } from '@/lib/constants/enums';
+import { crearNotificacionFichajeAprobado, crearNotificacionFichajeModificado, crearNotificacionFichajeRechazado } from '@/lib/notificaciones';
 import { prisma } from '@/lib/prisma';
 import { getJsonBody } from '@/lib/utils/json';
 
@@ -51,7 +52,7 @@ export async function GET(
 
     const { id } = await params;
 
-    const fichaje = await prisma.fichaje.findUnique({
+    const fichaje = await prisma.fichajes.findUnique({
       where: {
         id,
         empresaId: session.user.empresaId,
@@ -105,7 +106,7 @@ export async function PATCH(
     const { id } = await params;
 
     // Obtener fichaje
-    const fichaje = await prisma.fichaje.findUnique({
+    const fichaje = await prisma.fichajes.findUnique({
       where: {
         id,
         empresaId: session.user.empresaId,
@@ -138,12 +139,12 @@ export async function PATCH(
         rawBody !== null &&
         'motivoRechazo' in rawBody &&
         typeof (rawBody as Record<string, unknown>).motivoRechazo === 'string'
-          ? (rawBody as Record<string, unknown>).motivoRechazo
+          ? ((rawBody as Record<string, unknown>).motivoRechazo as string)
           : undefined;
 
       if (accion === 'aprobar') {
         // Validar que el fichaje tiene los eventos mínimos requeridos (entrada y salida)
-        const eventos = await prisma.fichajeEvento.findMany({
+        const eventos = await prisma.fichaje_eventos.findMany({
           where: { fichajeId: fichaje.id },
           orderBy: { hora: 'asc' },
         });
@@ -162,21 +163,73 @@ export async function PATCH(
           );
         }
 
-        const actualizado = await prisma.fichaje.update({
+        // FIX: Recalcular horas trabajadas y en pausa antes de aprobar
+        const { calcularHorasTrabajadas, calcularTiempoEnPausa } = await import('@/lib/calculos/fichajes');
+        const horasTrabajadas = calcularHorasTrabajadas(eventos) ?? 0;
+        const horasEnPausa = calcularTiempoEnPausa(eventos);
+
+        const actualizado = await prisma.fichajes.update({
           where: { id },
           data: {
             estado: EstadoFichaje.finalizado,
+            horasTrabajadas,
+            horasEnPausa,
           },
         });
 
+        // Notificar al empleado
+        try {
+          await crearNotificacionFichajeAprobado(
+            prisma,
+            {
+              fichajeId: fichaje.id,
+              empresaId: session.user.empresaId,
+              empleadoId: fichaje.empleadoId,
+              fecha: fichaje.fecha,
+            },
+            { actorUsuarioId: session.user.id }
+          );
+        } catch (error) {
+          console.error('[Fichajes] Error creando notificación de aprobación:', error);
+        }
+
         return successResponse(actualizado);
       } else if (accion === 'rechazar') {
-        const actualizado = await prisma.fichaje.update({
+        // FIX: También recalcular al rechazar para mantener datos actualizados
+        const eventos = await prisma.fichaje_eventos.findMany({
+          where: { fichajeId: fichaje.id },
+          orderBy: { hora: 'asc' },
+        });
+
+        const { calcularHorasTrabajadas, calcularTiempoEnPausa } = await import('@/lib/calculos/fichajes');
+        const horasTrabajadas = calcularHorasTrabajadas(eventos) ?? 0;
+        const horasEnPausa = calcularTiempoEnPausa(eventos);
+
+        const actualizado = await prisma.fichajes.update({
           where: { id },
           data: {
             estado: EstadoFichaje.pendiente, // Rechazado pasa a pendiente
+            horasTrabajadas,
+            horasEnPausa,
           },
         });
+
+        // Notificar al empleado
+        try {
+          await crearNotificacionFichajeRechazado(
+            prisma,
+            {
+              fichajeId: fichaje.id,
+              empresaId: session.user.empresaId,
+              empleadoId: fichaje.empleadoId,
+              fecha: fichaje.fecha,
+              motivoRechazo,
+            },
+            { actorUsuarioId: session.user.id }
+          );
+        } catch (error) {
+          console.error('[Fichajes] Error creando notificación de rechazo:', error);
+        }
 
         return successResponse(actualizado);
       }
@@ -200,7 +253,7 @@ export async function PATCH(
     // Actualizar evento del fichaje (por ahora solo actualizar la hora si se proporciona)
     if (validatedData.hora || validatedData.tipo) {
       // Buscar el evento a editar (por defecto el último evento del día)
-      const eventos = await prisma.fichajeEvento.findMany({
+      const eventos = await prisma.fichaje_eventos.findMany({
         where: { fichajeId: id },
         orderBy: { hora: 'desc' },
         take: 1,
@@ -208,11 +261,11 @@ export async function PATCH(
 
       if (eventos.length > 0) {
         const evento = eventos[0];
-        
-        await prisma.fichajeEvento.update({
+
+        await prisma.fichaje_eventos.update({
           where: { id: evento.id },
           data: {
-            ...(validatedData.hora && { 
+            ...(validatedData.hora && {
               hora: new Date(validatedData.hora),
               horaOriginal: evento.hora, // Audit: save original time
             }),
@@ -225,12 +278,36 @@ export async function PATCH(
 
         // Recalcular horas trabajadas
         await actualizarCalculosFichaje(id);
+
+        // Notificar al empleado del cambio
+        try {
+          const modificadorNombre = session.user.nombre || 'RR.HH.';
+          const detalles = validatedData.motivoEdicion
+            ? `Motivo: ${validatedData.motivoEdicion}`
+            : undefined;
+
+          await crearNotificacionFichajeModificado(
+            prisma,
+            {
+              fichajeId: fichaje.id,
+              empresaId: session.user.empresaId,
+              empleadoId: fichaje.empleadoId,
+              modificadoPorNombre: modificadorNombre,
+              accion: 'editado',
+              fechaFichaje: fichaje.fecha,
+              detalles,
+            },
+            { actorUsuarioId: session.user.id }
+          );
+        } catch (error) {
+          console.error('[Fichajes] Error creando notificación de edición:', error);
+        }
       }
     }
 
     // Actualizar fecha del fichaje si se proporciona
     if (validatedData.fecha) {
-      await prisma.fichaje.update({
+      await prisma.fichajes.update({
         where: { id },
         data: {
           fecha: new Date(validatedData.fecha),
@@ -248,13 +325,13 @@ export async function PATCH(
       fichaje.estado === EstadoFichaje.pendiente &&
       (session.user.rol === UsuarioRol.hr_admin || session.user.rol === UsuarioRol.manager)
     ) {
-      await prisma.fichaje.update({
+      await prisma.fichajes.update({
         where: { id },
         data: { estado: EstadoFichaje.finalizado },
       });
     }
 
-    const fichajeActualizado = await prisma.fichaje.findUnique({
+    const fichajeActualizado = await prisma.fichajes.findUnique({
       where: { id },
       include: {
         eventos: {
@@ -283,7 +360,7 @@ export async function DELETE(
 
     const { id } = await params;
 
-    await prisma.fichaje.delete({
+    await prisma.fichajes.delete({
       where: {
         id,
         empresaId: session.user.empresaId,

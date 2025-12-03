@@ -38,7 +38,7 @@ export async function POST(
     const { id: campanaId } = await params;
 
     // Obtener campaña con preferencias completas
-    const campana = await prisma.campanaVacaciones.findFirst({
+    const campana = await prisma.campanas_vacaciones.findFirst({
       where: {
         id: campanaId,
         empresaId: session.user.empresaId,
@@ -87,7 +87,7 @@ export async function POST(
 
     // Obtener ausencias ya aprobadas que puedan afectar el cuadrado
     const empleadoIds = campana.preferencias.map(p => p.empleado.id);
-    const ausenciasAprobadas = await prisma.ausencia.findMany({
+    const ausenciasAprobadas = await prisma.ausencias.findMany({
       where: {
         empleadoId: { in: empleadoIds },
         estado: { in: [EstadoAusencia.confirmada, EstadoAusencia.completada] },
@@ -109,7 +109,7 @@ export async function POST(
     });
 
     // Guardar resultado en la campaña sin cerrar aún
-    await prisma.campanaVacaciones.update({
+    await prisma.campanas_vacaciones.update({
       where: { id: campanaId },
       data: {
         propuestaIA: asJsonValue(resultado),
@@ -119,7 +119,7 @@ export async function POST(
 
     // Guardar propuestas individuales en cada preferencia
     for (const propuesta of resultado.propuestas) {
-      await prisma.preferenciaVacaciones.updateMany({
+      await prisma.preferencias_vacaciones.updateMany({
         where: {
           campanaId,
           empleadoId: propuesta.empleadoId,

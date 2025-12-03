@@ -36,7 +36,7 @@ export async function PATCH(
     const data = UpdateComplementoSchema.parse(body);
 
     // Verificar que el complemento pertenece al empleado y a la empresa
-    const complemento = await prisma.empleadoComplemento.findFirst({
+    const complemento = await prisma.empleado_complementos.findFirst({
       where: {
         id: complementoId,
         empleadoId: id,
@@ -71,7 +71,7 @@ export async function PATCH(
 
     // Verificar contrato si se especificó
     if (data.contratoId) {
-      const contrato = await prisma.contrato.findFirst({
+      const contrato = await prisma.contratos.findFirst({
         where: {
           id: data.contratoId,
           empleadoId: id,
@@ -83,11 +83,11 @@ export async function PATCH(
       }
     }
 
-    const updated = await prisma.empleadoComplemento.update({
+    const updated = await prisma.empleado_complementos.update({
       where: { id: complementoId },
       data,
       include: {
-        tipoComplemento: true,
+        tipos_complemento: true,
         contrato: {
           select: {
             id: true,
@@ -133,7 +133,7 @@ export async function DELETE(
     const { id, complementoId } = await params;
 
     // Verificar que el complemento pertenece al empleado y a la empresa
-    const complemento = await prisma.empleadoComplemento.findFirst({
+    const complemento = await prisma.empleado_complementos.findFirst({
       where: {
         id: complementoId,
         empleadoId: id,
@@ -143,7 +143,7 @@ export async function DELETE(
           select: { empresaId: true },
         },
         _count: {
-          select: { asignaciones: true },
+          select: { asignaciones_complemento: true },
         },
       },
     });
@@ -160,8 +160,8 @@ export async function DELETE(
     }
 
     // Si tiene asignaciones en nóminas, solo desactivar
-    if (complemento._count.asignaciones > 0) {
-      await prisma.empleadoComplemento.update({
+    if (complemento._count.asignaciones_complemento > 0) {
+      await prisma.empleado_complementos.update({
         where: { id: complementoId },
         data: { activo: false },
       });
@@ -173,7 +173,7 @@ export async function DELETE(
     }
 
     // Si no tiene asignaciones, eliminar físicamente
-    await prisma.empleadoComplemento.delete({
+    await prisma.empleado_complementos.delete({
       where: { id: complementoId },
     });
 

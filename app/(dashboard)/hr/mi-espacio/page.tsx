@@ -15,7 +15,7 @@ export default async function MiEspacioHRPage() {
     redirect('/login');
   }
 
-  const empleado = await prisma.empleado.findUnique({
+  const empleado = await prisma.empleados.findUnique({
     where: {
       usuarioId: session.user.id,
     },
@@ -34,7 +34,7 @@ export default async function MiEspacioHRPage() {
       contratos: true,
       saldosAusencias: {
         where: {
-          año: new Date().getFullYear(),
+          anio: new Date().getFullYear(),
         },
       },
       jornada: {
@@ -61,7 +61,7 @@ export default async function MiEspacioHRPage() {
     redirect('/hr/dashboard');
   }
 
-  const usuario = await prisma.usuario.findUnique({
+  const usuario = await prisma.usuarios.findUnique({
     where: {
       id: session.user.id,
     },

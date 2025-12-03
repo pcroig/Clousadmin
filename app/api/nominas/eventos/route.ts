@@ -38,7 +38,7 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const anio = searchParams.get('anio');
 
-    const eventos = await prisma.eventoNomina.findMany({
+    const eventos = await prisma.eventos_nomina.findMany({
       where: {
         empresaId: session.user.empresaId,
         ...(anio ? { anio: parseInt(anio) } : {}),
@@ -82,7 +82,7 @@ export async function GET(req: NextRequest) {
     }
 
     const compensaciones = rangoInicio && rangoFin
-      ? await prisma.compensacionHoraExtra.findMany({
+      ? await prisma.compensaciones_horas_extra.findMany({
           where: {
             empresaId: session.user.empresaId,
             createdAt: {
@@ -185,7 +185,7 @@ export async function POST(req: NextRequest) {
     const data = GenerarEventoSchema.parse(payload);
 
     // Verificar que no existe ya un evento para este mes/año
-    const existente = await prisma.eventoNomina.findFirst({
+    const existente = await prisma.eventos_nomina.findFirst({
       where: {
         empresaId: session.user.empresaId,
         mes: data.mes,
@@ -209,7 +209,7 @@ export async function POST(req: NextRequest) {
       : new Date(data.anio, data.mes, 0, 23, 59, 59); // Último día del mes
 
     // Crear el evento de nómina (estado: abierto)
-    const evento = await prisma.eventoNomina.create({
+    const evento = await prisma.eventos_nomina.create({
       data: {
         empresaId: session.user.empresaId,
         mes: data.mes,
@@ -231,11 +231,11 @@ export async function POST(req: NextRequest) {
         anio: data.anio,
       });
     } catch (error) {
-      await prisma.eventoNomina.delete({ where: { id: evento.id } }).catch(() => {});
+      await prisma.eventos_nomina.delete({ where: { id: evento.id } }).catch(() => {});
       throw error;
     }
 
-    const eventoActualizado = await prisma.eventoNomina.findUnique({
+    const eventoActualizado = await prisma.eventos_nomina.findUnique({
       where: { id: evento.id },
     });
 
@@ -244,7 +244,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Enviar notificaciones a los managers para completar complementos
-    const managers = await prisma.empleado.findMany({
+    const managers = await prisma.empleados.findMany({
       where: {
         empresaId: session.user.empresaId,
         usuario: {
@@ -260,14 +260,18 @@ export async function POST(req: NextRequest) {
     if (resultadoGeneracion.empleadosConComplementos > 0) {
       await Promise.all(
         managers.map((manager) =>
-          crearNotificacionComplementosPendientes(prisma, {
-            nominaId: evento.id,
-            empresaId: session.user.empresaId,
-            managerId: manager.id,
-            empleadosCount: resultadoGeneracion.empleadosConComplementos,
-            mes: data.mes,
-            año: data.anio,
-          })
+          crearNotificacionComplementosPendientes(
+            prisma,
+            {
+              nominaId: evento.id,
+              empresaId: session.user.empresaId,
+              managerId: manager.id,
+              empleadosCount: resultadoGeneracion.empleadosConComplementos,
+              mes: data.mes,
+              año: data.anio,
+            },
+            { actorUsuarioId: session.user.id }
+          )
         )
       );
     }

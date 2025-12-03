@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
     const antiguedad = searchParams.get('antiguedad');
 
     // Construir filtros base
-    const where: Prisma.EmpleadoWhereInput = {
+    const where: Prisma.empleadosWhereInput = {
       empresaId: session.user.empresaId,
       estadoEmpleado: 'activo',
     };
@@ -57,7 +57,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Obtener empleados con equipos
-    const empleados = await prisma.empleado.findMany({
+    const empleados = await prisma.empleados.findMany({
       where,
       select: {
         id: true,
@@ -84,7 +84,7 @@ export async function GET(request: NextRequest) {
     mesAnterior.setMonth(mesAnterior.getMonth() - 1);
     mesAnterior.setHours(0, 0, 0, 0);
 
-    const empleadosMesAnterior = await prisma.empleado.count({
+    const empleadosMesAnterior = await prisma.empleados.count({
       where: {
         ...where,
         fechaAlta: { lte: mesAnterior },
@@ -115,7 +115,7 @@ export async function GET(request: NextRequest) {
 
     // 4. Evolución plantilla (últimos 12 meses)
     // Optimización: Cargar todos los empleados una vez y calcular en memoria
-    const todosEmpleados = await prisma.empleado.findMany({
+    const todosEmpleados = await prisma.empleados.findMany({
       where: {
         empresaId: session.user.empresaId,
       },
@@ -155,14 +155,14 @@ export async function GET(request: NextRequest) {
     inicioMesActual.setDate(1);
     inicioMesActual.setHours(0, 0, 0, 0);
 
-    const altasMes = await prisma.empleado.count({
+    const altasMes = await prisma.empleados.count({
       where: {
         empresaId: session.user.empresaId,
         fechaAlta: { gte: inicioMesActual },
       },
     });
 
-    const bajasMes = await prisma.empleado.count({
+    const bajasMes = await prisma.empleados.count({
       where: {
         empresaId: session.user.empresaId,
         fechaBaja: { gte: inicioMesActual },

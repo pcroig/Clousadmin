@@ -20,7 +20,7 @@ async function main() {
 
   console.log('📋 Estado actual de las cuentas:');
   for (const email of emailsSeed) {
-    const usuario = await prisma.usuario.findUnique({
+    const usuario = await prisma.usuarios.findUnique({
       where: { email },
       include: { empleado: true },
     });
@@ -35,7 +35,7 @@ async function main() {
       // Forzar actualización si no está activo
       if (usuario.activo !== true) {
         console.log(`    ⚠️  ACTIVANDO USUARIO...`);
-        await prisma.usuario.update({
+        await prisma.usuarios.update({
           where: { email },
           data: { activo: true },
         });
@@ -44,7 +44,7 @@ async function main() {
 
       if (usuario.empleado && usuario.empleado.activo !== true) {
         console.log(`    ⚠️  ACTIVANDO EMPLEADO...`);
-        await prisma.empleado.update({
+        await prisma.empleados.update({
           where: { id: usuario.empleado.id },
           data: { activo: true },
         });
@@ -56,7 +56,7 @@ async function main() {
   }
 
   // Verificar TODAS las cuentas
-  const todosUsuarios = await prisma.usuario.findMany();
+  const todosUsuarios = await prisma.usuarios.findMany();
   console.log(`\n\n📊 Resumen: ${todosUsuarios.length} usuarios totales`);
   
   const usuariosInactivos = todosUsuarios.filter(u => u.activo !== true);
@@ -64,7 +64,7 @@ async function main() {
   
   if (usuariosInactivos.length > 0) {
     console.log(`  ⚠️  Activando usuarios inactivos...`);
-    await prisma.usuario.updateMany({
+    await prisma.usuarios.updateMany({
       where: {
         activo: false,
       },
@@ -75,13 +75,13 @@ async function main() {
     console.log(`  ✅ Todos los usuarios inactivos fueron activados`);
   }
 
-  const todosEmpleados = await prisma.empleado.findMany();
+  const todosEmpleados = await prisma.empleados.findMany();
   const empleadosInactivos = todosEmpleados.filter(e => e.activo !== true);
   console.log(`  Empleados inactivos: ${empleadosInactivos.length}`);
   
   if (empleadosInactivos.length > 0) {
     console.log(`  ⚠️  Activando empleados inactivos...`);
-    await prisma.empleado.updateMany({
+    await prisma.empleados.updateMany({
       where: {
         activo: false,
       },

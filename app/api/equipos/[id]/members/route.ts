@@ -34,7 +34,7 @@ export async function POST(request: NextRequest, context: RouteParams) {
     }
 
     // Verify team belongs to user's company
-    const team = await prisma.equipo.findFirst({
+    const team = await prisma.equipos.findFirst({
       where: {
         id: equipoId,
         empresaId: session.user.empresaId,
@@ -46,7 +46,7 @@ export async function POST(request: NextRequest, context: RouteParams) {
     }
 
     // Verify employee belongs to user's company
-    const employee = await prisma.empleado.findFirst({
+    const employee = await prisma.empleados.findFirst({
       where: {
         id: empleadoId,
         empresaId: session.user.empresaId,
@@ -59,7 +59,7 @@ export async function POST(request: NextRequest, context: RouteParams) {
 
     // Check if already a member
     const empleadoIdStr = typeof empleadoId === 'string' ? empleadoId : '';
-    const existingMember = await prisma.empleadoEquipo.findUnique({
+    const existingMember = await prisma.empleado_equipos.findUnique({
       where: {
         empleadoId_equipoId: {
           empleadoId: empleadoIdStr,
@@ -76,7 +76,7 @@ export async function POST(request: NextRequest, context: RouteParams) {
     }
 
     // Add member
-    await prisma.empleadoEquipo.create({
+    await prisma.empleado_equipos.create({
       data: {
         empleadoId: empleadoIdStr,
         equipoId,
@@ -84,17 +84,17 @@ export async function POST(request: NextRequest, context: RouteParams) {
     });
 
     // Return updated team
-    const updatedTeam = await prisma.equipo.findUnique({
+    const updatedTeamRaw = await prisma.equipos.findUnique({
       where: { id: equipoId },
       include: {
-        manager: {
+        empleados: {
           select: {
             id: true,
             nombre: true,
             apellidos: true,
           },
         },
-        miembros: {
+        empleado_equipos: {
           include: {
             empleado: {
               select: {
@@ -114,6 +114,8 @@ export async function POST(request: NextRequest, context: RouteParams) {
         },
       },
     });
+
+    const updatedTeam = formatEquipo(updatedTeamRaw);
 
     return NextResponse.json(updatedTeam);
   } catch (error) {
@@ -141,7 +143,7 @@ export async function DELETE(request: NextRequest, context: RouteParams) {
     }
 
     // Verify team belongs to user's company
-    const team = await prisma.equipo.findFirst({
+    const team = await prisma.equipos.findFirst({
       where: {
         id: equipoId,
         empresaId: session.user.empresaId,
@@ -154,14 +156,14 @@ export async function DELETE(request: NextRequest, context: RouteParams) {
 
     // If removing the manager, update the team's managerId to null
     if (team.managerId === empleadoId) {
-      await prisma.equipo.update({
+      await prisma.equipos.update({
         where: { id: equipoId },
         data: { managerId: null },
       });
     }
 
     // Remove member
-    await prisma.empleadoEquipo.delete({
+    await prisma.empleado_equipos.delete({
       where: {
         empleadoId_equipoId: {
           empleadoId,
@@ -171,17 +173,17 @@ export async function DELETE(request: NextRequest, context: RouteParams) {
     });
 
     // Return updated team
-    const updatedTeam = await prisma.equipo.findUnique({
+    const updatedTeamRaw = await prisma.equipos.findUnique({
       where: { id: equipoId },
       include: {
-        manager: {
+        empleados: {
           select: {
             id: true,
             nombre: true,
             apellidos: true,
           },
         },
-        miembros: {
+        empleado_equipos: {
           include: {
             empleado: {
               select: {
@@ -202,9 +204,49 @@ export async function DELETE(request: NextRequest, context: RouteParams) {
       },
     });
 
+    const updatedTeam = formatEquipo(updatedTeamRaw);
+
     return NextResponse.json(updatedTeam);
   } catch (error) {
     console.error('Error removing team member:', error);
     return NextResponse.json({ error: 'Error al eliminar miembro' }, { status: 500 });
   }
+}
+
+type EquipoWithRelations = NonNullable<
+  Awaited<ReturnType<(typeof prisma.equipos)['findUnique']>>
+> & {
+  empleados: {
+    id: string;
+    nombre: string;
+    apellidos: string;
+  } | null;
+  empleado_equipos: Array<{
+    empleado: {
+      id: string;
+      nombre: string;
+      apellidos: string;
+      fotoUrl: string | null;
+    };
+  }>;
+};
+
+function formatEquipo(
+  team: Awaited<ReturnType<(typeof prisma.equipos)['findUnique']>>
+) {
+  if (!team) return team;
+  const teamWithRelations = team as EquipoWithRelations;
+  return {
+    ...team,
+    manager: teamWithRelations.empleados
+      ? {
+          id: teamWithRelations.empleados.id,
+          nombre: teamWithRelations.empleados.nombre,
+          apellidos: teamWithRelations.empleados.apellidos,
+        }
+      : null,
+    miembros: teamWithRelations.empleado_equipos.map((miembro) => ({
+      empleado: miembro.empleado,
+    })),
+  };
 }

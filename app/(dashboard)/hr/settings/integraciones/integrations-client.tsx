@@ -22,12 +22,12 @@ import {
 
 
 
-import type { Integracion } from '@prisma/client';
+import type { integraciones } from '@prisma/client';
 
 interface IntegrationsClientProps {
   googleConfigured: boolean;
-  empresaIntegrations: Integracion[];
-  personalIntegrations: Integracion[];
+  empresaIntegrations: integraciones[];
+  personalIntegrations: integraciones[];
   userRole: string;
 }
 

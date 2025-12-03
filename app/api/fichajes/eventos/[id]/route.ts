@@ -41,7 +41,7 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
     const { tipo, hora, motivoEdicion } = validatedData;
 
     // Verificar que el evento existe y pertenece a la empresa
-    const evento = await prisma.fichajeEvento.findUnique({
+    const evento = await prisma.fichaje_eventos.findUnique({
       where: { id },
       include: { fichaje: true },
     });
@@ -49,7 +49,7 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
       return notFoundResponse('Evento no encontrado');
     }
 
-    await prisma.fichajeEvento.update({
+    await prisma.fichaje_eventos.update({
       where: { id },
       data: {
         tipo: tipo ?? evento.tipo,
@@ -62,11 +62,11 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
 
     // Recalcular
     const { calcularHorasTrabajadas, calcularTiempoEnPausa } = await import('@/lib/calculos/fichajes');
-    const actualizado = await prisma.fichaje.findUnique({ where: { id: evento.fichajeId }, include: { eventos: true } });
+    const actualizado = await prisma.fichajes.findUnique({ where: { id: evento.fichajeId }, include: { eventos: true } });
     if (actualizado) {
       const horasTrabajadas = calcularHorasTrabajadas(actualizado.eventos) ?? 0;
       const horasEnPausa = calcularTiempoEnPausa(actualizado.eventos);
-      await prisma.fichaje.update({ where: { id: evento.fichajeId }, data: { horasTrabajadas, horasEnPausa } });
+      await prisma.fichajes.update({ where: { id: evento.fichajeId }, data: { horasTrabajadas, horasEnPausa } });
     }
 
     return successResponse({ success: true });
@@ -87,7 +87,7 @@ export async function DELETE(_req: NextRequest, context: { params: Promise<{ id:
     const { id } = params;
 
     // Verificar que el evento existe y pertenece a la empresa
-    const evento = await prisma.fichajeEvento.findUnique({
+    const evento = await prisma.fichaje_eventos.findUnique({
       where: { id },
       include: { fichaje: true },
     });
@@ -95,33 +95,37 @@ export async function DELETE(_req: NextRequest, context: { params: Promise<{ id:
       return notFoundResponse('Evento no encontrado');
     }
 
-    await prisma.fichajeEvento.delete({ where: { id } });
+    await prisma.fichaje_eventos.delete({ where: { id } });
 
     // Recalcular
     const { calcularHorasTrabajadas, calcularTiempoEnPausa } = await import('@/lib/calculos/fichajes');
-    const actualizado = await prisma.fichaje.findUnique({ where: { id: evento.fichajeId }, include: { eventos: true } });
+    const actualizado = await prisma.fichajes.findUnique({ where: { id: evento.fichajeId }, include: { eventos: true } });
     if (actualizado) {
       const horasTrabajadas = calcularHorasTrabajadas(actualizado.eventos) ?? 0;
       const horasEnPausa = calcularTiempoEnPausa(actualizado.eventos);
-      await prisma.fichaje.update({ where: { id: evento.fichajeId }, data: { horasTrabajadas, horasEnPausa } });
+      await prisma.fichajes.update({ where: { id: evento.fichajeId }, data: { horasTrabajadas, horasEnPausa } });
 
       // Notificar si la edición la hace otro usuario
       if (session.user.empleadoId && session.user.empleadoId !== evento.fichaje.empleadoId) {
-        const editor = await prisma.empleado.findUnique({
+        const editor = await prisma.empleados.findUnique({
           where: { id: session.user.empleadoId },
           select: { nombre: true, apellidos: true },
         });
         const nombreEditor = editor ? `${editor.nombre} ${editor.apellidos}` : 'Administrador';
 
-        await crearNotificacionFichajeModificado(prisma, {
-          fichajeId: evento.fichajeId,
-          empresaId: session.user.empresaId,
-          empleadoId: evento.fichaje.empleadoId,
-          modificadoPorNombre: nombreEditor,
-          accion: 'eliminado',
-          fechaFichaje: evento.fichaje.fecha,
-          detalles: `Evento ${evento.tipo} eliminado.`,
-        });
+        await crearNotificacionFichajeModificado(
+          prisma,
+          {
+            fichajeId: evento.fichajeId,
+            empresaId: session.user.empresaId,
+            empleadoId: evento.fichaje.empleadoId,
+            modificadoPorNombre: nombreEditor,
+            accion: 'eliminado',
+            fechaFichaje: evento.fichaje.fecha,
+            detalles: `Evento ${evento.tipo} eliminado.`,
+          },
+          { actorUsuarioId: session.user.id }
+        );
       }
     }
 

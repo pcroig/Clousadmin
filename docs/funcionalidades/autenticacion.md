@@ -542,6 +542,25 @@ model Waitlist {
 - Usa el componente `EmployeeAvatar` de `@/components/shared/employee-avatar` para renderizar avatares de forma consistente
 - El componente maneja automáticamente fallbacks con iniciales y colores consistentes usando `getAvatarStyle` y `getInitials`
 
+**Server Components:**
+- Usa la función helper `getCurrentUserAvatar(session)` de `@/lib/auth` para obtener el avatar del usuario actual
+- Esta función obtiene el avatar desde `empleado.fotoUrl` (fuente única de verdad) de forma eficiente
+- Maneja automáticamente el fallback para platform admins que no tienen empleado asociado
+
+```typescript
+import { getSession, getCurrentUserAvatar } from '@/lib/auth';
+
+export default async function MyPage() {
+  const session = await getSession();
+  if (!session) redirect('/login');
+  
+  // Obtener avatar del usuario actual
+  const avatarUrl = await getCurrentUserAvatar(session);
+  
+  return <EmployeeAvatar fotoUrl={avatarUrl} />;
+}
+```
+
 ---
 
 ## Seguridad

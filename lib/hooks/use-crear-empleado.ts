@@ -18,7 +18,7 @@ import { prisma, Prisma } from '../prisma';
  *   // ... otros campos
  * });
  */
-type CrearEmpleadoInput = Prisma.EmpleadoUncheckedCreateInput & {
+type CrearEmpleadoInput = Prisma.empleadosUncheckedCreateInput & {
   empresaId: string;
   nombre: string;
   apellidos: string;
@@ -31,7 +31,7 @@ export async function crearEmpleadoConCarpetas(
   // Crear empleado en una transacción
   const empleado = await prisma.$transaction(async (tx) => {
     // 1. Crear empleado
-    const nuevoEmpleado = await tx.empleado.create({
+    const nuevoEmpleado = await tx.empleados.create({
       data,
     });
 

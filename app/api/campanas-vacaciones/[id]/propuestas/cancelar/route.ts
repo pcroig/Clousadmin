@@ -32,7 +32,7 @@ export async function POST(
 
     const { id: campanaId } = await params;
 
-    const campana = await prisma.campanaVacaciones.findFirst({
+    const campana = await prisma.campanas_vacaciones.findFirst({
       where: {
         id: campanaId,
         empresaId: session.user.empresaId,
@@ -47,7 +47,7 @@ export async function POST(
     }
 
     await prisma.$transaction(async (tx) => {
-      await tx.preferenciaVacaciones.updateMany({
+      await tx.preferencias_vacaciones.updateMany({
         where: {
           campanaId,
         },
@@ -59,7 +59,7 @@ export async function POST(
         },
       });
 
-      await tx.campanaVacaciones.update({
+      await tx.campanas_vacaciones.update({
         where: { id: campanaId },
         data: {
           propuestaIA: JSON_NULL,

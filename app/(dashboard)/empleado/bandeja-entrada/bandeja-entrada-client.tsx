@@ -8,13 +8,22 @@ import { CheckCircle2, Clock, FileSignature, Info, XCircle } from 'lucide-react'
 import Link from 'next/link';
 import { useState } from 'react';
 
+import { PageMobileHeader } from '@/components/layout/page-mobile-header';
 import { Button } from '@/components/ui/button';
 
+interface Solicitud {
+  id: string;
+  tipo: 'ausencia' | 'cambio_datos';
+  titulo: string;
+  detalles: string;
+  estado: string;
+  fechaCreacion: Date;
+  fechaResolucion: Date | null;
+}
 
 interface Notificacion {
   id: string;
   tipo: 'aprobada' | 'rechazada' | 'pendiente' | 'info';
-  titulo: string;
   mensaje: string;
   fecha: Date;
   leida: boolean;
@@ -23,13 +32,16 @@ interface Notificacion {
 }
 
 interface BandejaEntradaEmpleadoClientProps {
+  solicitudes: Solicitud[];
   notificaciones: Notificacion[];
 }
 
 export function BandejaEntradaEmpleadoClient({
   notificaciones,
 }: BandejaEntradaEmpleadoClientProps) {
-  const [filtro, setFiltro] = useState<'todas' | 'aprobada' | 'rechazada' | 'pendiente'>('todas');
+  const [filtroNotif, setFiltroNotif] = useState<'todas' | 'aprobada' | 'rechazada' | 'pendiente'>(
+    'todas',
+  );
 
   const notificacionesNoLeidas = notificaciones.filter((n) => !n.leida).length;
 
@@ -66,9 +78,9 @@ export function BandejaEntradaEmpleadoClient({
   };
 
   const notificacionesFiltradas =
-    filtro === 'todas'
+    filtroNotif === 'todas'
       ? notificaciones
-      : notificaciones.filter((n) => n.tipo === filtro);
+      : notificaciones.filter((n) => n.tipo === filtroNotif);
 
   // Iconos sin fondo - siempre gris oscuro según sistema de diseño
   const getIcono = (notif: Notificacion) => {
@@ -101,75 +113,138 @@ export function BandejaEntradaEmpleadoClient({
   };
 
   return (
-    <div className="h-full w-full flex flex-col">
-      {/* Header */}
-      <div className="flex-shrink-0 mb-6">
+    <div className="h-full w-full flex flex-col px-1 py-1 sm:max-w-[1800px] sm:mx-auto sm:px-8 sm:py-6">
+      {/* Mobile Header - sin fondo */}
+      <PageMobileHeader title="Bandeja de entrada" />
+
+      {/* Desktop Header */}
+      <div className="hidden sm:block mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Notificaciones</h1>
         <p className="text-sm text-gray-600 mt-1">
-          Mantente al día con el estado de tus solicitudes
+          Mantente al día con tus notificaciones
         </p>
       </div>
 
-      {/* Filtros y botón Leer todas */}
-      <div className="flex items-center justify-between mb-4 flex-shrink-0">
-        <div className="flex gap-2">
-          <button
-            onClick={() => setFiltro('todas')}
-            className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
-              filtro === 'todas'
-                ? 'bg-gray-900 text-white'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-            }`}
-          >
-            Todas ({contadores.todas})
-          </button>
-          <button
-            onClick={() => setFiltro('aprobada')}
-            className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
-              filtro === 'aprobada'
-                ? 'bg-gray-900 text-white'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-            }`}
-          >
-            Aprobadas ({contadores.aprobada})
-          </button>
-          <button
-            onClick={() => setFiltro('pendiente')}
-            className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
-              filtro === 'pendiente'
-                ? 'bg-gray-900 text-white'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-            }`}
-          >
-            Pendientes ({contadores.pendiente})
-          </button>
-          <button
-            onClick={() => setFiltro('rechazada')}
-            className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
-              filtro === 'rechazada'
-                ? 'bg-gray-900 text-white'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-            }`}
-          >
-            Rechazadas ({contadores.rechazada})
-          </button>
+      {/* Content */}
+      <div className="flex-1 overflow-auto">
+        <div className="space-y-3">
+        {/* Filtros - Desktop only */}
+        <div className="hidden sm:flex items-center justify-between">
+          <div className="flex gap-2">
+            <button
+              onClick={() => setFiltroNotif('todas')}
+              className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+                filtroNotif === 'todas'
+                  ? 'bg-gray-900 text-white'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              Todas ({contadores.todas})
+            </button>
+            <button
+              onClick={() => setFiltroNotif('aprobada')}
+              className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+                filtroNotif === 'aprobada'
+                  ? 'bg-gray-900 text-white'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              Aprobadas ({contadores.aprobada})
+            </button>
+            <button
+              onClick={() => setFiltroNotif('pendiente')}
+              className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+                filtroNotif === 'pendiente'
+                  ? 'bg-gray-900 text-white'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              Pendientes ({contadores.pendiente})
+            </button>
+            <button
+              onClick={() => setFiltroNotif('rechazada')}
+              className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+                filtroNotif === 'rechazada'
+                  ? 'bg-gray-900 text-white'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              Rechazadas ({contadores.rechazada})
+            </button>
+          </div>
+
+          {/* Botón Leer todas - Desktop */}
+          {notificacionesNoLeidas > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleMarcarTodasLeidas}
+              className="text-sm"
+            >
+              Leer todas ({notificacionesNoLeidas})
+            </Button>
+          )}
         </div>
 
-        {/* Botón Leer todas */}
-        {notificacionesNoLeidas > 0 && (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleMarcarTodasLeidas}
-            className="text-sm"
-          >
-            Leer todas ({notificacionesNoLeidas})
-          </Button>
-        )}
-      </div>
+        {/* Toggle Tabs - Mobile */}
+        <div className="sm:hidden space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="inline-flex rounded-full border border-gray-200 p-0.5 text-xs font-medium">
+              <button
+                onClick={() => setFiltroNotif('todas')}
+                className={`rounded-full px-3 py-1 transition ${
+                  filtroNotif === 'todas'
+                    ? 'bg-gray-900 text-white shadow-sm'
+                    : 'text-gray-600'
+                }`}
+              >
+                Todas
+              </button>
+              <button
+                onClick={() => setFiltroNotif('aprobada')}
+                className={`rounded-full px-3 py-1 transition ${
+                  filtroNotif === 'aprobada'
+                    ? 'bg-gray-900 text-white shadow-sm'
+                    : 'text-gray-600'
+                }`}
+              >
+                Aprobadas
+              </button>
+              <button
+                onClick={() => setFiltroNotif('pendiente')}
+                className={`rounded-full px-3 py-1 transition ${
+                  filtroNotif === 'pendiente'
+                    ? 'bg-gray-900 text-white shadow-sm'
+                    : 'text-gray-600'
+                }`}
+              >
+                Pendientes
+              </button>
+              <button
+                onClick={() => setFiltroNotif('rechazada')}
+                className={`rounded-full px-3 py-1 transition ${
+                  filtroNotif === 'rechazada'
+                    ? 'bg-gray-900 text-white shadow-sm'
+                    : 'text-gray-600'
+                }`}
+              >
+                Rechazadas
+              </button>
+            </div>
+            {notificacionesNoLeidas > 0 && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleMarcarTodasLeidas}
+                className="text-sm"
+              >
+                Leer todas
+              </Button>
+            )}
+          </div>
+        </div>
 
-      {/* Lista de notificaciones */}
-      <div className="flex-1 min-h-0 overflow-hidden">
+        {/* Lista de notificaciones */}
         {notificacionesFiltradas.length === 0 ? (
           <div className="bg-white rounded-lg border border-gray-200 p-12 text-center">
             <Info className="w-16 h-16 text-gray-300 mx-auto mb-4" />
@@ -180,27 +255,20 @@ export function BandejaEntradaEmpleadoClient({
             {notificacionesFiltradas.map((notif) => (
               <div
                 key={notif.id}
-                className="bg-white rounded-lg border border-gray-200 p-6 hover:shadow-sm transition-shadow cursor-pointer"
+                className="bg-white rounded-lg border border-gray-200 p-4 sm:p-6 hover:shadow-sm transition-shadow cursor-pointer"
                 onClick={() => handleMarcarLeida(notif.id)}
               >
-                <div className="flex items-start gap-4">
-                  {/* Icono sin fondo - solo gris oscuro según sistema de diseño */}
-                  <div className="flex-shrink-0 pt-0.5">
-                    {getIcono(notif)}
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <p className="text-sm font-semibold text-gray-900">
-                          {notif.titulo}
-                        </p>
-                        <p className="text-sm text-gray-600 mt-1">
-                          {notif.mensaje}
-                        </p>
+                <div className="flex items-start gap-3 sm:gap-4">
+                  {/* Icono */}
+                  <div className="flex-shrink-0 pt-0.5">{getIcono(notif)}</div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-gray-900">{notif.mensaje}</p>
                         {renderAccion(notif.metadata)}
                       </div>
                       {!notif.leida && (
-                        <div className="w-2 h-2 bg-[#d97757] rounded-full ml-2 mt-2 flex-shrink-0" />
+                        <div className="w-2 h-2 bg-[#d97757] rounded-full flex-shrink-0 mt-2" />
                       )}
                     </div>
                     <p className="text-xs text-gray-500 mt-2">
@@ -218,6 +286,7 @@ export function BandejaEntradaEmpleadoClient({
             ))}
           </div>
         )}
+        </div>
       </div>
     </div>
   );
@@ -255,3 +324,5 @@ function renderAccion(metadata?: Record<string, unknown>) {
     </div>
   );
 }
+
+// Placeholder removido - código duplicado que causaba errores de compilación

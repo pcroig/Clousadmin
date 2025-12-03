@@ -6,6 +6,7 @@
 
 'use client';
 
+import { Clock } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useReducer, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -382,93 +383,112 @@ export function FichajeWidget({
 
   return (
     <div className="h-full">
-      {/* Mobile: Sin header, solo contenido */}
-      <div className="sm:hidden h-full">
-        <Card className={`${MOBILE_DESIGN.widget.height.standard} flex flex-col overflow-hidden ${MOBILE_DESIGN.card.default}`}>
-          <CardContent className={`flex-1 ${MOBILE_DESIGN.spacing.widget} flex flex-col`}>
-            {/* Estado y Cronómetro juntos */}
-            <div className={`${MOBILE_DESIGN.card.highlight} text-center mb-3`}>
-              <div className={`${MOBILE_DESIGN.text.caption} mb-1`}>{getTituloEstado()}</div>
-              <div className={`${MOBILE_DESIGN.text.display} text-gray-900`}>{tiempoTrabajado}</div>
-              <div className={`${MOBILE_DESIGN.text.caption} mt-0.5`}>Horas trabajadas</div>
+      {/* Mobile: Card de fichaje mejorada */}
+      <div className="sm:hidden">
+        <div className="bg-white rounded-lg p-3 shadow-sm border border-gray-100">
+          {/* Estado + Cronómetro en misma altura */}
+          <div className="flex items-center justify-between mb-3">
+            {/* Izquierda: Icono + Estado + Tiempo restante (vertical) */}
+            <div className="flex items-center gap-2">
+              <Clock className="h-4 w-4 text-[#d97757] flex-shrink-0" />
+              <div className="flex flex-col">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs font-semibold text-gray-900">{getTituloEstado()}</span>
+                  {state.status === 'trabajando' && (
+                    <div className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />
+                  )}
+                </div>
+                {state.status === 'trabajando' && (
+                  <span className="text-[10px] text-gray-500">
+                    {formatearHorasMinutos(horasPorHacer)} restantes
+                  </span>
+                )}
+              </div>
             </div>
 
-            {/* Botones de acción */}
-            <div className={`${MOBILE_DESIGN.spacing.items} mt-auto`}>
-              {state.status === 'trabajando' ? (
-                <>
-                  <Button
-                    variant="default"
-                    className={`w-full ${MOBILE_DESIGN.button.primary}`}
-                    onClick={() => handleFichar('pausa_inicio')}
-                    disabled={state.loading}
-                  >
-                    Pausar
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className={`w-full ${MOBILE_DESIGN.button.primary}`}
-                    onClick={() => handleFichar('salida')}
-                    disabled={state.loading}
-                  >
-                    Finalizar Jornada
-                  </Button>
-                </>
-              ) : state.status === 'en_pausa' ? (
-                <>
-                  <Button
-                    variant="default"
-                    className={`w-full ${MOBILE_DESIGN.button.primary}`}
-                    onClick={() => handleFichar('pausa_fin')}
-                    disabled={state.loading}
-                  >
-                    Reanudar
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className={`w-full ${MOBILE_DESIGN.button.primary}`}
-                    onClick={() => handleFichar('salida')}
-                    disabled={state.loading}
-                  >
-                    Finalizar Jornada
-                  </Button>
-                </>
-              ) : (
+            {/* Derecha: Cronómetro (menos grande, menos bold) */}
+            <div className="text-xl font-medium text-gray-900">{tiempoTrabajado}</div>
+          </div>
+
+          {/* Botones de acción más compactos */}
+          <div className="grid grid-cols-2 gap-2">
+            {state.status === 'trabajando' ? (
+              <>
                 <Button
-                  variant="default"
-                  className={`w-full ${MOBILE_DESIGN.button.primary}`}
-                  onClick={() => handleFichar()}
+                  variant="outline"
+                  className="h-11 text-xs font-medium border-2"
+                  onClick={() => handleFichar('pausa_inicio')}
                   disabled={state.loading}
                 >
-                  {getTextoBoton()}
+                  Tienda
                 </Button>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+                <Button
+                  variant="default"
+                  className="h-11 text-xs font-medium bg-gray-900 hover:bg-gray-800"
+                  onClick={() => handleFichar('salida')}
+                  disabled={state.loading}
+                >
+                  Salida
+                </Button>
+              </>
+            ) : state.status === 'en_pausa' ? (
+              <>
+                <Button
+                  variant="default"
+                  className="h-11 text-xs font-medium"
+                  onClick={() => handleFichar('pausa_fin')}
+                  disabled={state.loading}
+                >
+                  Reanudar
+                </Button>
+                <Button
+                  variant="outline"
+                  className="h-11 text-xs font-medium border-2"
+                  onClick={() => handleFichar('salida')}
+                  disabled={state.loading}
+                >
+                  Salida
+                </Button>
+              </>
+            ) : (
+              <Button
+                variant="default"
+                className="col-span-2 h-11 text-xs font-medium"
+                onClick={() => handleFichar()}
+                disabled={state.loading}
+              >
+                {getTextoBoton()}
+              </Button>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Desktop: Con header y anillo */}
       <div className="hidden sm:block h-full">
         <WidgetCard title="Fichaje" href={href} contentClassName="px-6">
-          <div className="grid grid-cols-2 gap-4 h-full min-h-0">
-            {/* Estado y botones */}
-            <div className="flex flex-col justify-between">
-              <div>
-                <h3 className="text-[24px] font-bold text-gray-900">{getTituloEstado()}</h3>
-                <p className="text-[11px] text-gray-500 mt-1">
+          {/* Contenedor principal para las dos mitades */}
+          <div className="flex flex-col md:flex-row gap-6 h-full min-h-0">
+            {/* MITAD IZQUIERDA: Estado y botones coordinados */}
+            <div className="flex-1 flex flex-col justify-between min-w-0 py-8">
+              {/* Estado con descripción */}
+              <div className="space-y-1">
+                <h3 className="text-[24px] font-bold text-gray-900 leading-tight">{getTituloEstado()}</h3>
+                <p className="text-[12px] text-gray-500">
                   {state.status === 'trabajando' && `${formatearHorasMinutos(horasPorHacer)} restantes`}
                   {state.status === 'en_pausa' && 'En descanso'}
                   {state.status === 'sin_fichar' && 'Listo para comenzar'}
                   {state.status === 'finalizado' && 'Día completado'}
                 </p>
               </div>
+
+              {/* Botones de acción */}
               <div className="space-y-2">
                 {state.status === 'trabajando' ? (
                   <>
                     <Button
                       variant="default"
-                      className="w-full font-semibold text-[13px]"
+                      className="w-full font-semibold text-[12px] py-2"
                       onClick={() => handleFichar('pausa_inicio')}
                       disabled={state.loading}
                     >
@@ -476,7 +496,7 @@ export function FichajeWidget({
                     </Button>
                     <Button
                       variant="outline"
-                      className="w-full font-semibold text-[13px]"
+                      className="w-full font-semibold text-[12px] py-2"
                       onClick={() => handleFichar('salida')}
                       disabled={state.loading}
                     >
@@ -487,7 +507,7 @@ export function FichajeWidget({
                   <>
                     <Button
                       variant="default"
-                      className="w-full font-semibold text-[13px]"
+                      className="w-full font-semibold text-[12px] py-2"
                       onClick={() => handleFichar('pausa_fin')}
                       disabled={state.loading}
                     >
@@ -495,7 +515,7 @@ export function FichajeWidget({
                     </Button>
                     <Button
                       variant="outline"
-                      className="w-full font-semibold text-[13px]"
+                      className="w-full font-semibold text-[12px] py-2"
                       onClick={() => handleFichar('salida')}
                       disabled={state.loading}
                     >
@@ -506,7 +526,7 @@ export function FichajeWidget({
                   <>
                     <Button
                       variant="default"
-                      className="w-full font-semibold text-[13px]"
+                      className="w-full font-semibold text-[12px] py-2"
                       onClick={() => handleFichar()}
                       disabled={state.loading}
                     >
@@ -514,7 +534,7 @@ export function FichajeWidget({
                     </Button>
                     <Button
                       variant="outline"
-                      className="w-full font-semibold text-[13px]"
+                      className="w-full font-semibold text-[12px] py-2"
                       onClick={() => dispatch({ type: 'SET_MODAL', payload: true })}
                     >
                       + Añadir Manual
@@ -524,10 +544,11 @@ export function FichajeWidget({
               </div>
             </div>
 
-            {/* Anillo de progreso */}
-            <div className="flex flex-col items-center justify-center">
-              <div className="relative w-32 h-32">
-                <svg className="w-full h-full" viewBox="0 0 128 128">
+            {/* MITAD DERECHA: Semicírculo con indicadores en vértices */}
+            <div className="flex-1 flex items-center justify-center min-w-0">
+              <div className="relative w-40 h-44">
+                {/* SVG del semicírculo original */}
+                <svg className="w-full h-40" viewBox="0 0 128 128">
                   <circle
                     cx="64"
                     cy="64"
@@ -554,18 +575,26 @@ export function FichajeWidget({
                     transform="rotate(90 64 64)"
                   />
                 </svg>
-                <div className="absolute inset-0 flex items-center justify-center">
+
+                {/* Tiempo en el centro del semicírculo */}
+                <div className="absolute inset-0 top-0 left-0 w-full h-40 flex items-center justify-center">
                   <span className="text-2xl font-bold text-gray-900">{tiempoTrabajado}</span>
                 </div>
-              </div>
-              <div className="flex items-center justify-between w-full mt-2 px-2">
-                <div className="text-center">
-                  <div className="text-[11px] text-gray-900 font-semibold">{horasHechas}h</div>
-                  <div className="text-[9px] text-gray-500">Hechas</div>
+
+                {/* Indicador izquierdo (Horas hechas) - Debajo del vértice izquierdo */}
+                <div className="absolute left-2 -bottom-2">
+                  <div className="text-center">
+                    <div className="text-[11px] text-gray-900 font-semibold">{horasHechas}h</div>
+                    <div className="text-[9px] text-gray-500 whitespace-nowrap">Hechas</div>
+                  </div>
                 </div>
-                <div className="text-center">
-                  <div className="text-[11px] text-gray-900 font-semibold">{horasPorHacer}h</div>
-                  <div className="text-[9px] text-gray-500">Por hacer</div>
+
+                {/* Indicador derecho (Por hacer) - Debajo del vértice derecho */}
+                <div className="absolute right-2 -bottom-2">
+                  <div className="text-center">
+                    <div className="text-[11px] text-gray-900 font-semibold">{horasPorHacer}h</div>
+                    <div className="text-[9px] text-gray-500 whitespace-nowrap">Por hacer</div>
+                  </div>
                 </div>
               </div>
             </div>

@@ -28,7 +28,7 @@ export async function GET(request: NextRequest, context: RouteParams) {
     const { id: equipoId } = params;
 
     // Verify team belongs to user's company
-    const team = await prisma.equipo.findFirst({
+    const team = await prisma.equipos.findFirst({
       where: {
         id: equipoId,
         empresaId: session.user.empresaId,
@@ -40,7 +40,7 @@ export async function GET(request: NextRequest, context: RouteParams) {
     }
 
     // Get all employees from the company
-    const allEmployees = await prisma.empleado.findMany({
+    const allEmployees = await prisma.empleados.findMany({
       where: {
         empresaId: session.user.empresaId,
         activo: true,
@@ -59,7 +59,7 @@ export async function GET(request: NextRequest, context: RouteParams) {
     });
 
     // Get current team members
-    const teamMembers = await prisma.empleadoEquipo.findMany({
+    const teamMembers = await prisma.empleado_equipos.findMany({
       where: {
         equipoId,
       },

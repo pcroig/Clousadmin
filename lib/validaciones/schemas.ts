@@ -15,12 +15,21 @@ export const signupSchema = z.object({
   nombreEmpresa: z.string().min(1, 'Nombre de empresa requerido'),
   webEmpresa: z
     .union([
-      z.string().url('URL inválida'),
+      z.string(),
       z.literal(''),
       z.null(),
     ])
-    .optional(),
-  
+    .optional()
+    .transform((val) => {
+      if (!val || val === '') return null;
+      // Normalizar URL: agregar https:// si no tiene protocolo
+      let url = val.trim();
+      if (url && !url.startsWith('http://') && !url.startsWith('https://')) {
+        url = `https://${url}`;
+      }
+      return url;
+    }),
+
   // Datos del primer HR admin
   nombre: z.string().min(1, 'Nombre requerido'),
   apellidos: z.string().min(1, 'Apellidos requeridos'),
@@ -157,7 +166,7 @@ export const ausenciaCreateSchema = z.object({
   periodo: z.enum(['manana', 'tarde']).optional(), // Solo cuando medioDia=true
   motivo: z.string().optional(),
   justificanteUrl: z.string().url().optional(),
-  documentoId: z.string().uuid().optional(), // ID del documento justificante
+  documentoId: z.string().uuid().optional().or(z.literal('')).transform(val => val === '' ? undefined : val), // ID del documento justificante
   diasIdeales: z.array(z.string()).optional(),
   diasPrioritarios: z.array(z.string()).optional(),
   diasAlternativos: z.array(z.string()).optional(),
@@ -299,6 +308,48 @@ export const importarFestivosSchema = z.object({
 export type FestivoCreateInput = z.infer<typeof festivoCreateSchema>;
 export type FestivoUpdateInput = z.infer<typeof festivoUpdateSchema>;
 export type ImportarFestivosInput = z.infer<typeof importarFestivosSchema>;
+
+// ========================================
+// FESTIVOS PERSONALIZADOS POR EMPLEADO
+// ========================================
+
+export const empleadoFestivoCreateSchema = z.object({
+  empleadoId: z.string().uuid(),
+  fecha: z.string().or(z.date()),
+  nombre: z.string().min(1, 'Nombre requerido').max(200),
+  activo: z.boolean().default(true),
+});
+
+export const empleadoFestivoUpdateSchema = z.object({
+  nombre: z.string().min(1, 'Nombre requerido').max(200).optional(),
+  fecha: z.string().or(z.date()).optional(),
+  activo: z.boolean().optional(),
+});
+
+export type EmpleadoFestivoCreateInput = z.infer<typeof empleadoFestivoCreateSchema>;
+export type EmpleadoFestivoUpdateInput = z.infer<typeof empleadoFestivoUpdateSchema>;
+
+// ========================================
+// DÍAS PERSONALIZADOS DE AUSENCIAS
+// ========================================
+
+export const empleadoDiasAusenciasUpdateSchema = z.object({
+  diasAusenciasPersonalizados: z.number().int().min(0).max(365).nullable(),
+}).refine(
+  (data) => {
+    // Si es null, es válido (usa el mínimo global)
+    if (data.diasAusenciasPersonalizados === null) {
+      return true;
+    }
+    // Si es un número, debe ser al menos el mínimo (validación adicional en API)
+    return data.diasAusenciasPersonalizados >= 0;
+  },
+  {
+    message: 'Los días personalizados deben ser un número positivo o null para usar el mínimo global',
+  }
+);
+
+export type EmpleadoDiasAusenciasUpdateInput = z.infer<typeof empleadoDiasAusenciasUpdateSchema>;
 
 // ========================================
 // CALENDARIO LABORAL

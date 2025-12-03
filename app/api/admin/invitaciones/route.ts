@@ -21,7 +21,7 @@ export async function GET(_req: NextRequest) {
       );
     }
 
-    const invitaciones = await prisma.invitacionSignup.findMany({
+    const invitaciones = await prisma.invitaciones_signup.findMany({
       orderBy: { createdAt: 'desc' },
     });
 

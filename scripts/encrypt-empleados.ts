@@ -65,7 +65,7 @@ async function encryptBatch(dryRun: boolean): Promise<MigracionStats> {
   };
 
   while (true) {
-    const empleados = await prisma.empleado.findMany({
+    const empleados = await prisma.empleados.findMany({
       select: {
         id: true,
         empresaId: true,
@@ -119,7 +119,7 @@ async function encryptBatch(dryRun: boolean): Promise<MigracionStats> {
       }
 
       const encryptedData = encryptEmpleadoData(payload);
-      await prisma.empleado.update({
+      await prisma.empleados.update({
         where: { id: empleado.id },
         data: encryptedData,
       });

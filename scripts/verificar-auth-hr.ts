@@ -9,7 +9,7 @@ async function verificarAuthHR() {
   try {
     console.log('\n🔍 Verificando usuarios HR Admin en la base de datos...\n');
 
-    const usuariosHR = await prisma.usuario.findMany({
+    const usuariosHR = await prisma.usuarios.findMany({
       where: {
         rol: 'hr_admin',
         activo: true,
@@ -31,7 +31,7 @@ async function verificarAuthHR() {
       console.log('\n💡 Solución: Actualiza el rol de un usuario existente:');
       console.log("   UPDATE usuario SET rol = 'hr_admin' WHERE email = 'tu-email@example.com';\n");
 
-      const usuarios = await prisma.usuario.findMany({
+      const usuarios = await prisma.usuarios.findMany({
         where: { activo: true },
         select: {
           email: true,
@@ -60,7 +60,7 @@ async function verificarAuthHR() {
       });
 
       for (const usuario of usuariosHR) {
-        const sesiones = await prisma.sesionActiva.findMany({
+        const sesiones = await prisma.sesiones_activas.findMany({
           where: {
             usuarioId: usuario.id,
             expiraEn: { gt: new Date() },
@@ -85,7 +85,7 @@ async function verificarAuthHR() {
       }
     }
 
-    const fichajesPendientes = await prisma.fichaje.findMany({
+    const fichajesPendientes = await prisma.fichajes.findMany({
       where: {
         estado: 'pendiente',
       },
@@ -102,7 +102,7 @@ async function verificarAuthHR() {
       console.log(`📋 Fichajes pendientes: ${fichajesPendientes.length} encontrados`);
       console.log('   (Mostrando primeros 5)\n');
       for (const fichaje of fichajesPendientes) {
-        const empleado = await prisma.empleado.findUnique({
+        const empleado = await prisma.empleados.findUnique({
           where: { id: fichaje.empleadoId },
           select: { nombre: true, apellidos: true },
         });

@@ -19,7 +19,7 @@ export default async function PuestosPage() {
   }
 
   // Obtener todos los puestos con sus empleados y documentos
-  const puestos = await prisma.puesto.findMany({
+  const puestos = await prisma.puestos.findMany({
     where: {
       empresaId: session.user.empresaId,
       activo: true,

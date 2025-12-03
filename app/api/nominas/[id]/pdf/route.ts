@@ -23,7 +23,7 @@ export async function GET(
     const { id } = await params;
 
     // Obtener la nómina con su documento
-    const nomina = await prisma.nomina.findFirst({
+    const nomina = await prisma.nominas.findFirst({
       where: {
         id,
         empleado: {

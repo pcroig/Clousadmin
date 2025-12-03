@@ -1,8 +1,8 @@
 # 🚀 Onboarding de Empresa (HR Admin)
 
-**Estado**: ✅ Implementado  
-**Versión**: 2.0  
-**Última actualización**: 2025-01-27
+**Estado**: ✅ Implementado
+**Versión**: 2.1
+**Última actualización**: 2025-11-29
 
 ---
 
@@ -36,8 +36,9 @@ El onboarding de empresa es el proceso mediante el cual un nuevo HR Admin config
 **Objetivo:** Crear la empresa y el usuario HR Admin inicial.
 
 **Campos:**
+- Avatar del administrador (opcional, imagen hasta 2MB)
 - Nombre de la empresa * (obligatorio)
-- Sitio web (opcional)
+- Sitio web (opcional, normalización automática de URL)
 - Nombre del administrador * (obligatorio)
 - Apellidos del administrador * (obligatorio)
 - Email (pre-rellenado desde la invitación, bloqueado)
@@ -47,9 +48,16 @@ El onboarding de empresa es el proceso mediante el cual un nuevo HR Admin config
 **Acción:**
 - Valida el token de invitación
 - Crea empresa, usuario HR Admin y empleado en una transacción
+- **Sube avatar a S3** si se proporciona (formato: `avatars/{empresaId}/{empleadoId}/{timestamp}.{ext}`)
+- **Normaliza URL** del sitio web (añade `https://` automáticamente si no tiene protocolo)
 - Marca invitación como usada
 - Autentica automáticamente al usuario
 - Avanza al paso 1
+
+**Normalización de URL:**
+- Input: `"www.empresa.com"` → Output: `"https://www.empresa.com"`
+- Input: `"empresa.com"` → Output: `"https://empresa.com"`
+- Input: vacío → Output: `null`
 
 **Server Action:** `signupEmpresaAction`
 
@@ -59,7 +67,7 @@ El onboarding de empresa es el proceso mediante el cual un nuevo HR Admin config
 
 **Objetivo:** Importar empleados masivamente desde Excel.
 
-**Componente:** `components/onboarding/importar-empleados.tsx`
+**Componente:** `components/shared/importar-empleados-excel.tsx`
 
 **Funcionalidad:**
 - Subida de archivo Excel (.xlsx, .xls, .csv)
@@ -68,10 +76,22 @@ El onboarding de empresa es el proceso mediante el cual un nuevo HR Admin config
 - Validación de datos
 - Creación automática de equipos y puestos detectados
 - Opción de enviar invitaciones por email
+- **Persistencia:** Al volver a este paso, se cargan automáticamente empleados sin onboarding completado
+
+**Persistencia de Datos:**
+```typescript
+// Al montar el componente en modo onboarding:
+useEffect(() => {
+  // Carga empleados con onboardingCompletado === false
+  fetch('/api/empleados?limit=100')
+  // Filtra y muestra los empleados creados durante este flujo
+}, []);
+```
 
 **Nota importante:**
 - Los empleados se crean **sin jornada asignada**
-- La jornada se asignará en el paso 3
+- La jornada se asignará automáticamente en el paso 3
+- Al importar y luego volver al paso 1, los empleados previamente importados se muestran
 
 **API:** `POST /api/empleados/importar-excel`
 
@@ -86,15 +106,34 @@ El onboarding de empresa es el proceso mediante el cual un nuevo HR Admin config
 **Componente:** `components/onboarding/sedes-form.tsx`
 
 **Funcionalidad:**
-- Crear nuevas sedes
+- Crear nuevas sedes (botón integrado en el campo de ciudad)
 - Asignar sedes a toda la empresa o equipos específicos
-- Editar sedes existentes
+- Ver sedes creadas en formato compacto (ciudad + asignación inline)
 - Eliminar sedes (si no tienen empleados asignados)
+- **Persistencia:** Al volver a este paso, se cargan automáticamente las sedes creadas
+
+**UI Mejorada:**
+- Diseño compacto: muestra ciudad, nombre y asignación en una línea
+- Botón "Agregar" integrado junto al input de ciudad
+- Asignación mostrada inline: "Todos los empleados" o "Equipo: [nombre]"
+- Sin bordes en radio buttons (diseño más limpio)
+
+**Persistencia de Datos:**
+```typescript
+// Al montar el componente:
+useEffect(() => {
+  // Si no hay sedes iniciales, carga desde API
+  if (sedesIniciales.length === 0) {
+    fetch('/api/sedes')
+    setSedes(sedesNormalizadas)
+  }
+}, []);
+```
 
 **Server Actions:**
-- `crearSedeAction`
-- `asignarSedeAction`
-- `eliminarSedeAction`
+- `crearSedeAction` - Crear nueva sede con asignación
+- `asignarSedeAction` - Cambiar asignación de sede existente
+- `eliminarSedeAction` - Eliminar sede sin empleados
 
 ---
 
@@ -105,20 +144,21 @@ El onboarding de empresa es el proceso mediante el cual un nuevo HR Admin config
 **Componente:** `components/onboarding/jornada-step.tsx`
 
 **Características:**
-- Usa `JornadaFormFields` (componente reutilizable del panel de HR)
+- Usa `JornadaFormFields` con `showNombre={false}` y `showAsignacion={true}`
 - **Diseño embedded** (sin fondo ni border, integrado directamente en el paso)
 - **Sin loader inicial** - renderiza instantáneamente con valores por defecto
+- **Asignación al principio** - La sección de asignación aparece primero (es la agrupación lógica)
+- **Sin campo nombre visible** - El nombre se genera automáticamente como "Jornada base"
 - Valores por defecto pre-rellenados:
-  - Nombre: "Jornada Estándar" (opcional, si está vacío se usa "Jornada base")
   - Tipo: Flexible
   - Horas semanales: 40
   - Días laborables: Lunes a Viernes
   - Límites: opcionales
 
 **Configuración:**
+- **Asignación** (aparece primero): Nivel empresa (fijo para onboarding)
 - Tipo de jornada: Fija o Flexible
 - Horas semanales * (obligatorio)
-- Nombre (opcional)
 - Días laborables (selector visual)
 - Horarios por día (para jornada fija)
 - Descansos en minutos
@@ -126,12 +166,16 @@ El onboarding de empresa es el proceso mediante el cual un nuevo HR Admin config
 
 **Acción al guardar:**
 - Crea o actualiza la jornada predefinida
-- **Asigna automáticamente** a toda la empresa (nivel empresa)
+- **Verifica primero** si existen jornadas distintas ya asignadas (`/api/jornadas/verificar-previas`)
+- Si no hay jornadas previas, asigna automáticamente a toda la empresa
+- Si se detectan jornadas previas, muestra un diálogo de confirmación con el listado de jornadas que se reemplazarán y bloquea el paso hasta confirmar
+- El nombre se establece internamente como "Jornada base"
 - No requiere selección manual de asignación (simplificado para onboarding)
 
 **Notas técnicas:**
+- El campo `nombre` está oculto (`showNombre={false}`)
+- La asignación está visible y fija en nivel "empresa"
 - Si existe una jornada no predefinida, se actualiza en lugar de crear nueva
-- El nombre se normaliza: si está vacío, se usa "Jornada base"
 - Los límites solo se envían si tienen valor (opcionales)
 
 **Server Action:** `configurarCalendarioYJornadaAction`
@@ -149,6 +193,7 @@ El onboarding de empresa es el proceso mediante el cual un nuevo HR Admin config
 **Características:**
 - Usa `CalendarioFestivos` y `ListaFestivos` (componentes reutilizables del panel de HR)
 - Selector visual de días laborables de la semana
+- **Calendario visual de dos meses** (`numberOfMonths={2}`)
 - Gestión completa de festivos
 
 **Funcionalidades:**
@@ -156,8 +201,20 @@ El onboarding de empresa es el proceso mediante el cual un nuevo HR Admin config
 - **Festivos:**
   - Importar desde archivo ICS/CSV
   - Crear festivos manualmente
-  - Vista de calendario visual
+  - **Vista de calendario visual mostrando 2 meses simultáneamente**
   - Lista de festivos con edición/eliminación
+  - Sincronización automática entre calendario y lista
+
+**Visualización del Calendario:**
+```typescript
+<Calendar
+  numberOfMonths={2}  // Muestra 2 meses lado a lado
+  modifiers={{
+    festivo: festivosDates,
+    noLaborable: (date) => !esDiaLaborable(date)
+  }}
+/>
+```
 
 **Acción al guardar:**
 - Actualiza los días laborables de la empresa
@@ -348,6 +405,14 @@ El stepper muestra:
 
 ---
 
-**Última actualización:** 2025-01-27  
+**Última actualización:** 2025-11-29
 **Autor:** Clousadmin Dev Team
+**Cambios en v2.1:**
+- ✅ Avatar en paso 0 con upload a S3
+- ✅ Normalización automática de URLs (añade https://)
+- ✅ Persistencia de empleados al navegar entre pasos
+- ✅ Persistencia de sedes al navegar entre pasos
+- ✅ Jornada sin campo nombre visible (auto-generado)
+- ✅ Calendario con visualización de 2 meses
+- ✅ UI compacta en sedes (asignación inline)
 

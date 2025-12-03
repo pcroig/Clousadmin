@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
     const { session } = authResult;
 
     // Buscar empleado por usuarioId
-    const empleado = await prisma.empleado.findUnique({
+    const empleado = await prisma.empleados.findUnique({
       where: { usuarioId: session.user.id },
       select: {
         id: true,

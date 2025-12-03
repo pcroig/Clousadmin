@@ -33,7 +33,7 @@ import {
 } from '@/components/ui/table';
 import { EstadoFichaje } from '@/lib/constants/enums';
 import { extractArrayFromResponse } from '@/lib/utils/api-response';
-import { formatearHorasMinutos } from '@/lib/utils/formatters';
+import { extraerHoraDeISO, formatearHorasMinutos } from '@/lib/utils/formatters';
 
 
 interface FichajeEvento {
@@ -141,8 +141,9 @@ export function FichajesEmpleadoClient({ balanceInicial }: Props) {
       const entrada = eventosOrdenados.find(e => e.tipo === 'entrada');
       const salida = eventosOrdenados.find(e => e.tipo === 'salida');
 
-      const horarioEntrada = entrada ? format(new Date(entrada.hora), 'HH:mm') : null;
-      const horarioSalida = salida ? format(new Date(salida.hora), 'HH:mm') : null;
+      // Extraer hora directamente del ISO string para evitar desfases de zona horaria
+      const horarioEntrada = entrada ? extraerHoraDeISO(entrada.hora) : null;
+      const horarioSalida = salida ? extraerHoraDeISO(salida.hora) : null;
 
       let estado: 'completa' | 'incompleta' | 'pendiente' = 'completa';
       if (!entrada || !salida) {
@@ -175,7 +176,7 @@ export function FichajesEmpleadoClient({ balanceInicial }: Props) {
       
       // Agrupar fichajes en jornadas
       const jornadasAgrupadas = agruparPorJornada(
-        extractArrayFromResponse<FichajeDia>(data, { key: 'fichajes' })
+        extractArrayFromResponse<FichajeDia>(data, { key: 'data' })
       );
       setJornadas(jornadasAgrupadas);
     } catch (error) {

@@ -27,7 +27,7 @@ export default async function NominaDetailsPage(context: { params: Promise<{ id:
   const { id } = params;
 
   // Obtener la nómina con todos sus detalles
-  const nomina = await prisma.nomina.findFirst({
+  const nomina = await prisma.nominas.findFirst({
     where: {
       id,
       empleado: {
@@ -69,9 +69,9 @@ export default async function NominaDetailsPage(context: { params: Promise<{ id:
       },
       complementosAsignados: {
         include: {
-          empleadoComplemento: {
+          empleado_complementos: {
             include: {
-              tipoComplemento: {
+              tipos_complemento: {
                 select: {
                   nombre: true,
                   descripcion: true,
@@ -125,7 +125,7 @@ export default async function NominaDetailsPage(context: { params: Promise<{ id:
   }
 
   // Obtener ausencias del mes
-  const ausencias = await prisma.ausencia.findMany({
+  const ausencias = await prisma.ausencias.findMany({
     where: {
       empleadoId: nomina.empleadoId,
       fechaInicio: {
@@ -182,8 +182,8 @@ export default async function NominaDetailsPage(context: { params: Promise<{ id:
       importe: decimalToNumber(complemento.importe),
       empleadoComplemento: {
         tipoComplemento: {
-          nombre: complemento.empleadoComplemento.tipoComplemento.nombre,
-          descripcion: complemento.empleadoComplemento.tipoComplemento.descripcion,
+          nombre: complemento.empleado_complementos.tipos_complemento.nombre,
+          descripcion: complemento.empleado_complementos.tipos_complemento.descripcion,
         },
       },
     })),

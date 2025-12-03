@@ -46,7 +46,7 @@ export async function GET(_request: NextRequest) {
 
       // Empleado - Datos bancarios
       'empleado_iban',
-      'empleado_titular_cuenta',
+      'empleado_bic',
 
       // Contrato
       'contrato_id',

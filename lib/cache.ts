@@ -31,7 +31,7 @@ export const CacheDurations = {
  * ```ts
  * const getDashboardData = cachedQuery(
  *   async (empresaId: string) => {
- *     return await prisma.empleado.findMany({
+ *     return await prisma.empleados.findMany({
  *       where: { empresaId },
  *       select: { id: true, nombre: true },
  *     });

@@ -4,8 +4,8 @@
 // Onboarding Form - Multi-Step Employee Data Collection
 // ========================================
 
-import { Empleado } from '@prisma/client';
-import { ChevronLeft, ChevronRight, Upload, User } from 'lucide-react';
+import type { empleados } from '@prisma/client';
+import { Check, ChevronLeft, ChevronRight, Copy, HelpCircle, Upload, User } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { PWAExplicacion } from '@/components/onboarding/pwa-explicacion';
@@ -13,6 +13,18 @@ import { DocumentList, type DocumentListItem } from '@/components/shared/documen
 import { DocumentUploader } from '@/components/shared/document-uploader';
 import { EmployeeAvatar } from '@/components/shared/employee-avatar';
 import { Button } from '@/components/ui/button';
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldLabel,
+} from '@/components/ui/field';
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupButton,
+  InputGroupInput,
+} from '@/components/ui/input-group';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -22,7 +34,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import { PROVINCIAS_ESPANOLAS } from '@/lib/constants/provincias';
 import { getAvatarStyle } from '@/lib/design-system';
+import { useCopyToClipboard } from '@/lib/hooks/use-copy-to-clipboard';
 import { validarIBAN } from '@/lib/validaciones/iban';
 
 import type { DatosTemporales, ProgresoOnboarding } from '@/lib/onboarding';
@@ -30,7 +50,7 @@ import type { DocumentoRequerido as ConfigDocumentoRequerido, OnboardingConfigDa
 
 interface OnboardingFormProps {
   token: string;
-  empleado: Empleado;
+  empleado: empleados;
   progreso: ProgresoOnboarding;
   datosTemporales: DatosTemporales | null;
   nombreEmpresa: string;
@@ -63,7 +83,7 @@ const campoLabels: Record<string, string> = {
   estadoCivil: 'Estado Civil',
   numeroHijos: 'Número de Hijos',
   iban: 'IBAN',
-  titularCuenta: 'Titular de la cuenta',
+  bic: 'Código BIC',
 };
 
 // Función helper para obtener el label de un campo
@@ -209,8 +229,16 @@ export function OnboardingForm({
   // Paso 2: Datos Bancarios
   const [datosBancarios, setDatosBancarios] = useState({
     iban: datosInicial?.datos_bancarios?.iban || '',
-    titularCuenta: datosInicial?.datos_bancarios?.titularCuenta || '',
+    bic: datosInicial?.datos_bancarios?.bic || '',
   });
+  const {
+    copyToClipboard: copyIban,
+    isCopied: isIbanCopied,
+  } = useCopyToClipboard();
+  const {
+    copyToClipboard: copyBic,
+    isCopied: isBicCopied,
+  } = useCopyToClipboard();
 
   // Validación en tiempo real para IBAN
   const ibanValido = (() => {
@@ -383,6 +411,10 @@ export function OnboardingForm({
       const data = await res.json() as Record<string, unknown>;
 
       if (res.ok && data.success) {
+        // Actualizar el preview del avatar con la URL del servidor si existe
+        if (data.avatarUrl && typeof data.avatarUrl === 'string') {
+          setAvatarPreview(data.avatarUrl);
+        }
         setSuccess('Credenciales guardadas correctamente');
         setLoading(false);
         setTimeout(() => {
@@ -612,7 +644,7 @@ export function OnboardingForm({
   };
 
   const validarPaso2 = () => {
-    return datosBancarios.iban && datosBancarios.titularCuenta && ibanValido !== false;
+    return datosBancarios.iban && datosBancarios.bic && ibanValido !== false;
   };
 
   // Stepper dinámico según los pasos habilitados
@@ -986,23 +1018,32 @@ export function OnboardingForm({
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="direccionProvincia">
+            <Field>
+              <FieldLabel htmlFor="direccionProvincia">
                 Provincia <span className="text-red-500">*</span>
-              </Label>
-              <Input
-                id="direccionProvincia"
-                placeholder="Madrid"
+              </FieldLabel>
+              <Select
                 value={datosPersonales.direccionProvincia}
-                onChange={(e) =>
+                onValueChange={(value) =>
                   setDatosPersonales({
                     ...datosPersonales,
-                    direccionProvincia: e.target.value,
+                    direccionProvincia: value,
                   })
                 }
                 required
-              />
-            </div>
+              >
+                <SelectTrigger id="direccionProvincia">
+                  <SelectValue placeholder="Selecciona una provincia..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {PROVINCIAS_ESPANOLAS.map((provincia) => (
+                    <SelectItem key={provincia.value} value={provincia.value}>
+                      {provincia.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
           </div>
 
           {/* Información familiar (opcional) */}
@@ -1014,15 +1055,15 @@ export function OnboardingForm({
               </div>
             </div>
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="estadoCivil">Estado civil</Label>
+            <Field>
+              <FieldLabel htmlFor="estadoCivil">Estado civil</FieldLabel>
               <Select
                 value={datosPersonales.estadoCivil}
                 onValueChange={(value) =>
                   setDatosPersonales({ ...datosPersonales, estadoCivil: value })
                 }
               >
-                <SelectTrigger>
+                <SelectTrigger id="estadoCivil">
                   <SelectValue placeholder="Selecciona..." />
                 </SelectTrigger>
                 <SelectContent>
@@ -1033,7 +1074,7 @@ export function OnboardingForm({
                   <SelectItem value="pareja_hecho">Pareja de hecho</SelectItem>
                 </SelectContent>
               </Select>
-            </div>
+            </Field>
 
             <div className="space-y-2">
               <Label htmlFor="numeroHijos">Número de hijos</Label>
@@ -1110,22 +1151,11 @@ export function OnboardingForm({
       {pasoActual === 'datosBancarios' && (
         <form onSubmit={handleSubmitPaso2} className="space-y-4">
           <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="iban">
+            <Field>
+              <FieldLabel htmlFor="iban">
                 IBAN <span className="text-red-500">*</span>
-              </Label>
-              <Input
-                id="iban"
-                placeholder="ES91 2100 0418 4502 0005 1332"
-                value={datosBancarios.iban}
-                onChange={(e) =>
-                  setDatosBancarios({
-                    ...datosBancarios,
-                    iban: e.target.value.toUpperCase(),
-                  })
-                }
-                required
-                maxLength={34}
+              </FieldLabel>
+              <InputGroup
                 className={
                   ibanValido === false
                     ? 'border-red-500'
@@ -1133,33 +1163,111 @@ export function OnboardingForm({
                     ? 'border-green-500'
                     : ''
                 }
-              />
+              >
+                <InputGroupInput
+                  id="iban"
+                  placeholder="ES91 2100 0418 4502 0005 1332"
+                  value={datosBancarios.iban}
+                  onChange={(e) =>
+                    setDatosBancarios({
+                      ...datosBancarios,
+                      iban: e.target.value.toUpperCase(),
+                    })
+                  }
+                  required
+                  maxLength={34}
+                  aria-invalid={ibanValido === false}
+                />
+                <InputGroupAddon align="inline-end" className="gap-1">
+                  <TooltipProvider delayDuration={0}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <InputGroupButton
+                          variant="ghost"
+                          aria-label="Información IBAN"
+                          size="icon-xs"
+                          type="button"
+                        >
+                          <HelpCircle className="h-4 w-4" />
+                        </InputGroupButton>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Formato: ES seguido de 22 dígitos (ej: ES9121000418450200051332)</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                  <InputGroupButton
+                    variant="ghost"
+                    aria-label="Copiar IBAN"
+                    size="icon-xs"
+                    type="button"
+                    disabled={!datosBancarios.iban}
+                    onClick={() => datosBancarios.iban && copyIban(datosBancarios.iban)}
+                  >
+                    {isIbanCopied ? <Check className="h-4 w-4 text-emerald-600" /> : <Copy className="h-4 w-4" />}
+                  </InputGroupButton>
+                </InputGroupAddon>
+              </InputGroup>
               {ibanValido === false && (
-                <p className="text-xs text-red-600">
+                <FieldError>
                   IBAN inválido. Verifica el formato (ES + 22 dígitos) y el checksum
-                </p>
+                </FieldError>
               )}
               {ibanValido === true && (
-                <p className="text-xs text-green-600">IBAN válido ✓</p>
+                <FieldDescription className="text-green-600">
+                  IBAN válido ✓
+                </FieldDescription>
               )}
-            </div>
+            </Field>
 
             <div className="space-y-2">
-              <Label htmlFor="titularCuenta">
-                Titular de la cuenta <span className="text-red-500">*</span>
+              <Label htmlFor="bic">
+                Código BIC <span className="text-red-500">*</span>
               </Label>
-              <Input
-                id="titularCuenta"
-                placeholder="Nombre completo del titular"
-                value={datosBancarios.titularCuenta}
-                onChange={(e) =>
-                  setDatosBancarios({
-                    ...datosBancarios,
-                    titularCuenta: e.target.value,
-                  })
-                }
-                required
-              />
+              <InputGroup>
+                <InputGroupInput
+                  id="bic"
+                  placeholder="Ej: BBVAESMMXXX"
+                  maxLength={11}
+                  value={datosBancarios.bic}
+                  onChange={(e) =>
+                    setDatosBancarios({
+                      ...datosBancarios,
+                      bic: e.target.value.replace(/\s+/g, '').toUpperCase(),
+                    })
+                  }
+                  required
+                />
+                <InputGroupAddon align="inline-end" className="gap-1">
+                  <TooltipProvider delayDuration={0}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <InputGroupButton
+                          variant="ghost"
+                          aria-label="Información BIC"
+                          size="icon-xs"
+                          type="button"
+                        >
+                          <HelpCircle className="h-4 w-4" />
+                        </InputGroupButton>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Código identificador del banco (8 u 11 caracteres)</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                  <InputGroupButton
+                    variant="ghost"
+                    aria-label="Copiar BIC"
+                    size="icon-xs"
+                    type="button"
+                    disabled={!datosBancarios.bic}
+                    onClick={() => datosBancarios.bic && copyBic(datosBancarios.bic)}
+                  >
+                    {isBicCopied ? <Check className="h-4 w-4 text-emerald-600" /> : <Copy className="h-4 w-4" />}
+                  </InputGroupButton>
+                </InputGroupAddon>
+              </InputGroup>
             </div>
           </div>
 
@@ -1226,77 +1334,109 @@ export function OnboardingForm({
             </div>
           ) : (
             <div className="space-y-6">
-              {/* Lista de documentos requeridos */}
-              {documentosRequeridos.length > 0 && (
+              {/* Documentos para visualizar/descargar */}
+              {documentosRequeridos.filter((d) => d.tipo === 'visualizar').length > 0 && (
                 <div className="space-y-4">
-                  <h3 className="font-medium">Documentos requeridos:</h3>
-                  {documentosRequeridos.map((docReq: DocumentoRequeridoUI) => {
-                    const docSubido = documentos.find((d) =>
-                      documentoCumpleRequerimiento(d, docReq)
-                    );
-                    
-                    return (
-                      <div key={docReq.id} className="border rounded-lg p-4">
-                        <div className="flex items-center justify-between mb-3">
-                          <div>
+                  <h3 className="font-medium">Documentos para descargar:</h3>
+                  <div className="space-y-2">
+                    {documentosRequeridos
+                      .filter((d) => d.tipo === 'visualizar')
+                      .map((docReq: DocumentoRequeridoUI) => (
+                        <div key={docReq.id} className="border rounded-lg p-4 bg-blue-50 border-blue-200">
+                          <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
-                              <h4 className="font-medium">{docReq.nombre}</h4>
-                              {docReq.requerido && (
-                                <span className="text-xs font-semibold uppercase text-red-600">
-                                  Obligatorio
-                                </span>
-                              )}
+                              <h4 className="font-medium text-blue-900">{docReq.nombre}</h4>
                             </div>
-                            {docReq.descripcion && (
-                              <p className="text-sm text-gray-600">
-                                {docReq.descripcion}
-                              </p>
-                            )}
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                // Aquí se debería obtener la URL del documento
+                                console.log('Descargar documento:', docReq.documentoId);
+                              }}
+                            >
+                              Descargar
+                            </Button>
                           </div>
-                          {docSubido && (
-                            <span className="text-sm text-green-600 font-medium">
-                              ✓ Subido
-                            </span>
-                          )}
                         </div>
-                        
-                        {!docSubido ? (
-                          <>
-                            <DocumentUploader
-                              onUpload={(file) =>
-                                handleUploadDocumento(
-                                  file,
-                                  docReq.id,
-                                  docReq.nombre,
-                                  docReq.carpetaDestino
-                                )
-                              }
-                              label=""
-                              description="PDF, JPG o PNG (máx. 5MB)"
-                            />
-                            {docReq.carpetaDestino && (
-                              <p className="text-xs text-gray-500 mt-2">
-                                Se guardará en la carpeta &quot;{docReq.carpetaDestino}&quot;.
-                              </p>
-                            )}
-                          </>
-                        ) : (
-                          <div className="bg-green-50 border border-green-200 rounded p-3">
-                            <p className="text-sm text-green-800">
-                              Documento subido correctamente
-                            </p>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
+                      ))}
+                  </div>
                 </div>
               )}
 
-              {/* Documentos ya subidos */}
+              {/* Documentos que el empleado debe subir */}
+              {documentosRequeridos.filter((d) => d.tipo === 'solicitar').length > 0 && (
+                <div className="space-y-4">
+                  <h3 className="font-medium">Documentos a subir:</h3>
+                  {documentosRequeridos
+                    .filter((d) => d.tipo === 'solicitar')
+                    .map((docReq: DocumentoRequeridoUI) => {
+                      const docSubido = documentos.find((d) =>
+                        documentoCumpleRequerimiento(d, docReq)
+                      );
+                      
+                      return (
+                        <div key={docReq.id} className="border rounded-lg p-4 bg-amber-50 border-amber-200">
+                          <div className="flex items-center justify-between mb-3">
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <h4 className="font-medium">{docReq.nombre}</h4>
+                                {docReq.requerido && (
+                                  <span className="text-xs font-semibold uppercase text-red-600">
+                                    Obligatorio
+                                  </span>
+                                )}
+                              </div>
+                              {docReq.descripcion && (
+                                <p className="text-sm text-gray-600">
+                                  {docReq.descripcion}
+                                </p>
+                              )}
+                            </div>
+                            {docSubido && (
+                              <span className="text-sm text-green-600 font-medium">
+                                ✓ Subido
+                              </span>
+                            )}
+                          </div>
+                          
+                          {!docSubido ? (
+                            <>
+                              <DocumentUploader
+                                onUpload={(file) =>
+                                  handleUploadDocumento(
+                                    file,
+                                    docReq.id,
+                                    docReq.nombre,
+                                    docReq.carpetaDestino
+                                  )
+                                }
+                                label=""
+                                description="PDF, JPG o PNG (máx. 5MB)"
+                              />
+                              {docReq.carpetaDestino && (
+                                <p className="text-xs text-gray-500 mt-2">
+                                  Se guardará en la carpeta &quot;{docReq.carpetaDestino}&quot;.
+                                </p>
+                              )}
+                            </>
+                          ) : (
+                            <div className="bg-green-50 border border-green-200 rounded p-3">
+                              <p className="text-sm text-green-800">
+                                Documento subido correctamente
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                </div>
+              )}
+
+              {/* Documentos ya subidos (adicionales) */}
               {documentos.length > 0 && (
                 <div className="space-y-4">
-                  <h3 className="font-medium">Documentos subidos:</h3>
+                  <h3 className="font-medium">Otros documentos subidos:</h3>
                   <DocumentList
                     documentos={documentos}
                     onDownload={(doc) => {

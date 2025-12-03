@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
     manana.setDate(manana.getDate() + 1);
 
     // Contar fichajes cuadrados masivamente del día
-    const cuadradosMasivamente = await prisma.fichaje.count({
+    const cuadradosMasivamente = await prisma.fichajes.count({
       where: {
         empresaId: session.user.empresaId,
         cuadradoMasivamente: true,
@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
     });
 
     // Contar fichajes pendientes (requieren revisión)
-    const enRevision = await prisma.fichaje.count({
+    const enRevision = await prisma.fichajes.count({
       where: {
         empresaId: session.user.empresaId,
         estado: EstadoFichaje.pendiente,

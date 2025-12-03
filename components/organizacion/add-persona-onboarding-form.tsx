@@ -1,991 +1,773 @@
-// ========================================
-// Add Persona Onboarding Form
-// ========================================
-// Formulario para crear empleado y activar onboarding (envía email con link)
-// Incluye funcionalidad para subir documentos iniciales
-
 'use client';
 
-import { Eye, FileText, FileType, Mail, X } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+// ========================================
+// Add Persona Onboarding Form - Wizard Multi-paso
+// ========================================
+// Formulario para crear empleado y activar onboarding con navegación por pasos
+
+import { FileSignature, FileText, Mail } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
-import { CarpetaSelector } from '@/components/shared/carpeta-selector';
 import { Combobox, type ComboboxOption } from '@/components/shared/combobox';
+import { DialogWithSidebar } from '@/components/shared/dialog-with-sidebar';
 import { DocumentUploader } from '@/components/shared/document-uploader';
 import { LoadingButton } from '@/components/shared/loading-button';
+import { SearchableSelect } from '@/components/shared/searchable-select';
+import { WizardSteps } from '@/components/shared/wizard-steps';
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from '@/components/ui/accordion';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Spinner } from '@/components/ui/spinner';
+import { type DocumentoRequerido, filtrarDocumentosPorEquipo } from '@/lib/onboarding-config-types';
 import { parseJson } from '@/lib/utils/json';
+import { cn } from '@/lib/utils';
+
+interface AddPersonaOnboardingFormProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSuccess: () => void;
+  tipoEmpleado: 'nuevo' | 'existente';
+}
+
+interface FormData {
+  nombre: string;
+  apellidos: string;
+  email: string;
+  fechaAlta: string;
+  puestoId: string;
+  equipoId: string;
+  sedeId: string;
+}
 
 interface DocumentoSubido {
   id: string;
   nombre: string;
-  tipoDocumento: string;
   file: File;
-  carpetaId?: string;
+  carpetaDestino: string;
 }
 
-interface PlantillaAutoOnboarding {
-  id: string;
-  nombre: string;
-  descripcion?: string | null;
-  categoria?: string | null;
-  formato: 'docx' | 'pdf_rellenable';
-  requiereFirma: boolean;
-  carpetaDestinoDefault?: string | null;
-  esOficial: boolean;
-  autoGenerarOnboarding: boolean;
-  permiteRellenar: boolean;
-  requiereRevision: boolean;
-}
-
-interface AddPersonaOnboardingFormProps {
-  onSuccess: () => void;
-  onCancel: () => void;
-  tipoOnboarding?: 'completo' | 'simplificado';
-}
-
-interface PlantillaGenerarResponse {
-  success?: boolean;
-  error?: string;
-  details?: string;
-}
-
-interface DocumentoUploadResponse {
-  documento: { id: string };
-  error?: string;
-}
-
-interface EmpleadoCreateResponse {
-  id: string;
-  code?: string;
-  error?: string;
-  empleadoExistente?: {
-    id: string;
-    nombre: string;
-    apellidos: string;
-  };
-}
-
-interface OnboardingInviteResponse {
-  success?: boolean;
-  error?: string;
-}
-
-interface CarpetaCreateResponse {
-  carpeta: { id: string };
-  error?: string;
-}
-
-interface ApiPuesto {
+interface Puesto {
   id: string;
   nombre: string;
 }
 
-interface PuestosResponse {
-  puestos?: ApiPuesto[];
-  data?: ApiPuesto[];
+interface Equipo {
+  id: string;
+  nombre: string;
 }
 
-interface PlantillasApiResponse {
-  success?: boolean;
-  error?: string;
-  plantillas?: PlantillaAutoOnboarding[];
+interface Sede {
+  id: string;
+  nombre: string;
+  ciudad?: string;
 }
 
-export function AddPersonaOnboardingForm({ onSuccess, onCancel, tipoOnboarding = 'completo' }: AddPersonaOnboardingFormProps) {
+interface EmpleadoExistente {
+  id: string;
+  nombre: string;
+  apellidos: string;
+  email: string;
+}
+
+export function AddPersonaOnboardingForm({
+  open,
+  onOpenChange,
+  onSuccess,
+  tipoEmpleado,
+}: AddPersonaOnboardingFormProps) {
+  const [currentStep, setCurrentStep] = useState('basicos');
   const [loading, setLoading] = useState(false);
   const [uploadingDocs, setUploadingDocs] = useState(false);
-  const [puestos, setPuestos] = useState<Array<{ id: string; nombre: string }>>([]);
-  const [documentosSubidos, setDocumentosSubidos] = useState<DocumentoSubido[]>([]);
-  const [empleadoId, setEmpleadoId] = useState<string | null>(null);
-  const [tipoDocumentoActual, setTipoDocumentoActual] = useState<string>('otro');
-  const [nombreDocumentoActual, setNombreDocumentoActual] = useState<string>('');
-  const [carpetaIdSeleccionada, setCarpetaIdSeleccionada] = useState<string | null>(null);
-  const [plantillasDisponibles, setPlantillasDisponibles] = useState<PlantillaAutoOnboarding[]>([]);
-  const [plantillasSeleccionadas, setPlantillasSeleccionadas] = useState<Set<string>>(new Set());
-  const [plantillasLoading, setPlantillasLoading] = useState(true);
-  const [plantillasError, setPlantillasError] = useState('');
-  const [generandoPlantillasAuto, setGenerandoPlantillasAuto] = useState(false);
-  const [formData, setFormData] = useState({
+  
+  // Datos del formulario
+  const [formData, setFormData] = useState<FormData>({
     nombre: '',
     apellidos: '',
     email: '',
     fechaAlta: new Date().toISOString().split('T')[0],
     puestoId: '',
+    equipoId: '',
+    sedeId: '',
   });
 
-  const plantillasSeleccionadasArray = useMemo(
-    () => plantillasDisponibles.filter((plantilla) => plantillasSeleccionadas.has(plantilla.id)),
-    [plantillasDisponibles, plantillasSeleccionadas]
-  );
+  // Empleado seleccionado (si es existente)
+  const [empleadoSeleccionadoId, setEmpleadoSeleccionadoId] = useState('');
+  const [empleadosExistentes, setEmpleadosExistentes] = useState<EmpleadoExistente[]>([]);
 
+  // Opciones disponibles
+  const [puestos, setPuestos] = useState<Puesto[]>([]);
+  const [equipos, setEquipos] = useState<Equipo[]>([]);
+  const [sedes, setSedes] = useState<Sede[]>([]);
+
+  // Documentos y firmas
+  const [documentosSubidos, setDocumentosSubidos] = useState<DocumentoSubido[]>([]);
+  const [documentosConfig, setDocumentosConfig] = useState<DocumentoRequerido[]>([]);
+  const [firmasConfig, setFirmasConfig] = useState<DocumentoRequerido[]>([]);
+
+  const steps = [
+    { id: 'basicos', label: 'Datos Básicos' },
+    { id: 'docs-visualizar', label: 'Ver/Descargar' },
+    { id: 'docs-solicitar', label: 'Solicitar Documentos' },
+    { id: 'firmas', label: 'Firmas' },
+  ];
+
+  // Cargar datos iniciales al montar el componente
   useEffect(() => {
-    async function fetchPuestos() {
-      try {
-        const response = await fetch('/api/organizacion/puestos');
-        if (!response.ok) {
-          throw new Error('Error al cargar puestos');
-        }
-        const data = await parseJson<PuestosResponse | ApiPuesto[]>(response);
-        const lista = Array.isArray(data)
-          ? data
-          : Array.isArray(data?.puestos)
-            ? data.puestos ?? []
-            : Array.isArray(data?.data)
-              ? data.data ?? []
-              : [];
-        setPuestos(lista.map((puesto) => ({ id: puesto.id, nombre: puesto.nombre })));
-      } catch (error) {
-        console.error('Error fetching puestos:', error);
-        toast.error('No se pudieron cargar los puestos');
+    cargarDatosIniciales();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const cargarDatosIniciales = async () => {
+    try {
+      // Cargar puestos, equipos y sedes
+      await Promise.all([
+        cargarPuestos(),
+        cargarEquipos(),
+        cargarSedes(),
+        cargarConfiguracionOnboarding(),
+      ]);
+
+      // Si es empleado existente, cargar lista de empleados sin onboarding
+      if (tipoEmpleado === 'existente') {
+        await cargarEmpleadosExistentes();
       }
+    } catch (error) {
+      console.error('[cargarDatosIniciales] Error:', error);
+      toast.error('Error al cargar datos iniciales');
     }
-    fetchPuestos();
-  }, []);
+  };
 
-  useEffect(() => {
-    cargarPlantillasOnboarding();
-  }, []);
+  const cargarPuestos = async () => {
+    try {
+      const res = await fetch('/api/organizacion/puestos');
+      const data = await parseJson<Puesto[]>(res);
+      setPuestos(data);
+    } catch (error) {
+      console.error('[cargarPuestos] Error:', error);
+    }
+  };
 
-  // Convertir puestos a formato ComboboxOption
-  const puestosOptions: ComboboxOption[] = puestos.map((puesto) => ({
-    value: puesto.id,
-    label: puesto.nombre,
-  }));
+  const cargarEquipos = async () => {
+    try {
+      const res = await fetch('/api/equipos');
+      const data = await parseJson<Equipo[]>(res);
+      setEquipos(data);
+    } catch (error) {
+      console.error('[cargarEquipos] Error:', error);
+    }
+  };
 
-  // Función para crear un nuevo puesto
+  const cargarSedes = async () => {
+    try {
+      const res = await fetch('/api/sedes');
+      const data = await parseJson<Sede[]>(res);
+      setSedes(data);
+    } catch (error) {
+      console.error('[cargarSedes] Error:', error);
+    }
+  };
+
+  const cargarConfiguracionOnboarding = async () => {
+    try {
+      const res = await fetch('/api/hr/onboarding-config');
+      const data = await parseJson<{
+        success?: boolean;
+        config?: { documentosRequeridos?: DocumentoRequerido[] };
+      }>(res);
+
+      if (data.success && data.config?.documentosRequeridos) {
+        const docs = data.config.documentosRequeridos;
+        setDocumentosConfig(docs.filter((d) => !d.requiereFirma));
+        setFirmasConfig(docs.filter((d) => d.requiereFirma));
+      }
+    } catch (error) {
+      console.error('[cargarConfiguracionOnboarding] Error:', error);
+    }
+  };
+
+  const cargarEmpleadosExistentes = async () => {
+    try {
+      const res = await fetch('/api/empleados?onboardingActivo=false');
+      const data = await parseJson<{data?: EmpleadoExistente[]}>(res);
+      setEmpleadosExistentes(data.data || []);
+    } catch (error) {
+      console.error('[cargarEmpleadosExistentes] Error:', error);
+    }
+  };
+
   const handleCreatePuesto = async (nombre: string): Promise<string | null> => {
     try {
-      const response = await fetch('/api/organizacion/puestos', {
+      const res = await fetch('/api/organizacion/puestos', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ nombre }),
       });
 
-      if (!response.ok) {
-        const error = await parseJson<{ error?: string }>(response).catch(() => null);
-        toast.error(error?.error || 'Error al crear puesto');
-        return null;
+      const data = await parseJson<Puesto>(res);
+      if (res.ok) {
+        setPuestos((prev) => [...prev, data]);
+        toast.success('Puesto creado correctamente');
+        return data.id;
       }
-
-      const nuevoPuesto = await parseJson<ApiPuesto>(response);
-      setPuestos((prev) => [...prev, nuevoPuesto]);
-      toast.success('Puesto creado correctamente');
-      return nuevoPuesto.id;
+      return null;
     } catch (error) {
-      console.error('[AddPersonaOnboardingForm] Error creating puesto:', error);
+      console.error('[handleCreatePuesto] Error:', error);
       toast.error('Error al crear puesto');
       return null;
     }
   };
 
-  const cargarPlantillasOnboarding = async () => {
-    setPlantillasLoading(true);
-    setPlantillasError('');
+  const handleSubmit = async () => {
+    setLoading(true);
 
     try {
-      const response = await fetch('/api/plantillas?activa=true');
-      const data = await parseJson<PlantillasApiResponse>(response);
+      let empleadoId: string;
 
-      if (!response.ok || !data.success) {
-        setPlantillasError(data?.error || 'Error al cargar plantillas automáticas');
-        return;
-      }
-
-      const plantillas: PlantillaAutoOnboarding[] = (data.plantillas || []).map((plantilla) => ({
-        id: plantilla.id,
-        nombre: plantilla.nombre,
-        descripcion: plantilla.descripcion,
-        categoria: plantilla.categoria,
-        formato: plantilla.formato,
-        requiereFirma: Boolean(plantilla.requiereFirma),
-        carpetaDestinoDefault: plantilla.carpetaDestinoDefault,
-        esOficial: Boolean(plantilla.esOficial),
-        autoGenerarOnboarding: Boolean(plantilla.autoGenerarOnboarding),
-        permiteRellenar: Boolean(plantilla.permiteRellenar),
-        requiereRevision: Boolean(plantilla.requiereRevision),
-      }));
-
-      setPlantillasDisponibles(plantillas);
-      setPlantillasSeleccionadas((prev) => {
-        if (prev.size > 0) {
-          return new Set(prev);
-        }
-        const autoSet = new Set<string>();
-        plantillas.forEach((plantilla) => {
-          if (plantilla.autoGenerarOnboarding) {
-            autoSet.add(plantilla.id);
-          }
-        });
-        return autoSet;
-      });
-    } catch (error) {
-      console.error('[AddPersonaOnboardingForm] Error al cargar plantillas:', error);
-      setPlantillasError('Error al cargar plantillas automáticas');
-    } finally {
-      setPlantillasLoading(false);
-    }
-  };
-
-  const togglePlantillaSeleccion = (id: string) => {
-    setPlantillasSeleccionadas((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
+      if (tipoEmpleado === 'existente') {
+        // Usar empleado existente
+        empleadoId = empleadoSeleccionadoId;
       } else {
-        next.add(id);
-      }
-      return next;
-    });
-  };
+        // Crear nuevo empleado
+        const resEmpleado = await fetch('/api/empleados', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            nombre: formData.nombre,
+            apellidos: formData.apellidos,
+            email: formData.email,
+            fechaAlta: formData.fechaAlta,
+            puestoId: formData.puestoId || undefined,
+            sedeId: formData.sedeId || undefined,
+            activo: false, // Inactivo hasta completar onboarding
+          }),
+        });
 
-  const handlePreviewPlantilla = (id: string) => {
-    if (typeof window === 'undefined') return;
-    window.open(`/hr/documentos/plantillas/${id}`, '_blank', 'noopener,noreferrer');
-  };
+        const dataEmpleado = await parseJson<{id: string; error?: string}>(resEmpleado);
+        
+        if (!resEmpleado.ok || !dataEmpleado.id) {
+          throw new Error(dataEmpleado.error || 'Error al crear empleado');
+        }
 
-  const generarPlantillasAutomaticas = async (empleadoGeneradoId: string) => {
-    const plantillasParaGenerar = plantillasDisponibles.filter((plantilla) =>
-      plantillasSeleccionadas.has(plantilla.id)
-    );
+        empleadoId = dataEmpleado.id;
 
-    if (plantillasParaGenerar.length === 0) {
-      return;
-    }
-
-    setGenerandoPlantillasAuto(true);
-
-    try {
-      const resultados = await Promise.allSettled(
-        plantillasParaGenerar.map(async (plantilla) => {
-          const response = await fetch(`/api/plantillas/${plantilla.id}/generar`, {
+        // Asignar a equipo si fue seleccionado
+        if (formData.equipoId) {
+          await fetch(`/api/equipos/${formData.equipoId}/members`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              empleadoIds: [empleadoGeneradoId],
-              nombreDocumento: undefined,
-              carpetaDestino: plantilla.carpetaDestinoDefault || 'Otros',
-              notificarEmpleado: false,
-              requiereFirma: plantilla.requiereFirma,
-            }),
+            body: JSON.stringify({ empleadoId }),
           });
-
-          const data = await parseJson<PlantillaGenerarResponse>(response);
-
-          if (!response.ok || !data.success) {
-            throw new Error(data.error || data.details || 'Error al iniciar generación');
-          }
-
-          return data;
-        })
-      );
-
-      const exitos = resultados.filter((resultado) => resultado.status === 'fulfilled').length;
-      if (exitos > 0) {
-        toast.success(`Se iniciaron ${exitos} generación(es) automáticas`);
+        }
       }
 
-      const errores = resultados.filter(
-        (resultado) => resultado.status === 'rejected'
-      ) as PromiseRejectedResult[];
-
-      if (errores.length > 0) {
-        console.error('[AddPersonaOnboardingForm] Errores al generar plantillas automáticas:', errores);
-        toast.error(`${errores.length} plantilla(s) no se pudieron generar automáticamente`);
-      }
-    } catch (error) {
-      console.error('[AddPersonaOnboardingForm] Error al iniciar generación automática:', error);
-      toast.error('Error al iniciar la generación automática de plantillas');
-    } finally {
-      setGenerandoPlantillasAuto(false);
-    }
-  };
-
-  // Manejar subida de documento
-  const handleDocumentUpload = async (file: File, tipoDocumento: string, nombreDocumento: string) => {
-    if (!empleadoId) {
-      toast.error('Primero debes crear el empleado');
-      return;
-    }
-
-    setUploadingDocs(true);
-
-    try {
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('nombreDocumento', nombreDocumento);
-      formData.append('tipoDocumento', tipoDocumento);
-      
-      // Añadir carpetaId si se seleccionó una carpeta
-      if (carpetaIdSeleccionada) {
-        formData.append('carpetaId', carpetaIdSeleccionada);
+      // Subir documentos
+      if (documentosSubidos.length > 0) {
+        setUploadingDocs(true);
+        await subirDocumentos(empleadoId);
+        setUploadingDocs(false);
       }
 
-      const response = await fetch(`/api/empleados/${empleadoId}/onboarding/documentos`, {
+      // Enviar invitación de onboarding
+      const resOnboarding = await fetch('/api/onboarding/invite', {
         method: 'POST',
-        body: formData,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ empleadoId }),
       });
 
-      const data = await parseJson<DocumentoUploadResponse>(response);
+      const dataOnboarding = await parseJson<{success?: boolean; error?: string}>(resOnboarding);
 
-      if (response.ok) {
-        // Añadir a la lista de documentos subidos
-        setDocumentosSubidos((prev) => [
-          ...prev,
-          {
-            id: data.documento.id,
-            nombre: nombreDocumento,
-            tipoDocumento,
-            file,
-          },
-        ]);
-        toast.success('Documento subido correctamente');
-      } else {
-        toast.error(data.error || 'Error al subir documento');
-        throw new Error(data.error || 'Error al subir documento');
+      if (!dataOnboarding.success) {
+        throw new Error(dataOnboarding.error || 'Error al enviar invitación');
       }
+
+      toast.success('Empleado creado y email de onboarding enviado', { duration: 5000 });
+      onSuccess();
+      onOpenChange(false);
     } catch (error) {
-      console.error('[AddPersonaOnboardingForm] Error subiendo documento:', error);
-      throw error;
+      console.error('[handleSubmit] Error:', error);
+      toast.error(error instanceof Error ? error.message : 'Error al crear empleado');
     } finally {
+      setLoading(false);
       setUploadingDocs(false);
     }
   };
 
-  // Eliminar documento de la lista (solo local, no del servidor)
-  const handleRemoveDocument = (id: string) => {
-    setDocumentosSubidos((prev) => prev.filter((doc) => doc.id !== id));
+  const subirDocumentos = async (empleadoId: string) => {
+    for (const doc of documentosSubidos) {
+      try {
+        const formData = new FormData();
+        formData.append('file', doc.file);
+        formData.append('nombre', doc.nombre);
+        formData.append('carpetaDestino', doc.carpetaDestino);
+        formData.append('empleadoId', empleadoId);
+
+        await fetch('/api/documentos', {
+          method: 'POST',
+          body: formData,
+        });
+      } catch (error) {
+        console.error(`[subirDocumentos] Error subiendo ${doc.nombre}:`, error);
+      }
+    }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const añadirDocumento = async (file: File, carpetaDestino: string) => {
+    const nuevoDoc: DocumentoSubido = {
+      id: `temp_${Date.now()}`,
+      nombre: file.name,
+      file,
+      carpetaDestino,
+    };
+    setDocumentosSubidos((prev) => [...prev, nuevoDoc]);
+    toast.success('Documento añadido');
+  };
 
-    // Prevenir doble submit
-    if (loading || uploadingDocs) {
-      return;
-    }
+  const eliminarDocumento = (id: string) => {
+    setDocumentosSubidos((prev) => prev.filter((d) => d.id !== id));
+  };
 
-    // Validaciones básicas
-    if (!formData.nombre || !formData.apellidos || !formData.email) {
-      toast.error('Nombre, apellidos y email son requeridos');
-      return;
-    }
+  // Filtrar documentos por equipo seleccionado
+  const documentosFiltrados = filtrarDocumentosPorEquipo(
+    documentosConfig,
+    formData.equipoId ? [formData.equipoId] : []
+  );
 
-    setLoading(true);
+  const firmasFiltradas = filtrarDocumentosPorEquipo(
+    firmasConfig,
+    formData.equipoId ? [formData.equipoId] : []
+  );
 
-    try {
-      // Crear empleado
-      interface EmpleadoCreateData {
-        nombre: string;
-        apellidos: string;
-        email: string;
-        fechaAlta: string;
-        activo: boolean;
-        onboardingCompletado: boolean;
-        puestoId?: string;
+  // Validaciones por paso
+  const canGoNext = () => {
+    if (currentStep === 'basicos') {
+      if (tipoEmpleado === 'existente') {
+        return empleadoSeleccionadoId !== '';
       }
+      return formData.nombre && formData.apellidos && formData.email && formData.puestoId && formData.equipoId;
+    }
+    return true;
+  };
+
+  const handleNext = () => {
+    const currentIndex = steps.findIndex((s) => s.id === currentStep);
+    if (currentIndex < steps.length - 1 && canGoNext()) {
+      setCurrentStep(steps[currentIndex + 1].id);
+    } else if (currentIndex === steps.length - 1) {
+      // Último paso, submit
+      handleSubmit();
+    }
+  };
+
+  const puestosOptions: ComboboxOption[] = puestos.map((p) => ({
+    value: p.id,
+    label: p.nombre,
+  }));
+
+  const equiposItems = equipos.map((e) => ({
+    value: e.id,
+    label: e.nombre,
+  }));
+
+  const sedesItems = sedes.map((s) => ({
+    value: s.id,
+    label: s.ciudad ? `${s.nombre} (${s.ciudad})` : s.nombre,
+  }));
+
+  const empleadosItems = empleadosExistentes.map((e) => ({
+    value: e.id,
+    label: `${e.nombre} ${e.apellidos} (${e.email})`,
+  }));
+
+  const sidebarItems = steps.map((step) => ({
+    id: step.id,
+    label: step.label,
+    icon: () => {
+      const index = steps.findIndex((s) => s.id === step.id);
+      const currentIndex = steps.findIndex((s) => s.id === currentStep);
+      const isCompleted = index < currentIndex;
+      const isActive = step.id === currentStep;
       
-      const empleadoData: EmpleadoCreateData = {
-        nombre: formData.nombre,
-        apellidos: formData.apellidos,
-        email: formData.email,
-        fechaAlta: formData.fechaAlta,
-        activo: false, // Inactivo hasta que complete onboarding
-        onboardingCompletado: false,
-      };
-
-      // Añadir puestoId si está seleccionado
-      if (formData.puestoId) {
-        empleadoData.puestoId = formData.puestoId;
-      }
-
-      const responseEmpleado = await fetch('/api/empleados', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(empleadoData),
-      });
-
-      const dataEmpleado = await parseJson<EmpleadoCreateResponse>(responseEmpleado);
-
-      if (!responseEmpleado.ok) {
-        // Manejo específico para email duplicado
-        if (dataEmpleado.code === 'EMAIL_DUPLICADO' && dataEmpleado.empleadoExistente) {
-          const empleado = dataEmpleado.empleadoExistente;
-          toast.error(
-            `El email ${formData.email} ya está registrado para ${empleado.nombre} ${empleado.apellidos}`,
-            {
-              duration: 6000,
-              action: {
-                label: 'Ver empleado',
-                onClick: () => {
-                  window.location.href = `/hr/organizacion/personas/${empleado.id}`;
-                },
-              },
-            }
-          );
-        } else {
-          toast.error(dataEmpleado.error || 'Error al crear empleado');
-        }
-        setLoading(false);
-        return;
-      }
-
-      // Guardar empleadoId para subir documentos
-      setEmpleadoId(dataEmpleado.id);
-
-      // Activar onboarding (crea token y envía email)
-      const responseOnboarding = await fetch('/api/empleados/invitar', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          empleadoId: dataEmpleado.id,
-          tipoOnboarding: tipoOnboarding,
-        }),
-      });
-
-      const onboardingData = await parseJson<OnboardingInviteResponse>(responseOnboarding);
-
-      if (!responseOnboarding.ok) {
-        toast.error(onboardingData.error || 'Error al activar onboarding');
-        setLoading(false);
-        return;
-      }
-
-      // Subir documentos si hay alguno pendiente (solo los temporales, no los ya subidos)
-      const documentosPendientes = documentosSubidos.filter((doc) => doc.id.startsWith('temp-'));
-      if (documentosPendientes.length > 0) {
-        setUploadingDocs(true);
-        try {
-          for (const doc of documentosPendientes) {
-            const formDataDoc = new FormData();
-            formDataDoc.append('file', doc.file);
-            formDataDoc.append('nombreDocumento', doc.nombre);
-            formDataDoc.append('tipoDocumento', doc.tipoDocumento);
-            if (doc.carpetaId) {
-              formDataDoc.append('carpetaId', doc.carpetaId);
-            }
-
-            const responseDoc = await fetch(`/api/empleados/${dataEmpleado.id}/onboarding/documentos`, {
-              method: 'POST',
-              body: formDataDoc,
-            });
-
-            const dataDoc = await parseJson<DocumentoUploadResponse>(responseDoc);
-
-            if (!responseDoc.ok) {
-              toast.error(`Error al subir ${doc.nombre}: ${dataDoc.error || 'Error desconocido'}`);
-              continue; // Continuar con el siguiente documento
-            }
-
-            // Actualizar el documento temporal con el ID real
-            setDocumentosSubidos((prev) =>
-              prev.map((d) =>
-                d.id === doc.id
-                  ? { ...d, id: dataDoc.documento.id }
-                  : d
-              )
-            );
-          }
-          if (documentosPendientes.length > 0) {
-            toast.success(`${documentosPendientes.length} documento(s) subido(s) correctamente`);
-          }
-        } catch (error) {
-          console.error('[AddPersonaOnboardingForm] Error subiendo documentos:', error);
-          toast.error('Algunos documentos no se pudieron subir. Puedes subirlos más tarde desde el perfil del empleado.');
-        } finally {
-          setUploadingDocs(false);
-        }
-      }
-
-      await generarPlantillasAutomaticas(dataEmpleado.id);
-
-      toast.success(
-        `Empleado creado y email de onboarding enviado a ${formData.email}`,
-        { duration: 5000 }
+      return (
+        <div
+          className={cn(
+            'flex items-center justify-center w-6 h-6 rounded-full text-xs font-semibold',
+            isActive && 'bg-gray-400 text-white',
+            isCompleted && !isActive && 'bg-primary text-primary-foreground',
+            index > currentIndex && 'bg-gray-200 text-gray-500'
+          )}
+        >
+          {index + 1}
+        </div>
       );
-      onSuccess();
-    } catch (error) {
-      console.error('[AddPersonaOnboardingForm] Error:', error);
-      toast.error('Error al crear empleado y activar onboarding');
-    } finally {
-      setLoading(false);
-    }
-  };
+    },
+  }));
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      {/* Datos Básicos */}
-      <div className="space-y-4">
-        <div className="flex items-center gap-2">
-          <h3 className="text-sm font-semibold text-gray-900 border-b pb-2 flex-1">
-            Datos Básicos del Empleado
-          </h3>
-        </div>
-        <p className="text-sm text-gray-600">
-          Se enviará un email automático con un link único para que el empleado complete su onboarding. El link expira en 7 días.
-        </p>
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <Label htmlFor="nombre">Nombre *</Label>
-            <Input
-              id="nombre"
-              value={formData.nombre}
-              onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
-              required
-              placeholder="Juan"
-            />
-          </div>
-          <div>
-            <Label htmlFor="apellidos">Apellidos *</Label>
-            <Input
-              id="apellidos"
-              value={formData.apellidos}
-              onChange={(e) => setFormData({ ...formData, apellidos: e.target.value })}
-              required
-              placeholder="García López"
-            />
-          </div>
-          <div>
-            <Label htmlFor="email">Email *</Label>
-            <Input
-              id="email"
-              type="email"
-              value={formData.email}
-              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-              required
-              placeholder="juan.garcia@empresa.com"
-            />
-            <p className="text-xs text-gray-500 mt-1">
-              El email de onboarding se enviará a esta dirección
-            </p>
-          </div>
-          <div>
-            <Label htmlFor="fechaAlta">Fecha de Alta</Label>
-            <Input
-              id="fechaAlta"
-              type="date"
-              value={formData.fechaAlta}
-              onChange={(e) => setFormData({ ...formData, fechaAlta: e.target.value })}
-            />
-          </div>
-          <div className="col-span-2">
-            <Label htmlFor="puestoId">Puesto (opcional)</Label>
-            <Combobox
-              options={puestosOptions}
-              value={formData.puestoId || undefined}
-              onValueChange={(value) => setFormData({ ...formData, puestoId: value || '' })}
-              placeholder="Seleccionar o crear puesto"
-              emptyText="No se encontraron puestos."
-              createText="Crear nuevo puesto"
-              onCreateNew={handleCreatePuesto}
-            />
-          </div>
-        </div>
-      </div>
+    <DialogWithSidebar
+      open={open}
+      onOpenChange={onOpenChange}
+      title={tipoEmpleado === 'nuevo' ? 'Nuevo Empleado' : 'Activar Onboarding'}
+      sidebar={sidebarItems}
+      activeSidebarItem={currentStep}
+      onSidebarItemChange={(stepId) => {
+        // Solo permitir ir a pasos anteriores o actual
+        const targetIndex = steps.findIndex((s) => s.id === stepId);
+        const currentIndex = steps.findIndex((s) => s.id === currentStep);
+        if (targetIndex <= currentIndex) {
+          setCurrentStep(stepId);
+        }
+      }}
+      width="4xl"
+      showCloseButton={!loading}
+    >
+      <div className="flex flex-col h-full">{/* Contenido sin WizardSteps */}
+        {/* Contenido del paso actual */}
+        <div className="flex-1 overflow-y-auto">
+          {/* Paso 1: Datos Básicos */}
+        {currentStep === 'basicos' && (
+          <div className="space-y-6">
+            {tipoEmpleado === 'existente' ? (
+              <>
+                <div>
+                  <h3 className="text-base font-semibold text-gray-900 mb-2">
+                    Seleccionar Empleado
+                  </h3>
+                  <p className="text-sm text-gray-600 mb-4">
+                    Elige el empleado para el que deseas activar el onboarding
+                  </p>
+                </div>
 
-      {/* Plantillas automáticas */}
-      <div className="space-y-4">
-        <div className="flex items-center gap-2">
-          <h3 className="text-sm font-semibold text-gray-900 border-b pb-2 flex-1">
-            Plantillas automáticas (opcional)
-          </h3>
-          {plantillasSeleccionadasArray.length > 0 && (
-            <Badge variant="secondary" className="text-xs">
-              {plantillasSeleccionadasArray.length} seleccionada
-              {plantillasSeleccionadasArray.length === 1 ? '' : 's'}
-            </Badge>
-          )}
-        </div>
-        <p className="text-sm text-gray-600">
-          Selecciona los documentos que quieres generar automáticamente para este empleado al crear su
-          onboarding. Se guardarán en las carpetas configuradas y aparecerán en su bandeja para revisar,
-          rellenar y firmar si corresponde.
-        </p>
+                <div>
+                  <Label>Empleado</Label>
+                  <SearchableSelect
+                    items={empleadosItems}
+                    value={empleadoSeleccionadoId}
+                    onChange={setEmpleadoSeleccionadoId}
+                    placeholder="Buscar empleado..."
+                  />
+                </div>
+              </>
+            ) : (
+              <>
+                <div>
+                  <h3 className="text-base font-semibold text-gray-900 mb-2">
+                    Información del Empleado
+                  </h3>
+                  <p className="text-sm text-gray-600 mb-4">
+                    Completa los datos básicos del nuevo empleado
+                  </p>
+                </div>
 
-        {plantillasLoading ? (
-          <div className="flex items-center justify-center py-6">
-            <Spinner className="size-6 text-gray-400" />
-          </div>
-        ) : plantillasDisponibles.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-gray-200 p-4 text-center text-sm text-gray-500">
-            No hay plantillas configuradas. Puedes añadirlas desde Gestionar On/Offboarding → Plantillas.
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {plantillasDisponibles.map((plantilla) => (
-              <PlantillaAutoCard
-                key={plantilla.id}
-                plantilla={plantilla}
-                seleccionado={plantillasSeleccionadas.has(plantilla.id)}
-                onToggle={togglePlantillaSeleccion}
-                onPreview={handlePreviewPlantilla}
-              />
-            ))}
-          </div>
-        )}
-
-        {plantillasError && (
-          <div className="rounded-md bg-red-50 p-3">
-            <p className="text-sm text-red-600">{plantillasError}</p>
-          </div>
-        )}
-
-        {plantillasSeleccionadasArray.length > 0 && (
-          <p className="text-xs text-gray-500">
-            Se iniciará un job de generación por cada plantilla seleccionada después de crear al empleado.
-          </p>
-        )}
-      </div>
-
-      {/* Subida de Documentos (Opcional) */}
-      <div className="space-y-4">
-        <h3 className="text-sm font-semibold text-gray-900 border-b pb-2">
-          Documentos Iniciales (Opcional)
-        </h3>
-        <p className="text-sm text-gray-600">
-          Puedes subir documentos ahora o más tarde. Los documentos se asociarán al proceso de onboarding del empleado.
-        </p>
-
-        {/* Uploader de documentos */}
-        {!empleadoId ? (
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="tipoDocumento">Tipo de Documento</Label>
-                <Select
-                  value={tipoDocumentoActual}
-                  onValueChange={(value) => {
-                    setTipoDocumentoActual(value);
-                  }}
-                >
-                  <SelectTrigger id="tipoDocumento">
-                    <SelectValue placeholder="Seleccionar tipo" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="contrato">Contrato</SelectItem>
-                    <SelectItem value="nomina">Nómina</SelectItem>
-                    <SelectItem value="justificante">Justificante (ausencias / médicos)</SelectItem>
-                    <SelectItem value="otro">Otros documentos</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label htmlFor="nombreDocumento">Nombre del Documento</Label>
-                <Input
-                  id="nombreDocumento"
-                  placeholder="Ej: Contrato laboral"
-                  value={nombreDocumentoActual}
-                  onChange={(e) => {
-                    setNombreDocumentoActual(e.target.value);
-                  }}
-                />
-              </div>
-            </div>
-            
-            {/* Selector de Carpeta - solo cuando el empleado ya existe */}
-            {empleadoId && (
-              <CarpetaSelector
-                empleadoId={empleadoId}
-                value={carpetaIdSeleccionada}
-                onChange={setCarpetaIdSeleccionada}
-                defaultNombre="Otros"
-                label="Carpeta de destino (opcional)"
-                placeholder="Seleccionar carpeta o crear automáticamente"
-                onNuevaCarpeta={async (nombre) => {
-                  try {
-                    const response = await fetch('/api/carpetas', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({
-                        nombre,
-                        empleadoId,
-                        compartida: false,
-                      }),
-                    });
-                    
-                    if (!response.ok) {
-                      toast.error('Error al crear carpeta');
-                      return null;
-                    }
-                    
-                    const { carpeta } = await parseJson<CarpetaCreateResponse>(response);
-                    toast.success('Carpeta creada correctamente');
-                    return carpeta.id;
-                  } catch {
-                    toast.error('Error al crear carpeta');
-                    return null;
-                  }
-                }}
-              />
-            )}
-            <DocumentUploader
-              label="Subir documento"
-              description="PDF, JPG o PNG (máx. 5MB)"
-              onUpload={async (file) => {
-                // Obtener tipo y nombre del documento
-                const tipoDocumento = tipoDocumentoActual || 'otro';
-                const nombreDocumento = nombreDocumentoActual || file.name.split('.')[0];
-                
-                // Crear documento temporal en la lista
-                const tempId = `temp-${Date.now()}`;
-                
-                setDocumentosSubidos((prev) => [
-                  ...prev,
-                  {
-                    id: tempId,
-                    nombre: nombreDocumento,
-                    tipoDocumento,
-                    file,
-                    carpetaId: carpetaIdSeleccionada || undefined,
-                  },
-                ]);
-                
-                // Limpiar campos
-                setTipoDocumentoActual('otro');
-                setNombreDocumentoActual('');
-                
-                toast.success('Documento añadido. Se subirá al crear el empleado.');
-              }}
-              disabled={loading}
-            />
-          </div>
-        ) : (
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="tipoDocumentoAdicional">Tipo de Documento</Label>
-                <Select
-                  value={tipoDocumentoActual}
-                  onValueChange={(value) => {
-                    setTipoDocumentoActual(value);
-                  }}
-                >
-                  <SelectTrigger id="tipoDocumentoAdicional">
-                    <SelectValue placeholder="Seleccionar tipo" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="contrato">Contrato</SelectItem>
-                    <SelectItem value="nomina">Nómina</SelectItem>
-                    <SelectItem value="justificante">Justificante (ausencias / médicos)</SelectItem>
-                    <SelectItem value="otro">Otros documentos</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label htmlFor="nombreDocumentoAdicional">Nombre del Documento</Label>
-                <Input
-                  id="nombreDocumentoAdicional"
-                  placeholder="Ej: Contrato laboral"
-                  value={nombreDocumentoActual}
-                  onChange={(e) => {
-                    setNombreDocumentoActual(e.target.value);
-                  }}
-                />
-              </div>
-            </div>
-            
-            {/* Selector de Carpeta */}
-            <CarpetaSelector
-              empleadoId={empleadoId}
-              value={carpetaIdSeleccionada}
-              onChange={setCarpetaIdSeleccionada}
-              defaultNombre="Otros"
-              label="Carpeta de destino (opcional)"
-              placeholder="Seleccionar carpeta o crear automáticamente"
-              onNuevaCarpeta={async (nombre) => {
-                try {
-                  const response = await fetch('/api/carpetas', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                      nombre,
-                      empleadoId,
-                      compartida: false,
-                    }),
-                  });
-                  
-                  if (!response.ok) {
-                    toast.error('Error al crear carpeta');
-                    return null;
-                  }
-                  
-                  const { carpeta } = await parseJson<CarpetaCreateResponse>(response);
-                  toast.success('Carpeta creada correctamente');
-                  return carpeta.id;
-                } catch {
-                  toast.error('Error al crear carpeta');
-                  return null;
-                }
-              }}
-            />
-            <DocumentUploader
-              label="Subir documento adicional"
-              description="PDF, JPG o PNG (máx. 5MB)"
-              onUpload={async (file) => {
-                const tipoDocumento = tipoDocumentoActual || 'otro';
-                const nombreDocumento = nombreDocumentoActual || file.name.split('.')[0];
-                await handleDocumentUpload(file, tipoDocumento, nombreDocumento);
-                
-                // Limpiar campos
-                setTipoDocumentoActual('otro');
-                setNombreDocumentoActual('');
-              }}
-              disabled={uploadingDocs || loading}
-            />
-          </div>
-        )}
-
-        {/* Lista de documentos subidos */}
-        {documentosSubidos.length > 0 && (
-          <div className="mt-4">
-            <Label>Documentos a subir ({documentosSubidos.length})</Label>
-            <div className="mt-2 space-y-2">
-              {documentosSubidos.map((doc) => (
-                <div
-                  key={doc.id}
-                  className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border"
-                >
-                  <div className="flex items-center gap-3">
-                    <FileText className="h-5 w-5 text-gray-600" />
-                    <div>
-                      <p className="text-sm font-medium text-gray-900">{doc.nombre}</p>
-                      <p className="text-xs text-gray-500">
-                        {doc.tipoDocumento} • {(doc.file.size / 1024 / 1024).toFixed(2)} MB
-                      </p>
-                    </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>Nombre *</Label>
+                    <Input
+                      value={formData.nombre}
+                      onChange={(e) => setFormData({...formData, nombre: e.target.value})}
+                      placeholder="Juan"
+                      required
+                    />
                   </div>
-                  {!empleadoId && (
+
+                  <div>
+                    <Label>Apellidos *</Label>
+                    <Input
+                      value={formData.apellidos}
+                      onChange={(e) => setFormData({...formData, apellidos: e.target.value})}
+                      placeholder="García López"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <Label>Email *</Label>
+                    <Input
+                      type="email"
+                      value={formData.email}
+                      onChange={(e) => setFormData({...formData, email: e.target.value})}
+                      placeholder="juan.garcia@empresa.com"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <Label>Fecha de Alta</Label>
+                    <Input
+                      type="date"
+                      value={formData.fechaAlta}
+                      onChange={(e) => setFormData({...formData, fechaAlta: e.target.value})}
+                    />
+                  </div>
+
+                  <div className="col-span-2">
+                    <Label>Puesto *</Label>
+                    <Combobox
+                      options={puestosOptions}
+                      value={formData.puestoId}
+                      onValueChange={(value) => setFormData({...formData, puestoId: value || ''})}
+                      placeholder="Seleccionar o crear puesto"
+                      emptyText="No se encontraron puestos"
+                      createText="Crear nuevo puesto"
+                      onCreateNew={handleCreatePuesto}
+                    />
+                  </div>
+
+                  <div>
+                    <Label>Equipo *</Label>
+                    <SearchableSelect
+                      items={equiposItems}
+                      value={formData.equipoId}
+                      onChange={(value) => setFormData({...formData, equipoId: value})}
+                      placeholder="Seleccionar equipo"
+                    />
+                  </div>
+
+                  <div>
+                    <Label>Sede (opcional)</Label>
+                    <SearchableSelect
+                      items={sedesItems}
+                      value={formData.sedeId}
+                      onChange={(value) => setFormData({...formData, sedeId: value})}
+                      placeholder="Seleccionar sede"
+                    />
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* Paso 2: Documentos para Visualizar */}
+        {currentStep === 'docs-visualizar' && (
+          <div className="space-y-4">
+            <div>
+              <h3 className="text-base font-semibold text-gray-900 mb-2">
+                Documentos para Visualizar/Descargar
+              </h3>
+              <p className="text-sm text-gray-600 mb-4">
+                Documentos que el empleado podrá ver o descargar durante el onboarding
+              </p>
+            </div>
+
+            {documentosFiltrados.filter((d) => d.tipo === 'visualizar').length > 0 ? (
+              <div className="space-y-2">
+                <p className="text-sm font-medium text-gray-700 mb-3">
+                  Documentos configurados:
+                </p>
+                {documentosFiltrados
+                  .filter((d) => d.tipo === 'visualizar')
+                  .map((doc) => (
+                    <div
+                      key={doc.id}
+                      className="flex items-center justify-between p-3 border rounded-lg bg-blue-50 border-blue-200"
+                    >
+                      <div className="flex items-center gap-2">
+                        <FileText className="h-4 w-4 text-blue-600" />
+                        <span className="text-sm">{doc.nombre}</span>
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-gray-500 border border-dashed rounded-lg">
+                <FileText className="h-12 w-12 mx-auto mb-3 text-gray-400" />
+                <p className="text-sm">No hay documentos de visualización configurados</p>
+                <p className="text-xs mt-1">
+                  Puedes configurarlos en "Gestionar Onboarding"
+                </p>
+              </div>
+            )}
+
+            <div className="mt-4">
+              <p className="text-sm font-medium text-gray-700 mb-3">
+                Documentos adicionales:
+              </p>
+              <div className="space-y-3">
+                <DocumentUploader
+                  label="Subir documento adicional"
+                  description="PDF, JPG o PNG (máx. 5MB)"
+                  onUpload={(file) => añadirDocumento(file, 'Otros')}
+                  disabled={loading || uploadingDocs}
+                />
+
+                {documentosSubidos.map((doc) => (
+                  <div
+                    key={doc.id}
+                    className="flex items-center justify-between p-3 border rounded-lg"
+                  >
+                    <div className="flex items-center gap-2">
+                      <FileText className="h-4 w-4" />
+                      <span className="text-sm">{doc.nombre}</span>
+                    </div>
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => handleRemoveDocument(doc.id)}
-                      disabled={loading}
+                      onClick={() => eliminarDocumento(doc.id)}
                     >
-                      <X className="h-4 w-4" />
+                      Eliminar
                     </Button>
-                  )}
-                </div>
-              ))}
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         )}
-      </div>
 
-      {/* Info adicional */}
-      <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
-        <p className="text-sm text-yellow-800">
-          <strong>Nota:</strong> El empleado estará inactivo hasta que complete el proceso de onboarding.
-          {documentosSubidos.length > 0 && (
-            <span className="block mt-1">
-              {documentosSubidos.length} documento(s) se subirán automáticamente después de crear el empleado.
-            </span>
-          )}
-          {plantillasSeleccionadasArray.length > 0 && (
-            <span className="block mt-1">
-              {plantillasSeleccionadasArray.length} plantilla(s) se generarán automáticamente tras crear al empleado.
-            </span>
-          )}
-        </p>
-      </div>
-
-      {/* Botones */}
-      <div className="flex justify-end gap-3 pt-4 border-t">
-        <Button
-          type="button"
-          variant="outline"
-          onClick={onCancel}
-          disabled={loading || uploadingDocs || generandoPlantillasAuto}
-        >
-          Cancelar
-        </Button>
-        <LoadingButton type="submit" loading={loading || uploadingDocs || generandoPlantillasAuto}>
-          <Mail className="h-4 w-4 mr-2" />
-          Crear y Enviar Onboarding
-        </LoadingButton>
-      </div>
-    </form>
-  );
-}
-
-interface PlantillaAutoCardProps {
-  plantilla: PlantillaAutoOnboarding;
-  seleccionado: boolean;
-  onToggle: (id: string) => void;
-  onPreview: (id: string) => void;
-}
-
-function PlantillaAutoCard({ plantilla, seleccionado, onToggle, onPreview }: PlantillaAutoCardProps) {
-  return (
-    <div
-      className={`border rounded-lg p-4 transition-colors ${
-        seleccionado ? 'border-blue-500 bg-blue-50/40' : 'border-gray-200 hover:border-gray-300'
-      }`}
-    >
-      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-        <div className="flex flex-1 gap-3">
-          <Checkbox
-            id={`plantilla-auto-${plantilla.id}`}
-            checked={seleccionado}
-            onCheckedChange={() => onToggle(plantilla.id)}
-            className="mt-1"
-          />
-          <FileType className="h-5 w-5 text-gray-400 mt-1 hidden sm:block" />
-          <div className="flex-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <Label
-                htmlFor={`plantilla-auto-${plantilla.id}`}
-                className="font-medium cursor-pointer text-base text-gray-900"
-              >
-                {plantilla.nombre}
-              </Label>
-              {plantilla.esOficial && (
-                <Badge className="bg-blue-100 text-blue-800">Oficial</Badge>
-              )}
-              <Badge variant="outline">{plantilla.formato === 'docx' ? 'DOCX' : 'PDF'}</Badge>
-              {plantilla.requiereFirma && (
-                <Badge className="bg-amber-100 text-amber-800">Requiere firma</Badge>
-              )}
-              {plantilla.autoGenerarOnboarding && (
-                <Badge className="bg-emerald-100 text-emerald-800">Auto (config)</Badge>
-              )}
+        {/* Paso 3: Solicitar Documentos */}
+        {currentStep === 'docs-solicitar' && (
+          <div className="space-y-4">
+            <div>
+              <h3 className="text-base font-semibold text-gray-900 mb-2">
+                Documentos a Solicitar al Empleado
+              </h3>
+              <p className="text-sm text-gray-600 mb-4">
+                Estos son los documentos que el empleado deberá subir durante su onboarding
+              </p>
             </div>
-            {plantilla.descripcion && (
-              <p className="text-sm text-gray-600 mt-1">{plantilla.descripcion}</p>
+
+            {documentosFiltrados.filter((d) => d.tipo === 'solicitar').length > 0 ? (
+              <div className="space-y-2">
+                <p className="text-sm font-medium text-gray-700 mb-3">
+                  Documentos configurados:
+                </p>
+                {documentosFiltrados
+                  .filter((d) => d.tipo === 'solicitar')
+                  .map((doc) => (
+                    <div
+                      key={doc.id}
+                      className="flex items-center justify-between p-3 border rounded-lg bg-amber-50 border-amber-200"
+                    >
+                      <div className="flex items-center gap-2">
+                        <FileText className="h-4 w-4 text-amber-600" />
+                        <div className="flex flex-col">
+                          <span className="text-sm font-medium">{doc.nombre}</span>
+                          <span className="text-xs text-gray-500">
+                            Carpeta: {doc.carpetaDestino || 'Otros'}
+                          </span>
+                        </div>
+                        {doc.requerido && (
+                          <Badge variant="secondary" className="text-xs bg-amber-100">
+                            Requerido
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-gray-500 border border-dashed rounded-lg">
+                <FileText className="h-12 w-12 mx-auto mb-3 text-gray-400" />
+                <p className="text-sm">No hay documentos configurados para solicitar</p>
+                <p className="text-xs mt-1">
+                  El empleado no tendrá que subir ningún documento obligatorio
+                </p>
+              </div>
             )}
-            <div className="mt-2 flex flex-wrap gap-3 text-xs text-gray-500">
-              {plantilla.categoria && <span>Categoría: {plantilla.categoria}</span>}
-              {plantilla.permiteRellenar && <span>Permite rellenar antes de firmar</span>}
-              {plantilla.requiereRevision && <span>Revisión manual de HR</span>}
-              {plantilla.carpetaDestinoDefault && (
-                <span>Carpeta: {plantilla.carpetaDestinoDefault}</span>
-              )}
-            </div>
+
           </div>
+        )}
+
+        {/* Paso 4: Firmas */}
+        {currentStep === 'firmas' && (
+          <div className="space-y-4">
+            <div>
+              <h3 className="text-base font-semibold text-gray-900 mb-2">
+                Documentos para Firma
+              </h3>
+              <p className="text-sm text-gray-600 mb-4">
+                Documentos que requieren firma digital del empleado
+              </p>
+            </div>
+
+            {firmasFiltradas.length > 0 ? (
+              <div className="space-y-2">
+                {firmasFiltradas.map((firma) => (
+                  <div
+                    key={firma.id}
+                    className="flex items-center justify-between p-4 border rounded-lg bg-white"
+                  >
+                    <div className="flex items-center gap-3">
+                      <FileSignature className="h-5 w-5 text-blue-600" />
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium">{firma.nombre}</span>
+                          {firma.requerido && (
+                            <Badge variant="secondary" className="text-xs">
+                              Requerido
+                            </Badge>
+                          )}
+                          {firma.esAsincronico && (
+                            <Badge variant="outline" className="text-xs">
+                              Se subirá después del onboarding
+                            </Badge>
+                          )}
+                        </div>
+                        {firma.descripcion && (
+                          <p className="text-xs text-gray-500 mt-1">{firma.descripcion}</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-gray-500 border border-dashed rounded-lg">
+                <FileSignature className="h-12 w-12 mx-auto mb-3 text-gray-400" />
+                <p className="text-sm">No hay documentos de firma configurados</p>
+              </div>
+            )}
+
+          </div>
+        )}
         </div>
-        <div className="flex items-center gap-2">
+
+        {/* Navegación de pasos */}
+        <div className="flex items-center justify-between gap-3 pt-4 border-t flex-shrink-0">
           <Button
             type="button"
-            variant="ghost"
-            size="sm"
-            onClick={() => onPreview(plantilla.id)}
+            variant="outline"
+            onClick={() => {
+              const currentIndex = steps.findIndex((s) => s.id === currentStep);
+              if (currentIndex > 0) {
+                setCurrentStep(steps[currentIndex - 1].id);
+              }
+            }}
+            disabled={steps.findIndex((s) => s.id === currentStep) === 0 || loading || uploadingDocs}
           >
-            <Eye className="h-4 w-4 mr-1" />
-            Ver detalle
+            Anterior
           </Button>
+
+          <div className="text-sm text-gray-500">
+            Paso {steps.findIndex((s) => s.id === currentStep) + 1} de {steps.length}
+          </div>
+
+          {steps.findIndex((s) => s.id === currentStep) === steps.length - 1 ? (
+            <LoadingButton
+              type="button"
+              onClick={handleSubmit}
+              loading={loading || uploadingDocs}
+              disabled={loading || uploadingDocs}
+            >
+              Finalizar y Enviar
+            </LoadingButton>
+          ) : (
+            <Button
+              type="button"
+              onClick={handleNext}
+              disabled={!canGoNext() || loading || uploadingDocs}
+            >
+              Siguiente
+            </Button>
+          )}
         </div>
       </div>
-    </div>
+    </DialogWithSidebar>
   );
 }
-
-
-
-
-

@@ -25,7 +25,7 @@ export default async function CampanaVacacionesPage() {
   }
 
   // Fetch the active campaign
-  const campana = await prisma.campanaVacaciones.findFirst({
+  const campana = await prisma.campanas_vacaciones.findFirst({
     where: {
       empresaId: session.user.empresaId,
       estado: 'abierta',

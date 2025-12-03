@@ -4,6 +4,7 @@
 // GET: Obtener fichajes pendientes de revisión
 // POST: Aprobar/rechazar fichajes en revisión
 
+import { format } from 'date-fns';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 
@@ -12,24 +13,11 @@ import { procesarFichajesDia } from '@/lib/calculos/fichajes';
 import { crearNotificacionFichajeResuelto } from '@/lib/notificaciones';
 import { prisma, Prisma } from '@/lib/prisma';
 import { jornadaSelectCompleta } from '@/lib/prisma/selects';
-import { obtenerNombreDia } from '@/lib/utils/fechas';
+import { obtenerNombreDia, toMadridDate } from '@/lib/utils/fechas';
 
 // ========================================
 // Types para datos JSON de Prisma
 // ========================================
-
-interface DatosOriginales {
-  fichajeId?: string;
-  fecha?: string;
-  eventosExistentes?: Array<{ tipo: string; hora: string | Date }>;
-  fichajesExistentes?: Array<{ tipo: string; hora: string | Date }>;
-}
-
-interface Sugerencias {
-  razon?: string;
-  confianza?: number;
-  salidaSugerida?: string;
-}
 
 interface ConfigDiaJornada {
   activo?: boolean;
@@ -40,7 +28,14 @@ interface ConfigDiaJornada {
 }
 
 interface ConfigJornada {
-  [key: string]: ConfigDiaJornada | unknown;
+  tipo?: 'fija' | 'flexible';
+  descansoMinimo?: string;
+  [key: string]: ConfigDiaJornada | string | undefined;
+}
+
+interface AusenciaMedioDia {
+  empleadoId: string;
+  periodo: 'manana' | 'tarde';
 }
 
 const DEFAULT_LAZY_RECOVERY_DAYS = 3;
@@ -96,10 +91,11 @@ export async function GET(request: NextRequest) {
         : DEFAULT_LAZY_RECOVERY_DAYS;
 
     console.log(
-      `[API Revisión GET] Lazy recovery de fichajes para los últimos ${diasARecuperar} día(s) en empresa ${session.user.empresaId}`
+      `[API Revisión GET] Lazy recovery de fichajes para los últimos ${diasARecuperar} día(s) (incluyendo hoy) en empresa ${session.user.empresaId}`
     );
 
-    for (let offset = 1; offset <= diasARecuperar; offset++) {
+    // FIX: Cambiar offset de 1 a 0 para incluir el día de hoy
+    for (let offset = 0; offset <= diasARecuperar; offset++) {
       const fechaObjetivo = new Date(hoy);
       fechaObjetivo.setDate(fechaObjetivo.getDate() - offset);
 
@@ -115,11 +111,15 @@ export async function GET(request: NextRequest) {
     }
 
     console.log('[API Revisión GET] Fecha hoy:', hoy.toISOString());
-    console.log('[API Revisión GET] Buscando fichajes pendientes anteriores a hoy...');
+    console.log('[API Revisión GET] Buscando fichajes pendientes (incluyendo hoy)...');
 
     let fichajesPendientes;
+    // Declarar mapas fuera del try para que estén disponibles en el formateo
+    let ausenciasMedioDiaPorFecha = new Map<string, AusenciaMedioDia>();
+    
     try {
-      const fechaWhere: Prisma.DateTimeFilter = { lt: hoy };
+      // FIX: Cambiar lt a lte para incluir fichajes del día de hoy
+      const fechaWhere: Prisma.DateTimeFilter = { lte: hoy };
 
       if (fechaInicioParam) {
         const inicio = new Date(fechaInicioParam);
@@ -137,7 +137,7 @@ export async function GET(request: NextRequest) {
         }
       }
 
-      const empleadoWhere: Prisma.EmpleadoWhereInput = {};
+      const empleadoWhere: Prisma.empleadosWhereInput = {};
       if (equipoId && equipoId !== 'todos') {
         empleadoWhere.equipos = {
           some: {
@@ -152,7 +152,72 @@ export async function GET(request: NextRequest) {
         ];
       }
 
-      const where: Prisma.FichajeWhereInput = {
+      // IMPORTANTE: Obtener empleados con ausencias de día completo para excluirlos
+      // Lógica de solapamiento: ausencia.inicio <= rango.fin AND ausencia.fin >= rango.inicio
+      const rangoInicio = fechaWhere.gte ?? new Date(hoy.getTime() - 30 * 24 * 60 * 60 * 1000);
+      const rangoFin = fechaWhere.lte ?? hoy;
+      
+      const ausenciasDiaCompleto = await prisma.ausencias.findMany({
+        where: {
+          empresaId: session.user.empresaId,
+          medioDia: false, // Solo ausencias de día completo
+          estado: { in: ['confirmada', 'completada'] },
+          fechaInicio: { lte: rangoFin },
+          fechaFin: { gte: rangoInicio },
+        },
+        select: {
+          empleadoId: true,
+          fechaInicio: true,
+          fechaFin: true,
+        },
+      });
+
+      // NUEVO: Obtener ausencias de MEDIA JORNADA para ajustar eventos propuestos
+      const ausenciasMedioDia = await prisma.ausencias.findMany({
+        where: {
+          empresaId: session.user.empresaId,
+          medioDia: true, // Solo ausencias de media jornada
+          estado: { in: ['confirmada', 'completada'] },
+          fechaInicio: { lte: rangoFin },
+          fechaFin: { gte: rangoInicio },
+        },
+        select: {
+          empleadoId: true,
+          fechaInicio: true,
+          fechaFin: true,
+          periodo: true, // 'manana' o 'tarde'
+        },
+      });
+
+      // Crear set de empleados con ausencias de día completo por fecha
+      const empleadosConAusenciaPorFecha = new Map<string, Set<string>>();
+      for (const ausencia of ausenciasDiaCompleto) {
+        const current = new Date(ausencia.fechaInicio);
+        while (current <= ausencia.fechaFin) {
+          const fechaKey = format(toMadridDate(current), 'yyyy-MM-dd');
+          if (!empleadosConAusenciaPorFecha.has(fechaKey)) {
+            empleadosConAusenciaPorFecha.set(fechaKey, new Set());
+          }
+          empleadosConAusenciaPorFecha.get(fechaKey)!.add(ausencia.empleadoId);
+          current.setDate(current.getDate() + 1);
+        }
+      }
+
+      // Crear mapa de ausencias de media jornada: "empleadoId_fecha" -> periodo
+      ausenciasMedioDiaPorFecha = new Map<string, AusenciaMedioDia>();
+      for (const ausencia of ausenciasMedioDia) {
+        const current = new Date(ausencia.fechaInicio);
+        while (current <= ausencia.fechaFin) {
+          const fechaKey = `${ausencia.empleadoId}_${format(toMadridDate(current), 'yyyy-MM-dd')}`;
+          ausenciasMedioDiaPorFecha.set(fechaKey, {
+            empleadoId: ausencia.empleadoId,
+            periodo: ausencia.periodo as 'manana' | 'tarde',
+          });
+          current.setDate(current.getDate() + 1);
+        }
+      }
+
+      const where: Prisma.fichajesWhereInput = {
         empresaId: session.user.empresaId,
         estado: 'pendiente',
         fecha: fechaWhere,
@@ -162,7 +227,7 @@ export async function GET(request: NextRequest) {
         where.empleado = empleadoWhere;
       }
 
-      fichajesPendientes = await prisma.fichaje.findMany({
+      fichajesPendientes = await prisma.fichajes.findMany({
         where,
         include: {
           empleado: {
@@ -199,6 +264,13 @@ export async function GET(request: NextRequest) {
           fecha: 'asc',
         },
       });
+
+      // Filtrar fichajes de empleados con ausencia de día completo
+      fichajesPendientes = fichajesPendientes.filter((fichaje) => {
+        const fechaKey = format(toMadridDate(fichaje.fecha), 'yyyy-MM-dd');
+        const empleadosConAusencia = empleadosConAusenciaPorFecha.get(fechaKey);
+        return !empleadosConAusencia?.has(fichaje.empleadoId);
+      });
     } catch (prismaError) {
       console.error('[API Revisión] Error en Prisma query:', prismaError);
       throw prismaError;
@@ -208,114 +280,147 @@ export async function GET(request: NextRequest) {
 
     // Formatear datos para el modal
     const fichajes = fichajesPendientes.map((fichaje) => {
+      // PUNTO 1: Usar toMadridDate para normalizar fechas y evitar desfases
+      const fechaBase = toMadridDate(fichaje.fecha);
+      const fechaFormateada = format(fechaBase, 'yyyy-MM-dd');
+      
       const eventosRegistrados = fichaje.eventos.map((evento) => ({
         tipo: evento.tipo,
         hora: evento.hora.toISOString(),
         origen: 'registrado' as const,
       }));
 
+      // PUNTO 5: Verificar si tiene ausencia de media jornada
+      const ausenciaMedioDiaKey = `${fichaje.empleadoId}_${fechaFormateada}`;
+      const ausenciaMedioDia = ausenciasMedioDiaPorFecha.get(ausenciaMedioDiaKey);
+      
       // Calcular vista previa propuesta basándose en la jornada asignada del empleado
-      const previewEventos: { tipo: string; hora: string; origen: 'propuesto' }[] = [];
+      const eventosPropuestos: { tipo: string; hora: string; origen: 'propuesto' }[] = [];
       try {
-        const fechaBase = new Date(fichaje.fecha);
         const jornada = fichaje.empleado?.jornada;
         if (jornada?.config) {
-          const dias = ['domingo','lunes','martes','miercoles','jueves','viernes','sabado'];
-          const nombreDia = dias[fechaBase.getDay()];
-          const configJornada = (jornada.config as unknown) as ConfigJornada;
+          const nombreDia = obtenerNombreDia(fechaBase);
+          const configJornada = jornada.config as unknown as ConfigJornada;
           const confDia = configJornada[nombreDia] as ConfigDiaJornada | undefined;
           
-          if (confDia?.activo && confDia.entrada && confDia.salida) {
-            const setHora = (base: Date, hhmm: string) => {
-              const [h, m] = hhmm.split(':').map(Number);
-              const d = new Date(base);
-              d.setHours(h || 0, m || 0, 0, 0);
-              return d.toISOString();
-            };
-
-            previewEventos.push({ tipo: 'entrada', hora: setHora(fechaBase, confDia.entrada), origen: 'propuesto' });
+          // Helper para crear fecha con hora específica
+          const setHora = (base: Date, hhmm: string) => {
+            const [h, m] = hhmm.split(':').map(Number);
+            const d = new Date(base);
+            d.setHours(h || 0, m || 0, 0, 0);
+            return d.toISOString();
+          };
+          
+          // Verificar si el día está activo y tiene horarios
+          const diaActivo = confDia?.activo !== false && (confDia?.entrada || configJornada.tipo === 'flexible');
+          
+          if (diaActivo) {
+            // PUNTO 5: Ajustar eventos según ausencia de media jornada
+            // - Si ausencia de mañana: NO proponer entrada ni pausas, SÍ proponer salida
+            // - Si ausencia de tarde: SÍ proponer entrada, NO proponer pausas ni salida
+            const tieneAusenciaManana = ausenciaMedioDia?.periodo === 'manana';
+            const tieneAusenciaTarde = ausenciaMedioDia?.periodo === 'tarde';
             
-            // Pausa dinámica
-            let duracionPausaMinutos = 0;
-            if (confDia.pausa_inicio && confDia.pausa_fin) {
-              const ini = getMinutesFromHHMM(confDia.pausa_inicio);
-              const fin = getMinutesFromHHMM(confDia.pausa_fin);
-              duracionPausaMinutos = Math.max(0, fin - ini);
-            } else if (typeof (configJornada as any).descansoMinimo === 'string') {
-               duracionPausaMinutos = getMinutesFromHHMM((configJornada as any).descansoMinimo || '00:00');
+            // ENTRADA - Solo si no hay ausencia de mañana
+            if (!tieneAusenciaManana && confDia?.entrada) {
+              eventosPropuestos.push({ tipo: 'entrada', hora: setHora(fechaBase, confDia.entrada), origen: 'propuesto' });
+            }
+            
+            // PUNTO 2: Pausas OBLIGATORIAS si hay descanso configurado (y no hay ausencia de medio día)
+            if (!ausenciaMedioDia) {
+              let duracionPausaMinutos = 0;
+              
+              // Prioridad 1: Pausas fijas definidas en el día
+              if (confDia?.pausa_inicio && confDia?.pausa_fin) {
+                const ini = getMinutesFromHHMM(confDia.pausa_inicio);
+                const fin = getMinutesFromHHMM(confDia.pausa_fin);
+                duracionPausaMinutos = Math.max(0, fin - ini);
+              } 
+              // Prioridad 2: descansoMinimo (aplica tanto a fija como flexible)
+              else if (typeof configJornada.descansoMinimo === 'string' && configJornada.descansoMinimo !== '00:00') {
+                duracionPausaMinutos = getMinutesFromHHMM(configJornada.descansoMinimo);
+              }
+
+              if (duracionPausaMinutos > 0) {
+                // Buscar si existe pausa_inicio registrada
+                const pausaInicioReal = fichaje.eventos.find(e => e.tipo === 'pausa_inicio');
+                
+                if (pausaInicioReal) {
+                  // Si existe inicio real, proponer fin relativo a la duración
+                  const finCalculado = new Date(pausaInicioReal.hora.getTime() + duracionPausaMinutos * 60000);
+                  eventosPropuestos.push({ tipo: 'pausa_fin', hora: finCalculado.toISOString(), origen: 'propuesto' });
+                } else if (confDia?.pausa_inicio && confDia?.pausa_fin) {
+                  // Si hay horario fijo de pausas, usar esos
+                  eventosPropuestos.push({ tipo: 'pausa_inicio', hora: setHora(fechaBase, confDia.pausa_inicio), origen: 'propuesto' });
+                  eventosPropuestos.push({ tipo: 'pausa_fin', hora: setHora(fechaBase, confDia.pausa_fin), origen: 'propuesto' });
+                } else if (confDia?.entrada && confDia?.salida) {
+                  // Calcular pausas en mitad de jornada
+                  const entradaMinutos = getMinutesFromHHMM(confDia.entrada);
+                  const salidaMinutos = getMinutesFromHHMM(confDia.salida);
+                  const mitadJornada = entradaMinutos + Math.floor((salidaMinutos - entradaMinutos) / 2);
+                  const pausaInicioMinutos = mitadJornada - Math.floor(duracionPausaMinutos / 2);
+                  const pausaFinMinutos = pausaInicioMinutos + duracionPausaMinutos;
+                  
+                  const pausaInicioHora = `${Math.floor(pausaInicioMinutos / 60).toString().padStart(2, '0')}:${(pausaInicioMinutos % 60).toString().padStart(2, '0')}`;
+                  const pausaFinHora = `${Math.floor(pausaFinMinutos / 60).toString().padStart(2, '0')}:${(pausaFinMinutos % 60).toString().padStart(2, '0')}`;
+                  
+                  eventosPropuestos.push({ tipo: 'pausa_inicio', hora: setHora(fechaBase, pausaInicioHora), origen: 'propuesto' });
+                  eventosPropuestos.push({ tipo: 'pausa_fin', hora: setHora(fechaBase, pausaFinHora), origen: 'propuesto' });
+                }
+              }
             }
 
-            if (duracionPausaMinutos > 0) {
-               // Buscar si existe pausa_inicio registrada
-               const pausaInicioReal = fichaje.eventos.find(e => e.tipo === 'pausa_inicio');
-               
-               if (pausaInicioReal) {
-                 // Si existe inicio real, proponer fin relativo a la duración
-                 const finCalculado = new Date(pausaInicioReal.hora.getTime() + duracionPausaMinutos * 60000);
-                 previewEventos.push({ tipo: 'pausa_fin', hora: finCalculado.toISOString(), origen: 'propuesto' });
-               } else if (confDia.pausa_inicio && confDia.pausa_fin) {
-                 // Si no hay inicio real, y hay horario fijo, proponer ambos fijos
-                 previewEventos.push({ tipo: 'pausa_inicio', hora: setHora(fechaBase, confDia.pausa_inicio), origen: 'propuesto' });
-                 previewEventos.push({ tipo: 'pausa_fin', hora: setHora(fechaBase, confDia.pausa_fin), origen: 'propuesto' });
-               }
+            // SALIDA - Solo si no hay ausencia de tarde
+            if (!tieneAusenciaTarde && confDia?.salida) {
+              eventosPropuestos.push({ tipo: 'salida', hora: setHora(fechaBase, confDia.salida), origen: 'propuesto' });
             }
-
-            previewEventos.push({ tipo: 'salida', hora: setHora(fechaBase, confDia.salida), origen: 'propuesto' });
           }
         }
       } catch (e) {
         console.warn('[API Revisión] No se pudo construir vista previa por jornada:', e);
       }
       
-      // Determinar razón por la que está pendiente
-      let razon = 'Requiere revisión manual';
-      if (fichaje.eventos.length === 0) {
-        razon = 'Sin fichajes registrados en el día';
-      } else if (fichaje.estado === 'en_curso') {
-        razon = 'Fichaje incompleto (dejado en curso)';
-      }
-
-      // Determinar eventos faltantes (lógica básica, idealmente usar validarFichajeCompleto)
-      const tiposEventos = fichaje.eventos.map(e => e.tipo);
+      // Determinar eventos faltantes (los propuestos que no están registrados)
+      const tiposEventosRegistrados = fichaje.eventos.map(e => e.tipo);
       const eventosFaltantes: string[] = [];
       
-      // Lógica mejorada para sugerir eventos faltantes basada en la jornada (si está disponible en preview)
-      if (previewEventos.length > 0) {
-        const tiposPreview = previewEventos.map(e => e.tipo);
-        for (const tipo of tiposPreview) {
-          if (!tiposEventos.includes(tipo)) {
-            eventosFaltantes.push(tipo);
+      if (eventosPropuestos.length > 0) {
+        for (const evento of eventosPropuestos) {
+          if (!tiposEventosRegistrados.includes(evento.tipo)) {
+            eventosFaltantes.push(evento.tipo);
           }
         }
       } else {
-        // Fallback básico
-        if (!tiposEventos.includes('entrada')) eventosFaltantes.push('entrada');
-        if (!tiposEventos.includes('salida')) eventosFaltantes.push('salida');
+        // Fallback básico si no hay jornada configurada
+        if (!tiposEventosRegistrados.includes('entrada')) eventosFaltantes.push('entrada');
+        if (!tiposEventosRegistrados.includes('salida')) eventosFaltantes.push('salida');
       }
       
-      if (eventosFaltantes.length > 0) {
-         if (razon === 'Requiere revisión manual' || razon.includes('Fichaje incompleto')) {
-             const nombresEventos = eventosFaltantes.map(e => e.replace('_', ' '));
-             razon = `Faltan eventos: ${nombresEventos.join(', ')}`;
-         }
-      }
+      // PUNTO 3: Eliminar texto redundante - la razón solo para fichajes incompletos
+      // No mostrar "Sin fichajes registrados" porque ya está en eventos faltantes
+      const razon = fichaje.eventos.length > 0 ? 'Fichaje incompleto' : '';
 
       const equipoInfo = fichaje.empleado?.equipos?.[0]?.equipo ?? null;
 
+      // PUNTO 6: Filtrar eventos propuestos para devolver solo los que FALTAN (no los ya registrados)
+      const eventosPropuestosFiltrados = eventosPropuestos.filter(
+        ep => !tiposEventosRegistrados.includes(ep.tipo)
+      );
+
       return {
-        id: fichaje.id, // Usar el ID del fichaje directamente
+        id: fichaje.id,
         fichajeId: fichaje.id,
         empleadoId: fichaje.empleadoId,
         empleadoNombre: `${fichaje.empleado.nombre} ${fichaje.empleado.apellidos}`,
         equipoId: equipoInfo?.id ?? null,
         equipoNombre: equipoInfo?.nombre ?? null,
-        fecha: fichaje.fecha.toISOString(),
-        eventos: previewEventos.length > 0 ? previewEventos : eventosRegistrados,
-        eventosRegistrados, // Campo esperado por el modal
+        fecha: fechaFormateada, // PUNTO 1: Fecha formateada consistentemente
+        eventosRegistrados, // Eventos ya fichados (origen: 'registrado')
+        eventosPropuestos: eventosPropuestosFiltrados, // PUNTO 6: Eventos sugeridos (origen: 'propuesto')
         razon,
-        eventosFaltantes, // Campo esperado por el modal
-        confianza: 0,
+        eventosFaltantes,
         tieneEventosRegistrados: fichaje.eventos.length > 0,
+        ausenciaMedioDia: ausenciaMedioDia ? ausenciaMedioDia.periodo : null, // Info de ausencia media jornada
       };
     });
 
@@ -366,7 +471,7 @@ export async function POST(request: NextRequest) {
         const fichajeId = id;
 
         if (accion === 'descartar') {
-          const fichaje = await prisma.fichaje.findUnique({
+          const fichaje = await prisma.fichajes.findUnique({
             where: { id: fichajeId },
             include: {
               eventos: true,
@@ -394,7 +499,7 @@ export async function POST(request: NextRequest) {
             continue;
           }
 
-          await prisma.fichaje.update({
+          await prisma.fichajes.update({
             where: { id: fichajeId },
             data: {
               estado: 'finalizado',
@@ -410,7 +515,7 @@ export async function POST(request: NextRequest) {
         }
 
         if (accion === 'actualizar') {
-          const fichaje = await prisma.fichaje.findUnique({
+          const fichaje = await prisma.fichajes.findUnique({
             where: { id: fichajeId },
             include: { 
               eventos: true,
@@ -514,7 +619,7 @@ export async function POST(request: NextRequest) {
           for (const ev of eventosAcrear) {
             const yaExiste = fichaje.eventos.some(e => e.tipo === ev.tipo && Math.abs(new Date(e.hora).getTime() - ev.hora.getTime()) < 60000);
             if (!yaExiste) {
-              await prisma.fichajeEvento.create({
+              await prisma.fichaje_eventos.create({
                 data: {
                   fichajeId: fichaje.id,
                   tipo: ev.tipo,
@@ -526,7 +631,7 @@ export async function POST(request: NextRequest) {
 
           const { calcularHorasTrabajadas, calcularTiempoEnPausa } = await import('@/lib/calculos/fichajes');
 
-          const fichajeActualizado = await prisma.fichaje.findUnique({
+          const fichajeActualizado = await prisma.fichajes.findUnique({
             where: { id: fichajeId },
             include: { eventos: true },
           });
@@ -535,7 +640,7 @@ export async function POST(request: NextRequest) {
           const horasTrabajadas = calcularHorasTrabajadas(fichajeActualizado.eventos) ?? 0;
             const horasEnPausa = calcularTiempoEnPausa(fichajeActualizado.eventos);
 
-            await prisma.fichaje.update({
+            await prisma.fichajes.update({
               where: { id: fichajeId },
               data: {
                 estado: 'finalizado',
@@ -546,13 +651,17 @@ export async function POST(request: NextRequest) {
               },
             });
 
-            await crearNotificacionFichajeResuelto(prisma, {
-              fichajeId,
-              empresaId: session.user.empresaId,
-              empleadoId: fichaje.empleadoId,
-              empleadoNombre: `${fichaje.empleado.nombre} ${fichaje.empleado.apellidos}`,
-              fecha: fichaje.fecha,
-            });
+            await crearNotificacionFichajeResuelto(
+              prisma,
+              {
+                fichajeId,
+                empresaId: session.user.empresaId,
+                empleadoId: fichaje.empleadoId,
+                empleadoNombre: `${fichaje.empleado.nombre} ${fichaje.empleado.apellidos}`,
+                fecha: fichaje.fecha,
+              },
+              { actorUsuarioId: session.user.id }
+            );
           }
 
           actualizados++;

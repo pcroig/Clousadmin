@@ -8,6 +8,8 @@ import { revalidatePath } from 'next/cache';
 import { headers } from 'next/headers';
 import { z } from 'zod';
 
+import { randomBytes } from 'crypto';
+
 import { createSession, getSession, hashPassword } from '@/lib/auth';
 import { DIAS_LABORABLES_DEFAULT } from '@/lib/calculos/dias-laborables';
 import { UsuarioRol } from '@/lib/constants/enums';
@@ -19,6 +21,7 @@ import { DEFAULT_JORNADA_FORM_VALUES } from '@/lib/jornadas/defaults';
 import { prisma } from '@/lib/prisma';
 import { asJsonValue } from '@/lib/prisma/json';
 import { getClientIP } from '@/lib/rate-limit';
+import { uploadToS3 } from '@/lib/s3';
 import {
   calendarioJornadaOnboardingSchema,
   integracionCreateSchema,
@@ -32,7 +35,7 @@ import {
  * REQUIERE: Token de invitación válido
  */
 export async function signupEmpresaAction(
-  data: z.infer<typeof signupSchema> & { token?: string }
+  data: z.infer<typeof signupSchema> & { token?: string; avatarFile?: File | null }
 ) {
   try {
     const headersList = await headers();
@@ -41,6 +44,7 @@ export async function signupEmpresaAction(
 
     // Validar datos
     const validatedData = signupSchema.parse(data);
+    const avatarFile = data.avatarFile;
 
     // Verificar invitación (requerida)
     if (!data.token) {
@@ -75,7 +79,7 @@ export async function signupEmpresaAction(
     });
 
     // Verificar que el email no exista ya como usuario
-    const existingUser = await prisma.usuario.findUnique({
+    const existingUser = await prisma.usuarios.findUnique({
       where: { email: validatedData.email.toLowerCase() },
     });
 
@@ -92,7 +96,7 @@ export async function signupEmpresaAction(
     // Crear todo en una transacción
     const result = await prisma.$transaction(async (tx) => {
       // 1. Crear empresa
-      const empresa = await tx.empresa.create({
+      const empresa = await tx.empresas.create({
         data: {
           nombre: validatedData.nombreEmpresa,
           web: validatedData.webEmpresa || null,
@@ -100,7 +104,7 @@ export async function signupEmpresaAction(
       });
 
       // 2. Crear usuario HR Admin
-      const usuario = await tx.usuario.create({
+      const usuario = await tx.usuarios.create({
         data: {
           email: validatedData.email.toLowerCase(),
           password: hashedPassword,
@@ -114,7 +118,7 @@ export async function signupEmpresaAction(
       });
 
       // 3. Crear empleado asociado al usuario
-      const empleado = await tx.empleado.create({
+      const empleado = await tx.empleados.create({
         data: {
           usuarioId: usuario.id,
           empresaId: empresa.id,
@@ -128,13 +132,32 @@ export async function signupEmpresaAction(
       });
 
       // 4. Vincular empleado al usuario
-      await tx.usuario.update({
+      await tx.usuarios.update({
         where: { id: usuario.id },
         data: { empleadoId: empleado.id },
       });
 
+      // 5. Crear equipo "Admin" por defecto y asignar al HR admin
+      const equipoAdmin = await tx.equipos.create({
+        data: {
+          nombre: 'Admin',
+          descripcion: 'Equipo de administración de recursos humanos',
+          empresaId: empresa.id,
+          managerId: empleado.id,
+        },
+      });
+
+      // Asignar el HR admin al equipo Admin
+      await tx.empleado_equipos.create({
+        data: {
+          empleadoId: empleado.id,
+          equipoId: equipoAdmin.id,
+          fechaIncorporacion: new Date(),
+        },
+      });
+
       if (validatedData.consentimientoTratamiento) {
-        await tx.consentimiento.create({
+        await tx.consentimientos.create({
           data: {
             empresaId: empresa.id,
             empleadoId: empleado.id,
@@ -152,10 +175,37 @@ export async function signupEmpresaAction(
       return { usuario, empresa, empleado };
     });
 
-    // 5. Marcar invitación como usada
+    // 5. Subir avatar si se proporcionó
+    let avatarUrl: string | undefined;
+    if (avatarFile && avatarFile.size > 0) {
+      try {
+        const arrayBuffer = await avatarFile.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
+        const timestamp = Date.now();
+        const randomString = randomBytes(8).toString('hex');
+        const fileExtension = avatarFile.name.split('.').pop() || 'jpg';
+        const s3Key = `avatars/${result.empresa.id}/${result.empleado.id}/${timestamp}-${randomString}.${fileExtension}`;
+
+        avatarUrl = await uploadToS3(buffer, s3Key, avatarFile.type);
+
+        // Actualizar empleado con avatar
+        await prisma.empleados.update({
+          where: { id: result.empleado.id },
+          data: { fotoUrl: avatarUrl },
+        });
+
+        // Actualizar resultado local para la sesión
+        result.empleado.fotoUrl = avatarUrl;
+      } catch (avatarError) {
+        console.error('[signupEmpresaAction] Error subiendo avatar:', avatarError);
+        // No fallar el signup por error de avatar
+      }
+    }
+
+    // 6. Marcar invitación como usada
     await usarInvitacionSignup(data.token);
 
-    // 6. Crear sesión automáticamente (usuario autenticado tras signup)
+    // 7. Crear sesión automáticamente (usuario autenticado tras signup)
     await createSession({
       user: {
         id: result.usuario.id,
@@ -170,7 +220,7 @@ export async function signupEmpresaAction(
       },
     });
 
-    // 7. Mantener sincronizada la entrada en waitlist (si venía de ahí)
+    // 8. Mantener sincronizada la entrada en waitlist (si venía de ahí)
     if (waitlistEntry) {
       const nombreCompleto = `${validatedData.nombre} ${validatedData.apellidos}`.trim();
       try {
@@ -333,7 +383,7 @@ export async function configurarCalendarioYJornadaAction(
       });
 
       // Buscar la primera jornada activa de la empresa
-      const jornadaExistente = await tx.jornada.findFirst({
+      const jornadaExistente = await tx.jornadas.findFirst({
         where: {
           empresaId: session.user.empresaId,
           activa: true,
@@ -352,18 +402,18 @@ export async function configurarCalendarioYJornadaAction(
       };
 
       const registro = jornadaExistente
-        ? await tx.jornada.update({
+        ? await tx.jornadas.update({
             where: { id: jornadaExistente.id },
             data: dataJornada,
           })
-        : await tx.jornada.create({
+        : await tx.jornadas.create({
             data: {
               ...dataJornada,
               empresaId: session.user.empresaId,
             },
           });
 
-      await tx.empleado.updateMany({
+      await tx.empleados.updateMany({
         where: {
           empresaId: session.user.empresaId,
           jornadaId: null,
@@ -432,7 +482,7 @@ export async function crearSedeAction({
     // Auto-generar nombre desde ciudad
     const nombre = `Sede ${validatedData.ciudad}`;
 
-    const sede = await prisma.sede.create({
+    const sede = await prisma.sedes.create({
       data: {
         empresaId: validatedData.empresaId,
         nombre,
@@ -450,7 +500,7 @@ export async function crearSedeAction({
 
     // Aplicar asignación inicial si procede
     if (validatedData.asignacion?.tipo === 'empresa') {
-      await prisma.equipo.updateMany({
+      await prisma.equipos.updateMany({
         where: {
           empresaId: session.user.empresaId,
         },
@@ -468,7 +518,7 @@ export async function crearSedeAction({
         };
       }
 
-      const equipo = await prisma.equipo.findFirst({
+      const equipo = await prisma.equipos.findFirst({
         where: {
           id: validatedData.asignacion.equipoId,
           empresaId: session.user.empresaId,
@@ -482,7 +532,7 @@ export async function crearSedeAction({
         };
       }
 
-      await prisma.equipo.update({
+      await prisma.equipos.update({
         where: { id: equipo.id },
         data: {
           sedeId: sede.id,
@@ -490,7 +540,7 @@ export async function crearSedeAction({
       });
     }
 
-    const sedeActualizada = await prisma.sede.findUnique({
+    const sedeActualizada = await prisma.sedes.findUnique({
       where: { id: sede.id },
       include: {
         equipos: {
@@ -538,7 +588,7 @@ export async function asignarSedeAction(sedeId: string, asignacion: AsignacionSe
       };
     }
 
-    const sede = await prisma.sede.findFirst({
+    const sede = await prisma.sedes.findFirst({
       where: {
         id: sedeId,
         empresaId: session.user.empresaId,
@@ -558,7 +608,7 @@ export async function asignarSedeAction(sedeId: string, asignacion: AsignacionSe
     }
 
     if (asignacion.tipo === 'empresa') {
-      await prisma.equipo.updateMany({
+      await prisma.equipos.updateMany({
         where: {
           empresaId: session.user.empresaId,
         },
@@ -574,7 +624,7 @@ export async function asignarSedeAction(sedeId: string, asignacion: AsignacionSe
         };
       }
 
-      const equipo = await prisma.equipo.findFirst({
+      const equipo = await prisma.equipos.findFirst({
         where: {
           id: asignacion.equipoId,
           empresaId: session.user.empresaId,
@@ -588,7 +638,7 @@ export async function asignarSedeAction(sedeId: string, asignacion: AsignacionSe
         };
       }
 
-      await prisma.equipo.update({
+      await prisma.equipos.update({
         where: { id: equipo.id },
         data: {
           sedeId: sede.id,
@@ -596,7 +646,7 @@ export async function asignarSedeAction(sedeId: string, asignacion: AsignacionSe
       });
     }
 
-    const sedeActualizada = await prisma.sede.findUnique({
+    const sedeActualizada = await prisma.sedes.findUnique({
       where: { id: sede.id },
       include: {
         equipos: {
@@ -637,7 +687,7 @@ export async function eliminarSedeAction(sedeId: string) {
     }
 
     // Verificar que la sede pertenece a la empresa del usuario
-    const sede = await prisma.sede.findFirst({
+    const sede = await prisma.sedes.findFirst({
       where: {
         id: sedeId,
         empresaId: session.user.empresaId,
@@ -651,7 +701,7 @@ export async function eliminarSedeAction(sedeId: string) {
       };
     }
 
-    await prisma.sede.delete({
+    await prisma.sedes.delete({
       where: { id: sedeId },
     });
 
@@ -694,7 +744,7 @@ export async function configurarIntegracionAction(
     });
 
     // Buscar si ya existe una integración con estos parámetros
-    const existingIntegration = await prisma.integracion.findFirst({
+    const existingIntegration = await prisma.integraciones.findFirst({
       where: {
         empresaId: validatedData.empresaId,
         tipo: validatedData.tipo,
@@ -705,14 +755,14 @@ export async function configurarIntegracionAction(
 
     // Crear o actualizar la integración
     const integracion = existingIntegration
-      ? await prisma.integracion.update({
+      ? await prisma.integraciones.update({
           where: { id: existingIntegration.id },
           data: {
             config: asJsonValue(validatedData.config || {}),
             activa: true,
           },
         })
-      : await prisma.integracion.create({
+      : await prisma.integraciones.create({
           data: {
             empresaId: validatedData.empresaId,
             tipo: validatedData.tipo,
@@ -777,7 +827,7 @@ export async function invitarHRAdminAction({
     const emailLower = email.trim().toLowerCase();
 
     const empleadoExistente = empleadoId
-      ? await prisma.empleado.findFirst({
+      ? await prisma.empleados.findFirst({
           where: {
             id: empleadoId,
             empresaId: session.user.empresaId,
@@ -786,7 +836,7 @@ export async function invitarHRAdminAction({
             usuario: true,
           },
         })
-      : await prisma.empleado.findFirst({
+      : await prisma.empleados.findFirst({
           where: {
             email: emailLower,
             empresaId: session.user.empresaId,
@@ -805,7 +855,7 @@ export async function invitarHRAdminAction({
       }
 
       const usuarioActualizado = empleadoExistente.usuario
-        ? await prisma.usuario.update({
+        ? await prisma.usuarios.update({
             where: { id: empleadoExistente.usuario.id },
             data: {
               nombre,
@@ -814,7 +864,7 @@ export async function invitarHRAdminAction({
               rol: UsuarioRol.hr_admin,
             },
           })
-        : await prisma.usuario.create({
+        : await prisma.usuarios.create({
             data: {
               email: emailLower,
               nombre,
@@ -827,13 +877,13 @@ export async function invitarHRAdminAction({
           });
 
       if (!empleadoExistente.usuario) {
-        await prisma.empleado.update({
+        await prisma.empleados.update({
           where: { id: empleadoExistente.id },
           data: { usuarioId: usuarioActualizado.id },
         });
       }
 
-      await prisma.empleado.update({
+      await prisma.empleados.update({
         where: { id: empleadoExistente.id },
         data: {
           nombre,
@@ -866,7 +916,7 @@ export async function invitarHRAdminAction({
     }
 
     // Verificar que el email no exista
-    const existingUser = await prisma.usuario.findUnique({
+    const existingUser = await prisma.usuarios.findUnique({
       where: { email: emailLower },
     });
 
@@ -880,7 +930,7 @@ export async function invitarHRAdminAction({
     // Crear usuario y empleado en una transacción
     const result = await prisma.$transaction(async (tx) => {
       // 1. Crear usuario sin password (será establecida en el onboarding)
-      const usuario = await tx.usuario.create({
+      const usuario = await tx.usuarios.create({
         data: {
           email: emailLower,
           nombre,
@@ -893,7 +943,7 @@ export async function invitarHRAdminAction({
       });
 
       // 2. Crear empleado asociado
-      const empleado = await tx.empleado.create({
+      const empleado = await tx.empleados.create({
         data: {
           usuarioId: usuario.id,
           empresaId: session.user.empresaId,
@@ -907,7 +957,7 @@ export async function invitarHRAdminAction({
       });
 
       // 3. Vincular empleado al usuario
-      await tx.usuario.update({
+      await tx.usuarios.update({
         where: { id: usuario.id },
         data: { empleadoId: empleado.id },
       });
@@ -961,7 +1011,7 @@ export async function completarOnboardingAction() {
 
     // Marcar el onboarding como completado para el empleado
     if (session.user.empleadoId) {
-      await prisma.empleado.update({
+      await prisma.empleados.update({
         where: { id: session.user.empleadoId },
         data: {
           onboardingCompletado: true,

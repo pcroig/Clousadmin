@@ -17,7 +17,7 @@ export async function autoGenerarDocumentosOffboarding({
   empleadoId,
   solicitadoPor,
 }: AutoGenerarArgs): Promise<number> {
-  const plantillas = await prisma.plantillaDocumento.findMany({
+  const plantillas = await prisma.plantillas_documentos.findMany({
     where: {
       activa: true,
       autoGenerarOffboarding: true,

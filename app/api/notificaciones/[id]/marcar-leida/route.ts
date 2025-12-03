@@ -28,7 +28,7 @@ export async function PATCH(
     const { id } = await params;
 
     // Verificar que la notificación pertenece al usuario
-    const notificacion = await prisma.notificacion.findUnique({
+    const notificacion = await prisma.notificaciones.findUnique({
       where: { id },
     });
 
@@ -41,7 +41,7 @@ export async function PATCH(
     }
 
     // Marcar como leída
-    const notificacionActualizada = await prisma.notificacion.update({
+    const notificacionActualizada = await prisma.notificaciones.update({
       where: { id },
       data: { leida: true },
     });

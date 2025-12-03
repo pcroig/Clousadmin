@@ -19,7 +19,7 @@ export default async function SettingsPage() {
   }
 
   // Solo traer los campos que necesitamos para evitar serializar Decimals
-  const usuario = await prisma.usuario.findUnique({
+  const usuario = await prisma.usuarios.findUnique({
     where: { id: session.user.id },
     select: {
       email: true,

@@ -16,6 +16,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { EstadoFichaje } from '@/lib/constants/enums';
+import { extraerHoraDeISO } from '@/lib/utils/formatters';
 import { parseJson } from '@/lib/utils/json';
 
 interface FichajeEvento {
@@ -72,8 +73,9 @@ export function FichajesTab({ empleadoId }: { empleadoId: string }) {
       const entrada = eventos.find(e => e.tipo === 'entrada');
       const salida = eventos.find(e => e.tipo === 'salida');
 
-      const horarioEntrada = entrada ? format(new Date(entrada.hora), 'HH:mm') : null;
-      const horarioSalida = salida ? format(new Date(salida.hora), 'HH:mm') : null;
+      // Extraer hora directamente del ISO string para evitar desfases de zona horaria
+      const horarioEntrada = entrada ? extraerHoraDeISO(entrada.hora) : null;
+      const horarioSalida = salida ? extraerHoraDeISO(salida.hora) : null;
 
       let estado: 'completa' | 'incompleta' | 'pendiente' = 'completa';
       if (fichaje.estado === EstadoFichaje.en_curso) {

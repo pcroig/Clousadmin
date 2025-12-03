@@ -6,52 +6,25 @@
 import { prisma } from '@/lib/prisma';
 import { asJsonValue } from '@/lib/prisma/json';
 
-/**
- * Configuración de campos requeridos
- */
-export interface CamposRequeridos {
-  datos_personales: {
-    nif: boolean;
-    nss: boolean;
-    telefono: boolean;
-    direccionCalle: boolean;
-    direccionNumero: boolean;
-    direccionPiso: boolean;
-    codigoPostal: boolean;
-    ciudad: boolean;
-    direccionProvincia: boolean;
-    estadoCivil: boolean;
-    numeroHijos: boolean;
-  };
-  datos_bancarios: {
-    iban: boolean;
-    titularCuenta: boolean;
-  };
-}
+// Importar tipos para uso interno
+import type {
+  CamposRequeridos,
+  DocumentoRequerido,
+  PlantillaDocumento,
+} from './onboarding-config-types';
 
-/**
- * Documento requerido
- */
-export interface DocumentoRequerido {
-  id: string;
-  nombre: string;
-  descripcion?: string;
-  requerido: boolean;
-  requiereVisualizacion: boolean;
-  requiereFirma: boolean;
-  carpetaDestino?: string | null;
-}
+// Re-exportar tipos desde el archivo de tipos (para compatibilidad)
+export type {
+  CamposRequeridos,
+  DocumentoRequerido,
+  PlantillaDocumento,
+} from './onboarding-config-types';
 
-/**
- * Plantilla de documento
- */
-export interface PlantillaDocumento {
-  id: string;
-  nombre: string;
-  s3Key: string;
-  tipoDocumento: string;
-  descripcion?: string;
-}
+// Re-exportar funciones helper (son seguras en cliente porque no usan Prisma)
+export {
+  filtrarDocumentosPorEquipo,
+  obtenerDocumentosAsincronicos,
+} from './onboarding-config-types';
 
 /**
  * Configuración completa de onboarding
@@ -82,7 +55,7 @@ const DEFAULT_CONFIG: OnboardingConfigData = {
     },
     datos_bancarios: {
       iban: true,
-      titularCuenta: true,
+      bic: true,
     },
   },
   documentosRequeridos: [],
@@ -97,13 +70,13 @@ const DEFAULT_CONFIG: OnboardingConfigData = {
  */
 export async function obtenerOnboardingConfig(empresaId: string) {
   try {
-    let config = await prisma.onboardingConfig.findUnique({
+    let config = await prisma.onboarding_configs.findUnique({
       where: { empresaId },
     });
 
     // Si no existe configuración, crear una con valores por defecto
     if (!config) {
-      config = await prisma.onboardingConfig.create({
+      config = await prisma.onboarding_configs.create({
         data: {
           empresaId,
           camposRequeridos: asJsonValue(DEFAULT_CONFIG.camposRequeridos),
@@ -152,7 +125,7 @@ export async function actualizarCamposRequeridos(
     }
 
     // Actualizar campos requeridos
-    const updated = await prisma.onboardingConfig.update({
+    const updated = await prisma.onboarding_configs.update({
       where: { empresaId },
       data: {
         camposRequeridos: asJsonValue(camposRequeridos),
@@ -190,7 +163,7 @@ export async function actualizarDocumentosRequeridos(
     }
 
     // Actualizar documentos requeridos
-    const updated = await prisma.onboardingConfig.update({
+    const updated = await prisma.onboarding_configs.update({
       where: { empresaId },
       data: {
         documentosRequeridos: asJsonValue(documentosRequeridos),
@@ -228,7 +201,7 @@ export async function actualizarPlantillasDocumentos(
     }
 
     // Actualizar plantillas
-    const updated = await prisma.onboardingConfig.update({
+    const updated = await prisma.onboarding_configs.update({
       where: { empresaId },
       data: {
         plantillasDocumentos: asJsonValue(plantillasDocumentos),
@@ -285,6 +258,7 @@ export function validarDocumentosRequeridos(
     documentosFaltantes,
   };
 }
+
 
 
 

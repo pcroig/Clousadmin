@@ -24,7 +24,7 @@ export default async function HRCarpetaDetailPage(context: { params: Promise<{ i
   const { id } = await params;
 
   // Obtener carpeta con documentos y empleado
-  const carpeta = await prisma.carpeta.findUnique({
+  const carpeta = await prisma.carpetas.findUnique({
     where: {
       id: id,
     },
@@ -70,7 +70,7 @@ export default async function HRCarpetaDetailPage(context: { params: Promise<{ i
     if (tipoDocumento) {
       // Obtener documentos de carpetas de empleados Y documentos directamente en esta carpeta global
       const [documentosEmpleados, documentosCarpetaGlobal] = await Promise.all([
-        prisma.documento.findMany({
+        prisma.documentos.findMany({
           where: {
             empresaId: session.user.empresaId,
             tipoDocumento: tipoDocumento,
@@ -86,7 +86,7 @@ export default async function HRCarpetaDetailPage(context: { params: Promise<{ i
             },
           },
         }),
-        prisma.documento.findMany({
+        prisma.documentos.findMany({
           where: {
             carpetaId: carpeta.id,
             empresaId: session.user.empresaId,
@@ -118,7 +118,7 @@ export default async function HRCarpetaDetailPage(context: { params: Promise<{ i
   // Obtener lista de empleados para el filtro (si es carpeta global)
   let empleados: Array<{ id: string; nombre: string; apellidos: string }> = [];
   if (esGlobal) {
-    empleados = await prisma.empleado.findMany({
+    empleados = await prisma.empleados.findMany({
       where: {
         empresaId: session.user.empresaId,
         activo: true,

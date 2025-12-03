@@ -155,7 +155,7 @@ export function generarTextoCertificado(certificado: CertificadoFirmaSimple): st
  * @example
  * ```ts
  * const metadata = generarMetadataAuditoria(certificado);
- * await prisma.auditoriaAcceso.create({
+ * await prisma.auditoria_accesos.create({
  *   data: {
  *     empresaId,
  *     usuarioId: certificado.empleadoId,

@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
     );
 
     // 1. Obtener todas las ausencias pendientes de la empresa
-    const ausenciasPendientes = await prisma.ausencia.findMany({
+    const ausenciasPendientes = await prisma.ausencias.findMany({
       where: {
         empresaId: session.user.empresaId,
         estado: EstadoAusencia.pendiente,
@@ -54,7 +54,7 @@ export async function POST(req: NextRequest) {
     });
 
     // 2. Obtener todas las solicitudes de cambio pendientes
-    const solicitudesPendientes = await prisma.solicitudCambio.findMany({
+    const solicitudesPendientes = await prisma.solicitudes_cambio.findMany({
       where: {
         empresaId: session.user.empresaId,
         estado: {
@@ -95,7 +95,7 @@ export async function POST(req: NextRequest) {
             fechaFin < hoy ? EstadoAusencia.completada : EstadoAusencia.confirmada;
 
           // Actualizar ausencia
-          const updatedAusencia = await tx.ausencia.update({
+          const updatedAusencia = await tx.ausencias.update({
             where: { id: ausencia.id },
             data: {
               estado: nuevoEstado,
@@ -113,12 +113,12 @@ export async function POST(req: NextRequest) {
             let saldo = await tx.empleadoSaldoAusencias.findFirst({
               where: {
                 empleadoId: ausencia.empleadoId,
-                año,
+                anio: año,
               },
             });
 
             if (!saldo) {
-              const empleado = await tx.empleado.findUnique({
+              const empleado = await tx.empleados.findUnique({
                 where: { id: ausencia.empleadoId },
                 select: { diasVacaciones: true, empresaId: true },
               });
@@ -131,7 +131,7 @@ export async function POST(req: NextRequest) {
                 data: {
                   empleadoId: ausencia.empleadoId,
                   empresaId: empleado.empresaId,
-                  año,
+                  anio: año,
                   diasTotales: empleado.diasVacaciones,
                   diasUsados: 0,
                   diasPendientes: 0,
@@ -165,15 +165,19 @@ export async function POST(req: NextRequest) {
         });
 
         // Notificar al empleado que su ausencia fue aprobada
-        await crearNotificacionAusenciaAprobada(prisma, {
-          ausenciaId: ausencia.id,
-          empresaId: session.user.empresaId,
-          empleadoId: ausencia.empleadoId,
-          empleadoNombre: `${ausencia.empleado.nombre} ${ausencia.empleado.apellidos}`,
-          tipo: ausencia.tipo,
-          fechaInicio: ausencia.fechaInicio,
-          fechaFin: ausencia.fechaFin,
-        });
+        await crearNotificacionAusenciaAprobada(
+          prisma,
+          {
+            ausenciaId: ausencia.id,
+            empresaId: session.user.empresaId,
+            empleadoId: ausencia.empleadoId,
+            empleadoNombre: `${ausencia.empleado.nombre} ${ausencia.empleado.apellidos}`,
+            tipo: ausencia.tipo,
+            fechaInicio: ausencia.fechaInicio,
+            fechaFin: ausencia.fechaFin,
+          },
+          { actorUsuarioId: session.user.id }
+        );
 
         ausenciasAprobadas++;
       } catch (error) {
@@ -188,7 +192,7 @@ export async function POST(req: NextRequest) {
       try {
         await prisma.$transaction(async (tx) => {
           // Actualizar solicitud
-          const updatedSolicitud = await tx.solicitudCambio.update({
+          const updatedSolicitud = await tx.solicitudes_cambio.update({
             where: { id: solicitud.id },
             data: {
               estado: EstadoSolicitud.auto_aprobada,
@@ -220,13 +224,17 @@ export async function POST(req: NextRequest) {
         });
 
         // Notificar al empleado que su solicitud fue aprobada
-        await crearNotificacionSolicitudAprobada(prisma, {
-          solicitudId: solicitud.id,
-          empresaId: session.user.empresaId,
-          empleadoId: solicitud.empleadoId,
-          tipo: solicitud.tipo,
-          aprobadoPor: 'manual', // Aprobada por HR/Admin manualmente
-        });
+        await crearNotificacionSolicitudAprobada(
+          prisma,
+          {
+            solicitudId: solicitud.id,
+            empresaId: session.user.empresaId,
+            empleadoId: solicitud.empleadoId,
+            tipo: solicitud.tipo,
+            aprobadoPor: 'manual', // Aprobada por HR/Admin manualmente
+          },
+          { actorUsuarioId: session.user.id }
+        );
 
         solicitudesAprobadas++;
       } catch (error) {

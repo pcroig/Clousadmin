@@ -143,7 +143,7 @@ export function JornadasClient() {
   }
 
   return (
-    <div className="h-full w-full flex flex-col">
+    <div className="h-full w-full flex flex-col px-1 py-1 sm:max-w-[1800px] sm:mx-auto sm:px-8 sm:py-6">
       {/* Header */}
       <PageHeader
         title="Jornadas Laborales"

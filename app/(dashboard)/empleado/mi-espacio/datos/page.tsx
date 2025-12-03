@@ -23,7 +23,7 @@ export default async function MiEspacioDatosPage(props: {
   }
 
   // Obtener datos del empleado
-  const empleado = await prisma.empleado.findUnique({
+  const empleado = await prisma.empleados.findUnique({
     where: {
       usuarioId: session.user.id,
     },

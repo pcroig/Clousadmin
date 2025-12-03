@@ -9,7 +9,11 @@ import { z } from 'zod';
 import { callFeatureAI } from './core/features';
 import { MessageRole } from './core/types';
 
-import type { Ausencia, Empleado, PreferenciaVacaciones } from '@prisma/client';
+import type {
+  ausencias as Ausencia,
+  empleados as Empleado,
+  preferencias_vacaciones as PreferenciaVacaciones,
+} from '@prisma/client';
 
 /**
  * Propuesta de vacaciones para un empleado

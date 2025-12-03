@@ -10,6 +10,34 @@ import { prisma } from '@/lib/prisma';
 
 
 // GET /api/equipos - List teams
+const equipoInclude = {
+  empleados: {
+    select: {
+      id: true,
+      nombre: true,
+      apellidos: true,
+    },
+  },
+  empleado_equipos: {
+    include: {
+      empleado: {
+        select: {
+          id: true,
+          nombre: true,
+          apellidos: true,
+          fotoUrl: true,
+        },
+      },
+    },
+  },
+  sede: {
+    select: {
+      id: true,
+      nombre: true,
+    },
+  },
+} as const;
+
 export async function GET() {
   try {
     const session = await getSession();
@@ -18,41 +46,19 @@ export async function GET() {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
 
-    const equipos = await prisma.equipo.findMany({
+    const equiposRaw = await prisma.equipos.findMany({
       where: {
         empresaId: session.user.empresaId,
       },
-      include: {
-        manager: {
-          select: {
-            id: true,
-            nombre: true,
-            apellidos: true,
-          },
-        },
-        miembros: {
-          include: {
-            empleado: {
-              select: {
-                id: true,
-                nombre: true,
-                apellidos: true,
-                fotoUrl: true,
-              },
-            },
-          },
-        },
-        sede: {
-          select: {
-            id: true,
-            nombre: true,
-          },
-        },
-      },
+      include: equipoInclude,
       orderBy: {
         nombre: 'asc',
       },
     });
+
+    const equipos = equiposRaw.map((team) =>
+      formatEquipoResponse(team as EquipoWithRelations)
+    );
 
     return NextResponse.json(equipos);
   } catch (error) {
@@ -78,7 +84,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if team name already exists in the company
-    const existingTeam = await prisma.equipo.findFirst({
+    const existingTeam = await prisma.equipos.findFirst({
       where: {
         empresaId: session.user.empresaId,
         nombre: nombre.trim(),
@@ -95,45 +101,55 @@ export async function POST(request: NextRequest) {
     const descripcionStr = typeof descripcion === 'string' ? descripcion : undefined;
     const sedeIdStr = typeof sedeId === 'string' ? sedeId : null;
 
-    const equipo = await prisma.equipo.create({
+    const equipoRaw = await prisma.equipos.create({
       data: {
         empresaId: session.user.empresaId,
         nombre: nombre.trim(),
         descripcion: descripcionStr?.trim() || null,
         sedeId: sedeIdStr,
       },
-      include: {
-        manager: {
-          select: {
-            id: true,
-            nombre: true,
-            apellidos: true,
-          },
-        },
-        miembros: {
-          include: {
-            empleado: {
-              select: {
-                id: true,
-                nombre: true,
-                apellidos: true,
-                fotoUrl: true,
-              },
-            },
-          },
-        },
-        sede: {
-          select: {
-            id: true,
-            nombre: true,
-          },
-        },
-      },
+      include: equipoInclude,
     });
+
+    const equipo = formatEquipoResponse(equipoRaw as EquipoWithRelations);
 
     return NextResponse.json(equipo, { status: 201 });
   } catch (error) {
     console.error('Error creating team:', error);
     return NextResponse.json({ error: 'Error al crear equipo' }, { status: 500 });
   }
+}
+
+type EquipoWithRelations = NonNullable<
+  Awaited<ReturnType<(typeof prisma.equipos)['findMany']>>[number]
+> & {
+  empleados: {
+    id: string;
+    nombre: string;
+    apellidos: string;
+  } | null;
+  empleado_equipos: Array<{
+    empleado: {
+      id: string;
+      nombre: string;
+      apellidos: string;
+      fotoUrl: string | null;
+    };
+  }>;
+};
+
+function formatEquipoResponse(team: EquipoWithRelations) {
+  return {
+    ...team,
+    manager: team.empleados
+      ? {
+          id: team.empleados.id,
+          nombre: team.empleados.nombre,
+          apellidos: team.empleados.apellidos,
+        }
+      : null,
+    miembros: team.empleado_equipos.map((miembro) => ({
+      empleado: miembro.empleado,
+    })),
+  };
 }

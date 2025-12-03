@@ -83,7 +83,7 @@ export async function calcularDiasTrabajados(
   const fechaFin = new Date(anio, mes, 0);
   fechaFin.setHours(23, 59, 59, 999);
 
-  const fichajes = await prisma.fichaje.count({
+  const fichajes = await prisma.fichajes.count({
     where: {
       empleadoId,
       fecha: {
@@ -119,7 +119,7 @@ export async function calcularAusenciasPorTipo(
   fechaFin.setHours(23, 59, 59, 999);
 
   // Obtener todas las ausencias del mes (completadas o en curso)
-  const ausencias = await prisma.ausencia.findMany({
+  const ausencias = await prisma.ausencias.findMany({
     where: {
       empleadoId,
       estado: {
@@ -221,7 +221,7 @@ export async function calcularHorasMensuales(
   const fechaFin = new Date(anio, mes, 0);
   fechaFin.setHours(23, 59, 59, 999);
 
-  const fichajes = await prisma.fichaje.findMany({
+  const fichajes = await prisma.fichajes.findMany({
     where: {
       empleadoId,
       fecha: {
@@ -266,10 +266,10 @@ export async function calcularResumenMensual(
 ): Promise<ResumenMensual> {
 
   // Obtener datos del empleado
-  const empleado = await prisma.empleado.findUnique({
+  const empleado = await prisma.empleados.findUnique({
     where: { id: empleadoId },
     select: {
-      salarioBrutoMensual: true,
+      salarioBaseMensual: true,
     },
   });
 
@@ -299,11 +299,11 @@ export async function calcularResumenMensual(
     diasPermisosNoRetribuidos: ausencias.diasPermisosNoRetribuidos,
     horasTrabajadas: horas.horasTrabajadas,
     horasExtras: horas.horasExtras,
-    salarioBase: empleado?.salarioBrutoMensual ? Number(empleado.salarioBrutoMensual) : null,
+    salarioBase: empleado?.salarioBaseMensual ? Number(empleado.salarioBaseMensual) : null,
   };
 
   // Guardar/actualizar en la base de datos
-  await prisma.resumenMensualNomina.upsert({
+  await prisma.resumenes_mensuales_nomina.upsert({
     where: {
       empresaId_empleadoId_mes_anio: {
         empresaId,
@@ -354,7 +354,7 @@ export async function calcularResumenMensualEmpresa(
 ): Promise<ResumenMensual[]> {
 
   // Obtener todos los empleados activos
-  const empleados = await prisma.empleado.findMany({
+  const empleados = await prisma.empleados.findMany({
     where: {
       empresaId,
       activo: true,
@@ -389,7 +389,7 @@ export async function obtenerResumenMensual(
   anio: number
 ): Promise<ResumenMensual | null> {
   // Intentar obtener desde cache
-  const resumen = await prisma.resumenMensualNomina.findUnique({
+  const resumen = await prisma.resumenes_mensuales_nomina.findUnique({
     where: {
       empresaId_empleadoId_mes_anio: {
         empresaId,
@@ -430,7 +430,7 @@ export async function obtenerResumenesMensuales(
   mes: number,
   anio: number
 ): Promise<ResumenMensual[]> {
-  const resumenes = await prisma.resumenMensualNomina.findMany({
+  const resumenes = await prisma.resumenes_mensuales_nomina.findMany({
     where: {
       empresaId,
       mes,

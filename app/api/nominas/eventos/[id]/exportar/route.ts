@@ -32,7 +32,7 @@ export async function GET(
     }
 
     // Obtener evento con todas las nóminas
-    const evento = await prisma.eventoNomina.findFirst({
+    const evento = await prisma.eventos_nomina.findFirst({
       where: {
         id,
         empresaId: session.user.empresaId,
@@ -57,7 +57,7 @@ export async function GET(
                 direccionProvincia: true,
                 fechaNacimiento: true,
                 iban: true,
-                titularCuenta: true,
+                bic: true,
                 jornada: {
                   select: {
                     horasSemanales: true,
@@ -71,14 +71,14 @@ export async function GET(
                 tipoContrato: true,
                 fechaInicio: true,
                 fechaFin: true,
-                salarioBrutoAnual: true,
+                salarioBaseAnual: true,
               },
             },
             complementosAsignados: {
               include: {
-                empleadoComplemento: {
+                empleado_complementos: {
                   include: {
-                    tipoComplemento: true,
+                    tipos_complemento: true,
                   },
                 },
               },
@@ -125,7 +125,7 @@ export async function GET(
       // Construir columnas de complementos
       const complementos: Record<string, number> = {};
       nomina.complementosAsignados.forEach((asignacion) => {
-        const nombreComplemento = asignacion.empleadoComplemento.tipoComplemento.nombre;
+        const nombreComplemento = asignacion.empleado_complementos.tipos_complemento.nombre;
         complementos[nombreComplemento] = parseFloat(asignacion.importe.toString());
       });
 
@@ -141,7 +141,7 @@ export async function GET(
           : '',
         'NSS': empleado.nss || '',
         'IBAN': empleado.iban || '',
-        'Titular Cuenta': empleado.titularCuenta || '',
+        'BIC': empleado.bic || '',
 
         // Dirección
         'Dirección': direccionCompleta,
@@ -157,8 +157,8 @@ export async function GET(
         'Fecha Fin': contrato?.fechaFin
           ? contrato.fechaFin.toLocaleDateString('es-ES')
           : 'Indefinido',
-        'Salario Bruto Anual': parseFloat(
-          contrato?.salarioBrutoAnual?.toString() || '0'
+        'Salario Base Anual': parseFloat(
+          contrato?.salarioBaseAnual?.toString() || '0'
         ),
         'Horas/Semana': horasSemana ?? '',
 
@@ -217,14 +217,14 @@ export async function GET(
 
     const fechaExportacion = new Date();
 
-    await prisma.nomina.updateMany({
+    await prisma.nominas.updateMany({
       where: { eventoNominaId: id },
       data: {
         exportadaEn: fechaExportacion,
       },
     });
 
-    await prisma.eventoNomina.update({
+    await prisma.eventos_nomina.update({
       where: { id },
       data: {
         fechaExportacion,

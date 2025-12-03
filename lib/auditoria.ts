@@ -27,7 +27,7 @@ interface RegistrarAccesoParams {
  */
 export async function registrarAcceso(params: RegistrarAccesoParams): Promise<void> {
   try {
-    await prisma.auditoriaAcceso.create({
+    await prisma.auditoria_accesos.create({
       data: {
         empresaId: params.empresaId,
         usuarioId: params.usuarioId,
@@ -122,7 +122,7 @@ export async function obtenerLogAuditoria(
     where.accion = opciones.accion;
   }
 
-  return prisma.auditoriaAcceso.findMany({
+  return prisma.auditoria_accesos.findMany({
     where,
     orderBy: { createdAt: 'desc' },
     take: opciones?.limite || 100,
@@ -168,7 +168,7 @@ export async function obtenerEstadisticasAccesos(
   }
 
   // Contar accesos por usuario
-  const accesosPorUsuario = await prisma.auditoriaAcceso.groupBy({
+  const accesosPorUsuario = await prisma.auditoria_accesos.groupBy({
     by: ['usuarioId'],
     where,
     _count: {
@@ -182,7 +182,7 @@ export async function obtenerEstadisticasAccesos(
   });
 
   // Contar accesos por acción
-  const accesosPorAccion = await prisma.auditoriaAcceso.groupBy({
+  const accesosPorAccion = await prisma.auditoria_accesos.groupBy({
     by: ['accion'],
     where,
     _count: {
@@ -210,7 +210,7 @@ export async function limpiarLogsAntiguos(
   fechaLimite.setDate(fechaLimite.getDate() - diasRetencion);
 
   try {
-    const result = await prisma.auditoriaAcceso.deleteMany({
+    const result = await prisma.auditoria_accesos.deleteMany({
       where: {
         empresaId,
         createdAt: {
@@ -237,7 +237,7 @@ export async function detectarAccesosSospechosos(
   const desde = new Date(Date.now() - ventanaHoras * 60 * 60 * 1000);
 
   // Buscar usuarios con muchos accesos en poco tiempo
-  const accesosRecientes = await prisma.auditoriaAcceso.groupBy({
+  const accesosRecientes = await prisma.auditoria_accesos.groupBy({
     by: ['usuarioId'],
     where: {
       empresaId,

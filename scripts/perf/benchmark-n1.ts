@@ -26,7 +26,7 @@ function requireEnv(name: string, fallback?: string): string {
 }
 
 async function benchmarkBolsaHoras(empresaId: string, mes: number, anio: number) {
-  const empleados = await prisma.empleado.findMany({
+  const empleados = await prisma.empleados.findMany({
     where: { empresaId, activo: true },
     select: { id: true },
   });
@@ -51,7 +51,7 @@ async function benchmarkRevisionFichajes(empresaId: string) {
   popQueryCount();
   const start = performance.now();
 
-  const autoCompletados = await prisma.autoCompletado.findMany({
+  const autoCompletados = await prisma.auto_completados.findMany({
     where: {
       empresaId,
       estado: 'pendiente',
@@ -79,7 +79,7 @@ async function benchmarkRevisionFichajes(empresaId: string) {
   );
 
   if (fichajeIds.length > 0) {
-    await prisma.fichaje.findMany({
+    await prisma.fichajes.findMany({
       where: { id: { in: fichajeIds } },
       select: {
         id: true,
@@ -121,7 +121,7 @@ async function benchmarkEventosNomina(empresaId: string) {
   popQueryCount();
   const start = performance.now();
 
-  const eventos = await prisma.eventoNomina.findMany({
+  const eventos = await prisma.eventos_nomina.findMany({
     where: { empresaId },
     orderBy: [{ anio: 'desc' }, { mes: 'desc' }],
     take: 12,
@@ -157,7 +157,7 @@ async function benchmarkEventosNomina(empresaId: string) {
   }
 
   if (rangoInicio && rangoFin) {
-    await prisma.compensacionHoraExtra.findMany({
+    await prisma.compensaciones_horas_extra.findMany({
       where: {
         empresaId,
         createdAt: {

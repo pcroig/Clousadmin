@@ -16,13 +16,12 @@ import {
   Upload,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
-import { SolicitarFirmaDialog } from '@/components/firma/solicitar-firma-dialog';
+import { DocumentUploadArea } from '@/components/shared/document-upload-area';
 import { DocumentViewerModal, useDocumentViewer } from '@/components/shared/document-viewer';
 import { EmptyState } from '@/components/shared/empty-state';
-import { FileUploadAdvanced } from '@/components/shared/file-upload-advanced';
 import { InfoTooltip } from '@/components/shared/info-tooltip';
 import { LoadingButton } from '@/components/shared/loading-button';
 import { SearchableMultiSelect } from '@/components/shared/searchable-multi-select';
@@ -45,9 +44,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { UploadHandler } from '@/lib/hooks/use-file-upload';
 import { extractArrayFromResponse } from '@/lib/utils/api-response';
-import { parseJsonString } from '@/lib/utils/json';
 
 interface Documento {
   id: string;
@@ -96,8 +93,8 @@ interface CarpetaDetailClientProps {
 
 export function CarpetaDetailClient({ carpeta, empleados = [] }: CarpetaDetailClientProps) {
   const router = useRouter();
-  const maxUploadMB = Number(process.env.NEXT_PUBLIC_MAX_UPLOAD_MB ?? '10');
-  const uploadSectionRef = useRef<HTMLDivElement>(null);
+  const [modalUploadOpen, setModalUploadOpen] = useState(false);
+  const [empleadoDestinoUpload, setEmpleadoDestinoUpload] = useState('');
   const [modalEliminar, setModalEliminar] = useState(false);
   const [eliminando, setEliminando] = useState(false);
   const [documentoAEliminar, setDocumentoAEliminar] = useState<string | null>(
@@ -117,11 +114,22 @@ export function CarpetaDetailClient({ carpeta, empleados = [] }: CarpetaDetailCl
   const [empleadosList, setEmpleadosList] = useState<Empleado[]>([]);
   const [cargandoDatos, setCargandoDatos] = useState(false);
   const [actualizandoAsignacion, setActualizandoAsignacion] = useState(false);
-  const [documentoParaFirma, setDocumentoParaFirma] = useState<Documento | null>(null);
-  const [modalSolicitarFirma, setModalSolicitarFirma] = useState(false);
 
   // Document viewer state
   const documentViewer = useDocumentViewer();
+
+  const handleUploadButtonClick = useCallback(() => {
+    if (carpeta.esGlobal) {
+      if (empleados.length === 0) {
+        toast.error('No hay empleados activos para asignar este documento.');
+        return;
+      }
+      setEmpleadoDestinoUpload((prev) => prev || empleados[0]?.id || '');
+    } else {
+      setEmpleadoDestinoUpload('');
+    }
+    setModalUploadOpen(true);
+  }, [carpeta.esGlobal, empleados]);
 
   const parsearAsignadoA = useCallback(() => {
     if (!carpeta.asignadoA) {
@@ -249,59 +257,6 @@ export function CarpetaDetailClient({ carpeta, empleados = [] }: CarpetaDetailCl
     }
   };
 
-  const handleUpload: UploadHandler = useCallback(
-    ({ file, signal, onProgress }) =>
-      new Promise((resolve) => {
-        const formData = new FormData();
-        formData.append('file', file);
-        formData.append('carpetaId', carpeta.id);
-
-        const xhr = new XMLHttpRequest();
-        xhr.open('POST', '/api/documentos');
-
-        xhr.upload.onprogress = (event) => {
-          if (event.lengthComputable) {
-            onProgress?.(event.loaded, event.total);
-          }
-        };
-
-        xhr.onload = () => {
-          if (xhr.status >= 200 && xhr.status < 300) {
-            toast.success('Documento subido correctamente');
-            router.refresh();
-            resolve({ success: true });
-          } else {
-            let errorMessage = 'Error al subir archivo';
-            const response = parseJsonString<{ error?: string }>(xhr.responseText, {});
-            if (response.error) {
-              errorMessage = response.error;
-            }
-            resolve({ success: false, error: errorMessage });
-          }
-        };
-
-        xhr.onerror = () => {
-          resolve({ success: false, error: 'Error de red durante la subida' });
-        };
-
-        xhr.onabort = () => {
-          resolve({ success: false, error: 'Subida cancelada' });
-        };
-
-        if (signal.aborted) {
-          xhr.abort();
-        } else {
-          signal.addEventListener('abort', () => xhr.abort());
-        }
-
-        xhr.send(formData);
-      }),
-    [carpeta.id, router]
-  );
-
-  const scrollToUploader = useCallback(() => {
-    uploadSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }, []);
 
   const handleDescargar = async (documentoId: string, nombre: string) => {
     try {
@@ -337,8 +292,8 @@ export function CarpetaDetailClient({ carpeta, empleados = [] }: CarpetaDetailCl
       toast.error('Solo los documentos PDF pueden enviarse a firma.');
       return;
     }
-    setDocumentoParaFirma(documento);
-    setModalSolicitarFirma(true);
+    // Navegar a la página de solicitar firma (fuera del dashboard)
+    router.push(`/firma/solicitar/${documento.id}`);
   };
 
   const handleEliminar = async () => {
@@ -459,7 +414,7 @@ export function CarpetaDetailClient({ carpeta, empleados = [] }: CarpetaDetailCl
                   Editar Asignación
                 </Button>
               )}
-              <Button onClick={scrollToUploader}>
+              <Button onClick={handleUploadButtonClick}>
                 <Upload className="w-4 h-4 mr-2" />
                 Subir Documentos
               </Button>
@@ -467,14 +422,6 @@ export function CarpetaDetailClient({ carpeta, empleados = [] }: CarpetaDetailCl
           </div>
         </div>
 
-        <div ref={uploadSectionRef} className="mb-6">
-          <FileUploadAdvanced
-            onUpload={handleUpload}
-            allowMultiple
-            maxSizeMB={maxUploadMB}
-            className="bg-white/80 p-4 rounded-2xl border border-gray-100"
-          />
-        </div>
 
         {/* Filtros (solo para carpetas globales) */}
         {carpeta.esGlobal && empleados.length > 0 && (
@@ -530,7 +477,7 @@ export function CarpetaDetailClient({ carpeta, empleados = [] }: CarpetaDetailCl
                 title="No hay documentos en esta carpeta"
                 description="Haz clic en 'Subir Documentos' para añadir archivos"
                 action={
-                  <Button onClick={scrollToUploader}>
+                  <Button onClick={handleUploadButtonClick}>
                     <Upload className="w-4 h-4 mr-2" />
                     Subir Documento
                   </Button>
@@ -749,6 +696,72 @@ export function CarpetaDetailClient({ carpeta, empleados = [] }: CarpetaDetailCl
         </DialogContent>
       </Dialog>
 
+      {/* Modal subir documentos */}
+      <Dialog
+        open={modalUploadOpen}
+        onOpenChange={(open) => {
+          setModalUploadOpen(open);
+          if (!open) {
+            setEmpleadoDestinoUpload('');
+          }
+        }}
+      >
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Subir documentos</DialogTitle>
+            <DialogDescription>
+              Selecciona los archivos que quieres añadir a la carpeta <strong>{carpeta.nombre}</strong>.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            {carpeta.esGlobal ? (
+              <div className="space-y-2">
+                <Label>Asignar a empleado</Label>
+                <Select
+                  value={empleadoDestinoUpload || undefined}
+                  onValueChange={setEmpleadoDestinoUpload}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecciona un empleado" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {empleados.map((empleado) => (
+                      <SelectItem key={empleado.id} value={empleado.id}>
+                        {empleado.nombre} {empleado.apellidos}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-gray-500">
+                  Esta carpeta es maestra. Cada documento debe asignarse a la subcarpeta del empleado correspondiente.
+                </p>
+              </div>
+            ) : (
+              <p className="text-xs text-gray-500">
+                Los documentos se guardarán en la carpeta individual asignada a{' '}
+                {carpeta.empleado ? `${carpeta.empleado.nombre} ${carpeta.empleado.apellidos}` : 'esta carpeta'}.
+              </p>
+            )}
+
+            <DocumentUploadArea
+              carpetaId={carpeta.id}
+              variant="dropzone"
+              description="PDF, JPG o PNG | Máx. 10MB"
+              onUploaded={() => {
+                setModalUploadOpen(false);
+                setEmpleadoDestinoUpload('');
+                router.refresh();
+              }}
+              disabled={carpeta.esGlobal && !empleadoDestinoUpload}
+              getExtraFormData={() =>
+                carpeta.esGlobal && empleadoDestinoUpload ? { empleadoId: empleadoDestinoUpload } : undefined
+              }
+            />
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Modal Eliminar Documento */}
       <Dialog open={modalEliminar} onOpenChange={setModalEliminar}>
         <DialogContent>
@@ -781,23 +794,6 @@ export function CarpetaDetailClient({ carpeta, empleados = [] }: CarpetaDetailCl
         </DialogContent>
       </Dialog>
 
-      {documentoParaFirma && (
-        <SolicitarFirmaDialog
-          open={modalSolicitarFirma}
-          onOpenChange={(open) => {
-            setModalSolicitarFirma(open);
-            if (!open) {
-              setDocumentoParaFirma(null);
-            }
-          }}
-          documentoId={documentoParaFirma.id}
-          documentoNombre={documentoParaFirma.nombre}
-          onSuccess={() => {
-            setDocumentoParaFirma(null);
-            router.refresh();
-          }}
-        />
-      )}
 
       {/* Document Viewer Modal */}
       {documentViewer.documentId && (

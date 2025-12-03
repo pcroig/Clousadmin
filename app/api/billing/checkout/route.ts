@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Obtener datos de la empresa
-    const empresa = await prisma.empresa.findUnique({
+    const empresa = await prisma.empresas.findUnique({
       where: { id: user.empresaId },
       select: { id: true, nombre: true, email: true },
     });

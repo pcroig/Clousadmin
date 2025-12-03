@@ -19,7 +19,7 @@ export async function resolveAprobadorEmpleadoId(
     return session.user.empleadoId;
   }
 
-  const empleado = await prismaClient.empleado.findFirst({
+  const empleado = await prismaClient.empleados.findFirst({
     where: { usuarioId: session.user.id },
     select: { id: true },
   });

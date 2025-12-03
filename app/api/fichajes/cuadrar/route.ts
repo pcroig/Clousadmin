@@ -3,7 +3,7 @@
 // ========================================
 // POST: Cuadrar fichajes pendientes creando eventos según jornada
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { z } from 'zod';
 
 import {
@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
 
     // 1. Cargar todos los fichajes solicitados con sus relaciones
     if (descartarIds.length > 0) {
-      const fichajesDescartar = await prisma.fichaje.findMany({
+      const fichajesDescartar = await prisma.fichajes.findMany({
         where: {
           id: { in: descartarIds },
           empresaId: session.user.empresaId,
@@ -72,7 +72,7 @@ export async function POST(request: NextRequest) {
           continue;
         }
 
-        await prisma.fichaje.update({
+        await prisma.fichajes.update({
           where: { id: fichaje.id },
           data: {
             estado: 'finalizado',
@@ -98,7 +98,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const fichajes = await prisma.fichaje.findMany({
+    const fichajes = await prisma.fichajes.findMany({
       where: {
         id: { in: fichajeIds },
         empresaId: session.user.empresaId, // Seguridad: solo de mi empresa
@@ -138,7 +138,7 @@ export async function POST(request: NextRequest) {
 
     // 3. Cargar ausencias de medio día relevantes en el rango
     // Solo nos importan las ausencias CONFIRMADAS o COMPLETADAS y de MEDIO DIA
-    const ausenciasMedioDia = await prisma.ausencia.findMany({
+    const ausenciasMedioDia = await prisma.ausencias.findMany({
       where: {
         empresaId: session.user.empresaId,
         empleadoId: { in: empleadoIds },
@@ -179,7 +179,7 @@ export async function POST(request: NextRequest) {
           // Re-fetch dentro de la transacción para lock/concurrencia (optimista)
           // O confiar en la carga previa si el riesgo es bajo. 
           // Para seguridad máxima en "cuadrar", verificamos estado una vez más.
-          const fichajeActual = await tx.fichaje.findUnique({
+          const fichajeActual = await tx.fichajes.findUnique({
              where: { id: fichajeId },
              select: { estado: true } 
           });
@@ -249,6 +249,18 @@ export async function POST(request: NextRequest) {
           const tiposEventos = fichaje.eventos.map((e) => e.tipo);
           let eventosFaltantes = eventosRequeridos.filter((req) => !tiposEventos.includes(req));
 
+          // PUNTO 4: Logging de auditoría para fichajes parciales
+          // Garantizamos que los eventos originales se mantienen y solo se añaden los faltantes
+          if (fichaje.eventos.length > 0 && eventosFaltantes.length > 0) {
+            const eventosMantenidos = fichaje.eventos.map(e => e.tipo).join(', ');
+            const eventosFaltantesStr = eventosFaltantes.join(', ');
+            console.log(`[API Cuadrar] Fichaje parcial ${fichajeId}:`);
+            console.log(`  - Eventos mantenidos (${fichaje.eventos.length}): ${eventosMantenidos}`);
+            console.log(`  - Eventos a añadir (${eventosFaltantes.length}): ${eventosFaltantesStr}`);
+          } else if (fichaje.eventos.length === 0) {
+            console.log(`[API Cuadrar] Fichaje vacío ${fichajeId}: Creando ${eventosRequeridos.length} eventos según jornada`);
+          }
+
           const minutosDescansoConfig = (() => {
             if (configDia?.pausa_inicio && configDia?.pausa_fin) {
               const [inicioH, inicioM] = configDia.pausa_inicio.split(':').map(Number);
@@ -282,7 +294,7 @@ export async function POST(request: NextRequest) {
 
               if (!existeFinPosterior) {
                 const horaFin = new Date(new Date(ultimaPausaInicio.hora).getTime() + minutosDescansoConfig * 60 * 1000);
-                await tx.fichajeEvento.create({
+                await tx.fichaje_eventos.create({
                   data: {
                     fichajeId,
                     tipo: 'pausa_fin',
@@ -297,7 +309,7 @@ export async function POST(request: NextRequest) {
 
           // Si no faltan eventos, solo cerrar
           if (eventosFaltantes.length === 0) {
-            await tx.fichaje.update({
+            await tx.fichajes.update({
               where: { id: fichajeId },
               data: {
                 estado: 'finalizado',
@@ -310,40 +322,51 @@ export async function POST(request: NextRequest) {
             continue;
           }
 
-          // Crear eventos faltantes
-          const fechaBase = new Date(fichaje.fecha);
-          fechaBase.setHours(0, 0, 0, 0);
+          // Crear eventos faltantes MANTENIENDO los eventos originales
+          // La fecha debe pertenecer al día del fichaje (normalizar para evitar problemas de zona horaria)
+          const fechaBase = new Date(
+            fichaje.fecha.getFullYear(), 
+            fichaje.fecha.getMonth(), 
+            fichaje.fecha.getDate(),
+            0, 0, 0, 0
+          );
 
-          // Lógica de creación de eventos (reutilizada pero adaptada a variables locales)
+          // Lógica de creación de eventos (solo los faltantes)
           if (config.tipo === 'fija' || (configDia?.entrada && configDia.salida)) {
             if (!configDia) continue; // Safety check
 
-            // Entrada
-            if (eventosFaltantes.includes('entrada')) {
+            // Entrada - solo si falta y no hay ausencia de mañana
+            if (eventosFaltantes.includes('entrada') && !tiposEventos.includes('entrada')) {
                const [horas, minutos] = (configDia.entrada || '09:00').split(':').map(Number);
-               const hora = new Date(fechaBase); hora.setHours(horas, minutos, 0, 0);
-               await tx.fichajeEvento.create({ data: { fichajeId, tipo: 'entrada', hora } });
+               const hora = new Date(fechaBase); 
+               hora.setHours(horas, minutos, 0, 0);
+               await tx.fichaje_eventos.create({ data: { fichajeId, tipo: 'entrada', hora } });
             }
-            // Pausas
-            if (eventosFaltantes.includes('pausa_inicio') && configDia.pausa_inicio) {
+            
+            // Pausas - solo si faltan y no hay ausencia de medio día
+            if (eventosFaltantes.includes('pausa_inicio') && configDia.pausa_inicio && !tiposEventos.includes('pausa_inicio')) {
                const [h, m] = configDia.pausa_inicio.split(':').map(Number);
-               const hora = new Date(fechaBase); hora.setHours(h, m, 0, 0);
-               await tx.fichajeEvento.create({ data: { fichajeId, tipo: 'pausa_inicio', hora } });
+               const hora = new Date(fechaBase); 
+               hora.setHours(h, m, 0, 0);
+               await tx.fichaje_eventos.create({ data: { fichajeId, tipo: 'pausa_inicio', hora } });
             }
-            if (eventosFaltantes.includes('pausa_fin') && configDia.pausa_fin) {
+            if (eventosFaltantes.includes('pausa_fin') && configDia.pausa_fin && !tiposEventos.includes('pausa_fin')) {
                const [h, m] = configDia.pausa_fin.split(':').map(Number);
-               const hora = new Date(fechaBase); hora.setHours(h, m, 0, 0);
-               await tx.fichajeEvento.create({ data: { fichajeId, tipo: 'pausa_fin', hora } });
+               const hora = new Date(fechaBase); 
+               hora.setHours(h, m, 0, 0);
+               await tx.fichaje_eventos.create({ data: { fichajeId, tipo: 'pausa_fin', hora } });
             }
-            // Salida
-            if (eventosFaltantes.includes('salida')) {
+            
+            // Salida - solo si falta y no hay ausencia de tarde
+            if (eventosFaltantes.includes('salida') && !tiposEventos.includes('salida')) {
                const [h, m] = (configDia.salida || '18:00').split(':').map(Number);
-               const hora = new Date(fechaBase); hora.setHours(h, m, 0, 0);
-               await tx.fichajeEvento.create({ data: { fichajeId, tipo: 'salida', hora } });
+               const hora = new Date(fechaBase); 
+               hora.setHours(h, m, 0, 0);
+               await tx.fichaje_eventos.create({ data: { fichajeId, tipo: 'salida', hora } });
             }
           } 
           else if (config.tipo === 'flexible') {
-            // Lógica flexible (calculada)
+            // Lógica flexible (calculada) - MANTENER eventos originales
             // Calcular horas por día promedio
              const diasActivos = Object.entries(config).reduce((count, [k, v]) => {
               if (['tipo', 'descansoMinimo', 'limiteInferior', 'limiteSuperior'].includes(k)) return count;
@@ -353,18 +376,20 @@ export async function POST(request: NextRequest) {
             const diasLab = diasActivos > 0 ? diasActivos : 5;
             const horasPorDia = Number(jornada.horasSemanales) / diasLab;
 
-            // Entrada
+            // Entrada - usar la existente o crear una nueva
             let horaEntrada = new Date(fechaBase);
             const eventoEntrada = fichaje.eventos.find(e => e.tipo === 'entrada');
             
             if (eventoEntrada) {
+              // Usar la entrada registrada
               horaEntrada = new Date(eventoEntrada.hora);
-            } else if (eventosFaltantes.includes('entrada')) {
+            } else if (eventosFaltantes.includes('entrada') && !tiposEventos.includes('entrada')) {
+              // Solo crear si no existe
               horaEntrada.setHours(9, 0, 0, 0); // Default 9:00
-              await tx.fichajeEvento.create({ data: { fichajeId, tipo: 'entrada', hora: horaEntrada } });
+              await tx.fichaje_eventos.create({ data: { fichajeId, tipo: 'entrada', hora: horaEntrada } });
             }
 
-            // Pausas (si descansoMinimo)
+            // Pausas (si descansoMinimo) - solo si no existen
             if (config.descansoMinimo && eventosFaltantes.includes('pausa_inicio')) {
                const [hDesc, mDesc] = config.descansoMinimo.split(':').map(Number);
                const descansoMs = (hDesc * 60 + mDesc) * 60 * 1000;
@@ -374,14 +399,14 @@ export async function POST(request: NextRequest) {
                const horaPausaFin = new Date(horaPausaInicio.getTime() + descansoMs);
 
                if (!tiposEventos.includes('pausa_inicio'))
-                 await tx.fichajeEvento.create({ data: { fichajeId, tipo: 'pausa_inicio', hora: horaPausaInicio } });
+                 await tx.fichaje_eventos.create({ data: { fichajeId, tipo: 'pausa_inicio', hora: horaPausaInicio } });
                
-               if (!tiposEventos.includes('pausa_fin') && eventosFaltantes.includes('pausa_fin')) // Check doble por si acaso
-                 await tx.fichajeEvento.create({ data: { fichajeId, tipo: 'pausa_fin', hora: horaPausaFin } });
+               if (!tiposEventos.includes('pausa_fin') && eventosFaltantes.includes('pausa_fin'))
+                 await tx.fichaje_eventos.create({ data: { fichajeId, tipo: 'pausa_fin', hora: horaPausaFin } });
             }
 
-            // Salida
-            if (eventosFaltantes.includes('salida')) {
+            // Salida - solo si no existe
+            if (eventosFaltantes.includes('salida') && !tiposEventos.includes('salida')) {
                let durationMs = horasPorDia * 60 * 60 * 1000;
                // Si hay descanso minimo, sumarlo a la duración de la estancia
                if (config.descansoMinimo) {
@@ -389,7 +414,7 @@ export async function POST(request: NextRequest) {
                   durationMs += (h * 60 + m) * 60 * 1000;
                }
                const horaSalida = new Date(horaEntrada.getTime() + durationMs);
-               await tx.fichajeEvento.create({ data: { fichajeId, tipo: 'salida', hora: horaSalida } });
+               await tx.fichaje_eventos.create({ data: { fichajeId, tipo: 'salida', hora: horaSalida } });
             }
           }
 
@@ -399,7 +424,7 @@ export async function POST(request: NextRequest) {
           // Dado que 'actualizarCalculosFichaje' es una función de librería que hace queries, es mejor llamarla FUERA de la tx si es posible, o refactorizarla.
           // Sin embargo, para mantener integridad, deberíamos actualizar el estado DENTRO de la tx.
           
-          await tx.fichaje.update({
+          await tx.fichajes.update({
             where: { id: fichajeId },
             data: {
               estado: 'finalizado',

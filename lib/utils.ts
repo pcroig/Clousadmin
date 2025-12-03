@@ -132,7 +132,7 @@ const mapContratos = (input: unknown): MiEspacioContratoResumen[] | undefined =>
       tipoContrato: typeof contrato.tipoContrato === 'string' ? contrato.tipoContrato : null,
       fechaInicio: toISODateString(contrato.fechaInicio) ?? '',
       fechaFin: toISODateString(contrato.fechaFin),
-      salarioBrutoAnual: decimalToNumber(contrato.salarioBrutoAnual as DecimalLike),
+      salarioBaseAnual: decimalToNumber(contrato.salarioBaseAnual as DecimalLike),
       documentoId: typeof contrato.documentoId === 'string' ? contrato.documentoId : undefined,
     }));
 };
@@ -218,8 +218,16 @@ const mapSaldosAusencias = (input: unknown): MiEspacioSaldoAusencia[] | undefine
     .filter(isRecord)
     .map<MiEspacioSaldoAusencia>((saldo) => ({
       id: typeof saldo.id === 'string' ? saldo.id : '',
-      año: typeof saldo.año === 'number' ? saldo.año : Number(saldo.año) || new Date().getFullYear(),
-      diasTotales: typeof saldo.diasTotales === 'number' ? saldo.diasTotales : Number(saldo.diasTotales) || 0,
+      anio:
+        typeof (saldo as { anio?: unknown }).anio === 'number'
+          ? (saldo as { anio?: number }).anio!
+          : typeof (saldo as { anio?: unknown }).anio === 'string'
+            ? Number((saldo as { anio?: string }).anio) || new Date().getFullYear()
+            : typeof (saldo as { año?: unknown }).año === 'number'
+              ? (saldo as { año?: number }).año!
+              : Number((saldo as { año?: string }).año) || new Date().getFullYear(),
+      diasTotales:
+        typeof saldo.diasTotales === 'number' ? saldo.diasTotales : Number(saldo.diasTotales) || 0,
       diasUsados: decimalToNumber(saldo.diasUsados as DecimalLike) ?? 0,
       diasPendientes: decimalToNumber(saldo.diasPendientes as DecimalLike) ?? 0,
       origen: typeof saldo.origen === 'string' ? saldo.origen : undefined,
@@ -278,7 +286,7 @@ export function serializeEmpleado<T extends Record<string, unknown>>(empleado: T
     numeroHijos: normalizeNumeroHijos(empleado.numeroHijos),
     genero: typeof empleado.genero === 'string' ? empleado.genero : null,
     iban: typeof empleado.iban === 'string' ? empleado.iban : null,
-    titularCuenta: typeof empleado.titularCuenta === 'string' ? empleado.titularCuenta : null,
+    bic: typeof empleado.bic === 'string' ? empleado.bic : null,
     puesto: typeof empleado.puesto === 'string' ? empleado.puesto : null,
     puestoId: typeof empleado.puestoId === 'string' ? empleado.puestoId : null,
     tipoContrato: typeof empleado.tipoContrato === 'string' ? empleado.tipoContrato : null,
@@ -286,8 +294,8 @@ export function serializeEmpleado<T extends Record<string, unknown>>(empleado: T
       typeof empleado.categoriaProfesional === 'string' ? empleado.categoriaProfesional : null,
     grupoCotizacion: normalizeGrupoCotizacion(empleado.grupoCotizacion),
     estadoEmpleado: typeof empleado.estadoEmpleado === 'string' ? empleado.estadoEmpleado : null,
-    salarioBrutoAnual: decimalToNumber(empleado.salarioBrutoAnual as DecimalLike),
-    salarioBrutoMensual: decimalToNumber(empleado.salarioBrutoMensual as DecimalLike),
+    salarioBaseAnual: decimalToNumber(empleado.salarioBaseAnual as DecimalLike),
+    salarioBaseMensual: decimalToNumber(empleado.salarioBaseMensual as DecimalLike),
     numPagas: normalizeNumPagas(empleado.numPagas),
     jornadaId: typeof empleado.jornadaId === 'string' ? empleado.jornadaId : null,
     jornada: mapJornada(empleado.jornada),

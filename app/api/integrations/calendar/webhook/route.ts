@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Buscar integración por channelId
-    const integracion = await prisma.integracion.findFirst({
+    const integracion = await prisma.integraciones.findFirst({
       where: {
         tipo: "calendario",
         proveedor: "google_calendar",
@@ -95,7 +95,7 @@ export async function POST(req: NextRequest) {
  */
 async function processCalendarChanges(integracionId: string) {
   try {
-    const integracion = await prisma.integracion.findUnique({
+    const integracion = await prisma.integraciones.findUnique({
       where: { id: integracionId },
     });
 
@@ -147,7 +147,7 @@ async function processCalendarChanges(integracionId: string) {
           // Evento fue eliminado en Google Calendar
           console.log(`Event ${eventId} was deleted, canceling ausencia ${ausenciaId}`);
 
-          await prisma.ausencia.update({
+          await prisma.ausencias.update({
             where: { id: ausenciaId },
             data: {
               estado: EstadoAusencia.rechazada,
@@ -157,7 +157,7 @@ async function processCalendarChanges(integracionId: string) {
           // Eliminar del mapa
           const { [ausenciaId]: removed, ...restMap } = ausenciaEventMap;
           void removed;
-          await prisma.integracion.update({
+          await prisma.integraciones.update({
             where: { id: integracionId },
             data: {
               config: asJsonValue({
@@ -182,7 +182,7 @@ async function processCalendarChanges(integracionId: string) {
  * Obtener primer usuario admin de la empresa (fallback)
  */
 async function getFirstAdminUsuarioId(empresaId: string): Promise<string | null> {
-  const admin = await prisma.usuario.findFirst({
+  const admin = await prisma.usuarios.findFirst({
     where: {
       empresaId,
       rol: UsuarioRol.hr_admin,

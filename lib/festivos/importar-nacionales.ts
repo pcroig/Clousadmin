@@ -88,7 +88,7 @@ export async function importarFestivosNacionales(
     for (const festivo of festivosAño) {
       try {
         // Usar upsert para evitar duplicados
-        const result = await prisma.festivo.upsert({
+        const result = await prisma.festivos.upsert({
           where: {
             empresaId_fecha: {
               empresaId,
@@ -131,7 +131,7 @@ export async function importarFestivosNacionales(
  * Verifica si una empresa tiene festivos importados
  */
 export async function tieneFestivosImportados(empresaId: string): Promise<boolean> {
-  const count = await prisma.festivo.count({
+  const count = await prisma.festivos.count({
     where: {
       empresaId,
       tipo: 'nacional',

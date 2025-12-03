@@ -5,6 +5,12 @@
  * Returns the document as an inline PDF stream for in-app viewing.
  * - PDFs and images are served directly.
  * - DOCX files are converted to PDF on-the-fly (with caching).
+ * 
+ * @version 1.5.0 (2025-11-28)
+ * - Uses centralized `getPreviewHeaders()` for optimized HTTP headers
+ * - CSP configured specifically for PDF viewer compatibility
+ * - X-Frame-Options: SAMEORIGIN explicitly set
+ * - Supports cache with stale-while-revalidate for better performance
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -12,6 +18,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { logAccesoSensibles } from '@/lib/auditoria';
 import { getSession } from '@/lib/auth';
 import { getDocumentPreview, supportsPreview } from '@/lib/documentos/preview';
+import { getPreviewHeaders } from '@/lib/documentos/preview-headers';
 import { prisma } from '@/lib/prisma';
 
 export async function GET(
@@ -30,7 +37,7 @@ export async function GET(
     const { id } = params;
 
     // Quick check if document exists and supports preview
-    const documento = await prisma.documento.findUnique({
+    const documento = await prisma.documentos.findUnique({
       where: { id },
       select: {
         id: true,
@@ -69,31 +76,25 @@ export async function GET(
       options: { forceRegenerate },
     });
 
-    // Log access for audit
+    // Log access for audit (preview counts as 'lectura')
     await logAccesoSensibles({
       request,
       session,
       recurso: 'documento',
-      accion: 'preview',
+      accion: 'lectura',
       empleadoAccedidoId: documento.empleadoId ?? undefined,
       camposAccedidos: [documento.tipoDocumento ?? 'documento'],
     });
 
-    // Return the preview with appropriate headers
-    return new NextResponse(preview.buffer, {
-      headers: {
-        'Content-Type': preview.mimeType,
-        'Content-Disposition': `inline; filename="${encodeURIComponent(preview.fileName)}"`,
-        'Content-Length': preview.buffer.length.toString(),
-        // Security headers to prevent XSS in the viewer
-        'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'",
-        'X-Content-Type-Options': 'nosniff',
-        // Cache control - cache for 1 hour if converted, otherwise 5 minutes
-        'Cache-Control': preview.wasConverted
-          ? 'private, max-age=3600'
-          : 'private, max-age=300',
-      },
+    // Return the preview with optimized headers for native browser viewers
+    const headers = getPreviewHeaders({
+      mimeType: preview.mimeType,
+      fileName: preview.fileName,
+      wasConverted: preview.wasConverted,
+      contentLength: preview.buffer.length,
     });
+
+    return new NextResponse(preview.buffer as BodyInit, { headers });
   } catch (error) {
     console.error('[API Preview] Error:', error);
 

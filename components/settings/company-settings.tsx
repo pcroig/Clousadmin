@@ -4,7 +4,7 @@
 
 'use client';
 
-import { Building2, Mail, Phone, ShieldAlert, Users } from 'lucide-react';
+import { Building2, Mail, MapPin, Phone, ShieldAlert, Users } from 'lucide-react';
 import { useMemo } from 'react';
 
 import { InvitarHRAdmins } from '@/components/onboarding/invitar-hr-admins';
@@ -21,6 +21,13 @@ interface HRAdmin {
   ultimoAcceso: Date | string | null;
 }
 
+interface Sede {
+  id: string;
+  nombre: string;
+  ciudad: string;
+  activo: boolean;
+}
+
 interface CompanySettingsProps {
   empresa: {
     nombre: string;
@@ -30,6 +37,7 @@ interface CompanySettingsProps {
     createdAt?: Date | string;
   };
   hrAdmins: HRAdmin[];
+  sedes: Sede[];
 }
 
 const formatDate = (value?: Date | string | null) => {
@@ -45,7 +53,7 @@ const formatDate = (value?: Date | string | null) => {
   }
 };
 
-export function CompanySettings({ empresa, hrAdmins }: CompanySettingsProps) {
+export function CompanySettings({ empresa, hrAdmins, sedes }: CompanySettingsProps) {
   const adminsOrdenados = useMemo(() => {
     return hrAdmins.sort((a, b) => {
       if (a.activo === b.activo) {
@@ -54,6 +62,10 @@ export function CompanySettings({ empresa, hrAdmins }: CompanySettingsProps) {
       return a.activo ? -1 : 1;
     });
   }, [hrAdmins]);
+
+  const sedesOrdenadas = useMemo(() => {
+    return sedes.sort((a, b) => a.nombre.localeCompare(b.nombre));
+  }, [sedes]);
 
   return (
     <div className="space-y-8">
@@ -117,6 +129,42 @@ export function CompanySettings({ empresa, hrAdmins }: CompanySettingsProps) {
               </Button>
             </div>
           </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="flex items-start gap-3">
+          <div className="rounded-md bg-[#E8F5E9] p-2">
+            <MapPin className="h-5 w-5 text-[#4CAF50]" />
+          </div>
+          <div>
+            <CardTitle>Sedes</CardTitle>
+            <CardDescription>Ubicaciones físicas de tu empresa.</CardDescription>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {sedesOrdenadas.length === 0 ? (
+            <div className="rounded-lg border border-dashed p-6 text-center text-sm text-gray-500">
+              No hay sedes registradas. Contacta con soporte para añadir sedes.
+            </div>
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-2">
+              {sedesOrdenadas.map((sede) => (
+                <div
+                  key={sede.id}
+                  className="flex items-center gap-3 rounded-lg border border-gray-200 bg-white/70 px-4 py-3"
+                >
+                  <MapPin className="h-5 w-5 text-gray-400 flex-shrink-0" />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold text-gray-900 truncate">
+                      {sede.nombre}
+                    </p>
+                    <p className="text-xs text-gray-500">{sede.ciudad}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
 

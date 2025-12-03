@@ -61,13 +61,13 @@ export interface DatosEmpleado {
   numeroHijos?: number;
   genero?: string;
   iban?: string;
-  titularCuenta?: string;
+  bic?: string;
   puesto?: string;
   fechaAlta: Date;
   fechaBaja?: Date;
   tipoContrato?: string;
-  salarioBrutoAnual?: number;
-  salarioBrutoMensual?: number;
+  salarioBaseAnual?: number;
+  salarioBaseMensual?: number;
   diasVacaciones?: number;
   empresa: {
     id: string;
@@ -96,7 +96,7 @@ export interface DatosEmpleado {
     tipoContrato: string;
     fechaInicio: Date;
     fechaFin?: Date;
-    salarioBrutoAnual: number;
+    salarioBaseAnual: number;
   }>;
   ausencias?: Array<{
     id: string;

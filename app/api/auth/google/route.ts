@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const usuario = await prisma.usuario.findUnique({
+    const usuario = await prisma.usuarios.findUnique({
       where: { email },
       include: {
         empleado: {
@@ -84,7 +84,7 @@ export async function POST(req: NextRequest) {
 
     if (!usuario.googleId || usuario.googleId !== googleSub) {
       try {
-        await prisma.usuario.update({
+        await prisma.usuarios.update({
           where: { id: usuario.id },
           data: { googleId: googleSub },
         });
@@ -96,13 +96,13 @@ export async function POST(req: NextRequest) {
     let empleadoId = usuario.empleadoId ?? usuario.empleado?.id ?? null;
     if (!empleadoId) {
       try {
-        const empleadoRelacionado = await prisma.empleado.findUnique({
+        const empleadoRelacionado = await prisma.empleados.findUnique({
           where: { usuarioId: usuario.id },
           select: { id: true },
         });
 
         if (empleadoRelacionado?.id) {
-          await prisma.usuario.update({
+          await prisma.usuarios.update({
             where: { id: usuario.id },
             data: { empleadoId: empleadoRelacionado.id },
           });
@@ -116,7 +116,7 @@ export async function POST(req: NextRequest) {
     const avatarUrl = usuario.empleado?.fotoUrl ?? usuario.avatar ?? null;
 
     try {
-      await prisma.sesionActiva.deleteMany({
+      await prisma.sesiones_activas.deleteMany({
         where: { usuarioId: usuario.id },
       });
     } catch (sessionError) {

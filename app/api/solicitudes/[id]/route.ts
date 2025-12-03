@@ -49,7 +49,7 @@ export async function PATCH(
     const { accion, motivoRechazo } = validatedData;
 
     // Verificar que la solicitud existe y es de la misma empresa
-    const solicitud = await prisma.solicitudCambio.findFirst({
+    const solicitud = await prisma.solicitudes_cambio.findFirst({
       where: {
         id,
         empresaId: session.user.empresaId,
@@ -94,7 +94,7 @@ export async function PATCH(
     const result = await prisma.$transaction(async (tx) => {
       if (accion === 'aprobar') {
         // Aprobar solicitud
-        const solicitudActualizada = await tx.solicitudCambio.update({
+        const solicitudActualizada = await tx.solicitudes_cambio.update({
           where: { id },
           data: {
             estado: EstadoSolicitud.aprobada_manual,
@@ -128,7 +128,7 @@ export async function PATCH(
         };
       } else {
         // Rechazar solicitud
-        const solicitudActualizada = await tx.solicitudCambio.update({
+        const solicitudActualizada = await tx.solicitudes_cambio.update({
           where: { id },
           data: {
             estado: EstadoSolicitud.rechazada,
@@ -156,21 +156,29 @@ export async function PATCH(
 
     // Crear notificación fuera de la transacción
     if (accion === 'aprobar') {
-      await crearNotificacionSolicitudAprobada(prisma, {
-        solicitudId: solicitud.id,
-        empresaId: session.user.empresaId,
-        empleadoId: solicitud.empleadoId,
-        tipo: solicitud.tipo,
-        aprobadoPor: 'manual',
-      });
+      await crearNotificacionSolicitudAprobada(
+        prisma,
+        {
+          solicitudId: solicitud.id,
+          empresaId: session.user.empresaId,
+          empleadoId: solicitud.empleadoId,
+          tipo: solicitud.tipo,
+          aprobadoPor: 'manual',
+        },
+        { actorUsuarioId: session.user.id }
+      );
     } else {
-      await crearNotificacionSolicitudRechazada(prisma, {
-        solicitudId: solicitud.id,
-        empresaId: session.user.empresaId,
-        empleadoId: solicitud.empleadoId,
-        tipo: solicitud.tipo,
-        motivoRechazo,
-      });
+      await crearNotificacionSolicitudRechazada(
+        prisma,
+        {
+          solicitudId: solicitud.id,
+          empresaId: session.user.empresaId,
+          empleadoId: solicitud.empleadoId,
+          tipo: solicitud.tipo,
+          motivoRechazo,
+        },
+        { actorUsuarioId: session.user.id }
+      );
     }
 
     return successResponse(result);

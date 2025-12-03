@@ -40,7 +40,7 @@ export async function GET(request: NextRequest) {
     fechaDesde.setHours(0, 0, 0, 0);
 
     // Obtener fichajes del período
-    const fichajes = await prisma.fichaje.findMany({
+    const fichajes = await prisma.fichajes.findMany({
       where: {
         empleadoId,
         fecha: {

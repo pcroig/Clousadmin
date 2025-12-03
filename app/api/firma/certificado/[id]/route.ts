@@ -37,12 +37,12 @@ export async function GET(
     const validar = searchParams.get('validar') === 'true';
 
     // Obtener firma con toda la información necesaria
-    const firma = await prisma.firma.findUnique({
+    const firma = await prisma.firmas.findUnique({
       where: { id: firmaId },
       include: {
-        solicitudFirma: {
+        solicitudes_firma: {
           include: {
-            documento: {
+            documentos: {
               select: {
                 id: true,
                 nombre: true,
@@ -69,7 +69,7 @@ export async function GET(
     }
 
     // Validar que la firma pertenece a la empresa del usuario
-    if (firma.solicitudFirma.documento.empresaId !== session.user.empresaId) {
+    if (firma.solicitudes_firma.documentos.empresaId !== session.user.empresaId) {
       return NextResponse.json(
         { error: 'No tienes permisos para ver este certificado' },
         { status: 403 }
@@ -110,9 +110,9 @@ export async function GET(
       empleadoId: firma.empleadoId,
       empleadoNombre: `${firma.empleado.nombre} ${firma.empleado.apellidos}`,
       empleadoEmail: firma.empleado.email,
-      documentoId: firma.solicitudFirma.documentoId,
-      documentoNombre: firma.solicitudFirma.nombreDocumento,
-      documentoHash: firma.solicitudFirma.hashDocumento,
+      documentoId: firma.solicitudes_firma.documentoId,
+      documentoNombre: firma.solicitudes_firma.nombreDocumento,
+      documentoHash: firma.solicitudes_firma.hashDocumento,
       firmadoEn: firma.firmadoEn.toISOString(),
       ipAddress: firma.ipAddress || 'unknown',
       userAgent,
@@ -127,7 +127,7 @@ export async function GET(
     if (validar) {
       // Validar integridad del documento (requiere descargar el archivo)
       try {
-        const documentoBuffer = await downloadFromS3(firma.solicitudFirma.documento.s3Key);
+        const documentoBuffer = await downloadFromS3(firma.solicitudes_firma.documentos.s3Key);
         validacionDocumento = validarFirmaCompleta(certificado, documentoBuffer);
       } catch (error) {
         console.error('[GET /api/firma/certificado/:id] Error validando documento:', error);
@@ -151,12 +151,12 @@ export async function GET(
         datosCapturados: firma.datosCapturados,
       },
       solicitudFirma: {
-        id: firma.solicitudFirma.id,
-        titulo: firma.solicitudFirma.titulo,
-        estado: firma.solicitudFirma.estado,
+        id: firma.solicitudes_firma.id,
+        titulo: firma.solicitudes_firma.titulo,
+        estado: firma.solicitudes_firma.estado,
         documento: {
-          id: firma.solicitudFirma.documento.id,
-          nombre: firma.solicitudFirma.documento.nombre,
+          id: firma.solicitudes_firma.documentos.id,
+          nombre: firma.solicitudes_firma.documentos.nombre,
         },
       },
     });

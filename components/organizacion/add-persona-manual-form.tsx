@@ -6,16 +6,33 @@
 
 'use client';
 
-import { ChevronDown, ChevronUp, Upload } from 'lucide-react';
+import { ChevronDown, ChevronUp, HelpCircle, Upload } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
 import { Combobox, type ComboboxOption } from '@/components/shared/combobox';
 import { LoadingButton } from '@/components/shared/loading-button';
 import { Button } from '@/components/ui/button';
+import {
+  Field,
+  FieldLabel,
+} from '@/components/ui/field';
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupButton,
+  InputGroupInput,
+} from '@/components/ui/input-group';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import { PROVINCIAS_ESPANOLAS } from '@/lib/constants/provincias';
 import { parseJson } from '@/lib/utils/json';
 
 import { AddPersonaDocumentForm } from './add-persona-document-form';
@@ -193,14 +210,14 @@ export function AddPersonaManualForm({ onSuccess, onCancel }: AddPersonaManualFo
 
     // Datos bancarios
     iban: '',
-    titularCuenta: '',
+    bic: '',
 
     // Datos laborales
     puestoId: '',
     equipoIds: [] as string[],
     tipoContrato: 'indefinido',
-    salarioBrutoAnual: '',
-    salarioBrutoMensual: '',
+    salarioBaseAnual: '',
+    salarioBaseMensual: '',
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -461,14 +478,24 @@ export function AddPersonaManualForm({ onSuccess, onCancel }: AddPersonaManualFo
                 onChange={(e) => setFormData({ ...formData, ciudad: e.target.value })}
               />
             </div>
-            <div>
-              <Label htmlFor="direccionProvincia">Provincia</Label>
-              <Input
-                id="direccionProvincia"
+            <Field>
+              <FieldLabel htmlFor="direccionProvincia">Provincia</FieldLabel>
+              <Select
                 value={formData.direccionProvincia}
-                onChange={(e) => setFormData({ ...formData, direccionProvincia: e.target.value })}
-              />
-            </div>
+                onValueChange={(value) => setFormData({ ...formData, direccionProvincia: value })}
+              >
+                <SelectTrigger id="direccionProvincia">
+                  <SelectValue placeholder="Selecciona una provincia..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {PROVINCIAS_ESPANOLAS.map((provincia) => (
+                    <SelectItem key={provincia.value} value={provincia.value}>
+                      {provincia.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
           </div>
         </div>
       </div>
@@ -477,21 +504,49 @@ export function AddPersonaManualForm({ onSuccess, onCancel }: AddPersonaManualFo
       <div className="space-y-4">
         <h3 className="text-sm font-semibold text-gray-900 border-b pb-2">Datos Bancarios</h3>
         <div className="grid grid-cols-2 gap-4">
+          <Field>
+            <FieldLabel htmlFor="iban">IBAN</FieldLabel>
+            <InputGroup>
+              <InputGroupInput
+                id="iban"
+                value={formData.iban}
+                onChange={(e) => setFormData({ ...formData, iban: e.target.value.toUpperCase() })}
+                placeholder="ES00 0000 0000 0000 0000 0000"
+              />
+              <InputGroupAddon align="inline-end">
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <InputGroupButton
+                        variant="ghost"
+                        aria-label="Información IBAN"
+                        size="icon-xs"
+                        type="button"
+                      >
+                        <HelpCircle className="h-4 w-4" />
+                      </InputGroupButton>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Formato: ES seguido de 22 dígitos (ej: ES9121000418450200051332)</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </InputGroupAddon>
+            </InputGroup>
+          </Field>
           <div>
-            <Label htmlFor="iban">IBAN</Label>
+            <Label htmlFor="bic">Código BIC</Label>
             <Input
-              id="iban"
-              value={formData.iban}
-              onChange={(e) => setFormData({ ...formData, iban: e.target.value })}
-              placeholder="ES00 0000 0000 0000 0000 0000"
-            />
-          </div>
-          <div>
-            <Label htmlFor="titularCuenta">Titular de la Cuenta</Label>
-            <Input
-              id="titularCuenta"
-              value={formData.titularCuenta}
-              onChange={(e) => setFormData({ ...formData, titularCuenta: e.target.value })}
+              id="bic"
+              value={formData.bic}
+              maxLength={11}
+              placeholder="Ej: BBVAESMMXXX"
+              onChange={(e) =>
+                setFormData({
+                  ...formData,
+                  bic: e.target.value.replace(/\s+/g, '').toUpperCase(),
+                })
+              }
             />
           </div>
         </div>
@@ -525,10 +580,10 @@ export function AddPersonaManualForm({ onSuccess, onCancel }: AddPersonaManualFo
               onCreateNew={handleCreateEquipo}
             />
           </div>
-          <div>
-            <Label htmlFor="tipoContrato">Tipo de Contrato</Label>
+          <Field>
+            <FieldLabel htmlFor="tipoContrato">Tipo de Contrato</FieldLabel>
             <Select value={formData.tipoContrato} onValueChange={(value) => setFormData({ ...formData, tipoContrato: value })}>
-              <SelectTrigger>
+              <SelectTrigger id="tipoContrato">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -541,14 +596,14 @@ export function AddPersonaManualForm({ onSuccess, onCancel }: AddPersonaManualFo
                 <SelectItem value="obra_y_servicio">Obra y servicio</SelectItem>
               </SelectContent>
             </Select>
-          </div>
+          </Field>
           <div>
-            <Label htmlFor="salarioBrutoAnual">Salario Bruto Anual (€)</Label>
+            <Label htmlFor="salarioBaseAnual">Salario Base Anual (€)</Label>
             <Input
-              id="salarioBrutoAnual"
+              id="salarioBaseAnual"
               type="number"
-              value={formData.salarioBrutoAnual}
-              onChange={(e) => setFormData({ ...formData, salarioBrutoAnual: e.target.value })}
+              value={formData.salarioBaseAnual}
+              onChange={(e) => setFormData({ ...formData, salarioBaseAnual: e.target.value })}
             />
           </div>
         </div>

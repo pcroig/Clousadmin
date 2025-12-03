@@ -53,8 +53,8 @@ export interface EmpleadoDetectado {
   tipoContrato: string | null;
 
   // Compensación
-  salarioBrutoAnual: number | null;
-  salarioBrutoMensual: number | null;
+  salarioBaseAnual: number | null;
+  salarioBaseMensual: number | null;
 
   // Contacto - Campos separados para coincidir con Prisma schema
   direccion: string | null; // Dirección completa (legacy, se puede dividir en los campos siguientes)
@@ -80,8 +80,8 @@ const EMPLEADO_CAMPOS: Array<keyof EmpleadoDetectado> = [
   'manager',
   'fechaAlta',
   'tipoContrato',
-  'salarioBrutoAnual',
-  'salarioBrutoMensual',
+  'salarioBaseAnual',
+  'salarioBaseMensual',
   'direccion',
   'direccionCalle',
   'direccionNumero',
@@ -111,8 +111,8 @@ const EMPLEADO_CAMPO_DESCRIPCIONES: Record<keyof EmpleadoDetectado, string> = {
   manager: 'Manager directo (nombre completo o email)',
   fechaAlta: 'Fecha de alta/incorporación en formato YYYY-MM-DD',
   tipoContrato: 'Tipo de contrato (indefinido, temporal, prácticas, etc.)',
-  salarioBrutoAnual: 'Salario bruto anual en euros como número',
-  salarioBrutoMensual: 'Salario bruto mensual en euros como número',
+  salarioBaseAnual: 'Salario base anual en euros como número',
+  salarioBaseMensual: 'Salario base mensual en euros como número',
   direccion: 'Dirección completa cuando solo existe una columna',
   direccionCalle: 'Calle o vía (sin número)',
   direccionNumero: 'Número o portal de la dirección',
@@ -142,8 +142,8 @@ const EMPLEADO_JSON_TEMPLATE = `{
       "manager": string | null,
       "fechaAlta": string | null,
       "tipoContrato": string | null,
-      "salarioBrutoAnual": number | null,
-      "salarioBrutoMensual": number | null,
+      "salarioBaseAnual": number | null,
+      "salarioBaseMensual": number | null,
       "direccion": string | null,
       "direccionCalle": string | null,
       "direccionNumero": string | null,
@@ -191,8 +191,8 @@ export const EmpleadoDetectadoSchema = z.object({
   manager: z.string().nullable(),
   fechaAlta: z.string().nullable(),
   tipoContrato: z.string().nullable(),
-  salarioBrutoAnual: z.number().nullable(),
-  salarioBrutoMensual: z.number().nullable(),
+  salarioBaseAnual: z.number().nullable(),
+  salarioBaseMensual: z.number().nullable(),
   direccion: z.string().nullable(),
   direccionCalle: z.string().nullable(),
   direccionNumero: z.string().nullable(),
@@ -400,15 +400,15 @@ function obtenerMapeoBasicoColumnas(): Record<string, keyof EmpleadoDetectado> {
     'contract type': 'tipoContrato',
     'contrato': 'tipoContrato',
     // Salario
-    'salario bruto anual': 'salarioBrutoAnual',
-    'salariobrutoanual': 'salarioBrutoAnual',
-    'salario bruto anual (€)': 'salarioBrutoAnual',
-    'salary': 'salarioBrutoAnual',
-    'annual salary': 'salarioBrutoAnual',
-    'compensacion anual': 'salarioBrutoAnual',
-    'salario bruto mensual': 'salarioBrutoMensual',
-    'salario mensual': 'salarioBrutoMensual',
-    'monthly salary': 'salarioBrutoMensual',
+    'salario base anual': 'salarioBaseAnual',
+    'salariobrutoanual': 'salarioBaseAnual',
+    'salario base anual (€)': 'salarioBaseAnual',
+    'salary': 'salarioBaseAnual',
+    'annual salary': 'salarioBaseAnual',
+    'compensacion anual': 'salarioBaseAnual',
+    'salario base mensual': 'salarioBaseMensual',
+    'salario mensual': 'salarioBaseMensual',
+    'monthly salary': 'salarioBaseMensual',
     // Ubicación
     'direccion': 'direccion',
     'dirección': 'direccion',
@@ -486,8 +486,8 @@ function procesarEmpleadosConMapeo(
       manager: null,
       fechaAlta: null,
       tipoContrato: null,
-      salarioBrutoAnual: null,
-      salarioBrutoMensual: null,
+      salarioBaseAnual: null,
+      salarioBaseMensual: null,
       direccion: null,
       direccionCalle: null,
       direccionNumero: null,
@@ -534,7 +534,7 @@ function procesarEmpleadosConMapeo(
       if (campoMapeado === 'fechaNacimiento' || campoMapeado === 'fechaAlta') {
         const fechaISO = convertirFechaExcelAISO(valor);
         empleado[campoMapeado] = fechaISO;
-      } else if (campoMapeado === 'salarioBrutoAnual' || campoMapeado === 'salarioBrutoMensual') {
+      } else if (campoMapeado === 'salarioBaseAnual' || campoMapeado === 'salarioBaseMensual') {
         const num = convertirANumero(valor);
         empleado[campoMapeado] = num;
       } else if (campoMapeado === 'nombre' && typeof valor === 'string' && valor.includes(' ')) {
@@ -549,8 +549,8 @@ function procesarEmpleadosConMapeo(
     });
 
     // Post-procesamiento: calcular salario mensual, normalizar equipo, etc.
-    if (empleado.salarioBrutoAnual && !empleado.salarioBrutoMensual) {
-      empleado.salarioBrutoMensual = empleado.salarioBrutoAnual / 12;
+    if (empleado.salarioBaseAnual && !empleado.salarioBaseMensual) {
+      empleado.salarioBaseMensual = empleado.salarioBaseAnual / 12;
     }
 
     // Detectar equipos y managers únicos
@@ -653,7 +653,7 @@ ${CAMPOS_DESCRIPCION_TEXTO}
 - Normaliza NIF/NIE, NSS e IBAN eliminando espacios, guiones y usando mayúsculas.
 - Divide cualquier columna de "Nombre Completo" en "nombre" y "apellidos".
 - Convierte TODAS las fechas al formato ISO (YYYY-MM-DD).
-- Convierte salarios a números (sin símbolos). Si solo existe el salario anual, calcula salarioBrutoMensual = salarioBrutoAnual / 12.
+- Convierte salarios a números (sin símbolos). Si solo existe el salario anual, calcula salarioBaseMensual = salarioBaseAnual / 12.
 - Cuando haya columnas separadas de dirección, completa direccionCalle, direccionNumero, direccionPiso, direccionProvincia, ciudad y codigoPostal. Si solo hay una columna de dirección completa, úsala en "direccion".
 - Identifica equipos (department/área) y managers únicos (emails o nombres completos).
 

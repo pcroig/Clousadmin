@@ -183,13 +183,6 @@ export const CalendarioStep = forwardRef<CalendarioStepHandle, CalendarioStepPro
 
   return (
     <div className="space-y-6">
-      <div className="space-y-2">
-        <h3 className="text-lg font-semibold text-gray-900">Configura el calendario laboral</h3>
-        <p className="text-sm text-gray-500">
-          Establece los días laborables de la semana y añade los festivos de tu localidad.
-        </p>
-      </div>
-
       <div className="space-y-6">
         {importandoNacionales && (
           <p className="text-sm text-muted-foreground">
@@ -308,6 +301,7 @@ export const CalendarioStep = forwardRef<CalendarioStepHandle, CalendarioStepPro
               refreshToken={festivosRefreshKey}
               onRequestCreate={handleCreateFestivoInline}
               onRequestEdit={handleEditFestivoInline}
+              numberOfMonths={2}
             />
           </TabsContent>
 

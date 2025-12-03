@@ -6,6 +6,7 @@ import { redirect } from 'next/navigation';
 
 import { getSession } from '@/lib/auth';
 import { UsuarioRol } from '@/lib/constants/enums';
+import { PLANTILLAS_ENABLED } from '@/lib/constants/feature-flags';
 import { asegurarCarpetasGlobales } from '@/lib/documentos';
 import { prisma } from '@/lib/prisma';
 
@@ -23,10 +24,16 @@ export default async function DocumentosPage() {
   await asegurarCarpetasGlobales(session.user.empresaId);
 
   // Obtener todas las carpetas de nivel superior (sin parent)
-  const carpetas = await prisma.carpeta.findMany({
+  const carpetas = await prisma.carpetas.findMany({
     where: {
       empresaId: session.user.empresaId,
       parentId: null, // Solo carpetas de nivel superior
+      OR: [
+        { empleadoId: null },
+        {
+          esSistema: false,
+        },
+      ],
     },
     include: {
       documentos: true,
@@ -50,5 +57,5 @@ export default async function DocumentosPage() {
     numeroSubcarpetas: carpeta.subcarpetas.length,
   }));
 
-  return <DocumentosClient carpetas={carpetasData} />;
+  return <DocumentosClient carpetas={carpetasData} plantillasEnabled={PLANTILLAS_ENABLED} />;
 }

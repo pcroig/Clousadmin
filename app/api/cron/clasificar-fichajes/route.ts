@@ -16,8 +16,14 @@
 
 import { NextRequest } from 'next/server';
 
-import { procesarFichajesDia } from '@/lib/calculos/fichajes';
+import {
+  actualizarCalculosFichaje,
+  obtenerEmpleadosDisponibles,
+  validarFichajeCompleto,
+} from '@/lib/calculos/fichajes';
+import { EstadoFichaje } from '@/lib/constants/enums';
 import { initCronLogger } from '@/lib/cron/logger';
+import { crearNotificacionFichajeRequiereRevision } from '@/lib/notificaciones';
 import { prisma } from '@/lib/prisma';
 
 export async function POST(request: NextRequest) {
@@ -39,7 +45,7 @@ export async function POST(request: NextRequest) {
     console.log(`[CRON Cerrar Jornadas] Procesando día: ${ayer.toISOString().split('T')[0]}`);
 
     // Obtener todas las empresas
-    const empresas = await prisma.empresa.findMany();
+    const empresas = await prisma.empresas.findMany();
 
     let fichajesCreados = 0;
     let fichajesPendientes = 0;
@@ -50,26 +56,107 @@ export async function POST(request: NextRequest) {
       try {
         console.log(`[CRON Cerrar Jornadas] Procesando empresa: ${empresa.nombre}`);
 
-        const resultadoEmpresa = await procesarFichajesDia(empresa.id, ayer, {
-          notificar: true,
-        });
+        // Obtener empleados que deberían trabajar ese día
+        const empleadosDisponibles = await obtenerEmpleadosDisponibles(empresa.id, ayer);
 
-        fichajesCreados += resultadoEmpresa.fichajesCreados;
-        fichajesPendientes += resultadoEmpresa.fichajesPendientes;
-        fichajesFinalizados += resultadoEmpresa.fichajesFinalizados;
+        console.log(`[CRON Cerrar Jornadas] ${empleadosDisponibles.length} empleados disponibles en ${empresa.nombre}`);
 
-        if (resultadoEmpresa.errores.length > 0) {
-          for (const mensaje of resultadoEmpresa.errores) {
-            const scoped = `[${empresa.nombre}] ${mensaje}`;
-            errores.push(scoped);
-            console.error(`[CRON Cerrar Jornadas] ${scoped}`);
+        for (const empleado of empleadosDisponibles) {
+          try {
+            // Buscar fichaje del día anterior
+            let fichaje = await prisma.fichajes.findUnique({
+              where: {
+                empleadoId_fecha: {
+                  empleadoId: empleado.id,
+                  fecha: ayer,
+                },
+              },
+              include: {
+                eventos: true,
+              },
+            });
+
+            // Si no existe fichaje, crear uno en estado pendiente
+            if (!fichaje) {
+              fichaje = await prisma.fichajes.create({
+                data: {
+                  empresaId: empresa.id,
+                  empleadoId: empleado.id,
+                  fecha: ayer,
+                  estado: EstadoFichaje.pendiente,
+                },
+                include: {
+                  eventos: true,
+                },
+              });
+
+              console.log(`[CRON Cerrar Jornadas] Fichaje creado para ${empleado.nombre} ${empleado.apellidos}`);
+              fichajesCreados++;
+              fichajesPendientes++;
+              
+              // Crear notificación de fichaje pendiente
+              await crearNotificacionFichajeRequiereRevision(prisma, {
+                fichajeId: fichaje.id,
+                empresaId: empresa.id,
+                empleadoId: empleado.id,
+                empleadoNombre: `${empleado.nombre} ${empleado.apellidos}`,
+                fecha: fichaje.fecha,
+                razon: 'No se registraron fichajes en el día',
+              });
+              
+              continue;
+            }
+
+            // Si el fichaje está en curso, validarlo
+            if (fichaje.estado === EstadoFichaje.en_curso) {
+              // Validar si está completo
+              const validacion = await validarFichajeCompleto(fichaje.id);
+
+              // Actualizar cálculos
+              await actualizarCalculosFichaje(fichaje.id);
+
+              if (validacion.completo) {
+                // Fichaje completo: finalizar
+                await prisma.fichajes.update({
+                  where: { id: fichaje.id },
+                  data: {
+                    estado: EstadoFichaje.finalizado,
+                  },
+                });
+
+                console.log(`[CRON Cerrar Jornadas] Fichaje finalizado: ${empleado.nombre} ${empleado.apellidos}`);
+                fichajesFinalizados++;
+              } else {
+                // Fichaje incompleto: pendiente de cuadrar
+                await prisma.fichajes.update({
+                  where: { id: fichaje.id },
+                  data: {
+                    estado: EstadoFichaje.pendiente,
+                  },
+                });
+
+                console.log(`[CRON Cerrar Jornadas] Fichaje pendiente: ${empleado.nombre} ${empleado.apellidos} - ${validacion.razon}`);
+                fichajesPendientes++;
+
+                // Crear notificación de fichaje pendiente
+                await crearNotificacionFichajeRequiereRevision(prisma, {
+                  fichajeId: fichaje.id,
+                  empresaId: empresa.id,
+                  empleadoId: empleado.id,
+                  empleadoNombre: `${empleado.nombre} ${empleado.apellidos}`,
+                  fecha: fichaje.fecha,
+                  razon: validacion.razon ?? 'Faltan eventos por registrar',
+                });
+              }
+            }
+          } catch (error) {
+            const mensaje = `Error procesando empleado ${empleado.nombre} ${empleado.apellidos}: ${
+              error instanceof Error ? error.message : 'Error desconocido'
+            }`;
+            errores.push(mensaje);
+            console.error(`[CRON Cerrar Jornadas] ${mensaje}`);
           }
         }
-
-        console.log(
-          `[CRON Cerrar Jornadas] ${empresa.nombre} → empleados: ${resultadoEmpresa.empleadosDisponibles}, ` +
-            `creados: ${resultadoEmpresa.fichajesCreados}, pendientes: ${resultadoEmpresa.fichajesPendientes}, finalizados: ${resultadoEmpresa.fichajesFinalizados}`
-        );
       } catch (error) {
         const mensaje = `Error procesando empresa ${empresa.nombre}: ${
           error instanceof Error ? error.message : 'Error desconocido'

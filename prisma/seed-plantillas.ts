@@ -273,7 +273,7 @@ async function main() {
   console.log(`📄 Creando ${plantillasOficiales.length} plantillas oficiales...\n`);
 
   for (const plantilla of plantillasOficiales) {
-    const created = await prisma.plantillaDocumento.upsert({
+    const created = await prisma.plantillas_documentos.upsert({
       where: {
         // Unique constraint by s3Key
         s3Key: plantilla.s3Key,

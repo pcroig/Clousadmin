@@ -81,6 +81,7 @@ export async function POST(
     return NextResponse.json({
       success: true,
       message: 'Credenciales guardadas correctamente',
+      avatarUrl: resultado.avatarUrl || null,
     });
   } catch (error) {
     console.error('[POST /api/onboarding-simplificado/[token]/credenciales] Error:', error);

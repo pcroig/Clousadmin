@@ -38,7 +38,7 @@ export async function POST(
     }
 
     // Verificar que el evento existe y pertenece a la empresa
-    const evento = await prisma.eventoNomina.findFirst({
+    const evento = await prisma.eventos_nomina.findFirst({
       where: {
         id,
         empresaId: session.user.empresaId,
@@ -151,7 +151,7 @@ export async function POST(
         }
 
         // Obtener o crear carpeta "Nóminas" del empleado
-        let carpetaNominas = await prisma.carpeta.findFirst({
+        let carpetaNominas = await prisma.carpetas.findFirst({
           where: {
             empleadoId: nomina.empleadoId,
             nombre: 'Nóminas',
@@ -161,7 +161,7 @@ export async function POST(
 
         if (!carpetaNominas) {
           // Auto-crear carpeta de nóminas
-          carpetaNominas = await prisma.carpeta.create({
+          carpetaNominas = await prisma.carpetas.create({
             data: {
               empresaId: session.user.empresaId,
               empleadoId: nomina.empleadoId,
@@ -193,7 +193,7 @@ export async function POST(
         }
 
         // Crear documento
-        const documento = await prisma.documento.create({
+        const documento = await prisma.documentos.create({
           data: {
             empresaId: session.user.empresaId,
             empleadoId: nomina.empleadoId,
@@ -208,7 +208,7 @@ export async function POST(
         });
 
         // Vincular documento a nómina y actualizar a estado 'completada'
-        await prisma.nomina.update({
+        await prisma.nominas.update({
           where: { id: nomina.id },
           data: {
             documentoId: documento.id,
@@ -232,7 +232,7 @@ export async function POST(
     }
 
     // Verificar si todas las nóminas tienen documentos
-    const nominasSinDocumento = await prisma.nomina.count({
+    const nominasSinDocumento = await prisma.nominas.count({
       where: {
         eventoNominaId: id,
         documentoId: null,
@@ -243,7 +243,7 @@ export async function POST(
 
     // Actualizar fecha de importación si es la primera
     if (!evento.fechaImportacion) {
-      await prisma.eventoNomina.update({
+      await prisma.eventos_nomina.update({
         where: { id },
         data: {
           fechaImportacion: ahora,
@@ -256,7 +256,7 @@ export async function POST(
       });
     } else {
       // Incrementar contador de nóminas importadas
-      await prisma.eventoNomina.update({
+      await prisma.eventos_nomina.update({
         where: { id },
         data: {
           nominasImportadas: {

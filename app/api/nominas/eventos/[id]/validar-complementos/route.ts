@@ -31,7 +31,7 @@ export async function POST(
     const { id: eventoId } = await params;
 
     // Verificar que el evento existe y pertenece a la empresa
-    const evento = await prisma.eventoNomina.findFirst({
+    const evento = await prisma.eventos_nomina.findFirst({
       where: {
         id: eventoId,
         empresaId: session.user.empresaId,
@@ -48,7 +48,7 @@ export async function POST(
     // Para managers, verificar que solo estén validando complementos de su equipo
     if (session.user.rol === 'manager') {
       // Obtener empleados del manager
-      const empleadosManager = await prisma.empleado.findMany({
+      const empleadosManager = await prisma.empleados.findMany({
         where: {
           empresaId: session.user.empresaId,
           equipos: {
@@ -65,7 +65,7 @@ export async function POST(
       const empleadoIds = empleadosManager.map((e) => e.id);
 
       // Verificar que todos los complementos pertenecen a empleados del manager
-      const complementos = await prisma.empleadoComplemento.findMany({
+      const complementos = await prisma.empleado_complementos.findMany({
         where: {
           id: { in: data.complementoIds },
         },
@@ -88,7 +88,7 @@ export async function POST(
 
     // Realizar la validación o rechazo
     if (data.accion === 'validar') {
-      await prisma.empleadoComplemento.updateMany({
+      await prisma.empleado_complementos.updateMany({
         where: {
           id: { in: data.complementoIds },
         },
@@ -108,7 +108,7 @@ export async function POST(
         );
       }
 
-      await prisma.empleadoComplemento.updateMany({
+      await prisma.empleado_complementos.updateMany({
         where: {
           id: { in: data.complementoIds },
         },
@@ -127,13 +127,17 @@ export async function POST(
       .join(' ')
       .trim() || session.user.email;
 
-    await crearNotificacionNominaValidada(prisma, {
-      empresaId: session.user.empresaId,
-      eventoNominaId: eventoId,
-      validadorNombre,
-      complementosCount: data.complementoIds.length,
-      accion: data.accion,
-    });
+    await crearNotificacionNominaValidada(
+      prisma,
+      {
+        empresaId: session.user.empresaId,
+        eventoNominaId: eventoId,
+        validadorNombre,
+        complementosCount: data.complementoIds.length,
+        accion: data.accion,
+      },
+      { actorUsuarioId: session.user.id }
+    );
 
     return NextResponse.json({
       success: true,

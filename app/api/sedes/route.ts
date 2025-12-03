@@ -16,7 +16,7 @@ export async function GET() {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
 
-    const sedes = await prisma.sede.findMany({
+    const sedes = await prisma.sedes.findMany({
       where: {
         empresaId: session.user.empresaId,
         activo: true,

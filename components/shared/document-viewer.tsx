@@ -7,6 +7,11 @@
  * - Uses the /api/documentos/[id]/preview endpoint for rendering.
  * - Supports custom actions in the header (e.g., "Sign", "Download").
  * - Handles loading and error states.
+ * 
+ * @version 1.5.0 (2025-11-28)
+ * - Enhanced iframe sandbox: allow-downloads, allow-modals, allow-presentation
+ * - Enables full native PDF viewer functionality (download, print, fullscreen)
+ * - Compatible with Chrome, Firefox, Safari, Edge PDF viewers
  */
 
 import {
@@ -96,8 +101,14 @@ export function DocumentViewerModal({
   }, []);
 
   // Check if the document is a Word file
+  const normalizedMime = mimeType?.toLowerCase() ?? null;
   const isWordDocument =
-    mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+    normalizedMime === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+  const isPdfDocument = normalizedMime === 'application/pdf';
+
+  const iframeSandbox = isPdfDocument
+    ? undefined
+    : 'allow-same-origin allow-scripts allow-popups allow-forms allow-downloads allow-modals allow-presentation';
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
@@ -109,6 +120,7 @@ export function DocumentViewerModal({
             : 'sm:max-w-5xl h-[90vh] max-h-[900px]'
         )}
         showCloseButton={false}
+        aria-describedby={undefined}
       >
         {/* Header */}
         <DialogHeader className="flex-shrink-0 flex flex-row items-center justify-between gap-4 px-4 py-3 border-b bg-gray-50/80">
@@ -228,7 +240,7 @@ export function DocumentViewerModal({
             title={`Vista previa de ${title}`}
             onLoad={handleIframeLoad}
             onError={handleIframeError}
-            sandbox="allow-same-origin"
+            sandbox={iframeSandbox}
           />
         </div>
       </DialogContent>

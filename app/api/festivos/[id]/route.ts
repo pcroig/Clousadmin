@@ -35,7 +35,7 @@ export async function GET(
 
     const { id } = await params;
 
-    const festivo = await prisma.festivo.findFirst({
+    const festivo = await prisma.festivos.findFirst({
       where: {
         id,
         empresaId: session.user.empresaId,
@@ -80,7 +80,7 @@ export async function PATCH(
     const { id } = await params;
 
     // Verificar que el festivo existe y pertenece a la empresa
-    const festivoExistente = await prisma.festivo.findFirst({
+    const festivoExistente = await prisma.festivos.findFirst({
       where: {
         id,
         empresaId: session.user.empresaId,
@@ -112,7 +112,7 @@ export async function PATCH(
     }
 
     // Preparar datos de actualización
-    const updateData: Prisma.FestivoUpdateInput = {};
+    const updateData: Prisma.festivosUpdateInput = {};
 
     if (data.nombre !== undefined) {
       updateData.nombre = data.nombre;
@@ -133,7 +133,7 @@ export async function PATCH(
       }
 
       // Verificar que no exista otro festivo en esa fecha
-      const otraFechaExistente = await prisma.festivo.findFirst({
+      const otraFechaExistente = await prisma.festivos.findFirst({
         where: {
           empresaId: session.user.empresaId,
           fecha: nuevaFecha,
@@ -149,7 +149,7 @@ export async function PATCH(
     }
 
     // Actualizar festivo
-    const festivoActualizado = await prisma.festivo.update({
+    const festivoActualizado = await prisma.festivos.update({
       where: { id },
       data: updateData,
     });
@@ -188,7 +188,7 @@ export async function DELETE(
     const { id } = await params;
 
     // Verificar que el festivo existe y pertenece a la empresa
-    const festivo = await prisma.festivo.findFirst({
+    const festivo = await prisma.festivos.findFirst({
       where: {
         id,
         empresaId: session.user.empresaId,
@@ -207,7 +207,7 @@ export async function DELETE(
     }
 
     // Eliminar festivo
-    await prisma.festivo.delete({
+    await prisma.festivos.delete({
       where: { id },
     });
 

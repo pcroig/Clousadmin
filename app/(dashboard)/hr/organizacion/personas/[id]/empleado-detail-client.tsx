@@ -1,10 +1,11 @@
 'use client';
 
-import { ArrowLeft, MoreVertical } from 'lucide-react';
+import { ArrowLeft, Clock, MoreVertical } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
+import { EditarJornadaEmpleadoModal } from '@/components/hr/editar-jornada-empleado-modal';
 import { AusenciasTab as AusenciasTabShared } from '@/components/shared/mi-espacio/ausencias-tab';
 import { ContratosTab as ContratosTabShared } from '@/components/shared/mi-espacio/contratos-tab';
 import { DocumentosTab as DocumentosTabShared } from '@/components/shared/mi-espacio/documentos-tab';
@@ -37,6 +38,7 @@ const TABS = [
 export function EmpleadoDetailClient({ empleado, usuario }: EmpleadoDetailClientProps) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<string>('general');
+  const [mostrarModalJornada, setMostrarModalJornada] = useState(false);
 
   const handleFieldUpdate = async (field: keyof MiEspacioEmpleado, value: unknown) => {
     try {
@@ -102,6 +104,10 @@ export function EmpleadoDetailClient({ empleado, usuario }: EmpleadoDetailClient
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => setMostrarModalJornada(true)}>
+                <Clock className="mr-2 h-4 w-4" />
+                Cambiar jornada
+              </DropdownMenuItem>
               <DropdownMenuItem
                 onClick={triggerDarDeBaja}
                 className="text-red-600"
@@ -129,7 +135,7 @@ export function EmpleadoDetailClient({ empleado, usuario }: EmpleadoDetailClient
         ))}
       </div>
 
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1">
         {activeTab === 'general' && (
           <GeneralTabShared
             empleado={empleado}
@@ -153,6 +159,15 @@ export function EmpleadoDetailClient({ empleado, usuario }: EmpleadoDetailClient
 
         {activeTab === 'documentos' && <DocumentosTabShared empleado={empleado} />}
       </div>
+
+      {/* Modal para cambiar jornada */}
+      <EditarJornadaEmpleadoModal
+        open={mostrarModalJornada}
+        empleadoId={empleado.id}
+        empleadoNombre={`${empleado.nombre} ${empleado.apellidos}`}
+        jornadaActual={empleado.jornada}
+        onClose={() => setMostrarModalJornada(false)}
+      />
     </div>
   );
 }

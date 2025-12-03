@@ -134,11 +134,15 @@ export const datosBancariosSchema = z.object({
         });
       }
     }),
-  
-  titularCuenta: z
+
+  bic: z
     .string()
-    .min(1, 'El titular de la cuenta es obligatorio')
-    .max(200, 'El titular no puede tener más de 200 caracteres'),
+    .min(8, 'El BIC debe tener al menos 8 caracteres')
+    .max(11, 'El BIC no puede tener más de 11 caracteres')
+    .transform((val) => val.trim().replace(/\s+/g, '').toUpperCase())
+    .refine((val) => /^[A-Z0-9]{8}([A-Z0-9]{3})?$/.test(val), {
+      message: 'Formato de BIC inválido. Ejemplo válido: BBVAESMMXXX',
+    }),
 });
 
 /**

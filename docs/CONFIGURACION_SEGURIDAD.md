@@ -50,8 +50,8 @@ Los siguientes campos se encriptan automáticamente en la aplicación:
 - `iban` - Cuenta bancaria ✅ cifrado en altas/updates e importaciones (POST/PATCH `/api/empleados`, onboarding, importación Excel)
 - `nif` - Identificación fiscal ✅ cifrado en altas/updates e importaciones
 - `nss` - Número de Seguridad Social ✅ cifrado en altas/updates e importaciones
-- `salarioBrutoAnual` - **no se cifra** (requisito confirmado: no es necesario para este release)
-- `salarioBrutoMensual` - **no se cifra**
+- `salarioBaseAnual` - **no se cifra** (requisito confirmado: no es necesario para este release)
+- `salarioBaseMensual` - **no se cifra**
 
 > **Migración histórica**: usa `tsx scripts/encrypt-empleados.ts --confirm-backup --dry-run` para detectar registros legacy y vuelve a ejecutar sin `--dry-run` para cifrarlos. Procedimiento documentado en `docs/migraciones/2025-11-16-encriptar-empleados.md`.
 

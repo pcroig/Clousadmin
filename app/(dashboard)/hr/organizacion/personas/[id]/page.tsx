@@ -71,7 +71,7 @@ export default async function EmpleadoDetailPage(props: EmpleadoDetailPageProps)
   const { id } = params;
 
   // Obtener empleado con todas las relaciones
-  const empleado = await prisma.empleado.findUnique({
+  const empleado = await prisma.empleados.findUnique({
     where: {
       id,
       empresaId: session.user.empresaId, // Seguridad: solo de la misma empresa
@@ -127,7 +127,7 @@ export default async function EmpleadoDetailPage(props: EmpleadoDetailPageProps)
           fechaInicio: true,
           fechaFin: true,
           tipoContrato: true,
-          salarioBrutoAnual: true,
+          salarioBaseAnual: true,
         },
         orderBy: {
           fechaInicio: 'desc',
@@ -162,7 +162,7 @@ export default async function EmpleadoDetailPage(props: EmpleadoDetailPageProps)
   await asegurarCarpetasSistemaParaEmpleado(empleado.id, session.user.empresaId);
 
   // Re-obtener empleado para incluir posibles nuevas carpetas
-  const empleadoActualizado = await prisma.empleado.findUnique({
+  const empleadoActualizado = await prisma.empleados.findUnique({
     where: {
       id: empleado.id,
       empresaId: session.user.empresaId,
@@ -218,7 +218,7 @@ export default async function EmpleadoDetailPage(props: EmpleadoDetailPageProps)
           fechaInicio: true,
           fechaFin: true,
           tipoContrato: true,
-          salarioBrutoAnual: true,
+          salarioBaseAnual: true,
         },
         orderBy: {
           fechaInicio: 'desc',
@@ -268,8 +268,8 @@ export default async function EmpleadoDetailPage(props: EmpleadoDetailPageProps)
         ? empleadoDesencriptado.fechaNacimiento.toISOString()
         : empleadoDesencriptado.fechaNacimiento ?? null,
     // Convertir campos Decimal a números para Client Components
-    salarioBrutoAnual: decimalToNumber(empleadoDesencriptado.salarioBrutoAnual),
-    salarioBrutoMensual: decimalToNumber(empleadoDesencriptado.salarioBrutoMensual),
+    salarioBaseAnual: decimalToNumber(empleadoDesencriptado.salarioBaseAnual),
+    salarioBaseMensual: decimalToNumber(empleadoDesencriptado.salarioBaseMensual),
     ausencias: empleadoActualizado.ausencias.map((a) => ({
       id: a.id,
       tipo: a.tipo,
@@ -298,7 +298,7 @@ export default async function EmpleadoDetailPage(props: EmpleadoDetailPageProps)
       fechaFin:
         c.fechaFin instanceof Date ? c.fechaFin.toISOString() : c.fechaFin,
       tipoContrato: c.tipoContrato,
-      salarioBrutoAnual: Number(c.salarioBrutoAnual),
+      salarioBaseAnual: Number(c.salarioBaseAnual),
     })),
     equipos: empleadoActualizado.equipos.map((eq) => ({
       equipoId: eq.equipo.id,

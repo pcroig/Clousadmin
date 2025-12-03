@@ -82,10 +82,30 @@ export function Sidebar({ rol, usuario }: SidebarProps) {
     return null;
   }
 
-  const toggleMenu = (menu: string) => {
-    setOpenMenus((prev) =>
-      prev.includes(menu) ? prev.filter((m) => m !== menu) : [...prev, menu]
-    );
+  const handleParentNavigation = (item: NavigationItem) => {
+    if (!item.children?.length) {
+      return;
+    }
+
+    setOpenMenus((prev) => (prev.includes(item.name) ? prev : [...prev, item.name]));
+
+    const firstChild = item.children[0];
+    if (firstChild.href && pathname !== firstChild.href) {
+      void router.push(firstChild.href);
+    }
+  };
+
+  const handleParentClick = (item: NavigationItem) => {
+    if (!item.children?.length) {
+      return;
+    }
+
+    if (openMenus.includes(item.name)) {
+      setOpenMenus((prev) => prev.filter((menu) => menu !== item.name));
+      return;
+    }
+
+    handleParentNavigation(item);
   };
 
   const isActive = (path: string) => pathname?.startsWith(path);
@@ -94,7 +114,6 @@ export function Sidebar({ rol, usuario }: SidebarProps) {
   const itemHorizontalPadding = isCollapsed ? 'px-0' : 'px-3';
   const itemGap = isCollapsed ? 'gap-0' : 'gap-3';
   const footerPadding = isCollapsed ? 'p-3' : 'p-4';
-  const collapsibleTriggerClasses = isCollapsed ? 'justify-center px-0' : `justify-between ${itemHorizontalPadding}`;
   const linkAlignmentClasses = isCollapsed ? `justify-center ${itemHorizontalPadding}` : itemHorizontalPadding;
 
   const handleLogout = async () => {
@@ -153,12 +172,14 @@ export function Sidebar({ rol, usuario }: SidebarProps) {
       ],
     },
     {
-      name: 'Horario',
+      name: 'Fichaje',
+      href: '/hr/horario/fichajes',
       icon: Clock,
-      children: [
-        { name: 'Fichajes', href: '/hr/horario/fichajes' },
-        { name: 'Ausencias', href: '/hr/horario/ausencias' },
-      ],
+    },
+    {
+      name: 'Ausencia',
+      href: '/hr/horario/ausencias',
+      icon: Calendar,
     },
     {
       name: 'Organización',
@@ -208,12 +229,14 @@ export function Sidebar({ rol, usuario }: SidebarProps) {
       ],
     },
     {
-      name: 'Horario',
+      name: 'Fichaje',
+      href: '/manager/horario/fichajes',
       icon: Clock,
-      children: [
-        { name: 'Fichajes', href: '/manager/horario/fichajes' },
-        { name: 'Ausencias', href: '/manager/horario/ausencias' },
-      ],
+    },
+    {
+      name: 'Ausencia',
+      href: '/manager/horario/ausencias',
+      icon: Calendar,
     },
     {
       name: 'Mi espacio',
@@ -313,11 +336,19 @@ export function Sidebar({ rol, usuario }: SidebarProps) {
         {navigation.map((item) => {
           if (item.children) {
             const isOpen = openMenus.includes(item.name);
+            const hasActiveChild = item.children.some((child) => isActive(child.href));
             return (
               <div key={item.name}>
                 <button
-                  onClick={() => !isCollapsed && toggleMenu(item.name)}
-                  className={`flex w-full items-center rounded-lg py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 hover:text-gray-900 ${collapsibleTriggerClasses}`}
+                  type="button"
+                  onClick={() => handleParentClick(item)}
+                  className={`flex w-full items-center rounded-lg py-2 text-sm font-medium ${
+                    isCollapsed ? 'justify-center px-0' : `justify-between ${itemHorizontalPadding}`
+                  } ${
+                    hasActiveChild
+                      ? 'bg-gray-100 text-gray-900'
+                      : 'text-gray-700 hover:bg-gray-100 hover:text-gray-900'
+                  }`}
                   title={isCollapsed ? item.name : ''}
                 >
                   <div className={`flex items-center ${itemGap}`}>
@@ -326,7 +357,7 @@ export function Sidebar({ rol, usuario }: SidebarProps) {
                   </div>
                   {!isCollapsed && (
                     <ChevronDown
-                      className={`h-4 w-4 transition-transform ${
+                      className={`h-4 w-4 flex-shrink-0 transition-transform ${
                         isOpen ? 'rotate-180' : ''
                       }`}
                     />

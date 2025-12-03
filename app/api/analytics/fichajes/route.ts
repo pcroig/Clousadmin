@@ -53,7 +53,7 @@ export async function GET(request: NextRequest) {
     const antiguedad = searchParams.get('antiguedad');
 
     // Construir filtros base
-    const where: Prisma.EmpleadoWhereInput = {
+    const where: Prisma.empleadosWhereInput = {
       empresaId: session.user.empresaId,
       estadoEmpleado: 'activo',
     };
@@ -75,7 +75,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Obtener empleados con equipos
-    const empleados = await prisma.empleado.findMany({
+    const empleados = await prisma.empleados.findMany({
       where,
       select: {
         id: true,
@@ -101,7 +101,7 @@ export async function GET(request: NextRequest) {
     const finMesActual = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0);
 
     // 1. Total horas trabajadas mes actual
-    const fichajesMesActual = await prisma.fichaje.findMany({
+    const fichajesMesActual = await prisma.fichajes.findMany({
       where: {
         empresaId: session.user.empresaId,
         empleadoId: { in: empleadoIds },
@@ -125,7 +125,7 @@ export async function GET(request: NextRequest) {
     const inicioMesAnterior = new Date(hoy.getFullYear(), hoy.getMonth() - 1, 1);
     const finMesAnterior = new Date(hoy.getFullYear(), hoy.getMonth(), 0);
 
-    const fichajesMesAnterior = await prisma.fichaje.findMany({
+    const fichajesMesAnterior = await prisma.fichajes.findMany({
       where: {
         empresaId: session.user.empresaId,
         empleadoId: { in: empleadoIds },
@@ -158,7 +158,7 @@ export async function GET(request: NextRequest) {
 
     // 4. Horas trabajadas diarias del mes actual
     // Optimización: 1 query para todo el mes, luego agrupar en memoria
-    const fichajesMesParaDias = await prisma.fichaje.findMany({
+    const fichajesMesParaDias = await prisma.fichajes.findMany({
       where: {
         empresaId: session.user.empresaId,
         empleadoId: { in: empleadoIds },
@@ -200,7 +200,7 @@ export async function GET(request: NextRequest) {
 
     // 5. Tasa de absentismo
     // Corregido: Calcular días reales de ausencia, no número de ausencias
-    const ausenciasMes = await prisma.ausencia.findMany({
+    const ausenciasMes = await prisma.ausencias.findMany({
       where: {
         empresaId: session.user.empresaId,
         empleadoId: { in: empleadoIds },
@@ -277,7 +277,7 @@ export async function GET(request: NextRequest) {
 
     // 8. NUEVA: Absentismo por equipo
     // Optimización: 1 query para todas las ausencias, calcular días reales
-    const ausenciasMesPorEmpleado = await prisma.ausencia.findMany({
+    const ausenciasMesPorEmpleado = await prisma.ausencias.findMany({
       where: {
         empresaId: session.user.empresaId,
         empleadoId: { in: empleadoIds },

@@ -53,7 +53,7 @@ export async function loginAction(email: string, password: string): Promise<Logi
     
     // Verificar si el email existe primero
     const { prisma } = await import('@/lib/prisma');
-    const usuarioExistente = await prisma.usuario.findUnique({
+    const usuarioExistente = await prisma.usuarios.findUnique({
       where: { email: email.toLowerCase() },
     });
 
@@ -87,8 +87,8 @@ export async function loginAction(email: string, password: string): Promise<Logi
     }
 
     // Verificar estado activo directamente desde la BD (no confiar en el objeto devuelto)
-    const usuarioActualizado = await prisma.usuario.findUnique({
-      where: { id: usuario.id },
+    const usuarioActualizado = await prisma.usuarios.findUnique({
+      where: { id: usuarioExistente.id },
       select: { activo: true },
     });
 
@@ -100,20 +100,20 @@ export async function loginAction(email: string, password: string): Promise<Logi
     }
 
     // Garantizar que el usuario tiene su empleadoId sincronizado (autocorrección)
-    let empleadoId = usuario.empleadoId;
+    let empleadoId = usuarioExistente.empleadoId;
 
     if (!empleadoId) {
       try {
         const empleadoRelacionado =
           usuario.empleado ||
-          (await prisma.empleado.findUnique({
-            where: { usuarioId: usuario.id },
+          (await prisma.empleados.findUnique({
+            where: { usuarioId: usuarioExistente.id },
             select: { id: true },
           }));
 
         if (empleadoRelacionado?.id) {
-          const usuarioConEmpleado = await prisma.usuario.update({
-            where: { id: usuario.id },
+          const usuarioConEmpleado = await prisma.usuarios.update({
+            where: { id: usuarioExistente.id },
             data: { empleadoId: empleadoRelacionado.id },
             select: { empleadoId: true },
           });
@@ -126,9 +126,9 @@ export async function loginAction(email: string, password: string): Promise<Logi
     }
 
     // Si tiene 2FA habilitado, crear challenge y redirigir a OTP
-    if (usuario.totpEnabled) {
+    if (usuarioExistente.totpEnabled) {
       try {
-        const { token, expires } = await createTwoFactorChallenge(usuario.id);
+        const { token, expires } = await createTwoFactorChallenge(usuarioExistente.id);
         cookieStore.set(TWO_FACTOR_COOKIE, token, {
           httpOnly: true,
           secure: process.env.NODE_ENV === 'production',
@@ -153,13 +153,13 @@ export async function loginAction(email: string, password: string): Promise<Logi
     // CRÍTICO: Invalidar todas las sesiones antiguas del usuario antes de crear una nueva
     // Esto previene problemas con cookies antiguas que puedan tener datos desactualizados (ej. rol incorrecto)
     try {
-      const sesionesEliminadas = await prisma.sesionActiva.deleteMany({
-        where: { usuarioId: usuario.id },
+      const sesionesEliminadas = await prisma.sesiones_activas.deleteMany({
+        where: { usuarioId: usuarioExistente.id },
       });
       
       if (sesionesEliminadas.count > 0) {
         console.info(
-          `[Login] Invalidadas ${sesionesEliminadas.count} sesión(es) antigua(s) para usuario ${usuario.email}`
+          `[Login] Invalidadas ${sesionesEliminadas.count} sesión(es) antigua(s) para usuario ${usuarioExistente.email}`
         );
       }
     } catch (sessionError) {
@@ -171,7 +171,7 @@ export async function loginAction(email: string, password: string): Promise<Logi
     let avatarUrl: string | null = null;
     if (empleadoId) {
       try {
-        const empleado = await prisma.empleado.findUnique({
+        const empleado = await prisma.empleados.findUnique({
           where: { id: empleadoId },
           select: { fotoUrl: true },
         });
@@ -185,12 +185,12 @@ export async function loginAction(email: string, password: string): Promise<Logi
     await createSession(
       {
         user: {
-          id: usuario.id,
-          email: usuario.email,
-          nombre: usuario.nombre,
-          apellidos: usuario.apellidos,
-          rol: usuario.rol,
-          empresaId: usuario.empresaId,
+          id: usuarioExistente.id,
+          email: usuarioExistente.email,
+          nombre: usuarioExistente.nombre,
+          apellidos: usuarioExistente.apellidos,
+          rol: usuarioExistente.rol,
+          empresaId: usuarioExistente.empresaId,
           empleadoId,
           avatar: avatarUrl, // Usar empleado.fotoUrl como fuente de verdad
           activo: usuarioActualizado.activo, // Usar valor actualizado de BD
@@ -204,12 +204,12 @@ export async function loginAction(email: string, password: string): Promise<Logi
 
     // Logging para auditoría y debugging (sin información sensible)
     console.info(
-      `[Login] Login exitoso - Email: ${usuario.email}, Rol: ${usuario.rol}, EmpresaId: ${usuario.empresaId}`
+      `[Login] Login exitoso - Email: ${usuarioExistente.email}, Rol: ${usuarioExistente.rol}, EmpresaId: ${usuarioExistente.empresaId}`
     );
 
     return {
       success: true,
-      rol: usuario.rol,
+      rol: usuarioExistente.rol,
     };
   } catch (error) {
     console.error('[Login] Error:', error);

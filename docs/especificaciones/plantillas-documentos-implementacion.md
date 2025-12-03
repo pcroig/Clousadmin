@@ -401,10 +401,10 @@ export const VARIABLES_DISPONIBLES: VariableDefinicion[] = [
     encriptado: true,
   },
   {
-    key: 'empleado_titular_cuenta',
-    label: 'Titular de la cuenta',
+    key: 'empleado_bic',
+    label: 'Código BIC',
     tipo: 'string',
-    ejemplo: 'Juan Pérez García',
+    ejemplo: 'BBVAESMMXXX',
     categoria: 'empleado',
   },
   
@@ -432,14 +432,14 @@ export const VARIABLES_DISPONIBLES: VariableDefinicion[] = [
   },
   {
     key: 'contrato_salario_bruto_anual',
-    label: 'Salario bruto anual',
+    label: 'Salario base anual',
     tipo: 'string',
     ejemplo: '30.000,00 €',
     categoria: 'contrato',
   },
   {
     key: 'contrato_salario_bruto_mensual',
-    label: 'Salario bruto mensual',
+    label: 'Salario base mensual',
     tipo: 'string',
     ejemplo: '2.500,00 €',
     categoria: 'contrato',
@@ -655,7 +655,7 @@ interface EmpleadoConRelaciones {
   estadoCivil: string | null;
   numeroHijos: number;
   iban: string | null;
-  titularCuenta: string | null;
+  bic: string | null;
   diasVacaciones: number;
   empresa: {
     nombre: string;
@@ -678,7 +678,7 @@ interface EmpleadoConRelaciones {
     tipoContrato: string;
     fechaInicio: Date;
     fechaFin: Date | null;
-    salarioBrutoAnual: any;
+    salarioBaseAnual: any;
     categoriaProfesional: string | null;
     grupoCotizacion: number | null;
   }>;
@@ -721,7 +721,7 @@ export async function resolverVariables(
           tipoContrato: true,
           fechaInicio: true,
           fechaFin: true,
-          salarioBrutoAnual: true,
+          salarioBaseAnual: true,
           categoriaProfesional: true,
           grupoCotizacion: true,
         },
@@ -792,7 +792,7 @@ function obtenerValorVariable(
   if (variable === 'empleado_telefono') return empleado.telefono;
   if (variable === 'empleado_estado_civil') return empleado.estadoCivil;
   if (variable === 'empleado_numero_hijos') return empleado.numeroHijos.toString();
-  if (variable === 'empleado_titular_cuenta') return empleado.titularCuenta;
+  if (variable === 'empleado_bic') return empleado.bic;
 
   // --- EMPLEADO: Dirección ---
   if (variable === 'empleado_direccion_calle') return empleado.direccionCalle;
@@ -862,7 +862,7 @@ function obtenerValorVariable(
   }
 
   if (variable === 'contrato_salario_bruto_anual') {
-    const salario = parseFloat(contrato.salarioBrutoAnual.toString());
+    const salario = parseFloat(contrato.salarioBaseAnual.toString());
     return new Intl.NumberFormat('es-ES', {
       style: 'currency',
       currency: 'EUR',
@@ -870,7 +870,7 @@ function obtenerValorVariable(
   }
 
   if (variable === 'contrato_salario_bruto_mensual') {
-    const salarioAnual = parseFloat(contrato.salarioBrutoAnual.toString());
+    const salarioAnual = parseFloat(contrato.salarioBaseAnual.toString());
     const salarioMensual = salarioAnual / 14; // 14 pagas
     return new Intl.NumberFormat('es-ES', {
       style: 'currency',

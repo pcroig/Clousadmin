@@ -55,7 +55,7 @@ export async function aplicarCorreccionFichaje({
   motivoEdicion: string;
   usuarioId: string;
 }): Promise<void> {
-  const fichaje = await prisma.fichaje.findUnique({
+  const fichaje = await prisma.fichajes.findUnique({
     where: { id: fichajeId },
     include: {
       eventos: {
@@ -76,7 +76,7 @@ export async function aplicarCorreccionFichaje({
 
   const fechaActualizada = normalizarFechaCorreccion(payload.nuevaFecha);
   if (fechaActualizada) {
-    await prisma.fichaje.update({
+    await prisma.fichajes.update({
       where: { id: fichajeId },
       data: { fecha: fechaActualizada },
     });
@@ -90,7 +90,7 @@ export async function aplicarCorreccionFichaje({
       throw new Error('Formato de hora inválido');
     }
 
-    await prisma.fichajeEvento.update({
+    await prisma.fichaje_eventos.update({
       where: { id: eventoObjetivo.id },
       data: {
         hora: nuevaHora,

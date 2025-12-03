@@ -31,7 +31,7 @@ export async function renovarSaldoHorasAnual(
     };
   }
 
-  const empleados = await prisma.empleado.findMany({
+  const empleados = await prisma.empleados.findMany({
     where: {
       estadoEmpleado: EstadoEmpleado.activo,
       OR: [
@@ -70,7 +70,7 @@ export async function renovarSaldoHorasAnual(
     const chunk = updates.slice(i, i + CHUNK_SIZE);
     await prisma.$transaction(
       chunk.map(({ id, fechaObjetivo }) =>
-        prisma.empleado.update({
+        prisma.empleados.update({
           where: { id },
           data: {
             saldoRenovadoDesde: fechaObjetivo,

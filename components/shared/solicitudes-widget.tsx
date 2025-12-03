@@ -11,6 +11,7 @@ import { useRouter } from 'next/navigation';
 import { memo, useCallback, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
+import { EmpleadoHoverCard } from '@/components/empleado/empleado-hover-card';
 import { EmployeeAvatar } from '@/components/shared/employee-avatar';
 import {
   ejecutarAccionSolicitud,
@@ -29,10 +30,15 @@ export interface Solicitud {
     apellidos?: string | null;
     fotoUrl?: string | null;
     avatar?: string | null;
+    email?: string | null;
+    puesto?: string | null;
+    equipo?: string | null;
+    equipoNombre?: string | null;
   };
   descripcion: string;
   fecha: Date;
   prioridad?: 'alta' | 'media' | 'baja';
+  estadoLabel?: string;
 }
 
 interface SolicitudesWidgetProps {
@@ -123,24 +129,100 @@ export const SolicitudesWidget = memo(function SolicitudesWidget({
     [ejecutarAccion]
   );
 
+  const handleAprobarTodas = useCallback(async () => {
+    if (solicitudes.length === 0) return;
+
+    const confirmacion = window.confirm(
+      `¿Estás seguro de que quieres aprobar todas las ${solicitudes.length} solicitudes pendientes?`
+    );
+
+    if (!confirmacion) return;
+
+    setAccionEnCurso({ id: 'todas', accion: 'aprobar' });
+    let aprobadas = 0;
+    let errores = 0;
+
+    for (const solicitud of solicitudes) {
+      try {
+        const resultado = await ejecutarAccionSolicitud({
+          solicitudId: solicitud.id,
+          tipo: solicitud.tipo,
+          accion: 'aprobar',
+        });
+
+        if (resultado.ok) {
+          aprobadas++;
+        } else {
+          errores++;
+        }
+      } catch (error) {
+        console.error('[SolicitudesWidget] Error al aprobar solicitud:', error);
+        errores++;
+      }
+    }
+
+    setAccionEnCurso(null);
+
+    if (aprobadas > 0) {
+      toast.success(`${aprobadas} solicitudes aprobadas correctamente`);
+    }
+    if (errores > 0) {
+      toast.error(`${errores} solicitudes no pudieron ser aprobadas`);
+    }
+
+    router.refresh();
+  }, [solicitudes, router]);
+
   return (
     <WidgetCard
       title="Solicitudes"
       href={dashboardHref}
       badge={solicitudes.length > 0 ? solicitudes.length : undefined}
-      contentClassName="overflow-y-auto"
+      useScroll
+      headerAction={
+        solicitudes.length > 0 ? (
+          <button
+            onClick={handleAprobarTodas}
+            disabled={accionEnCurso !== null}
+            className="px-2 py-1 text-[11px] sm:text-xs font-medium text-gray-700 border border-gray-300 bg-white hover:bg-gray-50 rounded-md transition-colors disabled:opacity-50 disabled:pointer-events-none"
+            title="Aprobar todas"
+          >
+            Aprobar todas
+          </button>
+        ) : undefined
+      }
     >
-      <div className="space-y-0">
+      <div className="flex h-full flex-col">
         {solicitudesMostradas.length === 0 ? (
-          <EmptyState
-            layout="widget"
-            icon={ClipboardList}
-            title="Sin solicitudes pendientes"
-            description="Todo al día por ahora."
-          />
+          <div className="flex flex-1 items-center justify-center min-h-[200px]">
+            <EmptyState
+              layout="widget"
+              icon={ClipboardList}
+              title="Sin solicitudes pendientes"
+              description="Todo al día por ahora."
+            />
+          </div>
         ) : (
-          solicitudesMostradas.map((solicitud) => {
-            const estaProcesando = accionEnCurso?.id === solicitud.id;
+          <div className="space-y-0">
+            {solicitudesMostradas.map((solicitud) => {
+              const estaProcesando = accionEnCurso?.id === solicitud.id;
+              const hoverCardProps = {
+                empleado: {
+                  nombre: solicitud.empleado.nombre,
+                  apellidos: solicitud.empleado.apellidos,
+                  puesto: solicitud.empleado.puesto,
+                  email: solicitud.empleado.email,
+                  equipo: solicitud.empleado.equipo,
+                  equipoNombre: solicitud.empleado.equipoNombre,
+                  fotoUrl: solicitud.empleado.fotoUrl ?? solicitud.empleado.avatar,
+                },
+                estado: solicitud.estadoLabel
+                  ? {
+                      label: solicitud.estadoLabel,
+                      description: solicitud.descripcion,
+                    }
+                  : undefined,
+              } as const;
 
             return (
               <div
@@ -149,16 +231,23 @@ export const SolicitudesWidget = memo(function SolicitudesWidget({
                 className="py-3 border-b border-gray-200 last:border-0 hover:bg-gray-50 transition-colors px-2 -mx-2 cursor-pointer"
               >
                 <div className="flex items-start gap-3">
-                  <EmployeeAvatar
-                    nombre={solicitud.empleado.nombre}
-                    apellidos={solicitud.empleado.apellidos}
-                    fotoUrl={solicitud.empleado.fotoUrl}
-                    size="sm"
-                  />
+                  <EmpleadoHoverCard {...hoverCardProps} triggerClassName="flex-shrink-0">
+                    <EmployeeAvatar
+                      nombre={solicitud.empleado.nombre}
+                      apellidos={solicitud.empleado.apellidos}
+                      fotoUrl={solicitud.empleado.fotoUrl}
+                      size="sm"
+                    />
+                  </EmpleadoHoverCard>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-2 mb-1">
                       <p className="text-[13px] text-gray-900 leading-tight">
-                        <span className="font-semibold">{solicitud.empleado.nombre}</span>
+                        <EmpleadoHoverCard
+                          {...hoverCardProps}
+                          triggerClassName="font-semibold text-gray-900"
+                        >
+                          <span className="font-semibold">{solicitud.empleado.nombre} {solicitud.empleado.apellidos || ''}</span>
+                        </EmpleadoHoverCard>
                         {' solicita '}
                         <span className="font-normal text-gray-600">
                           {solicitud.descripcion.toLowerCase()}
@@ -189,7 +278,8 @@ export const SolicitudesWidget = memo(function SolicitudesWidget({
                 </div>
               </div>
             );
-          })
+          })}
+        </div>
         )}
       </div>
       {solicitudes.length > maxItems && (

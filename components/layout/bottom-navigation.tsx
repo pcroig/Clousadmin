@@ -4,7 +4,16 @@
 
 'use client';
 
-import { Calendar, Clock, Home, Inbox, Settings, User } from 'lucide-react';
+import {
+  Building2,
+  Calendar,
+  Clock,
+  FileText,
+  FolderOpen,
+  Home,
+  MoreHorizontal,
+  Users
+} from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
@@ -27,22 +36,10 @@ export function BottomNavigation({ rol }: BottomNavigationProps) {
   // Navegación para Empleado
   const empleadoNavigation: NavItem[] = [
     {
-      name: 'Dashboard',
+      name: 'Inicio',
       href: '/empleado/dashboard',
       icon: Home,
       isActive: (path) => path === '/empleado/dashboard',
-    },
-    {
-      name: 'Bandeja',
-      href: '/empleado/bandeja-entrada',
-      icon: Inbox,
-      isActive: (path) => path.includes('/empleado/bandeja-entrada'),
-    },
-    {
-      name: 'Ausencias',
-      href: '/empleado/mi-espacio/ausencias',
-      icon: Calendar,
-      isActive: (path) => path.includes('/empleado/mi-espacio/ausencias'),
     },
     {
       name: 'Fichajes',
@@ -51,69 +48,90 @@ export function BottomNavigation({ rol }: BottomNavigationProps) {
       isActive: (path) => path.includes('/empleado/mi-espacio/fichajes'),
     },
     {
-      name: 'Mi espacio',
+      name: 'Ausencias',
+      href: '/empleado/mi-espacio/ausencias',
+      icon: Calendar,
+      isActive: (path) => path.includes('/empleado/mi-espacio/ausencias'),
+    },
+    {
+      name: 'Documentos',
+      href: '/empleado/mi-espacio/documentos',
+      icon: FolderOpen,
+      isActive: (path) => path.includes('/empleado/mi-espacio/documentos'),
+    },
+    {
+      name: 'Otros',
       href: '/empleado/mi-espacio/datos',
-      icon: User,
+      icon: MoreHorizontal,
       isActive: (path) =>
-        path.startsWith('/empleado/mi-espacio/datos') ||
+        path.includes('/empleado/mi-espacio/datos') ||
         path.includes('/empleado/mi-espacio/contratos') ||
-        path.includes('/empleado/mi-espacio/documentos'),
+        path.includes('/empleado/mi-espacio/nominas'),
     },
   ];
 
-  // Navegación para Manager
+  // Navegación para Manager (4 items - Mi Espacio va en avatar)
   const managerNavigation: NavItem[] = [
     {
-      name: 'Dashboard',
+      name: 'Inicio',
       href: '/manager/dashboard',
       icon: Home,
       isActive: (path) => path === '/manager/dashboard',
     },
     {
-      name: 'Horario',
+      name: 'Fichajes',
       href: '/manager/horario/fichajes',
       icon: Clock,
-      isActive: (path) => path.includes('/manager/horario'),
+      isActive: (path) => path.includes('/manager/horario/fichajes'),
     },
     {
-      name: 'Bandeja',
-      href: '/manager/bandeja-entrada',
-      icon: Inbox,
-      isActive: (path) => path.includes('/manager/bandeja-entrada'),
+      name: 'Ausencias',
+      href: '/manager/horario/ausencias',
+      icon: Calendar,
+      isActive: (path) => path.includes('/manager/horario/ausencias'),
     },
     {
-      name: 'Perfil',
-      href: '/manager/settings',
-      icon: User,
-      isActive: (path) => path.includes('/manager/settings'),
+      name: 'Equipo',
+      href: '/manager/equipo',
+      icon: Users,
+      isActive: (path) => path.includes('/manager/equipo'),
     },
   ];
 
   // Navegación para HR Admin
   const hrNavigation: NavItem[] = [
     {
-      name: 'Dashboard',
+      name: 'Inicio',
       href: '/hr/dashboard',
       icon: Home,
       isActive: (path) => path === '/hr/dashboard',
     },
     {
-      name: 'Horario',
+      name: 'Fichajes',
       href: '/hr/horario/fichajes',
       icon: Clock,
-      isActive: (path) => path.includes('/hr/horario'),
+      isActive: (path) => path.includes('/hr/horario/fichajes'),
     },
     {
-      name: 'Bandeja',
-      href: '/hr/bandeja-entrada',
-      icon: Inbox,
-      isActive: (path) => path.includes('/hr/bandeja-entrada'),
+      name: 'Ausencias',
+      href: '/hr/horario/ausencias',
+      icon: Calendar,
+      isActive: (path) => path.includes('/hr/horario/ausencias'),
     },
     {
-      name: 'Ajustes',
-      href: '/hr/settings',
-      icon: Settings,
-      isActive: (path) => path.includes('/hr/settings'),
+      name: 'Org',
+      href: '/hr/organizacion/personas',
+      icon: Building2,
+      isActive: (path) => path.includes('/hr/organizacion'),
+    },
+    {
+      name: 'Otros',
+      href: '/hr/documentos',
+      icon: MoreHorizontal,
+      isActive: (path) =>
+        path.includes('/hr/documentos') ||
+        path.includes('/hr/payroll') ||
+        path.includes('/hr/informes'),
     },
   ];
 
@@ -122,7 +140,7 @@ export function BottomNavigation({ rol }: BottomNavigationProps) {
     rol === 'hr_admin' ? hrNavigation : rol === 'manager' ? managerNavigation : empleadoNavigation;
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-200 sm:hidden">
+    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-white shadow-[0_-2px_8px_rgba(0,0,0,0.08)] sm:hidden">
       <div className="flex items-center justify-around h-16">
         {navigation.map((item) => {
           const Icon = item.icon;

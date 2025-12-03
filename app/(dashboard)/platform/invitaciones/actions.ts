@@ -117,7 +117,7 @@ export async function deactivateCompanyAction(rawEmpresaId: string): Promise<Act
 
     const includeSubscriptions = await hasSubscriptionTable();
 
-    const company = await prisma.empresa.findUnique({
+    const company = await prisma.empresas.findUnique({
       where: { id: empresaId },
       select: {
         id: true,
@@ -153,17 +153,17 @@ export async function deactivateCompanyAction(rawEmpresaId: string): Promise<Act
     }
 
     await prisma.$transaction(async (tx) => {
-      await tx.empresa.update({
+      await tx.empresas.update({
         where: { id: empresaId },
         data: { activo: false },
       });
 
-      await tx.usuario.updateMany({
+      await tx.usuarios.updateMany({
         where: { empresaId },
         data: { activo: false },
       });
 
-      await tx.empleado.updateMany({
+      await tx.empleados.updateMany({
         where: { empresaId },
         data: {
           estadoEmpleado: 'suspendido',
@@ -171,7 +171,7 @@ export async function deactivateCompanyAction(rawEmpresaId: string): Promise<Act
         },
       });
 
-      await tx.sesionActiva.deleteMany({
+      await tx.sesiones_activas.deleteMany({
         where: {
           usuario: {
             is: { empresaId },

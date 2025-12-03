@@ -24,7 +24,7 @@ export default async function PersonasPage(props: {
   }
 
   // Obtener todos los empleados
-  const empleados = await prisma.empleado.findMany({
+  const empleados = await prisma.empleados.findMany({
     where: {
       empresaId: session.user.empresaId,
     },
@@ -51,7 +51,7 @@ export default async function PersonasPage(props: {
       codigoPostal: true,
       iban: true,
       fechaAlta: true,
-      salarioBrutoMensual: true,
+      salarioBaseMensual: true,
       puestoRelacion: {
         select: {
           id: true,
@@ -110,7 +110,7 @@ export default async function PersonasPage(props: {
       pais: 'España', // Default
       iban: emp.iban,
       fechaIngreso: emp.fechaAlta,
-      salarioBase: emp.salarioBrutoMensual ? Number(emp.salarioBrutoMensual) : null,
+      salarioBase: emp.salarioBaseMensual ? Number(emp.salarioBaseMensual) : null,
     },
   }));
 

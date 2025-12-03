@@ -93,7 +93,7 @@ Botón de exportación que genera un archivo Excel con 4 hojas:
 
 **KPIs principales destacados:**
 1. **Coste total nómina**: Suma de todos los salarios brutos mensuales (muestra variación vs mes anterior)
-2. **Salario promedio**: Media del salario bruto mensual por empleado
+2. **Salario promedio**: Media del salario base mensual por empleado
 3. **Brecha salarial (H vs M)**: Diferencia absoluta y porcentual entre los salarios promedios de hombres y mujeres
 4. *(Opcional)* **Nóminas procesadas**: Número de nóminas emitidas en el año en curso (visible solo cuando existe histórico)
 
@@ -114,7 +114,7 @@ Botón de exportación que genera un archivo Excel con 4 hojas:
    - Complementos más utilizados por importe total del año actual
 
 4. **Salario Promedio por Equipo** (Gráfico de Barras)
-   - Salario bruto mensual promedio por equipo
+   - Salario base mensual promedio por equipo
    - En euros mensuales
 
 5. **Evolución Coste Nómina** (Gráfico de Área)

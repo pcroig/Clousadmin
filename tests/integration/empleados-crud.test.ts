@@ -15,7 +15,7 @@ describe.skip('Empleados CRUD Integration', () => {
 
   beforeAll(async () => {
     // Crear empresa de test
-    const empresa = await prisma.empresa.create({
+    const empresa = await prisma.empresas.create({
       data: {
         nombre: 'Empresa Test Integration',
         cif: `TEST${Date.now()}`,
@@ -29,11 +29,11 @@ describe.skip('Empleados CRUD Integration', () => {
   afterAll(async () => {
     // Limpiar datos de test
     if (testEmpresaId) {
-      await prisma.empleado.deleteMany({
+      await prisma.empleados.deleteMany({
         where: { empresaId: testEmpresaId },
       });
 
-      await prisma.empresa.delete({
+      await prisma.empresas.delete({
         where: { id: testEmpresaId },
       });
     }
@@ -43,7 +43,7 @@ describe.skip('Empleados CRUD Integration', () => {
 
   describe('Crear Empleado', () => {
     it('debe crear empleado con datos mínimos', async () => {
-      const empleado = await prisma.empleado.create({
+      const empleado = await prisma.empleados.create({
         data: {
           empresaId: testEmpresaId,
           nombre: 'Juan',
@@ -65,7 +65,7 @@ describe.skip('Empleados CRUD Integration', () => {
     });
 
     it('debe crear empleado con todos los campos opcionales', async () => {
-      const empleado = await prisma.empleado.create({
+      const empleado = await prisma.empleados.create({
         data: {
           empresaId: testEmpresaId,
           nombre: 'María',
@@ -94,7 +94,7 @@ describe.skip('Empleados CRUD Integration', () => {
       const email = `duplicado${Date.now()}@test.com`;
 
       // Crear primer empleado
-      await prisma.empleado.create({
+      await prisma.empleados.create({
         data: {
           empresaId: testEmpresaId,
           nombre: 'Pedro',
@@ -108,7 +108,7 @@ describe.skip('Empleados CRUD Integration', () => {
 
       // Intentar crear segundo con mismo email
       await expect(
-        prisma.empleado.create({
+        prisma.empleados.create({
           data: {
             empresaId: testEmpresaId,
             nombre: 'Luis',
@@ -127,7 +127,7 @@ describe.skip('Empleados CRUD Integration', () => {
     beforeEach(async () => {
       // Crear empleado de test si no existe
       if (!testEmpleadoId) {
-        const empleado = await prisma.empleado.create({
+        const empleado = await prisma.empleados.create({
           data: {
             empresaId: testEmpresaId,
             nombre: 'Test',
@@ -143,7 +143,7 @@ describe.skip('Empleados CRUD Integration', () => {
     });
 
     it('debe obtener empleado por ID', async () => {
-      const empleado = await prisma.empleado.findUnique({
+      const empleado = await prisma.empleados.findUnique({
         where: { id: testEmpleadoId },
       });
 
@@ -152,7 +152,7 @@ describe.skip('Empleados CRUD Integration', () => {
     });
 
     it('debe obtener empleados de una empresa', async () => {
-      const empleados = await prisma.empleado.findMany({
+      const empleados = await prisma.empleados.findMany({
         where: { empresaId: testEmpresaId },
       });
 
@@ -161,7 +161,7 @@ describe.skip('Empleados CRUD Integration', () => {
     });
 
     it('debe filtrar por estado', async () => {
-      const activos = await prisma.empleado.findMany({
+      const activos = await prisma.empleados.findMany({
         where: {
           empresaId: testEmpresaId,
           estado: EstadoEmpleado.activo,
@@ -172,7 +172,7 @@ describe.skip('Empleados CRUD Integration', () => {
     });
 
     it('debe incluir relaciones (usuario, jornada)', async () => {
-      const empleado = await prisma.empleado.findUnique({
+      const empleado = await prisma.empleados.findUnique({
         where: { id: testEmpleadoId },
         include: {
           usuario: true,
@@ -190,7 +190,7 @@ describe.skip('Empleados CRUD Integration', () => {
   describe('Actualizar Empleado', () => {
     beforeEach(async () => {
       if (!testEmpleadoId) {
-        const empleado = await prisma.empleado.create({
+        const empleado = await prisma.empleados.create({
           data: {
             empresaId: testEmpresaId,
             nombre: 'Test',
@@ -206,7 +206,7 @@ describe.skip('Empleados CRUD Integration', () => {
     });
 
     it('debe actualizar datos básicos', async () => {
-      const updated = await prisma.empleado.update({
+      const updated = await prisma.empleados.update({
         where: { id: testEmpleadoId },
         data: {
           telefono: '+34611222333',
@@ -221,7 +221,7 @@ describe.skip('Empleados CRUD Integration', () => {
     it('debe actualizar salario', async () => {
       const salarioNuevo = 35000;
 
-      const updated = await prisma.empleado.update({
+      const updated = await prisma.empleados.update({
         where: { id: testEmpleadoId },
         data: { salarioBase: salarioNuevo },
       });
@@ -230,7 +230,7 @@ describe.skip('Empleados CRUD Integration', () => {
     });
 
     it('debe cambiar estado a baja', async () => {
-      const updated = await prisma.empleado.update({
+      const updated = await prisma.empleados.update({
         where: { id: testEmpleadoId },
         data: {
           estado: EstadoEmpleado.baja,
@@ -246,7 +246,7 @@ describe.skip('Empleados CRUD Integration', () => {
   describe('Eliminar Empleado', () => {
     it('debe poder eliminar empleado', async () => {
       // Crear empleado temporal
-      const tempEmpleado = await prisma.empleado.create({
+      const tempEmpleado = await prisma.empleados.create({
         data: {
           empresaId: testEmpresaId,
           nombre: 'Temporal',
@@ -259,12 +259,12 @@ describe.skip('Empleados CRUD Integration', () => {
       });
 
       // Eliminarlo
-      await prisma.empleado.delete({
+      await prisma.empleados.delete({
         where: { id: tempEmpleado.id },
       });
 
       // Verificar que ya no existe
-      const deleted = await prisma.empleado.findUnique({
+      const deleted = await prisma.empleados.findUnique({
         where: { id: tempEmpleado.id },
       });
 
@@ -276,7 +276,7 @@ describe.skip('Empleados CRUD Integration', () => {
     it('debe crear empleado con usuario asociado', async () => {
       const passwordHash = await bcrypt.hash('password123', 10);
 
-      const empleado = await prisma.empleado.create({
+      const empleado = await prisma.empleados.create({
         data: {
           empresaId: testEmpresaId,
           nombre: 'Con',
@@ -309,7 +309,7 @@ describe.skip('Empleados CRUD Integration', () => {
       const passwordHash = await bcrypt.hash('password123', 10);
       const email = `reverse${Date.now()}@test.com`;
 
-      const empleado = await prisma.empleado.create({
+      const empleado = await prisma.empleados.create({
         data: {
           empresaId: testEmpresaId,
           nombre: 'Reverse',
@@ -331,7 +331,7 @@ describe.skip('Empleados CRUD Integration', () => {
       });
 
       // Buscar usuario y obtener empleado
-      const usuario = await prisma.usuario.findUnique({
+      const usuario = await prisma.usuarios.findUnique({
         where: { email },
         include: { empleado: true },
       });
@@ -343,7 +343,7 @@ describe.skip('Empleados CRUD Integration', () => {
 
   describe('Queries complejas', () => {
     it('debe contar empleados activos', async () => {
-      const count = await prisma.empleado.count({
+      const count = await prisma.empleados.count({
         where: {
           empresaId: testEmpresaId,
           estado: EstadoEmpleado.activo,
@@ -354,7 +354,7 @@ describe.skip('Empleados CRUD Integration', () => {
     });
 
     it('debe buscar por texto en nombre/apellidos', async () => {
-      await prisma.empleado.create({
+      await prisma.empleados.create({
         data: {
           empresaId: testEmpresaId,
           nombre: 'Buscable',
@@ -366,7 +366,7 @@ describe.skip('Empleados CRUD Integration', () => {
         },
       });
 
-      const results = await prisma.empleado.findMany({
+      const results = await prisma.empleados.findMany({
         where: {
           empresaId: testEmpresaId,
           OR: [
@@ -380,7 +380,7 @@ describe.skip('Empleados CRUD Integration', () => {
     });
 
     it('debe ordenar por fecha de alta', async () => {
-      const empleados = await prisma.empleado.findMany({
+      const empleados = await prisma.empleados.findMany({
         where: { empresaId: testEmpresaId },
         orderBy: { fechaAlta: 'desc' },
         take: 5,

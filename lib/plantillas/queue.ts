@@ -36,7 +36,7 @@ async function procesarEmpleadosJob(
   let fallidos = 0;
 
   // Verificar formato de plantilla
-  const plantilla = await prisma.plantillaDocumento.findUnique({
+  const plantilla = await prisma.plantillas_documentos.findUnique({
     where: { id: config.plantillaId },
     select: { formato: true },
   });
@@ -81,7 +81,7 @@ async function procesarEmpleadosJob(
     const procesados = i + 1;
     const progreso = Math.round((procesados / total) * 100);
 
-    await prisma.jobGeneracionDocumentos.update({
+    await prisma.jobs_generacion_documentos.update({
       where: { id: jobId },
       data: {
         progreso,
@@ -173,7 +173,7 @@ async function procesarJobSinCola(jobId: string, config: JobConfig) {
   const total = config.empleadoIds.length;
   const inicio = Date.now();
 
-  await prisma.jobGeneracionDocumentos.update({
+  await prisma.jobs_generacion_documentos.update({
     where: { id: jobId },
     data: {
       estado: 'procesando',
@@ -184,7 +184,7 @@ async function procesarJobSinCola(jobId: string, config: JobConfig) {
   try {
     const { exitosos, fallidos, resultados } = await procesarEmpleadosJob(jobId, config);
 
-    await prisma.jobGeneracionDocumentos.update({
+    await prisma.jobs_generacion_documentos.update({
       where: { id: jobId },
       data: {
         estado: 'completado',
@@ -207,7 +207,7 @@ async function procesarJobSinCola(jobId: string, config: JobConfig) {
       jobId,
     });
   } catch (error) {
-    await prisma.jobGeneracionDocumentos.update({
+    await prisma.jobs_generacion_documentos.update({
       where: { id: jobId },
       data: {
         estado: 'fallido',
@@ -300,7 +300,7 @@ export async function agregarJobGeneracion(config: JobConfig): Promise<string> {
   }
 
   // Crear registro en BD
-  const jobRecord = await prisma.jobGeneracionDocumentos.create({
+  const jobRecord = await prisma.jobs_generacion_documentos.create({
     data: {
       empresaId: config.empresaId,
       plantillaId: config.plantillaId,
@@ -350,7 +350,7 @@ export async function agregarJobGeneracion(config: JobConfig): Promise<string> {
     }
 
     // Si es otro error, actualizar el registro y relanzar
-    await prisma.jobGeneracionDocumentos.update({
+    await prisma.jobs_generacion_documentos.update({
       where: { id: jobRecord.id },
       data: {
         estado: 'fallido',
@@ -368,7 +368,7 @@ export async function agregarJobGeneracion(config: JobConfig): Promise<string> {
 export async function obtenerEstadoJob(jobId: string): Promise<JobProgress | null> {
   try {
     // Buscar en BD
-    const jobRecord = await prisma.jobGeneracionDocumentos.findUnique({
+    const jobRecord = await prisma.jobs_generacion_documentos.findUnique({
       where: { id: jobId },
     });
 
@@ -407,7 +407,7 @@ export async function cancelarJob(jobId: string): Promise<boolean> {
     await job.remove();
 
     // Actualizar en BD
-    await prisma.jobGeneracionDocumentos.update({
+    await prisma.jobs_generacion_documentos.update({
       where: { id: jobId },
       data: {
         estado: 'fallido',
@@ -438,7 +438,7 @@ export const documentosWorker = new Worker(
     console.log(`[Worker] Procesando job ${jobId} - ${total} empleados`);
 
     // Actualizar estado a "procesando"
-    await prisma.jobGeneracionDocumentos.update({
+    await prisma.jobs_generacion_documentos.update({
       where: { id: jobId },
       data: {
         estado: 'procesando',
@@ -459,7 +459,7 @@ export const documentosWorker = new Worker(
     // Completar job
     const tiempoTotal = Date.now() - (job.processedOn || Date.now());
 
-    await prisma.jobGeneracionDocumentos.update({
+    await prisma.jobs_generacion_documentos.update({
       where: { id: jobId },
       data: {
         estado: 'completado',
@@ -474,13 +474,12 @@ export const documentosWorker = new Worker(
     });
 
     // Notificar al solicitante
-    await prisma.notificacion.create({
+    await prisma.notificaciones.create({
       data: {
         empresaId: config.empresaId,
         usuarioId: config.solicitadoPor,
         tipo: exitosos === total ? 'success' : fallidos > 0 ? 'warning' : 'info',
-        titulo: 'Generación de documentos completada',
-        mensaje: `Se generaron ${exitosos} documentos exitosamente${fallidos > 0 ? `, ${fallidos} fallidos` : ''}.`,
+        mensaje: `Se han generado ${exitosos} documento${exitosos !== 1 ? 's' : ''} exitosamente${fallidos > 0 ? ` (${fallidos} fallido${fallidos !== 1 ? 's' : ''})` : ''}`,
         metadata: {
           jobId,
           totalEmpleados: total,
@@ -542,7 +541,7 @@ documentosWorker.on('failed', async (job, error) => {
     const config: JobConfig & { jobId: string } = job.data;
 
     // Actualizar en BD
-    await prisma.jobGeneracionDocumentos.update({
+    await prisma.jobs_generacion_documentos.update({
       where: { id: config.jobId },
       data: {
         estado: 'fallido',
@@ -554,13 +553,12 @@ documentosWorker.on('failed', async (job, error) => {
     });
 
     // Notificar al solicitante
-    await prisma.notificacion.create({
+    await prisma.notificaciones.create({
       data: {
         empresaId: config.empresaId,
         usuarioId: config.solicitadoPor,
         tipo: 'error',
-        titulo: 'Error en generación de documentos',
-        mensaje: `Ocurrió un error al generar los documentos: ${error.message}`,
+        mensaje: `Error al generar los documentos: ${error.message}`,
         metadata: {
           jobId: config.jobId,
           error: error.message,
@@ -583,7 +581,7 @@ export async function limpiarJobsAntiguos(): Promise<void> {
     const hace7Dias = new Date();
     hace7Dias.setDate(hace7Dias.getDate() - 7);
 
-    const eliminados = await prisma.jobGeneracionDocumentos.deleteMany({
+    const eliminados = await prisma.jobs_generacion_documentos.deleteMany({
       where: {
         estado: 'completado',
         completadoEn: {

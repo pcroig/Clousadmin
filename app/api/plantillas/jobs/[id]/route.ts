@@ -34,7 +34,7 @@ export async function GET(
     }
 
     // Verificar permisos (el job debe ser de la empresa del usuario)
-    const job = await prisma.jobGeneracionDocumentos.findUnique({
+    const job = await prisma.jobs_generacion_documentos.findUnique({
       where: { id: params.id },
       select: { empresaId: true },
     });
@@ -76,7 +76,7 @@ export async function DELETE(
     }
 
     // Verificar permisos
-    const job = await prisma.jobGeneracionDocumentos.findUnique({
+    const job = await prisma.jobs_generacion_documentos.findUnique({
       where: { id: params.id },
       select: { empresaId: true, estado: true },
     });

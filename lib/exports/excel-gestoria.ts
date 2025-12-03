@@ -60,7 +60,7 @@ async function agregarHojaResumen(
   const resumenes = await obtenerResumenesMensuales(empresaId, mes, anio);
 
   // Obtener datos de empleados
-  const empleados = await prisma.empleado.findMany({
+  const empleados = await prisma.empleados.findMany({
     where: {
       empresaId,
       activo: true,
@@ -171,7 +171,7 @@ async function agregarHojaAusencias(
   const fechaFin = new Date(anio, mes, 0);
 
   // Obtener todas las ausencias del mes
-  const ausencias = await prisma.ausencia.findMany({
+  const ausencias = await prisma.ausencias.findMany({
     where: {
       empresaId,
       estado: {
@@ -301,7 +301,7 @@ async function agregarHojaCambios(
   data.push(['Tipo', 'Empleado', 'Fecha', 'Detalle']);
 
   // 1. ALTAS: Empleados dados de alta en el mes
-  const altas = await prisma.empleado.findMany({
+  const altas = await prisma.empleados.findMany({
     where: {
       empresaId,
       fechaAlta: {
@@ -330,7 +330,7 @@ async function agregarHojaCambios(
   }
 
   // 2. BAJAS: Empleados dados de baja en el mes
-  const bajas = await prisma.empleado.findMany({
+  const bajas = await prisma.empleados.findMany({
     where: {
       empresaId,
       fechaBaja: {
@@ -384,9 +384,9 @@ async function agregarHojaCambios(
     orderBy: {
       fechaRespuesta: 'asc',
     },
-  } satisfies Prisma.SolicitudCambioFindManyArgs;
+  } satisfies Prisma.solicitudes_cambioFindManyArgs;
 
-  const cambiosSalario = await prisma.solicitudCambio.findMany(cambiosSalarioQuery);
+  const cambiosSalario = await prisma.solicitudes_cambio.findMany(cambiosSalarioQuery);
 
   for (const cambio of cambiosSalario) {
     const campos = cambio.camposCambiados as Record<string, unknown>;
@@ -452,14 +452,14 @@ export async function guardarExportGestoria(
   generadoPor: string
 ): Promise<void> {
   // Contar empleados y alertas
-  const numEmpleados = await prisma.empleado.count({
+  const numEmpleados = await prisma.empleados.count({
     where: {
       empresaId,
       activo: true,
     },
   });
 
-  const numAlertasCriticas = await prisma.alertaNomina.count({
+  const numAlertasCriticas = await prisma.alertas_nomina.count({
     where: {
       empresaId,
       tipo: 'critico',
@@ -471,7 +471,7 @@ export async function guardarExportGestoria(
     },
   });
 
-  await prisma.exportGestoria.create({
+  await prisma.exports_gestoria.create({
     data: {
       empresaId,
       mes,

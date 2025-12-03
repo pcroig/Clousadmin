@@ -8,6 +8,7 @@ import { type BandejaEntradaTab, BandejaEntradaTabs } from '@/components/hr/band
 import { getSession } from '@/lib/auth';
 import { EstadoAusencia, EstadoSolicitud, UsuarioRol } from '@/lib/constants/enums';
 import { prisma } from '@/lib/prisma';
+import { formatAusenciaTipo } from '@/lib/utils/formatters';
 
 import type { TipoNotificacion } from '@/lib/notificaciones';
 import type { NotificacionUI } from '@/types/Notificacion';
@@ -37,7 +38,7 @@ export default async function ManagerBandejaEntradaPage(props: {
   }
 
   // Obtener IDs de empleados a cargo del manager
-  const empleadosACargo = await prisma.empleado.findMany({
+  const empleadosACargo = await prisma.empleados.findMany({
     where: {
       managerId: session.user.empleadoId,
       empresaId: session.user.empresaId,
@@ -51,7 +52,7 @@ export default async function ManagerBandejaEntradaPage(props: {
   const empleadoIds = empleadosACargo.map((e) => e.id);
 
   // Obtener solicitudes pendientes de ausencia (solo de su equipo)
-  const ausenciasPendientes = await prisma.ausencia.findMany({
+  const ausenciasPendientes = await prisma.ausencias.findMany({
     where: {
       empresaId: session.user.empresaId,
       estado: EstadoAusencia.pendiente,
@@ -74,7 +75,7 @@ export default async function ManagerBandejaEntradaPage(props: {
   });
 
   // Obtener solicitudes resueltas de ausencia (aprobadas/rechazadas) de su equipo
-  const ausenciasResueltas = await prisma.ausencia.findMany({
+  const ausenciasResueltas = await prisma.ausencias.findMany({
     where: {
       empresaId: session.user.empresaId,
       estado: {
@@ -100,7 +101,7 @@ export default async function ManagerBandejaEntradaPage(props: {
   });
 
   // Obtener solicitudes de cambio pendientes (solo de su equipo)
-  const solicitudesCambioPendientes = await prisma.solicitudCambio.findMany({
+  const solicitudesCambioPendientes = await prisma.solicitudes_cambio.findMany({
     where: {
       empresaId: session.user.empresaId,
       estado: {
@@ -125,7 +126,7 @@ export default async function ManagerBandejaEntradaPage(props: {
   });
 
   // Obtener solicitudes de cambio resueltas (solo de su equipo)
-  const solicitudesCambioResueltas = await prisma.solicitudCambio.findMany({
+  const solicitudesCambioResueltas = await prisma.solicitudes_cambio.findMany({
     where: {
       empresaId: session.user.empresaId,
       estado: {
@@ -167,7 +168,7 @@ export default async function ManagerBandejaEntradaPage(props: {
         fotoUrl: aus.empleado.fotoUrl || undefined,
       },
       tipo: 'ausencia',
-      detalles: `Solicitud de ${aus.tipo}`,
+      detalles: `Solicitud de ${formatAusenciaTipo(aus.tipo)}`,
       fechaCreacion: aus.createdAt,
       estado: EstadoAusencia.pendiente,
       metadata: {
@@ -184,7 +185,7 @@ export default async function ManagerBandejaEntradaPage(props: {
         fotoUrl: sol.empleado.fotoUrl || undefined,
       },
       tipo: 'cambio_datos',
-      detalles: `Solicitud de cambio de ${sol.tipo}`,
+      detalles: `Solicitud de cambio de ${formatAusenciaTipo(sol.tipo)}`,
       fechaCreacion: sol.createdAt,
       estado: EstadoAusencia.pendiente,
       metadata: {
@@ -204,7 +205,7 @@ export default async function ManagerBandejaEntradaPage(props: {
         fotoUrl: aus.empleado.fotoUrl || undefined,
       },
       tipo: 'ausencia',
-      detalles: `Solicitud de ${aus.tipo}`,
+      detalles: `Solicitud de ${formatAusenciaTipo(aus.tipo)}`,
       fechaCreacion: aus.createdAt,
       estado: aus.estado,
       fechaResolucion: aus.aprobadaEn || undefined,
@@ -222,7 +223,7 @@ export default async function ManagerBandejaEntradaPage(props: {
         fotoUrl: sol.empleado.fotoUrl || undefined,
       },
       tipo: 'cambio_datos',
-      detalles: `Solicitud de cambio de ${sol.tipo}`,
+      detalles: `Solicitud de cambio de ${formatAusenciaTipo(sol.tipo)}`,
       fechaCreacion: sol.createdAt,
       estado:
         sol.estado === EstadoSolicitud.aprobada_manual || sol.estado === EstadoSolicitud.auto_aprobada
@@ -239,7 +240,7 @@ export default async function ManagerBandejaEntradaPage(props: {
   ].sort((a, b) => (b.fechaResolucion?.getTime() || 0) - (a.fechaResolucion?.getTime() || 0));
 
   // Obtener elementos resueltos (auto-completados) - solo de su equipo
-  const itemsResueltos = await prisma.autoCompletado.findMany({
+  const itemsResueltos = await prisma.auto_completados.findMany({
     where: {
       empresaId: session.user.empresaId,
       estado: {
@@ -264,7 +265,7 @@ export default async function ManagerBandejaEntradaPage(props: {
   });
 
   // Estadísticas de items resueltos (solo de su equipo)
-  const fichajesActualizados = await prisma.autoCompletado.count({
+  const fichajesActualizados = await prisma.auto_completados.count({
     where: {
       empresaId: session.user.empresaId,
       tipo: 'fichaje_cerrado',
@@ -280,7 +281,7 @@ export default async function ManagerBandejaEntradaPage(props: {
   const treintaDiasAtras = new Date();
   treintaDiasAtras.setDate(treintaDiasAtras.getDate() - 30);
 
-  const ausenciasRevisadas = await prisma.ausencia.count({
+  const ausenciasRevisadas = await prisma.ausencias.count({
     where: {
       empresaId: session.user.empresaId,
       estado: {
@@ -295,7 +296,7 @@ export default async function ManagerBandejaEntradaPage(props: {
     },
   });
 
-  const nominasRevisadas = await prisma.autoCompletado.count({
+  const nominasRevisadas = await prisma.auto_completados.count({
     where: {
       empresaId: session.user.empresaId,
       tipo: 'nomina_extraida',
@@ -333,10 +334,21 @@ export default async function ManagerBandejaEntradaPage(props: {
   }));
 
   // Obtener notificaciones del manager
-  const notificacionesRaw = await prisma.notificacion.findMany({
+  const notificacionesRaw = await prisma.notificaciones.findMany({
     where: {
       usuarioId: session.user.id,
       empresaId: session.user.empresaId,
+    },
+    select: {
+      id: true,
+      empresaId: true,
+      usuarioId: true,
+      tipo: true,
+      mensaje: true,
+      metadata: true,
+      leida: true,
+      createdAt: true,
+      eventoNominaId: true,
     },
     orderBy: {
       createdAt: 'desc',
@@ -347,7 +359,6 @@ export default async function ManagerBandejaEntradaPage(props: {
   const notificaciones: NotificacionUI[] = notificacionesRaw.map((n) => ({
     id: n.id,
     tipo: n.tipo as TipoNotificacion,
-    titulo: n.titulo,
     mensaje: n.mensaje,
     fecha: n.createdAt,
     leida: n.leida,

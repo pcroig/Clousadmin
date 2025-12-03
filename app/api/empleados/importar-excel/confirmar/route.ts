@@ -87,7 +87,7 @@ export async function POST(req: NextRequest) {
       return sanitized ? sanitized.toUpperCase() : null;
     };
 
-    const empresa = await prisma.empresa.findUnique({
+    const empresa = await prisma.empresas.findUnique({
       where: { id: session.user.empresaId },
       select: { nombre: true },
     });
@@ -137,7 +137,7 @@ export async function POST(req: NextRequest) {
         puesto: string | null;
         equipo: string | null;
         fechaAlta: string | null;
-        salarioBrutoAnual: number | null;
+        salarioBaseAnual: number | null;
         invitacionEnviada: boolean;
       }>,
     };
@@ -148,7 +148,7 @@ export async function POST(req: NextRequest) {
     for (const nombreEquipo of equiposDetectados) {
       try {
         // Usar upsert para crear o actualizar equipo (ahora tenemos índice único)
-        const equipo = await prisma.equipo.upsert({
+        const equipo = await prisma.equipos.upsert({
           where: {
             empresaId_nombre: {
               empresaId: session.user.empresaId,
@@ -189,7 +189,7 @@ export async function POST(req: NextRequest) {
 
     for (const nombrePuesto of Array.from(puestosUnicos)) {
       try {
-        const puesto = await prisma.puesto.upsert({
+        const puesto = await prisma.puestos.upsert({
           where: {
             empresaId_nombre: {
               empresaId: session.user.empresaId,
@@ -234,7 +234,7 @@ export async function POST(req: NextRequest) {
           try {
             const creationResult = await prisma.$transaction(async (tx) => {
               // Verificar si el email ya existe
-              const usuarioExistente = await tx.usuario.findUnique({
+              const usuarioExistente = await tx.usuarios.findUnique({
                 where: { email: empleadoData.email!.toLowerCase() },
               });
 
@@ -246,7 +246,7 @@ export async function POST(req: NextRequest) {
               }
 
               // Crear usuario (sin password, se establecerá en el onboarding)
-              const usuario = await tx.usuario.create({
+              const usuario = await tx.usuarios.create({
                 data: {
                   email: empleadoData.email!.toLowerCase(),
                   nombre: empleadoData.nombre!,
@@ -260,7 +260,7 @@ export async function POST(req: NextRequest) {
 
               // Verificar si el NIF ya existe (si hay NIF)
               if (empleadoData.nif) {
-                const empleadoConNif = await tx.empleado.findUnique({
+                const empleadoConNif = await tx.empleados.findUnique({
                   where: { nif: empleadoData.nif },
                 });
 
@@ -269,19 +269,19 @@ export async function POST(req: NextRequest) {
                     `NIF duplicado: ${empleadoData.nif}`
                   );
                   // Eliminar el usuario creado para mantener consistencia
-                  await tx.usuario.delete({ where: { id: usuario.id } });
+                  await tx.usuarios.delete({ where: { id: usuario.id } });
                   return null; // Saltar este empleado
                 }
               }
 
               // Preparar datos del empleado
-              const salarioBrutoAnual =
-                empleadoData.salarioBrutoAnual !== undefined && empleadoData.salarioBrutoAnual !== null
-                  ? new Prisma.Decimal(empleadoData.salarioBrutoAnual)
+              const salarioBaseAnual =
+                empleadoData.salarioBaseAnual !== undefined && empleadoData.salarioBaseAnual !== null
+                  ? new Prisma.Decimal(empleadoData.salarioBaseAnual)
                   : null;
-              const salarioBrutoMensual =
-                empleadoData.salarioBrutoMensual !== undefined && empleadoData.salarioBrutoMensual !== null
-                  ? new Prisma.Decimal(empleadoData.salarioBrutoMensual)
+              const salarioBaseMensual =
+                empleadoData.salarioBaseMensual !== undefined && empleadoData.salarioBaseMensual !== null
+                  ? new Prisma.Decimal(empleadoData.salarioBaseMensual)
                   : null;
 
               const datosEmpleado = {
@@ -303,8 +303,8 @@ export async function POST(req: NextRequest) {
                 fechaAlta: empleadoData.fechaAlta
                   ? new Date(empleadoData.fechaAlta)
                   : new Date(),
-                salarioBrutoAnual,
-                salarioBrutoMensual,
+                salarioBaseAnual,
+                salarioBaseMensual,
                 direccionCalle: sanitizeOptionalString(empleadoData.direccionCalle),
                 direccionNumero: sanitizeOptionalString(empleadoData.direccionNumero),
                 direccionPiso: sanitizeOptionalString(empleadoData.direccionPiso),
@@ -329,19 +329,19 @@ export async function POST(req: NextRequest) {
               };
 
               // Crear empleado con datos encriptados
-              const empleado = await tx.empleado.create({
+              const empleado = await tx.empleados.create({
                 data: empleadoCreateData,
               });
 
               // Vincular empleado al usuario
-              await tx.usuario.update({
+              await tx.usuarios.update({
                 where: { id: usuario.id },
                 data: { empleadoId: empleado.id },
               });
 
               // Asignar a equipo si corresponde
               if (empleadoData.equipo && equiposCreados.has(empleadoData.equipo)) {
-                await tx.empleadoEquipo.create({
+                await tx.empleado_equipos.create({
                   data: {
                     empleadoId: empleado.id,
                     equipoId: equiposCreados.get(empleadoData.equipo)!,
@@ -357,7 +357,7 @@ export async function POST(req: NextRequest) {
                 puesto: empleado.puesto,
                 equipo: empleadoData.equipo || null,
                 fechaAlta: empleado.fechaAlta ? empleado.fechaAlta.toISOString() : null,
-                salarioBrutoAnual: empleado.salarioBrutoAnual ? parseFloat(empleado.salarioBrutoAnual.toString()) : null,
+                salarioBaseAnual: empleado.salarioBaseAnual ? parseFloat(empleado.salarioBaseAnual.toString()) : null,
               };
             }, { 
               timeout: 60000, // 60s timeout para permitir encriptación de datos sensibles
@@ -452,7 +452,7 @@ export async function POST(req: NextRequest) {
                 puesto: result.value.empleado.puesto,
                 equipo: result.value.empleado.equipo,
                 fechaAlta: result.value.empleado.fechaAlta,
-                salarioBrutoAnual: result.value.empleado.salarioBrutoAnual,
+                salarioBaseAnual: result.value.empleado.salarioBaseAnual,
                 invitacionEnviada: result.value.invitacionEnviada || false,
               });
             }
@@ -492,7 +492,7 @@ export async function POST(req: NextRequest) {
       try {
         // 2. Buscar todos los managers por email en una sola query
         const managersEncontradosPorEmail = emailsABuscar.length > 0
-          ? await prisma.empleado.findMany({
+          ? await prisma.empleados.findMany({
               where: {
                 empresaId: session.user.empresaId,
                 email: { in: emailsABuscar },
@@ -531,7 +531,7 @@ export async function POST(req: NextRequest) {
           }).filter(Boolean);
           
           if (nombreConditions.length > 0) {
-            const managersEncontradosPorNombre = await prisma.empleado.findMany({
+            const managersEncontradosPorNombre = await prisma.empleados.findMany({
               where: {
                 empresaId: session.user.empresaId,
                 OR: nombreConditions,
@@ -578,7 +578,7 @@ export async function POST(req: NextRequest) {
               const managerId = managersMap.get(managerKey)!;
               
               // Buscar el empleado creado
-              const empleadoCreado = await prisma.empleado.findFirst({
+              const empleadoCreado = await prisma.empleados.findFirst({
                 where: {
                   empresaId: session.user.empresaId,
                   email: empleadoData.email!.toLowerCase(),
@@ -587,7 +587,7 @@ export async function POST(req: NextRequest) {
 
               if (empleadoCreado) {
                 // 1. Asignar managerId al empleado (relación directa manager)
-                await prisma.empleado.update({
+                await prisma.empleados.update({
                   where: { id: empleadoCreado.id },
                   data: { managerId },
                 });
@@ -598,13 +598,13 @@ export async function POST(req: NextRequest) {
                   const equipoId = equiposCreados.get(empleadoData.equipo)!;
                   
                   // Verificar si el equipo ya tiene un manager, si no, asignarlo
-                  const equipo = await prisma.equipo.findUnique({
+                  const equipo = await prisma.equipos.findUnique({
                     where: { id: equipoId },
                     select: { managerId: true },
                   });
 
                   if (!equipo?.managerId) {
-                    await prisma.equipo.update({
+                    await prisma.equipos.update({
                       where: { id: equipoId },
                       data: { managerId },
                     });

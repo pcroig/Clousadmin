@@ -1,11 +1,11 @@
 'use client';
 
+import { FileText, Folder } from 'lucide-react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
-
-import { FirmasTab } from '@/components/firma/firmas-tab';
 import { type CarpetaCardData, CarpetasGrid } from '@/components/shared/carpetas-grid';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 import type { MiEspacioCarpeta, MiEspacioEmpleado } from '@/types/empleado';
 
@@ -13,7 +13,7 @@ interface DocumentosTabProps {
   empleado: MiEspacioEmpleado;
 }
 
-type DocumentosTabKey = 'personales' | 'compartidos' | 'firmas';
+type DocumentosTabKey = 'personales' | 'compartidos';
 
 export function DocumentosTab({ empleado }: DocumentosTabProps) {
   const router = useRouter();
@@ -22,7 +22,7 @@ export function DocumentosTab({ empleado }: DocumentosTabProps) {
 
   const initialTab = useMemo<DocumentosTabKey>(() => {
     const tabParam = searchParams.get('tab');
-    if (tabParam === 'compartidos' || tabParam === 'firmas') {
+    if (tabParam === 'compartidos') {
       return tabParam;
     }
     return 'personales';
@@ -89,59 +89,30 @@ export function DocumentosTab({ empleado }: DocumentosTabProps) {
   }, [activeDocTab]);
 
   return (
-    <div className="space-y-8">
-      <div className="flex flex-col gap-2">
-        <div>
-          <p className="text-sm uppercase tracking-wide text-gray-500">Documentos</p>
-          <h2 className="text-2xl font-semibold text-gray-900">Mis carpetas</h2>
+    <div className="space-y-4 sm:space-y-6">
+      <Tabs
+        value={activeDocTab}
+        onValueChange={(value) => handleChangeTab(value as DocumentosTabKey)}
+        className="flex-1 flex flex-col min-h-0"
+      >
+        <div className="mb-3">
+          {/* Mobile: Full width con iconos | Desktop: Solo ancho del contenido sin iconos */}
+          <TabsList className="grid w-full grid-cols-2 gap-2 sm:inline-flex sm:w-auto">
+            <TabsTrigger value="personales" className="text-sm">
+              <Folder className="h-4 w-4 mr-2 sm:hidden" />
+              Personales
+            </TabsTrigger>
+            <TabsTrigger value="compartidos" className="text-sm">
+              <FileText className="h-4 w-4 mr-2 sm:hidden" />
+              Compartidos
+            </TabsTrigger>
+          </TabsList>
         </div>
-        <p className="text-sm text-gray-500">
-          Accede a tus documentos personales, compartidos y solicitudes de firma
-        </p>
-      </div>
 
-      {/* Toggle Personales/Compartidos/Firmas */}
-      <div className="inline-flex flex-wrap items-center gap-2 rounded-2xl border border-gray-200/80 bg-white/60 p-1 shadow-sm">
-        <button
-          onClick={() => handleChangeTab('personales')}
-          className={`rounded-xl px-4 py-2 text-sm font-medium transition ${
-            activeDocTab === 'personales'
-              ? 'bg-gray-900 text-white shadow-sm'
-              : 'text-gray-600 hover:text-gray-900'
-          }`}
-        >
-          Personales
-        </button>
-        <button
-          onClick={() => handleChangeTab('compartidos')}
-          className={`rounded-xl px-4 py-2 text-sm font-medium transition ${
-            activeDocTab === 'compartidos'
-              ? 'bg-gray-900 text-white shadow-sm'
-              : 'text-gray-600 hover:text-gray-900'
-          }`}
-        >
-          Compartidos
-        </button>
-        <button
-          onClick={() => handleChangeTab('firmas')}
-          className={`rounded-xl px-4 py-2 text-sm font-medium transition ${
-            activeDocTab === 'firmas'
-              ? 'bg-gray-900 text-white shadow-sm'
-              : 'text-gray-600 hover:text-gray-900'
-          }`}
-        >
-          Firmas
-        </button>
-      </div>
-
-      {activeDocTab === 'firmas' ? (
-        <FirmasTab />
-      ) : (
-        <div className="space-y-4">
+        <TabsContent value="personales" className="flex-1 min-h-0 mt-0">
+          <div className="space-y-4">
           <p className="text-sm font-medium text-gray-600">
-            {activeDocTab === 'personales'
-              ? `${carpetasPersonales.length} ${carpetasPersonales.length === 1 ? 'carpeta personal' : 'carpetas personales'}`
-              : `${carpetasCompartidas.length} ${carpetasCompartidas.length === 1 ? 'carpeta compartida' : 'carpetas compartidas'}`}
+            {`${carpetasPersonales.length} ${carpetasPersonales.length === 1 ? 'carpeta personal' : 'carpetas personales'}`}
           </p>
           <CarpetasGrid
             carpetas={carpetasVisibles}
@@ -150,7 +121,22 @@ export function DocumentosTab({ empleado }: DocumentosTabProps) {
             emptyStateDescription={emptyStateConfig.description}
           />
         </div>
-      )}
+      </TabsContent>
+
+      <TabsContent value="compartidos" className="flex-1 min-h-0 mt-0">
+        <div className="space-y-4">
+          <p className="text-sm font-medium text-gray-600">
+            {`${carpetasCompartidas.length} ${carpetasCompartidas.length === 1 ? 'carpeta compartida' : 'carpetas compartidas'}`}
+          </p>
+          <CarpetasGrid
+            carpetas={carpetasVisibles}
+            onCarpetaClick={handleCarpetaClick}
+            emptyStateTitle={emptyStateConfig.title}
+            emptyStateDescription={emptyStateConfig.description}
+          />
+        </div>
+      </TabsContent>
+    </Tabs>
     </div>
   );
 }

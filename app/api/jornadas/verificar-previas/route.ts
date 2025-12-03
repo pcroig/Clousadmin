@@ -57,7 +57,7 @@ export async function GET(req: NextRequest) {
 
     switch (nivel) {
       case 'empresa':
-        empleadosConJornadas = await prisma.empleado.findMany({
+        empleadosConJornadas = await prisma.empleados.findMany({
           where: {
             empresaId: session.user.empresaId,
             activo: true,
@@ -82,7 +82,7 @@ export async function GET(req: NextRequest) {
         if (!equipoIds || equipoIds.length === 0) {
           return badRequestResponse('Debes especificar al menos un equipo');
         }
-        const miembrosEquipos = await prisma.empleadoEquipo.findMany({
+        const miembrosEquipos = await prisma.empleado_equipos.findMany({
           where: {
             equipoId: { in: equipoIds },
           },
@@ -93,7 +93,7 @@ export async function GET(req: NextRequest) {
         const empleadoIdsEquipos = [...new Set(miembrosEquipos.map((m) => m.empleadoId))];
         
         if (empleadoIdsEquipos.length > 0) {
-          empleadosConJornadas = await prisma.empleado.findMany({
+          empleadosConJornadas = await prisma.empleados.findMany({
             where: {
               id: { in: empleadoIdsEquipos },
               empresaId: session.user.empresaId,
@@ -120,7 +120,7 @@ export async function GET(req: NextRequest) {
         if (!empleadoIds || empleadoIds.length === 0) {
           return badRequestResponse('Debes especificar al menos un empleado');
         }
-        empleadosConJornadas = await prisma.empleado.findMany({
+        empleadosConJornadas = await prisma.empleados.findMany({
           where: {
             id: { in: empleadoIds },
             empresaId: session.user.empresaId,

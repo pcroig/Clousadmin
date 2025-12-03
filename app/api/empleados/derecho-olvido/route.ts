@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
 
     const { session } = authResult;
 
-    const empleado = await prisma.empleado.findFirst({
+    const empleado = await prisma.empleados.findFirst({
       where: { usuarioId: session.user.id, empresaId: session.user.empresaId },
       select: {
         id: true,
@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const solicitudExistente = await prisma.solicitudEliminacionDatos.findFirst({
+    const solicitudExistente = await prisma.solicitudes_eliminacion_datos.findFirst({
       where: {
         empresaId: session.user.empresaId,
         empleadoId: empleado.id,
@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const solicitud = await prisma.solicitudEliminacionDatos.create({
+    const solicitud = await prisma.solicitudes_eliminacion_datos.create({
       data: {
         empresaId: session.user.empresaId,
         empleadoId: empleado.id,

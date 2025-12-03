@@ -22,7 +22,7 @@ export async function GET(
     const { id } = await params;
 
     // Obtener la nómina
-    const empleadoWhere: Prisma.EmpleadoWhereInput = {
+    const empleadoWhere: Prisma.empleadosWhereInput = {
       empresaId: session.user.empresaId,
     };
 
@@ -33,7 +33,7 @@ export async function GET(
       empleadoWhere.id = session.user.empleadoId;
     }
 
-    const nomina = await prisma.nomina.findFirst({
+    const nomina = await prisma.nominas.findFirst({
       where: {
         id,
         empleado: empleadoWhere,
@@ -55,7 +55,7 @@ export async function GET(
     const finMes = new Date(nomina.anio, nomina.mes, 0, 23, 59, 59);
 
     // Obtener ausencias del mes (confirmadas o completadas)
-    const ausencias = await prisma.ausencia.findMany({
+    const ausencias = await prisma.ausencias.findMany({
       where: {
         empleadoId: nomina.empleadoId,
         estado: {
@@ -97,7 +97,7 @@ export async function GET(
     });
 
     // Obtener contratos cuya fecha de inicio o fin cae dentro del mes
-    const contratos = await prisma.contrato.findMany({
+    const contratos = await prisma.contratos.findMany({
       where: {
         empleadoId: nomina.empleadoId,
         OR: [
@@ -129,7 +129,7 @@ export async function GET(
     });
 
     // Obtener resumen de fichajes del mes
-    const fichajes = await prisma.fichaje.findMany({
+    const fichajes = await prisma.fichajes.findMany({
       where: {
         empleadoId: nomina.empleadoId,
         fecha: {

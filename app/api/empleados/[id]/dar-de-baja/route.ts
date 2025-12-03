@@ -54,7 +54,7 @@ export async function POST(
     const validatedData = validation.data;
 
     // Obtener empleado con todas las relaciones necesarias
-    const empleado = await prisma.empleado.findUnique({
+    const empleado = await prisma.empleados.findUnique({
       where: { 
         id: empleadoId,
         empresaId: session.user.empresaId, // Seguridad: solo de la misma empresa
@@ -106,7 +106,7 @@ export async function POST(
     const result = await prisma.$transaction(async (tx) => {
       // 1. Si hay contrato activo, actualizar su fecha fin
       if (empleado.contratos.length > 0) {
-        await tx.contrato.update({
+        await tx.contratos.update({
           where: { id: empleado.contratos[0].id },
           data: {
             fechaFin,
@@ -114,19 +114,19 @@ export async function POST(
         });
       } else {
         // Si no hay contrato, crear uno básico para mantener el historial
-        await tx.contrato.create({
+        await tx.contratos.create({
           data: {
             empleadoId: empleado.id,
             tipoContrato: empleado.tipoContrato || 'indefinido',
             fechaInicio: fechaAlta,
             fechaFin,
-            salarioBrutoAnual: empleado.salarioBrutoAnual || 0,
+            salarioBaseAnual: empleado.salarioBaseAnual || 0,
           },
         });
       }
 
       // 2. Desactivar empleado y establecer fecha de baja
-      await tx.empleado.update({
+      await tx.empleados.update({
         where: { id: empleadoId },
         data: {
           activo: false,
@@ -136,7 +136,7 @@ export async function POST(
       });
 
       // 3. Desactivar usuario (deshabilitar acceso a la plataforma)
-      await tx.usuario.update({
+      await tx.usuarios.update({
         where: { id: empleado.usuarioId },
         data: {
           activo: false,
@@ -149,7 +149,7 @@ export async function POST(
         let carpetaOffboarding = empleado.carpetas[0];
         
         if (!carpetaOffboarding) {
-          carpetaOffboarding = await tx.carpeta.create({
+          carpetaOffboarding = await tx.carpetas.create({
             data: {
               empresaId: session.user.empresaId,
               empleadoId: empleado.id,
@@ -160,7 +160,7 @@ export async function POST(
         }
 
         // Asociar documentos a la carpeta de offboarding
-        await tx.documento.updateMany({
+        await tx.documentos.updateMany({
           where: {
             id: { in: validatedData.documentosIds },
             empresaId: session.user.empresaId,

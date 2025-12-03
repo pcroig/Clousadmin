@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
     if (authResult instanceof Response) return authResult;
     const { session } = authResult;
 
-    const equipos = await prisma.equipo.findMany({
+    const equipos = await prisma.equipos.findMany({
       where: {
         empresaId: session.user.empresaId,
         activo: true,

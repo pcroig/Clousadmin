@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
 
     // Verificar que el empleado existe y pertenece a la misma empresa
     const { prisma } = await import('@/lib/prisma');
-    const empleado = await prisma.empleado.findUnique({
+    const empleado = await prisma.empleados.findUnique({
       where: { id: empleadoId },
       include: {
         empresa: true,
@@ -67,7 +67,7 @@ export async function POST(req: NextRequest) {
 
     // Verificar si ya existe un onboarding activo reciente (últimos 10 segundos)
     // Esto previene llamadas duplicadas que generan tokens inválidos
-    const onboardingExistente = await prisma.onboardingEmpleado.findUnique({
+    const onboardingExistente = await prisma.onboarding_empleados.findUnique({
       where: { empleadoId },
     });
 

@@ -65,13 +65,13 @@ async function diagnosticar() {
   // 3. Verificar que las tablas existan
   console.log('\n📋 3. Verificando esquema de base de datos...');
   try {
-    const empresas = await prisma.empresa.findMany({ take: 1 });
+    const empresas = await prisma.empresas.findMany({ take: 1 });
     console.log(`✅ Tabla 'empresas' accesible (${empresas.length} registros encontrados)`);
 
-    const fichajes = await prisma.fichaje.findMany({ take: 1 });
+    const fichajes = await prisma.fichajes.findMany({ take: 1 });
     console.log(`✅ Tabla 'fichajes' accesible (${fichajes.length} registros encontrados)`);
 
-    const empleados = await prisma.empleado.findMany({ take: 1 });
+    const empleados = await prisma.empleados.findMany({ take: 1 });
     console.log(`✅ Tabla 'empleados' accesible (${empleados.length} registros encontrados)`);
   } catch (error: unknown) {
     console.error('❌ ERROR al acceder a las tablas:');
@@ -101,9 +101,9 @@ async function diagnosticar() {
   console.log('\n📋 5. Contando registros en base de datos...');
   try {
     const [countEmpresas, countEmpleados, countFichajes] = await Promise.all([
-      prisma.empresa.count(),
-      prisma.empleado.count(),
-      prisma.fichaje.count(),
+      prisma.empresas.count(),
+      prisma.empleados.count(),
+      prisma.fichajes.count(),
     ]);
 
     console.log(`   Empresas: ${countEmpresas}`);

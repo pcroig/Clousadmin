@@ -31,7 +31,7 @@ export async function startTwoFactorSetup() {
   const otpauthUrl = getTotpUri(session.user.email, secret);
   const qr = await generateTotpQrData(otpauthUrl);
 
-  await prisma.usuario.update({
+  await prisma.usuarios.update({
     where: { id: session.user.id },
     data: {
       totpSecret: encryptedSecret,
@@ -45,7 +45,7 @@ export async function startTwoFactorSetup() {
 
 export async function confirmTwoFactorSetup(code: string) {
   const session = await requireSession();
-  const usuario = await prisma.usuario.findUnique({
+  const usuario = await prisma.usuarios.findUnique({
     where: { id: session.user.id },
     select: {
       totpSecret: true,
@@ -65,7 +65,7 @@ export async function confirmTwoFactorSetup(code: string) {
 
   const backupCodes = generateBackupCodes(10);
 
-  await prisma.usuario.update({
+  await prisma.usuarios.update({
     where: { id: session.user.id },
     data: {
       totpEnabled: true,
@@ -81,7 +81,7 @@ export async function confirmTwoFactorSetup(code: string) {
 
 export async function regenerateBackupCodesAction() {
   const session = await requireSession();
-  const usuario = await prisma.usuario.findUnique({
+  const usuario = await prisma.usuarios.findUnique({
     where: { id: session.user.id },
     select: { totpEnabled: true },
   });
@@ -92,7 +92,7 @@ export async function regenerateBackupCodesAction() {
 
   const backupCodes = generateBackupCodes(10);
 
-  await prisma.usuario.update({
+  await prisma.usuarios.update({
     where: { id: session.user.id },
     data: { backupCodes: hashBackupCodes(backupCodes) },
   });
@@ -103,7 +103,7 @@ export async function regenerateBackupCodesAction() {
 export async function disableTwoFactorAction(password: string) {
   const session = await requireSession();
 
-  const usuario = await prisma.usuario.findUnique({
+  const usuario = await prisma.usuarios.findUnique({
     where: { id: session.user.id },
     select: {
       password: true,
@@ -119,7 +119,7 @@ export async function disableTwoFactorAction(password: string) {
     return { success: false, error: 'Contraseña incorrecta.' };
   }
 
-  await prisma.usuario.update({
+  await prisma.usuarios.update({
     where: { id: session.user.id },
     data: {
       totpEnabled: false,

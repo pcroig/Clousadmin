@@ -16,7 +16,7 @@ type AsyncFn = (...args: any[]) => Promise<any>;
  */
 export const getSolicitudesAusenciasPendientes = cachedQuery(
   (async (empresaId: string) => {
-    return await prisma.ausencia.findMany({
+    return await prisma.ausencias.findMany({
       where: {
         empresaId,
         estado: EstadoAusencia.pendiente,
@@ -27,6 +27,8 @@ export const getSolicitudesAusenciasPendientes = cachedQuery(
             nombre: true,
             apellidos: true,
             fotoUrl: true,
+            email: true,
+            puesto: true,
           },
         },
       },
@@ -49,7 +51,7 @@ export const getSolicitudesAusenciasPendientes = cachedQuery(
  */
 export const getSolicitudesCambioPendientes = cachedQuery(
   (async (empresaId: string) => {
-    return await prisma.solicitudCambio.findMany({
+    return await prisma.solicitudes_cambio.findMany({
       where: {
         empresaId,
         estado: 'pendiente',
@@ -60,6 +62,19 @@ export const getSolicitudesCambioPendientes = cachedQuery(
             nombre: true,
             apellidos: true,
             fotoUrl: true,
+            email: true,
+            puesto: true,
+            equipos: {
+              select: {
+                equipoId: true,
+                equipo: {
+                  select: {
+                    nombre: true,
+                  },
+                },
+              },
+              take: 1,
+            },
           },
         },
       },
@@ -82,10 +97,21 @@ export const getSolicitudesCambioPendientes = cachedQuery(
  */
 export const getNotificacionesUsuario = cachedQuery(
   (async (empresaId: string, usuarioId: string) => {
-    return await prisma.notificacion.findMany({
+    return await prisma.notificaciones.findMany({
       where: {
         empresaId,
         usuarioId,
+      },
+      select: {
+        id: true,
+        empresaId: true,
+        usuarioId: true,
+        tipo: true,
+        mensaje: true,
+        metadata: true,
+        leida: true,
+        createdAt: true,
+        eventoNominaId: true,
       },
       orderBy: {
         createdAt: 'desc',
@@ -107,21 +133,21 @@ export const getNotificacionesUsuario = cachedQuery(
 export const getAutoCompletadosStats = cachedQuery(
   (async (empresaId: string) => {
     const [fichajes, ausencias, solicitudes] = await Promise.all([
-      prisma.autoCompletado.count({
+      prisma.auto_completados.count({
         where: {
           empresaId,
           tipo: 'fichaje_completado',
           estado: 'aprobado',
         },
       }),
-      prisma.autoCompletado.count({
+      prisma.auto_completados.count({
         where: {
           empresaId,
           tipo: 'ausencia_auto_aprobada',
           estado: 'aprobado',
         },
       }),
-      prisma.autoCompletado.count({
+      prisma.auto_completados.count({
         where: {
           empresaId,
           tipo: 'solicitud_auto_aprobada',
@@ -149,7 +175,7 @@ export const getAutoCompletadosStats = cachedQuery(
  */
 export const getFichajesRecientes = cachedQuery(
   (async (empleadoId: string) => {
-    const fichajesRaw = await prisma.fichaje.findMany({
+    const fichajesRaw = await prisma.fichajes.findMany({
       where: {
         empleadoId,
       },
@@ -186,7 +212,7 @@ export const getFichajesRecientes = cachedQuery(
  */
 export const getAusenciasRecientes = cachedQuery(
   (async (empleadoId: string) => {
-    const ausenciasRaw = await prisma.ausencia.findMany({
+    const ausenciasRaw = await prisma.ausencias.findMany({
       where: {
         empleadoId,
       },

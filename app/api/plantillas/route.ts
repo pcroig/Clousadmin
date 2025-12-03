@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
     const autoOffboarding = searchParams.get('autoOffboarding');
 
     // Filtros
-    const where: Prisma.PlantillaDocumentoWhereInput = {
+    const where: Prisma.plantillas_documentosWhereInput = {
       OR: [
         { empresaId: session.user.empresaId }, // Plantillas de la empresa
         { empresaId: null }, // Plantillas oficiales
@@ -61,7 +61,7 @@ export async function GET(request: NextRequest) {
       where.autoGenerarOffboarding = true;
     }
 
-    const plantillas = await prisma.plantillaDocumento.findMany({
+    const plantillas = await prisma.plantillas_documentos.findMany({
       where,
       select: {
         id: true,
@@ -186,7 +186,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Crear registro en BD
-    const plantilla = await prisma.plantillaDocumento.create({
+    const plantilla = await prisma.plantillas_documentos.create({
       data: {
         empresaId: session.user.empresaId,
         nombre,

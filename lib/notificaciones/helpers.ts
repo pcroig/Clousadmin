@@ -43,20 +43,37 @@ export function obtenerIconoPorCategoria(
 export function obtenerIconoPorTipo(tipo: TipoNotificacion): LucideIcon {
   // Iconos específicos para tipos especiales
   const iconosEspecificos: Partial<Record<TipoNotificacion, LucideIcon>> = {
+    // Firmas
     firma_pendiente: FileSignature,
     firma_completada: FileSignature,
+    // Documentos
     documento_solicitado: FileText,
     documento_subido: FileText,
     documento_rechazado: FileText,
-  documento_generado: FileText,
-  documento_pendiente_rellenar: FileText,
+    documento_generado: FileText,
+    documento_pendiente_rellenar: FileText,
+    documento_eliminado: FileText,
+    // Ausencias - todas usan Calendar excepto aprobada/rechazada
+    ausencia_solicitada: Calendar,
     ausencia_aprobada: CheckCircle,
     ausencia_rechazada: XCircle,
+    ausencia_cancelada: Calendar,
+    ausencia_modificada: Calendar,
+    campana_vacaciones_creada: Calendar,
+    campana_vacaciones_cuadrada: Calendar,
+    campana_vacaciones_completada: Calendar,
+    // Fichajes
+    fichaje_aprobado: CheckCircle,
+    fichaje_rechazado: XCircle,
+    // Nóminas
     nomina_error: AlertCircle,
-  nomina_validada: DollarSign,
-  complementos_pendientes: DollarSign,
+    nomina_validada: DollarSign,
+    complementos_pendientes: DollarSign,
+    complemento_asignado: DollarSign,
+    // Denuncias
     denuncia_recibida: AlertCircle,
-  denuncia_actualizada: AlertCircle,
+    denuncia_actualizada: AlertCircle,
+    // Equipos
     nuevo_empleado_equipo: Users,
     asignado_equipo: Users,
   };
@@ -87,6 +104,9 @@ export function formatearTipoNotificacion(tipo: TipoNotificacion): string {
     fichaje_autocompletado: 'Fichaje autocompletado',
     fichaje_requiere_revision: 'Fichaje requiere revisión',
     fichaje_resuelto: 'Fichaje resuelto',
+    fichaje_modificado: 'Fichaje modificado',
+    fichaje_aprobado: 'Fichaje aprobado',
+    fichaje_rechazado: 'Fichaje rechazado',
     cambio_manager: 'Cambio de manager',
     asignado_equipo: 'Asignado a equipo',
     nuevo_empleado_equipo: 'Nuevo miembro de equipo',
@@ -98,11 +118,13 @@ export function formatearTipoNotificacion(tipo: TipoNotificacion): string {
     nomina_disponible: 'Nómina disponible',
     nomina_error: 'Error en nómina',
     complementos_pendientes: 'Complementos pendientes',
+    complemento_asignado: 'Complemento asignado',
     documento_solicitado: 'Documento solicitado',
     documento_subido: 'Documento subido',
     documento_rechazado: 'Documento rechazado',
     documento_generado: 'Documento generado',
     documento_pendiente_rellenar: 'Documento pendiente de completar',
+    documento_eliminado: 'Documento eliminado',
     firma_pendiente: 'Firma pendiente',
     firma_completada: 'Firma completada',
     denuncia_recibida: 'Denuncia recibida',

@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
       fechaDesde = new Date(fechaDesdeStr);
     } else {
       // Obtener fecha de alta del empleado
-      const empleado = await prisma.empleado.findUnique({
+      const empleado = await prisma.empleados.findUnique({
         where: { id: empleadoId },
         select: { fechaAlta: true },
       });

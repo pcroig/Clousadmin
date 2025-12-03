@@ -110,7 +110,7 @@ export async function generarDocumentoDesdePlantilla(
 
   try {
     // 1. Obtener plantilla
-    const plantilla = await prisma.plantillaDocumento.findUnique({
+    const plantilla = await prisma.plantillas_documentos.findUnique({
       where: { id: plantillaId },
       select: {
         id: true,
@@ -135,7 +135,7 @@ export async function generarDocumentoDesdePlantilla(
     }
 
     // 2. Obtener datos completos del empleado
-    const empleado = await prisma.empleado.findUnique({
+    const empleado = await prisma.empleados.findUnique({
       where: { id: empleadoId },
       include: {
         empresa: {
@@ -176,7 +176,7 @@ export async function generarDocumentoDesdePlantilla(
             tipoContrato: true,
             fechaInicio: true,
             fechaFin: true,
-            salarioBrutoAnual: true,
+            salarioBaseAnual: true,
           },
         },
         ausencias: {
@@ -209,11 +209,11 @@ export async function generarDocumentoDesdePlantilla(
     // 5. Resolver todas las variables usando el sistema de IA
     // Obtener salario del contrato más reciente
     const contratoActual = empleado.contratos?.[0];
-    const salarioBrutoAnual = contratoActual?.salarioBrutoAnual
-      ? Number(contratoActual.salarioBrutoAnual)
+    const salarioBaseAnual = contratoActual?.salarioBaseAnual
+      ? Number(contratoActual.salarioBaseAnual)
       : undefined;
-    const salarioBrutoMensual = salarioBrutoAnual
-      ? Math.round((salarioBrutoAnual / 12) * 100) / 100
+    const salarioBaseMensual = salarioBaseAnual
+      ? Math.round((salarioBaseAnual / 12) * 100) / 100
       : undefined;
 
     const empresaNormalizada: DatosEmpleado['empresa'] = {
@@ -242,7 +242,7 @@ export async function generarDocumentoDesdePlantilla(
       numeroHijos: empleado.numeroHijos ?? undefined,
       genero: empleado.genero ?? undefined,
       iban: empleado.iban ?? undefined,
-      titularCuenta: empleado.titularCuenta ?? undefined,
+      bic: empleado.bic ?? undefined,
       puesto: empleado.puesto ?? undefined,
       fechaBaja: empleado.fechaBaja ?? undefined,
       tipoContrato: empleado.tipoContrato ?? undefined,
@@ -252,8 +252,8 @@ export async function generarDocumentoDesdePlantilla(
 
     const empleadoData: DatosEmpleado = {
       ...empleadoSanitizado,
-      salarioBrutoAnual,
-      salarioBrutoMensual,
+      salarioBaseAnual,
+      salarioBaseMensual,
       empresa: empresaNormalizada,
       jornada: empleado.jornada
         ? {
@@ -279,7 +279,7 @@ export async function generarDocumentoDesdePlantilla(
         tipoContrato: contrato.tipoContrato,
         fechaInicio: contrato.fechaInicio,
         fechaFin: contrato.fechaFin ?? undefined,
-        salarioBrutoAnual: Number(contrato.salarioBrutoAnual),
+        salarioBaseAnual: Number(contrato.salarioBaseAnual),
       })),
     };
 
@@ -331,7 +331,7 @@ export async function generarDocumentoDesdePlantilla(
     console.log(`[Generar] PDF generado a partir de DOCX: ${pdfS3Key}`);
 
     // 9. Buscar o crear carpeta destino
-    let carpeta = await prisma.carpeta.findFirst({
+    let carpeta = await prisma.carpetas.findFirst({
       where: {
         empleadoId: empleadoId,
         nombre: carpetaDestino,
@@ -341,7 +341,7 @@ export async function generarDocumentoDesdePlantilla(
 
     if (!carpeta) {
       // Crear carpeta si no existe
-      carpeta = await prisma.carpeta.create({
+      carpeta = await prisma.carpetas.create({
         data: {
           empresaId: empleado.empresaId,
           empleadoId: empleadoId,
@@ -353,7 +353,7 @@ export async function generarDocumentoDesdePlantilla(
     }
 
     // 10. Crear registro de Documento (siempre PDF)
-    const documento = await prisma.documento.create({
+    const documento = await prisma.documentos.create({
       data: {
         empresaId: empleado.empresaId,
         empleadoId: empleadoId,
@@ -379,7 +379,7 @@ export async function generarDocumentoDesdePlantilla(
     const requiereFirmaFinal = configuracion.requiereFirma || plantilla.requiereFirma;
     const permiteRellenar = Boolean(plantilla.permiteRellenar);
 
-    const documentoGenerado = await prisma.documentoGenerado.create({
+    const documentoGenerado = await prisma.documentosGenerado.create({
       data: {
         empresaId: empleado.empresaId,
         empleadoId: empleadoId,
@@ -423,7 +423,7 @@ export async function generarDocumentoDesdePlantilla(
       const hashDocumento = documento.hashDocumento ?? 'sin-hash';
       const tituloFirma = `Firma de ${documento.nombre}`;
 
-      const solicitudFirma = await prisma.solicitudFirma.create({
+      const solicitudFirma = await prisma.solicitudes_firma.create({
         data: {
           empresaId: empleado.empresaId,
           documentoId: documento.id,
@@ -437,7 +437,7 @@ export async function generarDocumentoDesdePlantilla(
       });
 
       // Crear firma individual
-      await prisma.firma.create({
+      await prisma.firmas.create({
         data: {
           solicitudFirmaId: solicitudFirma.id,
           empleadoId: empleadoId,

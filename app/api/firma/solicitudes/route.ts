@@ -66,13 +66,15 @@ export async function GET(request: NextRequest) {
  * Body:
  * {
  *   documentoId: string;
- *   titulo: string;
  *   mensaje?: string;
  *   firmantes: Array<{ empleadoId: string; orden?: number; tipo?: string }>;
  *   ordenFirma?: boolean;
  *   recordatorioAutomatico?: boolean;
  *   diasRecordatorio?: number;
+ *   posicionFirma?: { pagina: number; x: number; y: number };
  * }
+ *
+ * NOTA: El título se genera automáticamente del nombre del documento.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -111,13 +113,6 @@ export async function POST(request: NextRequest) {
     if (!body.documentoId) {
       return NextResponse.json(
         { error: 'El campo documentoId es requerido' },
-        { status: 400 }
-      );
-    }
-
-    if (!body.titulo) {
-      return NextResponse.json(
-        { error: 'El campo titulo es requerido' },
         { status: 400 }
       );
     }
@@ -184,6 +179,8 @@ export async function POST(request: NextRequest) {
       const pagina = typeof pos.pagina === 'number' ? pos.pagina : 0;
       const x = typeof pos.x === 'number' ? pos.x : 0;
       const y = typeof pos.y === 'number' ? pos.y : 0;
+      const width = typeof pos.width === 'number' ? pos.width : undefined;
+      const height = typeof pos.height === 'number' ? pos.height : undefined;
 
       const valoresSonNumeros =
         typeof pos.pagina === 'number' && typeof pos.x === 'number' && typeof pos.y === 'number';
@@ -211,17 +208,33 @@ export async function POST(request: NextRequest) {
         );
       }
 
+      // Validar width y height si se proporcionan
+      if (width !== undefined && (width < 0 || width > 1000)) {
+        return NextResponse.json(
+          { error: 'El ancho (width) debe estar entre 0 y 1000' },
+          { status: 400 }
+        );
+      }
+
+      if (height !== undefined && (height < 0 || height > 1000)) {
+        return NextResponse.json(
+          { error: 'El alto (height) debe estar entre 0 y 1000' },
+          { status: 400 }
+        );
+      }
+
       const paginaNormalizada = pagina === -1 ? -1 : Math.floor(pagina);
       posicionFirma = {
         pagina: paginaNormalizada,
         x: Math.round(x),
         y: Math.round(y),
+        width: width !== undefined ? Math.round(width) : undefined,
+        height: height !== undefined ? Math.round(height) : undefined,
       };
     }
 
     // Crear input para db-helper
     const documentoId = typeof body.documentoId === 'string' ? body.documentoId : '';
-    const titulo = typeof body.titulo === 'string' ? body.titulo : '';
     const mensaje = typeof body.mensaje === 'string' ? body.mensaje : undefined;
     const ordenFirma = typeof body.ordenFirma === 'boolean' ? body.ordenFirma : false;
     const recordatorioAutomatico = typeof body.recordatorioAutomatico === 'boolean' ? body.recordatorioAutomatico : true;
@@ -230,7 +243,7 @@ export async function POST(request: NextRequest) {
     const input: CrearSolicitudFirmaInput = {
       documentoId,
       empresaId: session.user.empresaId,
-      titulo,
+      // titulo se obtiene automáticamente del documento en crearSolicitudFirma
       mensaje,
       firmantes: sanitizedFirmantes,
       ordenFirma,

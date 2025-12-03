@@ -25,6 +25,38 @@
 - Sincronización con Google Calendar
 - Campañas de vacaciones
 
+## Respuesta GET /api/ausencias
+
+La respuesta incluye información del empleado necesaria para hover cards:
+
+```typescript
+{
+  data: [
+    {
+      id: string;
+      empleadoId: string;
+      tipo: string;
+      estado: string;
+      fechaInicio: string;
+      fechaFin: string;
+      empleado: {
+        nombre: string;
+        apellidos: string;
+        puesto: string;
+        email: string | null;
+        fotoUrl: string | null;
+        equipoNombre: string | null;  // Nombre del primer equipo
+        equipo: { id: string; nombre: string } | null;  // Objeto completo del equipo
+      };
+      // ... otros campos
+    }
+  ],
+  pagination: { /* ... */ }
+}
+```
+
+**Nota**: `equipoNombre` se proporciona directamente como string para facilitar el uso en hover cards. El objeto `equipo` completo también está disponible si se necesita el ID.
+
 ---
 
 ## Recursos Relacionados

@@ -187,6 +187,7 @@ type UploadOptions = {
   acl?: ObjectCannedACL;
   cacheControl?: string;
   contentDisposition?: string;
+  contentLength?: number;
 };
 
 export async function uploadToS3(
@@ -218,8 +219,9 @@ export async function uploadToS3(
         Body: file,
         ContentType: contentType,
         ACL: acl,
-        CacheControl: options?.cacheControl,
-        ContentDisposition: options?.contentDisposition,
+        ...(options?.cacheControl ? { CacheControl: options.cacheControl } : {}),
+        ...(options?.contentDisposition ? { ContentDisposition: options.contentDisposition } : {}),
+        ...(typeof options?.contentLength === 'number' ? { ContentLength: options.contentLength } : {}),
       })
     );
 

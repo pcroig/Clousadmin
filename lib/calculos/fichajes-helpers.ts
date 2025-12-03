@@ -3,7 +3,7 @@
 // ========================================
 // Funciones reutilizables para generar eventos propuestos y cálculos comunes
 
-import { Jornada } from '@prisma/client';
+import { jornadas as Jornada } from '@prisma/client';
 
 import { obtenerNombreDia } from '@/lib/utils/fechas';
 

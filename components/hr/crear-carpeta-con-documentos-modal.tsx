@@ -2,10 +2,12 @@
 
 import { FolderPlus, Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { toast } from 'sonner';
 
 import { DocumentUploaderInline } from '@/components/shared/document-uploader-inline';
 import { InfoTooltip } from '@/components/shared/info-tooltip';
+import { SearchableMultiSelect } from '@/components/shared/searchable-multi-select';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -24,6 +26,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { extractArrayFromResponse } from '@/lib/utils/api-response';
 import { parseJson } from '@/lib/utils/json';
 interface CrearCarpetaResponse {
   carpeta: {
@@ -53,6 +56,17 @@ interface CrearCarpetaConDocumentosModalProps {
   onSuccess?: (carpetaId: string) => void;
 }
 
+interface EquipoOption {
+  id: string;
+  nombre: string;
+}
+
+interface EmpleadoOption {
+  id: string;
+  nombre: string;
+  apellidos: string;
+}
+
 export function CrearCarpetaConDocumentosModal({
   open,
   onClose,
@@ -63,10 +77,69 @@ export function CrearCarpetaConDocumentosModal({
   
   // Datos de la carpeta
   const [nombreCarpeta, setNombreCarpeta] = useState('');
-  const [asignadoA, setAsignadoA] = useState<string>('todos');
+  const [tipoAsignacion, setTipoAsignacion] = useState<'todos' | 'equipo' | 'empleados'>('todos');
+  const [equipoSeleccionado, setEquipoSeleccionado] = useState('');
+  const [empleadosSeleccionados, setEmpleadosSeleccionados] = useState<string[]>([]);
+  const [equipos, setEquipos] = useState<EquipoOption[]>([]);
+  const [empleadosList, setEmpleadosList] = useState<EmpleadoOption[]>([]);
+  const [cargandoAsignaciones, setCargandoAsignaciones] = useState(false);
   
   // Documentos a subir
   const [documentos, setDocumentos] = useState<UploadedFile[]>([]);
+
+  useEffect(() => {
+    if (!open) return;
+
+    const cargarAsignaciones = async () => {
+      setCargandoAsignaciones(true);
+      try {
+        const [equiposRes, empleadosRes] = await Promise.all([
+          fetch('/api/organizacion/equipos'),
+          fetch('/api/empleados?activos=true'),
+        ]);
+
+        if (equiposRes.ok) {
+          const data = await equiposRes.json() as Record<string, unknown>;
+          const lista = extractArrayFromResponse<{ id: string; nombre: string }>(data, { key: 'equipos' }) ?? [];
+          setEquipos(lista);
+        }
+
+        if (empleadosRes.ok) {
+          const data = await empleadosRes.json() as Record<string, unknown>;
+          const lista = extractArrayFromResponse<{
+            id: string;
+            nombre?: string;
+            apellidos?: string;
+            usuario?: { nombre?: string; apellidos?: string };
+          }>(data, { key: 'empleados' }) ?? [];
+
+          setEmpleadosList(
+            lista.map((empleado) => ({
+              id: empleado.id,
+              nombre: empleado.nombre || empleado.usuario?.nombre || '',
+              apellidos: empleado.apellidos || empleado.usuario?.apellidos || '',
+            }))
+          );
+        }
+      } catch (error) {
+        console.error('Error cargando datos de asignación:', error);
+      } finally {
+        setCargandoAsignaciones(false);
+      }
+    };
+
+    void cargarAsignaciones();
+  }, [open]);
+
+  const buildAsignadoA = () => {
+    if (tipoAsignacion === 'equipo' && equipoSeleccionado) {
+      return `equipo:${equipoSeleccionado}`;
+    }
+    if (tipoAsignacion === 'empleados' && empleadosSeleccionados.length > 0) {
+      return empleadosSeleccionados.map((id) => `empleado:${id}`).join(',');
+    }
+    return 'todos';
+  };
 
   const handleCrearCarpeta = async () => {
     if (!nombreCarpeta.trim()) {
@@ -74,9 +147,21 @@ export function CrearCarpetaConDocumentosModal({
       return;
     }
 
+    if (tipoAsignacion === 'equipo' && !equipoSeleccionado) {
+      toast.error('Selecciona un equipo para asignar la carpeta');
+      return;
+    }
+
+    if (tipoAsignacion === 'empleados' && empleadosSeleccionados.length === 0) {
+      toast.error('Selecciona al menos un empleado para asignar la carpeta');
+      return;
+    }
+
     setLoading(true);
 
     try {
+      const asignadoA = buildAsignadoA();
+
       // 1. Crear carpeta
       const carpetaResponse = await fetch('/api/carpetas', {
         method: 'POST',
@@ -139,7 +224,9 @@ export function CrearCarpetaConDocumentosModal({
 
       // 3. Resetear y cerrar
       setNombreCarpeta('');
-      setAsignadoA('todos');
+      setTipoAsignacion('todos');
+      setEquipoSeleccionado('');
+      setEmpleadosSeleccionados([]);
       setDocumentos([]);
       
       onClose();
@@ -160,7 +247,7 @@ export function CrearCarpetaConDocumentosModal({
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl" aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <FolderPlus className="w-5 h-5" />
@@ -186,17 +273,65 @@ export function CrearCarpetaConDocumentosModal({
 
           {/* Asignar a */}
           <div className="space-y-2">
-            <Label htmlFor="asignadoA">Asignar a</Label>
-            <Select value={asignadoA} onValueChange={setAsignadoA} disabled={loading}>
+            <Label>Compartir con</Label>
+            <Select
+              value={tipoAsignacion}
+              onValueChange={(value) => {
+                setTipoAsignacion(value as 'todos' | 'equipo' | 'empleados');
+                setEquipoSeleccionado('');
+                setEmpleadosSeleccionados([]);
+              }}
+              disabled={loading}
+            >
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="todos">Todos los empleados</SelectItem>
-                {/* Futuro: equipos, departamentos, etc. */}
+                <SelectItem value="equipo">Equipo específico</SelectItem>
+                <SelectItem value="empleados">Empleados seleccionados</SelectItem>
               </SelectContent>
             </Select>
           </div>
+
+          {tipoAsignacion === 'equipo' && (
+            <div className="space-y-2">
+              <Label>Equipo</Label>
+              <Select
+                value={equipoSeleccionado}
+                onValueChange={setEquipoSeleccionado}
+                disabled={loading || cargandoAsignaciones}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecciona un equipo" />
+                </SelectTrigger>
+                <SelectContent>
+                  {equipos.map((equipo) => (
+                    <SelectItem key={equipo.id} value={equipo.id}>
+                      {equipo.nombre}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {tipoAsignacion === 'empleados' && (
+            <div className="space-y-2">
+              <Label>Empleados</Label>
+              <SearchableMultiSelect
+                items={empleadosList.map((empleado) => ({
+                  label: `${empleado.nombre} ${empleado.apellidos}`,
+                  value: empleado.id,
+                }))}
+                values={empleadosSeleccionados}
+                onChange={setEmpleadosSeleccionados}
+                placeholder="Buscar empleados..."
+                emptyMessage="No se encontraron empleados"
+                disabled={loading || cargandoAsignaciones}
+              />
+            </div>
+          )}
 
           {/* Subida de documentos */}
           <div className="space-y-2">

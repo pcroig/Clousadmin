@@ -11,6 +11,7 @@ import {
   requireAuthAsHR,
   successResponse,
 } from '@/lib/api-handler';
+import { getBaseUrl } from '@/lib/email';
 import { logAccesoSensibles } from '@/lib/auditoria';
 import { UsuarioRol } from '@/lib/constants/enums';
 import { CARPETAS_SISTEMA } from '@/lib/documentos';
@@ -36,7 +37,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const { page, limit, skip } = parsePaginationParams(searchParams);
 
-    const where: Prisma.EmpleadoWhereInput = {
+    const where: Prisma.empleadosWhereInput = {
       empresaId: session.user.empresaId,
     };
 
@@ -48,7 +49,7 @@ export async function GET(request: NextRequest) {
     }
 
     const [empleados, total] = await Promise.all([
-      prisma.empleado.findMany({
+      prisma.empleados.findMany({
         where,
         select: empleadoSelectListado,
         orderBy: {
@@ -57,7 +58,7 @@ export async function GET(request: NextRequest) {
         skip,
         take: limit,
       }),
-      prisma.empleado.count({ where }),
+      prisma.empleados.count({ where }),
     ]);
 
     const empleadosDesencriptados = decryptEmpleadoList(empleados);
@@ -86,7 +87,8 @@ export async function POST(request: NextRequest) {
     if (authResult instanceof Response) return authResult;
     const { session } = authResult;
 
-    const body = await request.json() as Record<string, unknown>;
+  const body = await request.json() as Record<string, unknown>;
+  const baseUrl = getBaseUrl(request.headers.get('origin') ?? undefined);
     const equipoIdsInput = Array.isArray(body.equipoIds)
       ? body.equipoIds.filter(
           (value): value is string => typeof value === 'string' && value.trim().length > 0
@@ -110,6 +112,14 @@ export async function POST(request: NextRequest) {
       return sanitized ? sanitized.toUpperCase() : null;
     };
 
+    const parseDateString = (value: unknown): Date | null => {
+      if (typeof value !== 'string') {
+        return null;
+      }
+      const parsed = new Date(value);
+      return Number.isNaN(parsed.getTime()) ? null : parsed;
+    };
+
     const email = sanitizeEmail(body.email);
     const nombre = sanitizeOptionalString(body.nombre);
     const apellidos = sanitizeOptionalString(body.apellidos);
@@ -123,7 +133,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Verificar que el email no exista
-    const existingUsuario = await prisma.usuario.findUnique({
+    const existingUsuario = await prisma.usuarios.findUnique({
       where: { email },
       include: {
         empleado: {
@@ -163,7 +173,7 @@ export async function POST(request: NextRequest) {
     // Crear usuario y empleado en transacción
     const result = await prisma.$transaction(async (tx) => {
       // Crear usuario
-      const usuario = await tx.usuario.create({
+      const usuario = await tx.usuarios.create({
         data: {
           email,
           password: await hash(Math.random().toString(36).slice(-8), 10), // Password temporal
@@ -176,14 +186,16 @@ export async function POST(request: NextRequest) {
       });
 
       // Preparar datos del empleado
-      const salarioBrutoAnual =
-        body.salarioBrutoAnual !== undefined && body.salarioBrutoAnual !== null && typeof body.salarioBrutoAnual === 'number'
-          ? new Prisma.Decimal(body.salarioBrutoAnual)
+      const salarioBaseAnual =
+        body.salarioBaseAnual !== undefined && body.salarioBaseAnual !== null && typeof body.salarioBaseAnual === 'number'
+          ? new Prisma.Decimal(body.salarioBaseAnual)
           : null;
-      const salarioBrutoMensual =
-        body.salarioBrutoMensual !== undefined && body.salarioBrutoMensual !== null && typeof body.salarioBrutoMensual === 'number'
-          ? new Prisma.Decimal(body.salarioBrutoMensual)
+      const salarioBaseMensual =
+        body.salarioBaseMensual !== undefined && body.salarioBaseMensual !== null && typeof body.salarioBaseMensual === 'number'
+          ? new Prisma.Decimal(body.salarioBaseMensual)
           : null;
+
+      const bicNormalizado = sanitizeOptionalString(body.bic);
 
       const empleadoData = {
         usuarioId: usuario.id,
@@ -193,7 +205,7 @@ export async function POST(request: NextRequest) {
         email,
         nif: sanitizeNif(body.nif),
         nss: sanitizeOptionalString(body.nss),
-        fechaNacimiento: typeof body.fechaNacimiento === 'string' ? new Date(body.fechaNacimiento) : null,
+        fechaNacimiento: parseDateString(body.fechaNacimiento),
         telefono: sanitizeOptionalString(body.telefono),
         direccionCalle: sanitizeOptionalString(body.direccionCalle),
         direccionNumero: sanitizeOptionalString(body.direccionNumero),
@@ -205,13 +217,13 @@ export async function POST(request: NextRequest) {
         numeroHijos: typeof body.numeroHijos === 'number' ? body.numeroHijos : 0,
         genero: sanitizeOptionalString(body.genero),
         iban: sanitizeOptionalString(body.iban),
-        titularCuenta: sanitizeOptionalString(body.titularCuenta),
-        puestoId: typeof body.puestoId === 'string' ? body.puestoId : null,
+        bic: bicNormalizado ? bicNormalizado.replace(/\s+/g, '').toUpperCase() : null,
+        puestoId: sanitizeOptionalString(body.puestoId),
         jornadaId: jornadaPorDefecto.id, // Siempre tendrá una jornada (getOrCreateDefaultJornada garantiza que exista)
-        fechaAlta: typeof body.fechaAlta === 'string' ? new Date(body.fechaAlta) : new Date(),
+        fechaAlta: parseDateString(body.fechaAlta) ?? new Date(),
         tipoContrato: typeof body.tipoContrato === 'string' ? body.tipoContrato : 'indefinido',
-        salarioBrutoAnual,
-        salarioBrutoMensual,
+        salarioBaseAnual,
+        salarioBaseMensual,
         activo: typeof body.activo === 'boolean' ? body.activo : true,
         onboardingCompletado: typeof body.onboardingCompletado === 'boolean' ? body.onboardingCompletado : false,
       } as const;
@@ -228,20 +240,20 @@ export async function POST(request: NextRequest) {
       };
 
       // Crear empleado con datos encriptados
-      const empleado = await tx.empleado.create({
+      const empleado = await tx.empleados.create({
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         data: empleadoCreateData as any,
       });
 
       // Garantizar vínculo bidireccional usuario <-> empleado
-      await tx.usuario.update({
+      await tx.usuarios.update({
         where: { id: usuario.id },
         data: { empleadoId: empleado.id },
       });
 
       // Asignar equipos si se proporcionaron
       if (equipoIdsInput.length > 0) {
-        await tx.empleadoEquipo.createMany({
+        await tx.empleado_equipos.createMany({
           data: equipoIdsInput.map((equipoId) => ({
             empleadoId: empleado.id,
             equipoId,
@@ -250,7 +262,7 @@ export async function POST(request: NextRequest) {
       }
 
       // Crear carpetas del sistema automáticamente usando constante
-      await tx.carpeta.createMany({
+      await tx.carpetas.createMany({
         data: CARPETAS_SISTEMA.map((nombreCarpeta) => ({
           empresaId: session.user.empresaId,
           empleadoId: empleado.id,
@@ -273,6 +285,7 @@ export async function POST(request: NextRequest) {
         nombre: result.empleado.nombre,
         apellidos: result.empleado.apellidos,
         tipoOnboarding: 'completo',
+        baseUrl,
       });
 
       if (!invitacionResult.success) {
@@ -295,11 +308,15 @@ export async function POST(request: NextRequest) {
 
     // Notificar a HR sobre la creación del empleado
     try {
-      await crearNotificacionEmpleadoCreado(prisma, {
-        empleadoId: result.empleado.id,
-        empresaId: session.user.empresaId,
-        empleadoNombre: `${result.empleado.nombre} ${result.empleado.apellidos}`,
-      });
+      await crearNotificacionEmpleadoCreado(
+        prisma,
+        {
+          empleadoId: result.empleado.id,
+          empresaId: session.user.empresaId,
+          empleadoNombre: `${result.empleado.nombre} ${result.empleado.apellidos}`,
+        },
+        { actorUsuarioId: session.user.id }
+      );
     } catch (error) {
       console.error('[API POST /api/empleados] Error creando notificación:', error);
       // No fallar la creación del empleado si falla la notificación

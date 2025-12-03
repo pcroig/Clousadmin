@@ -14,7 +14,7 @@
 
 import { AlertCircle, CheckCircle, ChevronDown, ChevronRight, FileText, Upload, XCircle } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
@@ -35,8 +35,8 @@ interface EmpleadoDetectado {
   equipo: string | null;
   manager: string | null;
   fechaAlta: string | null;
-  salarioBrutoAnual: number | null;
-  salarioBrutoMensual: number | null;
+  salarioBaseAnual: number | null;
+  salarioBaseMensual: number | null;
   direccionCalle: string | null;
   direccionNumero: string | null;
   direccionPiso: string | null;
@@ -66,7 +66,7 @@ interface EmpleadoImportado {
   puesto: string | null;
   equipo: string | null;
   fechaAlta: string | null;
-  salarioBrutoAnual: number | null;
+  salarioBaseAnual: number | null;
   invitacionEnviada: boolean;
 }
 
@@ -159,6 +159,7 @@ export function ImportarEmpleadosExcel({
   const [invitarEmpleados, setInvitarEmpleados] = useState(true);
   const [error, setError] = useState('');
   const [empleadosExpandidos, setEmpleadosExpandidos] = useState<Set<string>>(new Set());
+  const [cargandoEmpleados, setCargandoEmpleados] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const resumenStats = buildResumenStats(previewData);
 
@@ -167,6 +168,78 @@ export function ImportarEmpleadosExcel({
   const actionButtonsClass = shouldShowCancelButton
     ? 'flex flex-col gap-2 pt-2 sm:flex-row sm:items-center sm:justify-between'
     : 'flex flex-col gap-2 pt-2 sm:flex-row sm:items-center sm:justify-end';
+
+  // Cargar empleados recientes (sin onboarding completado) al montar
+  useEffect(() => {
+    const loadEmpleados = async () => {
+      // Solo cargar si autoConfirmAfterAnalysis está activo (modo onboarding)
+      // y no hay resultado de importación ya
+      if (!autoConfirmAfterAnalysis || resultadoImportacion) return;
+
+      setCargandoEmpleados(true);
+      try {
+        const response = await fetch('/api/empleados?limit=100');
+        if (response.ok) {
+          const data = await parseJson<{
+            data?: Array<{
+              id: string;
+              nombre: string;
+              apellidos: string;
+              email: string;
+              puesto?: { id: string; nombre: string } | null;
+              equipos?: Array<{ id: string; nombre: string }>;
+              fechaAlta: string | null;
+              salarioBaseAnual: number | null;
+              onboardingCompletado: boolean;
+              createdAt?: string;
+              usuario?: {
+                rol: string;
+              };
+            }>;
+          }>(response);
+
+          const empleados = data?.data ?? [];
+
+          // Filtrar empleados sin onboarding completado (creados durante este flujo)
+          // Excluir HR admins (son parte del signup inicial, no empleados importados)
+          const empleadosSinOnboarding = empleados.filter(
+            (emp) => !emp.onboardingCompletado && emp.usuario?.rol !== 'hr_admin'
+          );
+
+          if (empleadosSinOnboarding.length > 0) {
+            // Transformar a formato ResultadoImportacion
+            const resultado: ResultadoImportacion = {
+              empleadosCreados: empleadosSinOnboarding.length,
+              equiposCreados: 0, // No podemos calcularlo desde aquí
+              puestosCreados: 0, // No podemos calcularlo desde aquí
+              invitacionesEnviadas: 0, // No podemos saberlo
+              errores: [],
+              empleadosImportados: empleadosSinOnboarding.map((emp) => ({
+                id: emp.id,
+                nombre: emp.nombre,
+                apellidos: emp.apellidos,
+                email: emp.email,
+                puesto: emp.puesto?.nombre ?? null,
+                equipo: emp.equipos?.[0]?.nombre ?? null,
+                fechaAlta: emp.fechaAlta,
+                salarioBaseAnual: emp.salarioBaseAnual,
+                invitacionEnviada: false, // Asumir que no sabemos
+              })),
+            };
+
+            setResultadoImportacion(resultado);
+          }
+        }
+      } catch (err) {
+        console.error('Error cargando empleados:', err);
+        // No mostrar error, simplemente dejar vacío
+      } finally {
+        setCargandoEmpleados(false);
+      }
+    };
+
+    loadEmpleados();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -504,11 +577,11 @@ export function ImportarEmpleadosExcel({
                                 </span>
                               </div>
                             )}
-                            {emp.salarioBrutoAnual && (
+                            {emp.salarioBaseAnual && (
                               <div>
                                 <span className="text-gray-500">Salario anual:</span>
                                 <span className="ml-1 text-gray-900">
-                                  {emp.salarioBrutoAnual.toLocaleString('es-ES')}€
+                                  {emp.salarioBaseAnual.toLocaleString('es-ES')}€
                                 </span>
                               </div>
                             )}
@@ -673,11 +746,11 @@ export function ImportarEmpleadosExcel({
                               </span>
                             </div>
                           )}
-                          {emp.salarioBrutoAnual && (
+                          {emp.salarioBaseAnual && (
                             <div>
                               <span className="text-gray-500">Salario anual:</span>
                               <span className="ml-1 text-gray-900">
-                                {emp.salarioBrutoAnual.toLocaleString('es-ES')}€
+                                {emp.salarioBaseAnual.toLocaleString('es-ES')}€
                               </span>
                             </div>
                           )}

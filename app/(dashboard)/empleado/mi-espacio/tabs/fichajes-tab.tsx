@@ -17,6 +17,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { useApi } from '@/lib/hooks';
+import { extraerHoraDeISO } from '@/lib/utils/formatters';
 
 
 interface FichajeEvento {
@@ -84,8 +85,9 @@ export function FichajesTab({ empleadoId }: { empleadoId: string }) {
       const entrada = eventos.find((e) => e.tipo === 'entrada');
       const salida = eventos.find((e) => e.tipo === 'salida');
       
-      const horarioEntrada = entrada ? format(new Date(`2000-01-01T${entrada.hora}`), 'HH:mm') : null;
-      const horarioSalida = salida ? format(new Date(`2000-01-01T${salida.hora}`), 'HH:mm') : null;
+      // Extraer hora directamente del ISO string para evitar desfases de zona horaria
+      const horarioEntrada = entrada ? extraerHoraDeISO(entrada.hora) : null;
+      const horarioSalida = salida ? extraerHoraDeISO(salida.hora) : null;
 
       // Calcular horas trabajadas
       let horasTrabajadas = 0;

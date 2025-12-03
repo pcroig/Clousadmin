@@ -13,27 +13,22 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 import { CompactFilterBar } from '@/components/adaptive/CompactFilterBar';
-import { MobileActionBar } from '@/components/adaptive/MobileActionBar';
-import { ResponsiveContainer } from '@/components/adaptive/ResponsiveContainer';
+import { PageMobileHeader } from '@/components/layout/page-mobile-header';
+import { EmpleadoHoverCard } from '@/components/empleado/empleado-hover-card';
+import { AvatarCell, DataTable, type Column } from '@/components/shared/data-table';
 import { CompensarHorasDialog } from '@/components/shared/compensar-horas-dialog';
+import { EmptyState } from '@/components/shared/empty-state';
 import { FichajeModal } from '@/components/shared/fichajes/fichaje-modal';
 import { DataFilters, type FilterOption } from '@/components/shared/filters/data-filters';
 import { DateRangeControls } from '@/components/shared/filters/date-range-controls';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { EstadoFichaje } from '@/lib/constants/enums';
 import { useIsMobile } from '@/lib/hooks/use-viewport';
 import { extractArrayFromResponse } from '@/lib/utils/api-response';
-import { formatearHorasMinutos } from '@/lib/utils/formatters';
+import { extraerHoraDeISO, formatearHorasMinutos } from '@/lib/utils/formatters';
 import { calcularRangoFechas, toMadridDate } from '@/lib/utils/fechas';
 import { parseJson } from '@/lib/utils/json';
 
@@ -68,6 +63,8 @@ interface Fichaje {
       id: string;
       nombre: string;
     } | null;
+    email?: string | null;
+    fotoUrl?: string | null;
   };
 }
 
@@ -87,10 +84,18 @@ interface JornadaDia {
 
 const ESTADO_OPTIONS: FilterOption[] = [
   { value: 'en_curso', label: 'En curso' },
-  { value: 'finalizado', label: 'Finalizado' },
-  { value: 'revisado', label: 'Revisado' },
   { value: 'pendiente', label: 'Pendiente' },
+  { value: 'finalizado', label: 'Finalizado' },
 ];
+
+const FICHAJE_ESTADO_VARIANTS: Record<string, { label: string; className: string }> = {
+  en_curso: { label: 'En curso', className: 'bg-blue-100 text-blue-800' },
+  pendiente: { label: 'Pendiente', className: 'bg-yellow-100 text-yellow-800' },
+  finalizado: { label: 'Finalizado', className: 'bg-gray-100 text-gray-800' },
+};
+
+const getFichajeEstadoLabel = (estado: string): string =>
+  (FICHAJE_ESTADO_VARIANTS[estado] ?? FICHAJE_ESTADO_VARIANTS.en_curso).label;
 
 export function FichajesClient({ initialState }: { initialState?: string }) {
   const router = useRouter();
@@ -225,8 +230,9 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
       const entrada = eventosOrdenados.find(e => e.tipo === 'entrada');
       const salida = eventosOrdenados.find(e => e.tipo === 'salida');
 
-      const horarioEntrada = entrada ? format(new Date(entrada.hora), 'HH:mm') : null;
-      const horarioSalida = salida ? format(new Date(salida.hora), 'HH:mm') : null;
+      // Extraer hora directamente del ISO string para evitar desfases de zona horaria
+      const horarioEntrada = entrada ? extraerHoraDeISO(entrada.hora) : null;
+      const horarioSalida = salida ? extraerHoraDeISO(salida.hora) : null;
 
       const horasEsperadas = (() => {
         const valor = (fichaje as { horasEsperadas?: number | string | null }).horasEsperadas;
@@ -266,15 +272,6 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
       };
     }).sort((a, b) => b.fecha.getTime() - a.fecha.getTime());
   }, [calcularHorasTrabajadas, obtenerFechaReferencia]);
-
-  // Listener para refrescar en tiempo real
-  useEffect(() => {
-    function handleRealtimeUpdate() {
-      fetchFichajes();
-    }
-    window.addEventListener('fichaje-updated', handleRealtimeUpdate);
-    return () => window.removeEventListener('fichaje-updated', handleRealtimeUpdate);
-  }, []);
 
   const fetchFichajes = useCallback(async () => {
     setLoading(true);
@@ -322,6 +319,15 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
     fetchFichajes();
   }, [fetchFichajes]);
 
+  // Listener para refrescar en tiempo real
+  useEffect(() => {
+    function handleRealtimeUpdate() {
+      fetchFichajes();
+    }
+    window.addEventListener('fichaje-updated', handleRealtimeUpdate);
+    return () => window.removeEventListener('fichaje-updated', handleRealtimeUpdate);
+  }, [fetchFichajes]);
+
   const goToPreviousPeriod = useCallback(() => {
     const nuevaFecha = new Date(fechaBase);
     if (rangoFechas === 'dia') {
@@ -350,8 +356,18 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
     switch (rangoFechas) {
       case 'dia':
         return format(fechaBase, 'dd MMM', { locale: es });
-      case 'semana':
-        return `Sem ${format(fechaBase, 'w', { locale: es })}`;
+      case 'semana': {
+        const { inicio, fin } = calcularRangoFechas(fechaBase, 'semana');
+        const mesInicio = format(inicio, 'MMM', { locale: es });
+        const mesFin = format(fin, 'MMM', { locale: es });
+        const anio = format(fin, 'yyyy', { locale: es });
+
+        if (mesInicio === mesFin) {
+          return `${mesInicio} ${anio}`;
+        } else {
+          return `${mesInicio} - ${mesFin} ${anio}`;
+        }
+      }
       default:
         return format(fechaBase, 'MMM yyyy', { locale: es });
     }
@@ -374,26 +390,19 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
     return filtradas;
   }, [jornadas, busquedaEmpleado]);
 
-  // Stats Counters
-  const fichajesRevisados = useMemo(() => 
-    jornadasFiltradas.filter(j => j.fichaje.estado === 'revisado').length,
-    [jornadasFiltradas]
-  );
+  const resolveEmpleadoHoverInfo = useCallback((jornada: JornadaDia) => {
+    const empleado = jornada.fichaje?.empleado;
 
-  const fichajesPendientesRevision = useMemo(() => 
-    jornadasFiltradas.filter(j => 
-      j.fichaje.estado === EstadoFichaje.pendiente || 
-      j.fichaje.estado === 'pendiente_revision' || // Legacy
-      j.fichaje.estado === EstadoFichaje.en_curso ||
-      j.fichaje.estado === 'rechazado' // Legacy - tratar como pendiente
-    ).length,
-    [jornadasFiltradas]
-  );
-
-  const obtenerTiempoPendiente = useCallback(
-    (jornada: JornadaDia) => Math.max(jornada.horasEsperadas - jornada.horasTrabajadas, 0),
-    []
-  );
+    return {
+      id: empleado?.id ?? jornada.empleadoId,
+      nombre: empleado?.nombre ?? jornada.empleadoNombre,
+      apellidos: empleado?.apellidos ?? null,
+      puesto: empleado?.puesto ?? null,
+      equipoNombre: empleado?.equipo?.nombre ?? jornada.equipoNombre ?? null,
+      email: empleado?.email ?? null,
+      fotoUrl: empleado?.fotoUrl ?? undefined,
+    };
+  }, []);
 
   const handleVerDetalles = useCallback((fichajeId: string) => {
     setEditarFichajeModal({
@@ -410,12 +419,18 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
   const renderMobileList = () => (
     <div className="space-y-4 pb-20">
       {jornadasFiltradas.length === 0 ? (
-        <div className="text-center py-10 text-gray-500">
-          {busquedaEmpleado ? 'No se encontraron empleados' : 'No hay fichajes'}
-        </div>
+        <EmptyState
+          layout="inline"
+          icon={Clock}
+          title={busquedaEmpleado ? 'No se encontraron empleados' : 'No hay fichajes'}
+          description={
+            busquedaEmpleado
+              ? 'Prueba con otro nombre o restablece los filtros.'
+              : 'Cambia el periodo o ajusta los filtros para ver registros.'
+          }
+        />
       ) : (
         jornadasFiltradas.map((jornada) => {
-          const tiempoPendiente = obtenerTiempoPendiente(jornada);
           return (
           <Card
             key={`${jornada.empleadoId}-${jornada.fecha.toISOString()}`}
@@ -424,7 +439,13 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
           >
             <div className="flex justify-between items-start">
               <div>
-                <h3 className="font-medium text-gray-900">{jornada.empleadoNombre}</h3>
+                <EmpleadoHoverCard
+                  empleado={resolveEmpleadoHoverInfo(jornada)}
+                  estado={{ label: getFichajeEstadoLabel(jornada.fichaje.estado) }}
+                  triggerClassName="font-medium text-gray-900"
+                >
+                  {jornada.empleadoNombre}
+                </EmpleadoHoverCard>
                 <p className="text-xs text-gray-500">{format(jornada.fecha, 'EEEE, d MMM', { locale: es })}</p>
               </div>
               <EstadoBadge estado={jornada.fichaje.estado} />
@@ -440,18 +461,11 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
                   </span>
                 </div>
               </div>
-              <div className="space-y-2">
-                <div>
-                  <p className="text-xs text-gray-500 mb-1">Trabajado</p>
-                  <div className="text-sm font-medium">
-                    {formatearHorasMinutos(jornada.horasTrabajadas)}
-                  </div>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-500 mb-1">Tiempo pendiente</p>
-                  <div className={`text-sm font-medium ${tiempoPendiente > 0 ? 'text-red-600' : 'text-gray-900'}`}>
-                    {tiempoPendiente > 0 ? formatearHorasMinutos(tiempoPendiente) : 'Sin pendientes'}
-                  </div>
+              <div>
+                <p className="text-xs text-gray-500 mb-1">Horas</p>
+                <div className="text-sm">
+                  <span className="font-bold text-gray-900">{formatearHorasMinutos(jornada.horasTrabajadas)}</span>
+                  <span className="text-gray-600"> / {formatearHorasMinutos(jornada.horasEsperadas)}</span>
                 </div>
               </div>
             </div>
@@ -470,93 +484,92 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
     </div>
   );
 
-  const renderDesktopTable = () => (
-    <Card className="overflow-hidden px-0">
-      <div className="overflow-x-auto">
-        <Table className="min-w-full">
-          <TableHeader>
-            <TableRow>
-              <TableHead>Empleado</TableHead>
-              <TableHead>Fecha</TableHead>
-              <TableHead>Horas Trabajadas</TableHead>
-              <TableHead>Tiempo pendiente</TableHead>
-              <TableHead>Horario</TableHead>
-              <TableHead>Balance</TableHead>
-              <TableHead>Estado</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {jornadasFiltradas.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={7} className="h-24 text-center text-gray-500">
-                  {busquedaEmpleado ? 'No se encontraron empleados' : 'No hay fichajes'}
-                </TableCell>
-              </TableRow>
-            ) : (
-              jornadasFiltradas.map((jornada) => {
-                const tiempoPendiente = obtenerTiempoPendiente(jornada);
-                return (
-                <TableRow
-                  key={`${jornada.empleadoId}-${jornada.fecha.toISOString()}`}
-                  className="cursor-pointer hover:bg-gray-50 transition"
-                  onClick={() => handleVerDetalles(jornada.fichaje.id)}
-                >
-                  <TableCell className="font-medium text-gray-900">
-                    <div>{jornada.empleadoNombre}</div>
-                  </TableCell>
-                  <TableCell className="text-gray-500">
-                    {format(jornada.fecha, 'dd MMM', { locale: es })}
-                  </TableCell>
-                  <TableCell>
-                    <span className="font-medium text-gray-900">
-                      {formatearHorasMinutos(jornada.horasTrabajadas)}
-                    </span>
-                  </TableCell>
-                  <TableCell className="text-gray-500">
-                    {tiempoPendiente > 0 ? formatearHorasMinutos(tiempoPendiente) : 'Sin pendientes'}
-                  </TableCell>
-                  <TableCell className="text-gray-500 text-xs">
-                    {jornada.horarioEntrada ? (
-                      <span>
-                        {jornada.horarioEntrada} - {jornada.horarioSalida || '...'}
-                      </span>
-                    ) : (
-                      '-'
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <span className={`text-sm ${
-                        jornada.balance >= 0 
-                          ? 'text-green-600' 
-                          : 'text-red-600'
-                      }`}
-                    >
-                      {jornada.balance > 0 ? '+' : ''}{formatearHorasMinutos(jornada.balance)}
-                    </span>
-                  </TableCell>
-                  <TableCell>
-                    <EstadoBadge estado={jornada.fichaje.estado} />
-                  </TableCell>
-                </TableRow>
-              );})
-            )}
-          </TableBody>
-        </Table>
-      </div>
-    </Card>
-  );
+  const columns = useMemo<Column<JornadaDia>[]>(() => [
+    {
+      id: 'empleado',
+      header: 'Empleado',
+      priority: 'high',
+      cell: (jornada) => (
+        <EmpleadoHoverCard
+          empleado={resolveEmpleadoHoverInfo(jornada)}
+          estado={{ label: getFichajeEstadoLabel(jornada.fichaje.estado) }}
+          triggerClassName="block"
+          side="right"
+        >
+          <AvatarCell
+            nombre={jornada.fichaje.empleado?.nombre ?? jornada.empleadoNombre}
+            apellidos={jornada.fichaje.empleado?.apellidos ?? undefined}
+            fotoUrl={jornada.fichaje.empleado?.fotoUrl ?? undefined}
+            subtitle={jornada.fichaje.empleado?.puesto ?? undefined}
+            compact
+          />
+        </EmpleadoHoverCard>
+      ),
+    },
+    {
+      id: 'fecha',
+      header: 'Fecha',
+      align: 'center',
+      priority: 'medium',
+      cell: (jornada) => (
+        <span className="text-sm text-gray-600">
+          {format(jornada.fecha, 'dd MMM', { locale: es })}
+        </span>
+      ),
+    },
+    {
+      id: 'horas',
+      header: 'Horas',
+      align: 'center',
+      cell: (jornada) => (
+        <span className="text-sm text-gray-600">
+          <span className="font-bold text-gray-900">{formatearHorasMinutos(jornada.horasTrabajadas)}</span>
+          {' / '}
+          {formatearHorasMinutos(jornada.horasEsperadas)}
+        </span>
+      ),
+    },
+    {
+      id: 'horario',
+      header: 'Horario',
+      align: 'center',
+      priority: 'low',
+      cell: (jornada) => (
+        <span className="text-sm text-gray-600">
+          {jornada.horarioEntrada ? `${jornada.horarioEntrada} - ${jornada.horarioSalida || '...'}` : '—'}
+        </span>
+      ),
+    },
+    {
+      id: 'balance',
+      header: 'Balance',
+      align: 'center',
+      cell: (jornada) => (
+        <span
+          className={`text-sm font-medium ${
+            jornada.balance >= 0 ? 'text-green-600' : 'text-red-600'
+          }`}
+        >
+          {jornada.balance > 0 ? '+' : ''}
+          {formatearHorasMinutos(jornada.balance)}
+        </span>
+      ),
+    },
+    {
+      id: 'estado',
+      header: 'Estado',
+      align: 'center',
+      cell: (jornada) => <EstadoBadge estado={jornada.fichaje.estado} />,
+    },
+  ], [resolveEmpleadoHoverInfo]);
+
+  const desktopEmptyTitle = busquedaEmpleado ? 'No se encontraron empleados' : 'No hay fichajes';
+  const desktopEmptyDescription = busquedaEmpleado
+    ? 'Prueba con otro nombre o restablece los filtros.'
+    : 'Cambia el periodo o ajusta los filtros para ver registros.';
 
   function EstadoBadge({ estado }: { estado: string }) {
-    const variants: Record<string, { label: string; className: string }> = {
-      en_curso: { label: 'En curso', className: 'bg-blue-100 text-blue-800' },
-      finalizado: { label: 'Finalizado', className: 'bg-gray-100 text-gray-800' },
-      revisado: { label: 'Revisado', className: 'bg-green-100 text-green-800' },
-      pendiente: { label: 'Pendiente', className: 'bg-yellow-100 text-yellow-800' },
-      rechazado: { label: 'Rechazado', className: 'bg-red-100 text-red-800' },
-      pendiente_revision: { label: 'Pendiente Rev.', className: 'bg-orange-100 text-orange-800' }
-    };
-
-    const variant = variants[estado] || variants.en_curso;
+    const variant = FICHAJE_ESTADO_VARIANTS[estado] || FICHAJE_ESTADO_VARIANTS.en_curso;
     return (
       <Badge className={variant.className + ' text-xs'}>
         {variant.label}
@@ -565,17 +578,19 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
   }
 
   return (
-    <ResponsiveContainer variant="none" className="h-full w-full flex flex-col overflow-hidden">
+    <div className="h-full w-full flex flex-col px-1 py-1 sm:max-w-[1800px] sm:mx-auto sm:px-8 sm:py-6">
       {isMobile ? (
         <>
-          <MobileActionBar
+          <PageMobileHeader
             title="Fichajes"
-            primaryAction={{
-              label: 'Cuadrar',
-              onClick: () => router.push('/hr/horario/fichajes/cuadrar'),
-              display: 'label',
-            }}
-            secondaryActions={[
+            actions={[
+              {
+                label: 'Cuadrar',
+                onClick: () => router.push('/hr/horario/fichajes/cuadrar'),
+                icon: Check,
+                isPrimary: true,
+                isSpecialAction: true,
+              },
               {
                 icon: Calendar,
                 label: 'Gestionar jornadas',
@@ -587,10 +602,9 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
                 onClick: handleAbrirCompensacion,
               },
             ]}
-            className="mb-3"
           />
 
-          {/* Navegación de período + filtros en una línea */}
+          {/* Navegación de período + filtros */}
           <div className="flex-shrink-0 mb-3 space-y-3">
             <DateRangeControls
               variant="mobile"
@@ -645,22 +659,6 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
                       </SelectContent>
                     </Select>
                   </div>
-                  {fichajesRevisados > 0 && (
-                    <div className="flex items-center gap-2 p-3 bg-green-50 rounded-lg">
-                      <Check className="h-4 w-4 text-green-600" />
-                      <span className="text-sm text-green-700 font-medium">
-                        {fichajesRevisados} fichajes revisados
-                      </span>
-                    </div>
-                  )}
-                  {fichajesPendientesRevision > 0 && (
-                    <div className="flex items-center gap-2 p-3 bg-yellow-50 rounded-lg">
-                      <Clock className="h-4 w-4 text-yellow-600" />
-                      <span className="text-sm text-yellow-700 font-medium">
-                        {fichajesPendientesRevision} pendientes de revisión
-                      </span>
-                    </div>
-                  )}
                 </div>
               }
               filtersTitle="Filtros"
@@ -700,21 +698,8 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
               equipoValue={filtroEquipo}
               onEquipoChange={setFiltroEquipo}
               equipoOptions={equiposOptions}
-            >
-              <div className="flex items-center gap-2">
-                {fichajesRevisados > 0 && (
-                  <Badge className="bg-green-50 text-green-700 border border-green-200">
-                    {fichajesRevisados} revisados
-                  </Badge>
-                )}
-                {fichajesPendientesRevision > 0 && (
-                  <Badge className="bg-yellow-100 text-yellow-800">
-                    {fichajesPendientesRevision} pendientes
-                  </Badge>
-                )}
-              </div>
-            </DataFilters>
-            
+            />
+
             <DateRangeControls
               range={rangoFechas}
               label={periodLabel}
@@ -722,7 +707,22 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
               onNavigate={(direction) => (direction === 'prev' ? goToPreviousPeriod() : goToNextPeriod())}
             />
           </div>
-          <div className="flex-1 overflow-y-auto">{renderDesktopTable()}</div>
+          <div className="flex-1 overflow-y-auto">
+            <DataTable
+              columns={columns}
+              data={jornadasFiltradas}
+              onRowClick={(jornada) => handleVerDetalles(jornada.fichaje.id)}
+              getRowId={(jornada) => `${jornada.empleadoId}-${jornada.fecha.toISOString()}`}
+              emptyContent={
+                <EmptyState
+                  layout="table"
+                  icon={Clock}
+                  title={desktopEmptyTitle}
+                  description={desktopEmptyDescription}
+                />
+              }
+            />
+          </div>
         </>
       )}
 
@@ -754,7 +754,7 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
           onClose={() => setShowCompensarHorasDialog(false)}
         />
       )}
-    </ResponsiveContainer>
+    </div>
   );
 }
 

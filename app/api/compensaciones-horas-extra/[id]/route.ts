@@ -41,7 +41,7 @@ export async function PATCH(
     const { accion, motivoRechazo } = validatedData;
 
     // Buscar compensación
-    const compensacion = await prisma.compensacionHoraExtra.findUnique({
+    const compensacion = await prisma.compensaciones_horas_extra.findUnique({
       where: { id },
       include: {
         empleado: {
@@ -72,7 +72,7 @@ export async function PATCH(
 
     if (accion === 'rechazar') {
       // Rechazar compensación
-      const compensacionActualizada = await prisma.compensacionHoraExtra.update({
+      const compensacionActualizada = await prisma.compensaciones_horas_extra.update({
         where: { id },
         data: {
           estado: 'rechazada',
@@ -111,7 +111,7 @@ export async function PATCH(
       fechaInicio.setDate(fechaInicio.getDate() + 1); // Mañana como fecha simbólica
       const fechaFin = new Date(fechaInicio);
 
-      const ausencia = await prisma.ausencia.create({
+      const ausencia = await prisma.ausencias.create({
         data: {
           empresaId: compensacion.empresaId,
           empleadoId: compensacion.empleadoId,
@@ -135,9 +135,9 @@ export async function PATCH(
       
       await prisma.empleadoSaldoAusencias.upsert({
         where: {
-          empleadoId_año: {
+          empleadoId_anio: {
             empleadoId: compensacion.empleadoId,
-            año: añoActual,
+            anio: añoActual,
           },
         },
         update: {
@@ -148,7 +148,7 @@ export async function PATCH(
         create: {
           empresaId: compensacion.empresaId,
           empleadoId: compensacion.empleadoId,
-          año: añoActual,
+          anio: añoActual,
           diasTotales: Math.floor(diasAusencia),
           diasUsados: 0,
           diasPendientes: 0,
@@ -157,7 +157,7 @@ export async function PATCH(
       });
 
       // Actualizar compensación
-      const compensacionActualizada = await prisma.compensacionHoraExtra.update({
+      const compensacionActualizada = await prisma.compensaciones_horas_extra.update({
         where: { id },
         data: {
           estado: 'aprobada',
@@ -186,7 +186,7 @@ export async function PATCH(
       return successResponse(compensacionActualizada);
     } else {
       // Compensación por nómina
-      const compensacionActualizada = await prisma.compensacionHoraExtra.update({
+      const compensacionActualizada = await prisma.compensaciones_horas_extra.update({
         where: { id },
         data: {
           estado: 'aprobada',

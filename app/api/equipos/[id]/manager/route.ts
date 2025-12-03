@@ -30,7 +30,7 @@ export async function PATCH(request: NextRequest, context: RouteParams) {
     const { managerId } = body;
 
     // Verify team belongs to user's company
-    const team = await prisma.equipo.findFirst({
+    const team = await prisma.equipos.findFirst({
       where: {
         id: equipoId,
         empresaId: session.user.empresaId,
@@ -44,7 +44,7 @@ export async function PATCH(request: NextRequest, context: RouteParams) {
     // If managerId is provided, verify they are a member of the team
     const managerIdStr = typeof managerId === 'string' ? managerId : null;
     if (managerIdStr) {
-      const isMember = await prisma.empleadoEquipo.findUnique({
+      const isMember = await prisma.empleado_equipos.findUnique({
         where: {
           empleadoId_equipoId: {
             empleadoId: managerIdStr,
@@ -62,20 +62,20 @@ export async function PATCH(request: NextRequest, context: RouteParams) {
     }
 
     // Update manager
-    const updatedTeam = await prisma.equipo.update({
+    const updatedTeam = await prisma.equipos.update({
       where: { id: equipoId },
       data: {
         managerId: managerId || null,
       },
       include: {
-        manager: {
+        empleados: {
           select: {
             id: true,
             nombre: true,
             apellidos: true,
           },
         },
-        miembros: {
+        empleado_equipos: {
           include: {
             empleado: {
               select: {
@@ -96,7 +96,21 @@ export async function PATCH(request: NextRequest, context: RouteParams) {
       },
     });
 
-    return NextResponse.json(updatedTeam);
+    const formattedTeam = {
+      ...updatedTeam,
+      manager: updatedTeam.empleados
+        ? {
+            id: updatedTeam.empleados.id,
+            nombre: updatedTeam.empleados.nombre,
+            apellidos: updatedTeam.empleados.apellidos,
+          }
+        : null,
+      miembros: updatedTeam.empleado_equipos.map((miembro) => ({
+        empleado: miembro.empleado,
+      })),
+    };
+
+    return NextResponse.json(formattedTeam);
   } catch (error) {
     console.error('Error updating team manager:', error);
     return NextResponse.json({ error: 'Error al cambiar responsable' }, { status: 500 });

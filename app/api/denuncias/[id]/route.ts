@@ -27,7 +27,7 @@ export async function GET(
     const { id: denunciaId } = await context.params;
 
     // Buscar la denuncia
-    const denuncia = await prisma.denuncia.findUnique({
+    const denuncia = await prisma.denuncias.findUnique({
       where: { id: denunciaId },
       include: {
         denunciante: {

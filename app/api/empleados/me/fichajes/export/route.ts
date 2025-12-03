@@ -29,7 +29,7 @@ export async function GET(req: NextRequest) {
     const anio = anioParam ? parseInt(anioParam) : new Date().getFullYear();
 
     // Obtener fichajes
-    const fichajes = await prisma.fichaje.findMany({
+    const fichajesRaw = await prisma.fichajes.findMany({
       where: {
         empleadoId: session.user.empleadoId,
         fecha: {
@@ -41,13 +41,18 @@ export async function GET(req: NextRequest) {
         eventos: {
           orderBy: { hora: 'asc' },
         },
-        solicitudesCorreccion: {
+        solicitudes_correccion_fichaje: {
           where: { estado: 'rechazada' },
           select: { motivo: true, respuesta: true },
         },
       },
       orderBy: { fecha: 'desc' },
     });
+
+    const fichajes = fichajesRaw.map(({ solicitudes_correccion_fichaje, ...rest }) => ({
+      ...rest,
+      solicitudesCorreccion: solicitudes_correccion_fichaje,
+    }));
 
     // Preparar datos para Excel
     const datos = fichajes.map((f) => {
@@ -62,7 +67,7 @@ export async function GET(req: NextRequest) {
 
       return {
         Fecha: formatFechaEs(f.fecha),
-        Estado: f.estado,
+        Estado: f.estado as string,
         Entrada: entrada ? formatHoraEs(entrada) : '-',
         Salida: salida ? formatHoraEs(salida) : '-',
         'Horas Trabajadas': formatearHorasMinutos(horas),

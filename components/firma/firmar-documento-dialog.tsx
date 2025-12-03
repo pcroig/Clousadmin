@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
+import { DocumentViewerModal } from '@/components/shared/document-viewer';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -30,6 +31,7 @@ interface FirmarSolicitudResponse {
 
 export interface FirmaPendiente {
   id: string;
+  solicitudId: string;
   orden?: number;
   solicitudTitulo: string;
   solicitudMensaje?: string;
@@ -59,6 +61,7 @@ export function FirmarDocumentoDialog({
   const [usarFirmaGuardada, setUsarFirmaGuardada] = useState(false);
   const [guardarFirmaEnPerfil, setGuardarFirmaEnPerfil] = useState(false);
   const [canvasHasDrawing, setCanvasHasDrawing] = useState(false);
+  const [viewerOpen, setViewerOpen] = useState(false);
   const signatureRef = useRef<SignatureCanvasHandle | null>(null);
 
   useEffect(() => {
@@ -66,6 +69,7 @@ export function FirmarDocumentoDialog({
       setCanvasHasDrawing(false);
       setGuardarFirmaEnPerfil(false);
       setUsarFirmaGuardada(false);
+      setViewerOpen(false);
       signatureRef.current?.clear?.();
       return;
     }
@@ -132,7 +136,7 @@ export function FirmarDocumentoDialog({
         firmaImagenHeight: 180,
       };
 
-      const res = await fetch(`/api/firma/solicitudes/${firma.id}/firmar`, {
+      const res = await fetch(`/api/firma/solicitudes/${firma.solicitudId}/firmar`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -155,7 +159,7 @@ export function FirmarDocumentoDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl">
+      <DialogContent className="max-w-3xl" aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle>Firmar documento</DialogTitle>
         </DialogHeader>
@@ -168,13 +172,8 @@ export function FirmarDocumentoDialog({
                   <p className="font-semibold text-gray-900">{firma.documento.nombre}</p>
                   <p className="text-sm text-gray-500">{firma.solicitudTitulo}</p>
                 </div>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => window.open(`/api/documentos/${firma.documento.id}/preview`, '_blank')}
-                >
-                  Abrir documento
+                <Button type="button" variant="ghost" size="sm" onClick={() => setViewerOpen(true)}>
+                  Ver documento
                 </Button>
               </div>
               {firma.solicitudMensaje && (
@@ -278,6 +277,18 @@ export function FirmarDocumentoDialog({
           </Button>
         </DialogFooter>
       </DialogContent>
+
+      {firma && (
+        <DocumentViewerModal
+          open={viewerOpen}
+          onClose={() => setViewerOpen(false)}
+          documentId={firma.documento.id}
+          title={firma.documento.nombre}
+          onDownload={() =>
+            window.open(`/api/documentos/${firma.documento.id}`, '_blank', 'noopener,noreferrer')
+          }
+        />
+      )}
     </Dialog>
   );
 }

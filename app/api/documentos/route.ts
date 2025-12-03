@@ -68,13 +68,13 @@ export async function GET(request: NextRequest) {
     const tipoDocumento = searchParams.get('tipoDocumento');
 
     // Construir where clause
-    const where: Prisma.DocumentoWhereInput = {
+    const where: Prisma.documentosWhereInput = {
       empresaId: session.user.empresaId,
     };
 
     // Si no es HR admin, solo puede ver sus propios documentos
     if (session.user.rol !== UsuarioRol.hr_admin) {
-      const empleado = await prisma.empleado.findUnique({
+      const empleado = await prisma.empleados.findUnique({
         where: { usuarioId: session.user.id },
       });
 
@@ -99,7 +99,7 @@ export async function GET(request: NextRequest) {
     const { page, limit, skip } = parsePaginationParams(searchParams);
 
     const [documentos, total] = await Promise.all([
-      prisma.documento.findMany({
+      prisma.documentos.findMany({
         where,
         include: {
           carpeta: true,
@@ -115,7 +115,7 @@ export async function GET(request: NextRequest) {
         skip,
         take: limit,
       }),
-      prisma.documento.count({ where }),
+      prisma.documentos.count({ where }),
     ]);
 
     return NextResponse.json({
@@ -156,7 +156,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Obtener carpeta
-    const carpeta = await prisma.carpeta.findUnique({
+    const carpeta = await prisma.carpetas.findUnique({
       where: { id: carpetaId },
       include: { empleado: true },
     });
@@ -238,7 +238,7 @@ export async function POST(request: NextRequest) {
           throw new Error('STORAGE_BUCKET no configurado');
         }
         storageKey = `documentos/${rutaStorage}`;
-        await uploadToS3(bodyForStorage, storageKey, file.type);
+        await uploadToS3(bodyForStorage, storageKey, file.type, { contentLength: file.size });
         storageBucket = bucketName;
         cleanupUpload = async () => {
           await deleteFromS3(storageKey);
@@ -265,7 +265,7 @@ export async function POST(request: NextRequest) {
 
       // Crear registro en DB
       const documento = await prisma.$transaction(async (tx) => {
-        return tx.documento.create({
+        return tx.documentos.create({
           data: {
             empresaId: session.user.empresaId,
             empleadoId,
@@ -295,13 +295,17 @@ export async function POST(request: NextRequest) {
       // Notificar a HR cuando un empleado sube un documento
       if (session.user.rol !== UsuarioRol.hr_admin && empleadoId && documento.empleado) {
         try {
-          await crearNotificacionDocumentoSubido(prisma, {
-            documentoId: documento.id,
-            empresaId: session.user.empresaId,
-            empleadoId,
-            empleadoNombre: `${documento.empleado.nombre} ${documento.empleado.apellidos}`,
-            tipoDocumento: tipoDocumentoFinal,
-          });
+          await crearNotificacionDocumentoSubido(
+            prisma,
+            {
+              documentoId: documento.id,
+              empresaId: session.user.empresaId,
+              empleadoId,
+              empleadoNombre: `${documento.empleado.nombre} ${documento.empleado.apellidos}`,
+              tipoDocumento: tipoDocumentoFinal,
+            },
+            { actorUsuarioId: session.user.id }
+          );
         } catch (notifError) {
           console.error('[Documentos] Error creando notificación:', notifError);
           // No fallar la subida si falla la notificación

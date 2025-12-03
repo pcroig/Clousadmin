@@ -23,16 +23,16 @@ async function main() {
 
   // Limpiar datos previos si existen (opcional)
   // Comentado para no perder datos en sucesivas ejecuciones
-  // await prisma.empleadoEquipo.deleteMany({});
-  // await prisma.equipo.deleteMany({});
-  // await prisma.empleado.deleteMany({});
+  // await prisma.empleado_equipos.deleteMany({});
+  // await prisma.equipos.deleteMany({});
+  // await prisma.empleados.deleteMany({});
 
   // ========================================
   // 1. CREAR EMPRESA
   // ========================================
   console.log('📦 Creando empresa de prueba...');
   
-  const empresa = await prisma.empresa.upsert({
+  const empresa = await prisma.empresas.upsert({
     where: { cif: 'B12345678' },
     update: {},
     create: {
@@ -61,7 +61,7 @@ async function main() {
   // ========================================
   console.log('⏰ Creando jornadas predefinidas...');
 
-  const jornadaCompleta = await prisma.jornada.upsert({
+  const jornadaCompleta = await prisma.jornadas.upsert({
     where: { id: 'jornada-completa-40h' },
     update: {},
     create: {
@@ -82,7 +82,7 @@ async function main() {
     },
   });
 
-  const jornadaIntensiva = await prisma.jornada.upsert({
+  const jornadaIntensiva = await prisma.jornadas.upsert({
     where: { id: 'jornada-intensiva-35h' },
     update: {},
     create: {
@@ -112,7 +112,7 @@ async function main() {
 
   const passwordHash = await hash('Admin123!', 12);
 
-  const usuarioAdmin = await prisma.usuario.upsert({
+  const usuarioAdmin = await prisma.usuarios.upsert({
     where: { email: 'admin@clousadmin.com' },
     update: {
       activo: true,
@@ -130,7 +130,7 @@ async function main() {
     },
   });
 
-  const empleadoAdmin = await prisma.empleado.upsert({
+  const empleadoAdmin = await prisma.empleados.upsert({
     where: { usuarioId: usuarioAdmin.id },
     update: {
       activo: true,
@@ -152,8 +152,8 @@ async function main() {
       puesto: 'HR Administrator',
       fechaAlta: new Date('2024-01-01'),
       jornadaId: jornadaCompleta.id,
-      salarioBrutoAnual: 45000,
-      salarioBrutoMensual: 3750,
+      salarioBaseAnual: 45000,
+      salarioBaseMensual: 3750,
       onboardingCompletado: true,
       onboardingCompletadoEn: new Date(),
       documentosCompletos: true,
@@ -162,7 +162,7 @@ async function main() {
   });
 
   // Actualizar usuario para vincular con empleado
-  await prisma.usuario.update({
+  await prisma.usuarios.update({
     where: { id: usuarioAdmin.id },
     data: { empleadoId: empleadoAdmin.id },
   });
@@ -182,7 +182,7 @@ async function main() {
       nif: '11111111A',
       equipo: 'Tech',
       puesto: 'Software Engineer',
-      salarioBrutoAnual: 42000,
+      salarioBaseAnual: 42000,
       rol: UsuarioRol.empleado as const,
     },
     {
@@ -192,7 +192,7 @@ async function main() {
       nif: '22222222B',
       equipo: 'Producto',
       puesto: 'Product Manager',
-      salarioBrutoAnual: 48000,
+      salarioBaseAnual: 48000,
       rol: UsuarioRol.manager as const, // Carlos es manager de equipos
     },
     {
@@ -202,7 +202,7 @@ async function main() {
       nif: '33333333C',
       equipo: 'Diseño',
       puesto: 'UX Designer',
-      salarioBrutoAnual: 38000,
+      salarioBaseAnual: 38000,
       rol: UsuarioRol.empleado as const,
     },
     {
@@ -212,7 +212,7 @@ async function main() {
       nif: '44444444D',
       equipo: 'Tech',
       puesto: 'DevOps Engineer',
-      salarioBrutoAnual: 45000,
+      salarioBaseAnual: 45000,
       rol: UsuarioRol.empleado as const,
     },
     {
@@ -222,18 +222,18 @@ async function main() {
       nif: '55555555E',
       equipo: 'Tech',
       puesto: 'QA Engineer',
-      salarioBrutoAnual: 38000,
+      salarioBaseAnual: 38000,
       rol: UsuarioRol.empleado as const,
     },
   ];
 
-  type EmpleadoRecord = Awaited<ReturnType<typeof prisma.empleado.upsert>>;
+  type EmpleadoRecord = Awaited<ReturnType<typeof prisma.empleados.upsert>>;
   const empleados: EmpleadoRecord[] = [];
 
   for (const empData of empleadosData) {
     const usuarioPassword = await hash('Empleado123!', 12);
 
-    const usuario = await prisma.usuario.upsert({
+    const usuario = await prisma.usuarios.upsert({
       where: { email: empData.email },
       update: {
         // Asegurar que se actualiza si el usuario ya existe
@@ -254,15 +254,15 @@ async function main() {
       },
     });
 
-    const empleado = await prisma.empleado.upsert({
+    const empleado = await prisma.empleados.upsert({
       where: { usuarioId: usuario.id },
       update: {
         // Actualizar datos si el empleado ya existe
         nombre: empData.nombre,
         apellidos: empData.apellidos,
         puesto: empData.puesto,
-        salarioBrutoAnual: empData.salarioBrutoAnual,
-        salarioBrutoMensual: Math.round(empData.salarioBrutoAnual / 12),
+        salarioBaseAnual: empData.salarioBaseAnual,
+        salarioBaseMensual: Math.round(empData.salarioBaseAnual / 12),
         activo: true,
         jornadaId: jornadaCompleta.id, // Asegurar que se asigna jornada también en update
       },
@@ -282,15 +282,15 @@ async function main() {
         fechaAlta: new Date('2024-03-01'),
         managerId: empleadoAdmin.id,
         jornadaId: jornadaCompleta.id,
-        salarioBrutoAnual: empData.salarioBrutoAnual,
-        salarioBrutoMensual: Math.round(empData.salarioBrutoAnual / 12),
+        salarioBaseAnual: empData.salarioBaseAnual,
+        salarioBaseMensual: Math.round(empData.salarioBaseAnual / 12),
         onboardingCompletado: false,
         documentosCompletos: false,
       },
     });
 
     // Actualizar usuario para vincular con empleado
-    await prisma.usuario.update({
+    await prisma.usuarios.update({
       where: { id: usuario.id },
       data: { empleadoId: empleado.id },
     });
@@ -306,7 +306,7 @@ async function main() {
   // ========================================
   console.log('👨‍👩‍👧‍👦 Creando equipos...');
 
-  const equipoDesarrollo = await prisma.equipo.upsert({
+  const equipoDesarrollo = await prisma.equipos.upsert({
     where: {
       empresaId_nombre: {
         empresaId: empresa.id,
@@ -323,7 +323,7 @@ async function main() {
   });
 
   // Añadir miembros al equipo de desarrollo
-  await prisma.empleadoEquipo.createMany({
+  await prisma.empleado_equipos.createMany({
     data: [
       { empleadoId: empleados[0].id, equipoId: equipoDesarrollo.id }, // Ana
       { empleadoId: empleados[3].id, equipoId: equipoDesarrollo.id }, // Miguel
@@ -334,7 +334,7 @@ async function main() {
 
   console.log(`  ✅ ${equipoDesarrollo.nombre} (3 miembros)`);
 
-  const equipoProducto = await prisma.equipo.upsert({
+  const equipoProducto = await prisma.equipos.upsert({
     where: {
       empresaId_nombre: {
         empresaId: empresa.id,
@@ -351,7 +351,7 @@ async function main() {
   });
 
   // Añadir miembros al equipo de producto
-  await prisma.empleadoEquipo.createMany({
+  await prisma.empleado_equipos.createMany({
     data: [
       { empleadoId: empleados[1].id, equipoId: equipoProducto.id }, // Carlos
       { empleadoId: empleados[2].id, equipoId: equipoProducto.id }, // Laura
@@ -535,7 +535,7 @@ async function main() {
   ];
 
   for (const ausData of ausenciasData) {
-    await prisma.ausencia.create({
+    await prisma.ausencias.create({
       data: ausData,
     });
   }
@@ -561,7 +561,7 @@ async function main() {
   ];
 
   for (const festivo of festivos2025) {
-    await prisma.festivo.upsert({
+    await prisma.festivos.upsert({
       where: {
         empresaId_fecha: {
         empresaId: empresa.id,
@@ -593,16 +593,16 @@ async function main() {
   for (const empleado of empleados) {
     await prisma.empleadoSaldoAusencias.upsert({
       where: {
-        empleadoId_año: {
+        empleadoId_anio: {
           empleadoId: empleado.id,
-          año: año2025,
+          anio: año2025,
         },
       },
       update: {},
       create: {
         empleadoId: empleado.id,
         empresaId: empresa.id,
-        año: año2025,
+        anio: año2025,
         diasTotales: 22, // Default español
         diasUsados: 0,
         diasPendientes: 0,
@@ -626,14 +626,14 @@ async function main() {
   const empleadosParaFichajes = [empleadoAdmin, ...empleados].slice(0, 4);
   
   // Limpiar fichajes existentes antes de crear nuevos (por si el seed se ejecuta múltiples veces)
-  await prisma.fichajeEvento.deleteMany({
+  await prisma.fichaje_eventos.deleteMany({
     where: {
       fichaje: {
         empresaId: empresa.id,
       },
     },
   });
-  await prisma.fichaje.deleteMany({
+  await prisma.fichajes.deleteMany({
     where: {
       empresaId: empresa.id,
     },
@@ -663,7 +663,7 @@ async function main() {
             },
           ];
           
-          const fichaje = await prisma.fichaje.create({
+          const fichaje = await prisma.fichajes.create({
             data: {
               empresaId: empresa.id,
               empleadoId: empleado.id,
@@ -684,7 +684,7 @@ async function main() {
           const horasTrabajadas = calcularHorasTrabajadas(fichaje.eventos) ?? 0;
           const horasEnPausa = calcularTiempoEnPausa(fichaje.eventos) ?? 0;
           
-          await prisma.fichaje.update({
+          await prisma.fichajes.update({
             where: { id: fichaje.id },
             data: { horasTrabajadas, horasEnPausa },
           });
@@ -705,7 +705,7 @@ async function main() {
             },
           ];
           
-          const fichaje = await prisma.fichaje.create({
+          const fichaje = await prisma.fichajes.create({
             data: {
               empresaId: empresa.id,
               empleadoId: empleado.id,
@@ -726,7 +726,7 @@ async function main() {
           const horasTrabajadas = calcularHorasTrabajadas(fichaje.eventos) ?? 0;
           const horasEnPausa = calcularTiempoEnPausa(fichaje.eventos) ?? 0;
           
-          await prisma.fichaje.update({
+          await prisma.fichajes.update({
             where: { id: fichaje.id },
             data: { horasTrabajadas, horasEnPausa },
           });
@@ -755,7 +755,7 @@ async function main() {
             },
           ];
           
-          const fichaje = await prisma.fichaje.create({
+          const fichaje = await prisma.fichajes.create({
             data: {
               empresaId: empresa.id,
               empleadoId: empleado.id,
@@ -776,7 +776,7 @@ async function main() {
           const horasTrabajadas = calcularHorasTrabajadas(fichaje.eventos) ?? 0;
           const horasEnPausa = calcularTiempoEnPausa(fichaje.eventos) ?? 0;
           
-          await prisma.fichaje.update({
+          await prisma.fichajes.update({
             where: { id: fichaje.id },
             data: { horasTrabajadas, horasEnPausa },
           });
@@ -793,7 +793,7 @@ async function main() {
             },
           ];
           
-          const fichaje = await prisma.fichaje.create({
+          const fichaje = await prisma.fichajes.create({
             data: {
               empresaId: empresa.id,
               empleadoId: empleado.id,
@@ -814,7 +814,7 @@ async function main() {
           const horasTrabajadas = calcularHorasTrabajadas(fichaje.eventos) ?? 0;
           const horasEnPausa = calcularTiempoEnPausa(fichaje.eventos) ?? 0;
           
-          await prisma.fichaje.update({
+          await prisma.fichajes.update({
             where: { id: fichaje.id },
             data: { horasTrabajadas, horasEnPausa },
           });
@@ -846,7 +846,7 @@ async function main() {
   let carpetasCreadas = 0;
   for (const empleado of [empleadoAdmin, ...empleados]) {
     for (const nombreCarpeta of carpetasPredefinidas) {
-      await prisma.carpeta.create({
+      await prisma.carpetas.create({
         data: {
           empresaId: empresa.id,
           empleadoId: empleado.id,
@@ -867,7 +867,7 @@ async function main() {
   let carpetasCentralizadasCreadas = 0;
 
   for (const nombreCarpeta of carpetasCentralizadas) {
-    await prisma.carpeta.create({
+    await prisma.carpetas.create({
       data: {
         empresaId: empresa.id,
         empleadoId: null, // No pertenece a ningún empleado específico (carpeta global)

@@ -196,7 +196,7 @@ export async function teardownTestDatabase() {
 export async function createTestEmpresa(data?: Partial<any>) {
   const prisma = getPrismaTest();
 
-  return prisma.empresa.create({
+  return prisma.empresas.create({
     data: {
       nombre: data?.nombre || 'Empresa Test',
       nif: data?.nif || '12345678A',
@@ -227,7 +227,7 @@ export async function createTestUsuario(
     10
   );
 
-  return prisma.usuario.create({
+  return prisma.usuarios.create({
     data: {
       email: data?.email || 'usuario@test.com',
       password: hashedPassword,
@@ -249,7 +249,7 @@ export async function createTestEmpleado(
 ) {
   const prisma = getPrismaTest();
 
-  return prisma.empleado.create({
+  return prisma.empleados.create({
     data: {
       nombre: data?.nombre || 'Empleado',
       apellidos: data?.apellidos || 'Test',
@@ -269,7 +269,7 @@ export async function createTestEmpleado(
 export async function createTestEquipo(empresaId: string, data?: Partial<any>) {
   const prisma = getPrismaTest();
 
-  return prisma.equipo.create({
+  return prisma.equipos.create({
     data: {
       nombre: data?.nombre || 'Equipo Test',
       empresaId,
@@ -284,7 +284,7 @@ export async function createTestEquipo(empresaId: string, data?: Partial<any>) {
 export async function createTestJornada(empresaId: string, data?: Partial<any>) {
   const prisma = getPrismaTest();
 
-  return prisma.jornada.create({
+  return prisma.jornadas.create({
     data: {
       nombre: data?.nombre || 'Jornada Completa',
       horasSemanales: data?.horasSemanales || 40,

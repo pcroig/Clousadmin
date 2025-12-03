@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const usuario = await prisma.usuario.findUnique({
+    const usuario = await prisma.usuarios.findUnique({
       where: { email: normalizedEmail },
       select: { id: true, email: true },
     });

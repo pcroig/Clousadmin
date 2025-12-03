@@ -8,6 +8,31 @@
 
 ## 🔄 CAMBIOS RECIENTES
 
+### v3.5.0 - Unificación de Tablas y Mejoras de UI (Enero 2025)
+
+**Cambios**:
+- **Tabla unificada**: Migración a `DataTable` compartido con estilo consistente (header grisaceo, filas completas, EmptyState de shadcn)
+- **Avatar en tabla**: Columna de empleado muestra avatar + nombre + puesto usando `AvatarCell`
+- **Justificante como columna**: Columna separada para justificantes con icono de archivo
+- **Botones inline para pendientes**: Botones "Aprobar" y "Rechazar" aparecen directamente en la tabla sin fila expandible
+- **Fecha condensada**: Fecha de solicitud se muestra al lado del tipo (sin "Solicitada", solo año)
+- **InputGroup en reglas**: Inputs de "Gestionar Ausencias" muestran unidades (días, %) dentro del campo usando `InputGroup`
+- **Notificaciones mejoradas**: Títulos y descripciones más descriptivos con rango de fechas y tipo de ausencia
+- **Corrección de filtros**: Unificación de estado 'todos' en frontend y backend
+- **Política de carry-over UI**: El toggle ahora se presenta como una sola línea con tooltip "i" y switch, reutilizando el nuevo patrón `SwitchWithTooltip` sin bordes para ofrecer contexto inmediato
+- **Fix upload S3**: Corrección del header `ContentLength` para evitar errores al subir justificantes
+- **Mi Espacio simplificado**: Cards de ausencias ya no son clicables, icono de archivo junto al estado si hay justificante
+
+**Archivos afectados**:
+- `app/(dashboard)/hr/horario/ausencias/ausencias-client.tsx`
+- `components/shared/mi-espacio/ausencias-tab.tsx`
+- `components/empleado/solicitar-ausencia-modal.tsx`
+- `app/(dashboard)/hr/horario/ausencias/gestionar-ausencias-modal.tsx`
+- `lib/notificaciones.ts`
+- `lib/s3.ts`
+- `app/api/upload/route.ts`
+- `app/api/ausencias/route.ts`
+
 ### v3.4.0 - Política de Carry-Over y Mejoras de UX (27 Ene 2025)
 
 **Cambios**:
@@ -209,14 +234,22 @@
 #### ✅ `/hr/horario/ausencias`
 
 **Implementado**:
-- ✅ Tabla con todas las ausencias
-- ✅ Filtros por estado (todas, pendientes, aprobadas, rechazadas)
+- ✅ **Tabla unificada**: Usa `DataTable` compartido con estilo consistente
+- ✅ **Avatar + nombre**: Columna de empleado muestra avatar + nombre + puesto con `AvatarCell`
+- ✅ **Justificante como columna**: Columna separada con icono de archivo si hay justificante
+- ✅ **Botones inline**: Para ausencias pendientes, botones "Aprobar"/"Rechazar" aparecen directamente en la tabla
+- ✅ **Fecha condensada**: Fecha de solicitud al lado del tipo (sin "Solicitada", solo año)
+- ✅ **Click en fila**: Abre modal de edición directamente
+- ✅ Filtros por estado (todos, pendientes, aprobadas, rechazadas) - **Corregido**: usa 'todos' en lugar de 'todas'
 - ✅ Búsqueda por nombre de empleado
+- ✅ Filtro por equipo
+- ✅ Controles de fecha (mes por defecto)
 - ✅ Modal aprobar individual
 - ✅ Modal rechazar individual
 - ✅ Modal editar ausencia (tipo, fechas, motivo/detalles, medio día)
 - ✅ Botón "Actualizar ausencias" (aprobar todas pendientes)
 - ✅ Botón "Gestionar ausencias" (modal con tabs)
+- ✅ **EmptyState de shadcn**: Estados vacíos usan componente estándar con layout `table`
 
 **Estados mostrados**:
 - ✅ Usa estados unificados: `pendiente_aprobacion`, `en_curso`, `completada`, `auto_aprobada`, `rechazada`, `cancelada`
@@ -230,6 +263,9 @@
 - ✅ **Card "Saldo de ausencias" mejorada**: Fecha de rango visible en esquina superior derecha (no debajo)
 - ✅ Saldo de vacaciones (Total, Disponibles, Usados, Carry-Over si aplica)
 - ✅ Muestra saldo extendido y fecha de expiración si hay carry-over activo
+- ✅ **Cards simplificadas**: Ya no son clicables ni abren diálogo
+- ✅ **Icono de justificante**: Icono de archivo (`Paperclip`) aparece junto al badge de estado si hay justificante adjunto
+- ✅ Fecha condensada (sin hora, solo año)
 
 **Estados**:
 - Soporta estados nuevos: `pendiente_aprobacion`, `en_curso`, `completada`, `auto_aprobada`, `rechazada`
@@ -261,10 +297,10 @@
 - ✅ Implementado y funcional
 - ✅ Usa Dialog de shadcn/ui
 - ✅ Validación de saldo (considera carry-over si aplica)
-- ✅ Selector de tipos con información detallada (aprobación y descuento de saldo)
+- ✅ **Selector de tipos simplificado**: Sin iconos ni colores, tipografía gris neutra, información de aprobación y saldo en línea
 - ✅ Campo de upload de justificante (opcional, recomendado para tipos sin aprobación)
 - ✅ Soporte para archivos PDF, JPG, PNG (máx 5MB)
-- ✅ Subida a S3 antes de crear la ausencia
+- ✅ Subida a S3 antes de crear la ausencia - **Corregido**: Header `ContentLength` siempre válido
 - ✅ **Adaptativo según contexto**: 
   - Si `esHRAdmin=true`: Crea ausencia directamente (sin solicitud)
   - Si `esHRAdmin=false`: Crea solicitud que requiere aprobación
@@ -272,6 +308,7 @@
 
 #### ✅ `GestionarAusenciasModal`
 - ✅ Tab **Política de ausencias**: saldo anual y reglas (solapamiento, antelación) para toda la empresa
+- ✅ **✨ InputGroup**: Inputs de reglas (días, %) muestran unidades dentro del campo usando `InputGroup` de shadcn
 - ✅ **✨ NUEVO: Toggle de Política de Carry-Over**:
   - **Limpiar saldo al acabar el año** (por defecto): Saldo pendiente se limpia al finalizar el año
   - **Extender saldo 4 meses**: Saldo pendiente del año anterior se extiende automáticamente 4 meses al siguiente año
@@ -954,7 +991,7 @@ Cuando HR compensa horas extra creando ausencias:
 
 ---
 
-**Última actualización**: 27 Enero 2025  
-**Versión**: 3.4.0  
-**Estado**: Sistema refactorizado con validaciones robustas, transacciones atómicas y campo único de motivo/detalles. Interfaz de campañas de vacaciones mejorada con vista unificada e interacción directa. Modal de preferencias optimizado: apertura única automática al iniciar sesión, integración con notificaciones mediante eventos, y UI unificada con selector y visualización de días en la parte superior. **NUEVO**: Política de carry-over configurable (limpiar vs extender saldo), HR/empleado pueden crear ausencias, card de saldo mejorada con fecha arriba, sincronización mejorada con compensación de horas extra.
+**Última actualización**: Enero 2025  
+**Versión**: 3.5.0  
+**Estado**: Sistema refactorizado con validaciones robustas, transacciones atómicas y campo único de motivo/detalles. Interfaz de campañas de vacaciones mejorada con vista unificada e interacción directa. Modal de preferencias optimizado: apertura única automática al iniciar sesión, integración con notificaciones mediante eventos, y UI unificada con selector y visualización de días en la parte superior. **NUEVO**: Política de carry-over configurable (limpiar vs extender saldo), HR/empleado pueden crear ausencias, card de saldo mejorada con fecha arriba, sincronización mejorada con compensación de horas extra. **NUEVO v3.5.0**: Tablas unificadas con `DataTable` y `AvatarCell`, EmptyState de shadcn, botones inline para pendientes, justificante como columna separada, InputGroup para reglas, notificaciones mejoradas, fix de filtros y upload S3.
 

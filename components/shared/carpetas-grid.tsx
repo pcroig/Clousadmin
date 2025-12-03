@@ -36,11 +36,21 @@ export const CarpetasGrid = memo(function CarpetasGrid({
   }
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
-      {carpetas.map((carpeta) => (
-        <CarpetaCard key={carpeta.id} carpeta={carpeta} onClick={onCarpetaClick} />
-      ))}
-    </div>
+    <>
+      {/* MOBILE: Lista vertical */}
+      <div className="sm:hidden space-y-2">
+        {carpetas.map((carpeta) => (
+          <CarpetaCard key={carpeta.id} carpeta={carpeta} onClick={onCarpetaClick} />
+        ))}
+      </div>
+
+      {/* DESKTOP: Grid original */}
+      <div className="hidden sm:grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
+        {carpetas.map((carpeta) => (
+          <CarpetaCard key={carpeta.id} carpeta={carpeta} onClick={onCarpetaClick} />
+        ))}
+      </div>
+    </>
   );
 });
 

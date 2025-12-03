@@ -45,14 +45,14 @@ async function detectarAlertasCriticas(
   const alertas: Alerta[] = [];
 
   // Obtener datos del empleado
-  const empleado = await prisma.empleado.findUnique({
+  const empleado = await prisma.empleados.findUnique({
     where: { id: empleadoId },
     select: {
       nombre: true,
       apellidos: true,
       iban: true,
       nss: true,
-      salarioBrutoMensual: true,
+      salarioBaseMensual: true,
     },
   });
 
@@ -91,7 +91,7 @@ async function detectarAlertasCriticas(
   }
 
   // 3. NO_SALARIO: Salario no configurado
-  if (!empleado.salarioBrutoMensual) {
+  if (!empleado.salarioBaseMensual) {
     alertas.push({
       empleadoId,
       tipo: 'critico',
@@ -111,7 +111,7 @@ async function detectarAlertasCriticas(
   const hoy = new Date();
   hoy.setHours(0, 0, 0, 0);
 
-  const fichajesIncompletos = await prisma.fichaje.findMany({
+  const fichajesIncompletos = await prisma.fichajes.findMany({
     where: {
       empleadoId,
       fecha: {
@@ -163,7 +163,7 @@ async function detectarAlertasAdvertencia(
 ): Promise<Alerta[]> {
   const alertas: Alerta[] = [];
 
-  const empleado = await prisma.empleado.findUnique({
+  const empleado = await prisma.empleados.findUnique({
     where: { id: empleadoId },
     select: {
       nombre: true,
@@ -182,7 +182,7 @@ async function detectarAlertasAdvertencia(
   fechaFin.setHours(23, 59, 59, 999);
 
   // Complementos pendientes de validación
-  const complementosPendientes = await prisma.empleadoComplemento.count({
+  const complementosPendientes = await prisma.empleado_complementos.count({
     where: {
       empleadoId,
       activo: true,
@@ -206,7 +206,7 @@ async function detectarAlertasAdvertencia(
   }
 
   // Ausencias pendientes de aprobación
-  const ausenciasPendientes = await prisma.ausencia.count({
+  const ausenciasPendientes = await prisma.ausencias.count({
     where: {
       empleadoId,
       estado: EstadoAusencia.pendiente,
@@ -242,7 +242,7 @@ async function detectarAlertasAdvertencia(
   }
 
   // 1. HORAS_BAJAS / HORAS_ALTAS: Comparar horas trabajadas con esperadas
-  const fichajes = await prisma.fichaje.findMany({
+  const fichajes = await prisma.fichajes.findMany({
     where: {
       empleadoId,
       fecha: {
@@ -312,7 +312,7 @@ async function detectarAlertasAdvertencia(
   }
 
   // 2. IT_SIN_JUSTIFICANTE: Bajas médicas sin documento
-  const bajasIT = await prisma.ausencia.findMany({
+  const bajasIT = await prisma.ausencias.findMany({
     where: {
       empleadoId,
       tipo: {
@@ -357,7 +357,7 @@ async function detectarAlertasAdvertencia(
 
   // 3. DIAS_SIN_REGISTRO: Días sin fichaje ni ausencia
   // Calcular días laborables del mes
-  const empresa = await prisma.empresa.findUnique({
+  const empresa = await prisma.empresas.findUnique({
     where: { id: empresaId },
     select: { config: true },
   });
@@ -378,7 +378,7 @@ async function detectarAlertasAdvertencia(
   };
 
   // Obtener festivos del mes
-  const festivos = await prisma.festivo.findMany({
+  const festivos = await prisma.festivos.findMany({
     where: {
       empresaId,
       fecha: {
@@ -397,7 +397,7 @@ async function detectarAlertasAdvertencia(
   );
 
   // Obtener ausencias del mes
-  const ausencias = await prisma.ausencia.findMany({
+  const ausencias = await prisma.ausencias.findMany({
     where: {
       empleadoId,
       estado: {
@@ -510,7 +510,7 @@ async function detectarAlertasInformativas(
 ): Promise<Alerta[]> {
   const alertas: Alerta[] = [];
 
-  const empleado = await prisma.empleado.findUnique({
+  const empleado = await prisma.empleados.findUnique({
     where: { id: empleadoId },
     select: {
       nombre: true,
@@ -545,7 +545,7 @@ async function detectarAlertasInformativas(
   }
 
   // 2. Altas/Bajas de contrato dentro del mes
-  const contratosMes = await prisma.contrato.findMany({
+  const contratosMes = await prisma.contratos.findMany({
     where: {
       empleadoId,
       OR: [
@@ -645,7 +645,7 @@ export async function detectarAlertas(
   alertas: Alerta[];
 }> {
   // Obtener todos los empleados activos
-  const empleados = await prisma.empleado.findMany({
+  const empleados = await prisma.empleados.findMany({
     where: {
       empresaId,
       activo: true,
@@ -656,7 +656,7 @@ export async function detectarAlertas(
   });
 
   // Limpiar alertas antiguas del mismo mes/año
-  await prisma.alertaNomina.deleteMany({
+  await prisma.alertas_nomina.deleteMany({
     where: {
       empresaId,
       createdAt: {
@@ -682,7 +682,7 @@ export async function detectarAlertas(
 
   // Guardar alertas en la base de datos
   for (const alerta of todasLasAlertas) {
-    await prisma.alertaNomina.create({
+    await prisma.alertas_nomina.create({
       data: {
         empresaId,
         empleadoId: alerta.empleadoId,
@@ -734,7 +734,7 @@ export async function obtenerAlertas(
     apellidos: string;
   } | null;
 }>> {
-  const where: Prisma.AlertaNominaWhereInput = {
+  const where: Prisma.alertas_nominaWhereInput = {
     empresaId,
     createdAt: {
       gte: new Date(anio, mes - 1, 1),
@@ -746,7 +746,7 @@ export async function obtenerAlertas(
     where.tipo = tipo;
   }
 
-  return prisma.alertaNomina.findMany({
+  return prisma.alertas_nomina.findMany({
     where,
     include: {
       empleado: {
@@ -768,7 +768,7 @@ export async function obtenerAlertas(
  * Marca una alerta como resuelta
  */
 export async function resolverAlerta(alertaId: string): Promise<void> {
-  await prisma.alertaNomina.update({
+  await prisma.alertas_nomina.update({
     where: { id: alertaId },
     data: {
       resuelta: true,
@@ -785,7 +785,7 @@ export async function tieneAlertasCriticas(
   mes: number,
   anio: number
 ): Promise<boolean> {
-  const count = await prisma.alertaNomina.count({
+  const count = await prisma.alertas_nomina.count({
     where: {
       empresaId,
       tipo: 'critico',

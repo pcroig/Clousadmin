@@ -357,7 +357,7 @@ export function GeneralSettings({ usuario }: GeneralSettingsProps) {
       </Card>
 
       <Dialog open={showDerechoDialog} onOpenChange={setShowDerechoDialog}>
-        <DialogContent>
+        <DialogContent aria-describedby={undefined}>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-red-600">
               <ShieldAlert className="h-5 w-5" />

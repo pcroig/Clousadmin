@@ -33,7 +33,7 @@ const empleadoDataSchema = z.object({
   nss: z.string().optional(),
   puesto: z.string().optional(),
   fechaAlta: z.string().optional(),
-  salarioBrutoAnual: z.string().optional(),
+  salarioBaseAnual: z.string().optional(),
   tipoContrato: z.string().optional(),
   iban: z.string().optional(),
 }).partial();
@@ -55,7 +55,7 @@ const fieldsToExtract = {
   nss: 'Número de Seguridad Social',
   puesto: 'Puesto de trabajo',
   fechaAlta: 'Fecha de alta/inicio (formato YYYY-MM-DD)',
-  salarioBrutoAnual: 'Salario bruto anual (solo número)',
+  salarioBaseAnual: 'Salario base anual (solo número)',
   tipoContrato: 'Tipo de contrato (indefinido, temporal, etc.)',
   iban: 'IBAN',
 };

@@ -35,13 +35,13 @@ export async function POST(
     const { id: campanaId } = await params;
 
     // Buscar preferencia del empleado en esta campaña
-    const preferencia = await prisma.preferenciaVacaciones.findFirst({
+    const preferencia = await prisma.preferencias_vacaciones.findFirst({
       where: {
         campanaId,
         empleadoId: session.user.empleadoId,
       },
       include: {
-        campana: true,
+        campana_vacaciones: true,
         empleado: {
           select: {
             id: true,
@@ -61,7 +61,7 @@ export async function POST(
       return badRequestResponse('No estás asignado a esta campaña');
     }
 
-    if (preferencia.campana.estado !== 'cuadrada') {
+    if (preferencia.campana_vacaciones.estado !== 'cuadrada') {
       return badRequestResponse('La campaña aún no ha sido cuadrada');
     }
 
@@ -93,14 +93,15 @@ export async function POST(
     const { diasNaturales, diasLaborables, diasSolicitados } = await calcularDias(
       fechaInicio,
       fechaFin,
-      session.user.empresaId
+      session.user.empresaId,
+      session.user.empleadoId || undefined
     );
 
     // Obtener equipoId del empleado (si tiene)
     const equipoId = preferencia.empleado.equipos[0]?.equipoId || null;
 
     // Crear ausencia automáticamente en estado pendiente
-    const ausencia = await prisma.ausencia.create({
+    const ausencia = await prisma.ausencias.create({
       data: {
         empresaId: session.user.empresaId,
         empleadoId: session.user.empleadoId,
@@ -114,7 +115,7 @@ export async function POST(
         diasSolicitados,
         descuentaSaldo: true,
         estado: EstadoAusencia.pendiente,
-        motivo: `Vacaciones de campaña: ${preferencia.campana.titulo}`,
+        motivo: `Vacaciones de campaña: ${preferencia.campana_vacaciones.titulo}`,
           diasIdeales: asJsonValue(preferencia.diasIdeales),
           diasPrioritarios: asJsonValue(preferencia.diasPrioritarios),
           diasAlternativos: asJsonValue(preferencia.diasAlternativos),
@@ -122,7 +123,7 @@ export async function POST(
     });
 
     // Marcar preferencia como aceptada
-    await prisma.preferenciaVacaciones.update({
+    await prisma.preferencias_vacaciones.update({
       where: { id: preferencia.id },
       data: {
         aceptada: true,
@@ -134,7 +135,7 @@ export async function POST(
     const saldo = await prisma.empleadoSaldoAusencias.findFirst({
       where: {
         empleadoId: session.user.empleadoId,
-        año: añoActual,
+        anio: añoActual,
       },
     });
 

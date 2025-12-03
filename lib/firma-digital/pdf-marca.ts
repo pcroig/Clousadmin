@@ -8,8 +8,10 @@ import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 import type { OpcionesMarcaFirma } from './tipos';
 
 /**
- * Añade una marca visual de firma a un PDF
- * La marca incluye: nombre del firmante, fecha, y hash del certificado
+ * Añade una marca visual LIMPIA de firma a un PDF
+ * La marca muestra SOLO la imagen de firma y opcionalmente el nombre del firmante
+ * 
+ * NUEVA VERSIÓN: Sin bordes, sin cuadros, sin etiquetas innecesarias
  *
  * @param pdfBuffer - Buffer del PDF original
  * @param marca - Opciones de la marca de firma
@@ -22,7 +24,7 @@ import type { OpcionesMarcaFirma } from './tipos';
  *   nombreFirmante: 'Juan Pérez',
  *   fechaFirma: '12/11/2025 14:30',
  *   tipoFirma: 'simple',
- *   certificadoHash: 'a3b2c1...',
+ *   firmaImagen: { buffer, width: 180, height: 60 }
  * });
  * ```
  */
@@ -45,100 +47,51 @@ export async function anadirMarcaFirmaPDF(
     const pagina = paginas[paginaIndex];
     const { width, height: _height } = pagina.getSize();
 
-    // Cargar fuente
-    const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-    const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-
-    // Posición de la marca (por defecto abajo a la derecha)
-    const defaultWidth = 260;
-    const x = marca.posicion?.x ?? Math.max(40, width - defaultWidth - 40);
-    const y = marca.posicion?.y ?? 50;
-
-    const fontSize = 9;
-    const lineHeight = 12;
-
-    // Calcular dimensiones según imagen de firma (si existe)
-    let firmaImagenHeight = 0;
-    let firmaImagenWidth = 0;
-    if (marca.firmaImagen?.buffer) {
-      const isJpg = marca.firmaImagen.contentType?.includes('jpeg') || marca.firmaImagen.contentType?.includes('jpg');
-      const firmaImagen = isJpg
-        ? await pdfDoc.embedJpg(marca.firmaImagen.buffer)
-        : await pdfDoc.embedPng(marca.firmaImagen.buffer);
-      const maxWidth = Math.min(marca.firmaImagen.width ?? 180, defaultWidth - 40);
-      const ratio = firmaImagen.height / firmaImagen.width;
-      firmaImagenWidth = maxWidth;
-      firmaImagenHeight = marca.firmaImagen.height ?? maxWidth * ratio;
-      pagina.drawImage(firmaImagen, {
-        x: x + 10,
-        y: y + 25,
-        width: firmaImagenWidth,
-        height: firmaImagenHeight,
-      });
+    // Si no hay imagen de firma, no añadir nada (firma simple por click)
+    if (!marca.firmaImagen?.buffer) {
+      console.warn('[anadirMarcaFirmaPDF] No hay imagen de firma, saltando marca visual');
+      return pdfBuffer;
     }
 
-    const blockHeight = Math.max(80, firmaImagenHeight + 90);
+    // Cargar y calcular dimensiones de la imagen de firma
+    const isJpg = marca.firmaImagen.contentType?.includes('jpeg') || marca.firmaImagen.contentType?.includes('jpg');
+    const firmaImagen = isJpg
+      ? await pdfDoc.embedJpg(marca.firmaImagen.buffer)
+      : await pdfDoc.embedPng(marca.firmaImagen.buffer);
 
-    // Dibujar fondo semi-transparente (opcional)
-    pagina.drawRectangle({
-      x: x - 5,
-      y: y - 5,
-      width: defaultWidth,
-      height: blockHeight,
-      borderColor: rgb(0.7, 0.7, 0.7),
-      borderWidth: 1,
-      opacity: 0.1,
-    });
+    // Dimensiones de la imagen (respetar las originales proporcionadas)
+    const firmaWidth = marca.firmaImagen.width ?? 180;
+    const firmaHeight = marca.firmaImagen.height ?? 60;
+    
+    // Posición de la firma
+    // Si se proporciona posición explícita, usarla; sino, posicionar abajo a la derecha
+    const x = marca.posicion?.x ?? Math.max(40, width - firmaWidth - 40);
+    const y = marca.posicion?.y ?? 50;
 
-    // Título de la marca
-    let currentY = y + blockHeight - 15;
-    pagina.drawText('FIRMADO DIGITALMENTE', {
+    // Dibujar SOLO la imagen de firma
+    pagina.drawImage(firmaImagen, {
       x,
-      y: currentY,
-      size: fontSize + 1,
-      font: fontBold,
-      color: rgb(0.2, 0.2, 0.2),
+      y,
+      width: firmaWidth,
+      height: firmaHeight,
     });
 
-    // Nombre del firmante
-    currentY -= lineHeight + 6;
-    pagina.drawText(`Firmante: ${marca.nombreFirmante}`, {
-      x,
-      y: currentY,
-      size: fontSize,
-      font,
-      color: rgb(0.3, 0.3, 0.3),
-    });
+    // Opcionalmente añadir nombre del firmante debajo en texto pequeño y discreto
+    // Solo si hay espacio suficiente (y > 30)
+    if (y > 30) {
+      const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+      const nombreTexto = marca.nombreFirmante;
+      const fontSize = 7;
+      const textWidth = font.widthOfTextAtSize(nombreTexto, fontSize);
+      
+      // Centrar el texto bajo la firma
+      const textX = x + (firmaWidth - textWidth) / 2;
+      const textY = y - 10;
 
-    // Fecha de firma
-    currentY -= lineHeight;
-    pagina.drawText(`Fecha: ${marca.fechaFirma}`, {
-      x,
-      y: currentY,
-      size: fontSize,
-      font,
-      color: rgb(0.3, 0.3, 0.3),
-    });
-
-    // Tipo de firma
-    currentY -= lineHeight;
-    const tipoFirmaLabel = marca.tipoFirma === 'simple' ? 'Firma Simple' : marca.tipoFirma;
-    pagina.drawText(`Tipo: ${tipoFirmaLabel}`, {
-      x,
-      y: currentY,
-      size: fontSize,
-      font,
-      color: rgb(0.3, 0.3, 0.3),
-    });
-
-    // Hash del certificado (primeros 32 caracteres)
-    if (marca.certificadoHash) {
-      currentY -= lineHeight;
-      const hashCorto = marca.certificadoHash.substring(0, 32);
-      pagina.drawText(`Hash: ${hashCorto}...`, {
-        x,
-        y: currentY,
-        size: fontSize - 1,
+      pagina.drawText(nombreTexto, {
+        x: textX,
+        y: textY,
+        size: fontSize,
         font,
         color: rgb(0.4, 0.4, 0.4),
       });
@@ -155,7 +108,7 @@ export async function anadirMarcaFirmaPDF(
 
 /**
  * Añade múltiples marcas de firma a un PDF (para múltiples firmantes)
- * Las marcas se apilan verticalmente
+ * Las marcas se apilan verticalmente de forma limpia
  *
  * @param pdfBuffer - Buffer del PDF original
  * @param marcas - Array de opciones de marcas de firma
@@ -164,8 +117,8 @@ export async function anadirMarcaFirmaPDF(
  * @example
  * ```ts
  * const pdfFirmado = await anadirMarcasFirmasPDF(pdfOriginal, [
- *   { nombreFirmante: 'Juan Pérez', fechaFirma: '12/11/2025 14:30', tipoFirma: 'simple' },
- *   { nombreFirmante: 'María López', fechaFirma: '12/11/2025 15:45', tipoFirma: 'simple' },
+ *   { nombreFirmante: 'Juan Pérez', fechaFirma: '12/11/2025 14:30', tipoFirma: 'simple', firmaImagen: {...} },
+ *   { nombreFirmante: 'María López', fechaFirma: '12/11/2025 15:45', tipoFirma: 'simple', firmaImagen: {...} },
  * ]);
  * ```
  */
@@ -173,28 +126,94 @@ export async function anadirMarcasFirmasPDF(
   pdfBuffer: Buffer,
   marcas: OpcionesMarcaFirma[]
 ): Promise<Buffer> {
-  let pdfActual = pdfBuffer;
+  try {
+    // Cargar el PDF una sola vez
+    const pdfDoc = await PDFDocument.load(pdfBuffer);
+    
+    // Determinar página donde se añadirán las firmas
+    const paginas = pdfDoc.getPages();
+    const paginaIndex = paginas.length - 1; // Última página
+    const pagina = paginas[paginaIndex];
+    const { width, height } = pagina.getSize();
 
-  // Apilar marcas verticalmente (80px de altura cada una + 10px de separación)
-  for (let i = 0; i < marcas.length; i++) {
-    const marca = marcas[i];
+    // Filtrar marcas que tienen imagen de firma
+    const marcasConImagen = marcas.filter(m => m.firmaImagen?.buffer);
+    
+    if (marcasConImagen.length === 0) {
+      console.warn('[anadirMarcasFirmasPDF] No hay firmas con imagen para añadir');
+      return pdfBuffer;
+    }
 
-    // Calcular posición Y para apilar marcas
-    const offsetY = 50 + i * 140; // Altura estimada de cada bloque
+    // Cargar fuente para nombres
+    const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
 
-    const marcaConPosicion: OpcionesMarcaFirma = {
-      ...marca,
-      posicion: marca.posicion ?? {
-        pagina: -1, // Última página
-        x: 0, // Se calculará automáticamente
-        y: offsetY,
-      },
-    };
+    // Calcular posicionamiento para apilar firmas verticalmente
+    const firmaHeight = 70; // Altura aproximada por firma (60px imagen + 10px nombre)
+    const spacing = 15; // Espacio entre firmas
+    const startY = 60; // Margen inferior
 
-    pdfActual = await anadirMarcaFirmaPDF(pdfActual, marcaConPosicion);
+    for (let i = 0; i < marcasConImagen.length; i++) {
+      const marca = marcasConImagen[i];
+      
+      if (!marca.firmaImagen?.buffer) continue;
+
+      // Calcular posición Y para esta firma (apilar de abajo hacia arriba)
+      const yPosition = startY + i * (firmaHeight + spacing);
+      
+      // Verificar que no nos salimos de la página
+      if (yPosition + firmaHeight > height - 40) {
+        console.warn(`[anadirMarcasFirmasPDF] Firma ${i + 1} excede límites de página, omitiendo`);
+        continue;
+      }
+
+      // Cargar imagen de firma
+      const isJpg = marca.firmaImagen.contentType?.includes('jpeg') || marca.firmaImagen.contentType?.includes('jpg');
+      const firmaImagen = isJpg
+        ? await pdfDoc.embedJpg(marca.firmaImagen.buffer)
+        : await pdfDoc.embedPng(marca.firmaImagen.buffer);
+
+      // Dimensiones de la firma
+      const firmaWidth = marca.firmaImagen.width ?? 180;
+      const firmaHeightReal = marca.firmaImagen.height ?? 60;
+      
+      // Calcular posición X (alinear a la derecha o usar posición proporcionada)
+      const xPosition = marca.posicion?.x ?? Math.max(40, width - firmaWidth - 40);
+
+      // Dibujar imagen de firma
+      pagina.drawImage(firmaImagen, {
+        x: xPosition,
+        y: yPosition,
+        width: firmaWidth,
+        height: firmaHeightReal,
+      });
+
+      // Añadir nombre del firmante debajo (si hay espacio)
+      if (yPosition > 30) {
+        const nombreTexto = marca.nombreFirmante;
+        const fontSize = 7;
+        const textWidth = font.widthOfTextAtSize(nombreTexto, fontSize);
+        
+        // Centrar el texto bajo la firma
+        const textX = xPosition + (firmaWidth - textWidth) / 2;
+        const textY = yPosition - 10;
+
+        pagina.drawText(nombreTexto, {
+          x: textX,
+          y: textY,
+          size: fontSize,
+          font,
+          color: rgb(0.4, 0.4, 0.4),
+        });
+      }
+    }
+
+    // Guardar el PDF final
+    const pdfBytes = await pdfDoc.save();
+    return Buffer.from(pdfBytes);
+  } catch (error) {
+    console.error('[anadirMarcasFirmasPDF] Error:', error);
+    throw new Error('Error añadiendo múltiples marcas de firma al PDF');
   }
-
-  return pdfActual;
 }
 
 /**

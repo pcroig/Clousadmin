@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
     const proceso = searchParams.get('proceso'); // 'onboarding', 'offboarding'
 
     // Construir where clause
-    const where: Prisma.CarpetaWhereInput = {
+    const where: Prisma.carpetasWhereInput = {
       empresaId: session.user.empresaId,
     };
 
@@ -40,7 +40,7 @@ export async function GET(request: NextRequest) {
       ];
     }
 
-    const carpetas = await prisma.carpeta.findMany({
+    const carpetas = await prisma.carpetas.findMany({
       where,
       include: {
         empleado: {
@@ -121,7 +121,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Crear carpeta
-    const carpeta = await prisma.carpeta.create({
+    const carpeta = await prisma.carpetas.create({
       data: {
         empresaId: session.user.empresaId,
         nombre: nombre as string,

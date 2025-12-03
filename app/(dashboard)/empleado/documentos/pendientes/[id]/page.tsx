@@ -25,7 +25,7 @@ export default async function RellenarDocumentoPage(props: PageProps) {
     redirect('/empleado/dashboard');
   }
 
-  const documentoGenerado = await prisma.documentoGenerado.findUnique({
+  const documentoGenerado = await prisma.documentosGenerado.findUnique({
     where: { id: params.id },
     include: {
       documento: {
@@ -35,7 +35,7 @@ export default async function RellenarDocumentoPage(props: PageProps) {
           requiereFirma: true,
         },
       },
-      plantilla: {
+      plantillas_documentos: {
         select: {
           nombre: true,
           formato: true,
@@ -54,13 +54,13 @@ export default async function RellenarDocumentoPage(props: PageProps) {
   }
 
   if (
-    !documentoGenerado.plantilla.permiteRellenar ||
-    documentoGenerado.plantilla.formato !== 'pdf_rellenable'
+    !documentoGenerado.plantillas_documentos.permiteRellenar ||
+    documentoGenerado.plantillas_documentos.formato !== 'pdf_rellenable'
   ) {
     notFound();
   }
 
-  const configuracionIA = documentoGenerado.plantilla
+  const configuracionIA = documentoGenerado.plantillas_documentos
     .configuracionIA as Record<string, unknown> | null;
   const camposFusionados = Array.isArray(configuracionIA?.camposFusionados)
     ? (configuracionIA?.camposFusionados as Array<{
@@ -82,7 +82,7 @@ export default async function RellenarDocumentoPage(props: PageProps) {
     <RellenarDocumentoForm
       documentoGeneradoId={documentoGenerado.id}
       documentoNombre={documentoGenerado.documento.nombre}
-      plantillaNombre={documentoGenerado.plantilla.nombre}
+      plantillaNombre={documentoGenerado.plantillas_documentos.nombre}
       requiereFirma={documentoGenerado.documento.requiereFirma}
       campos={campos}
       valoresIniciales={

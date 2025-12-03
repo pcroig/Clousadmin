@@ -30,7 +30,7 @@ export async function PATCH(request: NextRequest, context: RouteParams) {
     const { nombre, descripcion, sedeId } = body;
 
     // Verify team belongs to user's company
-    const existingTeam = await prisma.equipo.findFirst({
+    const existingTeam = await prisma.equipos.findFirst({
       where: {
         id,
         empresaId: session.user.empresaId,
@@ -43,7 +43,7 @@ export async function PATCH(request: NextRequest, context: RouteParams) {
 
     // If updating name, check it doesn't conflict with another team
     if (nombre && typeof nombre === 'string' && nombre.trim() !== existingTeam.nombre) {
-      const nameConflict = await prisma.equipo.findFirst({
+      const nameConflict = await prisma.equipos.findFirst({
         where: {
           empresaId: session.user.empresaId,
           nombre: nombre.trim(),
@@ -65,7 +65,7 @@ export async function PATCH(request: NextRequest, context: RouteParams) {
     const descripcionStr = typeof descripcion === 'string' ? descripcion : undefined;
     const sedeIdStr = typeof sedeId === 'string' ? sedeId : undefined;
 
-    const updatedTeam = await prisma.equipo.update({
+    const updatedTeamRaw = await prisma.equipos.update({
       where: { id },
       data: {
         ...(nombreStr && { nombre: nombreStr.trim() }),
@@ -73,14 +73,14 @@ export async function PATCH(request: NextRequest, context: RouteParams) {
         ...(sedeIdStr !== undefined && { sedeId: sedeIdStr || null }),
       },
       include: {
-        manager: {
+        empleados: {
           select: {
             id: true,
             nombre: true,
             apellidos: true,
           },
         },
-        miembros: {
+        empleado_equipos: {
           include: {
             empleado: {
               select: {
@@ -101,11 +101,49 @@ export async function PATCH(request: NextRequest, context: RouteParams) {
       },
     });
 
+    const updatedTeam = formatEquipoResponse(updatedTeamRaw);
+
     return NextResponse.json(updatedTeam);
   } catch (error) {
     console.error('Error updating team:', error);
     return NextResponse.json({ error: 'Error al actualizar equipo' }, { status: 500 });
   }
+}
+
+type EquipoResponse = NonNullable<
+  Awaited<ReturnType<(typeof prisma.equipos)['findUnique']>>
+> & {
+  empleados: {
+    id: string;
+    nombre: string;
+    apellidos: string;
+  } | null;
+  empleado_equipos: Array<{
+    empleado: {
+      id: string;
+      nombre: string;
+      apellidos: string;
+      fotoUrl: string | null;
+    };
+  }>;
+};
+
+function formatEquipoResponse(team: Awaited<ReturnType<(typeof prisma.equipos)['findUnique']>>) {
+  if (!team) return team;
+  const teamFormatted = team as EquipoResponse;
+  return {
+    ...teamFormatted,
+    manager: teamFormatted.empleados
+      ? {
+          id: teamFormatted.empleados.id,
+          nombre: teamFormatted.empleados.nombre,
+          apellidos: teamFormatted.empleados.apellidos,
+        }
+      : null,
+    miembros: teamFormatted.empleado_equipos.map((miembro) => ({
+      empleado: miembro.empleado,
+    })),
+  };
 }
 
 // DELETE /api/equipos/[id] - Delete team
@@ -121,7 +159,7 @@ export async function DELETE(request: NextRequest, context: RouteParams) {
     const { id } = params;
 
     // Verify team belongs to user's company
-    const existingTeam = await prisma.equipo.findFirst({
+    const existingTeam = await prisma.equipos.findFirst({
       where: {
         id,
         empresaId: session.user.empresaId,
@@ -132,7 +170,7 @@ export async function DELETE(request: NextRequest, context: RouteParams) {
       return NextResponse.json({ error: 'Equipo no encontrado' }, { status: 404 });
     }
 
-    await prisma.equipo.delete({
+    await prisma.equipos.delete({
       where: { id },
     });
 

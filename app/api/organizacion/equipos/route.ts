@@ -30,7 +30,7 @@ export async function GET(req: NextRequest) {
     if (authResult instanceof Response) return authResult;
     const { session } = authResult;
 
-    const equipos = await prisma.equipo.findMany({
+    const equipos = await prisma.equipos.findMany({
       where: {
         empresaId: session.user.empresaId,
       },
@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
     const { data: validatedData } = validationResult;
 
     // Crear equipo
-    const equipo = await prisma.equipo.create({
+    const equipo = await prisma.equipos.create({
       data: {
         empresaId: session.user.empresaId,
         nombre: validatedData.nombre,
