@@ -666,7 +666,7 @@ export function AusenciasClient({}: AusenciasClientProps) {
   );
 
   return (
-    <ResponsiveContainer variant="page" className="h-full w-full flex flex-col overflow-hidden">
+    <ResponsiveContainer variant="none" className="h-full w-full flex flex-col overflow-hidden">
       {isMobile ? (
         <>
           <MobileActionBar

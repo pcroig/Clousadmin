@@ -1,43 +1,29 @@
 'use client';
 
 // ========================================
-// Jornada Step - Onboarding
+// Jornada Step - Onboarding (Múltiples Jornadas)
 // ========================================
 
-import { forwardRef, useEffect, useImperativeHandle, useState } from 'react';
+import { ChevronDown, Plus, Trash2 } from 'lucide-react';
+import { forwardRef, useImperativeHandle, useState } from 'react';
 import { toast } from 'sonner';
 
 import {
   type JornadaFormData,
   JornadaFormFields,
 } from '@/components/shared/jornada-form-fields';
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from '@/components/ui/accordion';
+import { Button } from '@/components/ui/button';
 import { type JornadaConfig } from '@/lib/calculos/fichajes-helpers';
-import { parseJson } from '@/lib/utils/json';
 
-// Tipo para las jornadas que vienen del API
-interface JornadaAPI {
-  id: string;
-  nombre: string;
-  horasSemanales: number;
-  config?: JornadaConfig | null;
-  esPredefinida?: boolean;
-}
-
-// Helper types from existing code
+// Helper types
 type DiaKey = 'lunes' | 'martes' | 'miercoles' | 'jueves' | 'viernes' | 'sabado' | 'domingo';
 const DIA_KEYS: DiaKey[] = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo'];
-
-const isDiaConfig = (value: unknown): value is { activo: boolean; entrada?: string; salida?: string; pausa_inicio?: string; pausa_fin?: string } =>
-  typeof value === 'object' && value !== null && !Array.isArray(value);
-
-const getDiaConfig = (
-  config: JornadaConfig | null | undefined,
-  dia: DiaKey
-) => {
-  if (!config) return undefined;
-  const value = config[dia];
-  return isDiaConfig(value) ? value : undefined;
-};
 
 export interface JornadaStepHandle {
   guardar: () => Promise<boolean>;
@@ -46,14 +32,11 @@ export interface JornadaStepHandle {
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
 interface JornadaStepProps {}
 
-export const JornadaStep = forwardRef<JornadaStepHandle, JornadaStepProps>(function JornadaStep(_, ref) {
-  // Form State
-  const [formData, setFormData] = useState<JornadaFormData>({
-    nombre: 'Jornada Estándar',
+// Default jornada configuration
+function createDefaultJornada(): JornadaFormData {
+  return {
     tipoJornada: 'flexible',
     horasSemanales: '40',
-    limiteInferior: '',
-    limiteSuperior: '',
     horariosFijos: {
       lunes: { activo: true, entrada: '09:00', salida: '18:00' },
       martes: { activo: true, entrada: '09:00', salida: '18:00' },
@@ -64,204 +47,168 @@ export const JornadaStep = forwardRef<JornadaStepHandle, JornadaStepProps>(funct
       domingo: { activo: false, entrada: '', salida: '' },
     },
     descansoMinutos: '',
-  });
+  };
+}
 
-  // Data State
+export const JornadaStep = forwardRef<JornadaStepHandle, JornadaStepProps>(function JornadaStep(_, ref) {
+  // Multiple jornadas state
+  const [jornadas, setJornadas] = useState<JornadaFormData[]>([createDefaultJornada()]);
+  const [expandedIndex, setExpandedIndex] = useState<string>('item-0');
   const [saving, setSaving] = useState(false);
-  const [errors, setErrors] = useState<Record<string, string>>({});
-  const [existingJornadaId, setExistingJornadaId] = useState<string | null>(null);
+  const [errors, setErrors] = useState<Record<number, Record<string, string>>>({});
 
-  // Load Data
-  useEffect(() => {
-    async function loadData() {
-      try {
-        const jornadasRes = await fetch('/api/jornadas');
+  function updateJornada(index: number, data: JornadaFormData) {
+    const newJornadas = [...jornadas];
+    newJornadas[index] = data;
+    setJornadas(newJornadas);
+  }
 
-        if (jornadasRes.ok) {
-          const data = await parseJson<JornadaAPI[]>(jornadasRes);
-          const jornadas = Array.isArray(data) ? data : [];
-          // Use the first non-predefined jornada, or create new default
-          const jornada: JornadaAPI | undefined = jornadas.find((j) => !j.esPredefinida) || jornadas[0];
+  function addJornada() {
+    const newJornadas = [...jornadas, createDefaultJornada()];
+    setJornadas(newJornadas);
+    setExpandedIndex(`item-${newJornadas.length - 1}`);
+  }
 
-          if (jornada) {
-            setExistingJornadaId(jornada.id);
-            // Populate form with existing data
-            const config = jornada.config || {};
-            const esFija = DIA_KEYS.some((dia) => {
-              const diaConfig = getDiaConfig(config, dia);
-              return Boolean(diaConfig?.entrada && diaConfig?.salida);
-            });
+  function removeJornada(index: number) {
+    if (jornadas.length <= 1) {
+      toast.error('Debe haber al menos una jornada');
+      return;
+    }
+    const newJornadas = jornadas.filter((_, i) => i !== index);
+    setJornadas(newJornadas);
+    // If we removed the expanded item, expand the first one
+    if (expandedIndex === `item-${index}`) {
+      setExpandedIndex('item-0');
+    }
+  }
 
-            const newHorariosFijos: Record<string, { activo: boolean; entrada: string; salida: string }> = {};
-            DIA_KEYS.forEach((dia) => {
-              const diaConfig = getDiaConfig(config, dia);
-              if (diaConfig) {
-                newHorariosFijos[dia] = {
-                  activo: diaConfig.activo ?? true,
-                  entrada: diaConfig.entrada ?? '09:00',
-                  salida: diaConfig.salida ?? '18:00',
-                };
-              } else {
-                newHorariosFijos[dia] = {
-                  activo: dia !== 'sabado' && dia !== 'domingo',
-                  entrada: '09:00',
-                  salida: '18:00',
-                };
-              }
-            });
+  function getJornadaLabel(jornada: JornadaFormData, index: number): string {
+    const tipo = jornada.tipoJornada === 'fija' ? 'Fija' : 'Flexible';
+    const horas = jornada.horasSemanales || '40';
+    return `Jornada ${index + 1} - ${tipo} ${horas}h`;
+  }
 
-            // Calculate break minutes
-            let descansoMinutos = '';
-            if (esFija) {
-               // ... logic similar to EditarJornadaModal
-               const primerDiaConPausa = DIA_KEYS.find((dia) => {
-                const diaConfig = getDiaConfig(config, dia);
-                return Boolean(diaConfig?.pausa_inicio && diaConfig?.pausa_fin);
-              });
-              if (primerDiaConPausa) {
-                const diaConfig = getDiaConfig(config, primerDiaConPausa);
-                if (diaConfig?.pausa_inicio && diaConfig?.pausa_fin) {
-                  const [h1, m1] = diaConfig.pausa_inicio.split(':').map(Number);
-                  const [h2, m2] = diaConfig.pausa_fin.split(':').map(Number);
-                  const minutos = (h2 * 60 + m2) - (h1 * 60 + m1);
-                  descansoMinutos = minutos.toString();
-                }
-              }
-            } else {
-              const descansoMinimo = typeof config?.descansoMinimo === 'string' ? config.descansoMinimo : '';
-              if (descansoMinimo) {
-                const [h, m] = descansoMinimo.split(':').map(Number);
-                descansoMinutos = (h * 60 + m).toString();
-              }
-            }
+  function validarJornadas(): boolean {
+    const newErrors: Record<number, Record<string, string>> = {};
+    let isValid = true;
 
-            setFormData({
-              nombre: jornada.nombre,
-              tipoJornada: esFija ? 'fija' : 'flexible',
-              horasSemanales: (jornada.horasSemanales || 40).toString(),
-              limiteInferior: config?.limiteInferior || '',
-              limiteSuperior: config?.limiteSuperior || '',
-              horariosFijos: newHorariosFijos,
-              descansoMinutos,
-            });
-          }
-        }
+    jornadas.forEach((jornada, index) => {
+      const jornadaErrors: Record<string, string> = {};
 
-      } catch (err) {
-        console.error('Error loading data', err);
-        toast.error('Error al cargar datos iniciales');
+      if (!jornada.horasSemanales || parseFloat(jornada.horasSemanales) <= 0) {
+        jornadaErrors.horasSemanales = 'Las horas semanales deben ser mayores a 0';
+        isValid = false;
       }
-    }
 
-    loadData();
-  }, []);
+      if (Object.keys(jornadaErrors).length > 0) {
+        newErrors[index] = jornadaErrors;
+      }
+    });
 
-  function validarFormulario(): boolean {
-    const newErrors: Record<string, string> = {};
-    
-    if (!formData.horasSemanales || parseFloat(formData.horasSemanales) <= 0) {
-      newErrors.horasSemanales = 'Las horas semanales deben ser mayores a 0';
-    }
-    
     setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    return isValid;
   }
 
   const guardar = async (): Promise<boolean> => {
-    if (!validarFormulario()) return false;
+    if (!validarJornadas()) {
+      toast.error('Por favor corrige los errores en las jornadas');
+      return false;
+    }
+
     setSaving(true);
 
     try {
-      // Build config object
-      const config: JornadaConfig = {};
-      const descansoMinutos = parseInt(formData.descansoMinutos || '0', 10);
-      
-      if (formData.tipoJornada === 'fija') {
-        DIA_KEYS.forEach((dia) => {
-          const horario = formData.horariosFijos[dia];
-          if (descansoMinutos > 0 && horario.activo) {
-            const pausaInicio = '14:00';
-            const [h, m] = pausaInicio.split(':').map(Number);
-            const totalMinutos = h * 60 + m + descansoMinutos;
-            const pausaFin = `${Math.floor(totalMinutos / 60).toString().padStart(2, '0')}:${(totalMinutos % 60).toString().padStart(2, '0')}`;
-            
-            config[dia] = {
-              activo: horario.activo,
-              entrada: horario.entrada,
-              salida: horario.salida,
-              pausa_inicio: pausaInicio,
-              pausa_fin: pausaFin,
-            };
-          } else {
-            config[dia] = {
-              activo: horario.activo,
-              entrada: horario.entrada,
-              salida: horario.salida,
-            };
+      // Create all jornadas
+      const createdJornadaIds: string[] = [];
+
+      for (let i = 0; i < jornadas.length; i++) {
+        const jornada = jornadas[i];
+
+        // Build config object
+        const config: JornadaConfig = {};
+        const descansoMinutos = parseInt(jornada.descansoMinutos || '0', 10);
+
+        if (jornada.tipoJornada === 'fija') {
+          DIA_KEYS.forEach((dia) => {
+            const horario = jornada.horariosFijos[dia];
+            if (descansoMinutos > 0 && horario.activo) {
+              const pausaInicio = '14:00';
+              const [h, m] = pausaInicio.split(':').map(Number);
+              const totalMinutos = h * 60 + m + descansoMinutos;
+              const pausaFin = `${Math.floor(totalMinutos / 60).toString().padStart(2, '0')}:${(totalMinutos % 60).toString().padStart(2, '0')}`;
+
+              config[dia] = {
+                activo: horario.activo,
+                entrada: horario.entrada,
+                salida: horario.salida,
+                pausa_inicio: pausaInicio,
+                pausa_fin: pausaFin,
+              };
+            } else {
+              config[dia] = {
+                activo: horario.activo,
+                entrada: horario.entrada,
+                salida: horario.salida,
+              };
+            }
+          });
+        } else {
+          DIA_KEYS.forEach((dia) => {
+            const estadoDia = jornada.horariosFijos[dia];
+            config[dia] = { activo: estadoDia?.activo ?? false };
+          });
+
+          if (descansoMinutos > 0) {
+            const horas = Math.floor(descansoMinutos / 60);
+            const minutos = descansoMinutos % 60;
+            config.descansoMinimo = `${horas.toString().padStart(2, '0')}:${minutos.toString().padStart(2, '0')}`;
           }
-        });
-      } else {
-        DIA_KEYS.forEach((dia) => {
-          const estadoDia = formData.horariosFijos[dia];
-          config[dia] = { activo: estadoDia?.activo ?? false };
+        }
+
+        // NOTE: limiteInferior/Superior are now global, not per-jornada
+        config.tipo = jornada.tipoJornada;
+
+        // Create jornada (without 'nombre' field)
+        const response = await fetch('/api/jornadas', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            tipo: jornada.tipoJornada,
+            horasSemanales: parseFloat(jornada.horasSemanales),
+            config,
+          }),
         });
 
-        if (descansoMinutos > 0) {
-          const horas = Math.floor(descansoMinutos / 60);
-          const minutos = descansoMinutos % 60;
-          config.descansoMinimo = `${horas.toString().padStart(2, '0')}:${minutos.toString().padStart(2, '0')}`;
+        if (!response.ok) {
+          throw new Error(`Error al guardar jornada ${i + 1}`);
+        }
+
+        const jornadaGuardada = await response.json() as { id: string };
+        createdJornadaIds.push(jornadaGuardada.id);
+      }
+
+      // Assign first jornada to entire company by default
+      // (HR can reassign employees to other jornadas later)
+      if (createdJornadaIds.length > 0) {
+        const asignacionResponse = await fetch('/api/jornadas/asignar', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            jornadaId: createdJornadaIds[0],
+            nivel: 'empresa',
+          }),
+        });
+        if (!asignacionResponse.ok) {
+          console.warn('No se pudo asignar la jornada por defecto a la empresa.');
         }
       }
 
-      if (formData.limiteInferior) config.limiteInferior = formData.limiteInferior;
-      if (formData.limiteSuperior) config.limiteSuperior = formData.limiteSuperior;
-      config.tipo = formData.tipoJornada;
-
-      // Save Jornada
-      const url = existingJornadaId ? `/api/jornadas/${existingJornadaId}` : '/api/jornadas';
-      const method = existingJornadaId ? 'PATCH' : 'POST';
-
-      const nombreNormalizado = formData.nombre.trim() || 'Jornada base';
-
-      const response = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          nombre: nombreNormalizado,
-          tipo: formData.tipoJornada,
-          horasSemanales: parseFloat(formData.horasSemanales),
-          config,
-          limiteInferior: formData.limiteInferior || undefined,
-          limiteSuperior: formData.limiteSuperior || undefined,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Error al guardar jornada');
-      }
-
-      const jornadaGuardada = await response.json() as { id: string };
-      setExistingJornadaId(jornadaGuardada.id);
-
-      // Assign jornada to entire company by default
-      const asignacionResponse = await fetch('/api/jornadas/asignar', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          jornadaId: jornadaGuardada.id,
-          nivel: 'empresa',
-        }),
-      });
-      if (!asignacionResponse.ok) {
-        console.warn('No se pudo asignar la jornada a la empresa en onboarding.');
-      }
-
-      toast.success('Jornada guardada correctamente');
+      toast.success(`${jornadas.length} jornada${jornadas.length > 1 ? 's' : ''} guardada${jornadas.length > 1 ? 's' : ''} correctamente`);
       return true;
 
     } catch (error) {
-      console.error('Error saving jornada', error);
-      toast.error('Error al guardar la jornada');
+      console.error('Error saving jornadas', error);
+      toast.error('Error al guardar las jornadas');
       return false;
     } finally {
       setSaving(false);
@@ -275,20 +222,71 @@ export const JornadaStep = forwardRef<JornadaStepHandle, JornadaStepProps>(funct
   return (
     <div className="space-y-6">
       <div className="space-y-2">
-        <h3 className="text-lg font-semibold text-gray-900">Define la jornada laboral</h3>
+        <h3 className="text-lg font-semibold text-gray-900">Define las jornadas laborales</h3>
         <p className="text-sm text-gray-500">
-          Configura el horario base de tu empresa. Podrás crear variaciones más adelante para equipos o personas específicas.
+          Configura las jornadas de tu empresa. Puedes crear varias jornadas para diferentes equipos o roles.
         </p>
       </div>
 
-      <JornadaFormFields
-        data={formData}
-        onChange={setFormData}
-        errors={errors}
+      <Accordion
+        type="single"
+        collapsible
+        value={expandedIndex}
+        onValueChange={setExpandedIndex}
+        className="space-y-3"
+      >
+        {jornadas.map((jornada, index) => (
+          <AccordionItem
+            key={`item-${index}`}
+            value={`item-${index}`}
+            className="border rounded-lg px-4 py-2 bg-white shadow-sm"
+          >
+            <div className="flex items-center justify-between">
+              <AccordionTrigger className="flex-1 text-left font-medium hover:no-underline">
+                <div className="flex items-center gap-2">
+                  <ChevronDown className="h-4 w-4 transition-transform duration-200" />
+                  {getJornadaLabel(jornada, index)}
+                </div>
+              </AccordionTrigger>
+              {jornadas.length > 1 && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    removeJornada(index);
+                  }}
+                  disabled={saving}
+                  className="ml-2 text-red-600 hover:text-red-700 hover:bg-red-50"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
+            <AccordionContent className="pt-4">
+              <JornadaFormFields
+                data={jornada}
+                onChange={(data) => updateJornada(index, data)}
+                errors={errors[index] || {}}
+                disabled={saving}
+                showAsignacion={false}
+              />
+            </AccordionContent>
+          </AccordionItem>
+        ))}
+      </Accordion>
+
+      <Button
+        type="button"
+        variant="outline"
+        onClick={addJornada}
         disabled={saving}
-        showAsignacion={false}
-      />
+        className="w-full"
+      >
+        <Plus className="h-4 w-4 mr-2" />
+        Agregar otra jornada
+      </Button>
     </div>
   );
 });
-

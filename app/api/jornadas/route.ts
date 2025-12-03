@@ -32,7 +32,7 @@ export async function GET(req: NextRequest) {
         activa: true,
       },
       orderBy: {
-        nombre: 'asc',
+        createdAt: 'asc', // Order by creation date since 'nombre' no longer exists
       },
       include: {
         _count: {
@@ -94,13 +94,8 @@ export async function POST(req: NextRequest) {
       };
     }
 
-    // Añadir límites de fichaje al config si se proporcionan
-    if (validatedData.limiteInferior) {
-      config.limiteInferior = validatedData.limiteInferior;
-    }
-    if (validatedData.limiteSuperior) {
-      config.limiteSuperior = validatedData.limiteSuperior;
-    }
+    // NOTE: limiteInferior and limiteSuperior are NO LONGER stored per-jornada
+    // They are now global in Empresa.config (limiteInferiorFichaje/limiteSuperiorFichaje)
 
     // Añadir tipo al config si se proporciona (para referencia)
     if (validatedData.tipo) {
@@ -109,11 +104,10 @@ export async function POST(req: NextRequest) {
 
     // Validar que no haya jornada duplicada asignada al mismo nivel
     // (esto se validará al asignar, pero es bueno tenerlo aquí también)
-    
-    // Crear jornada
+
+    // Crear jornada (without 'nombre' field)
     const jornada = await prisma.jornada.create({
       data: {
-        nombre: validatedData.nombre,
         empresaId: empresaId,
         horasSemanales: validatedData.horasSemanales,
         config: asJsonValue(config),

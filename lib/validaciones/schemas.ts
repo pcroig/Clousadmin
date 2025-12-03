@@ -105,23 +105,20 @@ const jornadaConfigSchema = z
   .object({
     tipo: z.enum(['fija', 'flexible']).optional(),
     descansoMinimo: z.string().optional(),
-    limiteInferior: z.string().optional(),
-    limiteSuperior: z.string().optional(),
+    // NOTE: limiteInferior and limiteSuperior are NO LONGER here - they are global in Empresa.config
   })
   .catchall(jornadaConfigDiaSchema);
 
 export const jornadaCreateSchema = z.object({
-  nombre: z.string().min(1, 'Nombre requerido'),
+  // NOTE: 'nombre' field has been removed - jornadas are now identified by their configuration
   empresaId: z.string().uuid(),
   tipo: z.enum(['fija', 'flexible']),
   horasSemanales: z.number().positive('Horas semanales deben ser positivas'),
-  
+
   // Configuración por día (para jornadas fijas)
   config: jornadaConfigSchema.optional(),
-  
-  // Límites de horario
-  limiteInferior: z.string().optional(), // "08:00"
-  limiteSuperior: z.string().optional(), // "20:00"
+
+  // NOTE: Límites de horario are now global per company (in Empresa.config.limiteInferiorFichaje/limiteSuperiorFichaje)
 });
 
 export const jornadaUpdateSchema = jornadaCreateSchema.partial().omit({ empresaId: true });
@@ -327,52 +324,69 @@ export const calendarioLaboralUpdateSchema = z.object({
 
 export type CalendarioLaboralUpdateInput = z.infer<typeof calendarioLaboralUpdateSchema>;
 
+// Global time limits for fichajes (applies to ALL jornadas)
+export const limitesGlobalesFichajeSchema = z.object({
+  limiteInferiorFichaje: z
+    .string()
+    .regex(HORA_24H_REGEX, 'Hora inválida (formato HH:MM)')
+    .optional(),
+  limiteSuperiorFichaje: z
+    .string()
+    .regex(HORA_24H_REGEX, 'Hora inválida (formato HH:MM)')
+    .optional(),
+});
+
+export type LimitesGlobalesFichajeInput = z.infer<typeof limitesGlobalesFichajeSchema>;
+
+// Individual jornada schema for onboarding (without nombre)
+const jornadaOnboardingItemSchema = z.object({
+  tipo: z.enum(['flexible', 'fija']),
+  horasSemanales: z
+    .number()
+    .min(1, 'Las horas semanales deben ser mayores que 0')
+    .max(168, 'Las horas semanales no pueden superar las 168 horas'),
+  horaEntrada: z
+    .string()
+    .regex(HORA_24H_REGEX, 'Hora inválida (formato HH:MM)')
+    .optional(),
+  horaSalida: z
+    .string()
+    .regex(HORA_24H_REGEX, 'Hora inválida (formato HH:MM)')
+    .optional(),
+  diasLaborables: z.record(z.string(), z.boolean()).optional(), // { lunes: true, martes: true, ... }
+  descansoMinutos: z.number().min(0).optional(), // Descanso en minutos
+});
+
 export const calendarioJornadaOnboardingSchema = z
   .object({
-    diasLaborables: calendarioLaboralUpdateSchema,
-    jornada: z.object({
-      nombre: z.string().min(3, 'El nombre de la jornada es obligatorio').max(100),
-      tipo: z.enum(['flexible', 'fija']),
-      horasSemanales: z
-        .number()
-        .min(1, 'Las horas semanales deben ser mayores que 0')
-        .max(168, 'Las horas semanales no pueden superar las 168 horas'),
-      limiteInferior: z
-        .string()
-        .regex(HORA_24H_REGEX, 'Hora inválida (formato HH:MM)')
-        .optional(),
-      limiteSuperior: z
-        .string()
-        .regex(HORA_24H_REGEX, 'Hora inválida (formato HH:MM)')
-        .optional(),
-      horaEntrada: z
-        .string()
-        .regex(HORA_24H_REGEX, 'Hora inválida (formato HH:MM)')
-        .optional(),
-      horaSalida: z
-        .string()
-        .regex(HORA_24H_REGEX, 'Hora inválida (formato HH:MM)')
-        .optional(),
-    }),
+    diasLaborables: calendarioLaboralUpdateSchema.optional(), // Optional, can be configured separately
+    // Global time limits (apply to ALL jornadas)
+    limiteInferiorFichaje: z
+      .string()
+      .regex(HORA_24H_REGEX, 'Hora inválida (formato HH:MM)')
+      .optional(),
+    limiteSuperiorFichaje: z
+      .string()
+      .regex(HORA_24H_REGEX, 'Hora inválida (formato HH:MM)')
+      .optional(),
+    // Multiple jornadas (at least one required)
+    jornadas: z
+      .array(jornadaOnboardingItemSchema)
+      .min(1, 'Debe haber al menos una jornada configurada'),
   })
   .superRefine((data, ctx) => {
-    if (data.jornada.tipo === 'flexible') {
-      if (!data.jornada.limiteInferior || !data.jornada.limiteSuperior) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: 'Define un rango horario para la jornada flexible',
-          path: ['jornada', 'limites'],
-        });
+    // Validate each jornada based on its type
+    data.jornadas.forEach((jornada, index) => {
+      if (jornada.tipo === 'fija') {
+        if (!jornada.horaEntrada || !jornada.horaSalida) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: 'Define hora de entrada y salida para la jornada fija',
+            path: ['jornadas', index, 'horario'],
+          });
+        }
       }
-    } else {
-      if (!data.jornada.horaEntrada || !data.jornada.horaSalida) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: 'Define hora de entrada y salida para la jornada fija',
-          path: ['jornada', 'horario'],
-        });
-      }
-    }
+    });
   });
 
 export type CalendarioJornadaOnboardingInput = z.infer<typeof calendarioJornadaOnboardingSchema>;

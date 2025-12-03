@@ -53,7 +53,7 @@ const getDiaConfig = (
 
 export interface JornadaDetalle {
   id: string;
-  nombre: string;
+  // NOTE: 'nombre' field has been removed from Jornada model
   horasSemanales: number;
   config: JornadaConfig | null;
   esPredefinida?: boolean;
@@ -83,11 +83,9 @@ interface EditarJornadaModalProps {
 export function EditarJornadaModal({ open, modo, jornada, onClose }: EditarJornadaModalProps) {
   // Estados del formulario unificado
   const [formData, setFormData] = useState<JornadaFormData>({
-    nombre: '',
+    // NOTE: 'nombre' field has been removed
     tipoJornada: 'flexible',
     horasSemanales: '40',
-    limiteInferior: '',
-    limiteSuperior: '',
     horariosFijos: {
       lunes: { activo: true, entrada: '09:00', salida: '18:00' },
       martes: { activo: true, entrada: '09:00', salida: '18:00' },
@@ -113,7 +111,7 @@ export function EditarJornadaModal({ open, modo, jornada, onClose }: EditarJorna
   const [mostrarAlertaJornadas, setMostrarAlertaJornadas] = useState(false);
   const [jornadasPreviasInfo, setJornadasPreviasInfo] = useState<{
     tieneJornadas: boolean;
-    jornadas: Array<{ nombre: string; cantidad: number }>;
+    jornadas: Array<{ cantidad: number }>; // NOTE: 'nombre' field removed
     nivel: 'empresa' | 'equipo' | 'individual';
     jornadaId: string;
   } | null>(null);
@@ -172,11 +170,10 @@ export function EditarJornadaModal({ open, modo, jornada, onClose }: EditarJorna
         }
 
         setFormData({
-          nombre: jornada.nombre,
+          // NOTE: 'nombre' field removed
           tipoJornada: esFija ? 'fija' : 'flexible',
           horasSemanales: jornada.horasSemanales.toString(),
-          limiteInferior: config?.limiteInferior || '',
-          limiteSuperior: config?.limiteSuperior || '',
+          // NOTE: limiteInferior/Superior removed (now global in Empresa.config)
           horariosFijos: newHorariosFijos,
           descansoMinutos,
         });
@@ -230,11 +227,10 @@ export function EditarJornadaModal({ open, modo, jornada, onClose }: EditarJorna
 
   function limpiarFormulario() {
     setFormData({
-      nombre: '',
+      // NOTE: 'nombre' field removed
       tipoJornada: 'flexible',
       horasSemanales: '40',
-      limiteInferior: '',
-      limiteSuperior: '',
+      // NOTE: limiteInferior/Superior removed (now global)
       horariosFijos: {
         lunes: { activo: true, entrada: '09:00', salida: '18:00' },
         martes: { activo: true, entrada: '09:00', salida: '18:00' },
@@ -424,7 +420,7 @@ export function EditarJornadaModal({ open, modo, jornada, onClose }: EditarJorna
           // Mostrar alerta de confirmación
           setJornadasPreviasInfo({
             tieneJornadas: true,
-            jornadas: previasInfo.jornadas as { nombre: string; cantidad: number }[],
+            jornadas: previasInfo.jornadas as { cantidad: number }[], // NOTE: 'nombre' field removed
             nivel: nivelAsignacion,
             jornadaId: jornadaId,
           });
@@ -500,12 +496,26 @@ export function EditarJornadaModal({ open, modo, jornada, onClose }: EditarJorna
 
   const esPredefinida = jornada?.esPredefinida;
 
+  // Generate descriptive title for edit mode (since 'nombre' field no longer exists)
+  const getJornadaTitle = () => {
+    if (modo === 'crear') return 'Nueva Jornada';
+    if (!jornada) return 'Editar Jornada';
+
+    const config = jornada.config;
+    const esFija = DIA_KEYS.some((dia) => {
+      const diaConfig = getDiaConfig(config, dia);
+      return Boolean(diaConfig?.entrada && diaConfig?.salida);
+    });
+    const tipo = esFija ? 'Fija' : 'Flexible';
+    return `Editar Jornada ${tipo} ${jornada.horasSemanales}h`;
+  };
+
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
-            {modo === 'crear' ? 'Nueva Jornada' : `Editar ${jornada?.nombre}`}
+            {getJornadaTitle()}
           </DialogTitle>
         </DialogHeader>
 
@@ -571,11 +581,11 @@ export function EditarJornadaModal({ open, modo, jornada, onClose }: EditarJorna
               )}
               
               <div className="mt-3">
-                <p className="font-medium mb-2">Jornadas que serán reemplazadas:</p>
+                <p className="font-medium mb-2">Empleados afectados:</p>
                 <ul className="list-disc list-inside space-y-1 text-sm">
                   {jornadasPreviasInfo?.jornadas.map((j, idx) => (
                     <li key={idx}>
-                      <strong>{j.nombre}</strong> - {j.cantidad} empleado{j.cantidad !== 1 ? 's' : ''}
+                      {j.cantidad} empleado{j.cantidad !== 1 ? 's' : ''} con jornada asignada
                     </li>
                   ))}
                 </ul>

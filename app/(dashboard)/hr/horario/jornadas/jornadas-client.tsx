@@ -41,7 +41,7 @@ const getDiaConfig = (config: JornadaConfig | null | undefined, dia: DiaKey): Di
 
 interface Jornada {
   id: string;
-  nombre: string;
+  // NOTE: 'nombre' field has been removed from Jornada model
   horasSemanales: number;
   config: JornadaConfig | null;
   esPredefinida: boolean;
@@ -124,6 +124,24 @@ export function JornadasClient() {
     return `${jornada.horasSemanales}h semanales`;
   }
 
+  function getNombreGenerado(jornada: Jornada) {
+    // Generate a descriptive name based on jornada configuration
+    const config = jornada.config;
+    const esFija = DIA_KEYS.some((dia) => {
+      const diaConfig = getDiaConfig(config, dia);
+      return Boolean(diaConfig?.entrada && diaConfig?.salida);
+    });
+
+    const tipo = esFija ? 'Fija' : 'Flexible';
+    const horas = jornada.horasSemanales;
+
+    if (jornada.esPredefinida) {
+      return `Jornada por Defecto (${horas}h ${tipo})`;
+    }
+
+    return `Jornada ${tipo} ${horas}h`;
+  }
+
   return (
     <div className="h-full w-full flex flex-col">
       {/* Header */}
@@ -141,7 +159,7 @@ export function JornadasClient() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Nombre</TableHead>
+                <TableHead>Descripción</TableHead>
                 <TableHead>Tipo</TableHead>
                 <TableHead>Horas Semanales</TableHead>
                 <TableHead>Horario</TableHead>
@@ -171,7 +189,7 @@ export function JornadasClient() {
                 jornadas.map((jornada) => (
                   <TableRow key={jornada.id}>
                     <TableCell>
-                      <div className="font-medium text-gray-900">{jornada.nombre}</div>
+                      <div className="font-medium text-gray-900">{getNombreGenerado(jornada)}</div>
                     </TableCell>
                     <TableCell>{getTipoBadge(jornada)}</TableCell>
                     <TableCell>{jornada.horasSemanales}h</TableCell>

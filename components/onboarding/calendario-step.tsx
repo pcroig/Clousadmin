@@ -32,6 +32,9 @@ export const CalendarioStep = forwardRef<CalendarioStepHandle, CalendarioStepPro
     sabado: false,
     domingo: false,
   });
+  // Global time limits for fichajes (applies to ALL jornadas)
+  const [limiteInferiorFichaje, setLimiteInferiorFichaje] = useState('07:00');
+  const [limiteSuperiorFichaje, setLimiteSuperiorFichaje] = useState('21:00');
   const [festivosView, setFestivosView] = useState<'calendario' | 'lista'>('lista');
   const [festivoEditor, setFestivoEditor] = useState<FestivoEditorState | null>(null);
   const [festivosRefreshKey, setFestivosRefreshKey] = useState(0);
@@ -45,9 +48,19 @@ export const CalendarioStep = forwardRef<CalendarioStepHandle, CalendarioStepPro
     try {
       const resCalendario = await fetch('/api/empresa/calendario-laboral');
       if (resCalendario.ok) {
-        const dataCalendario = await parseJson<{ diasLaborables?: typeof diasLaborables }>(resCalendario);
+        const dataCalendario = await parseJson<{
+          diasLaborables?: typeof diasLaborables;
+          limiteInferiorFichaje?: string;
+          limiteSuperiorFichaje?: string;
+        }>(resCalendario);
         if (dataCalendario?.diasLaborables) {
           setDiasLaborables(dataCalendario.diasLaborables);
+        }
+        if (dataCalendario?.limiteInferiorFichaje) {
+          setLimiteInferiorFichaje(dataCalendario.limiteInferiorFichaje);
+        }
+        if (dataCalendario?.limiteSuperiorFichaje) {
+          setLimiteSuperiorFichaje(dataCalendario.limiteSuperiorFichaje);
         }
       }
     } catch (e) {
@@ -142,7 +155,11 @@ export const CalendarioStep = forwardRef<CalendarioStepHandle, CalendarioStepPro
       const response = await fetch('/api/empresa/calendario-laboral', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(diasLaborables),
+        body: JSON.stringify({
+          diasLaborables,
+          limiteInferiorFichaje,
+          limiteSuperiorFichaje,
+        }),
       });
 
       if (response.ok) {
@@ -192,7 +209,7 @@ export const CalendarioStep = forwardRef<CalendarioStepHandle, CalendarioStepPro
               { key: 'domingo', label: 'Dom' },
             ].map((dia) => {
               const activo = diasLaborables[dia.key as keyof typeof diasLaborables];
-              
+
               return (
                 <button
                   key={dia.key}
@@ -215,6 +232,42 @@ export const CalendarioStep = forwardRef<CalendarioStepHandle, CalendarioStepPro
             })}
           </div>
         </Field>
+
+        <div className="grid grid-cols-2 gap-4 mt-4">
+          <Field>
+            <FieldLabel htmlFor="limiteInferiorFichaje">
+              Límite inferior de fichaje (aplica a todas las jornadas)
+            </FieldLabel>
+            <Input
+              id="limiteInferiorFichaje"
+              type="time"
+              value={limiteInferiorFichaje}
+              onChange={(e) => setLimiteInferiorFichaje(e.target.value)}
+              placeholder="07:00"
+              className="mt-2"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Hora mínima de entrada permitida
+            </p>
+          </Field>
+
+          <Field>
+            <FieldLabel htmlFor="limiteSuperiorFichaje">
+              Límite superior de fichaje (aplica a todas las jornadas)
+            </FieldLabel>
+            <Input
+              id="limiteSuperiorFichaje"
+              type="time"
+              value={limiteSuperiorFichaje}
+              onChange={(e) => setLimiteSuperiorFichaje(e.target.value)}
+              placeholder="21:00"
+              className="mt-2"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Hora máxima de salida permitida
+            </p>
+          </Field>
+        </div>
 
         <Tabs
           value={festivosView}

@@ -31,11 +31,10 @@ interface HorarioDia {
 }
 
 export interface JornadaFormData {
-  nombre: string;
+  // NOTE: 'nombre' field has been removed - jornadas are now identified by their configuration
   tipoJornada: 'fija' | 'flexible';
   horasSemanales: string;
-  limiteInferior: string;
-  limiteSuperior: string;
+  // NOTE: limiteInferior and limiteSuperior are NO LONGER per-jornada - they are global in Empresa.config
   horariosFijos: Record<string, HorarioDia>;
   descansoMinutos: string;
 }
@@ -109,20 +108,8 @@ export function JornadaFormFields({
 
   return (
     <div className="space-y-4">
-      {/* Nombre y configuración básica */}
-      <Field>
-        <FieldLabel htmlFor="nombre">Nombre de la jornada (opcional)</FieldLabel>
-        <Input
-          id="nombre"
-          value={data.nombre}
-          onChange={(e) => updateData({ nombre: e.target.value })}
-          placeholder="Ej: Jornada Completa 40h"
-          aria-invalid={!!errors.nombre}
-          disabled={disabled}
-        />
-        {errors.nombre && <FieldError>{errors.nombre}</FieldError>}
-      </Field>
-
+      {/* NOTE: 'Nombre de la jornada' field has been removed */}
+      {/* Configuración básica */}
       <div className="grid grid-cols-2 gap-4">
         <Field>
           <FieldLabel htmlFor="tipo">Tipo de jornada</FieldLabel>
@@ -307,34 +294,9 @@ export function JornadaFormFields({
         </div>
       )}
 
-      {/* Límites de fichaje */}
-      {!disabled && (
-        <div className="pt-4 border-t">
-          <div className="grid grid-cols-2 gap-4">
-            <Field>
-              <FieldLabel htmlFor="limiteInferior">Límite inferior</FieldLabel>
-              <Input
-                id="limiteInferior"
-                type="time"
-                value={data.limiteInferior}
-                onChange={(e) => updateData({ limiteInferior: e.target.value })}
-                placeholder="08:00"
-              />
-            </Field>
-
-            <Field>
-              <FieldLabel htmlFor="limiteSuperior">Límite superior</FieldLabel>
-              <Input
-                id="limiteSuperior"
-                type="time"
-                value={data.limiteSuperior}
-                onChange={(e) => updateData({ limiteSuperior: e.target.value })}
-                placeholder="20:00"
-              />
-            </Field>
-          </div>
-        </div>
-      )}
+      {/* NOTE: Límites de fichaje (inferior/superior) are now GLOBAL per company */}
+      {/* They are configured in Empresa.config, not per-jornada */}
+      {/* See: calendario-step.tsx for configuration */}
     </div>
   );
 }

@@ -471,7 +471,7 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
   );
 
   const renderDesktopTable = () => (
-    <Card className="overflow-hidden">
+    <Card className="overflow-hidden px-0">
       <div className="overflow-x-auto">
         <Table className="min-w-full">
           <TableHeader>
@@ -565,7 +565,7 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
   }
 
   return (
-    <ResponsiveContainer variant="page" className="h-full w-full flex flex-col overflow-hidden p-4 md:p-6">
+    <ResponsiveContainer variant="none" className="h-full w-full flex flex-col overflow-hidden">
       {isMobile ? (
         <>
           <MobileActionBar
@@ -676,7 +676,6 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
         <>
           <div className="flex items-center justify-between mb-6">
             <h1 className="text-2xl font-semibold text-gray-900">Fichajes</h1>
-            <span className="text-xs text-gray-400">debug marker 00:45</span>
             <div className="flex gap-2">
               <Button variant="outline" onClick={() => setJornadasModal(true)} className="border-gray-200">
                 <Clock className="w-4 h-4 mr-2" />

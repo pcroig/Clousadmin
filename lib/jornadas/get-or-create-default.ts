@@ -30,15 +30,14 @@ export async function getOrCreateDefaultJornada(
     return jornadaExistente;
   }
 
+  // NOTE: 'nombre' field has been removed from Jornada model
+  // NOTE: limiteInferior/Superior are now global in Empresa.config
   return client.jornada.create({
     data: {
       empresaId,
-      nombre: 'Jornada por Defecto',
       horasSemanales: 40,
       config: {
         tipo: 'flexible',
-        limiteInferior: '07:00',
-        limiteSuperior: '21:00',
         lunes: { activo: true },
         martes: { activo: true },
         miercoles: { activo: true },

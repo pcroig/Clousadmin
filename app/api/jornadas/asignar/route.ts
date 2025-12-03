@@ -22,7 +22,7 @@ interface EmpleadoConJornadaResumen {
   jornadaId: string | null;
   jornada: {
     id: string;
-    nombre: string;
+    // NOTE: 'nombre' field has been removed from Jornada model
   } | null;
 }
 
@@ -82,7 +82,7 @@ export async function POST(req: NextRequest) {
             jornada: {
               select: {
                 id: true,
-                nombre: true,
+                // NOTE: 'nombre' field removed from Jornada model
               },
             },
           },
@@ -154,7 +154,7 @@ export async function POST(req: NextRequest) {
             jornada: {
               select: {
                 id: true,
-                nombre: true,
+                // NOTE: 'nombre' field removed from Jornada model
               },
             },
           },

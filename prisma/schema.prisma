@@ -123,6 +123,18 @@ model Empresa {
   web       String? @db.VarChar(255) // Website URL
 
   // Configuration (JSONB for flexibility)
+  // config contains:
+  // - hora_cierre_fichaje_default: string (e.g., "18:00")
+  // - auto_completado_fichajes_dias: number
+  // - auto_completado_nominas_dias: number
+  // - auto_completado_contratos_dias: number
+  // - umbral_ia_nominas: number (0-1)
+  // - umbral_ia_contratos: number (0-1)
+  // - permitir_saldo_vacaciones_negativo: boolean
+  // - empleado_puede_ver_salario: boolean
+  // - diasLaborables: { lunes: boolean, martes: boolean, ... } (optional)
+  // - limiteInferiorFichaje: string (e.g., "07:00") - Global lower time limit for all jornadas
+  // - limiteSuperiorFichaje: string (e.g., "21:00") - Global upper time limit for all jornadas
   config Json @default("{\"hora_cierre_fichaje_default\":\"18:00\",\"auto_completado_fichajes_dias\":7,\"auto_completado_nominas_dias\":7,\"auto_completado_contratos_dias\":14,\"umbral_ia_nominas\":0.8,\"umbral_ia_contratos\":0.85,\"permitir_saldo_vacaciones_negativo\":true,\"empleado_puede_ver_salario\":false}")
 
   // Estado
@@ -490,16 +502,17 @@ model Integracion {
 // ========================================
 
 /// Jornada - Work schedule templates
-/// Defines expected work hours (e.g., "9-18h", "flexible")
+/// Defines expected work hours and working days (e.g., "40h flexible")
+/// Note: Time limits (limiteInferior/Superior) are now global per company in Empresa.config
 model Jornada {
   id             String  @id @default(uuid())
   empresaId      String
-  nombre         String  @db.VarChar(100) // e.g., "Jornada completa 40h"
   horasSemanales Decimal @db.Decimal(5, 2) // e.g., 40.00 hours
 
   // Schedule config (JSONB for flexibility)
   // Example fija: { "tipo": "fija", "lunes": { "activo": true, "entrada": "09:00", "salida": "18:00", "pausa_inicio": "14:00", "pausa_fin": "15:00" }, ... }
   // Example flexible: { "tipo": "flexible", "descansoMinimo": "00:30", "lunes": { "activo": true }, ... }
+  // NOTE: limiteInferior and limiteSuperior are NO LONGER stored here - they are global in Empresa.config
   config Json
 
   // Predefined by system (cannot be deleted)

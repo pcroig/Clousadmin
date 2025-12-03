@@ -96,7 +96,7 @@ export async function PATCH(
     }
 
     const dataToUpdate: Prisma.JornadaUpdateInput = {
-      nombre: validatedData.nombre,
+      // NOTE: 'nombre' field has been removed from Jornada model
       horasSemanales: validatedData.horasSemanales,
     };
 
