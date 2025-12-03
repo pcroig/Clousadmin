@@ -1065,11 +1065,10 @@ export async function crearNotificacionJornadaAsignada(
   params: {
     empresaId: string;
     empleadoId: string;
-    jornadaNombre: string;
   },
   options?: NotificacionEnvioOptions
 ) {
-  const { empresaId, empleadoId, jornadaNombre } = params;
+  const { empresaId, empleadoId } = params;
 
   const empleado = await prisma.empleados.findUnique({
     where: { id: empleadoId },
@@ -1093,9 +1092,8 @@ export async function crearNotificacionJornadaAsignada(
       empresaId,
       usuarioIds: empleadoUsuarioIds,
       tipo: 'jornada_asignada',
-      mensaje: `Se te ha asignado la jornada ${jornadaNombre}`,
+      mensaje: `Se te ha asignado una nueva jornada`,
       metadata: {
-        jornadaNombre,
         prioridad: 'normal',
       },
     }, options);
@@ -1111,11 +1109,10 @@ export async function crearNotificacionJornadaAsignada(
       empresaId,
       usuarioIds: hrUsuarioIds,
       tipo: 'jornada_asignada',
-      mensaje: `${nombreCompleto || 'El empleado'} ahora tiene asignada la jornada ${jornadaNombre}`,
+      mensaje: `${nombreCompleto || 'El empleado'} ahora tiene asignada una nueva jornada`,
       metadata: {
         empleadoId,
         empleadoNombre: nombreCompleto || undefined,
-        jornadaNombre,
         prioridad: 'baja',
       },
     }, options);
@@ -1132,11 +1129,10 @@ export async function crearNotificacionJornadaAsignada(
         empresaId,
         usuarioIds: managerUsuarioIds,
         tipo: 'jornada_asignada',
-        mensaje: `${nombreCompleto || 'Un miembro de tu equipo'} ahora tiene la jornada ${jornadaNombre}`,
+        mensaje: `${nombreCompleto || 'Un miembro de tu equipo'} ahora tiene una nueva jornada asignada`,
         metadata: {
           empleadoId,
           empleadoNombre: nombreCompleto || undefined,
-          jornadaNombre,
           prioridad: 'baja',
         },
       }, options);

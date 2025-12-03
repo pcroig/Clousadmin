@@ -394,22 +394,14 @@ export async function PATCH(
         empleadoData.jornadaId &&
         empleadoData.jornadaId !== empleadoActual.jornadaId
       ) {
-        const nuevaJornada = await prisma.jornadas.findUnique({
-          where: { id: empleadoData.jornadaId },
-          select: { nombre: true },
-        });
-
-        if (nuevaJornada) {
-          await crearNotificacionJornadaAsignada(
-            prisma,
-            {
-              empleadoId: id,
-              empresaId: session.user.empresaId,
-              jornadaNombre: nuevaJornada.nombre,
-            },
-            { actorUsuarioId: session.user.id }
-          );
-        }
+        await crearNotificacionJornadaAsignada(
+          prisma,
+          {
+            empleadoId: id,
+            empresaId: session.user.empresaId,
+          },
+          { actorUsuarioId: session.user.id }
+        );
       }
 
       // 3. Cambio de puesto

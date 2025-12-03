@@ -351,7 +351,6 @@ export async function configurarCalendarioYJornadaAction(
     const validatedData = calendarioJornadaOnboardingSchema.parse(input);
     const normalizedDias = validatedData.diasLaborables ?? DIAS_LABORABLES_DEFAULT;
     const normalizedJornada = {
-      nombre: validatedData.jornada.nombre?.trim() || DEFAULT_JORNADA_FORM_VALUES.nombre,
       tipo: validatedData.jornada.tipo,
       horasSemanales: validatedData.jornada.horasSemanales || DEFAULT_JORNADA_FORM_VALUES.horasSemanales,
       limiteInferior:
@@ -394,7 +393,6 @@ export async function configurarCalendarioYJornadaAction(
       });
 
       const dataJornada = {
-        nombre: normalizedJornada.nombre,
         horasSemanales: normalizedJornada.horasSemanales,
         config: asJsonValue(configJornada),
         esPredefinida: false,

@@ -25,12 +25,12 @@ vi.mock('@/lib/api-handler', async () => {
 
 vi.mock('@/lib/prisma', () => ({
   prisma: {
-    fichaje: {
+    fichajes: {
       findFirst: vi.fn(),
       findUnique: vi.fn(),
       update: vi.fn(),
     },
-    fichajeEvento: {
+    fichaje_eventos: {
       create: vi.fn(),
     },
   },

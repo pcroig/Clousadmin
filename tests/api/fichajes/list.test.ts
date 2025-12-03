@@ -26,11 +26,11 @@ vi.mock('@/lib/api-handler', async () => {
 
 vi.mock('@/lib/prisma', () => ({
   prisma: {
-    fichaje: {
+    fichajes: {
       findMany: vi.fn(),
       count: vi.fn(),
     },
-    empleado: {
+    empleados: {
       findMany: vi.fn(),
     },
   },

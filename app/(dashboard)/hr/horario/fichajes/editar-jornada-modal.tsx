@@ -251,15 +251,11 @@ export function EditarJornadaModal({ open, modo, jornada, onClose }: EditarJorna
 
   function validarFormulario(): boolean {
     const newErrors: Record<string, string> = {};
-    
-    if (!formData.nombre.trim()) {
-      newErrors.nombre = 'El nombre es obligatorio';
-    }
-    
+
     if (!formData.horasSemanales || parseFloat(formData.horasSemanales) <= 0) {
       newErrors.horasSemanales = 'Las horas semanales deben ser mayores a 0';
     }
-    
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   }
@@ -377,24 +373,19 @@ export function EditarJornadaModal({ open, modo, jornada, onClose }: EditarJorna
         }
       }
 
-      if (formData.limiteInferior) config.limiteInferior = formData.limiteInferior;
-      if (formData.limiteSuperior) config.limiteSuperior = formData.limiteSuperior;
       config.tipo = formData.tipoJornada;
 
       // Crear o actualizar jornada
-      const url = modo === 'crear' ? '/api/jornadas' : `/api/jornadas/${jornada?.id}`;                                                                          
+      const url = modo === 'crear' ? '/api/jornadas' : `/api/jornadas/${jornada?.id}`;
       const method = modo === 'crear' ? 'POST' : 'PATCH';
 
       const response = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          nombre: formData.nombre,
           tipo: formData.tipoJornada,
           horasSemanales: parseFloat(formData.horasSemanales),
           config,
-          limiteInferior: formData.limiteInferior || undefined,
-          limiteSuperior: formData.limiteSuperior || undefined,
         }),
       });
 
