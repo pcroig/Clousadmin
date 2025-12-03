@@ -353,14 +353,6 @@ export async function configurarCalendarioYJornadaAction(
     const normalizedJornada = {
       tipo: validatedData.jornada.tipo,
       horasSemanales: validatedData.jornada.horasSemanales || DEFAULT_JORNADA_FORM_VALUES.horasSemanales,
-      limiteInferior:
-        validatedData.jornada.tipo === 'flexible'
-          ? validatedData.jornada.limiteInferior || DEFAULT_JORNADA_FORM_VALUES.limiteInferior
-          : undefined,
-      limiteSuperior:
-        validatedData.jornada.tipo === 'flexible'
-          ? validatedData.jornada.limiteSuperior || DEFAULT_JORNADA_FORM_VALUES.limiteSuperior
-          : undefined,
       horaEntrada:
         validatedData.jornada.tipo === 'fija'
           ? validatedData.jornada.horaEntrada || DEFAULT_JORNADA_FORM_VALUES.horaEntrada
@@ -377,8 +369,6 @@ export async function configurarCalendarioYJornadaAction(
       const configJornada = buildJornadaConfig(normalizedJornada.tipo, normalizedDias, {
         horaEntrada: normalizedJornada.horaEntrada,
         horaSalida: normalizedJornada.horaSalida,
-        limiteInferior: normalizedJornada.limiteInferior,
-        limiteSuperior: normalizedJornada.limiteSuperior,
       });
 
       // Buscar la primera jornada activa de la empresa
