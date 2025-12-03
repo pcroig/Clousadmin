@@ -298,9 +298,10 @@ export function ImportarEmpleadosExcel({
         toast.success('Archivo procesado correctamente');
       }
 
+      // Auto-confirmar sin mostrar preview si está activo
       if (autoConfirmAfterAnalysis && previewPayload.resumen.validos > 0) {
-        setAnalizando(false);
         await handleConfirmarImportacion(previewPayload);
+        setAnalizando(false);
         return;
       }
     } catch (err) {
@@ -426,22 +427,7 @@ export function ImportarEmpleadosExcel({
         </Label>
       </div>
 
-      {/* Loader durante análisis */}
-      {analizando && (
-        <div className="space-y-4">
-          <div className="rounded-lg border-2 border-primary bg-primary/5 p-8 text-center">
-            <Spinner className="mx-auto size-12 text-primary" />
-            <p className="mt-4 text-lg font-medium text-primary">
-              Analizando archivo...
-            </p>
-            <p className="mt-2 text-sm text-gray-600">
-              La IA está procesando el Excel y detectando empleados, equipos y puestos.
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* Loader durante confirmación */}
+      {/* Loader durante confirmación (prioridad sobre análisis) */}
       {confirmando && (
         <div className="space-y-4">
           <div className="rounded-lg border-2 border-primary bg-primary/5 p-8 text-center">
@@ -451,6 +437,21 @@ export function ImportarEmpleadosExcel({
             </p>
             <p className="mt-2 text-sm text-gray-600">
               Estamos creando cuentas, asignando equipos y enviando invitaciones.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Loader durante análisis */}
+      {!confirmando && analizando && (
+        <div className="space-y-4">
+          <div className="rounded-lg border-2 border-primary bg-primary/5 p-8 text-center">
+            <Spinner className="mx-auto size-12 text-primary" />
+            <p className="mt-4 text-lg font-medium text-primary">
+              Analizando archivo...
+            </p>
+            <p className="mt-2 text-sm text-gray-600">
+              La IA está procesando el Excel y detectando empleados, equipos y puestos.
             </p>
           </div>
         </div>
