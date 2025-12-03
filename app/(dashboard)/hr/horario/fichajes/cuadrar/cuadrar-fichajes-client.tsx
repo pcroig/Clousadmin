@@ -26,7 +26,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { useIsMobile } from '@/lib/hooks/use-viewport';
-import { calcularRangoFechas } from '@/lib/utils/fechas';
+import { calcularRangoFechas, obtenerEtiquetaPeriodo } from '@/lib/utils/fechas';
 import { parseJson } from '@/lib/utils/json';
 
 interface EventoRevision {
@@ -124,16 +124,10 @@ export function CuadrarFichajesClient() {
     loadEquipos();
   }, []);
 
-  const periodLabel = useMemo(() => {
-    switch (rangoFechas) {
-      case 'dia':
-        return format(fechaBase, 'dd MMM', { locale: es });
-      case 'semana':
-        return `Sem ${format(fechaBase, 'w', { locale: es })}`;
-      default:
-        return format(fechaBase, 'MMM yyyy', { locale: es });
-    }
-  }, [fechaBase, rangoFechas]);
+  const periodLabel = useMemo(
+    () => obtenerEtiquetaPeriodo(fechaBase, rangoFechas),
+    [fechaBase, rangoFechas]
+  );
 
   const goToPreviousPeriod = useCallback(() => {
     const nuevaFecha = new Date(fechaBase);

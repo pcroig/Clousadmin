@@ -69,7 +69,7 @@ interface NavigationItem {
 export function Sidebar({ rol, usuario }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const [openMenus, setOpenMenus] = useState<string[]>(['Bandeja de entrada']);
+  const [openMenus, setOpenMenus] = useState<string[]>([]);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
   const [hasMounted, setHasMounted] = useState(false);
@@ -164,12 +164,8 @@ export function Sidebar({ rol, usuario }: SidebarProps) {
     },
     {
       name: 'Bandeja de entrada',
+      href: '/hr/bandeja-entrada',
       icon: Inbox,
-      children: [
-        { name: 'Solicitudes', href: '/hr/bandeja-entrada?tab=solicitudes' },
-        { name: 'Resueltas', href: '/hr/bandeja-entrada?tab=solved' },
-        { name: 'Notificaciones', href: '/hr/bandeja-entrada?tab=notificaciones' },
-      ],
     },
     {
       name: 'Fichaje',
@@ -221,12 +217,8 @@ export function Sidebar({ rol, usuario }: SidebarProps) {
     },
     {
       name: 'Bandeja de entrada',
+      href: '/manager/bandeja-entrada',
       icon: Inbox,
-      children: [
-        { name: 'Solicitudes', href: '/manager/bandeja-entrada?tab=solicitudes' },
-        { name: 'Resueltas', href: '/manager/bandeja-entrada?tab=solved' },
-        { name: 'Notificaciones', href: '/manager/bandeja-entrada?tab=notificaciones' },
-      ],
     },
     {
       name: 'Fichaje',

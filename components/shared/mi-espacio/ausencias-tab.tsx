@@ -526,32 +526,16 @@ export function AusenciasTab({
         isPast ? 'opacity-70' : ''
       }`}
     >
-      {/* Fechas con diseño de calendario pequeño */}
-      <div className="flex items-center gap-1 flex-shrink-0">
-        <div className="w-9 h-9 bg-white rounded-md shadow-sm border border-gray-200 overflow-hidden flex flex-col">
-          <div className="w-full h-1/4 flex items-center justify-center" style={{ backgroundColor: '#F4564D' }}>
-            <span className="text-[7px] font-semibold text-white leading-none">
-              {format(new Date(ausencia.fechaInicio), 'MMM', { locale: es }).toUpperCase()}
-            </span>
-          </div>
-          <div className="flex-1 flex items-center justify-center bg-white">
-            <span className="text-sm font-bold text-gray-900">{format(new Date(ausencia.fechaInicio), 'd')}</span>
-          </div>
-        </div>
-        {new Date(ausencia.fechaFin).toDateString() !== new Date(ausencia.fechaInicio).toDateString() && (
+      {/* Fechas con diseño de calendario */}
+      <div className="flex items-center gap-2 flex-shrink-0">
+        {new Date(ausencia.fechaFin).toDateString() !== new Date(ausencia.fechaInicio).toDateString() ? (
           <>
-            <ChevronRight className="h-3 w-3 text-gray-400" />
-            <div className="w-9 h-9 bg-white rounded-md shadow-sm border border-gray-200 overflow-hidden flex flex-col">
-              <div className="w-full h-1/4 flex items-center justify-center" style={{ backgroundColor: '#F4564D' }}>
-                <span className="text-[7px] font-semibold text-white leading-none">
-                  {format(new Date(ausencia.fechaFin), 'MMM', { locale: es }).toUpperCase()}
-                </span>
-              </div>
-              <div className="flex-1 flex items-center justify-center bg-white">
-                <span className="text-sm font-bold text-gray-900">{format(new Date(ausencia.fechaFin), 'd')}</span>
-              </div>
-            </div>
+            <FechaCalendar date={new Date(ausencia.fechaInicio)} />
+            <ChevronRight className="w-3 h-3 text-gray-400" />
+            <FechaCalendar date={new Date(ausencia.fechaFin)} />
           </>
+        ) : (
+          <FechaCalendar date={new Date(ausencia.fechaInicio)} />
         )}
       </div>
       
@@ -761,7 +745,7 @@ export function AusenciasTab({
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2">
               <CalendarIcon className="h-5 w-5 text-gray-600" />
-              <h3 className="text-sm font-semibold text-gray-900">Ausencias</h3>
+              <h3 className="text-sm font-semibold text-gray-900">Historial de ausencias</h3>
             </div>
             <div className="inline-flex rounded-full border border-gray-200 p-1 text-xs font-medium">
               <button
@@ -782,7 +766,7 @@ export function AusenciasTab({
                     : 'text-gray-600 hover:text-gray-900'
                 }`}
               >
-                Historial
+                Pasadas
               </button>
             </div>
           </div>

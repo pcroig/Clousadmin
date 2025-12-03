@@ -199,3 +199,4 @@ Todo funciona igual porque se re-exportan los tipos.
 ✅ **Arquitectura mejorada**  
 ✅ **Sin breaking changes**
 
+

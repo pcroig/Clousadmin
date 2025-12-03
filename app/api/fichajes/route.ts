@@ -25,6 +25,7 @@ import {
   validarFichajeCompleto,
   validarLimitesJornada,
 } from '@/lib/calculos/fichajes';
+import { normalizarFechaSinHora } from '@/lib/utils/fechas';
 import { EstadoFichaje, UsuarioRol } from '@/lib/constants/enums';
 import { prisma, Prisma } from '@/lib/prisma';
 import {
@@ -126,17 +127,17 @@ export async function GET(req: NextRequest) {
 
     // Filtrar por fecha
     if (fecha) {
-      // Crear fecha sin hora para evitar problemas de zona horaria
+      // FIX CRÍTICO: Usar normalizarFechaSinHora para evitar problemas de zona horaria
       const fechaParsed = new Date(fecha);
-      const fechaSoloFecha = new Date(fechaParsed.getFullYear(), fechaParsed.getMonth(), fechaParsed.getDate());
-      where.fecha = fechaSoloFecha;
+      where.fecha = normalizarFechaSinHora(fechaParsed);
     } else if (fechaInicio && fechaFin) {
       // Filtrar por rango
       const inicio = new Date(fechaInicio);
       const fin = new Date(fechaFin);
+      // FIX CRÍTICO: Usar normalizarFechaSinHora para evitar desfases de zona horaria
       where.fecha = {
-        gte: new Date(inicio.getFullYear(), inicio.getMonth(), inicio.getDate()),
-        lte: new Date(fin.getFullYear(), fin.getMonth(), fin.getDate()),
+        gte: normalizarFechaSinHora(inicio),
+        lte: normalizarFechaSinHora(fin),
       };
     }
 
@@ -250,7 +251,8 @@ export async function GET(req: NextRequest) {
           : null,
       };
 
-      const fechaBase = new Date(fichaje.fecha.getFullYear(), fichaje.fecha.getMonth(), fichaje.fecha.getDate());
+      // FIX CRÍTICO: Usar normalizarFechaSinHora
+      const fechaBase = normalizarFechaSinHora(fichaje.fecha);
       const key = `${fichaje.empleadoId}_${fechaBase.toISOString().split('T')[0]}`;
 
       const horasEsperadas = horasEsperadasMap[key] ?? 0;
@@ -339,8 +341,9 @@ export async function POST(req: NextRequest) {
     }
 
     // 4. Determinar fecha y hora
+    // FIX CRÍTICO: Usar normalizarFechaSinHora para evitar desfases
     const fechaBase = validatedData.fecha ? new Date(validatedData.fecha) : new Date();
-    const fecha = new Date(fechaBase.getFullYear(), fechaBase.getMonth(), fechaBase.getDate());
+    const fecha = normalizarFechaSinHora(fechaBase);
     const hora = validatedData.hora ? new Date(validatedData.hora) : new Date();
 
     // Validar que el empleado tiene jornada asignada

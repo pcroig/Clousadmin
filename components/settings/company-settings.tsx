@@ -4,13 +4,16 @@
 
 'use client';
 
-import { Building2, Mail, MapPin, Phone, ShieldAlert, Users } from 'lucide-react';
-import { useMemo } from 'react';
+import { Building2, Mail, MapPin, Phone, Plus, ShieldAlert, Trash2, Users } from 'lucide-react';
+import { useEffect, useMemo, useState, useTransition } from 'react';
+import { toast } from 'sonner';
 
+import { crearSedeAction, eliminarSedeAction } from '@/app/(auth)/signup/actions';
 import { InvitarHRAdmins } from '@/components/onboarding/invitar-hr-admins';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 
 interface HRAdmin {
   id: string;
@@ -54,6 +57,23 @@ const formatDate = (value?: Date | string | null) => {
 };
 
 export function CompanySettings({ empresa, hrAdmins, sedes }: CompanySettingsProps) {
+  const [sedesState, setSedesState] = useState(sedes);
+  const [nuevoNombreCiudad, setNuevoNombreCiudad] = useState('');
+  const [formError, setFormError] = useState('');
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [isAdding, startAddTransition] = useTransition();
+
+  useEffect(() => {
+    setSedesState(sedes);
+  }, [sedes]);
+
+  const normalizarSede = (sede: Sede | { id: string; nombre: string; ciudad: string; activo?: boolean }): Sede => ({
+    id: sede.id,
+    nombre: sede.nombre,
+    ciudad: sede.ciudad,
+    activo: 'activo' in sede ? Boolean(sede.activo) : true,
+  });
+
   const adminsOrdenados = useMemo(() => {
     return hrAdmins.sort((a, b) => {
       if (a.activo === b.activo) {
@@ -64,8 +84,58 @@ export function CompanySettings({ empresa, hrAdmins, sedes }: CompanySettingsPro
   }, [hrAdmins]);
 
   const sedesOrdenadas = useMemo(() => {
-    return sedes.sort((a, b) => a.nombre.localeCompare(b.nombre));
-  }, [sedes]);
+    return [...sedesState].sort((a, b) => a.nombre.localeCompare(b.nombre));
+  }, [sedesState]);
+
+  const handleAgregarSede = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const ciudad = nuevoNombreCiudad.trim();
+
+    if (!ciudad) {
+      setFormError('Introduce una ciudad o nombre identificativo');
+      return;
+    }
+
+    setFormError('');
+
+    startAddTransition(async () => {
+      try {
+        const result = await crearSedeAction({ ciudad });
+        if (result.success && result.sede) {
+          setSedesState((prev) => [...prev, normalizarSede(result.sede as Sede)]);
+          setNuevoNombreCiudad('');
+          toast.success('Sede añadida correctamente');
+        } else {
+          toast.error(result.error || 'No se pudo crear la sede');
+        }
+      } catch (error) {
+        console.error('[CompanySettings] Error creando sede', error);
+        toast.error('Error al crear la sede');
+      }
+    });
+  };
+
+  const handleEliminarSede = async (sedeId: string) => {
+    if (!confirm('¿Seguro que quieres eliminar esta sede?')) {
+      return;
+    }
+
+    setDeletingId(sedeId);
+    try {
+      const result = await eliminarSedeAction(sedeId);
+      if (result.success) {
+        setSedesState((prev) => prev.filter((sede) => sede.id !== sedeId));
+        toast.success('Sede eliminada');
+      } else {
+        toast.error(result.error || 'No se pudo eliminar la sede');
+      }
+    } catch (error) {
+      console.error('[CompanySettings] Error eliminando sede', error);
+      toast.error('Error al eliminar la sede');
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   return (
     <div className="space-y-8">
@@ -142,10 +212,24 @@ export function CompanySettings({ empresa, hrAdmins, sedes }: CompanySettingsPro
             <CardDescription>Ubicaciones físicas de tu empresa.</CardDescription>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
+          <form onSubmit={handleAgregarSede} className="flex flex-col gap-3 sm:flex-row">
+            <Input
+              value={nuevoNombreCiudad}
+              onChange={(event) => setNuevoNombreCiudad(event.target.value)}
+              placeholder="Ej. Barcelona, Madrid Centro..."
+              aria-label="Nombre de la nueva sede"
+            />
+            <Button type="submit" disabled={isAdding} className="sm:w-auto">
+              <Plus className="mr-2 h-4 w-4" />
+              {isAdding ? 'Añadiendo...' : 'Añadir sede'}
+            </Button>
+          </form>
+          {formError && <p className="text-xs text-red-600">{formError}</p>}
+
           {sedesOrdenadas.length === 0 ? (
             <div className="rounded-lg border border-dashed p-6 text-center text-sm text-gray-500">
-              No hay sedes registradas. Contacta con soporte para añadir sedes.
+              Todavía no hay sedes registradas. Añade la primera usando el formulario.
             </div>
           ) : (
             <div className="grid gap-3 sm:grid-cols-2">
@@ -161,6 +245,17 @@ export function CompanySettings({ empresa, hrAdmins, sedes }: CompanySettingsPro
                     </p>
                     <p className="text-xs text-gray-500">{sede.ciudad}</p>
                   </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => handleEliminarSede(sede.id)}
+                    disabled={deletingId === sede.id}
+                    className="text-gray-500 hover:text-red-600"
+                    aria-label={`Eliminar la sede ${sede.nombre}`}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
                 </div>
               ))}
             </div>

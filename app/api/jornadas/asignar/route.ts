@@ -3,7 +3,6 @@
 // ========================================
 
 import { NextRequest } from 'next/server';
-import { z } from 'zod';
 
 import {
   badRequestResponse,
@@ -14,6 +13,8 @@ import {
   validateRequest,
 } from '@/lib/api-handler';
 import { prisma } from '@/lib/prisma';
+import { idSchema } from '@/lib/validaciones/schemas';
+import { z } from 'zod';
 
 interface EmpleadoConJornadaResumen {
   id: string;
@@ -27,10 +28,10 @@ interface EmpleadoConJornadaResumen {
 }
 
 const asignacionSchema = z.object({
-  jornadaId: z.string().uuid(),
+  jornadaId: idSchema,
   nivel: z.enum(['empresa', 'equipo', 'individual']),
-  equipoIds: z.array(z.string().uuid()).optional(),
-  empleadoIds: z.array(z.string().uuid()).optional(),
+  equipoIds: z.array(idSchema).optional(),
+  empleadoIds: z.array(idSchema).optional(),
 });
 
 // POST /api/jornadas/asignar - Asignar jornada masivamente (solo HR Admin)

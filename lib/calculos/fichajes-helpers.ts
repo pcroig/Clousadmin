@@ -5,7 +5,7 @@
 
 import { jornadas as Jornada } from '@prisma/client';
 
-import { obtenerNombreDia } from '@/lib/utils/fechas';
+import { obtenerNombreDia, normalizarFechaSinHora } from '@/lib/utils/fechas';
 
 export type JornadaConfig = {
   tipo?: 'fija' | 'flexible';
@@ -164,8 +164,10 @@ export function obtenerConfigDia(jornada: Jornada, fecha: Date): DiaConfig | und
 
 /**
  * Calcula la fecha base (sin hora) de una fecha
+ * @deprecated Usar normalizarFechaSinHora de @/lib/utils/fechas
  */
 export function obtenerFechaBase(fecha: Date): Date {
-  return new Date(fecha.getFullYear(), fecha.getMonth(), fecha.getDate());
+  // FIX CRÍTICO: Usar función correcta que respeta zona horaria Madrid con import estático
+  return normalizarFechaSinHora(fecha);
 }
 

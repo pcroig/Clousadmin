@@ -40,7 +40,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { EstadoAusencia } from '@/lib/constants/enums';
 import { useIsMobile } from '@/lib/hooks/use-viewport';
 import { extractArrayFromResponse } from '@/lib/utils/api-response';
-import { calcularRangoFechas } from '@/lib/utils/fechas';
+import { calcularRangoFechas, obtenerEtiquetaPeriodo } from '@/lib/utils/fechas';
 import { getAusenciaEstadoLabel } from '@/lib/utils/formatters';
 import { parseJson } from '@/lib/utils/json';
 
@@ -203,16 +203,10 @@ export function AusenciasClient({}: AusenciasClientProps) {
     setFechaBase(nuevaFecha);
   }, [fechaBase, rangoFechas]);
 
-  const periodLabel = useMemo(() => {
-    switch (rangoFechas) {
-      case 'dia':
-        return format(fechaBase, 'dd MMM', { locale: es });
-      case 'semana':
-        return `Sem ${format(fechaBase, 'w', { locale: es })}`;
-      default:
-        return format(fechaBase, 'MMM yyyy', { locale: es });
-    }
-  }, [fechaBase, rangoFechas]);
+  const periodLabel = useMemo(
+    () => obtenerEtiquetaPeriodo(fechaBase, rangoFechas),
+    [fechaBase, rangoFechas]
+  );
 
   const fetchAusencias = useCallback(async () => {
     setLoading(true);

@@ -252,3 +252,4 @@ tipo: doc.tipo || (
 - El campo `documentoId` solo se usa para tipo "visualizar"
 - Los IDs de documentos seleccionados se convierten a objetos `DocumentoRequerido` al guardar
 
+

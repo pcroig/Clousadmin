@@ -4,7 +4,7 @@
 
 import { EstadoAusencia, TipoFichajeEvento } from '@/lib/constants/enums';
 import { prisma } from '@/lib/prisma';
-import { obtenerNombreDia } from '@/lib/utils/fechas';
+import { obtenerNombreDia, normalizarFechaSinHora } from '@/lib/utils/fechas';
 
 import { obtenerEmpleadosDisponibles } from './fichajes';
 
@@ -35,7 +35,8 @@ export interface PlantillaResumen {
 }
 
 function normalizarFecha(fecha: Date): Date {
-  return new Date(fecha.getFullYear(), fecha.getMonth(), fecha.getDate());
+  // FIX CRÍTICO: Usar normalizarFechaSinHora correcta con import estático
+  return normalizarFechaSinHora(fecha);
 }
 
 type EmpleadoMapInput = {

@@ -2,7 +2,24 @@
 
 **Fecha**: 2 de diciembre de 2025  
 **Tipo**: Bug Fixes y Mejoras  
-**Estado**: ✅ COMPLETADO
+**Estado**: ⚠️ PARCIALMENTE REVERTIDO (ver corrección del 3 de diciembre de 2025)
+
+---
+
+## ⚠️ NOTA IMPORTANTE - CORRECCIÓN POSTERIOR
+
+**Fecha de corrección**: 3 de diciembre de 2025
+
+El **Problema 1** descrito en este documento contenía una **premisa incorrecta**: 
+- ❌ **INCORRECTO**: "Fichajes del día actual no aparecían en cuadrar"
+- ✅ **CORRECTO**: El cuadrar fichajes es **SOLO para días vencidos** (ya finalizados)
+
+**Solución correcta aplicada el 3 de diciembre**:
+- Revertido `offset = 0` → `offset = 1` (excluir HOY)
+- Revertido `lte: hoy` → `lt: hoy` (excluir HOY)
+- Los fichajes del día actual NO deben aparecer hasta después del CRON nocturno (23:30)
+
+**Los problemas 2 y 3 de este documento siguen siendo válidos y las soluciones correctas.**
 
 ---
 
@@ -10,7 +27,7 @@
 
 Se han corregido **3 problemas críticos** que afectaban la funcionalidad de cuadraje de fichajes y la visualización de datos en tiempo real:
 
-1. ✅ Fichajes del día actual no aparecían en cuadrar
+1. ⚠️ ~~Fichajes del día actual no aparecían en cuadrar~~ (PREMISA INCORRECTA - REVERTIDO)
 2. ✅ La tabla de fichajes no se actualizaba en tiempo real
 3. ✅ Horas/Balance no reflejaban valores reales al aprobar/rechazar
 

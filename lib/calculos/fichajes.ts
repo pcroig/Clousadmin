@@ -20,7 +20,7 @@ import {
 import { EstadoAusencia } from '@/lib/constants/enums';
 import { crearNotificacionFichajeRequiereRevision } from '@/lib/notificaciones';
 import { prisma } from '@/lib/prisma';
-import { obtenerNombreDia } from '@/lib/utils/fechas';
+import { normalizarFechaSinHora, obtenerNombreDia } from '@/lib/utils/fechas';
 import { redondearHoras } from '@/lib/utils/numeros';
 
 import type { DiaConfig, JornadaConfig } from './fichajes-helpers';
@@ -38,10 +38,9 @@ export type FichajeConEventos = Fichaje & {
   eventos: FichajeEvento[];
 };
 
+// FIX: Usar la función de utilidad consistente para normalizar fechas
 function normalizarFecha(fecha: Date): Date {
-  const fechaNormalizada = new Date(fecha);
-  fechaNormalizada.setHours(0, 0, 0, 0);
-  return fechaNormalizada;
+  return normalizarFechaSinHora(fecha);
 }
 
 type EmpleadoConJornadaMinimal = Pick<Empleado, 'id' | 'empresaId'> & {
@@ -166,8 +165,8 @@ function evaluarDisponibilidadEmpleado(
  * Estado derivado de los eventos del fichaje del día
  */
 export async function obtenerEstadoFichaje(empleadoId: string): Promise<EstadoFichaje> {
-  const hoy = new Date();
-  const fechaHoy = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
+  // FIX CRÍTICO: Usar normalizarFechaSinHora en lugar de constructor directo
+  const fechaHoy = normalizarFechaSinHora(new Date());
 
   // Buscar el fichaje del día (único por empleado + fecha)
   const fichajeHoy = await prisma.fichajes.findUnique({
@@ -530,7 +529,8 @@ export async function obtenerFichaje(
   empleadoId: string,
   fecha: Date
 ): Promise<FichajeConEventos | null> {
-  const fechaSinHora = new Date(fecha.getFullYear(), fecha.getMonth(), fecha.getDate());
+  // FIX: Usar normalizarFechaSinHora para consistencia
+  const fechaSinHora = normalizarFechaSinHora(fecha);
   
   return prisma.fichajes.findUnique({
     where: {
@@ -612,7 +612,8 @@ export function calcularHorasEsperadasDesdeConfig(
   fecha: Date,
   horasSemanales?: number | string | null
 ): number {
-  const fechaBase = new Date(fecha.getFullYear(), fecha.getMonth(), fecha.getDate());
+  // FIX CRÍTICO: Usar normalizarFechaSinHora en lugar de constructor directo
+  const fechaBase = normalizarFechaSinHora(fecha);
   const nombreDia = obtenerNombreDia(fechaBase);
   const diaConfig = config[nombreDia] as DiaConfig | undefined;
 
@@ -723,7 +724,8 @@ export async function obtenerHorasEsperadasBatch(
   const resultado: Record<string, number> = {};
 
   for (const entrada of entradas) {
-    const fechaBase = new Date(entrada.fecha.getFullYear(), entrada.fecha.getMonth(), entrada.fecha.getDate());
+    // FIX CRÍTICO: Usar normalizarFechaSinHora en lugar de constructor directo
+    const fechaBase = normalizarFechaSinHora(entrada.fecha);
     const key = `${entrada.empleadoId}_${fechaBase.toISOString().split('T')[0]}`;
 
     if (resultado[key] !== undefined) {
@@ -978,7 +980,8 @@ export async function crearFichajesAutomaticos(
   empresaId: string,
   fecha: Date
 ): Promise<{ creados: number; errores: string[] }> {
-  const fechaSinHora = new Date(fecha.getFullYear(), fecha.getMonth(), fecha.getDate());
+  // FIX CRÍTICO: Usar normalizarFechaSinHora en lugar de constructor directo
+  const fechaSinHora = normalizarFechaSinHora(fecha);
   const errores: string[] = [];
   let creados = 0;
 
@@ -1166,7 +1169,8 @@ export async function obtenerAusenciaMedioDia(
   empleadoId: string,
   fecha: Date
 ): Promise<AusenciaMedioDia> {
-  const fechaSinHora = new Date(fecha.getFullYear(), fecha.getMonth(), fecha.getDate());
+  // FIX: Usar normalizarFechaSinHora para consistencia
+  const fechaSinHora = normalizarFechaSinHora(fecha);
   
   const ausencia = await prisma.ausencias.findFirst({
     where: {

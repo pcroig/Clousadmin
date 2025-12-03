@@ -13,6 +13,7 @@ import {
 import { calcularAntiguedad, obtenerRangoFechaAntiguedad } from '@/lib/calculos/antiguedad';
 import { EstadoFichaje } from '@/lib/constants/enums';
 import { prisma } from '@/lib/prisma';
+import { obtenerInicioMesActual, obtenerFinMesActual } from '@/lib/utils/fechas';
 
 import type { Prisma } from '@prisma/client';
 
@@ -183,9 +184,9 @@ export async function GET(request: NextRequest) {
     // ====================================
     const empleadoIds = empleados.map((e) => e.id);
 
-    const hoy = new Date();
-    const inicioMesActual = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
-    const finMesActual = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0);
+    // FIX: Usar helpers que respetan zona horaria Madrid
+    const inicioMesActual = obtenerInicioMesActual();
+    const finMesActual = obtenerFinMesActual();
 
     const fichajesMes = await prisma.fichajes.findMany({
       where: {

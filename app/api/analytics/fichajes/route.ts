@@ -14,6 +14,13 @@ import {
 import { obtenerRangoFechaAntiguedad } from '@/lib/calculos/antiguedad';
 import { EstadoAusencia, EstadoFichaje } from '@/lib/constants/enums';
 import { prisma } from '@/lib/prisma';
+import { 
+  obtenerRangoMes, 
+  obtenerInicioMesActual, 
+  obtenerFinMesActual,
+  calcularDiasLaborablesMes,
+  toMadridDate
+} from '@/lib/utils/fechas';
 
 import type { Prisma } from '@prisma/client';
 
@@ -26,19 +33,7 @@ const clampDateRange = (inicio: Date, fin: Date, rangoInicio: Date, rangoFin: Da
   return end >= start ? { start, end } : { start, end: start };
 };
 
-// Función para calcular días laborables en un mes
-function calcularDiasLaborables(year: number, month: number): number {
-  let count = 0;
-  const fecha = new Date(year, month, 1);
-  while (fecha.getMonth() === month) {
-    const dayOfWeek = fecha.getDay();
-    if (dayOfWeek !== 0 && dayOfWeek !== 6) {
-      count++;
-    }
-    fecha.setDate(fecha.getDate() + 1);
-  }
-  return count;
-}
+// ELIMINADO: Función calcularDiasLaborables reemplazada por helper centralizado
 
 // GET /api/analytics/fichajes - Obtener métricas de fichajes (solo HR Admin)
 export async function GET(request: NextRequest) {
@@ -96,9 +91,10 @@ export async function GET(request: NextRequest) {
     const empleadoIds = empleados.map((empleado) => empleado.id);
 
     // Obtener mes actual
-    const hoy = new Date();
-    const inicioMesActual = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
-    const finMesActual = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0);
+    // FIX: Usar helpers que respetan zona horaria Madrid
+    const hoy = toMadridDate(new Date());
+    const inicioMesActual = obtenerInicioMesActual();
+    const finMesActual = obtenerFinMesActual();
 
     // 1. Total horas trabajadas mes actual
     const fichajesMesActual = await prisma.fichajes.findMany({
@@ -122,8 +118,8 @@ export async function GET(request: NextRequest) {
     }, 0);
 
     // 2. Cambio respecto mes anterior
-    const inicioMesAnterior = new Date(hoy.getFullYear(), hoy.getMonth() - 1, 1);
-    const finMesAnterior = new Date(hoy.getFullYear(), hoy.getMonth(), 0);
+    // FIX: Usar helper que respeta zona horaria Madrid
+    const { inicio: inicioMesAnterior, fin: finMesAnterior } = obtenerRangoMes(1);
 
     const fichajesMesAnterior = await prisma.fichajes.findMany({
       where: {
@@ -147,9 +143,10 @@ export async function GET(request: NextRequest) {
     const cambioHoras = totalHorasMes - totalHorasMesAnterior;
 
     // 3. Promedio horas/día
-    const diasLaborables = calcularDiasLaborables(
-      hoy.getFullYear(),
-      hoy.getMonth()
+    // FIX: Usar helper centralizado que respeta zona horaria
+    const diasLaborables = calcularDiasLaborablesMes(
+      hoy.getUTCFullYear(),
+      hoy.getUTCMonth()
     );
     const promedioHorasDia =
       empleados.length > 0 && diasLaborables > 0

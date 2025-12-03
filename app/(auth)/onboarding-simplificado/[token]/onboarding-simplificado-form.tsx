@@ -23,6 +23,7 @@ interface OnboardingSimplificadoFormProps {
   empleado: OnboardingEmpleado & { empresaId?: string };
   progreso: ProgresoOnboardingSimplificado;
   datosTemporales: DatosTemporales | null;
+  empresaNombre?: string;
 }
 
 export function OnboardingSimplificadoForm({
@@ -30,6 +31,7 @@ export function OnboardingSimplificadoForm({
   empleado,
   progreso,
   datosTemporales: _datosTemporales,
+  empresaNombre,
 }: OnboardingSimplificadoFormProps) {
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState(() => {
@@ -41,6 +43,9 @@ export function OnboardingSimplificadoForm({
   });
 
   const [isCompleting, setIsCompleting] = useState(false);
+  const nombreBase = (empleado.nombre ?? empleado.apellidos ?? 'equipo').trim();
+  const saludoNombre = (nombreBase ? nombreBase.split(' ')[0] : 'equipo') || 'equipo';
+  const nombreEmpresa = (empresaNombre ?? 'Clousadmin').trim() || 'Clousadmin';
 
   const steps = [
     {
@@ -111,9 +116,11 @@ export function OnboardingSimplificadoForm({
   return (
     <div className="space-y-6">
       <div className="space-y-2">
-        <h1 className="text-2xl font-bold">Onboarding Simplificado</h1>
+        <h1 className="text-2xl font-bold">
+          Hola {saludoNombre}, bienvenido a {nombreEmpresa}
+        </h1>
         <p className="text-gray-500">
-          Completa los pasos para activar tu cuenta de empleado.
+          Completa estos pasos para activar tu cuenta en {nombreEmpresa}.
         </p>
       </div>
 

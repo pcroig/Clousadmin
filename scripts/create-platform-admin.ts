@@ -66,7 +66,7 @@ async function resolveEmpresa() {
     process.env.PLATFORM_ADMIN_EMPRESA_ID;
 
   if (empresaIdArg) {
-    const empresa = await prisma.empresass.findUnique({
+    const empresa = await prisma.empresas.findUnique({
       where: { id: empresaIdArg },
     });
 
@@ -79,7 +79,7 @@ async function resolveEmpresa() {
     return empresa;
   }
 
-  const empresas = await prisma.empresass.findMany({
+  const empresas = await prisma.empresas.findMany({
     orderBy: { createdAt: 'asc' },
     take: 2,
   });
@@ -88,7 +88,7 @@ async function resolveEmpresa() {
     return empresas[0];
   }
 
-  const existingPlatformEmpresa = await prisma.empresass.findFirst({
+  const existingPlatformEmpresa = await prisma.empresas.findFirst({
     where: {
       OR: [
         { nombre: 'Clousadmin Platform' },
@@ -101,7 +101,7 @@ async function resolveEmpresa() {
     return existingPlatformEmpresa;
   }
 
-  return prisma.empresass.create({
+  return prisma.empresas.create({
     data: {
       id: randomUUID(),
       nombre: 'Clousadmin Platform',
@@ -139,7 +139,7 @@ async function main() {
   }
 
   const normalizedEmail = email.toLowerCase();
-  const existingUser = await prisma.usuarioss.findUnique({
+  const existingUser = await prisma.usuarios.findUnique({
     where: { email: normalizedEmail },
   });
 
@@ -161,7 +161,7 @@ async function main() {
   const hashedPassword = password ? await hash(password, 12) : undefined;
 
   if (!existingUser) {
-    const created = await prisma.usuarioss.create({
+    const created = await prisma.usuarios.create({
       data: {
         id: randomUUID(),
         email: normalizedEmail,
@@ -205,7 +205,7 @@ async function main() {
     updateData.empresaId = empresa.id;
   }
 
-  const updated = await prisma.usuarioss.update({
+  const updated = await prisma.usuarios.update({
     where: { id: existingUser.id },
     data: updateData,
   });

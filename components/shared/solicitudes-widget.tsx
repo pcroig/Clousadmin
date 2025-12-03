@@ -194,7 +194,7 @@ export const SolicitudesWidget = memo(function SolicitudesWidget({
     >
       <div className="flex h-full flex-col">
         {solicitudesMostradas.length === 0 ? (
-          <div className="flex flex-1 items-center justify-center min-h-[200px]">
+          <div className="flex flex-1 items-center justify-center">
             <EmptyState
               layout="widget"
               icon={ClipboardList}
@@ -203,94 +203,96 @@ export const SolicitudesWidget = memo(function SolicitudesWidget({
             />
           </div>
         ) : (
-          <div className="space-y-0">
-            {solicitudesMostradas.map((solicitud) => {
-              const estaProcesando = accionEnCurso?.id === solicitud.id;
-              const hoverCardProps = {
-                empleado: {
-                  nombre: solicitud.empleado.nombre,
-                  apellidos: solicitud.empleado.apellidos,
-                  puesto: solicitud.empleado.puesto,
-                  email: solicitud.empleado.email,
-                  equipo: solicitud.empleado.equipo,
-                  equipoNombre: solicitud.empleado.equipoNombre,
-                  fotoUrl: solicitud.empleado.fotoUrl ?? solicitud.empleado.avatar,
-                },
-                estado: solicitud.estadoLabel
-                  ? {
-                      label: solicitud.estadoLabel,
-                      description: solicitud.descripcion,
-                    }
-                  : undefined,
-              } as const;
+          <>
+            <div className="space-y-0">
+              {solicitudesMostradas.map((solicitud) => {
+                const estaProcesando = accionEnCurso?.id === solicitud.id;
+                const hoverCardProps = {
+                  empleado: {
+                    nombre: solicitud.empleado.nombre,
+                    apellidos: solicitud.empleado.apellidos,
+                    puesto: solicitud.empleado.puesto,
+                    email: solicitud.empleado.email,
+                    equipo: solicitud.empleado.equipo,
+                    equipoNombre: solicitud.empleado.equipoNombre,
+                    fotoUrl: solicitud.empleado.fotoUrl ?? solicitud.empleado.avatar,
+                  },
+                  estado: solicitud.estadoLabel
+                    ? {
+                        label: solicitud.estadoLabel,
+                        description: solicitud.descripcion,
+                      }
+                    : undefined,
+                } as const;
 
-            return (
-              <div
-                key={solicitud.id}
-                onClick={() => router.push(dashboardHref)}
-                className="py-3 border-b border-gray-200 last:border-0 hover:bg-gray-50 transition-colors px-2 -mx-2 cursor-pointer"
-              >
-                <div className="flex items-start gap-3">
-                  <EmpleadoHoverCard {...hoverCardProps} triggerClassName="flex-shrink-0">
-                    <EmployeeAvatar
-                      nombre={solicitud.empleado.nombre}
-                      apellidos={solicitud.empleado.apellidos}
-                      fotoUrl={solicitud.empleado.fotoUrl}
-                      size="sm"
-                    />
-                  </EmpleadoHoverCard>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between gap-2 mb-1">
-                      <p className="text-[13px] text-gray-900 leading-tight">
-                        <EmpleadoHoverCard
-                          {...hoverCardProps}
-                          triggerClassName="font-semibold text-gray-900"
-                        >
-                          <span className="font-semibold">{solicitud.empleado.nombre} {solicitud.empleado.apellidos || ''}</span>
-                        </EmpleadoHoverCard>
-                        {' solicita '}
-                        <span className="font-normal text-gray-600">
-                          {solicitud.descripcion.toLowerCase()}
-                        </span>
-                      </p>
-                      <div className="flex flex-shrink-0" onClick={(e) => e.stopPropagation()}>
-                        <button
-                          onClick={() => handleAprobar(solicitud.id)}
-                          className="w-7 h-7 rounded-full flex items-center justify-center transition-colors group disabled:opacity-50 disabled:pointer-events-none"
-                          title="Aprobar"
-                          aria-disabled={estaProcesando}
-                          disabled={estaProcesando}
-                        >
-                          <CheckCircle className="w-4 h-4 text-gray-600 group-hover:text-success transition-colors" />
-                        </button>
-                        <button
-                          onClick={() => handleRechazar(solicitud.id)}
-                          className="w-7 h-7 rounded-full flex items-center justify-center transition-colors group disabled:opacity-50 disabled:pointer-events-none"
-                          title="Rechazar"
-                          aria-disabled={estaProcesando}
-                          disabled={estaProcesando}
-                        >
-                          <XCircle className="w-4 h-4 text-gray-600 group-hover:text-error transition-colors" />
-                        </button>
+                return (
+                  <div
+                    key={solicitud.id}
+                    onClick={() => router.push(dashboardHref)}
+                    className="py-3 border-b border-gray-200 last:border-0 hover:bg-gray-50 transition-colors px-2 -mx-2 cursor-pointer"
+                  >
+                    <div className="flex items-start gap-3">
+                      <EmpleadoHoverCard {...hoverCardProps} triggerClassName="flex-shrink-0">
+                        <EmployeeAvatar
+                          nombre={solicitud.empleado.nombre}
+                          apellidos={solicitud.empleado.apellidos}
+                          fotoUrl={solicitud.empleado.fotoUrl}
+                          size="sm"
+                        />
+                      </EmpleadoHoverCard>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between gap-2 mb-1">
+                          <p className="text-[13px] text-gray-900 leading-tight">
+                            <EmpleadoHoverCard
+                              {...hoverCardProps}
+                              triggerClassName="font-semibold text-gray-900"
+                            >
+                              <span className="font-semibold">{solicitud.empleado.nombre} {solicitud.empleado.apellidos || ''}</span>
+                            </EmpleadoHoverCard>
+                            {' solicita '}
+                            <span className="font-normal text-gray-600">
+                              {solicitud.descripcion.toLowerCase()}
+                            </span>
+                          </p>
+                          <div className="flex flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+                            <button
+                              onClick={() => handleAprobar(solicitud.id)}
+                              className="w-7 h-7 rounded-full flex items-center justify-center transition-colors group disabled:opacity-50 disabled:pointer-events-none"
+                              title="Aprobar"
+                              aria-disabled={estaProcesando}
+                              disabled={estaProcesando}
+                            >
+                              <CheckCircle className="w-4 h-4 text-gray-600 group-hover:text-success transition-colors" />
+                            </button>
+                            <button
+                              onClick={() => handleRechazar(solicitud.id)}
+                              className="w-7 h-7 rounded-full flex items-center justify-center transition-colors group disabled:opacity-50 disabled:pointer-events-none"
+                              title="Rechazar"
+                              aria-disabled={estaProcesando}
+                              disabled={estaProcesando}
+                            >
+                              <XCircle className="w-4 h-4 text-gray-600 group-hover:text-error transition-colors" />
+                            </button>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
+                );
+              })}
+            </div>
+            {solicitudes.length > maxItems && (
+              <div className="mt-3 pt-3 border-t border-gray-200">
+                <Link href={dashboardHref} className="block text-center">
+                  <span className="text-[13px] text-primary hover:text-primary/80 font-medium">
+                    Ver todas ({solicitudes.length})
+                  </span>
+                </Link>
               </div>
-            );
-          })}
-        </div>
+            )}
+          </>
         )}
       </div>
-      {solicitudes.length > maxItems && (
-        <div className="mt-3 pt-3 border-t border-gray-200">
-          <Link href={dashboardHref} className="block text-center">
-            <span className="text-[13px] text-primary hover:text-primary/80 font-medium">
-              Ver todas ({solicitudes.length})
-            </span>
-          </Link>
-        </div>
-      )}
     </WidgetCard>
   );
 });

@@ -6,7 +6,7 @@
 
 import type { fichaje_eventos as FichajeEvento } from '@prisma/client';
 
-import { obtenerNombreDia } from '@/lib/utils/fechas';
+import { obtenerNombreDia, normalizarFechaSinHora } from '@/lib/utils/fechas';
 
 interface JornadaClienteConfig extends Record<string, unknown> {
   tipo?: 'fija' | 'flexible';
@@ -195,7 +195,8 @@ export function calcularHorasObjetivoDesdeJornada(options: {
   }
 
   const config = jornada.config as JornadaClienteConfig;
-  const fechaBase = new Date(fecha.getFullYear(), fecha.getMonth(), fecha.getDate());
+  // FIX CRÍTICO: Usar normalizarFechaSinHora para evitar desfases de zona horaria con import estático
+  const fechaBase = normalizarFechaSinHora(fecha);
   const nombreDia = obtenerNombreDia(fechaBase);
   const diaConfig = config[nombreDia] as DiaConfig | undefined;
   const tipoJornada = config.tipo ?? (diaConfig?.entrada && diaConfig?.salida ? 'fija' : 'flexible');

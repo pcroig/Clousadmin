@@ -13,6 +13,7 @@ import {
 } from '@/lib/api-handler';
 import { obtenerRangoFechaAntiguedad } from '@/lib/calculos/antiguedad';
 import { prisma } from '@/lib/prisma';
+import { obtenerRangoMes, obtenerInicioMesActual, obtenerFinMesActual } from '@/lib/utils/fechas';
 
 import type { Prisma } from '@prisma/client';
 
@@ -80,15 +81,14 @@ export async function GET(request: NextRequest) {
     const totalEmpleados = empleados.length;
 
     // 2. Cambio respecto mes anterior
-    const mesAnterior = new Date();
-    mesAnterior.setMonth(mesAnterior.getMonth() - 1);
-    mesAnterior.setHours(0, 0, 0, 0);
+    // FIX: Usar helper que respeta zona horaria Madrid
+    const { fin: finMesAnterior } = obtenerRangoMes(1);
 
     const empleadosMesAnterior = await prisma.empleados.count({
       where: {
         ...where,
-        fechaAlta: { lte: mesAnterior },
-        OR: [{ fechaBaja: null }, { fechaBaja: { gt: mesAnterior } }],
+        fechaAlta: { lte: finMesAnterior },
+        OR: [{ fechaBaja: null }, { fechaBaja: { gt: finMesAnterior } }],
       },
     });
 
@@ -127,22 +127,18 @@ export async function GET(request: NextRequest) {
 
     const evolucionPlantilla = [];
     for (let i = 11; i >= 0; i--) {
-      const fecha = new Date();
-      fecha.setMonth(fecha.getMonth() - i);
-      fecha.setDate(1);
-      fecha.setHours(0, 0, 0, 0);
-
-      const finMes = new Date(fecha.getFullYear(), fecha.getMonth() + 1, 0);
+      // FIX: Usar helper que respeta zona horaria Madrid
+      const { inicio, fin } = obtenerRangoMes(i);
 
       // Calcular en memoria
       const count = todosEmpleados.filter((emp) => {
-        const altaAntes = emp.fechaAlta <= finMes;
-        const sinBajaOBajaDespues = !emp.fechaBaja || emp.fechaBaja > finMes;
+        const altaAntes = emp.fechaAlta <= fin;
+        const sinBajaOBajaDespues = !emp.fechaBaja || emp.fechaBaja > fin;
         return altaAntes && sinBajaOBajaDespues;
       }).length;
 
       evolucionPlantilla.push({
-        mes: fecha.toLocaleDateString('es-ES', {
+        mes: inicio.toLocaleDateString('es-ES', {
           month: 'short',
           year: 'numeric',
         }),
@@ -151,9 +147,8 @@ export async function GET(request: NextRequest) {
     }
 
     // 5. Altas y bajas del mes actual
-    const inicioMesActual = new Date();
-    inicioMesActual.setDate(1);
-    inicioMesActual.setHours(0, 0, 0, 0);
+    // FIX: Usar helper que respeta zona horaria Madrid
+    const inicioMesActual = obtenerInicioMesActual();
 
     const altasMes = await prisma.empleados.count({
       where: {
@@ -187,10 +182,8 @@ export async function GET(request: NextRequest) {
     // Optimización: Usar todosEmpleados ya cargado y calcular en memoria
     const evolucionAltasBajas = [];
     for (let i = 5; i >= 0; i--) {
-      const fecha = new Date();
-      fecha.setMonth(fecha.getMonth() - i);
-      const inicioMes = new Date(fecha.getFullYear(), fecha.getMonth(), 1);
-      const finMes = new Date(fecha.getFullYear(), fecha.getMonth() + 1, 0);
+      // FIX: Usar helper que respeta zona horaria Madrid
+      const { inicio: inicioMes, fin: finMes } = obtenerRangoMes(i);
 
       // Calcular en memoria
       const altas = todosEmpleados.filter((emp) => {
@@ -202,7 +195,7 @@ export async function GET(request: NextRequest) {
       }).length;
 
       evolucionAltasBajas.push({
-        mes: fecha.toLocaleDateString('es-ES', {
+        mes: inicioMes.toLocaleDateString('es-ES', {
           month: 'short',
           year: 'numeric',
         }),

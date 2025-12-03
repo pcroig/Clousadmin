@@ -53,6 +53,8 @@ interface FichajeWidgetState {
   status: EstadoFichaje;
   horaEntrada: Date | null;
   horasAcumuladas: number;
+  horaEntradaDia: Date | null;
+  horaSalidaDia: Date | null;
   modalManual: boolean;
   loading: boolean;
   inicializando: boolean;
@@ -68,6 +70,8 @@ type FichajeWidgetAction =
         status: EstadoFichaje;
         horaEntrada: Date | null;
         horasAcumuladas: number;
+        horaEntradaDia: Date | null;
+        horaSalidaDia: Date | null;
       };
     };
 
@@ -75,6 +79,8 @@ const initialState: FichajeWidgetState = {
   status: 'sin_fichar',
   horaEntrada: null,
   horasAcumuladas: 0,
+  horaEntradaDia: null,
+  horaSalidaDia: null,
   modalManual: false,
   loading: false,
   inicializando: true,
@@ -97,6 +103,8 @@ function fichajeWidgetReducer(
         status: action.payload.status,
         horaEntrada: action.payload.horaEntrada,
         horasAcumuladas: action.payload.horasAcumuladas,
+        horaEntradaDia: action.payload.horaEntradaDia,
+        horaSalidaDia: action.payload.horaSalidaDia,
         inicializando: false,
         loading: false,
       };
@@ -128,6 +136,43 @@ function deriveEstadoDesdeFichaje(fichaje: Fichaje): EstadoFichaje {
       return 'sin_fichar';
   }
 }
+
+const TIME_FORMATTER = new Intl.DateTimeFormat('es-ES', {
+  hour: '2-digit',
+  minute: '2-digit',
+});
+
+function obtenerEntradasSalidas(eventos: Array<{ tipo: string; hora: string | Date }>) {
+  if (!eventos || eventos.length === 0) {
+    return { horaEntradaDia: null, horaSalidaDia: null };
+  }
+
+  const ordenados = [...eventos].sort(
+    (a, b) => new Date(a.hora).getTime() - new Date(b.hora).getTime(),
+  );
+
+  let horaEntradaDia: Date | null = null;
+  let horaSalidaDia: Date | null = null;
+
+  for (const evento of ordenados) {
+    const instante = new Date(evento.hora);
+    if (Number.isNaN(instante.getTime())) {
+      continue;
+    }
+
+    if (!horaEntradaDia && evento.tipo === 'entrada') {
+      horaEntradaDia = instante;
+    }
+
+    if (evento.tipo === 'salida') {
+      horaSalidaDia = instante;
+    }
+  }
+
+  return { horaEntradaDia, horaSalidaDia };
+}
+
+const formatHoraCorta = (date: Date | null) => (date ? TIME_FORMATTER.format(date) : '--:--');
 
 
 export function FichajeWidget({
@@ -233,13 +278,20 @@ export function FichajeWidget({
         if (fichajes.length === 0) {
           dispatch({
             type: 'SET_DATA',
-            payload: { status: 'sin_fichar', horaEntrada: null, horasAcumuladas: 0 },
+            payload: {
+              status: 'sin_fichar',
+              horaEntrada: null,
+              horasAcumuladas: 0,
+              horaEntradaDia: null,
+              horaSalidaDia: null,
+            },
           });
           return;
         }
 
         const fichajeHoy = fichajes[0];
         const { horasAcumuladas, horaEnCurso } = calcularProgresoEventos(fichajeHoy.eventos);
+        const { horaEntradaDia, horaSalidaDia } = obtenerEntradasSalidas(fichajeHoy.eventos);
         const horasEsperadas =
           typeof fichajeHoy.horasEsperadas === 'number'
             ? fichajeHoy.horasEsperadas
@@ -255,13 +307,21 @@ export function FichajeWidget({
             status: deriveEstadoDesdeFichaje(fichajeHoy),
             horaEntrada: horaEnCurso,
             horasAcumuladas,
+            horaEntradaDia,
+            horaSalidaDia,
           },
         });
       } catch (error) {
         console.error('[FichajeWidget] Error obteniendo estado:', error);
         dispatch({
           type: 'SET_DATA',
-          payload: { status: 'sin_fichar', horaEntrada: null, horasAcumuladas: 0 },
+          payload: {
+            status: 'sin_fichar',
+            horaEntrada: null,
+            horasAcumuladas: 0,
+            horaEntradaDia: null,
+            horaSalidaDia: null,
+          },
         });
       }
     },
@@ -584,16 +644,16 @@ export function FichajeWidget({
                 {/* Indicador izquierdo (Horas hechas) - Debajo del vértice izquierdo */}
                 <div className="absolute left-2 -bottom-2">
                   <div className="text-center">
-                    <div className="text-[11px] text-gray-900 font-semibold">{horasHechas}h</div>
-                    <div className="text-[9px] text-gray-500 whitespace-nowrap">Hechas</div>
+                    <div className="text-[11px] text-gray-900 font-semibold">{formatHoraCorta(state.horaEntradaDia)}</div>
+                    <div className="text-[9px] text-gray-500 whitespace-nowrap">Entrada</div>
                   </div>
                 </div>
 
                 {/* Indicador derecho (Por hacer) - Debajo del vértice derecho */}
                 <div className="absolute right-2 -bottom-2">
                   <div className="text-center">
-                    <div className="text-[11px] text-gray-900 font-semibold">{horasPorHacer}h</div>
-                    <div className="text-[9px] text-gray-500 whitespace-nowrap">Por hacer</div>
+                    <div className="text-[11px] text-gray-900 font-semibold">{formatHoraCorta(state.horaSalidaDia)}</div>
+                    <div className="text-[9px] text-gray-500 whitespace-nowrap">Salida</div>
                   </div>
                 </div>
               </div>

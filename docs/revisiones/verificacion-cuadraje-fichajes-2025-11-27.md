@@ -27,8 +27,9 @@ El sistema de cuadraje de fichajes ha sido completamente revisado y optimizado. 
 const lazyDaysFromEnv = Number(process.env.FICHAJES_LAZY_DIAS ?? 3);
 const diasARecuperar = Math.min(lazyDaysFromEnv, 14);
 
-// FIX 2025-12-02: Incluir HOY en el recovery (offset = 0)
-for (let offset = 0; offset <= diasARecuperar; offset++) {
+// CORRECCIÓN 2025-12-03: Solo días VENCIDOS (offset = 1, excluir HOY)
+// El cuadrar fichajes es solo para días ya finalizados
+for (let offset = 1; offset <= diasARecuperar; offset++) {
   const fechaObjetivo = new Date(hoy);
   fechaObjetivo.setDate(fechaObjetivo.getDate() - offset);
   
@@ -37,16 +38,16 @@ for (let offset = 0; offset <= diasARecuperar; offset++) {
   });
 }
 
-// FIX 2025-12-02: Incluir HOY en el filtro de fecha (lt → lte)
-const fechaWhere: Prisma.DateTimeFilter = { lte: hoy };
+// CORRECCIÓN 2025-12-03: Solo días VENCIDOS (< hoy, excluir HOY)
+const fechaWhere: Prisma.DateTimeFilter = { lt: hoy };
 ```
 
 **Propósito**: 
-- Antes de mostrar fichajes pendientes, procesa los últimos N días **incluyendo HOY** (default 3, max 14)
-- Crea fichajes `pendiente` para empleados que no ficharon (incluyendo el día actual)
+- Antes de mostrar fichajes pendientes, procesa los últimos N días **VENCIDOS** (default 3, max 14)
+- **EXCLUYE el día actual**: El cuadrar fichajes es solo para días ya finalizados
+- Crea fichajes `pendiente` para empleados que no ficharon en días pasados
 - Re-clasifica fichajes `en_curso` como `pendiente` si están incompletos
 - **Fallback** si el CRON nocturno falla
-- **✅ CORRECCIÓN**: Los fichajes del día actual ahora aparecen inmediatamente en la pantalla de cuadrar
 
 **Mejoras en la Respuesta**:
 ```typescript
@@ -666,24 +667,21 @@ Si algo falla en producción:
 ```typescript
 // app/api/fichajes/revision/route.ts
 
-// ANTES (línea 97)
-for (let offset = 1; offset <= diasARecuperar; offset++) {
+// ⚠️ NOTA: La información anterior sobre incluir HOY era incorrecta
+// El cuadrar fichajes es SOLO para días vencidos (ya finalizados)
 
-// DESPUÉS
-for (let offset = 0; offset <= diasARecuperar; offset++) {
-  // ✅ Ahora incluye HOY (offset = 0)
+// CORRECTO (línea 97)
+for (let offset = 1; offset <= diasARecuperar; offset++) {
+  // ✅ Offset = 1 excluye HOY, solo procesa días vencidos
 }
 
-// ANTES (línea 120)
+// CORRECTO (línea 120)
 const fechaWhere: Prisma.DateTimeFilter = { lt: hoy };
-
-// DESPUÉS
-const fechaWhere: Prisma.DateTimeFilter = { lte: hoy };
-// ✅ Ahora incluye fichajes de hoy
+// ✅ Solo días anteriores a hoy (fecha < hoy)
 ```
 
 **Resultado**:
-- ✅ Los fichajes del día actual **aparecen inmediatamente** en cuadrar
+- ✅ Los fichajes **solo aparecen después de que finaliza el día** (CRON 23:30)
 - ✅ El sistema detecta empleados sin fichar **el mismo día**
 - ✅ Fallback robusto si el CRON falla
 
@@ -843,8 +841,14 @@ const actualizado = await prisma.fichajes.update({
 
 ## 📋 CHANGELOG
 
-### 2025-12-02 - Correcciones Críticas
-- ✅ **Bug Fix**: Fichajes de HOY ahora aparecen en cuadrar (offset=0, lte en filtro)
+### 2025-12-03 - Corrección Crítica de Lógica de Negocio
+- ✅ **Bug Fix REVERTIDO**: El cuadrar fichajes es SOLO para días vencidos
+- ✅ **Cambio**: `offset = 0` → `offset = 1` (excluir HOY del lazy recovery)
+- ✅ **Cambio**: `lte: hoy` → `lt: hoy` (excluir HOY del filtro de fecha)
+- ✅ **Razón**: Los fichajes del día actual no deben aparecer hasta después del CRON nocturno (23:30)
+
+### 2025-12-02 - Correcciones Críticas (INFORMACIÓN INCORRECTA - VER CHANGELOG 2025-12-03)
+- ❌ **Bug Fix INCORRECTO**: Fichajes de HOY ahora aparecen en cuadrar (offset=0, lte en filtro)
 - ✅ **Bug Fix**: Tabla se actualiza en tiempo real (fix dependencias useEffect)
 - ✅ **Bug Fix**: Horas/Balance recalculados al aprobar/rechazar fichajes
 - 📝 Documentación actualizada con todos los cambios

@@ -9,6 +9,7 @@ import { ChevronRight } from 'lucide-react';
 import Link from 'next/link';
 import { memo } from 'react';
 
+import { CountBadge } from '@/components/shared/count-badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
@@ -43,7 +44,9 @@ export const WidgetCard = memo(function WidgetCard({
 }: WidgetCardProps) {
   const content = useScroll ? (
     <ScrollArea className="h-full">
-      {children}
+      <div className="min-h-full">
+        {children}
+      </div>
     </ScrollArea>
   ) : (
     children
@@ -54,16 +57,12 @@ export const WidgetCard = memo(function WidgetCard({
       {showHeader && (
         <CardHeader className={`flex-shrink-0 py-3 sm:py-4 ${headerClassName}`}>
           <div className="flex items-center justify-between">
-            <div className="flex items-center">
+            <div className="flex items-center gap-2">
               <CardTitle className="text-[13px] sm:text-[14px] font-normal text-gray-900 flex items-center">
                 {titleIcon}
                 {title}
               </CardTitle>
-              {badge && (
-                <span className="flex items-center justify-center min-w-[20px] h-5 px-1.5 bg-warning text-white text-[10px] sm:text-[11px] font-bold rounded-lg">
-                  {badge}
-                </span>
-              )}
+              {badge && <CountBadge count={badge} />}
             </div>
             <div className="flex items-center gap-1 sm:gap-2">
               {headerAction}

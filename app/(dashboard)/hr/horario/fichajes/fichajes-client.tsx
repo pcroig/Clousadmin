@@ -29,7 +29,7 @@ import { EstadoFichaje } from '@/lib/constants/enums';
 import { useIsMobile } from '@/lib/hooks/use-viewport';
 import { extractArrayFromResponse } from '@/lib/utils/api-response';
 import { extraerHoraDeISO, formatearHorasMinutos } from '@/lib/utils/formatters';
-import { calcularRangoFechas, toMadridDate } from '@/lib/utils/fechas';
+import { calcularRangoFechas, obtenerEtiquetaPeriodo, toMadridDate } from '@/lib/utils/fechas';
 import { parseJson } from '@/lib/utils/json';
 
 import { JornadasModal } from './jornadas-modal';
@@ -352,26 +352,10 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
     setFechaBase(nuevaFecha);
   }, [fechaBase, rangoFechas]);
 
-  const periodLabel = useMemo(() => {
-    switch (rangoFechas) {
-      case 'dia':
-        return format(fechaBase, 'dd MMM', { locale: es });
-      case 'semana': {
-        const { inicio, fin } = calcularRangoFechas(fechaBase, 'semana');
-        const mesInicio = format(inicio, 'MMM', { locale: es });
-        const mesFin = format(fin, 'MMM', { locale: es });
-        const anio = format(fin, 'yyyy', { locale: es });
-
-        if (mesInicio === mesFin) {
-          return `${mesInicio} ${anio}`;
-        } else {
-          return `${mesInicio} - ${mesFin} ${anio}`;
-        }
-      }
-      default:
-        return format(fechaBase, 'MMM yyyy', { locale: es });
-    }
-  }, [fechaBase, rangoFechas]);
+  const periodLabel = useMemo(
+    () => obtenerEtiquetaPeriodo(fechaBase, rangoFechas),
+    [fechaBase, rangoFechas]
+  );
 
   // Filtrar jornadas por búsqueda de empleado
   // El filtro de estado y equipo YA se aplica en backend, pero mantenemos búsqueda local por si acaso

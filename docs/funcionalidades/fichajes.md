@@ -410,10 +410,10 @@ enum PeriodoMedioDia {
 
 **Funcionalidad:**
 1. **Listado inteligente**: Muestra fichajes `pendiente` con filtros avanzados (equipo, búsqueda, rango de fechas)
-   - ✅ **Corrección 2025-12-02**: Ahora incluye fichajes del día actual (HOY)
-   - ✅ Lazy recovery procesa desde `offset = 0` (incluye hoy)
-   - ✅ Los empleados que no fichan hoy aparecen inmediatamente en cuadrar
-   - ✅ Fallback robusto si el CRON nocturno falla
+   - ✅ **CORRECTO 2025-12-03**: Solo días VENCIDOS (excluye el día actual)
+   - ✅ Lazy recovery procesa desde `offset = 1` (excluye hoy)
+   - ✅ Los empleados que no fichan aparecen al día siguiente del CRON nocturno (23:30)
+   - ✅ Fallback robusto si el CRON nocturno falla (procesa últimos 3 días vencidos)
 2. **Vista descriptiva**: Para cada fichaje muestra:
    - **Indicador visual**: Icono diferenciando días vacíos (sin eventos) vs incompletos (con eventos parciales)
    - Eventos registrados (si existen) con hora formateada

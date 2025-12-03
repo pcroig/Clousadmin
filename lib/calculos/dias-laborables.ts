@@ -3,6 +3,7 @@
 // ========================================
 
 import { prisma } from '@/lib/prisma';
+import { normalizarFechaSinHora, crearFechaConHora } from '@/lib/utils/fechas';
 
 import { DIAS_LABORABLES_DEFAULT } from './dias-laborables.definitions';
 
@@ -15,11 +16,13 @@ type FestivoConFecha = {
 };
 
 function normalizarInicioDeDia(fecha: Date): Date {
-  return new Date(fecha.getFullYear(), fecha.getMonth(), fecha.getDate());
+  // FIX CRÍTICO: Usar función correcta de utils/fechas con import estático
+  return normalizarFechaSinHora(fecha);
 }
 
 function normalizarFinDeDia(fecha: Date): Date {
-  return new Date(fecha.getFullYear(), fecha.getMonth(), fecha.getDate(), 23, 59, 59, 999);
+  // FIX CRÍTICO: Usar crearFechaConHora que respeta zona horaria
+  return crearFechaConHora(fecha, 23, 59);
 }
 
 export function formatearClaveFecha(fecha: Date): string {

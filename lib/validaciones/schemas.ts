@@ -6,6 +6,9 @@ import { z } from 'zod';
 
 const HORA_24H_REGEX = /^([01]\d|2[0-3]):([0-5]\d)$/;
 
+// Schema para validar IDs de Prisma (acepta UUID o CUID)
+export const idSchema = z.union([z.string().uuid(), z.string().cuid()]);
+
 // ========================================
 // SIGNUP & ONBOARDING
 // ========================================
@@ -46,11 +49,11 @@ export type SignupInput = z.infer<typeof signupSchema>;
 
 export const sedeCreateSchema = z.object({
   ciudad: z.string().min(1, 'Ciudad requerida'),
-  empresaId: z.string().uuid(),
+  empresaId: idSchema,
   asignacion: z
     .object({
       tipo: z.enum(['empresa', 'equipo']),
-      equipoId: z.string().uuid().optional(),
+      equipoId: idSchema.optional(),
     })
     .optional(),
 });
@@ -61,7 +64,7 @@ export const integracionCreateSchema = z.object({
   tipo: z.enum(['calendario', 'comunicacion', 'nominas']),
   proveedor: z.string().min(1, 'Proveedor requerido'),
   config: z.record(z.string(), z.any()).optional(),
-  empresaId: z.string().uuid(),
+  empresaId: idSchema,
 });
 
 export type IntegracionCreateInput = z.infer<typeof integracionCreateSchema>;
@@ -73,8 +76,8 @@ export type IntegracionCreateInput = z.infer<typeof integracionCreateSchema>;
 export const equipoCreateSchema = z.object({
   nombre: z.string().min(1, 'Nombre requerido'),
   descripcion: z.string().optional(),
-  managerId: z.string().uuid().optional(),
-  empresaId: z.string().uuid(),
+  managerId: idSchema.optional(),
+  empresaId: idSchema,
 });
 
 export type EquipoCreateInput = z.infer<typeof equipoCreateSchema>;
@@ -89,10 +92,10 @@ export const empleadoCreateSchema = z.object({
   email: z.string().email('Email inválido'),
   nif: z.string().optional(),
   telefono: z.string().optional(),
-  puestoId: z.string().uuid().optional(),
-  equipoIds: z.array(z.string().uuid()).optional(),
+  puestoId: idSchema.optional(),
+  equipoIds: z.array(idSchema).optional(),
   fechaAlta: z.date().default(() => new Date()),
-  empresaId: z.string().uuid(),
+  empresaId: idSchema,
 });
 
 export type EmpleadoCreateInput = z.infer<typeof empleadoCreateSchema>;
@@ -134,9 +137,9 @@ export const jornadaUpdateSchema = jornadaCreateSchema.partial().omit({ empresaI
 
 export const jornadaAsignarSchema = z.object({
   nivel: z.enum(['empresa', 'equipo', 'individual']),
-  empresaId: z.string().uuid().optional(),
-  equipoId: z.string().uuid().optional(),
-  empleadoId: z.string().uuid().optional(),
+  empresaId: idSchema.optional(),
+  equipoId: idSchema.optional(),
+  empleadoId: idSchema.optional(),
 });
 
 export type JornadaCreateInput = z.infer<typeof jornadaCreateSchema>;
@@ -149,7 +152,7 @@ export type JornadaAsignarInput = z.infer<typeof jornadaAsignarSchema>;
 
 export const ausenciaCreateSchema = z.object({
   tipo: z.enum(['vacaciones', 'enfermedad', 'enfermedad_familiar', 'maternidad_paternidad', 'otro']),
-  empleadoId: z.string().uuid().optional(),
+  empleadoId: idSchema.optional(),
   fechaInicio: z.union([
     z.string().refine((val) => !isNaN(new Date(val).getTime()), {
       message: 'fechaInicio debe ser una fecha válida',
@@ -166,11 +169,11 @@ export const ausenciaCreateSchema = z.object({
   periodo: z.enum(['manana', 'tarde']).optional(), // Solo cuando medioDia=true
   motivo: z.string().optional(),
   justificanteUrl: z.string().url().optional(),
-  documentoId: z.string().uuid().optional().or(z.literal('')).transform(val => val === '' ? undefined : val), // ID del documento justificante
+  documentoId: idSchema.optional().or(z.literal('')).transform(val => val === '' ? undefined : val), // ID del documento justificante
   diasIdeales: z.array(z.string()).optional(),
   diasPrioritarios: z.array(z.string()).optional(),
   diasAlternativos: z.array(z.string()).optional(),
-  equipoId: z.string().uuid().optional(),
+  equipoId: idSchema.optional(),
 }).refine(
   (data) => {
     const inicio = new Date(data.fechaInicio);
@@ -233,7 +236,7 @@ export const ausenciaUpdateSchema = z.object({
   periodo: z.enum(['manana', 'tarde']).optional().nullable(), // Solo cuando medioDia=true
   motivo: z.string().optional().nullable(),
   justificanteUrl: z.string().url().optional().nullable(),
-  documentoId: z.string().uuid().optional().nullable(), // ID del documento justificante
+  documentoId: idSchema.optional().nullable(), // ID del documento justificante
   estado: z.enum(['pendiente', 'confirmada', 'completada', 'rechazada']).optional(),
   // Para mantener compatibilidad con aprobar/rechazar
   accion: z.enum(['aprobar', 'rechazar']).optional(),
@@ -314,7 +317,7 @@ export type ImportarFestivosInput = z.infer<typeof importarFestivosSchema>;
 // ========================================
 
 export const empleadoFestivoCreateSchema = z.object({
-  empleadoId: z.string().uuid(),
+  empleadoId: idSchema,
   fecha: z.string().or(z.date()),
   nombre: z.string().min(1, 'Nombre requerido').max(200),
   activo: z.boolean().default(true),
@@ -460,7 +463,7 @@ export type SaldoAusenciasUpdateInput = z.infer<typeof saldoAusenciasUpdateSchem
 export const campanaVacacionesCreateSchema = z.object({
   titulo: z.string().min(1, 'Título requerido').max(200),
   alcance: z.enum(['todos', 'equipos']).default('todos'),
-  equipoIds: z.array(z.string().uuid()).optional(),
+  equipoIds: z.array(idSchema).optional(),
   solapamientoMaximoPct: z.number().int().min(0).max(100).optional(),
   fechaInicioObjetivo: z.string().or(z.date()),
   fechaFinObjetivo: z.string().or(z.date()),
@@ -487,7 +490,7 @@ export const campanaVacacionesCreateSchema = z.object({
 export type CampanaVacacionesCreateInput = z.infer<typeof campanaVacacionesCreateSchema>;
 
 export const preferenciaVacacionesCreateSchema = z.object({
-  campanaId: z.string().uuid(),
+  campanaId: idSchema,
   diasIdeales: z.array(z.string().datetime()).min(1, 'Debe incluir al menos un día ideal'),
   diasPrioritarios: z.array(z.string().datetime()).optional(),
   diasAlternativos: z.array(z.string().datetime()).optional(),

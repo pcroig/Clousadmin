@@ -5,7 +5,7 @@ import { toast } from 'sonner';
 
 import { CalendarPlus } from 'lucide-react';
 
-import { CalendarioFestivos } from '@/components/hr/calendario-festivos';
+import { CalendarioFestivos, CalendarioFestivosLegend } from '@/components/hr/calendario-festivos';
 import { ListaFestivos } from '@/components/hr/lista-festivos';
 import { SwitchWithTooltip } from '@/components/shared/switch-with-tooltip';
 import { LoadingButton } from '@/components/shared/loading-button';
@@ -322,30 +322,33 @@ export function GestionarAusenciasModal({ open, onClose, onSaved }: GestionarAus
               }}
               className="space-y-4"
             >
-              <div className="flex items-center justify-between">
-                <TabsList className="w-auto">
+              <div className="flex flex-wrap items-center gap-4 md:justify-between">
+                <TabsList className="w-auto flex-shrink-0">
                   <TabsTrigger value="calendario">Calendario</TabsTrigger>
                   <TabsTrigger value="lista">Festivos</TabsTrigger>
                 </TabsList>
                 
-                <div className="flex items-center gap-2">
-                  <Button
-                    size="icon"
-                    variant="outline"
-                    onClick={() => handleCreateFestivoInline()}
-                    aria-label="Añadir festivo"
-                    title="Añadir festivo"
-                  >
-                    <CalendarPlus className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={processingFestivos}
-                  >
-                    {processingFestivos ? 'Importando...' : 'Importar'}
-                  </Button>
+                <div className="flex flex-1 flex-wrap items-center justify-end gap-4">
+                  {festivosView === 'calendario' && <CalendarioFestivosLegend className="flex-nowrap" />}
+                  <div className="flex items-center gap-2">
+                    <Button
+                      size="icon"
+                      variant="outline"
+                      onClick={() => handleCreateFestivoInline()}
+                      aria-label="Añadir festivo"
+                      title="Añadir festivo"
+                    >
+                      <CalendarPlus className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={processingFestivos}
+                    >
+                      {processingFestivos ? 'Importando...' : 'Importar'}
+                    </Button>
+                  </div>
                 </div>
               </div>
 
@@ -365,6 +368,7 @@ export function GestionarAusenciasModal({ open, onClose, onSaved }: GestionarAus
                   onRequestCreate={handleCreateFestivoInline}
                   onRequestEdit={handleEditFestivoInline}
                   numberOfMonths={1}
+                  showLegend={false}
                 />
               </TabsContent>
 

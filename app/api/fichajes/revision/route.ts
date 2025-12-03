@@ -13,7 +13,7 @@ import { procesarFichajesDia } from '@/lib/calculos/fichajes';
 import { crearNotificacionFichajeResuelto } from '@/lib/notificaciones';
 import { prisma, Prisma } from '@/lib/prisma';
 import { jornadaSelectCompleta } from '@/lib/prisma/selects';
-import { obtenerNombreDia, toMadridDate } from '@/lib/utils/fechas';
+import { crearFechaConHora, normalizarFechaSinHora, obtenerNombreDia, toMadridDate } from '@/lib/utils/fechas';
 
 // ========================================
 // Types para datos JSON de Prisma
@@ -91,11 +91,12 @@ export async function GET(request: NextRequest) {
         : DEFAULT_LAZY_RECOVERY_DAYS;
 
     console.log(
-      `[API Revisión GET] Lazy recovery de fichajes para los últimos ${diasARecuperar} día(s) (incluyendo hoy) en empresa ${session.user.empresaId}`
+      `[API Revisión GET] Lazy recovery de fichajes para los últimos ${diasARecuperar} día(s) vencido(s) (excluyendo hoy) en empresa ${session.user.empresaId}`
     );
 
-    // FIX: Cambiar offset de 1 a 0 para incluir el día de hoy
-    for (let offset = 0; offset <= diasARecuperar; offset++) {
+    // CORRECCIÓN: Lazy recovery solo para días VENCIDOS (offset = 1)
+    // El día actual no debe aparecer en cuadrar hasta después del CRON de las 23:30
+    for (let offset = 1; offset <= diasARecuperar; offset++) {
       const fechaObjetivo = new Date(hoy);
       fechaObjetivo.setDate(fechaObjetivo.getDate() - offset);
 
@@ -111,15 +112,16 @@ export async function GET(request: NextRequest) {
     }
 
     console.log('[API Revisión GET] Fecha hoy:', hoy.toISOString());
-    console.log('[API Revisión GET] Buscando fichajes pendientes (incluyendo hoy)...');
+    console.log('[API Revisión GET] Buscando fichajes pendientes (solo días vencidos)...');
 
     let fichajesPendientes;
     // Declarar mapas fuera del try para que estén disponibles en el formateo
     let ausenciasMedioDiaPorFecha = new Map<string, AusenciaMedioDia>();
     
     try {
-      // FIX: Cambiar lt a lte para incluir fichajes del día de hoy
-      const fechaWhere: Prisma.DateTimeFilter = { lte: hoy };
+      // CORRECCIÓN: Solo días VENCIDOS (< hoy), excluir el día actual
+      // El cuadrar fichajes es solo para días ya finalizados
+      const fechaWhere: Prisma.DateTimeFilter = { lt: hoy };
 
       if (fechaInicioParam) {
         const inicio = new Date(fechaInicioParam);
@@ -278,10 +280,10 @@ export async function GET(request: NextRequest) {
 
     console.log('[API Revisión] Encontrados:', fichajesPendientes.length, 'fichajes pendientes');
 
-    // Formatear datos para el modal
+      // Formatear datos para el modal
     const fichajes = fichajesPendientes.map((fichaje) => {
-      // PUNTO 1: Usar toMadridDate para normalizar fechas y evitar desfases
-      const fechaBase = toMadridDate(fichaje.fecha);
+      // FIX: Usar normalizarFechaSinHora para consistencia con cuadrar
+      const fechaBase = normalizarFechaSinHora(fichaje.fecha);
       const fechaFormateada = format(fechaBase, 'yyyy-MM-dd');
       
       const eventosRegistrados = fichaje.eventos.map((evento) => ({
@@ -303,12 +305,10 @@ export async function GET(request: NextRequest) {
           const configJornada = jornada.config as unknown as ConfigJornada;
           const confDia = configJornada[nombreDia] as ConfigDiaJornada | undefined;
           
-          // Helper para crear fecha con hora específica
+          // FIX: Helper para crear fecha con hora específica usando función de utilidad
           const setHora = (base: Date, hhmm: string) => {
             const [h, m] = hhmm.split(':').map(Number);
-            const d = new Date(base);
-            d.setHours(h || 0, m || 0, 0, 0);
-            return d.toISOString();
+            return crearFechaConHora(base, h || 0, m || 0).toISOString();
           };
           
           // Verificar si el día está activo y tiene horarios
@@ -538,12 +538,10 @@ export async function POST(request: NextRequest) {
           const fechaDia = new Date(fichaje.fecha);
           const jornadaEmpleado = fichaje.empleado?.jornada;
 
-          // Utilidad para parsear HH:mm en la fecha concreta
+          // FIX: Utilidad para parsear HH:mm en la fecha concreta usando función de utilidad
           const setHora = (base: Date, hhmm: string): Date => {
             const [h, m] = hhmm.split(':').map(Number);
-            const d = new Date(base);
-            d.setHours(h || 0, m || 0, 0, 0);
-            return d;
+            return crearFechaConHora(base, h || 0, m || 0);
           };
 
           // Mapear nombre de día

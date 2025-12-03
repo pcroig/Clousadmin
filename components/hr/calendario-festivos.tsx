@@ -26,6 +26,8 @@ interface CalendarioFestivosProps {
   onRequestCreate: (fecha: string) => void;
   onRequestEdit: (festivo: Festivo) => void;
   numberOfMonths?: number;
+  showLegend?: boolean;
+  legendClassName?: string;
 }
 
 const DIA_SEMANA_KEYS: Array<keyof DiasLaborables> = [
@@ -45,6 +47,8 @@ export function CalendarioFestivos({
   onRequestCreate,
   onRequestEdit,
   numberOfMonths = 2,
+  showLegend = true,
+  legendClassName,
 }: CalendarioFestivosProps) {
   const [mesActual, setMesActual] = useState(new Date());
   const [festivos, setFestivos] = useState<Festivo[]>([]);
@@ -122,18 +126,7 @@ export function CalendarioFestivos({
 
   return (
     <div className="space-y-4">
-      {!cargando && (
-        <div className="flex items-center gap-4 text-xs text-muted-foreground">
-          <div className="flex items-center gap-2">
-            <div className="h-3 w-3 rounded-sm border border-red-200 bg-red-100" />
-            <span>Festivos</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="h-3 w-3 rounded-sm bg-muted/40" />
-            <span>No laborable</span>
-          </div>
-        </div>
-      )}
+      {showLegend && !cargando && <CalendarioFestivosLegend className={legendClassName} />}
 
       <div>
         {cargando ? (
@@ -165,6 +158,25 @@ export function CalendarioFestivos({
             className="mx-auto"
           />
         )}
+      </div>
+    </div>
+  );
+}
+
+interface CalendarioFestivosLegendProps {
+  className?: string;
+}
+
+export function CalendarioFestivosLegend({ className }: CalendarioFestivosLegendProps) {
+  return (
+    <div className={cn('flex flex-wrap items-center gap-4 text-xs text-muted-foreground', className)}>
+      <div className="flex items-center gap-2">
+        <div className="h-3 w-3 rounded-sm border border-red-200 bg-red-100" />
+        <span>Festivos</span>
+      </div>
+      <div className="flex items-center gap-2">
+        <div className="h-3 w-3 rounded-sm bg-muted/40" />
+        <span>No laborable</span>
       </div>
     </div>
   );

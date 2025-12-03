@@ -18,8 +18,6 @@ import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
 import { parseJson } from '@/lib/utils/json';
 
@@ -144,7 +142,7 @@ export function ImportarEmpleadosExcel({
   onCancel,
   showToast = true,
   title = 'Importar múltiples empleados',
-  description = 'Sube un archivo Excel con los datos de múltiples empleados. La IA procesará automáticamente la estructura. La confirmación puede tardar entre 1 y 5 minutos dependiendo del volumen.',
+  description = 'Sube un archivo Excel con los datos que tengas; la IA detecta la estructura y mapea las columnas automáticamente.',
   showCancelButton,
   showFinishButton,
   showHeader = true,
@@ -156,7 +154,6 @@ export function ImportarEmpleadosExcel({
   const [confirmando, setConfirmando] = useState(false);
   const [previewData, setPreviewData] = useState<PreviewData | null>(null);
   const [resultadoImportacion, setResultadoImportacion] = useState<ResultadoImportacion | null>(null);
-  const [invitarEmpleados, setInvitarEmpleados] = useState(true);
   const [error, setError] = useState('');
   const [empleadosExpandidos, setEmpleadosExpandidos] = useState<Set<string>>(new Set());
   const [cargandoEmpleados, setCargandoEmpleados] = useState(false);
@@ -331,7 +328,7 @@ export function ImportarEmpleadosExcel({
           empleados: data.empleados,
           equiposDetectados: data.equiposDetectados,
           managersDetectados: data.managersDetectados,
-          invitarEmpleados,
+          invitarEmpleados: true,
         }),
       });
 
@@ -438,6 +435,9 @@ export function ImportarEmpleadosExcel({
             <p className="mt-2 text-sm text-gray-600">
               Estamos creando cuentas, asignando equipos y enviando invitaciones.
             </p>
+            <p className="text-xs text-gray-500">
+              La confirmación puede tardar 1-5 minutos según el volumen del archivo.
+            </p>
           </div>
         </div>
       )}
@@ -452,6 +452,9 @@ export function ImportarEmpleadosExcel({
             </p>
             <p className="mt-2 text-sm text-gray-600">
               La IA está procesando el Excel y detectando empleados, equipos y puestos.
+            </p>
+            <p className="text-xs text-gray-500">
+              La confirmación puede tardar 1-5 minutos según el volumen del archivo.
             </p>
           </div>
         </div>
@@ -657,17 +660,32 @@ export function ImportarEmpleadosExcel({
       {!analizando && !confirmando && !previewData && resultadoImportacion && (
         <div className="space-y-4">
           {/* Resumen */}
-          <div className="rounded-lg bg-green-50 border border-green-200 p-4">
+          <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
             <div className="flex items-start gap-3">
-              <CheckCircle className="h-6 w-6 text-green-500 mt-0.5" />
+              <FileText className="h-6 w-6 text-gray-500 mt-0.5" />
               <div className="flex-1">
-                <h4 className="font-semibold text-green-900">Importación completada</h4>
-                <div className="mt-2 space-y-1 text-sm text-green-800">
-                  <p>✓ {resultadoImportacion.empleadosCreados} empleados creados</p>
-                  <p>✓ {resultadoImportacion.equiposCreados} equipos creados</p>
-                  <p>✓ {resultadoImportacion.puestosCreados} puestos creados</p>
-                  <p>✓ {resultadoImportacion.invitacionesEnviadas} invitaciones enviadas</p>
-                </div>
+                <h4 className="text-base font-semibold text-gray-900">Importación completada</h4>
+                <p className="mt-1 text-sm text-gray-600">
+                  Estamos sincronizando los nuevos registros y enviando las invitaciones automáticamente.
+                </p>
+                <dl className="mt-4 space-y-2 text-sm text-gray-700">
+                  <div className="flex items-center justify-between gap-3">
+                    <dt className="text-gray-500">Empleados creados</dt>
+                    <dd className="font-medium text-gray-900">{resultadoImportacion.empleadosCreados}</dd>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <dt className="text-gray-500">Equipos creados</dt>
+                    <dd className="font-medium text-gray-900">{resultadoImportacion.equiposCreados}</dd>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <dt className="text-gray-500">Puestos creados</dt>
+                    <dd className="font-medium text-gray-900">{resultadoImportacion.puestosCreados}</dd>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <dt className="text-gray-500">Invitaciones enviadas</dt>
+                    <dd className="font-medium text-gray-900">{resultadoImportacion.invitacionesEnviadas}</dd>
+                  </div>
+                </dl>
               </div>
             </div>
           </div>
@@ -856,14 +874,6 @@ export function ImportarEmpleadosExcel({
         </div>
       )}
 
-      {/* Información adicional */}
-      {!archivo && !previewData && !resultadoImportacion && (
-        <div className="rounded-lg bg-gray-50 p-4">
-          <p className="text-sm text-gray-600">
-            <strong>💡 Tip:</strong> El Excel puede tener cualquier estructura. La IA detectará automáticamente las columnas y mapeará los datos correctamente.
-          </p>
-        </div>
-      )}
     </div>
   );
 }

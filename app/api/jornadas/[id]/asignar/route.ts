@@ -14,10 +14,11 @@ import {
   validateRequest,
 } from '@/lib/api-handler';
 import { prisma } from '@/lib/prisma';
+import { idSchema } from '@/lib/validaciones/schemas';
 
 const asignarSchema = z.object({
-  empleadoIds: z.array(z.string().uuid()).optional(),
-  equipoId: z.string().uuid().optional(),
+  empleadoIds: z.array(idSchema).optional(),
+  equipoId: idSchema.optional(),
   aplicarATodos: z.boolean().optional(),
 });
 

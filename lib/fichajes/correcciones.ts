@@ -4,6 +4,7 @@
 
 import { actualizarCalculosFichaje } from '@/lib/calculos/fichajes';
 import { prisma } from '@/lib/prisma';
+import { normalizarFechaSinHora } from '@/lib/utils/fechas';
 
 export interface CorreccionFichajePayload {
   nuevaFecha?: string | null;
@@ -20,7 +21,8 @@ export function normalizarFechaCorreccion(nuevaFecha?: string | null): Date | nu
     return null;
   }
 
-  return new Date(fecha.getFullYear(), fecha.getMonth(), fecha.getDate());
+  // FIX CRÍTICO: Usar función correcta que respeta zona horaria Madrid con import estático
+  return normalizarFechaSinHora(fecha);
 }
 
 export function normalizarHoraCorreccion(

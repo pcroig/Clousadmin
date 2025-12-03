@@ -1,69 +1,72 @@
 /**
- * Next.js Instrumentation Hook
- * Se ejecuta automáticamente al iniciar el servidor (tanto dev como prod)
- * Usado para inicializar workers, servicios en background, etc.
+ * Instrumentation para Next.js
+ * Se ejecuta al iniciar el servidor
  */
 
-import * as Sentry from '@sentry/nextjs';
-
-import './sentry.server.config';
+/**
+ * Verifica si la zona horaria es válida para el sistema de fichajes
+ * Acepta variantes de UTC que Node expone en diferentes entornos
+ */
+function esZonaHorariaValida(tz: string): boolean {
+  // Variantes de UTC que Node expone en diferentes entornos (Docker, macOS, Linux)
+  const utcVariantes = [
+    'UTC',
+    'Etc/UTC',
+    'GMT',
+    'GMT+0',
+    'GMT-0',
+    'UTC+0',
+    'UTC-0',
+    'Etc/GMT',
+    'Etc/Universal',
+    'Universal',
+  ];
+  
+  return utcVariantes.includes(tz) || tz === 'Europe/Madrid';
+}
 
 export async function register() {
-  // Solo ejecutar en el servidor (Node.js runtime)
-  if (process.env.NEXT_RUNTIME === 'nodejs') {
-    if (process.env.DISABLE_EMBEDDED_WORKER === 'true') {
-      console.log('[Instrumentation] Worker embebido desactivado (DISABLE_EMBEDDED_WORKER=true)');
-      return;
+  // ⚠️ VALIDACIÓN CRÍTICA: Zona horaria del servidor
+  const tz = process.env.TZ || Intl.DateTimeFormat().resolvedOptions().timeZone;
+  
+  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  console.log('🕐 ZONA HORARIA DEL SERVIDOR');
+  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  console.log(`Zona horaria detectada: ${tz}`);
+  console.log(`Variable TZ: ${process.env.TZ || '(no configurada)'}`);
+  
+  // FIX: Aceptar todas las variantes válidas de UTC
+  if (!esZonaHorariaValida(tz)) {
+    console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.error('⚠️  ERROR DE CONFIGURACIÓN: ZONA HORARIA');
+    console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.error(`Zona horaria actual: ${tz}`);
+    console.error('Zona horaria requerida: UTC (o variantes) / Europe/Madrid');
+    console.error('Variantes UTC aceptadas: UTC, Etc/UTC, GMT, GMT+0, etc.');
+    console.error('');
+    console.error('El sistema de fichajes puede fallar con otras zonas horarias.');
+    console.error('Configura TZ=UTC en las variables de entorno:');
+    console.error('  - En .env.local: TZ=UTC');
+    console.error('  - En Docker: ENV TZ=UTC');
+    console.error('  - En servidor: export TZ=UTC');
+    console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error(
+        `Zona horaria del servidor incorrecta: ${tz}. ` +
+        'Configure TZ=UTC en las variables de entorno.'
+      );
+    } else {
+      console.warn('⚠️  Modo desarrollo: continuando con advertencia');
     }
-
-    console.log('[Instrumentation] Inicializando servicios en background...');
-
-    // Importar dinámicamente para evitar problemas con edge runtime
-    const { documentosWorker } = await import('@/lib/plantillas/queue');
-
-    console.log('[Instrumentation] Worker de documentos iniciado');
-
-    // Event handlers para el worker
-    documentosWorker.on('completed', (job) => {
-      console.log(`[Worker] Job ${job.id} completado`);
-      Sentry.addBreadcrumb({
-        category: 'bullmq',
-        message: `Job ${job.id} completado`,
-        level: 'info',
-      });
-    });
-
-    documentosWorker.on('failed', (job, err) => {
-      console.error(`[Worker] Job ${job?.id} falló:`, err.message);
-      Sentry.captureException(err, {
-        tags: {
-          queue: 'documentos-generacion',
-        },
-        extra: {
-          jobId: job?.id,
-          name: job?.name,
-          attemptsMade: job?.attemptsMade,
-        },
-      });
-    });
-
-    documentosWorker.on('error', (err) => {
-      console.error('[Worker] Error en worker:', err);
-      Sentry.captureException(err, {
-        tags: {
-          queue: 'documentos-generacion',
-        },
-      });
-    });
-
-    // Graceful shutdown
-    const shutdown = async () => {
-      console.log('[Instrumentation] Cerrando worker de documentos...');
-      await documentosWorker.close();
-      process.exit(0);
-    };
-
-    process.on('SIGTERM', shutdown);
-    process.on('SIGINT', shutdown);
+  } else {
+    console.log(`✅ Zona horaria válida: ${tz}`);
+  }
+  
+  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  
+  // Registrar Sentry si está en producción
+  if (process.env.NODE_ENV === 'production') {
+    await import('./sentry.server.config');
   }
 }

@@ -415,6 +415,7 @@ export async function configurarCalendarioYJornadaAction(
     });
 
     revalidatePath('/signup');
+    revalidatePath('/hr/settings/compania');
 
     return {
       success: true,
@@ -541,6 +542,7 @@ export async function crearSedeAction({
     });
 
     revalidatePath('/signup');
+    revalidatePath('/hr/settings/compania');
 
     return {
       success: true,
@@ -647,6 +649,7 @@ export async function asignarSedeAction(sedeId: string, asignacion: AsignacionSe
     });
 
     revalidatePath('/signup');
+    revalidatePath('/hr/settings/compania');
 
     return {
       success: true,

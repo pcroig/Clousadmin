@@ -16,7 +16,7 @@
 | `/api/fichajes/eventos` | POST | Crear evento en fichaje existente. Recalcula horas automáticamente |
 | `/api/fichajes/eventos/{id}` | PATCH | Editar evento. Recalcula horas automáticamente |
 | `/api/fichajes/eventos/{id}` | DELETE | Eliminar evento |
-| `/api/fichajes/revision` | GET | Obtener fichajes pendientes de revisión. **⚠️ Actualizado**: Ahora incluye fichajes de HOY (lazy recovery con offset=0) |
+| `/api/fichajes/revision` | GET | Obtener fichajes pendientes de revisión. **Solo días vencidos** (lazy recovery con offset=1, excluye HOY) |
 | `/api/fichajes/revision` | POST | Procesar revisiones (actualizar/descartar fichajes) |
 | `/api/fichajes/cuadrar` | POST | Cuadrar fichajes masivamente creando eventos según jornada |
 | `/api/fichajes/balance/{empleadoId}` | GET | Balance de horas |
@@ -38,10 +38,10 @@
 - ✅ El balance se actualiza inmediatamente sin necesidad de editar eventos
 
 ### `GET /api/fichajes/revision`
-- ✅ **Corrección crítica**: Ahora incluye fichajes del día actual (HOY)
-- ✅ Lazy recovery procesa desde `offset = 0` (incluye hoy)
-- ✅ Filtro de fecha usa `lte: hoy` (incluye hoy)
-- ✅ Los empleados que no fichan hoy aparecen inmediatamente en cuadrar
+- ✅ **CORRECTO**: Solo fichajes de días VENCIDOS (excluye el día actual)
+- ✅ Lazy recovery procesa desde `offset = 1` (excluye hoy)
+- ✅ Filtro de fecha usa `lt: hoy` (excluye hoy)
+- ✅ Los empleados que no fichan aparecen al día siguiente después del CRON nocturno (23:30)
 
 ### Actualización en Tiempo Real
 - ✅ La tabla de fichajes se actualiza automáticamente mediante eventos `fichaje-updated`

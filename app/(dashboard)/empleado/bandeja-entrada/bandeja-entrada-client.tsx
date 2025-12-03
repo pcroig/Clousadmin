@@ -39,9 +39,7 @@ interface BandejaEntradaEmpleadoClientProps {
 export function BandejaEntradaEmpleadoClient({
   notificaciones,
 }: BandejaEntradaEmpleadoClientProps) {
-  const [filtroNotif, setFiltroNotif] = useState<'todas' | 'aprobada' | 'rechazada' | 'pendiente'>(
-    'todas',
-  );
+  const [filtroNotif, setFiltroNotif] = useState<'pendientes' | 'resueltas'>('pendientes');
 
   const notificacionesNoLeidas = notificaciones.filter((n) => !n.leida).length;
 
@@ -78,9 +76,9 @@ export function BandejaEntradaEmpleadoClient({
   };
 
   const notificacionesFiltradas =
-    filtroNotif === 'todas'
-      ? notificaciones
-      : notificaciones.filter((n) => n.tipo === filtroNotif);
+    filtroNotif === 'pendientes'
+      ? notificaciones.filter((n) => !n.leida)
+      : notificaciones.filter((n) => n.leida);
 
   // Iconos sin fondo - siempre gris oscuro según sistema de diseño
   const getIcono = (notif: Notificacion) => {
@@ -106,10 +104,8 @@ export function BandejaEntradaEmpleadoClient({
   };
 
   const contadores = {
-    todas: notificaciones.length,
-    aprobada: notificaciones.filter((n) => n.tipo === 'aprobada').length,
-    rechazada: notificaciones.filter((n) => n.tipo === 'rechazada').length,
-    pendiente: notificaciones.filter((n) => n.tipo === 'pendiente').length,
+    pendientes: notificaciones.filter((n) => !n.leida).length,
+    resueltas: notificaciones.filter((n) => n.leida).length,
   };
 
   return (
@@ -132,44 +128,24 @@ export function BandejaEntradaEmpleadoClient({
         <div className="hidden sm:flex items-center justify-between">
           <div className="flex gap-2">
             <button
-              onClick={() => setFiltroNotif('todas')}
+              onClick={() => setFiltroNotif('pendientes')}
               className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
-                filtroNotif === 'todas'
+                filtroNotif === 'pendientes'
                   ? 'bg-gray-900 text-white'
                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
               }`}
             >
-              Todas ({contadores.todas})
+              Pendientes ({contadores.pendientes})
             </button>
             <button
-              onClick={() => setFiltroNotif('aprobada')}
+              onClick={() => setFiltroNotif('resueltas')}
               className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
-                filtroNotif === 'aprobada'
+                filtroNotif === 'resueltas'
                   ? 'bg-gray-900 text-white'
                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
               }`}
             >
-              Aprobadas ({contadores.aprobada})
-            </button>
-            <button
-              onClick={() => setFiltroNotif('pendiente')}
-              className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
-                filtroNotif === 'pendiente'
-                  ? 'bg-gray-900 text-white'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
-            >
-              Pendientes ({contadores.pendiente})
-            </button>
-            <button
-              onClick={() => setFiltroNotif('rechazada')}
-              className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
-                filtroNotif === 'rechazada'
-                  ? 'bg-gray-900 text-white'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
-            >
-              Rechazadas ({contadores.rechazada})
+              Resueltas ({contadores.resueltas})
             </button>
           </div>
 
@@ -191,29 +167,9 @@ export function BandejaEntradaEmpleadoClient({
           <div className="flex items-center justify-between">
             <div className="inline-flex rounded-full border border-gray-200 p-0.5 text-xs font-medium">
               <button
-                onClick={() => setFiltroNotif('todas')}
+                onClick={() => setFiltroNotif('pendientes')}
                 className={`rounded-full px-3 py-1 transition ${
-                  filtroNotif === 'todas'
-                    ? 'bg-gray-900 text-white shadow-sm'
-                    : 'text-gray-600'
-                }`}
-              >
-                Todas
-              </button>
-              <button
-                onClick={() => setFiltroNotif('aprobada')}
-                className={`rounded-full px-3 py-1 transition ${
-                  filtroNotif === 'aprobada'
-                    ? 'bg-gray-900 text-white shadow-sm'
-                    : 'text-gray-600'
-                }`}
-              >
-                Aprobadas
-              </button>
-              <button
-                onClick={() => setFiltroNotif('pendiente')}
-                className={`rounded-full px-3 py-1 transition ${
-                  filtroNotif === 'pendiente'
+                  filtroNotif === 'pendientes'
                     ? 'bg-gray-900 text-white shadow-sm'
                     : 'text-gray-600'
                 }`}
@@ -221,14 +177,14 @@ export function BandejaEntradaEmpleadoClient({
                 Pendientes
               </button>
               <button
-                onClick={() => setFiltroNotif('rechazada')}
+                onClick={() => setFiltroNotif('resueltas')}
                 className={`rounded-full px-3 py-1 transition ${
-                  filtroNotif === 'rechazada'
+                  filtroNotif === 'resueltas'
                     ? 'bg-gray-900 text-white shadow-sm'
                     : 'text-gray-600'
                 }`}
               >
-                Rechazadas
+                Resueltas
               </button>
             </div>
             {notificacionesNoLeidas > 0 && (

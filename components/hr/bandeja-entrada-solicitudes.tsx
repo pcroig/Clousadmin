@@ -4,18 +4,12 @@
 
 'use client';
 
-import { Check, ClipboardList, MoreVertical, X } from 'lucide-react';
+import { Check, ClipboardList, X } from 'lucide-react';
 import { useState } from 'react';
 
 import { EmployeeAvatar } from '@/components/shared/employee-avatar';
 import { EmptyState } from '@/components/shared/empty-state';
 import { Button } from '@/components/ui/button';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { formatRelativeTime } from '@/lib/utils/formatRelativeTime';
 
 type SolicitudEstado =
@@ -341,20 +335,6 @@ export function BandejaEntradaSolicitudes({
                         </Button>
                       </>
                     )}
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
-                          <MoreVertical className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem>Ver detalles</DropdownMenuItem>
-                        <DropdownMenuItem>Ver empleado</DropdownMenuItem>
-                        {(solicitud.estado === 'pendiente' || solicitud.estado === 'pendiente_aprobacion') && (
-                          <DropdownMenuItem className="text-red-600">Archivar</DropdownMenuItem>
-                        )}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
                   </div>
                 </div>
               </div>

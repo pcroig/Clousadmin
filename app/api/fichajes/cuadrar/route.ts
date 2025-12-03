@@ -14,10 +14,11 @@ import {
   validateRequest
 } from '@/lib/api-handler';
 import {
-  actualizarCalculosFichaje,
+  calcularHorasTrabajadas,
+  calcularTiempoEnPausa,
 } from '@/lib/calculos/fichajes';
 import { prisma } from '@/lib/prisma';
-import { obtenerNombreDia } from '@/lib/utils/fechas';
+import { crearFechaConHora, normalizarFechaSinHora, obtenerNombreDia } from '@/lib/utils/fechas';
 
 import type { DiaConfig, JornadaConfig } from '@/lib/calculos/fichajes-helpers';
 
@@ -323,13 +324,8 @@ export async function POST(request: NextRequest) {
           }
 
           // Crear eventos faltantes MANTENIENDO los eventos originales
-          // La fecha debe pertenecer al día del fichaje (normalizar para evitar problemas de zona horaria)
-          const fechaBase = new Date(
-            fichaje.fecha.getFullYear(), 
-            fichaje.fecha.getMonth(), 
-            fichaje.fecha.getDate(),
-            0, 0, 0, 0
-          );
+          // FIX: Usar normalizarFechaSinHora para evitar desfases de zona horaria
+          const fechaBase = normalizarFechaSinHora(fichaje.fecha);
 
           // Lógica de creación de eventos (solo los faltantes)
           if (config.tipo === 'fija' || (configDia?.entrada && configDia.salida)) {
@@ -338,30 +334,26 @@ export async function POST(request: NextRequest) {
             // Entrada - solo si falta y no hay ausencia de mañana
             if (eventosFaltantes.includes('entrada') && !tiposEventos.includes('entrada')) {
                const [horas, minutos] = (configDia.entrada || '09:00').split(':').map(Number);
-               const hora = new Date(fechaBase); 
-               hora.setHours(horas, minutos, 0, 0);
+               const hora = crearFechaConHora(fechaBase, horas, minutos);
                await tx.fichaje_eventos.create({ data: { fichajeId, tipo: 'entrada', hora } });
             }
             
             // Pausas - solo si faltan y no hay ausencia de medio día
             if (eventosFaltantes.includes('pausa_inicio') && configDia.pausa_inicio && !tiposEventos.includes('pausa_inicio')) {
                const [h, m] = configDia.pausa_inicio.split(':').map(Number);
-               const hora = new Date(fechaBase); 
-               hora.setHours(h, m, 0, 0);
+               const hora = crearFechaConHora(fechaBase, h, m);
                await tx.fichaje_eventos.create({ data: { fichajeId, tipo: 'pausa_inicio', hora } });
             }
             if (eventosFaltantes.includes('pausa_fin') && configDia.pausa_fin && !tiposEventos.includes('pausa_fin')) {
                const [h, m] = configDia.pausa_fin.split(':').map(Number);
-               const hora = new Date(fechaBase); 
-               hora.setHours(h, m, 0, 0);
+               const hora = crearFechaConHora(fechaBase, h, m);
                await tx.fichaje_eventos.create({ data: { fichajeId, tipo: 'pausa_fin', hora } });
             }
             
             // Salida - solo si falta y no hay ausencia de tarde
             if (eventosFaltantes.includes('salida') && !tiposEventos.includes('salida')) {
                const [h, m] = (configDia.salida || '18:00').split(':').map(Number);
-               const hora = new Date(fechaBase); 
-               hora.setHours(h, m, 0, 0);
+               const hora = crearFechaConHora(fechaBase, h, m);
                await tx.fichaje_eventos.create({ data: { fichajeId, tipo: 'salida', hora } });
             }
           } 
@@ -385,7 +377,7 @@ export async function POST(request: NextRequest) {
               horaEntrada = new Date(eventoEntrada.hora);
             } else if (eventosFaltantes.includes('entrada') && !tiposEventos.includes('entrada')) {
               // Solo crear si no existe
-              horaEntrada.setHours(9, 0, 0, 0); // Default 9:00
+              horaEntrada = crearFechaConHora(fechaBase, 9, 0); // Default 9:00
               await tx.fichaje_eventos.create({ data: { fichajeId, tipo: 'entrada', hora: horaEntrada } });
             }
 
@@ -419,18 +411,27 @@ export async function POST(request: NextRequest) {
           }
 
           // 5. Actualizar cálculos y estado final
-          // NOTA: actualizarCalculosFichaje usa prisma global, no la tx. 
-          // Lo ideal sería pasarle tx, pero para simplificar refactor, recalcitramos horas "manualmente" aquí o aceptamos la leve race condition en el cálculo.
-          // Dado que 'actualizarCalculosFichaje' es una función de librería que hace queries, es mejor llamarla FUERA de la tx si es posible, o refactorizarla.
-          // Sin embargo, para mantener integridad, deberíamos actualizar el estado DENTRO de la tx.
+          // FIX: Calcular horas DENTRO de la transacción para evitar race conditions
+          // Obtener todos los eventos actualizados (incluyendo los recién creados)
+          const eventosActualizados = await tx.fichaje_eventos.findMany({
+            where: { fichajeId },
+            orderBy: { hora: 'asc' },
+          });
+
+          // Calcular horas trabajadas y en pausa usando las funciones puras
+          const horasTrabajadas = calcularHorasTrabajadas(eventosActualizados) ?? 0;
+          const horasEnPausa = calcularTiempoEnPausa(eventosActualizados);
           
           await tx.fichajes.update({
             where: { id: fichajeId },
             data: {
               estado: 'finalizado',
+              horasTrabajadas,
+              horasEnPausa,
               cuadradoMasivamente: true,
               cuadradoPor: session.user.id,
               cuadradoEn: new Date(),
+              fechaAprobacion: new Date(),
             },
           });
 
@@ -446,18 +447,9 @@ export async function POST(request: NextRequest) {
       maxWait: 5000 
     });
 
-    // Post-procesamiento: Actualizar cálculos de horas ANTES de responder
-    // CRÍTICO: Debe hacerse de forma síncrona para asegurar consistencia
-    console.log('[API Cuadrar] Recalculando horas trabajadas para fichajes cuadrados...');
-    for (const fichaje of fichajes) {
-      try {
-        await actualizarCalculosFichaje(fichaje.id);
-      } catch (e) {
-        console.error(`[API Cuadrar] Error recalculando horas para ${fichaje.id}`, e);
-        // Registrar error pero no fallar toda la operación
-        errores.push(`Fichaje ${fichaje.id}: Error calculando horas (${e instanceof Error ? e.message : 'desconocido'})`);
-      }
-    }
+    // FIX: Ya no necesitamos post-procesamiento de cálculo de horas
+    // porque se hace dentro de la transacción (líneas 421-432)
+    console.log(`[API Cuadrar] Transacción completada. ${cuadrados} fichajes cuadrados con horas calculadas.`);
 
     return successResponse({
       success: true,
