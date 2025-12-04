@@ -4,8 +4,8 @@
 // Jornada Step - Onboarding (Múltiples Jornadas)
 // ========================================
 
-import { ChevronDown, Plus, Trash2 } from 'lucide-react';
-import { forwardRef, useImperativeHandle, useState } from 'react';
+import { AlertCircle, ChevronDown, Plus, Trash2 } from 'lucide-react';
+import { forwardRef, useEffect, useImperativeHandle, useState } from 'react';
 import { toast } from 'sonner';
 
 import {
@@ -50,12 +50,49 @@ function createDefaultJornada(): JornadaFormData {
   };
 }
 
+interface Empleado {
+  id: string;
+  nombre: string;
+  apellidos: string;
+}
+
 export const JornadaStep = forwardRef<JornadaStepHandle, JornadaStepProps>(function JornadaStep(_, ref) {
   // Multiple jornadas state
   const [jornadas, setJornadas] = useState<JornadaFormData[]>([createDefaultJornada()]);
   const [expandedIndex, setExpandedIndex] = useState<string>('item-0');
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState<Record<number, Record<string, string>>>({});
+
+  // Empleados y asignación
+  const [empleados, setEmpleados] = useState<Empleado[]>([]);
+  const [loadingEmpleados, setLoadingEmpleados] = useState(true);
+  const [asignaciones, setAsignaciones] = useState<Record<number, string[]>>({}); // jornadaIndex -> empleadoIds[]
+
+  // Cargar empleados de la empresa
+  useEffect(() => {
+    async function cargarEmpleados() {
+      try {
+        const response = await fetch('/api/empleados?soloActivos=true');
+        if (!response.ok) throw new Error('Error al cargar empleados');
+
+        const data = await response.json() as Empleado[];
+        setEmpleados(data);
+
+        // Asignar todos los empleados a la primera jornada por defecto
+        if (data.length > 0) {
+          setAsignaciones({
+            0: data.map(e => e.id)
+          });
+        }
+      } catch (error) {
+        console.error('Error cargando empleados:', error);
+        toast.error('Error al cargar los empleados');
+      } finally {
+        setLoadingEmpleados(false);
+      }
+    }
+    cargarEmpleados();
+  }, []);
 
   function updateJornada(index: number, data: JornadaFormData) {
     const newJornadas = [...jornadas];
@@ -74,12 +111,43 @@ export const JornadaStep = forwardRef<JornadaStepHandle, JornadaStepProps>(funct
       toast.error('Debe haber al menos una jornada');
       return;
     }
+
+    // Reasignar empleados de la jornada eliminada a la primera jornada
+    const empleadosDeJornadaEliminada = asignaciones[index] || [];
+    const newAsignaciones = { ...asignaciones };
+    delete newAsignaciones[index];
+
+    // Agregar empleados de jornada eliminada a la primera jornada
+    if (empleadosDeJornadaEliminada.length > 0) {
+      newAsignaciones[0] = [...(newAsignaciones[0] || []), ...empleadosDeJornadaEliminada]];
+    }
+
+    // Re-indexar asignaciones
+    const reindexedAsignaciones: Record<number, string[]> = {};
+    Object.keys(newAsignaciones).forEach(key => {
+      const oldIndex = parseInt(key);
+      if (oldIndex < index) {
+        reindexedAsignaciones[oldIndex] = newAsignaciones[oldIndex];
+      } else if (oldIndex > index) {
+        reindexedAsignaciones[oldIndex - 1] = newAsignaciones[oldIndex];
+      }
+    });
+
+    setAsignaciones(reindexedAsignaciones);
     const newJornadas = jornadas.filter((_, i) => i !== index);
     setJornadas(newJornadas);
+
     // If we removed the expanded item, expand the first one
     if (expandedIndex === `item-${index}`) {
       setExpandedIndex('item-0');
     }
+  }
+
+  function handleAsignacionChange(jornadaIndex: number, empleadoIds: string[]) {
+    setAsignaciones({
+      ...asignaciones,
+      [jornadaIndex]: empleadoIds,
+    });
   }
 
   function getJornadaLabel(jornada: JornadaFormData, index: number): string {
@@ -104,6 +172,21 @@ export const JornadaStep = forwardRef<JornadaStepHandle, JornadaStepProps>(funct
         newErrors[index] = jornadaErrors;
       }
     });
+
+    // Validar que TODOS los empleados tengan jornada asignada
+    if (empleados.length > 0) {
+      const todosLosEmpleadosAsignados = new Set<string>();
+      Object.values(asignaciones).forEach(empleadoIds => {
+        empleadoIds.forEach(id => todosLosEmpleadosAsignados.add(id));
+      });
+
+      const empleadosSinJornada = empleados.filter(e => !todosLosEmpleadosAsignados.has(e.id));
+
+      if (empleadosSinJornada.length > 0) {
+        toast.error(`${empleadosSinJornada.length} empleado(s) sin jornada asignada. Todos los empleados deben tener una jornada.`);
+        isValid = false;
+      }
+    }
 
     setErrors(newErrors);
     return isValid;
@@ -187,19 +270,25 @@ export const JornadaStep = forwardRef<JornadaStepHandle, JornadaStepProps>(funct
         createdJornadaIds.push(jornadaGuardada.id);
       }
 
-      // Assign first jornada to entire company by default
-      // (HR can reassign employees to other jornadas later)
-      if (createdJornadaIds.length > 0) {
-        const asignacionResponse = await fetch('/api/jornadas/asignar', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            jornadaId: createdJornadaIds[0],
-            nivel: 'empresa',
-          }),
-        });
-        if (!asignacionResponse.ok) {
-          console.warn('No se pudo asignar la jornada por defecto a la empresa.');
+      // Asignar empleados a jornadas según las asignaciones configuradas
+      for (let i = 0; i < createdJornadaIds.length; i++) {
+        const jornadaId = createdJornadaIds[i];
+        const empleadosAsignados = asignaciones[i] || [];
+
+        if (empleadosAsignados.length > 0) {
+          const asignacionResponse = await fetch('/api/jornadas/asignar', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              jornadaId,
+              nivel: 'individual',
+              empleadoIds: empleadosAsignados,
+            }),
+          });
+
+          if (!asignacionResponse.ok) {
+            console.warn(`No se pudo asignar empleados a jornada ${i + 1}`);
+          }
         }
       }
 
@@ -219,14 +308,48 @@ export const JornadaStep = forwardRef<JornadaStepHandle, JornadaStepProps>(funct
     guardar
   }));
 
+  // Calcular empleados sin asignar
+  const empleadosAsignadosSet = new Set<string>();
+  Object.values(asignaciones).forEach(empleadoIds => {
+    empleadoIds.forEach(id => empleadosAsignadosSet.add(id));
+  });
+  const empleadosSinAsignar = empleados.filter(e => !empleadosAsignadosSet.has(e.id));
+
   return (
     <div className="space-y-6">
       <div className="space-y-2">
         <h3 className="text-lg font-semibold text-gray-900">Define las jornadas laborales</h3>
         <p className="text-sm text-gray-500">
-          Configura las jornadas de tu empresa. Puedes crear varias jornadas para diferentes equipos o roles.
+          Configura las jornadas de tu empresa y asigna empleados. Todos los empleados deben tener una jornada asignada.
         </p>
       </div>
+
+      {/* Alerta si hay empleados sin asignar */}
+      {empleadosSinAsignar.length > 0 && (
+        <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4">
+          <AlertCircle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <p className="text-sm font-medium text-amber-900">
+              {empleadosSinAsignar.length} empleado(s) sin jornada asignada
+            </p>
+            <p className="text-sm text-amber-700 mt-1">
+              Todos los empleados deben tener una jornada. Asígnalos a una de las jornadas antes de continuar.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Info de empleados totales */}
+      {empleados.length > 0 && (
+        <div className="text-sm text-gray-600 bg-gray-50 rounded-lg p-3 border border-gray-200">
+          <strong>{empleados.length}</strong> empleado(s) importado(s) •
+          <strong className="ml-1 text-green-700">{empleadosAsignadosSet.size}</strong> asignado(s) •
+          {empleadosSinAsignar.length > 0 && (
+            <strong className="ml-1 text-amber-700">{empleadosSinAsignar.length}</strong>
+          )}
+          {empleadosSinAsignar.length > 0 && ' sin asignar'}
+        </div>
+      )}
 
       <Accordion
         type="single"
@@ -269,9 +392,21 @@ export const JornadaStep = forwardRef<JornadaStepHandle, JornadaStepProps>(funct
                 data={jornada}
                 onChange={(data) => updateJornada(index, data)}
                 errors={errors[index] || {}}
-                disabled={saving}
-                showAsignacion={false}
+                disabled={saving || loadingEmpleados}
+                showAsignacion={empleados.length > 0}
+                nivelAsignacion="individual"
+                empleados={empleados}
+                empleadosSeleccionados={asignaciones[index] || []}
+                onEmpleadosSeleccionChange={(empleadoIds) => handleAsignacionChange(index, empleadoIds)}
               />
+              {/* Mostrar contador de empleados asignados */}
+              {empleados.length > 0 && (
+                <div className="mt-4 pt-4 border-t border-gray-200">
+                  <p className="text-sm text-gray-600">
+                    <strong>{(asignaciones[index] || []).length}</strong> de <strong>{empleados.length}</strong> empleado(s) asignados a esta jornada
+                  </p>
+                </div>
+              )}
             </AccordionContent>
           </AccordionItem>
         ))}
