@@ -9,6 +9,7 @@ import { getSession } from '@/lib/auth';
 import { UsuarioRol } from '@/lib/constants/enums';
 import { asegurarCarpetasSistemaParaEmpleado } from '@/lib/documentos';
 import { decryptEmpleadoData } from '@/lib/empleado-crypto';
+import { obtenerEtiquetaJornada } from '@/lib/jornadas/helpers';
 import { prisma } from '@/lib/prisma';
 import { decimalToNumber } from '@/lib/utils';
 
@@ -310,7 +311,11 @@ export default async function EmpleadoDetailPage(props: EmpleadoDetailPageProps)
     jornada: empleadoActualizado.jornada
       ? {
           id: empleadoActualizado.jornada.id,
-          nombre: empleadoActualizado.jornada.nombre,
+          etiqueta: obtenerEtiquetaJornada({
+            horasSemanales: Number(empleadoActualizado.jornada.horasSemanales),
+            config: empleadoActualizado.jornada.config as any,
+            id: empleadoActualizado.jornada.id,
+          }),
           horasSemanales: Number(empleadoActualizado.jornada.horasSemanales),
         }
       : null,

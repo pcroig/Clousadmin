@@ -17,6 +17,7 @@ import { convertDocxFromS3ToPdf } from './docx-to-pdf';
 import { resolverVariables } from './ia-resolver';
 import { extraerVariablesDeTexto, sanitizarNombreArchivo } from './sanitizar';
 import { ConfiguracionGeneracion, DatosEmpleado, ResultadoGeneracion } from './tipos';
+import { obtenerEtiquetaJornada } from '../jornadas/helpers';
 
 
 
@@ -151,8 +152,9 @@ export async function generarDocumentoDesdePlantilla(
         },
         jornada: {
           select: {
-            nombre: true,
+            id: true,
             horasSemanales: true,
+            config: true,
           },
         },
         manager: {
@@ -257,7 +259,11 @@ export async function generarDocumentoDesdePlantilla(
       empresa: empresaNormalizada,
       jornada: empleado.jornada
         ? {
-            nombre: empleado.jornada.nombre,
+            etiqueta: obtenerEtiquetaJornada({
+              horasSemanales: Number(empleado.jornada.horasSemanales),
+              config: empleado.jornada.config as any,
+              id: empleado.jornada.id,
+            }),
             horasSemanales: Number(empleado.jornada.horasSemanales),
           }
         : undefined,

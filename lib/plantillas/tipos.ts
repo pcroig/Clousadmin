@@ -79,7 +79,7 @@ export interface DatosEmpleado {
     web?: string;
   };
   jornada?: {
-    nombre: string;
+    etiqueta: string; // Descripción generada de la jornada (ej: "Jornada Fija 40h (09:00-18:00)")
     horasSemanales: number;
   };
   manager?: {
