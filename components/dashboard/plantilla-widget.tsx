@@ -62,10 +62,10 @@ export function PlantillaWidget({
       empleados: trabajando.empleados,
     },
     {
-      key: 'enPausa',
-      label: 'En pausa',
-      count: enPausa.count,
-      empleados: enPausa.empleados,
+      key: 'sinFichar',
+      label: 'Sin fichar',
+      count: sinFichar.count,
+      empleados: sinFichar.empleados,
     },
     {
       key: 'ausentes',
@@ -74,16 +74,16 @@ export function PlantillaWidget({
       empleados: ausentes.empleados,
     },
     {
-      key: 'sinFichar',
-      label: 'Sin fichar',
-      count: sinFichar.count,
-      empleados: sinFichar.empleados,
-    },
-    {
       key: 'fueraDeHorario',
       label: 'Fuera de horario',
       count: fueraDeHorario.count,
       empleados: fueraDeHorario.empleados,
+    },
+    {
+      key: 'enPausa',
+      label: 'En pausa',
+      count: enPausa.count,
+      empleados: enPausa.empleados,
     },
   ];
 

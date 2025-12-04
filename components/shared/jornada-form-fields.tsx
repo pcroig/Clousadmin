@@ -5,6 +5,9 @@
 // ========================================
 // Se usa en: onboarding, crear jornada, editar jornada
 
+import { Minus, Plus } from 'lucide-react';
+
+import { InfoTooltip } from '@/components/shared/info-tooltip';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
   Field,
@@ -12,6 +15,13 @@ import {
   FieldLabel,
 } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupButton,
+  InputGroupInput,
+  InputGroupText,
+} from '@/components/ui/input-group';
 import {
   Select,
   SelectContent,
@@ -80,6 +90,10 @@ export function JornadaFormFields({
   equipoSeleccionado = '',
   onEquipoSeleccionadoChange,
 }: JornadaFormFieldsProps) {
+  const DESCANSO_MIN = 0;
+  const DESCANSO_MAX = 480;
+  const DESCANSO_STEP = 15;
+
   function updateData(updates: Partial<JornadaFormData>) {
     onChange({ ...data, ...updates });
   }
@@ -105,6 +119,32 @@ export function JornadaFormFields({
       : [...empleadosSeleccionados, empleadoId];
     onEmpleadosSeleccionChange(newSelection);
   }
+
+  const parseDescansoValue = (value: string): number => {
+    const parsed = Number.parseInt(value, 10);
+    return Number.isNaN(parsed) ? 0 : parsed;
+  };
+
+  const clampDescanso = (value: number) => Math.min(DESCANSO_MAX, Math.max(DESCANSO_MIN, value));
+
+  const setDescansoValue = (value: number) => {
+    const clamped = clampDescanso(value);
+    updateData({ descansoMinutos: clamped === 0 ? '' : clamped.toString() });
+  };
+
+  const adjustDescanso = (delta: number) => {
+    const current = parseDescansoValue(data.descansoMinutos);
+    setDescansoValue(current + delta);
+  };
+
+  const handleDescansoBlur = () => {
+    if (data.descansoMinutos === '') return;
+    setDescansoValue(parseDescansoValue(data.descansoMinutos));
+  };
+
+  const descansoActual = parseDescansoValue(data.descansoMinutos);
+  const canDecreaseDescanso = descansoActual > DESCANSO_MIN;
+  const canIncreaseDescanso = descansoActual < DESCANSO_MAX;
 
   return (
     <div className="space-y-4">
@@ -245,22 +285,51 @@ export function JornadaFormFields({
       {/* Tiempo de descanso */}
       {!disabled && (
         <Field>
-          <FieldLabel htmlFor="descanso">Tiempo de descanso (minutos)</FieldLabel>
-          <Input
-            id="descanso"
-            type="number"
-            min={0}
-            max={480}
-            step={15}
-            value={data.descansoMinutos}
-            onChange={(e) => updateData({ descansoMinutos: e.target.value })}
-            placeholder="30"
-          />
-          <p className="text-sm text-gray-500 mt-1">
-            {data.tipoJornada === 'flexible' 
-              ? 'Descanso mínimo obligatorio al calcular balances'
-              : 'Tiempo de descanso diario (se aplicará de 14:00 a 14:00 + minutos)'}
-          </p>
+          <div className="flex items-center gap-2">
+            <FieldLabel htmlFor="descanso" className="flex items-center gap-2">
+              Tiempo de descanso
+            </FieldLabel>
+            <InfoTooltip
+              content="Los descansos son obligatorios: si la jornada supera las 6 horas debes garantizar al menos 15 minutos consecutivos."
+              side="right"
+            />
+          </div>
+          <InputGroup className="mt-2">
+            <InputGroupButton
+              type="button"
+              size="icon-xs"
+              variant="ghost"
+              aria-label="Reducir minutos de descanso"
+              onClick={() => adjustDescanso(-DESCANSO_STEP)}
+              disabled={!canDecreaseDescanso}
+            >
+              <Minus className="h-4 w-4" />
+            </InputGroupButton>
+            <InputGroupInput
+              id="descanso"
+              type="number"
+              min={DESCANSO_MIN}
+              max={DESCANSO_MAX}
+              step={DESCANSO_STEP}
+              value={data.descansoMinutos}
+              onChange={(e) => updateData({ descansoMinutos: e.target.value })}
+              onBlur={handleDescansoBlur}
+              placeholder="15"
+            />
+            <InputGroupAddon align="inline-end" className="gap-1">
+              <InputGroupText>min</InputGroupText>
+              <InputGroupButton
+                type="button"
+                size="icon-xs"
+                variant="ghost"
+                aria-label="Incrementar minutos de descanso"
+                onClick={() => adjustDescanso(DESCANSO_STEP)}
+                disabled={!canIncreaseDescanso}
+              >
+                <Plus className="h-4 w-4" />
+              </InputGroupButton>
+            </InputGroupAddon>
+          </InputGroup>
         </Field>
       )}
 

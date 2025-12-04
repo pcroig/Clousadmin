@@ -8,10 +8,15 @@ import { NextRequest } from 'next/server';
 
 import {
   badRequestResponse,
+  featureDisabledResponse,
   handleApiError,
   requireAuth,
   successResponse,
 } from '@/lib/api-handler';
+import {
+  CAMPANAS_VACACIONES_ENABLED,
+  CAMPANAS_VACACIONES_FEATURE_NAME,
+} from '@/lib/constants/feature-flags';
 import { prisma } from '@/lib/prisma';
 
 // GET /api/campanas-vacaciones/[id] - Obtener campaña específica
@@ -21,6 +26,10 @@ export async function GET(
 ) {
     const params = await context.params;
   try {
+    if (!CAMPANAS_VACACIONES_ENABLED) {
+      return featureDisabledResponse(CAMPANAS_VACACIONES_FEATURE_NAME);
+    }
+
     // Verificar autenticación
     const authResult = await requireAuth(req);
     if (authResult instanceof Response) return authResult;

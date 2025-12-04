@@ -358,6 +358,30 @@ export async function PATCH(
         }
       }
 
+      // Si se actualizó diasAusenciasPersonalizados, actualizar el saldo del año actual
+      if (empleadoData.diasAusenciasPersonalizados !== undefined) {
+        const añoActual = new Date().getFullYear();
+        const diasAsignados = empleadoData.diasAusenciasPersonalizados ?? updatedEmpleado.diasVacaciones;
+        
+        // Buscar el saldo del año actual
+        const saldoExistente = await tx.empleadoSaldoAusencias.findFirst({
+          where: {
+            empleadoId: id,
+            anio: añoActual,
+          },
+        });
+
+        if (saldoExistente) {
+          // Actualizar solo diasTotales, manteniendo diasUsados y diasPendientes
+          await tx.empleadoSaldoAusencias.update({
+            where: { id: saldoExistente.id },
+            data: {
+              diasTotales: diasAsignados,
+            },
+          });
+        }
+      }
+
       return updatedEmpleado;
     });
 

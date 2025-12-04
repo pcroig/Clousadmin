@@ -82,6 +82,7 @@ export async function POST(request: NextRequest) {
                 data: {
                   empresaId: empresa.id,
                   empleadoId: empleado.id,
+                  jornadaId: empleado.jornada?.id ?? null,
                   fecha: ayer,
                   estado: EstadoFichaje.pendiente,
                 },

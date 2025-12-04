@@ -6,11 +6,16 @@ import { NextRequest } from 'next/server';
 
 import {
   badRequestResponse,
+  featureDisabledResponse,
   handleApiError,
   requireAuth,
   successResponse,
 } from '@/lib/api-handler';
 import { calcularDias } from '@/lib/calculos/ausencias';
+import {
+  CAMPANAS_VACACIONES_ENABLED,
+  CAMPANAS_VACACIONES_FEATURE_NAME,
+} from '@/lib/constants/feature-flags';
 import { EstadoAusencia, UsuarioRol } from '@/lib/constants/enums';
 import { crearNotificacionCampanaCuadrada } from '@/lib/notificaciones';
 import { prisma } from '@/lib/prisma';
@@ -40,6 +45,10 @@ export async function POST(
 ) {
     const params = await context.params;
   try {
+    if (!CAMPANAS_VACACIONES_ENABLED) {
+      return featureDisabledResponse(CAMPANAS_VACACIONES_FEATURE_NAME);
+    }
+
     const authResult = await requireAuth(req);
     if (authResult instanceof Response) return authResult;
     const { session } = authResult;

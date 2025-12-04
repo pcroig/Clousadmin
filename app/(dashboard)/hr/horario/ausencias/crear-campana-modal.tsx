@@ -5,7 +5,7 @@ import { toast } from 'sonner';
 
 import { InfoTooltip } from '@/components/shared/info-tooltip';
 import { LoadingButton } from '@/components/shared/loading-button';
-import { ResponsiveDatePicker } from '@/components/shared/responsive-date-picker';
+import { ResponsiveDateRangePicker } from '@/components/shared/responsive-date-picker';
 import { ResponsiveDialog } from '@/components/shared/responsive-dialog';
 import { SearchableMultiSelect } from '@/components/shared/searchable-multi-select';
 import { Button } from '@/components/ui/button';
@@ -243,33 +243,29 @@ export function CrearCampanaModal({
           )}
 
           <Field>
-            <FieldLabel>Fecha inicio objetivo</FieldLabel>
-            <ResponsiveDatePicker
-              date={fechaInicio}
-              onSelect={setFechaInicio}
-              placeholder="Seleccionar fecha"
-              label="Fecha inicio objetivo"
+            <FieldLabel>Periodo objetivo de la campaña</FieldLabel>
+            <ResponsiveDateRangePicker
+              dateRange={{ from: fechaInicio, to: fechaFin }}
+              onSelect={(range) => {
+                setFechaInicio(range.from);
+                setFechaFin(range.to);
+              }}
+              placeholder="Seleccionar rango de fechas"
+              label="Seleccionar periodo objetivo"
+              disabled={(date) => date < today}
               fromDate={today}
             />
-          </Field>
-
-          <Field>
-            <FieldLabel>Fecha fin objetivo</FieldLabel>
-            <ResponsiveDatePicker
-              date={fechaFin}
-              onSelect={setFechaFin}
-              placeholder="Seleccionar fecha"
-              label="Fecha fin objetivo"
-              fromDate={fechaInicio || today}
-              disabled={(date) => fechaInicio ? date < fechaInicio : false}
-            />
+            {fechaInicio && fechaFin && (
+              <p className="mt-1 text-xs text-gray-500">
+                Periodo de {Math.ceil((fechaFin.getTime() - fechaInicio.getTime()) / (1000 * 60 * 60 * 24)) + 1} días
+              </p>
+            )}
           </Field>
 
           <div className="pt-2">
             <div className="flex items-center gap-2 text-sm font-medium text-gray-900">
               ¿Cómo funciona?
               <InfoTooltip
-                size="md"
                 side="right"
                 content={(
                   <div className="space-y-2 text-sm">

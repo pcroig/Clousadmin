@@ -18,6 +18,41 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.0.0] - 2025-12-04
+
+### Changed - Refactorización de API de Equipos
+
+#### Breaking Changes
+- **GET /api/equipos**: Ahora retorna objeto paginado `{ data: Equipo[], pagination: {...} }` en lugar de array directo
+  - Los componentes frontend han sido actualizados con fallbacks para mantener compatibilidad
+
+#### Added
+- **Validación con Zod**: Todos los endpoints de equipos ahora usan schemas de validación
+  - `createEquipoSchema`, `updateEquipoSchema`, `addMemberSchema`, `changeManagerSchema`, `politicaAusenciasSchema`
+- **Helpers centralizados**: Nuevo módulo `lib/equipos/helpers.ts`
+  - `formatEquipoResponse()` - Formateador único para respuestas
+  - `validateTeamBelongsToCompany()` - Validación de pertenencia
+  - `validateEmployeeIsTeamMember()` - Validación de membresía
+  - `getTeamMemberIds()` - Helper para obtener IDs
+- **Paginación**: GET /api/equipos ahora soporta paginación con `page` y `limit`
+- **Validaciones mejoradas**:
+  - Verificación de sedes antes de crear/actualizar
+  - Validación de empleados activos antes de añadir
+  - Verificación de manager como miembro del equipo
+
+#### Improved
+- **Eliminación de código duplicado**: ~200 líneas de código duplicado eliminadas
+- **Type safety**: Tipos explícitos en todas las funciones
+- **Manejo de errores**: Consistente con `handleApiError()` en todos los endpoints
+- **Seguridad**: Validaciones robustas de pertenencia a empresa en todos los endpoints
+- **Estructura de respuesta**: Estandarizada en todos los endpoints
+
+#### Fixed
+- **Error de runtime**: "equipos.map is not a function" - Corregido en 5 componentes
+- **Compatibilidad backward**: Componentes actualizados para soportar ambas estructuras de respuesta
+
+---
+
 ## [1.0.0] - 2025-01-27
 
 ### Added - Refactorización Completa de API

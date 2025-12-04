@@ -2,11 +2,25 @@
 // API Routes - Team Manager
 // ========================================
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 
-import { getSession } from '@/lib/auth';
-import { UsuarioRol } from '@/lib/constants/enums';
+import {
+  badRequestResponse,
+  handleApiError,
+  notFoundResponse,
+  requireAuthAsHR,
+  successResponse,
+  validateRequest,
+} from '@/lib/api-handler';
+import {
+  equipoInclude,
+  type EquipoWithRelations,
+  formatEquipoResponse,
+  validateEmployeeIsTeamMember,
+  validateTeamBelongsToCompany,
+} from '@/lib/equipos/helpers';
 import { prisma } from '@/lib/prisma';
+import { changeManagerSchema } from '@/lib/validaciones/equipos-schemas';
 
 
 type RouteParams = {
@@ -19,100 +33,44 @@ type RouteParams = {
 export async function PATCH(request: NextRequest, context: RouteParams) {
   const params = await context.params;
   try {
-    const session = await getSession();
-
-    if (!session || session.user.rol !== UsuarioRol.hr_admin) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
-    }
+    const authResult = await requireAuthAsHR(request);
+    if (authResult instanceof Response) return authResult;
+    const { session } = authResult;
 
     const { id: equipoId } = params;
-    const body = await request.json() as Record<string, unknown>;
-    const { managerId } = body;
 
-    // Verify team belongs to user's company
-    const team = await prisma.equipos.findFirst({
-      where: {
-        id: equipoId,
-        empresaId: session.user.empresaId,
-      },
-    });
-
-    if (!team) {
-      return NextResponse.json({ error: 'Equipo no encontrado' }, { status: 404 });
+    // Validar que el equipo pertenece a la empresa
+    const belongsToCompany = await validateTeamBelongsToCompany(equipoId, session.user.empresaId);
+    if (!belongsToCompany) {
+      return notFoundResponse('Equipo no encontrado');
     }
 
-    // If managerId is provided, verify they are a member of the team
-    const managerIdStr = typeof managerId === 'string' ? managerId : null;
-    if (managerIdStr) {
-      const isMember = await prisma.empleado_equipos.findUnique({
-        where: {
-          empleadoId_equipoId: {
-            empleadoId: managerIdStr,
-            equipoId,
-          },
-        },
-      });
+    // Validar request body
+    const validationResult = await validateRequest(request, changeManagerSchema);
+    if (validationResult instanceof Response) return validationResult;
+    const { data: validatedData } = validationResult;
 
+    // Si se proporciona un managerId, verificar que sea miembro del equipo
+    if (validatedData.managerId) {
+      const isMember = await validateEmployeeIsTeamMember(validatedData.managerId, equipoId);
       if (!isMember) {
-        return NextResponse.json(
-          { error: 'El responsable debe ser miembro del equipo' },
-          { status: 400 }
-        );
+        return badRequestResponse('El responsable debe ser miembro del equipo');
       }
     }
 
-    // Update manager
-    const updatedTeam = await prisma.equipos.update({
+    // Actualizar manager
+    const updatedTeamRaw = await prisma.equipos.update({
       where: { id: equipoId },
       data: {
-        managerId: managerId || null,
+        managerId: validatedData.managerId,
       },
-      include: {
-        empleados: {
-          select: {
-            id: true,
-            nombre: true,
-            apellidos: true,
-          },
-        },
-        empleado_equipos: {
-          include: {
-            empleado: {
-              select: {
-                id: true,
-                nombre: true,
-                apellidos: true,
-                fotoUrl: true,
-              },
-            },
-          },
-        },
-        sede: {
-          select: {
-            id: true,
-            nombre: true,
-          },
-        },
-      },
+      include: equipoInclude,
     });
 
-    const formattedTeam = {
-      ...updatedTeam,
-      manager: updatedTeam.empleados
-        ? {
-            id: updatedTeam.empleados.id,
-            nombre: updatedTeam.empleados.nombre,
-            apellidos: updatedTeam.empleados.apellidos,
-          }
-        : null,
-      miembros: updatedTeam.empleado_equipos.map((miembro) => ({
-        empleado: miembro.empleado,
-      })),
-    };
+    const updatedTeam = formatEquipoResponse(updatedTeamRaw as EquipoWithRelations);
 
-    return NextResponse.json(formattedTeam);
+    return successResponse(updatedTeam);
   } catch (error) {
-    console.error('Error updating team manager:', error);
-    return NextResponse.json({ error: 'Error al cambiar responsable' }, { status: 500 });
+    return handleApiError(error, 'API PATCH /api/equipos/[id]/manager');
   }
 }

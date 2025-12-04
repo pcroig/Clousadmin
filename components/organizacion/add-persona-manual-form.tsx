@@ -53,6 +53,7 @@ interface ApiPuesto {
 }
 
 interface EquiposResponse {
+  data?: ApiEquipo[];
   equipos?: ApiEquipo[];
 }
 

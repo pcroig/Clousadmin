@@ -64,6 +64,17 @@ export function FichajesTab({ empleadoId }: { empleadoId: string }) {
     }
   }, [empleadoId, refetchFichajes]);
 
+  // Listener para refrescar en tiempo real
+  useEffect(() => {
+    function handleRealtimeUpdate() {
+      if (empleadoId) {
+        refetchFichajes(`/api/fichajes?empleadoId=${empleadoId}&propios=1`);
+      }
+    }
+    window.addEventListener('fichaje-updated', handleRealtimeUpdate);
+    return () => window.removeEventListener('fichaje-updated', handleRealtimeUpdate);
+  }, [empleadoId, refetchFichajes]);
+
   function agruparPorJornada(fichajes: Fichaje[]): JornadaDia[] {
     // Agrupar por fecha
     const grupos: Record<string, Fichaje[]> = {};

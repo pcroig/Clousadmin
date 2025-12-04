@@ -324,8 +324,15 @@ export async function generarDocumentoDesdePlantilla(
     console.log(`[Generar] Nombre del documento: ${nombreDocumentoFinal}`);
 
     // 8. Subir a S3
-    const carpetaDestino =
+    const carpetaDestinoRaw =
       configuracion.carpetaDestino || plantilla.carpetaDestinoDefault || 'Otros';
+
+    // Validar que la carpeta destino es una carpeta del sistema válida
+    const CARPETAS_VALIDAS = ['Contratos', 'Nóminas', 'Justificantes', 'Otros'] as const;
+    const carpetaDestino = (CARPETAS_VALIDAS.includes(carpetaDestinoRaw as any)
+      ? carpetaDestinoRaw
+      : 'Otros') as 'Contratos' | 'Nóminas' | 'Justificantes' | 'Otros';
+
     const s3Key = `documentos/${empleado.empresaId}/${empleadoId}/${carpetaDestino}/${nombreDocumentoFinal}`;
 
     await subirDocumento(documentoBuffer, s3Key, DOCX_MIME_TYPE);
@@ -336,34 +343,12 @@ export async function generarDocumentoDesdePlantilla(
     const { pdfS3Key, pdfSize } = await convertDocxFromS3ToPdf(s3Key);
     console.log(`[Generar] PDF generado a partir de DOCX: ${pdfS3Key}`);
 
-    // 9. Buscar o crear carpeta destino
-    let carpeta = await prisma.carpetas.findFirst({
-      where: {
-        empleadoId: empleadoId,
-        nombre: carpetaDestino,
-        empresaId: empleado.empresaId,
-      },
-    });
-
-    if (!carpeta) {
-      // Crear carpeta si no existe
-      carpeta = await prisma.carpetas.create({
-        data: {
-          empresaId: empleado.empresaId,
-          empleadoId: empleadoId,
-          nombre: carpetaDestino,
-          esSistema: false,
-        },
-      });
-      console.log(`[Generar] Carpeta creada: ${carpetaDestino}`);
-    }
-
     // 10. Crear registro de Documento (siempre PDF)
+    // IMPORTANTE: Ya NO se asigna carpetaId aquí, se hace después con sincronización
     const documento = await prisma.documentos.create({
       data: {
         empresaId: empleado.empresaId,
         empleadoId: empleadoId,
-        carpetaId: carpeta.id,
         nombre: nombreDocumentoPdf,
         tipoDocumento: 'generado',
         mimeType: 'application/pdf',
@@ -371,6 +356,7 @@ export async function generarDocumentoDesdePlantilla(
         s3Key: pdfS3Key,
         s3Bucket: process.env.STORAGE_BUCKET || 'clousadmin-documents',
         requiereFirma: configuracion.requiereFirma || plantilla.requiereFirma,
+        generadoDesdePlantilla: true,
         datosExtraidos: {
           origenDocx: {
             nombre: nombreDocumentoFinal,
@@ -380,6 +366,24 @@ export async function generarDocumentoDesdePlantilla(
         },
       },
     });
+
+    // 10.1. Sincronizar documento con carpetas (empleado + master)
+    // Esta es la función CLAVE para la sincronización automática
+    const { sincronizarDocumentoConCarpetasSistema } = await import('@/lib/documentos');
+    const sincronizacion = await sincronizarDocumentoConCarpetasSistema(
+      documento.id,
+      empleadoId,
+      empleado.empresaId,
+      carpetaDestino
+    );
+
+    console.log(
+      `[Generar] Documento sincronizado con ${sincronizacion.carpetasAsignadas} carpetas:`,
+      {
+        carpetaEmpleado: sincronizacion.carpetaEmpleadoId,
+        carpetaMaster: sincronizacion.carpetaMasterId,
+      }
+    );
 
     // 11. Crear registro de DocumentoGenerado
     const requiereFirmaFinal = configuracion.requiereFirma || plantilla.requiereFirma;

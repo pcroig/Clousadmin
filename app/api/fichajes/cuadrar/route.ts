@@ -7,6 +7,7 @@ import { NextRequest } from 'next/server';
 import { z } from 'zod';
 
 import {
+  badRequestResponse,
   handleApiError,
   isNextResponse,
   requireAuthAsHR,
@@ -17,6 +18,12 @@ import {
   calcularHorasTrabajadas,
   calcularTiempoEnPausa,
 } from '@/lib/calculos/fichajes';
+import { calcularHorasEsperadasDelDia } from '@/lib/calculos/fichajes-helpers';
+import {
+  ajustarSalidaPorJornada,
+  obtenerPromedioEventosHistoricos,
+  validarSecuenciaEventos,
+} from '@/lib/calculos/fichajes-historico';
 import { prisma } from '@/lib/prisma';
 import { crearFechaConHora, normalizarFechaSinHora, obtenerNombreDia } from '@/lib/utils/fechas';
 
@@ -30,6 +37,8 @@ const cuadrarSchema = z.object({
   (data) => (data.fichajeIds?.length ?? 0) > 0 || (data.descartarIds?.length ?? 0) > 0,
   { message: 'Debe proporcionar al menos un fichaje' }
 );
+
+const MAX_FICHAJES_POR_REQUEST = 50;
 
 // POST /api/fichajes/cuadrar - Cuadrar fichajes masivamente (solo HR Admin)
 export async function POST(request: NextRequest) {
@@ -46,6 +55,16 @@ export async function POST(request: NextRequest) {
 
     const fichajeIds = validatedData.fichajeIds ?? [];
     const descartarIds = validatedData.descartarIds ?? [];
+
+    if (fichajeIds.length > MAX_FICHAJES_POR_REQUEST) {
+      return badRequestResponse(
+        `Máximo ${MAX_FICHAJES_POR_REQUEST} fichajes por solicitud`,
+        {
+          recibidos: fichajeIds.length,
+          limite: MAX_FICHAJES_POR_REQUEST,
+        }
+      );
+    }
 
     let cuadrados = 0;
     const errores: string[] = [];
@@ -323,92 +342,159 @@ export async function POST(request: NextRequest) {
             continue;
           }
 
-          // Crear eventos faltantes MANTENIENDO los eventos originales
-          // FIX: Usar normalizarFechaSinHora para evitar desfases de zona horaria
+          // Intentar completar eventos usando promedio histórico
+          const promedioHistorico = await obtenerPromedioEventosHistoricos(
+            fichaje.empleadoId,
+            fichaje.fecha,
+            jornada.id,
+            5
+          );
+
+          if (promedioHistorico && validarSecuenciaEventos(promedioHistorico)) {
+            const horasEsperadasDia = calcularHorasEsperadasDelDia(jornada, fichaje.fecha);
+            const descansoMinimoStr =
+              typeof config.descansoMinimo === 'string' ? config.descansoMinimo : undefined;
+            const promedioAjustado = ajustarSalidaPorJornada(
+              promedioHistorico,
+              fichaje.fecha,
+              horasEsperadasDia,
+              descansoMinimoStr
+            );
+
+            const registrarEventoDesdePromedio = async (
+              tipo: 'entrada' | 'pausa_inicio' | 'pausa_fin' | 'salida',
+              hora: Date | null
+            ) => {
+              if (!hora) return;
+              if (!eventosFaltantes.includes(tipo) || tiposEventos.includes(tipo)) {
+                return;
+              }
+
+              await tx.fichaje_eventos.create({
+                data: {
+                  fichajeId,
+                  tipo,
+                  hora,
+                },
+              });
+              tiposEventos.push(tipo);
+            };
+
+            await registrarEventoDesdePromedio('entrada', promedioAjustado.entrada);
+            await registrarEventoDesdePromedio('pausa_inicio', promedioAjustado.pausa_inicio);
+            await registrarEventoDesdePromedio('pausa_fin', promedioAjustado.pausa_fin);
+            await registrarEventoDesdePromedio('salida', promedioAjustado.salida);
+
+            eventosFaltantes = eventosRequeridos.filter((req) => !tiposEventos.includes(req));
+
+            console.log(`[API Cuadrar] Promedio histórico aplicado para fichaje ${fichajeId}`, {
+              empleadoId: fichaje.empleadoId,
+              eventosRestantes: eventosFaltantes,
+            });
+          } else {
+            console.log(
+              `[API Cuadrar] Sin promedio histórico disponible para fichaje ${fichajeId}, usando fallback de jornada`
+            );
+          }
+
+          // Re-evaluar tras el promedio
           const fechaBase = normalizarFechaSinHora(fichaje.fecha);
+          if (eventosFaltantes.length === 0) {
+            // Saltar creación manual pero continuar para recalcular horas al final
+          } else {
+            // Lógica de creación de eventos (solo los faltantes)
+            if (config.tipo === 'fija' || (configDia?.entrada && configDia.salida)) {
+              if (!configDia) continue; // Safety check
 
-          // Lógica de creación de eventos (solo los faltantes)
-          if (config.tipo === 'fija' || (configDia?.entrada && configDia.salida)) {
-            if (!configDia) continue; // Safety check
+              // Entrada - solo si falta y no hay ausencia de mañana
+              if (eventosFaltantes.includes('entrada') && !tiposEventos.includes('entrada')) {
+                const [horas, minutos] = (configDia.entrada || '09:00').split(':').map(Number);
+                const hora = crearFechaConHora(fechaBase, horas, minutos);
+                await tx.fichaje_eventos.create({ data: { fichajeId, tipo: 'entrada', hora } });
+              }
+              
+              // Pausas - solo si faltan y no hay ausencia de medio día
+              if (
+                eventosFaltantes.includes('pausa_inicio') &&
+                configDia.pausa_inicio &&
+                !tiposEventos.includes('pausa_inicio')
+              ) {
+                const [h, m] = configDia.pausa_inicio.split(':').map(Number);
+                const hora = crearFechaConHora(fechaBase, h, m);
+                await tx.fichaje_eventos.create({ data: { fichajeId, tipo: 'pausa_inicio', hora } });
+              }
+              if (
+                eventosFaltantes.includes('pausa_fin') &&
+                configDia.pausa_fin &&
+                !tiposEventos.includes('pausa_fin')
+              ) {
+                const [h, m] = configDia.pausa_fin.split(':').map(Number);
+                const hora = crearFechaConHora(fechaBase, h, m);
+                await tx.fichaje_eventos.create({ data: { fichajeId, tipo: 'pausa_fin', hora } });
+              }
+              
+              // Salida - solo si falta y no hay ausencia de tarde
+              if (eventosFaltantes.includes('salida') && !tiposEventos.includes('salida')) {
+                const [h, m] = (configDia.salida || '18:00').split(':').map(Number);
+                const hora = crearFechaConHora(fechaBase, h, m);
+                await tx.fichaje_eventos.create({ data: { fichajeId, tipo: 'salida', hora } });
+              }
+            } 
+            else if (config.tipo === 'flexible') {
+              // Lógica flexible (calculada) - MANTENER eventos originales
+              // Calcular horas por día promedio
+               const diasActivos = Object.entries(config).reduce((count, [k, v]) => {
+                if (['tipo', 'descansoMinimo', 'limiteInferior', 'limiteSuperior'].includes(k)) return count;
+                if (v && typeof v === 'object' && !Array.isArray(v) && (v as DiaConfig).activo) return count + 1;
+                return count;
+              }, 0);
+              const diasLab = diasActivos > 0 ? diasActivos : 5;
+              const horasPorDia = Number(jornada.horasSemanales) / diasLab;
 
-            // Entrada - solo si falta y no hay ausencia de mañana
-            if (eventosFaltantes.includes('entrada') && !tiposEventos.includes('entrada')) {
-               const [horas, minutos] = (configDia.entrada || '09:00').split(':').map(Number);
-               const hora = crearFechaConHora(fechaBase, horas, minutos);
-               await tx.fichaje_eventos.create({ data: { fichajeId, tipo: 'entrada', hora } });
-            }
-            
-            // Pausas - solo si faltan y no hay ausencia de medio día
-            if (eventosFaltantes.includes('pausa_inicio') && configDia.pausa_inicio && !tiposEventos.includes('pausa_inicio')) {
-               const [h, m] = configDia.pausa_inicio.split(':').map(Number);
-               const hora = crearFechaConHora(fechaBase, h, m);
-               await tx.fichaje_eventos.create({ data: { fichajeId, tipo: 'pausa_inicio', hora } });
-            }
-            if (eventosFaltantes.includes('pausa_fin') && configDia.pausa_fin && !tiposEventos.includes('pausa_fin')) {
-               const [h, m] = configDia.pausa_fin.split(':').map(Number);
-               const hora = crearFechaConHora(fechaBase, h, m);
-               await tx.fichaje_eventos.create({ data: { fichajeId, tipo: 'pausa_fin', hora } });
-            }
-            
-            // Salida - solo si falta y no hay ausencia de tarde
-            if (eventosFaltantes.includes('salida') && !tiposEventos.includes('salida')) {
-               const [h, m] = (configDia.salida || '18:00').split(':').map(Number);
-               const hora = crearFechaConHora(fechaBase, h, m);
-               await tx.fichaje_eventos.create({ data: { fichajeId, tipo: 'salida', hora } });
-            }
-          } 
-          else if (config.tipo === 'flexible') {
-            // Lógica flexible (calculada) - MANTENER eventos originales
-            // Calcular horas por día promedio
-             const diasActivos = Object.entries(config).reduce((count, [k, v]) => {
-              if (['tipo', 'descansoMinimo', 'limiteInferior', 'limiteSuperior'].includes(k)) return count;
-              if (v && typeof v === 'object' && !Array.isArray(v) && (v as DiaConfig).activo) return count + 1;
-              return count;
-            }, 0);
-            const diasLab = diasActivos > 0 ? diasActivos : 5;
-            const horasPorDia = Number(jornada.horasSemanales) / diasLab;
+              // Entrada - usar la existente o crear una nueva
+              let horaEntrada = new Date(fechaBase);
+              const eventoEntrada = fichaje.eventos.find(e => e.tipo === 'entrada');
+              
+              if (eventoEntrada) {
+                // Usar la entrada registrada
+                horaEntrada = new Date(eventoEntrada.hora);
+              } else if (eventosFaltantes.includes('entrada') && !tiposEventos.includes('entrada')) {
+                // Solo crear si no existe
+                horaEntrada = crearFechaConHora(fechaBase, 9, 0); // Default 9:00
+                await tx.fichaje_eventos.create({ data: { fichajeId, tipo: 'entrada', hora: horaEntrada } });
+              }
 
-            // Entrada - usar la existente o crear una nueva
-            let horaEntrada = new Date(fechaBase);
-            const eventoEntrada = fichaje.eventos.find(e => e.tipo === 'entrada');
-            
-            if (eventoEntrada) {
-              // Usar la entrada registrada
-              horaEntrada = new Date(eventoEntrada.hora);
-            } else if (eventosFaltantes.includes('entrada') && !tiposEventos.includes('entrada')) {
-              // Solo crear si no existe
-              horaEntrada = crearFechaConHora(fechaBase, 9, 0); // Default 9:00
-              await tx.fichaje_eventos.create({ data: { fichajeId, tipo: 'entrada', hora: horaEntrada } });
-            }
+              // Pausas (si descansoMinimo) - solo si no existen
+              if (config.descansoMinimo && eventosFaltantes.includes('pausa_inicio')) {
+                 const [hDesc, mDesc] = config.descansoMinimo.split(':').map(Number);
+                 const descansoMs = (hDesc * 60 + mDesc) * 60 * 1000;
+                 
+                 // Mitad de jornada
+                 const horaPausaInicio = new Date(horaEntrada.getTime() + (horasPorDia / 2) * 60 * 60 * 1000);
+                 const horaPausaFin = new Date(horaPausaInicio.getTime() + descansoMs);
 
-            // Pausas (si descansoMinimo) - solo si no existen
-            if (config.descansoMinimo && eventosFaltantes.includes('pausa_inicio')) {
-               const [hDesc, mDesc] = config.descansoMinimo.split(':').map(Number);
-               const descansoMs = (hDesc * 60 + mDesc) * 60 * 1000;
-               
-               // Mitad de jornada
-               const horaPausaInicio = new Date(horaEntrada.getTime() + (horasPorDia / 2) * 60 * 60 * 1000);
-               const horaPausaFin = new Date(horaPausaInicio.getTime() + descansoMs);
+                 if (!tiposEventos.includes('pausa_inicio'))
+                   await tx.fichaje_eventos.create({ data: { fichajeId, tipo: 'pausa_inicio', hora: horaPausaInicio } });
+                 
+                 if (!tiposEventos.includes('pausa_fin') && eventosFaltantes.includes('pausa_fin'))
+                   await tx.fichaje_eventos.create({ data: { fichajeId, tipo: 'pausa_fin', hora: horaPausaFin } });
+              }
 
-               if (!tiposEventos.includes('pausa_inicio'))
-                 await tx.fichaje_eventos.create({ data: { fichajeId, tipo: 'pausa_inicio', hora: horaPausaInicio } });
-               
-               if (!tiposEventos.includes('pausa_fin') && eventosFaltantes.includes('pausa_fin'))
-                 await tx.fichaje_eventos.create({ data: { fichajeId, tipo: 'pausa_fin', hora: horaPausaFin } });
-            }
-
-            // Salida - solo si no existe
-            if (eventosFaltantes.includes('salida') && !tiposEventos.includes('salida')) {
-               let durationMs = horasPorDia * 60 * 60 * 1000;
-               // Si hay descanso minimo, sumarlo a la duración de la estancia
-               if (config.descansoMinimo) {
-                  const [h, m] = config.descansoMinimo.split(':').map(Number);
-                  durationMs += (h * 60 + m) * 60 * 1000;
-               }
-               const horaSalida = new Date(horaEntrada.getTime() + durationMs);
-               await tx.fichaje_eventos.create({ data: { fichajeId, tipo: 'salida', hora: horaSalida } });
+              // Salida - solo si no existe
+              if (eventosFaltantes.includes('salida') && !tiposEventos.includes('salida')) {
+                 let durationMs = horasPorDia * 60 * 60 * 1000;
+                 // Si hay descanso minimo, sumarlo a la duración de la estancia
+                 if (config.descansoMinimo) {
+                    const [h, m] = config.descansoMinimo.split(':').map(Number);
+                    durationMs += (h * 60 + m) * 60 * 1000;
+                 }
+                 const horaSalida = new Date(horaEntrada.getTime() + durationMs);
+                 await tx.fichaje_eventos.create({ data: { fichajeId, tipo: 'salida', hora: horaSalida } });
+              }
             }
           }
+
+          // Crear eventos faltantes MANTENIENDO los eventos originales
 
           // 5. Actualizar cálculos y estado final
           // FIX: Calcular horas DENTRO de la transacción para evitar race conditions

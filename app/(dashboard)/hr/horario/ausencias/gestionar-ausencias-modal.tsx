@@ -329,7 +329,6 @@ export function GestionarAusenciasModal({ open, onClose, onSaved }: GestionarAus
                 </TabsList>
                 
                 <div className="flex flex-1 flex-wrap items-center justify-end gap-4">
-                  {festivosView === 'calendario' && <CalendarioFestivosLegend className="flex-nowrap" />}
                   <div className="flex items-center gap-2">
                     <Button
                       size="icon"
@@ -361,6 +360,7 @@ export function GestionarAusenciasModal({ open, onClose, onSaved }: GestionarAus
               />
 
               <TabsContent value="calendario" className="space-y-4">
+                <CalendarioFestivosLegend className="flex-nowrap" />
                 <CalendarioFestivos
                   diasLaborables={diasLaborables}
                   onUpdate={cargarDatos}

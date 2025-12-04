@@ -137,14 +137,18 @@ export default async function EmpleadoDetailPage(props: EmpleadoDetailPageProps)
       },
       carpetas: {
         include: {
-          documentos: {
-            select: {
-              id: true,
-              nombre: true,
-              tipoDocumento: true,
-              tamano: true,
-              s3Key: true,
-              createdAt: true,
+          documento_carpetas: {
+            include: {
+              documento: {
+                select: {
+                  id: true,
+                  nombre: true,
+                  tipoDocumento: true,
+                  tamano: true,
+                  s3Key: true,
+                  createdAt: true,
+                },
+              },
             },
             take: 50, // Limitar documentos por carpeta
           },
@@ -228,14 +232,18 @@ export default async function EmpleadoDetailPage(props: EmpleadoDetailPageProps)
       },
       carpetas: {
         include: {
-          documentos: {
-            select: {
-              id: true,
-              nombre: true,
-              tipoDocumento: true,
-              tamano: true,
-              s3Key: true,
-              createdAt: true,
+          documento_carpetas: {
+            include: {
+              documento: {
+                select: {
+                  id: true,
+                  nombre: true,
+                  tipoDocumento: true,
+                  tamano: true,
+                  s3Key: true,
+                  createdAt: true,
+                },
+              },
             },
             take: 50,
           },
@@ -317,6 +325,7 @@ export default async function EmpleadoDetailPage(props: EmpleadoDetailPageProps)
             id: empleadoActualizado.jornada.id,
           }),
           horasSemanales: Number(empleadoActualizado.jornada.horasSemanales),
+          config: empleadoActualizado.jornada.config as any,
         }
       : null,
     puestoRelacion: empleado.puestoRelacion
@@ -330,13 +339,13 @@ export default async function EmpleadoDetailPage(props: EmpleadoDetailPageProps)
       nombre: c.nombre,
       esSistema: c.esSistema,
       compartida: c.compartida,
-      documentos: c.documentos.map((doc) => ({
-        id: doc.id,
-        nombre: doc.nombre,
-        tipoDocumento: doc.tipoDocumento,
-        tamano: doc.tamano,
+      documentos: c.documento_carpetas.map((dc) => ({
+        id: dc.documento.id,
+        nombre: dc.documento.nombre,
+        tipoDocumento: dc.documento.tipoDocumento,
+        tamano: dc.documento.tamano,
         createdAt:
-          doc.createdAt instanceof Date ? doc.createdAt.toISOString() : doc.createdAt,
+          dc.documento.createdAt instanceof Date ? dc.documento.createdAt.toISOString() : dc.documento.createdAt,
       })),
     })),
   };

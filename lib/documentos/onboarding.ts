@@ -124,7 +124,11 @@ export async function obtenerCarpetaOnboardingEmpleado(
       },
       include: {
         subcarpetas: true,
-        documentos: true,
+        documento_carpetas: {
+          include: {
+            documento: true,
+          },
+        },
       },
     });
 
@@ -139,7 +143,11 @@ export async function obtenerCarpetaOnboardingEmpleado(
         },
         include: {
           subcarpetas: true,
-          documentos: true,
+          documento_carpetas: {
+            include: {
+              documento: true,
+            },
+          },
         },
       });
     }
@@ -178,17 +186,25 @@ export async function listarDocumentosOnboarding(
     const documentos = await prisma.documentos.findMany({
       where: {
         empresaId,
-        OR: [
-          { carpetaId: carpetaResult.carpeta.id },
-          {
-            carpeta: {
-              parentId: carpetaResult.carpeta.id,
-            },
+        documento_carpetas: {
+          some: {
+            OR: [
+              { carpetaId: carpetaResult.carpeta.id },
+              {
+                carpeta: {
+                  parentId: carpetaResult.carpeta.id,
+                },
+              },
+            ],
           },
-        ],
+        },
       },
       include: {
-        carpeta: true,
+        documento_carpetas: {
+          include: {
+            carpeta: true,
+          },
+        },
       },
       orderBy: {
         createdAt: 'desc',
@@ -279,7 +295,7 @@ export async function subirDocumentoOnboarding(
 ) {
   try {
     let carpetaDestino;
-    let carpetaHR;
+    let carpetaHR: Awaited<ReturnType<typeof obtenerOCrearCarpetaGlobal>> | undefined;
     const carpetaNombreNormalizado = carpetaNombreDestino?.trim();
 
     if (carpetaId) {
@@ -359,19 +375,40 @@ export async function subirDocumentoOnboarding(
       );
     }
 
-    // Crear documento en carpeta del empleado
-    const documento = await prisma.documentos.create({
-      data: {
-        empresaId,
-        empleadoId,
-        carpetaId: carpetaDestino!.id,
-        nombre: nombreDocumento,
-        tipoDocumento: tipoNormalizado,
-        s3Key,
-        s3Bucket,
-        mimeType,
-        tamano,
-      },
+    // Crear documento y asociarlo a las carpetas usando tabla intermedia
+    const documento = await prisma.$transaction(async (tx) => {
+      const doc = await tx.documentos.create({
+        data: {
+          empresaId,
+          empleadoId,
+          nombre: nombreDocumento,
+          tipoDocumento: tipoNormalizado,
+          s3Key,
+          s3Bucket,
+          mimeType,
+          tamano,
+        },
+      });
+
+      // Asociar a carpeta del empleado
+      await tx.documento_carpetas.create({
+        data: {
+          documentoId: doc.id,
+          carpetaId: carpetaDestino!.id,
+        },
+      });
+
+      // Si es compartida, asociar también a carpeta HR
+      if (carpetaHR) {
+        await tx.documento_carpetas.create({
+          data: {
+            documentoId: doc.id,
+            carpetaId: carpetaHR.id,
+          },
+        });
+      }
+
+      return doc;
     });
 
     return {

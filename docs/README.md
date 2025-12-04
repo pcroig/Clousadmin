@@ -18,6 +18,7 @@ docs/
 ├── SETUP_GOOGLE_OAUTH.md            # Configuración de Google OAuth y Calendar
 ├── SETUP_PLANTILLAS.md              # Configuración del sistema de plantillas
 ├── INVITAR_USUARIOS.md              # Flujo de invitaciones y alta de usuarios
+├── ROADMAP_FUNCIONALIDADES_FUTURAS.md # 🚀 Funcionalidades planificadas para el futuro
 │
 ├── ARQUITECTURA.md                   # Decisiones arquitectónicas y estructura
 ├── ESTRUCTURA.md                     # Estructura actual del proyecto
@@ -63,7 +64,8 @@ docs/
 │   ├── ausencias.md
 │   ├── autenticacion.md
 │   ├── bandeja-entrada.md
-│   ├── canal-denuncias.md            # ✨ NUEVO: Sistema de denuncias internas
+│   ├── canal-denuncias.md            # ✨ Sistema de denuncias internas
+│   ├── complementos-salariales.md    # ⭐ NUEVO: Sistema de complementos (fijos y variables)
 │   ├── documentos.md
 │   ├── festivos.md
 │   ├── fichajes.md
@@ -99,6 +101,7 @@ docs/
 4. **Diseño**: [`DESIGN_SYSTEM.md`](DESIGN_SYSTEM.md) - Sistema de diseño UI/UX y patrones de componentes
 5. **Código**: [`PATRONES_CODIGO.md`](PATRONES_CODIGO.md) - Convenciones de TypeScript/Next.js
 6. **Mobile**: [`MOBILE_OPTIMIZACION.md`](MOBILE_OPTIMIZACION.md) - Guía de adaptación mobile
+7. **Roadmap**: [`ROADMAP_FUNCIONALIDADES_FUTURAS.md`](ROADMAP_FUNCIONALIDADES_FUTURAS.md) - 🚀 Funcionalidades planificadas
 
 ### Para desarrollar
 1. **Reglas de desarrollo**: `.cursorrules` en la raíz del proyecto

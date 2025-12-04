@@ -14,6 +14,7 @@ import { CampanaPropuestaReminder } from '@/components/vacaciones/campana-propue
 import { CampanaVacacionesReminder } from '@/components/vacaciones/campana-vacaciones-reminder';
 import { getSession } from '@/lib/auth';
 import { obtenerResumenPlantillaEquipo } from '@/lib/calculos/plantilla';
+import { CAMPANAS_VACACIONES_ENABLED } from '@/lib/constants/feature-flags';
 import { EstadoAusencia, UsuarioRol } from '@/lib/constants/enums';
 import { prisma } from '@/lib/prisma';
 import { obtenerCampanaPendiente, obtenerPropuestaPendiente } from '@/lib/services/campanas-vacaciones';
@@ -42,8 +43,12 @@ export default async function ManagerDashboardPage() {
     redirect('/login');
   }
 
-  const campanaPendiente = await obtenerCampanaPendiente(manager.id, session.user.empresaId);
-  const campanaPropuesta = await obtenerPropuestaPendiente(manager.id, session.user.empresaId);
+  const campanaPendiente = CAMPANAS_VACACIONES_ENABLED
+    ? await obtenerCampanaPendiente(manager.id, session.user.empresaId)
+    : null;
+  const campanaPropuesta = CAMPANAS_VACACIONES_ENABLED
+    ? await obtenerPropuestaPendiente(manager.id, session.user.empresaId)
+    : null;
   const reminderData = campanaPendiente
     ? {
         id: campanaPendiente.id,
@@ -310,10 +315,12 @@ export default async function ManagerDashboardPage() {
           </div>
         </div>
       </div>
-      {!propuestaData && (
+      {CAMPANAS_VACACIONES_ENABLED && !propuestaData && (
         <CampanaVacacionesReminder campanaPendiente={reminderData} />
       )}
-      <CampanaPropuestaReminder propuestaPendiente={propuestaData} />
+      {CAMPANAS_VACACIONES_ENABLED && (
+        <CampanaPropuestaReminder propuestaPendiente={propuestaData} />
+      )}
     </>
   );
 }

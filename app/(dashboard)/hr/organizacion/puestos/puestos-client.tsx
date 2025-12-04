@@ -12,6 +12,7 @@ import { PageMobileHeader } from '@/components/layout/page-mobile-header';
 import { PuestoDetails } from '@/components/organizacion/puesto-details';
 import { PuestoFormModal } from '@/components/organizacion/puesto-form-modal';
 import { Column, DataTable } from '@/components/shared/data-table';
+import { EmployeeListPreview } from '@/components/shared/employee-list-preview';
 import { DetailsPanel } from '@/components/shared/details-panel';
 import { ExpandableSearch } from '@/components/shared/expandable-search';
 import { TableHeader } from '@/components/shared/table-header';
@@ -26,7 +27,9 @@ interface Puesto {
   empleados: {
     id: string;
     nombre: string;
+    apellidos?: string | null;
     avatar?: string;
+    fotoUrl?: string | null;
   }[];
   documentos: {
     id: string;
@@ -106,6 +109,7 @@ export function PuestosClient({ puestos: initialPuestos }: PuestosClientProps) {
           id: emp.id,
           nombre: `${emp.nombre} ${emp.apellidos}`,
           avatar: emp.fotoUrl || undefined,
+          fotoUrl: emp.fotoUrl || undefined,
         })),
         documentos: (puesto.documentos || []).map((doc) => ({
           ...doc,
@@ -146,12 +150,17 @@ export function PuestosClient({ puestos: initialPuestos }: PuestosClientProps) {
       sticky: true,
     },
     {
-      id: 'numeroEmpleados',
+      id: 'empleados',
       header: 'Empleados',
       cell: (row) => (
-        <span className="text-gray-900 font-medium">{row.numeroEmpleados}</span>
+        <EmployeeListPreview
+          empleados={row.empleados}
+          maxVisible={3}
+          emptyLabel="Sin empleados"
+          dense
+        />
       ),
-      width: '20%',
+      width: '30%',
       priority: 'high',
     },
     {

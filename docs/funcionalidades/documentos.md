@@ -122,35 +122,34 @@ Documento {
 El sistema gestiona **3 tipos distintos** de carpetas:
 
 #### 1. **Carpetas del Sistema Individuales** (por empleado)
-Se crean automáticamente para cada empleado, conectadas a funcionalidades de la plataforma:
+Se crean automáticamente para cada empleado. Definidas en `lib/documentos.ts` como `CARPETAS_SISTEMA`:
 
 - **📄 Contratos** (`esSistema: true`, `empleadoId: <id>`)
   - Contratos laborales, modificaciones, anexos, finiquitos
   - Se suben durante onboarding (opcional)
   - Vinculados al modelo `Contrato`
+  - **Tipo de documento**: `contrato`
 
 - **💰 Nóminas** (`esSistema: true`, `empleadoId: <id>`)
   - PDFs de nóminas mensuales
   - Importados masivamente o manualmente desde módulo de nóminas
   - Se reasignan automáticamente a cada empleado
+  - **Tipo de documento**: `nomina`
 
 - **📋 Justificantes** (`esSistema: true`, `empleadoId: <id>`)
   - Justificantes de ausencias y documentos médicos
   - Se crean automáticamente desde el módulo de ausencias
   - Vinculados a registros de ausencia (campo `documentoId`)
-  - **Tipo de documento**: `justificante` (compartido con Médicos)
+  - Empleados pueden subir archivos en esta carpeta
+  - **Tipo de documento**: `justificante`
 
-- **🏥 Médicos** (`esSistema: true`, `empleadoId: <id>`, opcional)
-  - Partes de baja, justificantes médicos
-  - Se vinculan a ausencias médicas
-  - Empleados pueden subir archivos
-  - **Tipo de documento**: `justificante` (compartido con Justificantes)
-  - **Nota**: A nivel de datos, "Médicos" y "Justificantes" comparten el mismo tipo `justificante`
-
-- **👤 Personales** (`esSistema: true`, `empleadoId: <id>`, opcional)
-  - DNI/NIE/Pasaporte, certificado bancario, certificado SS, títulos académicos
+- **📂 Otros** (`esSistema: true`, `empleadoId: <id>`)
+  - DNI/NIE/Pasaporte, certificado bancario, certificados SS, títulos académicos
+  - Documentos generales que no encajan en las otras categorías
   - Empleados pueden subir archivos libremente
-  - **Tipo de documento**: `otro` (cualquier carpeta no estándar se mapea a `otro`)
+  - **Tipo de documento**: `otro`
+
+**Nota**: Anteriormente existían carpetas "Personales" y "Médicos" como carpetas separadas, pero han sido consolidadas en "Otros" y "Justificantes" respectivamente para simplificar la estructura.
 
 #### 2. **Carpetas Globales HR** (agregación con filtros)
 Una carpeta por empresa, agregan documentos de TODOS los empleados:
@@ -298,7 +297,7 @@ Ver contenido de carpeta
     "id": "uuid",
     "nombre": "Contratos",
     "esSistema": true,
-    "esGlobal": false,
+    "esCarpetaMasterHR": false,
     "empleado": {...}
   },
   "documentos": [...],
@@ -306,8 +305,8 @@ Ver contenido de carpeta
 }
 ```
 
-**Carpetas Globales:**
-- Si `empleadoId` es `null` y `esSistema: true`, es una carpeta global
+**Carpetas Master HR:**
+- Si `empleadoId` es `null`, `compartida: true` y `esSistema: true`, es una carpeta master para HR
 - Agrega documentos de todos los empleados del mismo tipo
 - Vista HR incluye filtros por empleado y búsqueda
 - Tipos globales: Nóminas, Contratos, Justificantes
@@ -814,12 +813,11 @@ curl http://localhost:3000/api/documentos
 ## 📝 Notas Técnicas
 
 ### Estructura de Carpetas del Sistema
-Cada empleado tiene automáticamente 5 carpetas:
+Cada empleado tiene automáticamente 4 carpetas (definidas en `CARPETAS_SISTEMA`):
 1. **Contratos** - Contratos laborales, modificaciones, anexos (subidos en onboarding)
 2. **Nóminas** - PDFs de nóminas mensuales (importados desde módulo nóminas)
-3. **Justificantes** - Justificantes de ausencias (creados automáticamente)
-4. **Personales** - DNI, certificados bancarios, títulos
-5. **Médicos** - Justificantes médicos, bajas IT
+3. **Justificantes** - Justificantes de ausencias y documentos médicos (creados automáticamente)
+4. **Otros** - DNI, certificados bancarios, títulos, documentos generales
 
 ### Carpetas Globales vs Individuales
 
@@ -849,7 +847,7 @@ const carpetaGlobal = await obtenerOCrearCarpetaGlobal(
 ```
 
 ### Permisos de Upload
-- **Empleados** pueden subir SOLO a: Personales y Médicos
+- **Empleados** pueden subir SOLO a: Justificantes y Otros
 - **HR Admin** puede subir a todas las carpetas
 - **Managers** solo pueden ver (no subir)
 

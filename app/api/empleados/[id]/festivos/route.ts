@@ -1,31 +1,55 @@
-import { NextRequest, NextResponse as Response } from 'next/server';
+// ========================================
+// API Festivos Personalizados de Empleado
+// ========================================
+
+import { NextRequest } from 'next/server';
+import { z } from 'zod';
 
 import {
   badRequestResponse,
+  createdResponse,
   handleApiError,
   notFoundResponse,
-  requireAuthAsHR,
+  requireAuth,
   successResponse,
   validateRequest,
 } from '@/lib/api-handler';
+import { UsuarioRol } from '@/lib/constants/enums';
 import { prisma } from '@/lib/prisma';
-import { empleadoFestivoCreateSchema } from '@/lib/validaciones/schemas';
 
-// GET /api/empleados/[id]/festivos - Listar festivos personalizados del empleado
+// Force dynamic rendering
+export const dynamic = 'force-dynamic';
+
+// Schema de validación
+const festivoEmpleadoCreateSchema = z.object({
+  festivoEmpresaId: z.string(),
+  fecha: z.union([z.string(), z.date()]),
+  nombre: z.string().min(1).max(200),
+});
+
+// GET /api/empleados/[id]/festivos
 export async function GET(
-  request: NextRequest,
+  req: NextRequest,
   context: { params: Promise<{ id: string }> }
 ) {
   const params = await context.params;
   try {
-    const authResult = await requireAuthAsHR(request);
+    const authResult = await requireAuth(req);
     if (authResult instanceof Response) return authResult;
     const { session } = authResult;
 
     const { id: empleadoId } = params;
 
-    // Verificar que el empleado existe y pertenece a la empresa
-    const empleado = await prisma.empleados.findUnique({
+    // Verificar permisos
+    const isHR = session.user.rol === UsuarioRol.hr_admin;
+    const isOwnProfile = session.user.empleadoId === empleadoId;
+
+    if (!isHR && !isOwnProfile) {
+      return badRequestResponse('No tienes permisos');
+    }
+
+    // Verificar que el empleado pertenece a la misma empresa
+    const empleado = await prisma.empleados.findFirst({
       where: {
         id: empleadoId,
         empresaId: session.user.empresaId,
@@ -36,37 +60,64 @@ export async function GET(
       return notFoundResponse('Empleado no encontrado');
     }
 
-    // Obtener festivos personalizados del empleado
     const festivos = await prisma.empleado_festivos.findMany({
-      where: {
-        empleadoId,
+      where: { empleadoId },
+      include: {
+        festivoEmpresa: {
+          select: {
+            fecha: true,
+            nombre: true,
+          },
+        },
       },
-      orderBy: {
-        fecha: 'asc',
-      },
+      orderBy: { fecha: 'asc' },
     });
 
-    return successResponse(festivos);
+    const festivosNormalizados = festivos.map((f) => ({
+      id: f.id,
+      festivoEmpresaId: f.festivoEmpresaId,
+      fecha: f.fecha.toISOString().split('T')[0],
+      nombre: f.nombre,
+      estado: f.estado,
+      festivoEmpresa: {
+        fecha: f.festivoEmpresa.fecha.toISOString().split('T')[0],
+        nombre: f.festivoEmpresa.nombre,
+      },
+    }));
+
+    return successResponse(festivosNormalizados);
   } catch (error) {
     return handleApiError(error, 'API GET /api/empleados/[id]/festivos');
   }
 }
 
-// POST /api/empleados/[id]/festivos - Crear festivo personalizado para empleado
+// POST /api/empleados/[id]/festivos
 export async function POST(
-  request: NextRequest,
+  req: NextRequest,
   context: { params: Promise<{ id: string }> }
 ) {
   const params = await context.params;
   try {
-    const authResult = await requireAuthAsHR(request);
+    const authResult = await requireAuth(req);
     if (authResult instanceof Response) return authResult;
     const { session } = authResult;
 
     const { id: empleadoId } = params;
 
-    // Verificar que el empleado existe y pertenece a la empresa
-    const empleado = await prisma.empleados.findUnique({
+    // Verificar permisos
+    const isHR = session.user.rol === UsuarioRol.hr_admin;
+    const isOwnProfile = session.user.empleadoId === empleadoId;
+
+    if (!isHR && !isOwnProfile) {
+      return badRequestResponse('No tienes permisos');
+    }
+
+    const validationResult = await validateRequest(req, festivoEmpleadoCreateSchema);
+    if (validationResult instanceof Response) return validationResult;
+    const { data } = validationResult;
+
+    // Verificar empleado
+    const empleado = await prisma.empleados.findFirst({
       where: {
         id: empleadoId,
         empresaId: session.user.empresaId,
@@ -77,47 +128,66 @@ export async function POST(
       return notFoundResponse('Empleado no encontrado');
     }
 
-    // Validar request body
-    const validationResult = await validateRequest(request, empleadoFestivoCreateSchema);
-    if (validationResult instanceof Response) return validationResult;
-    const { data: validatedData } = validationResult;
-
-    // Asegurar que el empleadoId del path coincide con el del body
-    if (validatedData.empleadoId && validatedData.empleadoId !== empleadoId) {
-      return badRequestResponse('El ID del empleado no coincide con el de la URL');
-    }
-
-    // Parsear fecha
-    const fecha = new Date(validatedData.fecha);
-    if (isNaN(fecha.getTime())) {
-      return badRequestResponse('Fecha inválida');
-    }
-
-    // Verificar que no exista ya un festivo para esta fecha y empleado
-    const festivoExistente = await prisma.empleado_festivos.findFirst({
+    // Verificar que el festivo de empresa existe
+    const festivoEmpresa = await prisma.festivos.findFirst({
       where: {
-        empleadoId,
-        fecha,
+        id: data.festivoEmpresaId,
+        empresaId: session.user.empresaId,
       },
     });
 
-    if (festivoExistente) {
-      return badRequestResponse('Ya existe un festivo personalizado para esta fecha');
+    if (!festivoEmpresa) {
+      return badRequestResponse('Festivo de empresa no encontrado');
+    }
+
+    // Convertir fecha
+    let fecha: Date;
+    if (typeof data.fecha === 'string') {
+      const [year, month, day] = data.fecha.split('-').map(Number);
+      fecha = new Date(Date.UTC(year, month - 1, day));
+    } else {
+      fecha = data.fecha;
+    }
+
+    // Verificar que no existe ya un reemplazo para este festivo
+    const existente = await prisma.empleado_festivos.findFirst({
+      where: {
+        empleadoId,
+        festivoEmpresaId: data.festivoEmpresaId,
+      },
+    });
+
+    if (existente) {
+      return badRequestResponse('Ya existe un reemplazo para este festivo');
     }
 
     // Crear festivo personalizado
+    // Si es HR: estado aprobado
+    // Si es empleado: estado pendiente
     const festivo = await prisma.empleado_festivos.create({
       data: {
         empleadoId,
+        festivoEmpresaId: data.festivoEmpresaId,
         fecha,
-        nombre: validatedData.nombre,
-        activo: validatedData.activo ?? true,
+        nombre: data.nombre,
+        estado: isHR ? 'aprobado' : 'pendiente',
+        solicitadoPor: session.user.id,
+        aprobadoPor: isHR ? session.user.id : null,
       },
     });
 
-    return successResponse(festivo, 201);
+    console.info(
+      `[Festivos Empleado] ${isHR ? 'Creado' : 'Solicitado'} para empleado ${empleadoId}: ${festivo.nombre} (${festivo.fecha.toISOString().split('T')[0]})`
+    );
+
+    return createdResponse({
+      id: festivo.id,
+      festivoEmpresaId: festivo.festivoEmpresaId,
+      fecha: festivo.fecha.toISOString().split('T')[0],
+      nombre: festivo.nombre,
+      estado: festivo.estado,
+    });
   } catch (error) {
     return handleApiError(error, 'API POST /api/empleados/[id]/festivos');
   }
 }
-

@@ -7,7 +7,7 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
-import { CalendarioFestivos } from '@/components/hr/calendario-festivos';
+import { CalendarioFestivos, CalendarioFestivosLegend } from '@/components/hr/calendario-festivos';
 import { ListaFestivos } from '@/components/hr/lista-festivos';
 import { Button } from '@/components/ui/button';
 import { Field, FieldLabel } from '@/components/ui/field';
@@ -230,7 +230,7 @@ export const CalendarioStep = forwardRef<CalendarioStepHandle, CalendarioStepPro
         <div className="grid grid-cols-2 gap-4 mt-4">
           <Field>
             <FieldLabel htmlFor="limiteInferiorFichaje">
-              Límite inferior de fichaje (aplica a todas las jornadas)
+              Hora mínima de inicio
             </FieldLabel>
             <Input
               id="limiteInferiorFichaje"
@@ -240,14 +240,11 @@ export const CalendarioStep = forwardRef<CalendarioStepHandle, CalendarioStepPro
               placeholder="07:00"
               className="mt-2"
             />
-            <p className="text-xs text-gray-500 mt-1">
-              Hora mínima de entrada permitida
-            </p>
           </Field>
 
           <Field>
             <FieldLabel htmlFor="limiteSuperiorFichaje">
-              Límite superior de fichaje (aplica a todas las jornadas)
+              Hora máxima de salida
             </FieldLabel>
             <Input
               id="limiteSuperiorFichaje"
@@ -257,9 +254,6 @@ export const CalendarioStep = forwardRef<CalendarioStepHandle, CalendarioStepPro
               placeholder="21:00"
               className="mt-2"
             />
-            <p className="text-xs text-gray-500 mt-1">
-              Hora máxima de salida permitida
-            </p>
           </Field>
         </div>
 
@@ -272,20 +266,20 @@ export const CalendarioStep = forwardRef<CalendarioStepHandle, CalendarioStepPro
           }}
           className="space-y-4"
         >
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="calendario">Calendario visual</TabsTrigger>
-            <TabsTrigger value="lista">Lista de festivos</TabsTrigger>
-          </TabsList>
+          <div className="flex flex-wrap items-center gap-4 md:justify-between">
+            <TabsList className="w-auto flex-shrink-0">
+              <TabsTrigger value="calendario">Calendario visual</TabsTrigger>
+              <TabsTrigger value="lista">Lista de festivos</TabsTrigger>
+            </TabsList>
 
-          <TabsContent value="calendario" className="space-y-4">
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".ics,.csv"
-              className="hidden"
-              onChange={handleArchivoFestivosChange}
-            />
-            <div className="flex justify-end">
+            <div className="flex items-center gap-2">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".ics,.csv"
+                className="hidden"
+                onChange={handleArchivoFestivosChange}
+              />
               <Button
                 size="sm"
                 variant="outline"
@@ -295,7 +289,10 @@ export const CalendarioStep = forwardRef<CalendarioStepHandle, CalendarioStepPro
                 {processingFestivos ? 'Importando...' : 'Importar calendario'}
               </Button>
             </div>
+          </div>
 
+          <TabsContent value="calendario" className="space-y-4">
+            <CalendarioFestivosLegend />
             <CalendarioFestivos
               diasLaborables={diasLaborables}
               onUpdate={cargarDatos}
@@ -303,6 +300,7 @@ export const CalendarioStep = forwardRef<CalendarioStepHandle, CalendarioStepPro
               onRequestCreate={handleCreateFestivoInline}
               onRequestEdit={handleEditFestivoInline}
               numberOfMonths={2}
+              showLegend={false}
             />
           </TabsContent>
 

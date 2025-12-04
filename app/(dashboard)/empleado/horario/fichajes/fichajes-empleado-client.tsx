@@ -190,6 +190,15 @@ export function FichajesEmpleadoClient({ balanceInicial }: Props) {
     fetchFichajes();
   }, [fetchFichajes]);
 
+  // Listener para refrescar en tiempo real
+  useEffect(() => {
+    function handleRealtimeUpdate() {
+      fetchFichajes();
+    }
+    window.addEventListener('fichaje-updated', handleRealtimeUpdate);
+    return () => window.removeEventListener('fichaje-updated', handleRealtimeUpdate);
+  }, [fetchFichajes]);
+
   async function handleSolicitarCorreccion() {
     if (!correccionModal.fichajeId || !motivoCorreccion.trim()) return;
 

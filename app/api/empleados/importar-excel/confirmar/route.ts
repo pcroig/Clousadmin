@@ -32,6 +32,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 import { getSession } from '@/lib/auth';
 import { UsuarioRol } from '@/lib/constants/enums';
+import { asegurarCarpetasSistemaParaEmpleado } from '@/lib/documentos';
 import { encryptEmpleadoData } from '@/lib/empleado-crypto';
 import { invitarEmpleado } from '@/lib/invitaciones';
 import { getPredefinedJornada } from '@/lib/jornadas/get-or-create-default';
@@ -45,7 +46,6 @@ interface ConfirmarImportacionBody {
   empleados: (EmpleadoDetectado & { valido: boolean; errores: string[] })[];
   equiposDetectados: string[];
   managersDetectados: string[];
-  invitarEmpleados: boolean;
 }
 
 /**
@@ -365,6 +365,15 @@ export async function POST(req: NextRequest) {
 
             if (!creationResult) {
               return null; // Ya se registró el error correspondiente
+            }
+
+            // Asegurar que las carpetas del sistema existan para el empleado
+            try {
+              await asegurarCarpetasSistemaParaEmpleado(creationResult.empleadoId, session.user.empresaId);
+              console.log(`[ConfirmarImportacion] Carpetas del sistema aseguradas para ${creationResult.email}`);
+            } catch (error) {
+              console.error(`[ConfirmarImportacion] Error asegurando carpetas para ${creationResult.email}:`, error);
+              // No fallar la importación si falla la creación de carpetas
             }
 
             // Empleado creado con éxito, crear invitación

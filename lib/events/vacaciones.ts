@@ -1,3 +1,5 @@
+import { CAMPANAS_VACACIONES_ENABLED } from '@/lib/constants/feature-flags';
+
 const CAMPANA_URL_REGEX = /campanas\/([^/?#]+)/i;
 
 export const VACACIONES_PREFERENCIAS_EVENT = 'vacaciones:preferencias:open';
@@ -12,6 +14,10 @@ export const emitPreferenciasVacacionesEvent = (campanaId: string): boolean => {
     return false;
   }
 
+  if (!CAMPANAS_VACACIONES_ENABLED) {
+    return false;
+  }
+
   const detail: VacacionesPreferenciasEventDetail = {
     campanaId,
     handled: false,
@@ -23,6 +29,10 @@ export const emitPreferenciasVacacionesEvent = (campanaId: string): boolean => {
 
 export const openPreferenciasModalFromUrl = (accionUrl?: string): boolean => {
   if (!accionUrl) {
+    return false;
+  }
+
+  if (!CAMPANAS_VACACIONES_ENABLED) {
     return false;
   }
 

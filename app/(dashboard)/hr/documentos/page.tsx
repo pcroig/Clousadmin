@@ -23,23 +23,27 @@ export default async function DocumentosPage() {
   // Asegurar carpetas globales por defecto para HR
   await asegurarCarpetasGlobales(session.user.empresaId);
 
-  // Obtener todas las carpetas de nivel superior (sin parent)
+  // Obtener todas las carpetas de nivel superior accesibles por HR
+  // Solo carpetas sin empleado asignado (master folders y carpetas compartidas)
   const carpetas = await prisma.carpetas.findMany({
     where: {
       empresaId: session.user.empresaId,
       parentId: null, // Solo carpetas de nivel superior
-      OR: [
-        { empleadoId: null },
-        {
-          esSistema: false,
-        },
-      ],
+      empleadoId: null, // Solo carpetas master/compartidas (sin empleado específico)
     },
     include: {
-      documentos: true,
+      documento_carpetas: {
+        include: {
+          documento: true,
+        },
+      },
       subcarpetas: {
         include: {
-          documentos: true,
+          documento_carpetas: {
+            include: {
+              documento: true,
+            },
+          },
         },
       },
     },
@@ -53,7 +57,7 @@ export default async function DocumentosPage() {
     id: carpeta.id,
     nombre: carpeta.nombre,
     esSistema: carpeta.esSistema,
-    numeroDocumentos: carpeta.documentos.length,
+    numeroDocumentos: carpeta.documento_carpetas.length,
     numeroSubcarpetas: carpeta.subcarpetas.length,
   }));
 

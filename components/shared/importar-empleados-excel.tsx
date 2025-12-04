@@ -18,8 +18,6 @@ import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
 import { parseJson } from '@/lib/utils/json';
 
@@ -159,7 +157,6 @@ export function ImportarEmpleadosExcel({
   const [error, setError] = useState('');
   const [empleadosExpandidos, setEmpleadosExpandidos] = useState<Set<string>>(new Set());
   const [cargandoEmpleados, setCargandoEmpleados] = useState(false);
-  const [invitarEmpleados, setInvitarEmpleados] = useState(true); // Enviar invitaciones por defecto
   const fileInputRef = useRef<HTMLInputElement>(null);
   const resumenStats = buildResumenStats(previewData);
 
@@ -331,7 +328,6 @@ export function ImportarEmpleadosExcel({
           empleados: data.empleados,
           equiposDetectados: data.equiposDetectados,
           managersDetectados: data.managersDetectados,
-          invitarEmpleados, // Usar estado del checkbox
         }),
       });
 
@@ -415,17 +411,6 @@ export function ImportarEmpleadosExcel({
           <p className="text-sm text-gray-500">{description}</p>
         </div>
       )}
-
-      <div className="flex flex-wrap items-center gap-2 text-sm text-gray-700">
-        <Checkbox
-          id="invitar-empleados"
-          checked={invitarEmpleados}
-          onCheckedChange={(checked) => setInvitarEmpleados(Boolean(checked))}
-        />
-        <Label htmlFor="invitar-empleados" className="cursor-pointer text-sm text-gray-700">
-          Enviar invitaciones automáticamente a todos los empleados importados
-        </Label>
-      </div>
 
       {/* Loader durante confirmación (prioridad sobre análisis) */}
       {confirmando && (

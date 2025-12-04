@@ -24,13 +24,6 @@ export const CARPETAS_SISTEMA = [
 
 export type CarpetaSistema = typeof CARPETAS_SISTEMA[number];
 
-const CARPETAS_GLOBALES: CarpetaSistema[] = [
-  'Contratos',
-  'Nóminas',
-  'Justificantes',
-  'Otros',
-];
-
 const EMPLOYEE_UPLOAD_FOLDERS = new Set([
   'Justificantes',
   'Otros',
@@ -134,41 +127,162 @@ export const MIME_TYPES_PERMITIDOS = [
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // XLSX
 ];
 
-/**
- * Crea las carpetas del sistema para un empleado
- * 
- * @deprecated Usa `asegurarCarpetasSistemaParaEmpleado()` en su lugar.
- * Esta función crea carpetas sin verificar si ya existen, lo que puede causar duplicados.
- * La nueva función es idempotente y más segura.
- * 
- * @param empleadoId ID del empleado
- * @param empresaId ID de la empresa
- * @returns Array de carpetas creadas
- */
-export async function crearCarpetasSistemaParaEmpleado(
-  empleadoId: string,
-  empresaId: string
-) {
-  const carpetas = [];
+// ========================================
+// FUNCIONES AUXILIARES PARA RELACIÓN M:N DOCUMENTO-CARPETA
+// ========================================
 
-  for (const nombreCarpeta of CARPETAS_SISTEMA) {
-    const carpeta = await prisma.carpetas.create({
-      data: {
-        empresaId,
-        empleadoId,
-        nombre: nombreCarpeta,
-        esSistema: true,
-        compartida: false,
-      },
-    });
-    carpetas.push(carpeta);
+/**
+ * Asigna un documento a una carpeta (crea relación en tabla intermedia)
+ * @param documentoId ID del documento
+ * @param carpetaId ID de la carpeta
+ */
+export async function asignarDocumentoACarpeta(
+  documentoId: string,
+  carpetaId: string
+) {
+  return await prisma.documento_carpetas.create({
+    data: {
+      documentoId,
+      carpetaId,
+    },
+  });
+}
+
+/**
+ * Asigna un documento a múltiples carpetas de una vez
+ * @param documentoId ID del documento
+ * @param carpetaIds Array de IDs de carpetas
+ */
+export async function asignarDocumentoAMultiplesCarpetas(
+  documentoId: string,
+  carpetaIds: string[]
+) {
+  const relaciones = carpetaIds.map(carpetaId => ({
+    documentoId,
+    carpetaId,
+  }));
+
+  return await prisma.documento_carpetas.createMany({
+    data: relaciones,
+    skipDuplicates: true,
+  });
+}
+
+/**
+ * Sincroniza un documento con carpetas del sistema:
+ * - Carpeta personal del empleado (si existe)
+ * - Carpeta master correspondiente (para HRadmins)
+ *
+ * Esta es la función clave para la sincronización automática.
+ *
+ * @param documentoId ID del documento
+ * @param empleadoId ID del empleado propietario
+ * @param empresaId ID de la empresa
+ * @param nombreCarpeta Nombre de la carpeta del sistema ('Contratos', 'Nóminas', etc.)
+ */
+export async function sincronizarDocumentoConCarpetasSistema(
+  documentoId: string,
+  empleadoId: string,
+  empresaId: string,
+  nombreCarpeta: CarpetaSistema
+) {
+  const carpetasIds: string[] = [];
+
+  // 1. Buscar o crear carpeta del empleado
+  let carpetaEmpleado = await obtenerOCrearCarpetaSistema(
+    empleadoId,
+    empresaId,
+    nombreCarpeta
+  );
+  carpetasIds.push(carpetaEmpleado.id);
+
+  // 2. Buscar carpeta master correspondiente
+  const carpetaMaster = await prisma.carpetas.findFirst({
+    where: {
+      empresaId,
+      empleadoId: null,
+      nombre: nombreCarpeta,
+      esSistema: true,
+    },
+  });
+
+  if (carpetaMaster) {
+    carpetasIds.push(carpetaMaster.id);
+  } else {
+    console.warn(
+      `Carpeta master "${nombreCarpeta}" no encontrada para empresa ${empresaId}. Solo asignando a carpeta del empleado.`
+    );
   }
 
-  return carpetas;
+  // 3. Crear todas las relaciones
+  await asignarDocumentoAMultiplesCarpetas(documentoId, carpetasIds);
+
+  return {
+    carpetaEmpleadoId: carpetaEmpleado.id,
+    carpetaMasterId: carpetaMaster?.id,
+    carpetasAsignadas: carpetasIds.length,
+  };
+}
+
+/**
+ * Obtiene todas las carpetas en las que está un documento
+ * @param documentoId ID del documento
+ */
+export async function obtenerCarpetasDeDocumento(documentoId: string) {
+  const relaciones = await prisma.documento_carpetas.findMany({
+    where: { documentoId },
+    include: {
+      carpeta: true,
+    },
+  });
+
+  return relaciones.map(r => r.carpeta);
+}
+
+/**
+ * Obtiene todos los documentos de una carpeta (usando tabla intermedia)
+ * @param carpetaId ID de la carpeta
+ * @param incluirDetalles Si true, incluye datos completos del documento
+ */
+export async function obtenerDocumentosDeCarpeta(
+  carpetaId: string,
+  incluirDetalles = true
+) {
+  const relaciones = await prisma.documento_carpetas.findMany({
+    where: { carpetaId },
+    include: {
+      documento: incluirDetalles
+        ? {
+            include: {
+              empleado: {
+                select: {
+                  id: true,
+                  nombre: true,
+                  apellidos: true,
+                  email: true,
+                },
+              },
+            },
+          }
+        : true,
+    },
+    orderBy: {
+      documento: {
+        createdAt: 'desc',
+      },
+    },
+  });
+
+  return relaciones.map(r => r.documento);
 }
 
 /**
  * Obtiene las carpetas de un empleado
+ *
+ * ⚠️ NOTA: Esta función actualmente NO se usa en el código.
+ * Si decides usarla en el futuro, considera añadir `empleadoId: null` a las condiciones
+ * de carpetas compartidas para ser explícito, ya que las carpetas compartidas siempre
+ * tienen empleadoId = null según el diseño del sistema.
  */
 interface CarpetaWhereClause {
   OR: Array<Record<string, unknown>>;
@@ -186,30 +300,53 @@ export async function obtenerCarpetasEmpleado(
   };
 
   if (incluirCompartidas) {
-    // Carpetas compartidas: incluir las asignadas a "todos" o al empleado específico
-    whereClause.OR.push(
-      {
-        compartida: true,
-        asignadoA: 'todos',
+    // Carpetas compartidas: incluir las asignadas a "todos"
+    whereClause.OR.push({
+      empleadoId: null,
+      compartida: true,
+      asignadoA: 'todos',
+    });
+
+    // Obtener equipos del empleado para agregar carpetas de esos equipos
+    const empleado = await prisma.empleados.findUnique({
+      where: { id: empleadoId },
+      include: {
+        equipos: true,
       },
-      {
-        compartida: true,
-        asignadoA: {
-          contains: `empleado:${empleadoId}`,
-        },
+    });
+
+    if (empleado) {
+      // Agregar condiciones para cada equipo del empleado
+      for (const ee of empleado.equipos) {
+        whereClause.OR.push({
+          empleadoId: null,
+          compartida: true,
+          asignadoA: `equipo:${ee.equipoId}`,
+        });
       }
-    );
+    }
   }
 
   return prisma.carpetas.findMany({
     where: whereClause,
     include: {
-      documentos: {
-        orderBy: { createdAt: 'desc' },
+      documento_carpetas: {
+        include: {
+          documento: true,
+        },
+        orderBy: {
+          documento: {
+            createdAt: 'desc',
+          },
+        },
       },
       subcarpetas: {
         include: {
-          documentos: true,
+          documento_carpetas: {
+            include: {
+              documento: true,
+            },
+          },
         },
       },
     },
@@ -259,6 +396,7 @@ export async function puedeAccederACarpeta(
   }
 
   // Si es carpeta compartida asignada específicamente
+  // IMPORTANTE: Las carpetas compartidas SOLO se asignan a equipos, NO a empleados individuales
   if (carpeta.compartida && carpeta.asignadoA) {
     // Obtener empleado del usuario
     const empleado = await prisma.empleados.findUnique({
@@ -277,11 +415,6 @@ export async function puedeAccederACarpeta(
     }
 
     const asignadoAString = carpeta.asignadoA;
-
-    // Verificar si es un empleado específico
-    if (asignadoAString.includes(`empleado:${empleado.id}`)) {
-      return true;
-    }
 
     // Verificar si está asignado a un equipo del empleado
     if (asignadoAString.startsWith('equipo:')) {
@@ -390,10 +523,13 @@ export async function generarNombreUnico(
   let contador = 1;
 
   while (true) {
-    const existente = await prisma.documentos.findFirst({
+    // Buscar documento en la carpeta usando tabla intermedia
+    const existente = await prisma.documento_carpetas.findFirst({
       where: {
         carpetaId,
-        nombre: nombreFinal,
+        documento: {
+          nombre: nombreFinal,
+        },
       },
     });
 
@@ -556,13 +692,14 @@ export async function obtenerOCrearCarpetaGlobal(
 }
 
 /**
- * Asegura que las carpetas globales por defecto (Contratos, Nóminas, Justificantes)
- * existan para la empresa indicada. Devuelve las carpetas creadas o encontradas.
+ * Asegura que las carpetas master/globales por defecto existan para la empresa.
+ * Estas son carpetas sin empleadoId que agregan documentos de todos los empleados.
+ * Devuelve las carpetas creadas o encontradas.
  */
 export async function asegurarCarpetasGlobales(empresaId: string) {
   const carpetas = [];
 
-  for (const nombre of CARPETAS_GLOBALES) {
+  for (const nombre of CARPETAS_SISTEMA) {
     const carpeta = await obtenerOCrearCarpetaGlobal(empresaId, nombre);
     carpetas.push(carpeta);
   }

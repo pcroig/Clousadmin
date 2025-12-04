@@ -40,6 +40,7 @@ export async function POST(request: NextRequest) {
             nombre: true,
             apellidos: true,
             empresaId: true,
+            jornadaId: true,
           },
         },
       },
@@ -127,6 +128,7 @@ export async function POST(request: NextRequest) {
             data: {
               empresaId: solicitud.empleado.empresaId,
               empleadoId: solicitud.empleadoId,
+              jornadaId: solicitud.empleado.jornadaId,
               fecha,
               estado: EstadoFichaje.en_curso,
             },

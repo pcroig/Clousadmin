@@ -251,10 +251,10 @@ export function CrearCarpetaConDocumentosModal({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <FolderPlus className="w-5 h-5" />
-            Crear Carpeta Compartida
+            Crear Carpeta
           </DialogTitle>
           <DialogDescription>
-            Crea una carpeta compartida y opcionalmente sube documentos directamente
+            Crea una carpeta y asígnala a empleados o equipos. Opcionalmente sube documentos directamente.
           </DialogDescription>
         </DialogHeader>
 

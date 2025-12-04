@@ -103,12 +103,18 @@ const mapManager = (input: unknown): MiEspacioManager | null => {
 const mapJornada = (input: unknown): MiEspacioJornada | null => {
   if (!isRecord(input)) return null;
   const id = typeof input.id === 'string' ? input.id : 'sin-id';
-  const nombre = typeof input.nombre === 'string' ? input.nombre : '';
-  const horasSemanales = decimalToNumber(input.horasSemanales as DecimalLike);
+  // Accept both 'etiqueta' and 'nombre' for backward compatibility
+  const etiqueta =
+    (typeof input.etiqueta === 'string' ? input.etiqueta : null) ||
+    (typeof input.nombre === 'string' ? input.nombre : null) ||
+    '';
+  const horasSemanales = decimalToNumber(input.horasSemanales as DecimalLike) ?? 0;
+  const config = input.config ?? null;
   return {
     id,
-    nombre,
+    etiqueta,
     horasSemanales,
+    config,
   };
 };
 

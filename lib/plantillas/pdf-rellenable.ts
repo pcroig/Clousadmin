@@ -7,6 +7,7 @@ import { PDFCheckBox, PDFDocument, PDFDropdown, PDFTextField } from 'pdf-lib';
 
 import { callFeatureAI, ContentType, MessageRole } from '@/lib/ia';
 import { deleteOpenAIFile, uploadPDFToOpenAI } from '@/lib/ia/core/providers/openai';
+import { obtenerEtiquetaJornada } from '@/lib/jornadas/helpers';
 import {
   crearNotificacionDocumentoGeneradoEmpleado,
   crearNotificacionDocumentoPendienteRellenar,
@@ -379,8 +380,9 @@ export async function generarDocumentoDesdePDFRellenable(
         },
         jornada: {
           select: {
-            nombre: true,
+            id: true,
             horasSemanales: true,
+            config: true,
           },
         },
         manager: {
@@ -460,7 +462,11 @@ export async function generarDocumentoDesdePDFRellenable(
       empresa: empresaNormalizada,
       jornada: empleado.jornada
         ? {
-            nombre: empleado.jornada.nombre,
+            etiqueta: obtenerEtiquetaJornada({
+              id: empleado.jornada.id,
+              horasSemanales: Number(empleado.jornada.horasSemanales),
+              config: empleado.jornada.config as any,
+            }),
             horasSemanales: Number(empleado.jornada.horasSemanales),
           }
         : undefined,
@@ -533,19 +539,31 @@ export async function generarDocumentoDesdePDFRellenable(
     const requiereFirmaFinal = configuracion.requiereFirma || plantilla.requiereFirma;
     const permiteRellenar = Boolean(plantilla.permiteRellenar);
 
-    const documento = await prisma.documentos.create({
-      data: {
-        empresaId: empleado.empresaId,
-        empleadoId: empleadoId,
-        carpetaId: carpeta.id,
-        nombre: nombreDocumento,
-        tipoDocumento: 'generado',
-        mimeType: 'application/pdf',
-        tamano: pdfRellenado.length,
-        s3Key,
-        s3Bucket: process.env.STORAGE_BUCKET || 'clousadmin-documents',
-        requiereFirma: configuracion.requiereFirma || plantilla.requiereFirma,
-      },
+    // Crear documento y asociarlo a carpeta usando transacción
+    const documento = await prisma.$transaction(async (tx) => {
+      const doc = await tx.documentos.create({
+        data: {
+          empresaId: empleado.empresaId,
+          empleadoId: empleadoId,
+          nombre: nombreDocumento,
+          tipoDocumento: 'generado',
+          mimeType: 'application/pdf',
+          tamano: pdfRellenado.length,
+          s3Key,
+          s3Bucket: process.env.STORAGE_BUCKET || 'clousadmin-documents',
+          requiereFirma: configuracion.requiereFirma || plantilla.requiereFirma,
+        },
+      });
+
+      // Asociar a carpeta usando tabla intermedia
+      await tx.documento_carpetas.create({
+        data: {
+          documentoId: doc.id,
+          carpetaId: carpeta.id,
+        },
+      });
+
+      return doc;
     });
 
     const documentoGenerado = await prisma.documentosGenerado.create({

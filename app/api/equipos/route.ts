@@ -2,154 +2,124 @@
 // API Routes - Equipos
 // ========================================
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 
-import { getSession } from '@/lib/auth';
-import { UsuarioRol } from '@/lib/constants/enums';
+import {
+  badRequestResponse,
+  createdResponse,
+  handleApiError,
+  requireAuthAsHR,
+  successResponse,
+  validateRequest,
+} from '@/lib/api-handler';
+import {
+  equipoInclude,
+  type EquipoWithRelations,
+  formatEquipoResponse,
+} from '@/lib/equipos/helpers';
 import { prisma } from '@/lib/prisma';
+import {
+  buildPaginationMeta,
+  parsePaginationParams,
+} from '@/lib/utils/pagination';
+import { createEquipoSchema } from '@/lib/validaciones/equipos-schemas';
 
-
-// GET /api/equipos - List teams
-const equipoInclude = {
-  empleados: {
-    select: {
-      id: true,
-      nombre: true,
-      apellidos: true,
-    },
-  },
-  empleado_equipos: {
-    include: {
-      empleado: {
-        select: {
-          id: true,
-          nombre: true,
-          apellidos: true,
-          fotoUrl: true,
-        },
-      },
-    },
-  },
-  sede: {
-    select: {
-      id: true,
-      nombre: true,
-    },
-  },
-} as const;
-
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const session = await getSession();
+    const authResult = await requireAuthAsHR(request);
+    if (authResult instanceof Response) return authResult;
+    const { session } = authResult;
 
-    if (!session || session.user.rol !== UsuarioRol.hr_admin) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
-    }
+    const { searchParams } = new URL(request.url);
+    const { page, limit, skip } = parsePaginationParams(searchParams);
 
-    const equiposRaw = await prisma.equipos.findMany({
-      where: {
-        empresaId: session.user.empresaId,
-      },
-      include: equipoInclude,
-      orderBy: {
-        nombre: 'asc',
-      },
-    });
+    const [equiposRaw, total] = await Promise.all([
+      prisma.equipos.findMany({
+        where: {
+          empresaId: session.user.empresaId,
+        },
+        include: equipoInclude,
+        orderBy: {
+          nombre: 'asc',
+        },
+        skip,
+        take: limit,
+      }),
+      prisma.equipos.count({
+        where: {
+          empresaId: session.user.empresaId,
+        },
+      }),
+    ]);
 
     const equipos = equiposRaw.map((team) =>
       formatEquipoResponse(team as EquipoWithRelations)
-    );
+    ).filter((equipo): equipo is NonNullable<typeof equipo> => equipo !== null);
 
-    return NextResponse.json(equipos);
+    return successResponse({
+      data: equipos,
+      pagination: buildPaginationMeta(page, limit, total),
+    });
   } catch (error) {
-    console.error('Error fetching teams:', error);
-    return NextResponse.json({ error: 'Error al obtener equipos' }, { status: 500 });
+    return handleApiError(error, 'API GET /api/equipos');
   }
 }
 
 // POST /api/equipos - Create team
 export async function POST(request: NextRequest) {
   try {
-    const session = await getSession();
+    const authResult = await requireAuthAsHR(request);
+    if (authResult instanceof Response) return authResult;
+    const { session } = authResult;
 
-    if (!session || session.user.rol !== UsuarioRol.hr_admin) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
-    }
+    // Validar request body con Zod
+    const validationResult = await validateRequest(request, createEquipoSchema);
+    if (validationResult instanceof Response) return validationResult;
+    const { data: validatedData } = validationResult;
 
-    const body = await request.json() as Record<string, unknown>;
-    const { nombre, descripcion, sedeId } = body;
-
-    if (!nombre || typeof nombre !== 'string' || nombre.trim() === '') {
-      return NextResponse.json({ error: 'El nombre es requerido' }, { status: 400 });
-    }
-
-    // Check if team name already exists in the company
+    // Verificar que el nombre no esté duplicado en la empresa
     const existingTeam = await prisma.equipos.findFirst({
       where: {
         empresaId: session.user.empresaId,
-        nombre: nombre.trim(),
+        nombre: validatedData.nombre,
       },
+      select: { id: true },
     });
 
     if (existingTeam) {
-      return NextResponse.json(
-        { error: 'Ya existe un equipo con ese nombre' },
-        { status: 400 }
-      );
+      return badRequestResponse('Ya existe un equipo con ese nombre');
     }
 
-    const descripcionStr = typeof descripcion === 'string' ? descripcion : undefined;
-    const sedeIdStr = typeof sedeId === 'string' ? sedeId : null;
+    // Verificar que la sede existe si se proporciona
+    if (validatedData.sedeId) {
+      const sede = await prisma.sedes.findFirst({
+        where: {
+          id: validatedData.sedeId,
+          empresaId: session.user.empresaId,
+        },
+        select: { id: true },
+      });
 
+      if (!sede) {
+        return badRequestResponse('La sede especificada no existe');
+      }
+    }
+
+    // Crear equipo
     const equipoRaw = await prisma.equipos.create({
       data: {
         empresaId: session.user.empresaId,
-        nombre: nombre.trim(),
-        descripcion: descripcionStr?.trim() || null,
-        sedeId: sedeIdStr,
+        nombre: validatedData.nombre,
+        descripcion: validatedData.descripcion || null,
+        sedeId: validatedData.sedeId || null,
       },
       include: equipoInclude,
     });
 
     const equipo = formatEquipoResponse(equipoRaw as EquipoWithRelations);
 
-    return NextResponse.json(equipo, { status: 201 });
+    return createdResponse(equipo);
   } catch (error) {
-    console.error('Error creating team:', error);
-    return NextResponse.json({ error: 'Error al crear equipo' }, { status: 500 });
+    return handleApiError(error, 'API POST /api/equipos');
   }
-}
-
-type EquipoWithRelations = NonNullable<
-  Awaited<ReturnType<(typeof prisma.equipos)['findMany']>>[number]
-> & {
-  empleados: {
-    id: string;
-    nombre: string;
-    apellidos: string;
-  } | null;
-  empleado_equipos: Array<{
-    empleado: {
-      id: string;
-      nombre: string;
-      apellidos: string;
-      fotoUrl: string | null;
-    };
-  }>;
-};
-
-function formatEquipoResponse(team: EquipoWithRelations) {
-  return {
-    ...team,
-    manager: team.empleados
-      ? {
-          id: team.empleados.id,
-          nombre: team.empleados.nombre,
-          apellidos: team.empleados.apellidos,
-        }
-      : null,
-    miembros: team.empleado_equipos.map((miembro) => ({
-      empleado: miembro.empleado,
-    })),
-  };
 }

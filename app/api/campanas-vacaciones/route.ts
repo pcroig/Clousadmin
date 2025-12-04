@@ -9,10 +9,15 @@ import { NextRequest } from 'next/server';
 import {
   badRequestResponse,
   createdResponse,
+  featureDisabledResponse,
   handleApiError,
   requireAuth,
   successResponse,
 } from '@/lib/api-handler';
+import {
+  CAMPANAS_VACACIONES_ENABLED,
+  CAMPANAS_VACACIONES_FEATURE_NAME,
+} from '@/lib/constants/feature-flags';
 import { UsuarioRol } from '@/lib/constants/enums';
 import { crearNotificacionCampanaCreada } from '@/lib/notificaciones';
 import { prisma, Prisma } from '@/lib/prisma';
@@ -23,6 +28,10 @@ import { campanaVacacionesCreateSchema } from '@/lib/validaciones/schemas';
 // GET /api/campanas-vacaciones - Obtener campaña activa (single active campaign)
 export async function GET(req: NextRequest) {
   try {
+    if (!CAMPANAS_VACACIONES_ENABLED) {
+      return featureDisabledResponse(CAMPANAS_VACACIONES_FEATURE_NAME);
+    }
+
     // Verificar autenticación
     const authResult = await requireAuth(req);
     if (authResult instanceof Response) return authResult;
@@ -67,6 +76,10 @@ export async function GET(req: NextRequest) {
 // POST /api/campanas-vacaciones - Crear campaña
 export async function POST(req: NextRequest) {
   try {
+    if (!CAMPANAS_VACACIONES_ENABLED) {
+      return featureDisabledResponse(CAMPANAS_VACACIONES_FEATURE_NAME);
+    }
+
     // Verificar autenticación
     const authResult = await requireAuth(req);
     if (authResult instanceof Response) return authResult;

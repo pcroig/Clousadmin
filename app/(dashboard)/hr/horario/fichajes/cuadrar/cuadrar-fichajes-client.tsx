@@ -447,37 +447,48 @@ export function CuadrarFichajesClient() {
                           )}
                         </TableCell>
                         <TableCell>
-                          <div className="space-y-1">
-                            {/* PUNTO 6: Mostrar eventos registrados (blanco) */}
-                            {fichaje.eventosRegistrados.map((evento, idx) => (
-                              <div 
-                                key={`reg-${fichaje.id}-${idx}`} 
-                                className="flex items-center gap-2 text-xs bg-white border border-gray-200 rounded px-2 py-1"
-                              >
-                                <Clock className="w-3 h-3 text-gray-500" />
-                                <span className="font-medium text-gray-900">{EVENT_LABELS[evento.tipo] || evento.tipo}</span>
-                                <span className="text-gray-600">
-                                  {format(toDate(evento.hora), 'HH:mm', { locale: es })}
-                                </span>
+                          <div className="space-y-2">
+                            {/* Eventos Registrados */}
+                            {fichaje.eventosRegistrados.length > 0 && (
+                              <div>
+                                <p className="text-[10px] font-medium text-gray-500 uppercase mb-1">Registrados</p>
+                                <div className="flex flex-wrap gap-1">
+                                  {fichaje.eventosRegistrados.map((evento, idx) => (
+                                    <div 
+                                      key={`reg-${fichaje.id}-${idx}`} 
+                                      className="flex items-center gap-1.5 text-xs bg-white border border-gray-200 rounded px-2 py-1"
+                                    >
+                                      <Clock className="w-3 h-3 text-gray-500" />
+                                      <span className="font-medium text-gray-900">{EVENT_LABELS[evento.tipo] || evento.tipo}</span>
+                                      <span className="text-gray-600">
+                                        {format(toDate(evento.hora), 'HH:mm', { locale: es })}
+                                      </span>
+                                    </div>
+                                  ))}
+                                </div>
                               </div>
-                            ))}
+                            )}
                             
-                            {/* PUNTO 6: Mostrar eventos propuestos (color terciario) */}
-                            {fichaje.eventosPropuestos?.map((evento, idx) => (
-                              <div 
-                                key={`prop-${fichaje.id}-${idx}`} 
-                                className="flex items-center gap-2 text-xs bg-tertiary-50 border border-tertiary-200 rounded px-2 py-1"
-                              >
-                                <Clock className="w-3 h-3 text-tertiary-500" />
-                                <span className="font-medium text-tertiary-700">{EVENT_LABELS[evento.tipo] || evento.tipo}</span>
-                                <span className="text-tertiary-600">
-                                  {format(toDate(evento.hora), 'HH:mm', { locale: es })}
-                                </span>
-                                <Badge variant="outline" className="text-[9px] py-0 px-1 border-tertiary-300 text-tertiary-600">
-                                  Propuesto
-                                </Badge>
+                            {/* Eventos Propuestos */}
+                            {fichaje.eventosPropuestos && fichaje.eventosPropuestos.length > 0 && (
+                              <div>
+                                <p className="text-[10px] font-medium text-tertiary-600 uppercase mb-1">Propuestos</p>
+                                <div className="flex flex-wrap gap-1">
+                                  {fichaje.eventosPropuestos.map((evento, idx) => (
+                                    <div 
+                                      key={`prop-${fichaje.id}-${idx}`} 
+                                      className="flex items-center gap-1.5 text-xs bg-tertiary-50 border border-tertiary-200 rounded px-2 py-1"
+                                    >
+                                      <Clock className="w-3 h-3 text-tertiary-500" />
+                                      <span className="font-medium text-tertiary-700">{EVENT_LABELS[evento.tipo] || evento.tipo}</span>
+                                      <span className="text-tertiary-600">
+                                        {format(toDate(evento.hora), 'HH:mm', { locale: es })}
+                                      </span>
+                                    </div>
+                                  ))}
+                                </div>
                               </div>
-                            ))}
+                            )}
                             
                             {/* Si no hay eventos de ningún tipo */}
                             {fichaje.eventosRegistrados.length === 0 && (!fichaje.eventosPropuestos || fichaje.eventosPropuestos.length === 0) && (
@@ -487,7 +498,7 @@ export function CuadrarFichajesClient() {
                           
                           {/* Info de ausencia de media jornada si aplica */}
                           {fichaje.ausenciaMedioDia && (
-                            <div className="mt-1">
+                            <div className="mt-2">
                               <Badge variant="outline" className="text-[10px] bg-amber-50 border-amber-200 text-amber-700">
                                 Ausencia {fichaje.ausenciaMedioDia === 'manana' ? 'mañana' : 'tarde'}
                               </Badge>

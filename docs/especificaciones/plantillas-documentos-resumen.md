@@ -1,17 +1,36 @@
 # 📊 Plantillas de Documentos - Resumen Ejecutivo
 
-**Proyecto**: Clousadmin  
-**Fecha**: 12 de Noviembre 2025  
+**Proyecto**: Clousadmin
+**Fecha**: 12 de Noviembre 2025 (Especificación inicial)
+**Última actualización**: 4 de Diciembre 2025
 **Objetivo**: Sistema de plantillas con variables para automatizar generación de documentos
+**Estado**: 🚀 ~80% Implementado - Funcional en Producción
+
+---
+
+## 📌 Estado Actual de Implementación
+
+| Componente | Estado | Completitud |
+|------------|--------|-------------|
+| **Modelos BD** | ✅ Completo | 100% |
+| **Backend Core** | ✅ Funcional | 90% |
+| **APIs REST** | ✅ Funcional | 85% |
+| **Frontend UI** | ⚠️ Parcial | 70% |
+| **Integraciones** | ✅ Funcional | 80% |
+
+**Análisis detallado**: Ver [`docs/analisis/firma-digital-y-plantillas-estado.md`](../analisis/firma-digital-y-plantillas-estado.md) para estado completo actualizado al 27 de Enero 2025.
+
+**Este documento**: Especificación funcional y técnica del sistema. La mayoría de funcionalidades aquí descritas están implementadas y funcionando en producción.
 
 ---
 
 ## 🎯 Resumen Rápido
 
-### 🔧 Estado actual (enero 2026)
-- **Producción**: motor de plantillas **DOCX con variables** (docxtemplater). Es el flujo oficial hoy.
+### 🔧 Estado actual (diciembre 2025)
+- **Producción**: motor de plantillas **DOCX con variables** (docxtemplater). ✅ Es el flujo oficial y funcional.
 - **En pausa documentada**: motor **PDF rellenable**. El código base (`lib/plantillas/pdf-rellenable.ts`, API `/api/plantillas/[id]/escanear-campos`) está implementado parcialmente pero **deshabilitado hasta nueva fase**. Falta UI de mapeo persistente y QA, por lo que no se expone todavía.
-- **Escenarios descartados**: generación “híbrida” (DOCX→PDF con Vision) queda fuera del alcance.
+- **Escenarios descartados**: generación "híbrida" (DOCX→PDF con Vision) queda fuera del alcance.
+- **Falta implementar**: UI completa de generación masiva, previsualización avanzada.
 
 ### ¿Qué es?
 Un sistema que permite:

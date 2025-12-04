@@ -56,6 +56,17 @@ export async function GET(request: NextRequest) {
                   id: true,
                   nombre: true,
                   tipoDocumento: true,
+                  documento_carpetas: {
+                    include: {
+                      carpeta: {
+                        select: {
+                          id: true,
+                          nombre: true,
+                        },
+                      },
+                    },
+                    take: 1,
+                  },
                 },
               },
             },
@@ -85,6 +96,7 @@ export async function GET(request: NextRequest) {
             id: firma.solicitudes_firma.documentos.id,
             nombre: firma.solicitudes_firma.documentos.nombre,
             tipoDocumento: firma.solicitudes_firma.documentos.tipoDocumento,
+            carpetaId: firma.solicitudes_firma.documentos.documento_carpetas[0]?.carpetaId || null,
           },
         },
       };
@@ -120,7 +132,17 @@ export async function GET(request: NextRequest) {
                 id: true,
                 nombre: true,
                 tipoDocumento: true,
-                carpetaId: true,
+                documento_carpetas: {
+                  include: {
+                    carpeta: {
+                      select: {
+                        id: true,
+                        nombre: true,
+                      },
+                    },
+                  },
+                  take: 1,
+                },
               },
             },
           },
@@ -152,7 +174,7 @@ export async function GET(request: NextRequest) {
             id: firma.solicitudes_firma.documentos.id,
             nombre: firma.solicitudes_firma.documentos.nombre,
             tipoDocumento: firma.solicitudes_firma.documentos.tipoDocumento,
-            carpetaId: firma.solicitudes_firma.documentos.carpetaId || '',
+            carpetaId: firma.solicitudes_firma.documentos.documento_carpetas[0]?.carpetaId || '',
           },
         },
       })),
@@ -175,7 +197,7 @@ export async function GET(request: NextRequest) {
             id: firma.solicitudes_firma.documentos.id,
             nombre: firma.solicitudes_firma.documentos.nombre,
             tipoDocumento: firma.solicitudes_firma.documentos.tipoDocumento,
-            carpetaId: firma.solicitudes_firma.documentos.carpetaId || '',
+            carpetaId: firma.solicitudes_firma.documentos.documento_carpetas[0]?.carpetaId || '',
           },
         },
       })),

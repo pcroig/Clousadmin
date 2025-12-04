@@ -138,6 +138,15 @@ export function FichajesTab({ empleadoId }: { empleadoId: string }) {
     fetchFichajes();
   }, [fetchFichajes]);
 
+  // Listener para refrescar en tiempo real
+  useEffect(() => {
+    function handleRealtimeUpdate() {
+      fetchFichajes();
+    }
+    window.addEventListener('fichaje-updated', handleRealtimeUpdate);
+    return () => window.removeEventListener('fichaje-updated', handleRealtimeUpdate);
+  }, [fetchFichajes]);
+
   const balance = useMemo<BalanceResumen>(() => {
     const hoy = new Date();
     const resumen: BalanceResumen = {

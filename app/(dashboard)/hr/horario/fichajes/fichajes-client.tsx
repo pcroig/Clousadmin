@@ -8,7 +8,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Calendar, Check, Clock } from 'lucide-react';
+import { Check, Clock, Settings } from 'lucide-react';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -576,8 +576,8 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
                 isSpecialAction: true,
               },
               {
-                icon: Calendar,
-                label: 'Gestionar jornadas',
+                icon: Settings,
+                label: 'Jornadas',
                 onClick: () => setJornadasModal(true),
               },
               {
@@ -659,12 +659,16 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
           <div className="flex items-center justify-between mb-6">
             <h1 className="text-2xl font-semibold text-gray-900">Fichajes</h1>
             <div className="flex gap-2">
-              <Button variant="outline" onClick={() => setJornadasModal(true)} className="border-gray-200">
-                <Clock className="w-4 h-4 mr-2" />
-                Gestionar Jornadas
+              <Button
+                variant="outline"
+                onClick={() => setJornadasModal(true)}
+                className="border-gray-200 gap-2"
+              >
+                <Settings className="w-4 h-4" />
+                Jornadas
               </Button>
-              <Button variant="outline" className="border-gray-200" onClick={handleAbrirCompensacion}>
-                <Clock className="w-4 h-4 mr-2" />
+              <Button variant="outline" className="border-gray-200 gap-2" onClick={handleAbrirCompensacion}>
+                <Clock className="w-4 h-4" />
                 Compensar horas
               </Button>
               <Button asChild className="bg-gray-900 text-white hover:bg-gray-800">

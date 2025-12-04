@@ -29,18 +29,24 @@ export default async function HRCarpetaDetailPage(context: { params: Promise<{ i
       id: id,
     },
     include: {
-      documentos: {
+      documento_carpetas: {
         include: {
-          empleado: {
-            select: {
-              id: true,
-              nombre: true,
-              apellidos: true,
+          documento: {
+            include: {
+              empleado: {
+                select: {
+                  id: true,
+                  nombre: true,
+                  apellidos: true,
+                },
+              },
             },
           },
         },
         orderBy: {
-          createdAt: 'desc',
+          documento: {
+            createdAt: 'desc',
+          },
         },
       },
       empleado: {
@@ -57,13 +63,13 @@ export default async function HRCarpetaDetailPage(context: { params: Promise<{ i
     redirect('/hr/documentos');
   }
 
-  // Si es carpeta global (sin empleadoId), obtener documentos agregados de todos los empleados
-  let documentosAgregados = carpeta.documentos;
+  // Si es carpeta master del sistema compartida (para HR), obtener documentos agregados de todos los empleados
+  // Estas son las 4 carpetas: Contratos, Nóminas, Justificantes, Otros (sin empleadoId asignado)
+  let documentosAgregados = carpeta.documento_carpetas.map(dc => dc.documento);
   type DocumentoConEmpleado = (typeof documentosAgregados)[number];
-  let esGlobal = false;
+  const esCarpetaMasterHR = !carpeta.empleadoId && carpeta.compartida && carpeta.esSistema;
 
-  if (!carpeta.empleadoId && carpeta.compartida && carpeta.esSistema) {
-    esGlobal = true;
+  if (esCarpetaMasterHR) {
     // Buscar todos los documentos del mismo tipo en carpetas de empleados
     const tipoDocumento = obtenerTipoDocumentoDesdeCarpeta(carpeta.nombre);
 
@@ -88,7 +94,11 @@ export default async function HRCarpetaDetailPage(context: { params: Promise<{ i
         }),
         prisma.documentos.findMany({
           where: {
-            carpetaId: carpeta.id,
+            documento_carpetas: {
+              some: {
+                carpetaId: carpeta.id,
+              },
+            },
             empresaId: session.user.empresaId,
           },
           include: {
@@ -115,9 +125,9 @@ export default async function HRCarpetaDetailPage(context: { params: Promise<{ i
     }
   }
 
-  // Obtener lista de empleados para el filtro (si es carpeta global)
+  // Obtener lista de empleados para el filtro (si es carpeta master para HR)
   let empleados: Array<{ id: string; nombre: string; apellidos: string }> = [];
-  if (esGlobal) {
+  if (esCarpetaMasterHR) {
     empleados = await prisma.empleados.findMany({
       where: {
         empresaId: session.user.empresaId,
@@ -134,6 +144,41 @@ export default async function HRCarpetaDetailPage(context: { params: Promise<{ i
     });
   }
 
+  // Obtener información de firmas para cada documento
+  const documentIds = documentosAgregados.map(d => d.id);
+  const solicitudesFirma = await prisma.solicitudes_firma.findMany({
+    where: {
+      documentoId: { in: documentIds },
+      empresaId: session.user.empresaId,
+    },
+    include: {
+      firmas: {
+        select: {
+          id: true,
+          firmado: true,
+          empleadoId: true,
+        },
+      },
+    },
+  });
+
+  // Crear un mapa de documentoId -> estado de firma
+  const firmasPorDocumento = new Map(
+    solicitudesFirma.map(sol => {
+      // Una solicitud puede tener múltiples firmantes, consideramos completada si todos firmaron
+      const todosFirmados = sol.firmas.length > 0 && sol.firmas.every(f => f.firmado);
+      return [
+        sol.documentoId,
+        {
+          tieneSolicitud: true,
+          firmado: todosFirmados,
+          solicitudId: sol.id,
+          estadoSolicitud: sol.estado,
+        },
+      ];
+    })
+  );
+
   // Serializar datos para evitar problemas con Date
   const carpetaData = {
     id: carpeta.id,
@@ -142,20 +187,31 @@ export default async function HRCarpetaDetailPage(context: { params: Promise<{ i
     compartida: carpeta.compartida,
     asignadoA: carpeta.asignadoA,
     empleado: carpeta.empleado,
-    esGlobal,
-    documentos: documentosAgregados.map((doc) => ({
-      id: doc.id,
-      nombre: doc.nombre,
-      tipoDocumento: doc.tipoDocumento,
-      mimeType: doc.mimeType,
-      tamano: doc.tamano,
-      createdAt: doc.createdAt.toISOString(),
-      empleado: doc.empleado ? {
-        id: doc.empleado.id,
-        nombre: doc.empleado.nombre,
-        apellidos: doc.empleado.apellidos,
-      } : null,
-    })),
+    esCarpetaMasterHR,
+    documentos: documentosAgregados.map((doc) => {
+      const firmaInfo = firmasPorDocumento.get(doc.id);
+      return {
+        id: doc.id,
+        nombre: doc.nombre,
+        tipoDocumento: doc.tipoDocumento,
+        mimeType: doc.mimeType,
+        tamano: doc.tamano,
+        createdAt: doc.createdAt.toISOString(),
+        firmado: firmaInfo?.firmado ?? false,
+        firmadoEn: null,
+        firmaInfo: firmaInfo ? {
+          tieneSolicitud: firmaInfo.tieneSolicitud,
+          firmado: firmaInfo.firmado,
+          solicitudId: firmaInfo.solicitudId,
+          estadoSolicitud: firmaInfo.estadoSolicitud,
+        } : null,
+        empleado: doc.empleado ? {
+          id: doc.empleado.id,
+          nombre: doc.empleado.nombre,
+          apellidos: doc.empleado.apellidos,
+        } : null,
+      };
+    }),
   };
 
   return <CarpetaDetailClient carpeta={carpetaData} empleados={empleados} />;

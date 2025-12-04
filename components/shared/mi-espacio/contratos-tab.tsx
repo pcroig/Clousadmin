@@ -1,19 +1,19 @@
 'use client';
 
+import { format } from 'date-fns';
 import { useRouter } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 import { DarDeBajaModal } from '@/components/hr/DarDeBajaModal';
+import { ResponsiveDatePicker } from '@/components/shared/responsive-date-picker';
 import { SearchableMultiSelect } from '@/components/shared/searchable-multi-select';
 import { SearchableSelect } from '@/components/shared/searchable-select';
-import { ResponsiveDatePicker } from '@/components/shared/responsive-date-picker';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { TIPO_CONTRATO_LABELS, TipoContrato } from '@/lib/constants/enums';
 import { parseJson } from '@/lib/utils/json';
-import { format } from 'date-fns';
 
 
 import type { MiEspacioEmpleado } from '@/types/empleado';
@@ -35,6 +35,28 @@ interface HistorialSalario {
   fechaRegistro: string;
 }
 
+interface TipoComplemento {
+  id: string;
+  nombre: string;
+  descripcion?: string | null;
+  esImporteFijo: boolean;
+  importeFijo?: number | null;
+}
+
+interface ComplementoEmpleado {
+  id: string;
+  tipoComplementoId: string;
+  importePersonalizado?: number | null;
+  activo: boolean;
+  validado: boolean;
+  tipos_complemento: {
+    id: string;
+    nombre: string;
+    esImporteFijo: boolean;
+    importeFijo?: number | null;
+  };
+}
+
 interface ContratosTabProps {
   empleado: MiEspacioEmpleado;
   rol?: 'empleado' | 'manager' | 'hr_admin';
@@ -50,8 +72,11 @@ export function ContratosTab({ empleado, rol = 'empleado' }: ContratosTabProps) 
   const [fechaCambio, setFechaCambio] = useState('');
   const [historialSalarios, setHistorialSalarios] = useState<HistorialSalario[]>([]);
   const [addingComplemento, setAddingComplemento] = useState(false);
-  const [complementoTipo, setComplementoTipo] = useState('');
+  const [tiposComplemento, setTiposComplemento] = useState<TipoComplemento[]>([]);
+  const [complementoTipoId, setComplementoTipoId] = useState('');
   const [complementoImporte, setComplementoImporte] = useState('');
+  const [complementosEmpleado, setComplementosEmpleado] = useState<ComplementoEmpleado[]>([]);
+  const [loadingComplemento, setLoadingComplemento] = useState(false);
   const [tipoContratoSeleccionado, setTipoContratoSeleccionado] = useState<TipoContrato>(
     (empleado.tipoContrato as TipoContrato) || 'indefinido'
   );
@@ -153,6 +178,20 @@ export function ContratosTab({ empleado, rol = 'empleado' }: ContratosTabProps) 
     setManagerSeleccionado(empleado.manager?.id ?? '');
   }, [empleado.manager?.id]);
 
+  // Cargar complementos del empleado
+  const fetchComplementosEmpleado = useCallback(async () => {
+    try {
+      const response = await fetch(`/api/empleados/${empleado.id}/complementos`);
+      if (!response.ok) {
+        throw new Error('Error al cargar complementos');
+      }
+      const data = await parseJson<{ complementos: ComplementoEmpleado[] }>(response);
+      setComplementosEmpleado(data.complementos || []);
+    } catch (error) {
+      console.error('[ContratosTab] Error fetching complementos:', error);
+    }
+  }, [empleado.id]);
+
   useEffect(() => {
     if (!isHrAdmin) {
       return;
@@ -162,11 +201,12 @@ export function ContratosTab({ empleado, rol = 'empleado' }: ContratosTabProps) 
 
     const fetchAdminData = async () => {
       try {
-        const [jornadasResponse, puestosResponse, equiposResponse, managersResponse] = await Promise.allSettled([
+        const [jornadasResponse, puestosResponse, equiposResponse, managersResponse, tiposComplementoResponse] = await Promise.allSettled([
           fetch('/api/jornadas'),
           fetch('/api/organizacion/puestos'),
           fetch('/api/organizacion/equipos'),
           fetch('/api/empleados?activos=true&limit=200'),
+          fetch('/api/tipos-complemento'),
         ]);
 
         if (!isMounted) return;
@@ -225,17 +265,30 @@ export function ContratosTab({ empleado, rol = 'empleado' }: ContratosTabProps) 
               }))
           );
         }
+
+        if (tiposComplementoResponse.status === 'fulfilled' && tiposComplementoResponse.value.ok) {
+          const payload = await parseJson<TipoComplemento[] | { tipos?: TipoComplemento[] }>(
+            tiposComplementoResponse.value
+          ).catch(() => null);
+          const lista = Array.isArray(payload)
+            ? payload
+            : Array.isArray(payload?.tipos)
+            ? payload?.tipos
+            : [];
+          setTiposComplemento(lista);
+        }
       } catch (error) {
         console.error('[ContratosTab] Error fetching admin data', error);
       }
     };
 
     void fetchAdminData();
+    void fetchComplementosEmpleado();
 
     return () => {
       isMounted = false;
     };
-  }, [isHrAdmin, empleado.id]);
+  }, [isHrAdmin, empleado.id, fetchComplementosEmpleado]);
 
   // Escuchar evento de "Dar de Baja" desde el header
   useEffect(() => {
@@ -254,7 +307,7 @@ export function ContratosTab({ empleado, rol = 'empleado' }: ContratosTabProps) 
     (empleado.jornada
       ? {
           id: empleado.jornada.id,
-          nombre: empleado.jornada.nombre,
+          nombre: empleado.jornada.etiqueta,
           horasSemanales: empleado.jornada.horasSemanales,
         }
       : undefined);
@@ -410,6 +463,90 @@ export function ContratosTab({ empleado, rol = 'empleado' }: ContratosTabProps) 
         setManagerSeleccionado(previous);
       }
     })();
+  };
+
+  const handleGuardarComplemento = async () => {
+    if (!complementoTipoId) {
+      toast.error('Selecciona un tipo de complemento');
+      return;
+    }
+
+    const tipoSeleccionado = tiposComplemento.find(t => t.id === complementoTipoId);
+    if (!tipoSeleccionado) {
+      toast.error('Tipo de complemento no válido');
+      return;
+    }
+
+    // Validar importe según el tipo
+    if (!tipoSeleccionado.esImporteFijo && !complementoImporte) {
+      toast.error('Debes especificar un importe para complementos variables');
+      return;
+    }
+
+    if (complementoImporte && Number(complementoImporte) <= 0) {
+      toast.error('El importe debe ser mayor a 0');
+      return;
+    }
+
+    setLoadingComplemento(true);
+    try {
+      const payload: Record<string, unknown> = {
+        tipoComplementoId: complementoTipoId,
+        contratoId: contratoActualId,
+      };
+
+      // Solo enviar importe personalizado si es variable o si se sobrescribe el fijo
+      if (!tipoSeleccionado.esImporteFijo || complementoImporte) {
+        payload.importePersonalizado = Number(complementoImporte);
+      }
+
+      const response = await fetch(`/api/empleados/${empleado.id}/complementos`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const error = await parseJson<{ error?: string }>(response).catch(() => null);
+        throw new Error(error?.error || 'Error al guardar complemento');
+      }
+
+      toast.success('Complemento añadido correctamente');
+      setComplementoTipoId('');
+      setComplementoImporte('');
+      setAddingComplemento(false);
+      await fetchComplementosEmpleado();
+      router.refresh();
+    } catch (error) {
+      console.error('[ContratosTab] Error saving complemento:', error);
+      toast.error(error instanceof Error ? error.message : 'Error al guardar complemento');
+    } finally {
+      setLoadingComplemento(false);
+    }
+  };
+
+  const handleEliminarComplemento = async (complementoId: string) => {
+    if (!window.confirm('¿Estás seguro de que quieres eliminar este complemento?')) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/empleados/${empleado.id}/complementos/${complementoId}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        const error = await parseJson<{ error?: string }>(response).catch(() => null);
+        throw new Error(error?.error || 'Error al eliminar complemento');
+      }
+
+      toast.success('Complemento eliminado correctamente');
+      await fetchComplementosEmpleado();
+      router.refresh();
+    } catch (error) {
+      console.error('[ContratosTab] Error deleting complemento:', error);
+      toast.error(error instanceof Error ? error.message : 'Error al eliminar complemento');
+    }
   };
 
   return (
@@ -686,51 +823,85 @@ export function ContratosTab({ empleado, rol = 'empleado' }: ContratosTabProps) 
               
               {addingComplemento && rol === 'hr_admin' && (
                 <div className="mb-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
-                  <div className="grid grid-cols-2 gap-3 mb-2">
+                  <div className="space-y-3 mb-3">
                     <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">Tipo de complemento</label>
-                      <Input
-                        type="text"
-                        value={complementoTipo}
-                        onChange={(e) => setComplementoTipo(e.target.value)}
-                        placeholder="Ej: Plus transporte"
-                      />
+                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                        Tipo de complemento <span className="text-red-500">*</span>
+                      </label>
+                      {tiposComplemento.length > 0 ? (
+                        <SearchableSelect
+                          items={tiposComplemento.map((tipo) => ({
+                            value: tipo.id,
+                            label: `${tipo.nombre}${tipo.esImporteFijo ? ` (Fijo: ${Number(tipo.importeFijo || 0).toLocaleString('es-ES')} €)` : ' (Variable)'}`,
+                          }))}
+                          value={complementoTipoId}
+                          onChange={(value) => {
+                            setComplementoTipoId(value || '');
+                            // Si es fijo, pre-cargar el importe
+                            const tipo = tiposComplemento.find(t => t.id === value);
+                            if (tipo?.esImporteFijo && tipo.importeFijo) {
+                              setComplementoImporte(String(tipo.importeFijo));
+                            } else {
+                              setComplementoImporte('');
+                            }
+                          }}
+                          placeholder="Seleccionar tipo"
+                          label="Seleccionar tipo de complemento"
+                          disabled={loadingComplemento}
+                        />
+                      ) : (
+                        <Input
+                          type="text"
+                          value="Cargando tipos de complemento..."
+                          readOnly
+                          className="bg-gray-100"
+                        />
+                      )}
                     </div>
-                    <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">Importe (€/mes)</label>
-                      <Input
-                        type="number"
-                        value={complementoImporte}
-                        onChange={(e) => setComplementoImporte(e.target.value)}
-                        placeholder="Ej: 150"
-                      />
-                    </div>
+                    {complementoTipoId && (() => {
+                      const tipoSeleccionado = tiposComplemento.find(t => t.id === complementoTipoId);
+                      return tipoSeleccionado && (
+                        <>
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">
+                              Importe (€/mes) {!tipoSeleccionado.esImporteFijo && <span className="text-red-500">*</span>}
+                            </label>
+                            <Input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              value={complementoImporte}
+                              onChange={(e) => setComplementoImporte(e.target.value)}
+                              placeholder={tipoSeleccionado.esImporteFijo ? 'Opcional: sobrescribir importe fijo' : 'Especificar importe'}
+                              disabled={loadingComplemento}
+                            />
+                            {tipoSeleccionado.esImporteFijo && (
+                              <p className="text-xs text-gray-500 mt-1">
+                                Importe por defecto: {Number(tipoSeleccionado.importeFijo || 0).toLocaleString('es-ES')} €
+                              </p>
+                            )}
+                          </div>
+                        </>
+                      );
+                    })()}
                   </div>
                   <div className="flex gap-2">
                     <Button
                       size="sm"
-                      onClick={() => {
-                        if (complementoTipo && complementoImporte) {
-                          // Aquí iría la llamada a la API para guardar el complemento
-                          toast.success('Complemento añadido correctamente');
-                          setComplementoTipo('');
-                          setComplementoImporte('');
-                          setAddingComplemento(false);
-                          router.refresh();
-                        }
-                      }}
-                      disabled={!complementoTipo || !complementoImporte}
+                      onClick={handleGuardarComplemento}
+                      disabled={!complementoTipoId || loadingComplemento}
                     >
-                      Guardar
+                      {loadingComplemento ? 'Guardando...' : 'Guardar'}
                     </Button>
                     <Button
                       size="sm"
                       variant="outline"
                       onClick={() => {
-                        setComplementoTipo('');
+                        setComplementoTipoId('');
                         setComplementoImporte('');
                         setAddingComplemento(false);
                       }}
+                      disabled={loadingComplemento}
                     >
                       Cancelar
                     </Button>
@@ -738,31 +909,38 @@ export function ContratosTab({ empleado, rol = 'empleado' }: ContratosTabProps) 
                 </div>
               )}
               
-              {empleado.complementos && empleado.complementos.length > 0 ? (
+              {complementosEmpleado.length > 0 ? (
                 <div className="space-y-2">
-                  {empleado.complementos.map((comp, index) => {
-                    const nombreComplemento = comp?.tipo ?? comp?.tipoComplemento?.nombre ?? 'Complemento';
-                    const importe =
-                      typeof comp?.importe === 'number'
-                        ? comp.importe
-                        : typeof comp?.importePersonalizado === 'number'
-                          ? comp.importePersonalizado
-                          : 0;
+                  {complementosEmpleado.map((comp) => {
+                    const nombreComplemento = comp.tipos_complemento.nombre;
+                    const esFijo = comp.tipos_complemento.esImporteFijo;
+                    const importe = comp.importePersonalizado 
+                      ? Number(comp.importePersonalizado)
+                      : comp.tipos_complemento.importeFijo 
+                        ? Number(comp.tipos_complemento.importeFijo)
+                        : 0;
 
                     return (
-                      <div key={comp?.id ?? index} className="flex justify-between items-center text-sm p-2 bg-gray-50 rounded">
-                        <span className="text-gray-700">{nombreComplemento}</span>
+                      <div key={comp.id} className="flex justify-between items-center text-sm p-2 bg-gray-50 rounded border border-gray-200">
+                        <div className="flex items-center gap-2">
+                          <span className="text-gray-700">{nombreComplemento}</span>
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-gray-200 text-gray-600">
+                            {esFijo ? 'Fijo' : 'Variable'}
+                          </span>
+                          {!comp.validado && (
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-800">
+                              Pendiente validación
+                            </span>
+                          )}
+                        </div>
                         <div className="flex items-center gap-2">
                           <span className="font-medium">{importe.toLocaleString('es-ES')} €</span>
                           {rol === 'hr_admin' && (
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => {
-                                toast.success('Complemento eliminado');
-                                router.refresh();
-                              }}
-                              className="h-6 px-2 text-xs"
+                              onClick={() => handleEliminarComplemento(comp.id)}
+                              className="h-6 px-2 text-xs text-red-600 hover:text-red-700 hover:bg-red-50"
                             >
                               Eliminar
                             </Button>

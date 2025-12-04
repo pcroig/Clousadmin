@@ -70,6 +70,7 @@ export const SolicitudesWidget = memo(function SolicitudesWidget({
     () => solicitudes.slice(0, maxItems),
     [solicitudes, maxItems]
   );
+  const tieneSolicitudes = solicitudesMostradas.length > 0;
 
   const ejecutarAccion = useCallback(
     async (solicitudId: string, accion: SolicitudAccion) => {
@@ -178,7 +179,7 @@ export const SolicitudesWidget = memo(function SolicitudesWidget({
       title="Solicitudes"
       href={dashboardHref}
       badge={solicitudes.length > 0 ? solicitudes.length : undefined}
-      useScroll
+      useScroll={tieneSolicitudes}
       headerAction={
         solicitudes.length > 0 ? (
           <button
@@ -193,8 +194,8 @@ export const SolicitudesWidget = memo(function SolicitudesWidget({
       }
     >
       <div className="flex h-full flex-col">
-        {solicitudesMostradas.length === 0 ? (
-          <div className="flex flex-1 items-center justify-center">
+        {!tieneSolicitudes ? (
+          <div className="flex h-full min-h-full flex-1 items-center justify-center py-6">
             <EmptyState
               layout="widget"
               icon={ClipboardList}

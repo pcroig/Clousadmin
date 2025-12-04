@@ -13,10 +13,7 @@ import { PersonasClient } from './personas-client';
 
 
 // Server Component
-export default async function PersonasPage(props: {
-  searchParams: Promise<{ panel?: string; denunciaId?: string }>;
-}) {
-  const searchParams = await props.searchParams;
+export default async function PersonasPage() {
   const session = await getSession();
 
   if (!session || session.user.rol !== UsuarioRol.hr_admin) {
@@ -114,14 +111,9 @@ export default async function PersonasPage(props: {
     },
   }));
 
-  const panelParam = searchParams?.panel === 'denuncias' ? 'denuncias' : undefined;
-  const denunciaId = searchParams?.denunciaId;
-
   return (
     <PersonasClient
       empleados={empleadosData}
-      initialPanel={panelParam}
-      initialDenunciaId={denunciaId}
     />
   );
 }

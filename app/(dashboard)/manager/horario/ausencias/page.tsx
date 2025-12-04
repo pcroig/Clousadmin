@@ -7,6 +7,7 @@ import { redirect } from 'next/navigation';
 import { AusenciasClient } from '@/app/(dashboard)/hr/horario/ausencias/ausencias-client';
 import { getSession } from '@/lib/auth';
 import { UsuarioRol } from '@/lib/constants/enums';
+import { CAMPANAS_VACACIONES_ENABLED } from '@/lib/constants/feature-flags';
 
 export default async function ManagerAusenciasPage() {
   const session = await getSession();
@@ -29,5 +30,5 @@ export default async function ManagerAusenciasPage() {
     );
   }
 
-  return <AusenciasClient />;
+  return <AusenciasClient campanasEnabled={CAMPANAS_VACACIONES_ENABLED} />;
 }

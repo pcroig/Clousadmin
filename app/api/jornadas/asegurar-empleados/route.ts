@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
       mensaje:
         resultado.empleadosActualizados === 0
           ? 'Todos los empleados ya tienen jornada asignada'
-          : `Se asignó jornada "${resultado.jornadaAsignada?.nombre}" a ${resultado.empleadosActualizados} empleado(s)`,
+          : `Se asignó jornada ${resultado.jornadaAsignada?.id} a ${resultado.empleadosActualizados} empleado(s)`,
       empleadosActualizados: resultado.empleadosActualizados,
       jornadaAsignada: resultado.jornadaAsignada,
     });

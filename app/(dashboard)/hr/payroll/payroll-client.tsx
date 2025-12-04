@@ -29,6 +29,7 @@ import { AlertasSummary } from '@/components/payroll/alertas-summary';
 import { UploadNominasModal } from '@/components/payroll/upload-nominas-modal';
 import { ValidarComplementosDialog } from '@/components/payroll/validar-complementos-dialog';
 import { CompensarHorasDialog } from '@/components/shared/compensar-horas-dialog';
+import { EmployeeAvatar } from '@/components/shared/employee-avatar';
 import { DetailsPanel } from '@/components/shared/details-panel';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -89,6 +90,7 @@ interface Nomina {
     nombre: string;
     apellidos: string;
     email: string;
+    fotoUrl?: string | null;
   };
   estado: string;
   salarioBase: number;
@@ -1118,6 +1120,23 @@ function NominaDetailsPanel({
                           </div>
       ) : nomina ? (
         <div className="space-y-6">
+          <div className="flex items-center gap-3 rounded-lg border border-gray-200 p-3">
+            <EmployeeAvatar
+              nombre={nomina.empleado.nombre}
+              apellidos={nomina.empleado.apellidos}
+              fotoUrl={nomina.empleado.fotoUrl ?? null}
+              size="md"
+              className="h-12 w-12"
+            />
+            <div className="min-w-0">
+              <p className="text-base font-semibold text-gray-900 truncate">
+                {`${nomina.empleado.nombre} ${nomina.empleado.apellidos}`}
+              </p>
+              <p className="text-sm text-gray-500 truncate">
+                {nomina.empleado.email}
+              </p>
+            </div>
+          </div>
           {/* Información básica */}
           <div className="space-y-4">
                           <div>
@@ -1471,9 +1490,13 @@ function EventoDetailsPanel({
                               >
                                 <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3 flex-1">
-                          <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center flex-shrink-0">
-                            <User className="w-4 h-4 text-gray-600" />
-                                    </div>
+                          <EmployeeAvatar
+                            nombre={nomina.empleado.nombre}
+                            apellidos={nomina.empleado.apellidos}
+                            fotoUrl={nomina.empleado.fotoUrl ?? null}
+                            size="sm"
+                            className="h-9 w-9 flex-shrink-0"
+                          />
                           <div className="min-w-0 flex-1">
                                       <div className="flex items-center gap-2 mb-1">
                               <h4 className="font-medium text-gray-900 text-sm truncate">

@@ -37,9 +37,14 @@ export default async function EmpleadoCarpetaDetailPage(context: { params: Promi
       id: id,
     },
     include: {
-      documentos: {
+      documento_carpetas: {
+        include: {
+          documento: true,
+        },
         orderBy: {
-          createdAt: 'desc',
+          documento: {
+            createdAt: 'desc',
+          },
         },
       },
     },
@@ -73,7 +78,7 @@ export default async function EmpleadoCarpetaDetailPage(context: { params: Promi
     carpeta.empleadoId === empleado.id && allowedUploadFolders.has(carpeta.nombre);
 
   // Obtener información de firmas para cada documento
-  const documentIds = carpeta.documentos.map(d => d.id);
+  const documentIds = carpeta.documento_carpetas.map(dc => dc.documento.id);
   const solicitudesFirma = await prisma.solicitudes_firma.findMany({
     where: {
       documentoId: { in: documentIds },
@@ -110,7 +115,8 @@ export default async function EmpleadoCarpetaDetailPage(context: { params: Promi
     nombre: carpeta.nombre,
     esSistema: carpeta.esSistema,
     compartida: carpeta.compartida,
-    documentos: carpeta.documentos.map((doc) => {
+    documentos: carpeta.documento_carpetas.map((dc) => {
+      const doc = dc.documento;
       const firmaInfo = firmasPorDocumento.get(doc.id);
       return {
         id: doc.id,

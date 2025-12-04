@@ -414,6 +414,7 @@ export async function POST(req: NextRequest) {
         data: {
           empresaId: empleado.empresaId,
           empleadoId: targetEmpleadoId,
+          jornadaId: empleado.jornadaId,
           fecha,
           estado: EstadoFichaje.en_curso,
         },

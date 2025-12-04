@@ -44,6 +44,7 @@ export interface NominaDetailsClientProps {
       nombre: string;
       apellidos: string;
       email: string;
+      fotoUrl?: string | null;
       nss: string | null;
       iban: string | null;
       puesto?: string | null;

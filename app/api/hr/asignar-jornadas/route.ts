@@ -39,7 +39,7 @@ export async function POST(_request: NextRequest) {
 
     // Usar la primera jornada (predefinida si existe)
     const jornadaPorDefecto = jornadas[0];
-    console.log(`[API Asignar Jornadas] Jornada por defecto: ${jornadaPorDefecto.nombre}`);
+    console.log(`[API Asignar Jornadas] Jornada por defecto: ${jornadaPorDefecto.id}`);
 
     // 2. Obtener empleados activos sin jornada
     const empleadosSinJornada = await prisma.empleados.findMany({
@@ -62,7 +62,7 @@ export async function POST(_request: NextRequest) {
         success: true,
         mensaje: 'Todos los empleados ya tienen jornada asignada',
         actualizados: 0,
-        jornadaAsignada: jornadaPorDefecto.nombre,
+        jornadaAsignada: jornadaPorDefecto.id,
       });
     }
 
@@ -83,7 +83,7 @@ export async function POST(_request: NextRequest) {
       success: true,
       mensaje: `${actualizados.length} empleados actualizados correctamente`,
       actualizados: actualizados.length,
-      jornadaAsignada: jornadaPorDefecto.nombre,
+      jornadaAsignada: jornadaPorDefecto.id,
       empleados: actualizados,
     });
 

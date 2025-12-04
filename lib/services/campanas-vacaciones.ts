@@ -1,3 +1,4 @@
+import { CAMPANAS_VACACIONES_ENABLED } from '@/lib/constants/feature-flags';
 import { prisma, Prisma } from '@/lib/prisma';
 
 interface CampanaPendiente {
@@ -51,6 +52,10 @@ export async function obtenerCampanaPendiente(
   empleadoId: string,
   empresaId: string
 ): Promise<CampanaPendiente | null> {
+  if (!CAMPANAS_VACACIONES_ENABLED) {
+    return null;
+  }
+
   const preferenciaPendiente = await prisma.preferencias_vacaciones.findFirst({
     where: {
       empleadoId,
@@ -94,6 +99,10 @@ export async function obtenerPropuestaPendiente(
   empleadoId: string,
   empresaId: string
 ): Promise<CampanaPropuestaPendiente | null> {
+  if (!CAMPANAS_VACACIONES_ENABLED) {
+    return null;
+  }
+
   try {
     const preferencia = await prisma.preferencias_vacaciones.findFirst({
       where: {

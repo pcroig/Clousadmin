@@ -58,7 +58,7 @@ const formatDate = (value?: Date | string | null) => {
 
 export function CompanySettings({ empresa, hrAdmins, sedes }: CompanySettingsProps) {
   const [sedesState, setSedesState] = useState(sedes);
-  const [nuevoNombreCiudad, setNuevoNombreCiudad] = useState('');
+  const [nuevoNombreSede, setNuevoNombreSede] = useState('');
   const [formError, setFormError] = useState('');
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [isAdding, startAddTransition] = useTransition();
@@ -89,10 +89,10 @@ export function CompanySettings({ empresa, hrAdmins, sedes }: CompanySettingsPro
 
   const handleAgregarSede = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const ciudad = nuevoNombreCiudad.trim();
+    const ciudad = nuevoNombreSede.trim();
 
     if (!ciudad) {
-      setFormError('Introduce una ciudad o nombre identificativo');
+      setFormError('Introduce un nombre para la sede');
       return;
     }
 
@@ -103,7 +103,7 @@ export function CompanySettings({ empresa, hrAdmins, sedes }: CompanySettingsPro
         const result = await crearSedeAction({ ciudad });
         if (result.success && result.sede) {
           setSedesState((prev) => [...prev, normalizarSede(result.sede as Sede)]);
-          setNuevoNombreCiudad('');
+          setNuevoNombreSede('');
           toast.success('Sede añadida correctamente');
         } else {
           toast.error(result.error || 'No se pudo crear la sede');
@@ -215,9 +215,9 @@ export function CompanySettings({ empresa, hrAdmins, sedes }: CompanySettingsPro
         <CardContent className="space-y-4">
           <form onSubmit={handleAgregarSede} className="flex flex-col gap-3 sm:flex-row">
             <Input
-              value={nuevoNombreCiudad}
-              onChange={(event) => setNuevoNombreCiudad(event.target.value)}
-              placeholder="Ej. Barcelona, Madrid Centro..."
+              value={nuevoNombreSede}
+              onChange={(event) => setNuevoNombreSede(event.target.value)}
+              placeholder="Ej. Sede central, Madrid..."
               aria-label="Nombre de la nueva sede"
             />
             <Button type="submit" disabled={isAdding} className="sm:w-auto">

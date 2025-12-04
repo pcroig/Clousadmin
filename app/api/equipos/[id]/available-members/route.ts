@@ -2,10 +2,15 @@
 // API Routes - Available Members for Team
 // ========================================
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 
-import { getSession } from '@/lib/auth';
-import { UsuarioRol } from '@/lib/constants/enums';
+import {
+  handleApiError,
+  notFoundResponse,
+  requireAuthAsHR,
+  successResponse,
+} from '@/lib/api-handler';
+import { getTeamMemberIds, validateTeamBelongsToCompany } from '@/lib/equipos/helpers';
 import { prisma } from '@/lib/prisma';
 
 
@@ -19,27 +24,19 @@ type RouteParams = {
 export async function GET(request: NextRequest, context: RouteParams) {
   const params = await context.params;
   try {
-    const session = await getSession();
-
-    if (!session || session.user.rol !== UsuarioRol.hr_admin) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
-    }
+    const authResult = await requireAuthAsHR(request);
+    if (authResult instanceof Response) return authResult;
+    const { session } = authResult;
 
     const { id: equipoId } = params;
 
-    // Verify team belongs to user's company
-    const team = await prisma.equipos.findFirst({
-      where: {
-        id: equipoId,
-        empresaId: session.user.empresaId,
-      },
-    });
-
-    if (!team) {
-      return NextResponse.json({ error: 'Equipo no encontrado' }, { status: 404 });
+    // Validar que el equipo pertenece a la empresa
+    const belongsToCompany = await validateTeamBelongsToCompany(equipoId, session.user.empresaId);
+    if (!belongsToCompany) {
+      return notFoundResponse('Equipo no encontrado');
     }
 
-    // Get all employees from the company
+    // Obtener todos los empleados activos de la empresa
     const allEmployees = await prisma.empleados.findMany({
       where: {
         empresaId: session.user.empresaId,
@@ -58,29 +55,17 @@ export async function GET(request: NextRequest, context: RouteParams) {
       ],
     });
 
-    // Get current team members
-    const teamMembers = await prisma.empleado_equipos.findMany({
-      where: {
-        equipoId,
-      },
-      select: {
-        empleadoId: true,
-      },
-    });
+    // Obtener miembros actuales del equipo
+    const teamMemberIds = await getTeamMemberIds(equipoId);
+    const teamMemberIdsSet = new Set(teamMemberIds);
 
-    const teamMemberIds = new Set(teamMembers.map((m) => m.empleadoId));
-
-    // Filter out employees who are already members
+    // Filtrar empleados que ya son miembros
     const availableEmployees = allEmployees.filter(
-      (emp) => !teamMemberIds.has(emp.id)
+      (emp) => !teamMemberIdsSet.has(emp.id)
     );
 
-    return NextResponse.json(availableEmployees);
+    return successResponse(availableEmployees);
   } catch (error) {
-    console.error('Error fetching available members:', error);
-    return NextResponse.json(
-      { error: 'Error al obtener empleados disponibles' },
-      { status: 500 }
-    );
+    return handleApiError(error, 'API GET /api/equipos/[id]/available-members');
   }
 }

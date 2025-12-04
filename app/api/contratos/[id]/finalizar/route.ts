@@ -129,7 +129,7 @@ export async function POST(
       if (validatedData.documentosIds && validatedData.documentosIds.length > 0) {
         // Buscar o crear carpeta de Offboarding
         let carpetaOffboarding = contrato.empleado.carpetas[0];
-        
+
         if (!carpetaOffboarding) {
           carpetaOffboarding = await tx.carpetas.create({
             data: {
@@ -141,17 +141,32 @@ export async function POST(
           });
         }
 
-        // Asociar documentos a la carpeta de offboarding
+        // Actualizar tipo de documento
         await tx.documentos.updateMany({
           where: {
             id: { in: validatedData.documentosIds },
             empresaId: session.user.empresaId,
           },
           data: {
-            carpetaId: carpetaOffboarding.id,
             tipoDocumento: 'offboarding',
           },
         });
+
+        // Asociar documentos a la carpeta de offboarding usando tabla intermedia
+        for (const documentoId of validatedData.documentosIds) {
+          // Eliminar relaciones existentes
+          await tx.documento_carpetas.deleteMany({
+            where: { documentoId },
+          });
+
+          // Crear nueva relación con carpeta de offboarding
+          await tx.documento_carpetas.create({
+            data: {
+              documentoId,
+              carpetaId: carpetaOffboarding.id,
+            },
+          });
+        }
       }
 
       return {

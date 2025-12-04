@@ -866,6 +866,96 @@ const columns: Column<Ausencia>[] = [
 - ✅ Todos los estados vacíos deben usar `EmptyState` de shadcn con layout `table`
 - ✅ Headers deben estar centrados cuando el contenido de la columna está centrado
 
+### Tablas HTML con Columna de Acciones ⭐ ESTÁNDAR
+
+**Cuándo usar**: Para tablas que necesitan HTML nativo (e.g., páginas de documentos) donde no se usa el componente `DataTable`.
+
+**Patrón estandarizado**:
+
+```tsx
+<table className="w-full">
+  <thead className="bg-gray-50 border-b border-gray-200">
+    <tr>
+      <th className="text-left py-3 px-4 text-xs font-medium text-gray-600 uppercase">
+        Nombre
+      </th>
+      {/* ... otras columnas ... */}
+
+      {/* ⭐ Columna de acciones: sin título */}
+      <th className="w-[120px]"></th>
+    </tr>
+  </thead>
+  <tbody>
+    {items.map((item) => (
+      <tr
+        key={item.id}
+        className="cursor-pointer group border-b border-gray-100 last:border-0 hover:bg-gray-50 transition-colors"
+        onClick={() => handleVerItem(item)}
+      >
+        <td className="py-3 px-4">
+          {/* Contenido de la celda */}
+        </td>
+        {/* ... otras celdas ... */}
+
+        {/* ⭐ Columna de acciones con stopPropagation */}
+        <td className="py-3 px-4" onClick={(e) => e.stopPropagation()}>
+          <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-end gap-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => handleAction1(item)}
+              title="Acción 1"
+            >
+              <Icon1 className="w-4 h-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => handleAction2(item)}
+              title="Acción 2"
+            >
+              <Icon2 className="w-4 h-4" />
+            </Button>
+          </div>
+        </td>
+      </tr>
+    ))}
+  </tbody>
+</table>
+```
+
+**Reglas obligatorias**:
+
+1. **Columna de acciones SIN título**:
+   - ✅ `<th className="w-[120px]"></th>`
+   - ❌ `<th>Acciones</th>`
+
+2. **Filas clicables con hover group**:
+   - ✅ `className="cursor-pointer group hover:bg-gray-50"`
+   - Agrega `onClick` al `<tr>` para la acción principal (ej: ver detalle)
+
+3. **Acciones visibles solo en hover**:
+   - ✅ `<div className="opacity-0 group-hover:opacity-100 transition-opacity">`
+   - Los botones se ocultan por defecto, aparecen al hacer hover sobre la fila
+
+4. **stopPropagation en columna de acciones**:
+   - ✅ `<td onClick={(e) => e.stopPropagation()}>`
+   - Evita que el click en botones active el click de la fila
+
+5. **NO incluir botón "Ver"**:
+   - ❌ Botón con icono Eye para ver detalle
+   - ✅ La fila completa es clicable para ver
+
+**Ejemplos implementados**:
+- `app/(dashboard)/hr/documentos/[id]/carpeta-detail-client.tsx` - Tabla de documentos HR
+- `app/(dashboard)/empleado/mi-espacio/documentos/[id]/carpeta-detail-client.tsx` - Tabla de documentos empleado
+
+**Ventajas del patrón**:
+- ✨ Interfaz más limpia (acciones ocultas hasta hover)
+- ✨ Mejor UX (fila completa clicable)
+- ✨ Menos ruido visual (sin título "Acciones")
+- ✨ Interacción intuitiva (hover revela opciones)
+
 ### Botones
 - Usa `Button` de `components/ui/button.tsx`.
 - Variantes válidas: `default` (gris oscuro), `outline`, `secondary`, `ghost`, `link`, `destructive`.

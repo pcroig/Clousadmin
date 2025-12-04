@@ -123,19 +123,30 @@ export async function POST(req: NextRequest) {
 
       const tipoDocumentoBD = inferirTipoDocumento(carpetaNombre, tipo);
 
-      // Crear documento en BD
-      documento = await prisma.documentos.create({
-        data: {
-          empresaId: session.user.empresaId,
-          empleadoId,
-          carpetaId: carpeta.id,
-          nombre: file.name,
-          tipoDocumento: tipoDocumentoBD,
-          mimeType: file.type,
-          tamano: file.size,
-          s3Key,
-          s3Bucket: process.env.STORAGE_BUCKET || 'local',
-        },
+      // Crear documento en BD con relación a carpeta
+      documento = await prisma.$transaction(async (tx) => {
+        const doc = await tx.documentos.create({
+          data: {
+            empresaId: session.user.empresaId,
+            empleadoId,
+            nombre: file.name,
+            tipoDocumento: tipoDocumentoBD,
+            mimeType: file.type,
+            tamano: file.size,
+            s3Key,
+            s3Bucket: process.env.STORAGE_BUCKET || 'local',
+          },
+        });
+
+        // Asignar a carpeta usando tabla intermedia
+        await tx.documento_carpetas.create({
+          data: {
+            documentoId: doc.id,
+            carpetaId: carpeta.id,
+          },
+        });
+
+        return doc;
       });
     }
 
@@ -150,7 +161,6 @@ export async function POST(req: NextRequest) {
         ? {
             id: documento.id,
             nombre: documento.nombre,
-            carpetaId: documento.carpetaId,
           }
         : null,
     });

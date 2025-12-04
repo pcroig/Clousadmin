@@ -6,6 +6,7 @@
 import { randomBytes } from 'crypto';
 
 import { hashPassword } from '@/lib/auth';
+import { asegurarCarpetasSistemaParaEmpleado } from '@/lib/documentos';
 import { validarDocumentosRequeridosCompletos } from '@/lib/documentos/onboarding';
 import { getBaseUrl } from '@/lib/email';
 import { encryptEmpleadoData } from '@/lib/empleado-crypto';
@@ -732,6 +733,15 @@ export async function finalizarOnboarding(token: string) {
         fechaCompletado: new Date(),
       },
     });
+
+    // Asegurar que las carpetas del sistema existan para el empleado
+    try {
+      await asegurarCarpetasSistemaParaEmpleado(onboarding.empleadoId, onboarding.empresaId);
+      console.log(`[finalizarOnboarding] Carpetas del sistema aseguradas para empleado ${onboarding.empleadoId}`);
+    } catch (error) {
+      console.error('[finalizarOnboarding] Error asegurando carpetas del sistema:', error);
+      // No fallar el onboarding si falla la creación de carpetas
+    }
 
     // Obtener datos del empleado para la notificación
     const empleadoData = await prisma.empleados.findUnique({

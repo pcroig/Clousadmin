@@ -157,10 +157,11 @@ export function AddPersonaOnboardingForm({
   const cargarEquipos = async () => {
     try {
       const res = await fetch('/api/equipos');
-      const data = await parseJson<Equipo[]>(res);
-      setEquipos(data);
+      const data = await parseJson<{ data: Equipo[] }>(res);
+      setEquipos(data.data || []);
     } catch (error) {
       console.error('[cargarEquipos] Error:', error);
+      setEquipos([]); // Asegurar que siempre sea array
     }
   };
 

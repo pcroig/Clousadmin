@@ -7,11 +7,15 @@
 
 import { eachDayOfInterval, format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { Calendar as CalendarIcon } from 'lucide-react';
 import React, { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 import { EmployeeAvatar } from '@/components/shared/employee-avatar';
+import { ResponsiveDateRangePicker } from '@/components/shared/responsive-date-picker';
+import { ResponsiveDialog } from '@/components/shared/responsive-dialog';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { cn, toDateOnlyString } from '@/lib/utils';
 
 interface EmpleadoEquipo {
@@ -79,6 +83,10 @@ export function TablaCuadrajeCampana({
   const [asignaciones, setAsignaciones] = useState<AsignacionesMap>(() =>
     crearAsignacionesIniciales(campana)
   );
+  const [modalAbierto, setModalAbierto] = useState(false);
+  const [preferenciaSeleccionada, setPreferenciaSeleccionada] = useState<Preferencia | null>(null);
+  const [rangoTemporal, setRangoTemporal] = useState<{ from: Date | undefined; to: Date | undefined }>({ from: undefined, to: undefined });
+  const [guardando, setGuardando] = useState(false);
 
   // Generate all dates in the campaign period
   const fechas = useMemo(() => {
@@ -90,6 +98,53 @@ export function TablaCuadrajeCampana({
   useEffect(() => {
     setAsignaciones(crearAsignacionesIniciales(campana));
   }, [campana]);
+
+  const abrirModalEdicion = (pref: Preferencia) => {
+    const diasAsignados = asignaciones[pref.id] || [];
+    if (diasAsignados.length > 0) {
+      const sortedDays = ordenarDias(diasAsignados);
+      setRangoTemporal({
+        from: new Date(sortedDays[0] + 'T00:00:00'),
+        to: new Date(sortedDays[sortedDays.length - 1] + 'T00:00:00')
+      });
+    } else {
+      setRangoTemporal({ from: undefined, to: undefined });
+    }
+    setPreferenciaSeleccionada(pref);
+    setModalAbierto(true);
+  };
+
+  const guardarRango = async () => {
+    if (!preferenciaSeleccionada || !rangoTemporal.from || !rangoTemporal.to) {
+      toast.error('Selecciona un rango válido');
+      return;
+    }
+
+    setGuardando(true);
+    try {
+      const fechaInicio = toDateOnlyString(rangoTemporal.from);
+      const fechaFin = toDateOnlyString(rangoTemporal.to);
+      const nuevosDias = generarRangoDiasEstatico(fechaInicio, fechaFin);
+
+      // Optimistic update
+      setAsignaciones(prev => ({ ...prev, [preferenciaSeleccionada.id]: nuevosDias }));
+
+      await onActualizarPreferencia(preferenciaSeleccionada.id, {
+        fechaInicio,
+        fechaFin
+      });
+
+      toast.success('Rango actualizado correctamente');
+      setModalAbierto(false);
+    } catch (err) {
+      // Revert on error
+      setAsignaciones(crearAsignacionesIniciales(campana));
+      toast.error('Error al actualizar el rango');
+      console.error(err);
+    } finally {
+      setGuardando(false);
+    }
+  };
 
   // Group preferences by team
   const preferenciasPorEquipo = useMemo(() => {
@@ -239,7 +294,7 @@ export function TablaCuadrajeCampana({
                   return (
                     <tr key={pref.id} className="border-b hover:bg-gray-50/50 transition-colors">
                       <td className="sticky left-0 z-10 bg-white px-4 py-3 border-r group">
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2">
                           <EmployeeAvatar
                             nombre={pref.empleado.nombre}
                             apellidos={pref.empleado.apellidos}
@@ -261,6 +316,15 @@ export function TablaCuadrajeCampana({
                               )}
                             </div>
                           </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => abrirModalEdicion(pref)}
+                            className="opacity-0 group-hover:opacity-100 transition-opacity h-7 w-7 p-0"
+                            title="Editar rango con selector"
+                          >
+                            <CalendarIcon className="h-4 w-4" />
+                          </Button>
                         </div>
                       </td>
                       {fechas.map((fecha) => {
@@ -351,6 +415,72 @@ export function TablaCuadrajeCampana({
           <span>Solicitado</span>
         </div>
       </div>
+
+      {/* Modal de edición de rango */}
+      <ResponsiveDialog
+        open={modalAbierto}
+        onOpenChange={setModalAbierto}
+        title="Editar periodo de vacaciones"
+      >
+        <div className="space-y-4 py-4">
+          <div>
+            <p className="text-sm text-gray-600 mb-1">
+              Empleado: <span className="font-medium text-gray-900">
+                {preferenciaSeleccionada?.empleado.nombre} {preferenciaSeleccionada?.empleado.apellidos}
+              </span>
+            </p>
+            {preferenciaSeleccionada && Array.isArray(preferenciaSeleccionada.diasIdeales) && preferenciaSeleccionada.diasIdeales.length > 0 && (
+              <p className="text-xs text-gray-500">
+                Solicitud original: {preferenciaSeleccionada.diasIdeales.length} días
+              </p>
+            )}
+          </div>
+
+          <div>
+            <label className="text-sm font-medium text-gray-700 block mb-2">
+              Seleccionar rango de fechas
+            </label>
+            <ResponsiveDateRangePicker
+              dateRange={rangoTemporal}
+              onSelect={(range) => setRangoTemporal(range)}
+              placeholder="Seleccionar periodo"
+              label="Seleccionar periodo de vacaciones"
+              disabled={(date) => {
+                const dateStr = toDateOnlyString(date);
+                const inicioStr = campana.fechaInicioObjetivo;
+                const finStr = campana.fechaFinObjetivo;
+                return dateStr < inicioStr || dateStr > finStr;
+              }}
+              fromDate={new Date(campana.fechaInicioObjetivo + 'T00:00:00')}
+              toDate={new Date(campana.fechaFinObjetivo + 'T00:00:00')}
+            />
+            {rangoTemporal.from && rangoTemporal.to && (
+              <p className="mt-2 text-xs text-gray-500">
+                {Math.ceil((rangoTemporal.to.getTime() - rangoTemporal.from.getTime()) / (1000 * 60 * 60 * 24)) + 1} días seleccionados
+              </p>
+            )}
+          </div>
+
+          <div className="flex gap-2 pt-2">
+            <Button
+              variant="outline"
+              onClick={() => setModalAbierto(false)}
+              className="flex-1"
+              disabled={guardando}
+            >
+              Cancelar
+            </Button>
+            <Button
+              variant="default"
+              onClick={guardarRango}
+              className="flex-1"
+              disabled={guardando || !rangoTemporal.from || !rangoTemporal.to}
+            >
+              {guardando ? 'Guardando...' : 'Guardar'}
+            </Button>
+          </div>
+        </div>
+      </ResponsiveDialog>
     </div>
   );
 }

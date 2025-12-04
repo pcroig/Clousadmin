@@ -5,6 +5,7 @@
 import { redirect } from 'next/navigation';
 
 import { getSession } from '@/lib/auth';
+import { CAMPANAS_VACACIONES_ENABLED } from '@/lib/constants/feature-flags';
 import { UsuarioRol } from '@/lib/constants/enums';
 import { prisma } from '@/lib/prisma';
 
@@ -15,6 +16,10 @@ export default async function CampanaVacacionesPage() {
 
   if (!session) {
     redirect('/login');
+  }
+
+  if (!CAMPANAS_VACACIONES_ENABLED) {
+    redirect('/hr/horario/ausencias');
   }
 
   const puedeGestionar =

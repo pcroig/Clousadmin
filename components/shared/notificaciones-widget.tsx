@@ -37,6 +37,7 @@ export const NotificacionesWidget = memo(function NotificacionesWidget({
   const router = useRouter();
   const [marcandoLeidas, setMarcandoLeidas] = useState(false);
   const notificacionesMostradas = notificaciones.slice(0, maxItems);
+  const tieneNotificaciones = notificacionesMostradas.length > 0;
 
   const handleMarcarTodasLeidas = useCallback(async () => {
     setMarcandoLeidas(true);
@@ -144,7 +145,7 @@ export const NotificacionesWidget = memo(function NotificacionesWidget({
     <WidgetCard
       title="Notificaciones"
       href={href}
-      useScroll
+      useScroll={tieneNotificaciones}
       headerAction={
         notificacionesNoLeidas > 0 ? (
           <button
@@ -159,8 +160,8 @@ export const NotificacionesWidget = memo(function NotificacionesWidget({
       }
     >
       <div className="flex h-full flex-col">
-        {notificacionesMostradas.length === 0 ? (
-          <div className="flex flex-1 items-center justify-center">
+        {!tieneNotificaciones ? (
+          <div className="flex h-full min-h-full flex-1 items-center justify-center py-6">
             <EmptyState
               layout="widget"
               icon={Bell}

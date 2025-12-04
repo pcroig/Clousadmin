@@ -3,52 +3,45 @@
 // ========================================
 
 import { NextRequest } from 'next/server';
-import { z } from 'zod';
 
 import {
-  badRequestResponse,
   handleApiError,
   notFoundResponse,
   requireAuthAsHR,
   successResponse,
+  validateRequest,
 } from '@/lib/api-handler';
+import { validateTeamBelongsToCompany } from '@/lib/equipos/helpers';
 import { prisma } from '@/lib/prisma';
-import { getJsonBody } from '@/lib/utils/json';
-
-// Schema de validación
-const politicaSchema = z.object({
-  maxSolapamientoPct: z.number().int().min(0).max(100),
-  requiereAntelacionDias: z.number().int().min(0).max(365),
-});
+import { politicaAusenciasSchema } from '@/lib/validaciones/equipos-schemas';
 
 // GET /api/organizacion/equipos/[id]/politica - Obtener política del equipo
 export async function GET(
   req: NextRequest,
   context: { params: Promise<{ id: string }> }
 ) {
-    const params = await context.params;
+  const params = await context.params;
   try {
     const authResult = await requireAuthAsHR(req);
     if (authResult instanceof Response) return authResult;
     const { session } = authResult;
 
-    const { id } = await params;
+    const { id } = params;
 
-    // Verificar que el equipo existe y pertenece a la empresa
-    const equipo = await prisma.equipos.findFirst({
-      where: {
-        id,
-        empresaId: session.user.empresaId,
-      },
-    });
-
-    if (!equipo) {
+    // Validar que el equipo pertenece a la empresa
+    const belongsToCompany = await validateTeamBelongsToCompany(id, session.user.empresaId);
+    if (!belongsToCompany) {
       return notFoundResponse('Equipo no encontrado');
     }
 
     // Obtener política o devolver valores por defecto
     const politica = await prisma.equipo_politica_ausencias.findUnique({
       where: { equipoId: id },
+      select: {
+        equipoId: true,
+        maxSolapamientoPct: true,
+        requiereAntelacionDias: true,
+      },
     });
 
     if (!politica) {
@@ -57,13 +50,13 @@ export async function GET(
         equipoId: id,
         maxSolapamientoPct: 50,
         requiereAntelacionDias: 5,
+        isDefault: true,
       });
     }
 
     return successResponse({
-      equipoId: politica.equipoId,
-      maxSolapamientoPct: politica.maxSolapamientoPct,
-      requiereAntelacionDias: politica.requiereAntelacionDias,
+      ...politica,
+      isDefault: false,
     });
   } catch (error) {
     return handleApiError(error, 'API GET /api/organizacion/equipos/[id]/politica');
@@ -75,35 +68,23 @@ export async function PUT(
   req: NextRequest,
   context: { params: Promise<{ id: string }> }
 ) {
-    const params = await context.params;
+  const params = await context.params;
   try {
     const authResult = await requireAuthAsHR(req);
     if (authResult instanceof Response) return authResult;
     const { session } = authResult;
 
-    const { id } = await params;
+    const { id } = params;
 
-    // Verificar que el equipo existe y pertenece a la empresa
-    const equipo = await prisma.equipos.findFirst({
-      where: {
-        id,
-        empresaId: session.user.empresaId,
-      },
-    });
-
-    if (!equipo) {
+    // Validar que el equipo pertenece a la empresa
+    const belongsToCompany = await validateTeamBelongsToCompany(id, session.user.empresaId);
+    if (!belongsToCompany) {
       return notFoundResponse('Equipo no encontrado');
     }
 
-    const payload = await getJsonBody<Record<string, unknown>>(req);
-    const validationResult = politicaSchema.safeParse(payload);
-
-    if (!validationResult.success) {
-      return badRequestResponse(
-        validationResult.error.issues[0]?.message || 'Datos inválidos'
-      );
-    }
-
+    // Validar request body
+    const validationResult = await validateRequest(req, politicaAusenciasSchema);
+    if (validationResult instanceof Response) return validationResult;
     const { data } = validationResult;
 
     // Crear o actualizar política
@@ -118,6 +99,14 @@ export async function PUT(
       update: {
         maxSolapamientoPct: data.maxSolapamientoPct,
         requiereAntelacionDias: data.requiereAntelacionDias,
+      },
+      select: {
+        equipoId: true,
+        maxSolapamientoPct: true,
+        requiereAntelacionDias: true,
+        empresaId: true,
+        createdAt: true,
+        updatedAt: true,
       },
     });
 

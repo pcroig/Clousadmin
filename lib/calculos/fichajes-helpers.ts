@@ -171,3 +171,53 @@ export function obtenerFechaBase(fecha: Date): Date {
   return normalizarFechaSinHora(fecha);
 }
 
+/**
+ * Calcula las horas esperadas de trabajo para un día específico según la jornada
+ * @param jornada Jornada del empleado
+ * @param fecha Fecha del día a calcular
+ * @returns Horas esperadas de trabajo (sin incluir pausas)
+ */
+export function calcularHorasEsperadasDelDia(
+  jornada: Jornada,
+  fecha: Date
+): number {
+  const config = jornada.config as JornadaConfig;
+  const nombreDia = obtenerNombreDia(fecha);
+  const configDia = config[nombreDia] as DiaConfig | undefined;
+
+  // Jornada fija: calcular desde entrada/salida restando pausa
+  if (config.tipo === 'fija' && configDia?.entrada && configDia?.salida) {
+    const [hE, mE] = configDia.entrada.split(':').map(Number);
+    const [hS, mS] = configDia.salida.split(':').map(Number);
+    const minutosEntrada = hE * 60 + mE;
+    const minutosSalida = hS * 60 + mS;
+    let horasTrabajo = (minutosSalida - minutosEntrada) / 60;
+
+    // Restar pausa si está configurada
+    if (configDia.pausa_inicio && configDia.pausa_fin) {
+      const [hPI, mPI] = configDia.pausa_inicio.split(':').map(Number);
+      const [hPF, mPF] = configDia.pausa_fin.split(':').map(Number);
+      const minutosDescanso = hPF * 60 + mPF - (hPI * 60 + mPI);
+      horasTrabajo -= minutosDescanso / 60;
+    }
+
+    return horasTrabajo;
+  }
+
+  // Jornada flexible: horasSemanales / diasActivos
+  if (config.tipo === 'flexible') {
+    const diasActivos = Object.entries(config).filter(([k, v]) => {
+      if (['tipo', 'descansoMinimo', 'limiteInferior', 'limiteSuperior'].includes(k)) {
+        return false;
+      }
+      return v && typeof v === 'object' && !Array.isArray(v) && (v as DiaConfig).activo === true;
+    }).length;
+
+    const diasLab = diasActivos > 0 ? diasActivos : 5;
+    return Number(jornada.horasSemanales) / diasLab;
+  }
+
+  // Fallback: 8 horas estándar
+  return 8;
+}
+

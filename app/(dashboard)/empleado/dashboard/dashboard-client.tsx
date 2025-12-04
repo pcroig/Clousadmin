@@ -61,6 +61,7 @@ interface DashboardClientProps {
     };
   } | null;
   equipoResumen: PlantillaResumen | null;
+  campanasEnabled?: boolean;
 }
 
 export function EmpleadoDashboardClient({
@@ -76,6 +77,7 @@ export function EmpleadoDashboardClient({
   campanaPendiente,
   campanaPropuesta,
   equipoResumen,
+  campanasEnabled = true,
 }: DashboardClientProps) {
   const [modalAusencia, setModalAusencia] = useState(false);
   const [ausenciaParaEditar, setAusenciaParaEditar] = useState<AusenciaItem | null>(null);
@@ -257,17 +259,19 @@ export function EmpleadoDashboardClient({
         />
       )}
 
-      {!propuestaData && (
+      {campanasEnabled && !propuestaData && (
         <CampanaVacacionesReminder
           campanaPendiente={reminderData}
           onCompleted={() => router.refresh()}
         />
       )}
 
-      <CampanaPropuestaReminder
-        propuestaPendiente={propuestaData}
-        onResponded={() => router.refresh()}
-      />
+      {campanasEnabled && (
+        <CampanaPropuestaReminder
+          propuestaPendiente={propuestaData}
+          onResponded={() => router.refresh()}
+        />
+      )}
     </>
   );
 }

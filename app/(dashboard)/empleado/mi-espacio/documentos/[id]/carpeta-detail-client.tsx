@@ -4,7 +4,7 @@
 
 'use client';
 
-import { ArrowLeft, Download, Eye, FileSignature, FileText, Folder, Upload } from 'lucide-react';
+import { ArrowLeft, Download, FileImage, FileSignature, FileSpreadsheet, FileText, Folder, Upload } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useCallback, useRef } from 'react';
 import { toast } from 'sonner';
@@ -41,6 +41,42 @@ type CarpetaDetalle = MiEspacioCarpeta & {
 interface CarpetaDetailClientEmpleadoProps {
   carpeta: CarpetaDetalle;
   puedeSubir: boolean;
+}
+
+/**
+ * Determina el icono correcto según el tipo MIME del documento
+ */
+function getDocumentIcon(mimeType: string) {
+  // PDFs
+  if (mimeType === 'application/pdf') {
+    return FileText;
+  }
+
+  // Documentos de Word
+  if (
+    mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+    mimeType === 'application/msword' ||
+    mimeType.includes('word')
+  ) {
+    return FileText;
+  }
+
+  // Hojas de cálculo (Excel)
+  if (
+    mimeType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
+    mimeType === 'application/vnd.ms-excel' ||
+    mimeType.includes('spreadsheet')
+  ) {
+    return FileSpreadsheet;
+  }
+
+  // Imágenes
+  if (mimeType.startsWith('image/')) {
+    return FileImage;
+  }
+
+  // Default
+  return FileText;
 }
 
 export function CarpetaDetailClientEmpleado({
@@ -126,14 +162,17 @@ export function CarpetaDetailClientEmpleado({
               <h1 className="text-2xl font-bold text-gray-900">
                 {carpeta.nombre}
               </h1>
-              {carpeta.esSistema && (
+              {carpeta.esSistema ? (
                 <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">
-                  Sistema
+                  Master
                 </span>
-              )}
-              {carpeta.compartida && (
+              ) : carpeta.compartida ? (
                 <span className="text-xs bg-blue-100 text-blue-600 px-2 py-1 rounded">
-                  Compartida
+                  Compartidos
+                </span>
+              ) : (
+                <span className="text-xs bg-green-100 text-green-600 px-2 py-1 rounded">
+                  Personal
                 </span>
               )}
             </div>
@@ -216,20 +255,22 @@ export function CarpetaDetailClientEmpleado({
                   <th className="text-left py-3 px-4 text-xs font-medium text-gray-600 uppercase">
                     Fecha
                   </th>
-                  <th className="text-right py-3 px-4 text-xs font-medium text-gray-600 uppercase">
-                    Acciones
-                  </th>
+                  <th className="w-[80px]"></th>
                 </tr>
               </thead>
               <tbody>
                 {carpeta.documentos.map((documento) => (
                   <tr
                     key={documento.id}
-                    className="border-b border-gray-100 last:border-0 hover:bg-gray-50 transition-colors"
+                    className="cursor-pointer group border-b border-gray-100 last:border-0 hover:bg-gray-50 transition-colors"
+                    onClick={() => handleVerDocumento(documento)}
                   >
                     <td className="py-3 px-4">
                       <div className="flex items-center gap-3">
-                        <FileText className="w-5 h-5 text-gray-400" />
+                        {(() => {
+                          const IconComponent = getDocumentIcon(documento.mimeType || '');
+                          return <IconComponent className="w-5 h-5 text-gray-400" />;
+                        })()}
                         <span className="text-sm font-medium text-gray-900">
                           {documento.nombre}
                         </span>
@@ -272,23 +313,16 @@ export function CarpetaDetailClientEmpleado({
                     <td className="py-3 px-4 text-sm text-gray-600">
                       {formatearFecha(documento.createdAt)}
                     </td>
-                    <td className="py-3 px-4">
-                      <div className="flex items-center justify-end gap-2">
-                        <button
-                          onClick={() => handleVerDocumento(documento)}
-                          className="p-2 rounded-full hover:bg-gray-100 transition-colors group"
-                          title="Ver documento"
-                        >
-                          <Eye className="w-4 h-4 text-gray-600 group-hover:text-blue-600" />
-                        </button>
+                    <td className="py-3 px-4" onClick={(e) => e.stopPropagation()}>
+                      <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-end gap-2">
                         <button
                           onClick={() =>
                             handleDescargar(documento.id, documento.nombre)
                           }
-                          className="p-2 rounded-full hover:bg-gray-100 transition-colors group"
+                          className="p-2 rounded-full hover:bg-gray-100 transition-colors group/btn"
                           title="Descargar"
                         >
-                          <Download className="w-4 h-4 text-gray-600 group-hover:text-blue-600" />
+                          <Download className="w-4 h-4 text-gray-600 group-hover/btn:text-blue-600" />
                         </button>
                       </div>
                     </td>

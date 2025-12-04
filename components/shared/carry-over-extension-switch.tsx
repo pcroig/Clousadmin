@@ -28,7 +28,7 @@ export function SwitchWithTooltip({
     <div className="flex items-center justify-between">
       <div className="flex items-center gap-2">
         <span className="text-sm font-medium text-gray-900">{label}</span>
-        <InfoTooltip content={tooltipContent} side={tooltipSide} size="md" />
+        <InfoTooltip content={tooltipContent} side={tooltipSide} />
       </div>
       <Switch checked={checked} onCheckedChange={onCheckedChange} disabled={disabled} />
     </div>

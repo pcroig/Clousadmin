@@ -2,7 +2,8 @@
 
 **Versión**: 3.3.0  
 **Fecha**: 27 Enero 2025  
-**Estado**: Sistema refactorizado con validaciones robustas, transacciones atómicas y prevención REAL de race conditions. Interfaz de campañas de vacaciones unificada con interacción directa.
+**Última actualización**: Diciembre 2025  
+**Estado**: Sistema refactorizado con validaciones robustas, transacciones atómicas y prevención REAL de race conditions. ⚠️ **Campañas de vacaciones deprecadas temporalmente** para el primer lanzamiento.
 
 ---
 
@@ -15,13 +16,13 @@
 - **Avatar en tabla**: Columna de empleado muestra avatar + nombre + puesto usando `AvatarCell`
 - **Justificante como columna**: Columna separada para justificantes con icono de archivo
 - **Botones inline para pendientes**: Botones "Aprobar" y "Rechazar" aparecen directamente en la tabla sin fila expandible
-- **Fecha condensada**: Fecha de solicitud se muestra al lado del tipo (sin "Solicitada", solo año)
+- **Fecha condensada**: La columna de fechas muestra el rango `dd MMM` y, si existe `createdAt`, añade el texto "Solicitada 5 ene" en gris
 - **InputGroup en reglas**: Inputs de "Gestionar Ausencias" muestran unidades (días, %) dentro del campo usando `InputGroup`
 - **Notificaciones mejoradas**: Títulos y descripciones más descriptivos con rango de fechas y tipo de ausencia
 - **Corrección de filtros**: Unificación de estado 'todos' en frontend y backend
 - **Política de carry-over UI**: El toggle ahora se presenta como una sola línea con tooltip "i" y switch, reutilizando el nuevo patrón `SwitchWithTooltip` sin bordes para ofrecer contexto inmediato
 - **Fix upload S3**: Corrección del header `ContentLength` para evitar errores al subir justificantes
-- **Mi Espacio simplificado**: Cards de ausencias ya no son clicables, icono de archivo junto al estado si hay justificante
+- **Mi Espacio actualizado**: Las cards siguen siendo botones que abren el modal de edición y muestran el icono de justificante (`Paperclip`) junto al estado cuando hay archivo
 
 **Archivos afectados**:
 - `app/(dashboard)/hr/horario/ausencias/ausencias-client.tsx`
@@ -146,8 +147,8 @@
 3. **Lógica de Negocio**: Todos los cálculos de días, saldo, festivos, días laborables implementados
 4. **Páginas HR**: Vista completa con filtros, búsqueda, modales de edición
 5. **Páginas Empleado**: Vista en Mi Espacio con diseño visual (FechaCalendar, tabs Próximas/Pasadas)
-6. **Modal Gestionar Ausencias**: Reorganizado en dos tabs (Política de ausencias + Calendario laboral) con políticas centralizadas a nivel empresa
-7. **Estados Unificados**: Sistema de estados claro (pendiente/aprobada/rechazada/auto_aprobada)
+6. **Modal Gestionar Ausencias**: Vista única con secciones para saldo anual y calendario laboral (el bloque de festivos alterna entre calendario/lista mediante tabs)
+7. **Estados Unificados**: Sistema de estados claro (`pendiente`, `confirmada`, `completada`, `rechazada`) con auto-aprobaciones registradas mediante eventos pero sin enum dedicado
 8. **Sistema de Festivos**: CRUD completo, importación automática de festivos nacionales
 9. **Calendario Laboral**: Configuración de días laborables por empresa, integrado en cálculos
 10. **Campañas de Vacaciones**: Sistema de cuadrado inteligente con IA
@@ -169,15 +170,13 @@
 #### ✅ Modelo `Ausencia`
 ```prisma
 // Estados actuales (unificados):
-- 'pendiente_aprobacion' (default) - Estado inicial al crear, esperando aprobación
-- 'en_curso' - Aprobada y aún no disfrutada (fechaFin >= hoy)
+- 'pendiente' (default) - Estado inicial al crear, esperando aprobación manual
+- 'confirmada' - Aprobada y aún no finalizada (fechaFin >= hoy)
 - 'completada' - Aprobada y ya disfrutada (fechaFin < hoy)
-- 'auto_aprobada' - Auto-aprobada por IA (enfermedad/maternidad < 2 días)
 - 'rechazada' - Rechazada por HR/Manager
-- 'cancelada' - Cancelada por empleado
 ```
 
-**✅ Estados unificados**: Todos los componentes usan estos estados.
+**✅ Estados unificados**: Todos los componentes usan estos estados. Las cancelaciones eliminan la ausencia (DELETE) y disparan `ausencia_cancelada`, pero no existe enum `cancelada`.
 
 #### ✅ Modelo `EmpleadoSaldoAusencias`
 - ✅ Implementado
@@ -222,7 +221,6 @@
 
 | Endpoint | Estado | Prioridad |
 |----------|--------|-----------|
-| `/api/festivos` (CRUD) | ❌ | Media |
 | `/api/festivos/cargar-automatico` | ❌ | Media |
 | `/api/calendario/laboral-default` | ❌ | Baja |
 | `/api/calendario/importar` | ❌ | Baja |
@@ -238,9 +236,9 @@
 - ✅ **Avatar + nombre**: Columna de empleado muestra avatar + nombre + puesto con `AvatarCell`
 - ✅ **Justificante como columna**: Columna separada con icono de archivo si hay justificante
 - ✅ **Botones inline**: Para ausencias pendientes, botones "Aprobar"/"Rechazar" aparecen directamente en la tabla
-- ✅ **Fecha condensada**: Fecha de solicitud al lado del tipo (sin "Solicitada", solo año)
+- ✅ **Fecha condensada**: El rango se muestra como `dd MMM` y, si existe `createdAt`, aparece el texto "Solicitada 5 ene" en gris
 - ✅ **Click en fila**: Abre modal de edición directamente
-- ✅ Filtros por estado (todos, pendientes, aprobadas, rechazadas) - **Corregido**: usa 'todos' en lugar de 'todas'
+- ✅ Filtros por estado (todos, pendientes, confirmadas, completadas, rechazadas) - **Corregido**: usa 'todos' en lugar de 'todas'
 - ✅ Búsqueda por nombre de empleado
 - ✅ Filtro por equipo
 - ✅ Controles de fecha (mes por defecto)
@@ -248,11 +246,11 @@
 - ✅ Modal rechazar individual
 - ✅ Modal editar ausencia (tipo, fechas, motivo/detalles, medio día)
 - ✅ Botón "Actualizar ausencias" (aprobar todas pendientes)
-- ✅ Botón "Gestionar ausencias" (modal con tabs)
+- ✅ Botón "Gestionar ausencias" (modal con secciones consecutivas y tabs internas solo para festivos calendario/lista)
 - ✅ **EmptyState de shadcn**: Estados vacíos usan componente estándar con layout `table`
 
 **Estados mostrados**:
-- ✅ Usa estados unificados: `pendiente_aprobacion`, `en_curso`, `completada`, `auto_aprobada`, `rechazada`, `cancelada`
+- ✅ Usa estados unificados: `pendiente`, `confirmada`, `completada`, `rechazada`
 
 #### ✅ `/empleado/mi-espacio` (Tab Ausencias)
 
@@ -263,12 +261,12 @@
 - ✅ **Card "Saldo de ausencias" mejorada**: Fecha de rango visible en esquina superior derecha (no debajo)
 - ✅ Saldo de vacaciones (Total, Disponibles, Usados, Carry-Over si aplica)
 - ✅ Muestra saldo extendido y fecha de expiración si hay carry-over activo
-- ✅ **Cards simplificadas**: Ya no son clicables ni abren diálogo
+- ✅ **Cards simplificadas**: Siguen siendo botones sin recuadros pesados y abren el modal de edición si el rol lo permite
 - ✅ **Icono de justificante**: Icono de archivo (`Paperclip`) aparece junto al badge de estado si hay justificante adjunto
-- ✅ Fecha condensada (sin hora, solo año)
+- ✅ Fecha condensada (se muestra rango y etiqueta "Solicitada" cuando aplica)
 
 **Estados**:
-- Soporta estados nuevos: `pendiente_aprobacion`, `en_curso`, `completada`, `auto_aprobada`, `rechazada`
+- Soporta los estados actuales: `pendiente`, `confirmada`, `completada`, `rechazada`
 
 #### ✅ `/empleado/horario/ausencias`
 
@@ -307,14 +305,14 @@
 - ✅ **Prop `empleadoIdDestino`**: Permite a HR crear ausencias para otros empleados
 
 #### ✅ `GestionarAusenciasModal`
-- ✅ Tab **Política de ausencias**: saldo anual y reglas (solapamiento, antelación) para toda la empresa
+- ✅ Sección **Política de ausencias**: saldo anual y reglas (solapamiento, antelación) para toda la empresa
 - ✅ **✨ InputGroup**: Inputs de reglas (días, %) muestran unidades dentro del campo usando `InputGroup` de shadcn
 - ✅ **✨ NUEVO: Toggle de Política de Carry-Over**:
   - **Limpiar saldo al acabar el año** (por defecto): Saldo pendiente se limpia al finalizar el año
   - **Extender saldo 4 meses**: Saldo pendiente del año anterior se extiende automáticamente 4 meses al siguiente año
   - Extiende siempre 4 meses (valor fijo)
-  - Se guarda en `Empresa.config.politicaAusencias.carryOverMeses`
-- ✅ Tab **Calendario Laboral**: días laborables + gestión de festivos (importación y lista simplificada)
+  - Se guarda en `Empresa.config.carryOver` (campos `modo` y `mesesExtension`)
+- ✅ Sección **Calendario Laboral**: días laborables + gestión de festivos (importación y lista simplificada, con tabs internos calendario/lista)
 
 #### ✅ `FechaCalendar`
 - ✅ Componente reutilizable
@@ -337,17 +335,18 @@
 ### Sistema de Estados
 
 **Estados válidos** (según schema Prisma):
-- `pendiente_aprobacion` - Solicitud esperando aprobación
-- `en_curso` - Aprobada y aún no finalizada (fechaFin >= hoy)
+- `pendiente` - Solicitud esperando aprobación manual
+- `confirmada` - Aprobada y aún no finalizada (fechaFin >= hoy)
 - `completada` - Aprobada y ya finalizada (fechaFin < hoy)
-- `auto_aprobada` - Auto-aprobada por IA
 - `rechazada` - Rechazada por HR/Manager
-- `cancelada` - Cancelada por empleado
 
 **Lógica de transición**:
-- Al crear: `pendiente_aprobacion`
-- Al aprobar: `en_curso` (si fechaFin >= hoy) o `completada` (si fechaFin < hoy)
-- Auto-aprobación IA: `auto_aprobada`
+- Creación:
+  - Tipos que requieren aprobación (`vacaciones`, `otro`) comienzan en `pendiente`
+  - Tipos auto-aprobables (`enfermedad`, `enfermedad_familiar`, `maternidad_paternidad`) saltan directo a `confirmada` o `completada` según la fecha
+- Al aprobar manualmente: `confirmada` (si fechaFin >= hoy) o `completada` (si fechaFin < hoy)
+- Al rechazar: `rechazada` (no cambia saldo usado)
+- Cancelaciones eliminan la ausencia (DELETE) y envían `ausencia_cancelada`, no existe enum propio
 
 **Implementación en código**:
 ```typescript
@@ -357,21 +356,23 @@ hoy.setHours(0, 0, 0, 0);
 const fechaFin = new Date(ausencia.fechaFin);
 fechaFin.setHours(0, 0, 0, 0);
 
-const nuevoEstado = fechaFin < hoy ? 'completada' : 'en_curso';
+const nuevoEstado = fechaFin < hoy ? 'completada' : 'confirmada';
 ```
 
 **Cálculo de saldo usando estados**:
 ```typescript
 // Días usados (ausencias aprobadas y disfrutadas)
 const diasUsados = ausencias
-  .filter((a) => a.estado === 'en_curso' || a.estado === 'completada' || a.estado === 'auto_aprobada')
+  .filter((a) => a.estado === 'confirmada' || a.estado === 'completada')
   .reduce((sum, a) => sum + Number(a.diasSolicitados), 0);
 
 // Días pendientes (esperando aprobación)
 const diasPendientes = ausencias
-  .filter((a) => a.estado === 'pendiente_aprobacion')
+  .filter((a) => a.estado === 'pendiente')
   .reduce((sum, a) => sum + Number(a.diasSolicitados), 0);
 ```
+
+> ℹ️ Las auto-aprobaciones siguen guardándose como `confirmada`/`completada`. La diferencia se registra en `autoCompletado.tipo = 'ausencia_auto_aprobada'` para notificaciones e histórico.
 
 ## 📋 FLUJO COMPLETO DE AUSENCIAS
 
@@ -384,25 +385,25 @@ const diasPendientes = ausencias
    - Completa formulario (tipo, fechas, motivo/detalles según tipo)
    - **Opcional**: Sube justificante (recomendado para enfermedad, enfermedad_familiar, maternidad_paternidad)
    - Sistema valida saldo disponible (si es vacaciones), considerando carry-over si aplica
-   - Se crea ausencia con estado `pendiente_aprobacion` (o directamente aprobada según tipo)
+   - Se crea ausencia con estado `pendiente` (o directamente aprobada en `confirmada`/`completada` según tipo auto-aprobable)
    - Saldo pendiente se incrementa automáticamente (si descuenta saldo)
    - Si hay saldo extendido disponible, se usa primero (`diasDesdeCarryOver` se registra en la ausencia)
 
 2. **Ver Ausencias Propias**
-   - Tab "Próximas": Ausencias con fechaFin >= hoy y estados `pendiente_aprobacion`, `en_curso`, `auto_aprobada`
-   - Tab "Pasadas": Ausencias con fechaFin < hoy y estados `completada`, `auto_aprobada`
+   - Tab "Próximas": Ausencias con fechaFin >= hoy y estados `pendiente` o `confirmada`
+   - Tab "Pasadas": Ausencias con fechaFin < hoy y estado `completada`
    - Visualización con `FechaCalendar` para fechas
 
 3. **Cancelar Ausencia**
-   - Solo si estado es `pendiente_aprobacion`
-   - Sistema devuelve días al saldo disponible
-   - Ausencia pasa a estado `cancelada`
+   - Solo si estado es `pendiente`
+   - Sistema devuelve días al saldo disponible y envía notificación `ausencia_cancelada`
+   - La ausencia se elimina de la tabla (no existe estado persistente `cancelada`)
 
 ### Flujo HR/Manager
 
 1. **Ver Todas las Ausencias**
    - Accede a `/hr/horario/ausencias`
-   - Filtra por estado: todas, pendientes, en curso, completadas, rechazadas
+   - Filtra por estado: todas, pendientes, confirmadas, completadas, rechazadas
    - Busca por nombre de empleado
 
 2. **Abrir Ausencia Directamente** ⭐ NUEVO
@@ -416,7 +417,7 @@ const diasPendientes = ausencias
    - Click en ausencia pendiente
    - Modal muestra detalles completos
    - Opciones: Aprobar, Rechazar, Editar
-   - Al aprobar: sistema determina `en_curso` o `completada` según fechaFin
+   - Al aprobar: sistema determina `confirmada` o `completada` según fechaFin
    - Saldo se actualiza automáticamente (días pendientes → días usados), considerando carry-over
 
 3. **Actualización Masiva**
@@ -424,12 +425,10 @@ const diasPendientes = ausencias
    - Útil para días de gran volumen
 
 4. **Gestionar Ausencias**
-   - Modal con dos tabs:
-     - **Política de ausencias**: Configura días totales anuales (empresa o equipos), límite de solapamiento y días de antelación mínimos (todo a nivel empresa, sin selector adicional por equipo)
-     - **✨ NUEVO: Política de Carry-Over**: Toggle para elegir entre:
-       - **Limpiar saldo al acabar el año** (por defecto): Saldo pendiente se limpia al finalizar el año
-       - **Extender saldo 4 meses**: Saldo pendiente del año anterior se extiende 4 meses al siguiente año, luego se limpia solo la parte temporal
-     - **Calendario Laboral**: Define días laborables y gestiona festivos (importación nacional + listado scrollable)
+   - Modal con una sola vista: primero el bloque de saldo anual (InputGroup + switch `SwitchWithTooltip` para carry-over) y debajo el bloque de calendario laboral
+   - El bloque de festivos alterna entre **Calendario** y **Lista** mediante tabs internos
+   - **Carry-over**: Toggle para elegir entre limpiar saldo al acabar el año o extender 4 meses (actualiza `carryOverModo` en la configuración de empresa)
+   - **Calendario Laboral**: Define días laborables semanales y permite importar/cargar festivos (incluye botones inline para nuevo festivo e importación desde archivo)
 
 5. **Editar Ausencia**
    - Desde tabla o desde perfil de empleado
@@ -468,8 +467,8 @@ FormData:
 // 1. Calcula días naturales y laborables
 // 2. Valida saldo disponible (si tipo = 'vacaciones')
 // 3. Crea ausencia con estado:
-//    - 'pendiente_aprobacion' para 'vacaciones' y 'otro'
-//    - Estado directo aprobado para 'enfermedad', 'enfermedad_familiar', 'maternidad_paternidad'
+//    - 'pendiente' para 'vacaciones' y 'otro'
+//    - 'confirmada' (o 'completada' si fechaFin ya pasó) para 'enfermedad', 'enfermedad_familiar', 'maternidad_paternidad'
 // 4. Incrementa diasPendientes en saldo (si descuenta saldo)
 ```
 
@@ -488,7 +487,7 @@ FormData:
 | Caso | ¿Pasa por `auto_completados`? | Notificación |
 |------|-------------------------------|--------------|
 | **No requiere aprobación** | ❌ (no hay aprobación, solo registro directo) | `ausencia_aprobada` a HR/Manager con `autoAprobada: true` |
-| **Auto-aprobada** (por IA o batch) | ✅ `autoCompletado.tipo = 'ausencia_auto_aprobada'` | `ausencia_aprobada` al empleado + registro histórico |
+| **Aprobación automática** (IA/batch) | ✅ `autoCompletado.tipo = 'ausencia_auto_aprobada'` | `ausencia_aprobada` al empleado + registro histórico |
 
 - Usa `lib/auto-completado.ts` únicamente cuando una ausencia **estaba pendiente** y el sistema la aprueba automáticamente.
 - Las ausencias que nunca necesitaron aprobación solo actualizan saldo y disparan la notificación informativa para HR/Manager.
@@ -504,7 +503,7 @@ FormData:
 }
 
 // Sistema automáticamente:
-// 1. Determina estado: 'en_curso' (si fechaFin >= hoy) o 'completada'
+// 1. Determina estado: 'confirmada' (si fechaFin >= hoy) o 'completada'
 // 2. Actualiza saldo: diasPendientes → diasUsados
 // 3. Crea notificación para empleado
 ```
@@ -569,6 +568,8 @@ El sistema permite subir justificantes (documentos) para ausencias, especialment
 - **Otro**: Justificante opcional
 
 ## 🎯 CAMPAÑAS DE VACACIONES
+
+> ⚠️ **NOTA IMPORTANTE:** Esta funcionalidad está **DEPRECADA TEMPORALMENTE** para el primer lanzamiento (Diciembre 2025). Se retomará en futuras versiones. El código se mantiene intacto pero deshabilitado mediante feature flag `NEXT_PUBLIC_CAMPANAS_VACACIONES_ENABLED`.
 
 ### Vista HR: Cuadraje de Campaña
 
@@ -873,9 +874,9 @@ El sistema permite configurar cómo se maneja el saldo pendiente de ausencias al
 
 **Ubicación**: Modal "Gestionar Ausencias" → Tab "Política de ausencias"
 
-**Campo en base de datos**: `Empresa.config.politicaAusencias.carryOverMeses`
-- `0`: Limpiar saldo al acabar el año (por defecto)
-- `4`: Extender saldo 4 meses
+**Campo en base de datos**: `Empresa.config.carryOver` (objeto con `modo` y `mesesExtension`)
+- `modo = 'limpiar'`: Limpiar saldo al acabar el año (por defecto)
+- `modo = 'extender'` + `mesesExtension = 4`: Extender saldo 4 meses
 
 **Endpoint**: `PATCH /api/empresa/politica-ausencias`
 

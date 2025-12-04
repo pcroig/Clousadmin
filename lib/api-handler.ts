@@ -270,6 +270,21 @@ export function methodNotAllowedResponse(message: string = 'Método no permitido
   return NextResponse.json({ error: message, message }, { status: 405 });
 }
 
+/**
+ * Respuesta consistente para funcionalidades temporalmente deshabilitadas
+ */
+export function featureDisabledResponse(featureName: string): NextResponse {
+  const message = `La funcionalidad "${featureName}" estará disponible próximamente.`;
+  return NextResponse.json(
+    {
+      error: 'Funcionalidad no disponible',
+      message,
+      feature: featureName,
+    },
+    { status: 503 }
+  );
+}
+
 // ========================================
 // Rate Limiting Helpers
 // ========================================

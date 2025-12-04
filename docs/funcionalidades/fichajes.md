@@ -171,12 +171,9 @@ La función `estaEnHorarioLaboral()` determina si un empleado está dentro de su
 ✅ **Tiempo real**: Los estados se calculan en cada carga del dashboard
 ✅ **Precisión**: Considera ausencias, fichajes, y horarios configurados
 
-### Navegación
+### Interacción
 
-Cada categoría es clickeable y redirige a:
-- **Trabajando/En pausa/Sin fichar**: Página de fichajes (`/hr/horario/fichajes` o `/manager/horario/fichajes`)
-- **Ausentes**: Página de ausencias (`/hr/horario/ausencias?estado=confirmada`)
-- **Fuera de horario**: Página de personas (`/hr/organizacion/personas` o `/manager/horario/fichajes`)
+Al hacer clic en cualquier categoría se abre un diálogo contextual dentro del propio widget con la lista completa de empleados en ese estado. Desde ahí HR/Manager consultan nombre, rol y equipo sin abandonar el dashboard. Si necesitan acciones adicionales (editar fichajes, crear ausencias, etc.) navegan manualmente a las secciones correspondientes (`/hr/horario/fichajes`, `/hr/horario/ausencias`, `/hr/organizacion/personas`, etc.).
 
 ---
 
@@ -427,6 +424,7 @@ enum PeriodoMedioDia {
    - Considera ausencias de medio día (no crea eventos para períodos ausentes)
    - Marca como `finalizado` y registra auditoría
    - Notifica al empleado del fichaje resuelto
+   - **Promedios históricos**: Antes de generar eventos por jornada fija o flexible, el servicio intenta construir los timestamps usando la media de los últimos días con eventos reales del mismo empleado y jornada. Solo se promedian fichajes que ya contienen eventos y se ajusta la salida si supera las horas esperadas. Si no hay suficientes históricos se cae al cálculo tradicional; ayudas a HR a proponer horarios que reflejan la práctica reciente del empleado.
 4. **Descartar días vacíos**: Botón para excluir masivamente días sin fichajes (útil cuando no se trabajó)
 5. **Edición individual**: Botón "Editar" abre modal para modificar eventos manualmente
 6. **Registrar ausencia**: Botón "Ausencia" permite crear ausencia directamente desde la revisión
@@ -695,9 +693,10 @@ await prisma.empleado.create({
 
 ```prisma
 model Fichaje {
-  id              String   @id @default(uuid())
+  id              String   @id @default(cuid())
   empresaId       String
   empleadoId      String
+  jornadaId       String?  // Jornada del empleado al momento del fichaje (para filtrar históricos)
   fecha           DateTime @db.Date
   
   // Estado del fichaje completo (UN SOLO ESTADO para todo el día)
@@ -722,8 +721,10 @@ model Fichaje {
   
   // Relations
   eventos         FichajeEvento[]
+  jornada         jornadas? @relation(fields: [jornadaId], references: [id])
   
   @@unique([empleadoId, fecha])
+  @@index([empleadoId, jornadaId, estado, fecha]) // Índice para queries de históricos
 }
 ```
 
@@ -738,7 +739,7 @@ model Empleado {
 }
 
 model FichajeEvento {
-  id              String   @id @default(uuid())
+  id              String   @id @default(cuid())
   fichajeId       String
   tipo            String   @db.VarChar(50) // 'entrada', 'pausa_inicio', 'pausa_fin', 'salida'
   hora            DateTime @db.Timestamptz(6)
@@ -795,7 +796,7 @@ model Jornada {
 |----------|--------|-------------|------|
 | `/api/fichajes/revision` | GET | Obtener fichajes pendientes de revisión. Busca directamente en tabla `fichaje` con estado `pendiente` de días anteriores. **Parámetros**: `fechaInicio`, `fechaFin`, `equipoId`, `search` (búsqueda por nombre empleado). **Nuevo**: Cálculo dinámico de pausas (respeta inicio real + duración jornada) | HR |
 | `/api/fichajes/revision` | POST | Actualizar fichajes individuales desde pantalla de revisión. Soporta `accion: 'actualizar'` (cuadrar) y `accion: 'descartar'` (marcar días vacíos como finalizados) | HR |
-| `/api/fichajes/cuadrar` | POST | Cuadrar fichajes masivamente. Crea eventos faltantes según jornada con **lógica de pausas dinámicas** y marca como `finalizado`. **Body**: `{ fichajeIds: string[] }` o `{ descartarIds: string[] }` para descartar días vacíos | HR |
+| `/api/fichajes/cuadrar` | POST | Cuadrar fichajes masivamente. **Nuevo (2025-12-04)**: Usa promedios históricos de los últimos 5 días con eventos del empleado para calcular eventos propuestos. **Límite**: Máximo 50 fichajes por request. Crea eventos faltantes según promedio histórico (si disponible) o jornada con **lógica de pausas dinámicas** y marca como `finalizado`. **Body**: `{ fichajeIds: string[] }` o `{ descartarIds: string[] }` para descartar días vacíos | HR |
 
 ### Estadísticas
 
@@ -932,16 +933,23 @@ model ProcesamientoMarcajes {
 // Sistema automáticamente:
 // 1. Verifica ausencias de medio día del empleado
 // 2. Para cada fichaje, valida qué eventos faltan (considerando ausencias)
-// 3. Crea eventos faltantes según jornada del empleado (fija o flexible)
+// 3. **NUEVO (2025-12-04)**: Intenta calcular eventos usando promedios históricos:
+//    - Busca los últimos 5 días con eventos registrados del mismo empleado
+//    - Filtra por misma jornada (jornadaId) para garantizar consistencia
+//    - Calcula promedio de entrada, pausa_inicio, pausa_fin y salida
+//    - Ajusta la salida si el promedio supera las horas esperadas del día
+//    - Si no hay suficientes históricos, usa fallback de jornada
+// 4. Crea eventos faltantes según promedio histórico (si disponible) o jornada:
 //    - Jornada fija: usa horarios configurados
 //    - Jornada flexible: calcula horarios basándose en horas semanales
 //    - NO crea eventos para períodos con ausencia de medio día
-// 4. **Lógica de pausas dinámicas**: Si existe `pausa_inicio` real, calcula `pausa_fin` 
+// 5. **Lógica de pausas dinámicas**: Si existe `pausa_inicio` real, calcula `pausa_fin` 
 //    relativo al inicio real + duración configurada (ej. 14:15 + 1h = 15:15)
-// 5. Recalcula horasTrabajadas y horasEnPausa
-// 6. Cambia estado a 'finalizado' (o 'descartado' si se usó descartarIds)
-// 7. Registra auditoría: cuadradoMasivamente=true, cuadradoPor, cuadradoEn
-// 8. Notifica al empleado del fichaje resuelto
+// 6. Recalcula horasTrabajadas y horasEnPausa
+// 7. Cambia estado a 'finalizado' (incluidos los días vacíos descartados)
+// 8. Registra auditoría: cuadradoMasivamente=true, cuadradoPor, cuadradoEn
+// 9. Notifica al empleado del fichaje resuelto
+// **Límite**: Máximo 50 fichajes por request (rate limiting)
 
 // Respuesta (cuadrar):
 {
@@ -1046,8 +1054,8 @@ Componente unificado para navegación de períodos de tiempo (Día/Semana/Mes).
 
 ---
 
-**Versión**: 3.7
-**Última actualización**: Enero 2025
+**Versión**: 3.8
+**Última actualización**: 4 de diciembre de 2025
 **Estado**: Sistema completo implementado:
 - ✅ Validación determinística de fichajes completos
 - ✅ Campo `periodo` en ausencias de medio día (mañana/tarde)
@@ -1059,7 +1067,7 @@ Componente unificado para navegación de períodos de tiempo (Día/Semana/Mes).
 - ✅ **Edición sin auto-guardado**: Cambios se acumulan y se guardan solo al hacer click en "Guardar Cambios"
 - ✅ **Saldo de horas descuenta pausas**: Cálculo correcto que excluye tiempo en pausa
 - ✅ **Jornadas por defecto**: Todos los empleados activos tienen jornada asignada automáticamente
-- ✅ **Tiempo pendiente en tablas**: Columna "Tiempo pendiente" muestra horas faltantes por trabajar (horasEsperadas - horasTrabajadas) en lugar de "Horas esperadas"
+- ✅ **Balance diario en tablas**: La columna "Balance" muestra la diferencia entre horas trabajadas y horas esperadas (horasTrabajadas - horasEsperadas) y reemplaza a la antigua columna de "Horas esperadas"
 - ✅ **Fix filtro por equipo**: Corregido filtro por equipo para usar correctamente la relación N:N `EmpleadoEquipo` en lugar de campo inexistente `empleado.equipoId`
 - ✅ **Tabla optimizada**: Eliminada columna de acciones redundante; toda la fila es clicable para ver detalles
 - ✅ **Balance actualizado automáticamente**: Se recalcula al editar, cuadrar o crear fichajes
@@ -1080,3 +1088,6 @@ Componente unificado para navegación de períodos de tiempo (Día/Semana/Mes).
 - ✅ **Tabla unificada**: Migración a `DataTable` compartido con `AvatarCell` para empleados, estilo consistente (header grisaceo, filas completas, EmptyState de shadcn)
 - ✅ **Avatar en tabla**: Columna de empleado muestra avatar + nombre + puesto usando `AvatarCell`
 - ✅ **EmptyState de shadcn**: Estados vacíos usan componente estándar con layout `table` en lugar de texto plano
+- ✅ **Promedios históricos para cuadraje**: Sistema inteligente que calcula eventos propuestos basándose en el promedio de los últimos 5 días con eventos del mismo empleado, ajustando la salida según horas esperadas (2025-12-04)
+- ✅ **Rate limiting en cuadraje masivo**: Límite de 50 fichajes por request para proteger transacciones (2025-12-04)
+- ✅ **Campo jornadaId en fichajes**: Permite filtrar históricos por jornada para mayor precisión en promedios (2025-12-04)

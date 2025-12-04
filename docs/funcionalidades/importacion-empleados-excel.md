@@ -189,10 +189,11 @@ FormData {
     }
   ],
   "equiposDetectados": ["Desarrollo", "Ventas"],
-  "managersDetectados": ["María López"],
-  "invitarEmpleados": true
+  "managersDetectados": ["María López"]
 }
 ```
+
+> Nota: Las invitaciones a los empleados importados se envían automáticamente; ya no es necesario incluir flags adicionales en la petición.
 
 **Response:**
 ```json

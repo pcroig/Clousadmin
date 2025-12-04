@@ -11,6 +11,7 @@ import {
   successResponse,
   validateRequest,
 } from '@/lib/api-handler';
+import { obtenerEtiquetaJornada } from '@/lib/jornadas/helpers';
 import { prisma } from '@/lib/prisma';
 import { asJsonValue } from '@/lib/prisma/json';
 import { jornadaCreateSchema } from '@/lib/validaciones/schemas';
@@ -43,7 +44,17 @@ export async function GET(req: NextRequest) {
       },
     });
 
-    return successResponse(jornadas);
+    // Generate 'nombre' field for backward compatibility
+    const jornadasConNombre = jornadas.map((jornada) => ({
+      ...jornada,
+      nombre: obtenerEtiquetaJornada({
+        id: jornada.id,
+        horasSemanales: Number(jornada.horasSemanales),
+        config: jornada.config as JornadaConfig | null,
+      }),
+    }));
+
+    return successResponse(jornadasConNombre);
   } catch (error) {
     return handleApiError(error, 'API GET /api/jornadas');
   }

@@ -9,6 +9,7 @@ import { FirmaPendiente, FirmarDocumentoDialog } from '@/components/firma/firmar
 import { PdfCanvasViewer } from '@/components/shared/pdf-canvas-viewer';
 import { Button } from '@/components/ui/button';
 import { parseJson } from '@/lib/utils/json';
+import type { PosicionFirma, PosicionFirmaConMetadata } from '@/lib/firma-digital/tipos';
 
 interface SignaturePosition {
   page: number;
@@ -16,6 +17,12 @@ interface SignaturePosition {
   y: number;
   width: number;
   height: number;
+}
+
+interface PdfDimensiones {
+  width: number;
+  height: number;
+  numPaginas: number;
 }
 
 interface FirmaDetalle {
@@ -26,13 +33,7 @@ interface FirmaDetalle {
     titulo: string;
     mensaje?: string;
     ordenFirma: boolean;
-    posicionFirma?: {
-      pagina: number;
-      x: number;
-      y: number;
-      width: number;
-      height: number;
-    };
+    posicionFirma?: PosicionFirmaConMetadata | PosicionFirma;
     documento: {
       id: string;
       nombre: string;
@@ -50,6 +51,7 @@ export function FirmarDocumentoClient({ firmaId }: FirmarDocumentoClientProps) {
   const [error, setError] = useState<string | null>(null);
   const [firma, setFirma] = useState<FirmaDetalle | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [pdfDimensiones, setPdfDimensiones] = useState<PdfDimensiones | null>(null);
 
   // Cargar detalles de la firma
   useEffect(() => {
@@ -77,6 +79,30 @@ export function FirmarDocumentoClient({ firmaId }: FirmarDocumentoClientProps) {
       });
   }, [firmaId]);
 
+  // Cargar dimensiones reales del PDF
+  useEffect(() => {
+    if (!firma?.solicitudes_firma.documento.id) return;
+
+    fetch(`/api/documentos/${firma.solicitudes_firma.documento.id}/pdf-metadata`)
+      .then(async (res) => {
+        if (!res.ok) throw new Error('Error al cargar metadata del PDF');
+        return parseJson<{ metadata: { paginaPrincipal: { width: number; height: number }; numPaginas: number } }>(res);
+      })
+      .then((data) => {
+        if (data.metadata?.paginaPrincipal) {
+          setPdfDimensiones({
+            width: data.metadata.paginaPrincipal.width,
+            height: data.metadata.paginaPrincipal.height,
+            numPaginas: data.metadata.numPaginas ?? 1,
+          });
+        }
+      })
+      .catch(() => {
+        // Fallback a A4
+        setPdfDimensiones({ width: 595, height: 842, numPaginas: 1 });
+      });
+  }, [firma]);
+
   const previewUrl = useMemo(
     () => (firma ? `/api/documentos/${firma.solicitudes_firma.documento.id}/preview` : ''),
     [firma]
@@ -84,29 +110,59 @@ export function FirmarDocumentoClient({ firmaId }: FirmarDocumentoClientProps) {
 
   // Convertir posición de firma del formato DB al formato del viewer
   const signaturePositions = useMemo<SignaturePosition[]>(() => {
-    if (!firma?.solicitudes_firma.posicionFirma) return [];
+    if (!firma?.solicitudes_firma.posicionFirma || !pdfDimensiones) return [];
+
+    // Validar dimensiones para evitar división por cero
+    if (pdfDimensiones.width <= 0 || pdfDimensiones.height <= 0) {
+      console.error('[FirmarDocumentoClient] Dimensiones inválidas:', pdfDimensiones);
+      return [];
+    }
 
     const pos = firma.solicitudes_firma.posicionFirma;
 
-    // Convertir de coordenadas PDF (puntos) a porcentajes para el canvas
-    const PDF_WIDTH = 595; // Ancho A4 en puntos
-    const PDF_HEIGHT = 842; // Alto A4 en puntos
+    // Type guard para v2: debe tener version y porcentajes
+    const esFormatoV2 = (p: unknown): p is PosicionFirmaConMetadata => {
+      return typeof p === 'object' && p !== null && 'version' in p && p.version === 'v2';
+    };
 
-    // Valores por defecto si no están presentes en la BD
-    const width = pos.width ?? 180; // Default width
-    const height = pos.height ?? 60; // Default height
+    if (esFormatoV2(pos)) {
+      // Formato v2: Ya está en porcentajes, solo extraer
+      const { porcentajes } = pos;
 
-    // Sistema de coordenadas PDF: origen en esquina inferior izquierda
-    // Sistema de coordenadas canvas: origen en esquina superior izquierda
-    // Necesitamos invertir la coordenada Y
-    return [{
-      page: pos.pagina,
-      x: (pos.x / PDF_WIDTH) * 100, // Convertir a porcentaje
-      y: ((PDF_HEIGHT - pos.y - height) / PDF_HEIGHT) * 100, // Invertir Y y convertir a porcentaje
-      width: (width / PDF_WIDTH) * 100,
-      height: (height / PDF_HEIGHT) * 100,
-    }];
-  }, [firma]);
+      return [{
+        page: porcentajes.pagina,
+        x: porcentajes.xPorcentaje,  // Ya está en %
+        y: porcentajes.yPorcentaje,  // Ya está en %
+        width: porcentajes.widthPorcentaje ?? 30,
+        height: porcentajes.heightPorcentaje ?? 7,
+      }];
+    } else {
+      // Formato v1: Convertir de coordenadas absolutas a porcentajes
+      const posV1 = pos as PosicionFirma;
+
+      // Valores por defecto si no están presentes
+      const width = posV1.width ?? 180;
+      const height = posV1.height ?? 60;
+
+      // Convertir de puntos PDF a porcentajes usando dimensiones REALES
+      // Sistema de coordenadas PDF: origen en esquina inferior izquierda
+      // Sistema de coordenadas canvas: origen en esquina superior izquierda
+      // Necesitamos invertir la coordenada Y
+      const xPorcentaje = (posV1.x / pdfDimensiones.width) * 100;
+      const yDesdeArriba = pdfDimensiones.height - posV1.y - height;
+      const yPorcentaje = (yDesdeArriba / pdfDimensiones.height) * 100;
+      const widthPorcentaje = (width / pdfDimensiones.width) * 100;
+      const heightPorcentaje = (height / pdfDimensiones.height) * 100;
+
+      return [{
+        page: posV1.pagina,
+        x: xPorcentaje,
+        y: yPorcentaje,
+        width: widthPorcentaje,
+        height: heightPorcentaje,
+      }];
+    }
+  }, [firma, pdfDimensiones]);
 
   const firmaPendiente: FirmaPendiente | null = firma
     ? {

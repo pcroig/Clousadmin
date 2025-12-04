@@ -1,158 +1,143 @@
-import { NextRequest, NextResponse as Response } from 'next/server';
+// ========================================
+// API Festivo Personalizado Individual
+// ========================================
+
+import { NextRequest } from 'next/server';
+import { z } from 'zod';
 
 import {
   badRequestResponse,
   handleApiError,
   notFoundResponse,
-  requireAuthAsHR,
+  requireAuth,
   successResponse,
   validateRequest,
 } from '@/lib/api-handler';
+import { UsuarioRol } from '@/lib/constants/enums';
 import { prisma } from '@/lib/prisma';
-import { empleadoFestivoUpdateSchema } from '@/lib/validaciones/schemas';
 
-// PATCH /api/empleados/[id]/festivos/[festivoId] - Editar festivo personalizado
+// Force dynamic rendering
+export const dynamic = 'force-dynamic';
+
+const festivoUpdateSchema = z.object({
+  estado: z.enum(['aprobado', 'rechazado']).optional(),
+});
+
+// PATCH /api/empleados/[id]/festivos/[festivoId] - Aprobar/rechazar (solo HR)
 export async function PATCH(
-  request: NextRequest,
+  req: NextRequest,
   context: { params: Promise<{ id: string; festivoId: string }> }
 ) {
   const params = await context.params;
   try {
-    const authResult = await requireAuthAsHR(request);
+    const authResult = await requireAuth(req);
     if (authResult instanceof Response) return authResult;
     const { session } = authResult;
 
     const { id: empleadoId, festivoId } = params;
 
-    // Verificar que el empleado existe y pertenece a la empresa
-    const empleado = await prisma.empleados.findUnique({
-      where: {
-        id: empleadoId,
-        empresaId: session.user.empresaId,
-      },
-    });
-
-    if (!empleado) {
-      return notFoundResponse('Empleado no encontrado');
+    // Solo HR puede aprobar/rechazar
+    if (session.user.rol !== UsuarioRol.hr_admin) {
+      return badRequestResponse('No tienes permisos');
     }
 
-    // Validar request body
-    const validationResult = await validateRequest(request, empleadoFestivoUpdateSchema);
+    const validationResult = await validateRequest(req, festivoUpdateSchema);
     if (validationResult instanceof Response) return validationResult;
-    const { data: validatedData } = validationResult;
+    const { data } = validationResult;
 
-    // Verificar que el festivo existe y pertenece al empleado
-    const festivoExistente = await prisma.empleado_festivos.findUnique({
+    const festivo = await prisma.empleado_festivos.findFirst({
       where: {
         id: festivoId,
         empleadoId,
       },
-    });
-
-    if (!festivoExistente) {
-      return notFoundResponse('Festivo personalizado no encontrado');
-    }
-
-    // Preparar datos para actualizar
-    const dataToUpdate: {
-      nombre?: string;
-      fecha?: Date;
-      activo?: boolean;
-    } = {};
-
-    if (validatedData.nombre !== undefined) {
-      dataToUpdate.nombre = validatedData.nombre;
-    }
-
-    if (validatedData.fecha !== undefined) {
-      const fecha = new Date(validatedData.fecha);
-      if (isNaN(fecha.getTime())) {
-        return badRequestResponse('Fecha inválida');
-      }
-
-      // Verificar que no exista otro festivo para esta nueva fecha
-      if (fecha.getTime() !== festivoExistente.fecha.getTime()) {
-    const otroFestivo = await prisma.empleado_festivos.findFirst({
-          where: {
-            empleadoId,
-            fecha,
-            id: { not: festivoId },
-          },
-        });
-
-        if (otroFestivo) {
-          return badRequestResponse('Ya existe un festivo personalizado para esta fecha');
-        }
-      }
-
-      dataToUpdate.fecha = fecha;
-    }
-
-    if (validatedData.activo !== undefined) {
-      dataToUpdate.activo = validatedData.activo;
-    }
-
-    // Actualizar festivo
-    const festivo = await prisma.empleado_festivos.update({
-      where: {
-        id: festivoId,
+      include: {
+        empleado: {
+          select: { empresaId: true },
+        },
       },
-      data: dataToUpdate,
     });
 
-    return successResponse(festivo);
+    if (!festivo) {
+      return notFoundResponse('Festivo no encontrado');
+    }
+
+    if (festivo.empleado.empresaId !== session.user.empresaId) {
+      return badRequestResponse('No pertenece a tu empresa');
+    }
+
+    const actualizado = await prisma.empleado_festivos.update({
+      where: { id: festivoId },
+      data: {
+        estado: data.estado,
+        aprobadoPor: data.estado === 'aprobado' ? session.user.id : null,
+      },
+    });
+
+    console.info(
+      `[Festivos Empleado] ${data.estado === 'aprobado' ? 'Aprobado' : 'Rechazado'}: ${actualizado.nombre}`
+    );
+
+    return successResponse({
+      id: actualizado.id,
+      estado: actualizado.estado,
+    });
   } catch (error) {
     return handleApiError(error, 'API PATCH /api/empleados/[id]/festivos/[festivoId]');
   }
 }
 
-// DELETE /api/empleados/[id]/festivos/[festivoId] - Eliminar festivo personalizado
+// DELETE /api/empleados/[id]/festivos/[festivoId]
 export async function DELETE(
-  request: NextRequest,
+  req: NextRequest,
   context: { params: Promise<{ id: string; festivoId: string }> }
 ) {
   const params = await context.params;
   try {
-    const authResult = await requireAuthAsHR(request);
+    const authResult = await requireAuth(req);
     if (authResult instanceof Response) return authResult;
     const { session } = authResult;
 
     const { id: empleadoId, festivoId } = params;
 
-    // Verificar que el empleado existe y pertenece a la empresa
-    const empleado = await prisma.empleados.findUnique({
-      where: {
-        id: empleadoId,
-        empresaId: session.user.empresaId,
-      },
-    });
-
-    if (!empleado) {
-      return notFoundResponse('Empleado no encontrado');
-    }
-
-    // Verificar que el festivo existe y pertenece al empleado
-    const festivoExistente = await prisma.empleado_festivos.findUnique({
+    const festivo = await prisma.empleado_festivos.findFirst({
       where: {
         id: festivoId,
         empleadoId,
       },
-    });
-
-    if (!festivoExistente) {
-      return notFoundResponse('Festivo personalizado no encontrado');
-    }
-
-    // Eliminar festivo
-    await prisma.empleado_festivos.delete({
-      where: {
-        id: festivoId,
+      include: {
+        empleado: {
+          select: { empresaId: true },
+        },
       },
     });
 
-    return successResponse({ message: 'Festivo eliminado correctamente' });
+    if (!festivo) {
+      return notFoundResponse('Festivo no encontrado');
+    }
+
+    if (festivo.empleado.empresaId !== session.user.empresaId) {
+      return badRequestResponse('No pertenece a tu empresa');
+    }
+
+    // HR puede eliminar cualquiera
+    // Empleado solo puede eliminar sus propias solicitudes pendientes
+    const isHR = session.user.rol === UsuarioRol.hr_admin;
+    const isOwn = festivo.solicitadoPor === session.user.id;
+
+    if (!isHR && (!isOwn || festivo.estado !== 'pendiente')) {
+      return badRequestResponse('No puedes eliminar este festivo');
+    }
+
+    await prisma.empleado_festivos.delete({
+      where: { id: festivoId },
+    });
+
+    console.info(
+      `[Festivos Empleado] Eliminado: ${festivo.nombre}`
+    );
+
+    return successResponse({ success: true });
   } catch (error) {
     return handleApiError(error, 'API DELETE /api/empleados/[id]/festivos/[festivoId]');
   }
 }
-

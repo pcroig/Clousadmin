@@ -1006,6 +1006,7 @@ export async function crearFichajesAutomaticos(
           data: {
             empresaId,
             empleadoId: empleado.id,
+            jornadaId: empleado.jornada?.id ?? null,
             fecha: fechaSinHora,
             estado: PrismaEstadoFichaje.en_curso,
           },
@@ -1083,6 +1084,7 @@ export async function procesarFichajesDia(
           data: {
             empresaId,
             empleadoId: empleado.id,
+            jornadaId: empleado.jornada?.id ?? null,
             fecha: fechaSinHora,
             estado: PrismaEstadoFichaje.pendiente,
           },

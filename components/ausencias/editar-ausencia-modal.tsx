@@ -7,10 +7,11 @@
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Trash2 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 import { LoadingButton } from '@/components/shared/loading-button';
+import { ResponsiveDateRangePicker } from '@/components/shared/responsive-date-picker';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -76,8 +77,8 @@ export function EditarAusenciaModal({
   contexto = 'empleado',
 }: EditarAusenciaModalProps) {
   const [tipo, setTipo] = useState('vacaciones');
-  const [fechaInicio, setFechaInicio] = useState('');
-  const [fechaFin, setFechaFin] = useState('');
+  const [fechaInicio, setFechaInicio] = useState<Date | undefined>();
+  const [fechaFin, setFechaFin] = useState<Date | undefined>();
   const [medioDia, setMedioDia] = useState(false);
   const [periodo, setPeriodo] = useState<PeriodoMedioDiaValue>('manana');
   const [motivo, setMotivo] = useState('');
@@ -89,13 +90,20 @@ export function EditarAusenciaModal({
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState('');
 
+  const isSingleDaySelection = useMemo(() => {
+    if (!fechaInicio || !fechaFin) return false;
+    return fechaInicio.toDateString() === fechaFin.toDateString();
+  }, [fechaInicio, fechaFin]);
+
+  const medioDiaDisponible = Boolean(fechaInicio && fechaFin && isSingleDaySelection);
+
   // Precargar datos cuando se abre el modal
   useEffect(() => {
     if (!open || !ausencia) return;
 
     setTipo(ausencia.tipo);
-    setFechaInicio(format(new Date(ausencia.fechaInicio), 'yyyy-MM-dd'));
-    setFechaFin(format(new Date(ausencia.fechaFin), 'yyyy-MM-dd'));
+    setFechaInicio(new Date(ausencia.fechaInicio));
+    setFechaFin(new Date(ausencia.fechaFin));
     setMedioDia(Boolean(ausencia.medioDia));
     setPeriodo((ausencia.periodo as PeriodoMedioDiaValue) || 'manana');
     setMotivo(ausencia.motivo || '');
@@ -143,10 +151,7 @@ export function EditarAusenciaModal({
       return;
     }
 
-    const inicio = new Date(fechaInicio);
-    const fin = new Date(fechaFin);
-
-    if (fin < inicio) {
+    if (fechaFin < fechaInicio) {
       setError('La fecha de fin debe ser posterior a la de inicio');
       return;
     }
@@ -174,8 +179,8 @@ export function EditarAusenciaModal({
 
       const payload: Record<string, unknown> = {
         tipo,
-        fechaInicio,
-        fechaFin,
+        fechaInicio: fechaInicio.toISOString(),
+        fechaFin: fechaFin.toISOString(),
         medioDia,
         motivo: motivo || null,
       };
@@ -296,38 +301,51 @@ export function EditarAusenciaModal({
             </Select>
           </Field>
 
-          {/* Fechas */}
-          <div className="grid grid-cols-2 gap-4">
-            <Field>
-              <FieldLabel>Fecha inicio *</FieldLabel>
-              <Input
-                type="date"
-                value={fechaInicio}
-                onChange={(e) => setFechaInicio(e.target.value)}
-              />
-            </Field>
-            <Field>
-              <FieldLabel>Fecha fin *</FieldLabel>
-              <Input
-                type="date"
-                value={fechaFin}
-                onChange={(e) => setFechaFin(e.target.value)}
-              />
-            </Field>
-          </div>
+          {/* Fechas - Rango */}
+          <Field>
+            <FieldLabel>Periodo de ausencia *</FieldLabel>
+            <ResponsiveDateRangePicker
+              dateRange={{ from: fechaInicio, to: fechaFin }}
+              onSelect={(range) => {
+                setFechaInicio(range.from);
+                setFechaFin(range.to);
+              }}
+              placeholder="Seleccionar rango de fechas"
+              label="Seleccionar periodo"
+            />
+            {fechaInicio && fechaFin && (
+              <p className="mt-1 text-xs text-gray-500">
+                {isSingleDaySelection 
+                  ? '1 día seleccionado' 
+                  : `${Math.ceil((fechaFin.getTime() - fechaInicio.getTime()) / (1000 * 60 * 60 * 24)) + 1} días en el rango`
+                }
+              </p>
+            )}
+          </Field>
 
           {/* Medio día */}
-          <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              id="medioDia"
-              checked={medioDia}
-              onChange={(e) => setMedioDia(e.target.checked)}
-              className="rounded border-gray-300"
-            />
-            <Label htmlFor="medioDia" className="text-sm">
-              Medio día
-            </Label>
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="medioDia"
+                checked={medioDia}
+                onChange={(e) => setMedioDia(e.target.checked)}
+                className="rounded border-gray-300"
+                disabled={!medioDiaDisponible}
+              />
+              <Label 
+                htmlFor="medioDia" 
+                className={medioDiaDisponible ? 'text-sm cursor-pointer' : 'text-sm cursor-not-allowed text-gray-400'}
+              >
+                Medio día
+              </Label>
+            </div>
+            {!medioDiaDisponible && (
+              <p className="text-xs text-gray-500">
+                Selecciona la misma fecha de inicio y fin para solicitar medio día.
+              </p>
+            )}
           </div>
 
           {medioDia && (

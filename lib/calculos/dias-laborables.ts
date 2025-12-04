@@ -3,7 +3,7 @@
 // ========================================
 
 import { prisma } from '@/lib/prisma';
-import { normalizarFechaSinHora, crearFechaConHora } from '@/lib/utils/fechas';
+import { crearFechaConHora, normalizarFechaSinHora } from '@/lib/utils/fechas';
 
 import { DIAS_LABORABLES_DEFAULT } from './dias-laborables.definitions';
 
@@ -58,7 +58,10 @@ export async function getFestivosActivosEnRango(
 }
 
 /**
- * Obtiene festivos de empresa + festivos personalizados de un empleado
+ * Obtiene festivos efectivos para un empleado:
+ * - Festivos de empresa activos
+ * - Menos los festivos que el empleado tiene reemplazados (aprobados)
+ * - Más las fechas de los festivos personalizados aprobados
  */
 export async function getFestivosActivosParaEmpleado(
   empresaId: string,
@@ -74,24 +77,43 @@ export async function getFestivosActivosParaEmpleado(
     return festivosEmpresa;
   }
 
-  // Obtener festivos personalizados del empleado
-  const festivosEmpleado = await prisma.empleado_festivos.findMany({
+  // Obtener festivos personalizados APROBADOS del empleado
+  const festivosPersonalizados = await prisma.empleado_festivos.findMany({
     where: {
       empleadoId,
-      fecha: {
-        gte: normalizarInicioDeDia(fechaInicio),
-        lte: normalizarFinDeDia(fechaFin),
-      },
-      activo: true,
+      estado: 'aprobado',
     },
-    orderBy: {
-      fecha: 'asc',
+    select: {
+      festivoEmpresaId: true,
+      fecha: true,
     },
   });
 
-  // Combinar ambos (los festivos personalizados sobrescriben los de empresa si hay conflicto)
-  const festivos = [...festivosEmpresa, ...festivosEmpleado];
+  // Si no hay festivos personalizados, retornar solo los de empresa
+  if (festivosPersonalizados.length === 0) {
+    return festivosEmpresa;
+  }
+
+  // Crear Set con IDs de festivos de empresa reemplazados
+  const festivosReemplazados = new Set(
+    festivosPersonalizados.map((f) => f.festivoEmpresaId)
+  );
+
+  // Filtrar festivos de empresa que NO han sido reemplazados
+  const festivosEmpresaSinReemplazar = festivosEmpresa.filter(
+    (f) => !festivosReemplazados.has(f.id)
+  );
+
+  // Agregar las nuevas fechas personalizadas que están en el rango
+  const festivos: FestivoConFecha[] = [...festivosEmpresaSinReemplazar.map(f => ({ fecha: f.fecha }))];
   
+  for (const fp of festivosPersonalizados) {
+    const fechaNorm = normalizarInicioDeDia(fp.fecha);
+    if (fechaNorm >= normalizarInicioDeDia(fechaInicio) && fechaNorm <= normalizarFinDeDia(fechaFin)) {
+      festivos.push({ fecha: fp.fecha });
+    }
+  }
+
   return festivos;
 }
 

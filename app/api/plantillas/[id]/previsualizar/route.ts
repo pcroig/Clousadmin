@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 import { getSession } from '@/lib/auth';
+import { obtenerEtiquetaJornada } from '@/lib/jornadas/helpers';
 import {
   type DatosEmpleado,
   extraerVariablesDePlantilla,
@@ -79,8 +80,9 @@ export async function GET(
         },
         jornada: {
           select: {
-            nombre: true,
+            id: true,
             horasSemanales: true,
+            config: true,
           },
         },
         manager: {
@@ -181,7 +183,11 @@ export async function GET(
       empresa: empresaData,
       jornada: empleado.jornada
         ? {
-            nombre: empleado.jornada.nombre,
+            etiqueta: obtenerEtiquetaJornada({
+              id: empleado.jornada.id,
+              horasSemanales: Number(empleado.jornada.horasSemanales),
+              config: empleado.jornada.config as any,
+            }),
             horasSemanales: Number(empleado.jornada.horasSemanales),
           }
         : undefined,

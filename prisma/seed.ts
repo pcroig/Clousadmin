@@ -667,6 +667,7 @@ async function main() {
             data: {
               empresaId: empresa.id,
               empleadoId: empleado.id,
+              jornadaId: empleado.jornadaId ?? null,
               fecha: fechaFichajeSinHora,
               estado: EstadoAusencia.pendiente, // Pendiente porque falta salida
               eventos: {
@@ -709,6 +710,7 @@ async function main() {
             data: {
               empresaId: empresa.id,
               empleadoId: empleado.id,
+              jornadaId: empleado.jornadaId ?? null,
               fecha: fechaFichajeSinHora,
               estado: EstadoAusencia.pendiente, // Pendiente porque la pausa quedó sin cerrar
               eventos: {
@@ -759,6 +761,7 @@ async function main() {
             data: {
               empresaId: empresa.id,
               empleadoId: empleado.id,
+              jornadaId: empleado.jornadaId ?? null,
               fecha: fechaFichajeSinHora,
               estado: 'finalizado', // Finalizado porque tiene entrada + salida
               eventos: {
@@ -797,6 +800,7 @@ async function main() {
             data: {
               empresaId: empresa.id,
               empleadoId: empleado.id,
+              jornadaId: empleado.jornadaId ?? null,
               fecha: fechaFichajeSinHora,
               estado: EstadoAusencia.pendiente, // Falta entrada, queda pendiente para cuadre
               eventos: {

@@ -88,12 +88,17 @@ export async function GET(request: NextRequest) {
       where.empleadoId = empleadoId;
     }
 
-    if (carpetaId) {
-      where.carpetaId = carpetaId;
-    }
-
     if (tipoDocumento) {
       where.tipoDocumento = tipoDocumento;
+    }
+
+    // Filtro especial por carpeta (usa tabla intermedia)
+    if (carpetaId) {
+      where.documento_carpetas = {
+        some: {
+          carpetaId,
+        },
+      };
     }
 
     const { page, limit, skip } = parsePaginationParams(searchParams);
@@ -102,7 +107,11 @@ export async function GET(request: NextRequest) {
       prisma.documentos.findMany({
         where,
         include: {
-          carpeta: true,
+          documento_carpetas: {
+            include: {
+              carpeta: true,
+            },
+          },
           empleado: {
             select: {
               id: true,
@@ -265,11 +274,10 @@ export async function POST(request: NextRequest) {
 
       // Crear registro en DB
       const documento = await prisma.$transaction(async (tx) => {
-        return tx.documentos.create({
+        const doc = await tx.documentos.create({
           data: {
             empresaId: session.user.empresaId,
             empleadoId,
-            carpetaId,
             nombre: nombreUnico,
             tipoDocumento: tipoDocumentoFinal,
             mimeType: file.type,
@@ -278,7 +286,6 @@ export async function POST(request: NextRequest) {
             s3Bucket: storageBucket,
           },
           include: {
-            carpeta: true,
             empleado: {
               select: {
                 id: true,
@@ -288,6 +295,38 @@ export async function POST(request: NextRequest) {
             },
           },
         });
+
+        // Asignar documento a la carpeta (tabla intermedia)
+        await tx.documento_carpetas.create({
+          data: {
+            documentoId: doc.id,
+            carpetaId,
+          },
+        });
+
+        // Si la carpeta es del sistema, sincronizar también con carpeta master
+        if (carpeta.esSistema && carpeta.empleadoId) {
+          // Buscar carpeta master correspondiente
+          const carpetaMaster = await tx.carpetas.findFirst({
+            where: {
+              empresaId: carpeta.empresaId,
+              empleadoId: null,
+              nombre: carpeta.nombre,
+              esSistema: true,
+            },
+          });
+
+          if (carpetaMaster) {
+            await tx.documento_carpetas.create({
+              data: {
+                documentoId: doc.id,
+                carpetaId: carpetaMaster.id,
+              },
+            });
+          }
+        }
+
+        return doc;
       });
 
       cleanupUpload = null;

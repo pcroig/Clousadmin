@@ -39,33 +39,25 @@ abierto ↔ cerrado
 
 ## Componentes Principales
 
-### 1. Tipos de Complemento
+### 1. Complementos Salariales
 
-Catálogo de complementos salariales que pueden asignarse a empleados.
+El sistema de complementos permite gestionar retribuciones adicionales al salario base. Los complementos pueden ser de tipo **fijo** (cuantía predefinida) o **variable** (cuantía determinada caso por caso).
 
-**Endpoints:**
-- `GET /api/tipos-complemento` - Listar tipos
+> 📖 **Documentación completa**: Ver [docs/funcionalidades/complementos-salariales.md](./complementos-salariales.md) para información detallada sobre el modelo de datos, APIs, flujos de trabajo y casos de uso.
+
+**Resumen rápido:**
+
+- **Catálogo de tipos**: HR define tipos reutilizables (Plus transporte, Plus idiomas, etc.)
+- **Asignación a empleados**: Se asignan con importe fijo o variable
+- **Validación**: Requieren aprobación de HR/Manager antes de aplicarse a nóminas
+- **Estados**: Pendiente → Validado/Rechazado
+
+**Endpoints principales:**
+- `GET /api/tipos-complemento` - Catálogo de tipos
 - `POST /api/tipos-complemento` - Crear tipo
-- `PATCH /api/tipos-complemento/[id]` - Actualizar
-- `DELETE /api/tipos-complemento/[id]` - Desactivar
-
-**Campos:**
-- `nombre`: Nombre del complemento
-- `descripcion`: Descripción opcional
-- `importeFijo`: Importe fijo (null si es variable)
-- `periodicidad`: 'mensual' | 'anual'
-- `tributableIRPF`: Boolean
-- `tributableSS`: Boolean
-
-### 2. Complementos de Empleado
-
-Asignación de complementos a empleados específicos.
-
-**Endpoints:**
-- `GET /api/empleados/[id]/complementos` - Listar complementos del empleado
+- `GET /api/empleados/[id]/complementos` - Complementos del empleado
 - `POST /api/empleados/[id]/complementos` - Asignar complemento
-- `PATCH /api/empleados/[id]/complementos/[complementoId]` - Actualizar
-- `DELETE /api/empleados/[id]/complementos/[complementoId]` - Desactivar/eliminar
+- `POST /api/nominas/eventos/[id]/validar-complementos` - Validar complementos masivamente
 
 ### 3. Eventos de Nómina
 

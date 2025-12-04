@@ -43,6 +43,7 @@ export async function GET(
             nombre: true,
             apellidos: true,
             email: true,
+            fotoUrl: true,
             nss: true,
             iban: true,
             equipos: {

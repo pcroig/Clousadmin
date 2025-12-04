@@ -12,7 +12,7 @@ import { getOrCreateDefaultJornada } from './get-or-create-default';
  */
 export async function asegurarJornadaEmpleados(empresaId: string): Promise<{
   empleadosActualizados: number;
-  jornadaAsignada: { id: string; nombre: string } | null;
+  jornadaAsignada: { id: string } | null;
 }> {
   // 1. Obtener empleados activos sin jornada
   const empleadosSinJornada = await prisma.empleados.findMany({
@@ -51,14 +51,13 @@ export async function asegurarJornadaEmpleados(empresaId: string): Promise<{
   });
 
   console.log(
-    `[AsegurarJornadaEmpleados] ${resultado.count} empleados actualizados con jornada "${jornadaDefault.nombre}"`
+    `[AsegurarJornadaEmpleados] ${resultado.count} empleados actualizados con jornada ${jornadaDefault.id}`
   );
 
   return {
     empleadosActualizados: resultado.count,
     jornadaAsignada: {
       id: jornadaDefault.id,
-      nombre: jornadaDefault.nombre,
     },
   };
 }

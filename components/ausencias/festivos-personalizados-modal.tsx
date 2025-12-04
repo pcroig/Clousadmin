@@ -1,281 +1,548 @@
 'use client';
 
-import { format } from 'date-fns';
-import { es } from 'date-fns/locale';
-import { Calendar, Plus, Trash2 } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
+import { Calendar, Pencil, Trash2 } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
+import { FechaCalendar } from '@/components/shared/fecha-calendar';
+import { InfoTooltip } from '@/components/shared/info-tooltip';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogBody, DialogHeader, DialogScrollableContent, DialogTitle } from '@/components/ui/dialog';
+import {
+  Dialog,
+  DialogBody,
+  DialogFooter,
+  DialogHeader,
+  DialogScrollableContent,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { parseJson } from '@/lib/utils/json';
 
-interface FestivoPersonalizado {
+interface FestivoEmpresa {
   id: string;
   fecha: string;
   nombre: string;
-  activo: boolean;
+  tipo: string;
+}
+
+interface FestivoPersonalizado {
+  id?: string;
+  festivoEmpresaId: string;
+  fecha: string;
+  nombre: string;
+}
+
+interface FestivoApiResponse {
+  id: string;
+  festivoEmpresaId: string;
+  fecha: string;
+  nombre: string;
+  estado: 'pendiente' | 'aprobado' | 'rechazado';
+}
+
+interface EmpleadoOption {
+  id: string;
+  nombre: string;
+  apellidos: string;
 }
 
 interface FestivosPersonalizadosModalProps {
   open: boolean;
   onClose: () => void;
   empleadoId: string;
-  empleadoNombre: string;
+  contexto: 'empleado' | 'manager' | 'hr_admin';
+  onSuccess?: () => void;
+}
+
+interface DraftFestivo extends FestivoPersonalizado {
+  estado?: 'pendiente' | 'aprobado' | 'rechazado';
 }
 
 export function FestivosPersonalizadosModal({
   open,
   onClose,
   empleadoId,
-  empleadoNombre,
+  contexto,
+  onSuccess,
 }: FestivosPersonalizadosModalProps) {
-  const [festivos, setFestivos] = useState<FestivoPersonalizado[]>([]);
+  const [festivosEmpresa, setFestivosEmpresa] = useState<FestivoEmpresa[]>([]);
+  const [originalFestivos, setOriginalFestivos] = useState<Map<string, DraftFestivo>>(new Map());
+  const [draftFestivos, setDraftFestivos] = useState<Map<string, DraftFestivo>>(new Map());
+  const [editingFestivoId, setEditingFestivoId] = useState<string | null>(null);
+  const [editingFecha, setEditingFecha] = useState('');
+  const [editingNombre, setEditingNombre] = useState('');
+  const [empleados, setEmpleados] = useState<EmpleadoOption[]>([]);
+  const [copiarDialogOpen, setCopiarDialogOpen] = useState(false);
+  const [empleadosSeleccionados, setEmpleadosSeleccionados] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
-  const [creando, setCreando] = useState(false);
-  const [nuevoFestivo, setNuevoFestivo] = useState({
-    fecha: '',
-    nombre: '',
-  });
+  const [saving, setSaving] = useState(false);
 
-  const cargarFestivos = useCallback(async () => {
+  const isHR = contexto === 'hr_admin';
+
+  const cargarDatos = useCallback(async () => {
     if (!empleadoId) return;
-
+    setLoading(true);
     try {
-      const response = await fetch(`/api/empleados/${empleadoId}/festivos`);
-      if (!response.ok) {
-        throw new Error('Error al cargar festivos personalizados');
+      const [festivosEmpresaRes, festivosPersonalizadosRes] = await Promise.all([
+        fetch('/api/festivos?activo=true'),
+        fetch(`/api/empleados/${empleadoId}/festivos`),
+      ]);
+
+      if (festivosEmpresaRes.ok) {
+        const data = await parseJson<{ festivos: FestivoEmpresa[] }>(festivosEmpresaRes);
+        setFestivosEmpresa(data.festivos || []);
       }
 
-      const data = await parseJson<FestivoPersonalizado[]>(response);
-      setFestivos(Array.isArray(data) ? data : []);
+      if (festivosPersonalizadosRes.ok) {
+        const data = await parseJson<FestivoApiResponse[]>(festivosPersonalizadosRes);
+        const original = new Map<string, DraftFestivo>();
+        data.forEach((f) => {
+          original.set(f.festivoEmpresaId, {
+            id: f.id,
+            festivoEmpresaId: f.festivoEmpresaId,
+            fecha: f.fecha,
+            nombre: f.nombre,
+            estado: f.estado,
+          });
+        });
+        setOriginalFestivos(original);
+        setDraftFestivos(new Map(original));
+      }
+
+      if (isHR) {
+        const empleadosRes = await fetch('/api/empleados?activos=true');
+        if (empleadosRes.ok) {
+          const data = await parseJson<{ data: EmpleadoOption[] }>(empleadosRes);
+          const otros = (data.data || []).filter((emp) => emp.id !== empleadoId);
+          setEmpleados(otros);
+        }
+      }
     } catch (error) {
       console.error('Error cargando festivos personalizados:', error);
       toast.error('Error al cargar festivos personalizados');
+    } finally {
+      setLoading(false);
     }
-  }, [empleadoId]);
+  }, [empleadoId, isHR]);
 
   useEffect(() => {
     if (open) {
-      cargarFestivos();
+      cargarDatos();
     }
-  }, [open, cargarFestivos]);
+  }, [open, cargarDatos]);
 
-  const handleCrearFestivo = async () => {
-    if (!nuevoFestivo.fecha || !nuevoFestivo.nombre) {
-      toast.error('Por favor completa todos los campos');
+  const hasChanges = useMemo(() => {
+    if (originalFestivos.size !== draftFestivos.size) return true;
+    for (const [festivoEmpresaId, draft] of draftFestivos.entries()) {
+      const original = originalFestivos.get(festivoEmpresaId);
+      if (!original) return true;
+      if (original.fecha !== draft.fecha || original.nombre !== draft.nombre) {
+        return true;
+      }
+    }
+    return false;
+  }, [draftFestivos, originalFestivos]);
+
+  const startEditing = (festivoEmpresa: FestivoEmpresa) => {
+    const existingDraft = draftFestivos.get(festivoEmpresa.id);
+    setEditingFestivoId(festivoEmpresa.id);
+    setEditingFecha(existingDraft?.fecha ?? festivoEmpresa.fecha);
+    setEditingNombre(existingDraft?.nombre ?? festivoEmpresa.nombre);
+  };
+
+  const cancelEditing = () => {
+    setEditingFestivoId(null);
+    setEditingFecha('');
+    setEditingNombre('');
+  };
+
+  const applyEditing = () => {
+    if (!editingFestivoId) return;
+    if (!editingFecha || !editingNombre.trim()) {
+      toast.error('Completa fecha y nombre');
       return;
     }
-
-    setLoading(true);
-    try {
-      const response = await fetch(`/api/empleados/${empleadoId}/festivos`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          empleadoId,
-          fecha: nuevoFestivo.fecha,
-          nombre: nuevoFestivo.nombre,
-          activo: true,
-        }),
+    setDraftFestivos((prev) => {
+      const next = new Map(prev);
+      const original = originalFestivos.get(editingFestivoId);
+      next.set(editingFestivoId, {
+        festivoEmpresaId: editingFestivoId,
+        fecha: editingFecha,
+        nombre: editingNombre.trim(),
+        id: original?.id,
+        estado: original?.estado,
       });
+      return next;
+    });
+    cancelEditing();
+  };
 
-      if (!response.ok) {
-        const error = await parseJson<{ error?: string }>(response).catch(() => ({
-          error: 'Error desconocido',
-        }));
-        throw new Error(error.error || 'Error al crear festivo personalizado');
-      }
-
-      toast.success('Festivo personalizado creado correctamente');
-      setNuevoFestivo({ fecha: '', nombre: '' });
-      setCreando(false);
-      cargarFestivos();
-    } catch (error) {
-      console.error('Error creando festivo personalizado:', error);
-      toast.error(error instanceof Error ? error.message : 'Error al crear festivo personalizado');
-    } finally {
-      setLoading(false);
+  const removeDraft = (festivoEmpresaId: string) => {
+    setDraftFestivos((prev) => {
+      const next = new Map(prev);
+      next.delete(festivoEmpresaId);
+      return next;
+    });
+    if (editingFestivoId === festivoEmpresaId) {
+      cancelEditing();
     }
   };
 
-  const handleEliminarFestivo = async (festivoId: string) => {
-    if (!confirm('¿Estás seguro de eliminar este festivo personalizado?')) {
+  const handleGuardar = async () => {
+    if (!hasChanges) return;
+    setSaving(true);
+    try {
+      const toDelete: string[] = [];
+      const toCreate: DraftFestivo[] = [];
+      const processed = new Set<string>();
+
+      originalFestivos.forEach((original, festivoEmpresaId) => {
+        const draft = draftFestivos.get(festivoEmpresaId);
+        processed.add(festivoEmpresaId);
+        if (!draft) {
+          if (original.id) {
+            toDelete.push(original.id);
+          }
+          return;
+        }
+        if (original.fecha !== draft.fecha || original.nombre !== draft.nombre) {
+          if (original.id) {
+            toDelete.push(original.id);
+          }
+          toCreate.push({ ...draft, id: undefined });
+        }
+      });
+
+      draftFestivos.forEach((draft, festivoEmpresaId) => {
+        if (processed.has(festivoEmpresaId)) return;
+        toCreate.push(draft);
+      });
+
+      for (const festivoId of toDelete) {
+        const response = await fetch(`/api/empleados/${empleadoId}/festivos/${festivoId}`, {
+          method: 'DELETE',
+        });
+        if (!response.ok) {
+          throw new Error('Error eliminando festivo personalizado');
+        }
+      }
+
+      for (const draft of toCreate) {
+        const response = await fetch(`/api/empleados/${empleadoId}/festivos`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            festivoEmpresaId: draft.festivoEmpresaId,
+            fecha: draft.fecha,
+            nombre: draft.nombre,
+          }),
+        });
+        if (!response.ok) {
+          throw new Error('Error creando festivo personalizado');
+        }
+      }
+
+      toast.success('Cambios guardados');
+      await cargarDatos();
+      onSuccess?.();
+
+      if (isHR && draftFestivos.size > 0 && empleados.length > 0) {
+        setEmpleadosSeleccionados([]);
+        setCopiarDialogOpen(true);
+      }
+    } catch (error) {
+      console.error('Error guardando festivos personalizados:', error);
+      toast.error('Error al guardar cambios');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleCopiarConfiguracion = async () => {
+    if (empleadosSeleccionados.length === 0) {
+      toast.error('Selecciona al menos un empleado');
       return;
     }
-
-    setLoading(true);
+    setSaving(true);
     try {
-      const response = await fetch(`/api/empleados/${empleadoId}/festivos/${festivoId}`, {
-        method: 'DELETE',
-      });
-
-      if (!response.ok) {
-        throw new Error('Error al eliminar festivo personalizado');
+      for (const empleadoDestinoId of empleadosSeleccionados) {
+        for (const draft of draftFestivos.values()) {
+          const response = await fetch(`/api/empleados/${empleadoDestinoId}/festivos`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              festivoEmpresaId: draft.festivoEmpresaId,
+              fecha: draft.fecha,
+              nombre: draft.nombre,
+            }),
+          });
+          if (!response.ok) {
+            throw new Error('Error copiando configuración');
+          }
+        }
       }
-
-      toast.success('Festivo personalizado eliminado correctamente');
-      cargarFestivos();
+      toast.success('Festivos copiados correctamente');
+      setCopiarDialogOpen(false);
     } catch (error) {
-      console.error('Error eliminando festivo personalizado:', error);
-      toast.error('Error al eliminar festivo personalizado');
+      console.error('Error copiando festivos:', error);
+      toast.error('Error al copiar configuración');
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   };
 
-  const handleToggleActivo = async (festivoId: string, activo: boolean) => {
-    setLoading(true);
-    try {
-      const response = await fetch(`/api/empleados/${empleadoId}/festivos/${festivoId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ activo: !activo }),
-      });
 
-      if (!response.ok) {
-        throw new Error('Error al actualizar festivo personalizado');
-      }
+const renderDraftView = (festivoEmpresa: FestivoEmpresa, draft: DraftFestivo) => (
+  <div className="flex items-center gap-3 flex-wrap">
+    <div className="flex items-center gap-2 text-gray-400">
+      <div className="opacity-50">
+        <FechaCalendar date={new Date(festivoEmpresa.fecha)} size="sm" />
+      </div>
+      <span className="text-sm">{festivoEmpresa.nombre}</span>
+    </div>
+    <span className="text-gray-300 text-sm">→</span>
+    <div className="flex items-center gap-2">
+      <FechaCalendar date={new Date(draft.fecha)} size="sm" />
+      <span className="text-sm font-medium text-gray-900">{draft.nombre}</span>
+    </div>
+  </div>
+);
 
-      toast.success('Festivo personalizado actualizado correctamente');
-      cargarFestivos();
-    } catch (error) {
-      console.error('Error actualizando festivo personalizado:', error);
-      toast.error('Error al actualizar festivo personalizado');
-    } finally {
-      setLoading(false);
-    }
-  };
+  const renderOriginalView = (festivoEmpresa: FestivoEmpresa) => (
+    <div>
+      <p className="text-sm font-medium text-gray-900">{festivoEmpresa.nombre}</p>
+      <div className="mt-0.5">
+        <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+          {festivoEmpresa.tipo === 'nacional' ? 'Nacional' : 'Empresa'}
+        </Badge>
+      </div>
+    </div>
+  );
+
+const renderEditingView = () => (
+    <div className="flex flex-wrap gap-3">
+      <div className="flex-1 min-w-[180px]">
+        <Label className="text-xs text-gray-600">Nueva fecha</Label>
+        <Input
+          type="date"
+          value={editingFecha}
+          onChange={(e) => setEditingFecha(e.target.value)}
+          className="text-sm mt-1"
+        />
+      </div>
+      <div className="flex-1 min-w-[200px]">
+        <Label className="text-xs text-gray-600">Nombre del festivo</Label>
+        <Input
+          type="text"
+          value={editingNombre}
+          onChange={(e) => setEditingNombre(e.target.value)}
+          placeholder="Ej: San José - Valencia"
+          className="text-sm mt-1"
+        />
+      </div>
+      <div className="flex items-center gap-2 mt-1">
+        <Button size="sm" onClick={applyEditing}>
+          Listo
+        </Button>
+        <Button size="sm" variant="ghost" onClick={cancelEditing}>
+          Cancelar
+        </Button>
+      </div>
+    </div>
+  );
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogScrollableContent className="max-w-2xl">
+      <DialogScrollableContent className="max-w-3xl">
         <DialogHeader>
-          <DialogTitle>
-            Festivos personalizados - {empleadoNombre}
-          </DialogTitle>
+          <div className="flex items-center gap-2">
+            <DialogTitle>Personalizar festivos</DialogTitle>
+            <InfoTooltip
+              side="bottom"
+              content={
+                <p className="text-xs leading-relaxed">
+                  Útil para festivos locales o autonómicos. Ejemplo: reemplazar &quot;Día de la
+                  Constitución (6 dic)&quot; por &quot;San José (19 marzo)&quot;.
+                </p>
+              }
+            />
+          </div>
+          <p className="text-xs text-gray-500 mt-1">
+            Configura festivos específicos por empleado y aplica los cambios cuando estés listo.
+          </p>
         </DialogHeader>
 
         <DialogBody>
-          <div className="space-y-4">
-            <p className="text-sm text-gray-600">
-              Configura festivos locales específicos para este empleado. Estos festivos se usarán en lugar de
-              los festivos de empresa en las mismas fechas al calcular días laborables para ausencias.
-            </p>
-
-            {/* Formulario para crear nuevo festivo */}
-            {creando ? (
-              <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-3">
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-sm font-medium text-gray-700 mb-1 block">
-                      Fecha
-                    </label>
-                    <Input
-                      type="date"
-                      value={nuevoFestivo.fecha}
-                      onChange={(e) => setNuevoFestivo({ ...nuevoFestivo, fecha: e.target.value })}
-                      disabled={loading}
-                    />
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-gray-700 mb-1 block">
-                      Nombre del festivo
-                    </label>
-                    <Input
-                      type="text"
-                      value={nuevoFestivo.nombre}
-                      onChange={(e) => setNuevoFestivo({ ...nuevoFestivo, nombre: e.target.value })}
-                      placeholder="Ej: Fiesta local de..."
-                      disabled={loading}
-                    />
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  <Button onClick={handleCrearFestivo} disabled={loading}>
-                    {loading ? 'Guardando...' : 'Guardar'}
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    onClick={() => {
-                      setCreando(false);
-                      setNuevoFestivo({ fecha: '', nombre: '' });
-                    }}
-                    disabled={loading}
-                  >
-                    Cancelar
-                  </Button>
-                </div>
+          <div className="space-y-3">
+            {loading ? (
+              <div className="py-8 text-center text-sm text-gray-500">Cargando festivos…</div>
+            ) : festivosEmpresa.length === 0 ? (
+              <div className="rounded-lg border border-dashed border-gray-300 p-8 text-center">
+                <Calendar className="h-12 w-12 text-gray-400 mx-auto mb-3" />
+                <p className="text-sm text-gray-500">No hay festivos configurados</p>
               </div>
             ) : (
-              <Button onClick={() => setCreando(true)} className="w-full">
-                <Plus className="h-4 w-4 mr-2" />
-                Añadir festivo personalizado
-              </Button>
-            )}
+              <div className="space-y-2">
+                {festivosEmpresa.map((festivoEmpresa) => {
+                  const draft = draftFestivos.get(festivoEmpresa.id);
+                  const isEditing = editingFestivoId === festivoEmpresa.id;
 
-            {/* Lista de festivos personalizados */}
-            <div className="space-y-2">
-              <h4 className="text-sm font-semibold text-gray-900">
-                Festivos personalizados ({festivos.length})
-              </h4>
-              {festivos.length === 0 ? (
-                <div className="rounded-lg border border-dashed border-gray-300 p-8 text-center">
-                  <Calendar className="h-12 w-12 text-gray-400 mx-auto mb-3" />
-                  <p className="text-sm text-gray-500">
-                    No hay festivos personalizados configurados
-                  </p>
-                  <p className="text-xs text-gray-400 mt-1">
-                    Los festivos de la empresa se aplicarán a este empleado
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {festivos.map((festivo) => (
+                  return (
                     <div
-                      key={festivo.id}
-                      className="flex items-center gap-3 rounded-lg border border-gray-200 bg-white p-3"
+                      key={festivoEmpresa.id}
+                      className="rounded-lg border border-gray-200 bg-white p-3 hover:border-gray-300 transition-colors"
                     >
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-medium text-gray-900">
-                            {festivo.nombre}
-                          </span>
-                          {festivo.activo && (
-                            <Badge variant="success" className="text-xs">
-                              Activo
-                            </Badge>
+                      <div className="flex items-start gap-3">
+                        {!draft && !isEditing && (
+                          <div className="flex-shrink-0">
+                            <FechaCalendar date={new Date(festivoEmpresa.fecha)} />
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          {isEditing
+                            ? renderEditingView()
+                            : draft
+                            ? renderDraftView(festivoEmpresa, draft)
+                            : renderOriginalView(festivoEmpresa)}
+                        </div>
+                        <div className="flex items-center gap-1 flex-shrink-0">
+                          {draft ? (
+                            <>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => startEditing(festivoEmpresa)}
+                                className="text-gray-500 hover:text-gray-700"
+                                title="Editar"
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => removeDraft(festivoEmpresa.id)}
+                                className="text-red-600 hover:bg-red-50"
+                                title="Eliminar"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </>
+                          ) : (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => startEditing(festivoEmpresa)}
+                              className="text-xs h-7 px-2"
+                            >
+                              Personalizar
+                            </Button>
                           )}
                         </div>
-                        <span className="text-xs text-gray-500">
-                          {format(new Date(festivo.fecha), 'PPP', { locale: es })}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleToggleActivo(festivo.id, festivo.activo)}
-                          disabled={loading}
-                        >
-                          {festivo.activo ? 'Desactivar' : 'Activar'}
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleEliminarFestivo(festivo.id)}
-                          disabled={loading}
-                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
                       </div>
                     </div>
-                  ))}
-                </div>
-              )}
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </DialogBody>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} disabled={saving}>
+            Cerrar
+          </Button>
+          <Button onClick={handleGuardar} disabled={!hasChanges || saving}>
+            {saving ? 'Guardando…' : 'Guardar cambios'}
+          </Button>
+        </DialogFooter>
+      </DialogScrollableContent>
+
+      {isHR && (
+        <CopiarConfigDialog
+          open={copiarDialogOpen}
+          onClose={() => setCopiarDialogOpen(false)}
+          empleados={empleados}
+          empleadosSeleccionados={empleadosSeleccionados}
+          onSeleccionChange={setEmpleadosSeleccionados}
+          onCopiar={handleCopiarConfiguracion}
+          disabled={saving}
+        />
+      )}
+    </Dialog>
+  );
+}
+
+interface CopiarConfigDialogProps {
+  open: boolean;
+  onClose: () => void;
+  empleados: EmpleadoOption[];
+  empleadosSeleccionados: string[];
+  onSeleccionChange: (ids: string[]) => void;
+  onCopiar: () => Promise<void> | void;
+  disabled: boolean;
+}
+
+function CopiarConfigDialog({
+  open,
+  onClose,
+  empleados,
+  empleadosSeleccionados,
+  onSeleccionChange,
+  onCopiar,
+  disabled,
+}: CopiarConfigDialogProps) {
+  return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogScrollableContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Copiar configuración</DialogTitle>
+          <p className="text-xs text-gray-500">
+            Aplica estos festivos personalizados a otros empleados.
+          </p>
+        </DialogHeader>
+        <DialogBody>
+          <div className="space-y-3">
+            {empleados.length === 0 ? (
+              <p className="text-sm text-gray-500">No hay otros empleados disponibles.</p>
+            ) : (
+              <div className="max-h-64 overflow-y-auto space-y-2">
+                {empleados.map((empleado) => {
+                  const checked = empleadosSeleccionados.includes(empleado.id);
+                  return (
+                    <label
+                      key={empleado.id}
+                      className="flex items-center gap-3 rounded border border-gray-200 p-3 text-sm text-gray-700"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => {
+                          onSeleccionChange(
+                            checked
+                              ? empleadosSeleccionados.filter((id) => id !== empleado.id)
+                              : [...empleadosSeleccionados, empleado.id],
+                          );
+                        }}
+                        className="h-4 w-4 rounded border-gray-300 text-gray-900"
+                      />
+                      <span>
+                        {empleado.nombre} {empleado.apellidos}
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+            )}
+
+            <div className="flex justify-end gap-2 border-t border-gray-100 pt-4">
+              <Button variant="outline" onClick={onClose} disabled={disabled}>
+                Cancelar
+              </Button>
+              <Button onClick={onCopiar} disabled={disabled || empleadosSeleccionados.length === 0}>
+                Copiar
+              </Button>
             </div>
           </div>
         </DialogBody>
@@ -283,5 +550,3 @@ export function FestivosPersonalizadosModal({
     </Dialog>
   );
 }
-
-

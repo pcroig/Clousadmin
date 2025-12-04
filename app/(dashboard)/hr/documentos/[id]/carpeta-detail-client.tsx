@@ -6,11 +6,15 @@
 
 import {
   ArrowLeft,
+  Check,
   Download,
-  Eye,
+  Edit2,
+  FileImage,
   FileSignature,
+  FileSpreadsheet,
   FileText,
   Folder,
+  FolderInput,
   Settings,
   Trash2,
   Upload,
@@ -53,6 +57,8 @@ interface Documento {
   mimeType: string;
   tamano: number;
   createdAt: string;
+  firmado: boolean;
+  firmadoEn: string | null;
   empleado?: {
     id: string;
     nombre: string;
@@ -66,7 +72,7 @@ interface Carpeta {
   esSistema: boolean;
   compartida: boolean;
   asignadoA?: string | null;
-  esGlobal?: boolean;
+  esCarpetaMasterHR?: boolean;
   empleado?: {
     id: string;
     nombre: string;
@@ -91,6 +97,42 @@ interface CarpetaDetailClientProps {
   empleados?: Empleado[];
 }
 
+/**
+ * Determina el icono correcto según el tipo MIME del documento
+ */
+function getDocumentIcon(mimeType: string) {
+  // PDFs
+  if (mimeType === 'application/pdf') {
+    return FileText;
+  }
+
+  // Documentos de Word
+  if (
+    mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+    mimeType === 'application/msword' ||
+    mimeType.includes('word')
+  ) {
+    return FileText;
+  }
+
+  // Hojas de cálculo (Excel)
+  if (
+    mimeType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
+    mimeType === 'application/vnd.ms-excel' ||
+    mimeType.includes('spreadsheet')
+  ) {
+    return FileSpreadsheet;
+  }
+
+  // Imágenes
+  if (mimeType.startsWith('image/')) {
+    return FileImage;
+  }
+
+  // Default
+  return FileText;
+}
+
 export function CarpetaDetailClient({ carpeta, empleados = [] }: CarpetaDetailClientProps) {
   const router = useRouter();
   const [modalUploadOpen, setModalUploadOpen] = useState(false);
@@ -100,6 +142,20 @@ export function CarpetaDetailClient({ carpeta, empleados = [] }: CarpetaDetailCl
   const [documentoAEliminar, setDocumentoAEliminar] = useState<string | null>(
     null
   );
+
+  // Estados para modal de editar nombre
+  const [modalEditarNombre, setModalEditarNombre] = useState(false);
+  const [documentoAEditar, setDocumentoAEditar] = useState<Documento | null>(null);
+  const [nuevoNombre, setNuevoNombre] = useState('');
+  const [editandoNombre, setEditandoNombre] = useState(false);
+
+  // Estados para modal de mover documento
+  const [modalMoverDocumento, setModalMoverDocumento] = useState(false);
+  const [documentoAMover, setDocumentoAMover] = useState<Documento | null>(null);
+  const [carpetaDestino, setCarpetaDestino] = useState('');
+  const [carpetasDisponibles, setCarpetasDisponibles] = useState<Array<{ id: string; nombre: string }>>([]);
+  const [cargandoCarpetas, setCargandoCarpetas] = useState(false);
+  const [moviendoDocumento, setMoviendoDocumento] = useState(false);
 
   // Estados para filtros (solo para carpetas globales)
   const [filtroEmpleado, setFiltroEmpleado] = useState<string>('todos');
@@ -119,7 +175,7 @@ export function CarpetaDetailClient({ carpeta, empleados = [] }: CarpetaDetailCl
   const documentViewer = useDocumentViewer();
 
   const handleUploadButtonClick = useCallback(() => {
-    if (carpeta.esGlobal) {
+    if (carpeta.esCarpetaMasterHR) {
       if (empleados.length === 0) {
         toast.error('No hay empleados activos para asignar este documento.');
         return;
@@ -129,7 +185,7 @@ export function CarpetaDetailClient({ carpeta, empleados = [] }: CarpetaDetailCl
       setEmpleadoDestinoUpload('');
     }
     setModalUploadOpen(true);
-  }, [carpeta.esGlobal, empleados]);
+  }, [carpeta.esCarpetaMasterHR, empleados]);
 
   const parsearAsignadoA = useCallback(() => {
     if (!carpeta.asignadoA) {
@@ -322,6 +378,97 @@ export function CarpetaDetailClient({ carpeta, empleados = [] }: CarpetaDetailCl
     }
   };
 
+  const handleAbrirModalEditar = (documento: Documento) => {
+    setDocumentoAEditar(documento);
+    setNuevoNombre(documento.nombre);
+    setModalEditarNombre(true);
+  };
+
+  const handleGuardarNombre = async () => {
+    if (!documentoAEditar) return;
+
+    if (!nuevoNombre.trim()) {
+      toast.error('El nombre del documento no puede estar vacío');
+      return;
+    }
+
+    setEditandoNombre(true);
+    try {
+      const response = await fetch(`/api/documentos/${documentoAEditar.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nombre: nuevoNombre.trim() }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json() as Record<string, unknown>;
+        throw new Error(typeof error.error === 'string' ? error.error : 'Error al actualizar nombre');
+      }
+
+      setModalEditarNombre(false);
+      setDocumentoAEditar(null);
+      setNuevoNombre('');
+      toast.success('Nombre del documento actualizado correctamente');
+      router.refresh();
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Error al actualizar nombre';
+      toast.error(message);
+    } finally {
+      setEditandoNombre(false);
+    }
+  };
+
+  const handleAbrirModalMover = async (documento: Documento) => {
+    setDocumentoAMover(documento);
+    setCarpetaDestino('');
+    setModalMoverDocumento(true);
+
+    // Cargar carpetas disponibles
+    setCargandoCarpetas(true);
+    try {
+      const response = await fetch('/api/carpetas');
+      if (!response.ok) throw new Error('Error al cargar carpetas');
+
+      const data = await response.json() as { carpetas?: Array<{ id: string; nombre: string }> };
+      const carpetas = data.carpetas || [];
+      setCarpetasDisponibles(carpetas);
+    } catch (error: unknown) {
+      console.error('Error cargando carpetas:', error);
+      toast.error('Error al cargar carpetas disponibles');
+    } finally {
+      setCargandoCarpetas(false);
+    }
+  };
+
+  const handleMoverDocumento = async () => {
+    if (!documentoAMover || !carpetaDestino) return;
+
+    setMoviendoDocumento(true);
+    try {
+      const response = await fetch(`/api/documentos/${documentoAMover.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ carpetaId: carpetaDestino }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json() as Record<string, unknown>;
+        throw new Error(typeof error.error === 'string' ? error.error : 'Error al mover documento');
+      }
+
+      setModalMoverDocumento(false);
+      setDocumentoAMover(null);
+      setCarpetaDestino('');
+      toast.success('Documento movido a otra carpeta correctamente');
+      router.refresh();
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Error al mover documento';
+      toast.error(message);
+    } finally {
+      setMoviendoDocumento(false);
+    }
+  };
+
   const formatearTamano = (bytes: number) => {
     if (bytes < 1024) return bytes + ' B';
     if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
@@ -337,7 +484,7 @@ export function CarpetaDetailClient({ carpeta, empleados = [] }: CarpetaDetailCl
   };
 
   // Filtrar documentos (solo para carpetas globales)
-  const documentosFiltrados = carpeta.esGlobal
+  const documentosFiltrados = carpeta.esCarpetaMasterHR
     ? carpeta.documentos.filter((doc) => {
         if (filtroEmpleado !== 'todos' && doc.empleado?.id !== filtroEmpleado) {
           return false;
@@ -393,7 +540,7 @@ export function CarpetaDetailClient({ carpeta, empleados = [] }: CarpetaDetailCl
                   {carpeta.empleado.apellidos}
                 </p>
               )}
-              {carpeta.esGlobal && (
+              {carpeta.esCarpetaMasterHR && (
                 <div className="mt-2 flex items-center gap-2 text-sm text-gray-600">
                   <span>Carpeta global con documentos de todos los empleados.</span>
                   <InfoTooltip
@@ -424,7 +571,7 @@ export function CarpetaDetailClient({ carpeta, empleados = [] }: CarpetaDetailCl
 
 
         {/* Filtros (solo para carpetas globales) */}
-        {carpeta.esGlobal && empleados.length > 0 && (
+        {carpeta.esCarpetaMasterHR && empleados.length > 0 && (
           <div className="mb-4 flex-shrink-0 space-y-3">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
@@ -461,7 +608,7 @@ export function CarpetaDetailClient({ carpeta, empleados = [] }: CarpetaDetailCl
           <p className="text-sm text-gray-600 font-medium">
             {documentosFiltrados.length}{' '}
             {documentosFiltrados.length === 1 ? 'documento' : 'documentos'}
-            {carpeta.esGlobal && documentosFiltrados.length !== carpeta.documentos.length && (
+            {carpeta.esCarpetaMasterHR && documentosFiltrados.length !== carpeta.documentos.length && (
               <span className="text-gray-500"> (de {carpeta.documentos.length} total)</span>
             )}
           </p>
@@ -492,7 +639,7 @@ export function CarpetaDetailClient({ carpeta, empleados = [] }: CarpetaDetailCl
                     <th className="text-left py-3 px-4 text-xs font-medium text-gray-600 uppercase">
                       Nombre
                     </th>
-                    {carpeta.esGlobal && (
+                    {carpeta.esCarpetaMasterHR && (
                       <th className="text-left py-3 px-4 text-xs font-medium text-gray-600 uppercase">
                         Empleado
                       </th>
@@ -506,29 +653,38 @@ export function CarpetaDetailClient({ carpeta, empleados = [] }: CarpetaDetailCl
                     <th className="text-left py-3 px-4 text-xs font-medium text-gray-600 uppercase">
                       Fecha
                     </th>
-                    <th className="text-right py-3 px-4 text-xs font-medium text-gray-600 uppercase">
-                      Acciones
-                    </th>
+                    <th className="w-[120px]"></th>
                   </tr>
                 </thead>
                 <tbody>
                   {documentosFiltrados.map((documento) => (
                     <tr
                       key={documento.id}
-                      className="border-b border-gray-100 last:border-0 hover:bg-gray-50 transition-colors"
+                      className="border-b border-gray-100 last:border-0 hover:bg-gray-50 transition-colors cursor-pointer group"
+                      onClick={() => handleVerDocumento(documento)}
                     >
                       <td className="py-3 px-4">
                         <div className="flex items-center gap-3">
-                          <FileText className="w-5 h-5 text-gray-400" />
+                          {(() => {
+                            const IconComponent = getDocumentIcon(documento.mimeType);
+                            return <IconComponent className="w-5 h-5 text-gray-400" />;
+                          })()}
                           <div className="flex flex-col">
-                            <span className="text-sm font-medium text-gray-900">
-                              {documento.nombre}
-                            </span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-medium text-gray-900">
+                                {documento.nombre}
+                              </span>
+                              {documento.firmado && (
+                                <span className="text-xs px-1.5 py-0.5 bg-[#FFF4ED] text-[#d97757] rounded-md font-medium">
+                                  Firmado
+                                </span>
+                              )}
+                            </div>
                             <span className="text-xs text-gray-500">{documento.mimeType}</span>
                           </div>
                         </div>
                       </td>
-                      {carpeta.esGlobal && (
+                      {carpeta.esCarpetaMasterHR && (
                         <td className="py-3 px-4">
                           {documento.empleado ? (
                             <span className="text-sm text-gray-700">
@@ -550,15 +706,23 @@ export function CarpetaDetailClient({ carpeta, empleados = [] }: CarpetaDetailCl
                       <td className="py-3 px-4 text-sm text-gray-600">
                         {formatearFecha(documento.createdAt)}
                       </td>
-                      <td className="py-3 px-4">
-                        <div className="flex items-center justify-end gap-1">
+                      <td className="py-3 px-4" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                           <Button
                             variant="ghost"
                             size="icon"
-                            title="Ver documento"
-                            onClick={() => handleVerDocumento(documento)}
+                            title="Editar nombre"
+                            onClick={() => handleAbrirModalEditar(documento)}
                           >
-                            <Eye className="w-4 h-4" />
+                            <Edit2 className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            title="Mover a otra carpeta"
+                            onClick={() => handleAbrirModalMover(documento)}
+                          >
+                            <FolderInput className="w-4 h-4" />
                           </Button>
                           <Button
                             variant="ghost"
@@ -715,7 +879,7 @@ export function CarpetaDetailClient({ carpeta, empleados = [] }: CarpetaDetailCl
           </DialogHeader>
 
           <div className="space-y-4">
-            {carpeta.esGlobal ? (
+            {carpeta.esCarpetaMasterHR ? (
               <div className="space-y-2">
                 <Label>Asignar a empleado</Label>
                 <Select
@@ -753,9 +917,9 @@ export function CarpetaDetailClient({ carpeta, empleados = [] }: CarpetaDetailCl
                 setEmpleadoDestinoUpload('');
                 router.refresh();
               }}
-              disabled={carpeta.esGlobal && !empleadoDestinoUpload}
+              disabled={carpeta.esCarpetaMasterHR && !empleadoDestinoUpload}
               getExtraFormData={() =>
-                carpeta.esGlobal && empleadoDestinoUpload ? { empleadoId: empleadoDestinoUpload } : undefined
+                carpeta.esCarpetaMasterHR && empleadoDestinoUpload ? { empleadoId: empleadoDestinoUpload } : undefined
               }
             />
           </div>
@@ -794,6 +958,210 @@ export function CarpetaDetailClient({ carpeta, empleados = [] }: CarpetaDetailCl
         </DialogContent>
       </Dialog>
 
+      {/* Modal Editar Nombre */}
+      <Dialog open={modalEditarNombre} onOpenChange={setModalEditarNombre}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar Nombre del Documento</DialogTitle>
+            <DialogDescription>
+              Cambia el nombre del documento. Los cambios se aplicarán inmediatamente.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Label htmlFor="nuevoNombre">Nombre del documento</Label>
+            <Input
+              id="nuevoNombre"
+              value={nuevoNombre}
+              onChange={(e) => setNuevoNombre(e.target.value)}
+              placeholder="Ingresa el nuevo nombre"
+              disabled={editandoNombre}
+              className="mt-2"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !editandoNombre) {
+                  handleGuardarNombre();
+                }
+              }}
+            />
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setModalEditarNombre(false);
+                setDocumentoAEditar(null);
+                setNuevoNombre('');
+              }}
+              disabled={editandoNombre}
+            >
+              Cancelar
+            </Button>
+            <LoadingButton
+              onClick={handleGuardarNombre}
+              loading={editandoNombre}
+            >
+              <Check className="w-4 h-4 mr-2" />
+              Guardar
+            </LoadingButton>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal Mover Documento */}
+      <Dialog open={modalMoverDocumento} onOpenChange={setModalMoverDocumento}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Mover Documento</DialogTitle>
+            <DialogDescription>
+              Selecciona la carpeta de destino para mover {documentoAMover?.nombre}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4 space-y-2">
+            <Label htmlFor="carpetaDestino">Carpeta de destino</Label>
+            {cargandoCarpetas ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+              </div>
+            ) : (
+              <Select
+                value={carpetaDestino}
+                onValueChange={setCarpetaDestino}
+                disabled={moviendoDocumento}
+              >
+                <SelectTrigger id="carpetaDestino">
+                  <SelectValue placeholder="Selecciona una carpeta" />
+                </SelectTrigger>
+                <SelectContent>
+                  {carpetasDisponibles.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.nombre}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setModalMoverDocumento(false);
+                setDocumentoAMover(null);
+                setCarpetaDestino('');
+              }}
+              disabled={moviendoDocumento}
+            >
+              Cancelar
+            </Button>
+            <LoadingButton
+              onClick={handleMoverDocumento}
+              loading={moviendoDocumento}
+              disabled={!carpetaDestino}
+            >
+              <FolderInput className="w-4 h-4 mr-2" />
+              Mover
+            </LoadingButton>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal Editar Asignación */}
+      <Dialog open={modalEditarAsignacion} onOpenChange={setModalEditarAsignacion}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Editar Asignación de Carpeta Compartida</DialogTitle>
+            <DialogDescription>
+              Configura quién puede acceder a esta carpeta compartida. Los cambios se aplicarán inmediatamente.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4 space-y-4">
+            <div>
+              <Label className="text-sm font-medium">Tipo de asignación</Label>
+              <Select
+                value={tipoAsignacion}
+                onValueChange={(val) => setTipoAsignacion(val as 'todos' | 'equipo' | 'individual')}
+                disabled={actualizandoAsignacion}
+              >
+                <SelectTrigger className="mt-2">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todos los empleados</SelectItem>
+                  <SelectItem value="equipo">Equipo específico</SelectItem>
+                  <SelectItem value="individual">Empleados específicos</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {tipoAsignacion === 'equipo' && (
+              <div>
+                <Label className="text-sm font-medium">
+                  Seleccionar Equipo
+                </Label>
+                {cargandoDatos ? (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+                  </div>
+                ) : (
+                  <SearchableSelect
+                    value={equipoSeleccionado}
+                    onChange={setEquipoSeleccionado}
+                    items={equipos.map(eq => ({
+                      value: eq.id,
+                      label: eq.nombre,
+                    }))}
+                    placeholder="Buscar equipo..."
+                    emptyMessage="No se encontraron equipos"
+                    disabled={actualizandoAsignacion}
+                    className="mt-2"
+                  />
+                )}
+              </div>
+            )}
+
+            {tipoAsignacion === 'individual' && (
+              <div>
+                <Label className="text-sm font-medium">
+                  Seleccionar Empleados
+                  <InfoTooltip content="Puedes seleccionar múltiples empleados" />
+                </Label>
+                {cargandoDatos ? (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+                  </div>
+                ) : (
+                  <SearchableMultiSelect
+                    items={empleadosList.map(emp => ({
+                      value: emp.id,
+                      label: `${emp.nombre} ${emp.apellidos}`,
+                    }))}
+                    values={empleadosSeleccionados}
+                    onChange={setEmpleadosSeleccionados}
+                    placeholder="Buscar empleados..."
+                    emptyMessage="No se encontraron empleados"
+                    disabled={actualizandoAsignacion}
+                  />
+                )}
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setModalEditarAsignacion(false)}
+              disabled={actualizandoAsignacion}
+            >
+              Cancelar
+            </Button>
+            <LoadingButton
+              onClick={handleActualizarAsignacion}
+              loading={actualizandoAsignacion}
+            >
+              <Check className="w-4 h-4 mr-2" />
+              Guardar
+            </LoadingButton>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Document Viewer Modal */}
       {documentViewer.documentId && (

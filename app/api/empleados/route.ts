@@ -14,7 +14,7 @@ import {
 import { getBaseUrl } from '@/lib/email';
 import { logAccesoSensibles } from '@/lib/auditoria';
 import { UsuarioRol } from '@/lib/constants/enums';
-import { CARPETAS_SISTEMA } from '@/lib/documentos';
+import { asegurarCarpetasSistemaParaEmpleado } from '@/lib/documentos';
 import { decryptEmpleadoList, encryptEmpleadoData } from '@/lib/empleado-crypto';
 import { invitarEmpleado } from '@/lib/invitaciones';
 import { getOrCreateDefaultJornada } from '@/lib/jornadas/get-or-create-default';
@@ -261,20 +261,14 @@ export async function POST(request: NextRequest) {
         });
       }
 
-      // Crear carpetas del sistema automáticamente usando constante
-      await tx.carpetas.createMany({
-        data: CARPETAS_SISTEMA.map((nombreCarpeta) => ({
-          empresaId: session.user.empresaId,
-          empleadoId: empleado.id,
-          nombre: nombreCarpeta,
-          esSistema: true,
-        })),
-      });
-
       return { usuario, empleado };
     });
 
     console.log(`[API POST /api/empleados] Empleado creado: ${result.empleado.id}`);
+
+    // Crear carpetas del sistema automáticamente (función idempotente)
+    await asegurarCarpetasSistemaParaEmpleado(result.empleado.id, session.user.empresaId);
+    console.log(`[API POST /api/empleados] Carpetas del sistema creadas para ${result.empleado.id}`);
 
     // Crear invitación automática y enviar email
     try {

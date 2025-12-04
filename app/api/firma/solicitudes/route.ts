@@ -173,64 +173,130 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Procesar posicionFirma: puede venir en formato v2 (porcentajes) o v1 (absoluto, legacy)
     let posicionFirma: CrearSolicitudFirmaInput['posicionFirma'];
     if (body.posicionFirma && typeof body.posicionFirma === 'object' && body.posicionFirma !== null) {
       const pos = body.posicionFirma as Record<string, unknown>;
-      const pagina = typeof pos.pagina === 'number' ? pos.pagina : 0;
-      const x = typeof pos.x === 'number' ? pos.x : 0;
-      const y = typeof pos.y === 'number' ? pos.y : 0;
-      const width = typeof pos.width === 'number' ? pos.width : undefined;
-      const height = typeof pos.height === 'number' ? pos.height : undefined;
 
-      const valoresSonNumeros =
-        typeof pos.pagina === 'number' && typeof pos.x === 'number' && typeof pos.y === 'number';
-      if (!valoresSonNumeros || Number.isNaN(pagina) || Number.isNaN(x) || Number.isNaN(y)) {
-        return NextResponse.json(
-          { error: 'La posicionFirma debe incluir pagina, x e y numéricos' },
-          { status: 400 }
-        );
+      // Detectar formato: v2 usa xPorcentaje/yPorcentaje, v1 usa x/y
+      const esFormatoV2 = 'xPorcentaje' in pos && 'yPorcentaje' in pos;
+
+      if (esFormatoV2) {
+        // Formato V2 (recomendado): porcentajes
+        const pagina = typeof pos.pagina === 'number' ? pos.pagina : -1;
+        const xPorcentaje = typeof pos.xPorcentaje === 'number' ? pos.xPorcentaje : 0;
+        const yPorcentaje = typeof pos.yPorcentaje === 'number' ? pos.yPorcentaje : 0;
+        const widthPorcentaje = typeof pos.widthPorcentaje === 'number' ? pos.widthPorcentaje : undefined;
+        const heightPorcentaje = typeof pos.heightPorcentaje === 'number' ? pos.heightPorcentaje : undefined;
+
+        // Validar valores
+        if (xPorcentaje < 0 || xPorcentaje > 100 || yPorcentaje < 0 || yPorcentaje > 100) {
+          return NextResponse.json(
+            { error: 'Las coordenadas en porcentaje deben estar entre 0 y 100' },
+            { status: 400 }
+          );
+        }
+
+        if (widthPorcentaje !== undefined && (widthPorcentaje <= 0 || widthPorcentaje > 100)) {
+          return NextResponse.json(
+            { error: 'El ancho en porcentaje debe estar entre 0 y 100' },
+            { status: 400 }
+          );
+        }
+
+        if (heightPorcentaje !== undefined && (heightPorcentaje <= 0 || heightPorcentaje > 100)) {
+          return NextResponse.json(
+            { error: 'El alto en porcentaje debe estar entre 0 y 100' },
+            { status: 400 }
+          );
+        }
+
+        // Validar página: -1 (última página) o >= 1
+        if (pagina !== -1 && pagina < 1) {
+          return NextResponse.json(
+            { error: 'La página debe ser -1 (última) o un número mayor o igual a 1' },
+            { status: 400 }
+          );
+        }
+
+        // Guardar en formato v2 con metadata
+        const pdfDimensiones = typeof pos.pdfDimensiones === 'object' && pos.pdfDimensiones !== null
+          ? pos.pdfDimensiones as Record<string, unknown>
+          : undefined;
+
+        posicionFirma = {
+          version: 'v2',
+          porcentajes: {
+            pagina,
+            xPorcentaje,
+            yPorcentaje,
+            widthPorcentaje,
+            heightPorcentaje,
+          },
+          pdfDimensiones: pdfDimensiones ? {
+            width: typeof pdfDimensiones.width === 'number' ? pdfDimensiones.width : 595,
+            height: typeof pdfDimensiones.height === 'number' ? pdfDimensiones.height : 842,
+            numPaginas: typeof pdfDimensiones.numPaginas === 'number' ? pdfDimensiones.numPaginas : 1,
+          } : undefined,
+        } as CrearSolicitudFirmaInput['posicionFirma'];
+
+      } else {
+        // Formato V1 (legacy): coordenadas absolutas PDF
+        const pagina = typeof pos.pagina === 'number' ? pos.pagina : 0;
+        const x = typeof pos.x === 'number' ? pos.x : 0;
+        const y = typeof pos.y === 'number' ? pos.y : 0;
+        const width = typeof pos.width === 'number' ? pos.width : undefined;
+        const height = typeof pos.height === 'number' ? pos.height : undefined;
+
+        const valoresSonNumeros =
+          typeof pos.pagina === 'number' && typeof pos.x === 'number' && typeof pos.y === 'number';
+        if (!valoresSonNumeros || Number.isNaN(pagina) || Number.isNaN(x) || Number.isNaN(y)) {
+          return NextResponse.json(
+            { error: 'La posicionFirma debe incluir pagina, x e y numéricos' },
+            { status: 400 }
+          );
+        }
+
+        // Validar rangos razonables (PDF estándar A4: ~595x842 puntos)
+        if (x < 0 || x > 1000 || y < 0 || y > 1000) {
+          return NextResponse.json(
+            { error: 'Las coordenadas x e y deben estar entre 0 y 1000' },
+            { status: 400 }
+          );
+        }
+
+        // Validar página: -1 (última página) o >= 1
+        if (pagina !== -1 && pagina < 1) {
+          return NextResponse.json(
+            { error: 'La página debe ser -1 (última) o un número mayor o igual a 1' },
+            { status: 400 }
+          );
+        }
+
+        // Validar width y height si se proporcionan
+        if (width !== undefined && (width < 0 || width > 1000)) {
+          return NextResponse.json(
+            { error: 'El ancho (width) debe estar entre 0 y 1000' },
+            { status: 400 }
+          );
+        }
+
+        if (height !== undefined && (height < 0 || height > 1000)) {
+          return NextResponse.json(
+            { error: 'El alto (height) debe estar entre 0 y 1000' },
+            { status: 400 }
+          );
+        }
+
+        const paginaNormalizada = pagina === -1 ? -1 : Math.floor(pagina);
+        posicionFirma = {
+          pagina: paginaNormalizada,
+          x: Math.round(x),
+          y: Math.round(y),
+          width: width !== undefined ? Math.round(width) : undefined,
+          height: height !== undefined ? Math.round(height) : undefined,
+        } as CrearSolicitudFirmaInput['posicionFirma'];
       }
-
-      // Validar rangos razonables (PDF estándar A4: ~595x842 puntos)
-      // x, y deben estar entre 0 y 1000 (margen amplio para diferentes tamaños)
-      if (x < 0 || x > 1000 || y < 0 || y > 1000) {
-        return NextResponse.json(
-          { error: 'Las coordenadas x e y deben estar entre 0 y 1000' },
-          { status: 400 }
-        );
-      }
-
-      // Validar página: -1 (última página) o >= 1
-      if (pagina !== -1 && pagina < 1) {
-        return NextResponse.json(
-          { error: 'La página debe ser -1 (última) o un número mayor o igual a 1' },
-          { status: 400 }
-        );
-      }
-
-      // Validar width y height si se proporcionan
-      if (width !== undefined && (width < 0 || width > 1000)) {
-        return NextResponse.json(
-          { error: 'El ancho (width) debe estar entre 0 y 1000' },
-          { status: 400 }
-        );
-      }
-
-      if (height !== undefined && (height < 0 || height > 1000)) {
-        return NextResponse.json(
-          { error: 'El alto (height) debe estar entre 0 y 1000' },
-          { status: 400 }
-        );
-      }
-
-      const paginaNormalizada = pagina === -1 ? -1 : Math.floor(pagina);
-      posicionFirma = {
-        pagina: paginaNormalizada,
-        x: Math.round(x),
-        y: Math.round(y),
-        width: width !== undefined ? Math.round(width) : undefined,
-        height: height !== undefined ? Math.round(height) : undefined,
-      };
     }
 
     // Crear input para db-helper

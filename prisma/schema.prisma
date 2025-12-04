@@ -245,25 +245,25 @@ model campanas_vacaciones {
 }
 
 model carpetas {
-  id                    String       @id @default(cuid())
+  id                    String                @id @default(cuid())
   empresaId             String
   empleadoId            String?
-  nombre                String       @db.VarChar(255)
+  nombre                String                @db.VarChar(255)
   parentId              String?
-  esSistema             Boolean      @default(false)
-  createdAt             DateTime     @default(now())
-  updatedAt             DateTime     @updatedAt
+  esSistema             Boolean               @default(false)
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
   asignadoA             String?
-  compartida            Boolean      @default(false)
-  vinculadaAProceso     String?      @db.VarChar(50)
-  requiereFirma         Boolean      @default(false)
-  requiereRellenarDatos Boolean      @default(false)
+  compartida            Boolean               @default(false)
+  vinculadaAProceso     String?               @db.VarChar(50)
+  requiereFirma         Boolean               @default(false)
+  requiereRellenarDatos Boolean               @default(false)
   camposRequeridos      Json?
-  empleado              empleados?   @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
-  empresa               empresas     @relation(fields: [empresaId], references: [id], onDelete: Cascade)
-  parent                carpetas?    @relation("carpetasTocarpetas", fields: [parentId], references: [id], onDelete: Cascade)
-  subcarpetas           carpetas[]   @relation("carpetasTocarpetas")
-  documentos            documentos[]
+  empleado              empleados?            @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+  empresa               empresas              @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  parent                carpetas?             @relation("carpetasTocarpetas", fields: [parentId], references: [id], onDelete: Cascade)
+  subcarpetas           carpetas[]            @relation("carpetasTocarpetas")
+  documento_carpetas    documento_carpetas[]
 
   @@index([compartida])
   @@index([empleadoId])
@@ -357,36 +357,34 @@ model denuncias {
 }
 
 model documentos {
-  id                     String              @id @default(cuid())
+  id                     String                @id @default(cuid())
   empresaId              String
   empleadoId             String?
-  carpetaId              String?
-  nombre                 String              @db.VarChar(255)
-  tipoDocumento          String              @db.VarChar(100)
-  mimeType               String              @db.VarChar(100)
+  nombre                 String                @db.VarChar(255)
+  tipoDocumento          String                @db.VarChar(100)
+  mimeType               String                @db.VarChar(100)
   tamano                 Int
-  s3Key                  String              @unique
-  s3Bucket               String              @db.VarChar(255)
-  procesadoIA            Boolean             @default(false)
+  s3Key                  String                @unique
+  s3Bucket               String                @db.VarChar(255)
+  procesadoIA            Boolean               @default(false)
   datosExtraidos         Json?
-  createdAt              DateTime            @default(now())
-  updatedAt              DateTime            @updatedAt
+  createdAt              DateTime              @default(now())
+  updatedAt              DateTime              @updatedAt
   puestoId               String?
-  requiereFirma          Boolean             @default(false)
-  firmado                Boolean             @default(false)
+  requiereFirma          Boolean               @default(false)
+  firmado                Boolean               @default(false)
   firmadoEn              DateTime?
   hashDocumento          String?
-  generadoDesdePlantilla Boolean             @default(false)
+  generadoDesdePlantilla Boolean               @default(false)
   ausencias              ausencias[]
-  carpeta                carpetas?           @relation(fields: [carpetaId], references: [id])
-  empleado               empleados?          @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
-  empresa                empresas            @relation(fields: [empresaId], references: [id], onDelete: Cascade)
-  puestoRelacion         puestos?            @relation(fields: [puestoId], references: [id], onDelete: Cascade)
+  empleado               empleados?            @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+  empresa                empresas              @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  puestoRelacion         puestos?              @relation(fields: [puestoId], references: [id], onDelete: Cascade)
   documentoGenerado      documentosGenerado?
   nominas                nominas?
   solicitudes_firma      solicitudes_firma[]
+  documento_carpetas     documento_carpetas[]
 
-  @@index([carpetaId])
   @@index([empleadoId])
   @@index([empresaId])
   @@index([generadoDesdePlantilla])
@@ -394,6 +392,18 @@ model documentos {
   @@index([requiereFirma, firmado])
   @@index([s3Key])
   @@index([tipoDocumento])
+}
+
+model documento_carpetas {
+  documentoId String
+  carpetaId   String
+  createdAt   DateTime   @default(now())
+  documento   documentos @relation(fields: [documentoId], references: [id], onDelete: Cascade)
+  carpeta     carpetas   @relation(fields: [carpetaId], references: [id], onDelete: Cascade)
+
+  @@id([documentoId, carpetaId])
+  @@index([documentoId])
+  @@index([carpetaId])
 }
 
 model documentosGenerado {
@@ -739,35 +749,41 @@ model exports_gestoria {
 }
 
 model festivos {
-  id                String   @id @default(cuid())
-  empresaId         String
-  nombre            String   @db.VarChar(200)
-  fecha             DateTime @db.Date
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-  activo            Boolean  @default(true)
-  comunidadAutonoma String?  @db.VarChar(100)
-  origen            String   @default("manual") @db.VarChar(50)
-  tipo              String   @db.VarChar(50)
-  empresa           empresas @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  id                   String               @id @default(cuid())
+  empresaId            String
+  nombre               String               @db.VarChar(200)
+  fecha                DateTime             @db.Date
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
+  activo               Boolean              @default(true)
+  comunidadAutonoma    String?              @db.VarChar(100)
+  origen               String               @default("manual") @db.VarChar(50)
+  tipo                 String               @db.VarChar(50)
+  empresa              empresas             @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  empleado_festivos    empleado_festivos[]
 
   @@unique([empresaId, fecha])
   @@index([empresaId, fecha, activo])
 }
 
 model empleado_festivos {
-  id         String    @id @default(cuid())
-  empleadoId String
-  nombre     String    @db.VarChar(200)
-  fecha      DateTime  @db.Date
-  activo     Boolean   @default(true)
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
-  empleado   empleados @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+  id                String    @id @default(cuid())
+  empleadoId        String
+  festivoEmpresaId  String
+  fecha             DateTime  @db.Date
+  nombre            String    @db.VarChar(200)
+  estado            String    @default("pendiente") @db.VarChar(20)
+  solicitadoPor     String?
+  aprobadoPor       String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  empleado          empleados @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+  festivoEmpresa    festivos  @relation(fields: [festivoEmpresaId], references: [id], onDelete: Cascade)
 
-  @@unique([empleadoId, fecha])
+  @@unique([empleadoId, festivoEmpresaId])
   @@index([empleadoId])
-  @@index([fecha])
+  @@index([estado])
+  @@index([festivoEmpresaId])
 }
 
 model fichaje_eventos {
@@ -793,6 +809,7 @@ model fichajes {
   id                             String                           @id @default(cuid())
   empresaId                      String
   empleadoId                     String
+  jornadaId                      String?
   fecha                          DateTime                         @db.Date
   autoCompletado                 Boolean                          @default(false)
   createdAt                      DateTime                         @default(now())
@@ -807,10 +824,12 @@ model fichajes {
   eventos                        fichaje_eventos[]                @relation("eventos")
   empleado                       empleados                        @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
   empresa                        empresas                         @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  jornada                        jornadas?                        @relation(fields: [jornadaId], references: [id])
   solicitudes_correccion_fichaje solicitudes_correccion_fichaje[]
 
   @@unique([empleadoId, fecha])
   @@index([empleadoId])
+  @@index([empleadoId, jornadaId, estado, fecha])
   @@index([empresaId, empleadoId, fecha])
   @@index([empresaId, estado])
   @@index([empresaId, fecha])
@@ -961,6 +980,7 @@ model jornadas {
   updatedAt      DateTime    @updatedAt
 
   empleados      empleados[]
+  fichajes       fichajes[]
   empresa        empresas    @relation(fields: [empresaId], references: [id], onDelete: Cascade)
 
   @@index([empresaId])

@@ -76,13 +76,13 @@ Algunos tipos requieren **acciones específicas** del usuario:
 | Tipo | Acción | Flag | CTA | Nota |
 |------|--------|------|-----|------|
 | `firma_pendiente` | Firma digital | `requiresSignature: true` | "Firmar documento" | - |
-| `campana_vacaciones_creada` | Abrir modal preferencias | - | "Ver campaña" | Usa `openPreferenciasModalFromUrl` |
-| `campana_vacaciones_cuadrada` | Revisar propuesta | `requiresModal: true` | "Revisar propuesta" | Usa `openPreferenciasModalFromUrl` |
+| `campana_vacaciones_creada` | Abrir modal preferencias | - | "Ver campaña" | ⏸️ **DEPRECADA** - Usa `openPreferenciasModalFromUrl` |
+| `campana_vacaciones_cuadrada` | Revisar propuesta | `requiresModal: true` | "Revisar propuesta" | ⏸️ **DEPRECADA** - Usa `openPreferenciasModalFromUrl` |
 | `complementos_pendientes` | Completar complementos | `requiresModal: true` | "Completar complementos" | - |
 | `documento_pendiente_rellenar` | Completar formulario | `requiresModal: true` | "Completar ahora" | - |
 | `documento_solicitado` | Subir documento | - | "Subir documento" | - |
 
-> **Nota**: Las campañas de vacaciones (`campana_vacaciones_creada`, `campana_vacaciones_cuadrada`) utilizan `openPreferenciasModalFromUrl` para detectar URLs de campañas y abrir automáticamente el modal de preferencias en lugar de navegar.
+> ⚠️ **NOTA IMPORTANTE**: Las campañas de vacaciones (`campana_vacaciones_creada`, `campana_vacaciones_cuadrada`) están **DEPRECADAS TEMPORALMENTE** para el primer lanzamiento (Diciembre 2025). Estas notificaciones no se procesarán cuando la feature está deshabilitada. Utilizan `openPreferenciasModalFromUrl` para detectar URLs de campañas y abrir automáticamente el modal de preferencias en lugar de navegar.
 
 ---
 
@@ -113,8 +113,8 @@ Algunos tipos requieren **acciones específicas** del usuario:
 
 | Tipo | Categoría | Acción Especial | Flag |
 |------|-----------|-----------------|------|
-| `campana_vacaciones_creada` | Ausencias | Abrir modal preferencias | - |
-| `campana_vacaciones_cuadrada` | Ausencias | Revisar propuesta | `requiresModal: true` |
+| `campana_vacaciones_creada` | Ausencias | Abrir modal preferencias | ⏸️ **DEPRECADA** |
+| `campana_vacaciones_cuadrada` | Ausencias | Revisar propuesta | ⏸️ **DEPRECADA** |
 | `complementos_pendientes` | Nóminas | Completar complementos | `requiresModal: true` |
 | `firma_pendiente` | Fichas | Firma digital | `requiresSignature: true` |
 | `firma_completada` | Fichas | - | - |

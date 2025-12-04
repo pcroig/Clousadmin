@@ -45,6 +45,10 @@ export function SolicitarFirmaDialog({
   const [posicionesFirma, setPosicionesFirma] = useState<Array<{ x: number; y: number; width: number; height: number }>>([]);
   const [carpetaIdInterno, setCarpetaIdInterno] = useState<string | null>(carpetaId || null);
 
+  // PDF metadata state
+  const [pdfDimensiones, setPdfDimensiones] = useState<{ width: number; height: number; numPaginas: number } | null>(null);
+  const [cargandoMetadata, setCargandoMetadata] = useState(false);
+
   // Viewer state
   const [previewLoading, setPreviewLoading] = useState(true);
   const [previewError, setPreviewError] = useState(false);
@@ -74,6 +78,38 @@ export function SolicitarFirmaDialog({
       });
   }, [open, documentoId, carpetaIdInterno]);
 
+  // Cargar dimensiones del PDF cuando se abre el diálogo
+  useEffect(() => {
+    if (!open || pdfDimensiones || cargandoMetadata) return;
+
+    setCargandoMetadata(true);
+    fetch(`/api/documentos/${documentoId}/pdf-metadata`)
+      .then(async (res) => {
+        if (!res.ok) throw new Error('Error al cargar metadata');
+        return parseJson<{ metadata?: { paginaPrincipal?: { width: number; height: number }; numPaginas?: number } }>(res);
+      })
+      .then((data) => {
+        const metadata = data.metadata;
+        if (metadata?.paginaPrincipal) {
+          setPdfDimensiones({
+            width: metadata.paginaPrincipal.width,
+            height: metadata.paginaPrincipal.height,
+            numPaginas: metadata.numPaginas ?? 1,
+          });
+        }
+      })
+      .catch((error) => {
+        console.warn('[SolicitarFirmaDialog] No se pudieron cargar dimensiones PDF:', error);
+        // Usar dimensiones por defecto (A4)
+        setPdfDimensiones({
+          width: 595,
+          height: 842,
+          numPaginas: 1,
+        });
+      })
+      .finally(() => setCargandoMetadata(false));
+  }, [open, documentoId, pdfDimensiones, cargandoMetadata]);
+
   useEffect(() => {
     if (!open) {
       setEmpleadosSeleccionados([]);
@@ -81,6 +117,7 @@ export function SolicitarFirmaDialog({
       setPosicionesFirma([]);
       setPreviewLoading(true);
       setPreviewError(false);
+      setPdfDimensiones(null);
       return;
     }
 
@@ -171,20 +208,32 @@ export function SolicitarFirmaDialog({
 
     setLoading(true);
     try {
-      // Si hay posiciones definidas, convertir la primera de porcentaje a coordenadas PDF
-      // (esto es aproximado - idealmente se calcularía basándose en dimensiones reales del PDF)
+      // Enviar posición en formato v2 (porcentajes) con metadata del PDF
       let posicionFirma = undefined;
-      if (posicionesFirma.length > 0) {
+      if (posicionesFirma.length > 0 && pdfDimensiones) {
         const pos = posicionesFirma[0];
-        // Convertir de porcentaje a coordenadas PDF (aproximado)
-        const PDF_WIDTH = 595;
-        const PDF_HEIGHT = 842;
+
+        // Calcular dimensiones de la firma en porcentaje del PDF
+        // pos.width y pos.height ya están en % del contenedor iframe
+        // pero necesitamos asegurar valores razonables
+        const widthPorcentaje = pos.width || 30; // 30% del ancho por defecto
+        const heightPorcentaje = pos.height || 7; // 7% del alto por defecto
+
+        // Formato v2: porcentajes con metadata del PDF
         posicionFirma = {
-          pagina: -1, // Última página por defecto
-          x: (pos.x / 100) * PDF_WIDTH,
-          y: PDF_HEIGHT - ((pos.y / 100) * PDF_HEIGHT) - SIGNATURE_RECT_HEIGHT,
-          width: SIGNATURE_RECT_WIDTH,
-          height: SIGNATURE_RECT_HEIGHT,
+          version: 'v2',
+          porcentajes: {
+            pagina: -1, // Última página por defecto
+            xPorcentaje: pos.x,
+            yPorcentaje: pos.y,
+            widthPorcentaje,
+            heightPorcentaje,
+          },
+          pdfDimensiones: {
+            width: pdfDimensiones.width,
+            height: pdfDimensiones.height,
+            numPaginas: pdfDimensiones.numPaginas,
+          },
         };
       }
 
@@ -276,7 +325,21 @@ export function SolicitarFirmaDialog({
               <div>
                 <Label>Posición de la firma (opcional)</Label>
                 <p className="text-xs text-gray-500">
-                  Activa el modo edición para añadir recuadros de firma en el documento.
+                  {cargandoMetadata ? (
+                    <>
+                      <Spinner className="w-3 h-3 inline mr-1" />
+                      Obteniendo dimensiones del PDF...
+                    </>
+                  ) : pdfDimensiones ? (
+                    <>
+                      Activa el modo edición para añadir recuadros de firma en el documento.
+                      <span className="text-gray-400 ml-1">
+                        ({pdfDimensiones.numPaginas} página{pdfDimensiones.numPaginas !== 1 ? 's' : ''})
+                      </span>
+                    </>
+                  ) : (
+                    'Activa el modo edición para añadir recuadros de firma en el documento.'
+                  )}
                 </p>
               </div>
               <div className="flex items-center gap-2">

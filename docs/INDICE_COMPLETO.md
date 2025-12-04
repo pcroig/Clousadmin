@@ -1,7 +1,7 @@
 # 📚 Índice Completo de Documentación - Clousadmin
 
-**Última actualización**: 27 de enero de 2025  
-**Total de documentos**: 136 archivos markdown
+**Última actualización**: 4 de diciembre de 2025  
+**Total de documentos**: 137 archivos markdown
 
 ---
 
@@ -12,6 +12,9 @@
 - **[INVITAR_USUARIOS.md](INVITAR_USUARIOS.md)** - Flujo de invitaciones y alta de usuarios
 - **[SETUP_GOOGLE_OAUTH.md](SETUP_GOOGLE_OAUTH.md)** - Configuración de Google OAuth y Calendar
 - **[SETUP_PLANTILLAS.md](SETUP_PLANTILLAS.md)** - Sistema de plantillas de documentos
+
+### Roadmap y Planificación
+- **[ROADMAP_FUNCIONALIDADES_FUTURAS.md](ROADMAP_FUNCIONALIDADES_FUTURAS.md)** - 🚀 Funcionalidades planificadas para el futuro
 
 ### Arquitectura y Estructura
 - **[ARQUITECTURA.md](ARQUITECTURA.md)** - Decisiones arquitectónicas y estructura técnica
@@ -82,6 +85,7 @@
 - **[billing.md](funcionalidades/billing.md)** - Pasarela de pago con Stripe
 - **[calendario.md](funcionalidades/calendario.md)** - Calendario laboral
 - **[canal-denuncias.md](funcionalidades/canal-denuncias.md)** - Sistema de denuncias internas
+- **[complementos-salariales.md](funcionalidades/complementos-salariales.md)** - ⭐ Sistema de complementos salariales (fijos y variables)
 - **[documentos.md](funcionalidades/documentos.md)** - Gestión documental
 - **[documentos-procesos-onboarding-offboarding.md](funcionalidades/documentos-procesos-onboarding-offboarding.md)** - Documentos en procesos
 - **[festivos.md](funcionalidades/festivos.md)** - Gestión de festivos

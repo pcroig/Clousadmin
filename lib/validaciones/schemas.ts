@@ -135,16 +135,8 @@ export const jornadaCreateSchema = z.object({
 
 export const jornadaUpdateSchema = jornadaCreateSchema.partial().omit({ empresaId: true });
 
-export const jornadaAsignarSchema = z.object({
-  nivel: z.enum(['empresa', 'equipo', 'individual']),
-  empresaId: idSchema.optional(),
-  equipoId: idSchema.optional(),
-  empleadoId: idSchema.optional(),
-});
-
 export type JornadaCreateInput = z.infer<typeof jornadaCreateSchema>;
 export type JornadaUpdateInput = z.infer<typeof jornadaUpdateSchema>;
-export type JornadaAsignarInput = z.infer<typeof jornadaAsignarSchema>;
 
 // ========================================
 // AUSENCIAS

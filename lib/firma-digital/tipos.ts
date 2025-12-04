@@ -60,7 +60,8 @@ export interface CrearSolicitudFirmaInput {
   recordatorioAutomatico?: boolean;
   diasRecordatorio?: number;
   creadoPor?: string;
-  posicionFirma?: PosicionFirma;
+  /** Posición de firma: soporta v2 (porcentajes) y v1 (absoluto, legacy) */
+  posicionFirma?: PosicionFirmaConMetadata | PosicionFirma;
 }
 
 /**
@@ -90,6 +91,11 @@ export interface DatosCapturadosFirma {
   firmaImagenContentType?: string;
 }
 
+/**
+ * DEPRECATED: Posición en coordenadas absolutas PDF (puntos)
+ * Mantenido por retrocompatibilidad
+ * @deprecated Use PosicionFirmaPorcentajes en su lugar
+ */
 export interface PosicionFirma {
   /** Número de página (1-indexed, o -1 para última página) */
   pagina: number;
@@ -101,6 +107,51 @@ export interface PosicionFirma {
   width?: number;
   /** Alto del recuadro en puntos PDF (opcional, default: 60) */
   height?: number;
+}
+
+/**
+ * Posición de firma en PORCENTAJES (0-100) del documento
+ * Sistema de coordenadas: origen en esquina superior izquierda (como HTML)
+ * Recomendado para nuevas implementaciones - funciona con cualquier tamaño de PDF
+ */
+export interface PosicionFirmaPorcentajes {
+  /** Número de página (1-indexed, o -1 para última página) */
+  pagina: number;
+  /**
+   * Coordenada X en porcentaje (0-100)
+   * 0 = borde izquierdo, 100 = borde derecho
+   */
+  xPorcentaje: number;
+  /**
+   * Coordenada Y en porcentaje (0-100)
+   * 0 = borde superior, 100 = borde inferior
+   */
+  yPorcentaje: number;
+  /**
+   * Ancho en porcentaje del ancho del PDF (opcional, default: 30%)
+   */
+  widthPorcentaje?: number;
+  /**
+   * Alto en porcentaje del alto del PDF (opcional, default: 7%)
+   */
+  heightPorcentaje?: number;
+}
+
+/**
+ * Posición con metadata - formato guardado en DB
+ * Mantiene tanto porcentajes (para conversión) como dimensiones PDF (para auditoría)
+ */
+export interface PosicionFirmaConMetadata {
+  /** Versión del formato (para migraciones futuras) */
+  version: 'v2' | 'v1';
+  /** Posición en porcentajes */
+  porcentajes: PosicionFirmaPorcentajes;
+  /** Dimensiones del PDF original cuando se guardó (para validación) */
+  pdfDimensiones?: {
+    width: number;
+    height: number;
+    numPaginas: number;
+  };
 }
 
 /**

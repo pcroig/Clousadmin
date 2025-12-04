@@ -14,6 +14,7 @@ import {
 } from '@/lib/api-handler';
 import { obtenerEtiquetaJornada } from '@/lib/jornadas/helpers';
 import { prisma } from '@/lib/prisma';
+import { decimalToNumber } from '@/lib/utils';
 import { idSchema } from '@/lib/validaciones/schemas';
 import { z } from 'zod';
 
@@ -68,7 +69,7 @@ export async function POST(req: NextRequest) {
     switch (validatedData.nivel) {
       case 'empresa':
         // Obtener empleados con jornadas diferentes
-        empleadosConJornadasPrevias = await prisma.empleados.findMany({
+        const empleadosEmpresa = await prisma.empleados.findMany({
           where: {
             empresaId: session.user.empresaId,
             activo: true,
@@ -91,6 +92,16 @@ export async function POST(req: NextRequest) {
             },
           },
         });
+        empleadosConJornadasPrevias = empleadosEmpresa.map((emp) => ({
+          ...emp,
+          jornada: emp.jornada
+            ? {
+                id: emp.jornada.id,
+                horasSemanales: decimalToNumber(emp.jornada.horasSemanales) ?? 0,
+                config: emp.jornada.config,
+              }
+            : null,
+        }));
         break;
 
       case 'equipo':
@@ -107,9 +118,9 @@ export async function POST(req: NextRequest) {
           },
         });
         const empleadoIdsEquipos = [...new Set(miembrosEquipos.map((m) => m.empleadoId))];
-        
+
         if (empleadoIdsEquipos.length > 0) {
-          empleadosConJornadasPrevias = await prisma.empleados.findMany({
+          const empleadosEquipo = await prisma.empleados.findMany({
             where: {
               id: { in: empleadoIdsEquipos },
               empresaId: session.user.empresaId,
@@ -133,6 +144,16 @@ export async function POST(req: NextRequest) {
               },
             },
           });
+          empleadosConJornadasPrevias = empleadosEquipo.map((emp) => ({
+            ...emp,
+            jornada: emp.jornada
+              ? {
+                  id: emp.jornada.id,
+                  horasSemanales: decimalToNumber(emp.jornada.horasSemanales) ?? 0,
+                  config: emp.jornada.config,
+                }
+              : null,
+          }));
         }
         break;
 
@@ -141,7 +162,7 @@ export async function POST(req: NextRequest) {
           return badRequestResponse('Debes especificar al menos un empleado');
         }
         // Obtener empleados específicos con jornadas diferentes
-        empleadosConJornadasPrevias = await prisma.empleados.findMany({
+        const empleadosIndividual = await prisma.empleados.findMany({
           where: {
             id: { in: validatedData.empleadoIds },
             empresaId: session.user.empresaId,
@@ -165,6 +186,16 @@ export async function POST(req: NextRequest) {
             },
           },
         });
+        empleadosConJornadasPrevias = empleadosIndividual.map((emp) => ({
+          ...emp,
+          jornada: emp.jornada
+            ? {
+                id: emp.jornada.id,
+                horasSemanales: decimalToNumber(emp.jornada.horasSemanales) ?? 0,
+                config: emp.jornada.config,
+              }
+            : null,
+        }));
         break;
     }
 
@@ -260,7 +291,7 @@ export async function POST(req: NextRequest) {
       jornada: {
         id: jornada.id,
         etiqueta: obtenerEtiquetaJornada({
-          horasSemanales: jornada.horasSemanales,
+          horasSemanales: Number(jornada.horasSemanales),
           config: jornada.config as any,
           id: jornada.id,
         }),

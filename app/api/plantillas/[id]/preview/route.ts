@@ -17,6 +17,7 @@ import PizZip from 'pizzip';
 
 import { getSession } from '@/lib/auth';
 import { getPreviewHeaders } from '@/lib/documentos/preview-headers';
+import { obtenerEtiquetaJornada } from '@/lib/jornadas/helpers';
 import { convertDocxBufferToPdf } from '@/lib/plantillas/docx-to-pdf';
 import { resolverVariables } from '@/lib/plantillas/ia-resolver';
 import { extraerVariablesDeTexto } from '@/lib/plantillas/sanitizar';
@@ -136,8 +137,9 @@ export async function GET(
         },
         jornada: {
           select: {
-            nombre: true,
+            id: true,
             horasSemanales: true,
+            config: true,
           },
         },
         manager: {
@@ -227,7 +229,11 @@ export async function GET(
       empresa: empresaData,
       jornada: empleado.jornada
         ? {
-            nombre: empleado.jornada.nombre,
+            etiqueta: obtenerEtiquetaJornada({
+              id: empleado.jornada.id,
+              horasSemanales: Number(empleado.jornada.horasSemanales),
+              config: empleado.jornada.config as any,
+            }),
             horasSemanales: Number(empleado.jornada.horasSemanales),
           }
         : undefined,

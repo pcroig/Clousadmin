@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { FileAttachment } from '@/components/shared/file-attachment';
 import { InfoTooltip } from '@/components/shared/info-tooltip';
 import { LoadingButton } from '@/components/shared/loading-button';
-import { ResponsiveDatePicker } from '@/components/shared/responsive-date-picker';
+import { ResponsiveDateRangePicker } from '@/components/shared/responsive-date-picker';
 import { ResponsiveDialog } from '@/components/shared/responsive-dialog';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -430,33 +430,28 @@ export function SolicitarAusenciaModal({
             </div>
           )}
 
-          {/* Fechas */}
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div>
-              <Label>Fecha de inicio *</Label>
-              <ResponsiveDatePicker
-                date={fechaInicio}
-                onSelect={setFechaInicio}
-                placeholder="Seleccionar fecha"
-                label="Fecha de inicio"
-                disabled={(date) => date < today}
-                fromDate={today}
-              />
-            </div>
-
-            <div>
-              <Label>Fecha de fin *</Label>
-              <ResponsiveDatePicker
-                date={fechaFin}
-                onSelect={setFechaFin}
-                placeholder="Seleccionar fecha"
-                label="Fecha de fin"
-                disabled={(date) => {
-                  return date < today || (fechaInicio ? date < fechaInicio : false);
-                }}
-                fromDate={fechaInicio || today}
-              />
-            </div>
+          {/* Fechas - Rango */}
+          <div>
+            <Label>Periodo de ausencia *</Label>
+            <ResponsiveDateRangePicker
+              dateRange={{ from: fechaInicio, to: fechaFin }}
+              onSelect={(range) => {
+                setFechaInicio(range.from);
+                setFechaFin(range.to);
+              }}
+              placeholder="Seleccionar rango de fechas"
+              label="Seleccionar periodo"
+              disabled={(date) => date < today}
+              fromDate={today}
+            />
+            {fechaInicio && fechaFin && (
+              <p className="mt-1 text-xs text-gray-500">
+                {isSingleDaySelection 
+                  ? '1 día seleccionado' 
+                  : `${Math.ceil((fechaFin.getTime() - fechaInicio.getTime()) / (1000 * 60 * 60 * 24)) + 1} días en el rango`
+                }
+              </p>
+            )}
           </div>
 
           {/* Medio Día */}

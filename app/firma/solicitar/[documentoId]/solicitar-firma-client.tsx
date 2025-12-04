@@ -60,7 +60,9 @@ export function SolicitarFirmaClient({ documentoId }: SolicitarFirmaClientProps)
   const [empleados, setEmpleados] = useState<EmpleadoItem[]>([]);
   const [empleadosSeleccionados, setEmpleadosSeleccionados] = useState<string[]>([]);
   const [cargandoEmpleados, setCargandoEmpleados] = useState(false);
-  const [posicionesFirma, setPosicionesFirma] = useState<SignaturePosition[]>([]);
+  // Cambio: Posiciones por firmante en lugar de array global
+  const [posicionesPorFirmante, setPosicionesPorFirmante] = useState<Record<string, SignaturePosition[]>>({});
+  const [firmanteActivo, setFirmanteActivo] = useState<string | null>(null); // Para seleccionar a quién se asignan posiciones
   const [documentoNombre, setDocumentoNombre] = useState('');
   const [carpetaId, setCarpetaId] = useState<string | null>(null);
   const [solicitudExistente, setSolicitudExistente] = useState<SolicitudExistente | null>(null);
@@ -155,19 +157,45 @@ export function SolicitarFirmaClient({ documentoId }: SolicitarFirmaClientProps)
     [documentoId]
   );
 
+  // Auto-seleccionar primer firmante cuando se selecciona al menos uno
+  useEffect(() => {
+    if (empleadosSeleccionados.length === 0) {
+      // Limpiar todo si no hay empleados seleccionados
+      if (firmanteActivo !== null) {
+        setFirmanteActivo(null);
+      }
+      setPosicionesPorFirmante({});
+    } else if (!firmanteActivo || !empleadosSeleccionados.includes(firmanteActivo)) {
+      // Seleccionar el primero si no hay activo o si el activo fue deseleccionado
+      setFirmanteActivo(empleadosSeleccionados[0]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [empleadosSeleccionados]);
+
   /**
    * Handler cuando se hace click en el documento para añadir firma
-   * El componente PdfCanvasViewer ya calcula las coordenadas correctamente
+   * Asigna la posición al firmante activo
    */
   const handleAddSignature = (position: SignaturePosition) => {
-    setPosicionesFirma((prev) => [...prev, position]);
+    if (!firmanteActivo) {
+      toast.error('Selecciona un firmante primero');
+      return;
+    }
+    setPosicionesPorFirmante((prev) => ({
+      ...prev,
+      [firmanteActivo]: [...(prev[firmanteActivo] || []), position],
+    }));
   };
 
   /**
-   * Handler para eliminar una posición de firma
+   * Handler para eliminar una posición de firma del firmante activo
    */
   const handleRemoveSignature = (index: number) => {
-    setPosicionesFirma((prev) => prev.filter((_, i) => i !== index));
+    if (!firmanteActivo) return;
+    setPosicionesPorFirmante((prev) => ({
+      ...prev,
+      [firmanteActivo]: (prev[firmanteActivo] || []).filter((_, i) => i !== index),
+    }));
   };
 
   const handleSubmit = async () => {
@@ -178,53 +206,84 @@ export function SolicitarFirmaClient({ documentoId }: SolicitarFirmaClientProps)
 
     setLoading(true);
     try {
-      // Si hay posiciones definidas, convertir la primera de porcentaje a coordenadas PDF
-      let posicionFirma = undefined;
-      if (posicionesFirma.length > 0) {
-        const pos = posicionesFirma[0];
+      /**
+       * Crear una solicitud individual por cada firmante
+       * Cada solicitud tiene sus propias posiciones de firma
+       */
+      const PDF_WIDTH = 595; // Ancho A4 en puntos
+      const PDF_HEIGHT = 842; // Alto A4 en puntos
 
-        /**
-         * Conversión de coordenadas:
-         * - PdfCanvasViewer devuelve coordenadas en porcentaje (0-100) relativas a cada página
-         * - El API espera coordenadas en puntos PDF (595x842 para A4)
-         * - Sistema de coordenadas PDF: origen en esquina inferior izquierda
-         * - Sistema de coordenadas canvas: origen en esquina superior izquierda
-         */
-        const PDF_WIDTH = 595; // Ancho A4 en puntos
-        const PDF_HEIGHT = 842; // Alto A4 en puntos
+      const resultados = await Promise.allSettled(
+        empleadosSeleccionados.map(async (empleadoId) => {
+          // Obtener posiciones de este firmante específico
+          const posicionesEmpleado = posicionesPorFirmante[empleadoId] || [];
 
-        posicionFirma = {
-          pagina: pos.page, // Usar el número de página del canvas viewer
-          x: (pos.x / 100) * PDF_WIDTH,
-          // Invertir coordenada Y porque PDF usa origen abajo-izquierda
-          y: PDF_HEIGHT - ((pos.y / 100) * PDF_HEIGHT) - ((pos.height / 100) * PDF_HEIGHT),
-          width: SIGNATURE_RECT_WIDTH,
-          height: SIGNATURE_RECT_HEIGHT,
-        };
+          // Convertir la primera posición (si existe) a formato PDF
+          // NOTA: Por ahora solo usamos la primera posición, en el futuro se pueden soportar múltiples
+          let posicionFirma = undefined;
+          if (posicionesEmpleado.length > 0) {
+            const pos = posicionesEmpleado[0];
+
+            /**
+             * Conversión de coordenadas:
+             * - PdfCanvasViewer devuelve coordenadas en porcentaje (0-100) relativas a cada página
+             * - El API espera coordenadas en puntos PDF (595x842 para A4)
+             * - Sistema de coordenadas PDF: origen en esquina inferior izquierda
+             * - Sistema de coordenadas canvas: origen en esquina superior izquierda
+             */
+            posicionFirma = {
+              pagina: pos.page,
+              x: (pos.x / 100) * PDF_WIDTH,
+              // Invertir coordenada Y porque PDF usa origen abajo-izquierda
+              y: PDF_HEIGHT - ((pos.y / 100) * PDF_HEIGHT) - ((pos.height / 100) * PDF_HEIGHT),
+              width: SIGNATURE_RECT_WIDTH,
+              height: SIGNATURE_RECT_HEIGHT,
+            };
+          }
+
+          const body = {
+            documentoId,
+            firmantes: [{ empleadoId }], // Solo un firmante por solicitud
+            ordenFirma: false,
+            posicionFirma,
+          };
+
+          const res = await fetch('/api/firma/solicitudes', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+          });
+
+          const data = await parseJson<{ success?: boolean; error?: string }>(res);
+          if (!res.ok || !data.success) {
+            throw new Error(data.error || `No se pudo crear solicitud para empleado ${empleadoId}`);
+          }
+
+          return { empleadoId, success: true };
+        })
+      );
+
+      // Contar éxitos y fallos
+      const exitosas = resultados.filter((r) => r.status === 'fulfilled').length;
+      const fallidas = resultados.filter((r) => r.status === 'rejected').length;
+
+      if (fallidas === 0) {
+        // Todas exitosas
+        const mensaje = exitosas === 1
+          ? 'Solicitud de firma creada'
+          : `${exitosas} solicitudes de firma creadas`;
+        toast.success(mensaje);
+        router.back();
+      } else if (exitosas > 0) {
+        // Parcialmente exitosas
+        toast.warning(
+          `${exitosas} solicitudes creadas correctamente, ${fallidas} fallaron. Revisa las solicitudes creadas.`
+        );
+        router.back();
+      } else {
+        // Todas fallaron
+        throw new Error('No se pudo crear ninguna solicitud de firma');
       }
-
-      const body = {
-        documentoId,
-        firmantes: empleadosSeleccionados.map((empleadoId) => ({
-          empleadoId,
-        })),
-        ordenFirma: false,
-        posicionFirma,
-      };
-
-      const res = await fetch('/api/firma/solicitudes', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
-
-      const data = await parseJson<{ success?: boolean; error?: string }>(res);
-      if (!res.ok || !data.success) {
-        throw new Error(data.error || 'No se pudo crear la solicitud de firma');
-      }
-
-      toast.success('Solicitud de firma creada');
-      router.back();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Error al solicitar firma');
     } finally {
@@ -278,7 +337,7 @@ export function SolicitarFirmaClient({ documentoId }: SolicitarFirmaClientProps)
         <div className="flex-1 bg-gray-100 relative">
           <PdfCanvasViewer
             pdfUrl={previewUrl}
-            signaturePositions={posicionesFirma}
+            signaturePositions={firmanteActivo ? (posicionesPorFirmante[firmanteActivo] || []) : []}
             onDocumentClick={handleAddSignature}
             onRemovePosition={handleRemoveSignature}
             signatureBoxWidth={SIGNATURE_RECT_WIDTH}
@@ -378,58 +437,102 @@ export function SolicitarFirmaClient({ documentoId }: SolicitarFirmaClientProps)
                   </p>
                 </div>
 
-                <div className="border-t pt-4">
-                  <Label className="mb-2 block">Posición de firma (opcional)</Label>
-                  <p className="text-xs text-gray-500 mb-3">
-                    Haz clic sobre el documento para añadir recuadros donde debe aparecer la firma.
-                  </p>
-
-                  {posicionesFirma.length > 0 ? (
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-gray-700">
-                          {posicionesFirma.length} posición{posicionesFirma.length === 1 ? '' : 'es'}
-                        </span>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setPosicionesFirma([])}
-                        >
-                          <X className="w-3 h-3 mr-1" />
-                          Limpiar
-                        </Button>
-                      </div>
-                      <div className="space-y-1">
-                        {posicionesFirma.map((pos, index) => (
-                          <div
-                            key={index}
-                            className="flex items-center justify-between text-xs bg-gray-50 rounded px-2 py-1.5"
+                {/* Selector de firmante activo */}
+                {empleadosSeleccionados.length > 0 && (
+                  <div className="border-t pt-4">
+                    <Label className="mb-2 block">Asignar posiciones de firma</Label>
+                    <p className="text-xs text-gray-500 mb-3">
+                      Selecciona un firmante para asignarle posiciones en el documento.
+                    </p>
+                    <div className="flex flex-wrap gap-2 mb-4">
+                      {empleadosSeleccionados.map((empId) => {
+                        const empleado = empleados.find((e) => e.id === empId);
+                        const numPosiciones = (posicionesPorFirmante[empId] || []).length;
+                        return (
+                          <Button
+                            key={empId}
+                            type="button"
+                            variant={firmanteActivo === empId ? 'default' : 'outline'}
+                            size="sm"
+                            onClick={() => setFirmanteActivo(empId)}
+                            className="relative"
                           >
-                            <span>
-                              Posición {index + 1} (Página {pos.page})
+                            {empleado ? `${empleado.nombre} ${empleado.apellidos}` : empId}
+                            {numPosiciones > 0 && (
+                              <span className="ml-1.5 px-1.5 py-0.5 text-xs bg-blue-100 text-blue-700 rounded-full">
+                                {numPosiciones}
+                              </span>
+                            )}
+                          </Button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Posiciones de firma del firmante activo */}
+                {firmanteActivo && (
+                  <div className="border-t pt-4">
+                    <Label className="mb-2 block">Posiciones de firma</Label>
+                    <p className="text-xs text-gray-500 mb-3">
+                      Haz clic sobre el documento para añadir recuadros donde debe aparecer la firma.
+                    </p>
+
+                    {(() => {
+                      const posicionesActual = posicionesPorFirmante[firmanteActivo] || [];
+                      return posicionesActual.length > 0 ? (
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="text-gray-700">
+                              {posicionesActual.length} posición{posicionesActual.length === 1 ? '' : 'es'}
                             </span>
                             <Button
                               type="button"
                               variant="ghost"
                               size="sm"
-                              className="h-5 w-5 p-0"
-                              onClick={() => handleRemoveSignature(index)}
+                              onClick={() => {
+                                setPosicionesPorFirmante((prev) => ({
+                                  ...prev,
+                                  [firmanteActivo]: [],
+                                }));
+                              }}
                             >
-                              <X className="w-3 h-3" />
+                              <X className="w-3 h-3 mr-1" />
+                              Limpiar
                             </Button>
                           </div>
-                        ))}
-                      </div>
-                    </div>
-                  ) : (
-                    <p className="text-xs text-gray-400 italic">
-                      Sin posiciones definidas. La firma se añadirá al final del documento.
-                    </p>
-                  )}
+                          <div className="space-y-1">
+                            {posicionesActual.map((pos, index) => (
+                              <div
+                                key={index}
+                                className="flex items-center justify-between text-xs bg-gray-50 rounded px-2 py-1.5"
+                              >
+                                <span>
+                                  Posición {index + 1} (Página {pos.page})
+                                </span>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-5 w-5 p-0"
+                                  onClick={() => handleRemoveSignature(index)}
+                                >
+                                  <X className="w-3 h-3" />
+                                </Button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="text-xs text-gray-400 italic">
+                          Sin posiciones definidas. La firma se añadirá al final del documento.
+                        </p>
+                      );
+                    })()}
+                  </div>
+                )}
                 </div>
               </div>
-            </div>
             )}
           </div>
         </div>

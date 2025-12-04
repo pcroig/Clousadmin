@@ -6,7 +6,7 @@ import { Calendar as CalendarIcon, ChevronRight, Edit, Info, Paperclip, Settings
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
-import { EditarAusenciaModal, type EditarAusencia } from '@/components/ausencias/editar-ausencia-modal';
+import { type EditarAusencia, EditarAusenciaModal } from '@/components/ausencias/editar-ausencia-modal';
 import { FestivosPersonalizadosModal } from '@/components/ausencias/festivos-personalizados-modal';
 import { SolicitarAusenciaModal } from '@/components/empleado/solicitar-ausencia-modal';
 import { FechaCalendar } from '@/components/shared/fecha-calendar';
@@ -258,6 +258,42 @@ export function AusenciasTab({
     }
   }, [contexto, empleadoId]);
 
+  // Función para cargar festivos (empresa + personalizados del empleado)
+  const cargarFestivos = useCallback(async (signal?: AbortSignal) => {
+    try {
+      // Cargar festivos de empresa
+      const festivosResponse = await fetch('/api/festivos?activo=true', {
+        signal,
+      });
+      const festivosData = await parseJson<FestivosResponse>(festivosResponse).catch(() => null);
+      const festivosEmpresa = festivosData?.festivos || [];
+
+      // Cargar festivos personalizados del empleado
+      const festivosPersonalizadosResponse = await fetch(`/api/empleados/${empleadoId}/festivos`, {
+        signal,
+      });
+
+      let festivosPersonalizados: { fecha: string; nombre: string }[] = [];
+      if (festivosPersonalizadosResponse.ok) {
+        festivosPersonalizados = await parseJson<{ fecha: string; nombre: string }[]>(
+          festivosPersonalizadosResponse
+        ).catch(() => []);
+      }
+
+      // Combinar: festivos de empresa que NO tienen personalización + festivos personalizados
+      const fechasPersonalizadas = new Set(festivosPersonalizados.map((f) => f.fecha));
+      const festivosEmpresaFiltrados = festivosEmpresa.filter(
+        (f) => !fechasPersonalizadas.has(f.fecha)
+      );
+
+      setFestivos([...festivosEmpresaFiltrados, ...festivosPersonalizados]);
+    } catch (error: unknown) {
+      if (error instanceof Error && error.name !== 'AbortError') {
+        console.error('Error cargando festivos:', error);
+      }
+    }
+  }, [empleadoId]);
+
   // Cargar calendario laboral y festivos
   useEffect(() => {
     const controller = new AbortController();
@@ -277,13 +313,7 @@ export function AusenciasTab({
         }
 
         // Cargar festivos activos
-        const festivosResponse = await fetch('/api/festivos?activo=true', {
-          signal: controller.signal,
-        });
-        const festivosData = await parseJson<FestivosResponse>(festivosResponse).catch(() => null);
-        if (festivosResponse.ok) {
-          setFestivos(festivosData?.festivos || []);
-        }
+        await cargarFestivos(controller.signal);
       } catch (error: unknown) {
         if (error instanceof Error && error.name !== 'AbortError') {
           console.error('Error cargando calendario laboral:', error);
@@ -294,7 +324,7 @@ export function AusenciasTab({
     cargarCalendarioLaboral();
 
     return () => controller.abort();
-  }, []);
+  }, [cargarFestivos]);
 
   // Calcular saldo de ausencias
   const calcularSaldo = useCallback((): SaldoResponse => {
@@ -350,20 +380,6 @@ export function AusenciasTab({
     .sort((a, b) => new Date(b.fechaInicio).getTime() - new Date(a.fechaInicio).getTime())
     .slice(0, 5);
 
-  const getEstadoBadge = (estado: string) => {
-    switch (estado) {
-      case 'approved':
-      case 'auto_aprobada':
-        return <Badge className="bg-green-100 text-green-800">Aprobado</Badge>;
-      case 'rejected':
-        return <Badge className="bg-red-100 text-red-800">Rechazado</Badge>;
-      case 'pending':
-      case 'pendiente_aprobacion':
-        return <Badge className="bg-yellow-100 text-yellow-800">Pendiente</Badge>;
-      default:
-        return <Badge variant="secondary">{estado}</Badge>;
-    }
-  };
 
   // Función para verificar si un día es laborable
   const esDiaLaborable = (date: Date) => {
@@ -642,26 +658,15 @@ export function AusenciasTab({
               </svg>
               <h3 className="text-sm font-semibold text-gray-900">Saldo de ausencias</h3>
               {contexto === 'hr_admin' && !editandoDiasPersonalizados && (
-                <>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-6 w-6 text-gray-500 hover:text-gray-700"
-                    onClick={handleEditarDiasPersonalizados}
-                    title="Editar días personalizados"
-                  >
-                    <Settings className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-6 w-6 text-gray-500 hover:text-gray-700"
-                    onClick={() => setFestivosModalOpen(true)}
-                    title="Gestionar festivos personalizados"
-                  >
-                    <CalendarIcon className="h-4 w-4" />
-                  </Button>
-                </>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6 text-gray-500 hover:text-gray-700"
+                  onClick={handleEditarDiasPersonalizados}
+                  title="Editar días personalizados"
+                >
+                  <Settings className="h-4 w-4" />
+                </Button>
               )}
             </div>
             <span className="text-xs text-gray-500">
@@ -669,7 +674,7 @@ export function AusenciasTab({
             </span>
           </div>
           {editandoDiasPersonalizados && contexto === 'hr_admin' && (
-            <div className="mb-4 rounded-md border border-blue-200 bg-blue-50 p-3">
+            <div className="mb-4 rounded-md border border-gray-200 bg-gray-50 p-3">
               <p className="text-xs text-gray-700 mb-2">
                 Editar días personalizados para este empleado (deja vacío para usar el mínimo global)
               </p>
@@ -678,7 +683,7 @@ export function AusenciasTab({
                   type="number"
                   value={diasPersonalizadosInput}
                   onChange={(e) => setDiasPersonalizadosInput(e.target.value)}
-                  className="flex-1 rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  className="flex-1 rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:border-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900"
                   placeholder="Días personalizados"
                   min="0"
                   max="365"
@@ -686,7 +691,6 @@ export function AusenciasTab({
                 <Button
                   size="sm"
                   onClick={handleEditarDiasPersonalizados}
-                  className="bg-blue-600 hover:bg-blue-700"
                 >
                   Guardar
                 </Button>
@@ -783,7 +787,20 @@ export function AusenciasTab({
       {/* Columna derecha - Calendario */}
       <div className="rounded-lg border border-gray-200 bg-white p-6">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-gray-900">Calendario</h3>
+          <div className="flex items-center gap-2">
+            <h3 className="text-lg font-semibold text-gray-900">Calendario</h3>
+            {puedeAccionar && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-gray-500 hover:text-gray-700"
+                onClick={() => setFestivosModalOpen(true)}
+                title="Personalizar festivos"
+              >
+                <Edit className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
           {puedeAccionar && (
             <Button size="sm" onClick={handleOpenSolicitud}>
               {puedeRegistrar ? 'Registrar ausencia' : 'Solicitar ausencia'}
@@ -934,14 +951,13 @@ export function AusenciasTab({
             contexto={contexto}
           />
 
-          {contexto === 'hr_admin' && (
-            <FestivosPersonalizadosModal
-              open={festivosModalOpen}
-              onClose={() => setFestivosModalOpen(false)}
-              empleadoId={empleadoId}
-              empleadoNombre={empleadoNombre}
-            />
-          )}
+          <FestivosPersonalizadosModal
+            open={festivosModalOpen}
+            onClose={() => setFestivosModalOpen(false)}
+            empleadoId={empleadoId}
+            contexto={contexto}
+            onSuccess={() => cargarFestivos()}
+          />
         </>
       )}
       </div>

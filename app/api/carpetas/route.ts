@@ -32,11 +32,16 @@ export async function GET(request: NextRequest) {
       where.vinculadaAProceso = proceso;
     }
 
-    // Si es empleado regular, solo puede ver sus carpetas o las compartidas con él
+    // Si es empleado regular, solo puede ver sus carpetas o las compartidas asignadas a él
     if (session.user.rol === 'empleado' && session.user.empleadoId) {
       where.OR = [
         { empleadoId: session.user.empleadoId }, // Carpetas propias
-        { compartida: true }, // Carpetas compartidas
+        { empleadoId: null, compartida: true, asignadoA: 'todos' }, // Compartidas para todos
+        {
+          empleadoId: null,
+          compartida: true,
+          asignadoA: { contains: `empleado:${session.user.empleadoId}` }
+        }, // Compartidas asignadas específicamente
       ];
     }
 
@@ -52,7 +57,7 @@ export async function GET(request: NextRequest) {
         },
         _count: {
           select: {
-            documentos: true,
+            documento_carpetas: true,
           },
         },
       },

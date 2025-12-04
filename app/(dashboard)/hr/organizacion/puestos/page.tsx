@@ -69,6 +69,7 @@ export default async function PuestosPage() {
       id: emp.id,
       nombre: `${emp.nombre} ${emp.apellidos}`,
       avatar: emp.fotoUrl || undefined,
+      fotoUrl: emp.fotoUrl || undefined,
     })),
     documentos: puesto.documentos.map((doc) => ({
       id: doc.id,

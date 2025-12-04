@@ -306,87 +306,6 @@ export function CompensarHorasDialog(props: CompensarHorasDialogProps) {
         </DialogHeader>
 
         <div className="space-y-6 py-4">
-          {/* Sección: Filtros (sin switches, siempre visibles) */}
-          <div className="space-y-3">
-            <h3 className="text-sm font-semibold text-gray-900">Filtros</h3>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              {/* Filtro por mes (solo en contexto fichajes) */}
-              {props.context === 'fichajes' && (
-              <div>
-                  <Label className="text-xs text-gray-600 mb-1.5 block">Periodo</Label>
-                <Select value={mesSeleccionado} onValueChange={setMesSeleccionado}>
-                  <SelectTrigger className="w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Año completo</SelectItem>
-                      {MESES.map((mes, index) => (
-                        <SelectItem key={mes} value={String(index + 1)}>
-                          {mes}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-
-              {/* Filtro por empleado */}
-              <div>
-                <Label className="text-xs text-gray-600 mb-1.5 block">Empleado</Label>
-                <Select
-                  value={empleadoSeleccionado}
-                  onValueChange={setEmpleadoSeleccionado}
-                  disabled={empleadoOptions.length === 0}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Todos" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {empleadoOptions.length === 0 && (
-                      <div className="px-3 py-2 text-xs text-gray-500">
-                        No hay empleados con horas disponibles en este periodo.
-                      </div>
-                    )}
-                    <SelectItem value="all">Todos</SelectItem>
-                    {empleadoOptions.map((emp) => (
-                      <SelectItem key={emp.id} value={emp.id}>
-                        {emp.nombre}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Filtro por equipo */}
-              <div>
-                <Label className="text-xs text-gray-600 mb-1.5 block">Equipo</Label>
-                <Select
-                  value={equipoSeleccionado}
-                  onValueChange={setEquipoSeleccionado}
-                  disabled={equipoOptions.length === 0}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Todos" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {equipoOptions.length === 0 && (
-                      <div className="px-3 py-2 text-xs text-gray-500">
-                        No hay equipos con horas disponibles en este periodo.
-                      </div>
-                    )}
-                    <SelectItem value="all">Todos</SelectItem>
-                    {equipoOptions.map((eq) => (
-                      <SelectItem key={eq.id} value={eq.id}>
-                        {eq.nombre}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          </div>
-
           {/* Sección: Tipo de compensación con Slider */}
           <div className="space-y-3">
             <h3 className="text-sm font-semibold text-gray-900">Tipo de compensación</h3>
@@ -435,13 +354,95 @@ export function CompensarHorasDialog(props: CompensarHorasDialogProps) {
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-semibold text-gray-900">
-                Empleados ({balancesFiltrados.length})
+                Empleados horas extra ({balancesFiltrados.length})
               </h3>
               {selectedIds.size > 0 && (
                 <Badge variant="secondary" className="bg-blue-50 text-blue-700">
                   {selectedIds.size} seleccionados · {totalHorasSeleccionadas.toFixed(2)}h
                 </Badge>
               )}
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              {/* Filtro por mes (solo en contexto fichajes) */}
+              {props.context === 'fichajes' && (
+                <div>
+                  <Label className="sr-only">Periodo</Label>
+                  <Select
+                    value={mesSeleccionado}
+                    onValueChange={setMesSeleccionado}
+                    aria-label="Periodo"
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Periodo" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Año completo</SelectItem>
+                      {MESES.map((mes, index) => (
+                        <SelectItem key={mes} value={String(index + 1)}>
+                          {mes}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              {/* Filtro por empleado */}
+              <div>
+                <Label className="sr-only">Empleado</Label>
+                <Select
+                  value={empleadoSeleccionado}
+                  onValueChange={setEmpleadoSeleccionado}
+                  disabled={empleadoOptions.length === 0}
+                  aria-label="Empleado"
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Todos" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {empleadoOptions.length === 0 && (
+                      <div className="px-3 py-2 text-xs text-gray-500">
+                        No hay empleados con horas disponibles en este periodo.
+                      </div>
+                    )}
+                    <SelectItem value="all">Todos</SelectItem>
+                    {empleadoOptions.map((emp) => (
+                      <SelectItem key={emp.id} value={emp.id}>
+                        {emp.nombre}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Filtro por equipo */}
+              <div>
+                <Label className="sr-only">Equipo</Label>
+                <Select
+                  value={equipoSeleccionado}
+                  onValueChange={setEquipoSeleccionado}
+                  disabled={equipoOptions.length === 0}
+                  aria-label="Equipo"
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Todos" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {equipoOptions.length === 0 && (
+                      <div className="px-3 py-2 text-xs text-gray-500">
+                        No hay equipos con horas disponibles en este periodo.
+                      </div>
+                    )}
+                    <SelectItem value="all">Todos</SelectItem>
+                    {equipoOptions.map((eq) => (
+                      <SelectItem key={eq.id} value={eq.id}>
+                        {eq.nombre}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
             {/* Tabla */}

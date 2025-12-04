@@ -1,6 +1,6 @@
 # Referencia API - Fichajes
 
-**Última actualización:** 2 de diciembre de 2025  
+**Última actualización:** 4 de diciembre de 2025  
 **Estado:** Resumen. Para la funcionalidad completa consulta [`docs/funcionalidades/fichajes.md`](../../funcionalidades/fichajes.md).
 
 ---
@@ -18,7 +18,7 @@
 | `/api/fichajes/eventos/{id}` | DELETE | Eliminar evento |
 | `/api/fichajes/revision` | GET | Obtener fichajes pendientes de revisión. **Solo días vencidos** (lazy recovery con offset=1, excluye HOY) |
 | `/api/fichajes/revision` | POST | Procesar revisiones (actualizar/descartar fichajes) |
-| `/api/fichajes/cuadrar` | POST | Cuadrar fichajes masivamente creando eventos según jornada |
+| `/api/fichajes/cuadrar` | POST | Cuadrar fichajes masivamente. **Nuevo**: Usa promedios históricos de los últimos 5 días con eventos del empleado. **Límite**: Máximo 50 fichajes por request. Crea eventos faltantes según jornada o promedio histórico |
 | `/api/fichajes/balance/{empleadoId}` | GET | Balance de horas |
 | `/api/fichajes/correccion` | POST | Solicitar corrección |
 | `/api/fichajes/bolsa-horas` | GET | Bolsa de horas para HR |
@@ -30,7 +30,25 @@
 
 ---
 
-## 📋 Cambios Recientes (2025-12-02)
+## 📋 Cambios Recientes
+
+### 2025-12-04: Promedios Históricos y Rate Limiting
+
+#### `POST /api/fichajes/cuadrar`
+- ✅ **Nuevo**: Sistema de promedios históricos para calcular eventos propuestos
+  - Usa los últimos 5 días con eventos registrados del mismo empleado
+  - Filtra por `jornadaId` para garantizar consistencia
+  - Ajusta la salida si el promedio supera las horas esperadas del día
+  - Fallback automático a lógica de jornada si no hay suficientes históricos
+- ✅ **Rate Limiting**: Límite de 50 fichajes por request para proteger la transacción
+- ✅ **Migración de datos**: Backfill de `jornadaId` en fichajes antiguos para habilitar promedios históricos
+
+**Archivos relacionados:**
+- `lib/calculos/fichajes-historico.ts` (nuevo módulo)
+- `lib/calculos/fichajes-helpers.ts` (función `calcularHorasEsperadasDelDia`)
+- `prisma/migrations/20251204111828_backfill_jornada_id_fichajes/`
+
+### 2025-12-02: Mejoras en Cálculo de Horas
 
 ### `PATCH /api/fichajes/{id}`
 - ✅ **Mejora**: Ahora recalcula `horasTrabajadas` y `horasEnPausa` al aprobar/rechazar fichajes

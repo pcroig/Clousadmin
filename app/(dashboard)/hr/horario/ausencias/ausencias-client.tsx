@@ -118,6 +118,7 @@ const getInitialMonthDate = (): Date => {
 
 interface AusenciasClientProps {
   initialCampanasExpanded?: boolean;
+  campanasEnabled: boolean;
 }
 
 const ESTADO_OPTIONS: FilterOption[] = [
@@ -127,7 +128,10 @@ const ESTADO_OPTIONS: FilterOption[] = [
   { value: EstadoAusencia.rechazada, label: getAusenciaEstadoLabel(EstadoAusencia.rechazada) },
 ];
 
-export function AusenciasClient({}: AusenciasClientProps) {
+export function AusenciasClient({
+  initialCampanasExpanded: _initialCampanasExpanded,
+  campanasEnabled,
+}: AusenciasClientProps) {
   const isMobile = useIsMobile();
   const [ausencias, setAusencias] = useState<Ausencia[]>([]);
   const [campanaActiva, setCampanaActiva] = useState<Campana | null>(null);
@@ -246,21 +250,35 @@ export function AusenciasClient({}: AusenciasClientProps) {
   }, [busquedaEmpleado, filtroEquipo, filtroEstado, fechaBase, rangoFechas]);
 
   const fetchCampanaActiva = useCallback(async () => {
+    if (!campanasEnabled) {
+      setCampanaActiva(null);
+      return;
+    }
+
     try {
       const response = await fetch('/api/campanas-vacaciones');
       if (response.ok) {
-        const data = await response.json() as Campana | null;
-        setCampanaActiva(data); // API now returns single campaign or null
+        const data = (await response.json()) as Campana | null;
+        setCampanaActiva(data);
+      } else {
+        setCampanaActiva(null);
       }
     } catch (error) {
       console.error('Error fetching campaña activa:', error);
+      setCampanaActiva(null);
     }
-  }, []);
+  }, [campanasEnabled]);
 
   useEffect(() => {
     fetchAusencias();
+  }, [fetchAusencias]);
+
+  useEffect(() => {
+    if (!campanasEnabled) {
+      return;
+    }
     fetchCampanaActiva();
-  }, [fetchAusencias, fetchCampanaActiva]);
+  }, [campanasEnabled, fetchCampanaActiva]);
 
   // Edicion Effect
   useEffect(() => {
@@ -628,6 +646,10 @@ const renderJustificanteLink = (
   };
 
   const renderCampaignCard = () => {
+    if (!campanasEnabled) {
+      return null;
+    }
+
     if (!campanaActiva) return null;
     return (
       <Card className="mb-6 p-4 bg-blue-50 border-blue-100">
@@ -774,24 +796,34 @@ const renderJustificanteLink = (
     ? 'Prueba con otro nombre o restablece los filtros.'
     : 'Cambia el periodo o ajusta los filtros para ver registros.';
 
+  const mobileActions = campanasEnabled
+    ? [
+        {
+          label: 'Campaña',
+          onClick: () => setCrearCampanaModal(true),
+          isPrimary: true,
+        },
+        {
+          icon: Settings,
+          label: 'Gestionar ausencias',
+          onClick: () => setGestionarModal(true),
+        },
+      ]
+    : [
+        {
+          icon: Settings,
+          label: 'Gestionar ausencias',
+          onClick: () => setGestionarModal(true),
+        },
+      ];
+
   return (
     <div className="h-full w-full flex flex-col sm:max-w-[1800px] sm:mx-auto sm:px-8 sm:py-6">
       {isMobile ? (
         <>
           <PageMobileHeader
             title="Ausencias"
-            actions={[
-              {
-                label: 'Campaña',
-                onClick: () => setCrearCampanaModal(true),
-                isPrimary: true,
-              },
-              {
-                icon: Settings,
-                label: 'Gestionar ausencias',
-                onClick: () => setGestionarModal(true),
-              },
-            ]}
+            actions={mobileActions}
           />
 
           {/* Filtros */}
@@ -819,10 +851,14 @@ const renderJustificanteLink = (
         <>
           <PageHeader
             title="Ausencias"
-            actionButton={{
-              label: '+ Nueva Campaña',
-              onClick: () => setCrearCampanaModal(true),
-            }}
+            actionButton={
+              campanasEnabled
+                ? {
+                    label: '+ Nueva Campaña',
+                    onClick: () => setCrearCampanaModal(true),
+                  }
+                : undefined
+            }
             secondaryActionButton={{
               label: 'Gestionar ausencias',
               onClick: () => setGestionarModal(true),
@@ -1035,14 +1071,16 @@ const renderJustificanteLink = (
       </Dialog>
 
       {/* Modal Crear Campaña */}
-      <CrearCampanaModal
-        open={crearCampanaModal}
-        onClose={() => setCrearCampanaModal(false)}
-        onCreated={() => {
-          fetchCampanaActiva();
-          toast.success('Campaña creada correctamente');
-        }}
-      />
+      {campanasEnabled && (
+        <CrearCampanaModal
+          open={crearCampanaModal}
+          onClose={() => setCrearCampanaModal(false)}
+          onCreated={() => {
+            fetchCampanaActiva();
+            toast.success('Campaña creada correctamente');
+          }}
+        />
+      )}
 
       {/* Modal Gestionar Ausencias */}
       <GestionarAusenciasModal

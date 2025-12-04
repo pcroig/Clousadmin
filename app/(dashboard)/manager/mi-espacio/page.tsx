@@ -28,7 +28,11 @@ export default async function MiEspacioManagerPage() {
       },
       carpetas: {
         include: {
-          documentos: true,
+          documento_carpetas: {
+            include: {
+              documento: true,
+            },
+          },
         },
       },
       contratos: true,

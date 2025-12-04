@@ -13,6 +13,7 @@ import { randomBytes } from 'crypto';
 import { createSession, getSession, hashPassword } from '@/lib/auth';
 import { DIAS_LABORABLES_DEFAULT } from '@/lib/calculos/dias-laborables';
 import { UsuarioRol } from '@/lib/constants/enums';
+import { asegurarCarpetasSistemaParaEmpleado } from '@/lib/documentos';
 import { getBaseUrl } from '@/lib/email';
 import { persistDiasLaborables } from '@/lib/empresa/calendario-laboral';
 import { crearInvitacion } from '@/lib/invitaciones';
@@ -174,6 +175,15 @@ export async function signupEmpresaAction(
 
       return { usuario, empresa, empleado };
     });
+
+    // 4. Asegurar que las carpetas del sistema existan para el empleado
+    try {
+      await asegurarCarpetasSistemaParaEmpleado(result.empleado.id, result.empresa.id);
+      console.log(`[signupEmpresaAction] Carpetas del sistema aseguradas para ${result.empleado.id}`);
+    } catch (error) {
+      console.error('[signupEmpresaAction] Error asegurando carpetas del sistema:', error);
+      // No fallar el signup si falla la creación de carpetas
+    }
 
     // 5. Subir avatar si se proporcionó
     let avatarUrl: string | undefined;
@@ -353,17 +363,27 @@ export async function configurarCalendarioYJornadaAction(
 
     const validatedData = calendarioJornadaOnboardingSchema.parse(input);
     const normalizedDias = validatedData.diasLaborables ?? DIAS_LABORABLES_DEFAULT;
+
+    // Use the first jornada from the array (backwards compatibility)
+    const primeraJornada = validatedData.jornadas[0];
+    if (!primeraJornada) {
+      return {
+        success: false,
+        error: 'Debe haber al menos una jornada configurada',
+      };
+    }
+
     const normalizedJornada = {
-      tipo: validatedData.jornada.tipo,
-      horasSemanales: validatedData.jornada.horasSemanales || DEFAULT_JORNADA_FORM_VALUES.horasSemanales,
+      tipo: primeraJornada.tipo,
+      horasSemanales: primeraJornada.horasSemanales || DEFAULT_JORNADA_FORM_VALUES.horasSemanales,
       horaEntrada:
-        validatedData.jornada.tipo === 'fija'
-          ? validatedData.jornada.horaEntrada || DEFAULT_JORNADA_FORM_VALUES.horaEntrada
-          : validatedData.jornada.horaEntrada || DEFAULT_JORNADA_FORM_VALUES.horaEntrada,
+        primeraJornada.tipo === 'fija'
+          ? primeraJornada.horaEntrada || DEFAULT_JORNADA_FORM_VALUES.horaEntrada
+          : primeraJornada.horaEntrada || DEFAULT_JORNADA_FORM_VALUES.horaEntrada,
       horaSalida:
-        validatedData.jornada.tipo === 'fija'
-          ? validatedData.jornada.horaSalida || DEFAULT_JORNADA_FORM_VALUES.horaSalida
-          : validatedData.jornada.horaSalida || DEFAULT_JORNADA_FORM_VALUES.horaSalida,
+        primeraJornada.tipo === 'fija'
+          ? primeraJornada.horaSalida || DEFAULT_JORNADA_FORM_VALUES.horaSalida
+          : primeraJornada.horaSalida || DEFAULT_JORNADA_FORM_VALUES.horaSalida,
     };
 
     const jornadaCreada = await prisma.$transaction(async (tx) => {
@@ -959,7 +979,16 @@ export async function invitarHRAdminAction({
       return { usuario, empleado };
     });
 
-    // 4. Crear invitación
+    // 4. Asegurar que las carpetas del sistema existan para el empleado
+    try {
+      await asegurarCarpetasSistemaParaEmpleado(result.empleado.id, session.user.empresaId);
+      console.log(`[invitarHRAdminAction] Carpetas del sistema aseguradas para ${result.empleado.id}`);
+    } catch (error) {
+      console.error('[invitarHRAdminAction] Error asegurando carpetas del sistema:', error);
+      // No fallar la invitación si falla la creación de carpetas
+    }
+
+    // 5. Crear invitación
     const invitacion = await crearInvitacion(
       result.empleado.id,
       session.user.empresaId,

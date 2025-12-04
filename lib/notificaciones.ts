@@ -654,7 +654,33 @@ export async function crearNotificacionFirmaCompletada(
 ) {
   const { empresaId, solicitudId, documentoId, documentoNombre, usuarioDestinoId, pdfFirmadoS3Key } = params;
 
-  const usuarioIds = usuarioDestinoId ? [usuarioDestinoId] : await obtenerUsuariosANotificar(prisma, empresaId, { hrAdmin: true });
+  let usuarioIds: string[] = [];
+
+  if (usuarioDestinoId) {
+    // El usuarioDestinoId puede ser un email o un userId
+    // Intentar buscar el usuario primero por email, luego por id
+    const usuario = await prisma.usuarios.findFirst({
+      where: {
+        empresaId,
+        OR: [
+          { email: usuarioDestinoId },
+          { id: usuarioDestinoId },
+        ],
+        activo: true,
+      },
+      select: { id: true },
+    });
+
+    if (usuario) {
+      usuarioIds = [usuario.id];
+    } else {
+      console.warn(`[crearNotificacionFirmaCompletada] Usuario no encontrado: ${usuarioDestinoId}`);
+      // Fallback: notificar a todos los HR admins
+      usuarioIds = await obtenerUsuariosANotificar(prisma, empresaId, { hrAdmin: true });
+    }
+  } else {
+    usuarioIds = await obtenerUsuariosANotificar(prisma, empresaId, { hrAdmin: true });
+  }
 
   if (!usuarioIds.length) {
     return;
@@ -2113,7 +2139,7 @@ export async function crearNotificacionDenunciaRecibida(
       denunciaId,
       esAnonima,
       prioridad: 'critica',
-      accionUrl: `/hr/organizacion/personas?panel=denuncias&denunciaId=${denunciaId}`,
+      accionUrl: `/hr/organizacion/equipos?panel=denuncias&denunciaId=${denunciaId}`,
       accionTexto: 'Revisar denuncia',
     },
   }, options);

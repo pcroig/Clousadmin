@@ -11,7 +11,10 @@ import { prisma } from '@/lib/prisma';
 import { EquiposClient } from './equipos-client';
 
 
-export default async function EquiposPage() {
+export default async function EquiposPage(props: {
+  searchParams: Promise<{ panel?: string; denunciaId?: string }>;
+}) {
+  const searchParams = await props.searchParams;
   const session = await getSession();
 
   if (!session || session.user.rol !== UsuarioRol.hr_admin) {
@@ -69,6 +72,7 @@ export default async function EquiposPage() {
       id: miembro.empleado.id,
       nombre: `${miembro.empleado.nombre} ${miembro.empleado.apellidos}`,
       avatar: miembro.empleado.fotoUrl || undefined,
+      fotoUrl: miembro.empleado.fotoUrl || undefined,
     })),
     sede: equipo.sede ? {
       id: equipo.sede.id,
@@ -78,5 +82,14 @@ export default async function EquiposPage() {
     sedeId: equipo.sedeId,
   }));
 
-  return <EquiposClient equipos={equiposData} />;
+  const panelParam = searchParams?.panel === 'denuncias' ? 'denuncias' : undefined;
+  const denunciaId = searchParams?.denunciaId;
+
+  return (
+    <EquiposClient
+      equipos={equiposData}
+      initialPanel={panelParam}
+      initialDenunciaId={denunciaId}
+    />
+  );
 }

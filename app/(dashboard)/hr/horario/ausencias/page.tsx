@@ -5,6 +5,7 @@
 import { redirect } from 'next/navigation';
 
 import { getSession } from '@/lib/auth';
+import { CAMPANAS_VACACIONES_ENABLED } from '@/lib/constants/feature-flags';
 import { UsuarioRol } from '@/lib/constants/enums';
 
 import { AusenciasClient } from './ausencias-client';
@@ -22,6 +23,11 @@ export default async function AusenciasPage(props: {
 
   const initialCampanasExpanded = searchParams?.panel === 'campanas';
 
-  return <AusenciasClient initialCampanasExpanded={initialCampanasExpanded} />;
+  return (
+    <AusenciasClient
+      initialCampanasExpanded={initialCampanasExpanded}
+      campanasEnabled={CAMPANAS_VACACIONES_ENABLED}
+    />
+  );
 }
 

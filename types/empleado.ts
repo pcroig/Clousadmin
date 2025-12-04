@@ -93,8 +93,9 @@ export interface MiEspacioPuesto {
 
 export interface MiEspacioJornada {
   id: string;
-  nombre: string;
-  horasSemanales: number | null;
+  etiqueta: string;
+  horasSemanales: number;
+  config: any; // JornadaConfig, but using any to avoid circular dependencies
 }
 
 export interface MiEspacioManager {

@@ -4,17 +4,20 @@
 
 'use client';
 
-import { Plus } from 'lucide-react';
+import { Flag, Plus } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 import { CompactFilterBar } from '@/components/adaptive/CompactFilterBar';
+import { DenunciasDetails } from '@/components/hr/denuncias-details';
 import { PageMobileHeader } from '@/components/layout/page-mobile-header';
 import { EquipoDetails } from '@/components/organizacion/equipo-details';
 import { EquipoFormModal } from '@/components/organizacion/equipo-form-modal';
 import { Column, DataTable } from '@/components/shared/data-table';
+import { EmployeeListPreview } from '@/components/shared/employee-list-preview';
 import { DetailsPanel } from '@/components/shared/details-panel';
 import { ExpandableSearch } from '@/components/shared/expandable-search';
 import { TableHeader } from '@/components/shared/table-header';
+import { Button } from '@/components/ui/button';
 import { useIsMobile } from '@/lib/hooks/use-viewport';
 
 interface Equipo {
@@ -27,6 +30,7 @@ interface Equipo {
   empleados: {
     id: string;
     nombre: string;
+    apellidos?: string | null;
     avatar?: string | null;
     fotoUrl?: string | null;
   }[];
@@ -40,13 +44,16 @@ interface Equipo {
 
 interface EquiposClientProps {
   equipos: Equipo[];
+  initialPanel?: 'denuncias';
+  initialDenunciaId?: string;
 }
 
-export function EquiposClient({ equipos: initialEquipos }: EquiposClientProps) {
+export function EquiposClient({ equipos: initialEquipos, initialPanel, initialDenunciaId }: EquiposClientProps) {
   const [equipos, setEquipos] = useState<Equipo[]>(initialEquipos);
   const [selectedEquipo, setSelectedEquipo] = useState<Equipo | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [denunciasDetailsOpen, setDenunciasDetailsOpen] = useState(initialPanel === 'denuncias');
   const [_filtersOpen, _setFiltersOpen] = useState(false);
   const isMobile = useIsMobile();
 
@@ -66,7 +73,8 @@ export function EquiposClient({ equipos: initialEquipos }: EquiposClientProps) {
       if (!response.ok) {
         throw new Error('Error al cargar equipos');
       }
-      const data = await response.json() as Record<string, unknown>;
+      const result = await response.json() as Record<string, unknown>;
+      const data = (result.data || result) as Record<string, unknown>;
 
       // Transform data to match the expected format
       interface ApiEquipo {
@@ -171,13 +179,18 @@ export function EquiposClient({ equipos: initialEquipos }: EquiposClientProps) {
       priority: 'medium',
     },
     {
-      id: 'numeroEmpleados',
+      id: 'empleados',
       header: 'Miembros',
       cell: (row) => (
-        <span className="text-gray-900 font-medium">{row.numeroEmpleados}</span>
+        <EmployeeListPreview
+          empleados={row.empleados}
+          maxVisible={3}
+          emptyLabel="Sin miembros"
+          dense
+        />
       ),
-      width: '15%',
-      priority: 'low',
+      width: '25%',
+      priority: 'medium',
     },
   ];
 
@@ -194,6 +207,11 @@ export function EquiposClient({ equipos: initialEquipos }: EquiposClientProps) {
                   label: 'Crear equipo',
                   onClick: () => setShowCreateModal(true),
                   isPrimary: true,
+                },
+                {
+                  icon: Flag,
+                  label: 'Canal de denuncias',
+                  onClick: () => setDenunciasDetailsOpen(true),
                 },
               ]}
             />
@@ -227,11 +245,20 @@ export function EquiposClient({ equipos: initialEquipos }: EquiposClientProps) {
                 onClick: () => setShowCreateModal(true),
               }}
               rightContent={(
-                <ExpandableSearch
-                  value={searchTerm}
-                  onChange={setSearchTerm}
-                  placeholder="Buscar equipo..."
-                />
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => setDenunciasDetailsOpen(true)}
+                  >
+                    <Flag className="h-4 w-4" />
+                    <span>Canal de denuncias</span>
+                  </Button>
+                  <ExpandableSearch
+                    value={searchTerm}
+                    onChange={setSearchTerm}
+                    placeholder="Buscar equipo..."
+                  />
+                </div>
               )}
             />
 
@@ -248,7 +275,7 @@ export function EquiposClient({ equipos: initialEquipos }: EquiposClientProps) {
           </>
         )}
 
-        {/* Details Panel */}
+        {/* Details Panel - Equipo */}
         <DetailsPanel
           isOpen={!!selectedEquipo}
           onClose={() => setSelectedEquipo(null)}
@@ -261,6 +288,18 @@ export function EquiposClient({ equipos: initialEquipos }: EquiposClientProps) {
               onDelete={handleTeamDeleted}
             />
           )}
+        </DetailsPanel>
+
+        {/* Details Panel - Denuncias */}
+        <DetailsPanel
+          isOpen={denunciasDetailsOpen}
+          onClose={() => setDenunciasDetailsOpen(false)}
+          title="Canal de Denuncias"
+        >
+          <DenunciasDetails
+            onClose={() => setDenunciasDetailsOpen(false)}
+            initialDenunciaId={initialDenunciaId}
+          />
         </DetailsPanel>
       </div>
 

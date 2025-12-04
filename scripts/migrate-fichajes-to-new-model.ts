@@ -117,6 +117,7 @@ async function migrateFichajes() {
           data: {
             empresaId,
             empleadoId,
+            jornadaId: null,
             fecha,
             estado: estadoFichaje,
             horasTrabajadas,

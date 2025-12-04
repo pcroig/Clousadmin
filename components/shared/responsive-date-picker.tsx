@@ -259,7 +259,13 @@ export function ResponsiveDateRangePicker({
 
   const handleSelect = (range: DateRange | undefined) => {
     if (range) {
-      onSelect(range);
+      // Si solo se selecciona 'from' (primer clic), forzar 'to' al mismo día
+      // Esto permite rangos de 1 día de forma natural
+      const normalizedRange: DateRange = {
+        from: range.from,
+        to: range.to ?? range.from,
+      };
+      onSelect(normalizedRange);
     }
   };
 

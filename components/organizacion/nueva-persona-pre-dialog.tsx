@@ -38,7 +38,7 @@ export function NuevaPersonaPreDialog({
           <button
             onClick={() => handleSelect('nuevo')}
             className={cn(
-              'group relative flex flex-col items-center gap-4 p-6 rounded-lg border-2 transition-all',
+              'group relative flex flex-col items-center gap-4 p-6 rounded-lg border border-gray-200 transition-all',
               'hover:border-primary hover:bg-primary/5 hover:shadow-md',
               'focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2'
             )}
@@ -58,7 +58,7 @@ export function NuevaPersonaPreDialog({
           <button
             onClick={() => handleSelect('existente')}
             className={cn(
-              'group relative flex flex-col items-center gap-4 p-6 rounded-lg border-2 transition-all',
+              'group relative flex flex-col items-center gap-4 p-6 rounded-lg border border-gray-200 transition-all',
               'hover:border-primary hover:bg-primary/5 hover:shadow-md',
               'focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2'
             )}

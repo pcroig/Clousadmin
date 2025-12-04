@@ -55,6 +55,7 @@ type SedeApi = Omit<Sede, 'equipos'> & {
 };
 
 interface EquiposResponse {
+  data?: Array<{ id: string; nombre?: string | null }>;
   equipos?: Array<{ id: string; nombre?: string | null }>;
 }
 
@@ -76,7 +77,7 @@ const normalizeSede = (sede: SedeApi): Sede => ({
 export function SedesForm({ sedesIniciales = [] }: SedesFormProps) {
   const [sedes, setSedes] = useState<Sede[]>(sedesIniciales);
   const [equipos, setEquipos] = useState<EquipoOption[]>([]);
-  const [ciudad, setCiudad] = useState('');
+  const [nombreSede, setNombreSede] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [asignacionNueva, setAsignacionNueva] = useState<TipoAsignacion>('empresa');
@@ -124,7 +125,9 @@ export function SedesForm({ sedesIniciales = [] }: SedesFormProps) {
         const data = await parseJson<EquiposResponse | EquipoOption[]>(response);
         const equiposList = Array.isArray(data)
           ? data
-          : Array.isArray(data?.equipos)
+          : Array.isArray(data?.data)
+            ? data.data ?? []
+            : Array.isArray(data?.equipos)
             ? data.equipos ?? []
             : [];
         const equiposTransformados: EquipoOption[] = equiposList.map((equipo) => ({
@@ -221,6 +224,12 @@ export function SedesForm({ sedesIniciales = [] }: SedesFormProps) {
     const asignacionSeleccionada = asignacionNueva;
     const equipoSeleccionado = equipoNuevo;
 
+    const nombreNormalizado = nombreSede.trim();
+    if (!nombreNormalizado) {
+      setError('Introduce un nombre válido para la sede');
+      return;
+    }
+
     if (asignacionSeleccionada === 'equipo' && !equipoSeleccionado) {
       setError('Selecciona un equipo para asignar la sede');
       return;
@@ -230,7 +239,7 @@ export function SedesForm({ sedesIniciales = [] }: SedesFormProps) {
 
     try {
       const result = await crearSedeAction({
-        ciudad,
+        ciudad: nombreNormalizado,
         asignacion:
           asignacionSeleccionada === 'empresa'
             ? { tipo: 'empresa' }
@@ -240,7 +249,7 @@ export function SedesForm({ sedesIniciales = [] }: SedesFormProps) {
       if (result.success && result.sede) {
         const nuevaSede = normalizeSede(result.sede as SedeApi);
         setSedes((prev) => [...prev, nuevaSede]);
-        setCiudad('');
+        setNombreSede('');
         setAsignacionNueva('empresa');
         setEquipoNuevo('');
         setAsignaciones((prev) => ({
@@ -287,17 +296,17 @@ export function SedesForm({ sedesIniciales = [] }: SedesFormProps) {
       {/* Formulario para agregar sede */}
       <form onSubmit={handleAgregarSede} className="space-y-4">
         <div className="space-y-2">
-          <Label htmlFor="ciudad">Ciudad de la sede *</Label>
+          <Label htmlFor="nombreSede">Nombre de la sede *</Label>
           <div className="flex gap-2">
             <Input
-              id="ciudad"
-              placeholder="ej. Madrid, Barcelona..."
-              value={ciudad}
-              onChange={(e) => setCiudad(e.target.value)}
+              id="nombreSede"
+              placeholder="Ej. Sede central, Barcelona..."
+              value={nombreSede}
+              onChange={(e) => setNombreSede(e.target.value)}
               required
               className="flex-1"
             />
-            <Button type="submit" disabled={loading || !ciudad.trim()}>
+            <Button type="submit" disabled={loading || !nombreSede.trim()}>
               {loading ? 'Agregando...' : 'Agregar'}
             </Button>
           </div>

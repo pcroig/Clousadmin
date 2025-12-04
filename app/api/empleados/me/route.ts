@@ -5,6 +5,7 @@
 import { NextRequest } from 'next/server';
 
 import { handleApiError, notFoundResponse, requireAuth, successResponse } from '@/lib/api-handler';
+import { mapJornadaConNombreYEtiqueta } from '@/lib/jornadas/mappers';
 import { prisma } from '@/lib/prisma';
 
 export async function GET(req: NextRequest) {
@@ -26,7 +27,6 @@ export async function GET(req: NextRequest) {
         jornada: {
           select: {
             id: true,
-            nombre: true,
             horasSemanales: true,
             config: true,
           },
@@ -38,7 +38,13 @@ export async function GET(req: NextRequest) {
       return notFoundResponse('Empleado no encontrado');
     }
 
-    return successResponse(empleado);
+    // Generate 'nombre' and 'etiqueta' fields for jornada if it exists
+    const empleadoConJornadaNombre = {
+      ...empleado,
+      jornada: empleado.jornada ? mapJornadaConNombreYEtiqueta(empleado.jornada) : null,
+    };
+
+    return successResponse(empleadoConJornadaNombre);
   } catch (error) {
     return handleApiError(error, 'API GET /api/empleados/me');
   }

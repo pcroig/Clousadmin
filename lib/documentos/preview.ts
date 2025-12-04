@@ -145,7 +145,12 @@ export async function getDocumentPreview(
   const documento = await prisma.documentos.findUnique({
     where: { id: documentoId },
     include: {
-      carpeta: true,
+      documento_carpetas: {
+        include: {
+          carpeta: true,
+        },
+        take: 1,
+      },
     },
   });
 
@@ -157,13 +162,22 @@ export async function getDocumentPreview(
     throw new Error('Documento no encontrado');
   }
 
-  // Validate permissions
-  if (documento.carpetaId) {
-    const hasAccess = await puedeAccederACarpeta(
-      documento.carpetaId,
-      userId,
-      userRole
-    );
+  // Validate permissions - check if user has access to any of the document's folders
+  if (documento.documento_carpetas.length > 0) {
+    let hasAccess = false;
+
+    for (const dc of documento.documento_carpetas) {
+      const canAccess = await puedeAccederACarpeta(
+        dc.carpetaId,
+        userId,
+        userRole
+      );
+
+      if (canAccess) {
+        hasAccess = true;
+        break;
+      }
+    }
 
     if (!hasAccess) {
       throw new Error('No tienes permisos para acceder a este documento');

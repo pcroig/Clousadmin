@@ -212,8 +212,18 @@ export async function loadEmpleadoExportData(
           id: true,
           nombre: true,
           tipoDocumento: true,
-          carpetaId: true,
           createdAt: true,
+          documento_carpetas: {
+            include: {
+              carpeta: {
+                select: {
+                  id: true,
+                  nombre: true,
+                },
+              },
+            },
+            take: 1,
+          },
         },
         orderBy: {
           createdAt: 'desc',
@@ -265,7 +275,13 @@ export async function loadEmpleadoExportData(
     ausencias: empleado.ausencias,
     fichajes: empleado.fichajes as unknown as FichajeWithEventos[],
     contratos: empleado.contratos as unknown as ContratoResumen[],
-    documentos: empleado.documentos,
+    documentos: empleado.documentos.map(doc => ({
+      id: doc.id,
+      nombre: doc.nombre,
+      tipoDocumento: doc.tipoDocumento,
+      carpetaId: doc.documento_carpetas[0]?.carpetaId || null,
+      createdAt: doc.createdAt,
+    })),
     auditoria,
   };
 }

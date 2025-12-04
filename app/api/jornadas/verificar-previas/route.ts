@@ -10,7 +10,9 @@ import {
   requireAuthAsHR,
   successResponse,
 } from '@/lib/api-handler';
+import { obtenerEtiquetaJornada } from '@/lib/jornadas/helpers';
 import { prisma } from '@/lib/prisma';
+import { decimalToNumber } from '@/lib/utils';
 
 interface EmpleadoConJornadaResumen {
   id: string;
@@ -19,7 +21,8 @@ interface EmpleadoConJornadaResumen {
   jornadaId: string | null;
   jornada: {
     id: string;
-    nombre: string;
+    horasSemanales: number;
+    config: unknown;
   } | null;
 }
 
@@ -57,7 +60,7 @@ export async function GET(req: NextRequest) {
 
     switch (nivel) {
       case 'empresa':
-        empleadosConJornadas = await prisma.empleados.findMany({
+        const empleadosEmpresa = await prisma.empleados.findMany({
           where: {
             empresaId: session.user.empresaId,
             activo: true,
@@ -71,11 +74,22 @@ export async function GET(req: NextRequest) {
             jornada: {
               select: {
                 id: true,
-                nombre: true,
+                horasSemanales: true,
+                config: true,
               },
             },
           },
         });
+        empleadosConJornadas = empleadosEmpresa.map((emp) => ({
+          ...emp,
+          jornada: emp.jornada
+            ? {
+                id: emp.jornada.id,
+                horasSemanales: decimalToNumber(emp.jornada.horasSemanales) ?? 0,
+                config: emp.jornada.config as unknown,
+              }
+            : null,
+        }));
         break;
 
       case 'equipo':
@@ -93,7 +107,7 @@ export async function GET(req: NextRequest) {
         const empleadoIdsEquipos = [...new Set(miembrosEquipos.map((m) => m.empleadoId))];
         
         if (empleadoIdsEquipos.length > 0) {
-          empleadosConJornadas = await prisma.empleados.findMany({
+          const empleadosEquipo = await prisma.empleados.findMany({
             where: {
               id: { in: empleadoIdsEquipos },
               empresaId: session.user.empresaId,
@@ -108,11 +122,22 @@ export async function GET(req: NextRequest) {
               jornada: {
                 select: {
                   id: true,
-                  nombre: true,
+                  horasSemanales: true,
+                  config: true,
                 },
               },
             },
           });
+          empleadosConJornadas = empleadosEquipo.map((emp) => ({
+            ...emp,
+            jornada: emp.jornada
+              ? {
+                  id: emp.jornada.id,
+                  horasSemanales: decimalToNumber(emp.jornada.horasSemanales) ?? 0,
+                  config: emp.jornada.config as unknown,
+                }
+              : null,
+          }));
         }
         break;
 
@@ -120,7 +145,7 @@ export async function GET(req: NextRequest) {
         if (!empleadoIds || empleadoIds.length === 0) {
           return badRequestResponse('Debes especificar al menos un empleado');
         }
-        empleadosConJornadas = await prisma.empleados.findMany({
+        const empleadosIndividual = await prisma.empleados.findMany({
           where: {
             id: { in: empleadoIds },
             empresaId: session.user.empresaId,
@@ -135,19 +160,36 @@ export async function GET(req: NextRequest) {
             jornada: {
               select: {
                 id: true,
-                nombre: true,
+                horasSemanales: true,
+                config: true,
               },
             },
           },
         });
+        empleadosConJornadas = empleadosIndividual.map((emp) => ({
+          ...emp,
+          jornada: emp.jornada
+            ? {
+                id: emp.jornada.id,
+                horasSemanales: decimalToNumber(emp.jornada.horasSemanales) ?? 0,
+                config: emp.jornada.config as unknown,
+              }
+            : null,
+        }));
         break;
     }
 
     // Agrupar por jornada
     const jornadasPorNombre: Record<string, JornadaAgrupada> = {};
-    
+
     empleadosConJornadas.forEach((empleado) => {
-      const nombreJornada = empleado.jornada?.nombre || 'Sin nombre';
+      const nombreJornada = empleado.jornada
+        ? obtenerEtiquetaJornada({
+            id: empleado.jornada.id,
+            horasSemanales: empleado.jornada.horasSemanales,
+            config: empleado.jornada.config as any,
+          })
+        : 'Sin jornada';
       if (!jornadasPorNombre[nombreJornada]) {
         jornadasPorNombre[nombreJornada] = {
           nombre: nombreJornada,

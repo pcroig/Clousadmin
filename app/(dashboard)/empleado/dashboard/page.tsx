@@ -8,6 +8,7 @@ import { calcularSaldoDisponible } from '@/lib/calculos/ausencias';
 import { obtenerResumenPlantillaEquipo, type PlantillaResumen } from '@/lib/calculos/plantilla';
 import { EstadoAusencia, PeriodoMedioDiaValue, UsuarioRol } from '@/lib/constants/enums';
 import { prisma } from '@/lib/prisma';
+import { CAMPANAS_VACACIONES_ENABLED } from '@/lib/constants/feature-flags';
 import { obtenerCampanaPendiente, obtenerPropuestaPendiente } from '@/lib/services/campanas-vacaciones';
 
 import { EmpleadoDashboardClient } from './dashboard-client';
@@ -133,8 +134,12 @@ async function obtenerDatosDashboard(session: { user: { id: string; empresaId: s
   });
 
   // Buscar campaña activa con preferencia pendiente del empleado
-  const campanaPendiente = await obtenerCampanaPendiente(empleado.id, session.user.empresaId);
-  const campanaPropuesta = await obtenerPropuestaPendiente(empleado.id, session.user.empresaId);
+  const campanaPendiente = CAMPANAS_VACACIONES_ENABLED
+    ? await obtenerCampanaPendiente(empleado.id, session.user.empresaId)
+    : null;
+  const campanaPropuesta = CAMPANAS_VACACIONES_ENABLED
+    ? await obtenerPropuestaPendiente(empleado.id, session.user.empresaId)
+    : null;
 
   const notificaciones: NotificacionUI[] = notificacionesDb.map((notif) => ({
     id: notif.id,
@@ -312,6 +317,7 @@ export default async function EmpleadoDashboardPage() {
       ausenciasPasadas={dashboardData.ausenciasPasadasItems}
       campanaPendiente={dashboardData.campanaPendiente}
       campanaPropuesta={dashboardData.campanaPropuesta}
+      campanasEnabled={CAMPANAS_VACACIONES_ENABLED}
       equipoResumen={dashboardData.equipoResumen}
     />
   );

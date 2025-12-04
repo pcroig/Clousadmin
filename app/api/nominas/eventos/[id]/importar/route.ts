@@ -192,19 +192,30 @@ export async function POST(
           continue; // Pasar al siguiente archivo
         }
 
-        // Crear documento
-        const documento = await prisma.documentos.create({
-          data: {
-            empresaId: session.user.empresaId,
-            empleadoId: nomina.empleadoId,
-            carpetaId: carpetaNominas.id,
-            nombre: `Nómina ${evento.mes}/${evento.anio}`,
-            tipoDocumento: 'nomina',
-            mimeType: 'application/pdf',
-            tamano: file.size,
-            s3Key,
-            s3Bucket: process.env.STORAGE_BUCKET || 'local',
-          },
+        // Crear documento y asociar a carpeta en transacción
+        const documento = await prisma.$transaction(async (txDoc) => {
+          const doc = await txDoc.documentos.create({
+            data: {
+              empresaId: session.user.empresaId,
+              empleadoId: nomina.empleadoId,
+              nombre: `Nómina ${evento.mes}/${evento.anio}`,
+              tipoDocumento: 'nomina',
+              mimeType: 'application/pdf',
+              tamano: file.size,
+              s3Key,
+              s3Bucket: process.env.STORAGE_BUCKET || 'local',
+            },
+          });
+
+          // Asociar a carpeta usando tabla intermedia
+          await txDoc.documento_carpetas.create({
+            data: {
+              documentoId: doc.id,
+              carpetaId: carpetaNominas.id,
+            },
+          });
+
+          return doc;
         });
 
         // Vincular documento a nómina y actualizar a estado 'completada'

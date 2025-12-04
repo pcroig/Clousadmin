@@ -17,3 +17,6 @@ export * from './validacion';
 
 // Marcas visuales en PDFs
 export * from './pdf-marca';
+
+// Utilidades de posición
+export * from './posicion-utils';

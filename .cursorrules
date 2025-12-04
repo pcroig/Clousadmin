@@ -110,6 +110,16 @@ npx prisma migrate dev --name descripcion_cambio
 - .next/
 - Backups (.env.backup.*)
 
+## Documentación
+
+### Mantener documentación actualizada
+- **Preferir actualizar documentación existente** cuando ya existe documentación sobre el tema
+- Si no existe documentación previa, crear nueva documentación de forma concisa
+- Si no existe la sección, crearla de forma concisa
+- **Objetivo**: Mantener la documentación actualizada y bien organizada a medida que se hacen cambios
+- Buscar documentación existente en `docs/` antes de crear nueva
+- Actualizar índices y referencias cuando se modifique documentación
+
 ## Arquitectura y Escalabilidad
 
 ### Modelos de datos (Prisma)

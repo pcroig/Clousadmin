@@ -13,7 +13,7 @@ import {
 import { calcularAntiguedad, obtenerRangoFechaAntiguedad } from '@/lib/calculos/antiguedad';
 import { EstadoFichaje } from '@/lib/constants/enums';
 import { prisma } from '@/lib/prisma';
-import { obtenerInicioMesActual, obtenerFinMesActual } from '@/lib/utils/fechas';
+import { obtenerFinMesActual, obtenerInicioMesActual } from '@/lib/utils/fechas';
 
 import type { Prisma } from '@prisma/client';
 
@@ -238,6 +238,101 @@ export async function GET(request: NextRequest) {
     ];
 
     XLSX.utils.book_append_sheet(workbook, wsFichajes, 'Fichajes');
+
+    // ====================================
+    // Hoja 5: Brechas y Equidad
+    // ====================================
+    
+    // Obtener datos adicionales para análisis de brechas
+    const empleadosConDetalles = await prisma.empleados.findMany({
+      where,
+      select: {
+        id: true,
+        nombre: true,
+        apellidos: true,
+        email: true,
+        genero: true,
+        fechaAlta: true,
+        fechaNacimiento: true,
+        salarioBaseMensual: true,
+        puesto: true,
+        puestoRelacion: {
+          select: {
+            nombre: true,
+          },
+        },
+        managerId: true,
+        equipos: {
+          select: {
+            equipo: {
+              select: {
+                nombre: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    // Función helper para calcular edad
+    const calcularEdad = (fechaNacimiento: Date): number => {
+      const hoy = new Date();
+      let edad = hoy.getFullYear() - fechaNacimiento.getFullYear();
+      const mes = hoy.getMonth() - fechaNacimiento.getMonth();
+      if (mes < 0 || (mes === 0 && hoy.getDate() < fechaNacimiento.getDate())) {
+        edad--;
+      }
+      return edad;
+    };
+
+    // Función helper para determinar rango de edad
+    const obtenerRangoEdad = (edad: number): string => {
+      if (edad < 30) return '< 30 años';
+      if (edad < 40) return '30-40 años';
+      if (edad < 50) return '40-50 años';
+      return '50+ años';
+    };
+
+    const brechasData = empleadosConDetalles.map((e) => {
+      const edad = e.fechaNacimiento ? calcularEdad(new Date(e.fechaNacimiento)) : null;
+      const rangoEdad = edad ? obtenerRangoEdad(edad) : 'No disponible';
+      
+      return {
+        Nombre: e.nombre,
+        Apellidos: e.apellidos,
+        Email: e.email,
+        Género: e.genero || 'No especificado',
+        'Edad (años)': edad ?? 'N/A',
+        'Rango Edad': rangoEdad,
+        'Puesto': e.puestoRelacion?.nombre || 'Sin puesto',
+        'Equipos': equiposToLabel(e.equipos),
+        'Es Manager': empleadosConDetalles.some(emp => emp.managerId === e.id) ? 'Sí' : 'No',
+        'Salario Base Mensual': e.salarioBaseMensual 
+          ? `${Number(e.salarioBaseMensual).toFixed(2)}€` 
+          : 'N/A',
+        'Fecha Alta': e.fechaAlta.toLocaleDateString('es-ES'),
+        'Antigüedad': formatearAntiguedad(e.fechaAlta),
+      };
+    });
+
+    const wsBrechas = XLSX.utils.json_to_sheet(brechasData);
+
+    wsBrechas['!cols'] = [
+      { wch: 15 }, // Nombre
+      { wch: 20 }, // Apellidos
+      { wch: 30 }, // Email
+      { wch: 15 }, // Género
+      { wch: 12 }, // Edad (años)
+      { wch: 15 }, // Rango Edad
+      { wch: 20 }, // Puesto
+      { wch: 20 }, // Equipos
+      { wch: 12 }, // Es Manager
+      { wch: 20 }, // Salario Base Mensual
+      { wch: 12 }, // Fecha Alta
+      { wch: 15 }, // Antigüedad
+    ];
+
+    XLSX.utils.book_append_sheet(workbook, wsBrechas, 'Brechas y Equidad');
 
     // Generar buffer del archivo Excel
     const excelBuffer = XLSX.write(workbook, {

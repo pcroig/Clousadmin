@@ -42,14 +42,25 @@ export async function GET(
     const carpeta = await prisma.carpetas.findUnique({
       where: { id },
       include: {
-        documentos: {
-          orderBy: { createdAt: 'desc' },
+        documento_carpetas: {
+          include: {
+            documento: true,
+          },
+          orderBy: {
+            documento: {
+              createdAt: 'desc',
+            },
+          },
         },
         subcarpetas: {
           include: {
-            documentos: {
-              select: {
-                id: true,
+            documento_carpetas: {
+              include: {
+                documento: {
+                  select: {
+                    id: true,
+                  },
+                },
               },
             },
           },
@@ -105,7 +116,7 @@ export async function DELETE(
     const carpeta = await prisma.carpetas.findUnique({
       where: { id },
       include: {
-        documentos: true,
+        documento_carpetas: true,
         subcarpetas: true,
       },
     });
@@ -123,7 +134,7 @@ export async function DELETE(
     }
 
     // Verificar que esté vacía
-    if (carpeta.documentos.length > 0 || carpeta.subcarpetas.length > 0) {
+    if (carpeta.documento_carpetas.length > 0 || carpeta.subcarpetas.length > 0) {
       return NextResponse.json(
         { error: 'No se puede eliminar una carpeta que contiene documentos o subcarpetas' },
         { status: 400 }
@@ -184,12 +195,89 @@ export async function PATCH(
       );
     }
 
-    // No permitir editar carpetas del sistema
+    // Carpetas del sistema solo permiten editar asignadoA si son compartidas
     if (carpeta.esSistema) {
-      return NextResponse.json(
-        { error: 'No se pueden editar carpetas del sistema' },
-        { status: 400 }
-      );
+      // Si es del sistema, solo permitir editar asignadoA y solo si es compartida
+      if (compartida !== undefined) {
+        return NextResponse.json(
+          { error: 'No se puede cambiar el estado compartido de carpetas del sistema' },
+          { status: 400 }
+        );
+      }
+
+      if (!carpeta.compartida) {
+        return NextResponse.json(
+          { error: 'No se pueden editar carpetas del sistema que no son compartidas' },
+          { status: 400 }
+        );
+      }
+
+      // Solo permitir editar asignadoA para carpetas del sistema compartidas
+      if (asignadoA === undefined) {
+        return NextResponse.json(
+          { error: 'Debes proporcionar asignadoA para editar' },
+          { status: 400 }
+        );
+      }
+    }
+
+    // Validar asignadoA si se proporciona
+    if (asignadoA !== undefined && asignadoA !== null) {
+      if (typeof asignadoA !== 'string') {
+        return NextResponse.json(
+          { error: 'El campo asignadoA debe ser un string' },
+          { status: 400 }
+        );
+      }
+
+      // Validar formato
+      if (asignadoA !== 'todos' && !asignadoA.startsWith('equipo:') && !asignadoA.includes('empleado:')) {
+        return NextResponse.json(
+          { error: 'Formato de asignadoA inválido. Usa "todos", "equipo:id" o "empleado:id1,empleado:id2"' },
+          { status: 400 }
+        );
+      }
+
+      // Si es un equipo, verificar que existe
+      if (asignadoA.startsWith('equipo:')) {
+        const equipoId = asignadoA.replace('equipo:', '');
+        const equipo = await prisma.equipos.findUnique({
+          where: { id: equipoId },
+          select: { empresaId: true },
+        });
+
+        if (!equipo || equipo.empresaId !== session.user.empresaId) {
+          return NextResponse.json(
+            { error: 'Equipo no encontrado o no pertenece a tu empresa' },
+            { status: 404 }
+          );
+        }
+      }
+
+      // Si son empleados específicos, verificar que existen
+      if (asignadoA.includes('empleado:')) {
+        const empleadoIds = asignadoA
+          .split(',')
+          .filter((item) => item.trim().startsWith('empleado:'))
+          .map((item) => item.trim().replace('empleado:', ''));
+
+        if (empleadoIds.length > 0) {
+          const empleadosExistentes = await prisma.empleados.count({
+            where: {
+              id: { in: empleadoIds },
+              empresaId: session.user.empresaId,
+              activo: true,
+            },
+          });
+
+          if (empleadosExistentes !== empleadoIds.length) {
+            return NextResponse.json(
+              { error: 'Algunos empleados no existen, no están activos o no pertenecen a tu empresa' },
+              { status: 400 }
+            );
+          }
+        }
+      }
     }
 
     // Construir datos de actualización
@@ -225,6 +313,7 @@ export async function PATCH(
 
     return NextResponse.json({
       success: true,
+      message: 'Carpeta actualizada correctamente',
       carpeta: carpetaActualizada,
     });
   } catch (error) {

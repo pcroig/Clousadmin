@@ -4,20 +4,17 @@
 
 'use client';
 
-import { Flag, Plus, Settings } from 'lucide-react';
+import { Plus, Settings } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
 import { CompactFilterBar } from '@/components/adaptive/CompactFilterBar';
-import { DenunciasDetails } from '@/components/hr/denuncias-details';
 import { GestionarOnboardingModal } from '@/components/hr/gestionar-onboarding-modal';
 import { PageMobileHeader } from '@/components/layout/page-mobile-header';
 import { AddPersonaDialog } from '@/components/organizacion/add-persona-dialog';
 import { AvatarCell, Column, DataTable } from '@/components/shared/data-table';
-import { DetailsPanel } from '@/components/shared/details-panel';
 import { ExpandableSearch } from '@/components/shared/expandable-search';
 import { TableHeader } from '@/components/shared/table-header';
-import { Button } from '@/components/ui/button';
 import { useIsMobile } from '@/lib/hooks/use-viewport';
 
 
@@ -52,16 +49,13 @@ interface Empleado {
 
 interface PersonasClientProps {
   empleados: Empleado[];
-  initialPanel?: 'denuncias';
-  initialDenunciaId?: string;
 }
 
-export function PersonasClient({ empleados, initialPanel, initialDenunciaId }: PersonasClientProps) {
+export function PersonasClient({ empleados }: PersonasClientProps) {
   const router = useRouter();
   const [searchTerm, setSearchTerm] = useState('');
   const [addPersonaDialogOpen, setAddPersonaDialogOpen] = useState(false);
   const [gestionarOnboardingOpen, setGestionarOnboardingOpen] = useState(false);
-  const [denunciasDetailsOpen, setDenunciasDetailsOpen] = useState(initialPanel === 'denuncias');
   const [_filtersOpen, _setFiltersOpen] = useState(false);
   const isMobile = useIsMobile();
 
@@ -158,11 +152,6 @@ export function PersonasClient({ empleados, initialPanel, initialDenunciaId }: P
                 isPrimary: true,
               },
               {
-                icon: Flag,
-                label: 'Canal de denuncias',
-                onClick: () => setDenunciasDetailsOpen(true),
-              },
-              {
                 icon: Settings,
                 label: 'Gestionar onboarding',
                 onClick: () => setGestionarOnboardingOpen(true),
@@ -204,22 +193,11 @@ export function PersonasClient({ empleados, initialPanel, initialDenunciaId }: P
               variant: 'outline',
             }}
             rightContent={(
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setDenunciasDetailsOpen(true)}
-                  className="gap-2"
-                >
-                  <Flag className="h-4 w-4" />
-                  <span>Canal de denuncias</span>
-                </Button>
-                <ExpandableSearch
-                  value={searchTerm}
-                  onChange={setSearchTerm}
-                  placeholder="Buscar persona..."
-                />
-              </div>
+              <ExpandableSearch
+                value={searchTerm}
+                onChange={setSearchTerm}
+                placeholder="Buscar persona..."
+              />
             )}
           />
 
@@ -251,18 +229,6 @@ export function PersonasClient({ empleados, initialPanel, initialDenunciaId }: P
         open={gestionarOnboardingOpen}
         onOpenChange={setGestionarOnboardingOpen}
       />
-
-      {/* Panel de Denuncias */}
-      <DetailsPanel
-        isOpen={denunciasDetailsOpen}
-        onClose={() => setDenunciasDetailsOpen(false)}
-        title="Canal de Denuncias"
-      >
-        <DenunciasDetails
-          onClose={() => setDenunciasDetailsOpen(false)}
-          initialDenunciaId={initialDenunciaId}
-        />
-      </DetailsPanel>
     </div>
   );
 }
