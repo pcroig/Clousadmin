@@ -23,6 +23,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { obtenerEtiquetaJornada } from '@/lib/jornadas/helpers';
 import { parseJson } from '@/lib/utils/json';
 
 import { EditarJornadaModal, type JornadaDetalle } from './editar-jornada-modal';
@@ -44,7 +45,6 @@ const getDiaConfig = (config: JornadaConfig | null | undefined, dia: DiaKey): Di
 
 interface JornadaResumen {
   id: string;
-  nombre: string;
   horasSemanales: number;
   config: JornadaConfig | null;
   activa: boolean;
@@ -186,7 +186,13 @@ export function JornadasModal({ open, onClose }: JornadasModalProps) {
                   jornadas.map((jornada) => (
                     <TableRow key={jornada.id}>
                       <TableCell>
-                        <div className="font-medium text-gray-900">{jornada.nombre}</div>
+                        <div className="font-medium text-gray-900">
+                          {obtenerEtiquetaJornada({
+                            horasSemanales: jornada.horasSemanales,
+                            config: jornada.config,
+                            id: jornada.id,
+                          })}
+                        </div>
                       </TableCell>
                       <TableCell>{getTipoBadge(jornada)}</TableCell>
                       <TableCell>{jornada.horasSemanales}h</TableCell>

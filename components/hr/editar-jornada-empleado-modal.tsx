@@ -36,22 +36,27 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { obtenerEtiquetaJornada } from '@/lib/jornadas/helpers';
 import { parseJson } from '@/lib/utils/json';
+
+import type { JornadaConfig } from '@/lib/calculos/fichajes-helpers';
 
 interface Jornada {
   id: string;
-  nombre: string;
   horasSemanales: number;
+  config: JornadaConfig | null;
 }
 
 interface JornadaPrevia {
   id: string;
-  nombre: string;
+  horasSemanales: number;
+  config: JornadaConfig | null;
 }
 
 interface JornadaNueva {
   id: string;
-  nombre: string;
+  horasSemanales: number;
+  config: JornadaConfig | null;
 }
 
 interface EditarJornadaEmpleadoModalProps {
@@ -60,7 +65,8 @@ interface EditarJornadaEmpleadoModalProps {
   empleadoNombre: string;
   jornadaActual?: {
     id: string;
-    nombre: string;
+    horasSemanales: number;
+    config: JornadaConfig | null;
   } | null;
   onClose: () => void;
 }
@@ -197,7 +203,13 @@ export function EditarJornadaEmpleadoModal({
             {jornadaActual && (
               <div className="mb-4 rounded-lg bg-gray-50 p-4">
                 <p className="text-sm font-medium text-gray-700">Jornada actual:</p>
-                <p className="text-base font-semibold text-gray-900">{jornadaActual.nombre}</p>
+                <p className="text-base font-semibold text-gray-900">
+                  {obtenerEtiquetaJornada({
+                    horasSemanales: jornadaActual.horasSemanales,
+                    config: jornadaActual.config,
+                    id: jornadaActual.id,
+                  })}
+                </p>
               </div>
             )}
 
@@ -223,7 +235,11 @@ export function EditarJornadaEmpleadoModal({
                   ) : (
                     jornadas.map((jornada) => (
                       <SelectItem key={jornada.id} value={jornada.id}>
-                        {jornada.nombre} ({jornada.horasSemanales}h semanales)
+                        {obtenerEtiquetaJornada({
+                          horasSemanales: jornada.horasSemanales,
+                          config: jornada.config,
+                          id: jornada.id,
+                        })}
                       </SelectItem>
                     ))
                   )}
@@ -261,13 +277,21 @@ export function EditarJornadaEmpleadoModal({
                 <div>
                   <span className="font-medium text-gray-700">Jornada actual:</span>
                   <span className="ml-2 font-semibold text-gray-900">
-                    {jornadaPrevia?.nombre}
+                    {jornadaPrevia && obtenerEtiquetaJornada({
+                      horasSemanales: jornadaPrevia.horasSemanales,
+                      config: jornadaPrevia.config,
+                      id: jornadaPrevia.id,
+                    })}
                   </span>
                 </div>
                 <div>
                   <span className="font-medium text-gray-700">Nueva jornada:</span>
                   <span className="ml-2 font-semibold text-emerald-600">
-                    {jornadaNueva?.nombre}
+                    {jornadaNueva && obtenerEtiquetaJornada({
+                      horasSemanales: jornadaNueva.horasSemanales,
+                      config: jornadaNueva.config,
+                      id: jornadaNueva.id,
+                    })}
                   </span>
                 </div>
               </div>

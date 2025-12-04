@@ -12,6 +12,7 @@ import {
   successResponse,
   validateRequest,
 } from '@/lib/api-handler';
+import { obtenerEtiquetaJornada } from '@/lib/jornadas/helpers';
 import { prisma } from '@/lib/prisma';
 import { idSchema } from '@/lib/validaciones/schemas';
 import { z } from 'zod';
@@ -23,7 +24,8 @@ interface EmpleadoConJornadaResumen {
   jornadaId: string | null;
   jornada: {
     id: string;
-    // NOTE: 'nombre' field has been removed from Jornada model
+    horasSemanales: number;
+    config: unknown; // JornadaConfig
   } | null;
 }
 
@@ -83,7 +85,8 @@ export async function POST(req: NextRequest) {
             jornada: {
               select: {
                 id: true,
-                // NOTE: 'nombre' field removed from Jornada model
+                horasSemanales: true,
+                config: true,
               },
             },
           },
@@ -124,7 +127,8 @@ export async function POST(req: NextRequest) {
               jornada: {
                 select: {
                   id: true,
-                  nombre: true,
+                  horasSemanales: true,
+                  config: true,
                 },
               },
             },
@@ -155,7 +159,8 @@ export async function POST(req: NextRequest) {
             jornada: {
               select: {
                 id: true,
-                // NOTE: 'nombre' field removed from Jornada model
+                horasSemanales: true,
+                config: true,
               },
             },
           },
@@ -163,10 +168,17 @@ export async function POST(req: NextRequest) {
         break;
     }
 
-    // Obtener nombres únicos de jornadas previas
+    // Obtener etiquetas únicas de jornadas previas
     const jornadasPrevias = empleadosConJornadasPrevias
-      .map((empleado) => empleado.jornada?.nombre)
-      .filter((nombre): nombre is string => Boolean(nombre));
+      .map((empleado) => {
+        if (!empleado.jornada) return null;
+        return obtenerEtiquetaJornada({
+          horasSemanales: empleado.jornada.horasSemanales,
+          config: empleado.jornada.config as any,
+          id: empleado.jornada.id,
+        });
+      })
+      .filter((etiqueta): etiqueta is string => Boolean(etiqueta));
     jornadasPreviasUnicas = [...new Set(jornadasPrevias)];
 
     let empleadosActualizados = 0;
@@ -247,7 +259,11 @@ export async function POST(req: NextRequest) {
       } : null,
       jornada: {
         id: jornada.id,
-        nombre: jornada.nombre,
+        etiqueta: obtenerEtiquetaJornada({
+          horasSemanales: jornada.horasSemanales,
+          config: jornada.config as any,
+          id: jornada.id,
+        }),
       },
     });
   } catch (error) {
