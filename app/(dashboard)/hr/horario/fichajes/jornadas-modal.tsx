@@ -112,7 +112,8 @@ export function JornadasModal({ open, onClose }: JornadasModalProps) {
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   // Hooks
-  const { data: jornadas = [], loading, execute: refetchJornadas } = useApi<Jornada[]>();
+  const { data: jornadasData, loading, execute: refetchJornadas } = useApi<Jornada[]>();
+  const jornadas = jornadasData ?? [];
   const { validar, mostrarErrores } = useValidacionJornadas();
 
   const { mutate: eliminarJornada } = useMutation<void, void>({
