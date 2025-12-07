@@ -73,8 +73,6 @@ export async function GET(
             id: true,
             nombre: true,
             descripcion: true,
-            importeFijo: true,
-            esImporteFijo: true,
           },
         },
       },
@@ -106,7 +104,7 @@ export async function GET(
       pendientes: complementosFiltrados.filter((c) => !c.validado && !c.rechazado).length,
       rechazados: complementosFiltrados.filter((c) => c.rechazado).length,
       variables: complementosFiltrados.filter(
-        (c) => !c.importePersonalizado && !c.tipoComplemento.importeFijo
+        (c) => !c.esImporteFijo && Number(c.importePersonalizado) === 0
       ).length,
     };
 

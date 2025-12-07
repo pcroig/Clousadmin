@@ -5,6 +5,7 @@
 
 import { EstadoFichaje } from '@/lib/constants/enums';
 import { toMadridDate } from '@/lib/utils/fechas';
+import { calcularProgresoEventos } from '@/lib/calculos/fichajes-cliente';
 
 const HORAS_OBJETIVO_POR_DEFECTO = 8;
 
@@ -189,18 +190,36 @@ export function agruparFichajesEnJornadas(
       const entrada = parseHoraToDate(entradaEvento?.hora);
       const salida = parseHoraToDate(salidaEvento?.hora);
 
-      const horasTrabajadasRaw =
-        parseHorasTrabajadas(
+      // FIX CRÍTICO: Para fichajes en curso, calcular horas en tiempo real desde eventos
+      const estadoNormalizado = (fichajeBase.estado ?? EstadoFichaje.finalizado).toString();
+      const esEnCurso = estadoNormalizado === EstadoFichaje.en_curso;
+
+      let horasTrabajadas = 0;
+      if (esEnCurso && eventosOrdenados.length > 0) {
+        // Calcular horas en tiempo real desde eventos (mismo cálculo que el widget)
+        const { horasAcumuladas, horaEnCurso } = calcularProgresoEventos(eventosOrdenados);
+        if (horaEnCurso) {
+          // Hay tramo abierto: sumar horas acumuladas + tiempo desde último evento hasta ahora
+          const ahora = new Date();
+          const horasDesdeUltimoEvento = (ahora.getTime() - horaEnCurso.getTime()) / (1000 * 60 * 60);
+          horasTrabajadas = horasAcumuladas + horasDesdeUltimoEvento;
+        } else {
+          horasTrabajadas = horasAcumuladas;
+        }
+      } else {
+        // Fichaje finalizado: usar horas almacenadas en BD
+        const horasTrabajadasRaw = parseHorasTrabajadas(
           fichajesDelDia.find((f) => f.horasTrabajadas !== null && f.horasTrabajadas !== undefined)?.horasTrabajadas,
         );
+        horasTrabajadas = horasTrabajadasRaw;
 
-      let horasTrabajadas = horasTrabajadasRaw;
-      if (horasTrabajadas === 0 && entrada && salida) {
-        horasTrabajadas = (salida.getTime() - entrada.getTime()) / (1000 * 60 * 60);
+        // Fallback: si no hay horas en BD pero hay entrada y salida, calcular manualmente
+        if (horasTrabajadas === 0 && entrada && salida) {
+          horasTrabajadas = (salida.getTime() - entrada.getTime()) / (1000 * 60 * 60);
+        }
       }
 
       const balance = Number((horasTrabajadas - horasObjetivo).toFixed(2));
-      const estadoNormalizado = (fichajeBase.estado ?? EstadoFichaje.finalizado).toString();
       const { fechaDate } = normalizarFecha(fichajeBase.fecha);
 
       const fichajeNormalizado: FichajeNormalizado = {

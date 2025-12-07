@@ -251,6 +251,17 @@ export function CuadrarFichajesClient() {
         `Fichajes cuadrados: ${cuadrados}` + (errores.length ? `. Con incidencias: ${errores.length}` : '')
       );
 
+      if (errores.length > 0) {
+        errores.slice(0, 3).forEach((err) => {
+          if (typeof err === 'string') {
+            toast.warning(err, { duration: 5000 });
+          }
+        });
+        if (errores.length > 3) {
+          toast.info(`... y ${errores.length - 3} errores más`, { duration: 3000 });
+        }
+      }
+
       await fetchFichajesRevision();
     } catch (error) {
       console.error('[Cuadrar fichajes] Error actualizando:', error);

@@ -14,8 +14,6 @@ import { getJsonBody } from '@/lib/utils/json';
 const TipoComplementoSchema = z.object({
   nombre: z.string().min(1).max(200),
   descripcion: z.string().optional(),
-  esImporteFijo: z.boolean(),
-  importeFijo: z.number().optional(),
 });
 
 // ========================================
@@ -81,21 +79,11 @@ export async function POST(req: NextRequest) {
     const payload = await getJsonBody<Record<string, unknown>>(req);
     const data = TipoComplementoSchema.parse(payload);
 
-    // Validación: Si es importe fijo, debe tener importeFijo
-    if (data.esImporteFijo && !data.importeFijo) {
-      return NextResponse.json(
-        { error: 'Debe especificar el importe fijo' },
-        { status: 400 }
-      );
-    }
-
     const tipoComplemento = await prisma.tipos_complemento.create({
       data: {
         empresaId: session.user.empresaId,
         nombre: data.nombre,
         descripcion: data.descripcion || null,
-        esImporteFijo: data.esImporteFijo,
-        importeFijo: data.importeFijo || null,
       },
     });
 

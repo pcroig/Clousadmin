@@ -69,8 +69,18 @@ export function DocumentosTab({ empleado }: DocumentosTabProps) {
   const handleCarpetaClick = useCallback(
     (carpetaId: string) => {
       // Navegar a la carpeta según el contexto
-      const basePath = pathname?.includes('/hr/') ? '/hr' : '/empleado/mi-espacio';
-      router.push(`${basePath}/documentos/${carpetaId}`);
+      let targetUrl = `/empleado/mi-espacio/documentos/${carpetaId}`;
+
+      if (pathname?.includes('/hr/mi-espacio')) {
+        targetUrl = `/hr/mi-espacio/documentos/${carpetaId}`;
+      } else if (pathname?.includes('/manager/mi-espacio')) {
+        targetUrl = `/manager/mi-espacio/documentos/${carpetaId}`;
+      } else if (pathname?.includes('/hr/organizacion/personas/')) {
+        // Desde vista de empleado individual en HR, usar vista global de documentos
+        targetUrl = `/hr/documentos/${carpetaId}`;
+      }
+
+      router.push(targetUrl);
     },
     [pathname, router]
   );

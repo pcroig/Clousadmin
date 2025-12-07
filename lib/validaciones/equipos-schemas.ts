@@ -72,3 +72,7 @@ export const politicaAusenciasSchema = z.object({
 export type PoliticaAusenciasInput = z.infer<typeof politicaAusenciasSchema>;
 
 
+
+
+
+

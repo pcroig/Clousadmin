@@ -88,34 +88,16 @@ export default async function MiEspacioDocumentosPage() {
     });
   }
 
-  // DEBUG: Log para analizar
-  console.log('[DEBUG Carpetas Compartidas] Empleado ID:', empleado.id);
-  console.log('[DEBUG Carpetas Compartidas] Equipos del empleado:', equipoIds);
-  console.log('[DEBUG Carpetas Compartidas] Cláusulas OR:', JSON.stringify(clausulasOR, null, 2));
-
-  // DEBUG: Ver TODAS las carpetas compartidas en la empresa
-  const todasCarpetasCompartidasEmpresa = await prisma.carpetas.findMany({
-    where: {
-      empresaId: session.user.empresaId,
-      empleadoId: null,
-      compartida: true,
-    },
-    select: {
-      id: true,
-      nombre: true,
-      compartida: true,
-      asignadoA: true,
-      esSistema: true,
-    },
-  });
-  console.log('[DEBUG Carpetas Compartidas] TODAS en empresa:', todasCarpetasCompartidasEmpresa);
-
   // Obtener carpetas compartidas accesibles por el empleado
+  // EXCLUIR carpetas master de HR (asignadoA = 'hr') que son solo para /hr/documentos
+  // EXCLUIR carpetas del sistema (esSistema = true) ya que el empleado tiene sus propias carpetas del sistema
   const carpetasCompartidas = await prisma.carpetas.findMany({
     where: {
       empresaId: session.user.empresaId,
       empleadoId: null,
       compartida: true,
+      esSistema: false, // Excluir carpetas del sistema compartidas (duplicadas)
+      asignadoA: { not: 'hr' }, // Excluir carpetas master de HR
       OR: clausulasOR,
     },
     include: {
@@ -139,17 +121,14 @@ export default async function MiEspacioDocumentosPage() {
     ],
   });
 
-  console.log('[DEBUG Carpetas Compartidas] Encontradas:', carpetasCompartidas.length);
-  console.log('[DEBUG Carpetas Compartidas] Carpetas:', carpetasCompartidas.map(c => ({
-    id: c.id,
-    nombre: c.nombre,
-    compartida: c.compartida,
-    asignadoA: c.asignadoA,
-    esSistema: c.esSistema,
-  })));
-
   // Combinar ambos tipos de carpetas
   const todasLasCarpetas = [...carpetasPersonales, ...carpetasCompartidas];
+
+  // Transformar documento_carpetas a documentos para que mapCarpetas funcione
+  const carpetasTransformadas = todasLasCarpetas.map((carpeta) => ({
+    ...carpeta,
+    documentos: carpeta.documento_carpetas?.map((dc) => dc.documento) || [],
+  }));
 
   // Re-obtener empleado base para serialización
   const empleadoActualizado = await prisma.empleados.findUnique({
@@ -165,7 +144,7 @@ export default async function MiEspacioDocumentosPage() {
   // Serializar campos Decimal para Client Component
   const empleadoSerializado = serializeEmpleadoSeguro({
     ...empleadoActualizado,
-    carpetas: todasLasCarpetas,
+    carpetas: carpetasTransformadas,
   });
 
   return <MiEspacioDocumentosClient empleado={empleadoSerializado} />;

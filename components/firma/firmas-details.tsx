@@ -16,7 +16,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { parseJson } from '@/lib/utils/json';
-import { SolicitarFirmaDialog } from './solicitar-firma-dialog';
 
 interface ApiEmpleado {
   nombre: string;
@@ -107,11 +106,9 @@ export function FirmasDetails({ isHRView = false, onClose }: FirmasDetailsProps)
 
   // Estados para solicitar firma
   const [selectorOpen, setSelectorOpen] = useState(false);
-  const [solicitarFirmaOpen, setSolicitarFirmaOpen] = useState(false);
   const [carpetas, setCarpetas] = useState<Carpeta[]>([]);
   const [documentos, setDocumentos] = useState<Documento[]>([]);
   const [carpetaSeleccionada, setCarpetaSeleccionada] = useState<string>('');
-  const [documentoSeleccionado, setDocumentoSeleccionado] = useState<Documento | null>(null);
   const [loadingCarpetas, setLoadingCarpetas] = useState(false);
   const [loadingDocumentos, setLoadingDocumentos] = useState(false);
 
@@ -273,12 +270,11 @@ export function FirmasDetails({ isHRView = false, onClose }: FirmasDetailsProps)
     }
   }, [carpetas.length, cargarCarpetas]);
 
-  // Cuando se selecciona un documento, abrir el diálogo de solicitar firma
+  // Cuando se selecciona un documento, navegar a la página de solicitar firma
   const handleSelectDocument = useCallback((documento: Documento) => {
-    setDocumentoSeleccionado(documento);
     setSelectorOpen(false);
-    setSolicitarFirmaOpen(true);
-  }, []);
+    router.push(`/firma/solicitar/${documento.id}`);
+  }, [router]);
 
   // Resetear selector cuando se cierra
   const handleCloseSelectorDialog = useCallback(() => {
@@ -286,13 +282,6 @@ export function FirmasDetails({ isHRView = false, onClose }: FirmasDetailsProps)
     setCarpetaSeleccionada('');
     setDocumentos([]);
   }, []);
-
-  // Cuando se completa la solicitud de firma
-  const handleSuccessSolicitud = useCallback(() => {
-    setSolicitarFirmaOpen(false);
-    setDocumentoSeleccionado(null);
-    cargarFirmas();
-  }, [cargarFirmas]);
 
   const pendientesCount = firmasFiltradas.filter((f) => !f.firmado).length;
   const completadasCount = firmasFiltradas.filter((f) => f.firmado).length;
@@ -494,18 +483,6 @@ export function FirmasDetails({ isHRView = false, onClose }: FirmasDetailsProps)
           </div>
         </DialogContent>
       </Dialog>
-
-      {/* Diálogo de solicitar firma */}
-      {documentoSeleccionado && (
-        <SolicitarFirmaDialog
-          open={solicitarFirmaOpen}
-          onOpenChange={setSolicitarFirmaOpen}
-          documentoId={documentoSeleccionado.id}
-          documentoNombre={documentoSeleccionado.nombre}
-          carpetaId={documentoSeleccionado.carpetaId}
-          onSuccess={handleSuccessSolicitud}
-        />
-      )}
     </div>
   );
 }

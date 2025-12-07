@@ -17,6 +17,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { useApi } from '@/lib/hooks';
+import { extractArrayFromResponse } from '@/lib/utils/api-response';
 import { extraerHoraDeISO } from '@/lib/utils/formatters';
 
 
@@ -50,10 +51,13 @@ export function FichajesTab({ empleadoId }: { empleadoId: string }) {
   const [fichajeEditando, setFichajeEditando] = useState<Fichaje | null>(null);
 
   // Hook para cargar fichajes
-  const { loading, execute: refetchFichajes } = useApi<Fichaje[]>({
-    onSuccess: (data) => {
+  const { loading, execute: refetchFichajes } = useApi<Record<string, unknown>>({
+    onSuccess: (payload) => {
+      // FIX: La API devuelve { data: fichajes[], pagination: {} }
+      // Extraer el array correctamente
+      const fichajes = extractArrayFromResponse<Fichaje>(payload, { key: 'fichajes' });
       // Agrupar fichajes en jornadas cuando se cargan
-      const jornadasAgrupadas = agruparPorJornada(data);
+      const jornadasAgrupadas = agruparPorJornada(fichajes);
       setJornadas(jornadasAgrupadas);
     },
   });

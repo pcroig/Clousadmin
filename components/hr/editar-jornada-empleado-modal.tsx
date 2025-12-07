@@ -39,7 +39,28 @@ import {
 import { obtenerEtiquetaJornada } from '@/lib/jornadas/helpers';
 import { parseJson } from '@/lib/utils/json';
 
-import type { JornadaConfig } from '@/lib/calculos/fichajes-helpers';
+import type { DiaConfig, JornadaConfig } from '@/lib/calculos/fichajes-helpers';
+
+type DiaKey = 'lunes' | 'martes' | 'miercoles' | 'jueves' | 'viernes' | 'sabado' | 'domingo';
+
+const DIA_KEYS: Array<{ key: DiaKey; label: string; shortLabel: string }> = [
+  { key: 'lunes', label: 'Lunes', shortLabel: 'L' },
+  { key: 'martes', label: 'Martes', shortLabel: 'M' },
+  { key: 'miercoles', label: 'Miércoles', shortLabel: 'X' },
+  { key: 'jueves', label: 'Jueves', shortLabel: 'J' },
+  { key: 'viernes', label: 'Viernes', shortLabel: 'V' },
+  { key: 'sabado', label: 'Sábado', shortLabel: 'S' },
+  { key: 'domingo', label: 'Domingo', shortLabel: 'D' },
+];
+
+const isDiaConfig = (value: unknown): value is DiaConfig =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+const getDiaConfig = (config: JornadaConfig | null | undefined, dia: DiaKey): DiaConfig | undefined => {
+  if (!config) return undefined;
+  const value = config[dia];
+  return isDiaConfig(value) ? value : undefined;
+};
 
 interface Jornada {
   id: string;
@@ -201,15 +222,38 @@ export function EditarJornadaEmpleadoModal({
 
           <DialogBody>
             {jornadaActual && (
-              <div className="mb-4 rounded-lg bg-gray-50 p-4">
-                <p className="text-sm font-medium text-gray-700">Jornada actual:</p>
-                <p className="text-base font-semibold text-gray-900">
-                  {obtenerEtiquetaJornada({
-                    horasSemanales: jornadaActual.horasSemanales,
-                    config: jornadaActual.config,
-                    id: jornadaActual.id,
-                  })}
-                </p>
+              <div className="mb-4 rounded-lg bg-gray-50 p-4 space-y-3">
+                <div>
+                  <p className="text-sm font-medium text-gray-700">Jornada actual:</p>
+                  <p className="text-base font-semibold text-gray-900">
+                    {obtenerEtiquetaJornada({
+                      horasSemanales: jornadaActual.horasSemanales,
+                      config: jornadaActual.config,
+                      id: jornadaActual.id,
+                    })}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-700 mb-2">Días laborables:</p>
+                  <div className="flex gap-1">
+                    {DIA_KEYS.map((dia) => {
+                      const diaConfig = getDiaConfig(jornadaActual.config, dia.key);
+                      const activo = diaConfig?.activo ?? false;
+                      return (
+                        <div
+                          key={dia.key}
+                          className={`flex-1 px-2 py-1.5 rounded text-xs font-medium text-center ${
+                            activo
+                              ? 'bg-gray-900 text-white'
+                              : 'bg-gray-200 text-gray-500'
+                          }`}
+                        >
+                          {dia.shortLabel}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
             )}
 
@@ -246,6 +290,32 @@ export function EditarJornadaEmpleadoModal({
                 </SelectContent>
               </Select>
             </div>
+
+            {/* Preview de la jornada seleccionada */}
+            {jornadaSeleccionada && jornadaSeleccionada !== jornadaActual?.id && (
+              <div className="mt-4 rounded-lg bg-emerald-50 border border-emerald-200 p-4 space-y-2">
+                <p className="text-sm font-medium text-emerald-900">Vista previa de la nueva jornada:</p>
+                <div className="flex gap-1">
+                  {DIA_KEYS.map((dia) => {
+                    const jornadaPreview = jornadas.find(j => j.id === jornadaSeleccionada);
+                    const diaConfig = getDiaConfig(jornadaPreview?.config, dia.key);
+                    const activo = diaConfig?.activo ?? false;
+                    return (
+                      <div
+                        key={dia.key}
+                        className={`flex-1 px-2 py-1.5 rounded text-xs font-medium text-center ${
+                          activo
+                            ? 'bg-emerald-700 text-white'
+                            : 'bg-emerald-200 text-emerald-600'
+                        }`}
+                      >
+                        {dia.shortLabel}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </DialogBody>
 
           <DialogFooter className="gap-2">
@@ -320,6 +390,10 @@ export function EditarJornadaEmpleadoModal({
     </>
   );
 }
+
+
+
+
 
 
 

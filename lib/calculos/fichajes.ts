@@ -875,6 +875,10 @@ async function calcularEmpleadosDisponibles(
       where: {
         empresaId,
         activo: true,
+        // FIX: Solo empleados que ya estaban dados de alta en la fecha objetivo
+        fechaAlta: {
+          lte: fecha,
+        },
       },
       select: {
         id: true,

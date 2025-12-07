@@ -7,7 +7,7 @@ El sistema de fichajes permite a los empleados registrar su jornada laboral comp
 ### Estado actual de funcionalidades clave
 
 - **Horas extra**: ya existe el flujo completo (`GET /api/fichajes/bolsa-horas`, `POST /api/fichajes/compensar-horas`, `lib/services/compensacion-horas.ts`). No se requiere implementar nada nuevo, solo optimizaciones puntuales.
-- **Widget de plantilla**: ✅ Implementado con 5 estados (Trabajando, En pausa, Ausentes, Sin fichar, Fuera de horario). Muestra todos los empleados activos en tiempo real en dashboards de HR y Manager. Garantiza cobertura completa - todos los empleados aparecen en alguna categoría. Ver sección "1.1 Widget de Plantilla" para más detalles.
+- **Widget de plantilla**: ✅ Implementado con 5 estados (Trabajando, En pausa, Ausentes, Sin fichar, Fuera de horario). Muestra todos los empleados activos en tiempo real en dashboards de HR (desktop y mobile), Manager (solo desktop) y Empleado (solo desktop). Garantiza cobertura completa - todos los empleados aparecen en alguna categoría. Ver sección "1.1 Widget de Plantilla" para más detalles.
 - **Array duplicado de días**: el literal incorrecto en `app/api/fichajes/revision/route.ts` no se usa; el sistema emplea constantemente la constante correcta `dias`, por lo que no impacta cálculos.
 - **Finalizar desde pausa**: la validación (`lib/calculos/fichajes.ts`) permite cerrar jornada estando en pausa para garantizar que el tiempo en descanso no compute como trabajado. Cualquier cambio exigiría decisión de negocio.
 - **Correcciones de fichaje**: ✅ Implementado workflow formal con solicitud/aprobación. Empleados solicitan desde `/empleado/horario/fichajes`, HR/Manager aprueban desde la bandeja de entrada. Incluye notificaciones automáticas y auditoría completa.
@@ -55,7 +55,7 @@ Cada fichaje (día completo) tiene un único estado que refleja su ciclo de vida
 
 ### Estados del Empleado (Widget de Plantilla)
 
-El widget de plantilla en los dashboards (HR y Manager) muestra el estado actual de todos los empleados activos en **5 categorías**:
+El widget de plantilla en los dashboards (HR y Manager, y ahora también en el de Empleado) muestra el estado actual de todos los empleados activos en **5 categorías**:
 
 1. **Trabajando**: Empleados que han fichado entrada, están dentro de su horario laboral, NO están en pausa, y NO han fichado salida.
    - Último evento: `entrada` o `pausa_fin`
@@ -128,11 +128,12 @@ El sistema actualiza en tiempo real:
 
 ## 1.1 Widget de Plantilla (Dashboard)
 
-El widget de plantilla proporciona una vista en tiempo real del estado de todos los empleados activos. Está disponible en los dashboards de HR y Manager.
+El widget de plantilla proporciona una vista en tiempo real del estado de todos los empleados activos. Está disponible en los dashboards de HR, Manager (solo desktop) y Empleado (solo desktop).
 
 ### Ubicación
 - **HR Dashboard**: `/hr/dashboard`
-- **Manager Dashboard**: `/manager/dashboard`
+- **Manager Dashboard**: `/manager/dashboard` (renderizado solo en desktop)
+- **Empleado Dashboard**: `/empleado/dashboard` (renderizado solo en desktop)
 
 ### Funcionalidad
 
@@ -142,7 +143,7 @@ El widget de plantilla proporciona una vista en tiempo real del estado de todos 
 
 **Componente**: `components/dashboard/plantilla-widget.tsx`
 - Variante `card`: Desktop con WidgetCard
-- Variante `compact`: Mobile sin card, más compacto
+- Variante `compact`: Mobile sin card, más compacto (actualmente solo se usa en HR)
 
 ### Lógica de Clasificación
 

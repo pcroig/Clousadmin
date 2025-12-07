@@ -197,8 +197,10 @@ export default async function HRCarpetaDetailPage(context: { params: Promise<{ i
         mimeType: doc.mimeType,
         tamano: doc.tamano,
         createdAt: doc.createdAt.toISOString(),
-        firmado: firmaInfo?.firmado ?? false,
-        firmadoEn: null,
+        // IMPORTANTE: Usar el campo firmado de la BD, NO el de la solicitud
+        // Solo el documento que realmente contiene el PDF firmado debe aparecer como firmado
+        firmado: doc.firmado,
+        firmadoEn: doc.firmadoEn?.toISOString() ?? null,
         firmaInfo: firmaInfo ? {
           tieneSolicitud: firmaInfo.tieneSolicitud,
           firmado: firmaInfo.firmado,

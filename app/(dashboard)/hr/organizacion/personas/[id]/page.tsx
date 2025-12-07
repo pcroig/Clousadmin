@@ -166,6 +166,67 @@ export default async function EmpleadoDetailPage(props: EmpleadoDetailPageProps)
   // Esta función es idempotente y no duplica carpetas
   await asegurarCarpetasSistemaParaEmpleado(empleado.id, session.user.empresaId);
 
+  // Obtener carpetas compartidas accesibles por el empleado
+  const equipoIds = empleado.equipos.map((eq) => eq.equipoId);
+
+  // Construir cláusulas OR para carpetas compartidas
+  const clausulasOR: Array<
+    | { asignadoA: string }
+    | { asignadoA: { contains: string } }
+  > = [
+    { asignadoA: 'todos' },
+    { asignadoA: { contains: `empleado:${empleado.id}` } },
+  ];
+
+  // Añadir cláusula para cada equipo al que pertenece el empleado
+  equipoIds.forEach((equipoId) => {
+    clausulasOR.push({ asignadoA: `equipo:${equipoId}` });
+  });
+
+  // Obtener carpetas compartidas
+  // EXCLUIR carpetas del sistema (esSistema = true) ya que el empleado tiene sus propias carpetas del sistema
+  const carpetasCompartidas = await prisma.carpetas.findMany({
+    where: {
+      empresaId: session.user.empresaId,
+      empleadoId: null,
+      compartida: true,
+      esSistema: false, // Excluir carpetas del sistema compartidas (duplicadas)
+      asignadoA: { not: 'hr' }, // Excluir carpetas master de HR
+      OR: clausulasOR,
+    },
+    include: {
+      documento_carpetas: {
+        where: {
+          documento: {
+            OR: [
+              { empleadoId: null }, // Documentos globales de la carpeta
+              { empleadoId: empleado.id }, // Documentos asignados a este empleado
+            ],
+          },
+        },
+        include: {
+          documento: {
+            select: {
+              id: true,
+              nombre: true,
+              tipoDocumento: true,
+              tamano: true,
+              s3Key: true,
+              createdAt: true,
+              firmado: true,
+              firmadoEn: true,
+            },
+          },
+        },
+        take: 50,
+      },
+    },
+    orderBy: [
+      { esSistema: 'desc' },
+      { nombre: 'asc' },
+    ],
+  });
+
   // Re-obtener empleado para incluir posibles nuevas carpetas
   const empleadoActualizado = await prisma.empleados.findUnique({
     where: {
@@ -334,7 +395,7 @@ export default async function EmpleadoDetailPage(props: EmpleadoDetailPageProps)
           nombre: empleado.puestoRelacion.nombre,
         }
       : null,
-    carpetas: empleadoActualizado.carpetas.map((c) => ({
+    carpetas: [...empleadoActualizado.carpetas, ...carpetasCompartidas].map((c) => ({
       id: c.id,
       nombre: c.nombre,
       esSistema: c.esSistema,
@@ -346,6 +407,9 @@ export default async function EmpleadoDetailPage(props: EmpleadoDetailPageProps)
         tamano: dc.documento.tamano,
         createdAt:
           dc.documento.createdAt instanceof Date ? dc.documento.createdAt.toISOString() : dc.documento.createdAt,
+        firmado: dc.documento.firmado,
+        firmadoEn: dc.documento.firmadoEn instanceof Date ? dc.documento.firmadoEn.toISOString() : dc.documento.firmadoEn,
+        firmaInfo: null,
       })),
     })),
   };

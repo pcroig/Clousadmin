@@ -60,8 +60,12 @@ export interface CrearSolicitudFirmaInput {
   recordatorioAutomatico?: boolean;
   diasRecordatorio?: number;
   creadoPor?: string;
-  /** Posición de firma: soporta v2 (porcentajes) y v1 (absoluto, legacy) */
+  /** NUEVO: Array de posiciones de firma (soporta múltiples puntos) */
+  posicionesFirma?: PosicionFirma[];
+  /** DEPRECATED: Posición de firma: soporta v2 (porcentajes) y v1 (absoluto, legacy) */
   posicionFirma?: PosicionFirmaConMetadata | PosicionFirma;
+  /** Si true, mantiene el documento original intacto. Si false, lo reemplaza con la versión firmada */
+  mantenerOriginal?: boolean;
 }
 
 /**

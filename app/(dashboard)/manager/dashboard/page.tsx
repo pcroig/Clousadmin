@@ -243,18 +243,6 @@ export default async function ManagerDashboardPage() {
           <FichajeBarMobile />
         </div>
 
-        {/* Widget de plantilla compacto - sin card */}
-        <div className="flex-1 min-h-0 pb-4 overflow-auto">
-          <PlantillaWidget
-            trabajando={plantillaResumenEquipo.trabajando}
-            enPausa={plantillaResumenEquipo.enPausa}
-            ausentes={plantillaResumenEquipo.ausentes}
-            sinFichar={plantillaResumenEquipo.sinFichar}
-            fueraDeHorario={plantillaResumenEquipo.fueraDeHorario}
-            rol="manager"
-            variant="compact"
-          />
-        </div>
       </div>
 
       {/* Desktop Layout */}

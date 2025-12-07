@@ -94,17 +94,18 @@ export async function PATCH(req: NextRequest) {
       carryOverModo,
       carryOverMeses,
     } = body as {
-      maxSolapamientoPct: number;
-      requiereAntelacionDias: number;
+      maxSolapamientoPct?: number;
+      requiereAntelacionDias?: number;
       carryOverModo?: 'limpiar' | 'extender';
       carryOverMeses?: number;
     };
 
-    // Validaciones
+    // Validaciones solo si se proporcionan los campos
     if (
-      typeof maxSolapamientoPct !== 'number' ||
-      maxSolapamientoPct < 0 ||
-      maxSolapamientoPct > 100
+      maxSolapamientoPct !== undefined &&
+      (typeof maxSolapamientoPct !== 'number' ||
+        maxSolapamientoPct < 0 ||
+        maxSolapamientoPct > 100)
     ) {
       return NextResponse.json(
         { error: 'El porcentaje de solapamiento debe estar entre 0 y 100' },
@@ -113,9 +114,10 @@ export async function PATCH(req: NextRequest) {
     }
 
     if (
-      typeof requiereAntelacionDias !== 'number' ||
-      requiereAntelacionDias < 0 ||
-      requiereAntelacionDias > 365
+      requiereAntelacionDias !== undefined &&
+      (typeof requiereAntelacionDias !== 'number' ||
+        requiereAntelacionDias < 0 ||
+        requiereAntelacionDias > 365)
     ) {
       return NextResponse.json(
         { error: 'Los días de antelación deben estar entre 0 y 365' },
@@ -145,39 +147,53 @@ export async function PATCH(req: NextRequest) {
 
     const configActual = (empresa.config as Record<string, unknown>) || {};
 
-    const carryOverConfig: Record<string, unknown> =
-      typeof carryOverModo === 'string'
-        ? {
-            modo: carryOverModo,
-            mesesExtension: carryOverModo === 'extender' ? 4 : 0,
-          }
-        : (configActual.carryOver as Record<string, unknown> | undefined) ?? {
-            modo: 'limpiar',
-            mesesExtension: 0,
-          };
+    // Solo actualizar los campos que se proporcionan
+    const configActualizada: Record<string, unknown> = { ...configActual };
+
+    if (maxSolapamientoPct !== undefined) {
+      configActualizada.maxSolapamientoPct = maxSolapamientoPct;
+    }
+
+    if (requiereAntelacionDias !== undefined) {
+      configActualizada.requiereAntelacionDias = requiereAntelacionDias;
+    }
+
+    if (typeof carryOverModo === 'string') {
+      configActualizada.carryOver = {
+        modo: carryOverModo,
+        mesesExtension: carryOverModo === 'extender' ? 4 : 0,
+      };
+    }
 
     // Actualizar config
     await prisma.empresas.update({
       where: { id: session.user.empresaId },
       data: {
-        config: asJsonValue({
-          ...configActual,
-          maxSolapamientoPct,
-          requiereAntelacionDias,
-          carryOver: carryOverConfig,
-        }),
+        config: asJsonValue(configActualizada),
       },
     });
 
+    // Retornar los valores actuales (incluyendo los que no se modificaron)
+    const carryOverFinal = (configActualizada.carryOver as Record<string, unknown> | undefined) ?? {
+      modo: 'limpiar',
+      mesesExtension: 0,
+    };
+    const maxSolFinal = typeof configActualizada.maxSolapamientoPct === 'number'
+      ? configActualizada.maxSolapamientoPct
+      : 50;
+    const reqAntelFinal = typeof configActualizada.requiereAntelacionDias === 'number'
+      ? configActualizada.requiereAntelacionDias
+      : 5;
+
     return NextResponse.json({
-      maxSolapamientoPct,
-      requiereAntelacionDias,
+      maxSolapamientoPct: maxSolFinal,
+      requiereAntelacionDias: reqAntelFinal,
       carryOverModo:
-        typeof carryOverConfig.modo === 'string' && carryOverConfig.modo === 'extender'
+        typeof carryOverFinal.modo === 'string' && carryOverFinal.modo === 'extender'
           ? 'extender'
           : 'limpiar',
       carryOverMeses:
-        typeof carryOverConfig.modo === 'string' && carryOverConfig.modo === 'extender'
+        typeof carryOverFinal.modo === 'string' && carryOverFinal.modo === 'extender'
           ? 4
           : 0,
     });

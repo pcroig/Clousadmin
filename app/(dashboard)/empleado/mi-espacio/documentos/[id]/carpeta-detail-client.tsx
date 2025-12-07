@@ -24,6 +24,8 @@ type CarpetaDocumento = {
   tamano?: number | null;
   createdAt?: string | null;
   mimeType?: string | null;
+  firmado: boolean;
+  firmadoEn?: string | null;
   firmaInfo?: {
     tieneSolicitud: boolean;
     firmado: boolean;
@@ -41,6 +43,7 @@ type CarpetaDetalle = MiEspacioCarpeta & {
 interface CarpetaDetailClientEmpleadoProps {
   carpeta: CarpetaDetalle;
   puedeSubir: boolean;
+  backUrl?: string; // URL de retorno opcional
 }
 
 /**
@@ -82,10 +85,19 @@ function getDocumentIcon(mimeType: string) {
 export function CarpetaDetailClientEmpleado({
   carpeta,
   puedeSubir,
+  backUrl,
 }: CarpetaDetailClientEmpleadoProps) {
   const router = useRouter();
   const uploadSectionRef = useRef<HTMLDivElement>(null);
   const maxUploadMB = Number(process.env.NEXT_PUBLIC_MAX_UPLOAD_MB ?? '10');
+
+  const handleVolver = () => {
+    if (backUrl) {
+      router.push(backUrl);
+    } else {
+      router.back();
+    }
+  };
 
   // Document viewer state
   const documentViewer = useDocumentViewer();
@@ -144,11 +156,11 @@ export function CarpetaDetailClientEmpleado({
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => router.push('/empleado/mi-espacio/documentos')}
+          onClick={handleVolver}
           className="mb-4 -ml-2"
         >
           <ArrowLeft className="w-4 h-4 mr-2" />
-          Volver a Mis Documentos
+          Volver
         </Button>
 
         <div className="flex items-center justify-between">
@@ -247,9 +259,6 @@ export function CarpetaDetailClientEmpleado({
                     Tipo
                   </th>
                   <th className="text-left py-3 px-4 text-xs font-medium text-gray-600 uppercase">
-                    Estado
-                  </th>
-                  <th className="text-left py-3 px-4 text-xs font-medium text-gray-600 uppercase">
                     Tamaño
                   </th>
                   <th className="text-left py-3 px-4 text-xs font-medium text-gray-600 uppercase">
@@ -271,41 +280,42 @@ export function CarpetaDetailClientEmpleado({
                           const IconComponent = getDocumentIcon(documento.mimeType || '');
                           return <IconComponent className="w-5 h-5 text-gray-400" />;
                         })()}
-                        <span className="text-sm font-medium text-gray-900">
-                          {documento.nombre}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium text-gray-900">
+                            {documento.nombre}
+                          </span>
+                          {documento.firmado && (
+                            <span className="text-xs px-1.5 py-0.5 bg-[#FFF4ED] text-[#d97757] rounded-md font-medium">
+                              Firmado
+                            </span>
+                          )}
+                          {/* Solo mostrar "Pendiente firma" si:
+                              1. El documento NO está firmado
+                              2. Hay una solicitud de firma
+                              3. El empleado NO ha firmado todavía (si ya firmó, se creó una copia y este original no debe mostrar estado)
+                          */}
+                          {documento.firmaInfo?.tieneSolicitud && !documento.firmado && !documento.firmaInfo.firmado && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (documento.firmaInfo?.firmaId) {
+                                  router.push(`/firma/firmar/${documento.firmaInfo.firmaId}`);
+                                }
+                              }}
+                              className="inline-flex items-center"
+                            >
+                              <span className="text-xs px-1.5 py-0.5 bg-amber-50 text-amber-700 rounded-md font-medium hover:bg-amber-100 cursor-pointer">
+                                Pendiente firma
+                              </span>
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </td>
                     <td className="py-3 px-4">
                       <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">
                         {documento.tipoDocumento}
                       </span>
-                    </td>
-                    <td className="py-3 px-4">
-                      {documento.firmaInfo?.tieneSolicitud ? (
-                        documento.firmaInfo.firmado ? (
-                          <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                            <FileSignature className="w-3 h-3 mr-1" />
-                            Firmado
-                          </Badge>
-                        ) : (
-                          <button
-                            onClick={() => {
-                              if (documento.firmaInfo?.firmaId) {
-                                router.push(`/firma/firmar/${documento.firmaInfo.firmaId}`);
-                              }
-                            }}
-                            className="inline-flex items-center"
-                          >
-                            <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100 cursor-pointer">
-                              <FileSignature className="w-3 h-3 mr-1" />
-                              Pendiente firma
-                            </Badge>
-                          </button>
-                        )
-                      ) : (
-                        <span className="text-xs text-gray-400">-</span>
-                      )}
                     </td>
                     <td className="py-3 px-4 text-sm text-gray-600">
                       {formatearTamano(documento.tamano ?? 0)}

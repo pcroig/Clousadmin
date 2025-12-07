@@ -141,6 +141,8 @@ export interface MiEspacioDocumento {
   tamano?: number | null;
   createdAt?: string | null;
   mimeType?: string | null;
+  firmado: boolean;
+  firmadoEn?: string | null;
   firmaInfo?: {
     tieneSolicitud: boolean;
     firmado: boolean;

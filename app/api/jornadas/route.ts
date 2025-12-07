@@ -41,10 +41,22 @@ export async function GET(req: NextRequest) {
             empleados: true,
           },
         },
+        empleados: {
+          select: {
+            id: true,
+            nombre: true,
+            apellidos: true,
+            fotoUrl: true,
+          },
+          take: 10, // Limitar para performance
+          where: {
+            activo: true,
+          },
+        },
       },
     });
 
-    // Generate 'nombre' field for backward compatibility
+    // Generate 'nombre' field for backward compatibility and add empleadosPreview
     const jornadasConNombre = jornadas.map((jornada) => ({
       ...jornada,
       nombre: obtenerEtiquetaJornada({
@@ -52,6 +64,7 @@ export async function GET(req: NextRequest) {
         horasSemanales: Number(jornada.horasSemanales),
         config: jornada.config as JornadaConfig | null,
       }),
+      empleadosPreview: jornada.empleados, // Para mostrar avatares apilados
     }));
 
     return successResponse(jornadasConNombre);

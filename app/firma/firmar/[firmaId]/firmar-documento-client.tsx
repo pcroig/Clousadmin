@@ -1,5 +1,6 @@
 'use client';
 
+import { decodeJwt } from 'jose';
 import { AlertCircle, ArrowLeft, Check, Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
@@ -8,8 +9,9 @@ import { toast } from 'sonner';
 import { FirmaPendiente, FirmarDocumentoDialog } from '@/components/firma/firmar-documento-dialog';
 import { PdfCanvasViewer } from '@/components/shared/pdf-canvas-viewer';
 import { Button } from '@/components/ui/button';
-import { parseJson } from '@/lib/utils/json';
+import { UsuarioRol } from '@/lib/constants/enums';
 import type { PosicionFirma, PosicionFirmaConMetadata } from '@/lib/firma-digital/tipos';
+import { parseJson } from '@/lib/utils/json';
 
 interface SignaturePosition {
   page: number;
@@ -46,6 +48,53 @@ interface FirmarDocumentoClientProps {
 }
 
 export function FirmarDocumentoClient({ firmaId }: FirmarDocumentoClientProps) {
+  const obtenerRolDesdeCookie = (): UsuarioRol | null => {
+    if (typeof document === 'undefined') return null;
+
+    const cookie = document.cookie
+      .split('; ')
+      .find((row) => row.startsWith('clousadmin-session='));
+
+    if (!cookie) return null;
+
+    const token = cookie.split('=')[1];
+    if (!token) return null;
+
+    try {
+      const decoded = decodeJwt(token) as { user?: { rol?: string } };
+      const rol = decoded?.user?.rol;
+
+      if (!rol) return null;
+
+      const rolesValidos = new Set<UsuarioRol>([
+        UsuarioRol.platform_admin,
+        UsuarioRol.hr_admin,
+        UsuarioRol.manager,
+        UsuarioRol.empleado,
+      ]);
+
+      return rolesValidos.has(rol as UsuarioRol) ? (rol as UsuarioRol) : null;
+    } catch (error) {
+      // En caso de token inválido, no bloqueamos la UX; usamos fallback
+      return null;
+    }
+  };
+
+  const obtenerRutaPostFirma = (): string => {
+    const rol = obtenerRolDesdeCookie();
+
+    if (rol === UsuarioRol.hr_admin || rol === UsuarioRol.platform_admin) {
+      return '/hr/mi-espacio';
+    }
+
+    if (rol === UsuarioRol.manager) {
+      return '/manager/mi-espacio';
+    }
+
+    // Fallback para empleados o rol desconocido
+    return '/empleado/mi-espacio';
+  };
+
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -120,6 +169,31 @@ export function FirmarDocumentoClient({ firmaId }: FirmarDocumentoClientProps) {
 
     const pos = firma.solicitudes_firma.posicionFirma;
 
+    // NUEVO: Formato múltiple { multiple: true, posiciones: [...] }
+    if (typeof pos === 'object' && pos !== null && 'multiple' in pos && (pos as any).multiple === true) {
+      const posiciones = (pos as any).posiciones;
+      if (Array.isArray(posiciones)) {
+        return posiciones.map((p: any) => {
+          // Convert from PDF coordinates to percentages
+          const width = p.width ?? 180;
+          const height = p.height ?? 60;
+          const xPorcentaje = (p.x / pdfDimensiones.width) * 100;
+          const yDesdeArriba = pdfDimensiones.height - p.y - height;
+          const yPorcentaje = (yDesdeArriba / pdfDimensiones.height) * 100;
+          const widthPorcentaje = (width / pdfDimensiones.width) * 100;
+          const heightPorcentaje = (height / pdfDimensiones.height) * 100;
+
+          return {
+            page: p.pagina,
+            x: xPorcentaje,
+            y: yPorcentaje,
+            width: widthPorcentaje,
+            height: heightPorcentaje,
+          };
+        });
+      }
+    }
+
     // Type guard para v2: debe tener version y porcentajes
     const esFormatoV2 = (p: unknown): p is PosicionFirmaConMetadata => {
       return typeof p === 'object' && p !== null && 'version' in p && p.version === 'v2';
@@ -181,7 +255,10 @@ export function FirmarDocumentoClient({ firmaId }: FirmarDocumentoClientProps) {
 
   const handleFirmado = () => {
     toast.success('Documento firmado correctamente');
-    router.back();
+    // Redirigir al espacio adecuado según rol
+    setTimeout(() => {
+      router.push(obtenerRutaPostFirma());
+    }, 500);
   };
 
   if (loading) {

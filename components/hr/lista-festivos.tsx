@@ -14,6 +14,7 @@ import { LoadingButton } from '@/components/shared/loading-button';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import {
   Table,
   TableBody,
@@ -52,6 +53,7 @@ export function ListaFestivos({
   const [guardando, setGuardando] = useState(false);
   const [formFecha, setFormFecha] = useState('');
   const [formNombre, setFormNombre] = useState('');
+  const [formActivo, setFormActivo] = useState(true);
 
   const esEdicionNacional = useMemo(
     () => editorState?.mode === 'editar' && editorState.festivo?.tipo === 'nacional',
@@ -82,15 +84,18 @@ export function ListaFestivos({
     if (!editorState) {
       setFormFecha('');
       setFormNombre('');
+      setFormActivo(true);
       return;
     }
 
     if (editorState.mode === 'crear') {
       setFormFecha(editorState.fecha ?? '');
       setFormNombre('');
+      setFormActivo(true);
     } else if (editorState.festivo) {
       setFormFecha(editorState.festivo.fecha);
       setFormNombre(editorState.festivo.nombre);
+      setFormActivo(editorState.festivo.activo);
     }
   }, [editorState]);
 
@@ -121,9 +126,18 @@ export function ListaFestivos({
   async function handleGuardarFestivo() {
     if (!editorState) return;
 
-    if (!formFecha || !formNombre) {
-      toast.error('Completa la fecha y el nombre del festivo');
-      return;
+    // Validaciones previas antes de setGuardando
+    if (editorState.mode === 'crear') {
+      if (!formFecha || !formNombre) {
+        toast.error('Completa la fecha y el nombre del festivo');
+        return;
+      }
+    } else if (editorState.festivo) {
+      // Validar campos requeridos para festivos no nacionales
+      if (!esEdicionNacional && (!formFecha || !formNombre)) {
+        toast.error('Completa la fecha y el nombre del festivo');
+        return;
+      }
     }
 
     setGuardando(true);
@@ -135,7 +149,7 @@ export function ListaFestivos({
           body: JSON.stringify({
             fecha: formFecha,
             nombre: formNombre,
-            activo: true,
+            activo: formActivo,
           }),
         });
 
@@ -146,14 +160,19 @@ export function ListaFestivos({
 
         toast.success('Festivo creado correctamente');
       } else if (editorState.festivo) {
+        // Para festivos nacionales, solo enviar el campo 'activo'
+        const body = esEdicionNacional
+          ? { activo: formActivo }
+          : {
+              fecha: formFecha,
+              nombre: formNombre,
+              activo: formActivo,
+            };
+
         const response = await fetch(`/api/festivos/${editorState.festivo.id}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            fecha: formFecha,
-            nombre: formNombre,
-            activo: true,
-          }),
+          body: JSON.stringify(body),
         });
 
         if (!response.ok) {
@@ -161,7 +180,10 @@ export function ListaFestivos({
           throw new Error(error?.error || 'Error al actualizar festivo');
         }
 
-        toast.success('Festivo actualizado correctamente');
+        const mensaje = esEdicionNacional
+          ? `Festivo ${formActivo ? 'activado' : 'desactivado'} correctamente`
+          : 'Festivo actualizado correctamente';
+        toast.success(mensaje);
       }
 
       await cargarFestivos();
@@ -219,29 +241,55 @@ export function ListaFestivos({
               {editorState && (
                 <TableRow className="bg-muted/40">
                   <TableCell>
-                    <Label htmlFor="fechaFestivo" className="sr-only">
-                      Fecha
-                    </Label>
-                    <Input
-                      id="fechaFestivo"
-                      type="date"
-                      value={formFecha}
-                      onChange={(event) => setFormFecha(event.target.value)}
-                      disabled={esEdicionNacional}
-                    />
+                    {esEdicionNacional ? (
+                      <div className="py-2 text-sm">{formatFecha(formFecha)}</div>
+                    ) : (
+                      <>
+                        <Label htmlFor="fechaFestivo" className="sr-only">
+                          Fecha
+                        </Label>
+                        <Input
+                          id="fechaFestivo"
+                          type="date"
+                          value={formFecha}
+                          onChange={(event) => setFormFecha(event.target.value)}
+                        />
+                      </>
+                    )}
                   </TableCell>
                   <TableCell>
-                    <Label htmlFor="nombreFestivo" className="sr-only">
-                      Nombre
-                    </Label>
-                    <Input
-                      id="nombreFestivo"
-                      value={formNombre}
-                      onChange={(event) => setFormNombre(event.target.value)}
-                      maxLength={100}
-                      placeholder="Ej: Día de la empresa"
-                      disabled={esEdicionNacional}
-                    />
+                    {esEdicionNacional ? (
+                      <div className="space-y-1">
+                        <div className="text-sm">{formNombre}</div>
+                        <div className="flex items-center gap-2">
+                          <Switch
+                            id="activoFestivo"
+                            checked={formActivo}
+                            onCheckedChange={setFormActivo}
+                            disabled={guardando}
+                          />
+                          <Label
+                            htmlFor="activoFestivo"
+                            className="text-xs text-muted-foreground cursor-pointer"
+                          >
+                            {formActivo ? 'Activo' : 'Inactivo'}
+                          </Label>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <Label htmlFor="nombreFestivo" className="sr-only">
+                          Nombre
+                        </Label>
+                        <Input
+                          id="nombreFestivo"
+                          value={formNombre}
+                          onChange={(event) => setFormNombre(event.target.value)}
+                          maxLength={100}
+                          placeholder="Ej: Día de la empresa"
+                        />
+                      </>
+                    )}
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2">
@@ -261,11 +309,16 @@ export function ListaFestivos({
               )}
 
               {festivos.map((festivo) => (
-                <TableRow key={festivo.id}>
+                <TableRow key={festivo.id} className={!festivo.activo ? 'opacity-50' : ''}>
                   <TableCell className="font-medium">{formatFecha(festivo.fecha)}</TableCell>
                   <TableCell>
                     <div className="flex flex-col">
-                      <span>{festivo.nombre}</span>
+                      <div className="flex items-center gap-2">
+                        <span>{festivo.nombre}</span>
+                        {!festivo.activo && (
+                          <span className="text-xs text-red-600 font-medium">(Inactivo)</span>
+                        )}
+                      </div>
                       <span className="text-xs text-muted-foreground capitalize">{festivo.tipo}</span>
                     </div>
                   </TableCell>
@@ -275,19 +328,21 @@ export function ListaFestivos({
                         size="sm"
                         variant="ghost"
                         onClick={() => onEditRequest(festivo)}
-                        title="Editar festivo"
+                        title={festivo.tipo === 'nacional' ? 'Activar/Desactivar festivo' : 'Editar festivo'}
                       >
                         <Pencil className="w-4 h-4" />
                       </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => handleEliminar(festivo)}
-                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                        title="Quitar festivo"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
+                      {festivo.tipo !== 'nacional' && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleEliminar(festivo)}
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          title="Quitar festivo"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      )}
                     </div>
                   </TableCell>
                 </TableRow>

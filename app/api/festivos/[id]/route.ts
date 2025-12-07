@@ -104,7 +104,7 @@ export async function PATCH(
 
     // Si es festivo nacional, solo se puede activar/desactivar
     if (festivoExistente.tipo === 'nacional') {
-      if (data.nombre || data.fecha) {
+      if (data.nombre !== undefined || data.fecha !== undefined) {
         return badRequestResponse(
           'No se puede modificar el nombre o fecha de festivos nacionales. Solo se pueden activar/desactivar.'
         );

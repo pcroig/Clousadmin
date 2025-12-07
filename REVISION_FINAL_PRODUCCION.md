@@ -397,3 +397,198 @@ Claude (Anthropic) - Análisis Crítico, Correcciones Verificadas y Validación 
 3. La funcionalidad estará disponible inmediatamente
 
 **Nota:** El código completo se mantiene intacto. Solo está deshabilitado mediante feature flag para facilitar la reactivación futura.
+
+---
+
+## 🔧 FIX CRÍTICO: Cálculo de horas en tiempo real para fichajes en curso
+
+**Fecha:** 5 de diciembre de 2025
+
+### Problema
+Las columnas "Horas" y "Balance" en el historial de fichajes (Mi Espacio) no se actualizaban en tiempo real para fichajes en curso, mostrando siempre 0 horas. En cambio, el widget de fichajes sí mostraba las horas correctamente actualizadas.
+
+### Causa raíz
+El problema estaba en `lib/utils/fichajesHistorial.ts`. La función `agruparFichajesEnJornadas` usaba **únicamente las horas almacenadas en BD** (`horasTrabajadas`), que para fichajes en curso siempre es 0 (se calculan al finalizar el fichaje).
+
+El widget, en cambio, calculaba las horas en tiempo real usando `calcularProgresoEventos` desde los eventos del fichaje.
+
+### Solución implementada
+
+#### 1. Modificación en `lib/utils/fichajesHistorial.ts`
+
+Ahora la función `agruparFichajesEnJornadas` diferencia entre:
+
+- **Fichajes en curso** → Calcula horas en tiempo real desde eventos (mismo cálculo que el widget)
+- **Fichajes finalizados** → Usa horas almacenadas en BD (más eficiente)
+
+```typescript
+// FIX CRÍTICO: Para fichajes en curso, calcular horas en tiempo real desde eventos
+const estadoNormalizado = (fichajeBase.estado ?? EstadoFichaje.finalizado).toString();
+const esEnCurso = estadoNormalizado === EstadoFichaje.en_curso;
+
+let horasTrabajadas = 0;
+if (esEnCurso && eventosOrdenados.length > 0) {
+  // Calcular horas en tiempo real desde eventos (mismo cálculo que el widget)
+  const { horasAcumuladas, horaEnCurso } = calcularProgresoEventos(eventosOrdenados);
+  if (horaEnCurso) {
+    // Hay tramo abierto: sumar horas acumuladas + tiempo desde último evento hasta ahora
+    const ahora = new Date();
+    const horasDesdeUltimoEvento = (ahora.getTime() - horaEnCurso.getTime()) / (1000 * 60 * 60);
+    horasTrabajadas = horasAcumuladas + horasDesdeUltimoEvento;
+  } else {
+    horasTrabajadas = horasAcumuladas;
+  }
+} else {
+  // Fichaje finalizado: usar horas almacenadas en BD
+  const horasTrabajadasRaw = parseHorasTrabajadas(
+    fichajesDelDia.find((f) => f.horasTrabajadas !== null && f.horasTrabajadas !== undefined)?.horasTrabajadas,
+  );
+  horasTrabajadas = horasTrabajadasRaw;
+
+  // Fallback: si no hay horas en BD pero hay entrada y salida, calcular manualmente
+  if (horasTrabajadas === 0 && entrada && salida) {
+    horasTrabajadas = (salida.getTime() - entrada.getTime()) / (1000 * 60 * 60);
+  }
+}
+```
+
+#### 2. Mejora en `components/shared/mi-espacio/fichajes-tab.tsx`
+
+Se añadió la columna "Balance" al historial de fichajes en desktop y mobile para mantener consistencia con el widget de fichajes.
+
+#### 3. Fix de delay intermitente en actualización (5 de diciembre de 2025 - Actualización)
+
+**Problema adicional detectado**: En la vista HR/horario/fichajes, la actualización de horas tenía un delay intermitente de ~30 segundos, mientras que Mi Espacio funcionaba correctamente.
+
+**Causa**: El intervalo usaba `useRef` y verificaba si había fichajes en curso **antes** de ejecutar el `setJornadas`. Si las jornadas se actualizaban después de que el intervalo ya estaba corriendo, el check fallaba y había que esperar hasta el siguiente ciclo (15s) + el delay de detección.
+
+**Solución**: Eliminar `useRef` y hacer que el intervalo siempre se ejecute. La verificación de fichajes en curso se hace **dentro** del `setJornadas`, usando el estado actual (`prev`). Si no hay fichajes en curso, se retorna `prev` sin modificar (evita re-render innecesario).
+
+```typescript
+// ❌ ANTES (con delay intermitente)
+const jornadasRef = useRef(jornadas);
+useEffect(() => {
+  jornadasRef.current = jornadas;
+}, [jornadas]);
+
+useEffect(() => {
+  const intervalo = setInterval(() => {
+    const hayEnCurso = jornadasRef.current.some(...); // Check ANTES
+    if (!hayEnCurso) return; // Si falla, espera 15s más
+    setJornadas((prev) => ...);
+  }, 15000);
+}, []);
+
+// ✅ DESPUÉS (sin delay)
+useEffect(() => {
+  const intervalo = setInterval(() => {
+    setJornadas((prev) => {
+      const hayEnCurso = prev.some(...); // Check DENTRO con estado actual
+      if (!hayEnCurso) return prev; // No modifica, no re-render
+      return prev.map(...); // Recalcula solo si hay en curso
+    });
+  }, 15000);
+}, []);
+```
+
+**Archivos actualizados**:
+- ✅ `components/shared/mi-espacio/fichajes-tab.tsx`
+- ✅ `app/(dashboard)/hr/horario/fichajes/fichajes-client.tsx`
+
+**Desktop:**
+```typescript
+{
+  id: 'balance',
+  header: 'Balance',
+  priority: 'low',
+  align: 'right',
+  cell: (row) => (
+    <span
+      className={`text-sm font-semibold ${
+        row.balance >= 0 ? 'text-green-600' : 'text-red-600'
+      }`}
+    >
+      {row.balance >= 0 ? '+' : ''}
+      {row.balance.toFixed(1)}h
+    </span>
+  ),
+},
+```
+
+**Mobile:**
+```typescript
+<div className="text-xs font-medium text-gray-700">
+  {jornada.horasTrabajadas.toFixed(1)}h / {jornada.horasObjetivo.toFixed(1)}h
+  <span className={`ml-1 ${jornada.balance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+    ({jornada.balance >= 0 ? '+' : ''}{jornada.balance.toFixed(1)}h)
+  </span>
+</div>
+```
+
+### Validación
+
+Se creó el script `scripts/test-horas-tiempo-real.ts` que valida que el cálculo de horas sea idéntico entre:
+- Widget de fichajes (usa `calcularProgresoEventos`)
+- Historial de fichajes (usa `agruparFichajesEnJornadas`)
+
+**Resultado del test:**
+```
+✅ COMPARACIÓN:
+   Widget: 0.30h
+   Historial: 0.30h
+   ✅ ¡COINCIDEN! (diferencia: 0.0 min)
+```
+
+### Relación con el fix de fechas de festivos
+
+**Sí, este problema estaba relacionado** con el fix de fechas (uso de `Date.UTC()` vs `new Date()`). Ambos problemas compartían la misma causa raíz: **desfase de zona horaria**.
+
+- **Festivos**: Las fechas se creaban con timezone local, causando un offset de 1 día
+- **Fichajes**: Los cálculos de horas dependían de fechas normalizadas correctamente
+
+El fix de `normalizarFechaSinHora` que implementamos para los festivos también beneficia al cálculo de fichajes, asegurando que las comparaciones de fechas sean consistentes.
+
+### Archivos modificados
+
+1. ✅ `lib/utils/fichajesHistorial.ts` - Lógica de cálculo de horas en tiempo real
+2. ✅ `components/shared/mi-espacio/fichajes-tab.tsx` - UI con columna Balance + fix de intervalo
+3. ✅ `app/(dashboard)/hr/horario/fichajes/fichajes-client.tsx` - Fix de intervalo para eliminar delay intermitente
+
+### Impacto en producción
+
+- ✅ **Sin breaking changes**: Fichajes finalizados siguen usando BD (más eficiente)
+- ✅ **Mejora UX**: Fichajes en curso muestran horas actualizadas en tiempo real
+- ✅ **Consistencia**: Widget y historial usan la misma lógica de cálculo
+- ✅ **Performance**: Solo se recalcula para fichajes en curso (minoritarios)
+- ✅ **Sin delays**: Ambas vistas (Mi Espacio y HR/horario/fichajes) actualizan inmediatamente sin delay intermitente
+
+---
+
+## 🔧 FIX CRÍTICO: Festivos y datos semilla en UTC
+
+**Fecha:** 5 de diciembre de 2025
+
+### Problema
+Al importar o sembrar festivos con `new Date(año, mes, día)`, el motor JS interpretaba la fecha en zona horaria local (Europa/Madrid). Al persistir en PostgreSQL (UTC) la fecha se desplazaba un día (ej. `2025-12-06` → `2025-12-05`), provocando bloqueos de fichaje en días laborables.
+
+### Causa raíz
+Uso del constructor local `new Date(año, mes, día)` tanto en `lib/festivos/importar-nacionales.ts` como en scripts de seeding/mocks. Cualquier ejecución en zonas UTC±X generaba un desfase de 1 día.
+
+### Solución implementada
+
+1. **Generación en UTC**
+   - Todos los festivos nacionales ahora se crean con `new Date(Date.UTC(...))`.
+   - El cálculo de Pascua/Viernes Santo usa `Date.UTC` end-to-end.
+2. **Datos existentes**
+   - Se ejecutó `scripts/fix-fechas-festivos.ts` corrigiendo 18 registros desplazados.
+3. **Cobertura total**
+   - `prisma/seed.ts` y tests (`lib/calculos/__tests__/fichajes-historico.test.ts`) actualizados para sembrar/validar en UTC.
+   - Documentación actualizada (`docs/funcionalidades/festivos.md`) con la guía “Manejo seguro de fechas”.
+
+### Impacto en producción
+
+- ✅ Festivos nacionales/empresa ya no se desfasarán en nuevas importaciones ni seeds.
+- ✅ Los datos legacy quedan alineados (5 dic vuelve a ser laborable, 6 dic festivo real).
+- ✅ Los entornos de QA/CI producirán fechas iguales sin depender de la zona horaria del runner.
+
+---

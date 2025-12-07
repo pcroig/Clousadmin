@@ -1,7 +1,7 @@
 import { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
-import { FirmarDocumentoClient } from './firmar-documento-client';
+import { FirmarDocumentoClientWrapper } from './wrapper';
 
 interface PageProps {
   params: {
@@ -20,5 +20,5 @@ export default async function FirmarDocumentoPage({ params }: PageProps) {
     notFound();
   }
 
-  return <FirmarDocumentoClient firmaId={firmaId} />;
+  return <FirmarDocumentoClientWrapper firmaId={firmaId} />;
 }

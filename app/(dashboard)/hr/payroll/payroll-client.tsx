@@ -23,6 +23,7 @@ import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
+import { EmpleadoHoverCard } from '@/components/empleado/empleado-hover-card';
 import { PageLayout } from '@/components/layout/page-layout';
 import { PageMobileHeader } from '@/components/layout/page-mobile-header';
 import { AlertasSummary } from '@/components/payroll/alertas-summary';
@@ -1120,23 +1121,6 @@ function NominaDetailsPanel({
                           </div>
       ) : nomina ? (
         <div className="space-y-6">
-          <div className="flex items-center gap-3 rounded-lg border border-gray-200 p-3">
-            <EmployeeAvatar
-              nombre={nomina.empleado.nombre}
-              apellidos={nomina.empleado.apellidos}
-              fotoUrl={nomina.empleado.fotoUrl ?? null}
-              size="md"
-              className="h-12 w-12"
-            />
-            <div className="min-w-0">
-              <p className="text-base font-semibold text-gray-900 truncate">
-                {`${nomina.empleado.nombre} ${nomina.empleado.apellidos}`}
-              </p>
-              <p className="text-sm text-gray-500 truncate">
-                {nomina.empleado.email}
-              </p>
-            </div>
-          </div>
           {/* Información básica */}
           <div className="space-y-4">
                           <div>
@@ -1490,22 +1474,31 @@ function EventoDetailsPanel({
                               >
                                 <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3 flex-1">
-                          <EmployeeAvatar
-                            nombre={nomina.empleado.nombre}
-                            apellidos={nomina.empleado.apellidos}
-                            fotoUrl={nomina.empleado.fotoUrl ?? null}
-                            size="sm"
-                            className="h-9 w-9 flex-shrink-0"
-                          />
-                          <div className="min-w-0 flex-1">
-                                      <div className="flex items-center gap-2 mb-1">
-                              <h4 className="font-medium text-gray-900 text-sm truncate">
-                                          {nomina.empleado.nombre} {nomina.empleado.apellidos}
-                                        </h4>
-                                        <span className={`text-xs font-medium ${estadoNominaInfo.color}`}>
-                                          {estadoNominaInfo.label}
-                                        </span>
-                                      </div>
+                          <EmpleadoHoverCard
+                            empleado={{
+                              nombre: nomina.empleado.nombre,
+                              apellidos: nomina.empleado.apellidos,
+                              email: nomina.empleado.email,
+                              fotoUrl: nomina.empleado.fotoUrl,
+                            }}
+                            triggerClassName="flex items-center gap-3 min-w-0"
+                          >
+                            <EmployeeAvatar
+                              nombre={nomina.empleado.nombre}
+                              apellidos={nomina.empleado.apellidos}
+                              fotoUrl={nomina.empleado.fotoUrl ?? null}
+                              size="sm"
+                              className="h-9 w-9 flex-shrink-0"
+                            />
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-2 mb-1">
+                                <h4 className="font-medium text-gray-900 text-sm truncate">
+                                  {nomina.empleado.nombre} {nomina.empleado.apellidos}
+                                </h4>
+                                <span className={`text-xs font-medium ${estadoNominaInfo.color}`}>
+                                  {estadoNominaInfo.label}
+                                </span>
+                              </div>
                             
                             {/* Información descriptiva */}
                             <div className="flex flex-wrap gap-2 text-xs">
@@ -1546,7 +1539,8 @@ function EventoDetailsPanel({
                                 </span>
                               )}
                             </div>
-                                    </div>
+                            </div>
+                          </EmpleadoHoverCard>
                                         </div>
                                         </div>
                     </button>

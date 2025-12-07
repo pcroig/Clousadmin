@@ -49,6 +49,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { extractArrayFromResponse } from '@/lib/utils/api-response';
+import { esDocumentoFirmable, getMensajeTipoDocumento } from '@/lib/documentos/utils';
 
 interface Documento {
   id: string;
@@ -344,8 +345,8 @@ export function CarpetaDetailClient({ carpeta, empleados = [] }: CarpetaDetailCl
   };
 
   const handleSolicitarFirma = (documento: Documento) => {
-    if (documento.mimeType !== 'application/pdf') {
-      toast.error('Solo los documentos PDF pueden enviarse a firma.');
+    if (!esDocumentoFirmable(documento.mimeType)) {
+      toast.error('Solo los documentos PDF y Word pueden enviarse a firma.');
       return;
     }
     // Navegar a la página de solicitar firma (fuera del dashboard)
@@ -728,11 +729,11 @@ export function CarpetaDetailClient({ carpeta, empleados = [] }: CarpetaDetailCl
                             variant="ghost"
                             size="icon"
                             title={
-                              documento.mimeType === 'application/pdf'
-                                ? 'Solicitar firma'
-                                : 'Solo los PDF se pueden enviar a firma'
+                              esDocumentoFirmable(documento.mimeType)
+                                ? `Solicitar firma - ${getMensajeTipoDocumento(documento.mimeType)}`
+                                : 'Solo PDF y Word pueden enviarse a firma'
                             }
-                            disabled={documento.mimeType !== 'application/pdf'}
+                            disabled={!esDocumentoFirmable(documento.mimeType)}
                             onClick={() => handleSolicitarFirma(documento)}
                           >
                             <FileSignature className="w-4 h-4" />
@@ -1177,7 +1178,7 @@ export function CarpetaDetailClient({ carpeta, empleados = [] }: CarpetaDetailCl
             }
           }}
           actions={
-            documentViewer.documentMimeType === 'application/pdf' ? (
+            esDocumentoFirmable(documentViewer.documentMimeType) ? (
               <Button
                 variant="outline"
                 size="sm"

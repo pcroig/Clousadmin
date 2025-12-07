@@ -192,7 +192,7 @@ describe('fichajes-historico', () => {
           id: `fichaje-${i}`,
           empleadoId: 'empleado-1',
           jornadaId: 'jornada-1',
-          fecha: new Date(2025, 0, dia),
+          fecha: new Date(Date.UTC(2025, 0, dia)), // FIX: Usar UTC para evitar desfase de timezone
           estado: 'finalizado',
           eventos: [
             { tipo: 'entrada', hora: new Date(Date.UTC(2025, 0, dia, 9, 0, 0)) },

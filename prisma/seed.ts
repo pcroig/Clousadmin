@@ -67,10 +67,10 @@ async function main() {
     create: {
       id: 'jornada-completa-40h',
       empresaId: empresa.id,
-      nombre: 'Jornada Completa 40h',
       horasSemanales: 40,
       esPredefinida: true,
       config: {
+        tipo: 'fija',
         lunes: { activo: true, entrada: '09:00', salida: '18:00' },
         martes: { activo: true, entrada: '09:00', salida: '18:00' },
         miercoles: { activo: true, entrada: '09:00', salida: '18:00' },
@@ -88,10 +88,10 @@ async function main() {
     create: {
       id: 'jornada-intensiva-35h',
       empresaId: empresa.id,
-      nombre: 'Jornada Intensiva 35h',
       horasSemanales: 35,
       esPredefinida: true,
       config: {
+        tipo: 'fija',
         lunes: { activo: true, entrada: '09:00', salida: '16:00' },
         martes: { activo: true, entrada: '09:00', salida: '16:00' },
         miercoles: { activo: true, entrada: '09:00', salida: '16:00' },
@@ -103,7 +103,7 @@ async function main() {
     },
   });
 
-  console.log(`✅ Jornadas creadas: ${jornadaCompleta.nombre}, ${jornadaIntensiva.nombre}\n`);
+  console.log(`✅ Jornadas creadas: ${jornadaCompleta.id}, ${jornadaIntensiva.id}\n`);
 
   // ========================================
   // 3. CREAR USUARIO Y EMPLEADO HR ADMIN
@@ -547,17 +547,18 @@ async function main() {
   // ========================================
   console.log('🎉 Creando festivos de España 2025...');
 
+  // FIX: Usar Date.UTC para evitar desfase de zona horaria (similar al bug de importar-nacionales)
   const festivos2025 = [
-    { fecha: new Date('2025-01-01'), nombre: 'Año Nuevo' },
-    { fecha: new Date('2025-01-06'), nombre: 'Reyes Magos' },
-    { fecha: new Date('2025-04-18'), nombre: 'Viernes Santo' },
-    { fecha: new Date('2025-05-01'), nombre: 'Día del Trabajador' },
-    { fecha: new Date('2025-08-15'), nombre: 'Asunción de la Virgen' },
-    { fecha: new Date('2025-10-12'), nombre: 'Fiesta Nacional de España' },
-    { fecha: new Date('2025-11-01'), nombre: 'Todos los Santos' },
-    { fecha: new Date('2025-12-06'), nombre: 'Día de la Constitución' },
-    { fecha: new Date('2025-12-08'), nombre: 'Inmaculada Concepción' },
-    { fecha: new Date('2025-12-25'), nombre: 'Navidad' },
+    { fecha: new Date('2025-01-01T00:00:00.000Z'), nombre: 'Año Nuevo' },
+    { fecha: new Date('2025-01-06T00:00:00.000Z'), nombre: 'Reyes Magos' },
+    { fecha: new Date('2025-04-18T00:00:00.000Z'), nombre: 'Viernes Santo' },
+    { fecha: new Date('2025-05-01T00:00:00.000Z'), nombre: 'Día del Trabajador' },
+    { fecha: new Date('2025-08-15T00:00:00.000Z'), nombre: 'Asunción de la Virgen' },
+    { fecha: new Date('2025-10-12T00:00:00.000Z'), nombre: 'Fiesta Nacional de España' },
+    { fecha: new Date('2025-11-01T00:00:00.000Z'), nombre: 'Todos los Santos' },
+    { fecha: new Date('2025-12-06T00:00:00.000Z'), nombre: 'Día de la Constitución' },
+    { fecha: new Date('2025-12-08T00:00:00.000Z'), nombre: 'Inmaculada Concepción' },
+    { fecha: new Date('2025-12-25T00:00:00.000Z'), nombre: 'Navidad' },
   ];
 
   for (const festivo of festivos2025) {

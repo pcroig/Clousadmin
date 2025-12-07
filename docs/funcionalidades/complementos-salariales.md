@@ -12,26 +12,25 @@ Los complementos se organizan en un **catálogo de tipos** que define la empresa
 
 - **Nombre**: Identificación del complemento (ej: "Plus transporte", "Plus idiomas")
 - **Descripción**: Información adicional opcional
-- **Tipo (Fijo/Variable)**:
-  - **Fijo**: El complemento tiene una cuantía predefinida. Solo requiere validación de si aplica o no al empleado
-  - **Variable**: La cuantía se determina cada vez que se asigna al empleado
-- **Importe fijo**: Cantidad predefinida (solo para complementos fijos)
 - **Estado**: Activo/Inactivo
+
+> **Nota importante (Actualización Dic 2025)**: Los tipos de complemento ya NO almacenan la modalidad (fijo/variable) ni el importe. Estos campos se definen individualmente para cada empleado al asignar el complemento.
 
 ### Asignación de Complementos
 
 Cuando se asigna un complemento a un empleado, se crea una **asignación** con:
 
 - **Empleado**: A quién se le asigna
-- **Tipo de complemento**: Referencia al catálogo
+- **Tipo de complemento**: Referencia al catálogo (solo nombre/descripción)
+- **Modalidad (Fijo/Variable)**: 
+  - **Fijo** (`esImporteFijo: true`): El importe se mantiene constante mes a mes
+  - **Variable** (`esImporteFijo: false`): El importe puede cambiar y requiere validación cada período
+- **Importe**: Campo obligatorio, define la cuantía mensual del complemento
 - **Contrato**: Opcionalmente vinculado a un contrato específico
-- **Importe personalizado**: 
-  - Para complementos variables: campo obligatorio
-  - Para complementos fijos: opcional, permite sobrescribir el importe por defecto
 - **Estado de validación**:
   - `validado`: Aprobado por HR/Manager
   - `rechazado`: Rechazado con motivo
-  - `pendiente`: Esperando validación
+  - `pendiente`: Esperando validación (complementos variables con importe 0)
 
 ## Modelo de Datos
 
@@ -43,8 +42,6 @@ model tipos_complemento {
   empresaId             String
   nombre                String                  @db.VarChar(200)
   descripcion           String?
-  esImporteFijo         Boolean                 @default(true)
-  importeFijo           Decimal?                @db.Decimal(10, 2)
   activo                Boolean                 @default(true)
   createdAt             DateTime                @default(now())
   updatedAt             DateTime                @updatedAt
@@ -55,6 +52,11 @@ model tipos_complemento {
 }
 ```
 
+**Cambios importantes**:
+- ❌ Eliminado: `esImporteFijo` y `importeFijo`
+- ✅ Solo almacena: nombre, descripción, y estado activo/inactivo
+- 📌 La modalidad y el importe se definen por empleado, no por tipo
+
 ### Tabla `empleado_complementos`
 
 ```prisma
@@ -63,7 +65,8 @@ model empleado_complementos {
   empleadoId               String
   tipoComplementoId        String
   contratoId               String?
-  importePersonalizado     Decimal?                   @db.Decimal(10, 2)
+  esImporteFijo            Boolean                    @default(true)
+  importePersonalizado     Decimal                    @db.Decimal(10, 2)
   activo                   Boolean                    @default(true)
   validado                 Boolean                    @default(false)
   validadoPor              String?
@@ -82,6 +85,11 @@ model empleado_complementos {
   @@index([tipoComplementoId])
 }
 ```
+
+**Cambios importantes**:
+- ✅ Nuevo: `esImporteFijo` (Boolean, default true) - Define si el complemento es fijo o variable
+- ✅ Modificado: `importePersonalizado` ahora es NOT NULL - Todo complemento debe tener un importe definido
+- 📌 Un complemento variable con importe 0 indica que está pendiente de asignación
 
 ## APIs
 
@@ -104,8 +112,6 @@ Lista todos los tipos de complemento de la empresa.
       "id": "clx...",
       "nombre": "Plus transporte",
       "descripcion": "Compensación por desplazamiento",
-      "esImporteFijo": true,
-      "importeFijo": 150.00,
       "activo": true,
       "_count": {
         "empleado_complementos": 25
@@ -125,15 +131,13 @@ Crea un nuevo tipo de complemento.
 ```json
 {
   "nombre": "Plus nocturnidad",
-  "descripcion": "Complemento por trabajo nocturno",
-  "esImporteFijo": true,
-  "importeFijo": 200.00
+  "descripcion": "Complemento por trabajo nocturno"
 }
 ```
 
 **Validaciones**:
-- Si `esImporteFijo` es `true`, debe incluir `importeFijo`
-- `importeFijo` debe ser > 0
+- `nombre` es obligatorio (max 200 caracteres)
+- `descripcion` es opcional
 
 ### Gestión de Complementos del Empleado
 
@@ -154,6 +158,7 @@ Lista todos los complementos asignados a un empleado.
       "id": "clx...",
       "empleadoId": "clx...",
       "tipoComplementoId": "clx...",
+      "esImporteFijo": true,
       "importePersonalizado": 180.00,
       "activo": true,
       "validado": true,
@@ -163,8 +168,7 @@ Lista todos los complementos asignados a un empleado.
       "tipos_complemento": {
         "id": "clx...",
         "nombre": "Plus transporte",
-        "esImporteFijo": true,
-        "importeFijo": 150.00
+        "descripcion": "Compensación por desplazamiento"
       },
       "contrato": {
         "id": "clx...",
@@ -189,8 +193,9 @@ Asigna un complemento a un empleado.
 ```json
 {
   "tipoComplementoId": "clx...",
-  "contratoId": "clx...",  // Opcional
-  "importePersonalizado": 180.00  // Obligatorio para variables, opcional para fijos
+  "contratoId": "clx...",      // Opcional
+  "esImporteFijo": true,        // Obligatorio: define si es fijo o variable
+  "importe": 180.00             // Obligatorio: cuantía mensual del complemento
 }
 ```
 
@@ -198,8 +203,8 @@ Asigna un complemento a un empleado.
 - El tipo de complemento debe existir y estar activo
 - El contrato debe pertenecer al empleado (si se especifica)
 - No puede existir ya el mismo complemento activo
-- Si es variable, debe especificar `importePersonalizado`
-- El importe debe ser > 0
+- `esImporteFijo` es obligatorio (true = fijo, false = variable)
+- `importe` es obligatorio y debe ser > 0
 
 **Respuesta**:
 ```json
@@ -217,9 +222,10 @@ Actualiza un complemento existente.
 **Body**:
 ```json
 {
-  "importePersonalizado": 200.00,  // Opcional
-  "contratoId": "clx...",          // Opcional
-  "activo": false                   // Opcional
+  "importePersonalizado": 200.00,  // Opcional: actualizar el importe
+  "esImporteFijo": false,           // Opcional: cambiar modalidad fijo/variable
+  "contratoId": "clx...",           // Opcional: vincular a otro contrato
+  "activo": false                   // Opcional: activar/desactivar
 }
 ```
 
@@ -450,15 +456,15 @@ El sistema genera notificaciones automáticas:
 POST /api/tipos-complemento
 {
   "nombre": "Plus transporte",
-  "esImporteFijo": true,
-  "importeFijo": 150.00
+  "descripcion": "Compensación por desplazamiento"
 }
 
-// 2. HR lo asigna a un empleado
+// 2. HR lo asigna a un empleado con modalidad fija
 POST /api/empleados/emp123/complementos
 {
-  "tipoComplementoId": "tipo123"
-  // No necesita importePersonalizado, usa el fijo
+  "tipoComplementoId": "tipo123",
+  "esImporteFijo": true,    // Modalidad fija
+  "importe": 150.00         // Importe mensual
 }
 
 // 3. HR valida el complemento
@@ -472,34 +478,54 @@ POST /api/nominas/eventos/evento123/validar-complementos
 ### Caso 2: Plus Variable por Idiomas
 
 ```typescript
-// 1. HR crea el tipo variable
+// 1. HR crea el tipo
 POST /api/tipos-complemento
 {
   "nombre": "Plus idiomas",
-  "descripcion": "Según número de idiomas",
-  "esImporteFijo": false
+  "descripcion": "Según número de idiomas"
 }
 
-// 2. HR lo asigna con importe específico
+// 2. HR lo asigna con modalidad variable e importe inicial 0 (pendiente)
 POST /api/empleados/emp456/complementos
 {
   "tipoComplementoId": "tipo456",
+  "esImporteFijo": false,   // Modalidad variable
+  "importe": 0              // Pendiente de asignación
+}
+
+// 3. Posteriormente se actualiza el importe
+PATCH /api/empleados/emp456/complementos/comp456
+{
   "importePersonalizado": 200.00  // 2 idiomas x 100€
 }
 
-// 3. Validación igual que caso anterior
+// 4. HR valida el complemento
+POST /api/nominas/eventos/evento123/validar-complementos
+{
+  "complementoIds": ["comp456"],
+  "accion": "validar"
+}
 ```
 
-### Caso 3: Sobrescribir Importe Fijo
+### Caso 3: Mismo tipo, diferentes importes por empleado
 
 ```typescript
-// El tipo tiene importeFijo: 150€
-// Pero queremos darle 180€ a un empleado específico
+// El mismo tipo "Plus transporte" puede tener importes diferentes
 
+// Empleado 1: Plus fijo de 150€
 POST /api/empleados/emp789/complementos
 {
   "tipoComplementoId": "tipo123",
-  "importePersonalizado": 180.00  // Sobrescribe el 150€ fijo
+  "esImporteFijo": true,
+  "importe": 150.00
+}
+
+// Empleado 2: Plus fijo de 180€ (distancia mayor)
+POST /api/empleados/emp790/complementos
+{
+  "tipoComplementoId": "tipo123",
+  "esImporteFijo": true,
+  "importe": 180.00
 }
 ```
 
@@ -514,27 +540,31 @@ POST /api/empleados/emp789/complementos
 
 ### Para Desarrolladores
 
-1. **Validación de tipos**: Siempre verificar `esImporteFijo` antes de requerir importe
-2. **Índices**: Usar los índices de BD para queries eficientes:
+1. **Tipos simplificados**: Los tipos de complemento solo almacenan nombre/descripción
+2. **Modalidad por empleado**: `esImporteFijo` se define al asignar, no en el tipo
+3. **Importe obligatorio**: Todos los complementos deben tener `importePersonalizado` (NOT NULL)
+4. **Índices**: Usar los índices de BD para queries eficientes:
    - `[empleadoId, activo]` para complementos de un empleado
    - `[empresaId, activo]` para tipos de la empresa
-3. **Transacciones**: Usar transacciones al crear/actualizar múltiples complementos
-4. **Soft delete**: Los complementos con asignaciones se desactivan, no se eliminan
-5. **Cache**: Considerar cachear el catálogo de tipos (cambia poco)
+5. **Transacciones**: Usar transacciones al crear/actualizar múltiples complementos
+6. **Soft delete**: Los complementos con asignaciones se desactivan, no se eliminan
+7. **Cache**: Considerar cachear el catálogo de tipos (cambia poco)
 
 ### Validaciones Obligatorias
 
 ```typescript
-// ✅ CORRECTO
-const tipo = await getTipoComplemento(tipoId);
-if (!tipo.esImporteFijo && !importePersonalizado) {
-  throw new Error('Importe requerido para complementos variables');
-}
+// ✅ CORRECTO - Validar importe obligatorio
+const AsignarComplementoSchema = z.object({
+  tipoComplementoId: z.string().cuid(),
+  contratoId: z.string().cuid().optional(),
+  esImporteFijo: z.boolean(),
+  importe: z.number().positive(),
+});
 
-// ✅ CORRECTO
-if (importePersonalizado && importePersonalizado <= 0) {
-  throw new Error('El importe debe ser mayor a 0');
-}
+// ✅ CORRECTO - Detectar complementos variables pendientes
+const complementosPendientes = empleado.complementos.some(
+  (comp) => !comp.esImporteFijo && Number(comp.importePersonalizado) === 0
+);
 
 // ✅ CORRECTO - No duplicar complementos activos
 const existente = await prisma.empleado_complementos.findFirst({
@@ -562,9 +592,11 @@ if (existente) {
 
 ## Limitaciones Conocidas
 
-1. **No hay histórico de cambios**: Los cambios de importe no se registran históricamenteActualmente no existe, pero sería útil para auditoría
+1. **No hay histórico de cambios**: Los cambios de importe no se registran históricamente
+2. **Sin auditoría de cambios**: Actualmente no existe, pero sería útil para auditoría
 3. **Validación individual**: No existe endpoint para validar un solo complemento, solo masivo
 4. **Sin periodicidad**: Los complementos no tienen campo de periodicidad (mensual, trimestral, etc.)
+5. **Un solo complemento activo por tipo**: No se puede asignar el mismo tipo dos veces a un empleado (aunque con importes diferentes)
 
 ## Roadmap Futuro
 
@@ -602,14 +634,24 @@ if (existente) {
 
 ### Error "Datos inválidos" al guardar
 
-**Causa común**: Intentar guardar un complemento variable sin especificar `importePersonalizado`
+**Causa común**: No especificar `esImporteFijo` o `importe` al crear un complemento
 
-**Solución**: Para complementos con `esImporteFijo: false`, siempre incluir el importe
+**Solución**: Ambos campos son obligatorios al asignar un complemento a un empleado
+
+### El complemento muestra "Pendiente" aunque esté asignado
+
+**Causa**: Es un complemento variable (`esImporteFijo: false`) con `importePersonalizado: 0`
+
+**Solución**: Actualizar el importe del complemento mediante PATCH antes de validarlo
 
 ---
 
-**Última actualización**: 4 de diciembre de 2025  
-**Versión**: 1.0  
+**Última actualización**: 7 de diciembre de 2025  
+**Versión**: 2.0 (Actualización: Desacoplamiento de modalidad e importe del tipo)  
 **Autor**: Sistema Clousadmin
+
+
+
+
 
 

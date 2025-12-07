@@ -11,8 +11,9 @@ import { prisma } from '@/lib/prisma';
 import { getJsonBody } from '@/lib/utils/json';
 
 const UpdateComplementoSchema = z.object({
-  importePersonalizado: z.number().optional(),
-  contratoId: z.string().uuid().optional(),
+  importePersonalizado: z.number().positive().optional(),
+  esImporteFijo: z.boolean().optional(),
+  contratoId: z.string().cuid().optional(),
   activo: z.boolean().optional(),
 });
 
@@ -57,16 +58,6 @@ export async function PATCH(
 
     if (complemento.empleado.empresaId !== session.user.empresaId) {
       return NextResponse.json({ error: 'Acceso denegado' }, { status: 403 });
-    }
-
-    // Validar importe personalizado si se especificó
-    if (data.importePersonalizado !== undefined && data.importePersonalizado !== null) {
-      if (data.importePersonalizado <= 0) {
-        return NextResponse.json(
-          { error: 'El importe personalizado debe ser mayor a 0' },
-          { status: 400 }
-        );
-      }
     }
 
     // Verificar contrato si se especificó

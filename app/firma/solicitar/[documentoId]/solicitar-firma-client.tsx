@@ -11,6 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
+import { Switch } from '@/components/ui/switch';
 import { extractArrayFromResponse } from '@/lib/utils/api-response';
 import { parseJson } from '@/lib/utils/json';
 
@@ -67,6 +68,8 @@ export function SolicitarFirmaClient({ documentoId }: SolicitarFirmaClientProps)
   const [carpetaId, setCarpetaId] = useState<string | null>(null);
   const [solicitudExistente, setSolicitudExistente] = useState<SolicitudExistente | null>(null);
   const [cargandoSolicitud, setCargandoSolicitud] = useState(true);
+  const [pdfDimensiones, setPdfDimensiones] = useState<{ width: number; height: number } | null>(null);
+  const [mantenerOriginal, setMantenerOriginal] = useState(true);
 
   // Constantes para el tamaño del recuadro de firma
   const SIGNATURE_RECT_WIDTH = 180;
@@ -87,6 +90,24 @@ export function SolicitarFirmaClient({ documentoId }: SolicitarFirmaClientProps)
       })
       .catch(() => {
         // Silenciar error
+      });
+  }, [documentoId]);
+
+  // Cargar dimensiones reales del PDF para conversión precisa de coordenadas
+  useEffect(() => {
+    fetch(`/api/documentos/${documentoId}/pdf-metadata`)
+      .then((res) => parseJson<{ metadata?: { paginaPrincipal?: { width: number; height: number } } }>(res))
+      .then((data) => {
+        if (data.metadata?.paginaPrincipal) {
+          setPdfDimensiones({
+            width: data.metadata.paginaPrincipal.width,
+            height: data.metadata.paginaPrincipal.height,
+          });
+        }
+      })
+      .catch(() => {
+        // Fallback a dimensiones A4 estándar
+        setPdfDimensiones({ width: 595, height: 842 });
       });
   }, [documentoId]);
 
@@ -210,42 +231,40 @@ export function SolicitarFirmaClient({ documentoId }: SolicitarFirmaClientProps)
        * Crear una solicitud individual por cada firmante
        * Cada solicitud tiene sus propias posiciones de firma
        */
-      const PDF_WIDTH = 595; // Ancho A4 en puntos
-      const PDF_HEIGHT = 842; // Alto A4 en puntos
+      // Usar dimensiones reales del PDF (o fallback a A4)
+      const PDF_WIDTH = pdfDimensiones?.width || 595;
+      const PDF_HEIGHT = pdfDimensiones?.height || 842;
+
+      // Convertir TODAS las posiciones de TODOS los firmantes a formato PDF
+      const posicionesPorFirmanteConvertidas: Record<string, any[]> = {};
+
+      for (const empleadoId of empleadosSeleccionados) {
+        const posicionesEmpleado = posicionesPorFirmante[empleadoId] || [];
+
+        if (posicionesEmpleado.length > 0) {
+          posicionesPorFirmanteConvertidas[empleadoId] = posicionesEmpleado.map(pos => ({
+            pagina: pos.page,
+            x: (pos.x / 100) * PDF_WIDTH,
+            // Invertir coordenada Y porque PDF usa origen abajo-izquierda
+            y: PDF_HEIGHT - ((pos.y / 100) * PDF_HEIGHT) - ((pos.height / 100) * PDF_HEIGHT),
+            // IMPORTANTE: Guardar width/height calculados desde los porcentajes, no valores hardcodeados
+            width: (pos.width / 100) * PDF_WIDTH,
+            height: (pos.height / 100) * PDF_HEIGHT,
+          }));
+        }
+      }
 
       const resultados = await Promise.allSettled(
         empleadosSeleccionados.map(async (empleadoId) => {
-          // Obtener posiciones de este firmante específico
-          const posicionesEmpleado = posicionesPorFirmante[empleadoId] || [];
-
-          // Convertir la primera posición (si existe) a formato PDF
-          // NOTA: Por ahora solo usamos la primera posición, en el futuro se pueden soportar múltiples
-          let posicionFirma = undefined;
-          if (posicionesEmpleado.length > 0) {
-            const pos = posicionesEmpleado[0];
-
-            /**
-             * Conversión de coordenadas:
-             * - PdfCanvasViewer devuelve coordenadas en porcentaje (0-100) relativas a cada página
-             * - El API espera coordenadas en puntos PDF (595x842 para A4)
-             * - Sistema de coordenadas PDF: origen en esquina inferior izquierda
-             * - Sistema de coordenadas canvas: origen en esquina superior izquierda
-             */
-            posicionFirma = {
-              pagina: pos.page,
-              x: (pos.x / 100) * PDF_WIDTH,
-              // Invertir coordenada Y porque PDF usa origen abajo-izquierda
-              y: PDF_HEIGHT - ((pos.y / 100) * PDF_HEIGHT) - ((pos.height / 100) * PDF_HEIGHT),
-              width: SIGNATURE_RECT_WIDTH,
-              height: SIGNATURE_RECT_HEIGHT,
-            };
-          }
+          // Obtener posiciones convertidas de este firmante específico
+          const posicionesFirmante = posicionesPorFirmanteConvertidas[empleadoId] || [];
 
           const body = {
             documentoId,
             firmantes: [{ empleadoId }], // Solo un firmante por solicitud
             ordenFirma: false,
-            posicionFirma,
+            posicionesFirma: posicionesFirmante, // Array de posiciones
+            mantenerOriginal, // Toggle para mantener o reemplazar el original
           };
 
           const res = await fetch('/api/firma/solicitudes', {
@@ -531,6 +550,27 @@ export function SolicitarFirmaClient({ documentoId }: SolicitarFirmaClientProps)
                     })()}
                   </div>
                 )}
+
+                {/* Toggle para mantener original */}
+                <div className="border-t pt-4">
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label htmlFor="mantener-original" className="text-sm font-medium">
+                        Mantener documento original
+                      </Label>
+                      <p className="text-xs text-gray-500">
+                        Si está activado, se crearán copias individuales del documento firmado para cada empleado.
+                        Si está desactivado, el documento original será reemplazado con la versión firmada.
+                      </p>
+                    </div>
+                    <Switch
+                      id="mantener-original"
+                      checked={mantenerOriginal}
+                      onCheckedChange={setMantenerOriginal}
+                      disabled={loading}
+                    />
+                  </div>
+                </div>
                 </div>
               </div>
             )}

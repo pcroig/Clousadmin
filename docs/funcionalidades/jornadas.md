@@ -77,7 +77,8 @@ Componentes:
 - ✅ Selector: Tipo (Fija / Flexible)
 - ✅ Campo: Horas semanales
 - ✅ Días laborables (selector visual de días de la semana)
-- ✅ Tiempo de descanso en **minutos** (input numérico)
+- ✅ Toggle para habilitar/deshabilitar descanso (por defecto habilitado)
+- ✅ Tiempo de descanso en **minutos** (input numérico, visible solo si está habilitado)
 - ✅ Horarios por día (para jornada fija)
 - ✅ Límites de fichaje (inferior/superior)
 - ✅ Asignación integrada (empresa/equipo/individual)
@@ -190,9 +191,11 @@ Componentes:
 ```
 
 **Notas:**
-- `pausa_inicio` / `pausa_fin`: Horas de inicio y fin de pausa (formato HH:MM)
-- `descansoMinimo`: Tiempo mínimo de descanso para jornada flexible (formato HH:MM)
+- `pausa_inicio` / `pausa_fin`: Horas de inicio y fin de pausa (formato HH:MM) - **OPCIONAL**
+- `descansoMinimo`: Tiempo mínimo de descanso para jornada flexible (formato HH:MM) - **OPCIONAL**
 - El tiempo de descanso se configura en **minutos** en la UI y se convierte a formato hora
+- El descanso es **opcional** mediante un toggle/switch. Por defecto está habilitado.
+- Si no se habilita el descanso, no se incluyen `pausa_inicio`/`pausa_fin` en jornadas fijas ni `descansoMinimo` en flexibles
 
 ---
 
@@ -263,8 +266,9 @@ Componentes:
 - **Jornadas normales**: Las jornadas creadas desde onboarding o manualmente son editables y eliminables
 - **Eliminación**: Solo si no tienen empleados asignados (soft delete: `activa: false`)
 - **Tiempo de descanso**: Se configura en minutos en la UI, se convierte a formato HH:MM en el config
-- **Jornada fija**: El descanso se aplica de 14:00 en adelante según los minutos configurados
-- **Jornada flexible**: El descanso mínimo es un requerimiento para cálculos de balance
+- **Jornada fija**: El descanso se aplica de 14:00 en adelante según los minutos configurados (si está habilitado)
+- **Jornada flexible**: El descanso mínimo es opcional y se usa para cálculos de balance cuando está configurado
+- **Descanso opcional**: El toggle del descanso está habilitado por defecto (60 minutos), pero puede deshabilitarse completamente
 - **Validación de empresa**: Todas las operaciones validan `empresaId` desde la sesión
 - **Reutilización**: El mismo componente se usa para crear y editar (DRY)
 
@@ -299,7 +303,8 @@ Durante el onboarding inicial de la empresa en `/signup`, la jornada y el calend
 
 2. El usuario puede:
    - Editar todos los valores (nombre, horas, tipo, horarios, días)
-   - Configurar descansos en minutos
+   - Habilitar/deshabilitar descanso con un toggle (por defecto habilitado)
+   - Configurar descansos en minutos (si está habilitado)
    - Seleccionar tipo de jornada (Fija o Flexible)
 
 3. Al guardar:
@@ -335,7 +340,8 @@ Durante el onboarding inicial de la empresa en `/signup`, la jornada y el calend
    - Tipo: Fija o Flexible
    - Horas semanales
    - Días laborables (selector visual)
-   - Tiempo de descanso (en minutos)
+   - Toggle para habilitar descanso (por defecto activado)
+   - Tiempo de descanso (en minutos, solo si está habilitado)
    - Horarios por día (si es fija)
    - Límites de fichaje
    - Opcional: Asignar inmediatamente (empresa/equipo/individual)

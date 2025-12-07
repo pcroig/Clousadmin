@@ -18,6 +18,7 @@ interface Complemento {
   empleadoId: string;
   tipoComplementoId: string;
   importePersonalizado: number | null;
+  esImporteFijo: boolean;
   validado: boolean;
   rechazado: boolean;
   motivoRechazo: string | null;
@@ -39,8 +40,6 @@ interface Complemento {
     id: string;
     nombre: string;
     descripcion: string | null;
-    importeFijo: number | null;
-    periodicidad: string;
   };
 }
 
@@ -128,7 +127,7 @@ export function ValidarComplementosDialog({
         (filtroEstado === 'pendientes' && !comp.validado && !comp.rechazado) ||
         (filtroEstado === 'validados' && comp.validado) ||
         (filtroEstado === 'rechazados' && comp.rechazado) ||
-        (filtroEstado === 'variables' && !comp.importePersonalizado && !comp.tipoComplemento.importeFijo);
+        (filtroEstado === 'variables' && !comp.esImporteFijo && Number(comp.importePersonalizado) === 0);
 
       return matchesSearch && matchesEstado;
     });
@@ -353,8 +352,8 @@ export function ValidarComplementosDialog({
                 </thead>
                 <tbody>
                   {complementosFiltrados.map((comp) => {
-                    const esVariable = !comp.importePersonalizado && !comp.tipoComplemento.importeFijo;
-                    const importe = comp.importePersonalizado || comp.tipoComplemento.importeFijo;
+                    const esVariable = !comp.esImporteFijo;
+                    const importe = comp.importePersonalizado;
                     const deshabilitado = comp.validado || comp.rechazado;
 
                     return (

@@ -14,6 +14,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useApi } from '@/lib/hooks';
+import { extractArrayFromResponse } from '@/lib/utils/api-response';
 import {
   agruparFichajesEnJornadas,
   calcularResumenJornadas,
@@ -22,6 +23,9 @@ import {
   getEstadoBadgeConfig,
   type JornadaUI,
 } from '@/lib/utils/fichajesHistorial';
+import { calcularProgresoEventos } from '@/lib/calculos/fichajes-cliente';
+import { EstadoFichaje } from '@/lib/constants/enums';
+import { formatearHorasMinutos } from '@/lib/utils/formatters';
 
 import type { MiEspacioEmpleado } from '@/types/empleado';
 
@@ -75,9 +79,12 @@ export function FichajesTab({
     return 8; // Default
   }, [empleado]);
 
-  const { loading, execute: refetchFichajes } = useApi<FichajeDTO[]>({
-    onSuccess: (data) => {
-      setJornadas(agruparFichajesEnJornadas(data, { horasObjetivo }));
+  const { loading, execute: refetchFichajes } = useApi<Record<string, unknown>>({
+    onSuccess: (payload) => {
+      // FIX: La API devuelve { data: fichajes[], pagination: {} }
+      // Extraer el array correctamente
+      const fichajes = extractArrayFromResponse<FichajeDTO>(payload, { key: 'fichajes' });
+      setJornadas(agruparFichajesEnJornadas(fichajes, { horasObjetivo }));
     },
   });
 
@@ -96,6 +103,45 @@ export function FichajesTab({
     window.addEventListener('fichaje-updated', handleRealtimeUpdate);
     return () => window.removeEventListener('fichaje-updated', handleRealtimeUpdate);
   }, [empleadoId, refetchFichajes]);
+
+  // Recalcular horas/balance de fichajes en curso en el cliente (sin esperar a API)
+  // FIX: Intervalo permanente que siempre ejecuta (no condicional), más eficiente
+  useEffect(() => {
+    const intervalo = setInterval(() => {
+      setJornadas((prev) => {
+        // Detectar si hay fichajes en curso en CADA iteración del intervalo
+        const hayFichajesEnCurso = prev.some((jornada) => jornada.estado === EstadoFichaje.en_curso);
+        if (!hayFichajesEnCurso) return prev; // Si no hay, no modificar el array (evita re-render)
+
+        // Recalcular solo los fichajes en curso
+        return prev.map((jornada) => {
+          if (jornada.estado !== EstadoFichaje.en_curso) {
+            return jornada;
+          }
+
+          const eventos = jornada.fichaje.eventos ?? [];
+          const { horasAcumuladas, horaEnCurso } = calcularProgresoEventos(eventos);
+
+          let horasTrabajadas = horasAcumuladas;
+          if (horaEnCurso) {
+            const ahora = new Date();
+            const horasDesdeUltimoEvento = (ahora.getTime() - horaEnCurso.getTime()) / (1000 * 60 * 60);
+            horasTrabajadas += horasDesdeUltimoEvento;
+          }
+
+          const balance = Number((horasTrabajadas - jornada.horasObjetivo).toFixed(2));
+
+          return {
+            ...jornada,
+            horasTrabajadas,
+            balance,
+          };
+        });
+      });
+    }, 15000); // refrescar cada 15s
+
+    return () => clearInterval(intervalo);
+  }, []); // Sin dependencias - el intervalo se crea solo una vez
 
   const resumen = useMemo(() => {
     // Si hay fecha de renovación, filtrar jornadas anteriores
@@ -181,9 +227,21 @@ export function FichajesTab({
       priority: 'high',
       cell: (row) => (
         <div className="text-sm text-gray-900">
-          <span className="font-semibold">{row.horasTrabajadas.toFixed(1)}h</span>
-          <span className="text-gray-500"> / {row.horasObjetivo.toFixed(1)}h</span>
+          <span className="font-semibold">{formatearHorasMinutos(row.horasTrabajadas)}</span>
+          <span className="text-gray-500"> / {formatearHorasMinutos(row.horasObjetivo)}</span>
         </div>
+      ),
+    },
+    {
+      id: 'balance',
+      header: 'Balance',
+      priority: 'high',
+      cell: (row) => (
+        <span className={`text-sm font-semibold ${
+          row.balance >= 0 ? 'text-green-600' : 'text-red-600'
+        }`}>
+          {row.balance >= 0 ? '+' : ''}{formatearHorasMinutos(row.balance)}
+        </span>
       ),
     },
     {
@@ -433,10 +491,17 @@ export function FichajesTab({
                         </div>
                       </div>
 
-                      {/* Derecha: Horas + Chevron */}
-                      <div className="flex items-center gap-1.5">
-                        <div className="text-xs font-medium text-gray-700">
-                          {jornada.horasTrabajadas.toFixed(1)}h / {jornada.horasObjetivo.toFixed(1)}h
+                      {/* Derecha: Horas + Balance + Chevron */}
+                      <div className="flex items-center gap-2">
+                        <div className="text-right">
+                          <div className="text-xs font-medium text-gray-700">
+                            {formatearHorasMinutos(jornada.horasTrabajadas)}
+                          </div>
+                          <div className={`text-[10px] font-semibold ${
+                            jornada.balance >= 0 ? 'text-green-600' : 'text-red-600'
+                          }`}>
+                            {jornada.balance >= 0 ? '+' : ''}{formatearHorasMinutos(jornada.balance)}
+                          </div>
                         </div>
                         
                         {isExpanded ? (
@@ -451,6 +516,20 @@ export function FichajesTab({
                     {isExpanded && (
                       <div className="px-2.5 pb-2 pt-0 border-t bg-gray-50/50">
                         <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 mt-2">
+                          <div>
+                            <div className="text-[10px] text-gray-500 mb-0.5">Horas objetivo</div>
+                            <div className="text-xs text-gray-900">
+                              {formatearHorasMinutos(jornada.horasObjetivo)}
+                            </div>
+                          </div>
+                          <div>
+                            <div className="text-[10px] text-gray-500 mb-0.5">Balance</div>
+                            <div className={`text-xs font-semibold ${
+                              jornada.balance >= 0 ? 'text-green-600' : 'text-red-600'
+                            }`}>
+                              {jornada.balance >= 0 ? '+' : ''}{formatearHorasMinutos(jornada.balance)}
+                            </div>
+                          </div>
                           <div className="col-span-2">
                             <div className="text-[10px] text-gray-500 mb-0.5">Horario</div>
                             <div className="text-xs text-gray-900">

@@ -186,7 +186,7 @@ export function EquiposClient({ equipos: initialEquipos, initialPanel, initialDe
           empleados={row.empleados}
           maxVisible={3}
           emptyLabel="Sin miembros"
-          dense
+          avatarSize="md"
         />
       ),
       width: '25%',

@@ -556,8 +556,8 @@ export function generarRutaStorage(
   if (empleadoId) {
     return `${empresaId}/${empleadoId}/${carpetaNombre.toLowerCase()}/${nombreArchivo}`;
   } else {
-    // Carpeta compartida
-    return `${empresaId}/compartidos/${nombreArchivo}`;
+    // Carpeta compartida - incluir nombre de carpeta para evitar colisiones de s3Key
+    return `${empresaId}/compartidos/${carpetaNombre.toLowerCase()}/${nombreArchivo}`;
   }
 }
 

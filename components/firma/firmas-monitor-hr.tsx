@@ -40,11 +40,18 @@ interface FirmaDisplay {
   empleadoNombre: string;
   empleadoEmail: string;
   requiereOrden: boolean;
+  solicitudId: string;
   solicitudTitulo: string;
   solicitudMensaje?: string;
   solicitudEstado: string;
+  solicitudCreada?: string;
+  solicitudCompletada?: string;
+  mantenerOriginal?: boolean;
   documentoId: string;
   documentoNombre: string;
+  documentoFirmadoS3Key?: string;
+  totalFirmantes: number;
+  firmadasCount: number;
 }
 
 export function FirmasMonitorHR() {
@@ -74,6 +81,9 @@ export function FirmasMonitorHR() {
 
         items.forEach((solicitud: any) => {
           if (solicitud.firmas && Array.isArray(solicitud.firmas)) {
+            const firmadasCount = solicitud.firmas.filter((f: any) => f.firmado).length;
+            const totalFirmantes = solicitud.firmas.length;
+
             solicitud.firmas.forEach((firma: any) => {
               todasLasFirmas.push({
                 id: firma.id,
@@ -82,11 +92,18 @@ export function FirmasMonitorHR() {
                 empleadoNombre: firma.empleados ? `${firma.empleados.nombre} ${firma.empleados.apellidos}` : 'Desconocido',
                 empleadoEmail: firma.empleados?.email || '',
                 requiereOrden: solicitud.ordenFirma || false,
+                solicitudId: solicitud.id,
                 solicitudTitulo: solicitud.titulo || '',
                 solicitudMensaje: solicitud.mensaje,
                 solicitudEstado: solicitud.estado || '',
+                solicitudCreada: solicitud.createdAt,
+                solicitudCompletada: solicitud.completadaEn,
+                mantenerOriginal: solicitud.mantenerOriginal ?? true,
                 documentoId: solicitud.documentos?.id || '',
                 documentoNombre: solicitud.documentos?.nombre || 'Sin nombre',
+                documentoFirmadoS3Key: solicitud.pdfFirmadoS3Key,
+                totalFirmantes,
+                firmadasCount,
               });
             });
           }
@@ -209,19 +226,22 @@ export function FirmasMonitorHR() {
                   }`}
                 >
                   <div className="flex items-start justify-between gap-2 mb-1">
-                    <p className="text-sm font-semibold text-gray-900">{firma.documentoNombre}</p>
+                    <p className="text-sm font-semibold text-gray-900 line-clamp-1">{firma.documentoNombre}</p>
                     {firma.firmado ? (
-                      <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 text-xs">
+                      <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 text-xs shrink-0">
                         Firmado
                       </Badge>
                     ) : (
-                      <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 text-xs">
+                      <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 text-xs shrink-0">
                         Pendiente
                       </Badge>
                     )}
                   </div>
                   <p className="text-xs text-gray-600">{firma.empleadoNombre}</p>
-                  <p className="text-xs text-gray-500 line-clamp-1">{firma.solicitudTitulo}</p>
+                  <div className="flex items-center justify-between gap-2 mt-1">
+                    <p className="text-xs text-gray-500 line-clamp-1">{firma.solicitudTitulo}</p>
+                    <p className="text-xs text-gray-400 shrink-0">{firma.firmadasCount}/{firma.totalFirmantes}</p>
+                  </div>
                   {firma.requiereOrden && (
                     <p className="text-xs text-amber-600 mt-1">Orden #{firma.orden}</p>
                   )}
@@ -234,9 +254,9 @@ export function FirmasMonitorHR() {
         <div className="border border-gray-200 rounded-lg bg-white p-4 flex flex-col gap-4">
           {selectedFirma ? (
             <>
-              <div className="flex flex-col gap-2">
+              <div className="flex flex-col gap-3">
                 <div className="flex items-start justify-between gap-4">
-                  <div>
+                  <div className="flex-1">
                     <p className="text-lg font-semibold text-gray-900">
                       {selectedFirma.documentoNombre}
                     </p>
@@ -245,21 +265,63 @@ export function FirmasMonitorHR() {
                     </p>
                     <p className="text-xs text-gray-500">{selectedFirma.empleadoEmail}</p>
                   </div>
-                  {selectedFirma.firmado ? (
-                    <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                      <FileSignature className="w-3 h-3 mr-1" />
-                      Firmado
-                    </Badge>
-                  ) : (
-                    <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">
-                      <FileSignature className="w-3 h-3 mr-1" />
-                      Pendiente
-                    </Badge>
-                  )}
+                  <div className="flex flex-col gap-2 items-end">
+                    {selectedFirma.firmado ? (
+                      <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                        <FileSignature className="w-3 h-3 mr-1" />
+                        Firmado
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">
+                        <FileSignature className="w-3 h-3 mr-1" />
+                        Pendiente
+                      </Badge>
+                    )}
+                    <p className="text-xs text-gray-600">
+                      Progreso: {selectedFirma.firmadasCount}/{selectedFirma.totalFirmantes}
+                    </p>
+                  </div>
                 </div>
-                <p className="text-sm text-gray-500 whitespace-pre-line">
-                  {selectedFirma.solicitudMensaje || selectedFirma.solicitudTitulo}
-                </p>
+
+                <div className="p-3 bg-gray-50 rounded-md space-y-1">
+                  <p className="text-xs font-medium text-gray-700">Información de la solicitud</p>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div>
+                      <span className="text-gray-500">Estado:</span>{' '}
+                      <span className="font-medium capitalize">{selectedFirma.solicitudEstado}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">Modo:</span>{' '}
+                      <span className="font-medium">
+                        {selectedFirma.mantenerOriginal ? 'Mantener original' : 'Reemplazar original'}
+                      </span>
+                    </div>
+                    {selectedFirma.requiereOrden && (
+                      <div className="col-span-2">
+                        <span className="text-gray-500">Orden de firma:</span>{' '}
+                        <span className="font-medium">Sí (orden #{selectedFirma.orden})</span>
+                      </div>
+                    )}
+                    {selectedFirma.documentoFirmadoS3Key && (
+                      <div className="col-span-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => window.open(`/api/firma/solicitudes/${selectedFirma.solicitudId}/documento-firmado`, '_blank')}
+                          className="w-full"
+                        >
+                          Ver documento firmado final
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {selectedFirma.solicitudMensaje && (
+                  <p className="text-sm text-gray-600 whitespace-pre-line border-l-2 border-gray-200 pl-3">
+                    {selectedFirma.solicitudMensaje}
+                  </p>
+                )}
               </div>
 
               {previewUrl ? (

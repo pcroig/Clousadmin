@@ -16,6 +16,7 @@ import {
   validarComplecionFirmas,
   validarIntegridadDocumento,
 } from '@/lib/firma-digital';
+import { convertirWordAPDF, esDocumentoWord } from '@/lib/documentos/convertir-word';
 import { crearNotificacionFirmaCompletada, crearNotificacionFirmaPendiente } from '@/lib/notificaciones';
 import { prisma } from '@/lib/prisma';
 import { asJsonValue, JSON_NULL } from '@/lib/prisma/json';
@@ -73,7 +74,9 @@ export async function crearSolicitudFirma(input: CrearSolicitudFirmaInput) {
     recordatorioAutomatico = true,
     diasRecordatorio = 3,
     creadoPor,
-    posicionFirma,
+    posicionesFirma, // NUEVO: Array de posiciones
+    posicionFirma,   // LEGACY: Retrocompatibilidad
+    mantenerOriginal = true, // NUEVO: Por defecto mantiene el original
   } = input;
 
   // 1. Obtener documento y generar hash
@@ -96,15 +99,52 @@ export async function crearSolicitudFirma(input: CrearSolicitudFirmaInput) {
     throw new Error('El documento no pertenece a esta empresa');
   }
 
-  if (documento.mimeType !== 'application/pdf') {
-    throw new Error('Solo se pueden solicitar firmas sobre documentos PDF.');
+  // Verificar si es PDF o Word (convertible)
+  const esPDF = documento.mimeType === 'application/pdf';
+  const esWord = esDocumentoWord(documento.mimeType);
+
+  if (!esPDF && !esWord) {
+    throw new Error('Solo se pueden solicitar firmas sobre documentos PDF o Word (.docx)');
   }
 
-  // Descargar documento y generar hash
-  const documentoBuffer = await downloadFromS3(documento.s3Key);
-  const hashDocumento = generarHashDocumento(documentoBuffer);
+  // Descargar documento original
+  let documentoBuffer = await downloadFromS3(documento.s3Key);
+
+  // Si es Word, convertir a PDF automáticamente
+  let documentoParaFirma = documentoBuffer;
+  let s3KeyParaFirma = documento.s3Key;
+
+  if (esWord) {
+    console.log('[crearSolicitudFirma] Convirtiendo Word a PDF:', documento.nombre);
+    try {
+      documentoParaFirma = await convertirWordAPDF(documentoBuffer);
+
+      // Guardar PDF convertido temporalmente en S3
+      const nombrePDF = documento.nombre.replace(/\.(docx?|DOCX?)$/i, '.pdf');
+      s3KeyParaFirma = `temp-firmas/${empresaId}/${Date.now()}-${nombrePDF}`;
+      await uploadToS3(documentoParaFirma, s3KeyParaFirma, 'application/pdf');
+
+      console.log('[crearSolicitudFirma] PDF generado:', s3KeyParaFirma);
+    } catch (error) {
+      console.error('[crearSolicitudFirma] Error al convertir Word:', error);
+      throw new Error('No se pudo convertir el documento Word a PDF. LibreOffice no está disponible.');
+    }
+  }
+
+  // Generar hash del documento (PDF original o convertido)
+  const hashDocumento = generarHashDocumento(documentoParaFirma);
 
   // 2. Crear solicitud de firma
+  // Determinar qué guardar en posicionFirma (campo JSON)
+  let posicionFirmaJson: any = JSON_NULL;
+  if (posicionesFirma && posicionesFirma.length > 0) {
+    // NUEVO: Guardar array de posiciones
+    posicionFirmaJson = asJsonValue({ multiple: true, posiciones: posicionesFirma });
+  } else if (posicionFirma) {
+    // LEGACY: Guardar single position (retrocompatibilidad)
+    posicionFirmaJson = asJsonValue(posicionFirma);
+  }
+
   const solicitud = await prisma.solicitudes_firma.create({
     data: {
       empresaId,
@@ -117,9 +157,11 @@ export async function crearSolicitudFirma(input: CrearSolicitudFirmaInput) {
       diasRecordatorio,
       nombreDocumento: documento.nombre,
       hashDocumento,
-      posicionFirma: posicionFirma ? asJsonValue(posicionFirma) : JSON_NULL,
+      posicionFirma: posicionFirmaJson,
       estado: 'pendiente',
       creadoPor,
+      mantenerOriginal, // NUEVO: Guardar preferencia de mantener original
+      pdfTemporalS3Key: esWord ? s3KeyParaFirma : null, // NUEVO: Guardar referencia al PDF temporal convertido
     },
   });
 
@@ -275,12 +317,33 @@ export async function firmarDocumento(
     }
   }
 
-  if (firma.solicitudes_firma.documentos.mimeType !== 'application/pdf') {
-    throw new Error('Solo se pueden firmar documentos PDF generados desde plantillas.');
+  // Validar que el documento sea PDF o Word (Word se convierte automáticamente a PDF)
+  const mimeType = firma.solicitudes_firma.documentos.mimeType;
+  const esPDF = mimeType === 'application/pdf';
+  const esWord = esDocumentoWord(mimeType);
+
+  if (!esPDF && !esWord) {
+    throw new Error('Solo se pueden firmar documentos PDF y Word.');
   }
 
   // 4. Validar integridad del documento
-  const documentoBuffer = await downloadFromS3(firma.solicitudes_firma.documentos.s3Key);
+  // Si existe pdfTemporalS3Key (documento Word convertido), usar ese PDF
+  // De lo contrario, usar el documento original
+  const s3KeyParaValidar = firma.solicitudes_firma.pdfTemporalS3Key ?? firma.solicitudes_firma.documentos.s3Key;
+  let documentoBuffer = await downloadFromS3(s3KeyParaValidar);
+
+  // Si no había PDF temporal pero el documento es Word, convertirlo ahora
+  // (esto solo pasaría con solicitudes antiguas creadas antes de este cambio)
+  if (!firma.solicitudes_firma.pdfTemporalS3Key && esWord) {
+    console.log('[firmarDocumento] Convirtiendo Word a PDF (legacy)');
+    try {
+      documentoBuffer = await convertirWordAPDF(documentoBuffer);
+    } catch (error) {
+      console.error('[firmarDocumento] Error al convertir Word para validación:', error);
+      throw new Error('No se pudo convertir el documento Word a PDF para validación.');
+    }
+  }
+
   const validacion = validarIntegridadDocumento(
     documentoBuffer,
     firma.solicitudes_firma.hashDocumento
@@ -368,37 +431,43 @@ export async function firmarDocumento(
           orderBy: { firmadoEn: 'asc' },
         });
 
-        // Obtener posición guardada de la solicitud (puede ser v2 o v1)
-        let posicionBase: PosicionFirma | undefined;
+        // Obtener posiciones guardadas de la solicitud (puede ser array o single)
+        let posicionesBase: PosicionFirma[] = [];
         if (firma.solicitudes_firma.posicionFirma) {
           try {
-            const posicionMetadata = firma.solicitudes_firma.posicionFirma as
-              | PosicionFirmaConMetadata
-              | PosicionFirma
-              | Record<string, unknown>;
+            const posicionData = firma.solicitudes_firma.posicionFirma as Record<string, unknown>;
 
-            // Convertir a PosicionFirma absoluta usando el PDF real
-            posicionBase = await metadataAPosicionPDF(
-              posicionMetadata as PosicionFirmaConMetadata | PosicionFirma,
-              documentoBuffer
-            );
+            // Detectar si es el nuevo formato múltiple
+            if (posicionData.multiple === true && Array.isArray(posicionData.posiciones)) {
+              // NUEVO: Array de posiciones
+              posicionesBase = posicionData.posiciones as PosicionFirma[];
+            } else {
+              // LEGACY: Single position (v1 o v2)
+              const posicionSingle = await metadataAPosicionPDF(
+                posicionData as unknown as PosicionFirmaConMetadata | PosicionFirma,
+                documentoBuffer
+              );
+              if (posicionSingle) {
+                posicionesBase = [posicionSingle];
+              }
+            }
 
             // Log solo en desarrollo
             if (process.env.NODE_ENV === 'development') {
-              console.log('[firmarDocumento] Posición convertida:', posicionBase);
+              console.log('[firmarDocumento] Posiciones convertidas:', posicionesBase.length);
             }
           } catch (error) {
-            console.error('[firmarDocumento] Error convirtiendo posición:', error);
-            // Si falla la conversión, seguir sin posición (se usará la por defecto)
+            console.error('[firmarDocumento] Error convirtiendo posiciones:', error);
+            // Si falla la conversión, seguir sin posiciones (se usará la por defecto)
           }
         }
 
         // Generar marcas de firma para cada firmante (incluyendo imagen manuscrita si existe)
-        // Si hay posición guardada, todas las firmas usarán esa posición base
-        // Si hay múltiples firmas, anadirMarcasFirmasPDF las apilará verticalmente desde esa posición
+        // NUEVO: Si hay múltiples posiciones, cada firmante usa su posición correspondiente
+        // Si hay menos posiciones que firmantes, se repite la última posición
 
         const marcas = await Promise.all(
-          firmasCompletadas.map(async (f) => {
+          firmasCompletadas.map(async (f, index) => {
             const capturados = (f.datosCapturados as DatosCapturadosFirma | null) ?? null;
             let firmaImagenBuffer: Buffer | undefined;
             const firmaImagenWidth = capturados?.firmaImagenWidth;
@@ -414,6 +483,13 @@ export async function firmarDocumento(
               }
             }
 
+            // Determinar posición para este firmante
+            // Si hay posiciones definidas, usar la del índice o la última si no hay suficientes
+            let posicionParaEsteFirmante: PosicionFirma | undefined;
+            if (posicionesBase.length > 0) {
+              posicionParaEsteFirmante = posicionesBase[Math.min(index, posicionesBase.length - 1)];
+            }
+
             return {
               nombreFirmante: `${f.empleado.nombre} ${f.empleado.apellidos}`,
               fechaFirma:
@@ -423,8 +499,8 @@ export async function firmarDocumento(
                 }) || 'N/A',
               tipoFirma: f.tipo as TipoFirma,
               certificadoHash: f.certificadoHash ?? undefined,
-              // Usar la posición convertida (o undefined para usar posición por defecto)
-              posicion: posicionBase,
+              // Usar la posición específica para este firmante
+              posicion: posicionParaEsteFirmante,
               firmaImagen: firmaImagenBuffer
                 ? {
                     buffer: firmaImagenBuffer,
@@ -441,8 +517,8 @@ export async function firmarDocumento(
         const pdfConMarcas = await anadirMarcasFirmasPDF(documentoBuffer, marcas);
 
         // Subir PDF firmado a S3
-        const extension = firma.solicitudes_firma.documentos.nombre.split('.').pop() || 'pdf';
-        const pdfFirmadoS3Key = `documentos-firmados/${firma.solicitudes_firma.empresaId}/${firma.solicitudes_firma.id}/firmado.${extension}`;
+        // IMPORTANTE: Siempre usar .pdf porque pdfConMarcas es un PDF (incluso si el original era Word)
+        const pdfFirmadoS3Key = `documentos-firmados/${firma.solicitudes_firma.empresaId}/${firma.solicitudes_firma.id}/firmado.pdf`;
 
         await uploadToS3(pdfConMarcas, pdfFirmadoS3Key, 'application/pdf');
 
@@ -456,31 +532,55 @@ export async function firmarDocumento(
 
         // Crear documentos firmados individuales para cada empleado que firmó
         const documentoOriginal = firma.solicitudes_firma.documentos;
-        const nombreBase = documentoOriginal.nombre.replace(/\.pdf$/i, '');
+        // Eliminar CUALQUIER extensión del nombre original (.pdf, .docx, .doc, etc.)
+        const nombreBase = documentoOriginal.nombre.replace(/\.[^.]+$/, '');
 
-        // Obtener todos los empleados que firmaron
-        const firmasConEmpleado = await prisma.firmas.findMany({
-          where: {
-            solicitudFirmaId: firma.solicitudFirmaId,
-            firmado: true,
-          },
-          select: {
-            empleadoId: true,
-            empleado: {
-              select: {
-                id: true,
-                nombre: true,
-                apellidos: true,
-              },
-            },
-          },
-        });
+        // Verificar si se debe mantener el original o reemplazarlo
+        const mantenerOriginal = firma.solicitudes_firma.mantenerOriginal ?? true;
 
         // Variable para guardar el primer documento creado (para notificaciones)
         let primerDocumentoFirmado: { id: string; nombre: string } | null = null;
 
-        // SIEMPRE crear copias individuales para cada empleado que firmó
-        for (const firmaConEmpleado of firmasConEmpleado) {
+        if (!mantenerOriginal) {
+          // MODO: Reemplazar documento original con versión firmada
+          await prisma.documentos.update({
+            where: { id: documentoOriginal.id },
+            data: {
+              s3Key: pdfFirmadoS3Key,
+              mimeType: 'application/pdf',
+              tamano: pdfConMarcas.length,
+              firmado: true,
+              firmadoEn: ahora,
+              hashDocumento: generarHashDocumento(pdfConMarcas),
+            },
+          });
+
+          primerDocumentoFirmado = {
+            id: documentoOriginal.id,
+            nombre: documentoOriginal.nombre,
+          };
+        } else {
+          // MODO: Mantener original y crear copias individuales para cada empleado
+          // Obtener todos los empleados que firmaron
+          const firmasConEmpleado = await prisma.firmas.findMany({
+            where: {
+              solicitudFirmaId: firma.solicitudFirmaId,
+              firmado: true,
+            },
+            select: {
+              empleadoId: true,
+              empleado: {
+                select: {
+                  id: true,
+                  nombre: true,
+                  apellidos: true,
+                },
+              },
+            },
+          });
+
+          // Crear copias individuales para cada empleado que firmó
+          for (const firmaConEmpleado of firmasConEmpleado) {
           // Generar nombre personalizado: "Nombre original - Nombre Empleado (firma).pdf"
           const nombreEmpleado = `${firmaConEmpleado.empleado.nombre} ${firmaConEmpleado.empleado.apellidos}`;
           const nombreDocumentoFirmado = `${nombreBase} - ${nombreEmpleado} (firma).pdf`;
@@ -543,8 +643,9 @@ export async function firmarDocumento(
           }
         }
 
-        // Si no se creó ningún documento (no había firmantes), crear uno genérico
-        const nuevoDocumentoFirmado = primerDocumentoFirmado || await (async () => {
+          // Si no se creó ningún documento (no había firmantes), crear uno genérico
+          if (!primerDocumentoFirmado) {
+            primerDocumentoFirmado = await (async () => {
           const nombreGenerico = `${nombreBase} (firmado).pdf`;
 
           // Obtener carpeta del documento original
@@ -581,21 +682,30 @@ export async function firmarDocumento(
           }
 
           return { id: doc.id, nombre: doc.nombre };
-        })();
+            })();
+          }
+        }
+
+        // Variable para notificaciones (usar el documento creado o el original reemplazado)
+        const nuevoDocumentoFirmado = primerDocumentoFirmado!;
 
         // Si el documento original fue generado desde plantilla, actualizar la referencia
-        const docGenerado = await prisma.documentosGenerado.findUnique({
-          where: { documentoId: documentoOriginal.id },
-        });
-
-        if (docGenerado) {
-          await prisma.documentosGenerado.update({
+        // SOLO si se reemplazó el original (mantenerOriginal = false)
+        // Si se mantiene el original, NO marcarlo como firmado
+        if (!mantenerOriginal) {
+          const docGenerado = await prisma.documentosGenerado.findUnique({
             where: { documentoId: documentoOriginal.id },
-            data: {
-              firmado: true,
-              firmadoEn: ahora,
-            },
           });
+
+          if (docGenerado) {
+            await prisma.documentosGenerado.update({
+              where: { documentoId: documentoOriginal.id },
+              data: {
+                firmado: true,
+                firmadoEn: ahora,
+              },
+            });
+          }
         }
 
         await crearNotificacionFirmaCompletada(prisma, {

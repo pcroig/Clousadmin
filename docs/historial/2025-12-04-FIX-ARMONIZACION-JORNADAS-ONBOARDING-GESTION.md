@@ -336,3 +336,7 @@ El campo `tipo` podría haber sido un campo separado en la tabla, pero se decidi
 
 Co-Authored-By: Claude <noreply@anthropic.com>
 
+
+
+
+

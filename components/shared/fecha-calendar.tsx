@@ -9,9 +9,10 @@ import { es } from 'date-fns/locale';
 interface FechaCalendarProps {
   date: Date;
   className?: string;
+  size?: 'sm' | 'md' | 'lg';
 }
 
-export function FechaCalendar({ date, className = '' }: FechaCalendarProps) {
+export function FechaCalendar({ date, className = '', size = 'md' }: FechaCalendarProps) {
   const mes = format(date, 'MMM', { locale: es }).toUpperCase();
   const dia = format(date, 'd');
 

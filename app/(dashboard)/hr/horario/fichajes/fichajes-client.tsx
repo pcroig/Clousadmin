@@ -30,6 +30,7 @@ import { useIsMobile } from '@/lib/hooks/use-viewport';
 import { extractArrayFromResponse } from '@/lib/utils/api-response';
 import { extraerHoraDeISO, formatearHorasMinutos } from '@/lib/utils/formatters';
 import { calcularRangoFechas, obtenerEtiquetaPeriodo, toMadridDate } from '@/lib/utils/fechas';
+import { calcularProgresoEventos } from '@/lib/calculos/fichajes-cliente';
 import { parseJson } from '@/lib/utils/json';
 
 import { JornadasModal } from './jornadas-modal';
@@ -290,6 +291,10 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
       if (filtroEquipo !== 'todos') {
         params.append('equipoId', filtroEquipo);
       }
+      
+      // FIX: Solicitar límite alto para mostrar todos los fichajes del rango sin paginación
+      // En una semana típica con 50 empleados = ~250 fichajes, 200 es suficiente
+      params.append('limit', '200');
 
       const response = await fetch(`/api/fichajes?${params}`);
       const payload =
@@ -306,7 +311,9 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
       }
 
       const fichajes = extractArrayFromResponse<Fichaje>(payload, { key: 'fichajes' });
+
       const jornadasAgrupadas = agruparPorJornada(fichajes);
+
       setJornadas(jornadasAgrupadas);
     } catch (error) {
       console.error('Error fetching fichajes:', error);
@@ -327,6 +334,43 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
     window.addEventListener('fichaje-updated', handleRealtimeUpdate);
     return () => window.removeEventListener('fichaje-updated', handleRealtimeUpdate);
   }, [fetchFichajes]);
+
+  // Recalcular horas/balance en curso en cliente (misma lógica que widget) para sincronizar la tabla
+  // FIX: Intervalo permanente que siempre ejecuta (no condicional), más eficiente
+  useEffect(() => {
+    const intervalo = setInterval(() => {
+      setJornadas((prev) => {
+        // Detectar si hay fichajes en curso en CADA iteración del intervalo
+        const hayEnCurso = prev.some((j) => j.fichaje.estado === EstadoFichaje.en_curso);
+        if (!hayEnCurso) return prev; // Si no hay, no modificar el array (evita re-render)
+
+        // Recalcular solo los fichajes en curso
+        return prev.map((j) => {
+          if (j.fichaje.estado !== EstadoFichaje.en_curso) return j;
+
+          const eventos = j.fichaje.eventos ?? [];
+          const { horasAcumuladas, horaEnCurso } = calcularProgresoEventos(eventos);
+
+          let horasTrabajadas = horasAcumuladas;
+          if (horaEnCurso) {
+            const ahora = new Date();
+            const horasDesdeUltimoEvento = (ahora.getTime() - horaEnCurso.getTime()) / (1000 * 60 * 60);
+            horasTrabajadas += horasDesdeUltimoEvento;
+          }
+
+          const balance = Math.round((horasTrabajadas - j.horasEsperadas) * 100) / 100;
+
+          return {
+            ...j,
+            horasTrabajadas,
+            balance,
+          };
+        });
+      });
+    }, 15000); // 15s para mantener la vista sincronizada sin golpear la API
+
+    return () => clearInterval(intervalo);
+  }, []); // Sin dependencias - el intervalo se crea solo una vez
 
   const goToPreviousPeriod = useCallback(() => {
     const nuevaFecha = new Date(fechaBase);

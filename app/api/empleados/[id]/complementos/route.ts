@@ -12,9 +12,10 @@ import { prisma } from '@/lib/prisma';
 import { getJsonBody } from '@/lib/utils/json';
 
 const AsignarComplementoSchema = z.object({
-  tipoComplementoId: z.string().uuid(),
-  contratoId: z.string().uuid().optional(),
-  importePersonalizado: z.number().optional(),
+  tipoComplementoId: z.string().cuid(),
+  contratoId: z.string().cuid().optional(),
+  esImporteFijo: z.boolean(),
+  importe: z.number().positive(),
 });
 
 // ========================================
@@ -176,22 +177,13 @@ export async function POST(
       );
     }
 
-    // Validar importe personalizado si se especificó
-    if (data.importePersonalizado !== undefined) {
-      if (data.importePersonalizado <= 0) {
-        return NextResponse.json(
-          { error: 'El importe personalizado debe ser mayor a 0' },
-          { status: 400 }
-        );
-      }
-    }
-
     const complemento = await prisma.empleado_complementos.create({
       data: {
         empleadoId: id,
         tipoComplementoId: data.tipoComplementoId,
         contratoId: data.contratoId || null,
-        importePersonalizado: data.importePersonalizado || null,
+        esImporteFijo: data.esImporteFijo,
+        importePersonalizado: data.importe,
       },
       include: {
         tipos_complemento: true,
@@ -214,7 +206,7 @@ export async function POST(
           empleadoNombre: `${empleado.nombre} ${empleado.apellidos || ''}`.trim(),
           empresaId: session.user.empresaId,
           complementoNombre: tipoComplemento.nombre,
-          importe: data.importePersonalizado || Number(tipoComplemento.importeFijo ?? 0),
+          importe: data.importe,
         },
         { actorUsuarioId: session.user.id }
       );

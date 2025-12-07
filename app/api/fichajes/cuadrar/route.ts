@@ -4,6 +4,7 @@
 // POST: Cuadrar fichajes pendientes creando eventos según jornada
 
 import { NextRequest } from 'next/server';
+import { format } from 'date-fns';
 import { z } from 'zod';
 
 import {
@@ -25,7 +26,7 @@ import {
   validarSecuenciaEventos,
 } from '@/lib/calculos/fichajes-historico';
 import { prisma } from '@/lib/prisma';
-import { crearFechaConHora, normalizarFechaSinHora, obtenerNombreDia } from '@/lib/utils/fechas';
+import { crearFechaConHora, normalizarFechaSinHora, obtenerNombreDia, toMadridDate } from '@/lib/utils/fechas';
 
 import type { DiaConfig, JornadaConfig } from '@/lib/calculos/fichajes-helpers';
 
@@ -53,8 +54,8 @@ export async function POST(request: NextRequest) {
     if (isNextResponse(validationResult)) return validationResult;
     const { data: validatedData } = validationResult;
 
-    const fichajeIds = validatedData.fichajeIds ?? [];
-    const descartarIds = validatedData.descartarIds ?? [];
+    const fichajeIds = [...new Set(validatedData.fichajeIds ?? [])];
+    const descartarIds = [...new Set(validatedData.descartarIds ?? [])];
 
     if (fichajeIds.length > MAX_FICHAJES_POR_REQUEST) {
       return badRequestResponse(
@@ -89,6 +90,11 @@ export async function POST(request: NextRequest) {
       for (const fichaje of fichajesDescartar) {
         if (fichaje.eventos.length > 0) {
           errores.push(`Fichaje ${fichaje.id}: Solo se pueden descartar días sin fichajes`);
+          continue;
+        }
+
+        if (fichaje.estado !== 'pendiente' && fichaje.estado !== 'en_curso') {
+          errores.push(`Fichaje ${fichaje.id}: Solo se pueden descartar fichajes pendientes`);
           continue;
         }
 
@@ -176,7 +182,7 @@ export async function POST(request: NextRequest) {
       // Las ausencias de medio día suelen ser de un solo día, pero por si acaso iteramos
       const current = new Date(ausencia.fechaInicio);
       while (current <= ausencia.fechaFin) {
-        const key = `${ausencia.empleadoId}_${current.toISOString().split('T')[0]}`;
+        const key = `${ausencia.empleadoId}_${format(toMadridDate(current), 'yyyy-MM-dd')}`;
         mapaAusencias.set(key, ausencia);
         current.setDate(current.getDate() + 1);
       }
@@ -207,6 +213,7 @@ export async function POST(request: NextRequest) {
           if (!fichajeActual || (fichajeActual.estado !== 'pendiente' && fichajeActual.estado !== 'en_curso')) {
              // Si cambió de estado desde la carga inicial, lo saltamos silenciosamente o logueamos
              console.warn(`[API Cuadrar] Fichaje ${fichajeId} cambió de estado o no existe, saltando.`);
+             errores.push(`Fichaje ${fichajeId}: Ya procesado o estado inválido`);
              continue;
           }
 
@@ -217,14 +224,16 @@ export async function POST(request: NextRequest) {
           }
 
           // Recuperar ausencia del mapa
-          const fechaKey = `${fichaje.empleadoId}_${fichaje.fecha.toISOString().split('T')[0]}`;
+          const fechaKey = `${fichaje.empleadoId}_${format(toMadridDate(fichaje.fecha), 'yyyy-MM-dd')}`;
           const ausenciaMatch = mapaAusencias.get(fechaKey);
           
           // Simular objeto AusenciaMedioDia
           // Casteamos el tipo Ausencia para evitar conflictos con includes opcionales
           const ausenciaMedioDiaInfo = {
-            tieneAusencia: !!ausenciaMatch,
-            medioDia: (ausenciaMatch?.periodo as 'manana' | 'tarde') || null, 
+            tieneAusencia: !!ausenciaMatch && (ausenciaMatch.periodo === 'manana' || ausenciaMatch.periodo === 'tarde'),
+            medioDia: (ausenciaMatch?.periodo === 'manana' || ausenciaMatch?.periodo === 'tarde')
+              ? (ausenciaMatch.periodo as 'manana' | 'tarde')
+              : null, 
             ausencia: ausenciaMatch as unknown as Record<string, unknown> | null,
           };
 
@@ -259,6 +268,10 @@ export async function POST(request: NextRequest) {
                   eventosRequeridos.push('pausa_inicio');
                   eventosRequeridos.push('pausa_fin');
                }
+            } else if (configDia === undefined) {
+               // Fallback: si no hay configuración del día, asumir día laborable básico
+               if (!ausenciaMedioDiaInfo.tieneAusencia || ausenciaMedioDiaInfo.medioDia === 'tarde') eventosRequeridos.push('entrada');
+               if (!ausenciaMedioDiaInfo.tieneAusencia || ausenciaMedioDiaInfo.medioDia === 'manana') eventosRequeridos.push('salida');
             }
           }
           else {
@@ -314,15 +327,21 @@ export async function POST(request: NextRequest) {
 
               if (!existeFinPosterior) {
                 const horaFin = new Date(new Date(ultimaPausaInicio.hora).getTime() + minutosDescansoConfig * 60 * 1000);
-                await tx.fichaje_eventos.create({
-                  data: {
-                    fichajeId,
-                    tipo: 'pausa_fin',
-                    hora: horaFin,
-                  },
-                });
-                tiposEventos.push('pausa_fin');
-                eventosFaltantes = eventosRequeridos.filter((req) => !tiposEventos.includes(req));
+                const eventoSalida = fichaje.eventos.find((e) => e.tipo === 'salida');
+
+                if (eventoSalida && horaFin.getTime() >= new Date(eventoSalida.hora).getTime()) {
+                  console.warn(`[API Cuadrar] Fichaje ${fichajeId}: pausa_fin calculada pasaría de la salida, no se crea`);
+                } else {
+                  await tx.fichaje_eventos.create({
+                    data: {
+                      fichajeId,
+                      tipo: 'pausa_fin',
+                      hora: horaFin,
+                    },
+                  });
+                  tiposEventos.push('pausa_fin');
+                  eventosFaltantes = eventosRequeridos.filter((req) => !tiposEventos.includes(req));
+                }
               }
             }
           }
@@ -505,7 +524,13 @@ export async function POST(request: NextRequest) {
           });
 
           // Calcular horas trabajadas y en pausa usando las funciones puras
-          const horasTrabajadas = calcularHorasTrabajadas(eventosActualizados) ?? 0;
+          const horasTrabajadas = calcularHorasTrabajadas(eventosActualizados);
+
+          if (horasTrabajadas === null) {
+            errores.push(`Fichaje ${fichajeId}: Secuencia de eventos inválida, no se puede cerrar`);
+            continue;
+          }
+
           const horasEnPausa = calcularTiempoEnPausa(eventosActualizados);
           
           await tx.fichajes.update({

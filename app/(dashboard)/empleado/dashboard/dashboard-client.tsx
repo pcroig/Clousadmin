@@ -152,20 +152,6 @@ export function EmpleadoDashboardClient({
             <div>
               <FichajeWidget href="/empleado/mi-espacio/fichajes" />
             </div>
-
-            {/* Plantilla Widget */}
-            {equipoResumen && (
-              <div>
-                <PlantillaWidget
-                  trabajando={equipoResumen.trabajando}
-                  enPausa={equipoResumen.enPausa}
-                  ausentes={equipoResumen.ausentes}
-                  sinFichar={equipoResumen.sinFichar}
-                  fueraDeHorario={equipoResumen.fueraDeHorario}
-                  rol="empleado"
-                />
-              </div>
-            )}
           </div>
 
           {/* DESKTOP Grid Layout */}

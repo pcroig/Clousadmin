@@ -119,6 +119,21 @@ model empleado_festivos {
 - `contarDiasLaborables(fechaInicio, fechaFin, empresaId)`: Cuenta días
 - `getFestivosActivosParaEmpleado(empresaId, empleadoId, fechaInicio, fechaFin)`: **Función clave** que obtiene festivos de empresa + personalizados del empleado, **reemplazando** los de empresa cuando hay conflicto de fechas
 
+### 🕒 Manejo seguro de fechas y zonas horarias
+
+- **No usar** `new Date(año, mes, día)` para crear festivos guardados en la BD. Ese constructor toma la zona horaria local y desplaza la fecha (ej. 6 dic → 5 dic en UTC).
+- **Siempre** generar fechas con `Date.UTC`, por ejemplo:
+  ```ts
+  new Date(Date.UTC(año, 11, 6)); // Día de la Constitución
+  ```
+- Los scripts de seeding/migraciones (como `prisma/seed.ts`) deben usar el mismo patrón. Si necesitas corregir datos heredados, toma como referencia `scripts/fix-fechas-festivos.ts`.
+- Al recibir fechas `YYYY-MM-DD` desde formularios o APIs, conviértelas así:
+  ```ts
+  const [y, m, d] = fecha.split('-').map(Number);
+  const fechaUtc = new Date(Date.UTC(y, m - 1, d));
+  ```
+- Antes de crear eventos de fichaje o comparar días, pasa siempre por `normalizarFechaSinHora()` para alinear con Madrid/UTC y evitar offsets.
+
 ---
 
 ## 🔌 API ENDPOINTS
@@ -186,16 +201,18 @@ Editar festivo de empresa.
 ```
 
 **Restricciones**:
-- Festivos nacionales: solo se puede cambiar `activo`
-- Festivos empresa: todos los campos editables
+- Festivos nacionales: solo se puede cambiar `activo` (activar/desactivar)
+- Festivos empresa: todos los campos editables (`nombre`, `fecha`, `activo`)
 - Solo HR Admin
+
+**Importante**: Para festivos nacionales, solo se debe enviar `{"activo": true/false}` en el body. Intentar cambiar `nombre` o `fecha` resultará en error.
 
 #### DELETE /api/festivos/[id]
 Eliminar festivo de empresa.
 
 **Restricciones**:
 - Solo festivos tipo 'empresa'
-- Festivos nacionales solo se desactivan
+- Festivos nacionales **no se pueden eliminar**, solo desactivar usando PATCH
 - Solo HR Admin
 
 #### POST /api/festivos/importar-nacionales
@@ -337,15 +354,23 @@ Tabla de festivos de empresa con acciones.
 
 **Columnas**:
 - Fecha (formato largo español)
-- Nombre
-- Tipo (Badge: Nacional/Empresa)
-- Estado (Badge: Activo/Inactivo)
+- Nombre (con indicador "(Inactivo)" si aplica)
+- Tipo (Nacional/Empresa)
 - Acciones
 
+**Características**:
+- Los festivos inactivos se muestran con opacidad reducida (50%)
+- Los festivos nacionales no tienen botón de eliminar
+
 **Acciones**:
-- Editar (solo empresa)
-- Eliminar (solo empresa)
-- Activar/Desactivar (todos)
+- **Editar**:
+  - Festivos de empresa: permite cambiar nombre, fecha y estado activo
+  - Festivos nacionales: solo muestra toggle para activar/desactivar
+- **Eliminar**: solo disponible para festivos de empresa
+
+**Modo de edición**:
+- Festivos de empresa: formulario completo con campos de fecha y nombre editables
+- Festivos nacionales: muestra fecha y nombre como texto, con un switch para activar/desactivar
 
 ### FestivosPersonalizadosModal
 **Ubicación**: `components/ausencias/festivos-personalizados-modal.tsx`

@@ -8,6 +8,7 @@ import { MapPin, Pencil, Trash2, User, Users } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
+import { EmpleadoHoverCard } from '@/components/empleado/empleado-hover-card';
 import { EmployeeAvatar } from '@/components/shared/employee-avatar';
 import {
   AlertDialog,
@@ -179,20 +180,34 @@ export function EquipoDetails({ equipo, onUpdate, onDelete }: EquipoDetailsProps
             ) : (
               equipo.empleados.map((empleado) => {
                 const fotoUrl = empleado.fotoUrl ?? empleado.avatar ?? undefined;
+                const parts = empleado.nombre.split(' ');
+                const nombre = parts[0] || empleado.nombre;
+                const apellidos = parts.slice(1).join(' ') || null;
 
                 return (
                   <div
                     key={empleado.id}
                     className="flex items-center gap-3 p-3 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
                   >
-                    <EmployeeAvatar
-                      nombre={empleado.nombre}
-                      fotoUrl={fotoUrl}
-                      size="sm"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm text-gray-900 font-medium">{empleado.nombre}</p>
-                    </div>
+                    <EmpleadoHoverCard
+                      empleado={{
+                        id: empleado.id,
+                        nombre,
+                        apellidos,
+                        fotoUrl,
+                      }}
+                      triggerClassName="flex items-center gap-3 flex-1 min-w-0"
+                    >
+                      <EmployeeAvatar
+                        nombre={nombre}
+                        apellidos={apellidos}
+                        fotoUrl={fotoUrl}
+                        size="sm"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-gray-900 font-medium">{empleado.nombre}</p>
+                      </div>
+                    </EmpleadoHoverCard>
                     {empleado.id === equipo.responsableId && (
                       <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded font-medium">
                         Responsable

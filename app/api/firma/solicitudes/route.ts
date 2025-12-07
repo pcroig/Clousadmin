@@ -173,9 +173,26 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Procesar posicionFirma: puede venir en formato v2 (porcentajes) o v1 (absoluto, legacy)
+    // Procesar posicionesFirma (array) o posicionFirma (legacy - single)
+    let posicionesFirma: CrearSolicitudFirmaInput['posicionesFirma'];
     let posicionFirma: CrearSolicitudFirmaInput['posicionFirma'];
-    if (body.posicionFirma && typeof body.posicionFirma === 'object' && body.posicionFirma !== null) {
+
+    // Prioridad 1: posicionesFirma (array - nuevo formato)
+    if (Array.isArray(body.posicionesFirma) && body.posicionesFirma.length > 0) {
+      posicionesFirma = body.posicionesFirma.map((pos: any) => {
+        if (!pos || typeof pos !== 'object') return null;
+
+        const pagina = typeof pos.pagina === 'number' ? pos.pagina : -1;
+        const x = typeof pos.x === 'number' ? pos.x : 0;
+        const y = typeof pos.y === 'number' ? pos.y : 0;
+        const width = typeof pos.width === 'number' ? pos.width : undefined;
+        const height = typeof pos.height === 'number' ? pos.height : undefined;
+
+        return { pagina, x, y, width, height };
+      }).filter((p): p is NonNullable<typeof p> => p !== null);
+    }
+    // Fallback: posicionFirma (single - retrocompatibilidad)
+    else if (body.posicionFirma && typeof body.posicionFirma === 'object' && body.posicionFirma !== null) {
       const pos = body.posicionFirma as Record<string, unknown>;
 
       // Detectar formato: v2 usa xPorcentaje/yPorcentaje, v1 usa x/y
@@ -289,13 +306,14 @@ export async function POST(request: NextRequest) {
         }
 
         const paginaNormalizada = pagina === -1 ? -1 : Math.floor(pagina);
-        posicionFirma = {
+        // Convertir legacy single position a array para consistencia
+        posicionesFirma = [{
           pagina: paginaNormalizada,
           x: Math.round(x),
           y: Math.round(y),
           width: width !== undefined ? Math.round(width) : undefined,
           height: height !== undefined ? Math.round(height) : undefined,
-        } as CrearSolicitudFirmaInput['posicionFirma'];
+        }];
       }
     }
 
@@ -305,6 +323,7 @@ export async function POST(request: NextRequest) {
     const ordenFirma = typeof body.ordenFirma === 'boolean' ? body.ordenFirma : false;
     const recordatorioAutomatico = typeof body.recordatorioAutomatico === 'boolean' ? body.recordatorioAutomatico : true;
     const diasRecordatorio = typeof body.diasRecordatorio === 'number' ? body.diasRecordatorio : 3;
+    const mantenerOriginal = typeof body.mantenerOriginal === 'boolean' ? body.mantenerOriginal : true;
 
     const input: CrearSolicitudFirmaInput = {
       documentoId,
@@ -317,7 +336,9 @@ export async function POST(request: NextRequest) {
       recordatorioAutomatico,
       diasRecordatorio,
       creadoPor: session.user.email || session.user.id,
-      posicionFirma,
+      posicionesFirma, // Array de posiciones (nuevo formato)
+      posicionFirma,   // Single position (legacy/V2 con porcentajes)
+      mantenerOriginal, // CRÍTICO: Toggle para mantener/reemplazar original
     };
 
     // Crear solicitud

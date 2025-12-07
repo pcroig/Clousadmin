@@ -16,6 +16,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { EstadoFichaje } from '@/lib/constants/enums';
+import { extractArrayFromResponse } from '@/lib/utils/api-response';
 import { extraerHoraDeISO } from '@/lib/utils/formatters';
 import { parseJson } from '@/lib/utils/json';
 
@@ -111,8 +112,11 @@ export function FichajesTab({ empleadoId }: { empleadoId: string }) {
       if (!response.ok) {
         throw new Error('Error al obtener fichajes');
       }
-      const data = await parseJson<ApiFichaje[]>(response).catch(() => []);
-      const rawFichajes: ApiFichaje[] = Array.isArray(data) ? data : [];
+      const payload = await parseJson<Record<string, unknown>>(response).catch(() => ({}));
+      
+      // FIX: La API devuelve { data: fichajes[], pagination: {} }
+      // Usar extractArrayFromResponse para extraer el array correctamente
+      const rawFichajes = extractArrayFromResponse<ApiFichaje>(payload, { key: 'fichajes' });
 
       // Procesar fichajes con su nueva estructura (eventos separados)
       const fichajesConEventos: Fichaje[] = rawFichajes.map((f) => ({

@@ -1,7 +1,7 @@
 import { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
-import { SolicitarFirmaClient } from './solicitar-firma-client';
+import { SolicitarFirmaClientWrapper } from './wrapper';
 
 interface PageProps {
   params: {
@@ -20,5 +20,5 @@ export default async function SolicitarFirmaPage({ params }: PageProps) {
     notFound();
   }
 
-  return <SolicitarFirmaClient documentoId={documentoId} />;
+  return <SolicitarFirmaClientWrapper documentoId={documentoId} />;
 }

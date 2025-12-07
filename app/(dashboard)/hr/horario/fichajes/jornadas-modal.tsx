@@ -7,6 +7,8 @@
 import { Clock, Edit2, Plus } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
+import { EmployeeListPreview } from '@/components/shared/employee-list-preview';
+import { CountBadge } from '@/components/shared/count-badge';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -33,6 +35,15 @@ import type { DiaConfig, JornadaConfig } from '@/lib/calculos/fichajes-helpers';
 type DiaKey = 'lunes' | 'martes' | 'miercoles' | 'jueves' | 'viernes' | 'sabado' | 'domingo';
 
 const DIA_KEYS: DiaKey[] = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo'];
+const DIA_INICIAL: Record<DiaKey, string> = {
+  lunes: 'L',
+  martes: 'M',
+  miercoles: 'X',
+  jueves: 'J',
+  viernes: 'V',
+  sabado: 'S',
+  domingo: 'D',
+};
 
 const isDiaConfig = (value: unknown): value is DiaConfig =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -48,6 +59,13 @@ interface JornadaResumen {
   horasSemanales: number;
   config: JornadaConfig | null;
   activa: boolean;
+  empleadosPreview?: Array<{
+    id: string;
+    nombre: string;
+    apellidos?: string | null;
+    fotoUrl?: string | null;
+    avatar?: string | null;
+  }>;
   _count?: {
     empleados: number;
   };
@@ -133,18 +151,27 @@ export function JornadasModal({ open, onClose }: JornadasModalProps) {
     );
   }
 
-  function getDescripcion(jornada: JornadaResumen) {
-    const config = jornada.config;
-    const primerDiaActivo = DIA_KEYS.map((dia) => getDiaConfig(config, dia)).find(
-      (diaConfig) => diaConfig?.activo
-    );
+  const renderDiasLaborables = (jornada: JornadaResumen) => (
+    <div className="flex gap-1">
+      {DIA_KEYS.map((dia) => {
+        const diaConfig = getDiaConfig(jornada.config, dia);
+        const activo = diaConfig?.activo ?? Boolean(diaConfig?.entrada || diaConfig?.salida);
 
-    if (primerDiaActivo?.entrada && primerDiaActivo?.salida) {
-      return `${primerDiaActivo.entrada} - ${primerDiaActivo.salida}`;
-    }
-
-    return `${jornada.horasSemanales}h semanales`;
-  }
+        return (
+          <span
+            key={dia}
+            className={`w-6 h-6 rounded-md text-[10px] font-semibold flex items-center justify-center border ${
+              activo
+                ? 'bg-gray-900 text-white border-gray-900'
+                : 'bg-gray-50 text-gray-400 border-gray-200'
+            }`}
+          >
+            {DIA_INICIAL[dia]}
+          </span>
+        );
+      })}
+    </div>
+  );
 
   return (
     <>
@@ -164,7 +191,7 @@ export function JornadasModal({ open, onClose }: JornadasModalProps) {
                   <TableHead>Nombre</TableHead>
                   <TableHead>Tipo</TableHead>
                   <TableHead>Horas Semanales</TableHead>
-                  <TableHead>Horario</TableHead>
+                  <TableHead>Días</TableHead>
                   <TableHead>Asignados</TableHead>
                   <TableHead className="text-right">Acciones</TableHead>
                 </TableRow>
@@ -196,13 +223,27 @@ export function JornadasModal({ open, onClose }: JornadasModalProps) {
                       </TableCell>
                       <TableCell>{getTipoBadge(jornada)}</TableCell>
                       <TableCell>{jornada.horasSemanales}h</TableCell>
-                      <TableCell className="text-sm text-gray-600">
-                        {getDescripcion(jornada)}
-                      </TableCell>
+                      <TableCell>{renderDiasLaborables(jornada)}</TableCell>
                       <TableCell>
-                        <span className="text-sm text-gray-600">
-                          {jornada._count?.empleados || 0} empleado{jornada._count?.empleados !== 1 ? 's' : ''}
-                        </span>
+                        {Array.isArray(jornada.empleadosPreview) && jornada.empleadosPreview.length > 0 ? (
+                          <EmployeeListPreview
+                            empleados={jornada.empleadosPreview.map((e) => ({
+                              id: e.id,
+                              nombre: e.nombre,
+                              apellidos: e.apellidos ?? undefined,
+                              fotoUrl: e.fotoUrl ?? undefined,
+                              avatar: e.avatar ?? undefined,
+                            }))}
+                          maxVisible={5}
+                          dense
+                          avatarSize="xxs"
+                          />
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            <CountBadge count={jornada._count?.empleados ?? 0} />
+                            <span className="text-xs text-gray-600">empleados</span>
+                          </div>
+                        )}
                       </TableCell>
                       <TableCell className="text-right">
                         <Button

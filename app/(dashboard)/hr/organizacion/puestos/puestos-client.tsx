@@ -157,7 +157,7 @@ export function PuestosClient({ puestos: initialPuestos }: PuestosClientProps) {
           empleados={row.empleados}
           maxVisible={3}
           emptyLabel="Sin empleados"
-          dense
+          avatarSize="md"
         />
       ),
       width: '30%',

@@ -3,7 +3,7 @@
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Calendar as CalendarIcon, ChevronRight, Edit, Info, Paperclip, Settings } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { type KeyboardEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 import { type EditarAusencia, EditarAusenciaModal } from '@/components/ausencias/editar-ausencia-modal';
@@ -534,14 +534,28 @@ export function AusenciasTab({
     setDiasPersonalizadosInput('');
   };
 
-  const renderAusenciaCard = (ausencia: Ausencia, isPast = false) => (
-    <button
-      key={ausencia.id}
-      onClick={() => setAusenciaParaEditar(ausencia)}
-      className={`flex w-full items-center gap-2 rounded-lg border border-gray-100 bg-white px-2.5 py-2 text-left transition hover:bg-gray-50 ${
-        isPast ? 'opacity-70' : ''
-      }`}
-    >
+  const renderAusenciaCard = (ausencia: Ausencia, isPast = false) => {
+    const handleOpenModal = () => setAusenciaParaEditar(ausencia);
+
+    const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        handleOpenModal();
+      }
+    };
+
+    return (
+      <div
+        key={ausencia.id}
+        role="button"
+        tabIndex={0}
+        onClick={handleOpenModal}
+        onKeyDown={handleKeyDown}
+        className={`flex w-full items-center gap-2 rounded-lg border border-gray-100 bg-white px-2.5 py-2 text-left transition hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-300 ${
+          isPast ? 'opacity-70' : ''
+        }`}
+        aria-label={`Abrir detalle de ausencia ${ausencia.tipo ?? ''}`}
+      >
       {/* Fechas con diseño de calendario */}
       <div className="flex items-center gap-2 flex-shrink-0">
         {new Date(ausencia.fechaFin).toDateString() !== new Date(ausencia.fechaInicio).toDateString() ? (
@@ -567,6 +581,7 @@ export function AusenciasTab({
       <div className="flex items-center gap-1 flex-shrink-0">
         {ausencia.justificanteUrl && (
           <button
+            type="button"
             className="p-1 text-gray-400 hover:text-gray-600"
             onClick={(e) => {
               e.stopPropagation();
@@ -580,8 +595,9 @@ export function AusenciasTab({
           {getAusenciaEstadoLabel(ausencia.estado)}
         </Badge>
       </div>
-    </button>
-  );
+      </div>
+    );
+  };
 
   const listaActual =
     listaAusenciasTab === 'proximas'

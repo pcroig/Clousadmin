@@ -202,6 +202,9 @@ const mapDocumentos = (input: unknown): MiEspacioDocumento[] | undefined => {
       tipoDocumento: typeof documento.tipoDocumento === 'string' ? documento.tipoDocumento : undefined,
       tamano: typeof documento.tamano === 'number' ? documento.tamano : decimalToNumber(documento.tamano as DecimalLike),
       createdAt: toISODateString(documento.createdAt),
+      firmado: typeof documento.firmado === 'boolean' ? documento.firmado : false,
+      firmadoEn: toISODateString(documento.firmadoEn),
+      firmaInfo: null,
     }));
 };
 

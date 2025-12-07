@@ -28,10 +28,8 @@ type EmpleadoParaPrenomina = {
   }>;
   complementos: Array<{
     id: string;
-    importePersonalizado: Prisma.Decimal | null;
-    tipoComplemento: {
-      importeFijo: Prisma.Decimal | null;
-    } | null;
+    importePersonalizado: Prisma.Decimal;
+    esImporteFijo: boolean;
   }>;
   ausencias: Array<{
     fechaInicio: Date;
@@ -140,11 +138,7 @@ export async function generarPrenominasEvento(
         select: {
           id: true,
           importePersonalizado: true,
-          tipos_complemento: {
-            select: {
-              importeFijo: true,
-            },
-          },
+          esImporteFijo: true,
         },
       },
       ausencias: {
@@ -176,11 +170,7 @@ export async function generarPrenominasEvento(
     complementos: empleado.empleado_complementos.map((comp) => ({
       id: comp.id,
       importePersonalizado: comp.importePersonalizado,
-      tipoComplemento: comp.tipos_complemento
-        ? {
-            importeFijo: comp.tipos_complemento.importeFijo,
-          }
-        : null,
+      esImporteFijo: comp.esImporteFijo,
     })),
     ausencias: empleado.ausencias,
   }));
@@ -421,9 +411,9 @@ function calcularDatosBaseNomina(
     ? salarioMensual.mul(diasTrabajados).div(diasMes).toDecimalPlaces(2)
     : salarioMensual;
 
+  // Un complemento está pendiente si es variable (no fijo) y su importe es 0
   const complementosPendientes = empleado.complementos.some(
-    (comp) =>
-      !comp.importePersonalizado && !comp.tipoComplemento?.importeFijo
+    (comp) => !comp.esImporteFijo && Number(comp.importePersonalizado) === 0
   );
 
   return {

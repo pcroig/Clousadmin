@@ -449,7 +449,8 @@ model empleado_complementos {
   empleadoId               String
   tipoComplementoId        String
   contratoId               String?
-  importePersonalizado     Decimal?                   @db.Decimal(10, 2)
+  esImporteFijo            Boolean                    @default(true)
+  importePersonalizado     Decimal                    @db.Decimal(10, 2)
   activo                   Boolean                    @default(true)
   validado                 Boolean                    @default(false)
   validadoPor              String?
@@ -1316,10 +1317,12 @@ model solicitudes_firma {
   createdAt              DateTime   @default(now())
   updatedAt              DateTime   @updatedAt
   pdfFirmadoS3Key        String?
+  pdfTemporalS3Key       String?
   creadoPor              String?    @db.VarChar(100)
   diasRecordatorio       Int        @default(3)
   hashDocumento          String
   motivoCancelacion      String?
+  mantenerOriginal       Boolean    @default(true)
   nombreDocumento        String     @db.VarChar(255)
   ordenFirma             Boolean    @default(false)
   recordatorioAutomatico Boolean    @default(true)
@@ -1369,8 +1372,6 @@ model tipos_complemento {
   empresaId             String
   nombre                String                  @db.VarChar(200)
   descripcion           String?
-  esImporteFijo         Boolean                 @default(true)
-  importeFijo           Decimal?                @db.Decimal(10, 2)
   activo                Boolean                 @default(true)
   createdAt             DateTime                @default(now())
   updatedAt             DateTime                @updatedAt

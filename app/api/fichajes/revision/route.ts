@@ -75,6 +75,22 @@ export async function GET(request: NextRequest) {
 
     console.log('[API Revisión GET] EmpresaId:', session.user.empresaId);
 
+    // Obtener fecha de creación de la empresa para validación temporal
+    const empresa = await prisma.empresas.findUnique({
+      where: { id: session.user.empresaId },
+      select: { createdAt: true },
+    });
+
+    if (!empresa) {
+      return NextResponse.json(
+        { error: 'Empresa no encontrada' },
+        { status: 404 }
+      );
+    }
+
+    const fechaCreacionEmpresa = new Date(empresa.createdAt);
+    fechaCreacionEmpresa.setHours(0, 0, 0, 0);
+
     const searchParams = request.nextUrl.searchParams;
     const fechaInicioParam = searchParams.get('fechaInicio');
     const fechaFinParam = searchParams.get('fechaFin');
@@ -99,6 +115,11 @@ export async function GET(request: NextRequest) {
     for (let offset = 1; offset <= diasARecuperar; offset++) {
       const fechaObjetivo = new Date(hoy);
       fechaObjetivo.setDate(fechaObjetivo.getDate() - offset);
+
+      // FIX: No procesar días anteriores a la creación de la empresa
+      if (fechaObjetivo < fechaCreacionEmpresa) {
+        continue;
+      }
 
       try {
         await procesarFichajesDia(session.user.empresaId, fechaObjetivo, { notificar: false });
@@ -423,8 +444,6 @@ export async function GET(request: NextRequest) {
         ausenciaMedioDia: ausenciaMedioDia ? ausenciaMedioDia.periodo : null, // Info de ausencia media jornada
       };
     });
-
-    console.log('[API Revisión] Fichajes formateados:', fichajes.length);
 
     return NextResponse.json({ fichajes }, { status: 200 });
 

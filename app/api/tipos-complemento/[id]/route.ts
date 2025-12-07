@@ -13,8 +13,6 @@ import { getJsonBody } from '@/lib/utils/json';
 const UpdateSchema = z.object({
   nombre: z.string().min(1).max(200).optional(),
   descripcion: z.string().optional(),
-  esImporteFijo: z.boolean().optional(),
-  importeFijo: z.number().optional(),
   activo: z.boolean().optional(),
 });
 

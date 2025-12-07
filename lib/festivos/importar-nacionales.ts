@@ -24,12 +24,12 @@ function calcularViernesSanto(año: number): Date {
   const mes = Math.floor((h + l - 7 * m + 114) / 31);
   const dia = ((h + l - 7 * m + 114) % 31) + 1;
 
-  // Domingo de Pascua
-  const pascua = new Date(año, mes - 1, dia);
+  // Domingo de Pascua en UTC
+  const pascua = new Date(Date.UTC(año, mes - 1, dia));
   
   // Viernes Santo es 2 días antes del Domingo de Pascua
   const viernesSanto = new Date(pascua);
-  viernesSanto.setDate(pascua.getDate() - 2);
+  viernesSanto.setUTCDate(pascua.getUTCDate() - 2);
   
   return viernesSanto;
 }
@@ -41,16 +41,16 @@ function obtenerFestivosNacionalesAño(año: number): Array<{ fecha: Date; nombr
   const viernesSanto = calcularViernesSanto(año);
   
   return [
-    { fecha: new Date(año, 0, 1), nombre: 'Año Nuevo' },
-    { fecha: new Date(año, 0, 6), nombre: 'Reyes Magos' },
+    { fecha: new Date(Date.UTC(año, 0, 1)), nombre: 'Año Nuevo' },
+    { fecha: new Date(Date.UTC(año, 0, 6)), nombre: 'Reyes Magos' },
     { fecha: viernesSanto, nombre: 'Viernes Santo' },
-    { fecha: new Date(año, 4, 1), nombre: 'Día del Trabajador' },
-    { fecha: new Date(año, 7, 15), nombre: 'Asunción de la Virgen' },
-    { fecha: new Date(año, 9, 12), nombre: 'Fiesta Nacional de España' },
-    { fecha: new Date(año, 10, 1), nombre: 'Todos los Santos' },
-    { fecha: new Date(año, 11, 6), nombre: 'Día de la Constitución' },
-    { fecha: new Date(año, 11, 8), nombre: 'Inmaculada Concepción' },
-    { fecha: new Date(año, 11, 25), nombre: 'Navidad' },
+    { fecha: new Date(Date.UTC(año, 4, 1)), nombre: 'Día del Trabajador' },
+    { fecha: new Date(Date.UTC(año, 7, 15)), nombre: 'Asunción de la Virgen' },
+    { fecha: new Date(Date.UTC(año, 9, 12)), nombre: 'Fiesta Nacional de España' },
+    { fecha: new Date(Date.UTC(año, 10, 1)), nombre: 'Todos los Santos' },
+    { fecha: new Date(Date.UTC(año, 11, 6)), nombre: 'Día de la Constitución' },
+    { fecha: new Date(Date.UTC(año, 11, 8)), nombre: 'Inmaculada Concepción' },
+    { fecha: new Date(Date.UTC(año, 11, 25)), nombre: 'Navidad' },
   ];
 }
 

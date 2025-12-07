@@ -5,8 +5,6 @@
 // ========================================
 // Se usa en: onboarding, crear jornada, editar jornada
 
-import { Minus, Plus } from 'lucide-react';
-
 import { InfoTooltip } from '@/components/shared/info-tooltip';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -18,7 +16,6 @@ import { Input } from '@/components/ui/input';
 import {
   InputGroup,
   InputGroupAddon,
-  InputGroupButton,
   InputGroupInput,
   InputGroupText,
 } from '@/components/ui/input-group';
@@ -29,6 +26,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 
 type DiaKey = 'lunes' | 'martes' | 'miercoles' | 'jueves' | 'viernes' | 'sabado' | 'domingo';
 
@@ -46,6 +44,7 @@ export interface JornadaFormData {
   horasSemanales: string;
   // NOTE: limiteInferior and limiteSuperior are NO LONGER per-jornada - they are global in Empresa.config
   horariosFijos: Record<string, HorarioDia>;
+  tieneDescanso: boolean;
   descansoMinutos: string;
 }
 
@@ -132,19 +131,10 @@ export function JornadaFormFields({
     updateData({ descansoMinutos: clamped === 0 ? '' : clamped.toString() });
   };
 
-  const adjustDescanso = (delta: number) => {
-    const current = parseDescansoValue(data.descansoMinutos);
-    setDescansoValue(current + delta);
-  };
-
   const handleDescansoBlur = () => {
     if (data.descansoMinutos === '') return;
     setDescansoValue(parseDescansoValue(data.descansoMinutos));
   };
-
-  const descansoActual = parseDescansoValue(data.descansoMinutos);
-  const canDecreaseDescanso = descansoActual > DESCANSO_MIN;
-  const canIncreaseDescanso = descansoActual < DESCANSO_MAX;
 
   return (
     <div className="space-y-4">
@@ -171,6 +161,7 @@ export function JornadaFormFields({
               <SelectItem value="fija">Fija</SelectItem>
             </SelectContent>
           </Select>
+          {errors.tipoJornada && <FieldError>{errors.tipoJornada}</FieldError>}
         </Field>
 
         <Field>
@@ -284,53 +275,51 @@ export function JornadaFormFields({
 
       {/* Tiempo de descanso */}
       {!disabled && (
-        <Field>
-          <div className="flex items-center gap-2">
-            <FieldLabel htmlFor="descanso" className="flex items-center gap-2">
-              Tiempo de descanso
-            </FieldLabel>
-            <InfoTooltip
-              content="Los descansos son obligatorios: si la jornada supera las 6 horas debes garantizar al menos 15 minutos consecutivos."
-              side="right"
+        <div className="pt-4 border-t space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <FieldLabel htmlFor="tiene-descanso" className="flex items-center gap-2">
+                ¿Tiene descanso?
+              </FieldLabel>
+              <InfoTooltip
+                content="Los descansos son obligatorios: si la jornada supera las 6 horas debes garantizar al menos 15 minutos consecutivos."
+                side="right"
+              />
+            </div>
+            <Switch
+              id="tiene-descanso"
+              checked={data.tieneDescanso}
+              onCheckedChange={(checked) => {
+                updateData({ 
+                  tieneDescanso: checked,
+                  descansoMinutos: checked ? (data.descansoMinutos || '60') : ''
+                });
+              }}
             />
           </div>
-          <InputGroup className="mt-2">
-            <InputGroupButton
-              type="button"
-              size="icon-xs"
-              variant="ghost"
-              aria-label="Reducir minutos de descanso"
-              onClick={() => adjustDescanso(-DESCANSO_STEP)}
-              disabled={!canDecreaseDescanso}
-            >
-              <Minus className="h-4 w-4" />
-            </InputGroupButton>
-            <InputGroupInput
-              id="descanso"
-              type="number"
-              min={DESCANSO_MIN}
-              max={DESCANSO_MAX}
-              step={DESCANSO_STEP}
-              value={data.descansoMinutos}
-              onChange={(e) => updateData({ descansoMinutos: e.target.value })}
-              onBlur={handleDescansoBlur}
-              placeholder="15"
-            />
-            <InputGroupAddon align="inline-end" className="gap-1">
-              <InputGroupText>min</InputGroupText>
-              <InputGroupButton
-                type="button"
-                size="icon-xs"
-                variant="ghost"
-                aria-label="Incrementar minutos de descanso"
-                onClick={() => adjustDescanso(DESCANSO_STEP)}
-                disabled={!canIncreaseDescanso}
-              >
-                <Plus className="h-4 w-4" />
-              </InputGroupButton>
-            </InputGroupAddon>
-          </InputGroup>
-        </Field>
+          
+          {data.tieneDescanso && (
+            <Field>
+              <FieldLabel htmlFor="descanso">Duración del descanso</FieldLabel>
+              <InputGroup className="mt-2">
+                <InputGroupInput
+                  id="descanso"
+                  type="number"
+                  min={DESCANSO_MIN}
+                  max={DESCANSO_MAX}
+                  step={DESCANSO_STEP}
+                  value={data.descansoMinutos}
+                  onChange={(e) => updateData({ descansoMinutos: e.target.value })}
+                  onBlur={handleDescansoBlur}
+                  placeholder="60"
+                />
+                <InputGroupAddon align="inline-end" className="gap-1">
+                  <InputGroupText>min</InputGroupText>
+                </InputGroupAddon>
+              </InputGroup>
+            </Field>
+          )}
+        </div>
       )}
 
       {/* Horarios específicos (solo si es tipo fija) */}
