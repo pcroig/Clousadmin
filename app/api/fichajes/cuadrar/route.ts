@@ -128,6 +128,7 @@ export async function POST(request: NextRequest) {
       where: {
         id: { in: fichajeIds },
         empresaId: session.user.empresaId, // Seguridad: solo de mi empresa
+        tipoFichaje: 'ordinario', // Solo cuadrar fichajes ordinarios
       },
       include: {
         empleado: {
@@ -142,6 +143,19 @@ export async function POST(request: NextRequest) {
         },
       },
     });
+
+    // Validar que no se intenten cuadrar fichajes extraordinarios
+    if (fichajes.length < fichajeIds.length) {
+      const fichajesEncontrados = new Set(fichajes.map(f => f.id));
+      const extraordinariosIntento = fichajeIds.filter(id => !fichajesEncontrados.has(id));
+
+      if (extraordinariosIntento.length > 0) {
+        return badRequestResponse(
+          'Los fichajes extraordinarios deben cuadrarse manualmente mediante edición de eventos.',
+          { fichajesExtraordinarios: extraordinariosIntento }
+        );
+      }
+    }
 
     if (fichajes.length === 0) {
       return successResponse({

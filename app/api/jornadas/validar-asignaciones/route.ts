@@ -9,8 +9,8 @@ import {
   generarMensajeEmpleadosSinJornada,
   validarAsignacionesCompletas,
 } from '@/lib/jornadas/validar-asignaciones';
-import { getServerSession } from '@/lib/auth/get-server-session';
-import { prisma } from '@/lib/db/prisma';
+import { getSession } from '@/lib/auth';
+import { prisma } from '@/lib/prisma';
 
 /**
  * GET /api/jornadas/validar-asignaciones
@@ -21,7 +21,7 @@ import { prisma } from '@/lib/db/prisma';
  */
 export async function GET() {
   try {
-    const session = await getServerSession();
+    const session = await getSession();
 
     if (!session?.user?.empresaId) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });

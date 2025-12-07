@@ -243,6 +243,7 @@ export async function GET(request: NextRequest) {
       const where: Prisma.fichajesWhereInput = {
         empresaId: session.user.empresaId,
         estado: 'pendiente',
+        tipoFichaje: 'ordinario', // Solo revisar fichajes ordinarios
         fecha: fechaWhere,
       };
 

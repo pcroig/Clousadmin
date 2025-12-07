@@ -21,9 +21,10 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
-  DialogContent,
+  DialogBody,
   DialogFooter,
   DialogHeader,
+  DialogScrollableContent,
   DialogTitle,
 } from '@/components/ui/dialog';
 import {
@@ -477,13 +478,12 @@ export function JornadasModal({ open, onClose }: JornadasModalProps) {
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl">
+      <DialogScrollableContent className="max-w-3xl">
         <DialogHeader>
           <DialogTitle>Gestión de Jornadas</DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4">
-
+        <DialogBody>
           {/* Tabla con filas expandibles */}
           {loading ? (
             <div className="text-center py-8 text-gray-500">Cargando...</div>
@@ -593,7 +593,7 @@ export function JornadasModal({ open, onClose }: JornadasModalProps) {
               </TableBody>
             </Table>
           )}
-        </div>
+        </DialogBody>
 
         <DialogFooter className="gap-2">
           {isCreating || expandedId ? (
@@ -631,7 +631,7 @@ export function JornadasModal({ open, onClose }: JornadasModalProps) {
             </>
           )}
         </DialogFooter>
-      </DialogContent>
+      </DialogScrollableContent>
     </Dialog>
   );
 }
