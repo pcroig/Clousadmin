@@ -287,25 +287,56 @@ export function JornadasModal({ open, onClose }: JornadasModalProps) {
         config.descanso = parseInt(formData.descansoMinutos) || 60;
       }
 
-      const body = {
+      // 1. Crear o actualizar jornada
+      const jornadaBody = {
         horasSemanales,
         config,
-        nivelAsignacion,
-        empleadosIds: nivelAsignacion === 'individual' ? empleadosSeleccionados : undefined,
-        equipoId: nivelAsignacion === 'equipo' ? equipoSeleccionado : undefined,
       };
 
       const url = jornadaId ? `/api/jornadas/${jornadaId}` : '/api/jornadas';
-      const method = jornadaId ? 'PUT' : 'POST';
+      const method = jornadaId ? 'PATCH' : 'POST';
 
       const response = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
+        body: JSON.stringify(jornadaBody),
       });
 
       if (!response.ok) {
-        throw new Error('Error al guardar jornada');
+        const errorData = await response.json().catch(() => ({}));
+        const errorMsg = errorData.error || errorData.message || 'Error al guardar jornada';
+        toast.error(errorMsg);
+        return;
+      }
+
+      const result = await response.json();
+      const jornadaIdFinal = jornadaId || result.data?.id;
+
+      // 2. Asignar empleados si hay nivel de asignación
+      if (jornadaIdFinal && (nivelAsignacion || empleadosSeleccionados.length > 0 || equipoSeleccionado)) {
+        const asignacionBody: any = {
+          jornadaId: jornadaIdFinal,
+          nivel: nivelAsignacion,
+        };
+
+        if (nivelAsignacion === 'individual') {
+          asignacionBody.empleadosIds = empleadosSeleccionados;
+        } else if (nivelAsignacion === 'equipo') {
+          asignacionBody.equipoId = equipoSeleccionado;
+        }
+
+        const asignacionResponse = await fetch('/api/jornadas/asignar', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(asignacionBody),
+        });
+
+        if (!asignacionResponse.ok) {
+          const errorData = await asignacionResponse.json().catch(() => ({}));
+          const errorMsg = errorData.error || errorData.message || 'Error al asignar jornada';
+          toast.error(errorMsg);
+          return;
+        }
       }
 
       toast.success(jornadaId ? 'Jornada actualizada' : 'Jornada creada');
@@ -321,7 +352,7 @@ export function JornadasModal({ open, onClose }: JornadasModalProps) {
       setIsCreating(false);
     } catch (error) {
       console.error('Error guardando jornada:', error);
-      toast.error('Error al guardar la jornada');
+      toast.error('Error inesperado al guardar');
     } finally {
       setGuardando(false);
     }
@@ -446,12 +477,12 @@ export function JornadasModal({ open, onClose }: JornadasModalProps) {
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[85vh] flex flex-col">
+      <DialogContent className="max-w-4xl">
         <DialogHeader>
           <DialogTitle>Gestión de Jornadas</DialogTitle>
         </DialogHeader>
 
-        <div className="flex-1 overflow-y-auto space-y-4">
+        <div className="space-y-4">
 
           {/* Tabla con filas expandibles */}
           {loading ? (
@@ -477,7 +508,7 @@ export function JornadasModal({ open, onClose }: JornadasModalProps) {
                 {isCreating && expandedId === 'new' && (
                   <TableRow>
                     <TableCell colSpan={4} className="p-0">
-                        <div className="p-6 bg-gray-50">
+                        <div className="p-6">
                           <h3 className="text-lg font-semibold mb-4">Crear Nueva Jornada</h3>
                           <JornadaFormFields
                             data={formData}
@@ -520,7 +551,7 @@ export function JornadasModal({ open, onClose }: JornadasModalProps) {
                     {expandedId === jornada.id && !isCreating && (
                       <TableRow>
                         <TableCell colSpan={4} className="p-0">
-                          <div className="p-6 bg-gray-50 border-t">
+                          <div className="p-6 border-t">
                             <div className="flex items-center justify-between mb-4">
                               <h3 className="text-lg font-semibold">Editar Jornada</h3>
                               {!jornada.esPredefinida && (
