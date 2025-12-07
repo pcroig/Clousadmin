@@ -56,16 +56,86 @@ export async function GET(req: NextRequest) {
       },
     });
 
-    // Generate 'nombre' field for backward compatibility and add empleadosPreview
-    const jornadasConNombre = jornadas.map((jornada) => ({
-      ...jornada,
-      nombre: obtenerEtiquetaJornada({
-        id: jornada.id,
-        horasSemanales: Number(jornada.horasSemanales),
-        config: jornada.config as JornadaConfig | null,
-      }),
-      empleadosPreview: jornada.empleados, // Para mostrar avatares apilados
-    }));
+    // Obtener total de empleados activos para detectar "Toda la empresa"
+    const totalEmpleados = await prisma.empleados.count({
+      where: {
+        empresaId: session.user.empresaId,
+        activo: true,
+      },
+    });
+
+    // Obtener equipos para detectar asignación por equipo
+    const equipos = await prisma.equipos.findMany({
+      where: {
+        empresaId: session.user.empresaId,
+      },
+      select: {
+        id: true,
+        nombre: true,
+      },
+    });
+
+    // Generate 'nombre' field for backward compatibility and add empleadosPreview + nivel de asignación
+    const jornadasConNombre = await Promise.all(
+      jornadas.map(async (jornada) => {
+        const numEmpleados = jornada._count?.empleados || 0;
+
+        // Determinar nivel de asignación
+        let nivelAsignacion: 'empresa' | 'equipo' | 'individual' = 'individual';
+        let equiposAsignados: string[] = [];
+
+        if (numEmpleados === totalEmpleados && numEmpleados > 0) {
+          nivelAsignacion = 'empresa';
+        } else if (numEmpleados > 1) {
+          // Verificar si todos los empleados pertenecen a los mismos equipos
+          const empleadosConEquipos = await prisma.empleados.findMany({
+            where: {
+              jornadaId: jornada.id,
+              activo: true,
+            },
+            select: {
+              equipos: {
+                select: {
+                  equipo: {
+                    select: {
+                      id: true,
+                      nombre: true,
+                    },
+                  },
+                },
+              },
+            },
+          });
+
+          const equiposIds = new Set<string>();
+          const equiposNombres = new Map<string, string>();
+
+          empleadosConEquipos.forEach(emp => {
+            emp.equipos.forEach(eq => {
+              equiposIds.add(eq.equipo.id);
+              equiposNombres.set(eq.equipo.id, eq.equipo.nombre);
+            });
+          });
+
+          if (equiposIds.size > 0) {
+            nivelAsignacion = 'equipo';
+            equiposAsignados = Array.from(equiposNombres.values());
+          }
+        }
+
+        return {
+          ...jornada,
+          nombre: obtenerEtiquetaJornada({
+            id: jornada.id,
+            horasSemanales: Number(jornada.horasSemanales),
+            config: jornada.config as JornadaConfig | null,
+          }),
+          empleadosPreview: jornada.empleados,
+          nivelAsignacion,
+          equiposAsignados,
+        };
+      })
+    );
 
     return successResponse(jornadasConNombre);
   } catch (error) {

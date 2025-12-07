@@ -480,6 +480,57 @@ export function validarEvento(
 }
 
 /**
+ * Valida evento extraordinario (solo entrada/salida)
+ * @param tipoEvento - Tipo de evento a validar
+ * @param empleadoId - ID del empleado
+ * @returns Resultado de validación
+ */
+export async function validarEventoExtraordinario(
+  tipoEvento: 'entrada' | 'salida',
+  empleadoId: string
+): Promise<{ valido: boolean; error?: string }> {
+  const fechaHoy = normalizarFechaSinHora(new Date());
+
+  const fichajeHoy = await prisma.fichajes.findUnique({
+    where: {
+      empleadoId_fecha: { empleadoId, fecha: fechaHoy },
+    },
+    include: {
+      eventos: { orderBy: { hora: 'asc' } }
+    },
+  });
+
+  // Sin fichaje: solo puede iniciar con entrada
+  if (!fichajeHoy) {
+    return tipoEvento === 'entrada'
+      ? { valido: true }
+      : { valido: false, error: 'Debes fichar entrada primero' };
+  }
+
+  // Con fichaje: validar secuencia entrada → salida
+  const ultimoEvento = fichajeHoy.eventos[fichajeHoy.eventos.length - 1];
+
+  if (tipoEvento === 'entrada') {
+    if (ultimoEvento?.tipo === 'entrada') {
+      return { valido: false, error: 'Ya has fichado entrada' };
+    }
+    if (fichajeHoy.estado === 'finalizado') {
+      return { valido: false, error: 'Ya has finalizado la jornada de hoy' };
+    }
+    return { valido: true };
+  }
+
+  if (tipoEvento === 'salida') {
+    if (!ultimoEvento || ultimoEvento.tipo !== 'entrada') {
+      return { valido: false, error: 'Debes fichar entrada primero' };
+    }
+    return { valido: true };
+  }
+
+  return { valido: false, error: 'Tipo de evento no permitido' };
+}
+
+/**
  * Valida si el evento está dentro de los límites de la jornada
  */
 export async function validarLimitesJornada(

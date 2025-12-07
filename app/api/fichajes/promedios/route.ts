@@ -40,9 +40,12 @@ export async function GET(request: NextRequest) {
     fechaDesde.setHours(0, 0, 0, 0);
 
     // Obtener fichajes del período
+    // IMPORTANTE: Solo usar fichajes ordinarios para promedios
+    // Los extraordinarios son excepcionales y no representan patrones habituales
     const fichajes = await prisma.fichajes.findMany({
       where: {
         empleadoId,
+        tipoFichaje: 'ordinario', // Solo ordinarios para promedios
         fecha: {
           gte: fechaDesde,
         },

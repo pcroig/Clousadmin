@@ -811,6 +811,7 @@ model fichajes {
   empresaId                      String
   empleadoId                     String
   jornadaId                      String?
+  tipoFichaje                    TipoFichaje                      @default(ordinario)
   fecha                          DateTime                         @db.Date
   autoCompletado                 Boolean                          @default(false)
   createdAt                      DateTime                         @default(now())
@@ -837,6 +838,8 @@ model fichajes {
   @@index([empresaId])
   @@index([estado])
   @@index([fecha])
+  @@index([tipoFichaje])
+  @@index([empleadoId, tipoFichaje, fecha(sort: Desc)])
 }
 
 model firmas {
@@ -1480,6 +1483,11 @@ enum EstadoFichaje {
   en_curso
   pendiente
   finalizado
+}
+
+enum TipoFichaje {
+  ordinario
+  extraordinario
 }
 
 enum EstadoSolicitud {

@@ -22,6 +22,7 @@ import {
   esDiaLaboral,
   obtenerHorasEsperadasBatch,
   validarEvento,
+  validarEventoExtraordinario,
   validarFichajeCompleto,
   validarLimitesJornada,
 } from '@/lib/calculos/fichajes';
@@ -39,6 +40,7 @@ const fichajeEventoCreateSchema = z.object({
   hora: z.string().optional(), // Opcional, default ahora
   ubicacion: z.string().optional(),
   empleadoId: z.string().uuid().optional(),
+  tipoFichaje: z.enum(['ordinario', 'extraordinario']).optional().default('ordinario'),
 });
 
 // GET /api/fichajes - Listar fichajes
@@ -268,7 +270,12 @@ export async function GET(req: NextRequest) {
           ? Number(fichaje.horasEnPausa)
           : calcularTiempoEnPausa(eventos);
 
-      const balance = Math.round((horasTrabajadas - horasEsperadas) * 100) / 100;
+      // Calcular balance según tipo de fichaje
+      // Extraordinarios: balance = horasTrabajadas (todo es extra)
+      // Ordinarios: balance = horasTrabajadas - horasEsperadas
+      const balance = fichaje.tipoFichaje === 'extraordinario'
+        ? horasTrabajadas
+        : Math.round((horasTrabajadas - horasEsperadas) * 100) / 100;
 
       const { empleado: _empleado, ...restoFichaje } = fichaje;
 
@@ -346,7 +353,10 @@ export async function POST(req: NextRequest) {
     const fecha = normalizarFechaSinHora(fechaBase);
     const hora = validatedData.hora ? new Date(validatedData.hora) : new Date();
 
-    // Validar que el empleado tiene jornada asignada
+    // 5. Determinar tipo de fichaje
+    const tipoFichaje = validatedData.tipoFichaje || 'ordinario';
+
+    // 6. Cargar empleado
     const empleado = await prisma.empleados.findUnique({
       where: { id: targetEmpleadoId, empresaId: session.user.empresaId },
       select: {
@@ -360,35 +370,91 @@ export async function POST(req: NextRequest) {
       return badRequestResponse('Empleado no encontrado en tu empresa');
     }
 
-    if (!empleado.jornadaId) {
-      return badRequestResponse('No tienes una jornada laboral asignada. Contacta con HR para que te asignen una jornada antes de fichar.');
-    }
+    // ============================================
+    // FORK DE VALIDACIONES: ORDINARIO vs EXTRAORDINARIO
+    // ============================================
 
-    // Validar que la jornada esté activa
-    if (!empleado.jornada || !empleado.jornada.activa) {
-      return badRequestResponse('Tu jornada laboral está inactiva. Contacta con HR para que te asignen una jornada activa.');
-    }
+    if (tipoFichaje === 'extraordinario') {
+      // ============================================
+      // FLUJO EXTRAORDINARIO
+      // ============================================
 
-    const validacion = await validarEvento(validatedData.tipo, targetEmpleadoId);
-
-    if (!validacion.valido) {
-      return badRequestResponse(validacion.error || 'Evento inválido');
-    }
-
-    // Validar que es día laborable (solo para entrada)
-    if (validatedData.tipo === 'entrada') {
-      const esLaboral = await esDiaLaboral(targetEmpleadoId, fecha);
-      
-      if (!esLaboral) {
-        return badRequestResponse('No puedes fichar en este día. Puede ser un día no laborable según el calendario de la empresa, un festivo, o tienes una ausencia de día completo.');
+      // Validar que solo sean entrada/salida
+      if (!['entrada', 'salida'].includes(validatedData.tipo)) {
+        return badRequestResponse(
+          'Los fichajes extraordinarios solo permiten entrada y salida. No se permiten pausas.'
+        );
       }
-    }
 
-    // Validar límites de jornada
-    const validacionLimites = await validarLimitesJornada(targetEmpleadoId, hora);
+      // Validar secuencia extraordinaria
+      const validacion = await validarEventoExtraordinario(
+        validatedData.tipo as 'entrada' | 'salida',
+        targetEmpleadoId
+      );
 
-    if (!validacionLimites.valido) {
-      return badRequestResponse(validacionLimites.error || 'Límites de jornada inválidos');
+      if (!validacion.valido) {
+        return badRequestResponse(validacion.error || 'Evento inválido');
+      }
+
+      // Validar límites globales empresa (si existen)
+      const empresa = await prisma.empresas.findUnique({
+        where: { id: empleado.empresaId },
+        select: { config: true },
+      });
+
+      const empresaConfig = empresa?.config as {
+        limiteInferiorFichaje?: string;
+        limiteSuperiorFichaje?: string;
+      } | null;
+
+      if (empresaConfig?.limiteInferiorFichaje || empresaConfig?.limiteSuperiorFichaje) {
+        const horaFichaje = `${hora.getHours().toString().padStart(2, '0')}:${hora.getMinutes().toString().padStart(2, '0')}`;
+
+        if (empresaConfig.limiteInferiorFichaje && horaFichaje < empresaConfig.limiteInferiorFichaje) {
+          return badRequestResponse(`No puedes fichar antes de ${empresaConfig.limiteInferiorFichaje}`);
+        }
+        if (empresaConfig.limiteSuperiorFichaje && horaFichaje > empresaConfig.limiteSuperiorFichaje) {
+          return badRequestResponse(`No puedes fichar después de ${empresaConfig.limiteSuperiorFichaje}`);
+        }
+      }
+
+    } else {
+      // ============================================
+      // FLUJO ORDINARIO (código original)
+      // ============================================
+
+      // Validar que el empleado tiene jornada asignada
+      if (!empleado.jornadaId) {
+        return badRequestResponse('No tienes una jornada laboral asignada. Contacta con HR para que te asignen una jornada antes de fichar.');
+      }
+
+      // Validar que la jornada esté activa
+      if (!empleado.jornada || !empleado.jornada.activa) {
+        return badRequestResponse('Tu jornada laboral está inactiva. Contacta con HR para que te asignen una jornada activa.');
+      }
+
+      // Validar secuencia ordinaria
+      const validacion = await validarEvento(validatedData.tipo, targetEmpleadoId);
+
+      if (!validacion.valido) {
+        return badRequestResponse(validacion.error || 'Evento inválido');
+      }
+
+      // Validar que es día laborable (solo para entrada)
+      if (validatedData.tipo === 'entrada') {
+        const esLaboral = await esDiaLaboral(targetEmpleadoId, fecha);
+
+        if (!esLaboral) {
+          return badRequestResponse('No puedes fichar en este día. Puede ser un día no laborable según el calendario de la empresa, un festivo, o tienes una ausencia de día completo.');
+        }
+      }
+
+      // Validar límites de jornada
+      const validacionLimites = await validarLimitesJornada(targetEmpleadoId, hora);
+
+      if (!validacionLimites.valido) {
+        return badRequestResponse(validacionLimites.error || 'Límites de jornada inválidos');
+      }
     }
 
     // 6. Buscar o crear fichaje del día
@@ -414,7 +480,8 @@ export async function POST(req: NextRequest) {
         data: {
           empresaId: empleado.empresaId,
           empleadoId: targetEmpleadoId,
-          jornadaId: empleado.jornadaId,
+          jornadaId: tipoFichaje === 'extraordinario' ? null : empleado.jornadaId,
+          tipoFichaje: tipoFichaje,
           fecha,
           estado: EstadoFichaje.en_curso,
         },

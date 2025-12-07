@@ -77,12 +77,14 @@ export async function POST(request: NextRequest) {
             });
 
             // Si no existe fichaje, crear uno en estado pendiente
+            // IMPORTANTE: Solo crear fichajes ordinarios automáticamente
             if (!fichaje) {
               fichaje = await prisma.fichajes.create({
                 data: {
                   empresaId: empresa.id,
                   empleadoId: empleado.id,
                   jornadaId: empleado.jornada?.id ?? null,
+                  tipoFichaje: 'ordinario', // CRON solo crea fichajes ordinarios
                   fecha: ayer,
                   estado: EstadoFichaje.pendiente,
                 },

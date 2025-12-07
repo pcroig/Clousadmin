@@ -6,10 +6,20 @@
 
 'use client';
 
-import { Clock } from 'lucide-react';
+import { AlertTriangle, Clock } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useReducer, useState } from 'react';
 import { toast } from 'sonner';
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { calcularHorasObjetivoDesdeJornada, calcularProgresoEventos } from '@/lib/calculos/fichajes-cliente';
@@ -181,6 +191,9 @@ export function FichajeWidget({
   const [state, dispatch] = useReducer(fichajeWidgetReducer, initialState);
   const [tick, setTick] = useState(0);
   const [horasObjetivoDia, setHorasObjetivoDia] = useState<number>(8);
+  const [empleadoData, setEmpleadoData] = useState<EmpleadoActualResponse | null>(null);
+  const [showExtraordinarioDialog, setShowExtraordinarioDialog] = useState(false);
+  const [pendingFichajeTipo, setPendingFichajeTipo] = useState<string | null>(null);
 
   useEffect(() => {
     if (state.status !== 'trabajando' || !state.horaEntrada) {
@@ -204,6 +217,10 @@ export function FichajeWidget({
         }
 
         const payload = await parseJson<EmpleadoActualResponse>(response).catch(() => null);
+        if (!cancelled && payload) {
+          setEmpleadoData(payload);
+        }
+
         if (!payload?.jornada) {
           return;
         }
@@ -343,33 +360,83 @@ export function FichajeWidget({
     obtenerEstadoActual({ initial: true });
   }, [obtenerEstadoActual]);
 
-  async function handleFichar(tipoOverride?: string) {
+  /**
+   * Verifica si el empleado está fichando fuera de su horario laboral
+   * @returns true si está fuera de horario (fichaje extraordinario)
+   */
+  function esFueraDeHorario(): boolean {
+    // Si no hay jornada asignada, siempre es extraordinario
+    if (!empleadoData?.jornada) {
+      return true;
+    }
+
+    const jornada = empleadoData.jornada;
+    const config = jornada.config as Record<string, unknown> | null;
+
+    if (!config) {
+      return false;
+    }
+
+    // Obtener día actual
+    const ahora = new Date();
+    const diasSemana = ['domingo', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado'];
+    const nombreDia = diasSemana[ahora.getDay()];
+
+    const configDia = config[nombreDia] as { activo?: boolean } | undefined;
+
+    // Si el día no está activo en la jornada, es extraordinario
+    if (!configDia || configDia.activo === false) {
+      return true;
+    }
+
+    return false;
+  }
+
+  async function handleFichar(tipoOverride?: string, confirmed: boolean = false) {
     if (state.loading) return;
+
+    // Determinar tipo de fichaje según estado actual
+    let tipo = tipoOverride || 'entrada';
+
+    if (!tipoOverride) {
+      switch (state.status) {
+        case 'sin_fichar':
+        case 'finalizado':
+          tipo = 'entrada';
+          break;
+        case 'trabajando':
+          tipo = 'pausa_inicio';
+          break;
+        case 'en_pausa':
+          tipo = 'pausa_fin';
+          break;
+      }
+    }
+
+    // Solo verificar si está fuera de horario para fichajes de entrada
+    // (no para pausas o salidas en medio de una jornada)
+    const esEntrada = tipo === 'entrada';
+    const fueraDeHorario = esEntrada && esFueraDeHorario();
+
+    // Si está fuera de horario y no ha confirmado, mostrar diálogo
+    if (fueraDeHorario && !confirmed) {
+      setPendingFichajeTipo(tipo);
+      setShowExtraordinarioDialog(true);
+      return;
+    }
 
     dispatch({ type: 'SET_LOADING', payload: true });
     try {
-      // Determinar tipo de fichaje según estado actual
-      let tipo = tipoOverride || 'entrada';
-      
-      if (!tipoOverride) {
-        switch (state.status) {
-          case 'sin_fichar':
-          case 'finalizado':
-            tipo = 'entrada';
-            break;
-          case 'trabajando':
-            tipo = 'pausa_inicio';
-            break;
-          case 'en_pausa':
-            tipo = 'pausa_fin';
-            break;
-        }
-      }
+      // Determinar tipo de fichaje: ordinario o extraordinario
+      const tipoFichaje = fueraDeHorario ? 'extraordinario' : 'ordinario';
 
       const response = await fetch('/api/fichajes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tipo }),
+        body: JSON.stringify({
+          tipo,
+          tipoFichaje,
+        }),
       });
 
       if (!response.ok) {
@@ -380,15 +447,33 @@ export function FichajeWidget({
 
       // Actualizar estado después de fichar
       await obtenerEstadoActual();
-      
+
       // Notificar a otros componentes (ej: tabla de fichajes)
       window.dispatchEvent(new CustomEvent('fichaje-updated'));
+
+      // Mostrar mensaje de éxito diferente para extraordinarios
+      if (tipoFichaje === 'extraordinario') {
+        toast.success('Fichaje extraordinario registrado (horas extra)');
+      }
     } catch (error) {
       console.error('[FichajeWidget] Error al fichar:', error);
       toast.error('Error al fichar. Intenta de nuevo.');
     } finally {
       dispatch({ type: 'SET_LOADING', payload: false });
     }
+  }
+
+  function handleConfirmarExtraordinario() {
+    setShowExtraordinarioDialog(false);
+    if (pendingFichajeTipo) {
+      handleFichar(pendingFichajeTipo, true);
+      setPendingFichajeTipo(null);
+    }
+  }
+
+  function handleCancelarExtraordinario() {
+    setShowExtraordinarioDialog(false);
+    setPendingFichajeTipo(null);
   }
 
   function getTextoBoton() {
@@ -674,6 +759,36 @@ export function FichajeWidget({
         contexto="empleado"
         modo="crear"
       />
+
+      {/* Dialog de confirmación para fichajes extraordinarios */}
+      <AlertDialog open={showExtraordinarioDialog} onOpenChange={setShowExtraordinarioDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-amber-600" />
+              Fichaje fuera de horario
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Estás fichando fuera de tu horario laboral ordinario. Este fichaje se registrará como
+              <strong className="text-amber-700"> horas extraordinarias</strong>.
+              <br />
+              <br />
+              ¿Deseas continuar?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={handleCancelarExtraordinario}>
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmarExtraordinario}
+              className="bg-amber-600 hover:bg-amber-700"
+            >
+              Confirmar fichaje extraordinario
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

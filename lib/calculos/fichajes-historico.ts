@@ -107,8 +107,11 @@ export async function obtenerPromedioEventosHistoricos(
   const fechaBase = normalizarFechaSinHora(fecha);
 
   // Construir where clause
+  // IMPORTANTE: Solo usar fichajes ordinarios para promedios históricos
+  // Los extraordinarios son excepcionales y no representan patrones habituales
   const whereClause: Record<string, unknown> = {
     empleadoId,
+    tipoFichaje: 'ordinario', // Solo ordinarios para promedios
     estado: 'finalizado',
     fecha: { lt: fechaBase },
   };

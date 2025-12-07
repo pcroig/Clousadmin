@@ -20,11 +20,12 @@ import { LoadingButton } from '@/components/shared/loading-button';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
-  DialogLarge as Dialog,
-  DialogLargeContent as DialogContent,
-  DialogLargeHeader as DialogHeader,
-  DialogLargeTitle as DialogTitle,
-} from '@/components/ui/dialog-large';
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import {
   Table,
   TableBody,
@@ -77,6 +78,8 @@ interface Jornada {
   config: JornadaConfig | null;
   esPredefinida: boolean;
   activa: boolean;
+  nivelAsignacion?: 'empresa' | 'equipo' | 'individual';
+  equiposAsignados?: string[];
   empleadosPreview?: Array<{
     id: string;
     nombre: string;
@@ -393,44 +396,62 @@ export function JornadasModal({ open, onClose }: JornadasModalProps) {
   }
 
   function renderAsignados(jornada: Jornada) {
-    if (!jornada.empleadosPreview || jornada.empleadosPreview.length === 0) {
+    const numEmpleados = jornada._count?.empleados || 0;
+
+    // Caso 1: Toda la empresa
+    if (jornada.nivelAsignacion === 'empresa') {
       return (
-        <span className="text-sm text-gray-500">
-          {jornada._count?.empleados || 0} empleado{jornada._count?.empleados !== 1 ? 's' : ''}
+        <span className="text-sm text-gray-900 font-medium">
+          Toda la empresa ({numEmpleados})
         </span>
       );
     }
 
+    // Caso 2: Por equipos
+    if (jornada.nivelAsignacion === 'equipo' && jornada.equiposAsignados && jornada.equiposAsignados.length > 0) {
+      return (
+        <span className="text-sm text-gray-900">
+          {jornada.equiposAsignados.join(', ')} ({numEmpleados})
+        </span>
+      );
+    }
+
+    // Caso 3: Empleados individuales
+    if (jornada.empleadosPreview && jornada.empleadosPreview.length > 0) {
+      return (
+        <EmployeeListPreview
+          empleados={jornada.empleadosPreview.map((e) => ({
+            id: e.id,
+            nombre: e.nombre,
+            apellidos: e.apellidos ?? undefined,
+            fotoUrl: e.fotoUrl ?? undefined,
+            avatar: e.avatar ?? undefined,
+          }))}
+          maxVisible={5}
+          dense
+          avatarSize="xxs"
+        />
+      );
+    }
+
+    // Sin asignación
     return (
-      <EmployeeListPreview
-        empleados={jornada.empleadosPreview.map((e) => ({
-          id: e.id,
-          nombre: e.nombre,
-          apellidos: e.apellidos ?? undefined,
-          fotoUrl: e.fotoUrl ?? undefined,
-          avatar: e.avatar ?? undefined,
-        }))}
-        maxVisible={3}
-        avatarSize="md"
-      />
+      <span className="text-sm text-gray-500">
+        Sin asignar
+      </span>
     );
   }
 
+  const jornadaActual = expandedId && !isCreating ? jornadas.find(j => j.id === expandedId) : null;
+
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-4xl max-h-[85vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>Gestión de Jornadas</DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4">
-          {/* Botón crear */}
-          <div className="flex justify-end">
-            <Button onClick={handleCrear} disabled={isCreating} className="gap-2">
-              <Plus className="w-4 h-4" />
-              Nueva Jornada
-            </Button>
-          </div>
+        <div className="flex-1 overflow-y-auto space-y-4">
 
           {/* Tabla con filas expandibles */}
           {loading ? (
@@ -445,10 +466,8 @@ export function JornadasModal({ open, onClose }: JornadasModalProps) {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Descripción</TableHead>
                   <TableHead>Tipo</TableHead>
                   <TableHead>Horas</TableHead>
-                  <TableHead>Días</TableHead>
                   <TableHead>Asignados</TableHead>
                   <TableHead className="w-12"></TableHead>
                 </TableRow>
@@ -456,9 +475,8 @@ export function JornadasModal({ open, onClose }: JornadasModalProps) {
               <TableBody>
                 {/* Fila para crear nueva jornada */}
                 {isCreating && expandedId === 'new' && (
-                  <Fragment>
-                    <TableRow>
-                      <TableCell colSpan={6} className="p-0">
+                  <TableRow>
+                    <TableCell colSpan={4} className="p-0">
                         <div className="p-6 bg-gray-50">
                           <h3 className="text-lg font-semibold mb-4">Crear Nueva Jornada</h3>
                           <JornadaFormFields
@@ -476,26 +494,10 @@ export function JornadasModal({ open, onClose }: JornadasModalProps) {
                             equipoSeleccionado={equipoSeleccionado}
                             onEquipoSeleccionadoChange={setEquipoSeleccionado}
                           />
-                          <div className="flex justify-end gap-2 mt-4">
-                            <LoadingButton onClick={() => handleGuardarJornada()} loading={guardando}>
-                              Crear Jornada
-                            </LoadingButton>
-                            <Button
-                              variant="outline"
-                              onClick={() => {
-                                setExpandedId(null);
-                                setIsCreating(false);
-                              }}
-                              disabled={guardando}
-                            >
-                              Cancelar
-                            </Button>
-                          </div>
                         </div>
                       </TableCell>
                     </TableRow>
-                  </Fragment>
-                )}
+                  )}
 
                 {/* Filas de jornadas existentes */}
                 {jornadas.map((jornada) => (
@@ -504,16 +506,8 @@ export function JornadasModal({ open, onClose }: JornadasModalProps) {
                       className="cursor-pointer hover:bg-gray-50"
                       onClick={() => handleExpandirJornada(jornada.id, jornada)}
                     >
-                      <TableCell>
-                        <div className="font-medium text-gray-900">{getNombreGenerado(jornada)}</div>
-                      </TableCell>
                       <TableCell>{getTipoBadge(jornada)}</TableCell>
-                      <TableCell>{jornada.horasSemanales}h</TableCell>
-                      <TableCell>
-                        <div className="flex gap-1">
-                          {getDiasLaborables(jornada)}
-                        </div>
-                      </TableCell>
+                      <TableCell className="font-medium">{jornada.horasSemanales}h</TableCell>
                       <TableCell>{renderAsignados(jornada)}</TableCell>
                       <TableCell>
                         <Button variant="ghost" size="sm">
@@ -525,7 +519,7 @@ export function JornadasModal({ open, onClose }: JornadasModalProps) {
                     {/* Fila expandida con formulario de edición */}
                     {expandedId === jornada.id && !isCreating && (
                       <TableRow>
-                        <TableCell colSpan={6} className="p-0">
+                        <TableCell colSpan={4} className="p-0">
                           <div className="p-6 bg-gray-50 border-t">
                             <div className="flex items-center justify-between mb-4">
                               <h3 className="text-lg font-semibold">Editar Jornada</h3>
@@ -559,20 +553,6 @@ export function JornadasModal({ open, onClose }: JornadasModalProps) {
                               equipoSeleccionado={equipoSeleccionado}
                               onEquipoSeleccionadoChange={setEquipoSeleccionado}
                             />
-                            <div className="flex justify-end gap-2 mt-4">
-                              {!jornada.esPredefinida && (
-                                <LoadingButton onClick={() => handleGuardarJornada(jornada.id)} loading={guardando}>
-                                  Guardar Cambios
-                                </LoadingButton>
-                              )}
-                              <Button
-                                variant="outline"
-                                onClick={() => setExpandedId(null)}
-                                disabled={guardando}
-                              >
-                                Cerrar
-                              </Button>
-                            </div>
                           </div>
                         </TableCell>
                       </TableRow>
@@ -583,6 +563,43 @@ export function JornadasModal({ open, onClose }: JornadasModalProps) {
             </Table>
           )}
         </div>
+
+        <DialogFooter className="gap-2">
+          {isCreating || expandedId ? (
+            <>
+              {jornadaActual && !jornadaActual.esPredefinida && !isCreating && (
+                <LoadingButton onClick={() => handleGuardarJornada(expandedId!)} loading={guardando}>
+                  Guardar Cambios
+                </LoadingButton>
+              )}
+              {isCreating && (
+                <LoadingButton onClick={() => handleGuardarJornada()} loading={guardando}>
+                  Crear Jornada
+                </LoadingButton>
+              )}
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setExpandedId(null);
+                  setIsCreating(false);
+                }}
+                disabled={guardando}
+              >
+                Cancelar
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button onClick={handleCrear} className="gap-2">
+                <Plus className="w-4 h-4" />
+                Nueva Jornada
+              </Button>
+              <Button variant="outline" onClick={onClose}>
+                Cerrar
+              </Button>
+            </>
+          )}
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
