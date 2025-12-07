@@ -201,18 +201,18 @@ export function JornadasModal({ open, onClose }: JornadasModalProps) {
     setErrors({});
   }
 
-  function handleExpandirJornada(jornadaId: string, jornada: Jornada) {
+  async function handleExpandirJornada(jornadaId: string, jornada: Jornada) {
     if (expandedId === jornadaId) {
       setExpandedId(null);
       setIsCreating(false);
     } else {
       setExpandedId(jornadaId);
       setIsCreating(false);
-      cargarDatosJornada(jornada);
+      await cargarDatosJornada(jornada);
     }
   }
 
-  function cargarDatosJornada(jornada: Jornada) {
+  async function cargarDatosJornada(jornada: Jornada) {
     const config = jornada.config;
     const esFija = DIA_KEYS.some((dia) => {
       const diaConfig = getDiaConfig(config, dia);
@@ -240,6 +240,18 @@ export function JornadasModal({ open, onClose }: JornadasModalProps) {
           };
         }
       });
+    } else if (config) {
+      // Para jornadas flexibles, cargar solo activo/inactivo
+      DIA_KEYS.forEach((dia) => {
+        const diaConfig = getDiaConfig(config, dia);
+        if (diaConfig) {
+          horariosFijos[dia] = {
+            activo: Boolean(diaConfig.activo),
+            entrada: '',
+            salida: '',
+          };
+        }
+      });
     }
 
     setFormData({
@@ -249,6 +261,46 @@ export function JornadasModal({ open, onClose }: JornadasModalProps) {
       tieneDescanso: Boolean(config?.descanso),
       descansoMinutos: String(config?.descanso || 60),
     });
+
+    // Cargar información de asignación
+    if (jornada.nivelAsignacion) {
+      setNivelAsignacion(jornada.nivelAsignacion);
+
+      if (jornada.nivelAsignacion === 'individual') {
+        // Para jornadas individuales, necesitamos cargar TODOS los empleados
+        // ya que empleadosPreview solo trae 10
+        try {
+          const response = await fetch(`/api/jornadas/${jornada.id}`);
+          if (response.ok) {
+            const data = await response.json();
+            const jornadaCompleta = data.data;
+            if (jornadaCompleta?.empleados && Array.isArray(jornadaCompleta.empleados)) {
+              const empleadosIds = jornadaCompleta.empleados.map((e: any) => e.id);
+              setEmpleadosSeleccionados(empleadosIds);
+            } else {
+              setEmpleadosSeleccionados([]);
+            }
+          }
+        } catch (error) {
+          console.error('Error cargando empleados de jornada:', error);
+          setEmpleadosSeleccionados([]);
+        }
+        setEquipoSeleccionado('');
+      } else if (jornada.nivelAsignacion === 'equipo') {
+        // Para equipos, la API no retorna equipoId directamente
+        // Necesitaremos mejorarlo en el futuro, por ahora limpiar
+        setEquipoSeleccionado('');
+        setEmpleadosSeleccionados([]);
+      } else {
+        // Empresa
+        setEmpleadosSeleccionados([]);
+        setEquipoSeleccionado('');
+      }
+    } else {
+      setNivelAsignacion('empresa');
+      setEmpleadosSeleccionados([]);
+      setEquipoSeleccionado('');
+    }
   }
 
   async function handleGuardarJornada(jornadaId?: string) {
