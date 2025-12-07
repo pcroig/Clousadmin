@@ -1,10 +1,8 @@
 'use client';
 
 // ========================================
-// Modal de Gestión de Jornadas - Con Tabla Expandible
+// Modal de Gestión de Jornadas - SIMPLIFICADO
 // ========================================
-// ACTUALIZADO: 7 Diciembre 2025 - Ahora usa tabla expandible inline
-// igual que jornadas-client.tsx
 
 import { CalendarX, ChevronDown, ChevronUp, Plus, Trash2 } from 'lucide-react';
 import { Fragment, useEffect, useState } from 'react';
@@ -37,7 +35,6 @@ import {
 } from '@/components/ui/table';
 import { type JornadaConfig, type DiaConfig } from '@/lib/calculos/fichajes-helpers';
 import { useApi, useMutation } from '@/lib/hooks';
-import { useValidacionJornadas } from '@/lib/hooks/use-validacion-jornadas';
 
 type DiaKey = 'lunes' | 'martes' | 'miercoles' | 'jueves' | 'viernes' | 'sabado' | 'domingo';
 
@@ -99,32 +96,18 @@ interface JornadasModalProps {
 }
 
 export function JornadasModal({ open, onClose }: JornadasModalProps) {
-  // Estado de expansión
+  // Estado de expansión - solo para ver detalles
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [isCreating, setIsCreating] = useState(false);
-
-  // Formulario de edición
-  const [formData, setFormData] = useState<JornadaFormData>(createDefaultJornada());
-  const [empleadosSeleccionados, setEmpleadosSeleccionados] = useState<string[]>([]);
-  const [nivelAsignacion, setNivelAsignacion] = useState<'empresa' | 'equipo' | 'individual'>('empresa');
-  const [equipoSeleccionado, setEquipoSeleccionado] = useState<string>('');
 
   // Estados auxiliares
   const [empleados, setEmpleados] = useState<Empleado[]>([]);
   const [equipos, setEquipos] = useState<Equipo[]>([]);
   const [guardando, setGuardando] = useState(false);
-  const [errors, setErrors] = useState<Record<string, string>>({});
 
   // Hooks
   const { data: jornadasData, loading, execute: refetchJornadas } = useApi<Jornada[]>();
   const jornadas = jornadasData ?? [];
-  const { validar, mostrarErrores } = useValidacionJornadas();
-
-  const { mutate: eliminarJornada } = useMutation<void, void>({
-    onSuccess: () => {
-      refetchJornadas('/api/jornadas');
-    },
-  });
+  const { execute: eliminarJornada } = useMutation<void>({ method: 'DELETE' });
 
   useEffect(() => {
     if (open) {
@@ -132,14 +115,24 @@ export function JornadasModal({ open, onClose }: JornadasModalProps) {
       cargarEmpleados();
       cargarEquipos();
     }
-  }, [open, refetchJornadas]);
+  }, [open]);
 
   async function cargarEmpleados() {
     try {
       const response = await fetch('/api/empleados');
       if (response.ok) {
-        const data = await response.json() as { data?: Empleado[] };
-        setEmpleados(Array.isArray(data.data) ? data.data : []);
+        const data = await response.json() as { data?: unknown[] };
+        const empleadosArray = Array.isArray(data.data) ? data.data : [];
+        setEmpleados(
+          empleadosArray.map((empleado: unknown) => {
+            const e = empleado as { id: string; nombre: string; apellidos: string };
+            return {
+              id: e.id,
+              nombre: e.nombre,
+              apellidos: e.apellidos,
+            };
+          })
+        );
       }
     } catch (error) {
       console.error('Error cargando empleados:', error);
@@ -173,276 +166,17 @@ export function JornadasModal({ open, onClose }: JornadasModalProps) {
     }
   }
 
-  function createDefaultJornada(): JornadaFormData {
-    return {
-      tipoJornada: 'flexible',
-      horasSemanales: '40',
-      horariosFijos: {
-        lunes: { activo: true, entrada: '09:00', salida: '18:00' },
-        martes: { activo: true, entrada: '09:00', salida: '18:00' },
-        miercoles: { activo: true, entrada: '09:00', salida: '18:00' },
-        jueves: { activo: true, entrada: '09:00', salida: '18:00' },
-        viernes: { activo: true, entrada: '09:00', salida: '18:00' },
-        sabado: { activo: false, entrada: '', salida: '' },
-        domingo: { activo: false, entrada: '', salida: '' },
-      },
-      tieneDescanso: true,
-      descansoMinutos: '60',
-    };
-  }
-
-  function handleCrear() {
-    setIsCreating(true);
-    setExpandedId('new');
-    setFormData(createDefaultJornada());
-    setNivelAsignacion('empresa');
-    setEmpleadosSeleccionados([]);
-    setEquipoSeleccionado('');
-    setErrors({});
-  }
-
-  async function handleExpandirJornada(jornadaId: string, jornada: Jornada) {
-    if (expandedId === jornadaId) {
-      setExpandedId(null);
-      setIsCreating(false);
-    } else {
-      setExpandedId(jornadaId);
-      setIsCreating(false);
-      await cargarDatosJornada(jornada);
-    }
-  }
-
-  async function cargarDatosJornada(jornada: Jornada) {
-    const config = jornada.config;
-    const esFija = DIA_KEYS.some((dia) => {
-      const diaConfig = getDiaConfig(config, dia);
-      return Boolean(diaConfig?.entrada && diaConfig?.salida);
-    });
-
-    const horariosFijos: Record<DiaKey, { activo: boolean; entrada: string; salida: string }> = {
-      lunes: { activo: false, entrada: '', salida: '' },
-      martes: { activo: false, entrada: '', salida: '' },
-      miercoles: { activo: false, entrada: '', salida: '' },
-      jueves: { activo: false, entrada: '', salida: '' },
-      viernes: { activo: false, entrada: '', salida: '' },
-      sabado: { activo: false, entrada: '', salida: '' },
-      domingo: { activo: false, entrada: '', salida: '' },
-    };
-
-    if (esFija && config) {
-      DIA_KEYS.forEach((dia) => {
-        const diaConfig = getDiaConfig(config, dia);
-        if (diaConfig) {
-          horariosFijos[dia] = {
-            activo: Boolean(diaConfig.activo),
-            entrada: diaConfig.entrada || '',
-            salida: diaConfig.salida || '',
-          };
-        }
-      });
-    } else if (config) {
-      // Para jornadas flexibles, cargar solo activo/inactivo
-      DIA_KEYS.forEach((dia) => {
-        const diaConfig = getDiaConfig(config, dia);
-        if (diaConfig) {
-          horariosFijos[dia] = {
-            activo: Boolean(diaConfig.activo),
-            entrada: '',
-            salida: '',
-          };
-        }
-      });
-    }
-
-    setFormData({
-      tipoJornada: esFija ? 'fija' : 'flexible',
-      horasSemanales: String(jornada.horasSemanales),
-      horariosFijos,
-      tieneDescanso: Boolean(config?.descanso),
-      descansoMinutos: String(config?.descanso || 60),
-    });
-
-    // Cargar información de asignación
-    if (jornada.nivelAsignacion) {
-      setNivelAsignacion(jornada.nivelAsignacion);
-
-      if (jornada.nivelAsignacion === 'individual') {
-        // Para jornadas individuales, necesitamos cargar TODOS los empleados
-        // ya que empleadosPreview solo trae 10
-        try {
-          const response = await fetch(`/api/jornadas/${jornada.id}`);
-          if (response.ok) {
-            const data = await response.json();
-            const jornadaCompleta = data.data;
-            if (jornadaCompleta?.empleados && Array.isArray(jornadaCompleta.empleados)) {
-              const empleadosIds = jornadaCompleta.empleados.map((e: any) => e.id);
-              setEmpleadosSeleccionados(empleadosIds);
-            } else {
-              setEmpleadosSeleccionados([]);
-            }
-          }
-        } catch (error) {
-          console.error('Error cargando empleados de jornada:', error);
-          setEmpleadosSeleccionados([]);
-        }
-        setEquipoSeleccionado('');
-      } else if (jornada.nivelAsignacion === 'equipo') {
-        // Para equipos, la API no retorna equipoId directamente
-        // Necesitaremos mejorarlo en el futuro, por ahora limpiar
-        setEquipoSeleccionado('');
-        setEmpleadosSeleccionados([]);
-      } else {
-        // Empresa
-        setEmpleadosSeleccionados([]);
-        setEquipoSeleccionado('');
-      }
-    } else {
-      setNivelAsignacion('empresa');
-      setEmpleadosSeleccionados([]);
-      setEquipoSeleccionado('');
-    }
-  }
-
-  async function handleGuardarJornada(jornadaId?: string) {
-    setGuardando(true);
-    setErrors({});
-
-    try {
-      const horasSemanales = parseFloat(formData.horasSemanales);
-      if (isNaN(horasSemanales) || horasSemanales <= 0) {
-        setErrors({ horasSemanales: 'Las horas semanales deben ser un número mayor que 0' });
-        return;
-      }
-
-      const config: JornadaConfig = {};
-
-      if (formData.tipoJornada === 'fija') {
-        DIA_KEYS.forEach((dia) => {
-          const horario = formData.horariosFijos[dia];
-          if (horario.activo) {
-            config[dia] = {
-              activo: true,
-              entrada: horario.entrada,
-              salida: horario.salida,
-            };
-          } else {
-            config[dia] = { activo: false };
-          }
-        });
-      } else {
-        DIA_KEYS.forEach((dia) => {
-          const horario = formData.horariosFijos[dia];
-          config[dia] = { activo: horario.activo };
-        });
-      }
-
-      if (formData.tieneDescanso) {
-        config.descanso = parseInt(formData.descansoMinutos) || 60;
-      }
-
-      // 1. Crear o actualizar jornada
-      const jornadaBody = {
-        horasSemanales,
-        config,
-      };
-
-      const url = jornadaId ? `/api/jornadas/${jornadaId}` : '/api/jornadas';
-      const method = jornadaId ? 'PATCH' : 'POST';
-
-      const response = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(jornadaBody),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        const errorMsg = errorData.error || errorData.message || 'Error al guardar jornada';
-        toast.error(errorMsg);
-        return;
-      }
-
-      const result = await response.json();
-      const jornadaIdFinal = jornadaId || result.data?.id;
-
-      // 2. Asignar empleados si hay nivel de asignación
-      if (jornadaIdFinal && (nivelAsignacion || empleadosSeleccionados.length > 0 || equipoSeleccionado)) {
-        const asignacionBody: any = {
-          jornadaId: jornadaIdFinal,
-          nivel: nivelAsignacion,
-        };
-
-        if (nivelAsignacion === 'individual') {
-          asignacionBody.empleadosIds = empleadosSeleccionados;
-        } else if (nivelAsignacion === 'equipo') {
-          asignacionBody.equipoId = equipoSeleccionado;
-        }
-
-        const asignacionResponse = await fetch('/api/jornadas/asignar', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(asignacionBody),
-        });
-
-        if (!asignacionResponse.ok) {
-          const errorData = await asignacionResponse.json().catch(() => ({}));
-          const errorMsg = errorData.error || errorData.message || 'Error al asignar jornada';
-          toast.error(errorMsg);
-          return;
-        }
-      }
-
-      toast.success(jornadaId ? 'Jornada actualizada' : 'Jornada creada');
-
-      // Validar después de guardar
-      const esValido = await validar();
-      if (!esValido) {
-        mostrarErrores();
-      }
-
-      refetchJornadas('/api/jornadas');
-      setExpandedId(null);
-      setIsCreating(false);
-    } catch (error) {
-      console.error('Error guardando jornada:', error);
-      toast.error('Error inesperado al guardar');
-    } finally {
-      setGuardando(false);
-    }
-  }
-
   async function handleEliminar(jornadaId: string) {
     if (!confirm('¿Estás seguro de eliminar esta jornada?')) return;
 
     try {
-      eliminarJornada(`/api/jornadas/${jornadaId}`, undefined);
+      await eliminarJornada(`/api/jornadas/${jornadaId}`, undefined);
       toast.success('Jornada eliminada');
       setExpandedId(null);
+      refetchJornadas('/api/jornadas');
     } catch (error) {
       toast.error('Error al eliminar la jornada');
     }
-  }
-
-  function getNombreGenerado(jornada: Jornada): string {
-    const config = jornada.config;
-    const esFija = DIA_KEYS.some((dia) => {
-      const diaConfig = getDiaConfig(config, dia);
-      return Boolean(diaConfig?.entrada && diaConfig?.salida);
-    });
-
-    if (esFija && config) {
-      const primerDiaActivo = DIA_KEYS.find((dia) => {
-        const diaConfig = getDiaConfig(config, dia);
-        return diaConfig?.activo && diaConfig.entrada && diaConfig.salida;
-      });
-
-      if (primerDiaActivo) {
-        const diaConfig = getDiaConfig(config, primerDiaActivo);
-        return `Jornada Fija ${jornada.horasSemanales}h (${diaConfig?.entrada}-${diaConfig?.salida})`;
-      }
-    }
-
-    return `Jornada Flexible ${jornada.horasSemanales}h`;
   }
 
   function getTipoBadge(jornada: Jornada) {
@@ -457,26 +191,6 @@ export function JornadasModal({ open, onClose }: JornadasModalProps) {
         {esFija ? 'Fija' : 'Flexible'}
       </Badge>
     );
-  }
-
-  function getDiasLaborables(jornada: Jornada) {
-    return DIA_KEYS.map((dia) => {
-      const diaConfig = getDiaConfig(jornada.config, dia);
-      const activo = diaConfig?.activo ?? false;
-
-      return (
-        <span
-          key={dia}
-          className={`w-6 h-6 rounded-md text-[10px] font-semibold flex items-center justify-center border ${
-            activo
-              ? 'bg-gray-900 text-white border-gray-900'
-              : 'bg-gray-50 text-gray-400 border-gray-200'
-          }`}
-        >
-          {DIA_INICIAL[dia]}
-        </span>
-      );
-    });
   }
 
   function renderAsignados(jornada: Jornada) {
@@ -526,8 +240,6 @@ export function JornadasModal({ open, onClose }: JornadasModalProps) {
     );
   }
 
-  const jornadaActual = expandedId && !isCreating ? jornadas.find(j => j.id === expandedId) : null;
-
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogScrollableContent className="max-w-3xl">
@@ -536,7 +248,7 @@ export function JornadasModal({ open, onClose }: JornadasModalProps) {
         </DialogHeader>
 
         <DialogBody>
-          {/* Tabla con filas expandibles */}
+          {/* Tabla de jornadas */}
           {loading ? (
             <div className="text-center py-8 text-gray-500">Cargando...</div>
           ) : jornadas.length === 0 ? (
@@ -556,38 +268,11 @@ export function JornadasModal({ open, onClose }: JornadasModalProps) {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {/* Fila para crear nueva jornada */}
-                {isCreating && expandedId === 'new' && (
-                  <TableRow>
-                    <TableCell colSpan={4} className="p-0">
-                        <div className="p-6">
-                          <h3 className="text-lg font-semibold mb-4">Crear Nueva Jornada</h3>
-                          <JornadaFormFields
-                            data={formData}
-                            onChange={setFormData}
-                            errors={errors}
-                            disabled={guardando}
-                            showAsignacion={true}
-                            nivelAsignacion={nivelAsignacion}
-                            onNivelAsignacionChange={setNivelAsignacion}
-                            empleados={empleados}
-                            empleadosSeleccionados={empleadosSeleccionados}
-                            onEmpleadosSeleccionChange={setEmpleadosSeleccionados}
-                            equipos={equipos}
-                            equipoSeleccionado={equipoSeleccionado}
-                            onEquipoSeleccionadoChange={setEquipoSeleccionado}
-                          />
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  )}
-
-                {/* Filas de jornadas existentes */}
                 {jornadas.map((jornada) => (
                   <Fragment key={jornada.id}>
                     <TableRow
                       className="cursor-pointer hover:bg-gray-50"
-                      onClick={() => handleExpandirJornada(jornada.id, jornada)}
+                      onClick={() => setExpandedId(expandedId === jornada.id ? null : jornada.id)}
                     >
                       <TableCell>{getTipoBadge(jornada)}</TableCell>
                       <TableCell className="font-medium">{jornada.horasSemanales}h</TableCell>
@@ -599,13 +284,13 @@ export function JornadasModal({ open, onClose }: JornadasModalProps) {
                       </TableCell>
                     </TableRow>
 
-                    {/* Fila expandida con formulario de edición */}
-                    {expandedId === jornada.id && !isCreating && (
+                    {/* Fila expandida con detalles */}
+                    {expandedId === jornada.id && (
                       <TableRow>
                         <TableCell colSpan={4} className="p-0">
-                          <div className="p-6 border-t">
+                          <div className="p-6 border-t bg-gray-50">
                             <div className="flex items-center justify-between mb-4">
-                              <h3 className="text-lg font-semibold">Editar Jornada</h3>
+                              <h3 className="text-lg font-semibold">Detalles de la jornada</h3>
                               {!jornada.esPredefinida && (
                                 <Button
                                   variant="outline"
@@ -621,21 +306,53 @@ export function JornadasModal({ open, onClose }: JornadasModalProps) {
                                 </Button>
                               )}
                             </div>
-                            <JornadaFormFields
-                              data={formData}
-                              onChange={setFormData}
-                              errors={errors}
-                              disabled={guardando || jornada.esPredefinida}
-                              showAsignacion={true}
-                              nivelAsignacion={nivelAsignacion}
-                              onNivelAsignacionChange={setNivelAsignacion}
-                              empleados={empleados}
-                              empleadosSeleccionados={empleadosSeleccionados}
-                              onEmpleadosSeleccionChange={setEmpleadosSeleccionados}
-                              equipos={equipos}
-                              equipoSeleccionado={equipoSeleccionado}
-                              onEquipoSeleccionadoChange={setEquipoSeleccionado}
-                            />
+
+                            {/* Mostrar detalles de configuración */}
+                            <div className="space-y-3 text-sm">
+                              <div>
+                                <span className="font-medium text-gray-700">Tipo:</span>{' '}
+                                <span className="text-gray-900">{getTipoBadge(jornada)}</span>
+                              </div>
+                              <div>
+                                <span className="font-medium text-gray-700">Horas semanales:</span>{' '}
+                                <span className="text-gray-900">{jornada.horasSemanales}h</span>
+                              </div>
+                              {jornada.config?.descanso && (
+                                <div>
+                                  <span className="font-medium text-gray-700">Descanso:</span>{' '}
+                                  <span className="text-gray-900">{jornada.config.descanso} minutos</span>
+                                </div>
+                              )}
+
+                              {/* Días laborables */}
+                              <div>
+                                <span className="font-medium text-gray-700">Días laborables:</span>
+                                <div className="flex gap-2 mt-2">
+                                  {DIA_KEYS.map((dia) => {
+                                    const diaConfig = getDiaConfig(jornada.config, dia);
+                                    const activo = diaConfig?.activo ?? false;
+                                    return (
+                                      <div key={dia} className="flex flex-col items-center gap-1">
+                                        <span
+                                          className={`w-8 h-8 rounded-md text-xs font-semibold flex items-center justify-center border ${
+                                            activo
+                                              ? 'bg-gray-900 text-white border-gray-900'
+                                              : 'bg-white text-gray-400 border-gray-200'
+                                          }`}
+                                        >
+                                          {DIA_INICIAL[dia]}
+                                        </span>
+                                        {activo && diaConfig?.entrada && diaConfig?.salida && (
+                                          <span className="text-[10px] text-gray-600">
+                                            {diaConfig.entrada}-{diaConfig.salida}
+                                          </span>
+                                        )}
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            </div>
                           </div>
                         </TableCell>
                       </TableRow>
@@ -648,40 +365,16 @@ export function JornadasModal({ open, onClose }: JornadasModalProps) {
         </DialogBody>
 
         <DialogFooter className="gap-2">
-          {isCreating || expandedId ? (
-            <>
-              {jornadaActual && !jornadaActual.esPredefinida && !isCreating && (
-                <LoadingButton onClick={() => handleGuardarJornada(expandedId!)} loading={guardando}>
-                  Guardar Cambios
-                </LoadingButton>
-              )}
-              {isCreating && (
-                <LoadingButton onClick={() => handleGuardarJornada()} loading={guardando}>
-                  Crear Jornada
-                </LoadingButton>
-              )}
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setExpandedId(null);
-                  setIsCreating(false);
-                }}
-                disabled={guardando}
-              >
-                Cancelar
-              </Button>
-            </>
-          ) : (
-            <>
-              <Button onClick={handleCrear} className="gap-2">
-                <Plus className="w-4 h-4" />
-                Nueva Jornada
-              </Button>
-              <Button variant="outline" onClick={onClose}>
-                Cerrar
-              </Button>
-            </>
-          )}
+          <Button onClick={onClose} variant="outline">
+            Cerrar
+          </Button>
+          <Button onClick={() => {
+            // Navegar a la página de gestión de jornadas para crear/editar
+            window.location.href = '/hr/horario/jornadas';
+          }} className="gap-2">
+            <Plus className="w-4 h-4" />
+            Nueva Jornada
+          </Button>
         </DialogFooter>
       </DialogScrollableContent>
     </Dialog>
