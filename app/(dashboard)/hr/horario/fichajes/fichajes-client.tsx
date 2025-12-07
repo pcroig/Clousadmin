@@ -33,7 +33,7 @@ import { calcularRangoFechas, obtenerEtiquetaPeriodo, toMadridDate } from '@/lib
 import { calcularProgresoEventos } from '@/lib/calculos/fichajes-cliente';
 import { parseJson } from '@/lib/utils/json';
 
-import { JornadasModal } from './jornadas-modal';
+// JornadasModal eliminado - ahora se usa la ruta /hr/horario/jornadas
 
 // NUEVO MODELO: Fichaje tiene eventos dentro
 interface FichajeEvento {
@@ -114,7 +114,6 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
   const [fechaBase, setFechaBase] = useState(new Date());
 
   // Modals
-  const [jornadasModal, setJornadasModal] = useState(false);
   const [showCompensarHorasDialog, setShowCompensarHorasDialog] = useState(false);
   const [periodoCompensar, setPeriodoCompensar] = useState<{ mes: number; anio: number }>(() =>
     obtenerPeriodoDesdeFecha(new Date())
@@ -622,7 +621,7 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
               {
                 icon: Settings,
                 label: 'Jornadas',
-                onClick: () => setJornadasModal(true),
+                onClick: () => router.push('/hr/horario/jornadas'),
               },
               {
                 icon: Clock,
@@ -705,7 +704,7 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
             <div className="flex gap-2">
               <Button
                 variant="outline"
-                onClick={() => setJornadasModal(true)}
+                onClick={() => router.push('/hr/horario/jornadas')}
                 className="border-gray-200 gap-2"
               >
                 <Settings className="w-4 h-4" />
@@ -757,12 +756,6 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
           </div>
         </>
       )}
-
-      {/* Modal Gestionar Jornadas */}
-      <JornadasModal 
-        open={jornadasModal} 
-        onClose={() => setJornadasModal(false)} 
-      />
 
       {/* Modal Editar Fichaje */}
       <FichajeModal
