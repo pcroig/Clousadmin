@@ -8,7 +8,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Check, Clock, Settings } from 'lucide-react';
+import { Check, Clock, Settings, Zap } from 'lucide-react';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -33,7 +33,7 @@ import { calcularRangoFechas, obtenerEtiquetaPeriodo, toMadridDate } from '@/lib
 import { calcularProgresoEventos } from '@/lib/calculos/fichajes-cliente';
 import { parseJson } from '@/lib/utils/json';
 
-// JornadasModal eliminado - ahora se usa la ruta /hr/horario/jornadas
+import { JornadasModal } from './jornadas-modal';
 
 // NUEVO MODELO: Fichaje tiene eventos dentro
 interface FichajeEvento {
@@ -48,6 +48,7 @@ interface Fichaje {
   id: string;
   fecha: string;
   estado: string;
+  tipoFichaje?: 'ordinario' | 'extraordinario';
   horasTrabajadas: number | string | null; // Prisma Decimal se serializa como string
   horasEnPausa: number | string | null; // Prisma Decimal se serializa como string
   horasEsperadas?: number | string | null;
@@ -115,6 +116,7 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
 
   // Modals
   const [showCompensarHorasDialog, setShowCompensarHorasDialog] = useState(false);
+  const [jornadasModalOpen, setJornadasModalOpen] = useState(false);
   const [periodoCompensar, setPeriodoCompensar] = useState<{ mes: number; anio: number }>(() =>
     obtenerPeriodoDesdeFecha(new Date())
   );
@@ -586,7 +588,19 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
       id: 'estado',
       header: 'Estado',
       align: 'center',
-      cell: (jornada) => <EstadoBadge estado={jornada.fichaje.estado} />,
+      cell: (jornada) => (
+        <div className="flex items-center justify-center gap-1.5">
+          <EstadoBadge estado={jornada.fichaje.estado} />
+          {jornada.fichaje.tipoFichaje === 'extraordinario' && (
+            <div className="group relative">
+              <Zap className="h-4 w-4 text-amber-600 fill-amber-100" />
+              <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 text-xs text-white bg-gray-900 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                Horas extra
+              </span>
+            </div>
+          )}
+        </div>
+      ),
     },
   ], [resolveEmpleadoHoverInfo]);
 
@@ -621,7 +635,7 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
               {
                 icon: Settings,
                 label: 'Jornadas',
-                onClick: () => router.push('/hr/horario/jornadas'),
+                onClick: () => setJornadasModalOpen(true),
               },
               {
                 icon: Clock,
@@ -704,7 +718,7 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
             <div className="flex gap-2">
               <Button
                 variant="outline"
-                onClick={() => router.push('/hr/horario/jornadas')}
+                onClick={() => setJornadasModalOpen(true)}
                 className="border-gray-200 gap-2"
               >
                 <Settings className="w-4 h-4" />
@@ -779,6 +793,15 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
           onClose={() => setShowCompensarHorasDialog(false)}
         />
       )}
+
+      {/* Modal de Gestión de Jornadas */}
+      <JornadasModal
+        open={jornadasModalOpen}
+        onClose={() => {
+          setJornadasModalOpen(false);
+          fetchFichajes(); // Refrescar fichajes por si cambiaron las jornadas
+        }}
+      />
     </div>
   );
 }
