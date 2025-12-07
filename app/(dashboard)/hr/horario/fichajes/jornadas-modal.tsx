@@ -1,7 +1,7 @@
 'use client';
 
 // ========================================
-// Modal de Gestión de Jornadas - SIMPLIFICADO
+// Modal de Gestión de Jornadas - CON EDICIÓN INLINE
 // ========================================
 
 import { CalendarX, ChevronDown, ChevronUp, Plus, Trash2 } from 'lucide-react';
@@ -95,14 +95,39 @@ interface JornadasModalProps {
   onClose: () => void;
 }
 
+function createDefaultFormData(): JornadaFormData {
+  return {
+    tipoJornada: 'flexible',
+    horasSemanales: '40',
+    horariosFijos: {
+      lunes: { activo: true, entrada: '09:00', salida: '18:00' },
+      martes: { activo: true, entrada: '09:00', salida: '18:00' },
+      miercoles: { activo: true, entrada: '09:00', salida: '18:00' },
+      jueves: { activo: true, entrada: '09:00', salida: '18:00' },
+      viernes: { activo: true, entrada: '09:00', salida: '18:00' },
+      sabado: { activo: false, entrada: '', salida: '' },
+      domingo: { activo: false, entrada: '', salida: '' },
+    },
+    tieneDescanso: true,
+    descansoMinutos: '60',
+  };
+}
+
 export function JornadasModal({ open, onClose }: JornadasModalProps) {
-  // Estado de expansión - solo para ver detalles
-  const [expandedId, setExpandedId] = useState<string | null>(null);
+  // Estado de expansión/edición - UN SOLO ID que puede ser de jornada existente o 'new'
+  const [editingId, setEditingId] = useState<string | null>(null);
+
+  // Form data - se usa tanto para crear como para editar
+  const [formData, setFormData] = useState<JornadaFormData>(createDefaultFormData());
+  const [empleadosSeleccionados, setEmpleadosSeleccionados] = useState<string[]>([]);
+  const [nivelAsignacion, setNivelAsignacion] = useState<'empresa' | 'equipo' | 'individual'>('empresa');
+  const [equipoSeleccionado, setEquipoSeleccionado] = useState<string>('');
 
   // Estados auxiliares
   const [empleados, setEmpleados] = useState<Empleado[]>([]);
   const [equipos, setEquipos] = useState<Equipo[]>([]);
   const [guardando, setGuardando] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   // Hooks
   const { data: jornadasData, loading, execute: refetchJornadas } = useApi<Jornada[]>();
@@ -166,13 +191,216 @@ export function JornadasModal({ open, onClose }: JornadasModalProps) {
     }
   }
 
+  function handleNuevaJornada() {
+    setEditingId('new');
+    setFormData(createDefaultFormData());
+    setNivelAsignacion('empresa');
+    setEmpleadosSeleccionados([]);
+    setEquipoSeleccionado('');
+    setErrors({});
+  }
+
+  async function handleEditarJornada(jornada: Jornada) {
+    setEditingId(jornada.id);
+
+    // Cargar datos del formulario
+    const config = jornada.config;
+    const esFija = DIA_KEYS.some((dia) => {
+      const diaConfig = getDiaConfig(config, dia);
+      return Boolean(diaConfig?.entrada && diaConfig?.salida);
+    });
+
+    const horariosFijos: Record<DiaKey, { activo: boolean; entrada: string; salida: string }> = {
+      lunes: { activo: false, entrada: '', salida: '' },
+      martes: { activo: false, entrada: '', salida: '' },
+      miercoles: { activo: false, entrada: '', salida: '' },
+      jueves: { activo: false, entrada: '', salida: '' },
+      viernes: { activo: false, entrada: '', salida: '' },
+      sabado: { activo: false, entrada: '', salida: '' },
+      domingo: { activo: false, entrada: '', salida: '' },
+    };
+
+    if (esFija && config) {
+      DIA_KEYS.forEach((dia) => {
+        const diaConfig = getDiaConfig(config, dia);
+        if (diaConfig) {
+          horariosFijos[dia] = {
+            activo: Boolean(diaConfig.activo),
+            entrada: diaConfig.entrada || '',
+            salida: diaConfig.salida || '',
+          };
+        }
+      });
+    } else if (config) {
+      DIA_KEYS.forEach((dia) => {
+        const diaConfig = getDiaConfig(config, dia);
+        if (diaConfig) {
+          horariosFijos[dia] = {
+            activo: Boolean(diaConfig.activo),
+            entrada: '',
+            salida: '',
+          };
+        }
+      });
+    }
+
+    setFormData({
+      tipoJornada: esFija ? 'fija' : 'flexible',
+      horasSemanales: String(jornada.horasSemanales),
+      horariosFijos,
+      tieneDescanso: Boolean(config?.descanso),
+      descansoMinutos: String(config?.descanso || 60),
+    });
+
+    // Cargar información de asignación
+    if (jornada.nivelAsignacion) {
+      setNivelAsignacion(jornada.nivelAsignacion);
+
+      if (jornada.nivelAsignacion === 'individual') {
+        // Cargar todos los empleados asignados
+        try {
+          const response = await fetch(`/api/jornadas/${jornada.id}`);
+          if (response.ok) {
+            const data = await response.json();
+            const jornadaCompleta = data.data;
+            if (jornadaCompleta?.empleados && Array.isArray(jornadaCompleta.empleados)) {
+              const empleadosIds = jornadaCompleta.empleados.map((e: any) => e.id);
+              setEmpleadosSeleccionados(empleadosIds);
+            } else {
+              setEmpleadosSeleccionados([]);
+            }
+          }
+        } catch (error) {
+          console.error('Error cargando empleados de jornada:', error);
+          setEmpleadosSeleccionados([]);
+        }
+        setEquipoSeleccionado('');
+      } else if (jornada.nivelAsignacion === 'equipo') {
+        setEquipoSeleccionado('');
+        setEmpleadosSeleccionados([]);
+      } else {
+        setEmpleadosSeleccionados([]);
+        setEquipoSeleccionado('');
+      }
+    } else {
+      setNivelAsignacion('empresa');
+      setEmpleadosSeleccionados([]);
+      setEquipoSeleccionado('');
+    }
+
+    setErrors({});
+  }
+
+  async function handleGuardar() {
+    setGuardando(true);
+    setErrors({});
+
+    try {
+      const horasSemanales = parseFloat(formData.horasSemanales);
+      if (isNaN(horasSemanales) || horasSemanales <= 0) {
+        setErrors({ horasSemanales: 'Las horas semanales deben ser un número mayor que 0' });
+        return;
+      }
+
+      const config: JornadaConfig = {};
+
+      if (formData.tipoJornada === 'fija') {
+        DIA_KEYS.forEach((dia) => {
+          const horario = formData.horariosFijos[dia];
+          if (horario.activo) {
+            config[dia] = {
+              activo: true,
+              entrada: horario.entrada,
+              salida: horario.salida,
+            };
+          } else {
+            config[dia] = { activo: false };
+          }
+        });
+      } else {
+        DIA_KEYS.forEach((dia) => {
+          const horario = formData.horariosFijos[dia];
+          config[dia] = { activo: horario.activo };
+        });
+      }
+
+      if (formData.tieneDescanso) {
+        config.descanso = parseInt(formData.descansoMinutos) || 60;
+      }
+
+      // 1. Crear o actualizar jornada
+      const jornadaBody = {
+        horasSemanales,
+        config,
+      };
+
+      const isCreating = editingId === 'new';
+      const url = isCreating ? '/api/jornadas' : `/api/jornadas/${editingId}`;
+      const method = isCreating ? 'POST' : 'PATCH';
+
+      const response = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(jornadaBody),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        const errorMsg = errorData.error || errorData.message || 'Error al guardar jornada';
+        toast.error(errorMsg);
+        return;
+      }
+
+      const result = await response.json();
+      const jornadaIdFinal = isCreating ? result.data?.id : editingId;
+
+      // 2. Asignar empleados si hay nivel de asignación
+      if (jornadaIdFinal && (nivelAsignacion || empleadosSeleccionados.length > 0 || equipoSeleccionado)) {
+        const asignacionBody: any = {
+          jornadaId: jornadaIdFinal,
+          nivel: nivelAsignacion,
+        };
+
+        if (nivelAsignacion === 'individual') {
+          asignacionBody.empleadosIds = empleadosSeleccionados;
+        } else if (nivelAsignacion === 'equipo') {
+          asignacionBody.equipoId = equipoSeleccionado;
+        }
+
+        const asignacionResponse = await fetch('/api/jornadas/asignar', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(asignacionBody),
+        });
+
+        if (!asignacionResponse.ok) {
+          const errorData = await asignacionResponse.json().catch(() => ({}));
+          const errorMsg = errorData.error || errorData.message || 'Error al asignar jornada';
+          toast.error(errorMsg);
+          return;
+        }
+      }
+
+      toast.success(isCreating ? 'Jornada creada' : 'Jornada actualizada');
+
+      // Refrescar lista y cerrar edición
+      await refetchJornadas('/api/jornadas');
+      setEditingId(null);
+    } catch (error) {
+      console.error('Error guardando jornada:', error);
+      toast.error('Error inesperado al guardar');
+    } finally {
+      setGuardando(false);
+    }
+  }
+
   async function handleEliminar(jornadaId: string) {
     if (!confirm('¿Estás seguro de eliminar esta jornada?')) return;
 
     try {
       await eliminarJornada(`/api/jornadas/${jornadaId}`, undefined);
       toast.success('Jornada eliminada');
-      setExpandedId(null);
+      setEditingId(null);
       refetchJornadas('/api/jornadas');
     } catch (error) {
       toast.error('Error al eliminar la jornada');
@@ -196,7 +424,6 @@ export function JornadasModal({ open, onClose }: JornadasModalProps) {
   function renderAsignados(jornada: Jornada) {
     const numEmpleados = jornada._count?.empleados || 0;
 
-    // Caso 1: Toda la empresa
     if (jornada.nivelAsignacion === 'empresa') {
       return (
         <span className="text-sm text-gray-900 font-medium">
@@ -205,7 +432,6 @@ export function JornadasModal({ open, onClose }: JornadasModalProps) {
       );
     }
 
-    // Caso 2: Por equipos
     if (jornada.nivelAsignacion === 'equipo' && jornada.equiposAsignados && jornada.equiposAsignados.length > 0) {
       return (
         <span className="text-sm text-gray-900">
@@ -214,7 +440,6 @@ export function JornadasModal({ open, onClose }: JornadasModalProps) {
       );
     }
 
-    // Caso 3: Empleados individuales
     if (jornada.empleadosPreview && jornada.empleadosPreview.length > 0) {
       return (
         <EmployeeListPreview
@@ -232,13 +457,14 @@ export function JornadasModal({ open, onClose }: JornadasModalProps) {
       );
     }
 
-    // Sin asignación
     return (
       <span className="text-sm text-gray-500">
         Sin asignar
       </span>
     );
   }
+
+  const isCreating = editingId === 'new';
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
@@ -251,7 +477,7 @@ export function JornadasModal({ open, onClose }: JornadasModalProps) {
           {/* Tabla de jornadas */}
           {loading ? (
             <div className="text-center py-8 text-gray-500">Cargando...</div>
-          ) : jornadas.length === 0 ? (
+          ) : jornadas.length === 0 && !isCreating ? (
             <EmptyState
               icon={CalendarX}
               title="No hay jornadas configuradas"
@@ -268,29 +494,62 @@ export function JornadasModal({ open, onClose }: JornadasModalProps) {
                 </TableRow>
               </TableHeader>
               <TableBody>
+                {/* Fila de crear nueva jornada */}
+                {isCreating && (
+                  <TableRow>
+                    <TableCell colSpan={4} className="p-0">
+                      <div className="p-6">
+                        <h3 className="text-lg font-semibold mb-4">Crear Nueva Jornada</h3>
+                        <JornadaFormFields
+                          data={formData}
+                          onChange={setFormData}
+                          errors={errors}
+                          disabled={guardando}
+                          showAsignacion={true}
+                          nivelAsignacion={nivelAsignacion}
+                          onNivelAsignacionChange={setNivelAsignacion}
+                          empleados={empleados}
+                          empleadosSeleccionados={empleadosSeleccionados}
+                          onEmpleadosSeleccionChange={setEmpleadosSeleccionados}
+                          equipos={equipos}
+                          equipoSeleccionado={equipoSeleccionado}
+                          onEquipoSeleccionadoChange={setEquipoSeleccionado}
+                        />
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                )}
+
+                {/* Filas de jornadas existentes */}
                 {jornadas.map((jornada) => (
                   <Fragment key={jornada.id}>
                     <TableRow
-                      className="cursor-pointer hover:bg-gray-50"
-                      onClick={() => setExpandedId(expandedId === jornada.id ? null : jornada.id)}
+                      className={`cursor-pointer hover:bg-gray-50 ${editingId === jornada.id ? 'bg-gray-50' : ''}`}
+                      onClick={() => {
+                        if (editingId === jornada.id) {
+                          setEditingId(null);
+                        } else {
+                          handleEditarJornada(jornada);
+                        }
+                      }}
                     >
                       <TableCell>{getTipoBadge(jornada)}</TableCell>
                       <TableCell className="font-medium">{jornada.horasSemanales}h</TableCell>
                       <TableCell>{renderAsignados(jornada)}</TableCell>
                       <TableCell>
                         <Button variant="ghost" size="sm">
-                          {expandedId === jornada.id ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                          {editingId === jornada.id ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                         </Button>
                       </TableCell>
                     </TableRow>
 
-                    {/* Fila expandida con detalles */}
-                    {expandedId === jornada.id && (
+                    {/* Fila expandida con formulario de edición */}
+                    {editingId === jornada.id && (
                       <TableRow>
                         <TableCell colSpan={4} className="p-0">
-                          <div className="p-6 border-t bg-gray-50">
+                          <div className="p-6 border-t">
                             <div className="flex items-center justify-between mb-4">
-                              <h3 className="text-lg font-semibold">Detalles de la jornada</h3>
+                              <h3 className="text-lg font-semibold">Editar Jornada</h3>
                               {!jornada.esPredefinida && (
                                 <Button
                                   variant="outline"
@@ -306,53 +565,21 @@ export function JornadasModal({ open, onClose }: JornadasModalProps) {
                                 </Button>
                               )}
                             </div>
-
-                            {/* Mostrar detalles de configuración */}
-                            <div className="space-y-3 text-sm">
-                              <div>
-                                <span className="font-medium text-gray-700">Tipo:</span>{' '}
-                                <span className="text-gray-900">{getTipoBadge(jornada)}</span>
-                              </div>
-                              <div>
-                                <span className="font-medium text-gray-700">Horas semanales:</span>{' '}
-                                <span className="text-gray-900">{jornada.horasSemanales}h</span>
-                              </div>
-                              {jornada.config?.descanso && (
-                                <div>
-                                  <span className="font-medium text-gray-700">Descanso:</span>{' '}
-                                  <span className="text-gray-900">{jornada.config.descanso} minutos</span>
-                                </div>
-                              )}
-
-                              {/* Días laborables */}
-                              <div>
-                                <span className="font-medium text-gray-700">Días laborables:</span>
-                                <div className="flex gap-2 mt-2">
-                                  {DIA_KEYS.map((dia) => {
-                                    const diaConfig = getDiaConfig(jornada.config, dia);
-                                    const activo = diaConfig?.activo ?? false;
-                                    return (
-                                      <div key={dia} className="flex flex-col items-center gap-1">
-                                        <span
-                                          className={`w-8 h-8 rounded-md text-xs font-semibold flex items-center justify-center border ${
-                                            activo
-                                              ? 'bg-gray-900 text-white border-gray-900'
-                                              : 'bg-white text-gray-400 border-gray-200'
-                                          }`}
-                                        >
-                                          {DIA_INICIAL[dia]}
-                                        </span>
-                                        {activo && diaConfig?.entrada && diaConfig?.salida && (
-                                          <span className="text-[10px] text-gray-600">
-                                            {diaConfig.entrada}-{diaConfig.salida}
-                                          </span>
-                                        )}
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              </div>
-                            </div>
+                            <JornadaFormFields
+                              data={formData}
+                              onChange={setFormData}
+                              errors={errors}
+                              disabled={guardando || jornada.esPredefinida}
+                              showAsignacion={true}
+                              nivelAsignacion={nivelAsignacion}
+                              onNivelAsignacionChange={setNivelAsignacion}
+                              empleados={empleados}
+                              empleadosSeleccionados={empleadosSeleccionados}
+                              onEmpleadosSeleccionChange={setEmpleadosSeleccionados}
+                              equipos={equipos}
+                              equipoSeleccionado={equipoSeleccionado}
+                              onEquipoSeleccionadoChange={setEquipoSeleccionado}
+                            />
                           </div>
                         </TableCell>
                       </TableRow>
@@ -365,16 +592,30 @@ export function JornadasModal({ open, onClose }: JornadasModalProps) {
         </DialogBody>
 
         <DialogFooter className="gap-2">
-          <Button onClick={onClose} variant="outline">
-            Cerrar
-          </Button>
-          <Button onClick={() => {
-            // Navegar a la página de gestión de jornadas para crear/editar
-            window.location.href = '/hr/horario/jornadas';
-          }} className="gap-2">
-            <Plus className="w-4 h-4" />
-            Nueva Jornada
-          </Button>
+          {editingId ? (
+            <>
+              <Button
+                variant="outline"
+                onClick={() => setEditingId(null)}
+                disabled={guardando}
+              >
+                Cancelar
+              </Button>
+              <LoadingButton onClick={handleGuardar} loading={guardando}>
+                {isCreating ? 'Crear Jornada' : 'Guardar Cambios'}
+              </LoadingButton>
+            </>
+          ) : (
+            <>
+              <Button onClick={onClose} variant="outline">
+                Cerrar
+              </Button>
+              <Button onClick={handleNuevaJornada} className="gap-2">
+                <Plus className="w-4 h-4" />
+                Nueva Jornada
+              </Button>
+            </>
+          )}
         </DialogFooter>
       </DialogScrollableContent>
     </Dialog>
