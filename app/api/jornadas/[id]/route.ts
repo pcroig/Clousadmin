@@ -100,6 +100,7 @@ export async function PATCH(
       horasSemanales: validatedData.horasSemanales,
     };
 
+    // NOTE: 'tipo' se guarda dentro de config.tipo, no como campo separado
     if (validatedData.config) {
       dataToUpdate.config = asJsonValue(validatedData.config as JornadaConfig);
     }

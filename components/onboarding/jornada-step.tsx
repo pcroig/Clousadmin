@@ -4,8 +4,8 @@
 // Jornada Step - Onboarding (Múltiples Jornadas)
 // ========================================
 
-import { AlertCircle, ChevronDown, Loader2, Plus, Trash2 } from 'lucide-react';
-import { forwardRef, useEffect, useImperativeHandle, useMemo, useState } from 'react';
+import { AlertCircle, ChevronDown, Plus, Trash2 } from 'lucide-react';
+import { forwardRef, useEffect, useImperativeHandle, useState } from 'react';
 import { toast } from 'sonner';
 
 import {
@@ -47,7 +47,8 @@ function createDefaultJornada(): JornadaFormData {
       sabado: { activo: false, entrada: '', salida: '' },
       domingo: { activo: false, entrada: '', salida: '' },
     },
-    descansoMinutos: '',
+    tieneDescanso: true,
+    descansoMinutos: '60',
   };
 }
 
@@ -117,10 +118,10 @@ export const JornadaStep = forwardRef<JornadaStepHandle, JornadaStepProps>(funct
 
         const empleadosArray = Array.isArray(empleadosData.data) ? empleadosData.data : [];
         const equiposArray = Array.isArray(equiposData.data)
-          ? equiposData.data.map((eq: any) => ({
-              id: eq.id,
-              nombre: eq.nombre,
-              miembros: eq._count?.miembros || 0,
+          ? (equiposData.data as Array<Record<string, unknown>>).map((eq) => ({
+              id: eq.id as string,
+              nombre: eq.nombre as string,
+              miembros: ((eq._count as Record<string, unknown>)?.empleado_equipos as number) || (eq.numeroMiembros as number) || 0,
             }))
           : [];
 
@@ -227,6 +228,38 @@ export const JornadaStep = forwardRef<JornadaStepHandle, JornadaStepProps>(funct
     const newErrors: Record<number, Record<string, string>> = {};
     let isValid = true;
 
+    // Validar que no haya más de una jornada con nivel "empresa" (todos los empleados)
+    const jornadasEmpresa = Object.entries(asignaciones).filter(([_, asignacion]) => asignacion.nivel === 'empresa');
+    if (jornadasEmpresa.length > 1) {
+      toast.error('Solo puede haber una jornada asignada a toda la empresa. Las demás deben ser para equipos o empleados específicos.');
+      isValid = false;
+    }
+
+    // Validar conflictos de equipos duplicados
+    const equiposUsados = new Set<string>();
+    Object.entries(asignaciones).forEach(([index, asignacion]) => {
+      if (asignacion.nivel === 'equipo' && asignacion.equipoId) {
+        if (equiposUsados.has(asignacion.equipoId)) {
+          toast.error(`El equipo seleccionado en la jornada ${parseInt(index) + 1} ya está asignado a otra jornada`);
+          isValid = false;
+        }
+        equiposUsados.add(asignacion.equipoId);
+      }
+    });
+
+    // Validar conflictos de empleados individuales
+    const empleadosUsados = new Set<string>();
+    Object.entries(asignaciones).forEach(([index, asignacion]) => {
+      if (asignacion.nivel === 'individual' && asignacion.empleadoIds) {
+        const empleadosDuplicados = asignacion.empleadoIds.filter(id => empleadosUsados.has(id));
+        if (empleadosDuplicados.length > 0) {
+          toast.error(`Algunos empleados de la jornada ${parseInt(index) + 1} ya están asignados a otra jornada`);
+          isValid = false;
+        }
+        asignacion.empleadoIds.forEach(id => empleadosUsados.add(id));
+      }
+    });
+
     jornadas.forEach((jornada, index) => {
       const jornadaErrors: Record<string, string> = {};
 
@@ -299,7 +332,7 @@ export const JornadaStep = forwardRef<JornadaStepHandle, JornadaStepProps>(funct
 
         // Build config object
         const config: JornadaConfig = {};
-        const descansoMinutos = parseInt(jornada.descansoMinutos || '0', 10);
+        const descansoMinutos = jornada.tieneDescanso ? parseInt(jornada.descansoMinutos || '0', 10) : 0;
 
         if (jornada.tipoJornada === 'fija') {
           DIA_KEYS.forEach((dia) => {
@@ -361,16 +394,28 @@ export const JornadaStep = forwardRef<JornadaStepHandle, JornadaStepProps>(funct
       }
 
       // Asignar jornadas según configuración
+      // IMPORTANTE: Procesar primero las jornadas específicas (equipos/individuales)
+      // y al final la jornada de empresa (para no sobrescribir)
       const asignacionesFallidas: number[] = [];
+      const asignacionesOrdenadas = Object.entries(asignaciones)
+        .map(([index, asignacion]) => ({ index: parseInt(index), asignacion }))
+        .sort((a, b) => {
+          // Prioridad: individual (1), equipo (2), empresa (3)
+          const prioridad = { individual: 1, equipo: 2, empresa: 3 };
+          return prioridad[a.asignacion.nivel] - prioridad[b.asignacion.nivel];
+        });
 
-      for (let i = 0; i < createdJornadaIds.length; i++) {
-        const jornadaId = createdJornadaIds[i];
-        const asignacion = asignaciones[i];
-
-        if (!asignacion) continue;
+      for (const { index, asignacion } of asignacionesOrdenadas) {
+        const jornadaId = createdJornadaIds[index];
+        if (!jornadaId || !asignacion) continue;
 
         try {
-          const payload: any = {
+          const payload: {
+            jornadaId: string;
+            nivel: NivelAsignacion;
+            equipoIds?: string[];
+            empleadoIds?: string[];
+          } = {
             jornadaId,
             nivel: asignacion.nivel,
           };
@@ -389,12 +434,12 @@ export const JornadaStep = forwardRef<JornadaStepHandle, JornadaStepProps>(funct
 
           if (!asignacionResponse.ok) {
             const errorData = await asignacionResponse.json().catch(() => ({}));
-            console.error(`Error al asignar jornada ${i + 1}:`, errorData);
-            asignacionesFallidas.push(i + 1);
+            console.error(`Error al asignar jornada ${index + 1}:`, errorData);
+            asignacionesFallidas.push(index + 1);
           }
         } catch (error) {
-          console.error(`Excepción al asignar jornada ${i + 1}:`, error);
-          asignacionesFallidas.push(i + 1);
+          console.error(`Excepción al asignar jornada ${index + 1}:`, error);
+          asignacionesFallidas.push(index + 1);
         }
       }
 

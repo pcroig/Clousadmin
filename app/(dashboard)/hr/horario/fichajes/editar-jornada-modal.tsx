@@ -79,9 +79,20 @@ interface EditarJornadaModalProps {
   modo: 'crear' | 'editar';
   jornada: JornadaDetalle | null;
   onClose: () => void;
+  prefilledNivelAsignacion?: 'empresa' | 'equipo' | 'individual';
+  prefilledEmpleadosIds?: string[];
+  prefilledEquipoId?: string;
 }
 
-export function EditarJornadaModal({ open, modo, jornada, onClose }: EditarJornadaModalProps) {
+export function EditarJornadaModal({
+  open,
+  modo,
+  jornada,
+  onClose,
+  prefilledNivelAsignacion,
+  prefilledEmpleadosIds,
+  prefilledEquipoId,
+}: EditarJornadaModalProps) {
   // Estados del formulario unificado
   const [formData, setFormData] = useState<JornadaFormData>({
     // NOTE: 'nombre' field has been removed
@@ -96,15 +107,18 @@ export function EditarJornadaModal({ open, modo, jornada, onClose }: EditarJorna
       sabado: { activo: false, entrada: '', salida: '' },
       domingo: { activo: false, entrada: '', salida: '' },
     },
-    descansoMinutos: '',
+    tieneDescanso: true,
+    descansoMinutos: '60',
   });
 
   // Estados de asignación
   const [empleados, setEmpleados] = useState<Empleado[]>([]);
-  const [empleadosSeleccionados, setEmpleadosSeleccionados] = useState<string[]>([]);
-  const [nivelAsignacion, setNivelAsignacion] = useState<'empresa' | 'equipo' | 'individual'>('empresa');
+  const [empleadosSeleccionados, setEmpleadosSeleccionados] = useState<string[]>(prefilledEmpleadosIds ?? []);
+  const [nivelAsignacion, setNivelAsignacion] = useState<'empresa' | 'equipo' | 'individual'>(
+    prefilledNivelAsignacion ?? 'empresa'
+  );
   const [equipos, setEquipos] = useState<{ id: string; nombre: string; miembros: number }[]>([]);
-  const [equipoSeleccionado, setEquipoSeleccionado] = useState<string>('');
+  const [equipoSeleccionado, setEquipoSeleccionado] = useState<string>(prefilledEquipoId ?? '');
   
   // Estados de UI
   const [cargando, setCargando] = useState(false);
@@ -148,6 +162,8 @@ export function EditarJornadaModal({ open, modo, jornada, onClose }: EditarJorna
 
         // Calcular minutos de descanso desde pausa_inicio y pausa_fin
         let descansoMinutos = '';
+        let tieneDescanso = false;
+        
         if (esFija) {
           const primerDiaConPausa = DIA_KEYS.find((dia) => {
             const diaConfig = getDiaConfig(config, dia);
@@ -160,13 +176,16 @@ export function EditarJornadaModal({ open, modo, jornada, onClose }: EditarJorna
               const [h2, m2] = diaConfig.pausa_fin.split(':').map(Number);
               const minutos = (h2 * 60 + m2) - (h1 * 60 + m1);
               descansoMinutos = minutos.toString();
+              tieneDescanso = minutos > 0;
             }
           }
         } else {
           const descansoMinimo = typeof config?.descansoMinimo === 'string' ? config.descansoMinimo : '';
           if (descansoMinimo) {
             const [h, m] = descansoMinimo.split(':').map(Number);
-            descansoMinutos = (h * 60 + m).toString();
+            const minutos = h * 60 + m;
+            descansoMinutos = minutos.toString();
+            tieneDescanso = minutos > 0;
           }
         }
 
@@ -176,6 +195,7 @@ export function EditarJornadaModal({ open, modo, jornada, onClose }: EditarJorna
           horasSemanales: jornada.horasSemanales.toString(),
           // NOTE: limiteInferior/Superior removed (now global in Empresa.config)
           horariosFijos: newHorariosFijos,
+          tieneDescanso,
           descansoMinutos,
         });
       } else {
@@ -186,7 +206,16 @@ export function EditarJornadaModal({ open, modo, jornada, onClose }: EditarJorna
       cargarEmpleados();
       cargarEquipos();
     }
-  }, [open, modo, jornada]);
+  }, [open, modo, jornada, prefilledEmpleadosIds, prefilledEquipoId, prefilledNivelAsignacion]);
+
+  useEffect(() => {
+    if (!open) return;
+    if (modo === 'crear') {
+      setNivelAsignacion(prefilledNivelAsignacion ?? 'empresa');
+      setEmpleadosSeleccionados(prefilledEmpleadosIds ?? []);
+      setEquipoSeleccionado(prefilledEquipoId ?? '');
+    }
+  }, [open, modo, prefilledEmpleadosIds, prefilledEquipoId, prefilledNivelAsignacion]);
 
   async function cargarEmpleados() {
     try {
@@ -206,17 +235,23 @@ export function EditarJornadaModal({ open, modo, jornada, onClose }: EditarJorna
 
   async function cargarEquipos() {
     try {
-      const response = await fetch('/api/organizacion/equipos');
+      const response = await fetch('/api/equipos');
       if (response.ok) {
         const data = await response.json() as Record<string, unknown>;
-        const equiposArray = Array.isArray(data) ? data : [];
+        const equiposData = (data as { data?: unknown[] }).data || [];
+        const equiposArray = Array.isArray(equiposData) ? equiposData : [];
         setEquipos(
           equiposArray.map((equipo: unknown) => {
-            const e = equipo as { id: string; nombre: string; _count?: { miembros?: number } };
+            const e = equipo as { 
+              id: string; 
+              nombre: string; 
+              _count?: { empleado_equipos?: number }; 
+              numeroMiembros?: number;
+            };
             return {
               id: e.id,
               nombre: e.nombre,
-              miembros: e._count?.miembros ?? 0,
+              miembros: e._count?.empleado_equipos || e.numeroMiembros || 0,
             };
           })
         );
@@ -241,11 +276,12 @@ export function EditarJornadaModal({ open, modo, jornada, onClose }: EditarJorna
         sabado: { activo: false, entrada: '', salida: '' },
         domingo: { activo: false, entrada: '', salida: '' },
       },
-      descansoMinutos: '',
+      tieneDescanso: true,
+      descansoMinutos: '60',
     });
-    setNivelAsignacion('empresa');
-    setEmpleadosSeleccionados([]);
-    setEquipoSeleccionado('');
+    setNivelAsignacion(prefilledNivelAsignacion ?? 'empresa');
+    setEmpleadosSeleccionados(prefilledEmpleadosIds ?? []);
+    setEquipoSeleccionado(prefilledEquipoId ?? '');
     setErrors({});
   }
 
@@ -330,8 +366,8 @@ export function EditarJornadaModal({ open, modo, jornada, onClose }: EditarJorna
       // Construir configuración
       const config: JornadaConfig = {};
       
-      // Convertir minutos de descanso a formato de pausa
-      const descansoMinutos = parseInt(formData.descansoMinutos || '0', 10);
+      // Convertir minutos de descanso a formato de pausa (solo si está habilitado)
+      const descansoMinutos = formData.tieneDescanso ? parseInt(formData.descansoMinutos || '0', 10) : 0;
       
       if (formData.tipoJornada === 'fija') {
         DIA_KEYS.forEach((dia) => {
@@ -529,21 +565,18 @@ export function EditarJornadaModal({ open, modo, jornada, onClose }: EditarJorna
           />
         </DialogBody>
 
-        <DialogFooter className="gap-2">
+        <DialogFooter className="gap-2 justify-end">
           {modo === 'editar' && !esPredefinida && (
             <Button
-              variant="destructive"
+              variant="outline"
               onClick={handleEliminar}
               disabled={cargando}
-              className="mr-auto"
+              className="border-red-200 text-red-600 hover:text-red-700 hover:border-red-300 hover:bg-red-50"
             >
               <Trash2 className="w-4 h-4 mr-2" />
               Eliminar
             </Button>
           )}
-          <Button variant="outline" onClick={onClose} disabled={cargando}>
-            Cancelar
-          </Button>
           {!esPredefinida && (
             <LoadingButton onClick={handleGuardar} loading={cargando}>
               {modo === 'crear' ? 'Crear Jornada' : 'Guardar Cambios'}
@@ -559,23 +592,23 @@ export function EditarJornadaModal({ open, modo, jornada, onClose }: EditarJorna
             <AlertDialogTitle>Jornadas previas detectadas</AlertDialogTitle>
             <AlertDialogDescription>
               {jornadasPreviasInfo?.nivel === 'empresa' && (
-                <p className="mb-2">
+                <span className="block mb-2">
                   Ya existe una jornada asignada a toda la empresa. Al asignar esta nueva jornada, se reemplazará la jornada anterior.
-                </p>
+                </span>
               )}
               {jornadasPreviasInfo?.nivel === 'equipo' && (
-                <p className="mb-2">
+                <span className="block mb-2">
                   Los empleados del equipo seleccionado ya tienen jornadas asignadas. Al asignar esta nueva jornada, se reemplazarán las jornadas anteriores.
-                </p>
+                </span>
               )}
               {jornadasPreviasInfo?.nivel === 'individual' && (
-                <p className="mb-2">
+                <span className="block mb-2">
                   Los empleados seleccionados ya tienen jornadas asignadas. Al asignar esta nueva jornada, se reemplazarán las jornadas anteriores.
-                </p>
+                </span>
               )}
-              
+
               <div className="mt-3">
-                <p className="font-medium mb-2">Empleados afectados:</p>
+                <span className="font-medium block mb-2">Empleados afectados:</span>
                 <ul className="list-disc list-inside space-y-1 text-sm">
                   {jornadasPreviasInfo?.jornadas.map((j, idx) => (
                     <li key={idx}>
@@ -584,10 +617,10 @@ export function EditarJornadaModal({ open, modo, jornada, onClose }: EditarJorna
                   ))}
                 </ul>
               </div>
-              
-              <p className="mt-4 text-sm font-medium">
+
+              <span className="block mt-4 text-sm font-medium">
                 ¿Deseas continuar y reemplazar las jornadas anteriores?
-              </p>
+              </span>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

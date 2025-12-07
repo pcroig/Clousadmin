@@ -40,7 +40,7 @@ export const CalendarioStep = forwardRef<CalendarioStepHandle, CalendarioStepPro
   const [festivoEditor, setFestivoEditor] = useState<FestivoEditorState | null>(null);
   const [festivosRefreshKey, setFestivosRefreshKey] = useState(0);
   const [processingFestivos, setProcessingFestivos] = useState(false);
-  const [saving, setSaving] = useState(false);
+  const [_saving, _setSaving] = useState(false);
   const [importandoNacionales, setImportandoNacionales] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const nacionalesImportadosRef = useRef(false);
@@ -151,7 +151,7 @@ export const CalendarioStep = forwardRef<CalendarioStepHandle, CalendarioStepPro
   }
 
   const guardar = async (): Promise<boolean> => {
-    setSaving(true);
+    _setSaving(true);
     try {
       const response = await fetch('/api/empresa/calendario-laboral', {
         method: 'PATCH',
@@ -174,7 +174,7 @@ export const CalendarioStep = forwardRef<CalendarioStepHandle, CalendarioStepPro
       toast.error('Error al guardar calendario');
       return false;
     } finally {
-      setSaving(false);
+      _setSaving(false);
     }
   };
 
@@ -268,28 +268,37 @@ export const CalendarioStep = forwardRef<CalendarioStepHandle, CalendarioStepPro
         >
           <div className="flex flex-wrap items-center gap-4 md:justify-between">
             <TabsList className="w-auto flex-shrink-0">
-              <TabsTrigger value="calendario">Calendario visual</TabsTrigger>
-              <TabsTrigger value="lista">Lista de festivos</TabsTrigger>
+              <TabsTrigger value="calendario">Calendario</TabsTrigger>
+              <TabsTrigger value="lista">Festivos</TabsTrigger>
             </TabsList>
 
             <div className="flex items-center gap-2">
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".ics,.csv"
-                className="hidden"
-                onChange={handleArchivoFestivosChange}
-              />
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => handleCreateFestivoInline()}
+                disabled={processingFestivos}
+              >
+                Añadir festivo
+              </Button>
               <Button
                 size="sm"
                 variant="outline"
                 onClick={() => fileInputRef.current?.click()}
                 disabled={processingFestivos}
               >
-                {processingFestivos ? 'Importando...' : 'Importar calendario'}
+                {processingFestivos ? 'Importando...' : 'Importar'}
               </Button>
             </div>
           </div>
+
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".ics,.csv"
+            className="hidden"
+            onChange={handleArchivoFestivosChange}
+          />
 
           <TabsContent value="calendario" className="space-y-4">
             <CalendarioFestivosLegend />
@@ -312,6 +321,7 @@ export const CalendarioStep = forwardRef<CalendarioStepHandle, CalendarioStepPro
               onEditorClose={handleCloseEditor}
               onCreateRequest={() => handleCreateFestivoInline()}
               onEditRequest={handleEditFestivoInline}
+              showCreateButton={false}
             />
           </TabsContent>
         </Tabs>
