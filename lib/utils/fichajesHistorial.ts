@@ -219,7 +219,14 @@ export function agruparFichajesEnJornadas(
         }
       }
 
-      const balance = Number((horasTrabajadas - horasObjetivo).toFixed(2));
+      // FIX: Usar horasEsperadas del fichaje (0 para extraordinarios) en lugar del parámetro
+      const horasEsperadasFichaje = typeof fichajeBase.horasEsperadas === 'number'
+        ? fichajeBase.horasEsperadas
+        : typeof fichajeBase.horasEsperadas === 'string'
+          ? Number(fichajeBase.horasEsperadas)
+          : horasObjetivo;
+
+      const balance = Number((horasTrabajadas - horasEsperadasFichaje).toFixed(2));
       const { fechaDate } = normalizarFecha(fichajeBase.fecha);
 
       const fichajeNormalizado: FichajeNormalizado = {
@@ -234,7 +241,7 @@ export function agruparFichajesEnJornadas(
         fecha: fechaDate,
         fichaje: fichajeNormalizado,
         horasTrabajadas,
-        horasObjetivo,
+        horasObjetivo: horasEsperadasFichaje, // FIX: Usar horas esperadas reales del fichaje
         entrada,
         salida,
         balance,

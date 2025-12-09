@@ -69,6 +69,7 @@ type CompanyQueryRow = {
   id: string;
   nombre: string;
   activo: boolean;
+  deletedAt: Date | null;
   createdAt: Date;
   subscriptions?: {
     id: string;
@@ -90,6 +91,7 @@ async function getCompanyRows(): Promise<CompanyStatusRow[]> {
           id: true,
           nombre: true,
           activo: true,
+          deletedAt: true,
           createdAt: true,
           ...(includeSubscriptions
             ? {
@@ -131,6 +133,7 @@ async function getCompanyRows(): Promise<CompanyStatusRow[]> {
       id: company.id,
       nombre: company.nombre,
       activo: company.activo,
+      deletedAt: company.deletedAt ? company.deletedAt.toISOString() : null,
       createdAt: company.createdAt.toISOString(),
       activeEmployees: employeeMap[company.id] ?? 0,
       subscription: latestSubscription

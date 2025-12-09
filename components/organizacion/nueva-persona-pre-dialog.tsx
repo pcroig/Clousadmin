@@ -28,7 +28,14 @@ export function NuevaPersonaPreDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl">
+      <DialogContent
+        className="sm:max-w-2xl"
+        // Evita que el auto-focus caiga en el primer botón y muestre el ring inicial
+        onOpenAutoFocus={(event) => {
+          event.preventDefault();
+          event.currentTarget.focus();
+        }}
+      >
         <DialogHeader>
           <DialogTitle className="text-center text-xl">Nueva Persona</DialogTitle>
         </DialogHeader>
@@ -38,9 +45,9 @@ export function NuevaPersonaPreDialog({
           <button
             onClick={() => handleSelect('nuevo')}
             className={cn(
-              'group relative flex flex-col items-center gap-4 p-6 rounded-lg border border-gray-200 transition-all',
+              'group relative flex flex-col items-center gap-4 p-6 rounded-lg border-2 border-gray-200 transition-all',
               'hover:border-primary hover:bg-primary/5 hover:shadow-md',
-              'focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2'
+              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2'
             )}
           >
             <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
@@ -58,9 +65,9 @@ export function NuevaPersonaPreDialog({
           <button
             onClick={() => handleSelect('existente')}
             className={cn(
-              'group relative flex flex-col items-center gap-4 p-6 rounded-lg border border-gray-200 transition-all',
+              'group relative flex flex-col items-center gap-4 p-6 rounded-lg border-2 border-gray-200 transition-all',
               'hover:border-primary hover:bg-primary/5 hover:shadow-md',
-              'focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2'
+              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2'
             )}
           >
             <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
@@ -69,7 +76,7 @@ export function NuevaPersonaPreDialog({
             <div className="text-center">
               <h3 className="font-semibold text-gray-900 mb-1">Empleado Existente</h3>
               <p className="text-sm text-gray-600">
-                Activar onboarding para empleado ya registrado
+                Importar o añadir manualmente datos del empleado
               </p>
             </div>
           </button>

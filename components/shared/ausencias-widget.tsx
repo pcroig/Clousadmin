@@ -131,7 +131,7 @@ export const AusenciasWidget = memo(function AusenciasWidget({
                           className="h-7 w-7 text-gray-400 hover:text-gray-600"
                           onClick={(e) => {
                             e.stopPropagation();
-                            window.open(ausencia.justificanteUrl!, '_blank', 'noopener,noreferrer');
+                            window.open(`/api/ausencias/${ausencia.id}/justificante?inline=1`, '_blank', 'noopener,noreferrer');
                           }}
                         >
                           <Paperclip className="h-4 w-4" />
@@ -257,7 +257,7 @@ export const AusenciasWidget = memo(function AusenciasWidget({
                           className="h-6 w-6 text-gray-400 hover:text-gray-600"
                           onClick={(e) => {
                             e.stopPropagation();
-                            window.open(ausencia.justificanteUrl!, '_blank', 'noopener,noreferrer');
+                            window.open(`/api/ausencias/${ausencia.id}/justificante?inline=1`, '_blank', 'noopener,noreferrer');
                           }}
                         >
                           <Paperclip className="h-3.5 w-3.5" />
@@ -307,7 +307,7 @@ export const AusenciasWidget = memo(function AusenciasWidget({
                           className="h-6 w-6 text-gray-400 hover:text-gray-600"
                           onClick={(e) => {
                             e.stopPropagation();
-                            window.open(ausencia.justificanteUrl!, '_blank', 'noopener,noreferrer');
+                            window.open(`/api/ausencias/${ausencia.id}/justificante?inline=1`, '_blank', 'noopener,noreferrer');
                           }}
                         >
                           <Paperclip className="h-3.5 w-3.5" />

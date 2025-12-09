@@ -24,7 +24,11 @@ import { TIPOS_AUTO_APROBABLES, TIPOS_DESCUENTAN_SALDO } from '@/lib/constants/a
 import { EstadoAusencia, UsuarioRol } from '@/lib/constants/enums';
 import { eliminarDocumentoPorId } from '@/lib/documentos';
 import { CalendarManager } from '@/lib/integrations/calendar/calendar-manager';
-import { crearNotificacionAusenciaAutoAprobada, crearNotificacionAusenciaSolicitada } from '@/lib/notificaciones';
+import {
+  crearNotificacionAusenciaAprobada,
+  crearNotificacionAusenciaAutoAprobada,
+  crearNotificacionAusenciaSolicitada,
+} from '@/lib/notificaciones';
 import { prisma } from '@/lib/prisma';
 import { asJsonValue, JSON_NULL } from '@/lib/prisma/json';
 import {
@@ -457,7 +461,9 @@ export async function POST(req: NextRequest) {
     }
 
     // Determinar si la ausencia es auto-aprobable
-    const esAutoAprobable = TIPOS_AUTO_APROBABLES.includes(validatedData.tipo);
+    // Si HR Admin crea la ausencia, se aprueba automáticamente sin importar el tipo
+    const esHRAdmin = session.user.rol === UsuarioRol.hr_admin;
+    const esAutoAprobable = TIPOS_AUTO_APROBABLES.includes(validatedData.tipo) || esHRAdmin;
     const estadoInicial = esAutoAprobable
       ? determinarEstadoTrasAprobacion(fechaFin)
       : EstadoAusencia.pendiente;
@@ -490,14 +496,37 @@ export async function POST(req: NextRequest) {
             throw new SaldoInsuficienteError(validacion.saldoActual, validacion.mensaje);
           }
 
-          const saldoResult = await actualizarSaldo(
-            empleadoId,
-            año,
-            'solicitar',
-            diasSolicitadosFinal,
-            tx
-          );
-          diasDesdeCarryOver = saldoResult.diasDesdeCarryOver;
+          // Si es auto-aprobable (incluyendo HR Admin), aprobar directamente
+          // Si no, solo marcar como pendiente
+          if (esAutoAprobable) {
+            // Primero solicitar (incrementa pendientes)
+            const saldoSolicitar = await actualizarSaldo(
+              empleadoId,
+              año,
+              'solicitar',
+              diasSolicitadosFinal,
+              tx
+            );
+            // Luego aprobar (mueve de pendientes a usados)
+            const saldoAprobar = await actualizarSaldo(
+              empleadoId,
+              año,
+              'aprobar',
+              diasSolicitadosFinal,
+              tx,
+              { diasDesdeCarryOver: saldoSolicitar.diasDesdeCarryOver }
+            );
+            diasDesdeCarryOver = saldoAprobar.diasDesdeCarryOver;
+          } else {
+            const saldoResult = await actualizarSaldo(
+              empleadoId,
+              año,
+              'solicitar',
+              diasSolicitadosFinal,
+              tx
+            );
+            diasDesdeCarryOver = saldoResult.diasDesdeCarryOver;
+          }
         }
 
         return tx.ausencias.create({
@@ -545,23 +574,51 @@ export async function POST(req: NextRequest) {
 
     // Actualizar saldo y crear notificaciones según si fue auto-aprobada o requiere aprobación
     if (esAutoAprobable) {
-      try {
-        await crearNotificacionAusenciaAutoAprobada(
-          prisma,
-          {
-            ausenciaId: ausencia.id,
-            empresaId: session.user.empresaId,
-            empleadoId,
-            empleadoNombre: `${ausencia.empleado.nombre} ${ausencia.empleado.apellidos}`,
-            managerId: ausencia.empleado.managerId,
-            tipo: ausencia.tipo,
-            fechaInicio: ausencia.fechaInicio,
-            fechaFin: ausencia.fechaFin,
-          },
-          { actorUsuarioId: session.user.id }
-        );
-      } catch (error) {
-        console.error('[Ausencias] Error creando notificación auto-aprobada:', error);
+      // Si HR Admin creó la ausencia, notificar al empleado que fue aprobada
+      // Si es auto-aprobable por tipo (enfermedad, etc), notificar a HR/Manager
+      const esAusenciaRegistradaPorHR = esHRAdmin && empleadoIdDestino !== session.user.empleadoId;
+
+      if (esAusenciaRegistradaPorHR) {
+        // Notificar al empleado que HR registró y aprobó su ausencia
+        try {
+          await crearNotificacionAusenciaAprobada(
+            prisma,
+            {
+              ausenciaId: ausencia.id,
+              empresaId: session.user.empresaId,
+              empleadoId,
+              empleadoNombre: `${ausencia.empleado.nombre} ${ausencia.empleado.apellidos}`,
+              tipo: ausencia.tipo,
+              fechaInicio: ausencia.fechaInicio,
+              fechaFin: ausencia.fechaFin,
+              diasSolicitados: diasSolicitadosFinal,
+            },
+            { actorUsuarioId: session.user.id }
+          );
+        } catch (error) {
+          console.error('[Ausencias] Error creando notificación para empleado:', error);
+        }
+      } else {
+        // Notificar a HR/Manager sobre ausencia auto-aprobada por tipo
+        try {
+          await crearNotificacionAusenciaAutoAprobada(
+            prisma,
+            {
+              ausenciaId: ausencia.id,
+              empresaId: session.user.empresaId,
+              empleadoId,
+              empleadoNombre: `${ausencia.empleado.nombre} ${ausencia.empleado.apellidos}`,
+              managerId: ausencia.empleado.managerId,
+              tipo: ausencia.tipo,
+              fechaInicio: ausencia.fechaInicio,
+              fechaFin: ausencia.fechaFin,
+              diasSolicitados: diasSolicitadosFinal,
+            },
+            { actorUsuarioId: session.user.id }
+          );
+        } catch (error) {
+          console.error('[Ausencias] Error creando notificación auto-aprobada:', error);
+        }
       }
 
       try {

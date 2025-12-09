@@ -4,6 +4,7 @@ import { FolderPlus, Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
+import { useSWRConfig } from 'swr';
 
 import { DocumentUploaderInline } from '@/components/shared/document-uploader-inline';
 import { InfoTooltip } from '@/components/shared/info-tooltip';
@@ -73,6 +74,7 @@ export function CrearCarpetaConDocumentosModal({
   onSuccess,
 }: CrearCarpetaConDocumentosModalProps) {
   const router = useRouter();
+  const { mutate } = useSWRConfig();
   const [loading, setLoading] = useState(false);
   
   // Datos de la carpeta
@@ -222,16 +224,26 @@ export function CrearCarpetaConDocumentosModal({
         }
       }
 
-      // 3. Resetear y cerrar
+      // 3. Revalidar datos automáticamente
+      await mutate('/api/carpetas');
+      if (documentos.length > 0) {
+        await mutate(`/api/documentos?carpetaId=${carpeta.id}`);
+      }
+
+      // 4. Forzar refresh del Server Component para actualizar la UI
+      router.refresh();
+
+      // 5. Resetear y cerrar
       setNombreCarpeta('');
       setTipoAsignacion('todos');
       setEquipoSeleccionado('');
       setEmpleadosSeleccionados([]);
       setDocumentos([]);
-      
+
       onClose();
-      
-      // 4. Callback o redirigir
+      toast.success('Carpeta creada correctamente');
+
+      // 6. Callback o redirigir
       if (onSuccess) {
         onSuccess(carpeta.id);
       } else {

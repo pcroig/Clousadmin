@@ -15,7 +15,11 @@ import {
   successResponse,
   validateRequest,
 } from '@/lib/api-handler';
-import { EstadoSolicitudCorreccionFichaje, UsuarioRol } from '@/lib/constants/enums';
+import { EstadoFichaje, EstadoSolicitudCorreccionFichaje, UsuarioRol } from '@/lib/constants/enums';
+import {
+  actualizarCalculosFichaje,
+} from '@/lib/calculos/fichajes';
+import { esOrigenOptimista } from '@/lib/fichajes/constantes';
 import {
   aplicarCorreccionFichaje,
   type CorreccionFichajePayload,
@@ -107,6 +111,102 @@ export async function PATCH(
     );
 
     if (accion === 'rechazar') {
+      // NUEVO: Verificar si es corrección optimista y revocar eventos editados
+      const detalles = solicitud.detalles as {
+        eventos?: Array<{id?: string, tipo: string, hora: string, editado: boolean}>;
+        eventoSalidaId?: string;
+        origen?: string;
+      };
+
+      // Verificar si es corrección optimista (cualquiera de los 3 casos)
+      if (esOrigenOptimista(detalles.origen)) {
+        // Revocación optimista: eliminar eventos editados en una transacción
+        await prisma.$transaction(async (tx) => {
+          // 1. Obtener IDs de eventos a eliminar
+          const eventosIds = (detalles.eventos || [])
+            .map(e => e.id)
+            .filter((id): id is string => !!id);
+
+          // 2. Eliminar eventos editados optimistamente
+          if (eventosIds.length > 0) {
+            const deleted = await tx.fichaje_eventos.deleteMany({
+              where: {
+                id: { in: eventosIds },
+                editado: true // Solo eliminar eventos editados
+              }
+            });
+
+            if (deleted.count !== eventosIds.length) {
+              console.error(`[Revocación] Esperado eliminar ${eventosIds.length} eventos, se eliminaron ${deleted.count}`);
+            }
+          }
+
+          // 3. Eliminar evento de salida si fue creado optimistamente
+          if (detalles.eventoSalidaId) {
+            await tx.fichaje_eventos.deleteMany({
+              where: {
+                id: detalles.eventoSalidaId,
+                fichajeId: solicitud.fichajeId,
+                tipo: 'salida'
+              }
+            });
+          }
+
+          // 4. Marcar fichaje como pendiente (requiere cuadrar)
+          await tx.fichajes.update({
+            where: { id: solicitud.fichajeId },
+            data: { estado: EstadoFichaje.pendiente }
+          });
+
+          // 5. Recalcular horas sin los eventos eliminados
+          await actualizarCalculosFichaje(solicitud.fichajeId, tx);
+
+          // 6. Actualizar auto_completado a rechazado
+          await tx.auto_completados.updateMany({
+            where: {
+              datosOriginales: {
+                path: ['solicitudId'],
+                equals: solicitud.id
+              }
+            },
+            data: {
+              estado: 'rechazado',
+              aprobadoEn: new Date(),
+              aprobadoPor: session.user.empleadoId
+            }
+          });
+
+          // 7. Rechazar solicitud
+          await tx.solicitudes_correccion_fichaje.update({
+            where: { id: solicitud.id },
+            data: {
+              estado: EstadoSolicitudCorreccionFichaje.rechazada,
+              respuesta: motivoRespuesta ?? null,
+              revisadaPor: session.user.empleadoId,
+              revisadaEn: new Date(),
+            }
+          });
+        });
+
+        // 8. Notificar al empleado del rechazo y revocación
+        await crearNotificacionSolicitudRechazada(
+          prisma,
+          {
+            solicitudId: solicitud.id,
+            empresaId: solicitud.empresaId,
+            empleadoId: solicitud.empleadoId,
+            tipo: 'fichaje_correccion',
+            motivoRechazo: motivoRespuesta
+              ? `${motivoRespuesta} (Los eventos editados han sido eliminados)`
+              : 'Corrección rechazada. Los eventos editados han sido eliminados.',
+          },
+          { actorUsuarioId: session.user.id }
+        );
+
+        return successResponse({ mensaje: 'Corrección rechazada y eventos optimistas eliminados' });
+      }
+
+      // Flujo normal (no optimista)
       const actualizada = await prisma.solicitudes_correccion_fichaje.update({
         where: { id: solicitud.id },
         data: {

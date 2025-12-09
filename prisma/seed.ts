@@ -67,10 +67,10 @@ async function main() {
     create: {
       id: 'jornada-completa-40h',
       empresaId: empresa.id,
+      nombre: 'Jornada Completa 40h',
       horasSemanales: 40,
       esPredefinida: true,
       config: {
-        tipo: 'fija',
         lunes: { activo: true, entrada: '09:00', salida: '18:00' },
         martes: { activo: true, entrada: '09:00', salida: '18:00' },
         miercoles: { activo: true, entrada: '09:00', salida: '18:00' },
@@ -88,10 +88,10 @@ async function main() {
     create: {
       id: 'jornada-intensiva-35h',
       empresaId: empresa.id,
+      nombre: 'Jornada Intensiva 35h',
       horasSemanales: 35,
       esPredefinida: true,
       config: {
-        tipo: 'fija',
         lunes: { activo: true, entrada: '09:00', salida: '16:00' },
         martes: { activo: true, entrada: '09:00', salida: '16:00' },
         miercoles: { activo: true, entrada: '09:00', salida: '16:00' },
@@ -103,7 +103,7 @@ async function main() {
     },
   });
 
-  console.log(`✅ Jornadas creadas: ${jornadaCompleta.id}, ${jornadaIntensiva.id}\n`);
+  console.log(`✅ Jornadas creadas: ${jornadaCompleta.nombre}, ${jornadaIntensiva.nombre}\n`);
 
   // ========================================
   // 3. CREAR USUARIO Y EMPLEADO HR ADMIN

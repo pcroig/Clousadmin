@@ -8,7 +8,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Check, Clock, Settings, Zap } from 'lucide-react';
+import { Check, Clock, Edit2, Settings, Zap } from 'lucide-react';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -346,7 +346,8 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
         if (!hayEnCurso) return prev; // Si no hay, no modificar el array (evita re-render)
 
         // Recalcular solo los fichajes en curso
-        return prev.map((j) => {
+        let cambioDetectado = false;
+        const nuevoArray = prev.map((j) => {
           if (j.fichaje.estado !== EstadoFichaje.en_curso) return j;
 
           const eventos = j.fichaje.eventos ?? [];
@@ -361,14 +362,22 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
 
           const balance = Math.round((horasTrabajadas - j.horasEsperadas) * 100) / 100;
 
+          // Solo marcar cambio si los valores son diferentes
+          if (j.horasTrabajadas !== horasTrabajadas || j.balance !== balance) {
+            cambioDetectado = true;
+          }
+
           return {
             ...j,
             horasTrabajadas,
             balance,
           };
         });
+
+        // Solo retornar el nuevo array si hubo cambios reales
+        return cambioDetectado ? nuevoArray : prev;
       });
-    }, 15000); // 15s para mantener la vista sincronizada sin golpear la API
+    }, 3000); // 3s para actualización más fluida de fichajes en curso
 
     return () => clearInterval(intervalo);
   }, []); // Sin dependencias - el intervalo se crea solo una vez
@@ -518,6 +527,7 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
       id: 'empleado',
       header: 'Empleado',
       priority: 'high',
+      width: '180px',
       cell: (jornada) => (
         <EmpleadoHoverCard
           empleado={resolveEmpleadoHoverInfo(jornada)}
@@ -540,6 +550,7 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
       header: 'Fecha',
       align: 'center',
       priority: 'medium',
+      width: '120px',
       cell: (jornada) => (
         <span className="text-sm text-gray-600">
           {format(jornada.fecha, 'dd MMM', { locale: es })}
@@ -550,6 +561,7 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
       id: 'horas',
       header: 'Horas',
       align: 'center',
+      width: '125px',
       cell: (jornada) => (
         <span className="text-sm text-gray-600">
           <span className="font-bold text-gray-900">{formatearHorasMinutos(jornada.horasTrabajadas)}</span>
@@ -563,6 +575,7 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
       header: 'Horario',
       align: 'center',
       priority: 'low',
+      width: '135px',
       cell: (jornada) => (
         <span className="text-sm text-gray-600">
           {jornada.horarioEntrada ? `${jornada.horarioEntrada} - ${jornada.horarioSalida || '...'}` : '—'}
@@ -573,6 +586,7 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
       id: 'balance',
       header: 'Balance',
       align: 'center',
+      width: '115px',
       cell: (jornada) => (
         <span
           className={`text-sm font-medium ${
@@ -588,6 +602,7 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
       id: 'estado',
       header: 'Estado',
       align: 'center',
+      width: '140px',
       cell: (jornada) => (
         <div className="flex items-center justify-center gap-1.5">
           <EstadoBadge estado={jornada.fichaje.estado} />
@@ -602,7 +617,29 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
         </div>
       ),
     },
-  ], [resolveEmpleadoHoverInfo]);
+    {
+      id: 'acciones',
+      header: '',
+      align: 'right',
+      priority: 'low',
+      width: '60px',
+      cell: (jornada) => (
+        <Button
+          variant="ghost"
+          size="icon"
+          className="ml-auto opacity-0 transition-opacity group-hover:opacity-100"
+          title="Editar fichaje"
+          aria-label="Editar fichaje"
+          onClick={(event) => {
+            event.stopPropagation();
+            handleVerDetalles(jornada.fichaje.id);
+          }}
+        >
+          <Edit2 className="h-4 w-4" />
+        </Button>
+      ),
+    },
+  ], [resolveEmpleadoHoverInfo, handleVerDetalles]);
 
   const desktopEmptyTitle = busquedaEmpleado ? 'No se encontraron empleados' : 'No hay fichajes';
   const desktopEmptyDescription = busquedaEmpleado

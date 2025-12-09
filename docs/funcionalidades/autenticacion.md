@@ -281,19 +281,54 @@ NEXTAUTH_SECRET=clave-super-secreta
 
 **Estado:** ✅ En producción
 
+**Flujo completo:**
+1. Usuario solicita reset desde `/forgot-password`
+2. Sistema genera token seguro (32 bytes hex + hash)
+3. Envía email con link de recuperación (válido 1h)
+4. Usuario accede a `/reset-password/[token]` y crea nueva contraseña
+5. Sistema invalida todas las sesiones activas
+6. Redirige a `/login?reset=success` con mensaje de confirmación
+
 **Endpoints:**
-- `POST /api/auth/recovery/request` → recibe email, aplica rate limiting y envía enlace firmado (válido 1h) usando Resend.
-- `POST /api/auth/recovery/reset` → valida token y actualiza la contraseña (invalidando todas las sesiones activas).
+- `POST /api/auth/recovery/request` → Recibe email, aplica rate limiting y envía enlace
+- `POST /api/auth/recovery/reset` → Valida token y actualiza contraseña
 
 **UI:**
-- `/forgot-password` formulario público para solicitar el email.
-- `/reset-password/[token]` formulario protegido que valida el token antes de permitir el cambio.
+- `/forgot-password` - Formulario de solicitud
+- `/reset-password/[token]` - Formulario de nueva contraseña con toggle de visibilidad
+- `/login` - Muestra mensaje de éxito tras reset completado
+
+**Seguridad:**
+- Rate limiting por IP y email
+- Tokens hasheados en base de datos
+- Un solo uso por token
+- No revela si el email existe (previene enumeración)
 
 **Plantillas de email:** `lib/emails/password-recovery.ts`
 
 ---
 
-### 7. Autenticación en dos pasos (2FA TOTP + Backup Codes)
+### 7. Cambio de email
+
+**Estado:** ✅ En producción
+
+**Ubicación:** `/configuracion/seguridad`
+
+**Funcionalidad:**
+- Permite a los usuarios cambiar su email asignado
+- Requiere contraseña actual para confirmar
+- Validaciones:
+  - Formato de email válido
+  - Email no duplicado en el sistema
+  - Verificación de contraseña correcta
+
+**UI:** Componente `ChangeEmailCard` con toggle de visibilidad de contraseña
+
+**Server Action:** `changeEmailAction` en `app/(dashboard)/configuracion/seguridad/actions.ts`
+
+---
+
+### 8. Autenticación en dos pasos (2FA TOTP + Backup Codes)
 
 **Estado:** ✅ En producción
 
@@ -570,6 +605,7 @@ export default async function MyPage() {
 - **Mínimo:** 8 caracteres
 - **Nunca** se almacenan en texto plano
 - **Verificación:** `bcrypt.compare()`
+- **UI:** Toggle de visibilidad en todos los inputs de contraseña (`components/ui/password-input.tsx`)
 
 ### Sesiones JWT
 - **Secret:** `NEXTAUTH_SECRET` (env var)
@@ -799,7 +835,7 @@ console.log('[loginAction] Password válida:', isValid)
 
 ---
 
-**Última actualización:** 27 de enero 2025  
+**Última actualización:** 8 de diciembre 2025
 **Autor:** Clousadmin Dev Team
 
 

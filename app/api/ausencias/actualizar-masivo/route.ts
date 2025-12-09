@@ -16,9 +16,10 @@ import {
 import { actualizarSaldo } from '@/lib/calculos/ausencias';
 import { EstadoAusencia, UsuarioRol } from '@/lib/constants/enums';
 import { prisma } from '@/lib/prisma';
+import { idArraySchema } from '@/lib/validaciones/schemas';
 
 const actualizarMasivoSchema = z.object({
-  ausenciasIds: z.array(z.string().uuid()),
+  ausenciasIds: idArraySchema,
   accion: z.enum(['aprobar', 'rechazar']),
   motivoRechazo: z.string().optional(),
 });

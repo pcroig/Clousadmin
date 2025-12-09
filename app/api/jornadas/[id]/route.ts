@@ -48,7 +48,11 @@ export async function GET(
             nombre: true,
             apellidos: true,
           },
+          where: {
+            activo: true,
+          },
         },
+        asignacion: true, // ✅ Incluir metadata de asignación
       },
     });
 
@@ -56,7 +60,7 @@ export async function GET(
       return notFoundResponse('Jornada no encontrada');
     }
 
-    return successResponse(jornada);
+    return successResponse({ data: jornada });
   } catch (error) {
     return handleApiError(error, 'API GET /api/jornadas/[id]');
   }
@@ -148,14 +152,34 @@ export async function DELETE(
       return badRequestResponse('No se pueden eliminar jornadas predefinidas');
     }
 
-    // No permitir eliminar si hay empleados asignados
+    // Si hay empleados asignados, desasignarlos automáticamente
     if (jornada.empleados.length > 0) {
-      return badRequestResponse(
-        `No se puede eliminar. ${jornada.empleados.length} empleados tienen esta jornada asignada`
-      );
+      await prisma.$transaction(async (tx) => {
+        // 1. Desasignar todos los empleados (setear jornadaId a null)
+        await tx.empleados.updateMany({
+          where: { jornadaId: id },
+          data: { jornadaId: null },
+        });
+
+        // 2. Eliminar registro de asignación si existe
+        await tx.jornada_asignaciones.deleteMany({
+          where: { jornadaId: id },
+        });
+
+        // 3. Marcar jornada como inactiva
+        await tx.jornadas.update({
+          where: { id },
+          data: { activa: false },
+        });
+      });
+
+      return successResponse({
+        success: true,
+        empleadosDesasignados: jornada.empleados.length,
+      });
     }
 
-    // Marcar como inactiva en lugar de eliminar
+    // Si no hay empleados, simplemente marcar como inactiva
     await prisma.jornadas.update({
       where: { id },
       data: { activa: false },

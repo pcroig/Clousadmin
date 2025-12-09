@@ -100,13 +100,20 @@ export function DocumentViewerModal({
     setIsFullscreen((prev) => !prev);
   }, []);
 
-  // Check if the document is a Word file
+  // Check if the document is a Word file (mostrar mensaje de conversión)
   const normalizedMime = mimeType?.toLowerCase() ?? null;
   const isWordDocument =
     normalizedMime === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
-  const isPdfDocument = normalizedMime === 'application/pdf';
 
-  const iframeSandbox = isPdfDocument
+  // Determinar si el preview será un PDF:
+  // - PDFs nativos: sí
+  // - DOCX: se convierten a PDF en el backend
+  const isPdfDocument = normalizedMime === 'application/pdf';
+  const previewWillBePdf = isPdfDocument || isWordDocument;
+
+  // CRÍTICO: No usar sandbox para PDFs (nativos o convertidos de DOCX)
+  // El sandbox impide que Chrome cargue su visor PDF interno
+  const iframeSandbox = previewWillBePdf
     ? undefined
     : 'allow-same-origin allow-scripts allow-popups allow-forms allow-downloads allow-modals allow-presentation';
 

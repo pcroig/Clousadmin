@@ -210,7 +210,10 @@ export function CarpetaDetailClientEmpleado({
         <div ref={uploadSectionRef} className="mb-6">
           <DocumentUploadArea
             carpetaId={carpeta.id}
-            onUploaded={() => router.refresh()}
+            onUploaded={() => {
+              // La revalidación ya se hace automáticamente en DocumentUploadArea
+              router.refresh();
+            }}
             description={`Tamaño máximo ${maxUploadMB}MB por archivo`}
           />
         </div>
@@ -288,26 +291,6 @@ export function CarpetaDetailClientEmpleado({
                             <span className="text-xs px-1.5 py-0.5 bg-[#FFF4ED] text-[#d97757] rounded-md font-medium">
                               Firmado
                             </span>
-                          )}
-                          {/* Solo mostrar "Pendiente firma" si:
-                              1. El documento NO está firmado
-                              2. Hay una solicitud de firma
-                              3. El empleado NO ha firmado todavía (si ya firmó, se creó una copia y este original no debe mostrar estado)
-                          */}
-                          {documento.firmaInfo?.tieneSolicitud && !documento.firmado && !documento.firmaInfo.firmado && (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                if (documento.firmaInfo?.firmaId) {
-                                  router.push(`/firma/firmar/${documento.firmaInfo.firmaId}`);
-                                }
-                              }}
-                              className="inline-flex items-center"
-                            >
-                              <span className="text-xs px-1.5 py-0.5 bg-amber-50 text-amber-700 rounded-md font-medium hover:bg-amber-100 cursor-pointer">
-                                Pendiente firma
-                              </span>
-                            </button>
                           )}
                         </div>
                       </div>

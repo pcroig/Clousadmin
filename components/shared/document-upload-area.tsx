@@ -1,13 +1,15 @@
 'use client';
 
-import { Loader2, Upload } from 'lucide-react';
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import { Loader2, Upload, X, FileText } from 'lucide-react';
+import React, { useCallback, useMemo, useRef, useState, useImperativeHandle, forwardRef } from 'react';
 import { toast } from 'sonner';
+import { useSWRConfig } from 'swr';
 
 import { uploadFilesToCarpeta } from '@/lib/documentos/client-upload';
 import { cn } from '@/lib/utils';
 
 type UploadVariant = 'minimal' | 'dropzone';
+type UploadMode = 'immediate' | 'preview'; // NUEVO: modo preview
 
 interface DocumentUploadAreaProps {
   carpetaId?: string;
@@ -16,35 +18,40 @@ interface DocumentUploadAreaProps {
   buttonLabel?: string;
   onUploaded?: () => void;
   variant?: UploadVariant;
+  mode?: UploadMode; // NUEVO: controla si sube inmediatamente o muestra preview
+  onFilesSelected?: (files: File[]) => void; // NUEVO: callback cuando se seleccionan archivos en modo preview
   getExtraFormData?: () => Record<string, string> | undefined;
 }
 
-export function DocumentUploadArea({
-  carpetaId,
-  disabled,
-  description,
-  buttonLabel = 'Seleccionar archivos',
-  onUploaded,
-  variant = 'minimal',
-  getExtraFormData,
-}: DocumentUploadAreaProps) {
+// NUEVO: Interface para el ref handle
+export interface DocumentUploadAreaHandle {
+  upload: () => Promise<void>;
+  selectedFiles: File[];
+  isUploading: boolean;
+}
+
+export const DocumentUploadArea = forwardRef<DocumentUploadAreaHandle, DocumentUploadAreaProps>((props, ref) => {
+  const {
+    carpetaId,
+    disabled,
+    description,
+    buttonLabel = 'Seleccionar archivos',
+    onUploaded,
+    variant = 'minimal',
+    mode = 'immediate',
+    onFilesSelected,
+    getExtraFormData,
+  } = props;
+
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [progressText, setProgressText] = useState<string | null>(null);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]); // NUEVO: archivos seleccionados en modo preview
+  const { mutate } = useSWRConfig();
 
   const helperText = useMemo(
     () => description ?? 'Los archivos se procesarán inmediatamente.',
     [description]
-  );
-
-  const handleFiles = useCallback(
-    (fileList: FileList | null) => {
-      if (!fileList || fileList.length === 0) return;
-      const files = Array.from(fileList);
-      void startUpload(files);
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [carpetaId]
   );
 
   const startUpload = useCallback(
@@ -79,11 +86,19 @@ export function DocumentUploadArea({
       setProgressText(null);
 
       if (result.successes > 0) {
+        // Revalidar automáticamente los documentos de esta carpeta
+        if (carpetaId) {
+          await mutate(`/api/documentos?carpetaId=${carpetaId}`);
+        }
+        // También revalidar lista de carpetas por si cambió el contador
+        await mutate('/api/carpetas');
+
         toast.success(
           result.successes === 1
             ? 'Documento subido correctamente'
             : `${result.successes} documentos subidos correctamente`
         );
+
         onUploaded?.();
       }
 
@@ -92,8 +107,45 @@ export function DocumentUploadArea({
         toast.error(firstError.message || 'Algunos archivos no se pudieron subir');
       }
     },
-    [carpetaId, onUploaded]
+    [carpetaId, onUploaded, mutate, getExtraFormData]
   );
+
+  const handleFiles = useCallback(
+    (fileList: FileList | null) => {
+      if (!fileList || fileList.length === 0) return;
+      const files = Array.from(fileList);
+
+      if (mode === 'preview') {
+        // Modo preview: guardar archivos y notificar al padre
+        setSelectedFiles(files);
+        onFilesSelected?.(files);
+      } else {
+        // Modo immediate: subir inmediatamente (comportamiento actual)
+        void startUpload(files);
+      }
+    },
+    [carpetaId, mode, onFilesSelected, startUpload]
+  );
+
+  const removeFile = useCallback((index: number) => {
+    setSelectedFiles(prev => {
+      const newFiles = prev.filter((_, i) => i !== index);
+      onFilesSelected?.(newFiles);
+      return newFiles;
+    });
+  }, [onFilesSelected]);
+
+  // NUEVO: Exponer métodos al componente padre mediante ref
+  useImperativeHandle(ref, () => ({
+    upload: async () => {
+      if (selectedFiles.length > 0) {
+        await startUpload(selectedFiles);
+        setSelectedFiles([]);
+      }
+    },
+    selectedFiles,
+    isUploading,
+  }), [selectedFiles, isUploading, startUpload]);
 
   const handleButtonClick = useCallback(() => {
     if (disabled || !carpetaId || isUploading) return;
@@ -162,6 +214,45 @@ export function DocumentUploadArea({
     </div>
   );
 
+  // NUEVO: Renderizar lista de archivos seleccionados en modo preview
+  const renderFilesList = () => {
+    if (mode !== 'preview' || selectedFiles.length === 0) return null;
+
+    return (
+      <div className="space-y-2">
+        <p className="text-sm font-medium text-gray-700">
+          {selectedFiles.length} archivo{selectedFiles.length !== 1 ? 's' : ''} seleccionado{selectedFiles.length !== 1 ? 's' : ''}
+        </p>
+        <div className="space-y-2 max-h-60 overflow-y-auto">
+          {selectedFiles.map((file, index) => (
+            <div
+              key={`${file.name}-${index}`}
+              className="flex items-center justify-between gap-3 rounded-lg border border-gray-200 bg-white px-3 py-2"
+            >
+              <div className="flex items-center gap-2 flex-1 min-w-0">
+                <FileText className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-gray-900 truncate">{file.name}</p>
+                  <p className="text-xs text-gray-500">
+                    {(file.size / 1024 / 1024).toFixed(2)} MB
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => removeFile(index)}
+                className="text-gray-400 hover:text-red-500 transition-colors flex-shrink-0"
+                disabled={isUploading}
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="space-y-3">
       {input}
@@ -169,6 +260,7 @@ export function DocumentUploadArea({
       {isUploading && variant === 'dropzone' && (
         <p className="text-xs text-center text-blue-600">{progressText ?? 'Procesando...'}</p>
       )}
+      {renderFilesList()}
       {!carpetaId && (
         <p className="text-xs text-red-500">
           Selecciona una carpeta para activar la subida de documentos.
@@ -176,6 +268,6 @@ export function DocumentUploadArea({
       )}
     </div>
   );
-}
+});
 
-
+DocumentUploadArea.displayName = 'DocumentUploadArea';

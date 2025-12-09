@@ -6,8 +6,53 @@ import { z } from 'zod';
 
 const HORA_24H_REGEX = /^([01]\d|2[0-3]):([0-5]\d)$/;
 
-// Schema para validar IDs de Prisma (acepta UUID o CUID)
-export const idSchema = z.union([z.string().uuid(), z.string().cuid()]);
+// ========================================
+// ID VALIDATION
+// ========================================
+// IMPORTANTE: Todos los modelos de Prisma usan @default(cuid())
+// NO hay modelos con UUID en este proyecto
+// Formato CUID: cmixws9vx000n1yckq4zq4l6i (25 caracteres)
+// Formato UUID: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx (36 caracteres con guiones)
+
+/**
+ * Schema para validar IDs de Prisma.
+ * USAR ESTE SCHEMA para todos los IDs que referencien modelos de Prisma.
+ *
+ * ❌ INCORRECTO: z.string().uuid()
+ * ✅ CORRECTO: idSchema
+ *
+ * Ejemplos de uso:
+ * - empleadoId: idSchema
+ * - empresaId: idSchema
+ * - equipoId: idSchema.optional()
+ * - documentoIds: z.array(idSchema)
+ */
+export const idSchema = z.string().cuid();
+
+/**
+ * Schema para IDs opcionales
+ */
+export const optionalIdSchema = idSchema.optional();
+
+/**
+ * Schema para IDs nullable
+ */
+export const nullableIdSchema = idSchema.nullable();
+
+/**
+ * Schema para IDs nullish (nullable + optional)
+ */
+export const nullishIdSchema = idSchema.nullish();
+
+/**
+ * Schema para arrays de IDs
+ */
+export const idArraySchema = z.array(idSchema);
+
+/**
+ * Schema para arrays opcionales de IDs
+ */
+export const optionalIdArraySchema = z.array(idSchema).optional();
 
 // ========================================
 // SIGNUP & ONBOARDING
@@ -123,7 +168,7 @@ const jornadaConfigSchema = z
 
 export const jornadaCreateSchema = z.object({
   // NOTE: 'nombre' field has been removed - jornadas are now identified by their configuration
-  empresaId: z.string().uuid(),
+  empresaId: idSchema,
   tipo: z.enum(['fija', 'flexible']),
   horasSemanales: z.number().positive('Horas semanales deben ser positivas'),
 

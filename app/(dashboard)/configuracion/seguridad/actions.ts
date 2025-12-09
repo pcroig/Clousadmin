@@ -134,3 +134,50 @@ export async function disableTwoFactorAction(password: string) {
   return { success: true };
 }
 
+export async function changeEmailAction(newEmail: string, password: string) {
+  const session = await requireSession();
+
+  // Validar formato de email
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(newEmail)) {
+    return { success: false, error: 'El email no es válido.' };
+  }
+
+  // Verificar que el email no esté en uso
+  const existingUser = await prisma.usuarios.findFirst({
+    where: {
+      email: newEmail,
+      NOT: { id: session.user.id },
+    },
+  });
+
+  if (existingUser) {
+    return { success: false, error: 'Este email ya está en uso.' };
+  }
+
+  // Verificar contraseña actual
+  const usuario = await prisma.usuarios.findUnique({
+    where: { id: session.user.id },
+    select: { password: true },
+  });
+
+  if (!usuario?.password) {
+    return { success: false, error: 'No podemos validar tu cuenta.' };
+  }
+
+  const validPassword = await verifyPassword(password, usuario.password);
+  if (!validPassword) {
+    return { success: false, error: 'Contraseña incorrecta.' };
+  }
+
+  // Actualizar email
+  await prisma.usuarios.update({
+    where: { id: session.user.id },
+    data: { email: newEmail },
+  });
+
+  revalidatePath('/configuracion/seguridad');
+
+  return { success: true };
+}
+

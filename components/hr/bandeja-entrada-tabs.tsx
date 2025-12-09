@@ -4,7 +4,7 @@
 
 'use client';
 
-import { Settings } from 'lucide-react';
+import { Filter, Settings } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
@@ -21,6 +21,12 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { iconButtonClasses } from '@/lib/design-system';
 import { ejecutarAccionSolicitud } from '@/lib/services/solicitudes-actions';
 import { parseJson } from '@/lib/utils/json';
@@ -42,6 +48,7 @@ type NotificacionItem = Parameters<
 >[0]['notificaciones'][number];
 
 export type BandejaEntradaTab = 'solicitudes' | 'auto-completed' | 'notificaciones';
+export type FiltroEstado = 'todas' | 'pendientes' | 'resueltas';
 
 interface BandejaEntradaTabsProps {
   solicitudesPendientes: SolicitudPendiente[];
@@ -75,6 +82,10 @@ export function BandejaEntradaTabs({
   const router = useRouter();
   const [autoApproveLoading, setAutoApproveLoading] = useState(false);
 
+  // Estados para filtros - predeterminado "todas"
+  const [filtroSolicitudes, setFiltroSolicitudes] = useState<FiltroEstado>('todas');
+  const [filtroNotificaciones, setFiltroNotificaciones] = useState<FiltroEstado>('todas');
+
   const ausenciasPendientes = useMemo(
     () => solicitudesPendientes.filter((s) => s.tipo === 'ausencia'),
     [solicitudesPendientes],
@@ -84,10 +95,30 @@ export function BandejaEntradaTabs({
     [solicitudesPendientes],
   );
 
+  // Filtrar notificaciones según el filtro seleccionado
+  const notificacionesFiltradas = useMemo(() => {
+    if (filtroNotificaciones === 'pendientes') {
+      return notificaciones.filter((n) => !n.leida);
+    } else if (filtroNotificaciones === 'resueltas') {
+      return notificaciones.filter((n) => n.leida);
+    }
+    return notificaciones;
+  }, [notificaciones, filtroNotificaciones]);
+
   const notificacionesNoLeidas = useMemo(
     () => notificaciones.filter((n) => !n.leida).length,
     [notificaciones],
   );
+
+  // Filtrar solicitudes según el filtro seleccionado
+  const solicitudesFiltradas = useMemo(() => {
+    if (filtroSolicitudes === 'pendientes') {
+      return { pendientes: solicitudesPendientes, resueltas: [] };
+    } else if (filtroSolicitudes === 'resueltas') {
+      return { pendientes: [], resueltas: solicitudesResueltas };
+    }
+    return { pendientes: solicitudesPendientes, resueltas: solicitudesResueltas };
+  }, [solicitudesPendientes, solicitudesResueltas, filtroSolicitudes]);
 
   const handleAprobar = async (id: string) => {
     const solicitudPendiente = solicitudesPendientes.find((s) => s.id === id);
@@ -225,7 +256,7 @@ export function BandejaEntradaTabs({
 
   const actionButtons = (
     <>
-      {activeTab === 'solicitudes' && solicitudesPendientes.length > 0 && (
+      {activeTab === 'solicitudes' && solicitudesPendientes.length > 0 && filtroSolicitudes !== 'resueltas' && (
         <AlertDialog>
           <AlertDialogTrigger asChild>
             <Button
@@ -268,7 +299,7 @@ export function BandejaEntradaTabs({
         </AlertDialog>
       )}
 
-      {activeTab === 'notificaciones' && notificacionesNoLeidas > 0 && (
+      {activeTab === 'notificaciones' && notificacionesNoLeidas > 0 && filtroNotificaciones !== 'resueltas' && (
         <Button
           variant="outline"
           size="sm"
@@ -277,6 +308,57 @@ export function BandejaEntradaTabs({
         >
           Leer todas ({notificacionesNoLeidas})
         </Button>
+      )}
+
+      {/* Dropdown de filtros */}
+      {activeTab === 'solicitudes' && (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              type="button"
+              className={iconButtonClasses.default}
+              aria-label="Filtrar solicitudes"
+            >
+              <Filter className="h-4 w-4" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => setFiltroSolicitudes('todas')}>
+              Todas
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setFiltroSolicitudes('pendientes')}>
+              Pendientes
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setFiltroSolicitudes('resueltas')}>
+              Resueltas
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )}
+
+      {activeTab === 'notificaciones' && (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              type="button"
+              className={iconButtonClasses.default}
+              aria-label="Filtrar notificaciones"
+            >
+              <Filter className="h-4 w-4" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => setFiltroNotificaciones('todas')}>
+              Todas
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setFiltroNotificaciones('pendientes')}>
+              No leídas
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setFiltroNotificaciones('resueltas')}>
+              Leídas
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       )}
 
       <button
@@ -348,8 +430,8 @@ export function BandejaEntradaTabs({
       <div className="pt-4">
         {activeTab === 'solicitudes' && (
           <BandejaEntradaSolicitudes
-            solicitudesPendientes={solicitudesPendientes}
-            solicitudesResueltas={solicitudesResueltas}
+            solicitudesPendientes={solicitudesFiltradas.pendientes}
+            solicitudesResueltas={solicitudesFiltradas.resueltas}
             onAprobar={handleAprobar}
             onRechazar={handleRechazar}
           />
@@ -361,7 +443,7 @@ export function BandejaEntradaTabs({
 
         {activeTab === 'notificaciones' && (
           <BandejaEntradaNotificaciones
-            notificaciones={notificaciones}
+            notificaciones={notificacionesFiltradas}
             onMarcarLeida={handleMarcarLeida}
           />
         )}

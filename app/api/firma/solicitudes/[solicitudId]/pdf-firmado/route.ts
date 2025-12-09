@@ -80,17 +80,6 @@ export async function GET(
       }
     }
 
-    // Verificar que la solicitud está completada
-    if (solicitud.estado !== 'completada') {
-      return NextResponse.json(
-        {
-          error: 'El PDF firmado solo está disponible cuando la solicitud está completada',
-          estadoActual: solicitud.estado,
-        },
-        { status: 400 }
-      );
-    }
-
     // Verificar que existe el PDF firmado
     if (!solicitud.pdfFirmadoS3Key) {
       return NextResponse.json(
@@ -108,15 +97,21 @@ export async function GET(
     const nombreBase = solicitud.documentos.nombre.replace(/\.[^/.]+$/, ''); // Eliminar extensión
     const nombreArchivo = `${nombreBase}_firmado.pdf`;
 
-    // Retornar PDF como archivo descargable
-    // Convertir Buffer a Uint8Array para Response
+    // Determinar si es descarga o visualización inline
+    const { searchParams } = new URL(request.url);
+    const download = searchParams.get('download') === 'true';
+
+    // Retornar PDF (inline para visualizar o attachment para descargar)
     const uint8Array = new Uint8Array(pdfBuffer);
 
     return new Response(uint8Array, {
       headers: {
         'Content-Type': 'application/pdf',
-        'Content-Disposition': `attachment; filename="${nombreArchivo}"`,
+        'Content-Disposition': download
+          ? `attachment; filename="${nombreArchivo}"`
+          : `inline; filename="${nombreArchivo}"`,
         'Content-Length': pdfBuffer.length.toString(),
+        'Cache-Control': 'public, max-age=3600',
       },
     });
   } catch (error: unknown) {

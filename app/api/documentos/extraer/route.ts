@@ -11,7 +11,6 @@ import { handleApiError, requireAuthAsHR } from '@/lib/api-handler';
 import { deleteOpenAIFile, uploadPDFToOpenAI } from '@/lib/ia/core/providers/openai';
 import { AIProvider } from '@/lib/ia/core/types';
 import { analyzeDocument } from '@/lib/ia/patterns/vision';
-import { uploadToS3 } from '@/lib/s3';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60; // 60 segundos para procesamiento de IA
@@ -92,28 +91,20 @@ export async function POST(request: NextRequest) {
     console.log(`[API Extraer] Procesando archivo: ${file.name} (${file.type})`);
 
     const buffer = Buffer.from(await file.arrayBuffer());
-    const s3Key = `documentos/temp/${Date.now()}-${file.name}`;
-    
-    // Determinar si usar URL pública, base64, o file_id de OpenAI
-    const isS3Configured = !!(
-      process.env.STORAGE_ENDPOINT &&
-      process.env.STORAGE_REGION &&
-      process.env.STORAGE_ACCESS_KEY &&
-      process.env.STORAGE_SECRET_KEY &&
-      process.env.STORAGE_BUCKET
-    );
-    
+
     const isPDF = file.type === 'application/pdf';
     let documentInput: string;
     let openaiFileId: string | null = null;
-    
+
+    // IMPORTANTE: Para Vision API, usar SIEMPRE base64 para imágenes
+    // Las URLs de S3 privadas no son accesibles por OpenAI
+    // Solo PDFs usan Files API cuando está disponible
+
     if (isPDF) {
-      // Para PDFs: OpenAI soporta dos opciones:
-      // 1. Subir a Files API y usar file_id (mejor para producción)
-      // 2. Enviar directamente como base64 (más simple para desarrollo)
-      const useFileUpload = isS3Configured; // En producción usar upload, en desarrollo base64
-      
-      if (useFileUpload) {
+      // Para PDFs: Intentar usar OpenAI Files API si está disponible
+      const hasOpenAI = !!process.env.OPENAI_API_KEY;
+
+      if (hasOpenAI) {
         // Producción: Subir a OpenAI Files API
         console.log(`[API Extraer] PDF detectado, subiendo a OpenAI Files API...`);
         try {
@@ -129,21 +120,18 @@ export async function POST(request: NextRequest) {
           documentInput = `data:application/pdf;base64,${base64}`;
         }
       } else {
-        // Desarrollo: Usar base64 directamente (más simple, no requiere upload)
-        console.log(`[API Extraer] PDF detectado, usando base64 directamente (desarrollo)...`);
+        // Sin OpenAI: Usar base64 directamente (Anthropic lo soporta)
+        console.log(`[API Extraer] PDF detectado, usando base64 directamente...`);
         const base64 = buffer.toString('base64');
         documentInput = `data:application/pdf;base64,${base64}`;
       }
-    } else if (isS3Configured) {
-      // Producción: Subir a S3 y usar URL pública (solo para imágenes)
-      const s3Url = await uploadToS3(buffer, s3Key, file.type);
-      console.log(`[API Extraer] Archivo subido a S3: ${s3Url}`);
-      documentInput = s3Url;
     } else {
-      // Desarrollo: Convertir a base64 para enviar directamente (solo imágenes)
+      // Para IMÁGENES: SIEMPRE usar base64 (no URLs de S3)
+      // OpenAI Vision API requiere URLs públicas o base64
+      // S3 privado no es accesible, así que usamos base64
       const base64 = buffer.toString('base64');
       documentInput = `data:${file.type};base64,${base64}`;
-      console.log(`[API Extraer] Usando base64 para desarrollo local (tamaño: ${(base64.length / 1024).toFixed(2)} KB)`);
+      console.log(`[API Extraer] Imagen detectada, usando base64 (tamaño: ${(base64.length / 1024).toFixed(2)} KB)`);
     }
 
     // Extraer datos usando Vision Pattern
@@ -191,7 +179,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       datosExtraidos,
-      s3Url: isS3Configured && !isPDF ? documentInput : undefined, // Solo incluir si es URL de S3 (no PDFs)
       metadata: {
         provider: result.provider,
         usage: result.usage,

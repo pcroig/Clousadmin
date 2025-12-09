@@ -1,6 +1,6 @@
 'use client';
 
-import { AlertCircle, Loader2, Trash2 } from 'lucide-react';
+import { AlertCircle, Info, Loader2, Trash2 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -10,6 +10,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
+import { Switch } from '@/components/ui/switch';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { extractArrayFromResponse } from '@/lib/utils/api-response';
 import { parseJson } from '@/lib/utils/json';
 
@@ -44,6 +46,9 @@ export function SolicitarFirmaDialog({
   const [cargandoEmpleados, setCargandoEmpleados] = useState(false);
   const [posicionesFirma, setPosicionesFirma] = useState<Array<{ x: number; y: number; width: number; height: number }>>([]);
   const [carpetaIdInterno, setCarpetaIdInterno] = useState<string | null>(carpetaId || null);
+  const [mantenerOriginal, setMantenerOriginal] = useState(true);
+  const [firmaEmpresaDisponible, setFirmaEmpresaDisponible] = useState(false);
+  const [incluirFirmaEmpresa, setIncluirFirmaEmpresa] = useState(true);
 
   // PDF metadata state
   const [pdfDimensiones, setPdfDimensiones] = useState<{ width: number; height: number; numPaginas: number } | null>(null);
@@ -110,6 +115,24 @@ export function SolicitarFirmaDialog({
       .finally(() => setCargandoMetadata(false));
   }, [open, documentoId, pdfDimensiones, cargandoMetadata]);
 
+  // Verificar si hay firma de empresa disponible
+  useEffect(() => {
+    if (!open) return;
+
+    fetch('/api/empresa/firma')
+      .then(async (res) => {
+        if (!res.ok) return;
+        return parseJson<{ firmaGuardada?: boolean }>(res);
+      })
+      .then((data) => {
+        setFirmaEmpresaDisponible(Boolean(data?.firmaGuardada));
+      })
+      .catch(() => {
+        // Silenciar error (puede ser que no sea HR admin)
+        setFirmaEmpresaDisponible(false);
+      });
+  }, [open]);
+
   useEffect(() => {
     if (!open) {
       setEmpleadosSeleccionados([]);
@@ -118,6 +141,7 @@ export function SolicitarFirmaDialog({
       setPreviewLoading(true);
       setPreviewError(false);
       setPdfDimensiones(null);
+      setMantenerOriginal(true);
       return;
     }
 
@@ -208,33 +232,20 @@ export function SolicitarFirmaDialog({
 
     setLoading(true);
     try {
-      // Enviar posición en formato v2 (porcentajes) con metadata del PDF
-      let posicionFirma = undefined;
+      // CAMBIO: Enviar todas las posiciones, no solo la primera
+      let posicionesFirmaParaEnviar = undefined;
+
       if (posicionesFirma.length > 0 && pdfDimensiones) {
-        const pos = posicionesFirma[0];
+        // Convertir todas las posiciones al formato esperado por el backend
+        const posicionesConvertidas = posicionesFirma.map((pos) => ({
+          pagina: -1, // Última página por defecto
+          x: (pos.x / 100) * pdfDimensiones.width,
+          y: ((100 - pos.y - pos.height) / 100) * pdfDimensiones.height,
+          width: (pos.width / 100) * pdfDimensiones.width,
+          height: (pos.height / 100) * pdfDimensiones.height,
+        }));
 
-        // Calcular dimensiones de la firma en porcentaje del PDF
-        // pos.width y pos.height ya están en % del contenedor iframe
-        // pero necesitamos asegurar valores razonables
-        const widthPorcentaje = pos.width || 30; // 30% del ancho por defecto
-        const heightPorcentaje = pos.height || 7; // 7% del alto por defecto
-
-        // Formato v2: porcentajes con metadata del PDF
-        posicionFirma = {
-          version: 'v2',
-          porcentajes: {
-            pagina: -1, // Última página por defecto
-            xPorcentaje: pos.x,
-            yPorcentaje: pos.y,
-            widthPorcentaje,
-            heightPorcentaje,
-          },
-          pdfDimensiones: {
-            width: pdfDimensiones.width,
-            height: pdfDimensiones.height,
-            numPaginas: pdfDimensiones.numPaginas,
-          },
-        };
+        posicionesFirmaParaEnviar = posicionesConvertidas;
       }
 
       const body = {
@@ -244,7 +255,10 @@ export function SolicitarFirmaDialog({
           empleadoId,
         })),
         ordenFirma: false,
-        posicionFirma,
+        // CAMBIO: Usar el campo correcto para múltiples posiciones
+        posicionesFirma: posicionesFirmaParaEnviar,
+        mantenerOriginal,
+        incluirFirmaEmpresa,
       };
 
       const res = await fetch('/api/firma/solicitudes', {
@@ -316,8 +330,71 @@ export function SolicitarFirmaDialog({
               disabled={loading || cargandoEmpleados}
             />
             <p className="text-xs text-gray-500">
-              Puedes seleccionar empleados individuales o usar “Seleccionar todos” para un envío masivo.
+              Puedes seleccionar empleados individuales o usar "Seleccionar todos" para un envío masivo.
             </p>
+          </div>
+
+          {/* Opciones de configuración */}
+          <div className="space-y-4 p-4 border rounded-lg bg-gray-50/50">
+            <h3 className="text-sm font-semibold text-gray-900">Configuración</h3>
+
+            {/* Mantener documento original */}
+            <TooltipProvider>
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="mantener-original" className="text-sm font-medium cursor-pointer">
+                    Mantener documento original
+                  </Label>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Info className="w-4 h-4 text-gray-400 cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs">
+                      <p className="text-xs">
+                        Si está activado, se crearán copias individuales del documento firmado para cada empleado.
+                        Si está desactivado, el documento original será reemplazado con la versión firmada.
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
+                <Switch
+                  id="mantener-original"
+                  checked={mantenerOriginal}
+                  onCheckedChange={setMantenerOriginal}
+                  disabled={loading}
+                />
+              </div>
+            </TooltipProvider>
+
+            {/* Añadir firma de empresa */}
+            {firmaEmpresaDisponible && (
+              <TooltipProvider>
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor="incluir-firma-empresa" className="text-sm font-medium cursor-pointer">
+                      Añadir firma de empresa
+                    </Label>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Info className="w-4 h-4 text-gray-400 cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-xs">
+                        <p className="text-xs">
+                          La firma de la empresa se añadirá automáticamente al documento cuando todos los empleados hayan firmado.
+                          Aparecerá debajo de las firmas de los empleados.
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
+                  <Switch
+                    id="incluir-firma-empresa"
+                    checked={incluirFirmaEmpresa}
+                    onCheckedChange={setIncluirFirmaEmpresa}
+                    disabled={loading}
+                  />
+                </div>
+              </TooltipProvider>
+            )}
           </div>
 
           <div className="space-y-3">

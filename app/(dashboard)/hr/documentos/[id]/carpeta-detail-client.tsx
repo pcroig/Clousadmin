@@ -15,15 +15,17 @@ import {
   FileText,
   Folder,
   FolderInput,
+  Loader2,
   Settings,
   Trash2,
   Upload,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
+import { useSWRConfig } from 'swr';
 
-import { DocumentUploadArea } from '@/components/shared/document-upload-area';
+import { DocumentUploadArea, type DocumentUploadAreaHandle } from '@/components/shared/document-upload-area';
 import { DocumentViewerModal, useDocumentViewer } from '@/components/shared/document-viewer';
 import { EmptyState } from '@/components/shared/empty-state';
 import { InfoTooltip } from '@/components/shared/info-tooltip';
@@ -136,8 +138,11 @@ function getDocumentIcon(mimeType: string) {
 
 export function CarpetaDetailClient({ carpeta, empleados = [] }: CarpetaDetailClientProps) {
   const router = useRouter();
+  const { mutate } = useSWRConfig();
+  const uploadRef = useRef<DocumentUploadAreaHandle>(null);
   const [modalUploadOpen, setModalUploadOpen] = useState(false);
   const [empleadoDestinoUpload, setEmpleadoDestinoUpload] = useState('');
+  const [selectedFilesCount, setSelectedFilesCount] = useState(0);
   const [modalEliminar, setModalEliminar] = useState(false);
   const [eliminando, setEliminando] = useState(false);
   const [documentoAEliminar, setDocumentoAEliminar] = useState<string | null>(
@@ -305,7 +310,8 @@ export function CarpetaDetailClient({ carpeta, empleados = [] }: CarpetaDetailCl
 
       toast.success('Asignación actualizada correctamente');
       setModalEditarAsignacion(false);
-      router.refresh();
+      // Revalidar carpetas
+      await mutate('/api/carpetas');
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Error al actualizar asignación';
       toast.error(message);
@@ -370,7 +376,9 @@ export function CarpetaDetailClient({ carpeta, empleados = [] }: CarpetaDetailCl
       setModalEliminar(false);
       setDocumentoAEliminar(null);
       toast.success('Documento eliminado correctamente');
-      router.refresh();
+      // Revalidar documentos de esta carpeta
+      await mutate(`/api/documentos?carpetaId=${carpeta.id}`);
+      await mutate('/api/carpetas');
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Error al eliminar documento';
       toast.error(message);
@@ -410,7 +418,8 @@ export function CarpetaDetailClient({ carpeta, empleados = [] }: CarpetaDetailCl
       setDocumentoAEditar(null);
       setNuevoNombre('');
       toast.success('Nombre del documento actualizado correctamente');
-      router.refresh();
+      // Revalidar documentos de esta carpeta
+      await mutate(`/api/documentos?carpetaId=${carpeta.id}`);
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Error al actualizar nombre';
       toast.error(message);
@@ -461,7 +470,10 @@ export function CarpetaDetailClient({ carpeta, empleados = [] }: CarpetaDetailCl
       setDocumentoAMover(null);
       setCarpetaDestino('');
       toast.success('Documento movido a otra carpeta correctamente');
-      router.refresh();
+      // Revalidar documentos de ambas carpetas
+      await mutate(`/api/documentos?carpetaId=${carpeta.id}`);
+      await mutate(`/api/documentos?carpetaId=${carpetaDestino}`);
+      await mutate('/api/carpetas');
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Error al mover documento';
       toast.error(message);
@@ -910,20 +922,50 @@ export function CarpetaDetailClient({ carpeta, empleados = [] }: CarpetaDetailCl
             )}
 
             <DocumentUploadArea
+              ref={uploadRef}
               carpetaId={carpeta.id}
               variant="dropzone"
-              description="PDF, JPG o PNG | Máx. 10MB"
+              mode="preview"
+              description="PDF, JPG o PNG | Máx. 10MB | Selecciona archivos y luego presiona Subir"
               onUploaded={() => {
                 setModalUploadOpen(false);
                 setEmpleadoDestinoUpload('');
+                setSelectedFilesCount(0);
                 router.refresh();
               }}
+              onFilesSelected={(files) => setSelectedFilesCount(files.length)}
               disabled={carpeta.esCarpetaMasterHR && !empleadoDestinoUpload}
               getExtraFormData={() =>
                 carpeta.esCarpetaMasterHR && empleadoDestinoUpload ? { empleadoId: empleadoDestinoUpload } : undefined
               }
             />
           </div>
+
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setModalUploadOpen(false)}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={async () => {
+                if (uploadRef.current) {
+                  await uploadRef.current.upload();
+                }
+              }}
+              disabled={selectedFilesCount === 0 || uploadRef.current?.isUploading || (carpeta.esCarpetaMasterHR && !empleadoDestinoUpload)}
+            >
+              {uploadRef.current?.isUploading ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Subiendo...
+                </>
+              ) : (
+                <>
+                  <Upload className="h-4 w-4 mr-2" />
+                  Subir {selectedFilesCount > 0 && `(${selectedFilesCount})`}
+                </>
+              )}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 

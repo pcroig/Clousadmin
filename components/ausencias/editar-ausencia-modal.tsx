@@ -1,6 +1,9 @@
 // ========================================
-// Editar Ausencia Modal - Shared Component
+// Ausencia Modal - Crear y Editar Ausencias
 // ========================================
+// Modal unificado para crear y editar ausencias
+// - Modo CREAR: ausencia = null, muestra selector de empleado
+// - Modo EDITAR: ausencia != null, usa empleadoId existente
 
 'use client';
 
@@ -26,7 +29,15 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
 import { EstadoAusencia, PeriodoMedioDiaValue } from '@/lib/constants/enums';
+import { extractArrayFromResponse } from '@/lib/utils/api-response';
 import { parseJson } from '@/lib/utils/json';
+
+interface Empleado {
+  id: string;
+  nombre: string;
+  apellidos: string;
+  puesto: string;
+}
 
 export interface EditarAusencia {
   id: string;
@@ -41,6 +52,7 @@ export interface EditarAusencia {
   motivo: string | null;
   justificanteUrl?: string | null;
   documentoId?: string | null;
+  diasSolicitados?: number | string;
   empleado: {
     nombre: string;
     apellidos: string;
@@ -76,6 +88,16 @@ export function EditarAusenciaModal({
   onSuccess,
   contexto = 'empleado',
 }: EditarAusenciaModalProps) {
+  // Modo crear o editar
+  const isCreating = ausencia === null;
+  const isEditing = !isCreating;
+
+  // Estados para modo CREAR: selector de empleado
+  const [empleados, setEmpleados] = useState<Empleado[]>([]);
+  const [loadingEmpleados, setLoadingEmpleados] = useState(false);
+  const [selectedEmpleadoId, setSelectedEmpleadoId] = useState('');
+
+  // Estados del formulario
   const [tipo, setTipo] = useState('vacaciones');
   const [fechaInicio, setFechaInicio] = useState<Date | undefined>();
   const [fechaFin, setFechaFin] = useState<Date | undefined>();
@@ -90,6 +112,13 @@ export function EditarAusenciaModal({
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState('');
 
+  // Saldo de vacaciones
+  const [saldoDisponible, setSaldoDisponible] = useState<number | null>(null);
+  const [loadingSaldo, setLoadingSaldo] = useState(false);
+
+  // EmpleadoId efectivo: seleccionado (crear) o de ausencia (editar)
+  const efectivoEmpleadoId = isCreating ? selectedEmpleadoId : ausencia?.empleadoId || '';
+
   const isSingleDaySelection = useMemo(() => {
     if (!fechaInicio || !fechaFin) return false;
     return fechaInicio.toDateString() === fechaFin.toDateString();
@@ -97,20 +126,114 @@ export function EditarAusenciaModal({
 
   const medioDiaDisponible = Boolean(fechaInicio && fechaFin && isSingleDaySelection);
 
-  // Precargar datos cuando se abre el modal
-  useEffect(() => {
-    if (!open || !ausencia) return;
+  // Calcular días solicitados (aproximación simple para validación de frontend)
+  const diasSolicitados = useMemo(() => {
+    if (!fechaInicio || !fechaFin) return 0;
 
-    setTipo(ausencia.tipo);
-    setFechaInicio(new Date(ausencia.fechaInicio));
-    setFechaFin(new Date(ausencia.fechaFin));
-    setMedioDia(Boolean(ausencia.medioDia));
-    setPeriodo((ausencia.periodo as PeriodoMedioDiaValue) || 'manana');
-    setMotivo(ausencia.motivo || '');
-    setJustificanteUrl(ausencia.justificanteUrl || null);
-    setDocumentoId(ausencia.documentoId || null);
-    setJustificanteFile(null);
-    setError('');
+    const diffTime = Math.abs(fechaFin.getTime() - fechaInicio.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+
+    return medioDia ? diffDays * 0.5 : diffDays;
+  }, [fechaInicio, fechaFin, medioDia]);
+
+  // Validar si excede el saldo disponible
+  const excedeSaldo = useMemo(() => {
+    if (tipo !== 'vacaciones' || saldoDisponible === null) return false;
+
+    // MODO EDITAR: considerar días originales
+    if (isEditing && ausencia) {
+      const diasOriginales = Number(ausencia.diasSolicitados) || 0;
+      const saldoConDevolucion = saldoDisponible + diasOriginales;
+      return diasSolicitados > saldoConDevolucion;
+    }
+
+    // MODO CREAR: comparar directamente
+    return diasSolicitados > saldoDisponible;
+  }, [tipo, diasSolicitados, saldoDisponible, ausencia, isEditing]);
+
+  // Cargar empleados activos (solo en modo CREAR)
+  useEffect(() => {
+    if (!open || !isCreating) return;
+
+    const fetchEmpleados = async () => {
+      setLoadingEmpleados(true);
+      try {
+        const response = await fetch('/api/empleados?activos=true');
+        if (!response.ok) throw new Error('Error al cargar empleados');
+
+        const data = await parseJson<{ data: Empleado[] }>(response);
+        const empleadosArray = extractArrayFromResponse(data) as Empleado[];
+        setEmpleados(empleadosArray);
+      } catch (err) {
+        console.error('[fetchEmpleados] Error:', err);
+        toast.error('Error al cargar la lista de empleados');
+        setEmpleados([]);
+      } finally {
+        setLoadingEmpleados(false);
+      }
+    };
+
+    fetchEmpleados();
+  }, [open, isCreating]);
+
+  // Cargar saldo del empleado
+  useEffect(() => {
+    if (!efectivoEmpleadoId || tipo !== 'vacaciones') {
+      setSaldoDisponible(null);
+      return;
+    }
+
+    const fetchSaldo = async () => {
+      setLoadingSaldo(true);
+      try {
+        const response = await fetch(`/api/ausencias/saldo?empleadoId=${efectivoEmpleadoId}`);
+        if (!response.ok) throw new Error('Error al cargar saldo');
+
+        const data = await parseJson<{ diasDisponibles: number }>(response);
+        setSaldoDisponible(data.diasDisponibles);
+      } catch (err) {
+        console.error('[fetchSaldo] Error:', err);
+        setSaldoDisponible(null);
+      } finally {
+        setLoadingSaldo(false);
+      }
+    };
+
+    fetchSaldo();
+  }, [efectivoEmpleadoId, tipo]);
+
+  // Precargar datos cuando se abre el modal en MODO EDITAR
+  useEffect(() => {
+    if (!open) return;
+
+    if (ausencia) {
+      // MODO EDITAR: precargar datos existentes
+      setTipo(ausencia.tipo);
+      setFechaInicio(new Date(ausencia.fechaInicio));
+      setFechaFin(new Date(ausencia.fechaFin));
+      setMedioDia(Boolean(ausencia.medioDia));
+      setPeriodo((ausencia.periodo as PeriodoMedioDiaValue) || 'manana');
+      setMotivo(ausencia.motivo || '');
+      setJustificanteUrl(ausencia.justificanteUrl || null);
+      setDocumentoId(ausencia.documentoId || null);
+      setJustificanteFile(null);
+      setError('');
+      setSaldoDisponible(null);
+    } else {
+      // MODO CREAR: resetear a valores por defecto
+      setSelectedEmpleadoId('');
+      setTipo('vacaciones');
+      setFechaInicio(undefined);
+      setFechaFin(undefined);
+      setMedioDia(false);
+      setPeriodo('manana');
+      setMotivo('');
+      setJustificanteUrl(null);
+      setDocumentoId(null);
+      setJustificanteFile(null);
+      setError('');
+      setSaldoDisponible(null);
+    }
   }, [open, ausencia]);
 
   const handleClose = () => {
@@ -143,9 +266,12 @@ export function EditarAusenciaModal({
   };
 
   const handleSave = async () => {
-    if (!ausencia) return;
+    // Validaciones comunes
+    if (isCreating && !selectedEmpleadoId) {
+      setError('Selecciona un empleado');
+      return;
+    }
 
-    // Validaciones
     if (!fechaInicio || !fechaFin) {
       setError('Selecciona las fechas de inicio y fin');
       return;
@@ -161,6 +287,18 @@ export function EditarAusenciaModal({
       return;
     }
 
+    // Validar saldo de vacaciones
+    if (tipo === 'vacaciones' && excedeSaldo) {
+      if (isEditing && ausencia) {
+        const diasOriginales = Number(ausencia.diasSolicitados) || 0;
+        const saldoConDevolucion = (saldoDisponible || 0) + diasOriginales;
+        setError(`No hay saldo suficiente. Disponibles (con devolución): ${saldoConDevolucion} días, solicitados: ${diasSolicitados} días.`);
+      } else {
+        setError(`No hay saldo suficiente. Disponibles: ${saldoDisponible} días, solicitados: ${diasSolicitados} días.`);
+      }
+      return;
+    }
+
     setSaving(true);
     setError('');
 
@@ -171,19 +309,44 @@ export function EditarAusenciaModal({
       // Subir justificante si hay archivo nuevo
       if (justificanteFile) {
         setUploadingJustificante(true);
-        const uploadResult = await uploadJustificante(justificanteFile, ausencia.empleadoId);
+        const uploadResult = await uploadJustificante(justificanteFile, efectivoEmpleadoId);
         newJustificanteUrl = uploadResult.url;
         newDocumentoId = uploadResult.documentoId || null;
         setUploadingJustificante(false);
       }
 
+      // Normalizar fechas a medianoche UTC antes de enviar
+      // Usar Date.UTC() para evitar problemas de zona horaria
+      const fechaInicioNormalizada = new Date(Date.UTC(
+        fechaInicio.getFullYear(),
+        fechaInicio.getMonth(),
+        fechaInicio.getDate(),
+        0, 0, 0, 0
+      ));
+
+      const fechaFinNormalizada = new Date(Date.UTC(
+        fechaFin.getFullYear(),
+        fechaFin.getMonth(),
+        fechaFin.getDate(),
+        0, 0, 0, 0
+      ));
+
       const payload: Record<string, unknown> = {
         tipo,
-        fechaInicio: fechaInicio.toISOString(),
-        fechaFin: fechaFin.toISOString(),
+        fechaInicio: fechaInicioNormalizada.toISOString(),
+        fechaFin: fechaFinNormalizada.toISOString(),
         medioDia,
-        motivo: motivo || null,
       };
+
+      // Solo agregar motivo si tiene valor (Zod no acepta null en campos .optional())
+      if (motivo && motivo.trim()) {
+        payload.motivo = motivo.trim();
+      }
+
+      // MODO CREAR: agregar empleadoId (el estado lo determina automáticamente el backend)
+      if (isCreating) {
+        payload.empleadoId = selectedEmpleadoId;
+      }
 
       if (medioDia) {
         payload.periodo = periodo;
@@ -197,23 +360,27 @@ export function EditarAusenciaModal({
         payload.documentoId = newDocumentoId;
       }
 
-      const response = await fetch(`/api/ausencias/${ausencia.id}`, {
-        method: 'PATCH',
+      // Elegir endpoint según modo
+      const url = isCreating ? '/api/ausencias' : `/api/ausencias/${ausencia!.id}`;
+      const method = isCreating ? 'POST' : 'PATCH';
+
+      const response = await fetch(url, {
+        method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
 
       const data = await parseJson<{ error?: string }>(response);
       if (!response.ok) {
-        throw new Error(data.error || 'Error al actualizar la ausencia');
+        throw new Error(data.error || (isCreating ? 'Error al crear la ausencia' : 'Error al actualizar la ausencia'));
       }
 
-      toast.success('Ausencia actualizada correctamente');
+      toast.success(isCreating ? 'Ausencia creada correctamente' : 'Ausencia actualizada correctamente');
       onSuccess();
       handleClose();
     } catch (err: unknown) {
       console.error('[handleSave] Error:', err);
-      const errorMessage = err instanceof Error ? err.message : 'Error al actualizar la ausencia';
+      const errorMessage = err instanceof Error ? err.message : (isCreating ? 'Error al crear la ausencia' : 'Error al actualizar la ausencia');
       setError(errorMessage);
       toast.error(errorMessage);
     } finally {
@@ -223,7 +390,7 @@ export function EditarAusenciaModal({
   };
 
   const handleDelete = async () => {
-    if (!ausencia) return;
+    if (!ausencia) return; // Solo disponible en modo EDITAR
 
     if (!confirm('¿Estás seguro de que quieres eliminar esta ausencia? Esta acción no se puede deshacer.')) {
       return;
@@ -255,8 +422,6 @@ export function EditarAusenciaModal({
     }
   };
 
-  if (!ausencia) return null;
-
   const formatSolicitudFecha = (dateString: string) => {
     try {
       return format(new Date(dateString), 'd MMM yyyy', { locale: es });
@@ -265,24 +430,59 @@ export function EditarAusenciaModal({
     }
   };
 
+  const empleadoSeleccionado = empleados.find((e) => e.id === selectedEmpleadoId);
+
   return (
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && handleClose()}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>Editar Ausencia</DialogTitle>
+          <DialogTitle>{isCreating ? 'Crear Ausencia' : 'Editar Ausencia'}</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4">
-          {/* Banner sin fondo con nombre, rol y fecha */}
-          <div className="border-b border-gray-200 pb-4">
-            <p className="text-sm font-medium text-gray-900">
-              {ausencia.empleado.nombre} {ausencia.empleado.apellidos}
-            </p>
-            <p className="text-xs text-gray-500">{ausencia.empleado.puesto}</p>
-            <p className="text-xs text-gray-500 mt-1">
-              Solicitada el {formatSolicitudFecha(ausencia.createdAt)}
-            </p>
-          </div>
+          {/* MODO EDITAR: Banner con info del empleado */}
+          {isEditing && ausencia && (
+            <div className="border-b border-gray-200 pb-4">
+              <p className="text-sm font-medium text-gray-900">
+                {ausencia.empleado.nombre} {ausencia.empleado.apellidos}
+              </p>
+              <p className="text-xs text-gray-500">{ausencia.empleado.puesto}</p>
+              <p className="text-xs text-gray-500 mt-1">
+                Solicitada el {formatSolicitudFecha(ausencia.createdAt)}
+              </p>
+            </div>
+          )}
+
+          {/* MODO CREAR: Selector de empleado */}
+          {isCreating && (
+            <Field>
+              <FieldLabel>Empleado *</FieldLabel>
+              {loadingEmpleados ? (
+                <div className="flex items-center gap-2 text-sm text-gray-500">
+                  <Spinner className="size-4" />
+                  Cargando empleados...
+                </div>
+              ) : (
+                <Select value={selectedEmpleadoId} onValueChange={setSelectedEmpleadoId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecciona un empleado" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {empleados.map((emp) => (
+                      <SelectItem key={emp.id} value={emp.id}>
+                        {emp.nombre} {emp.apellidos} - {emp.puesto}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+              {empleadoSeleccionado && (
+                <p className="text-xs text-gray-500 mt-1">
+                  {empleadoSeleccionado.puesto}
+                </p>
+              )}
+            </Field>
+          )}
 
           {/* Tipo de ausencia */}
           <Field>
@@ -299,6 +499,27 @@ export function EditarAusenciaModal({
                 ))}
               </SelectContent>
             </Select>
+            {/* Validación de saldo para vacaciones */}
+            {tipo === 'vacaciones' && efectivoEmpleadoId && loadingSaldo && (
+              <div className="mt-2">
+                <p className="text-xs text-gray-500 flex items-center gap-2">
+                  <Spinner className="size-3" />
+                  Verificando saldo disponible...
+                </p>
+              </div>
+            )}
+            {tipo === 'vacaciones' && efectivoEmpleadoId && !loadingSaldo && excedeSaldo && (
+              <div className="mt-2 bg-red-50 border border-red-200 rounded-lg p-3">
+                <p className="text-sm text-red-800 font-medium">⚠️ Saldo insuficiente</p>
+                <p className="text-xs text-red-700 mt-1">
+                  Días solicitados: {diasSolicitados} | Disponibles: {
+                    isEditing && ausencia
+                      ? (saldoDisponible || 0) + (Number(ausencia.diasSolicitados) || 0)
+                      : (saldoDisponible || 0)
+                  } días
+                </p>
+              </div>
+            )}
           </Field>
 
           {/* Fechas - Rango */}
@@ -428,30 +649,39 @@ export function EditarAusenciaModal({
         </div>
 
         <DialogFooter>
-          <Button
-            variant="destructive"
-            onClick={handleDelete}
-            disabled={saving || deleting || uploadingJustificante}
-            className="mr-auto"
-          >
-            {deleting ? (
-              <>
-                <Spinner className="size-3 mr-2" />
-                Eliminando...
-              </>
-            ) : (
-              <>
-                <Trash2 className="size-4 mr-2" />
-                Eliminar
-              </>
-            )}
-          </Button>
+          {/* Botón eliminar solo en modo EDITAR */}
+          {isEditing && (
+            <Button
+              variant="destructive"
+              onClick={handleDelete}
+              disabled={saving || deleting || uploadingJustificante}
+              className="mr-auto"
+            >
+              {deleting ? (
+                <>
+                  <Spinner className="size-3 mr-2" />
+                  Eliminando...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="size-4 mr-2" />
+                  Eliminar
+                </>
+              )}
+            </Button>
+          )}
+
           <LoadingButton
             onClick={handleSave}
             loading={saving || uploadingJustificante}
-            disabled={saving || deleting || uploadingJustificante}
+            disabled={saving || deleting || uploadingJustificante || loadingEmpleados}
           >
-            {uploadingJustificante ? 'Subiendo...' : saving ? 'Guardando...' : 'Guardar cambios'}
+            {uploadingJustificante
+              ? 'Subiendo...'
+              : saving
+                ? (isCreating ? 'Creando...' : 'Guardando...')
+                : (isCreating ? 'Crear ausencia' : 'Guardar cambios')
+            }
           </LoadingButton>
         </DialogFooter>
       </DialogContent>

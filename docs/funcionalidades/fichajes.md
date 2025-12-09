@@ -17,7 +17,11 @@ El sistema de fichajes permite a los empleados registrar su jornada laboral comp
 - **Discrepancias**: las solicitudes de corrección rechazadas permanecen visibles en el historial del fichaje para garantizar transparencia legal. No se permite su eliminación.
 - **Exportación Excel**: los empleados pueden descargar su historial completo de fichajes desde `Ajustes > General > Exportar Fichajes`. Incluye fechas, eventos, horas trabajadas/pausas y discrepancias.
 - **Sincronización en tiempo real**: el widget de fichaje y la tabla de registros se actualizan automáticamente cuando se ficha o se edita un evento gracias al evento global `fichaje-updated`.
-- **Auditoría de ediciones**: cada vez que HR/Manager crea, edita o elimina un evento en nombre del empleado se envía una notificación (`fichaje_modificado`) y se registra el cambio con motivo.
+- **Auditoría de ediciones y notificaciones**: cada vez que HR/Manager crea, edita o elimina un evento en nombre de un empleado:
+  - ✅ Se envía notificación `fichaje_modificado` al empleado afectado
+  - ✅ Notificación incluye: quién realizó el cambio, qué acción (creado/editado/eliminado), fecha del fichaje y detalles/motivo
+  - ✅ Se registra el cambio con `motivoEdicion` en el modelo `fichaje_eventos`
+  - ✅ Empleado puede revocar el cambio generando una discrepancia (según proceso formal de correcciones)
 
 ## Estados del Fichaje
 
@@ -470,9 +474,13 @@ Un único modal reutilizable para **crear** y **editar** fichajes con múltiples
   - Selector de tipo de evento
   - Input de hora
   - Botón de eliminar
-- **Validación anti-futuro**: No permite crear/editar eventos para fechas u horas futuras
+- **Validación anti-futuro**:
+  - ✅ Permite editar fichajes del **día actual (hoy)**
+  - ❌ Bloquea edición de fechas futuras (mañana en adelante)
+  - ❌ No permite crear eventos con hora futura
+  - Normaliza fechas a medianoche para comparación precisa
 - **Indicador de edición**: Muestra qué eventos fueron previamente editados
-- **Motivo opcional**: Campo de texto para justificar el fichaje/cambio
+- **Motivo opcional**: Campo de texto para justificar el fichaje/cambio (se elimina banner de discrepancias para empleados)
 
 #### Modos de Operación
 
@@ -532,9 +540,20 @@ Un único modal reutilizable para **crear** y **editar** fichajes con múltiples
 #### Endpoints Utilizados
 
 - **Crear fichaje directo** (HR/Manager): `POST /api/fichajes` + `POST /api/fichajes/eventos`
+  - `POST /api/fichajes/eventos`: Si el editor es diferente al empleado dueño, envía notificación `fichaje_modificado` con acción `creado`
 - **Crear solicitud** (Empleado): `POST /api/solicitudes` (tipo: `fichaje_manual`)
-- **Editar fichaje**: `PATCH /api/fichajes/eventos/[id]`, `POST /api/fichajes/eventos`, `DELETE /api/fichajes/eventos/[id]`
+- **Editar fichaje**:
+  - `PATCH /api/fichajes/eventos/[id]`: Actualiza tipo/hora de evento existente. **Notifica** si editor ≠ empleado (acción `editado`)
+  - `POST /api/fichajes/eventos`: Crea nuevo evento. **Notifica** si editor ≠ empleado (acción `creado`)
+  - `DELETE /api/fichajes/eventos/[id]`: Elimina evento. **Notifica** si editor ≠ empleado (acción `eliminado`)
+  - Todos recalculan `horasTrabajadas` y `horasEnPausa` automáticamente
 - **Cargar fichaje**: `GET /api/fichajes/[id]`
+
+**Notificaciones automáticas (Dic 2025)**:
+- ✅ Todas las operaciones de edición (PATCH/POST/DELETE) verifican si `session.user.empleadoId !== evento.fichaje.empleadoId`
+- ✅ Si es diferente, crean notificación `fichaje_modificado` con datos completos del cambio
+- ✅ Empleado afectado recibe notificación en bandeja de entrada
+- ✅ Sistema de revocación disponible mediante solicitudes de corrección
 
 ### Solicitudes de corrección (flujo formal)
 - **Empleados**: desde `/empleado/horario/fichajes` envían una solicitud indicando motivo y nuevos valores. Endpoint: `POST /api/fichajes/correcciones`.
@@ -554,6 +573,35 @@ Un único modal reutilizable para **crear** y **editar** fichajes con múltiples
 ✅ No puede pausar si no está trabajando
 ✅ No puede reanudar si no está en pausa
 ✅ No puede finalizar si no tiene entrada o está en pausa
+
+#### Dialog de Descanso Incompleto
+
+**Componente**: `components/shared/fichaje-widget.tsx` (líneas 827-886)
+
+Cuando un empleado intenta finalizar su jornada sin registrar el descanso requerido (o con descanso incompleto), el sistema muestra un `AlertDialog` informativo:
+
+**Comportamiento**:
+1. Backend retorna error `DESCANSO_INCOMPLETO` con metadatos:
+   - `tienePausaInicio`: boolean
+   - `tienePausaFin`: boolean
+   - `fichajeId`: string
+
+2. Widget carga eventos del estado (optimizado, sin fetch adicional) y muestra:
+   - **Título**: "Descanso incompleto" con icono de alerta naranja
+   - **Mensaje contextual**:
+     - "no has registrado ninguna pausa" (si no hay pausa_inicio ni pausa_fin)
+     - "no has registrado el fin de la pausa" (si hay pausa_inicio pero no pausa_fin)
+     - "la pausa está incompleta" (otros casos)
+   - **Lista de eventos registrados**: Muestra tipo y hora de cada evento (Entrada, Inicio de pausa, Fin de pausa, Salida)
+   - **Botones de acción**:
+     - `Confirmar`: Finaliza la jornada sin descanso (llama `handleConfirmarSinDescanso`)
+     - `Editar eventos`: Abre el modal de edición para corregir (llama `handleEditarEventos`)
+
+**UX optimizada (Dic 2025)**:
+- ✅ Muestra eventos existentes con sus horas formateadas
+- ✅ Botón principal dice "Confirmar" (no "Confirmar así")
+- ✅ Sin botón "Cancelar" en footer (se cierra con click fuera)
+- ✅ Eventos cargados desde estado del widget (performance mejorada)
 
 ### Al Validar (CRON o Cuadrar)
 
@@ -1092,3 +1140,201 @@ Componente unificado para navegación de períodos de tiempo (Día/Semana/Mes).
 - ✅ **Promedios históricos para cuadraje**: Sistema inteligente que calcula eventos propuestos basándose en el promedio de los últimos 5 días con eventos del mismo empleado, ajustando la salida según horas esperadas (2025-12-04)
 - ✅ **Rate limiting en cuadraje masivo**: Límite de 50 fichajes por request para proteger transacciones (2025-12-04)
 - ✅ **Campo jornadaId en fichajes**: Permite filtrar históricos por jornada para mayor precisión en promedios (2025-12-04)
+- ✅ **Fichajes extraordinarios**: Sistema completo para registrar horas extra en días festivos o no laborables (2025-12-08)
+
+---
+
+## 12. Fichajes Extraordinarios ⚡
+
+**Fecha de implementación**: 8 de diciembre 2025
+**Estado**: ✅ Completo y en producción
+
+### 12.1 Visión General
+
+Los fichajes extraordinarios permiten a los empleados registrar horas trabajadas fuera de su horario ordinario, específicamente en:
+- Días festivos
+- Fines de semana
+- Días no laborables según calendario empresa
+- Días sin jornada asignada
+
+### 12.2 Arquitectura
+
+**Schema**: Nuevo enum `TipoFichaje` y campo en tabla `fichajes`
+
+```prisma
+enum TipoFichaje {
+  ordinario       // Fichaje dentro del horario laboral normal
+  extraordinario  // Fichaje fuera de horario (festivos, fines de semana)
+}
+
+model fichajes {
+  // ... otros campos
+  tipoFichaje TipoFichaje @default(ordinario)
+
+  @@index([tipoFichaje])
+  @@index([empleadoId, tipoFichaje, fecha(sort: Desc)])
+}
+```
+
+**Migración**: `20251207225051_add_tipo_fichaje`
+- Compatibilidad 100% hacia atrás (todos los fichajes existentes = ordinario)
+
+### 12.3 Flujo de Usuario
+
+#### Paso 1: Intento Inicial (siempre ordinario)
+
+```
+Usuario hace clic en "Fichar" → Widget envía como 'ordinario'
+```
+
+#### Paso 2: Validación Backend
+
+```typescript
+// app/api/fichajes/route.ts:373-465
+if (tipoFichaje === 'extraordinario') {
+  // Validaciones simplificadas:
+  // - Solo entrada/salida (no pausas)
+  // - NO requiere jornadaId
+  // - NO valida día laborable
+  // - Valida límites globales empresa (si existen)
+} else {
+  // Validaciones ordinarias (código original)
+  // - Requiere jornadaId
+  // - Valida día laborable
+  // - Permite pausas
+}
+```
+
+#### Paso 3: Error Estructurado
+
+Si el día NO es laborable, backend retorna:
+
+```json
+{
+  "error": "No puedes fichar en este día. Es festivo o no laborable según tu jornada",
+  "code": "DIA_NO_LABORABLE",
+  "sugerencia": "Puedes registrar este fichaje como horas extraordinarias si trabajaste excepcionalmente este día"
+}
+```
+
+#### Paso 4: Confirmación Usuario
+
+```tsx
+// components/shared/fichaje-widget.tsx:434-438
+if (error?.code === 'DIA_NO_LABORABLE' && !forceExtraordinario) {
+  setPendingFichajeTipo(tipo);
+  setShowExtraordinarioDialog(true); // Muestra AlertDialog
+  return;
+}
+```
+
+AlertDialog ofrece:
+- **Cancelar**: No crea fichaje
+- **Confirmar como extraordinario**: Reenvía con `tipoFichaje: 'extraordinario'`
+
+#### Paso 5: Creación Fichaje Extraordinario
+
+Backend crea fichaje con validaciones simplificadas:
+- ✅ Permite fichar en festivos
+- ✅ Permite fichar sin jornada asignada
+- ❌ Solo permite eventos: `entrada` y `salida` (NO pausas)
+
+### 12.4 Cálculo de Balance
+
+```typescript
+// app/api/fichajes/route.ts:273-278
+const balance = fichaje.tipoFichaje === 'extraordinario'
+  ? horasTrabajadas                    // Todo es balance positivo
+  : horasTrabajadas - horasEsperadas;  // Balance normal
+```
+
+**Diferencia clave**:
+- **Ordinario**: Balance = trabajado - esperado (puede ser negativo)
+- **Extraordinario**: Balance = trabajado (siempre positivo, son horas extra)
+
+### 12.5 Filtros Automáticos
+
+Los fichajes extraordinarios están **excluidos** automáticamente de:
+
+| Funcionalidad | Endpoint/Archivo | Razón |
+|--------------|------------------|-------|
+| Cuadrar fichajes | `/api/fichajes/cuadrar` | Requieren revisión manual individual |
+| Revisión masiva | `/api/fichajes/revision` | Excepcionales, no batch |
+| Promedios históricos | `/api/fichajes/promedios` | Sesgarían patrones ordinarios |
+| Histórico patrones | `lib/calculos/fichajes-historico.ts` | No representan comportamiento habitual |
+| CRON clasificación | `/api/cron/clasificar-fichajes` | CRON solo procesa ordinarios |
+| **Balance de horas** | `lib/calculos/balance-horas.ts` | Solo fichajes ordinarios cuentan para balance |
+
+**Importante**: Los fichajes extraordinarios están **excluidos del balance de horas**. El balance solo considera fichajes ordinarios para calcular la diferencia entre horas trabajadas y esperadas según jornada.
+
+### 12.6 Indicador Visual
+
+**Ubicación**: `/hr/horario/fichajes` (tabla de fichajes)
+
+```tsx
+{fichaje.tipoFichaje === 'extraordinario' && (
+  <Zap className="h-4 w-4 text-amber-500" /> // Icono rayo
+)}
+```
+
+Con tooltip "Horas extra" al hacer hover.
+
+### 12.7 Decisiones de Diseño
+
+#### ¿Por qué no detectar festivos en frontend?
+
+Frontend no tiene acceso a:
+- Calendario de festivos completo
+- Ausencias del empleado
+- Configuración dinámica de días laborables
+
+**Solución**: Backend valida y retorna código específico, frontend reacciona.
+
+#### ¿Por qué solo entrada/salida?
+
+Fichajes extraordinarios son excepcionales. Las pausas son propias de jornadas estructuradas normales.
+
+#### ¿Por qué excluir de cuadrado automático?
+
+Por naturaleza excepcional, requieren validación manual de HR que efectivamente se trabajaron esas horas.
+
+#### ¿Por qué jornadaId puede ser null?
+
+Empleados eventuales o situaciones especiales pueden trabajar sin jornada ordinaria asignada.
+
+### 12.8 Archivos Modificados
+
+| Archivo | Cambios | Líneas |
+|---------|---------|--------|
+| `prisma/schema.prisma` | Enum `TipoFichaje` + campo + índices | 1561-1564 |
+| `app/api/fichajes/route.ts` | Fork de validaciones + error estructurado | 373-465 |
+| `components/shared/fichaje-widget.tsx` | Interceptor error + AlertDialog | 363-464 |
+| `app/api/fichajes/cuadrar/route.ts` | Filtro `tipoFichaje: 'ordinario'` | 131 |
+| `app/api/fichajes/revision/route.ts` | Filtro en query | 246 |
+| `app/api/fichajes/promedios/route.ts` | Filtro en históricos | 48 |
+| `lib/calculos/fichajes-historico.ts` | Filtro en patrones | 114 |
+| `app/api/cron/clasificar-fichajes/route.ts` | Tipo explícito en creación | 87 |
+| `app/(dashboard)/hr/horario/fichajes/fichajes-client.tsx` | Indicador visual ⚡ | N/A |
+| `lib/calculos/balance-horas.ts` | Exclusión de extraordinarios en balance | 118, 206, 344 |
+
+### 12.9 Impacto del Sistema
+
+**Líneas de código**:
+- Agregadas: ~150
+- Modificadas: ~20
+- Eliminadas: ~30
+
+**Compatibilidad**: 100% hacia atrás garantizada (default `ordinario`)
+
+### 12.10 Referencias Técnicas
+
+- **Documentación estados**: [fichajes-estados-flujo.md](fichajes-estados-flujo.md#fichajes-extraordinarios)
+- **Implementación completa**: [2025-12-08-fichajes-extraordinarios.md](../historial/2025-12-08-fichajes-extraordinarios.md)
+- **Schema Prisma**: [schema.prisma:1561-1564](../../prisma/schema.prisma#L1561-L1564)
+- **API validación**: [route.ts:373-465](../../app/api/fichajes/route.ts#L373-L465)
+- **Widget frontend**: [fichaje-widget.tsx:363-464](../../components/shared/fichaje-widget.tsx#L363-L464)
+
+---
+
+**Versión**: 3.9
+**Última actualización**: 8 de diciembre de 2025

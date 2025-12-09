@@ -1,10 +1,12 @@
 'use client';
 
 import { Loader2, Plus, Upload } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
+import { useSWRConfig } from 'swr';
 
-import { DocumentUploadArea } from '@/components/shared/document-upload-area';
+import { DocumentUploadArea, type DocumentUploadAreaHandle } from '@/components/shared/document-upload-area';
 import { SearchableSelect } from '@/components/shared/searchable-select';
 import { Button } from '@/components/ui/button';
 import {
@@ -50,6 +52,9 @@ interface EmpleadoOption {
 }
 
 export function SubirDocumentosModal({ open, onOpenChange, onUploaded }: SubirDocumentosModalProps) {
+  const router = useRouter();
+  const { mutate } = useSWRConfig();
+  const uploadRef = useRef<DocumentUploadAreaHandle>(null);
   const [carpetas, setCarpetas] = useState<CarpetaOption[]>([]);
   const [selectedCarpeta, setSelectedCarpeta] = useState<string>('');
   const [loadingCarpetas, setLoadingCarpetas] = useState(false);
@@ -58,6 +63,7 @@ export function SubirDocumentosModal({ open, onOpenChange, onUploaded }: SubirDo
   const [empleados, setEmpleados] = useState<EmpleadoOption[]>([]);
   const [loadingEmpleados, setLoadingEmpleados] = useState(false);
   const [empleadoDestino, setEmpleadoDestino] = useState<string>('');
+  const [selectedFilesCount, setSelectedFilesCount] = useState(0);
 
   const loadCarpetas = useCallback(async () => {
     setLoadingCarpetas(true);
@@ -175,19 +181,29 @@ export function SubirDocumentosModal({ open, onOpenChange, onUploaded }: SubirDo
       setSelectedCarpeta(data.carpeta.id);
       setNuevoNombreCarpeta('');
       toast.success('Carpeta creada correctamente');
+      // Revalidar lista de carpetas globalmente
+      await mutate('/api/carpetas');
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Error al crear la carpeta';
       toast.error(message);
     } finally {
       setCreatingFolder(false);
     }
-  }, [nuevoNombreCarpeta]);
+  }, [nuevoNombreCarpeta, mutate]);
 
   const handleUploaded = useCallback(() => {
+    // La revalidación ya se hace automáticamente en DocumentUploadArea
+    router.refresh(); // NUEVO: Forzar refresh del Server Component
     onUploaded?.();
     onOpenChange(false);
     setEmpleadoDestino('');
-  }, [onOpenChange, onUploaded]);
+    setSelectedFilesCount(0);
+  }, [onOpenChange, onUploaded, router]);
+
+  const handleUploadClick = useCallback(async () => {
+    if (!uploadRef.current) return;
+    await uploadRef.current.upload();
+  }, []);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -271,10 +287,13 @@ export function SubirDocumentosModal({ open, onOpenChange, onUploaded }: SubirDo
 
           <section>
             <DocumentUploadArea
+              ref={uploadRef}
               carpetaId={selectedCarpeta}
               variant="dropzone"
+              mode="preview"
               onUploaded={handleUploaded}
-              description="PDF, JPG o PNG | Máx. 10MB"
+              onFilesSelected={(files) => setSelectedFilesCount(files.length)}
+              description="PDF, JPG o PNG | Máx. 10MB | Selecciona archivos y luego presiona Subir"
               disabled={!selectedCarpeta || (requiereEmpleadoDestino && !empleadoDestino)}
               getExtraFormData={() =>
                 requiereEmpleadoDestino && empleadoDestino ? { empleadoId: empleadoDestino } : undefined
@@ -286,6 +305,22 @@ export function SubirDocumentosModal({ open, onOpenChange, onUploaded }: SubirDo
         <DialogFooter>
           <Button variant="ghost" onClick={() => onOpenChange(false)}>
             Cancelar
+          </Button>
+          <Button
+            onClick={handleUploadClick}
+            disabled={!selectedCarpeta || selectedFilesCount === 0 || uploadRef.current?.isUploading}
+          >
+            {uploadRef.current?.isUploading ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Subiendo...
+              </>
+            ) : (
+              <>
+                <Upload className="h-4 w-4 mr-2" />
+                Subir {selectedFilesCount > 0 && `(${selectedFilesCount})`}
+              </>
+            )}
           </Button>
         </DialogFooter>
       </DialogContent>

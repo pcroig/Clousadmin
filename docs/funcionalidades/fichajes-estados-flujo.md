@@ -1,17 +1,84 @@
 # Flujo de Estados de Fichajes y Lógica del CRON
 
-**Fecha**: 21 de noviembre 2025  
+**Fecha**: 8 de diciembre 2025
 **Estado**: ✅ Documentado y revisado
 
 ---
 
-## 📊 Estados de Fichaje
+## 📊 Estados y Tipos de Fichaje
+
+### Estados de Fichaje
 
 | Estado | Uso | Cuándo se aplica |
 |--------|-----|------------------|
 | `en_curso` | Fichaje activo durante el día actual | Durante el día de trabajo, mientras el empleado está fichando |
 | `pendiente` | Requiere revisión/cuadrar | Fichajes incompletos o sin registrar que necesitan intervención de HR |
 | `finalizado` | Completado correctamente | Fichajes con todos los eventos requeridos según jornada |
+
+### Tipos de Fichaje
+
+| Tipo | Uso | Validaciones | Cálculo de Balance |
+|------|-----|--------------|-------------------|
+| `ordinario` | Fichaje dentro del horario laboral normal | Requiere jornada asignada, valida día laborable, permite pausas | `horasTrabajadas - horasEsperadas` |
+| `extraordinario` | Fichaje fuera de horario (festivos, sin jornada) | NO requiere jornada, NO valida festivos, solo entrada/salida | `horasTrabajadas` (todas son extra) |
+
+---
+
+## ⚡ Fichajes Extraordinarios
+
+**Desde**: 8 de diciembre 2025
+**Schema**: `TipoFichaje` enum con valores `ordinario` | `extraordinario`
+
+### Casos de Uso
+
+Un fichaje es **extraordinario** cuando:
+- Empleado ficha en día festivo
+- Empleado ficha en día no laborable según calendario empresa
+- Empleado NO tiene jornada asignada
+- Empleado ficha en día no activo en su jornada
+
+### Flujo de Creación
+
+```
+Usuario intenta fichar → Widget envía como 'ordinario'
+                      ↓
+Backend valida día laborable
+                      ↓
+¿Es laborable? → SÍ → Fichaje ordinario creado ✅
+             ↓
+             NO → Error: { code: 'DIA_NO_LABORABLE' }
+                      ↓
+Widget muestra diálogo: "¿Registrar como extraordinario?"
+                      ↓
+Usuario confirma → Widget reenvía con tipoFichaje='extraordinario'
+                      ↓
+Backend valida flujo extraordinario → Fichaje creado ✅
+```
+
+### Características
+
+**Validaciones simplificadas:**
+- ✅ NO requiere `jornadaId` (puede ser null)
+- ✅ NO valida si es día laborable
+- ✅ NO valida festivos ni ausencias
+- ❌ Solo permite eventos: `entrada` y `salida` (NO pausas)
+
+**Filtros automáticos:**
+- Excluidos de cuadrado automático (`/api/fichajes/cuadrar`)
+- Excluidos de revisión masiva (`/api/fichajes/revision`)
+- Excluidos de cálculo de promedios (`/api/fichajes/promedios`)
+- Excluidos de histórico de patrones (`lib/calculos/fichajes-historico`)
+
+**Indicador visual:**
+- Icono ⚡ en tabla de fichajes HR
+- Tooltip "Horas extra" al hacer hover
+
+### Referencias
+
+- **Backend**: `app/api/fichajes/route.ts:373-465`
+- **Frontend**: `components/shared/fichaje-widget.tsx:363-464`
+- **Validación**: `lib/calculos/fichajes.ts:488-531`
+- **Schema**: `prisma/schema.prisma:1561-1564`
 
 ---
 
@@ -345,7 +412,7 @@ La lógica del CRON está **bien implementada** y sigue el flujo esperado:
 - **Modal cuadrar**: `app/api/fichajes/revision/route.ts`
 - **Estados**: `lib/constants/enums.ts:70-74`
 
-**Última actualización**: 21 de noviembre 2025
+**Última actualización**: 8 de diciembre 2025
 
 
 

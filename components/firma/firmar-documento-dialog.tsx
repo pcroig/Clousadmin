@@ -26,6 +26,12 @@ interface FirmarSolicitudResponse {
   success: boolean;
   mensaje?: string;
   error?: string;
+  solicitudCompletada?: boolean;
+  solicitudId?: string;
+  documentoFirmado?: {
+    id: string;
+    nombre: string;
+  };
 }
 
 
@@ -46,7 +52,7 @@ interface FirmarDocumentoDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   firma: FirmaPendiente | null;
-  onSigned?: () => void;
+  onSigned?: (data?: { solicitudCompletada?: boolean; solicitudId?: string; documentoFirmado?: { id: string; nombre: string } }) => void;
 }
 
 export function FirmarDocumentoDialog({
@@ -148,7 +154,11 @@ export function FirmarDocumentoDialog({
       }
 
       toast.success(data.mensaje || 'Documento firmado correctamente');
-      onSigned?.();
+      onSigned?.({
+        solicitudCompletada: data.solicitudCompletada,
+        solicitudId: data.solicitudId,
+        documentoFirmado: data.documentoFirmado,
+      });
       onOpenChange(false);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Error al firmar documento');

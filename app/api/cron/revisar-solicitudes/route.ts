@@ -21,6 +21,7 @@ import { NextRequest } from 'next/server';
 import { registrarAutoCompletadoSolicitud } from '@/lib/auto-completado';
 import { EstadoSolicitud } from '@/lib/constants/enums';
 import { initCronLogger } from '@/lib/cron/logger';
+import { esOrigenOptimista } from '@/lib/fichajes/constantes';
 import { clasificarSolicitud } from '@/lib/ia';
 import { crearNotificacionSolicitudRequiereRevision } from '@/lib/notificaciones';
 import { prisma } from '@/lib/prisma';
@@ -202,13 +203,108 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // ============================================
+    // PROCESAR SOLICITUDES DE CORRECCIÓN DE FICHAJES (OPTIMISTAS)
+    // ============================================
+
+    console.log(`[CRON Revisar Solicitudes] Buscando solicitudes de corrección de fichajes optimistas...`);
+
+    const solicitudesCorreccion = await prisma.solicitudes_correccion_fichaje.findMany({
+      where: {
+        estado: 'pendiente',
+        createdAt: {
+          lte: limiteTiempo // Más de 48h
+        }
+      },
+      include: {
+        fichaje: true
+      }
+    });
+
+    console.log(`[CRON Revisar Solicitudes] ${solicitudesCorreccion.length} solicitudes de corrección a revisar`);
+
+    let correccionesAprobadas = 0;
+    const erroresCorreccion: string[] = [];
+
+    for (const solicitud of solicitudesCorreccion) {
+      try {
+        // Verificar si es corrección optimista
+        const detalles = solicitud.detalles as {
+          eventos?: Array<{tipo: string, hora: string, editado: boolean}>;
+          origen?: string;
+        };
+
+        // Verificar si es corrección optimista (cualquiera de los 3 casos)
+        if (!esOrigenOptimista(detalles.origen)) {
+          // No es corrección optimista, saltar
+          console.log(`[CRON Revisar Solicitudes] Solicitud ${solicitud.id} no es optimista (origen: ${detalles.origen}), omitiendo`);
+          continue;
+        }
+
+        // Validar que el fichaje sigue finalizado antes de auto-aprobar
+        if (solicitud.fichaje.estado !== 'finalizado') {
+          console.log(`[CRON Revisar Solicitudes] Solicitud ${solicitud.id} omitida: fichaje no está finalizado (estado: ${solicitud.fichaje.estado})`);
+          continue;
+        }
+
+        console.log(`[CRON Revisar Solicitudes] Auto-aprobando corrección optimista ${solicitud.id} (origen: ${detalles.origen})`);
+
+        // AUTO-APROBAR corrección optimista
+        await prisma.$transaction(async (tx) => {
+          // 1. Actualizar solicitud a aprobada
+          await tx.solicitudes_correccion_fichaje.update({
+            where: { id: solicitud.id },
+            data: {
+              estado: 'aprobada',
+              revisadaPor: null, // Auto-aprobado por sistema
+              revisadaEn: ahora,
+              respuesta: 'Auto-aprobado automáticamente por el sistema tras 48 horas'
+            }
+          });
+
+          // 2. Actualizar auto_completado
+          const updated = await tx.auto_completados.updateMany({
+            where: {
+              datosOriginales: {
+                path: ['solicitudId'],
+                equals: solicitud.id
+              }
+            },
+            data: {
+              estado: 'aprobado',
+              aprobadoEn: ahora,
+              aprobadoPor: 'cron_revisar_solicitudes'
+            }
+          });
+
+          if (updated.count === 0) {
+            console.warn(`[CRON Revisar Solicitudes] No se encontró auto_completado para solicitud ${solicitud.id}`);
+          }
+        });
+
+        console.log(`[CRON Revisar Solicitudes] Corrección optimista ${solicitud.id} auto-aprobada`);
+        correccionesAprobadas++;
+      } catch (error) {
+        const mensaje = `Error procesando corrección ${solicitud.id}: ${
+          error instanceof Error ? error.message : 'Error desconocido'
+        }`;
+        erroresCorreccion.push(mensaje);
+        console.error(`[CRON Revisar Solicitudes] ${mensaje}`);
+      }
+    }
+
     const resultado = {
       success: true,
       timestamp: ahora.toISOString(),
       solicitudesRevisadas: solicitudesPendientes.length,
       autoAprobadas: aprobadas,
       requierenRevision,
-      errores,
+      correccionesFichajes: {
+        revisadas: solicitudesCorreccion.length,
+        autoAprobadas: correccionesAprobadas,
+        errores: erroresCorreccion.length
+      },
+      errores: [...errores, ...erroresCorreccion],
     };
 
     console.log('[CRON Revisar Solicitudes] Proceso completado:', resultado);
@@ -218,6 +314,8 @@ export async function POST(request: NextRequest) {
         solicitudesRevisadas: resultado.solicitudesRevisadas,
         autoAprobadas: resultado.autoAprobadas,
         requierenRevision: resultado.requierenRevision,
+        correccionesFichajesRevisadas: resultado.correccionesFichajes.revisadas,
+        correccionesFichajesAprobadas: resultado.correccionesFichajes.autoAprobadas,
         errores: resultado.errores.length,
       },
     });

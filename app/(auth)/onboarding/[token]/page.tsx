@@ -6,23 +6,14 @@ import { GalleryVerticalEnd } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 
-import { type DatosTemporales, type ProgresoOnboarding, verificarTokenOnboarding } from '@/lib/onboarding';
-import { obtenerOnboardingConfig, type OnboardingConfigData } from '@/lib/onboarding-config';
+import { verificarTokenOnboarding } from '@/lib/onboarding';
 
 import { OnboardingForm } from './onboarding-form';
 
 export default async function OnboardingPage(context: { params: Promise<{ token: string }> }) {
-    const params = await context.params;
-  const { token } = await params;
+  const params = await context.params;
+  const { token } = params;
   const { valido, onboarding, error } = await verificarTokenOnboarding(token);
-  let onboardingConfig: OnboardingConfigData | null = null;
-
-  if (valido && onboarding) {
-    const configResult = await obtenerOnboardingConfig(onboarding.empresaId);
-    if (configResult.success && configResult.config) {
-      onboardingConfig = configResult.config;
-    }
-  }
 
   return (
     <div className="grid min-h-svh lg:grid-cols-2">
@@ -54,11 +45,7 @@ export default async function OnboardingPage(context: { params: Promise<{ token:
               <OnboardingForm
                 token={token}
                 empleado={onboarding!.empleado}
-                progreso={onboarding!.progreso as unknown as ProgresoOnboarding}
-                datosTemporales={onboarding!.datosTemporales as unknown as DatosTemporales | null}
                 nombreEmpresa={onboarding!.empresa.nombre}
-                tipoOnboarding={onboarding!.tipoOnboarding}
-                onboardingConfig={onboardingConfig}
               />
             )}
           </div>

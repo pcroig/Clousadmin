@@ -698,9 +698,9 @@ export async function crearNotificacionFirmaCompletada(
       pdfFirmadoS3Key,
       icono: 'firma',
       prioridad: 'normal',
-      accionTexto: 'Ver documento',
-      accionUrl: '/hr/documentos',
-      url: '/hr/documentos',
+      accionTexto: 'Ver documento firmado',
+      accionUrl: `/firma/solicitud/${solicitudId}`,
+      url: `/firma/solicitud/${solicitudId}`,
     },
   }, options);
 }
@@ -1313,7 +1313,7 @@ export async function crearNotificacionSolicitudCreada(
       solicitudId,
       tipo,
       prioridad: 'alta',
-      accionUrl: '/hr/solicitudes',
+      accionUrl: '/hr/bandeja-entrada?tab=solicitudes',
       accionTexto: 'Revisar solicitud',
     },
   }, options);
@@ -1872,8 +1872,9 @@ export async function crearNotificacionCampanaCreada(
           fechaInicio: fechaInicio.toISOString(),
           fechaFin: fechaFin.toISOString(),
           prioridad: 'alta',
-          accionUrl: `/empleado/vacaciones/campanas/${campanaId}`,
+          accionUrl: `/empleado/horario/ausencias?campana=${campanaId}`,
           accionTexto: 'Ver campaña',
+          requiresModal: true,
         },
       }, options);
     }
@@ -1906,8 +1907,9 @@ export async function crearNotificacionCampanaCompletada(
       campanaId,
       totalEmpleados,
       prioridad: 'alta',
-      accionUrl: `/hr/vacaciones/campanas/${campanaId}`,
+      accionUrl: `/hr/horario/ausencias?campana=${campanaId}`,
       accionTexto: 'Cuadrar vacaciones',
+      requiresModal: true,
     },
   }, options);
 }
@@ -1991,7 +1993,7 @@ export async function crearNotificacionOnboardingCompletado(
       empleadoId,
       empleadoNombre,
       prioridad: 'normal',
-      accionUrl: `/hr/empleados/${empleadoId}`,
+      accionUrl: `/hr/organizacion/personas/${empleadoId}`,
       accionTexto: 'Ver empleado',
     },
   }, options);

@@ -5,7 +5,7 @@
 // ========================================
 // Formulario para crear empleado y activar onboarding con navegación por pasos
 
-import { FileSignature, FileText, Mail } from 'lucide-react';
+import { FileSignature, FileText, Mail, Upload } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -23,11 +23,15 @@ import {
 } from '@/components/ui/accordion';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { type DocumentoRequerido, filtrarDocumentosPorEquipo } from '@/lib/onboarding-config-types';
+import { Switch } from '@/components/ui/switch';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { type DocumentoRequerido, filtrarDocumentosPorEquipo, type WorkflowAccion, getTipoAccionLabel } from '@/lib/onboarding-config-types';
 import { parseJson } from '@/lib/utils/json';
 import { cn } from '@/lib/utils';
+import { AddPersonaDocumentForm } from './add-persona-document-form';
 
 interface AddPersonaOnboardingFormProps {
   open: boolean;
@@ -44,6 +48,24 @@ interface FormData {
   puestoId: string;
   equipoId: string;
   sedeId: string;
+  // Datos personales opcionales
+  nif?: string;
+  nss?: string;
+  fechaNacimiento?: string;
+  telefono?: string;
+  // Dirección opcional
+  direccionCalle?: string;
+  direccionNumero?: string;
+  direccionPiso?: string;
+  codigoPostal?: string;
+  ciudad?: string;
+  direccionProvincia?: string;
+  // Datos laborales opcionales
+  salarioBaseAnual?: string;
+  tipoContrato?: string;
+  // Datos bancarios opcionales
+  iban?: string;
+  bic?: string;
 }
 
 interface DocumentoSubido {
@@ -106,17 +128,24 @@ export function AddPersonaOnboardingForm({
   const [equipos, setEquipos] = useState<Equipo[]>([]);
   const [sedes, setSedes] = useState<Sede[]>([]);
 
-  // Documentos y firmas
+  // Documentos y firmas (DEPRECADO - solo para empleado existente)
   const [documentosSubidos, setDocumentosSubidos] = useState<DocumentoSubido[]>([]);
   const [documentosConfig, setDocumentosConfig] = useState<DocumentoRequerido[]>([]);
   const [firmasConfig, setFirmasConfig] = useState<DocumentoRequerido[]>([]);
 
-  const steps = [
-    { id: 'basicos', label: 'Datos Básicos' },
-    { id: 'docs-visualizar', label: 'Ver/Descargar' },
-    { id: 'docs-solicitar', label: 'Solicitar Documentos' },
-    { id: 'firmas', label: 'Firmas' },
-  ];
+  // Workflow de onboarding (para empleado nuevo)
+  const [workflowAcciones, setWorkflowAcciones] = useState<WorkflowAccion[]>([]);
+  const [accionesActivas, setAccionesActivas] = useState<Record<string, boolean>>({});
+
+  // Si es empleado existente, solo mostrar el paso de datos básicos (sin onboarding)
+  const steps = tipoEmpleado === 'existente'
+    ? [{ id: 'basicos', label: 'Datos del Empleado' }]
+    : [
+        { id: 'basicos', label: 'Datos Básicos' },
+        { id: 'docs-visualizar', label: 'Ver/Descargar' },
+        { id: 'docs-solicitar', label: 'Solicitar Documentos' },
+        { id: 'firmas', label: 'Firmas' },
+      ];
 
   // Cargar datos iniciales al montar el componente
   useEffect(() => {
@@ -131,12 +160,15 @@ export function AddPersonaOnboardingForm({
         cargarPuestos(),
         cargarEquipos(),
         cargarSedes(),
-        cargarConfiguracionOnboarding(),
       ]);
 
-      // Si es empleado existente, cargar lista de empleados sin onboarding
+      // Si es empleado existente, cargar config antigua + empleados sin onboarding
       if (tipoEmpleado === 'existente') {
+        await cargarConfiguracionOnboarding(); // Sistema antiguo
         await cargarEmpleadosExistentes();
+      } else {
+        // Si es empleado nuevo, cargar workflow nuevo
+        await cargarWorkflowOnboarding();
       }
     } catch (error) {
       console.error('[cargarDatosIniciales] Error:', error);
@@ -193,6 +225,27 @@ export function AddPersonaOnboardingForm({
     }
   };
 
+  const cargarWorkflowOnboarding = async () => {
+    try {
+      const res = await fetch('/api/onboarding/config');
+      const data = await parseJson<{ workflowAcciones?: WorkflowAccion[] }>(res);
+
+      if (data.workflowAcciones && Array.isArray(data.workflowAcciones)) {
+        setWorkflowAcciones(data.workflowAcciones);
+
+        // Inicializar todas las acciones como activas por defecto
+        const activasDefault: Record<string, boolean> = {};
+        data.workflowAcciones.forEach((accion) => {
+          activasDefault[accion.id] = accion.activo;
+        });
+        setAccionesActivas(activasDefault);
+      }
+    } catch (error) {
+      console.error('[cargarWorkflowOnboarding] Error:', error);
+      toast.error('Error al cargar configuración de onboarding');
+    }
+  };
+
   const cargarEmpleadosExistentes = async () => {
     try {
       const res = await fetch('/api/empleados?onboardingActivo=false');
@@ -229,45 +282,75 @@ export function AddPersonaOnboardingForm({
     setLoading(true);
 
     try {
-      let empleadoId: string;
+      // Crear empleado con todos los campos opcionales
+      const empleadoData: Record<string, unknown> = {
+        nombre: formData.nombre,
+        apellidos: formData.apellidos,
+        email: formData.email,
+        fechaAlta: formData.fechaAlta,
+        puestoId: formData.puestoId || undefined,
+        sedeId: formData.sedeId || undefined,
+        activo: tipoEmpleado === 'existente' ? true : false, // Existente ya está activo, nuevo espera onboarding
+      };
 
-      if (tipoEmpleado === 'existente') {
-        // Usar empleado existente
-        empleadoId = empleadoSeleccionadoId;
-      } else {
-        // Crear nuevo empleado
-        const resEmpleado = await fetch('/api/empleados', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            nombre: formData.nombre,
-            apellidos: formData.apellidos,
-            email: formData.email,
-            fechaAlta: formData.fechaAlta,
-            puestoId: formData.puestoId || undefined,
-            sedeId: formData.sedeId || undefined,
-            activo: false, // Inactivo hasta completar onboarding
-          }),
-        });
+      // Añadir campos opcionales si están presentes
+      if (formData.nif) empleadoData.nif = formData.nif;
+      if (formData.nss) empleadoData.nss = formData.nss;
+      if (formData.fechaNacimiento) empleadoData.fechaNacimiento = formData.fechaNacimiento;
+      if (formData.telefono) empleadoData.telefono = formData.telefono;
+      if (formData.direccionCalle) empleadoData.direccionCalle = formData.direccionCalle;
+      if (formData.direccionNumero) empleadoData.direccionNumero = formData.direccionNumero;
+      if (formData.direccionPiso) empleadoData.direccionPiso = formData.direccionPiso;
+      if (formData.codigoPostal) empleadoData.codigoPostal = formData.codigoPostal;
+      if (formData.ciudad) empleadoData.ciudad = formData.ciudad;
+      if (formData.direccionProvincia) empleadoData.direccionProvincia = formData.direccionProvincia;
+      if (formData.salarioBaseAnual) empleadoData.salarioBaseAnual = formData.salarioBaseAnual;
+      if (formData.tipoContrato) empleadoData.tipoContrato = formData.tipoContrato;
+      if (formData.iban) empleadoData.iban = formData.iban;
+      if (formData.bic) empleadoData.bic = formData.bic;
 
-        const dataEmpleado = await parseJson<{id: string; error?: string}>(resEmpleado);
-        
-        if (!resEmpleado.ok || !dataEmpleado.id) {
-          throw new Error(dataEmpleado.error || 'Error al crear empleado');
-        }
+      const resEmpleado = await fetch('/api/empleados', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(empleadoData),
+      });
 
-        empleadoId = dataEmpleado.id;
+      const dataEmpleado = await parseJson<{id: string; error?: string}>(resEmpleado);
 
-        // Asignar a equipo si fue seleccionado
-        if (formData.equipoId) {
-          await fetch(`/api/equipos/${formData.equipoId}/members`, {
+      if (!resEmpleado.ok || !dataEmpleado.id) {
+        throw new Error(dataEmpleado.error || 'Error al crear empleado');
+      }
+
+      const empleadoId = dataEmpleado.id;
+
+      // Asignar a equipo si fue seleccionado
+      if (formData.equipoId) {
+        try {
+          const resEquipo = await fetch(`/api/equipos/${formData.equipoId}/members`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ empleadoId }),
           });
+
+          if (!resEquipo.ok) {
+            console.error('[handleSubmit] Error al asignar equipo:', await resEquipo.text());
+            // No lanzar error, solo log - continuar con el onboarding
+          }
+        } catch (equipoError) {
+          console.error('[handleSubmit] Error al asignar equipo:', equipoError);
+          // No lanzar error, solo log - continuar con el onboarding
         }
       }
 
+      // Si es empleado existente, solo creamos y terminamos (sin onboarding)
+      if (tipoEmpleado === 'existente') {
+        toast.success('Empleado añadido correctamente', { duration: 5000 });
+        onSuccess();
+        onOpenChange(false);
+        return;
+      }
+
+      // Si es empleado nuevo, continuar con onboarding
       // Subir documentos
       if (documentosSubidos.length > 0) {
         setUploadingDocs(true);
@@ -275,12 +358,27 @@ export function AddPersonaOnboardingForm({
         setUploadingDocs(false);
       }
 
-      // Enviar invitación de onboarding
-      const resOnboarding = await fetch('/api/onboarding/invite', {
+      // Enviar invitación de onboarding con acciones seleccionadas
+      console.log('[handleSubmit] Enviando invitación con:', {
+        empleadoId,
+        tipoOnboarding: 'completo',
+        accionesActivas,
+      });
+
+      const resOnboarding = await fetch('/api/empleados/invitar', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ empleadoId }),
+        body: JSON.stringify({
+          empleadoId,
+          tipoOnboarding: 'completo',
+          accionesActivas,
+        }),
       });
+
+      if (!resOnboarding.ok) {
+        const errorData = await resOnboarding.json() as { error?: string };
+        throw new Error(errorData.error || 'Error al enviar invitación');
+      }
 
       const dataOnboarding = await parseJson<{success?: boolean; error?: string}>(resOnboarding);
 
@@ -348,9 +446,7 @@ export function AddPersonaOnboardingForm({
   // Validaciones por paso
   const canGoNext = () => {
     if (currentStep === 'basicos') {
-      if (tipoEmpleado === 'existente') {
-        return empleadoSeleccionadoId !== '';
-      }
+      // Para nuevo y existente manual, validar los mismos campos básicos
       return formData.nombre && formData.apellidos && formData.email && formData.puestoId && formData.equipoId;
     }
     return true;
@@ -410,62 +506,27 @@ export function AddPersonaOnboardingForm({
     },
   }));
 
-  return (
-    <DialogWithSidebar
-      open={open}
-      onOpenChange={onOpenChange}
-      title={tipoEmpleado === 'nuevo' ? 'Nuevo Empleado' : 'Activar Onboarding'}
-      sidebar={sidebarItems}
-      activeSidebarItem={currentStep}
-      onSidebarItemChange={(stepId) => {
-        // Solo permitir ir a pasos anteriores o actual
-        const targetIndex = steps.findIndex((s) => s.id === stepId);
-        const currentIndex = steps.findIndex((s) => s.id === currentStep);
-        if (targetIndex <= currentIndex) {
-          setCurrentStep(stepId);
-        }
-      }}
-      width="4xl"
-      showCloseButton={!loading}
-    >
-      <div className="flex flex-col h-full">{/* Contenido sin WizardSteps */}
-        {/* Contenido del paso actual */}
-        <div className="flex-1 overflow-y-auto">
-          {/* Paso 1: Datos Básicos */}
-        {currentStep === 'basicos' && (
-          <div className="space-y-6">
-            {tipoEmpleado === 'existente' ? (
-              <>
-                <div>
-                  <h3 className="text-base font-semibold text-gray-900 mb-2">
-                    Seleccionar Empleado
-                  </h3>
-                  <p className="text-sm text-gray-600 mb-4">
-                    Elige el empleado para el que deseas activar el onboarding
-                  </p>
-                </div>
+  // Si es empleado existente, usar Dialog simple (sin sidebar ni wizard)
+  if (tipoEmpleado === 'existente') {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Añadir Empleado Existente</DialogTitle>
+          </DialogHeader>
 
-                <div>
-                  <Label>Empleado</Label>
-                  <SearchableSelect
-                    items={empleadosItems}
-                    value={empleadoSeleccionadoId}
-                    onChange={setEmpleadoSeleccionadoId}
-                    placeholder="Buscar empleado..."
-                  />
-                </div>
-              </>
-            ) : (
-              <>
-                <div>
-                  <h3 className="text-base font-semibold text-gray-900 mb-2">
-                    Información del Empleado
-                  </h3>
-                  <p className="text-sm text-gray-600 mb-4">
-                    Completa los datos básicos del nuevo empleado
-                  </p>
-                </div>
+          <div className="space-y-4 py-4">
+            <Tabs defaultValue="manual" className="w-full">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="manual">Añadir Manualmente</TabsTrigger>
+                <TabsTrigger value="import">
+                  <Upload className="h-4 w-4 mr-2" />
+                  Importar
+                </TabsTrigger>
+              </TabsList>
 
+              <TabsContent value="manual" className="space-y-4 mt-4">
+                {/* Campos obligatorios */}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label>Nombre *</Label>
@@ -531,7 +592,7 @@ export function AddPersonaOnboardingForm({
                   </div>
 
                   <div>
-                    <Label>Sede (opcional)</Label>
+                    <Label>Sede</Label>
                     <SearchableSelect
                       items={sedesItems}
                       value={formData.sedeId}
@@ -540,235 +601,427 @@ export function AddPersonaOnboardingForm({
                     />
                   </div>
                 </div>
-              </>
-            )}
-          </div>
-        )}
 
-        {/* Paso 2: Documentos para Visualizar */}
-        {currentStep === 'docs-visualizar' && (
-          <div className="space-y-4">
-            <div>
-              <h3 className="text-base font-semibold text-gray-900 mb-2">
-                Documentos para Visualizar/Descargar
-              </h3>
-              <p className="text-sm text-gray-600 mb-4">
-                Documentos que el empleado podrá ver o descargar durante el onboarding
-              </p>
-            </div>
+                {/* Campos opcionales adicionales - Colapsados */}
+                <Accordion type="single" collapsible className="w-full">
+                  <AccordionItem value="datos-personales">
+                    <AccordionTrigger className="text-sm font-medium">
+                      Datos Personales (opcional)
+                    </AccordionTrigger>
+                    <AccordionContent>
+                      <div className="grid grid-cols-2 gap-4 pt-2">
+                        <div>
+                          <Label>NIF/DNI/NIE</Label>
+                          <Input
+                            value={formData.nif || ''}
+                            onChange={(e) => setFormData({...formData, nif: e.target.value})}
+                            placeholder="12345678A"
+                          />
+                        </div>
 
-            {documentosFiltrados.filter((d) => d.tipo === 'visualizar').length > 0 ? (
-              <div className="space-y-2">
-                <p className="text-sm font-medium text-gray-700 mb-3">
-                  Documentos configurados:
-                </p>
-                {documentosFiltrados
-                  .filter((d) => d.tipo === 'visualizar')
-                  .map((doc) => (
-                    <div
-                      key={doc.id}
-                      className="flex items-center justify-between p-3 border rounded-lg bg-blue-50 border-blue-200"
-                    >
-                      <div className="flex items-center gap-2">
-                        <FileText className="h-4 w-4 text-blue-600" />
-                        <span className="text-sm">{doc.nombre}</span>
+                        <div>
+                          <Label>NSS</Label>
+                          <Input
+                            value={formData.nss || ''}
+                            onChange={(e) => setFormData({...formData, nss: e.target.value})}
+                            placeholder="123456789012"
+                          />
+                        </div>
+
+                        <div>
+                          <Label>Fecha de Nacimiento</Label>
+                          <Input
+                            type="date"
+                            value={formData.fechaNacimiento || ''}
+                            onChange={(e) => setFormData({...formData, fechaNacimiento: e.target.value})}
+                          />
+                        </div>
+
+                        <div>
+                          <Label>Teléfono</Label>
+                          <Input
+                            value={formData.telefono || ''}
+                            onChange={(e) => setFormData({...formData, telefono: e.target.value})}
+                            placeholder="+34 600 000 000"
+                          />
+                        </div>
                       </div>
-                    </div>
-                  ))}
-              </div>
-            ) : (
-              <div className="text-center py-8 text-gray-500 border border-dashed rounded-lg">
-                <FileText className="h-12 w-12 mx-auto mb-3 text-gray-400" />
-                <p className="text-sm">No hay documentos de visualización configurados</p>
-                <p className="text-xs mt-1">
-                  Puedes configurarlos en "Gestionar Onboarding"
-                </p>
-              </div>
-            )}
+                    </AccordionContent>
+                  </AccordionItem>
 
-            <div className="mt-4">
-              <p className="text-sm font-medium text-gray-700 mb-3">
-                Documentos adicionales:
-              </p>
-              <div className="space-y-3">
-                <DocumentUploader
-                  label="Subir documento adicional"
-                  description="PDF, JPG o PNG (máx. 5MB)"
-                  onUpload={(file) => añadirDocumento(file, 'Otros')}
-                  disabled={loading || uploadingDocs}
+                  <AccordionItem value="direccion">
+                    <AccordionTrigger className="text-sm font-medium">
+                      Dirección (opcional)
+                    </AccordionTrigger>
+                    <AccordionContent>
+                      <div className="grid grid-cols-2 gap-4 pt-2">
+                        <div>
+                          <Label>Calle</Label>
+                          <Input
+                            value={formData.direccionCalle || ''}
+                            onChange={(e) => setFormData({...formData, direccionCalle: e.target.value})}
+                            placeholder="Calle Mayor"
+                          />
+                        </div>
+
+                        <div>
+                          <Label>Número</Label>
+                          <Input
+                            value={formData.direccionNumero || ''}
+                            onChange={(e) => setFormData({...formData, direccionNumero: e.target.value})}
+                            placeholder="123"
+                          />
+                        </div>
+
+                        <div>
+                          <Label>Piso/Puerta</Label>
+                          <Input
+                            value={formData.direccionPiso || ''}
+                            onChange={(e) => setFormData({...formData, direccionPiso: e.target.value})}
+                            placeholder="3º A"
+                          />
+                        </div>
+
+                        <div>
+                          <Label>Código Postal</Label>
+                          <Input
+                            value={formData.codigoPostal || ''}
+                            onChange={(e) => setFormData({...formData, codigoPostal: e.target.value})}
+                            placeholder="28001"
+                          />
+                        </div>
+
+                        <div>
+                          <Label>Ciudad</Label>
+                          <Input
+                            value={formData.ciudad || ''}
+                            onChange={(e) => setFormData({...formData, ciudad: e.target.value})}
+                            placeholder="Madrid"
+                          />
+                        </div>
+
+                        <div>
+                          <Label>Provincia</Label>
+                          <Input
+                            value={formData.direccionProvincia || ''}
+                            onChange={(e) => setFormData({...formData, direccionProvincia: e.target.value})}
+                            placeholder="Madrid"
+                          />
+                        </div>
+                      </div>
+                    </AccordionContent>
+                  </AccordionItem>
+
+                  <AccordionItem value="datos-laborales">
+                    <AccordionTrigger className="text-sm font-medium">
+                      Datos Laborales (opcional)
+                    </AccordionTrigger>
+                    <AccordionContent>
+                      <div className="grid grid-cols-2 gap-4 pt-2">
+                        <div>
+                          <Label>Salario Base Anual</Label>
+                          <Input
+                            type="number"
+                            value={formData.salarioBaseAnual || ''}
+                            onChange={(e) => setFormData({...formData, salarioBaseAnual: e.target.value})}
+                            placeholder="30000"
+                          />
+                        </div>
+
+                        <div>
+                          <Label>Tipo de Contrato</Label>
+                          <SearchableSelect
+                            items={[
+                              { id: 'indefinido', label: 'Indefinido' },
+                              { id: 'temporal', label: 'Temporal' },
+                              { id: 'practicas', label: 'Prácticas' },
+                              { id: 'formacion', label: 'Formación' },
+                            ]}
+                            value={formData.tipoContrato || ''}
+                            onChange={(value) => setFormData({...formData, tipoContrato: value})}
+                            placeholder="Seleccionar tipo"
+                          />
+                        </div>
+                      </div>
+                    </AccordionContent>
+                  </AccordionItem>
+
+                  <AccordionItem value="datos-bancarios">
+                    <AccordionTrigger className="text-sm font-medium">
+                      Datos Bancarios (opcional)
+                    </AccordionTrigger>
+                    <AccordionContent>
+                      <div className="grid grid-cols-2 gap-4 pt-2">
+                        <div>
+                          <Label>IBAN</Label>
+                          <Input
+                            value={formData.iban || ''}
+                            onChange={(e) => setFormData({...formData, iban: e.target.value})}
+                            placeholder="ES91 2100 0418 4502 0005 1332"
+                          />
+                        </div>
+
+                        <div>
+                          <Label>BIC/SWIFT</Label>
+                          <Input
+                            value={formData.bic || ''}
+                            onChange={(e) => setFormData({...formData, bic: e.target.value})}
+                            placeholder="CAIXESBBXXX"
+                          />
+                        </div>
+                      </div>
+                    </AccordionContent>
+                  </AccordionItem>
+                </Accordion>
+
+                <div className="flex justify-end gap-3 pt-4 border-t">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => onOpenChange(false)}
+                    disabled={loading}
+                  >
+                    Cancelar
+                  </Button>
+                  <LoadingButton
+                    onClick={handleSubmit}
+                    loading={loading}
+                    disabled={!canGoNext() || loading}
+                  >
+                    Añadir Empleado
+                  </LoadingButton>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="import" className="mt-4">
+                <AddPersonaDocumentForm
+                  onSuccess={() => {
+                    toast.success('Empleado(s) importado(s) correctamente');
+                    onSuccess();
+                    onOpenChange(false);
+                  }}
+                  onCancel={() => onOpenChange(false)}
                 />
+              </TabsContent>
+            </Tabs>
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
 
-                {documentosSubidos.map((doc) => (
-                  <div
-                    key={doc.id}
-                    className="flex items-center justify-between p-3 border rounded-lg"
-                  >
-                    <div className="flex items-center gap-2">
-                      <FileText className="h-4 w-4" />
-                      <span className="text-sm">{doc.nombre}</span>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => eliminarDocumento(doc.id)}
-                    >
-                      Eliminar
-                    </Button>
-                  </div>
-                ))}
+
+  // Para empleado nuevo, usar Dialog simple con 2 pasos
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>
+            {currentStep === 'basicos' ? 'Nuevo Empleado - Datos Básicos' : 'Nuevo Empleado - Configurar Onboarding'}
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-6 py-4">
+          {/* Paso 1: Datos Básicos */}
+          {currentStep === 'basicos' && (
+            <div className="space-y-4">
+              <div>
+                <h3 className="text-base font-semibold text-gray-900 mb-2">
+                  Información del Empleado
+                </h3>
+                <p className="text-sm text-gray-600 mb-4">
+                  Completa los datos básicos del nuevo empleado
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>Nombre *</Label>
+                  <Input
+                    value={formData.nombre}
+                    onChange={(e) => setFormData({...formData, nombre: e.target.value})}
+                    placeholder="Juan"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <Label>Apellidos *</Label>
+                  <Input
+                    value={formData.apellidos}
+                    onChange={(e) => setFormData({...formData, apellidos: e.target.value})}
+                    placeholder="García López"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <Label>Email *</Label>
+                  <Input
+                    type="email"
+                    value={formData.email}
+                    onChange={(e) => setFormData({...formData, email: e.target.value})}
+                    placeholder="juan.garcia@empresa.com"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <Label>Fecha de Alta</Label>
+                  <Input
+                    type="date"
+                    value={formData.fechaAlta}
+                    onChange={(e) => setFormData({...formData, fechaAlta: e.target.value})}
+                  />
+                </div>
+
+                <div className="col-span-2">
+                  <Label>Puesto *</Label>
+                  <Combobox
+                    options={puestosOptions}
+                    value={formData.puestoId}
+                    onValueChange={(value) => setFormData({...formData, puestoId: value || ''})}
+                    placeholder="Seleccionar o crear puesto"
+                    emptyText="No se encontraron puestos"
+                    createText="Crear nuevo puesto"
+                    onCreateNew={handleCreatePuesto}
+                  />
+                </div>
+
+                <div>
+                  <Label>Equipo *</Label>
+                  <SearchableSelect
+                    items={equiposItems}
+                    value={formData.equipoId}
+                    onChange={(value) => setFormData({...formData, equipoId: value})}
+                    placeholder="Seleccionar equipo"
+                  />
+                </div>
+
+                <div>
+                  <Label>Sede (opcional)</Label>
+                  <SearchableSelect
+                    items={sedesItems}
+                    value={formData.sedeId}
+                    onChange={(value) => setFormData({...formData, sedeId: value})}
+                    placeholder="Seleccionar sede"
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-4 border-t">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => onOpenChange(false)}
+                  disabled={loading}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  onClick={() => {
+                    if (canGoNext()) {
+                      setCurrentStep('acciones-workflow');
+                    }
+                  }}
+                  disabled={!canGoNext()}
+                >
+                  Siguiente: Configurar Onboarding
+                </Button>
               </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* Paso 3: Solicitar Documentos */}
-        {currentStep === 'docs-solicitar' && (
-          <div className="space-y-4">
-            <div>
-              <h3 className="text-base font-semibold text-gray-900 mb-2">
-                Documentos a Solicitar al Empleado
-              </h3>
-              <p className="text-sm text-gray-600 mb-4">
-                Estos son los documentos que el empleado deberá subir durante su onboarding
-              </p>
-            </div>
-
-            {documentosFiltrados.filter((d) => d.tipo === 'solicitar').length > 0 ? (
-              <div className="space-y-2">
-                <p className="text-sm font-medium text-gray-700 mb-3">
-                  Documentos configurados:
+          {/* Paso 2: Acciones del Workflow */}
+          {currentStep === 'acciones-workflow' && (
+            <div className="space-y-4">
+              <div>
+                <h3 className="text-base font-semibold text-gray-900 mb-2">
+                  Acciones del Onboarding
+                </h3>
+                <p className="text-sm text-gray-600 mb-4">
+                  Selecciona qué acciones debe completar este empleado durante su onboarding
                 </p>
-                {documentosFiltrados
-                  .filter((d) => d.tipo === 'solicitar')
-                  .map((doc) => (
-                    <div
-                      key={doc.id}
-                      className="flex items-center justify-between p-3 border rounded-lg bg-amber-50 border-amber-200"
-                    >
-                      <div className="flex items-center gap-2">
-                        <FileText className="h-4 w-4 text-amber-600" />
-                        <div className="flex flex-col">
-                          <span className="text-sm font-medium">{doc.nombre}</span>
-                          <span className="text-xs text-gray-500">
-                            Carpeta: {doc.carpetaDestino || 'Otros'}
-                          </span>
+              </div>
+
+              {workflowAcciones.length === 0 ? (
+                <div className="text-center py-12 border border-dashed rounded-lg bg-gray-50">
+                  <p className="text-gray-600">No hay acciones configuradas en el workflow</p>
+                  <p className="text-sm text-gray-500 mt-2">
+                    Ve a "Gestionar Onboarding" para configurar el workflow
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {workflowAcciones.map((accion) => {
+                    const isActive = accionesActivas[accion.id] !== false;
+
+                    return (
+                      <div
+                        key={accion.id}
+                        className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50"
+                      >
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <p className="font-medium">{accion.titulo}</p>
+                            <Badge variant="outline">
+                              {getTipoAccionLabel(accion.tipo)}
+                            </Badge>
+                          </div>
                         </div>
-                        {doc.requerido && (
-                          <Badge variant="secondary" className="text-xs bg-amber-100">
-                            Requerido
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-              </div>
-            ) : (
-              <div className="text-center py-8 text-gray-500 border border-dashed rounded-lg">
-                <FileText className="h-12 w-12 mx-auto mb-3 text-gray-400" />
-                <p className="text-sm">No hay documentos configurados para solicitar</p>
-                <p className="text-xs mt-1">
-                  El empleado no tendrá que subir ningún documento obligatorio
-                </p>
-              </div>
-            )}
-
-          </div>
-        )}
-
-        {/* Paso 4: Firmas */}
-        {currentStep === 'firmas' && (
-          <div className="space-y-4">
-            <div>
-              <h3 className="text-base font-semibold text-gray-900 mb-2">
-                Documentos para Firma
-              </h3>
-              <p className="text-sm text-gray-600 mb-4">
-                Documentos que requieren firma digital del empleado
-              </p>
-            </div>
-
-            {firmasFiltradas.length > 0 ? (
-              <div className="space-y-2">
-                {firmasFiltradas.map((firma) => (
-                  <div
-                    key={firma.id}
-                    className="flex items-center justify-between p-4 border rounded-lg bg-white"
-                  >
-                    <div className="flex items-center gap-3">
-                      <FileSignature className="h-5 w-5 text-blue-600" />
-                      <div>
                         <div className="flex items-center gap-2">
-                          <span className="text-sm font-medium">{firma.nombre}</span>
-                          {firma.requerido && (
-                            <Badge variant="secondary" className="text-xs">
-                              Requerido
-                            </Badge>
-                          )}
-                          {firma.esAsincronico && (
-                            <Badge variant="outline" className="text-xs">
-                              Se subirá después del onboarding
-                            </Badge>
-                          )}
+                          <Label htmlFor={`accion-${accion.id}`} className="text-sm text-gray-600">
+                            {isActive ? 'Activa' : 'Inactiva'}
+                          </Label>
+                          <Switch
+                            id={`accion-${accion.id}`}
+                            checked={isActive}
+                            onCheckedChange={(checked) => {
+                              setAccionesActivas({
+                                ...accionesActivas,
+                                [accion.id]: checked,
+                              });
+                            }}
+                          />
                         </div>
-                        {firma.descripcion && (
-                          <p className="text-xs text-gray-500 mt-1">{firma.descripcion}</p>
-                        )}
                       </div>
-                    </div>
-                  </div>
-                ))}
+                    );
+                  })}
+                </div>
+              )}
+
+              <div className="flex justify-between gap-3 pt-4 border-t">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setCurrentStep('basicos')}
+                  disabled={loading}
+                >
+                  Anterior
+                </Button>
+                <div className="flex gap-3">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => onOpenChange(false)}
+                    disabled={loading}
+                  >
+                    Cancelar
+                  </Button>
+                  <LoadingButton
+                    onClick={handleSubmit}
+                    loading={loading}
+                    disabled={loading}
+                  >
+                    <Mail className="h-4 w-4 mr-2" />
+                    Enviar Invitación
+                  </LoadingButton>
+                </div>
               </div>
-            ) : (
-              <div className="text-center py-8 text-gray-500 border border-dashed rounded-lg">
-                <FileSignature className="h-12 w-12 mx-auto mb-3 text-gray-400" />
-                <p className="text-sm">No hay documentos de firma configurados</p>
-              </div>
-            )}
-
-          </div>
-        )}
-        </div>
-
-        {/* Navegación de pasos */}
-        <div className="flex items-center justify-between gap-3 pt-4 border-t flex-shrink-0">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => {
-              const currentIndex = steps.findIndex((s) => s.id === currentStep);
-              if (currentIndex > 0) {
-                setCurrentStep(steps[currentIndex - 1].id);
-              }
-            }}
-            disabled={steps.findIndex((s) => s.id === currentStep) === 0 || loading || uploadingDocs}
-          >
-            Anterior
-          </Button>
-
-          <div className="text-sm text-gray-500">
-            Paso {steps.findIndex((s) => s.id === currentStep) + 1} de {steps.length}
-          </div>
-
-          {steps.findIndex((s) => s.id === currentStep) === steps.length - 1 ? (
-            <LoadingButton
-              type="button"
-              onClick={handleSubmit}
-              loading={loading || uploadingDocs}
-              disabled={loading || uploadingDocs}
-            >
-              Finalizar y Enviar
-            </LoadingButton>
-          ) : (
-            <Button
-              type="button"
-              onClick={handleNext}
-              disabled={!canGoNext() || loading || uploadingDocs}
-            >
-              Siguiente
-            </Button>
+            </div>
           )}
         </div>
-      </div>
-    </DialogWithSidebar>
+      </DialogContent>
+    </Dialog>
   );
 }

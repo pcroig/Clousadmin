@@ -1,6 +1,5 @@
 'use client';
 
-import { decodeJwt } from 'jose';
 import { AlertCircle, ArrowLeft, Check, Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
@@ -9,7 +8,7 @@ import { toast } from 'sonner';
 import { FirmaPendiente, FirmarDocumentoDialog } from '@/components/firma/firmar-documento-dialog';
 import { PdfCanvasViewer } from '@/components/shared/pdf-canvas-viewer';
 import { Button } from '@/components/ui/button';
-import { UsuarioRol } from '@/lib/constants/enums';
+import { getPostFirmaRedirect } from '@/lib/firma-digital/get-post-firma-redirect';
 import type { PosicionFirma, PosicionFirmaConMetadata } from '@/lib/firma-digital/tipos';
 import { parseJson } from '@/lib/utils/json';
 
@@ -48,59 +47,14 @@ interface FirmarDocumentoClientProps {
 }
 
 export function FirmarDocumentoClient({ firmaId }: FirmarDocumentoClientProps) {
-  const obtenerRolDesdeCookie = (): UsuarioRol | null => {
-    if (typeof document === 'undefined') return null;
-
-    const cookie = document.cookie
-      .split('; ')
-      .find((row) => row.startsWith('clousadmin-session='));
-
-    if (!cookie) return null;
-
-    const token = cookie.split('=')[1];
-    if (!token) return null;
-
-    try {
-      const decoded = decodeJwt(token) as { user?: { rol?: string } };
-      const rol = decoded?.user?.rol;
-
-      if (!rol) return null;
-
-      const rolesValidos = new Set<UsuarioRol>([
-        UsuarioRol.platform_admin,
-        UsuarioRol.hr_admin,
-        UsuarioRol.manager,
-        UsuarioRol.empleado,
-      ]);
-
-      return rolesValidos.has(rol as UsuarioRol) ? (rol as UsuarioRol) : null;
-    } catch (error) {
-      // En caso de token inválido, no bloqueamos la UX; usamos fallback
-      return null;
-    }
-  };
-
-  const obtenerRutaPostFirma = (): string => {
-    const rol = obtenerRolDesdeCookie();
-
-    if (rol === UsuarioRol.hr_admin || rol === UsuarioRol.platform_admin) {
-      return '/hr/mi-espacio';
-    }
-
-    if (rol === UsuarioRol.manager) {
-      return '/manager/mi-espacio';
-    }
-
-    // Fallback para empleados o rol desconocido
-    return '/empleado/mi-espacio';
-  };
-
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [firma, setFirma] = useState<FirmaDetalle | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [pdfDimensiones, setPdfDimensiones] = useState<PdfDimensiones | null>(null);
+  const [documentoFirmado, setDocumentoFirmado] = useState(false);
+  const [pdfCacheKey, setPdfCacheKey] = useState(Date.now());
 
   // Cargar detalles de la firma
   useEffect(() => {
@@ -129,10 +83,11 @@ export function FirmarDocumentoClient({ firmaId }: FirmarDocumentoClientProps) {
   }, [firmaId]);
 
   // Cargar dimensiones reales del PDF
+  // CRÍTICO: Usar el endpoint de solicitud que analiza el PDF con firma empresa si aplica
   useEffect(() => {
-    if (!firma?.solicitudes_firma.documento.id) return;
+    if (!firma?.solicitudes_firma.id) return;
 
-    fetch(`/api/documentos/${firma.solicitudes_firma.documento.id}/pdf-metadata`)
+    fetch(`/api/firma/solicitudes/${firma.solicitudes_firma.id}/pdf-metadata`)
       .then(async (res) => {
         if (!res.ok) throw new Error('Error al cargar metadata del PDF');
         return parseJson<{ metadata: { paginaPrincipal: { width: number; height: number }; numPaginas: number } }>(res);
@@ -152,13 +107,22 @@ export function FirmarDocumentoClient({ firmaId }: FirmarDocumentoClientProps) {
       });
   }, [firma]);
 
-  const previewUrl = useMemo(
-    () => (firma ? `/api/documentos/${firma.solicitudes_firma.documento.id}/preview` : ''),
-    [firma]
-  );
+  // Siempre usar el documento original para preview
+  // CRÍTICO: Usar el endpoint de firma que sirve el PDF con firma empresa si aplica
+  // El endpoint /api/firma/solicitudes/[solicitudId]/preview retorna:
+  // - pdfTemporalS3Key si existe (PDF con firma empresa ya aplicada)
+  // - documento original si no hay pdfTemporalS3Key
+  const previewUrl = useMemo(() => {
+    if (!firma) return '';
+    return `/api/firma/solicitudes/${firma.solicitudes_firma.id}/preview?t=${pdfCacheKey}`;
+  }, [firma, pdfCacheKey]);
 
   // Convertir posición de firma del formato DB al formato del viewer
   const signaturePositions = useMemo<SignaturePosition[]>(() => {
+    // Si el documento ya está firmado, NO mostrar recuadros de firma
+    // El PDF devuelto por /preview ya contiene la firma embebida
+    if (documentoFirmado) return [];
+
     if (!firma?.solicitudes_firma.posicionFirma || !pdfDimensiones) return [];
 
     // Validar dimensiones para evitar división por cero
@@ -236,7 +200,7 @@ export function FirmarDocumentoClient({ firmaId }: FirmarDocumentoClientProps) {
         height: heightPorcentaje,
       }];
     }
-  }, [firma, pdfDimensiones]);
+  }, [firma, pdfDimensiones, documentoFirmado]);
 
   const firmaPendiente: FirmaPendiente | null = firma
     ? {
@@ -253,12 +217,25 @@ export function FirmarDocumentoClient({ firmaId }: FirmarDocumentoClientProps) {
       }
     : null;
 
-  const handleFirmado = () => {
-    toast.success('Documento firmado correctamente');
-    // Redirigir al espacio adecuado según rol
-    setTimeout(() => {
-      router.push(obtenerRutaPostFirma());
-    }, 500);
+  const handleFirmado = (data?: {
+    solicitudCompletada?: boolean;
+    solicitudId?: string;
+    documentoFirmado?: { id: string; nombre: string }
+  }) => {
+    setDialogOpen(false);
+    setDocumentoFirmado(true);
+
+    // Mostrar mensaje de éxito
+    toast.success('¡Documento firmado correctamente!', {
+      description: 'El documento se ha actualizado con tu firma',
+      duration: 3000,
+    });
+
+    // Si la solicitud está completada, redirigir a la página de solicitud
+    // donde podrán ver el PDF con todas las firmas aplicadas
+    if (data?.solicitudCompletada && data?.solicitudId) {
+      router.push(`/firma/solicitud/${data.solicitudId}`);
+    }
   };
 
   if (loading) {
@@ -279,7 +256,7 @@ export function FirmarDocumentoClient({ firmaId }: FirmarDocumentoClientProps) {
           <AlertCircle className="w-12 h-12 text-red-400 mb-4" />
           <p className="text-base font-medium text-gray-900 mb-2">Error al cargar documento</p>
           <p className="text-sm text-gray-600 mb-4">{error || 'Firma no encontrada'}</p>
-          <Button variant="outline" onClick={() => router.back()}>
+          <Button variant="outline" onClick={() => router.push(getPostFirmaRedirect())}>
             <ArrowLeft className="w-4 h-4 mr-2" />
             Volver
           </Button>
@@ -294,19 +271,29 @@ export function FirmarDocumentoClient({ firmaId }: FirmarDocumentoClientProps) {
       <div className="flex-shrink-0 bg-white border-b px-6 py-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <Button variant="ghost" size="sm" onClick={() => router.back()}>
+            <Button variant="ghost" size="sm" onClick={() => router.push(getPostFirmaRedirect())}>
               <ArrowLeft className="w-4 h-4 mr-2" />
-              Volver
+              {documentoFirmado ? 'Ir a Mi Espacio' : 'Volver'}
             </Button>
             <div>
-              <h1 className="text-xl font-semibold text-gray-900">Firmar documento</h1>
+              <h1 className="text-xl font-semibold text-gray-900">
+                {documentoFirmado ? 'Documento firmado' : 'Firmar documento'}
+              </h1>
               <p className="text-sm text-gray-500">{firma.solicitudes_firma.documento.nombre}</p>
             </div>
           </div>
-          <Button onClick={() => setDialogOpen(true)}>
-            <Check className="w-4 h-4 mr-2" />
-            Firmar
-          </Button>
+          {!documentoFirmado && (
+            <Button onClick={() => setDialogOpen(true)}>
+              <Check className="w-4 h-4 mr-2" />
+              Firmar
+            </Button>
+          )}
+          {documentoFirmado && (
+            <div className="flex items-center gap-2 px-4 py-2 bg-green-50 text-green-700 rounded-lg border border-green-200">
+              <Check className="w-4 h-4" />
+              <span className="text-sm font-medium">Firmado correctamente</span>
+            </div>
+          )}
         </div>
       </div>
 

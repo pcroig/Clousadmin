@@ -17,7 +17,7 @@ import {
   CalendarioStep,
   type CalendarioStepHandle,
 } from '@/components/onboarding/calendario-step';
-import { ImportarEmpleados } from '@/components/onboarding/importar-empleados';
+import { AddPersonaDocumentForm } from '@/components/organizacion/add-persona-document-form';
 import { IntegracionesForm } from '@/components/onboarding/integraciones-form';
 import { InvitarHRAdmins } from '@/components/onboarding/invitar-hr-admins';
 import {
@@ -29,28 +29,32 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { PasswordInput } from '@/components/ui/password-input';
 
 import { completarOnboardingAction, signupEmpresaAction } from './actions';
 
 
 interface SignupPrefill {
   nombreEmpresa?: string | null;
+  webEmpresa?: string | null;
   nombre?: string | null;
   apellidos?: string | null;
+  avatarUrl?: string | null;
 }
 
 interface SignupFormProps {
   token: string;
   emailInvitacion: string;
   prefill?: SignupPrefill;
+  cuentaYaCreada?: boolean; // Indica si la cuenta ya fue creada (paso 0 completado)
 }
 
-export function SignupForm({ token, emailInvitacion, prefill }: SignupFormProps) {
+export function SignupForm({ token, emailInvitacion, prefill, cuentaYaCreada }: SignupFormProps) {
   const router = useRouter();
-  
+
   // Estado del paso actual (0-6)
   const [pasoActual, setPasoActual] = useState(0);
-  const [primerPasoCompletado, setPrimerPasoCompletado] = useState(false);
+  const [primerPasoCompletado, setPrimerPasoCompletado] = useState(cuentaYaCreada ?? false);
   
   const jornadaStepRef = useRef<JornadaStepHandle>(null);
   const calendarioStepRef = useRef<CalendarioStepHandle>(null);
@@ -61,7 +65,7 @@ export function SignupForm({ token, emailInvitacion, prefill }: SignupFormProps)
   // Estado del formulario inicial (paso 0)
   const [formData, setFormData] = useState(() => ({
     nombreEmpresa: prefill?.nombreEmpresa ?? '',
-    webEmpresa: '',
+    webEmpresa: prefill?.webEmpresa ?? '',
     nombre: prefill?.nombre ?? '',
     apellidos: prefill?.apellidos ?? '',
     email: emailInvitacion, // Pre-rellenar con email de la invitación
@@ -70,11 +74,12 @@ export function SignupForm({ token, emailInvitacion, prefill }: SignupFormProps)
   }));
 
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
-  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(prefill?.avatarUrl ?? null);
   const avatarInputRef = useRef<HTMLInputElement>(null);
-  
+
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [empleadosCount, setEmpleadosCount] = useState(0);
   
   // Total de pasos
   const totalPasos = 7;
@@ -253,11 +258,48 @@ export function SignupForm({ token, emailInvitacion, prefill }: SignupFormProps)
     }
   }
 
-  const handleSiguiente = () => {
+  const handleSiguiente = async () => {
+    // Validar empleados en el paso 1 (sin contar al HR admin)
+    if (pasoActual === 1) {
+      try {
+        const res = await fetch('/api/empleados');
+        const data = (await res.json()) as { data?: unknown[] };
+        const count = data.data?.length || 0;
+
+        // Requiere al menos 2 empleados totales (1 HR admin + 1 del equipo)
+        if (count < 2) {
+          toast.error('Debes añadir al menos 1 empleado para continuar');
+          return;
+        }
+
+        setEmpleadosCount(count);
+      } catch (error) {
+        console.error('[handleSiguiente] Error:', error);
+        toast.error('Error al verificar empleados');
+        return;
+      }
+    }
+
     if (pasoActual < totalPasos - 1) {
       setPasoActual(pasoActual + 1);
     }
   };
+
+  // Cargar contador de empleados cuando entramos al paso 1
+  useEffect(() => {
+    if (pasoActual === 1) {
+      fetch('/api/empleados')
+        .then((res) => res.json())
+        .then((data) => {
+          const typedData = data as { data?: unknown[] };
+          const count = typedData.data?.length || 0;
+          setEmpleadosCount(count);
+        })
+        .catch((error) => {
+          console.error('[useEffect] Error cargando empleados:', error);
+        });
+    }
+  }, [pasoActual]);
 
   const handleAnterior = () => {
     if (pasoActual > 0) {
@@ -272,8 +314,8 @@ export function SignupForm({ token, emailInvitacion, prefill }: SignupFormProps)
       descripcion: 'Configura tu empresa en Clousadmin y empieza a gestionar tu equipo. Tu email ya ha sido verificado.',
     },
     {
-      titulo: 'Importa empleados',
-      descripcion: 'Sube un archivo Excel. La confirmación puede tardar 1-5 minutos según el volumen',
+      titulo: 'Añade empleados',
+      descripcion: 'Importa desde Excel o añade manualmente. Necesitas al menos 1 empleado para continuar',
     },
     {
       titulo: 'Configura las sedes',
@@ -448,42 +490,46 @@ export function SignupForm({ token, emailInvitacion, prefill }: SignupFormProps)
           </p>
         </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="password">Crea tu contraseña *</Label>
-          <Input
-            id="password"
-            name="password"
-            type="password"
-            placeholder="Mínimo 8 caracteres"
-            value={formData.password}
-            onChange={handleChange}
-            required
-            autoComplete="new-password"
-            minLength={8}
-          />
-        </div>
+        {!primerPasoCompletado && (
+          <>
+            <div className="space-y-2">
+              <Label htmlFor="password">Crea tu contraseña *</Label>
+              <PasswordInput
+                id="password"
+                name="password"
+                placeholder="Mínimo 8 caracteres"
+                value={formData.password}
+                onChange={handleChange}
+                required
+                autoComplete="new-password"
+                minLength={8}
+              />
+              <p className="text-xs text-muted-foreground">Mínimo 8 caracteres</p>
+            </div>
 
-        <div className="flex items-start gap-2">
-          <Checkbox
-            id="consentimientoTratamiento"
-            checked={formData.consentimientoTratamiento}
-            onCheckedChange={(checked) => handleCheckboxChange(Boolean(checked))}
-            required
-            aria-describedby="consentimiento-help-text"
-          />
-          <div className="text-sm">
-            <Label
-              htmlFor="consentimientoTratamiento"
-              className="text-sm font-medium text-gray-900"
-            >
-              Acepto el tratamiento de mis datos conforme a la política de privacidad de Clousadmin.
-            </Label>
-            <p id="consentimiento-help-text" className="text-xs text-gray-500">
-              Esta autorización es necesaria para poder crear tu cuenta y gestionar tus datos como
-              responsable del servicio.
-            </p>
-          </div>
-        </div>
+            <div className="flex items-start gap-2">
+              <Checkbox
+                id="consentimientoTratamiento"
+                checked={formData.consentimientoTratamiento}
+                onCheckedChange={(checked) => handleCheckboxChange(Boolean(checked))}
+                required
+                aria-describedby="consentimiento-help-text"
+              />
+              <div className="text-sm">
+                <Label
+                  htmlFor="consentimientoTratamiento"
+                  className="text-sm font-medium text-gray-900"
+                >
+                  Acepto el tratamiento de mis datos conforme a la política de privacidad de Clousadmin.
+                </Label>
+                <p id="consentimiento-help-text" className="text-xs text-gray-500">
+                  Esta autorización es necesaria para poder crear tu cuenta y gestionar tus datos como
+                  responsable del servicio.
+                </p>
+              </div>
+            </div>
+          </>
+        )}
 
         {error && (
           <div className="rounded-md bg-red-50 p-3">
@@ -494,39 +540,65 @@ export function SignupForm({ token, emailInvitacion, prefill }: SignupFormProps)
         <Button
           type="submit"
           className="w-full"
-          disabled={!formData.consentimientoTratamiento || loading}
+          disabled={primerPasoCompletado ? false : (!formData.consentimientoTratamiento || loading)}
         >
-          {loading ? 'Creando cuenta...' : 'Crear cuenta y continuar'}
+          {primerPasoCompletado ? 'Continuar al siguiente paso' : (loading ? 'Creando cuenta...' : 'Crear cuenta y continuar')}
         </Button>
 
-        <div className="space-y-3 pt-4">
-          <p className="text-center text-xs text-gray-500">
-            ¿Tu empresa usa Google Workspace? Tras crear la cuenta podrás iniciar sesión desde{' '}
-            <Link href="/login" className="text-primary hover:underline">
-              «Continuar con Google»
-            </Link>{' '}
-            usando este mismo email.
-          </p>
-          <div className="text-center">
-            <span className="text-sm text-gray-500">¿Ya tienes cuenta? </span>
-            <a href="/login" className="text-sm text-primary hover:underline">
-              Inicia sesión
-            </a>
+        {!primerPasoCompletado && (
+          <div className="space-y-3 pt-4">
+            <p className="text-center text-xs text-gray-500">
+              ¿Tu empresa usa Google Workspace? Tras crear la cuenta podrás iniciar sesión desde{' '}
+              <Link href="/login" className="text-primary hover:underline">
+                «Continuar con Google»
+              </Link>{' '}
+              usando este mismo email.
+            </p>
+            <div className="text-center">
+              <span className="text-sm text-gray-500">¿Ya tienes cuenta? </span>
+              <a href="/login" className="text-sm text-primary hover:underline">
+                Inicia sesión
+              </a>
+            </div>
           </div>
-        </div>
+        )}
       </form>
       )}
 
       {/* Paso 1: Empleados */}
       {pasoActual === 1 && (
         <div className="space-y-6">
-          <ImportarEmpleados />
+          {empleadosCount > 1 && (
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+              <p className="text-sm text-green-800">
+                ✓ {empleadosCount - 1} empleado{empleadosCount - 1 > 1 ? 's' : ''} del equipo añadido{empleadosCount - 1 > 1 ? 's' : ''}
+              </p>
+            </div>
+          )}
+
+          <AddPersonaDocumentForm
+            onSuccess={() => {
+              toast.success('Empleado(s) añadido(s) correctamente');
+              // Recargar contador
+              fetch('/api/empleados')
+                .then((res) => res.json())
+                .then((data) => {
+                  const typedData = data as { data?: unknown[] };
+                  const count = typedData.data?.length || 0;
+                  setEmpleadosCount(count);
+                })
+                .catch((error) => {
+                  console.error('[onSuccess] Error cargando empleados:', error);
+                });
+            }}
+            onCancel={() => {}}
+          />
           <div className="flex justify-between pt-4 border-t">
             <Button variant="outline" onClick={handleAnterior}>
               Anterior
             </Button>
             <Button onClick={handleSiguiente}>
-              Siguiente
+              Siguiente {empleadosCount < 2 && <span className="ml-2 text-xs opacity-70">(añade al menos 1 empleado)</span>}
             </Button>
           </div>
         </div>

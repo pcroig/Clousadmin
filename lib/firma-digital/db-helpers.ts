@@ -77,6 +77,9 @@ export async function crearSolicitudFirma(input: CrearSolicitudFirmaInput) {
     posicionesFirma, // NUEVO: Array de posiciones
     posicionFirma,   // LEGACY: Retrocompatibilidad
     mantenerOriginal = true, // NUEVO: Por defecto mantiene el original
+    incluirFirmaEmpresa = true, // NUEVO: Por defecto incluye firma de empresa
+    posicionesFirmaEmpresa, // NUEVO: Array de posiciones específicas para firma de empresa
+    firmaEmpresaSolicitudS3Key, // NUEVO: S3 key de firma empresa para esta solicitud
   } = input;
 
   // 1. Obtener documento y generar hash
@@ -145,6 +148,12 @@ export async function crearSolicitudFirma(input: CrearSolicitudFirmaInput) {
     posicionFirmaJson = asJsonValue(posicionFirma);
   }
 
+  // Guardar posiciones de firma de empresa si se proporcionaron
+  let posicionesFirmaEmpresaJson: any = JSON_NULL;
+  if (posicionesFirmaEmpresa && posicionesFirmaEmpresa.length > 0) {
+    posicionesFirmaEmpresaJson = asJsonValue(posicionesFirmaEmpresa);
+  }
+
   const solicitud = await prisma.solicitudes_firma.create({
     data: {
       empresaId,
@@ -161,9 +170,77 @@ export async function crearSolicitudFirma(input: CrearSolicitudFirmaInput) {
       estado: 'pendiente',
       creadoPor,
       mantenerOriginal, // NUEVO: Guardar preferencia de mantener original
+      incluirFirmaEmpresa, // NUEVO: Guardar preferencia de incluir firma empresa
+      posicionesFirmaEmpresa: posicionesFirmaEmpresaJson, // NUEVO: Guardar posiciones específicas de firma empresa
+      firmaEmpresaS3Key: firmaEmpresaSolicitudS3Key, // NUEVO: Guardar S3 key de firma empresa para esta solicitud
       pdfTemporalS3Key: esWord ? s3KeyParaFirma : null, // NUEVO: Guardar referencia al PDF temporal convertido
     },
   });
+
+  // 2.5. NUEVO: Aplicar firma de empresa al PDF ANTES de crear las firmas de empleados
+  let documentoConFirmaEmpresa = documentoParaFirma;
+  let s3KeyConFirmaEmpresa = s3KeyParaFirma;
+
+  if (incluirFirmaEmpresa && firmaEmpresaSolicitudS3Key && posicionesFirmaEmpresa && posicionesFirmaEmpresa.length > 0) {
+    try {
+      console.log('[crearSolicitudFirma] Añadiendo firma de empresa al documento base...');
+
+      const firmaEmpresaBuffer = await downloadFromS3(firmaEmpresaSolicitudS3Key);
+
+      // Obtener nombre de la empresa
+      const empresa = await prisma.empresas.findUnique({
+        where: { id: empresaId },
+        select: { nombre: true },
+      });
+
+      if (empresa) {
+        // Crear marcas de firma para cada posición de firma empresa
+        const ahora = new Date();
+        const marcasFirmaEmpresa = posicionesFirmaEmpresa.map((posicion) => ({
+          nombreFirmante: empresa.nombre,
+          fechaFirma: ahora.toLocaleString('es-ES', {
+            dateStyle: 'short',
+            timeStyle: 'short',
+          }),
+          tipoFirma: 'simple' as TipoFirma,
+          certificadoHash: undefined,
+          posicion,
+          firmaImagen: {
+            buffer: firmaEmpresaBuffer,
+            width: 180,
+            height: 60,
+            contentType: 'image/png' as const,
+          },
+        }));
+
+        // Aplicar firma de empresa al documento
+        documentoConFirmaEmpresa = await anadirMarcasFirmasPDF(documentoParaFirma, marcasFirmaEmpresa);
+
+        // Guardar PDF con firma empresa en S3
+        s3KeyConFirmaEmpresa = `temp-firmas/${empresaId}/${Date.now()}-con-firma-empresa.pdf`;
+        await uploadToS3(documentoConFirmaEmpresa, s3KeyConFirmaEmpresa, 'application/pdf');
+
+        console.log(`[crearSolicitudFirma] PDF con firma de empresa guardado: ${s3KeyConFirmaEmpresa}`);
+
+        // CRÍTICO: Recalcular hash del documento CON firma empresa
+        const hashDocumentoConFirmaEmpresa = generarHashDocumento(documentoConFirmaEmpresa);
+
+        // Actualizar la solicitud con el S3 key del PDF con firma empresa Y el nuevo hash
+        await prisma.solicitudes_firma.update({
+          where: { id: solicitud.id },
+          data: {
+            pdfTemporalS3Key: s3KeyConFirmaEmpresa, // Este PDF tiene la firma empresa
+            hashDocumento: hashDocumentoConFirmaEmpresa, // Hash del PDF CON firma empresa
+          },
+        });
+
+        console.log('[crearSolicitudFirma] Hash actualizado para documento con firma empresa');
+      }
+    } catch (error) {
+      console.error('[crearSolicitudFirma] Error aplicando firma de empresa:', error);
+      // Continuar sin firma de empresa en caso de error
+    }
+  }
 
   // 3. Crear registros de firma para cada firmante
   const ahora = new Date();
@@ -391,6 +468,9 @@ export async function firmarDocumento(
 
   const estadoComplecion = validarComplecionFirmas(todasLasFirmas);
 
+  // Variable para guardar el primer documento firmado (para notificaciones y respuesta)
+  let primerDocumentoFirmado: { id: string; nombre: string } | null = null;
+
   // 8. Actualizar estado de solicitud si todas firmaron
   if (estadoComplecion.completo) {
     await prisma.solicitudes_firma.update({
@@ -513,6 +593,9 @@ export async function firmarDocumento(
           })
         );
 
+        // NOTA: La firma de empresa ya está aplicada en el documento base (pdfTemporalS3Key)
+        // No es necesario añadirla aquí, ya que se aplicó al crear la solicitud
+
         // Aplicar marcas al PDF
         const pdfConMarcas = await anadirMarcasFirmasPDF(documentoBuffer, marcas);
 
@@ -537,9 +620,6 @@ export async function firmarDocumento(
 
         // Verificar si se debe mantener el original o reemplazarlo
         const mantenerOriginal = firma.solicitudes_firma.mantenerOriginal ?? true;
-
-        // Variable para guardar el primer documento creado (para notificaciones)
-        let primerDocumentoFirmado: { id: string; nombre: string } | null = null;
 
         if (!mantenerOriginal) {
           // MODO: Reemplazar documento original con versión firmada
@@ -736,6 +816,11 @@ export async function firmarDocumento(
     firma: firmaActualizada,
     certificado,
     solicitudCompletada: estadoComplecion.completo,
+    // Devolver información del documento firmado cuando todas las firmas están completas
+    documentoFirmado: estadoComplecion.completo && primerDocumentoFirmado ? {
+      id: primerDocumentoFirmado.id,
+      nombre: primerDocumentoFirmado.nombre,
+    } : undefined,
   };
 }
 

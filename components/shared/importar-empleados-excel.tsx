@@ -6,9 +6,9 @@
 // Componente reutilizable para importación masiva de empleados desde Excel
 // Usado en: Onboarding y HR/Organización/Añadir Personas
 //
-// FLUJO DE DOS FASES (con soporte para auto-confirmación):
-// 1. Análisis: Procesa Excel con IA y muestra preview (NO guarda en BD)
-// 2. Confirmación: Usuario confirma manualmente o se ejecuta automáticamente según el contexto
+// FLUJO SIMPLIFICADO (auto-importación):
+// 1. Análisis y guardado: Procesa Excel con IA y guarda automáticamente en BD
+// 2. Resultado: Muestra resumen de empleados importados con opción de importar más
 //
 // @see docs/funcionalidades/importacion-empleados-excel.md
 
@@ -45,7 +45,8 @@ interface EmpleadoDetectado {
   errores: string[];
 }
 
-interface PreviewData {
+// Datos procesados del Excel antes de guardar en BD
+interface DatosAnalisisExcel {
   empleados: EmpleadoDetectado[];
   equiposDetectados: string[];
   managersDetectados: string[];
@@ -77,36 +78,6 @@ interface ResultadoImportacion {
   empleadosImportados: EmpleadoImportado[];
 }
 
-type ResumenStat = {
-  label: string;
-  value: number;
-  tone?: 'warning';
-};
-
-const buildResumenStats = (data: PreviewData | null): ResumenStat[] => {
-  if (!data) {
-    return [];
-  }
-
-  const stats: ResumenStat[] = [
-    { label: 'Empleados detectados', value: data.resumen.total },
-    { label: 'Listos para importar', value: data.resumen.validos },
-  ];
-
-  if (data.resumen.invalidos > 0) {
-    stats.push({ label: 'Con errores', value: data.resumen.invalidos, tone: 'warning' });
-  }
-
-  if (data.equiposDetectados.length > 0) {
-    stats.push({ label: 'Equipos detectados', value: data.equiposDetectados.length });
-  }
-
-  if (data.managersDetectados.length > 0) {
-    stats.push({ label: 'Managers detectados', value: data.managersDetectados.length });
-  }
-
-  return stats;
-};
 
 interface ImportarEmpleadosExcelProps {
   /** Callback ejecutado después de una importación exitosa */
@@ -132,9 +103,6 @@ interface ImportarEmpleadosExcelProps {
 
   /** Mostrar cabecera con título y descripción */
   showHeader?: boolean;
-
-  /** Confirmar automáticamente tras procesar el Excel */
-  autoConfirmAfterAnalysis?: boolean;
 }
 
 export function ImportarEmpleadosExcel({
@@ -146,109 +114,29 @@ export function ImportarEmpleadosExcel({
   showCancelButton,
   showFinishButton,
   showHeader = true,
-  autoConfirmAfterAnalysis = false,
 }: ImportarEmpleadosExcelProps) {
   const router = useRouter();
   const [archivo, setArchivo] = useState<File | null>(null);
   const [analizando, setAnalizando] = useState(false);
   const [confirmando, setConfirmando] = useState(false);
-  const [previewData, setPreviewData] = useState<PreviewData | null>(null);
   const [resultadoImportacion, setResultadoImportacion] = useState<ResultadoImportacion | null>(null);
   const [error, setError] = useState('');
   const [empleadosExpandidos, setEmpleadosExpandidos] = useState<Set<string>>(new Set());
-  const [cargandoEmpleados, setCargandoEmpleados] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const resumenStats = buildResumenStats(previewData);
 
   const shouldShowCancelButton = showCancelButton ?? (onCancel !== undefined);
   const shouldShowFinishButton = showFinishButton ?? (onSuccess !== undefined);
-  const actionButtonsClass = shouldShowCancelButton
-    ? 'flex flex-col gap-2 pt-2 sm:flex-row sm:items-center sm:justify-between'
-    : 'flex flex-col gap-2 pt-2 sm:flex-row sm:items-center sm:justify-end';
-
-  // Cargar empleados recientes (sin onboarding completado) al montar
-  useEffect(() => {
-    const loadEmpleados = async () => {
-      // Solo cargar si autoConfirmAfterAnalysis está activo (modo onboarding)
-      // y no hay resultado de importación ya
-      if (!autoConfirmAfterAnalysis || resultadoImportacion) return;
-
-      setCargandoEmpleados(true);
-      try {
-        const response = await fetch('/api/empleados?limit=100');
-        if (response.ok) {
-          const data = await parseJson<{
-            data?: Array<{
-              id: string;
-              nombre: string;
-              apellidos: string;
-              email: string;
-              puesto?: { id: string; nombre: string } | null;
-              equipos?: Array<{ id: string; nombre: string }>;
-              fechaAlta: string | null;
-              salarioBaseAnual: number | null;
-              onboardingCompletado: boolean;
-              createdAt?: string;
-              usuario?: {
-                rol: string;
-              };
-            }>;
-          }>(response);
-
-          const empleados = data?.data ?? [];
-
-          // Filtrar empleados sin onboarding completado (creados durante este flujo)
-          // Excluir HR admins (son parte del signup inicial, no empleados importados)
-          const empleadosSinOnboarding = empleados.filter(
-            (emp) => !emp.onboardingCompletado && emp.usuario?.rol !== 'hr_admin'
-          );
-
-          if (empleadosSinOnboarding.length > 0) {
-            // Transformar a formato ResultadoImportacion
-            const resultado: ResultadoImportacion = {
-              empleadosCreados: empleadosSinOnboarding.length,
-              equiposCreados: 0, // No podemos calcularlo desde aquí
-              puestosCreados: 0, // No podemos calcularlo desde aquí
-              invitacionesEnviadas: 0, // No podemos saberlo
-              errores: [],
-              empleadosImportados: empleadosSinOnboarding.map((emp) => ({
-                id: emp.id,
-                nombre: emp.nombre,
-                apellidos: emp.apellidos,
-                email: emp.email,
-                puesto: emp.puesto?.nombre ?? null,
-                equipo: emp.equipos?.[0]?.nombre ?? null,
-                fechaAlta: emp.fechaAlta,
-                salarioBaseAnual: emp.salarioBaseAnual,
-                invitacionEnviada: false, // Asumir que no sabemos
-              })),
-            };
-
-            setResultadoImportacion(resultado);
-          }
-        }
-      } catch (err) {
-        console.error('Error cargando empleados:', err);
-        // No mostrar error, simplemente dejar vacío
-      } finally {
-        setCargandoEmpleados(false);
-      }
-    };
-
-    loadEmpleados();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       setArchivo(file);
-      setPreviewData(null);
       setResultadoImportacion(null);
       setError('');
     }
   };
 
-  // PASO 1: Analizar archivo y mostrar preview (NO guarda en BD)
+  // Analizar archivo y auto-importar directamente (sin paso intermedio de confirmación)
   const handleAnalizarArchivo = async () => {
     if (!archivo) return;
 
@@ -281,38 +169,27 @@ export function ImportarEmpleadosExcel({
         return;
       }
 
-      // Guardar datos para preview
-      const previewPayload: PreviewData = {
+      // Guardar datos del análisis
+      const datosAnalisis: DatosAnalisisExcel = {
         empleados: analyzeResult.data.empleados,
         equiposDetectados: analyzeResult.data.equiposDetectados,
         managersDetectados: analyzeResult.data.managersDetectados || [],
         resumen: analyzeResult.data.resumen,
       };
 
-      setPreviewData(previewPayload);
-
-      if (showToast) {
-        toast.success('Archivo procesado correctamente');
-      }
-
-      // Auto-confirmar sin mostrar preview si está activo
-      if (autoConfirmAfterAnalysis && previewPayload.resumen.validos > 0) {
-        await handleConfirmarImportacion(previewPayload);
-        setAnalizando(false);
-        return;
-      }
+      // Guardar directamente sin paso intermedio de confirmación
+      setAnalizando(false);
+      await handleConfirmarImportacion(datosAnalisis);
     } catch (err) {
       setError('Error al procesar el archivo');
       if (showToast) toast.error('Error al procesar el archivo');
       console.error('Error:', err);
-    } finally {
       setAnalizando(false);
     }
   };
 
-  // PASO 2: Confirmar y guardar en BD
-  const handleConfirmarImportacion = async (dataOverride?: PreviewData) => {
-    const data = dataOverride ?? previewData;
+  // Guardar empleados en BD
+  const handleConfirmarImportacion = async (data: DatosAnalisisExcel) => {
     if (!data) return;
 
     setError('');
@@ -339,11 +216,10 @@ export function ImportarEmpleadosExcel({
 
       if (importResponse.ok && importResult.success) {
         setResultadoImportacion(importResult.data ?? null);
-        setPreviewData(null); // Limpiar preview
         if (showToast) {
           toast.success('Importación completada');
         }
-        
+
         // Limpiar archivo
         setArchivo(null);
         if (fileInputRef.current) {
@@ -376,7 +252,6 @@ export function ImportarEmpleadosExcel({
   };
 
   const handleReiniciar = () => {
-    setPreviewData(null);
     setResultadoImportacion(null);
     setArchivo(null);
     setError('');
@@ -386,14 +261,6 @@ export function ImportarEmpleadosExcel({
     }
   };
 
-  const handleCancelarPreview = () => {
-    setPreviewData(null);
-    setArchivo(null);
-    setError('');
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
-  };
 
   const handleFinalizar = () => {
     if (onSuccess) {
@@ -448,204 +315,11 @@ export function ImportarEmpleadosExcel({
         </div>
       )}
 
-      {/* Preview de datos analizados (antes de guardar) */}
-      {!analizando && !confirmando && previewData && !resultadoImportacion && (
-        <div className="space-y-4">
-          {/* Resumen del análisis */}
-          <div className="rounded-xl border bg-white p-4 shadow-sm">
-            <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <h4 className="font-semibold text-gray-900">Resumen de la importación</h4>
-                <p className="text-sm text-gray-500">
-                  Datos detectados durante el análisis del archivo.
-                </p>
-              </div>
-              <span className="text-xs font-medium text-gray-500">
-                Último análisis: {new Date().toLocaleTimeString('es-ES')}
-              </span>
-            </div>
-
-            <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              {resumenStats.length > 0 ? (
-                resumenStats.map((stat) => (
-                  <div
-                    key={stat.label}
-                    className={`rounded-lg border px-3 py-3 ${
-                      stat.tone === 'warning'
-                        ? 'border-amber-200 bg-amber-50'
-                        : 'border-gray-100 bg-gray-50'
-                    }`}
-                  >
-                    <p className="text-xs uppercase tracking-wide text-gray-500">{stat.label}</p>
-                    <p
-                      className={`text-2xl font-semibold ${
-                        stat.tone === 'warning' ? 'text-amber-600' : 'text-gray-900'
-                      }`}
-                    >
-                      {stat.value}
-                    </p>
-                  </div>
-                ))
-              ) : (
-                <div className="rounded-lg border border-dashed px-3 py-6 text-center text-sm text-gray-500">
-                  No hay datos para mostrar todavía.
-                </div>
-              )}
-            </div>
-
-            {previewData.equiposDetectados.length > 0 && (
-              <div className="mt-4">
-                <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
-                  Equipos detectados
-                </p>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {previewData.equiposDetectados.map((equipo, idx) => (
-                    <span
-                      key={idx}
-                      className="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-gray-700"
-                    >
-                      {equipo}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Lista de empleados válidos (colapsados) */}
-          {previewData.empleados.filter(e => e.valido).length > 0 && (
-            <div className="space-y-2">
-              <h4 className="text-sm font-medium text-gray-700">
-                Empleados a importar ({previewData.empleados.filter(e => e.valido).length})
-              </h4>
-              <div className="space-y-2 max-h-96 overflow-y-auto">
-                {previewData.empleados.filter(e => e.valido).map((emp, idx) => {
-                  const empleadoKey = `${emp.email}-${idx}`;
-                  const expandido = empleadosExpandidos.has(empleadoKey);
-                  return (
-                    <div
-                      key={empleadoKey}
-                      className="rounded-lg border bg-white hover:border-gray-400 transition-colors"
-                    >
-                      <button
-                        onClick={() => toggleEmpleadoExpandido(empleadoKey)}
-                        className="w-full p-3 flex items-center justify-between text-left"
-                      >
-                        <div className="flex items-center gap-3">
-                          <CheckCircle className="h-4 w-4 text-green-500 flex-shrink-0" />
-                          <div>
-                            <p className="text-sm font-medium text-gray-900">
-                              {emp.nombre} {emp.apellidos}
-                            </p>
-                            <p className="text-xs text-gray-600">{emp.email}</p>
-                          </div>
-                        </div>
-                        {expandido ? (
-                          <ChevronDown className="h-4 w-4 text-gray-400" />
-                        ) : (
-                          <ChevronRight className="h-4 w-4 text-gray-400" />
-                        )}
-                      </button>
-                      {expandido && (
-                        <div className="px-3 pb-3 pt-0 space-y-2 border-t bg-gray-50">
-                          <div className="grid grid-cols-2 gap-2 pt-2 text-xs">
-                            {emp.puesto && (
-                              <div>
-                                <span className="text-gray-500">Puesto:</span>
-                                <span className="ml-1 text-gray-900">{emp.puesto}</span>
-                              </div>
-                            )}
-                            {emp.equipo && (
-                              <div>
-                                <span className="text-gray-500">Equipo:</span>
-                                <span className="ml-1 text-gray-900">{emp.equipo}</span>
-                              </div>
-                            )}
-                            {emp.fechaAlta && (
-                              <div>
-                                <span className="text-gray-500">Fecha de alta:</span>
-                                <span className="ml-1 text-gray-900">
-                                  {new Date(emp.fechaAlta).toLocaleDateString('es-ES')}
-                                </span>
-                              </div>
-                            )}
-                            {emp.salarioBaseAnual && (
-                              <div>
-                                <span className="text-gray-500">Salario anual:</span>
-                                <span className="ml-1 text-gray-900">
-                                  {emp.salarioBaseAnual.toLocaleString('es-ES')}€
-                                </span>
-                              </div>
-                            )}
-                            {emp.nif && (
-                              <div>
-                                <span className="text-gray-500">NIF:</span>
-                                <span className="ml-1 text-gray-900">{emp.nif}</span>
-                              </div>
-                            )}
-                            {emp.telefono && (
-                              <div>
-                                <span className="text-gray-500">Teléfono:</span>
-                                <span className="ml-1 text-gray-900">{emp.telefono}</span>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* Lista de empleados inválidos */}
-          {previewData.empleados.filter(e => !e.valido).length > 0 && (
-            <div className="rounded-lg bg-yellow-50 border border-yellow-200 p-4">
-              <div className="flex items-start gap-3">
-                <AlertCircle className="h-5 w-5 text-yellow-600 mt-0.5" />
-                <div className="flex-1">
-                  <h4 className="font-medium text-yellow-900 text-sm">
-                    Empleados con errores ({previewData.empleados.filter(e => !e.valido).length})
-                  </h4>
-                  <div className="mt-2 space-y-2 max-h-40 overflow-y-auto">
-                    {previewData.empleados.filter(e => !e.valido).map((emp, idx) => (
-                      <div key={idx} className="text-xs text-yellow-800">
-                        <p className="font-medium">{emp.email || 'Sin email'}</p>
-                        <ul className="list-disc list-inside ml-2">
-                          {emp.errores.map((error, errorIdx) => (
-                            <li key={errorIdx}>{error}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Botones de confirmación */}
-          <div className={actionButtonsClass}>
-            {shouldShowCancelButton && (
-              <Button variant="outline" onClick={handleCancelarPreview}>
-                Cancelar
-              </Button>
-            )}
-
-            <Button
-              onClick={() => handleConfirmarImportacion()}
-              disabled={previewData.resumen.validos === 0}
-              className="bg-primary hover:bg-primary/90"
-            >
-              Confirmar e importar {previewData.resumen.validos} empleados
-            </Button>
-          </div>
-        </div>
-      )}
+      {/* ELIMINADO: Paso intermedio de preview con botón "Confirmar e importar X empleados"
+          Ahora el flujo es directo: Analizar → Auto-importar → Resultado */}
 
       {/* Resultado de importación - Empleados colapsados */}
-      {!analizando && !confirmando && !previewData && resultadoImportacion && (
+      {!analizando && !confirmando && resultadoImportacion && (
         <div className="space-y-4">
           {/* Resumen */}
           <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
@@ -788,7 +462,7 @@ export function ImportarEmpleadosExcel({
             <Button variant="outline" onClick={handleReiniciar}>
               Importar más empleados
             </Button>
-            
+
             {shouldShowFinishButton && (
               <div className="flex gap-2 sm:justify-end">
                 {shouldShowCancelButton && onCancel && (
@@ -796,15 +470,15 @@ export function ImportarEmpleadosExcel({
                     Cancelar
                   </Button>
                 )}
-                <Button onClick={handleFinalizar}>Guardar y volver</Button>
+                <Button onClick={handleFinalizar}>Guardar</Button>
               </div>
             )}
           </div>
         </div>
       )}
 
-      {/* Área de carga de archivo (solo si no hay resultado ni preview) */}
-      {!analizando && !confirmando && !previewData && !resultadoImportacion && (
+      {/* Área de carga de archivo (solo si no hay resultado) */}
+      {!analizando && !confirmando && !resultadoImportacion && (
         <div className="space-y-4">
           <div
             className="rounded-lg border-2 border-dashed p-8 text-center cursor-pointer hover:border-primary transition-colors"

@@ -8,12 +8,13 @@ import { z } from 'zod';
 import { getSession } from '@/lib/auth';
 import { UsuarioRol } from '@/lib/constants/enums';
 import { prisma } from '@/lib/prisma';
+import { optionalIdArraySchema } from '@/lib/validaciones/schemas';
 
 // Schema de validación
 const puestoCreateSchema = z.object({
   nombre: z.string().min(1, 'El nombre es requerido').max(100),
   descripcion: z.string().optional(),
-  empleadoIds: z.array(z.string().uuid()).optional(),
+  empleadoIds: optionalIdArraySchema,
 });
 
 // GET /api/puestos - Listar todos los puestos activos

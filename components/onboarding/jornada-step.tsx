@@ -68,7 +68,7 @@ type NivelAsignacion = 'empresa' | 'equipo' | 'individual';
 
 interface AsignacionPorJornada {
   nivel: NivelAsignacion;
-  equipoId?: string;
+  equipoIds?: string[]; // Array para permitir múltiples equipos
   empleadoIds?: string[];
 }
 
@@ -204,10 +204,10 @@ export const JornadaStep = forwardRef<JornadaStepHandle, JornadaStepProps>(funct
     });
   }
 
-  function handleEquipoChange(jornadaIndex: number, equipoId: string) {
+  function handleEquiposChange(jornadaIndex: number, equipoIds: string[]) {
     setAsignaciones({
       ...asignaciones,
-      [jornadaIndex]: { nivel: 'equipo', equipoId },
+      [jornadaIndex]: { nivel: 'equipo', equipoIds },
     });
   }
 
@@ -238,12 +238,15 @@ export const JornadaStep = forwardRef<JornadaStepHandle, JornadaStepProps>(funct
     // Validar conflictos de equipos duplicados
     const equiposUsados = new Set<string>();
     Object.entries(asignaciones).forEach(([index, asignacion]) => {
-      if (asignacion.nivel === 'equipo' && asignacion.equipoId) {
-        if (equiposUsados.has(asignacion.equipoId)) {
-          toast.error(`El equipo seleccionado en la jornada ${parseInt(index) + 1} ya está asignado a otra jornada`);
-          isValid = false;
-        }
-        equiposUsados.add(asignacion.equipoId);
+      if (asignacion.nivel === 'equipo' && asignacion.equipoIds) {
+        asignacion.equipoIds.forEach(equipoId => {
+          if (equiposUsados.has(equipoId)) {
+            const equipo = equipos.find(eq => eq.id === equipoId);
+            toast.error(`El equipo "${equipo?.nombre || equipoId}" en la jornada ${parseInt(index) + 1} ya está asignado a otra jornada`);
+            isValid = false;
+          }
+          equiposUsados.add(equipoId);
+        });
       }
     });
 
@@ -271,8 +274,8 @@ export const JornadaStep = forwardRef<JornadaStepHandle, JornadaStepProps>(funct
       // Validar asignación por jornada
       const asignacion = asignaciones[index];
       if (asignacion) {
-        if (asignacion.nivel === 'equipo' && !asignacion.equipoId) {
-          toast.error(`Jornada ${index + 1}: Debes seleccionar un equipo`);
+        if (asignacion.nivel === 'equipo' && (!asignacion.equipoIds || asignacion.equipoIds.length === 0)) {
+          toast.error(`Jornada ${index + 1}: Debes seleccionar al menos un equipo`);
           isValid = false;
         }
         if (asignacion.nivel === 'individual' && (!asignacion.empleadoIds || asignacion.empleadoIds.length === 0)) {
@@ -326,9 +329,11 @@ export const JornadaStep = forwardRef<JornadaStepHandle, JornadaStepProps>(funct
     try {
       // Create all jornadas
       const createdJornadaIds: string[] = [];
+      let jornadasCreadasExitosamente = false;
 
-      for (let i = 0; i < jornadas.length; i++) {
-        const jornada = jornadas[i];
+      try {
+        for (let i = 0; i < jornadas.length; i++) {
+          const jornada = jornadas[i];
 
         // Build config object
         const config: JornadaConfig = {};
@@ -386,11 +391,34 @@ export const JornadaStep = forwardRef<JornadaStepHandle, JornadaStepProps>(funct
         });
 
         if (!response.ok) {
+          const errorText = await response.text();
+          console.error(`Error al crear jornada ${i + 1}:`, errorText);
           throw new Error(`Error al guardar jornada ${i + 1}`);
         }
 
-        const jornadaGuardada = await response.json() as { id: string };
-        createdJornadaIds.push(jornadaGuardada.id);
+          const jornadaGuardada = await response.json() as { data?: { id: string }; id?: string };
+          const jornadaId = jornadaGuardada.data?.id || jornadaGuardada.id;
+
+          if (!jornadaId) {
+            console.error('Jornada creada sin ID:', jornadaGuardada);
+            throw new Error(`Jornada ${i + 1} creada pero sin ID`);
+          }
+
+          console.log(`Jornada ${i + 1} creada con ID:`, jornadaId);
+          createdJornadaIds.push(jornadaId);
+        }
+
+        jornadasCreadasExitosamente = true;
+      } catch (errorCreacion) {
+        // ✅ Rollback: Eliminar jornadas creadas si falla la creación
+        for (const jornadaId of createdJornadaIds) {
+          try {
+            await fetch(`/api/jornadas/${jornadaId}`, { method: 'DELETE' });
+          } catch (deleteError) {
+            console.error(`Error eliminando jornada ${jornadaId}:`, deleteError);
+          }
+        }
+        throw errorCreacion;
       }
 
       // Asignar jornadas según configuración
@@ -420,11 +448,13 @@ export const JornadaStep = forwardRef<JornadaStepHandle, JornadaStepProps>(funct
             nivel: asignacion.nivel,
           };
 
-          if (asignacion.nivel === 'equipo' && asignacion.equipoId) {
-            payload.equipoIds = [asignacion.equipoId];
+          if (asignacion.nivel === 'equipo' && asignacion.equipoIds) {
+            payload.equipoIds = asignacion.equipoIds;
           } else if (asignacion.nivel === 'individual' && asignacion.empleadoIds) {
             payload.empleadoIds = asignacion.empleadoIds;
           }
+
+          console.log(`Asignando jornada ${index + 1}:`, payload);
 
           const asignacionResponse = await fetch('/api/jornadas/asignar', {
             method: 'POST',
@@ -433,14 +463,51 @@ export const JornadaStep = forwardRef<JornadaStepHandle, JornadaStepProps>(funct
           });
 
           if (!asignacionResponse.ok) {
-            const errorData = await asignacionResponse.json().catch(() => ({}));
-            console.error(`Error al asignar jornada ${index + 1}:`, errorData);
+            const errorText = await asignacionResponse.text();
+            console.error(`Error al asignar jornada ${index + 1}:`, {
+              status: asignacionResponse.status,
+              statusText: asignacionResponse.statusText,
+              body: errorText,
+              payload,
+            });
+            let errorData: { error?: string; message?: string; details?: Array<{ path: string[]; message: string }> } = { error: 'Error desconocido' };
+            try {
+              errorData = JSON.parse(errorText) as { error?: string; message?: string; details?: Array<{ path: string[]; message: string }> };
+            } catch {
+              errorData = { error: errorText || 'Error desconocido' };
+            }
+
+            // Si hay detalles de validación (Zod), mostrar errores específicos
+            if (errorData.details && Array.isArray(errorData.details) && errorData.details.length > 0) {
+              const validationErrors = errorData.details
+                .map(issue => `${issue.path.join('.')}: ${issue.message}`)
+                .join(', ');
+              toast.error(`Error asignando jornada ${index + 1}: ${validationErrors}`);
+            } else {
+              toast.error(`Error asignando jornada ${index + 1}: ${errorData.error || errorData.message || 'Error desconocido'}`);
+            }
             asignacionesFallidas.push(index + 1);
+          } else {
+            console.log(`Jornada ${index + 1} asignada correctamente`);
           }
         } catch (error) {
           console.error(`Excepción al asignar jornada ${index + 1}:`, error);
           asignacionesFallidas.push(index + 1);
         }
+      }
+
+      // ✅ ROLLBACK: Si fallan TODAS las asignaciones, eliminar jornadas creadas
+      if (asignacionesFallidas.length === jornadas.length) {
+        toast.error('Error al asignar empleados. Revertiendo cambios...');
+        for (const jornadaId of createdJornadaIds) {
+          try {
+            await fetch(`/api/jornadas/${jornadaId}`, { method: 'DELETE' });
+          } catch (deleteError) {
+            console.error(`Error eliminando jornada ${jornadaId}:`, deleteError);
+          }
+        }
+        toast.error('No se pudo completar la configuración de jornadas');
+        return false;
       }
 
       // Informar resultado de asignaciones
@@ -558,8 +625,8 @@ export const JornadaStep = forwardRef<JornadaStepHandle, JornadaStepProps>(funct
                 empleadosSeleccionados={asignaciones[index]?.empleadoIds || []}
                 onEmpleadosSeleccionChange={(ids) => handleEmpleadosChange(index, ids)}
                 equipos={equipos}
-                equipoSeleccionado={asignaciones[index]?.equipoId || ''}
-                onEquipoSeleccionadoChange={(id) => handleEquipoChange(index, id)}
+                equiposSeleccionados={asignaciones[index]?.equipoIds || []}
+                onEquiposSeleccionadosChange={(ids) => handleEquiposChange(index, ids)}
               />
             </AccordionContent>
           </AccordionItem>

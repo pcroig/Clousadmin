@@ -4,19 +4,21 @@
 
 ## 🎯 Estado: FUNCIONALIDAD COMPLETA
 
-**Fecha**: 25 de noviembre 2025  
-**Fase**: MVP - Funcionalidad Completa con UI Unificada
+**Fecha**: 8 de diciembre 2025  
+**Fase**: Funcionalidad completa (UI y backend alineados con validaciones y transacciones)  
+**Nota reciente**: Los cambios de jornada (crear/editar/eliminar) solo se aplican al pulsar **Guardar cambios** en el modal; cancelar descarta todo.
 
 ---
 
 ## 📋 RESUMEN
 
 Sistema de gestión de jornadas laborales que permite a HR definir horarios de trabajo y asignarlos a empleados, equipos o toda la empresa. Incluye:
-- ✅ Componente reutilizable para crear/editar jornadas
-- ✅ Configuración de descansos en minutos
-- ✅ Asignación flexible (empresa/equipo/individual)
-- ✅ Jornada predefinida configurable desde onboarding (paso 3: "Calendario y Jornada")
-- ✅ Valores por defecto pre-rellenados pero completamente editables
+- ✅ Componente reutilizable para crear/editar jornadas (accordion en modal y onboarding)
+- ✅ Configuración de descansos en minutos → se persiste como `descansoMinimo` en formato `HH:MM`
+- ✅ Asignación flexible (empresa/equipo/individual) con metadata en `jornada_asignaciones`
+- ✅ Validación completa: sin solapamientos entre niveles y con cobertura 100% de empleados activos
+- ✅ Jornada predefinida configurable desde onboarding (paso 3: "Calendario y Jornada") y reutilizada en panel HR
+- ✅ Cambios atómicos en el modal: eliminar/editar/crear se mantienen en memoria hasta guardar (cancelar revierte)
 
 ---
 
@@ -24,7 +26,8 @@ Sistema de gestión de jornadas laborales que permite a HR definir horarios de t
 
 ### 1. Modelo de Datos
 - ✅ Tabla `jornadas` en Prisma Schema
-- ✅ Relación con `empleados` (cada empleado tiene una `jornadaId`)
+- ✅ Tabla `jornada_asignaciones` (metadata de nivel de asignación y `equipoIds`) con FK a `jornadas` y `empresas`
+- ✅ Relación con `empleados` (cada empleado tiene una `jornadaId`; constraint lógico: una jornada por empleado)
 - ✅ Tipos de jornada: **Fija** (horario específico) y **Flexible** (horas semanales)
 - ✅ Configuración por día de la semana
 - ✅ Campos: `horasSemanales`, `config` (JSON), `activa`
@@ -35,28 +38,28 @@ Sistema de gestión de jornadas laborales que permite a HR definir horarios de t
 ### 2. API Routes
 **GET /api/jornadas**
 - Lista todas las jornadas activas de la empresa
+- Incluye metadata de `asignacion` (nivel y `equipoIds`) para reconstruir contexto sin heurísticas
 - Solo accesible por HR Admin
 
 **POST /api/jornadas**
-- Crea nueva jornada
-- Validación con Zod
+- Crea nueva jornada (validación con Zod)
 - Configuración por defecto (L-V 9:00-18:00)
 
 **GET /api/jornadas/[id]**
 - Obtiene jornada específica
-- Incluye lista de empleados asignados
+- Incluye lista de empleados activos asignados y `asignacion`
 
 **PATCH /api/jornadas/[id]**
 - Actualiza jornada existente
 - Todas las jornadas normales son editables
 
 **DELETE /api/jornadas/[id]**
-- Marca jornada como inactiva
-- Valida que no haya empleados asignados
+- Desasigna empleados en transacción y marca jornada como inactiva
+- Elimina registros asociados en `jornada_asignaciones`
 
-**POST /api/jornadas/[id]/asignar**
-- Asigna jornada a empleados específicos, equipo completo, o toda la empresa
-- Actualiza `jornadaId` en tabla `empleados`
+**POST /api/jornadas/asignar**
+- Asigna jornada a empresa/equipos/individuales
+- Transacción: actualiza `empleados.jornadaId` y upsert en `jornada_asignaciones`
 
 ### 3. UI para HR Admin
 
@@ -64,24 +67,20 @@ Sistema de gestión de jornadas laborales que permite a HR definir horarios de t
 
 Componentes:
 - ✅ `PageHeader` con botón "Nueva Jornada"
-- ✅ Tabla con listado de jornadas
-- ✅ Badge de tipo (Fija / Flexible)
+- ✅ Listado con accordions (alineado con onboarding) para editar varias jornadas
+- ✅ Badge de tipo (Fija / Flexible) y nivel de asignación (empresa/equipo/individual)
 - ✅ Botones de acción:
-  - **Editar** (todas las jornadas)
-  - **Eliminar** (solo si no tiene empleados asignados)
-  - **Asignar** (para todas)
+  - **Editar** dentro del accordion
+  - **Eliminar** (desasigna y marca inactiva)
+  - **Asignar** integrado en el mismo flujo
 
-**Modal: Crear/Editar Jornada** (Unificado)
+**Modal/Accordion: Crear/Editar Jornada** (Unificado)
 - ✅ Componente reutilizable: `JornadaFormFields` (`components/shared/jornada-form-fields.tsx`)
-- ✅ Campo: Nombre
-- ✅ Selector: Tipo (Fija / Flexible)
-- ✅ Campo: Horas semanales
-- ✅ Días laborables (selector visual de días de la semana)
-- ✅ Toggle para habilitar/deshabilitar descanso (por defecto habilitado)
-- ✅ Tiempo de descanso en **minutos** (input numérico, visible solo si está habilitado)
+- ✅ Campos: Nombre, tipo, horas semanales, días laborables
+- ✅ Descanso en minutos (UI) → se guarda como `descansoMinimo` en `config` (`HH:MM`)
 - ✅ Horarios por día (para jornada fija)
 - ✅ Límites de fichaje (inferior/superior)
-- ✅ Asignación integrada (empresa/equipo/individual)
+- ✅ Asignación integrada (empresa/equipo/individual) con precarga de `asignacion`
 
 ### 4. Validaciones
 **Schemas en `lib/validaciones/schemas.ts`:**
@@ -89,12 +88,13 @@ Componentes:
 - ✅ `jornadaUpdateSchema` (actualizar)
 - ✅ `jornadaAsignarSchema` (asignar)
 
-**Reglas de negocio:**
+**Reglas de negocio y checks de solapamiento/cobertura:**
 - ✅ Solo HR Admin puede gestionar jornadas
-- ✅ Las jornadas se pueden editar y eliminar si no tienen empleados asignados
-- ✅ No se puede eliminar una jornada si tiene empleados asignados
+- ✅ Exactamente una jornada por empleado (sin solapamientos entre empresa/equipo/individual)
+- ✅ Jornada de empresa es excluyente
+- ✅ Equipos se expanden a empleados para detectar solapamientos
+- ✅ Cobertura completa: no debe quedar ningún empleado activo sin jornada al guardar
 - ✅ `empresaId` se valida automáticamente desde la sesión
-- ✅ Asignación masiva con verificación de jornadas previas
 
 ### 5. Componente Reutilizable
 **`JornadaFormFields`** (`components/shared/jornada-form-fields.tsx`)
@@ -134,7 +134,7 @@ Componentes:
      - Horarios por día (si es fija)
      - Límites de fichaje
      - Opcional: Asignar a empresa/equipo/empleados
-   - Al guardar, si hay asignación, verifica jornadas previas
+   - Al guardar valida solapamientos/cobertura y elimina jornadas obsoletas antes de crear/actualizar
 
 3. **Editar jornada**
    - Click en "Editar" en cualquier jornada
@@ -143,9 +143,9 @@ Componentes:
    - Puede reasignar durante la edición
 
 4. **Eliminar jornada**
-   - Click en "Eliminar"
-   - Solo si no tiene empleados asignados
-   - Confirmación requerida
+   - Click en "Eliminar" dentro del modal (no dispara API inmediata)
+   - La eliminación queda en borrador y se procesa junto a altas/ediciones al pulsar **Guardar cambios**
+   - Cancelar o cerrar con "X" descarta la eliminación
 
 ---
 
@@ -220,17 +220,17 @@ Componentes:
 - Soporte para asignación integrada
 
 **`EditarJornadaModal`** (`app/(dashboard)/hr/horario/fichajes/editar-jornada-modal.tsx`)
-- Modal unificado para crear/editar
+- Modal/accordion unificado para crear/editar
 - Usa `JornadaFormFields` internamente
-- Maneja lógica de asignación y verificación de jornadas previas
-- Integración con APIs de asignación masiva
+- Maneja validación de solapamientos/cobertura y eliminación de jornadas obsoletas antes de guardar
+- Integración con APIs de asignación masiva (transacciones + metadata)
 
 **Flujo de Asignación:**
 1. Usuario configura jornada en el modal
 2. Selecciona nivel de asignación (empresa/equipo/individual)
-3. Al guardar, verifica jornadas previas (`/api/jornadas/verificar-previas`)
-4. Si hay jornadas previas, muestra alerta de confirmación
-5. Usa `/api/jornadas/asignar` para asignación masiva
+3. Al guardar, expande equipos a empleados y valida solapamientos + cobertura 100%
+4. Si detecta jornada de empresa + otra, o empleados sin jornada, bloquea con mensaje específico
+5. Usa `/api/jornadas/asignar` para asignación masiva (upsert en `jornada_asignaciones`)
 
 ## ⚠️ PRÓXIMAS MEJORAS
 
@@ -255,16 +255,16 @@ Componentes:
 4. ✅ Crear una nueva jornada con todos los campos
 5. ✅ Verificar que aparece en la lista
 6. ✅ Editar la jornada creada → Cambios guardados
-7. ✅ Intentar eliminar jornada con empleados → Error
-8. ✅ Eliminar jornada sin empleados asignados → Éxito
-9. ✅ Asignar jornada a empresa/equipo/empleados → Verificación previa
+7. ✅ Eliminar jornada con empleados desde el modal → Guardar debe desasignar y marcar inactiva; cancelar debe mantenerla intacta
+8. ✅ Flujo combinado: eliminar jornadas obsoletas y crear nueva jornada empresa → sin conflictos
+9. ✅ Asignar jornada a empresa/equipo/empleados → valida solapamientos y cobertura
 
 ---
 
 ## 📝 NOTAS TÉCNICAS
 
 - **Jornadas normales**: Las jornadas creadas desde onboarding o manualmente son editables y eliminables
-- **Eliminación**: Solo si no tienen empleados asignados (soft delete: `activa: false`)
+- **Eliminación diferida**: El modal ya no hace DELETE inmediato; las eliminaciones se agrupan con creaciones/ediciones y se envían al guardar. Cancelar o cerrar descarta cambios locales.
 - **Tiempo de descanso**: Se configura en minutos en la UI, se convierte a formato HH:MM en el config
 - **Jornada fija**: El descanso se aplica de 14:00 en adelante según los minutos configurados (si está habilitado)
 - **Jornada flexible**: El descanso mínimo es opcional y se usa para cálculos de balance cuando está configurado
@@ -280,10 +280,9 @@ Componentes:
 |----------|--------|-------------|------|
 | `/api/jornadas` | GET | Lista todas las jornadas activas de la empresa | HR |
 | `/api/jornadas` | POST | Crea nueva jornada | HR |
-| `/api/jornadas/[id]` | GET | Obtiene jornada específica con empleados asignados | HR |
+| `/api/jornadas/[id]` | GET | Obtiene jornada específica con empleados asignados y metadata de asignación | HR |
 | `/api/jornadas/[id]` | PATCH | Actualiza jornada existente | HR |
-| `/api/jornadas/[id]` | DELETE | Marca jornada como inactiva | HR |
-| `/api/jornadas/[id]/asignar` | POST | Asigna jornada a empleados específicos | HR |
+| `/api/jornadas/[id]` | DELETE | Desasigna empleados y marca jornada como inactiva | HR |
 | `/api/jornadas/asignar` | POST | Asigna jornada masivamente (empresa/equipos/individuales) | HR |
 
 ---
@@ -308,10 +307,10 @@ Durante el onboarding inicial de la empresa en `/signup`, la jornada y el calend
    - Seleccionar tipo de jornada (Fija o Flexible)
 
 3. Al guardar:
--   - Se crea/actualiza la jornada predefinida
--   - Verifica si hay empleados con jornadas diferentes (`/api/jornadas/verificar-previas`)
--     y, si las hay, obliga al HR a confirmar el reemplazo antes de continuar
--   - Se asigna automáticamente a todos los empleados que no tienen jornada (importados en el paso 1) una vez se confirma
+   - Se crea/actualiza la jornada predefinida
+   - Valida solapamientos entre empresa/equipo/individual y cobertura 100%
+   - Desasigna jornadas obsoletas si es necesario y reasigna con `/api/jornadas/asignar`
+   - Se asigna automáticamente a todos los empleados que no tienen jornada (importados en el paso 1)
 
 #### Paso 4 - Calendario Laboral:
 
@@ -345,7 +344,7 @@ Durante el onboarding inicial de la empresa en `/signup`, la jornada y el calend
    - Horarios por día (si es fija)
    - Límites de fichaje
    - Opcional: Asignar inmediatamente (empresa/equipo/individual)
-4. Al guardar, si hay asignación, verifica jornadas previas
+4. Al guardar valida solapamientos/cobertura y actualiza `jornada_asignaciones`
 5. Jornada creada y disponible
 
 ### Editar Jornada (HR)
@@ -365,10 +364,11 @@ Durante el onboarding inicial de la empresa en `/signup`, la jornada y el calend
 - **Por equipo**: Seleccionar un equipo (todos sus miembros)
 - **Individual**: Seleccionar empleados específicos mediante checkboxes
 
-**Confirmación:**
-- Si hay jornadas previas, muestra alerta con lista de jornadas que serán reemplazadas
-- Usuario confirma antes de asignar
-- Actualiza `jornadaId` en tabla `empleados`
+**Validación y confirmación:**
+- Detecta solapamientos entre empresa/equipo/individual (expande equipos a empleados)
+- Bloquea si existe jornada de empresa y se intenta añadir otra
+- Bloquea si algún empleado quedara sin jornada
+- Actualiza `jornadaId` en tabla `empleados` y `jornada_asignaciones`
 
 ---
 
@@ -383,13 +383,14 @@ Durante el onboarding inicial de la empresa en `/signup`, la jornada y el calend
    - Validación: nombre obligatorio, horas semanales > 0
 
 3. **Eliminación**:
-   - Solo si no tiene empleados asignados
-   - Soft delete: marca `activa: false`
+   - Se procesa solo al guardar el modal junto al resto de cambios
+   - Bloquea eliminar jornadas con empleados asignados si no se desasignan en la misma operación
+   - Soft delete: marca `activa: false` y desasigna empleados en transacción
 
 4. **Asignación**:
    - Niveles: empresa completa / equipo / empleados individuales
-   - Verifica jornadas previas antes de asignar
-   - Muestra confirmación si hay reemplazo de jornadas existentes
+   - Sin solapamientos: empresa es excluyente; equipos/individuales se expanden a empleados
+   - Bloquea si queda cualquier empleado sin jornada
 
 5. **Validación de empresa**:
    - Todas las operaciones validan `empresaId` desde sesión
@@ -397,8 +398,8 @@ Durante el onboarding inicial de la empresa en `/signup`, la jornada y el calend
 
 ---
 
-**Versión**: 2.1  
-**Última actualización**: 27 de enero 2025
+**Versión**: 2.3  
+**Última actualización**: 8 de diciembre 2025
 
 ---
 

@@ -198,11 +198,17 @@ export async function signupEmpresaAction(
 
         avatarUrl = await uploadToS3(buffer, s3Key, avatarFile.type);
 
-        // Actualizar empleado con avatar
-        await prisma.empleados.update({
-          where: { id: result.empleado.id },
-          data: { fotoUrl: avatarUrl },
-        });
+        // Actualizar empleado y usuario con el mismo avatar para evitar desincronización
+        await prisma.$transaction([
+          prisma.empleados.update({
+            where: { id: result.empleado.id },
+            data: { fotoUrl: avatarUrl },
+          }),
+          prisma.usuarios.update({
+            where: { id: result.usuario.id },
+            data: { avatar: avatarUrl },
+          }),
+        ]);
 
         // Actualizar resultado local para la sesión
         result.empleado.fotoUrl = avatarUrl;

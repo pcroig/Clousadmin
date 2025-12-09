@@ -6,7 +6,7 @@
 
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Calendar as CalendarIcon, Paperclip, Settings } from 'lucide-react';
+import { Calendar as CalendarIcon, Edit2, Paperclip, Plus, Settings } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -43,6 +43,8 @@ import { extractArrayFromResponse } from '@/lib/utils/api-response';
 import { calcularRangoFechas, obtenerEtiquetaPeriodo } from '@/lib/utils/fechas';
 import { getAusenciaEstadoLabel } from '@/lib/utils/formatters';
 import { parseJson } from '@/lib/utils/json';
+
+import { EditarAusenciaModal, type EditarAusencia } from '@/components/ausencias/editar-ausencia-modal';
 
 import { CrearCampanaModal } from './crear-campana-modal';
 import { GestionarAusenciasModal } from './gestionar-ausencias-modal';
@@ -87,28 +89,6 @@ interface Campana {
   };
 }
 
-type EditFormState = {
-  tipo: string;
-  estado: EstadoAusencia;
-  fechaInicio: string;
-  fechaFin: string;
-  medioDia: boolean;
-  motivo: string;
-  justificanteUrl: string | null;
-  documentoId: string | null;
-};
-
-const createEmptyEditForm = (): EditFormState => ({
-  tipo: 'vacaciones',
-  estado: EstadoAusencia.pendiente,
-  fechaInicio: '',
-  fechaFin: '',
-  medioDia: false,
-  motivo: '',
-  justificanteUrl: null,
-  documentoId: null,
-});
-
 const getInitialMonthDate = (): Date => {
   const initialDate = new Date();
   initialDate.setHours(0, 0, 0, 0);
@@ -127,6 +107,30 @@ const ESTADO_OPTIONS: FilterOption[] = [
   { value: EstadoAusencia.completada, label: getAusenciaEstadoLabel(EstadoAusencia.completada) },
   { value: EstadoAusencia.rechazada, label: getAusenciaEstadoLabel(EstadoAusencia.rechazada) },
 ];
+
+/**
+ * Convierte un objeto Ausencia a EditarAusencia para el modal compartido
+ */
+const convertirAusenciaParaEdicion = (ausencia: Ausencia): EditarAusencia => ({
+  id: ausencia.id,
+  empleadoId: ausencia.empleadoId,
+  tipo: ausencia.tipo,
+  fechaInicio: ausencia.fechaInicio,
+  fechaFin: ausencia.fechaFin,
+  createdAt: ausencia.createdAt,
+  medioDia: ausencia.medioDia,
+  periodo: ausencia.periodo,
+  estado: ausencia.estado,
+  motivo: ausencia.motivo,
+  justificanteUrl: ausencia.justificanteUrl,
+  documentoId: ausencia.documentoId,
+  diasSolicitados: ausencia.diasSolicitados,
+  empleado: {
+    nombre: ausencia.empleado.nombre,
+    apellidos: ausencia.empleado.apellidos,
+    puesto: ausencia.empleado.puesto,
+  }
+});
 
 export function AusenciasClient({
   initialCampanasExpanded: _initialCampanasExpanded,
@@ -154,15 +158,11 @@ export function AusenciasClient({
     open: false,
     ausenciaId: null
   });
-  const [editarModal, setEditarModal] = useState<{ open: boolean; ausencia: Ausencia | null }>({
+  const [editarModal, setEditarModal] = useState<{ open: boolean; ausencia: EditarAusencia | null }>({
     open: false,
     ausencia: null
   });
-  const [editForm, setEditForm] = useState<EditFormState>(createEmptyEditForm());
-  const [editJustificanteFile, setEditJustificanteFile] = useState<File | null>(null);
-  const [uploadingEditJustificante, setUploadingEditJustificante] = useState(false);
-  const [savingEdit, setSavingEdit] = useState(false);
-  const [editError, setEditError] = useState('');
+  const [crearModal, setCrearModal] = useState(false);
   const [motivoRechazo, setMotivoRechazo] = useState('');
 
   // Load Equipos
@@ -280,34 +280,6 @@ export function AusenciasClient({
     fetchCampanaActiva();
   }, [campanasEnabled, fetchCampanaActiva]);
 
-  // Edicion Effect
-  useEffect(() => {
-    if (editarModal.ausencia) {
-      const ausencia = editarModal.ausencia;
-      const fechaInicio = ausencia.fechaInicio ? format(new Date(ausencia.fechaInicio), 'yyyy-MM-dd') : '';
-      const fechaFin = ausencia.fechaFin ? format(new Date(ausencia.fechaFin), 'yyyy-MM-dd') : '';
-
-      setEditForm({
-        tipo: ausencia.tipo,
-        estado: (ausencia.estado as EstadoAusencia) || EstadoAusencia.pendiente,
-        fechaInicio,
-        fechaFin,
-        medioDia: Boolean(ausencia.medioDia),
-        motivo: ausencia.motivo || '',
-        justificanteUrl: ausencia.justificanteUrl || null,
-        documentoId: ausencia.documentoId || null,
-      });
-      setEditJustificanteFile(null);
-      setEditError('');
-    } else {
-      setEditForm(createEmptyEditForm());
-      setEditJustificanteFile(null);
-      setEditError('');
-      setUploadingEditJustificante(false);
-      setSavingEdit(false);
-    }
-  }, [editarModal.ausencia]);
-
   async function _handleAprobar(id: string) {
     try {
       const response = await fetch(`/api/ausencias/${id}`, {
@@ -361,134 +333,6 @@ export function AusenciasClient({
     }
   }
 
-  const closeEditarModal = () => {
-    setEditarModal({ open: false, ausencia: null });
-    setEditForm(createEmptyEditForm());
-    setEditJustificanteFile(null);
-    setEditError('');
-    setUploadingEditJustificante(false);
-    setSavingEdit(false);
-  };
-
-  const uploadJustificante = async (file: File, empleadoId: string): Promise<{ url: string; documentoId: string | null }> => {
-    setUploadingEditJustificante(true);
-    try {
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('tipo', 'justificante');
-      formData.append('crearDocumento', 'true');
-      formData.append('empleadoId', empleadoId);
-
-      const uploadResponse = await fetch('/api/upload', {
-        method: 'POST',
-        body: formData,
-      });
-      
-      const uploadData = await uploadResponse.json() as { 
-        url: string; 
-        error?: string; 
-        documento?: { id: string } | null;
-      } | unknown;
-      
-      if (!uploadResponse.ok) {
-        const errorData = uploadData as { error?: string };
-        throw new Error(errorData.error || 'Error al subir justificante');
-      }
-
-      const successData = uploadData as { url: string; documento?: { id: string } | null };
-      return {
-        url: successData.url,
-        documentoId: successData.documento?.id || null,
-      };
-    } finally {
-      setUploadingEditJustificante(false);
-    }
-  };
-
-  const handleGuardarEdicion = async () => {
-    if (!editarModal.ausencia) return;
-    
-    // Validaciones
-    if (!editForm.fechaInicio || !editForm.fechaFin) {
-      setEditError('Selecciona las fechas de inicio y fin');
-      return;
-    }
-
-    const fechaInicio = new Date(editForm.fechaInicio);
-    const fechaFin = new Date(editForm.fechaFin);
-    
-    if (fechaFin < fechaInicio) {
-      setEditError('La fecha de fin debe ser posterior o igual a la fecha de inicio');
-      return;
-    }
-
-    if (editForm.tipo === 'otro' && !editForm.motivo?.trim()) {
-      setEditError('El motivo es obligatorio para ausencias de tipo "Otro"');
-      return;
-    }
-
-    setSavingEdit(true);
-    setEditError('');
-
-    try {
-      let justificanteUrl = editForm.justificanteUrl;
-      let documentoIdToSend: string | null | undefined = editForm.documentoId;
-
-      // Subir justificante si hay archivo nuevo
-      if (editJustificanteFile) {
-        if (!editarModal.ausencia.empleadoId) {
-          throw new Error('No se puede subir justificante: falta empleado');
-        }
-        const uploadResult = await uploadJustificante(editJustificanteFile, editarModal.ausencia.empleadoId);
-        justificanteUrl = uploadResult.url;
-        documentoIdToSend = uploadResult.documentoId;
-      }
-
-      const payload: Record<string, unknown> = {
-        tipo: editForm.tipo,
-        fechaInicio: editForm.fechaInicio,
-        fechaFin: editForm.fechaFin,
-        medioDia: editForm.medioDia,
-        motivo: editForm.motivo || null,
-        estado: editForm.estado,
-      };
-
-      // Incluir justificanteUrl si existe (nuevo o existente)
-      if (justificanteUrl !== null && justificanteUrl !== undefined) {
-        payload.justificanteUrl = justificanteUrl;
-      }
-      
-      // Incluir documentoId si existe (nuevo o existente)
-      if (documentoIdToSend !== null && documentoIdToSend !== undefined) {
-        payload.documentoId = documentoIdToSend;
-      }
-
-      const response = await fetch(`/api/ausencias/${editarModal.ausencia.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-
-      const data = await response.json() as { error?: string } | unknown;
-      if (!response.ok) {
-        const errorData = data as { error?: string };
-        throw new Error(errorData.error || 'Error al actualizar la ausencia');
-      }
-
-      toast.success('Ausencia actualizada correctamente');
-      closeEditarModal();
-      fetchAusencias();
-    } catch (error: unknown) {
-      console.error('[handleGuardarEdicion] Error:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Error al actualizar la ausencia';
-      setEditError(errorMessage);
-      toast.error(errorMessage);
-    } finally {
-      setSavingEdit(false);
-      setUploadingEditJustificante(false);
-    }
-  };
-
   function getEstadoBadge(estado: string) {
     const variants: Record<string, { label: string; className: string }> = {
       pendiente: { label: getAusenciaEstadoLabel(EstadoAusencia.pendiente), className: 'bg-yellow-100 text-yellow-800' },
@@ -529,7 +373,8 @@ const renderJustificanteLink = (
   ausencia: Ausencia,
   options: { stopPropagation?: boolean; size?: 'sm' | 'default' } = {}
 ) => {
-  if (!ausencia.justificanteUrl) {
+  // Support both documentoId (new, preferred) and justificanteUrl (legacy)
+  if (!ausencia.documentoId && !ausencia.justificanteUrl) {
     return null;
   }
 
@@ -540,6 +385,11 @@ const renderJustificanteLink = (
       }
     : undefined;
 
+  // Use API endpoint to avoid S3 AccessDenied errors
+  const justificanteUrl = ausencia.documentoId
+    ? `/api/documentos/${ausencia.documentoId}/preview`
+    : ausencia.justificanteUrl!;
+
   return (
     <Button
       variant="link"
@@ -548,7 +398,7 @@ const renderJustificanteLink = (
       onClick={handleClick}
       asChild
     >
-      <a href={ausencia.justificanteUrl} target="_blank" rel="noopener noreferrer">
+      <a href={justificanteUrl} target="_blank" rel="noopener noreferrer">
         Ver justificante
       </a>
     </Button>
@@ -580,11 +430,11 @@ const renderJustificanteLink = (
             className="p-4 space-y-3 cursor-pointer focus-visible:ring-2 focus-visible:ring-gray-400 focus-visible:outline-none"
             role="button"
             tabIndex={0}
-            onClick={() => setEditarModal({ open: true, ausencia })}
+            onClick={() => setEditarModal({ open: true, ausencia: convertirAusenciaParaEdicion(ausencia) })}
             onKeyDown={(event: React.KeyboardEvent<HTMLDivElement>) => {
               if (event.key === 'Enter' || event.key === ' ') {
                 event.preventDefault();
-                setEditarModal({ open: true, ausencia });
+                setEditarModal({ open: true, ausencia: convertirAusenciaParaEdicion(ausencia) });
               }
             }}
           >
@@ -684,6 +534,7 @@ const renderJustificanteLink = (
       id: 'empleado',
       header: 'Empleado',
       priority: 'high',
+      width: '200px',
       cell: (ausencia) => (
         <EmpleadoHoverCard
           empleado={{
@@ -716,7 +567,7 @@ const renderJustificanteLink = (
       id: 'tipo',
       header: 'Tipo',
       priority: 'high',
-      width: '150px',
+      width: '130px',
       cell: (ausencia) => (
         <span className="text-sm font-semibold text-gray-900">{getTipoBadge(ausencia.tipo)}</span>
       ),
@@ -726,7 +577,7 @@ const renderJustificanteLink = (
       header: 'Fechas',
       align: 'center',
       priority: 'medium',
-      width: '280px',
+      width: '220px',
       cell: (ausencia) => (
         <div className="flex items-center justify-center gap-2">
           <div className="text-sm font-medium text-gray-900">
@@ -746,6 +597,7 @@ const renderJustificanteLink = (
       header: 'Estado',
       align: 'center',
       priority: 'medium',
+      width: '180px',
       cell: (ausencia) =>
         ausencia.estado === EstadoAusencia.pendiente ? (
           <div className="flex justify-center items-center gap-2 h-6">
@@ -783,11 +635,33 @@ const renderJustificanteLink = (
       header: 'Justificante',
       align: 'center',
       priority: 'low',
-      width: '140px',
+      width: '110px',
       cell: (ausencia) =>
         ausencia.justificanteUrl ? (
           renderJustificanteLink(ausencia, { stopPropagation: true, size: 'sm' })
         ) : null,
+    },
+    {
+      id: 'acciones',
+      header: '',
+      align: 'right',
+      priority: 'low',
+      width: '60px',
+      cell: (ausencia) => (
+        <Button
+          variant="ghost"
+          size="icon"
+          className="ml-auto opacity-0 transition-opacity group-hover:opacity-100"
+          title="Editar ausencia"
+          aria-label="Editar ausencia"
+          onClick={(event) => {
+            event.stopPropagation();
+            setEditarModal({ open: true, ausencia: convertirAusenciaParaEdicion(ausencia) });
+          }}
+        >
+          <Edit2 className="h-4 w-4" />
+        </Button>
+      ),
     },
   ];
 
@@ -851,19 +725,23 @@ const renderJustificanteLink = (
         <>
           <PageHeader
             title="Ausencias"
-            actionButton={
+            actionButton={{
+              label: '+ Crear Ausencia',
+              onClick: () => setCrearModal(true),
+            }}
+            secondaryActionButton={
               campanasEnabled
                 ? {
                     label: '+ Nueva Campaña',
                     onClick: () => setCrearCampanaModal(true),
+                    variant: 'outline',
                   }
-                : undefined
+                : {
+                    label: 'Gestionar ausencias',
+                    onClick: () => setGestionarModal(true),
+                    variant: 'outline',
+                  }
             }
-            secondaryActionButton={{
-              label: 'Gestionar ausencias',
-              onClick: () => setGestionarModal(true),
-              variant: 'outline',
-            }}
           />
           
           {renderCampaignCard()}
@@ -892,7 +770,7 @@ const renderJustificanteLink = (
             <DataTable
               columns={columns}
               data={ausencias}
-              onRowClick={(ausencia) => setEditarModal({ open: true, ausencia })}
+              onRowClick={(ausencia) => setEditarModal({ open: true, ausencia: convertirAusenciaParaEdicion(ausencia) })}
               getRowId={(ausencia) => ausencia.id}
               emptyContent={
                 <EmptyState
@@ -939,136 +817,23 @@ const renderJustificanteLink = (
         </DialogContent>
       </Dialog>
 
-      {/* Modal Editar Ausencia */}
-      <Dialog
+      {/* Modal Editar Ausencia - Shared Component */}
+      <EditarAusenciaModal
         open={editarModal.open}
-        onOpenChange={(open) => {
-          if (!open) {
-            closeEditarModal();
-          }
-        }}
-      >
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Editar Ausencia</DialogTitle>
-          </DialogHeader>
-          
-            {editarModal.ausencia && (
-            <div className="space-y-4">
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <p className="text-sm font-medium text-gray-900 mb-1">
-                  {editarModal.ausencia.empleado.nombre} {editarModal.ausencia.empleado.apellidos}
-                </p>
-                <p className="text-xs text-gray-500">{editarModal.ausencia.empleado.puesto}</p>
-              </div>
+        ausencia={editarModal.ausencia}
+        onClose={() => setEditarModal({ open: false, ausencia: null })}
+        onSuccess={fetchAusencias}
+        contexto="hr_admin"
+      />
 
-              <div className="rounded-lg border border-gray-100 p-4 space-y-2 text-sm text-gray-600">
-                <p>
-                  <span className="font-medium text-gray-900">Solicitud creada:</span> {formatSolicitudFecha(editarModal.ausencia.createdAt)}
-                </p>
-                <div className="flex items-center gap-2">
-                  <span className="font-medium text-gray-900">Justificante:</span>
-                  {editarModal.ausencia.justificanteUrl && (
-                    <Button variant="link" size="sm" className="px-0" asChild>
-                      <a
-                        href={editarModal.ausencia.justificanteUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        Ver justificante
-                      </a>
-                    </Button>
-                  )}
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <Field>
-                  <FieldLabel>Tipo</FieldLabel>
-                  <Select 
-                    value={editForm.tipo} 
-                    onValueChange={(val) => setEditForm(prev => ({ ...prev, tipo: val }))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {/* Using hardcoded options to match the component context */}
-                      <SelectItem value="vacaciones">Vacaciones</SelectItem>
-                      <SelectItem value="enfermedad">Enfermedad</SelectItem>
-                      <SelectItem value="enfermedad_familiar">Enfermedad Familiar</SelectItem>
-                      <SelectItem value="maternidad_paternidad">Maternidad/Paternidad</SelectItem>
-                      <SelectItem value="otro">Otro</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </Field>
-                <Field>
-                  <FieldLabel>Estado</FieldLabel>
-                  <Select 
-                    value={editForm.estado} 
-                    onValueChange={(value) => setEditForm((prev) => ({ ...prev, estado: value as EstadoAusencia }))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {Object.values(EstadoAusencia).map((estado) => (
-                        <SelectItem key={estado} value={estado}>
-                          {getAusenciaEstadoLabel(estado)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </Field>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label>Fecha Inicio</Label>
-                  <Input 
-                    type="date" 
-                    value={editForm.fechaInicio}
-                    onChange={(e) => setEditForm(prev => ({ ...prev, fechaInicio: e.target.value }))}
-                  />
-                </div>
-                <div>
-                  <Label>Fecha Fin</Label>
-                  <Input 
-                    type="date" 
-                    value={editForm.fechaFin}
-                    onChange={(e) => setEditForm(prev => ({ ...prev, fechaFin: e.target.value }))}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <Label>Motivo</Label>
-                <Textarea 
-                  value={editForm.motivo}
-                  onChange={(e) => setEditForm(prev => ({ ...prev, motivo: e.target.value }))}
-                  placeholder="Detalles de la ausencia..."
-                />
-              </div>
-
-              {editError && (
-                <p className="text-sm text-red-600 bg-red-50 p-2 rounded">{editError}</p>
-              )}
-            </div>
-          )}
-
-          <DialogFooter>
-            <Button variant="outline" onClick={closeEditarModal}>
-              Cancelar
-            </Button>
-            <LoadingButton 
-              loading={savingEdit || uploadingEditJustificante}
-              onClick={handleGuardarEdicion}
-            >
-              Guardar Cambios
-            </LoadingButton>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* Modal Crear Ausencia - Using Unified Component */}
+      <EditarAusenciaModal
+        open={crearModal}
+        ausencia={null}
+        onClose={() => setCrearModal(false)}
+        onSuccess={fetchAusencias}
+        contexto="hr_admin"
+      />
 
       {/* Modal Crear Campaña */}
       {campanasEnabled && (

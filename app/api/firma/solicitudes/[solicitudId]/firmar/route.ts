@@ -130,6 +130,8 @@ export async function POST(
       firmado: true,
       solicitudCompletada: resultado.solicitudCompletada,
       certificado: resultado.certificado,
+      documentoFirmado: resultado.documentoFirmado,
+      solicitudId,
       mensaje: resultado.solicitudCompletada
         ? 'Documento firmado correctamente. Todas las firmas han sido completadas.'
         : 'Documento firmado correctamente.',

@@ -11,6 +11,7 @@ import { UsuarioRol } from '@/lib/constants/enums';
 
 import { prisma } from './prisma';
 import { deleteFromS3 } from './s3';
+import { sanitizeFileName } from './utils/file-helpers';
 
 /**
  * Carpetas del sistema que se crean automáticamente para cada empleado
@@ -553,11 +554,15 @@ export function generarRutaStorage(
   carpetaNombre: string,
   nombreArchivo: string
 ): string {
+  // Sanitizar nombre de carpeta para evitar problemas con S3/filesystem
+  // Reemplazar espacios, barras y caracteres especiales
+  const carpetaSanitizada = sanitizeFileName(carpetaNombre.toLowerCase());
+
   if (empleadoId) {
-    return `${empresaId}/${empleadoId}/${carpetaNombre.toLowerCase()}/${nombreArchivo}`;
+    return `${empresaId}/${empleadoId}/${carpetaSanitizada}/${nombreArchivo}`;
   } else {
     // Carpeta compartida - incluir nombre de carpeta para evitar colisiones de s3Key
-    return `${empresaId}/compartidos/${carpetaNombre.toLowerCase()}/${nombreArchivo}`;
+    return `${empresaId}/compartidos/${carpetaSanitizada}/${nombreArchivo}`;
   }
 }
 

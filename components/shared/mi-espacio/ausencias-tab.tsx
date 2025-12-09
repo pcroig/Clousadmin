@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { PeriodoMedioDiaValue } from '@/lib/constants/enums';
+import { useFestivos, notifyFestivosUpdated } from '@/lib/hooks/use-festivos';
 import { obtenerNombreDia } from '@/lib/utils/fechas';
 import { getAusenciaBadgeVariant, getAusenciaEstadoLabel } from '@/lib/utils/formatters';
 import { parseJson } from '@/lib/utils/json';
@@ -112,7 +113,12 @@ export function AusenciasTab({
     sabado: false,
     domingo: false,
   });
-  const [festivos, setFestivos] = useState<{ fecha: string; nombre: string }[]>([]);
+
+  // Usar hook centralizado para festivos con revalidación automática
+  const { festivos } = useFestivos({
+    empleadoId,
+    revalidateInterval: 60000, // Revalidar cada 60 segundos
+  });
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [tooltipData, setTooltipData] = useState<{
@@ -258,43 +264,7 @@ export function AusenciasTab({
     }
   }, [contexto, empleadoId]);
 
-  // Función para cargar festivos (empresa + personalizados del empleado)
-  const cargarFestivos = useCallback(async (signal?: AbortSignal) => {
-    try {
-      // Cargar festivos de empresa
-      const festivosResponse = await fetch('/api/festivos?activo=true', {
-        signal,
-      });
-      const festivosData = await parseJson<FestivosResponse>(festivosResponse).catch(() => null);
-      const festivosEmpresa = festivosData?.festivos || [];
-
-      // Cargar festivos personalizados del empleado
-      const festivosPersonalizadosResponse = await fetch(`/api/empleados/${empleadoId}/festivos`, {
-        signal,
-      });
-
-      let festivosPersonalizados: { fecha: string; nombre: string }[] = [];
-      if (festivosPersonalizadosResponse.ok) {
-        festivosPersonalizados = await parseJson<{ fecha: string; nombre: string }[]>(
-          festivosPersonalizadosResponse
-        ).catch(() => []);
-      }
-
-      // Combinar: festivos de empresa que NO tienen personalización + festivos personalizados
-      const fechasPersonalizadas = new Set(festivosPersonalizados.map((f) => f.fecha));
-      const festivosEmpresaFiltrados = festivosEmpresa.filter(
-        (f) => !fechasPersonalizadas.has(f.fecha)
-      );
-
-      setFestivos([...festivosEmpresaFiltrados, ...festivosPersonalizados]);
-    } catch (error: unknown) {
-      if (error instanceof Error && error.name !== 'AbortError') {
-        console.error('Error cargando festivos:', error);
-      }
-    }
-  }, [empleadoId]);
-
-  // Cargar calendario laboral y festivos
+  // Cargar calendario laboral (días laborables)
   useEffect(() => {
     const controller = new AbortController();
 
@@ -311,9 +281,6 @@ export function AusenciasTab({
             ...diasData.diasLaborables,
           }));
         }
-
-        // Cargar festivos activos
-        await cargarFestivos(controller.signal);
       } catch (error: unknown) {
         if (error instanceof Error && error.name !== 'AbortError') {
           console.error('Error cargando calendario laboral:', error);
@@ -324,7 +291,7 @@ export function AusenciasTab({
     cargarCalendarioLaboral();
 
     return () => controller.abort();
-  }, [cargarFestivos]);
+  }, []); // ← Solo cargar una vez al montar
 
   // Calcular saldo de ausencias
   const calcularSaldo = useCallback((): SaldoResponse => {
@@ -393,24 +360,36 @@ export function AusenciasTab({
     return festivos.some((f) => f.fecha === dateStr);
   };
 
+  // Función helper para normalizar fecha a medianoche
+  const normalizarFechaInicio = (fecha: Date | string): Date => {
+    const d = new Date(fecha);
+    d.setHours(0, 0, 0, 0);
+    return d;
+  };
+
+  // Función helper para normalizar fecha a fin del día
+  const normalizarFechaFin = (fecha: Date | string): Date => {
+    const d = new Date(fecha);
+    d.setHours(23, 59, 59, 999);
+    return d;
+  };
+
   // Función para verificar si un día tiene ausencia
   const tieneAusencia = (date: Date) => {
+    const checkDate = normalizarFechaInicio(date);
     return ausencias.some((ausencia) => {
-      const inicio = new Date(ausencia.fechaInicio);
-      const fin = new Date(ausencia.fechaFin);
-      return date >= inicio && date <= fin;
+      const inicio = normalizarFechaInicio(ausencia.fechaInicio);
+      const fin = normalizarFechaFin(ausencia.fechaFin);
+      return checkDate >= inicio && checkDate <= fin;
     });
   };
 
   // Obtener ausencia de un día específico
   const getAusenciaDelDia = (date: Date): Ausencia | null => {
+    const checkDate = normalizarFechaInicio(date);
     const ausencia = ausencias.find((a) => {
-      const inicio = new Date(a.fechaInicio);
-      inicio.setHours(0, 0, 0, 0);
-      const fin = new Date(a.fechaFin);
-      fin.setHours(0, 0, 0, 0);
-      const checkDate = new Date(date);
-      checkDate.setHours(0, 0, 0, 0);
+      const inicio = normalizarFechaInicio(a.fechaInicio);
+      const fin = normalizarFechaFin(a.fechaFin);
       return checkDate >= inicio && checkDate <= fin;
     });
     return ausencia || null;
@@ -471,7 +450,14 @@ export function AusenciasTab({
 
   // Modificadores para el calendario
   const modifiers = {
-    ausencia: (date: Date) => tieneAusencia(date),
+    // Solo marcar como ausencia si es día laborable Y tiene ausencia
+    ausencia: (date: Date) => {
+      const tieneAus = tieneAusencia(date);
+      const esLaborable = esDiaLaborable(date);
+      const esFest = esFestivo(date);
+      // Mostrar como ausencia solo si es día laborable y no es festivo
+      return tieneAus && esLaborable && !esFest;
+    },
     festivo: (date: Date) => esFestivo(date),
     noLaborable: (date: Date) => !esDiaLaborable(date),
   };
@@ -585,7 +571,7 @@ export function AusenciasTab({
             className="p-1 text-gray-400 hover:text-gray-600"
             onClick={(e) => {
               e.stopPropagation();
-              window.open(ausencia.justificanteUrl!, '_blank', 'noopener,noreferrer');
+              window.open(`/api/ausencias/${ausencia.id}/justificante?inline=1`, '_blank', 'noopener,noreferrer');
             }}
           >
             <Paperclip className="h-3.5 w-3.5" />
@@ -972,7 +958,7 @@ export function AusenciasTab({
             onClose={() => setFestivosModalOpen(false)}
             empleadoId={empleadoId}
             contexto={contexto}
-            onSuccess={() => cargarFestivos()}
+            onSuccess={() => notifyFestivosUpdated()}
           />
         </>
       )}

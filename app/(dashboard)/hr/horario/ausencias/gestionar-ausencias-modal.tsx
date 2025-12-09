@@ -1,11 +1,12 @@
 'use client';
 
-import { type ChangeEvent, useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
 import { CalendarPlus } from 'lucide-react';
 
 import { CalendarioFestivos, CalendarioFestivosLegend } from '@/components/hr/calendario-festivos';
+import { ImportarFestivosModal } from '@/components/hr/importar-festivos-modal';
 import { ListaFestivos } from '@/components/hr/lista-festivos';
 import { SwitchWithTooltip } from '@/components/shared/switch-with-tooltip';
 import { LoadingButton } from '@/components/shared/loading-button';
@@ -38,12 +39,11 @@ interface GestionarAusenciasModalProps {
 
 export function GestionarAusenciasModal({ open, onClose, onSaved }: GestionarAusenciasModalProps) {
   const [saving, setSaving] = useState(false);
-  const [processingFestivos, setProcessingFestivos] = useState(false);
 
   // Saldo de ausencias
   const [diasTotales, setDiasTotales] = useState('22');
   const [carryOverMode, setCarryOverMode] = useState<'limpiar' | 'extender'>('limpiar');
-  
+
   // Calendario laboral
   const [diasLaborables, setDiasLaborables] = useState({
     lunes: true,
@@ -57,7 +57,8 @@ export function GestionarAusenciasModal({ open, onClose, onSaved }: GestionarAus
   const [festivosView, setFestivosView] = useState<'calendario' | 'lista'>('lista');
   const [festivoEditor, setFestivoEditor] = useState<FestivoEditorState | null>(null);
   const [festivosRefreshKey, setFestivosRefreshKey] = useState(0);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [importarModalOpen, setImportarModalOpen] = useState(false);
+  const [añoSeleccionadoImportar, setAñoSeleccionadoImportar] = useState<number>();
 
   const cargarDatos = useCallback(async () => {
     try {
@@ -175,41 +176,17 @@ export function GestionarAusenciasModal({ open, onClose, onSaved }: GestionarAus
       setSaving(false);
     }
   }
-  
-  async function handleArchivoFestivosChange(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    if (!file) {
-      return;
-    }
 
-    setProcessingFestivos(true);
-    try {
-      const formData = new FormData();
-      formData.append('file', file);
+  const handleImportSuccess = async () => {
+    await cargarDatos();
+    setFestivosRefreshKey((prev) => prev + 1);
+    onSaved?.();
+  };
 
-      const response = await fetch('/api/festivos/importar', {
-        method: 'POST',
-        body: formData,
-      });
-
-      const data = await parseJson<{ message?: string; error?: string }>(response).catch(() => null);
-
-      if (response.ok) {
-        toast.success(data?.message || 'Calendario importado correctamente');
-        await cargarDatos();
-        setFestivosRefreshKey((prev) => prev + 1);
-        onSaved?.();
-      } else {
-        toast.error(data?.error || 'Error al importar calendario');
-      }
-    } catch (error) {
-      console.error('Error importando calendario desde archivo:', error);
-      toast.error('Error al importar calendario');
-    } finally {
-      setProcessingFestivos(false);
-      event.target.value = '';
-    }
-  }
+  const handleOpenImportarModal = (año?: number) => {
+    setAñoSeleccionadoImportar(año);
+    setImportarModalOpen(true);
+  };
 
   const handleCloseEditor = () => setFestivoEditor(null);
 
@@ -342,22 +319,13 @@ export function GestionarAusenciasModal({ open, onClose, onSaved }: GestionarAus
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => fileInputRef.current?.click()}
-                      disabled={processingFestivos}
+                      onClick={() => handleOpenImportarModal()}
                     >
-                      {processingFestivos ? 'Importando...' : 'Importar'}
+                      Importar
                     </Button>
                   </div>
                 </div>
               </div>
-
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".ics,.csv"
-                className="hidden"
-                onChange={handleArchivoFestivosChange}
-              />
 
               <TabsContent value="calendario" className="space-y-4">
                 <CalendarioFestivosLegend className="flex-nowrap" />
@@ -381,6 +349,7 @@ export function GestionarAusenciasModal({ open, onClose, onSaved }: GestionarAus
                   onCreateRequest={() => handleCreateFestivoInline()}
                   onEditRequest={handleEditFestivoInline}
                   showCreateButton={false}
+                  onImportRequest={(año) => handleOpenImportarModal(año)}
                 />
               </TabsContent>
             </Tabs>
@@ -400,6 +369,14 @@ export function GestionarAusenciasModal({ open, onClose, onSaved }: GestionarAus
           </LoadingButton>
         </DialogFooter>
       </DialogScrollableContent>
+
+      {/* Modal de importar festivos */}
+      <ImportarFestivosModal
+        open={importarModalOpen}
+        onClose={() => setImportarModalOpen(false)}
+        onSuccess={handleImportSuccess}
+        añoSeleccionado={añoSeleccionadoImportar}
+      />
     </Dialog>
   );
 }

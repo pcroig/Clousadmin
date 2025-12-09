@@ -90,7 +90,8 @@ export function CredencialesForm({ token, empleado, onComplete, initialProgress 
         formData.append('avatar', avatarFile);
       }
 
-      const res = await fetch(`/api/onboarding-simplificado/${token}/credenciales`, {
+      // Usar endpoint unificado de credenciales (funciona para ambos tipos de onboarding)
+      const res = await fetch(`/api/onboarding/${token}/credenciales`, {
         method: 'POST',
         body: formData,
       });

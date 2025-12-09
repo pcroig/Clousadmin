@@ -465,22 +465,60 @@ FormData:
 
 // Sistema automáticamente:
 // 1. Calcula días naturales y laborables
-// 2. Valida saldo disponible (si tipo = 'vacaciones')
-// 3. Crea ausencia con estado:
+// 2. ✅ SOLO descuenta días laborables del saldo (excluye fines de semana y festivos)
+//    Ejemplo: Si el rango incluye un fin de semana, NO se descuentan esos días
+// 3. Valida saldo disponible (si tipo = 'vacaciones')
+// 4. Crea ausencia con estado:
 //    - 'pendiente' para 'vacaciones' y 'otro'
 //    - 'confirmada' (o 'completada' si fechaFin ya pasó) para 'enfermedad', 'enfermedad_familiar', 'maternidad_paternidad'
-// 4. Incrementa diasPendientes en saldo (si descuenta saldo)
+// 5. Incrementa diasPendientes en saldo (si descuenta saldo) - solo con los días laborables calculados
 ```
 
 ### Tipos de Ausencia y Reglas
 
 | Tipo | Necesita Aprobación | Descuenta Saldo | Auto-aprobación IA |
 |------|---------------------|-----------------|---------------------|
-| **Vacaciones** | ✅ Sí | ✅ Sí | Solo después de 2 días sin aprobar |
+| **Vacaciones** | ✅ Sí | ✅ Sí (solo días laborables) | Solo después de 2 días sin aprobar |
 | **Enfermedad** | ❌ No | ❌ No | Directo (sin aprobación) |
 | **Enfermedad familiar** | ❌ No | ❌ No | Directo (sin aprobación) |
 | **Maternidad/Paternidad** | ❌ No | ❌ No | Directo (sin aprobación) |
 | **Otro** | ✅ Sí | ❌ No | Solo después de 2 días sin aprobar |
+
+### 📅 Cálculo de Días Laborables
+
+**IMPORTANTE**: El sistema **solo descuenta del saldo los días laborables** según la configuración de la empresa.
+
+#### Ejemplo 1: Ausencia con fin de semana
+```
+Solicitud: Viernes 1 dic - Lunes 4 dic (4 días naturales)
+Configuración empresa: L-V laborables
+Cálculo:
+  - Viernes 1: ✅ Laborable → Cuenta
+  - Sábado 2: ❌ No laborable → NO cuenta
+  - Domingo 3: ❌ No laborable → NO cuenta
+  - Lunes 4: ✅ Laborable → Cuenta
+Resultado: Se descuentan 2 días del saldo (no 4)
+```
+
+#### Ejemplo 2: Ausencia con festivo
+```
+Solicitud: Jueves 6 dic - Lunes 10 dic (5 días naturales)
+Configuración empresa: L-V laborables
+Festivo: 8 dic (Inmaculada Concepción)
+Cálculo:
+  - Jueves 6: ✅ Laborable → Cuenta
+  - Viernes 7: ✅ Laborable → Cuenta
+  - Sábado 8: ❌ Festivo → NO cuenta
+  - Domingo 9: ❌ No laborable → NO cuenta
+  - Lunes 10: ✅ Laborable → Cuenta
+Resultado: Se descuentan 3 días del saldo (no 5)
+```
+
+#### Días que NO se descuentan del saldo:
+- ❌ Sábados y domingos (si la empresa no los tiene como laborables)
+- ❌ Festivos nacionales activos (ej: 1 enero, 25 diciembre)
+- ❌ Festivos personalizados de la empresa (ej: aniversario)
+- ❌ Cualquier día configurado como no laborable en el calendario de la empresa
 
 ### Diferencia clave
 

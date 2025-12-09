@@ -243,47 +243,24 @@ export function BandejaEntradaSolicitudes({
   onAprobar,
   onRechazar,
 }: BandejaEntradaSolicitudesProps) {
-  const [vista, setVista] = useState<VistaType>('pendientes');
-  // Determinar qué solicitudes mostrar
-  const solicitudesActuales = vista === 'pendientes' ? solicitudesPendientes : solicitudesResueltas;
-  const emptyStateCopy = vista === 'pendientes'
+  // Combinar pendientes y resueltas
+  const todasSolicitudes = [...solicitudesPendientes, ...solicitudesResueltas];
+  const tienePendientes = solicitudesPendientes.length > 0;
+
+  const emptyStateCopy = tienePendientes
     ? {
         title: 'Sin solicitudes pendientes',
         description: 'Cuando un empleado envíe una solicitud aparecerá aquí para que la revises.',
       }
     : {
-        title: 'Sin solicitudes resueltas',
-        description: 'Gestiona una solicitud pendiente para verla en este listado.',
+        title: 'Sin solicitudes',
+        description: 'No hay solicitudes para mostrar con los filtros actuales.',
       };
 
   return (
     <div className="space-y-4">
-      {/* Toggle entre Pendientes y Resueltas */}
-      <div className="flex items-center gap-2 mb-4">
-        <button
-          onClick={() => setVista('pendientes')}
-          className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
-            vista === 'pendientes'
-              ? 'bg-gray-900 text-white'
-              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-          }`}
-        >
-          Pendientes ({solicitudesPendientes.length})
-        </button>
-        <button
-          onClick={() => setVista('resueltas')}
-          className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
-            vista === 'resueltas'
-              ? 'bg-gray-900 text-white'
-              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-          }`}
-        >
-          Resueltas ({solicitudesResueltas.length})
-        </button>
-      </div>
-
       {/* Lista de solicitudes */}
-      {solicitudesActuales.length === 0 ? (
+      {todasSolicitudes.length === 0 ? (
         <div className="flex min-h-[320px] items-center justify-center">
           <EmptyState
             icon={ClipboardList}
@@ -294,10 +271,12 @@ export function BandejaEntradaSolicitudes({
         </div>
       ) : (
         <div className="space-y-3">
-          {solicitudesActuales.map((solicitud) => {
+          {todasSolicitudes.map((solicitud) => {
             const titulo = getSolicitudTitulo(solicitud);
             const descripcion = getSolicitudDescripcion(solicitud);
             const fullName = `${solicitud.empleado.nombre} ${solicitud.empleado.apellidos}`.trim();
+
+            const esPendiente = solicitud.estado === 'pendiente' || solicitud.estado === 'pendiente_aprobacion';
 
             return (
               <div key={solicitud.id} className="bg-white rounded-lg border border-gray-200 p-5 hover:shadow-sm transition-shadow">
@@ -310,12 +289,15 @@ export function BandejaEntradaSolicitudes({
                   />
 
                   <div className="flex-1 space-y-1">
-                    <p className="text-sm font-semibold text-gray-900">{titulo}</p>
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-semibold text-gray-900">{titulo}</p>
+                      {esPendiente && <span className="w-2 h-2 rounded-full bg-amber-500 flex-shrink-0" />}
+                    </div>
                     <p className="text-sm text-gray-600">{descripcion}</p>
                   </div>
 
                   <div className="flex items-center gap-2">
-                    {(solicitud.estado === 'pendiente' || solicitud.estado === 'pendiente_aprobacion') && (
+                    {esPendiente && (
                       <>
                         <Button
                           variant="ghost"

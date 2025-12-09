@@ -28,10 +28,55 @@ export function BandejaEntradaNotificaciones({
 }: BandejaEntradaNotificacionesProps) {
   const router = useRouter();
 
+  /**
+   * Corrige URLs antiguas de notificaciones que apuntan a lugares incorrectos
+   */
+  const corregirUrlNotificacion = (notificacion: NotificacionUI): string | undefined => {
+    const accionUrl = notificacion.metadata?.accionUrl;
+    if (!accionUrl) return undefined;
+
+    // Corregir notificaciones de firma_completada que apuntan a /hr/documentos
+    if (notificacion.tipo === 'firma_completada') {
+      const metadata = notificacion.metadata as { solicitudId?: string } | undefined;
+      const solicitudId = metadata?.solicitudId;
+      if (solicitudId && accionUrl === '/hr/documentos') {
+        return `/firma/solicitud/${solicitudId}`;
+      }
+    }
+
+    // Corregir notificaciones de solicitud_creada que apuntan a /hr/solicitudes
+    if (notificacion.tipo === 'solicitud_creada' && accionUrl === '/hr/solicitudes') {
+      return '/hr/bandeja-entrada?tab=solicitudes';
+    }
+
+    // Corregir notificaciones de campañas con URLs viejas
+    if (notificacion.tipo === 'campana_vacaciones_creada' || notificacion.tipo === 'campana_vacaciones_completada') {
+      const metadata = notificacion.metadata as { campanaId?: string } | undefined;
+      const campanaId = metadata?.campanaId;
+      if (campanaId && accionUrl.includes('/vacaciones/campanas/')) {
+        return `/hr/horario/ausencias?campana=${campanaId}`;
+      }
+      if (campanaId && accionUrl.includes('/empleado/vacaciones/campanas/')) {
+        return `/empleado/horario/ausencias?campana=${campanaId}`;
+      }
+    }
+
+    // Corregir notificaciones de onboarding_completado con URL vieja
+    if (notificacion.tipo === 'onboarding_completado') {
+      const metadata = notificacion.metadata as Record<string, unknown> | null | undefined;
+      const empleadoId = metadata?.empleadoId as string | undefined;
+      if (empleadoId && accionUrl === `/hr/empleados/${empleadoId}`) {
+        return `/hr/organizacion/personas/${empleadoId}`;
+      }
+    }
+
+    return accionUrl;
+  };
+
   const handleClick = (notificacion: NotificacionUI) => {
     onMarcarLeida?.(notificacion.id);
 
-    const accionUrl = notificacion.metadata?.accionUrl;
+    const accionUrl = corregirUrlNotificacion(notificacion);
     if (accionUrl) {
       if (openPreferenciasModalFromUrl(accionUrl)) {
         return;
@@ -41,7 +86,8 @@ export function BandejaEntradaNotificaciones({
   };
 
   const renderAccion = (notificacion: NotificacionUI) => {
-    const accionUrl = notificacion.metadata?.accionUrl;
+    const accionUrlOriginal = notificacion.metadata?.accionUrl;
+    const accionUrl = corregirUrlNotificacion(notificacion);
     const accionTexto = notificacion.metadata?.accionTexto;
     const tieneAccionEspecial =
       notificacion.metadata?.requiresModal ||
@@ -49,7 +95,7 @@ export function BandejaEntradaNotificaciones({
       notificacion.metadata?.requiresSelection;
 
     if (
-      !accionUrl ||
+      !accionUrlOriginal ||
       !accionTexto ||
       !tieneAccionEspecial
     ) {
@@ -59,10 +105,12 @@ export function BandejaEntradaNotificaciones({
     const handleAccion = (event: MouseEvent<HTMLButtonElement>) => {
       event.stopPropagation();
       onMarcarLeida?.(notificacion.id);
-      if (openPreferenciasModalFromUrl(accionUrl)) {
+      if (accionUrl && openPreferenciasModalFromUrl(accionUrl)) {
         return;
       }
-      router.push(accionUrl);
+      if (accionUrl) {
+        router.push(accionUrl);
+      }
     };
 
     return (

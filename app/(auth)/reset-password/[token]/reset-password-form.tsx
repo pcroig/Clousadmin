@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { PasswordInput } from '@/components/ui/password-input';
 import { parseJsonSafe } from '@/lib/utils/json';
 
 interface ResetPasswordFormProps {
@@ -95,20 +96,19 @@ export function ResetPasswordForm({ token, tokenValid }: ResetPasswordFormProps)
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="space-y-2">
           <Label htmlFor="password">Contraseña</Label>
-          <Input
+          <PasswordInput
             id="password"
-            type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             minLength={8}
             required
           />
+          <p className="text-xs text-muted-foreground">Mínimo 8 caracteres</p>
         </div>
         <div className="space-y-2">
           <Label htmlFor="confirmPassword">Confirmar contraseña</Label>
-          <Input
+          <PasswordInput
             id="confirmPassword"
-            type="password"
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
             minLength={8}

@@ -625,6 +625,12 @@ model empresas {
   updatedAt                      DateTime                         @updatedAt
   web                            String?                          @db.VarChar(255)
   activo                         Boolean                          @default(true)
+  deletedAt                      DateTime?
+  // Firma de empresa (para documentos)
+  firmaEmpresaGuardada           Boolean                          @default(false)
+  firmaEmpresaS3Key              String?
+  firmaEmpresaGuardadaData       Json?
+  firmaEmpresaGuardadaEn         DateTime?
   alertas_nomina                 alertas_nomina[]
   auditoria_accesos              auditoria_accesos[]
   ausencias                      ausencias[]
@@ -649,6 +655,7 @@ model empresas {
   invitaciones_empleados         invitaciones_empleados[]
   jobs_generacion_documentos     jobs_generacion_documentos[]
   jornadas                       jornadas[]
+  jornada_asignaciones           jornada_asignaciones[]
   notificaciones                 notificaciones[]
   onboarding_configs             onboarding_configs?
   onboarding_empleados           onboarding_empleados[]
@@ -811,8 +818,8 @@ model fichajes {
   empresaId                      String
   empleadoId                     String
   jornadaId                      String?
-  tipoFichaje                    TipoFichaje                      @default(ordinario)
   fecha                          DateTime                         @db.Date
+  tipoFichaje                    TipoFichaje                      @default(ordinario)
   autoCompletado                 Boolean                          @default(false)
   createdAt                      DateTime                         @default(now())
   updatedAt                      DateTime                         @updatedAt
@@ -966,9 +973,9 @@ model jobs_generacion_documentos {
 /// Note: Time limits (limiteInferior/Superior) are now global per company in Empresa.config
 /// Note: 'nombre' field has been removed - generate descriptive names in UI based on config
 model jornadas {
-  id             String      @id @default(cuid())
+  id             String                @id @default(cuid())
   empresaId      String
-  horasSemanales Decimal     @db.Decimal(5, 2) // e.g., 40.00 hours
+  horasSemanales Decimal               @db.Decimal(5, 2) // e.g., 40.00 hours
 
   // Schedule config (JSONB for flexibility)
   // Example fija: { "tipo": "fija", "lunes": { "activo": true, "entrada": "09:00", "salida": "18:00", "pausa_inicio": "14:00", "pausa_fin": "15:00" }, ... }
@@ -977,17 +984,38 @@ model jornadas {
   config         Json
 
   // Predefined by system (cannot be deleted)
-  esPredefinida  Boolean     @default(false)
-  activa         Boolean     @default(true)
+  esPredefinida  Boolean               @default(false)
+  activa         Boolean               @default(true)
 
-  createdAt      DateTime    @default(now())
-  updatedAt      DateTime    @updatedAt
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
 
   empleados      empleados[]
   fichajes       fichajes[]
-  empresa        empresas    @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  asignacion     jornada_asignaciones?
+  empresa        empresas              @relation(fields: [empresaId], references: [id], onDelete: Cascade)
 
   @@index([empresaId])
+}
+
+/// Jornada Asignaciones - Assignment metadata tracking
+/// Stores how a jornada was assigned (empresa/equipo/individual) for precise editing
+/// This ensures we know the original assignment context when editing
+model jornada_asignaciones {
+  id              String   @id @default(cuid())
+  jornadaId       String   @unique
+  empresaId       String
+  nivelAsignacion String   @db.VarChar(20) // 'empresa' | 'equipo' | 'individual'
+  equipoIds       Json?    // Array of equipo IDs if nivel=equipo, null otherwise
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  jornada jornadas @relation(fields: [jornadaId], references: [id], onDelete: Cascade)
+  empresa empresas @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+
+  @@index([jornadaId])
+  @@index([empresaId])
+  @@index([nivelAsignacion])
 }
 
 model nominas {
@@ -1063,6 +1091,7 @@ model onboarding_configs {
   camposRequeridos     Json     @default("{\"datos_bancarios\": {\"bic\": true, \"iban\": true}, \"datos_personales\": {\"nif\": true, \"nss\": true, \"ciudad\": true, \"telefono\": true, \"estadoCivil\": false, \"numeroHijos\": false, \"codigoPostal\": true, \"direccionPiso\": false, \"direccionCalle\": true, \"direccionNumero\": true, \"direccionProvincia\": true}}")
   documentosRequeridos Json     @default("[]")
   plantillasDocumentos Json     @default("[]")
+  workflowAcciones     Json     @default("[]") // Array de WorkflowAccion (nuevo sistema)
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
   empresa              empresas @relation(fields: [empresaId], references: [id], onDelete: Cascade)
@@ -1331,6 +1360,9 @@ model solicitudes_firma {
   recordatorioAutomatico Boolean    @default(true)
   titulo                 String     @db.VarChar(255)
   posicionFirma          Json?
+  incluirFirmaEmpresa    Boolean    @default(true)
+  posicionesFirmaEmpresa Json?
+  firmaEmpresaS3Key      String?
   firmas                 firmas[]
   documentos             documentos @relation(fields: [documentoId], references: [id], onDelete: Cascade)
   empresa                empresas   @relation(fields: [empresaId], references: [id], onDelete: Cascade)
@@ -1485,11 +1517,6 @@ enum EstadoFichaje {
   finalizado
 }
 
-enum TipoFichaje {
-  ordinario
-  extraordinario
-}
-
 enum EstadoSolicitud {
   pendiente
   requiere_revision
@@ -1542,6 +1569,11 @@ enum TipoEquipo {
   proyecto
   squad
   temporal
+}
+
+enum TipoFichaje {
+  ordinario
+  extraordinario
 }
 
 enum TipoFichajeEvento {

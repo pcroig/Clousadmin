@@ -7,7 +7,7 @@ import { toast } from 'sonner';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Spinner } from '@/components/ui/spinner';
+import { getPostFirmaRedirect } from '@/lib/firma-digital/get-post-firma-redirect';
 import { parseJson } from '@/lib/utils/json';
 
 interface SolicitudDetalle {
@@ -128,7 +128,7 @@ export function VerSolicitudClient({ solicitudId }: VerSolicitudClientProps) {
           <AlertCircle className="w-12 h-12 text-red-400 mb-4" />
           <p className="text-base font-medium text-gray-900 mb-2">Error al cargar solicitud</p>
           <p className="text-sm text-gray-600 mb-4">{error || 'Solicitud no encontrada'}</p>
-          <Button variant="outline" onClick={() => router.back()}>
+          <Button variant="outline" onClick={() => router.push(getPostFirmaRedirect())}>
             <ArrowLeft className="w-4 h-4 mr-2" />
             Volver
           </Button>
@@ -146,7 +146,7 @@ export function VerSolicitudClient({ solicitudId }: VerSolicitudClientProps) {
       <div className="flex-shrink-0 bg-white border-b px-6 py-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <Button variant="ghost" size="sm" onClick={() => router.back()}>
+            <Button variant="ghost" size="sm" onClick={() => router.push(getPostFirmaRedirect())}>
               <ArrowLeft className="w-4 h-4 mr-2" />
               Volver
             </Button>

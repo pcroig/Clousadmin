@@ -62,6 +62,14 @@ export async function POST(req: NextRequest) {
       return notFoundResponse('Jornada no encontrada');
     }
 
+    // Validación adicional: empleados únicos
+    if (validatedData.nivel === 'individual' && validatedData.empleadoIds) {
+      const empleadoIdsSet = new Set(validatedData.empleadoIds);
+      if (empleadoIdsSet.size !== validatedData.empleadoIds.length) {
+        return badRequestResponse('Hay empleados duplicados en la selección');
+      }
+    }
+
     // Validar jornadas previas antes de asignar
     let empleadosConJornadasPrevias: EmpleadoConJornadaResumen[] = [];
     let jornadasPreviasUnicas: string[] = [];
@@ -214,43 +222,13 @@ export async function POST(req: NextRequest) {
 
     let empleadosActualizados = 0;
 
-    // 4. Aplicar asignación según nivel
-    switch (validatedData.nivel) {
-      case 'empresa':
-        // Asignar a todos los empleados de la empresa
-        const resultEmpresa = await prisma.empleados.updateMany({
-          where: {
-            empresaId: session.user.empresaId,
-            activo: true,
-          },
-          data: {
-            jornadaId: validatedData.jornadaId,
-          },
-        });
-        empleadosActualizados = resultEmpresa.count;
-        break;
-
-      case 'equipo':
-        if (!validatedData.equipoIds || validatedData.equipoIds.length === 0) {
-          return badRequestResponse('Debes especificar al menos un equipo');
-        }
-
-        // Obtener empleados de los equipos especificados
-        const miembrosEquipos = await prisma.empleado_equipos.findMany({
-          where: {
-            equipoId: { in: validatedData.equipoIds },
-          },
-          select: {
-            empleadoId: true,
-          },
-        });
-
-        const empleadoIdsEquipos = [...new Set(miembrosEquipos.map((m) => m.empleadoId))];
-
-        if (empleadoIdsEquipos.length > 0) {
-          const resultEquipos = await prisma.empleados.updateMany({
+    // 4. Aplicar asignación según nivel (dentro de una transacción)
+    await prisma.$transaction(async (tx) => {
+      switch (validatedData.nivel) {
+        case 'empresa':
+          // Asignar a todos los empleados de la empresa
+          const resultEmpresa = await tx.empleados.updateMany({
             where: {
-              id: { in: empleadoIdsEquipos },
               empresaId: session.user.empresaId,
               activo: true,
             },
@@ -258,28 +236,78 @@ export async function POST(req: NextRequest) {
               jornadaId: validatedData.jornadaId,
             },
           });
-          empleadosActualizados = resultEquipos.count;
-        }
-        break;
+          empleadosActualizados = resultEmpresa.count;
+          break;
 
-      case 'individual':
-        if (!validatedData.empleadoIds || validatedData.empleadoIds.length === 0) {
-          return badRequestResponse('Debes especificar al menos un empleado');
-        }
+        case 'equipo':
+          if (!validatedData.equipoIds || validatedData.equipoIds.length === 0) {
+            throw new Error('Debes especificar al menos un equipo');
+          }
 
-        const resultIndividual = await prisma.empleados.updateMany({
-          where: {
-            id: { in: validatedData.empleadoIds },
-            empresaId: session.user.empresaId,
-            activo: true,
-          },
-          data: {
-            jornadaId: validatedData.jornadaId,
-          },
-        });
-        empleadosActualizados = resultIndividual.count;
-        break;
-    }
+          // Obtener empleados de los equipos especificados
+          const miembrosEquipos = await tx.empleado_equipos.findMany({
+            where: {
+              equipoId: { in: validatedData.equipoIds },
+            },
+            select: {
+              empleadoId: true,
+            },
+          });
+
+          const empleadoIdsEquipos = [...new Set(miembrosEquipos.map((m) => m.empleadoId))];
+
+          if (empleadoIdsEquipos.length > 0) {
+            const resultEquipos = await tx.empleados.updateMany({
+              where: {
+                id: { in: empleadoIdsEquipos },
+                empresaId: session.user.empresaId,
+                activo: true,
+              },
+              data: {
+                jornadaId: validatedData.jornadaId,
+              },
+            });
+            empleadosActualizados = resultEquipos.count;
+          }
+          break;
+
+        case 'individual':
+          if (!validatedData.empleadoIds || validatedData.empleadoIds.length === 0) {
+            throw new Error('Debes especificar al menos un empleado');
+          }
+
+          const resultIndividual = await tx.empleados.updateMany({
+            where: {
+              id: { in: validatedData.empleadoIds },
+              empresaId: session.user.empresaId,
+              activo: true,
+            },
+            data: {
+              jornadaId: validatedData.jornadaId,
+            },
+          });
+          empleadosActualizados = resultIndividual.count;
+          break;
+      }
+
+      // 5. Guardar metadata de asignación (upsert para manejar re-asignaciones)
+      await tx.jornada_asignaciones.upsert({
+        where: {
+          jornadaId: validatedData.jornadaId,
+        },
+        create: {
+          jornadaId: validatedData.jornadaId,
+          empresaId: session.user.empresaId,
+          nivelAsignacion: validatedData.nivel,
+          equipoIds: (validatedData.nivel === 'equipo' ? validatedData.equipoIds : null) as any,
+        },
+        update: {
+          nivelAsignacion: validatedData.nivel,
+          equipoIds: (validatedData.nivel === 'equipo' ? validatedData.equipoIds : null) as any,
+          updatedAt: new Date(),
+        },
+      });
+    });
 
     return successResponse({
       success: true,

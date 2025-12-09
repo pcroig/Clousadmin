@@ -1,11 +1,15 @@
 'use client';
 
-import { Loader2, Power, ShieldAlert } from 'lucide-react';
+import { Loader2, Power, ShieldAlert, RotateCcw, Trash2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
 import { toast } from 'sonner';
 
-import { deactivateCompanyAction } from '@/app/(dashboard)/platform/invitaciones/actions';
+import {
+  deactivateCompanyAction,
+  reactivateCompanyAction,
+  deleteCompanyAction,
+} from '@/app/(dashboard)/platform/invitaciones/actions';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -21,6 +25,7 @@ export type CompanyStatusRow = {
   id: string;
   nombre: string;
   activo: boolean;
+  deletedAt: string | null;
   createdAt: string;
   activeEmployees: number;
   subscription: {
@@ -84,7 +89,35 @@ export function CompanyStatusTable({ companies }: CompanyStatusTableProps) {
       if (!result.success) {
         toast.error(result.error ?? 'No se pudo desactivar la empresa');
       } else {
-        toast.success('Empresa desactivada correctamente');
+        toast.success('Empresa suspendida correctamente');
+        router.refresh();
+      }
+      setTargetId(null);
+    });
+  };
+
+  const handleReactivate = (companyId: string) => {
+    setTargetId(companyId);
+    startTransition(async () => {
+      const result = await reactivateCompanyAction(companyId);
+      if (!result.success) {
+        toast.error(result.error ?? 'No se pudo reactivar la empresa');
+      } else {
+        toast.success('Empresa reactivada correctamente');
+        router.refresh();
+      }
+      setTargetId(null);
+    });
+  };
+
+  const handleDelete = (companyId: string) => {
+    setTargetId(companyId);
+    startTransition(async () => {
+      const result = await deleteCompanyAction(companyId);
+      if (!result.success) {
+        toast.error(result.error ?? 'No se pudo eliminar la empresa');
+      } else {
+        toast.success('Empresa eliminada correctamente');
         router.refresh();
       }
       setTargetId(null);
@@ -116,17 +149,26 @@ export function CompanyStatusTable({ companies }: CompanyStatusTableProps) {
         <TableBody>
           {companies.map((company) => {
             const isInactive = !company.activo;
+            const isDeleted = !!company.deletedAt;
             const isLoading = pending && targetId === company.id;
 
             return (
-              <TableRow key={company.id} className={isInactive ? 'opacity-60' : undefined}>
+              <TableRow
+                key={company.id}
+                className={isInactive || isDeleted ? 'opacity-60' : undefined}
+              >
                 <TableCell>
                   <div className="flex flex-col">
                     <span className="font-medium">{company.nombre}</span>
-                    {isInactive ? (
+                    {isDeleted ? (
+                      <span className="text-xs text-red-700 flex items-center gap-1">
+                        <Trash2 className="h-3.5 w-3.5" />
+                        Eliminada
+                      </span>
+                    ) : isInactive ? (
                       <span className="text-xs text-red-600 flex items-center gap-1">
                         <ShieldAlert className="h-3.5 w-3.5" />
-                        Inactiva
+                        Suspendida
                       </span>
                     ) : (
                       <span className="text-xs text-muted-foreground">Activa</span>
@@ -134,10 +176,12 @@ export function CompanyStatusTable({ companies }: CompanyStatusTableProps) {
                   </div>
                 </TableCell>
                 <TableCell>
-                  {company.activo ? (
+                  {isDeleted ? (
+                    <Badge variant="destructive">Eliminada</Badge>
+                  ) : company.activo ? (
                     <Badge variant="outline">Activa</Badge>
                   ) : (
-                    <Badge variant="secondary">Inactiva</Badge>
+                    <Badge variant="secondary">Suspendida</Badge>
                   )}
                 </TableCell>
                 <TableCell>{company.activeEmployees}</TableCell>
@@ -150,25 +194,71 @@ export function CompanyStatusTable({ companies }: CompanyStatusTableProps) {
                 <TableCell>{formatDate(company.subscription?.currentPeriodEnd ?? null)}</TableCell>
                 <TableCell>{formatDate(company.createdAt)}</TableCell>
                 <TableCell className="text-right">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    disabled={!company.activo || isLoading}
-                    onClick={() => handleDeactivate(company.id)}
-                  >
-                    {isLoading ? (
+                  <div className="flex items-center justify-end gap-2">
+                    {!isDeleted && company.activo && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        disabled={isLoading}
+                        onClick={() => handleDeactivate(company.id)}
+                      >
+                        {isLoading ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Procesando
+                          </>
+                        ) : (
+                          <>
+                            <Power className="mr-2 h-4 w-4" />
+                            Suspender
+                          </>
+                        )}
+                      </Button>
+                    )}
+                    {!isDeleted && !company.activo && (
                       <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Desactivando
-                      </>
-                    ) : (
-                      <>
-                        <Power className="mr-2 h-4 w-4" />
-                        Suspender
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          disabled={isLoading}
+                          onClick={() => handleReactivate(company.id)}
+                        >
+                          {isLoading ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              Procesando
+                            </>
+                          ) : (
+                            <>
+                              <RotateCcw className="mr-2 h-4 w-4" />
+                              Reanudar
+                            </>
+                          )}
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          disabled={isLoading}
+                          onClick={() => handleDelete(company.id)}
+                        >
+                          {isLoading ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              Procesando
+                            </>
+                          ) : (
+                            <>
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              Eliminar
+                            </>
+                          )}
+                        </Button>
                       </>
                     )}
-                  </Button>
+                  </div>
                 </TableCell>
               </TableRow>
             );

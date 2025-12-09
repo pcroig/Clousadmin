@@ -20,6 +20,16 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
   Table,
   TableBody,
   TableCell,
@@ -89,21 +99,28 @@ export function JornadasClient() {
   const [formData, setFormData] = useState<JornadaFormData>(createDefaultJornada());
   const [empleadosSeleccionados, setEmpleadosSeleccionados] = useState<string[]>([]);
   const [nivelAsignacion, setNivelAsignacion] = useState<'empresa' | 'equipo' | 'individual'>('empresa');
-  const [equipoSeleccionado, setEquipoSeleccionado] = useState<string>('');
+  const [equiposSeleccionados, setEquiposSeleccionados] = useState<string[]>([]);
 
   // Estados auxiliares
   const [empleados, setEmpleados] = useState<Empleado[]>([]);
   const [equipos, setEquipos] = useState<Equipo[]>([]);
   const [guardando, setGuardando] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [jornadaAEliminar, setJornadaAEliminar] = useState<Jornada | null>(null);
 
   // Hooks
   const { data: jornadas = [], loading, execute: refetchJornadas } = useApi<Jornada[]>();
   const { validar, mostrarErrores } = useValidacionJornadas();
 
-  const { mutate: eliminarJornada } = useMutation<void, void>({
+  const { mutate: eliminarJornada, loading: eliminando } = useMutation<void, void>({
     onSuccess: () => {
+      toast.success('Jornada eliminada');
+      setExpandedId(null);
+      setJornadaAEliminar(null);
       refetchJornadas('/api/jornadas');
+    },
+    onError: (error) => {
+      toast.error(error.message || 'Error al eliminar jornada');
     },
   });
 
@@ -176,7 +193,7 @@ export function JornadasClient() {
     setFormData(createDefaultJornada());
     setNivelAsignacion('empresa');
     setEmpleadosSeleccionados([]);
-    setEquipoSeleccionado('');
+    setEquiposSeleccionados([]);
     setErrors({});
   }
 
@@ -258,7 +275,7 @@ export function JornadasClient() {
     // Reset asignación (se cargará al expandir)
     setNivelAsignacion('empresa');
     setEmpleadosSeleccionados([]);
-    setEquipoSeleccionado('');
+    setEquiposSeleccionados([]);
   }
 
   async function handleGuardar(jornadaId?: string) {
@@ -335,7 +352,7 @@ export function JornadasClient() {
 
       // Asignar empleados si corresponde
       const debeAsignar = (nivelAsignacion === 'individual' && empleadosSeleccionados.length > 0) ||
-                         (nivelAsignacion === 'equipo' && equipoSeleccionado) ||
+                         (nivelAsignacion === 'equipo' && equiposSeleccionados.length > 0) ||
                          nivelAsignacion === 'empresa';
 
       if (debeAsignar) {
@@ -345,7 +362,7 @@ export function JornadasClient() {
           body: JSON.stringify({
             jornadaId: idJornada,
             nivel: nivelAsignacion,
-            equipoIds: nivelAsignacion === 'equipo' && equipoSeleccionado ? [equipoSeleccionado] : undefined,
+            equipoIds: nivelAsignacion === 'equipo' && equiposSeleccionados.length > 0 ? equiposSeleccionados : undefined,
             empleadoIds: nivelAsignacion === 'individual' ? empleadosSeleccionados : undefined,
           }),
         });
@@ -369,10 +386,10 @@ export function JornadasClient() {
     }
   }
 
-  async function handleEliminar(id: string) {
-    if (!confirm('¿Estás seguro de eliminar esta jornada?')) return;
+  async function confirmarEliminarJornada() {
+    if (!jornadaAEliminar) return;
 
-    await eliminarJornada(`/api/jornadas/${id}`, undefined, { method: 'DELETE' });
+    await eliminarJornada(`/api/jornadas/${jornadaAEliminar.id}`, undefined, { method: 'DELETE' });
   }
 
   function validarFormulario(): boolean {
@@ -522,8 +539,8 @@ export function JornadasClient() {
                               empleadosSeleccionados={empleadosSeleccionados}
                               onEmpleadosSeleccionChange={setEmpleadosSeleccionados}
                               equipos={equipos}
-                              equipoSeleccionado={equipoSeleccionado}
-                              onEquipoSeleccionadoChange={setEquipoSeleccionado}
+                              equiposSeleccionados={equiposSeleccionados}
+                              onEquiposSeleccionadosChange={setEquiposSeleccionados}
                             />
                             <div className="flex gap-2 mt-6">
                               <LoadingButton onClick={() => handleGuardar()} loading={guardando}>
@@ -584,7 +601,7 @@ export function JornadasClient() {
                                     size="sm"
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      handleEliminar(jornada.id);
+                                      setJornadaAEliminar(jornada);
                                     }}
                                     className="border-red-200 text-red-600 hover:text-red-700 hover:border-red-300 hover:bg-red-50"
                                   >
@@ -605,8 +622,8 @@ export function JornadasClient() {
                                 empleadosSeleccionados={empleadosSeleccionados}
                                 onEmpleadosSeleccionChange={setEmpleadosSeleccionados}
                                 equipos={equipos}
-                                equipoSeleccionado={equipoSeleccionado}
-                                onEquipoSeleccionadoChange={setEquipoSeleccionado}
+                                equiposSeleccionados={equiposSeleccionados}
+                                onEquiposSeleccionadosChange={setEquiposSeleccionados}
                               />
                               {!jornada.esPredefinida && (
                                 <div className="flex gap-2 mt-6">
@@ -634,6 +651,36 @@ export function JornadasClient() {
           </Table>
         </Card>
       </div>
+
+      <AlertDialog
+        open={Boolean(jornadaAEliminar)}
+        onOpenChange={(isOpen) => {
+          if (!isOpen && !eliminando) {
+            setJornadaAEliminar(null);
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar jornada?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {jornadaAEliminar
+                ? `Se eliminará la jornada «${getNombreGenerado(jornadaAEliminar)}». Se desasignará de ${jornadaAEliminar._count?.empleados ?? 0} empleado${jornadaAEliminar._count?.empleados === 1 ? '' : 's'}.`
+                : 'Confirma la eliminación de la jornada seleccionada.'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={eliminando}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmarEliminarJornada}
+              className="bg-red-600 hover:bg-red-700"
+              disabled={eliminando}
+            >
+              {eliminando ? 'Eliminando...' : 'Eliminar jornada'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

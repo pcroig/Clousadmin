@@ -2,7 +2,7 @@
 
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { CalendarDays, ChevronDown, ChevronUp, Clock, RotateCcw } from 'lucide-react';
+import { CalendarDays, ChevronDown, ChevronUp, Clock, RotateCcw, Zap } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -129,6 +129,7 @@ export function FichajesTab({
             horasTrabajadas += horasDesdeUltimoEvento;
           }
 
+          // FIX: Usar horasObjetivo del fichaje (ya viene desde el API con 0 para extraordinarios)
           const balance = Number((horasTrabajadas - jornada.horasObjetivo).toFixed(2));
 
           return {
@@ -263,7 +264,19 @@ export function FichajesTab({
       header: 'Estado',
       priority: 'medium',
       align: 'right',
-      cell: (row) => getEstadoBadge(row.estado),
+      cell: (row) => (
+        <div className="flex items-center justify-end gap-1.5">
+          {getEstadoBadge(row.estado)}
+          {row.fichaje.tipoFichaje === 'extraordinario' && (
+            <div className="group relative">
+              <Zap className="h-4 w-4 text-amber-600 fill-amber-100" />
+              <span className="absolute bottom-full right-0 mb-1 px-2 py-1 text-xs text-white bg-gray-900 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                Horas extra
+              </span>
+            </div>
+          )}
+        </div>
+      ),
     },
   ], []);
 

@@ -79,20 +79,9 @@ interface EditarJornadaModalProps {
   modo: 'crear' | 'editar';
   jornada: JornadaDetalle | null;
   onClose: () => void;
-  prefilledNivelAsignacion?: 'empresa' | 'equipo' | 'individual';
-  prefilledEmpleadosIds?: string[];
-  prefilledEquipoId?: string;
 }
 
-export function EditarJornadaModal({
-  open,
-  modo,
-  jornada,
-  onClose,
-  prefilledNivelAsignacion,
-  prefilledEmpleadosIds,
-  prefilledEquipoId,
-}: EditarJornadaModalProps) {
+export function EditarJornadaModal({ open, modo, jornada, onClose }: EditarJornadaModalProps) {
   // Estados del formulario unificado
   const [formData, setFormData] = useState<JornadaFormData>({
     // NOTE: 'nombre' field has been removed
@@ -113,13 +102,11 @@ export function EditarJornadaModal({
 
   // Estados de asignación
   const [empleados, setEmpleados] = useState<Empleado[]>([]);
-  const [empleadosSeleccionados, setEmpleadosSeleccionados] = useState<string[]>(prefilledEmpleadosIds ?? []);
-  const [nivelAsignacion, setNivelAsignacion] = useState<'empresa' | 'equipo' | 'individual'>(
-    prefilledNivelAsignacion ?? 'empresa'
-  );
+  const [empleadosSeleccionados, setEmpleadosSeleccionados] = useState<string[]>([]);
+  const [nivelAsignacion, setNivelAsignacion] = useState<'empresa' | 'equipo' | 'individual'>('empresa');
   const [equipos, setEquipos] = useState<{ id: string; nombre: string; miembros: number }[]>([]);
-  const [equipoSeleccionado, setEquipoSeleccionado] = useState<string>(prefilledEquipoId ?? '');
-  
+  const [equiposSeleccionados, setEquiposSeleccionados] = useState<string[]>([]);
+
   // Estados de UI
   const [cargando, setCargando] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -130,6 +117,7 @@ export function EditarJornadaModal({
     nivel: 'empresa' | 'equipo' | 'individual';
     jornadaId: string;
   } | null>(null);
+  const [mostrarDialogoEliminar, setMostrarDialogoEliminar] = useState(false);
 
   // Cargar datos cuando se abre el modal
   useEffect(() => {
@@ -160,10 +148,10 @@ export function EditarJornadaModal({
           }
         });
 
-        // Calcular minutos de descanso desde pausa_inicio y pausa_fin
+        // Calcular minutos de descanso desde pausa_inicio y pausa_fin o config.descanso
         let descansoMinutos = '';
         let tieneDescanso = false;
-        
+
         if (esFija) {
           const primerDiaConPausa = DIA_KEYS.find((dia) => {
             const diaConfig = getDiaConfig(config, dia);
@@ -176,17 +164,27 @@ export function EditarJornadaModal({
               const [h2, m2] = diaConfig.pausa_fin.split(':').map(Number);
               const minutos = (h2 * 60 + m2) - (h1 * 60 + m1);
               descansoMinutos = minutos.toString();
-              tieneDescanso = minutos > 0;
+              tieneDescanso = true;
             }
           }
         } else {
-          const descansoMinimo = typeof config?.descansoMinimo === 'string' ? config.descansoMinimo : '';
-          if (descansoMinimo) {
-            const [h, m] = descansoMinimo.split(':').map(Number);
-            const minutos = h * 60 + m;
-            descansoMinutos = minutos.toString();
-            tieneDescanso = minutos > 0;
+          // Jornada flexible: usar config.descanso directamente
+          if (typeof config?.descanso === 'number') {
+            descansoMinutos = config.descanso.toString();
+            tieneDescanso = true;
+          } else {
+            const descansoMinimo = typeof config?.descansoMinimo === 'string' ? config.descansoMinimo : '';
+            if (descansoMinimo) {
+              const [h, m] = descansoMinimo.split(':').map(Number);
+              descansoMinutos = (h * 60 + m).toString();
+              tieneDescanso = true;
+            }
           }
+        }
+
+        // Si no se detectó descanso, usar valores por defecto
+        if (!tieneDescanso) {
+          descansoMinutos = '60';
         }
 
         setFormData({
@@ -206,16 +204,7 @@ export function EditarJornadaModal({
       cargarEmpleados();
       cargarEquipos();
     }
-  }, [open, modo, jornada, prefilledEmpleadosIds, prefilledEquipoId, prefilledNivelAsignacion]);
-
-  useEffect(() => {
-    if (!open) return;
-    if (modo === 'crear') {
-      setNivelAsignacion(prefilledNivelAsignacion ?? 'empresa');
-      setEmpleadosSeleccionados(prefilledEmpleadosIds ?? []);
-      setEquipoSeleccionado(prefilledEquipoId ?? '');
-    }
-  }, [open, modo, prefilledEmpleadosIds, prefilledEquipoId, prefilledNivelAsignacion]);
+  }, [open, modo, jornada]);
 
   async function cargarEmpleados() {
     try {
@@ -235,23 +224,17 @@ export function EditarJornadaModal({
 
   async function cargarEquipos() {
     try {
-      const response = await fetch('/api/equipos');
+      const response = await fetch('/api/organizacion/equipos');
       if (response.ok) {
         const data = await response.json() as Record<string, unknown>;
-        const equiposData = (data as { data?: unknown[] }).data || [];
-        const equiposArray = Array.isArray(equiposData) ? equiposData : [];
+        const equiposArray = Array.isArray(data) ? data : [];
         setEquipos(
           equiposArray.map((equipo: unknown) => {
-            const e = equipo as { 
-              id: string; 
-              nombre: string; 
-              _count?: { empleado_equipos?: number }; 
-              numeroMiembros?: number;
-            };
+            const e = equipo as { id: string; nombre: string; _count?: { miembros?: number } };
             return {
               id: e.id,
               nombre: e.nombre,
-              miembros: e._count?.empleado_equipos || e.numeroMiembros || 0,
+              miembros: e._count?.miembros ?? 0,
             };
           })
         );
@@ -279,9 +262,9 @@ export function EditarJornadaModal({
       tieneDescanso: true,
       descansoMinutos: '60',
     });
-    setNivelAsignacion(prefilledNivelAsignacion ?? 'empresa');
-    setEmpleadosSeleccionados(prefilledEmpleadosIds ?? []);
-    setEquipoSeleccionado(prefilledEquipoId ?? '');
+    setNivelAsignacion('empresa');
+    setEmpleadosSeleccionados([]);
+    setEquiposSeleccionados([]);
     setErrors({});
   }
 
@@ -300,8 +283,8 @@ export function EditarJornadaModal({
     try {
       let url = `/api/jornadas/verificar-previas?nivel=${nivelAsignacion}`;
       
-      if (nivelAsignacion === 'equipo' && equipoSeleccionado) {
-        url += `&equipoIds=${equipoSeleccionado}`;
+      if (nivelAsignacion === 'equipo' && equiposSeleccionados.length > 0) {
+        url += `&equipoIds=${equiposSeleccionados.join(',')}`;
       } else if (nivelAsignacion === 'individual' && empleadosSeleccionados.length > 0) {
         url += `&empleadoIds=${empleadosSeleccionados.join(',')}`;
       }
@@ -330,14 +313,14 @@ export function EditarJornadaModal({
             empleadoIds: empleadosSeleccionados,
           }),
         });
-      } else if (nivelAsignacion === 'equipo' && equipoSeleccionado) {
+      } else if (nivelAsignacion === 'equipo' && equiposSeleccionados.length > 0) {
         await fetch('/api/jornadas/asignar', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             jornadaId: jornadaId,
             nivel: 'equipo',
-            equipoIds: [equipoSeleccionado],
+            equipoIds: equiposSeleccionados,
           }),
         });
       } else if (nivelAsignacion === 'empresa') {
@@ -366,8 +349,8 @@ export function EditarJornadaModal({
       // Construir configuración
       const config: JornadaConfig = {};
       
-      // Convertir minutos de descanso a formato de pausa (solo si está habilitado)
-      const descansoMinutos = formData.tieneDescanso ? parseInt(formData.descansoMinutos || '0', 10) : 0;
+      // Convertir minutos de descanso a formato de pausa
+      const descansoMinutos = parseInt(formData.descansoMinutos || '0', 10);
       
       if (formData.tipoJornada === 'fija') {
         DIA_KEYS.forEach((dia) => {
@@ -437,7 +420,7 @@ export function EditarJornadaModal({
 
       // Verificar si hay asignación y si hay jornadas previas
       const debeAsignar = (nivelAsignacion === 'individual' && empleadosSeleccionados.length > 0) ||
-                         (nivelAsignacion === 'equipo' && equipoSeleccionado) ||
+                         (nivelAsignacion === 'equipo' && equiposSeleccionados.length > 0) ||
                          nivelAsignacion === 'empresa';
 
       if (debeAsignar) {
@@ -498,8 +481,8 @@ export function EditarJornadaModal({
     }
   }
 
-  async function handleEliminar() {
-    if (!jornada || !confirm('¿Estás seguro de eliminar esta jornada?')) return;
+  async function confirmarEliminar() {
+    if (!jornada) return;
 
     setCargando(true);
     try {
@@ -511,14 +494,18 @@ export function EditarJornadaModal({
         toast.success('Jornada eliminada exitosamente');
         onClose();
       } else {
-        const error = await response.json() as Record<string, unknown>;
-        toast.error(typeof error.error === 'string' ? error.error : 'Error al eliminar jornada');
+        const error = (await response.json().catch(() => ({ error: 'Error desconocido' }))) as {
+          error?: unknown;
+        };
+        const mensajeError = typeof error.error === 'string' ? error.error : 'Error al eliminar jornada';
+        toast.error(mensajeError);
       }
     } catch (error) {
       console.error('Error:', error);
       toast.error('Error al eliminar jornada');
     } finally {
       setCargando(false);
+      setMostrarDialogoEliminar(false);
     }
   }
 
@@ -560,23 +547,26 @@ export function EditarJornadaModal({
             empleadosSeleccionados={empleadosSeleccionados}
             onEmpleadosSeleccionChange={setEmpleadosSeleccionados}
             equipos={equipos}
-            equipoSeleccionado={equipoSeleccionado}
-            onEquipoSeleccionadoChange={setEquipoSeleccionado}
+            equiposSeleccionados={equiposSeleccionados}
+            onEquiposSeleccionadosChange={setEquiposSeleccionados}
           />
         </DialogBody>
 
-        <DialogFooter className="gap-2 justify-end">
+        <DialogFooter className="gap-2">
           {modo === 'editar' && !esPredefinida && (
             <Button
-              variant="outline"
-              onClick={handleEliminar}
+              variant="destructive"
+              onClick={() => setMostrarDialogoEliminar(true)}
               disabled={cargando}
-              className="border-red-200 text-red-600 hover:text-red-700 hover:border-red-300 hover:bg-red-50"
+              className="mr-auto"
             >
               <Trash2 className="w-4 h-4 mr-2" />
               Eliminar
             </Button>
           )}
+          <Button variant="outline" onClick={onClose} disabled={cargando}>
+            Cancelar
+          </Button>
           {!esPredefinida && (
             <LoadingButton onClick={handleGuardar} loading={cargando}>
               {modo === 'crear' ? 'Crear Jornada' : 'Guardar Cambios'}
@@ -585,6 +575,37 @@ export function EditarJornadaModal({
         </DialogFooter>
       </DialogScrollableContent>
 
+      {/* Confirmación de eliminación */}
+      <AlertDialog
+        open={mostrarDialogoEliminar}
+        onOpenChange={(isOpen) => {
+          if (!isOpen && !cargando) {
+            setMostrarDialogoEliminar(false);
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar jornada?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {jornada
+                ? `Se eliminará la jornada de ${jornada.horasSemanales}h. Esta acción no se puede deshacer.`
+                : 'Confirma la eliminación de la jornada seleccionada.'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={cargando}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmarEliminar}
+              className="bg-red-600 hover:bg-red-700"
+              disabled={cargando}
+            >
+              {cargando ? 'Eliminando...' : 'Eliminar'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* Alert Dialog para confirmar reemplazo de jornadas previas */}
       <AlertDialog open={mostrarAlertaJornadas} onOpenChange={setMostrarAlertaJornadas}>
         <AlertDialogContent>
@@ -592,23 +613,23 @@ export function EditarJornadaModal({
             <AlertDialogTitle>Jornadas previas detectadas</AlertDialogTitle>
             <AlertDialogDescription>
               {jornadasPreviasInfo?.nivel === 'empresa' && (
-                <span className="block mb-2">
+                <p className="mb-2">
                   Ya existe una jornada asignada a toda la empresa. Al asignar esta nueva jornada, se reemplazará la jornada anterior.
-                </span>
+                </p>
               )}
               {jornadasPreviasInfo?.nivel === 'equipo' && (
-                <span className="block mb-2">
+                <p className="mb-2">
                   Los empleados del equipo seleccionado ya tienen jornadas asignadas. Al asignar esta nueva jornada, se reemplazarán las jornadas anteriores.
-                </span>
+                </p>
               )}
               {jornadasPreviasInfo?.nivel === 'individual' && (
-                <span className="block mb-2">
+                <p className="mb-2">
                   Los empleados seleccionados ya tienen jornadas asignadas. Al asignar esta nueva jornada, se reemplazarán las jornadas anteriores.
-                </span>
+                </p>
               )}
-
+              
               <div className="mt-3">
-                <span className="font-medium block mb-2">Empleados afectados:</span>
+                <p className="font-medium mb-2">Empleados afectados:</p>
                 <ul className="list-disc list-inside space-y-1 text-sm">
                   {jornadasPreviasInfo?.jornadas.map((j, idx) => (
                     <li key={idx}>
@@ -617,10 +638,10 @@ export function EditarJornadaModal({
                   ))}
                 </ul>
               </div>
-
-              <span className="block mt-4 text-sm font-medium">
+              
+              <p className="mt-4 text-sm font-medium">
                 ¿Deseas continuar y reemplazar las jornadas anteriores?
-              </span>
+              </p>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -639,6 +660,5 @@ export function EditarJornadaModal({
     </Dialog>
   );
 }
-
 
 

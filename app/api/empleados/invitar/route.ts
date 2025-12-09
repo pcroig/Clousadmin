@@ -19,9 +19,10 @@ import { crearOnboarding } from '@/lib/onboarding';
 
 
 const invitacionSchema = z.object({
-  empleadoId: z.string().uuid(),
+  empleadoId: z.string().cuid(), // CUID, no UUID (Prisma usa @default(cuid()))
   email: z.string().email().optional(), // Email opcional, si no se provee usa el del empleado
   tipoOnboarding: z.enum(['completo', 'simplificado']).optional(), // Tipo de onboarding, por defecto 'completo'
+  accionesActivas: z.record(z.string(), z.boolean()).optional(), // Acciones activas del workflow para este empleado
 });
 
 // POST /api/empleados/invitar - Enviar invitación a empleado (solo HR Admin)
@@ -33,11 +34,18 @@ export async function POST(req: NextRequest) {
     const { session } = authResult;
 
     // Validar request body
-    const validationResult = await validateRequest(req, invitacionSchema);
-    if (validationResult instanceof Response) return validationResult;
-    const { data: validatedData } = validationResult;
+    const body = await req.json();
+    console.log('[POST /api/empleados/invitar] Body recibido:', JSON.stringify(body, null, 2));
 
-    const { empleadoId, tipoOnboarding = 'completo' } = validatedData;
+    const validationResult = invitacionSchema.safeParse(body);
+    if (!validationResult.success) {
+      console.error('[POST /api/empleados/invitar] Error de validación:', validationResult.error);
+      return badRequestResponse('Datos inválidos');
+    }
+
+    const validatedData = validationResult.data;
+    const { empleadoId, tipoOnboarding = 'completo', accionesActivas } = validatedData;
+    console.log('[POST /api/empleados/invitar] Datos validados:', { empleadoId, tipoOnboarding, accionesActivas });
     const origin = req.headers.get('origin') ?? undefined;
     const baseUrl = getBaseUrl(origin);
 
@@ -95,7 +103,7 @@ export async function POST(req: NextRequest) {
       empleadoId,
       session.user.empresaId,
       tipoOnboarding,
-      { baseUrl }
+      { baseUrl, accionesActivas }
     );
 
     if (!result.success) {

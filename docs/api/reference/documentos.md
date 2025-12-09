@@ -1,7 +1,9 @@
 # Referencia API - Documentos
 
-**Última actualización:** 4 de diciembre de 2025
+**Última actualización:** 8 de diciembre de 2025
 **Estado:** Referencia completa de endpoints. Ver funcionalidad detallada en [`docs/funcionalidades/documentos.md`](../../funcionalidades/documentos.md).
+
+> **Nota:** Desde dic 2025, el sistema usa **SWR** para actualizaciones automáticas. Ver [Hooks de Documentos](../hooks/use-documentos-use-carpetas.md) para integración frontend.
 
 ---
 
@@ -193,10 +195,12 @@ Creadas manualmente por HR:
 - `lib/documentos/preview-headers.ts` - Headers de seguridad
 
 **Frontend:**
+- `lib/hooks/use-documentos.ts` - Hook reactivo para documentos
+- `lib/hooks/use-carpetas.ts` - Hook reactivo para carpetas
 - `app/(dashboard)/hr/documentos/*` - Vistas HR
 - `app/(dashboard)/empleado/mi-espacio/documentos/*` - Vistas Empleado
 - `components/shared/document-viewer.tsx` - Visor de documentos
-- `components/shared/document-upload-area.tsx` - Upload component
+- `components/shared/document-upload-area.tsx` - Upload con revalidación automática
 
 
 

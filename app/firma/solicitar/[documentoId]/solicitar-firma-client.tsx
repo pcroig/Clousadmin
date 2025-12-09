@@ -1,18 +1,20 @@
 'use client';
 
-import { ArrowLeft, Check, CheckCircle2, Clock, X } from 'lucide-react';
+import { ArrowLeft, Check, Info, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
+import { SignatureCanvas, type SignatureCanvasHandle } from '@/components/firma/signature-canvas';
 import { PdfCanvasViewer } from '@/components/shared/pdf-canvas-viewer';
 import { SearchableMultiSelect } from '@/components/shared/searchable-multi-select';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
 import { Switch } from '@/components/ui/switch';
-import { extractArrayFromResponse } from '@/lib/utils/api-response';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { getPostFirmaRedirect } from '@/lib/firma-digital/get-post-firma-redirect';
 import { parseJson } from '@/lib/utils/json';
 
 interface EmpleadoItem {
@@ -30,27 +32,6 @@ interface SignaturePosition {
   height: number;
 }
 
-interface FirmaDetalle {
-  id: string;
-  orden: number;
-  firmado: boolean;
-  firmadoEn?: string;
-  empleado?: {
-    nombre: string;
-    apellidos: string;
-    email: string;
-  };
-}
-
-interface SolicitudExistente {
-  id: string;
-  titulo: string;
-  mensaje?: string;
-  estado: string;
-  ordenFirma: boolean;
-  firmas?: FirmaDetalle[];
-}
-
 interface SolicitarFirmaClientProps {
   documentoId: string;
 }
@@ -66,14 +47,39 @@ export function SolicitarFirmaClient({ documentoId }: SolicitarFirmaClientProps)
   const [firmanteActivo, setFirmanteActivo] = useState<string | null>(null); // Para seleccionar a quién se asignan posiciones
   const [documentoNombre, setDocumentoNombre] = useState('');
   const [carpetaId, setCarpetaId] = useState<string | null>(null);
-  const [solicitudExistente, setSolicitudExistente] = useState<SolicitudExistente | null>(null);
-  const [cargandoSolicitud, setCargandoSolicitud] = useState(true);
   const [pdfDimensiones, setPdfDimensiones] = useState<{ width: number; height: number } | null>(null);
   const [mantenerOriginal, setMantenerOriginal] = useState(true);
+  const [incluirFirmaEmpresa, setIncluirFirmaEmpresa] = useState(false);
+  const [posicionesFirmaEmpresa, setPosicionesFirmaEmpresa] = useState<SignaturePosition[]>([]);
+  const [guardarFirmaEmpresa, setGuardarFirmaEmpresa] = useState(false);
+  const [firmaEmpresaGuardada, setFirmaEmpresaGuardada] = useState<string | null>(null);
+
+  const firmaEmpresaCanvasRef = useRef<SignatureCanvasHandle>(null);
+
+  // ID especial para la firma de empresa
+  const FIRMA_EMPRESA_ID = '__EMPRESA__';
 
   // Constantes para el tamaño del recuadro de firma
   const SIGNATURE_RECT_WIDTH = 180;
   const SIGNATURE_RECT_HEIGHT = 60;
+
+  // Verificar si hay firma de empresa disponible y cargarla
+  useEffect(() => {
+    fetch('/api/empresa/firma')
+      .then(async (res) => {
+        if (!res.ok) return null;
+        return parseJson<{ firmaGuardada?: boolean; firmaUrl?: string }>(res);
+      })
+      .then((data) => {
+        if (data?.firmaGuardada && data.firmaUrl) {
+          setFirmaEmpresaGuardada(data.firmaUrl);
+          setGuardarFirmaEmpresa(true); // Mantener activado el checkbox
+        }
+      })
+      .catch(() => {
+        // Silenciar error (puede ser que no sea HR admin)
+      });
+  }, []);
 
   // Cargar documento y sus detalles
   useEffect(() => {
@@ -109,27 +115,6 @@ export function SolicitarFirmaClient({ documentoId }: SolicitarFirmaClientProps)
         // Fallback a dimensiones A4 estándar
         setPdfDimensiones({ width: 595, height: 842 });
       });
-  }, [documentoId]);
-
-  // Cargar solicitud existente si ya hay una para este documento
-  useEffect(() => {
-    setCargandoSolicitud(true);
-    fetch(`/api/firma/solicitudes?documentoId=${documentoId}`)
-      .then(async (res) => {
-        if (!res.ok) {
-          throw new Error('Error al cargar solicitud');
-        }
-        return parseJson<{ solicitudes: SolicitudExistente[] }>(res);
-      })
-      .then((data) => {
-        if (data.solicitudes && data.solicitudes.length > 0) {
-          setSolicitudExistente(data.solicitudes[0]);
-        }
-      })
-      .catch(() => {
-        // Silenciar error - es normal que no exista solicitud aún
-      })
-      .finally(() => setCargandoSolicitud(false));
   }, [documentoId]);
 
   // Cargar empleados con acceso a la carpeta
@@ -195,34 +180,63 @@ export function SolicitarFirmaClient({ documentoId }: SolicitarFirmaClientProps)
 
   /**
    * Handler cuando se hace click en el documento para añadir firma
-   * Asigna la posición al firmante activo
+   * Asigna la posición al firmante activo o a la firma de empresa
    */
   const handleAddSignature = (position: SignaturePosition) => {
     if (!firmanteActivo) {
-      toast.error('Selecciona un firmante primero');
+      toast.error('Selecciona un firmante o la firma de empresa');
       return;
     }
-    setPosicionesPorFirmante((prev) => ({
-      ...prev,
-      [firmanteActivo]: [...(prev[firmanteActivo] || []), position],
-    }));
+
+    if (firmanteActivo === FIRMA_EMPRESA_ID) {
+      // Añadir posición para firma de empresa
+      setPosicionesFirmaEmpresa((prev) => [...prev, position]);
+    } else {
+      // Añadir posición para empleado
+      setPosicionesPorFirmante((prev) => ({
+        ...prev,
+        [firmanteActivo]: [...(prev[firmanteActivo] || []), position],
+      }));
+    }
   };
 
   /**
-   * Handler para eliminar una posición de firma del firmante activo
+   * Handler para eliminar una posición de firma del firmante activo o firma empresa
    */
   const handleRemoveSignature = (index: number) => {
     if (!firmanteActivo) return;
-    setPosicionesPorFirmante((prev) => ({
-      ...prev,
-      [firmanteActivo]: (prev[firmanteActivo] || []).filter((_, i) => i !== index),
-    }));
+
+    if (firmanteActivo === FIRMA_EMPRESA_ID) {
+      setPosicionesFirmaEmpresa((prev) => prev.filter((_, i) => i !== index));
+    } else {
+      setPosicionesPorFirmante((prev) => ({
+        ...prev,
+        [firmanteActivo]: (prev[firmanteActivo] || []).filter((_, i) => i !== index),
+      }));
+    }
   };
 
   const handleSubmit = async () => {
+    // Validar que haya al menos un empleado
     if (empleadosSeleccionados.length === 0) {
-      toast.error('Selecciona al menos un firmante');
+      toast.error('Selecciona al menos un empleado');
       return;
+    }
+
+    // Validar firma de empresa si está activada
+    if (incluirFirmaEmpresa) {
+      if (posicionesFirmaEmpresa.length === 0) {
+        toast.error('Coloca al menos una posición para la firma de empresa');
+        return;
+      }
+
+      if (!firmaEmpresaGuardada) {
+        const firmaDataURL = firmaEmpresaCanvasRef.current?.getDataURL();
+        if (!firmaDataURL) {
+          toast.error('Por favor dibuja la firma de empresa');
+          return;
+        }
+      }
     }
 
     setLoading(true);
@@ -254,18 +268,45 @@ export function SolicitarFirmaClient({ documentoId }: SolicitarFirmaClientProps)
         }
       }
 
+      // Convertir posiciones de firma de empresa a formato PDF
+      const posicionesFirmaEmpresaConvertidas = posicionesFirmaEmpresa.map(pos => ({
+        pagina: pos.page,
+        x: (pos.x / 100) * PDF_WIDTH,
+        y: PDF_HEIGHT - ((pos.y / 100) * PDF_HEIGHT) - ((pos.height / 100) * PDF_HEIGHT),
+        width: (pos.width / 100) * PDF_WIDTH,
+        height: (pos.height / 100) * PDF_HEIGHT,
+      }));
+
+      // Obtener firma de empresa si está activada
+      let firmaEmpresaDataURL: string | null = null;
+      if (incluirFirmaEmpresa) {
+        if (firmaEmpresaGuardada) {
+          firmaEmpresaDataURL = firmaEmpresaGuardada;
+        } else {
+          firmaEmpresaDataURL = firmaEmpresaCanvasRef.current?.getDataURL() || null;
+        }
+      }
+
       const resultados = await Promise.allSettled(
         empleadosSeleccionados.map(async (empleadoId) => {
           // Obtener posiciones convertidas de este firmante específico
           const posicionesFirmante = posicionesPorFirmanteConvertidas[empleadoId] || [];
 
-          const body = {
+          const body: any = {
             documentoId,
             firmantes: [{ empleadoId }], // Solo un firmante por solicitud
             ordenFirma: false,
             posicionesFirma: posicionesFirmante, // Array de posiciones
             mantenerOriginal, // Toggle para mantener o reemplazar el original
+            incluirFirmaEmpresa, // Toggle para incluir firma de empresa
           };
+
+          // Añadir firma de empresa si está activada
+          if (incluirFirmaEmpresa && firmaEmpresaDataURL) {
+            body.firmaEmpresaDataURL = firmaEmpresaDataURL;
+            body.guardarFirmaEmpresa = guardarFirmaEmpresa;
+            body.posicionesFirmaEmpresa = posicionesFirmaEmpresaConvertidas; // Posiciones específicas de firma empresa
+          }
 
           const res = await fetch('/api/firma/solicitudes', {
             method: 'POST',
@@ -292,13 +333,13 @@ export function SolicitarFirmaClient({ documentoId }: SolicitarFirmaClientProps)
           ? 'Solicitud de firma creada'
           : `${exitosas} solicitudes de firma creadas`;
         toast.success(mensaje);
-        router.back();
+        router.push(getPostFirmaRedirect());
       } else if (exitosas > 0) {
         // Parcialmente exitosas
         toast.warning(
           `${exitosas} solicitudes creadas correctamente, ${fallidas} fallaron. Revisa las solicitudes creadas.`
         );
-        router.back();
+        router.push(getPostFirmaRedirect());
       } else {
         // Todas fallaron
         throw new Error('No se pudo crear ninguna solicitud de firma');
@@ -319,7 +360,7 @@ export function SolicitarFirmaClient({ documentoId }: SolicitarFirmaClientProps)
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => router.back()}
+              onClick={() => router.push(getPostFirmaRedirect())}
             >
               <ArrowLeft className="w-4 h-4 mr-2" />
               Volver
@@ -356,7 +397,14 @@ export function SolicitarFirmaClient({ documentoId }: SolicitarFirmaClientProps)
         <div className="flex-1 bg-gray-100 relative">
           <PdfCanvasViewer
             pdfUrl={previewUrl}
-            signaturePositions={firmanteActivo ? (posicionesPorFirmante[firmanteActivo] || []) : []}
+            signaturePositions={
+              firmanteActivo === FIRMA_EMPRESA_ID
+                ? posicionesFirmaEmpresa
+                : firmanteActivo
+                  ? (posicionesPorFirmante[firmanteActivo] || [])
+                  : []
+            }
+            signatureBoxColor={firmanteActivo === FIRMA_EMPRESA_ID ? 'purple' : 'blue'}
             onDocumentClick={handleAddSignature}
             onRemovePosition={handleRemoveSignature}
             signatureBoxWidth={SIGNATURE_RECT_WIDTH}
@@ -364,67 +412,11 @@ export function SolicitarFirmaClient({ documentoId }: SolicitarFirmaClientProps)
           />
         </div>
 
-        {/* Columna derecha - Panel de firmantes o Monitoreo */}
+        {/* Columna derecha - Panel de firmantes */}
         <div className="w-96 bg-white border-l flex flex-col">
           <div className="flex-1 overflow-y-auto p-6 space-y-6">
-            {cargandoSolicitud ? (
-              <div className="flex items-center justify-center gap-2 py-8 text-sm text-gray-500">
-                <Spinner className="w-4 h-4" />
-                Cargando...
-              </div>
-            ) : solicitudExistente ? (
-              /* Monitoreo de Firmas */
-              <div>
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-lg font-semibold text-gray-900">Estado de Firmas</h2>
-                  <Badge variant={solicitudExistente.estado === 'completada' ? 'default' : 'secondary'}>
-                    {solicitudExistente.estado}
-                  </Badge>
-                </div>
-
-                <div className="space-y-3">
-                  {solicitudExistente.firmas && solicitudExistente.firmas.map((firma) => (
-                    <div
-                      key={firma.id}
-                      className="border rounded-lg p-3 bg-gray-50"
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-gray-900 truncate">
-                            {firma.empleado?.nombre} {firma.empleado?.apellidos}
-                          </p>
-                          <p className="text-xs text-gray-500 truncate">
-                            {firma.empleado?.email}
-                          </p>
-                          {firma.firmadoEn && (
-                            <p className="text-xs text-gray-400 mt-1">
-                              Firmado: {new Date(firma.firmadoEn).toLocaleDateString()}
-                            </p>
-                          )}
-                        </div>
-                        <div className="flex-shrink-0">
-                          {firma.firmado ? (
-                            <CheckCircle2 className="w-5 h-5 text-green-600" />
-                          ) : (
-                            <Clock className="w-5 h-5 text-amber-600" />
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                {solicitudExistente.estado !== 'completada' && (
-                  <div className="mt-6 pt-4 border-t">
-                    <p className="text-xs text-gray-500">
-                      La solicitud permanecerá activa hasta que todos los empleados firmen o sea marcada como completada.
-                    </p>
-                  </div>
-                )}
-              </div>
-            ) : (
-              /* Formulario de Solicitud */
-              <div>
+            {/* Formulario de Solicitud */}
+            <div>
                 <h2 className="text-lg font-semibold text-gray-900 mb-4">Firmantes</h2>
 
                 <div className="space-y-4">
@@ -457,13 +449,14 @@ export function SolicitarFirmaClient({ documentoId }: SolicitarFirmaClientProps)
                 </div>
 
                 {/* Selector de firmante activo */}
-                {empleadosSeleccionados.length > 0 && (
+                {(empleadosSeleccionados.length > 0 || incluirFirmaEmpresa) && (
                   <div className="border-t pt-4">
                     <Label className="mb-2 block">Asignar posiciones de firma</Label>
                     <p className="text-xs text-gray-500 mb-3">
                       Selecciona un firmante para asignarle posiciones en el documento.
                     </p>
                     <div className="flex flex-wrap gap-2 mb-4">
+                      {/* Botones de empleados */}
                       {empleadosSeleccionados.map((empId) => {
                         const empleado = empleados.find((e) => e.id === empId);
                         const numPosiciones = (posicionesPorFirmante[empId] || []).length;
@@ -498,7 +491,10 @@ export function SolicitarFirmaClient({ documentoId }: SolicitarFirmaClientProps)
                     </p>
 
                     {(() => {
-                      const posicionesActual = posicionesPorFirmante[firmanteActivo] || [];
+                      const posicionesActual = firmanteActivo === FIRMA_EMPRESA_ID
+                        ? posicionesFirmaEmpresa
+                        : (posicionesPorFirmante[firmanteActivo] || []);
+
                       return posicionesActual.length > 0 ? (
                         <div className="space-y-2">
                           <div className="flex items-center justify-between text-sm">
@@ -510,10 +506,14 @@ export function SolicitarFirmaClient({ documentoId }: SolicitarFirmaClientProps)
                               variant="ghost"
                               size="sm"
                               onClick={() => {
-                                setPosicionesPorFirmante((prev) => ({
-                                  ...prev,
-                                  [firmanteActivo]: [],
-                                }));
+                                if (firmanteActivo === FIRMA_EMPRESA_ID) {
+                                  setPosicionesFirmaEmpresa([]);
+                                } else {
+                                  setPosicionesPorFirmante((prev) => ({
+                                    ...prev,
+                                    [firmanteActivo]: [],
+                                  }));
+                                }
                               }}
                             >
                               <X className="w-3 h-3 mr-1" />
@@ -554,14 +554,25 @@ export function SolicitarFirmaClient({ documentoId }: SolicitarFirmaClientProps)
                 {/* Toggle para mantener original */}
                 <div className="border-t pt-4">
                   <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label htmlFor="mantener-original" className="text-sm font-medium">
-                        Mantener documento original
-                      </Label>
-                      <p className="text-xs text-gray-500">
-                        Si está activado, se crearán copias individuales del documento firmado para cada empleado.
-                        Si está desactivado, el documento original será reemplazado con la versión firmada.
-                      </p>
+                    <div className="space-y-0.5 flex-1">
+                      <div className="flex items-center gap-2">
+                        <Label htmlFor="mantener-original" className="text-sm font-medium">
+                          Mantener documento original
+                        </Label>
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Info className="w-4 h-4 text-gray-400 cursor-help" />
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-xs">
+                              <p className="text-xs">
+                                Si está activado, se crearán copias individuales del documento firmado para cada empleado.
+                                Si está desactivado, el documento original será reemplazado con la versión firmada.
+                              </p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </div>
                     </div>
                     <Switch
                       id="mantener-original"
@@ -570,10 +581,166 @@ export function SolicitarFirmaClient({ documentoId }: SolicitarFirmaClientProps)
                       disabled={loading}
                     />
                   </div>
+
+                  {/* Sección de firma de empresa */}
+                  <div className="mt-4 pt-4 border-t">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="space-y-0.5 flex-1">
+                        <div className="flex items-center gap-2">
+                          <Label htmlFor="incluir-firma-empresa" className="text-sm font-medium">
+                            Añadir firma de empresa
+                          </Label>
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Info className="w-4 h-4 text-gray-400 cursor-help" />
+                              </TooltipTrigger>
+                              <TooltipContent className="max-w-xs">
+                                <p className="text-xs">
+                                  La firma de la empresa se añadirá al documento ANTES de enviarlo a los empleados.
+                                  Los empleados verán el documento con la firma de la empresa ya aplicada.
+                                </p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        </div>
+                      </div>
+                      <Switch
+                        id="incluir-firma-empresa"
+                        checked={incluirFirmaEmpresa}
+                        onCheckedChange={(checked) => {
+                          setIncluirFirmaEmpresa(checked);
+                          // Si se desactiva, limpiar posiciones y firma
+                          if (!checked) {
+                            setPosicionesFirmaEmpresa([]);
+                            if (firmanteActivo === FIRMA_EMPRESA_ID) {
+                              setFirmanteActivo(null);
+                            }
+                          }
+                        }}
+                        disabled={loading}
+                      />
+                    </div>
+
+                    {/* Sección de asignación de posiciones de firma empresa */}
+                    {incluirFirmaEmpresa && (
+                      <div className="mt-3 p-3 border border-purple-200 rounded-md bg-purple-50/50">
+                        <Label className="text-sm font-medium mb-2 block text-purple-900">
+                          Asignar posiciones de firma de empresa
+                        </Label>
+                        <p className="text-xs text-purple-700 mb-3">
+                          Haz clic en el botón "Firma Empresa" y luego haz clic en el documento para colocar las posiciones.
+                        </p>
+
+                        {/* Botón para activar modo firma empresa */}
+                        <div className="mb-3">
+                          <Button
+                            type="button"
+                            variant={firmanteActivo === FIRMA_EMPRESA_ID ? 'default' : 'outline'}
+                            size="sm"
+                            onClick={() => setFirmanteActivo(FIRMA_EMPRESA_ID)}
+                            className="border-purple-300 text-purple-700 hover:bg-purple-50 data-[state=active]:bg-purple-600 data-[state=active]:text-white"
+                          >
+                            Firma Empresa
+                            {posicionesFirmaEmpresa.length > 0 && (
+                              <span className="ml-1.5 px-1.5 py-0.5 text-xs bg-purple-100 text-purple-700 rounded-full">
+                                {posicionesFirmaEmpresa.length}
+                              </span>
+                            )}
+                          </Button>
+                        </div>
+
+                        {/* Lista de posiciones colocadas */}
+                        {posicionesFirmaEmpresa.length > 0 && (
+                          <div className="space-y-2">
+                            <p className="text-xs font-medium text-purple-800">
+                              Posiciones colocadas:
+                            </p>
+                            <div className="space-y-1">
+                              {posicionesFirmaEmpresa.map((pos, index) => (
+                                <div
+                                  key={index}
+                                  className="flex items-center justify-between text-xs bg-white rounded px-2 py-1.5 border border-purple-200"
+                                >
+                                  <span className="text-purple-700">
+                                    Posición {index + 1} (Página {pos.page})
+                                  </span>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-5 w-5 p-0 text-purple-600 hover:text-purple-800"
+                                    onClick={() => {
+                                      setPosicionesFirmaEmpresa((prev) => prev.filter((_, i) => i !== index));
+                                    }}
+                                  >
+                                    <X className="w-3 h-3" />
+                                  </Button>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Canvas de firma de empresa cuando hay posiciones colocadas */}
+                    {incluirFirmaEmpresa && posicionesFirmaEmpresa.length > 0 && (
+                      <div className="space-y-3 mt-3">
+                        <div className="p-3 bg-white border rounded-md">
+                          <Label className="text-sm font-medium mb-2 block">Dibuja la firma de la empresa</Label>
+                          <p className="text-xs text-gray-500 mb-3">
+                            Esta firma aparecerá en {posicionesFirmaEmpresa.length} posición{posicionesFirmaEmpresa.length === 1 ? '' : 'es'} del documento.
+                          </p>
+
+                          {firmaEmpresaGuardada ? (
+                            <div className="space-y-2">
+                              <div className="flex items-center justify-between p-2 bg-green-50 border border-green-200 rounded">
+                                <span className="text-xs text-green-700">Firma guardada disponible</span>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => {
+                                    setFirmaEmpresaGuardada(null);
+                                    firmaEmpresaCanvasRef.current?.clear();
+                                  }}
+                                  className="h-6 text-xs"
+                                >
+                                  Cambiar firma
+                                </Button>
+                              </div>
+                              <img
+                                src={firmaEmpresaGuardada}
+                                alt="Firma de empresa guardada"
+                                className="border rounded p-2 bg-white max-h-20 mx-auto"
+                              />
+                            </div>
+                          ) : (
+                            <SignatureCanvas ref={firmaEmpresaCanvasRef} className="w-full" />
+                          )}
+                        </div>
+
+                        <div className="flex items-center space-x-2">
+                          <Checkbox
+                            id="guardar-firma-empresa"
+                            checked={guardarFirmaEmpresa}
+                            onCheckedChange={(checked) => setGuardarFirmaEmpresa(Boolean(checked))}
+                            disabled={loading}
+                          />
+                          <Label
+                            htmlFor="guardar-firma-empresa"
+                            className="text-sm font-normal cursor-pointer"
+                          >
+                            Guardar como firma predeterminada de la empresa
+                          </Label>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
                 </div>
               </div>
-            )}
           </div>
         </div>
       </div>

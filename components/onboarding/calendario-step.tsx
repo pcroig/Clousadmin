@@ -4,10 +4,11 @@
 // Calendario Laboral Step - Onboarding
 // ========================================
 
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useState } from 'react';
 import { toast } from 'sonner';
 
 import { CalendarioFestivos, CalendarioFestivosLegend } from '@/components/hr/calendario-festivos';
+import { ImportarFestivosModal } from '@/components/hr/importar-festivos-modal';
 import { ListaFestivos } from '@/components/hr/lista-festivos';
 import { Button } from '@/components/ui/button';
 import { Field, FieldLabel } from '@/components/ui/field';
@@ -39,11 +40,10 @@ export const CalendarioStep = forwardRef<CalendarioStepHandle, CalendarioStepPro
   const [festivosView, setFestivosView] = useState<'calendario' | 'lista'>('lista');
   const [festivoEditor, setFestivoEditor] = useState<FestivoEditorState | null>(null);
   const [festivosRefreshKey, setFestivosRefreshKey] = useState(0);
-  const [processingFestivos, setProcessingFestivos] = useState(false);
   const [_saving, _setSaving] = useState(false);
   const [importandoNacionales, setImportandoNacionales] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const nacionalesImportadosRef = useRef(false);
+  const [importarModalOpen, setImportarModalOpen] = useState(false);
+  const [añoSeleccionadoImportar, setAñoSeleccionadoImportar] = useState<number>();
 
   const cargarDatos = useCallback(async () => {
     try {
@@ -74,9 +74,10 @@ export const CalendarioStep = forwardRef<CalendarioStepHandle, CalendarioStepPro
   }, [cargarDatos]);
 
   useEffect(() => {
+    let importado = false;
     async function ensureFestivosNacionales() {
-      if (nacionalesImportadosRef.current) return;
-      nacionalesImportadosRef.current = true;
+      if (importado) return;
+      importado = true;
       setImportandoNacionales(true);
       try {
         const response = await fetch('/api/festivos/importar-nacionales', {
@@ -87,11 +88,9 @@ export const CalendarioStep = forwardRef<CalendarioStepHandle, CalendarioStepPro
           setFestivosRefreshKey((prev) => prev + 1);
         } else {
           console.warn('[CalendarioStep] No se pudieron importar los festivos nacionales por defecto.');
-          nacionalesImportadosRef.current = false;
         }
       } catch (error) {
         console.error('Error importando festivos nacionales por defecto:', error);
-        nacionalesImportadosRef.current = false;
       } finally {
         setImportandoNacionales(false);
       }
@@ -118,37 +117,15 @@ export const CalendarioStep = forwardRef<CalendarioStepHandle, CalendarioStepPro
 
   const handleCloseEditor = () => setFestivoEditor(null);
 
-  async function handleArchivoFestivosChange(event: React.ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    if (!file) return;
+  const handleImportSuccess = async () => {
+    await cargarDatos();
+    setFestivosRefreshKey((prev) => prev + 1);
+  };
 
-    setProcessingFestivos(true);
-    try {
-      const formData = new FormData();
-      formData.append('file', file);
-
-      const response = await fetch('/api/festivos/importar', {
-        method: 'POST',
-        body: formData,
-      });
-
-      const data = await parseJson<{ message?: string; error?: string }>(response).catch(() => null);
-
-      if (response.ok) {
-        toast.success(data?.message || 'Calendario importado correctamente');
-        await cargarDatos();
-        setFestivosRefreshKey((prev) => prev + 1);
-      } else {
-        toast.error(data?.error || 'Error al importar calendario');
-      }
-    } catch (error) {
-      console.error('Error importando calendario:', error);
-      toast.error('Error al importar calendario');
-    } finally {
-      setProcessingFestivos(false);
-      event.target.value = '';
-    }
-  }
+  const handleOpenImportarModal = (año?: number) => {
+    setAñoSeleccionadoImportar(año);
+    setImportarModalOpen(true);
+  };
 
   const guardar = async (): Promise<boolean> => {
     _setSaving(true);
@@ -277,28 +254,18 @@ export const CalendarioStep = forwardRef<CalendarioStepHandle, CalendarioStepPro
                 size="sm"
                 variant="outline"
                 onClick={() => handleCreateFestivoInline()}
-                disabled={processingFestivos}
               >
                 Añadir festivo
               </Button>
               <Button
                 size="sm"
                 variant="outline"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={processingFestivos}
+                onClick={() => handleOpenImportarModal()}
               >
-                {processingFestivos ? 'Importando...' : 'Importar'}
+                Importar
               </Button>
             </div>
           </div>
-
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".ics,.csv"
-            className="hidden"
-            onChange={handleArchivoFestivosChange}
-          />
 
           <TabsContent value="calendario" className="space-y-4">
             <CalendarioFestivosLegend />
@@ -322,10 +289,19 @@ export const CalendarioStep = forwardRef<CalendarioStepHandle, CalendarioStepPro
               onCreateRequest={() => handleCreateFestivoInline()}
               onEditRequest={handleEditFestivoInline}
               showCreateButton={false}
+              onImportRequest={(año) => handleOpenImportarModal(año)}
             />
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Modal de importar festivos */}
+      <ImportarFestivosModal
+        open={importarModalOpen}
+        onClose={() => setImportarModalOpen(false)}
+        onSuccess={handleImportSuccess}
+        añoSeleccionado={añoSeleccionadoImportar}
+      />
     </div>
   );
 });

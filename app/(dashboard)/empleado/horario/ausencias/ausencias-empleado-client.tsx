@@ -280,12 +280,12 @@ export function AusenciasEmpleadoClient({ saldo, campanas = [] }: Props) {
                           variant="ghost"
                           size="sm"
                           className="px-0 text-primary flex items-center gap-1"
-                          asChild
+                          onClick={() =>
+                            window.open(`/api/ausencias/${ausencia.id}/justificante?inline=1`, '_blank', 'noopener,noreferrer')
+                          }
                         >
-                          <a href={ausencia.justificanteUrl} target="_blank" rel="noopener noreferrer">
-                            <Paperclip className="h-4 w-4" />
-                            Ver
-                          </a>
+                          <Paperclip className="h-4 w-4" />
+                          Ver
                         </Button>
                       ) : (
                         <span className="text-gray-500 text-sm">-</span>

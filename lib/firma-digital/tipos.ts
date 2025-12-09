@@ -66,6 +66,12 @@ export interface CrearSolicitudFirmaInput {
   posicionFirma?: PosicionFirmaConMetadata | PosicionFirma;
   /** Si true, mantiene el documento original intacto. Si false, lo reemplaza con la versión firmada */
   mantenerOriginal?: boolean;
+  /** Si true, incluye la firma de empresa automáticamente al completar todas las firmas */
+  incluirFirmaEmpresa?: boolean;
+  /** Array de posiciones específicas donde colocar la firma de empresa */
+  posicionesFirmaEmpresa?: PosicionFirma[];
+  /** S3 key de la firma de empresa para esta solicitud específica */
+  firmaEmpresaSolicitudS3Key?: string;
 }
 
 /**

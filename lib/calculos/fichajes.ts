@@ -9,6 +9,8 @@ import {
   fichajes as Fichaje,
   fichaje_eventos as FichajeEvento,
   EstadoFichaje as PrismaEstadoFichaje,
+  Prisma,
+  PrismaClient,
 } from '@prisma/client';
 
 import {
@@ -804,8 +806,13 @@ export async function obtenerHorasEsperadasBatch(
  * Actualiza los cálculos agregados del fichaje (horas trabajadas y en pausa)
  * Se llama después de crear/editar un evento
  */
-export async function actualizarCalculosFichaje(fichajeId: string): Promise<void> {
-  const fichaje = await prisma.fichajes.findUnique({
+export async function actualizarCalculosFichaje(
+  fichajeId: string,
+  prismaClient?: PrismaClient | Prisma.TransactionClient
+): Promise<void> {
+  const client = prismaClient ?? prisma;
+
+  const fichaje = await client.fichajes.findUnique({
     where: { id: fichajeId },
     include: {
       eventos: {
@@ -823,8 +830,8 @@ export async function actualizarCalculosFichaje(fichajeId: string): Promise<void
   const horasTrabajadas = calcularHorasTrabajadas(fichaje.eventos) ?? 0;
   const horasEnPausa = calcularTiempoEnPausa(fichaje.eventos);
 
-  await prisma.fichajes.update({
-    where: { id: fichajeId },
+  await client.fichajes.update({
+    where: { id: fichaje.id },
     data: {
       horasTrabajadas,
       horasEnPausa,
@@ -1404,5 +1411,106 @@ export async function validarFichajeCompleto(
     eventosRequeridos,
     eventosFaltantes,
     razon: completo ? undefined : `Faltan eventos: ${eventosFaltantes.join(', ')}`,
+  };
+}
+
+/**
+ * Resultado de validación de descanso antes de salida
+ */
+export interface ValidacionDescanso {
+  requiereDescanso: boolean;
+  descansoCompleto: boolean;
+  tienePausaInicio: boolean;
+  tienePausaFin: boolean;
+  debeConfirmar: boolean; // true si debe mostrar dialog de confirmación
+}
+
+/**
+ * Valida si el empleado puede finalizar su jornada considerando los descansos
+ * Retorna información sobre si requiere descanso y si está completo
+ *
+ * Se usa ANTES de crear el evento de salida para validar si se debe mostrar
+ * el dialog de confirmación/edición al empleado
+ */
+export async function validarDescansoAntesDeSalida(
+  empleadoId: string,
+  fecha: Date
+): Promise<ValidacionDescanso> {
+  const fechaSinHora = normalizarFechaSinHora(fecha);
+
+  // Obtener fichaje del día
+  const fichaje = await prisma.fichajes.findUnique({
+    where: {
+      empleadoId_fecha: { empleadoId, fecha: fechaSinHora },
+    },
+    include: {
+      empleado: {
+        include: {
+          jornada: true,
+        },
+      },
+      eventos: {
+        orderBy: {
+          hora: 'asc',
+        },
+      },
+    },
+  });
+
+  // Sin fichaje o sin jornada: no requiere descanso
+  if (!fichaje || !fichaje.empleado.jornada) {
+    return {
+      requiereDescanso: false,
+      descansoCompleto: true,
+      tienePausaInicio: false,
+      tienePausaFin: false,
+      debeConfirmar: false,
+    };
+  }
+
+  const jornada = fichaje.empleado.jornada;
+  const config = jornada.config as JornadaConfig;
+  const nombreDia = obtenerNombreDia(fechaSinHora);
+  const configDia = config[nombreDia] as DiaConfig | undefined;
+
+  // Obtener información de ausencia de medio día
+  const ausenciaMedioDia = await obtenerAusenciaMedioDia(empleadoId, fechaSinHora);
+
+  let requiereDescanso = false;
+
+  // JORNADA FIJA: requiere pausa si está configurada
+  if (config.tipo === 'fija' || (configDia && configDia.entrada && configDia.salida)) {
+    if (configDia && configDia.activo !== false && configDia.pausa_inicio && configDia.pausa_fin && !ausenciaMedioDia.tieneAusencia) {
+      requiereDescanso = true;
+    }
+  }
+  // JORNADA FLEXIBLE: requiere pausa si hay descansoMinimo configurado
+  else if (config.tipo === 'flexible') {
+    if (configDia && configDia.activo !== false && config.descansoMinimo && !ausenciaMedioDia.tieneAusencia) {
+      requiereDescanso = true;
+    }
+  }
+
+  // Verificar eventos de pausa existentes
+  const tiposEventosExistentes = fichaje.eventos.map((e) => e.tipo);
+  const tienePausaInicio = tiposEventosExistentes.includes('pausa_inicio');
+  const tienePausaFin = tiposEventosExistentes.includes('pausa_fin');
+
+  // Descanso está completo si:
+  // 1. No requiere descanso, O
+  // 2. Tiene pausa_inicio Y pausa_fin
+  const descansoCompleto = !requiereDescanso || (tienePausaInicio && tienePausaFin);
+
+  // Debe confirmar si:
+  // 1. Requiere descanso, Y
+  // 2. El descanso NO está completo (falta pausa_inicio, pausa_fin, o ambos)
+  const debeConfirmar = requiereDescanso && !descansoCompleto;
+
+  return {
+    requiereDescanso,
+    descansoCompleto,
+    tienePausaInicio,
+    tienePausaFin,
+    debeConfirmar,
   };
 }

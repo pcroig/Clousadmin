@@ -11,9 +11,10 @@ import { getSession } from '@/lib/auth';
 import { NOMINA_ESTADOS } from '@/lib/constants/nomina-estados';
 import { prisma } from '@/lib/prisma';
 import { getJsonBody } from '@/lib/utils/json';
+import { idSchema } from '@/lib/validaciones/schemas';
 
 const AsignarComplementoSchema = z.object({
-  empleadoComplementoId: z.string().uuid(),
+  empleadoComplementoId: idSchema,
   importe: z.number().positive(),
   notas: z.string().optional(),
 });

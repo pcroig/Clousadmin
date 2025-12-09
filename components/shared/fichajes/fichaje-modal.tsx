@@ -250,12 +250,14 @@ export function FichajeModal({
       return;
     }
 
+    // Validar que no sea una fecha futura (permitir hoy, bloquear mañana+)
     const fechaSeleccionada = new Date(fecha);
     const hoy = new Date();
-    hoy.setHours(23, 59, 59, 999);
+    fechaSeleccionada.setHours(0, 0, 0, 0);
+    hoy.setHours(0, 0, 0, 0);
 
     if (fechaSeleccionada > hoy) {
-      toast.error('Solo puedes registrar fichajes hasta el día actual');
+      toast.error('No puedes registrar fichajes en fechas futuras');
       return;
     }
 
@@ -264,7 +266,7 @@ export function FichajeModal({
         toast.error('Todos los eventos deben tener una hora');
         return;
       }
-      
+
       const fechaHora = new Date(`${fecha}T${ev.hora}:00`);
       if (fechaHora > new Date()) {
         toast.error('No puedes registrar eventos en el futuro');
@@ -319,6 +321,7 @@ export function FichajeModal({
           tipo: ev.tipo,
           hora: new Date(`${fecha}T${ev.hora}:00`).toISOString(),
           motivoEdicion: motivo || undefined,
+          esEdicionManual: true, // Marcar como edición manual (no fichaje en tiempo real)
         }),
       });
     }
@@ -394,7 +397,7 @@ export function FichajeModal({
 
       // Añadir el resto de eventos (o todos si ya existía el fichaje)
       const eventosParaAñadir = fichajeId && fichajes.length > 0 ? eventos : eventos.slice(1);
-      
+
       for (const ev of eventosParaAñadir) {
         await fetch('/api/fichajes/eventos', {
           method: 'POST',
@@ -404,6 +407,7 @@ export function FichajeModal({
             tipo: ev.tipo,
             hora: new Date(`${fecha}T${ev.hora}:00`).toISOString(),
             motivoEdicion: motivo || undefined,
+            esEdicionManual: true, // Marcar como edición manual (no fichaje en tiempo real)
           }),
         });
       }
@@ -595,13 +599,6 @@ export function FichajeModal({
               className="bg-white"
             />
           </Field>
-
-          {/* Nota informativa para solicitudes (empleado) */}
-          {!operaDirecto && (
-            <div className="bg-blue-50 p-3 rounded-md text-xs text-blue-700 mt-2">
-              <strong>Nota:</strong> Si tu solicitud es rechazada por un administrador, quedará registrada permanentemente como una <strong>discrepancia</strong> en tu historial de fichajes.
-            </div>
-          )}
         </div>
         </DialogBody>
 

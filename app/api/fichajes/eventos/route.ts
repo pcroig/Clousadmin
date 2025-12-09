@@ -16,12 +16,14 @@ import {
 import { calcularHorasTrabajadas, calcularTiempoEnPausa } from '@/lib/calculos/fichajes';
 import { crearNotificacionFichajeModificado } from '@/lib/notificaciones';
 import { prisma } from '@/lib/prisma';
+import { idSchema, optionalIdSchema } from '@/lib/validaciones/schemas';
 
 const fichajeEventoSchema = z.object({
-  fichajeId: z.string().uuid(),
+  fichajeId: idSchema,
   tipo: z.enum(['entrada', 'pausa_inicio', 'pausa_fin', 'salida']),
   hora: z.string(),
   motivoEdicion: z.string().optional(),
+  esEdicionManual: z.boolean().optional().default(false), // true si viene del modal de edición
 });
 
 // POST /api/fichajes/eventos - Crear evento de fichaje
@@ -37,7 +39,7 @@ export async function POST(req: NextRequest) {
     if (isNextResponse(validationResult)) return validationResult;
     const { data: validatedData } = validationResult;
 
-    const { fichajeId, tipo, hora, motivoEdicion } = validatedData;
+    const { fichajeId, tipo, hora, motivoEdicion, esEdicionManual } = validatedData;
 
     // Verificar que el fichaje existe y pertenece a la empresa
     const fichaje = await prisma.fichajes.findFirst({
@@ -54,12 +56,17 @@ export async function POST(req: NextRequest) {
       return notFoundResponse('Fichaje no encontrado');
     }
 
+    // CRÍTICO: Marcar como editado si:
+    // 1. Es edición manual (desde modal de edición), O
+    // 2. Tiene motivo de edición
+    const esEditado = esEdicionManual || Boolean(motivoEdicion);
+
     const evento = await prisma.fichaje_eventos.create({
       data: {
         fichajeId,
         tipo,
         hora: new Date(hora),
-        editado: Boolean(motivoEdicion),
+        editado: esEditado,
         motivoEdicion: motivoEdicion || null,
       },
     });

@@ -17,9 +17,10 @@ import {
 import { UsuarioRol } from '@/lib/constants/enums';
 import { crearNotificacionFichajeRequiereRevision } from '@/lib/notificaciones';
 import { prisma, Prisma } from '@/lib/prisma';
+import { idSchema } from '@/lib/validaciones/schemas';
 
 const crearCorreccionSchema = z.object({
-  fichajeId: z.string().uuid(),
+  fichajeId: idSchema,
   motivo: z.string().min(10, 'Explica brevemente el motivo de la corrección'),
   nuevaFecha: z.string().optional(),
   nuevaHora: z.string().optional(),

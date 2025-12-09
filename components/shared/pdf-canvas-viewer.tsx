@@ -51,11 +51,14 @@ interface PdfCanvasViewerProps {
   onRemovePosition?: (index: number) => void;
   /** Si true, solo muestra las posiciones sin permitir interacción */
   readOnly?: boolean;
+  /** Color del borde y fondo del cuadro de firma (blue, purple, etc.) - default: blue */
+  signatureBoxColor?: 'blue' | 'purple';
 }
 
 export function PdfCanvasViewer({
   pdfUrl,
   signaturePositions = [],
+  signatureBoxColor = 'blue',
   onDocumentClick,
   signatureBoxWidth = 180,
   signatureBoxHeight = 60,
@@ -195,10 +198,14 @@ export function PdfCanvasViewer({
                   // Solo renderizar firmas de la página actual
                   if (pos.page !== pageNumber) return null;
 
+                  const colorClasses = signatureBoxColor === 'purple'
+                    ? 'border-purple-500 bg-purple-500/10 text-purple-700'
+                    : 'border-blue-500 bg-blue-500/10 text-blue-700';
+
                   return (
                     <div
                       key={`sig_${globalIndex}`}
-                      className="absolute border-2 border-blue-500 bg-blue-500/10 backdrop-blur-sm rounded group pointer-events-none"
+                      className={`absolute border-2 ${colorClasses} backdrop-blur-sm rounded group pointer-events-none`}
                       style={{
                         left: `${pos.x}%`,
                         top: `${pos.y}%`,
@@ -206,7 +213,7 @@ export function PdfCanvasViewer({
                         height: `${pos.height}%`,
                       }}
                     >
-                      <div className="absolute inset-0 flex items-center justify-center text-xs text-blue-700 font-medium">
+                      <div className={`absolute inset-0 flex items-center justify-center text-xs font-medium ${signatureBoxColor === 'purple' ? 'text-purple-700' : 'text-blue-700'}`}>
                         Firma {globalIndex + 1}
                       </div>
                       {onRemovePosition && !readOnly && (

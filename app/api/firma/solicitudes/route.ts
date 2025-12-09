@@ -324,6 +324,65 @@ export async function POST(request: NextRequest) {
     const recordatorioAutomatico = typeof body.recordatorioAutomatico === 'boolean' ? body.recordatorioAutomatico : true;
     const diasRecordatorio = typeof body.diasRecordatorio === 'number' ? body.diasRecordatorio : 3;
     const mantenerOriginal = typeof body.mantenerOriginal === 'boolean' ? body.mantenerOriginal : true;
+    const incluirFirmaEmpresa = typeof body.incluirFirmaEmpresa === 'boolean' ? body.incluirFirmaEmpresa : true;
+    const firmaEmpresaDataURL = typeof body.firmaEmpresaDataURL === 'string' ? body.firmaEmpresaDataURL : undefined;
+    const guardarFirmaEmpresa = typeof body.guardarFirmaEmpresa === 'boolean' ? body.guardarFirmaEmpresa : false;
+
+    // Procesar posiciones de firma de empresa (array de posiciones específicas)
+    let posicionesFirmaEmpresa: Array<{ pagina: number; x: number; y: number; width?: number; height?: number }> | undefined;
+    if (Array.isArray(body.posicionesFirmaEmpresa) && body.posicionesFirmaEmpresa.length > 0) {
+      posicionesFirmaEmpresa = body.posicionesFirmaEmpresa.map((pos: any) => {
+        if (!pos || typeof pos !== 'object') return null;
+
+        const pagina = typeof pos.pagina === 'number' ? pos.pagina : -1;
+        const x = typeof pos.x === 'number' ? pos.x : 0;
+        const y = typeof pos.y === 'number' ? pos.y : 0;
+        const width = typeof pos.width === 'number' ? pos.width : undefined;
+        const height = typeof pos.height === 'number' ? pos.height : undefined;
+
+        return { pagina, x, y, width, height };
+      }).filter((p): p is NonNullable<typeof p> => p !== null);
+    }
+
+    // Guardar firma de empresa si se proporcionó
+    let firmaEmpresaSolicitudS3Key: string | undefined;
+    if (incluirFirmaEmpresa && firmaEmpresaDataURL) {
+      try {
+        // Convertir data URL a buffer
+        const base64Data = firmaEmpresaDataURL.replace(/^data:image\/\w+;base64,/, '');
+        const buffer = Buffer.from(base64Data, 'base64');
+
+        const { uploadToS3 } = await import('@/lib/s3');
+
+        // SIEMPRE guardar firma para esta solicitud específica
+        const solicitudS3Key = `firmas/${session.user.empresaId}/solicitud/${Date.now()}-empresa.png`;
+        await uploadToS3(buffer, solicitudS3Key, 'image/png');
+        firmaEmpresaSolicitudS3Key = solicitudS3Key;
+        console.log('[POST /api/firma/solicitudes] Firma de empresa para solicitud guardada:', solicitudS3Key);
+
+        // OPCIONALMENTE guardar como firma predeterminada de la empresa
+        if (guardarFirmaEmpresa) {
+          const empresaS3Key = `firmas/${session.user.empresaId}/empresa/firma.png`;
+          await uploadToS3(buffer, empresaS3Key, 'image/png');
+
+          // Actualizar empresa
+          const { prisma } = await import('@/lib/prisma');
+          await prisma.empresas.update({
+            where: { id: session.user.empresaId },
+            data: {
+              firmaEmpresaGuardada: true,
+              firmaEmpresaS3Key: empresaS3Key,
+              firmaEmpresaGuardadaEn: new Date(),
+            },
+          });
+
+          console.log('[POST /api/firma/solicitudes] Firma de empresa guardada como predeterminada:', empresaS3Key);
+        }
+      } catch (error) {
+        console.error('[POST /api/firma/solicitudes] Error guardando firma de empresa:', error);
+        // No fallar la solicitud si falla el guardado de la firma
+      }
+    }
 
     const input: CrearSolicitudFirmaInput = {
       documentoId,
@@ -339,6 +398,9 @@ export async function POST(request: NextRequest) {
       posicionesFirma, // Array de posiciones (nuevo formato)
       posicionFirma,   // Single position (legacy/V2 con porcentajes)
       mantenerOriginal, // CRÍTICO: Toggle para mantener/reemplazar original
+      incluirFirmaEmpresa, // Toggle para incluir firma de empresa
+      posicionesFirmaEmpresa, // Array de posiciones específicas para firma de empresa
+      firmaEmpresaSolicitudS3Key, // S3 key de firma empresa para esta solicitud
     };
 
     // Crear solicitud

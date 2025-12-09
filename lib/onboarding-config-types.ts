@@ -1,10 +1,86 @@
 // ========================================
-// Onboarding Config Types - Solo tipos e interfaces
+// Onboarding Config Types - Sistema de Workflow
 // ========================================
-// Archivo separado para evitar imports de Prisma en el cliente
+// Nuevas interfaces para el sistema de onboarding basado en workflows configurables
+
+// ===================
+// NUEVAS INTERFACES (Sistema de Workflow)
+// ===================
 
 /**
- * Configuración de campos requeridos
+ * Tipo de acción en el workflow
+ */
+export type TipoAccion = 'rellenar_campos' | 'compartir_docs' | 'solicitar_docs' | 'solicitar_firma';
+
+/**
+ * Acción del workflow de onboarding
+ */
+export interface WorkflowAccion {
+  id: string; // cuid
+  orden: number;
+  tipo: TipoAccion;
+  titulo: string;
+  activo: boolean;
+  config: RellenarCamposConfig | CompartirDocsConfig | SolicitarDocsConfig | SolicitarFirmaConfig;
+}
+
+/**
+ * Configuración para acción tipo "rellenar_campos"
+ */
+export interface RellenarCamposConfig {
+  campos: string[]; // IDs de campos: 'nif', 'nss', 'fechaNacimiento', 'telefono', 'iban', 'bic', etc.
+}
+
+/**
+ * Configuración para acción tipo "compartir_docs"
+ */
+export interface CompartirDocsConfig {
+  documentoIds: string[]; // IDs de documentos existentes a compartir
+  carpetaId?: string; // Carpeta desde donde compartir (opcional)
+}
+
+/**
+ * Documento requerido en acción "solicitar_docs"
+ */
+export interface DocumentoRequeridoSolicitar {
+  id: string;
+  nombre: string;
+  requerido: boolean;
+  carpetaDestinoId: string; // Carpeta personal del empleado donde se subirá
+}
+
+/**
+ * Configuración para acción tipo "solicitar_docs"
+ */
+export interface SolicitarDocsConfig {
+  documentosRequeridos: DocumentoRequeridoSolicitar[];
+}
+
+/**
+ * Documento para firma en acción "solicitar_firma"
+ */
+export interface DocumentoFirma {
+  id: string;
+  nombre: string;
+  tipo: 'sincrono' | 'asincrono'; // Síncrono: documento ya existe / Asíncrono: se subirá después
+  documentoId?: string; // Solo para tipo 'sincrono': documento ya subido
+  requiereAccionesAntes: string[]; // IDs de acciones que deben completarse antes
+}
+
+/**
+ * Configuración para acción tipo "solicitar_firma"
+ */
+export interface SolicitarFirmaConfig {
+  documentosFirma: DocumentoFirma[];
+}
+
+// ===================
+// DEPRECATED (Sistema Antiguo - Mantener temporalmente)
+// ===================
+
+/**
+ * @deprecated Usar WorkflowAccion en su lugar
+ * Configuración de campos requeridos (sistema antiguo)
  */
 export interface CamposRequeridos {
   datos_personales: {
@@ -27,7 +103,8 @@ export interface CamposRequeridos {
 }
 
 /**
- * Documento requerido
+ * @deprecated Usar WorkflowAccion con tipo 'solicitar_docs' o 'compartir_docs'
+ * Documento requerido (sistema antiguo)
  */
 export interface DocumentoRequerido {
   id: string;
@@ -37,17 +114,16 @@ export interface DocumentoRequerido {
   requiereVisualizacion: boolean;
   requiereFirma: boolean;
   carpetaDestino?: string | null;
-  esAsincronico?: boolean; // Para firmas asíncronas
-  asignadoA?: 'todos' | 'equipos'; // Alcance del documento
-  equipoIds?: string[]; // IDs de equipos si asignadoA='equipos'
-  
-  // Nuevos campos para diferenciar tipos de documentos
-  tipo?: 'visualizar' | 'solicitar' | 'firma'; // Tipo de documento
-  documentoId?: string; // ID del documento existente (solo para tipo 'visualizar')
+  esAsincronico?: boolean;
+  asignadoA?: 'todos' | 'equipos';
+  equipoIds?: string[];
+  tipo?: 'visualizar' | 'solicitar' | 'firma';
+  documentoId?: string;
 }
 
 /**
- * Plantilla de documento
+ * @deprecated Mantener para backward compatibility
+ * Plantilla de documento (sistema antiguo)
  */
 export interface PlantillaDocumento {
   id: string;
@@ -57,29 +133,44 @@ export interface PlantillaDocumento {
   descripcion?: string;
 }
 
+// ===================
+// HELPER FUNCTIONS
+// ===================
+
 /**
- * Filtrar documentos por equipo del empleado
+ * Filtrar acciones por equipo del empleado
+ */
+export function filtrarAccionesPorEquipo(
+  acciones: WorkflowAccion[],
+  equipoIdsEmpleado: string[]
+): WorkflowAccion[] {
+  // Por ahora no hay filtro por equipo en acciones
+  // Todas las acciones se aplican a todos los empleados
+  // Se puede extender en el futuro si se necesita
+  return acciones.filter((a) => a.activo);
+}
+
+/**
+ * @deprecated Usar filtrarAccionesPorEquipo
+ * Filtrar documentos por equipo del empleado (sistema antiguo)
  */
 export function filtrarDocumentosPorEquipo(
   documentos: DocumentoRequerido[],
   equipoIdsEmpleado: string[]
 ): DocumentoRequerido[] {
   return documentos.filter((doc) => {
-    // Si está asignado a todos, siempre se incluye
     if (!doc.asignadoA || doc.asignadoA === 'todos') {
       return true;
     }
-
-    // Si está asignado a equipos específicos, verificar si el empleado está en alguno
     if (doc.asignadoA === 'equipos' && doc.equipoIds && doc.equipoIds.length > 0) {
       return doc.equipoIds.some((equipoId) => equipoIdsEmpleado.includes(equipoId));
     }
-
     return false;
   });
 }
 
 /**
+ * @deprecated Sistema antiguo
  * Obtener documentos de firma asíncronos
  */
 export function obtenerDocumentosAsincronicos(
@@ -88,3 +179,61 @@ export function obtenerDocumentosAsincronicos(
   return documentos.filter((doc) => doc.requiereFirma && doc.esAsincronico);
 }
 
+/**
+ * Obtener label legible para tipo de acción
+ */
+export function getTipoAccionLabel(tipo: TipoAccion): string {
+  const labels: Record<TipoAccion, string> = {
+    rellenar_campos: 'Rellenar campos',
+    compartir_docs: 'Compartir documentos',
+    solicitar_docs: 'Solicitar documentos',
+    solicitar_firma: 'Solicitar firma',
+  };
+  return labels[tipo] || tipo;
+}
+
+/**
+ * Validar estructura de WorkflowAccion
+ */
+export function validarWorkflowAccion(accion: unknown): accion is WorkflowAccion {
+  if (typeof accion !== 'object' || accion === null) return false;
+
+  const a = accion as WorkflowAccion;
+
+  // Validar campos básicos
+  if (
+    typeof a.id !== 'string' ||
+    typeof a.orden !== 'number' ||
+    typeof a.tipo !== 'string' ||
+    !['rellenar_campos', 'compartir_docs', 'solicitar_docs', 'solicitar_firma'].includes(a.tipo) ||
+    typeof a.titulo !== 'string' ||
+    typeof a.activo !== 'boolean' ||
+    typeof a.config !== 'object' ||
+    a.config === null ||
+    Array.isArray(a.config)
+  ) {
+    return false;
+  }
+
+  return true;
+}
+
+/**
+ * Campos disponibles para rellenar
+ */
+export const CAMPOS_DISPONIBLES = [
+  { id: 'nif', label: 'NIF/DNI/NIE' },
+  { id: 'nss', label: 'Número de Seguridad Social' },
+  { id: 'fechaNacimiento', label: 'Fecha de Nacimiento' },
+  { id: 'telefono', label: 'Teléfono' },
+  { id: 'direccionCalle', label: 'Calle' },
+  { id: 'direccionNumero', label: 'Número' },
+  { id: 'direccionPiso', label: 'Piso/Puerta' },
+  { id: 'codigoPostal', label: 'Código Postal' },
+  { id: 'ciudad', label: 'Ciudad' },
+  { id: 'direccionProvincia', label: 'Provincia' },
+  { id: 'iban', label: 'IBAN' },
+  { id: 'bic', label: 'BIC/SWIFT' },
+  { id: 'salarioBaseAnual', label: 'Salario Base Anual' },
+  { id: 'tipoContrato', label: 'Tipo de Contrato' },
+] as const;

@@ -51,11 +51,11 @@ export async function POST(request: NextRequest, context: RouteParams) {
     const { data: validatedData } = validationResult;
 
     // Verificar que el empleado existe y pertenece a la empresa
+    // NOTA: NO validamos activo:true porque empleados en onboarding pueden ser asignados a equipos
     const employee = await prisma.empleados.findFirst({
       where: {
         id: validatedData.empleadoId,
         empresaId: session.user.empresaId,
-        activo: true,
       },
       select: { id: true },
     });

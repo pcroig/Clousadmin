@@ -1,7 +1,7 @@
 # 🎣 HOOKS REUTILIZABLES - DOCUMENTACIÓN
 
-**Fecha**: 27 de enero 2025  
-**Versión**: 1.0  
+**Fecha**: 9 de diciembre 2025
+**Versión**: 1.1
 **Estado**: ✅ Implementado
 
 ---
@@ -255,6 +255,78 @@ function CarpetaDetailClient({ carpetaId }: { carpetaId: string }) {
 - `components/ui/file-preview.tsx` - Previsualización de archivos con estado
 - `components/ui/upload-progress.tsx` - Barra de progreso con ETA y velocidad
 - `components/ui/upload-error-alert.tsx` - Alertas de error con retry
+
+---
+
+### 4. `useFestivos` - Para Gestión de Festivos con Sincronización
+
+Hook centralizado para cargar festivos activos con sincronización automática entre componentes y pestañas.
+
+**Ubicación**: `lib/hooks/use-festivos.ts`
+
+**Características**:
+- ✅ Carga de festivos activos de empresa
+- ✅ Carga de festivos personalizados por empleado
+- ✅ Polling automático configurable (default: 60s)
+- ✅ Event listeners para sincronización instantánea
+- ✅ Sincronización cross-tab con localStorage
+- ✅ Invalidación automática de caché
+
+**Uso básico**:
+```tsx
+import { useFestivos } from '@/lib/hooks/use-festivos';
+
+function CalendarioAusencias({ empleadoId }: { empleadoId: string }) {
+  const { festivos, isLoading, error } = useFestivos({
+    empleadoId,
+    revalidateInterval: 60000, // Revalidar cada 60 segundos
+  });
+
+  const esFestivo = (date: Date) => {
+    const dateStr = format(date, 'yyyy-MM-dd');
+    return festivos.some((f) => f.fecha === dateStr);
+  };
+
+  return <Calendar modifiers={{ festivo: esFestivo }} />;
+}
+```
+
+**Notificar cambios manualmente**:
+```tsx
+import { notifyFestivosUpdated } from '@/lib/hooks/use-festivos';
+
+async function handleToggleActivo(festivo: Festivo) {
+  await fetch(`/api/festivos/${festivo.id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ activo: !festivo.activo }),
+  });
+
+  notifyFestivosUpdated(); // ← Todos los calendarios se actualizan automáticamente
+}
+```
+
+**Props**:
+- `festivos: Festivo[]` - Lista de festivos activos
+- `isLoading: boolean` - Estado de carga inicial
+- `error: Error | null` - Error si ocurre
+- `refetch(): Promise<void>` - Forzar recarga manual
+
+**Opciones**:
+- `empleadoId?: string` - ID del empleado para festivos personalizados
+- `revalidateInterval?: number` - Intervalo de polling en ms (default: 60000)
+- `enabled?: boolean` - Habilitar/deshabilitar hook (default: true)
+
+**Integración**:
+- ✅ `components/shared/mi-espacio/ausencias-tab.tsx` - Calendario de ausencias
+- ✅ `app/(dashboard)/hr/organizacion/personas/[id]/empleado-detail-client.tsx` - Vista de empleado
+- ✅ `components/hr/lista-festivos.tsx` - Gestión de festivos (notifica cambios)
+
+**Sincronización automática**:
+1. **Polling**: Recarga cada 60s automáticamente
+2. **Window events**: Sincronización instantánea en la misma pestaña
+3. **LocalStorage**: Sincronización entre pestañas del navegador
+
+**Documentación completa**: [docs/historial/2025-12-09-festivos-completo.md](historial/2025-12-09-festivos-completo.md)
 
 ---
 

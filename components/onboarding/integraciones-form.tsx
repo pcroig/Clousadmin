@@ -127,9 +127,10 @@ export function IntegracionesForm({
   // Manejar omitir integraciones (marcar como completado)
   const handleSkipIntegrations = async () => {
     if (!token) return;
-    
+
     try {
-      const response = await fetch(`/api/onboarding-simplificado/${token}/integraciones-completado`, {
+      // Usar endpoint unificado que funciona para ambos tipos de onboarding
+      const response = await fetch(`/api/onboarding/${token}/integraciones-completado`, {
         method: 'POST',
       });
 
@@ -146,7 +147,8 @@ export function IntegracionesForm({
     if (!token) return;
 
     try {
-      const response = await fetch(`/api/onboarding-simplificado/${token}/integraciones-completado`, {
+      // Usar endpoint unificado que funciona para ambos tipos de onboarding
+      const response = await fetch(`/api/onboarding/${token}/integraciones-completado`, {
         method: 'POST',
       });
 
@@ -291,8 +293,8 @@ export function IntegracionesForm({
         </div>
       </div>
 
-      {/* Botones de navegación para onboarding simplificado */}
-      {simplified && (onComplete || onSkip) && (
+      {/* Botones de navegación */}
+      {(onComplete || onSkip) && (
         <div className="flex justify-end gap-3 pt-4 border-t">
           {onSkip && (
             <Button type="button" variant="outline" onClick={handleSkipIntegrations}>

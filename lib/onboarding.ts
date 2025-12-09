@@ -12,6 +12,8 @@ import { getBaseUrl } from '@/lib/email';
 import { encryptEmpleadoData } from '@/lib/empleado-crypto';
 import { crearNotificacionOnboardingCompletado } from '@/lib/notificaciones';
 import { obtenerOnboardingConfig } from '@/lib/onboarding-config';
+import type { WorkflowAccion } from '@/lib/onboarding-config-types';
+import { validarTodasAccionesCompletadas } from '@/lib/onboarding-validacion';
 import { prisma, Prisma } from '@/lib/prisma';
 import { asJsonValue } from '@/lib/prisma/json';
 import { uploadToS3 } from '@/lib/s3';
@@ -23,6 +25,7 @@ export type TipoOnboarding = 'completo' | 'simplificado';
 
 /**
  * Progreso del onboarding completo (nuevos empleados)
+ * @deprecated Usar ProgresoOnboardingWorkflow para nuevos onboardings
  */
 export interface ProgresoOnboardingCompleto {
   credenciales_completadas: boolean;
@@ -42,9 +45,22 @@ export interface ProgresoOnboardingSimplificado {
 }
 
 /**
- * Union type para progreso de onboarding (soporta ambos tipos)
+ * Progreso del onboarding basado en workflow (nuevos empleados - nuevo sistema)
+ * Incluye pasos base (credenciales, integraciones, PWA) + acciones dinámicas del workflow
  */
-export type ProgresoOnboarding = ProgresoOnboardingCompleto | ProgresoOnboardingSimplificado;
+export interface ProgresoOnboardingWorkflow {
+  // Pasos base (obligatorios para todos)
+  credenciales_completadas: boolean;
+  integraciones: boolean;
+  pwa_explicacion: boolean;
+  // Acciones dinámicas del workflow configurado por la empresa
+  acciones: Record<string, boolean>; // { [accionId]: completada }
+}
+
+/**
+ * Union type para progreso de onboarding (soporta todos los tipos)
+ */
+export type ProgresoOnboarding = ProgresoOnboardingCompleto | ProgresoOnboardingSimplificado | ProgresoOnboardingWorkflow;
 
 /**
  * Datos temporales almacenados durante el onboarding
@@ -98,6 +114,7 @@ export type CrearOnboardingResult = CrearOnboardingSuccess | CrearOnboardingErro
  */
 export interface CrearOnboardingOptions {
   baseUrl?: string;
+  accionesActivas?: Record<string, boolean>; // Acciones activas del workflow para este empleado
 }
 
 export async function crearOnboarding(
@@ -126,19 +143,26 @@ export async function crearOnboarding(
       }
 
       // Definir progreso inicial según tipo de onboarding
-      const progresoInicial = tipoOnboarding === 'completo'
-        ? {
-            credenciales_completadas: false,
-            datos_personales: false,
-            datos_bancarios: false,
-            datos_documentos: false,
-            pwa_explicacion: false,
-          }
-        : {
-            credenciales_completadas: false,
-            integraciones: false,
-            pwa_explicacion: false,
-          };
+      let progresoInicial: ProgresoOnboarding;
+
+      if (tipoOnboarding === 'completo') {
+        // Nuevo sistema de workflow: pasos base + acciones dinámicas
+        progresoInicial = {
+          // Pasos base (igual que simplificado)
+          credenciales_completadas: false,
+          integraciones: false,
+          pwa_explicacion: false,
+          // Acciones dinámicas del workflow
+          acciones: options?.accionesActivas || {},
+        } as ProgresoOnboardingWorkflow;
+      } else {
+        // Onboarding simplificado (empleados existentes)
+        progresoInicial = {
+          credenciales_completadas: false,
+          integraciones: false,
+          pwa_explicacion: false,
+        } as ProgresoOnboardingSimplificado;
+      }
 
       return await tx.onboarding_empleados.create({
         data: {
@@ -252,23 +276,31 @@ export async function guardarCredenciales(
       avatarUrl = await uploadToS3(avatarFile.buffer, s3Key, avatarFile.mimeType);
     }
 
-    // Actualizar usuario con contraseña (avatar se almacena solo en empleado.fotoUrl)
-    await prisma.usuarios.update({
-      where: { id: onboarding.empleado.usuarioId },
-      data: {
-        password: hashedPassword,
-        emailVerificado: true,
-        activo: true,
-      },
-    });
-
-    // Guardar avatar en empleado.fotoUrl como fuente única de verdad
+    // Actualizar usuario (y avatar si aplica) manteniendo sincronía con empleado
+    const userUpdateData: Prisma.usuariosUpdateInput = {
+      password: hashedPassword,
+      emailVerificado: true,
+      activo: true,
+    };
     if (avatarUrl) {
-      await prisma.empleados.update({
-        where: { id: onboarding.empleadoId },
-        data: {
-          fotoUrl: avatarUrl,
-        },
+      userUpdateData.avatar = avatarUrl;
+    }
+    // Mantener sincronía entre usuario y empleado (avatar y credenciales)
+    if (avatarUrl) {
+      await prisma.$transaction([
+        prisma.usuarios.update({
+          where: { id: onboarding.empleado.usuarioId },
+          data: userUpdateData,
+        }),
+        prisma.empleados.update({
+          where: { id: onboarding.empleadoId },
+          data: { fotoUrl: avatarUrl },
+        }),
+      ]);
+    } else {
+      await prisma.usuarios.update({
+        where: { id: onboarding.empleado.usuarioId },
+        data: userUpdateData,
       });
     }
 
@@ -445,6 +477,83 @@ export async function guardarProgresoDocumentos(token: string) {
 }
 
 /**
+ * Obtener workflow configurado para la empresa
+ */
+export async function obtenerWorkflowConfig(empresaId: string): Promise<WorkflowAccion[]> {
+  try {
+    const config = await prisma.onboarding_configs.findUnique({
+      where: { empresaId },
+      select: { workflowAcciones: true },
+    });
+
+    if (!config || !config.workflowAcciones) {
+      return [];
+    }
+
+    // Parsear y retornar workflow
+    const workflow = config.workflowAcciones as unknown as WorkflowAccion[];
+    return Array.isArray(workflow) ? workflow : [];
+  } catch (error) {
+    console.error('[obtenerWorkflowConfig] Error:', error);
+    return [];
+  }
+}
+
+/**
+ * Actualizar progreso de una acción específica
+ */
+export async function actualizarProgresoAccion(
+  empleadoId: string,
+  accionId: string,
+  completado: boolean,
+  datosAdicionales?: Record<string, unknown>
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const onboarding = await prisma.onboarding_empleados.findUnique({
+      where: { empleadoId },
+    });
+
+    if (!onboarding) {
+      return { success: false, error: 'Onboarding no encontrado' };
+    }
+
+    // Obtener progreso actual
+    const progresoActual = onboarding.progreso as unknown as ProgresoOnboardingWorkflow;
+    const datosTemporalesActuales = (onboarding.datosTemporales as unknown as Record<string, unknown>) || {};
+
+    // Actualizar progreso de la acción (preservar pasos base)
+    const progresoNuevo: ProgresoOnboardingWorkflow = {
+      credenciales_completadas: progresoActual.credenciales_completadas || false,
+      integraciones: progresoActual.integraciones || false,
+      pwa_explicacion: progresoActual.pwa_explicacion || false,
+      acciones: {
+        ...(progresoActual.acciones || {}),
+        [accionId]: completado,
+      },
+    };
+
+    // Merge datos adicionales si se proporcionan
+    const datosTemporalesNuevos = datosAdicionales
+      ? { ...datosTemporalesActuales, ...datosAdicionales }
+      : datosTemporalesActuales;
+
+    // Guardar en la base de datos
+    await prisma.onboarding_empleados.update({
+      where: { id: onboarding.id },
+      data: {
+        progreso: asJsonValue(progresoNuevo),
+        datosTemporales: asJsonValue(datosTemporalesNuevos),
+      },
+    });
+
+    return { success: true };
+  } catch (error) {
+    console.error('[actualizarProgresoAccion] Error:', error);
+    return { success: false, error: 'Error al actualizar progreso' };
+  }
+}
+
+/**
  * Calcular si un empleado debe estar activo según sus fechas de contrato
  * @param fechaAlta - Fecha de inicio de contrato
  * @param fechaBaja - Fecha de finalización de contrato (opcional)
@@ -456,24 +565,24 @@ export function calcularEstadoActivoSegunFechas(
 ): boolean {
   const fechaActual = new Date();
   fechaActual.setHours(0, 0, 0, 0); // Normalizar a inicio del día
-  
+
   const fechaAltaNormalizada = new Date(fechaAlta);
   fechaAltaNormalizada.setHours(0, 0, 0, 0);
-  
+
   // Si tiene fecha de baja, verificar si ya pasó
   if (fechaBaja) {
     const fechaBajaNormalizada = new Date(fechaBaja);
     fechaBajaNormalizada.setHours(0, 0, 0, 0);
-    
+
     // Si la fecha de baja ya pasó, debe estar inactivo
     if (fechaBajaNormalizada < fechaActual) {
       return false;
     }
-    
+
     // Si la fecha de alta ya pasó y la de baja no, debe estar activo
     return fechaAltaNormalizada <= fechaActual;
   }
-  
+
   // Sin fecha de baja: activo si la fecha de alta ya pasó
   return fechaAltaNormalizada <= fechaActual;
 }
@@ -550,125 +659,239 @@ export async function finalizarOnboarding(token: string) {
     const progreso = onboarding.progreso as unknown as ProgresoOnboarding;
 
     if (tipoOnboarding === 'completo') {
-      const progresoCompleto = progreso as ProgresoOnboardingCompleto;
-      if (!progresoCompleto.credenciales_completadas || 
-          !progresoCompleto.datos_personales || 
-          !progresoCompleto.datos_bancarios ||
-          !progresoCompleto.pwa_explicacion) {
-        return {
-          success: false,
-          error: 'Faltan pasos por completar (credenciales, datos personales, bancarios o PWA)',
+      // Detectar si es workflow nuevo o sistema viejo
+      const progresoWorkflow = progreso as ProgresoOnboardingWorkflow;
+      const esNuevoWorkflow = progresoWorkflow.acciones !== undefined;
+
+      if (esNuevoWorkflow) {
+        // NUEVO SISTEMA: Validar pasos base + workflow dinámico
+
+        // 1. Validar pasos base (credenciales, integraciones, PWA)
+        if (!progresoWorkflow.credenciales_completadas) {
+          return {
+            success: false,
+            error: 'Debes completar el paso de credenciales antes de finalizar',
+          };
+        }
+        if (!progresoWorkflow.integraciones) {
+          return {
+            success: false,
+            error: 'Debes completar el paso de integraciones antes de finalizar',
+          };
+        }
+        if (!progresoWorkflow.pwa_explicacion) {
+          return {
+            success: false,
+            error: 'Debes completar el paso de instalación de la app móvil antes de finalizar',
+          };
+        }
+
+        // 2. Validar workflow dinámico
+        const workflow = await obtenerWorkflowConfig(onboarding.empresaId);
+        const accionesActivas = workflow.filter((a) => a.activo);
+
+        // Validar que todas las acciones activas estén completadas
+        const datosTemporales = (onboarding.datosTemporales as unknown as Record<string, unknown>) || {};
+        const validacion = await validarTodasAccionesCompletadas(
+          accionesActivas,
+          progresoWorkflow.acciones || {},
+          datosTemporales,
+          onboarding.empleadoId
+        );
+
+        if (!validacion.completado) {
+          return {
+            success: false,
+            error: `Faltan acciones por completar: ${validacion.accionesPendientes.join(', ')}`,
+          };
+        }
+
+        // Transferir datos temporales a empleado
+        const empleado = await prisma.empleados.findUnique({
+          where: { id: onboarding.empleadoId },
+          select: {
+            fechaAlta: true,
+            fechaBaja: true,
+            usuarioId: true,
+          },
+        });
+
+        if (!empleado) {
+          return {
+            success: false,
+            error: 'Empleado no encontrado',
+          };
+        }
+
+        // Preparar datos del empleado desde datosTemporales
+        const datosEmpleado: Record<string, unknown> = {
+          onboardingCompletado: true,
+          onboardingCompletadoEn: new Date(),
         };
-      }
 
-      // Obtener datos temporales
-      const datosTemporales = onboarding.datosTemporales as unknown as DatosTemporales;
-      if (!datosTemporales?.datos_personales || !datosTemporales?.datos_bancarios) {
-        return {
-          success: false,
-          error: 'Datos incompletos',
-        };
-      }
+        // Transferir campos específicos si existen en datosTemporales
+        const camposATransferir = [
+          'nif', 'nss', 'telefono', 'fechaNacimiento',
+          'direccionCalle', 'direccionNumero', 'direccionPiso',
+          'codigoPostal', 'ciudad', 'direccionProvincia',
+          'estadoCivil', 'numeroHijos',
+          'iban', 'bic',
+        ];
 
-      // Validar documentos requeridos (solo para onboarding completo)
-      const configResult = await obtenerOnboardingConfig(onboarding.empresaId);
-      if (configResult.success && configResult.config) {
-        const documentosRequeridos = configResult.config.documentosRequeridos;
-        
-        // Si hay documentos requeridos, validar que todos estén completos
-        if (documentosRequeridos && Array.isArray(documentosRequeridos) && documentosRequeridos.length > 0) {
-          // Solo validar documentos que son requeridos (requerido: true)
-          interface DocRequerido { requerido: boolean; }
-          const docsRequeridos = documentosRequeridos.filter((d: DocRequerido) => d.requerido === true);
-          
-          if (docsRequeridos.length > 0) {
-            const validacionDocs = await validarDocumentosRequeridosCompletos(
-              onboarding.empresaId,
-              onboarding.empleadoId,
-              docsRequeridos
-            );
+        for (const campo of camposATransferir) {
+          if (datosTemporales[campo] !== undefined && datosTemporales[campo] !== null) {
+            datosEmpleado[campo] = datosTemporales[campo];
+          }
+        }
 
-            if (validacionDocs.success && !validacionDocs.completo) {
-              const docsFaltantes = validacionDocs.documentosFaltantes || [];
-              const nombresDocsFaltantes = docsFaltantes.map((d) => d.nombre).join(', ');
-              return {
-                success: false,
-                error: `Faltan documentos requeridos: ${nombresDocsFaltantes}`,
-              };
+        // Calcular estado activo según fechas de contrato
+        const debeEstarActivo = calcularEstadoActivoSegunFechas(
+          empleado.fechaAlta,
+          empleado.fechaBaja
+        );
+
+        // Encriptar campos sensibles antes de guardar
+        const datosEmpleadoEncriptados = encryptEmpleadoData(datosEmpleado);
+
+        // Traspasar datos encriptados a Empleado y actualizar estado activo
+        await prisma.empleados.update({
+          where: { id: onboarding.empleadoId },
+          data: {
+            ...datosEmpleadoEncriptados,
+            activo: debeEstarActivo,
+          },
+        });
+
+        // Actualizar también el estado activo del usuario
+        await prisma.usuarios.update({
+          where: { id: empleado.usuarioId },
+          data: {
+            empleadoId: onboarding.empleadoId,
+            activo: debeEstarActivo,
+          },
+        });
+      } else {
+        // SISTEMA VIEJO: Validación hardcoded (backward compatibility)
+        const progresoCompleto = progreso as ProgresoOnboardingCompleto;
+        if (!progresoCompleto.credenciales_completadas ||
+            !progresoCompleto.datos_personales ||
+            !progresoCompleto.datos_bancarios ||
+            !progresoCompleto.pwa_explicacion) {
+          return {
+            success: false,
+            error: 'Faltan pasos por completar (credenciales, datos personales, bancarios o PWA)',
+          };
+        }
+
+        // Obtener datos temporales
+        const datosTemporales = onboarding.datosTemporales as unknown as DatosTemporales;
+        if (!datosTemporales?.datos_personales || !datosTemporales?.datos_bancarios) {
+          return {
+            success: false,
+            error: 'Datos incompletos',
+          };
+        }
+
+        // Validar documentos requeridos (solo para onboarding completo)
+        const configResult = await obtenerOnboardingConfig(onboarding.empresaId);
+        if (configResult.success && configResult.config) {
+          const documentosRequeridos = configResult.config.documentosRequeridos;
+
+          // Si hay documentos requeridos, validar que todos estén completos
+          if (documentosRequeridos && Array.isArray(documentosRequeridos) && documentosRequeridos.length > 0) {
+            // Solo validar documentos que son requeridos (requerido: true)
+            interface DocRequerido { requerido: boolean; }
+            const docsRequeridos = documentosRequeridos.filter((d: DocRequerido) => d.requerido === true);
+
+            if (docsRequeridos.length > 0) {
+              const validacionDocs = await validarDocumentosRequeridosCompletos(
+                onboarding.empresaId,
+                onboarding.empleadoId,
+                docsRequeridos
+              );
+
+              if (validacionDocs.success && !validacionDocs.completo) {
+                const docsFaltantes = validacionDocs.documentosFaltantes || [];
+                const nombresDocsFaltantes = docsFaltantes.map((d) => d.nombre).join(', ');
+                return {
+                  success: false,
+                  error: `Faltan documentos requeridos: ${nombresDocsFaltantes}`,
+                };
+              }
             }
           }
         }
-      }
 
-      const { datos_personales, datos_bancarios } = datosTemporales;
+        const { datos_personales, datos_bancarios } = datosTemporales;
 
-      // Preparar datos del empleado (solo para onboarding completo)
-      const datosEmpleado = {
-        // Datos personales
-        nif: datos_personales.nif,
-        nss: datos_personales.nss,
-        telefono: datos_personales.telefono,
-        direccionCalle: datos_personales.direccionCalle,
-        direccionNumero: datos_personales.direccionNumero,
-        direccionPiso: datos_personales.direccionPiso,
-        codigoPostal: datos_personales.codigoPostal,
-        ciudad: datos_personales.ciudad,
-        direccionProvincia: datos_personales.direccionProvincia,
-        estadoCivil: datos_personales.estadoCivil,
-        numeroHijos: datos_personales.numeroHijos || 0,
+        // Preparar datos del empleado (solo para onboarding completo)
+        const datosEmpleado = {
+          // Datos personales
+          nif: datos_personales.nif,
+          nss: datos_personales.nss,
+          telefono: datos_personales.telefono,
+          direccionCalle: datos_personales.direccionCalle,
+          direccionNumero: datos_personales.direccionNumero,
+          direccionPiso: datos_personales.direccionPiso,
+          codigoPostal: datos_personales.codigoPostal,
+          ciudad: datos_personales.ciudad,
+          direccionProvincia: datos_personales.direccionProvincia,
+          estadoCivil: datos_personales.estadoCivil,
+          numeroHijos: datos_personales.numeroHijos || 0,
 
-        // Datos bancarios
-        iban: datos_bancarios.iban,
-        bic: datos_bancarios.bic,
+          // Datos bancarios
+          iban: datos_bancarios.iban,
+          bic: datos_bancarios.bic,
 
-        // Marcar onboarding completo
-        onboardingCompletado: true,
-        onboardingCompletadoEn: new Date(),
-      };
-
-      // Obtener empleado para verificar fechas de contrato
-      const empleado = await prisma.empleados.findUnique({
-        where: { id: onboarding.empleadoId },
-        select: {
-          fechaAlta: true,
-          fechaBaja: true,
-          usuarioId: true,
-        },
-      });
-
-      if (!empleado) {
-        return {
-          success: false,
-          error: 'Empleado no encontrado',
+          // Marcar onboarding completo
+          onboardingCompletado: true,
+          onboardingCompletadoEn: new Date(),
         };
+
+        // Obtener empleado para verificar fechas de contrato
+        const empleado = await prisma.empleados.findUnique({
+          where: { id: onboarding.empleadoId },
+          select: {
+            fechaAlta: true,
+            fechaBaja: true,
+            usuarioId: true,
+          },
+        });
+
+        if (!empleado) {
+          return {
+            success: false,
+            error: 'Empleado no encontrado',
+          };
+        }
+
+        // Calcular estado activo según fechas de contrato
+        const debeEstarActivo = calcularEstadoActivoSegunFechas(
+          empleado.fechaAlta,
+          empleado.fechaBaja
+        );
+
+        // Encriptar campos sensibles antes de guardar
+        const datosEmpleadoEncriptados = encryptEmpleadoData(datosEmpleado);
+
+        // Traspasar datos encriptados a Empleado y actualizar estado activo
+        await prisma.empleados.update({
+          where: { id: onboarding.empleadoId },
+          data: {
+            ...datosEmpleadoEncriptados,
+            activo: debeEstarActivo,
+          },
+        });
+
+        // Actualizar también el estado activo del usuario
+        await prisma.usuarios.update({
+          where: { id: empleado.usuarioId },
+          data: {
+            empleadoId: onboarding.empleadoId,
+            activo: debeEstarActivo,
+          },
+        });
       }
-
-      // Calcular estado activo según fechas de contrato
-      const debeEstarActivo = calcularEstadoActivoSegunFechas(
-        empleado.fechaAlta,
-        empleado.fechaBaja
-      );
-
-      // Encriptar campos sensibles antes de guardar
-      const datosEmpleadoEncriptados = encryptEmpleadoData(datosEmpleado);
-
-      // Traspasar datos encriptados a Empleado y actualizar estado activo
-      await prisma.empleados.update({
-        where: { id: onboarding.empleadoId },
-        data: {
-          ...datosEmpleadoEncriptados,
-          activo: debeEstarActivo,
-        },
-      });
-
-      // Actualizar también el estado activo del usuario
-      await prisma.usuarios.update({
-        where: { id: empleado.usuarioId },
-        data: {
-          empleadoId: onboarding.empleadoId,
-          activo: debeEstarActivo,
-        },
-      });
     } else {
       // Onboarding simplificado - solo validar pasos básicos
       const progresoSimplificado = progreso as ProgresoOnboardingSimplificado;
@@ -844,8 +1067,9 @@ export async function guardarProgresoIntegraciones(token: string) {
     }
 
     const { onboarding } = verificacion;
-    const progreso = onboarding.progreso as unknown as ProgresoOnboardingSimplificado;
+    const progreso = onboarding.progreso as unknown as ProgresoOnboarding;
 
+    // Actualizar progreso de integraciones (funciona para ambos tipos de onboarding)
     await prisma.onboarding_empleados.update({
       where: { id: onboarding.id },
       data: {

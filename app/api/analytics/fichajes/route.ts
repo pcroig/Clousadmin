@@ -101,6 +101,7 @@ export async function GET(request: NextRequest) {
       where: {
         empresaId: session.user.empresaId,
         empleadoId: { in: empleadoIds },
+        tipoFichaje: 'ordinario', // FIX: Excluir extraordinarios de analytics de horas trabajadas
         fecha: {
           gte: inicioMesActual,
           lte: finMesActual,
@@ -125,6 +126,7 @@ export async function GET(request: NextRequest) {
       where: {
         empresaId: session.user.empresaId,
         empleadoId: { in: empleadoIds },
+        tipoFichaje: 'ordinario', // FIX: Excluir extraordinarios
         fecha: {
           gte: inicioMesAnterior,
           lte: finMesAnterior,
@@ -159,6 +161,7 @@ export async function GET(request: NextRequest) {
       where: {
         empresaId: session.user.empresaId,
         empleadoId: { in: empleadoIds },
+        tipoFichaje: 'ordinario', // FIX: Excluir extraordinarios
         fecha: {
           gte: inicioMesActual,
           lte: finMesActual <= hoy ? finMesActual : hoy,

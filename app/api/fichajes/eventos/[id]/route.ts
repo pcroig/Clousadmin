@@ -67,6 +67,29 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
       const horasTrabajadas = calcularHorasTrabajadas(actualizado.eventos) ?? 0;
       const horasEnPausa = calcularTiempoEnPausa(actualizado.eventos);
       await prisma.fichajes.update({ where: { id: evento.fichajeId }, data: { horasTrabajadas, horasEnPausa } });
+
+      // Notificar si la edición la hace otro usuario (HR admin o manager)
+      if (session.user.empleadoId && session.user.empleadoId !== evento.fichaje.empleadoId) {
+        const editor = await prisma.empleados.findUnique({
+          where: { id: session.user.empleadoId },
+          select: { nombre: true, apellidos: true },
+        });
+        const nombreEditor = editor ? `${editor.nombre} ${editor.apellidos}` : 'Administrador';
+
+        await crearNotificacionFichajeModificado(
+          prisma,
+          {
+            fichajeId: evento.fichajeId,
+            empresaId: session.user.empresaId,
+            empleadoId: evento.fichaje.empleadoId,
+            modificadoPorNombre: nombreEditor,
+            accion: 'editado',
+            fechaFichaje: evento.fichaje.fecha,
+            detalles: motivoEdicion || `Evento ${evento.tipo} modificado.`,
+          },
+          { actorUsuarioId: session.user.id }
+        );
+      }
     }
 
     return successResponse({ success: true });

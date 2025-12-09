@@ -1,7 +1,7 @@
 # 📅 DOCUMENTACIÓN: SISTEMA DE FESTIVOS Y CALENDARIO LABORAL
 
-**Versión**: 2.0  
-**Fecha**: 4 Diciembre 2024  
+**Versión**: 2.1
+**Fecha**: 9 Diciembre 2025
 **Estado**: Sistema completo y operativo
 
 ---
@@ -350,27 +350,35 @@ Vista de calendario mensual para gestionar festivos de empresa.
 ### ListaFestivos
 **Ubicación**: `components/hr/lista-festivos.tsx`
 
-Tabla de festivos de empresa con acciones.
+Tabla de festivos de empresa con acciones y **gestión por año**.
 
 **Columnas**:
-- Fecha (formato largo español)
+- **Fecha**: Visualización con componente `FechaCalendar` (diseño tipo calendario con mes y día)
+  - Selector de año integrado en el `<TableHead>` (dropdown compacto)
+  - Rango disponible: año actual -1 a año actual +3
 - Nombre (con indicador "(Inactivo)" si aplica)
-- Tipo (Nacional/Empresa)
+- Tipo (Nacional/Empresa) - mostrado bajo el nombre
 - Acciones
 
-**Características**:
-- Los festivos inactivos se muestran con opacidad reducida (50%)
+**Características principales**:
+- ✅ **Gestión por año**: Selector de año en el header de la columna "Fecha"
+- ✅ **Alerta de festivos faltantes**: Si hay menos de 10 festivos nacionales para el año seleccionado
+- ✅ **Visualización tipo calendario**: Cada fecha se muestra con el componente `FechaCalendar` (escala 75%)
+- ✅ **Creación inline**: Fila de creación que aparece dentro de la tabla
+- ✅ **Limpieza automática**: El formulario se limpia al cancelar sin guardar
+- ✅ **Sincronización**: Hook `useFestivos` para actualización automática
+- Los festivos inactivos se muestran con opacidad reducida (60%)
 - Los festivos nacionales no tienen botón de eliminar
 
 **Acciones**:
-- **Editar**:
-  - Festivos de empresa: permite cambiar nombre, fecha y estado activo
-  - Festivos nacionales: solo muestra toggle para activar/desactivar
-- **Eliminar**: solo disponible para festivos de empresa
+- **Toggle activo/inactivo**: Switch para activar/desactivar festivos
+- **Eliminar**: Solo disponible para festivos de tipo "empresa"
+- **Crear festivo**: Fila inline dentro de la tabla con campos fecha, nombre y estado
 
-**Modo de edición**:
-- Festivos de empresa: formulario completo con campos de fecha y nombre editables
-- Festivos nacionales: muestra fecha y nombre como texto, con un switch para activar/desactivar
+**Importación unificada**:
+- Prop `onImportRequest?: (año?: number) => void`
+- Se integra con el modal `ImportarFestivosModal` del componente padre
+- El link en la alerta de festivos faltantes llama a `onImportRequest(añoSeleccionado)`
 
 ### FestivosPersonalizadosModal
 **Ubicación**: `components/ausencias/festivos-personalizados-modal.tsx`
@@ -403,6 +411,42 @@ Tabla de festivos de empresa con acciones.
 8. Selecciona empleados destino
 9. Click en "Copiar configuración"
 
+### ImportarFestivosModal
+**Ubicación**: `components/hr/importar-festivos-modal.tsx`
+
+**Nuevo en v2.1**: Modal unificado para importar festivos con dos opciones.
+
+**Características**:
+- Modal con selección de modo de importación
+- Dos opciones claramente diferenciadas:
+  1. **Desde archivo**: Importar festivos desde .ics o .csv
+  2. **Festivos nacionales**: Importar los 10 festivos nacionales de España para un año específico
+
+**Props**:
+```typescript
+interface ImportarFestivosModalProps {
+  open: boolean;
+  onClose: () => void;
+  onSuccess: () => void;
+  añoSeleccionado?: number; // Año para importar festivos nacionales
+}
+```
+
+**Flujo de usuario**:
+1. Clic en botón "Importar" → Abre modal con dos opciones
+2. **Opción 1 - Desde archivo**:
+   - Seleccionar archivo (.ics/.csv)
+   - Preview del nombre y tamaño del archivo
+   - Importar
+3. **Opción 2 - Festivos nacionales**:
+   - Muestra lista de los 10 festivos que se importarán
+   - Información del año seleccionado
+   - Confirmación explícita
+   - Importar
+4. Success → Recargar lista y cerrar modal
+
+**Botón "Atrás"**: Permite volver a la selección de opciones sin cerrar el modal
+
 ### Modal Gestionar Ausencias > Calendario Laboral
 **Ubicación**: `app/(dashboard)/hr/horario/ausencias/gestionar-ausencias-modal.tsx`
 
@@ -410,9 +454,14 @@ Tab completo para configurar calendario laboral de empresa.
 
 **Secciones**:
 1. **Días Laborables**: Checkboxes para L-D
-2. **Botón Importar**: Importa festivos nacionales
-3. **Festivos**: Toggle entre calendario visual y lista
+2. **Botón Importar**: Abre `ImportarFestivosModal` con opciones de importación
+3. **Festivos**: Toggle entre calendario visual y lista (con gestión por año)
 4. **Guardar**: Guarda días laborables
+
+**Sincronización con Onboarding**:
+- Usa el mismo `ImportarFestivosModal` que el paso 4 del onboarding
+- Misma UX y funcionalidad en ambos contextos
+- Hook `useFestivos` para sincronización automática
 
 ### Calendario Individual del Empleado
 **Ubicación**: `components/shared/mi-espacio/ausencias-tab.tsx`
@@ -441,11 +490,25 @@ Cuando se crea una empresa nueva:
 2. Click en **Gestionar Ausencias**
 3. Tab **Calendario Laboral**
 4. Ajusta días laborables (checkboxes)
-5. Click **Importar Calendario Nacional** (si no se hizo automáticamente)
-6. Cambia a vista calendario o lista
-7. Crea festivos personalizados de empresa (click en día o botón)
-8. Activa/desactiva festivos según necesidad
-9. Click **Guardar Configuración**
+5. **Importar festivos** (si no se hizo automáticamente):
+   - Click en botón **Importar**
+   - Seleccionar opción:
+     - **Desde archivo**: Importar .ics/.csv
+     - **Festivos nacionales**: Importar 10 festivos de España para el año seleccionado
+   - Confirmar importación
+6. **Gestionar festivos por año**:
+   - Seleccionar año en el dropdown del header de la tabla (año actual -1 a +3)
+   - Ver alerta si faltan festivos nacionales (< 10 festivos)
+   - Importar festivos del año específico desde la alerta
+7. Cambia a vista calendario o lista
+8. Crea festivos personalizados de empresa:
+   - Click en botón "Añadir festivo" (icono +)
+   - Aparece fila inline en la tabla
+   - Completar fecha, nombre y estado
+   - Guardar o cancelar (limpia formulario)
+9. Activa/desactiva festivos con el switch
+10. Elimina festivos de empresa (festivos nacionales no se pueden eliminar)
+11. Click **Guardar Configuración**
 
 ### Configuración de Festivos Personalizados por Empleado
 
@@ -649,11 +712,20 @@ const festivos = await getFestivosActivosParaEmpleado(
 
 **Frontend**:
 - `components/hr/calendario-festivos.tsx` - Calendario visual de empresa
-- `components/hr/lista-festivos.tsx` - Tabla festivos de empresa
+- `components/hr/lista-festivos.tsx` - Tabla festivos con gestión por año
+- `components/hr/importar-festivos-modal.tsx` - **Nuevo v2.1**: Modal unificado de importación
 - `components/hr/editar-festivo-modal.tsx` - Modal crear/editar festivo de empresa
-- `components/ausencias/festivos-personalizados-modal.tsx` - **Nuevo**: Modal personalizar festivos por empleado
+- `components/ausencias/festivos-personalizados-modal.tsx` - Modal personalizar festivos por empleado
 - `components/shared/mi-espacio/ausencias-tab.tsx` - Calendario individual con festivos combinados
-- `app/(dashboard)/hr/horario/ausencias/gestionar-ausencias-modal.tsx` - Tab calendario laboral
+- `components/onboarding/calendario-step.tsx` - Paso 4 del onboarding (usa ImportarFestivosModal)
+- `app/(dashboard)/hr/horario/ausencias/gestionar-ausencias-modal.tsx` - Tab calendario laboral (usa ImportarFestivosModal)
+
+**Hooks**:
+- `lib/hooks/use-festivos.ts` - **Nuevo v2.1**: Hook centralizado para sincronización de festivos
+  - Polling automático cada 60 segundos
+  - Sincronización cross-tab vía localStorage
+  - Event-driven updates vía window.dispatchEvent
+  - Función `notifyFestivosUpdated()` para notificar cambios
 
 **Base de Datos**:
 - `prisma/schema.prisma`:
@@ -664,9 +736,38 @@ const festivos = await getFestivosActivosParaEmpleado(
 
 ---
 
-## 🎯 RESUMEN DE CAMBIOS EN V2.0
+## 🎯 RESUMEN DE CAMBIOS
 
-### Cambios Principales
+### v2.1 (9 Diciembre 2025) - Gestión por Año e Importación Unificada
+
+**Cambios Principales**:
+1. ✅ **Gestión por año**: Selector de año integrado en tabla de festivos
+2. ✅ **Modal de importación unificado**: `ImportarFestivosModal` con dos opciones (archivo/nacionales)
+3. ✅ **Alerta de festivos faltantes**: Aviso cuando hay < 10 festivos nacionales para el año
+4. ✅ **Visualización calendario**: Componente `FechaCalendar` para mostrar fechas
+5. ✅ **Creación inline**: Formulario de creación dentro de la tabla
+6. ✅ **Limpieza automática**: Formulario se limpia al cancelar
+7. ✅ **Sincronización total**: Hook `useFestivos` para actualización automática cross-tab
+8. ✅ **Unificación onboarding**: Mismo modal de importación en onboarding y gestión HR
+
+**Mejoras de UX**:
+- Selector de año compacto en header de tabla (año -1 a +3)
+- Link directo a importación desde alerta de festivos faltantes
+- Modal con cards clickeables para seleccionar modo de importación
+- Botón "Atrás" en modal para volver a selección de opciones
+- Preview de archivo antes de importar
+- Lista detallada de festivos nacionales antes de importar
+
+**Mejoras Técnicas**:
+- Hook `useFestivos` con polling (60s), events y localStorage sync
+- Función `notifyFestivosUpdated()` para notificaciones centralizadas
+- Eliminación de código duplicado (~60 líneas) entre gestionar-ausencias y onboarding
+- Componentes reutilizables entre diferentes contextos
+- API ya soportaba filtro por año (`?año={año}`)
+
+### v2.0 (4 Diciembre 2024) - Festivos Personalizados por Empleado
+
+**Cambios Principales**:
 1. **Sistema de festivos personalizados por empleado** completamente implementado
 2. **Lógica de sustitución**: Los festivos personalizados reemplazan a los de empresa en las mismas fechas
 3. **Modal rediseñado**: Nueva UI intuitiva para personalizar festivos
@@ -674,24 +775,20 @@ const festivos = await getFestivosActivosParaEmpleado(
 5. **Botón guardar**: Cambios se aplican al hacer clic en "Guardar configuración"
 6. **Dialog de copia**: Opción para copiar configuración a otros empleados tras guardar
 7. **Sincronización completa**: Integrado en calendario individual, ausencias y fichajes
-8. **Título simplificado**: "Personalizar festivos" (sin nombre del empleado)
 
-### Mejoras de UX
+**Mejoras de UX**:
 - Vista clara de festivos de empresa vs personalizados
 - Festivo de empresa se muestra tachado cuando está personalizado
 - Badge "Personalizado" para identificar festivos reemplazados
-- Proceso de guardado explícito en lugar de cambios automáticos
 - Selección múltiple con checkboxes para copiar a otros empleados
-- Información contextual sobre el propósito de los festivos personalizados
 
-### Mejoras Técnicas
-- Función `getFestivosActivosParaEmpleado` optimizada para combinar festivos correctamente
-- Filtrado eficiente usando `Set` para búsquedas rápidas
-- Eliminación de lógica innecesaria de estados activo/inactivo
+**Mejoras Técnicas**:
+- Función `getFestivosActivosParaEmpleado` optimizada
+- Filtrado eficiente usando `Set`
 - Mejor separación de responsabilidades entre API y componentes
 
 ---
 
-**Última actualización**: 4 Diciembre 2024  
-**Estado**: Sistema completo y operativo  
-**Versión**: 2.0
+**Última actualización**: 9 Diciembre 2025
+**Estado**: Sistema completo y operativo
+**Versión**: 2.1

@@ -1,0 +1,68 @@
+# PROMPT PARA CONSOLIDAR DOCUMENTACIÓN TÉCNICA
+
+Utiliza este prompt en nuevas conversaciones de Claude Code para consolidar documentación fragmentada:
+
+---
+
+## PROMPT:
+
+Necesito consolidar la documentación técnica sobre [NOMBRE_FUNCIONALIDAD] que está fragmentada en múltiples archivos. El objetivo es tener documentación limpia, organizada y sin redundancias.
+
+**Instrucciones:**
+
+1. **Identificar todos los archivos** de documentación relacionados con [NOMBRE_FUNCIONALIDAD]:
+   - Busca archivos .md que mencionen [PALABRA_CLAVE]
+   - Lista los archivos encontrados con tamaño y fecha de modificación
+
+2. **Analizar el contenido** de cada archivo:
+   - Lee brevemente cada uno (primeras 15-20 líneas)
+   - Identifica el propósito de cada documento
+   - Detecta redundancias y solapamientos
+
+3. **Crear un documento consolidado** que:
+   - Tenga un ÍNDICE con enlaces internos a cada sección
+   - Organice el contenido cronológicamente (si aplica)
+   - Incluya TODO el contexto importante de los archivos individuales
+   - Tenga secciones claras separadas por fecha/fase/componente
+   - Al final, incluya un "Resumen Ejecutivo" con:
+     * Documentos activos restantes
+     * Documentos eliminados (consolidados)
+     * Estado final del sistema
+     * Funcionalidades implementadas
+     * Reglas de negocio garantizadas
+
+4. **Actualizar el documento principal** con toda la información consolidada
+
+5. **Eliminar archivos redundantes** que ahora están consolidados en el documento principal
+
+6. **Verificar el resultado**:
+   - Listar los archivos de documentación que quedan
+   - Confirmar que no hay redundancias
+   - Mostrar el tamaño final del documento consolidado
+
+**Output esperado:**
+- Un solo documento principal consolidado con índice navegable
+- Archivos redundantes eliminados
+- Documentación limpia, organizada y completa
+
+---
+
+## EJEMPLO DE USO:
+
+"Necesito consolidar la documentación técnica sobre JORNADAS que está fragmentada en múltiples archivos. El objetivo es tener documentación limpia, organizada y sin redundancias. [seguir con las instrucciones arriba...]"
+
+---
+
+## NOTAS:
+
+- Preserva TODA la información técnica importante (no resumir en exceso)
+- Mantén bloques de código completos cuando sean relevantes
+- Usa formato markdown con buena estructura jerárquica (h1, h2, h3)
+- Incluye enlaces internos con anclas HTML para navegación rápida
+- Al final, confirma qué archivos fueron eliminados y por qué
+
+---
+
+Creado: 8 de Diciembre de 2025
+Autor: Claude Code
+Propósito: Reutilizar para consolidar documentación fragmentada en otros módulos/funcionalidades

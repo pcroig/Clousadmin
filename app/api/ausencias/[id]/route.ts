@@ -334,7 +334,7 @@ export async function PATCH(
         periodo: z.enum(['manana', 'tarde']).optional(),
         motivo: z.string().nullable().optional(),
         justificanteUrl: z.string().nullable().optional(),
-        documentoId: z.string().uuid().nullable().optional(),
+        documentoId: z.string().nullable().optional(), // CUID, no UUID
         estado: z.enum(['pendiente', 'confirmada', 'completada', 'rechazada']).optional(),
       }).refine((data) => {
         if (data.fechaInicio && data.fechaFin) {
@@ -747,36 +747,55 @@ export async function PATCH(
   }
 }
 
-// DELETE /api/ausencias/[id] - Cancelar ausencia (solo empleado)
+// DELETE /api/ausencias/[id] - Cancelar/Eliminar ausencia
+// - Empleado: solo puede cancelar sus propias ausencias pendientes
+// - HR Admin: puede eliminar cualquier ausencia de su empresa
 export async function DELETE(
   req: NextRequest,
   context: { params: Promise<{ id: string }> }
 ) {
     const params = await context.params;
   try {
-    // Verificar autenticación (debe ser empleado)
+    // Verificar autenticación
     const authResult = await requireAuth(req);
     if (authResult instanceof Response) return authResult;
     const { session } = authResult;
 
-    if (!session.user.empleadoId) {
-      return forbiddenResponse('Solo empleados pueden cancelar sus ausencias');
-    }
-
     // Await params in Next.js 15+
     const { id } = await params;
 
-    // Verificar que la ausencia es del empleado y está pendiente
+    // Determinar permisos según rol
+    const esHRAdmin = session.user.rol === UsuarioRol.hr_admin;
+    const esEmpleado = session.user.rol === UsuarioRol.empleado;
+
+    // Construir WHERE clause según permisos
+    const whereClause: Prisma.ausenciasWhereInput = {
+      id,
+      empresaId: session.user.empresaId, // Siempre verificar que pertenece a la empresa
+    };
+
+    if (esHRAdmin) {
+      // HR Admin puede eliminar cualquier ausencia de su empresa (sin restricciones de estado ni empleado)
+      // No agregar filtros adicionales
+    } else if (esEmpleado && session.user.empleadoId) {
+      // Empleado solo puede cancelar sus propias ausencias en estado pendiente
+      whereClause.empleadoId = session.user.empleadoId;
+      whereClause.estado = EstadoAusencia.pendiente;
+    } else {
+      return forbiddenResponse('No tienes permisos para eliminar ausencias');
+    }
+
+    // Buscar la ausencia con los filtros apropiados
     const ausencia = await prisma.ausencias.findFirst({
-      where: {
-        id,
-        empleadoId: session.user.empleadoId,
-        estado: EstadoAusencia.pendiente,
-      }
+      where: whereClause,
     });
 
     if (!ausencia) {
-      return notFoundResponse('Ausencia no encontrada o no se puede cancelar');
+      if (esHRAdmin) {
+        return notFoundResponse('Ausencia no encontrada');
+      } else {
+        return notFoundResponse('Ausencia no encontrada o no se puede cancelar (solo ausencias pendientes)');
+      }
     }
 
     // Actualizar saldo si la ausencia descuentaba saldo

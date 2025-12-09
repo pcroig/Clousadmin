@@ -12,9 +12,10 @@ interface PWAExplicacionProps {
   onComplete?: () => void;
   showCompleteButton?: boolean;
   loading?: boolean;
+  token?: string; // Token para llamar al endpoint de progreso
 }
 
-export function PWAExplicacion({ onComplete, showCompleteButton = false, loading = false }: PWAExplicacionProps) {
+export function PWAExplicacion({ onComplete, showCompleteButton = false, loading = false, token }: PWAExplicacionProps) {
   const [activeTab, setActiveTab] = useState('ios');
   const [installing, setInstalling] = useState(false);
   const { canInstall, promptInstall } = usePWAInstallPrompt();
@@ -25,6 +26,29 @@ export function PWAExplicacion({ onComplete, showCompleteButton = false, loading
       await promptInstall();
     } finally {
       setInstalling(false);
+    }
+  };
+
+  const handleComplete = async () => {
+    if (!token || !onComplete) {
+      // Si no hay token, solo llamar a onComplete (onboarding simplificado)
+      onComplete?.();
+      return;
+    }
+
+    try {
+      // Llamar al endpoint para guardar el progreso
+      const response = await fetch(`/api/onboarding/${token}/pwa-completado`, {
+        method: 'POST',
+      });
+
+      if (response.ok) {
+        onComplete();
+      }
+    } catch (error) {
+      console.error('[PWAExplicacion] Error al guardar progreso:', error);
+      // Llamar a onComplete de todos modos
+      onComplete();
     }
   };
 
@@ -104,7 +128,7 @@ export function PWAExplicacion({ onComplete, showCompleteButton = false, loading
       {showCompleteButton && (
         <div className="flex justify-center pt-4 border-t">
           <LoadingButton
-            onClick={onComplete}
+            onClick={handleComplete}
             loading={loading}
             className="w-full sm:w-auto"
           >

@@ -5,12 +5,18 @@
 
 'use client';
 
-import { Bell } from 'lucide-react';
+import { Bell, Filter } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { memo, useCallback, useState, type MouseEvent } from 'react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { openPreferenciasModalFromUrl } from '@/lib/events/vacaciones';
 import { obtenerIconoPorTipo } from '@/lib/notificaciones/helpers';
 import { formatRelativeTimeShort } from '@/lib/utils/formatRelativeTime';
@@ -28,6 +34,8 @@ interface NotificacionesWidgetProps {
   href?: string; // URL de redirección personalizable
 }
 
+type FiltroNotificaciones = 'todas' | 'no_leidas' | 'leidas';
+
 export const NotificacionesWidget = memo(function NotificacionesWidget({
   notificaciones,
   maxItems = 5,
@@ -36,8 +44,18 @@ export const NotificacionesWidget = memo(function NotificacionesWidget({
 }: NotificacionesWidgetProps) {
   const router = useRouter();
   const [marcandoLeidas, setMarcandoLeidas] = useState(false);
-  const notificacionesMostradas = notificaciones.slice(0, maxItems);
+  const [filtro, setFiltro] = useState<FiltroNotificaciones>('no_leidas');
+
+  // Filtrar notificaciones según el filtro
+  const notificacionesFiltradas = notificaciones.filter(n => {
+    if (filtro === 'no_leidas') return !n.leida;
+    if (filtro === 'leidas') return n.leida;
+    return true; // 'todas'
+  });
+
+  const notificacionesMostradas = notificacionesFiltradas.slice(0, maxItems);
   const tieneNotificaciones = notificacionesMostradas.length > 0;
+  const notificacionesNoLeidas = notificaciones.filter(n => !n.leida);
 
   const handleMarcarTodasLeidas = useCallback(async () => {
     setMarcandoLeidas(true);
@@ -61,18 +79,74 @@ export const NotificacionesWidget = memo(function NotificacionesWidget({
     }
   }, [router]);
 
-  const handleClick = (notif: NotificacionUI) => {
+  /**
+   * Corrige URLs antiguas de notificaciones que apuntan a lugares incorrectos
+   */
+  const corregirUrlNotificacion = useCallback((notif: NotificacionUI): string | undefined => {
+    const accionUrl = notif.metadata?.accionUrl;
+    if (!accionUrl) return undefined;
+
+    // Corregir notificaciones de firma_completada que apuntan a /hr/documentos
+    if (notif.tipo === 'firma_completada') {
+      const solicitudId = notif.metadata?.solicitudId as string | undefined;
+      if (solicitudId && accionUrl === '/hr/documentos') {
+        return `/firma/solicitud/${solicitudId}`;
+      }
+    }
+
+    // Corregir notificaciones de solicitud_creada que apuntan a /hr/solicitudes
+    if (notif.tipo === 'solicitud_creada' && accionUrl === '/hr/solicitudes') {
+      return '/hr/bandeja-entrada?tab=solicitudes';
+    }
+
+    // Corregir notificaciones de campañas con URLs viejas
+    if (notif.tipo === 'campana_vacaciones_creada' || notif.tipo === 'campana_vacaciones_completada') {
+      const campanaId = notif.metadata?.campanaId as string | undefined;
+      if (campanaId && accionUrl.includes('/vacaciones/campanas/')) {
+        return `/hr/horario/ausencias?campana=${campanaId}`;
+      }
+      if (campanaId && accionUrl.includes('/empleado/vacaciones/campanas/')) {
+        return `/empleado/horario/ausencias?campana=${campanaId}`;
+      }
+    }
+
+    // Corregir notificaciones de onboarding_completado con URL vieja
+    if (notif.tipo === 'onboarding_completado') {
+      const empleadoId = notif.metadata?.empleadoId as string | undefined;
+      if (empleadoId && accionUrl === `/hr/empleados/${empleadoId}`) {
+        return `/hr/organizacion/personas/${empleadoId}`;
+      }
+    }
+
+    return accionUrl;
+  }, []);
+
+  const handleClick = useCallback(async (notif: NotificacionUI) => {
+    // Marcar como leída si no lo está
+    if (!notif.leida) {
+      try {
+        await fetch(`/api/notificaciones/${notif.id}/marcar-leida`, {
+          method: 'PATCH',
+        });
+        // No esperamos la respuesta para mejorar UX
+      } catch (error) {
+        console.error('[NotificacionesWidget] Error al marcar como leída:', error);
+      }
+    }
+
     // Si tiene URL de acción, navegar allí
-    if (notif.metadata?.accionUrl) {
-      if (openPreferenciasModalFromUrl(notif.metadata.accionUrl)) {
+    const accionUrl = corregirUrlNotificacion(notif);
+    if (accionUrl) {
+      if (openPreferenciasModalFromUrl(accionUrl)) {
+        router.refresh(); // Refrescar para actualizar el estado
         return;
       }
-      router.push(notif.metadata.accionUrl);
+      router.push(accionUrl);
     } else {
       // Si no, ir a la bandeja de entrada
       router.push(href);
     }
-  };
+  }, [router, href, corregirUrlNotificacion]);
 
   const renderNotificacion = (notif: NotificacionUI) => {
     const IconComponent = obtenerIconoPorTipo(notif.tipo);
@@ -83,20 +157,23 @@ export const NotificacionesWidget = memo(function NotificacionesWidget({
       notif.metadata?.requiresSignature ||
       notif.metadata?.requiresSelection;
 
-    const accionUrl = notif.metadata?.accionUrl;
+    const accionUrlOriginal = notif.metadata?.accionUrl;
+    const accionUrl = corregirUrlNotificacion(notif);
     const accionTexto = notif.metadata?.accionTexto;
 
     const renderAccion = () => {
-      if (!tieneAccionEspecial || !accionUrl || !accionTexto) {
+      if (!tieneAccionEspecial || !accionUrlOriginal || !accionTexto) {
         return null;
       }
 
       const handleAccion = (event: MouseEvent<HTMLButtonElement>) => {
         event.stopPropagation();
-        if (openPreferenciasModalFromUrl(accionUrl)) {
+        if (accionUrl && openPreferenciasModalFromUrl(accionUrl)) {
           return;
         }
-        router.push(accionUrl);
+        if (accionUrl) {
+          router.push(accionUrl);
+        }
       };
 
       return (
@@ -129,7 +206,6 @@ export const NotificacionesWidget = memo(function NotificacionesWidget({
             </p>
             <div className="flex items-center gap-1 text-[11px] text-gray-500 shrink-0">
               <span>{formatRelativeTimeShort(notif.fecha)}</span>
-              {!notif.leida && <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />}
             </div>
           </div>
 
@@ -139,24 +215,46 @@ export const NotificacionesWidget = memo(function NotificacionesWidget({
     );
   };
 
-  const notificacionesNoLeidas = notificaciones.filter(n => !n.leida).length;
-
   return (
     <WidgetCard
       title="Notificaciones"
       href={href}
       useScroll={tieneNotificaciones}
       headerAction={
-        notificacionesNoLeidas > 0 ? (
-          <button
-            onClick={handleMarcarTodasLeidas}
-            disabled={marcandoLeidas}
-            className="px-2 py-1 text-[11px] sm:text-xs font-medium text-gray-700 border border-gray-300 bg-white hover:bg-gray-50 rounded-md transition-colors disabled:opacity-50 disabled:pointer-events-none"
-            title="Marcar todas como leídas"
-          >
-            Marcar leídas
-          </button>
-        ) : undefined
+        <div className="flex items-center gap-2">
+          {notificacionesNoLeidas.length > 0 && filtro !== 'leidas' && (
+            <button
+              onClick={handleMarcarTodasLeidas}
+              disabled={marcandoLeidas}
+              className="px-2 py-1 text-[11px] sm:text-xs font-medium text-gray-700 border border-gray-300 bg-white hover:bg-gray-50 rounded-md transition-colors disabled:opacity-50 disabled:pointer-events-none"
+              title="Marcar todas como leídas"
+            >
+              Marcar leídas
+            </button>
+          )}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                className="h-8 w-8 rounded-md hover:bg-gray-100 flex items-center justify-center transition-colors"
+                aria-label="Filtrar notificaciones"
+              >
+                <Filter className="h-4 w-4 text-gray-600" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => setFiltro('todas')}>
+                Todas
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setFiltro('no_leidas')}>
+                No leídas
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setFiltro('leidas')}>
+                Leídas
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       }
     >
       <div className="flex h-full flex-col">

@@ -31,3 +31,4 @@ ALTER TABLE "tipos_complemento" DROP COLUMN IF EXISTS "esImporteFijo";
 ALTER TABLE "tipos_complemento" DROP COLUMN IF EXISTS "importeFijo";
 
 
+

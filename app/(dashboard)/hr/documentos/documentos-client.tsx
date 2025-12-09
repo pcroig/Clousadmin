@@ -299,8 +299,7 @@ export function DocumentosClient({ carpetas, plantillasEnabled }: DocumentosClie
         open={modalCrearCarpeta}
         onClose={() => setModalCrearCarpeta(false)}
         onSuccess={(_carpetaId) => {
-          // Recargar página para mostrar nueva carpeta
-          router.refresh();
+          // Ya no se necesita router.refresh(), se revalida automáticamente
         }}
       />
 
@@ -310,8 +309,7 @@ export function DocumentosClient({ carpetas, plantillasEnabled }: DocumentosClie
           open={modalSubirPlantilla}
           onOpenChange={setModalSubirPlantilla}
           onSuccess={() => {
-            // Recargar página para mostrar nueva plantilla
-            router.refresh();
+            // Ya no se necesita router.refresh(), se revalida automáticamente
           }}
         />
       )}

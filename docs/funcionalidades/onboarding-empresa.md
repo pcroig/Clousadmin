@@ -166,9 +166,8 @@ useEffect(() => {
 
 **Acción al guardar:**
 - Crea o actualiza la jornada predefinida
-- **Verifica primero** si existen jornadas distintas ya asignadas (`/api/jornadas/verificar-previas`)
-- Si no hay jornadas previas, asigna automáticamente a toda la empresa
-- Si se detectan jornadas previas, muestra un diálogo de confirmación con el listado de jornadas que se reemplazarán y bloquea el paso hasta confirmar
+- Valida solapamientos y cobertura 100% (empresa es excluyente)
+- Desasigna jornadas obsoletas y asigna automáticamente a toda la empresa
 - El nombre se establece internamente como "Jornada base"
 - No requiere selección manual de asignación (simplificado para onboarding)
 
@@ -186,41 +185,88 @@ useEffect(() => {
 
 ### Paso 4: Calendario Laboral
 
-**Objetivo:** Configurar días laborables y festivos de la empresa.
+**Objetivo:** Configurar días laborables, límites de fichaje y festivos de la empresa.
 
 **Componente:** `components/onboarding/calendario-step.tsx`
 
-**Características:**
-- Usa `CalendarioFestivos` y `ListaFestivos` (componentes reutilizables del panel de HR)
-- Selector visual de días laborables de la semana
-- **Calendario visual de dos meses** (`numberOfMonths={2}`)
-- Gestión completa de festivos
+**Características principales:**
+- ✅ Usa `CalendarioFestivos` y `ListaFestivos` (componentes reutilizables del panel de HR)
+- ✅ Selector visual de días laborables de la semana (L-D)
+- ✅ Campos de límites de fichaje (hora mínima inicio / hora máxima salida)
+- ✅ **Calendario visual de dos meses** (`numberOfMonths={2}`)
+- ✅ **Gestión de festivos por año** con selector integrado
+- ✅ **Modal unificado de importación** (`ImportarFestivosModal`)
+- ✅ **Importación automática de festivos nacionales** al entrar al paso
+- ✅ **Sincronización completa** con configuración de HR Admin
 
-**Funcionalidades:**
-- **Días laborables:** Selector visual para activar/desactivar días (L-D)
-- **Festivos:**
-  - Importar desde archivo ICS/CSV
-  - Crear festivos manualmente
-  - **Vista de calendario visual mostrando 2 meses simultáneamente**
-  - Lista de festivos con edición/eliminación
-  - Sincronización automática entre calendario y lista
+**Secciones del paso:**
 
-**Visualización del Calendario:**
+1. **Días laborables de la semana**
+   - Selector visual con botones toggle para L-D
+   - Por defecto: Lunes a Viernes activos
+
+2. **Límites de fichaje globales**
+   - **Hora mínima de inicio**: Campo time input (ej: 07:00)
+   - **Hora máxima de salida**: Campo time input (ej: 21:00)
+   - Aplicable a TODAS las jornadas de la empresa
+   - Opcional: Se pueden dejar vacíos
+
+3. **Festivos** (con tabs: Calendario / Lista)
+   - **Tab Calendario**: Vista visual de 2 meses con festivos marcados
+   - **Tab Lista**: Tabla con gestión por año
+     - Selector de año en header de tabla
+     - Visualización con `FechaCalendar` (diseño tipo calendario)
+     - Alerta si faltan festivos nacionales (< 10)
+     - Crear festivos inline en la tabla
+     - Toggle activo/inactivo
+   - **Botones de acción**:
+     - "Añadir festivo": Crea festivo inline en la tabla
+     - "Importar": Abre modal unificado con 2 opciones
+
+**Modal de Importación (`ImportarFestivosModal`)**:
+
+Opciones disponibles:
+1. **Desde archivo**:
+   - Formatos: .ics, .csv
+   - Preview del archivo seleccionado
+   - Import directo
+2. **Festivos nacionales**:
+   - Lista de 10 festivos nacionales de España
+   - Selección del año (usa año del selector de la tabla)
+   - Confirmación explícita
+   - Detección de duplicados automática (upsert)
+
+**Importación automática inicial:**
 ```typescript
-<Calendar
-  numberOfMonths={2}  // Muestra 2 meses lado a lado
-  modifiers={{
-    festivo: festivosDates,
-    noLaborable: (date) => !esDiaLaborable(date)
-  }}
-/>
+useEffect(() => {
+  // Al montar el componente por primera vez
+  // Importa festivos nacionales del año actual automáticamente
+  fetch('/api/festivos/importar-nacionales', { method: 'POST' });
+}, []);
 ```
 
-**Acción al guardar:**
-- Actualiza los días laborables de la empresa
-- Guarda festivos en la base de datos
+**Sincronización con HR Admin:**
+- Usa el **mismo modal** de importación (`ImportarFestivosModal`)
+- Usa los **mismos componentes** de calendario y lista
+- Misma UX y funcionalidad en ambos contextos
+- Hook `useFestivos` para actualización automática
 
-**Server Action:** `configurarCalendarioYJornadaAction` (solo actualiza calendario, no jornada)
+**Acción al guardar (imperative handle):**
+```typescript
+const guardar = async (): Promise<boolean> => {
+  // Guarda:
+  // 1. Días laborables
+  // 2. Límites de fichaje globales
+  // NO guarda festivos (se guardan automáticamente al crear/editar)
+};
+```
+
+**Server Action:** `configurarCalendarioYJornadaAction` (actualiza calendario y límites de fichaje)
+
+**Datos persistidos:**
+- Días laborables → `empresa.config.diasLaborables`
+- Límites de fichaje → `empresa.config.limiteInferiorFichaje` y `limiteSuperiorFichaje`
+- Festivos → Tabla `festivos` (se guardan inmediatamente al crear/editar)
 
 ---
 
@@ -281,6 +327,8 @@ useEffect(() => {
 - `components/shared/jornada-form-fields.tsx` (usado en paso 3)
 - `components/hr/calendario-festivos.tsx` (usado en paso 4)
 - `components/hr/lista-festivos.tsx` (usado en paso 4)
+- `components/hr/importar-festivos-modal.tsx` (usado en paso 4)
+- `components/shared/fecha-calendar.tsx` (usado en lista de festivos)
 
 ### Server Actions
 
@@ -405,8 +453,16 @@ El stepper muestra:
 
 ---
 
-**Última actualización:** 2025-11-29
+**Última actualización:** 2025-12-09
 **Autor:** Clousadmin Dev Team
+
+**Cambios en v2.2 (9 Dic 2025):**
+- ✅ **Paso 4 actualizado**: Modal unificado de importación de festivos
+- ✅ **Gestión por año**: Selector de año en tabla de festivos
+- ✅ **Importación automática**: Festivos nacionales se importan al entrar al paso 4
+- ✅ **Límites de fichaje**: Campos de hora mínima/máxima en paso 4
+- ✅ **Sincronización total**: Mismo modal y componentes que gestión HR
+
 **Cambios en v2.1:**
 - ✅ Avatar en paso 0 con upload a S3
 - ✅ Normalización automática de URLs (añade https://)

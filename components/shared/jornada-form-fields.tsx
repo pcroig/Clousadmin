@@ -60,8 +60,8 @@ interface JornadaFormFieldsProps {
   empleadosSeleccionados?: string[];
   onEmpleadosSeleccionChange?: (ids: string[]) => void;
   equipos?: Array<{ id: string; nombre: string; miembros: number }>;
-  equipoSeleccionado?: string;
-  onEquipoSeleccionadoChange?: (id: string) => void;
+  equiposSeleccionados?: string[]; // Cambiado de singular a plural para múltiples equipos
+  onEquiposSeleccionadosChange?: (ids: string[]) => void; // Cambiado para recibir array
 }
 
 const DIA_KEYS: Array<{ key: DiaKey; label: string; shortLabel: string }> = [
@@ -86,8 +86,8 @@ export function JornadaFormFields({
   empleadosSeleccionados = [],
   onEmpleadosSeleccionChange,
   equipos = [],
-  equipoSeleccionado = '',
-  onEquipoSeleccionadoChange,
+  equiposSeleccionados = [],
+  onEquiposSeleccionadosChange,
 }: JornadaFormFieldsProps) {
   const DESCANSO_MIN = 0;
   const DESCANSO_MAX = 480;
@@ -117,6 +117,14 @@ export function JornadaFormFields({
       ? empleadosSeleccionados.filter(id => id !== empleadoId)
       : [...empleadosSeleccionados, empleadoId];
     onEmpleadosSeleccionChange(newSelection);
+  }
+
+  function toggleEquipo(equipoId: string) {
+    if (!onEquiposSeleccionadosChange) return;
+    const newSelection = equiposSeleccionados.includes(equipoId)
+      ? equiposSeleccionados.filter(id => id !== equipoId)
+      : [...equiposSeleccionados, equipoId];
+    onEquiposSeleccionadosChange(newSelection);
   }
 
   const parseDescansoValue = (value: string): number => {
@@ -203,23 +211,24 @@ export function JornadaFormFields({
 
           {nivelAsignacion === 'equipo' && (
             <Field className="mt-3">
-              <FieldLabel>Seleccionar equipo</FieldLabel>
-              <Select 
-                value={equipoSeleccionado} 
-                onValueChange={(v) => onEquipoSeleccionadoChange?.(v)}
-                disabled={disabled}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Elige un equipo" />
-                </SelectTrigger>
-                <SelectContent>
-                  {equipos.map(eq => (
-                    <SelectItem key={eq.id} value={eq.id}>
-                      {eq.nombre} ({eq.miembros} {eq.miembros === 1 ? 'miembro' : 'miembros'})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <FieldLabel>Seleccionar equipos</FieldLabel>
+              <div className="border rounded-md p-4 space-y-2 max-h-64 overflow-y-auto mt-2">
+                {equipos.map(equipo => (
+                  <div key={equipo.id} className="flex items-center gap-2">
+                    <Checkbox
+                      checked={equiposSeleccionados.includes(equipo.id)}
+                      onCheckedChange={() => toggleEquipo(equipo.id)}
+                      disabled={disabled}
+                    />
+                    <span className="text-sm">
+                      {equipo.nombre} ({equipo.miembros} {equipo.miembros === 1 ? 'miembro' : 'miembros'})
+                    </span>
+                  </div>
+                ))}
+              </div>
+              <p className="text-sm text-gray-500 mt-2">
+                {equiposSeleccionados.length} equipo{equiposSeleccionados.length !== 1 ? 's' : ''} seleccionado{equiposSeleccionados.length !== 1 ? 's' : ''}
+              </p>
             </Field>
           )}
 

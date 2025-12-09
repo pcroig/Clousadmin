@@ -1,21 +1,26 @@
 'use client';
 
 // ========================================
-// Modal de Gestión de Jornadas - CON EDICIÓN INLINE
+// Modal de Gestión de Jornadas - DISEÑO UNIFICADO CON ONBOARDING
 // ========================================
+// Usa Accordion como en onboarding, pero sin nombre/etiqueta
+// Los asignados actúan como identificador
 
-import { CalendarX, ChevronDown, ChevronUp, Plus, Trash2 } from 'lucide-react';
-import { Fragment, useEffect, useState } from 'react';
+import { ChevronDown, Plus, Trash2 } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
-import { EmployeeListPreview } from '@/components/shared/employee-list-preview';
-import { EmptyState } from '@/components/shared/empty-state';
 import {
   type JornadaFormData,
   JornadaFormFields,
 } from '@/components/shared/jornada-form-fields';
 import { LoadingButton } from '@/components/shared/loading-button';
-import { Badge } from '@/components/ui/badge';
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from '@/components/ui/accordion';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -25,29 +30,11 @@ import {
   DialogScrollableContent,
   DialogTitle,
 } from '@/components/ui/dialog';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { type JornadaConfig, type DiaConfig } from '@/lib/calculos/fichajes-helpers';
-import { useApi, useMutation } from '@/lib/hooks';
+import { useApi } from '@/lib/hooks';
 
 type DiaKey = 'lunes' | 'martes' | 'miercoles' | 'jueves' | 'viernes' | 'sabado' | 'domingo';
-
 const DIA_KEYS: DiaKey[] = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo'];
-const DIA_INICIAL: Record<DiaKey, string> = {
-  lunes: 'L',
-  martes: 'M',
-  miercoles: 'X',
-  jueves: 'J',
-  viernes: 'V',
-  sabado: 'S',
-  domingo: 'D',
-};
 
 const isDiaConfig = (value: unknown): value is DiaConfig =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -68,6 +55,7 @@ interface Equipo {
   id: string;
   nombre: string;
   miembros: number;
+  empleadoIds?: string[]; // IDs de empleados en este equipo
 }
 
 interface Jornada {
@@ -76,14 +64,14 @@ interface Jornada {
   config: JornadaConfig | null;
   esPredefinida: boolean;
   activa: boolean;
-  nivelAsignacion?: 'empresa' | 'equipo' | 'individual';
-  equiposAsignados?: string[];
-  empleadosPreview?: Array<{
+  asignacion?: {
+    nivelAsignacion: string;
+    equipoIds?: string[] | null;
+  } | null;
+  empleados?: Array<{
     id: string;
     nombre: string;
     apellidos?: string | null;
-    fotoUrl?: string | null;
-    avatar?: string | null;
   }>;
   _count?: {
     empleados: number;
@@ -95,7 +83,20 @@ interface JornadasModalProps {
   onClose: () => void;
 }
 
-function createDefaultFormData(): JornadaFormData {
+type NivelAsignacion = 'empresa' | 'equipo' | 'individual';
+
+interface JornadaLocal extends JornadaFormData {
+  id?: string; // ID si es existente, undefined si es nueva
+  esPredefinida?: boolean;
+}
+
+interface AsignacionPorJornada {
+  nivel: NivelAsignacion;
+  equipoIds?: string[]; // Array para permitir múltiples equipos
+  empleadoIds?: string[];
+}
+
+function createDefaultJornada(): JornadaLocal {
   return {
     tipoJornada: 'flexible',
     horasSemanales: '40',
@@ -113,26 +114,54 @@ function createDefaultFormData(): JornadaFormData {
   };
 }
 
-export function JornadasModal({ open, onClose }: JornadasModalProps) {
-  // Estado de expansión/edición - UN SOLO ID que puede ser de jornada existente o 'new'
-  const [editingId, setEditingId] = useState<string | null>(null);
+function getJornadaLabel(jornada: JornadaLocal, asignacion: AsignacionPorJornada, empleados: Empleado[], equipos: Equipo[]): string {
+  const tipo = jornada.tipoJornada === 'fija' ? 'Fija' : 'Flexible';
+  const horas = jornada.horasSemanales || '40';
 
-  // Form data - se usa tanto para crear como para editar
-  const [formData, setFormData] = useState<JornadaFormData>(createDefaultFormData());
-  const [empleadosSeleccionados, setEmpleadosSeleccionados] = useState<string[]>([]);
-  const [nivelAsignacion, setNivelAsignacion] = useState<'empresa' | 'equipo' | 'individual'>('empresa');
-  const [equipoSeleccionado, setEquipoSeleccionado] = useState<string>('');
+  let asignadosLabel = '';
+  if (asignacion.nivel === 'empresa') {
+    asignadosLabel = 'Toda la empresa';
+  } else if (asignacion.nivel === 'equipo' && asignacion.equipoIds && asignacion.equipoIds.length > 0) {
+    if (asignacion.equipoIds.length === 1) {
+      const equipo = equipos.find(eq => eq.id === asignacion.equipoIds![0]);
+      asignadosLabel = equipo ? equipo.nombre : 'Equipo';
+    } else {
+      const nombresEquipos = asignacion.equipoIds
+        .map(id => equipos.find(eq => eq.id === id)?.nombre)
+        .filter(Boolean)
+        .join(', ');
+      asignadosLabel = nombresEquipos || `${asignacion.equipoIds.length} equipos`;
+    }
+  } else if (asignacion.nivel === 'individual' && asignacion.empleadoIds && asignacion.empleadoIds.length > 0) {
+    const primerEmpleado = empleados.find(emp => emp.id === asignacion.empleadoIds![0]);
+    if (asignacion.empleadoIds.length === 1 && primerEmpleado) {
+      asignadosLabel = `${primerEmpleado.nombre} ${primerEmpleado.apellidos}`;
+    } else {
+      asignadosLabel = `${asignacion.empleadoIds.length} empleados`;
+    }
+  } else {
+    asignadosLabel = 'Sin asignar';
+  }
+
+  return `${tipo} ${horas}h - ${asignadosLabel}`;
+}
+
+export function JornadasModal({ open, onClose }: JornadasModalProps) {
+  // Estado de jornadas locales (mezcla de existentes y nuevas)
+  const [jornadas, setJornadas] = useState<JornadaLocal[]>([]);
+  const [asignaciones, setAsignaciones] = useState<Record<number, AsignacionPorJornada>>({});
+  const [expandedIndex, setExpandedIndex] = useState<string>('');
 
   // Estados auxiliares
   const [empleados, setEmpleados] = useState<Empleado[]>([]);
   const [equipos, setEquipos] = useState<Equipo[]>([]);
   const [guardando, setGuardando] = useState(false);
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [errors, setErrors] = useState<Record<number, Record<string, string>>>({});
+  const [inicializado, setInicializado] = useState(false);
 
   // Hooks
   const { data: jornadasData, loading, execute: refetchJornadas } = useApi<Jornada[]>();
-  const jornadas = jornadasData ?? [];
-  const { execute: eliminarJornada } = useMutation<void>({ method: 'DELETE' });
+  const jornadasExistentes = jornadasData ?? [];
 
   useEffect(() => {
     if (open) {
@@ -141,6 +170,100 @@ export function JornadasModal({ open, onClose }: JornadasModalProps) {
       cargarEquipos();
     }
   }, [open]);
+
+  // Cargar jornadas existentes en el estado local
+  useEffect(() => {
+    if (jornadasExistentes.length > 0) {
+      const jornadasLocales: JornadaLocal[] = jornadasExistentes.map((jornada) => {
+        const config = jornada.config;
+        const esFija = DIA_KEYS.some((dia) => {
+          const diaConfig = getDiaConfig(config, dia);
+          return Boolean(diaConfig?.entrada && diaConfig?.salida);
+        });
+
+        const horariosFijos: Record<DiaKey, { activo: boolean; entrada: string; salida: string }> = {
+          lunes: { activo: false, entrada: '', salida: '' },
+          martes: { activo: false, entrada: '', salida: '' },
+          miercoles: { activo: false, entrada: '', salida: '' },
+          jueves: { activo: false, entrada: '', salida: '' },
+          viernes: { activo: false, entrada: '', salida: '' },
+          sabado: { activo: false, entrada: '', salida: '' },
+          domingo: { activo: false, entrada: '', salida: '' },
+        };
+
+        if (esFija && config) {
+          DIA_KEYS.forEach((dia) => {
+            const diaConfig = getDiaConfig(config, dia);
+            if (diaConfig) {
+              horariosFijos[dia] = {
+                activo: Boolean(diaConfig.activo),
+                entrada: diaConfig.entrada || '',
+                salida: diaConfig.salida || '',
+              };
+            }
+          });
+        } else if (config) {
+          DIA_KEYS.forEach((dia) => {
+            const diaConfig = getDiaConfig(config, dia);
+            if (diaConfig) {
+              horariosFijos[dia] = {
+                activo: Boolean(diaConfig.activo),
+                entrada: '',
+                salida: '',
+              };
+            }
+          });
+        }
+
+        const descansoValue = config?.descanso;
+        const tieneDescanso = descansoValue !== undefined && descansoValue !== null;
+        const descansoMinutos = tieneDescanso ? String(descansoValue) : '60';
+
+        return {
+          id: jornada.id,
+          esPredefinida: jornada.esPredefinida,
+          tipoJornada: esFija ? 'fija' : 'flexible',
+          horasSemanales: String(jornada.horasSemanales),
+          horariosFijos,
+          tieneDescanso,
+          descansoMinutos,
+        };
+      });
+
+      const asignacionesLocales: Record<number, AsignacionPorJornada> = {};
+      jornadasExistentes.forEach((jornada, index) => {
+        const asignacion = jornada.asignacion;
+        if (asignacion) {
+          const nivel = asignacion.nivelAsignacion as NivelAsignacion;
+          if (nivel === 'equipo' && asignacion.equipoIds) {
+            asignacionesLocales[index] = {
+              nivel,
+              equipoIds: Array.isArray(asignacion.equipoIds) ? asignacion.equipoIds : [],
+            };
+          } else if (nivel === 'individual' && jornada.empleados) {
+            asignacionesLocales[index] = {
+              nivel,
+              empleadoIds: jornada.empleados.map(e => e.id),
+            };
+          } else {
+            asignacionesLocales[index] = { nivel };
+          }
+        } else {
+          asignacionesLocales[index] = { nivel: 'empresa' };
+        }
+      });
+
+      setJornadas(jornadasLocales);
+      setAsignaciones(asignacionesLocales);
+      setInicializado(true);
+    } else if (!loading && !inicializado) {
+      // No hay jornadas, empezar con una vacía (solo la primera vez)
+      setJornadas([createDefaultJornada()]);
+      setAsignaciones({ 0: { nivel: 'empresa' } });
+      setExpandedIndex('item-0');
+      setInicializado(true);
+    }
+  }, [jornadasExistentes, loading, inicializado]);
 
   async function cargarEmpleados() {
     try {
@@ -175,13 +298,18 @@ export function JornadasModal({ open, onClose }: JornadasModalProps) {
             const e = equipo as {
               id: string;
               nombre: string;
-              _count?: { empleado_equipos?: number };
               numeroMiembros?: number;
+              miembros?: Array<{ id: string }>; // ✅ 'miembros' viene de formatEquipoResponse
             };
+
+            // Extraer IDs de empleados desde 'miembros' (no 'empleado_equipos')
+            const empleadoIds = e.miembros?.map(m => m.id) || [];
+
             return {
               id: e.id,
               nombre: e.nombre,
-              miembros: e._count?.empleado_equipos || e.numeroMiembros || 0,
+              miembros: e.numeroMiembros || empleadoIds.length,
+              empleadoIds, // ✅ IDs extraídos correctamente
             };
           })
         );
@@ -191,180 +319,360 @@ export function JornadasModal({ open, onClose }: JornadasModalProps) {
     }
   }
 
-  function handleNuevaJornada() {
-    setEditingId('new');
-    setFormData(createDefaultFormData());
-    setNivelAsignacion('empresa');
-    setEmpleadosSeleccionados([]);
-    setEquipoSeleccionado('');
-    setErrors({});
+  function updateJornada(index: number, data: JornadaFormData) {
+    const newJornadas = [...jornadas];
+    newJornadas[index] = { ...newJornadas[index], ...data };
+    setJornadas(newJornadas);
   }
 
-  async function handleEditarJornada(jornada: Jornada) {
-    setEditingId(jornada.id);
-
-    // Cargar datos del formulario
-    const config = jornada.config;
-    const esFija = DIA_KEYS.some((dia) => {
-      const diaConfig = getDiaConfig(config, dia);
-      return Boolean(diaConfig?.entrada && diaConfig?.salida);
+  function addJornada() {
+    const newJornadas = [...jornadas, createDefaultJornada()];
+    setJornadas(newJornadas);
+    setAsignaciones({
+      ...asignaciones,
+      [newJornadas.length - 1]: { nivel: 'individual', empleadoIds: [] },
     });
+    setExpandedIndex(`item-${newJornadas.length - 1}`);
+  }
 
-    const horariosFijos: Record<DiaKey, { activo: boolean; entrada: string; salida: string }> = {
-      lunes: { activo: false, entrada: '', salida: '' },
-      martes: { activo: false, entrada: '', salida: '' },
-      miercoles: { activo: false, entrada: '', salida: '' },
-      jueves: { activo: false, entrada: '', salida: '' },
-      viernes: { activo: false, entrada: '', salida: '' },
-      sabado: { activo: false, entrada: '', salida: '' },
-      domingo: { activo: false, entrada: '', salida: '' },
-    };
-
-    if (esFija && config) {
-      DIA_KEYS.forEach((dia) => {
-        const diaConfig = getDiaConfig(config, dia);
-        if (diaConfig) {
-          horariosFijos[dia] = {
-            activo: Boolean(diaConfig.activo),
-            entrada: diaConfig.entrada || '',
-            salida: diaConfig.salida || '',
-          };
-        }
-      });
-    } else if (config) {
-      DIA_KEYS.forEach((dia) => {
-        const diaConfig = getDiaConfig(config, dia);
-        if (diaConfig) {
-          horariosFijos[dia] = {
-            activo: Boolean(diaConfig.activo),
-            entrada: '',
-            salida: '',
-          };
-        }
-      });
+  function removeJornada(index: number) {
+    if (jornadas.length <= 1) {
+      toast.error('Debe haber al menos una jornada');
+      return;
     }
 
-    setFormData({
-      tipoJornada: esFija ? 'fija' : 'flexible',
-      horasSemanales: String(jornada.horasSemanales),
-      horariosFijos,
-      tieneDescanso: Boolean(config?.descanso),
-      descansoMinutos: String(config?.descanso || 60),
+    // Re-indexar asignaciones
+    const reindexedAsignaciones: Record<number, AsignacionPorJornada> = {};
+    Object.keys(asignaciones).forEach(key => {
+      const oldIndex = parseInt(key);
+      if (oldIndex === index) return; // Eliminar esta jornada
+      const newIndex = oldIndex < index ? oldIndex : oldIndex - 1;
+      reindexedAsignaciones[newIndex] = asignaciones[oldIndex];
     });
 
-    // Cargar información de asignación
-    if (jornada.nivelAsignacion) {
-      setNivelAsignacion(jornada.nivelAsignacion);
+    setAsignaciones(reindexedAsignaciones);
+    const newJornadas = jornadas.filter((_, i) => i !== index);
+    setJornadas(newJornadas);
 
-      if (jornada.nivelAsignacion === 'individual') {
-        // Cargar todos los empleados asignados
-        try {
-          const response = await fetch(`/api/jornadas/${jornada.id}`);
-          if (response.ok) {
-            const data = await response.json();
-            const jornadaCompleta = data.data;
-            if (jornadaCompleta?.empleados && Array.isArray(jornadaCompleta.empleados)) {
-              const empleadosIds = jornadaCompleta.empleados.map((e: any) => e.id);
-              setEmpleadosSeleccionados(empleadosIds);
-            } else {
-              setEmpleadosSeleccionados([]);
-            }
-          }
-        } catch (error) {
-          console.error('Error cargando empleados de jornada:', error);
-          setEmpleadosSeleccionados([]);
-        }
-        setEquipoSeleccionado('');
-      } else if (jornada.nivelAsignacion === 'equipo') {
-        setEquipoSeleccionado('');
-        setEmpleadosSeleccionados([]);
-      } else {
-        setEmpleadosSeleccionados([]);
-        setEquipoSeleccionado('');
+    if (expandedIndex === `item-${index}`) {
+      setExpandedIndex('item-0');
+    }
+  }
+
+  function handleNivelAsignacionChange(jornadaIndex: number, nivel: NivelAsignacion) {
+    setAsignaciones({
+      ...asignaciones,
+      [jornadaIndex]: { nivel },
+    });
+  }
+
+  function handleEquiposChange(jornadaIndex: number, equipoIds: string[]) {
+    setAsignaciones({
+      ...asignaciones,
+      [jornadaIndex]: { nivel: 'equipo', equipoIds },
+    });
+  }
+
+  function handleEmpleadosChange(jornadaIndex: number, empleadoIds: string[]) {
+    setAsignaciones({
+      ...asignaciones,
+      [jornadaIndex]: { nivel: 'individual', empleadoIds },
+    });
+  }
+
+  function validarJornadas(): boolean {
+    const newErrors: Record<number, Record<string, string>> = {};
+    let isValid = true;
+
+    // 1. Validar campos básicos
+    jornadas.forEach((jornada, index) => {
+      const jornadaErrors: Record<string, string> = {};
+
+      if (!jornada.horasSemanales || parseFloat(jornada.horasSemanales) <= 0) {
+        jornadaErrors.horasSemanales = 'Las horas semanales deben ser mayores a 0';
+        isValid = false;
       }
-    } else {
-      setNivelAsignacion('empresa');
-      setEmpleadosSeleccionados([]);
-      setEquipoSeleccionado('');
+
+      // Validar que tenga asignación válida
+      const asignacion = asignaciones[index];
+      if (asignacion) {
+        if (asignacion.nivel === 'equipo' && (!asignacion.equipoIds || asignacion.equipoIds.length === 0)) {
+          toast.error(`Jornada ${index + 1}: Debes seleccionar al menos un equipo`);
+          isValid = false;
+        }
+        if (asignacion.nivel === 'individual' && (!asignacion.empleadoIds || asignacion.empleadoIds.length === 0)) {
+          toast.error(`Jornada ${index + 1}: Debes seleccionar al menos un empleado`);
+          isValid = false;
+        }
+      }
+
+      if (Object.keys(jornadaErrors).length > 0) {
+        newErrors[index] = jornadaErrors;
+      }
+    });
+
+    // 2. Calcular qué empleados cubre cada jornada (expandiendo equipos a empleados)
+    const empleadosPorJornada: Map<number, Set<string>> = new Map();
+
+    console.log('[VALIDACION] Total jornadas:', jornadas.length);
+    console.log('[VALIDACION] Total empleados disponibles:', empleados.length);
+    console.log('[VALIDACION] Total equipos disponibles:', equipos.length);
+    console.log('[VALIDACION] Asignaciones:', asignaciones);
+
+    Object.entries(asignaciones).forEach(([indexStr, asignacion]) => {
+      const index = parseInt(indexStr);
+      const empleadosEnJornada = new Set<string>();
+
+      console.log(`[VALIDACION] Jornada ${index + 1} - Nivel: ${asignacion.nivel}`);
+
+      if (asignacion.nivel === 'empresa') {
+        // Toda la empresa = todos los empleados
+        empleados.forEach(emp => empleadosEnJornada.add(emp.id));
+        console.log(`[VALIDACION] Jornada ${index + 1} - Empresa: ${empleadosEnJornada.size} empleados`);
+      } else if (asignacion.nivel === 'equipo' && asignacion.equipoIds) {
+        // Expandir equipos a empleados
+        asignacion.equipoIds.forEach(equipoId => {
+          const equipo = equipos.find(eq => eq.id === equipoId);
+          console.log(`[VALIDACION] Jornada ${index + 1} - Buscando equipo:`, equipoId, 'Encontrado:', equipo);
+          if (equipo && equipo.empleadoIds) {
+            console.log(`[VALIDACION] Jornada ${index + 1} - Equipo ${equipo.nombre}: ${equipo.empleadoIds.length} empleados`);
+            equipo.empleadoIds.forEach(empId => empleadosEnJornada.add(empId));
+          }
+        });
+        console.log(`[VALIDACION] Jornada ${index + 1} - Total empleados en equipos: ${empleadosEnJornada.size}`);
+      } else if (asignacion.nivel === 'individual' && asignacion.empleadoIds) {
+        // Empleados específicos
+        asignacion.empleadoIds.forEach(empId => empleadosEnJornada.add(empId));
+        console.log(`[VALIDACION] Jornada ${index + 1} - Individual: ${empleadosEnJornada.size} empleados`);
+      }
+
+      empleadosPorJornada.set(index, empleadosEnJornada);
+    });
+
+    // 3. Calcular TODOS los empleados cubiertos por TODAS las jornadas
+    const empleadosCubiertos = new Set<string>();
+    empleadosPorJornada.forEach(empleadosSet => {
+      empleadosSet.forEach(empId => empleadosCubiertos.add(empId));
+    });
+
+    console.log('[VALIDACION] Empleados cubiertos por jornadas:', empleadosCubiertos.size);
+    console.log('[VALIDACION] Total empleados activos:', empleados.length);
+
+    // 4. Detectar solapamientos entre jornadas
+    const jornadasIndices = Array.from(empleadosPorJornada.keys());
+    console.log('[VALIDACION] Comparando jornadas:', jornadasIndices);
+
+    for (let i = 0; i < jornadasIndices.length; i++) {
+      for (let j = i + 1; j < jornadasIndices.length; j++) {
+        const index1 = jornadasIndices[i];
+        const index2 = jornadasIndices[j];
+        const empleados1 = empleadosPorJornada.get(index1)!;
+        const empleados2 = empleadosPorJornada.get(index2)!;
+
+        console.log(`[VALIDACION] Comparando Jornada ${index1 + 1} (${empleados1.size} emps) vs Jornada ${index2 + 1} (${empleados2.size} emps)`);
+
+        // Encontrar intersección
+        const interseccion = Array.from(empleados1).filter(empId => empleados2.has(empId));
+        console.log(`[VALIDACION] Intersección: ${interseccion.length} empleados`);
+
+        if (interseccion.length > 0) {
+          const asig1 = asignaciones[index1];
+          const asig2 = asignaciones[index2];
+
+          let mensaje = `Conflicto entre Jornada ${index1 + 1} y Jornada ${index2 + 1}: `;
+
+          if (asig1.nivel === 'empresa' || asig2.nivel === 'empresa') {
+            mensaje += 'No puede haber otra jornada cuando ya existe una asignada a toda la empresa';
+          } else if (interseccion.length === empleados1.size || interseccion.length === empleados2.size) {
+            mensaje += 'Hay solapamiento total de empleados';
+          } else {
+            mensaje += `${interseccion.length} empleado${interseccion.length > 1 ? 's están' : ' está'} en ambas jornadas`;
+          }
+
+          console.log('[VALIDACION] ERROR:', mensaje);
+          toast.error(mensaje);
+          isValid = false;
+        }
+      }
     }
 
-    setErrors({});
+    // 5. CRÍTICO: Verificar que TODOS los empleados tienen jornada asignada
+    const empleadosSinJornada = empleados.filter(emp => !empleadosCubiertos.has(emp.id));
+
+    if (empleadosSinJornada.length > 0) {
+      console.log('[VALIDACION] ERROR: Empleados sin jornada:', empleadosSinJornada.map(e => `${e.nombre} ${e.apellidos}`));
+
+      const mensaje = empleadosSinJornada.length === 1
+        ? `${empleadosSinJornada[0].nombre} ${empleadosSinJornada[0].apellidos} no tiene jornada asignada`
+        : `${empleadosSinJornada.length} empleados no tienen jornada asignada: ${empleadosSinJornada.slice(0, 3).map(e => `${e.nombre} ${e.apellidos}`).join(', ')}${empleadosSinJornada.length > 3 ? '...' : ''}`;
+
+      toast.error(mensaje);
+      isValid = false;
+    } else {
+      console.log('[VALIDACION] ✅ Todos los empleados tienen jornada asignada');
+    }
+
+    setErrors(newErrors);
+    return isValid;
   }
 
   async function handleGuardar() {
+    if (!validarJornadas()) {
+      toast.error('Por favor corrige los errores');
+      return;
+    }
+
     setGuardando(true);
-    setErrors({});
 
     try {
-      const horasSemanales = parseFloat(formData.horasSemanales);
-      if (isNaN(horasSemanales) || horasSemanales <= 0) {
-        setErrors({ horasSemanales: 'Las horas semanales deben ser un número mayor que 0' });
-        return;
+      const jornadasCreadas: string[] = [];
+      const jornadasActualizadas: string[] = [];
+
+      // 1. PRIMERO: Detectar y eliminar jornadas que ya no están en el modal
+      const jornadasActualesIds = new Set(jornadas.filter(j => j.id).map(j => j.id!));
+      const jornadasExistentesIds = jornadasExistentes.map(j => j.id);
+      const jornadasAEliminar = jornadasExistentesIds.filter(id => !jornadasActualesIds.has(id));
+
+      console.log('[GUARDAR] Jornadas actuales:', Array.from(jornadasActualesIds));
+      console.log('[GUARDAR] Jornadas existentes:', jornadasExistentesIds);
+      console.log('[GUARDAR] Jornadas a eliminar:', jornadasAEliminar);
+
+      // Validar que las jornadas a eliminar no tengan empleados asignados
+      for (const jornadaId of jornadasAEliminar) {
+        const jornadaExistente = jornadasExistentes.find(j => j.id === jornadaId);
+        if (jornadaExistente && jornadaExistente._count && jornadaExistente._count.empleados > 0) {
+          setGuardando(false);
+          toast.error(`No se puede eliminar una jornada con ${jornadaExistente._count.empleados} empleado(s) asignado(s). Primero reasigna los empleados.`);
+          return;
+        }
       }
 
-      const config: JornadaConfig = {};
+      // Eliminar jornadas que fueron removidas del modal
+      for (const jornadaId of jornadasAEliminar) {
+        console.log('[GUARDAR] Eliminando jornada:', jornadaId);
+        const response = await fetch(`/api/jornadas/${jornadaId}`, { method: 'DELETE' });
+        if (!response.ok) {
+          const errorData = await response.json() as { error?: string };
+          throw new Error(`Error eliminando jornada: ${errorData.error || 'Error desconocido'}`);
+        }
+      }
 
-      if (formData.tipoJornada === 'fija') {
-        DIA_KEYS.forEach((dia) => {
-          const horario = formData.horariosFijos[dia];
-          if (horario.activo) {
-            config[dia] = {
-              activo: true,
-              entrada: horario.entrada,
-              salida: horario.salida,
-            };
-          } else {
-            config[dia] = { activo: false };
+      // 2. LUEGO: Procesar cada jornada (crear o actualizar)
+      for (let i = 0; i < jornadas.length; i++) {
+        const jornada = jornadas[i];
+        const asignacion = asignaciones[i];
+
+        // Build config
+        const config: JornadaConfig = {};
+        if (jornada.tipoJornada === 'fija') {
+          DIA_KEYS.forEach((dia) => {
+            const horario = jornada.horariosFijos[dia];
+            if (horario.activo) {
+              config[dia] = {
+                activo: true,
+                entrada: horario.entrada,
+                salida: horario.salida,
+              };
+            } else {
+              config[dia] = { activo: false };
+            }
+          });
+        } else {
+          DIA_KEYS.forEach((dia) => {
+            const horario = jornada.horariosFijos[dia];
+            config[dia] = { activo: horario.activo };
+          });
+        }
+
+        if (jornada.tieneDescanso && jornada.descansoMinutos) {
+          const descansoNum = parseInt(jornada.descansoMinutos, 10);
+          if (!isNaN(descansoNum) && descansoNum > 0) {
+            const horas = Math.floor(descansoNum / 60);
+            const minutos = descansoNum % 60;
+            config.descansoMinimo = `${horas.toString().padStart(2, '0')}:${minutos.toString().padStart(2, '0')}`;
           }
-        });
-      } else {
-        DIA_KEYS.forEach((dia) => {
-          const horario = formData.horariosFijos[dia];
-          config[dia] = { activo: horario.activo };
-        });
-      }
+        }
 
-      if (formData.tieneDescanso) {
-        config.descanso = parseInt(formData.descansoMinutos) || 60;
-      }
+        config.tipo = jornada.tipoJornada;
 
-      // 1. Crear o actualizar jornada
-      const jornadaBody = {
-        horasSemanales,
-        config,
-      };
-
-      const isCreating = editingId === 'new';
-      const url = isCreating ? '/api/jornadas' : `/api/jornadas/${editingId}`;
-      const method = isCreating ? 'POST' : 'PATCH';
-
-      const response = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(jornadaBody),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        const errorMsg = errorData.error || errorData.message || 'Error al guardar jornada';
-        toast.error(errorMsg);
-        return;
-      }
-
-      const result = await response.json();
-      const jornadaIdFinal = isCreating ? result.data?.id : editingId;
-
-      // 2. Asignar empleados si hay nivel de asignación
-      if (jornadaIdFinal && (nivelAsignacion || empleadosSeleccionados.length > 0 || equipoSeleccionado)) {
-        const asignacionBody: any = {
-          jornadaId: jornadaIdFinal,
-          nivel: nivelAsignacion,
+        // Crear o actualizar jornada
+        const jornadaBody = {
+          tipo: jornada.tipoJornada, // ✅ Campo requerido por el schema
+          horasSemanales: parseFloat(jornada.horasSemanales),
+          config,
         };
 
-        if (nivelAsignacion === 'individual') {
-          asignacionBody.empleadosIds = empleadosSeleccionados;
-        } else if (nivelAsignacion === 'equipo') {
-          asignacionBody.equipoId = equipoSeleccionado;
+        let jornadaId: string;
+
+        if (jornada.id) {
+          // Actualizar existente
+          console.log(`[DEBUG] Actualizando jornada ${i + 1}:`, jornadaBody);
+          const response = await fetch(`/api/jornadas/${jornada.id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(jornadaBody),
+          });
+
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ error: 'Error desconocido' })) as { error?: string; message?: string; details?: Array<{ path: string[]; message: string }> };
+
+            // Si hay detalles de validación (Zod), mostrar errores específicos
+            if (errorData.details && Array.isArray(errorData.details) && errorData.details.length > 0) {
+              const validationErrors = errorData.details
+                .map(issue => `${issue.path.join('.')}: ${issue.message}`)
+                .join(', ');
+              throw new Error(`Jornada ${i + 1}: ${validationErrors}`);
+            }
+
+            const errorMsg = errorData.error || errorData.message || `Error ${response.status}`;
+            throw new Error(`Jornada ${i + 1}: ${errorMsg}`);
+          }
+
+          jornadaId = jornada.id;
+          jornadasActualizadas.push(jornadaId);
+        } else {
+          // Crear nueva
+          console.log(`[DEBUG] Creando jornada ${i + 1}:`, jornadaBody);
+          const response = await fetch('/api/jornadas', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(jornadaBody),
+          });
+
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ error: 'Error desconocido' })) as { error?: string; message?: string; details?: Array<{ path: string[]; message: string }> };
+
+            // Si hay detalles de validación (Zod), mostrar errores específicos
+            if (errorData.details && Array.isArray(errorData.details) && errorData.details.length > 0) {
+              const validationErrors = errorData.details
+                .map(issue => `${issue.path.join('.')}: ${issue.message}`)
+                .join(', ');
+              throw new Error(`Jornada ${i + 1}: ${validationErrors}`);
+            }
+
+            const errorMsg = errorData.error || errorData.message || `Error ${response.status}`;
+            throw new Error(`Jornada ${i + 1}: ${errorMsg}`);
+          }
+
+          const result = await response.json() as { data?: { id: string }; id?: string };
+          const createdId = result.data?.id || result.id;
+          if (!createdId) {
+            throw new Error(`Jornada ${i + 1}: Creada pero sin ID en la respuesta`);
+          }
+          jornadaId = createdId;
+          jornadasCreadas.push(jornadaId);
+        }
+
+        // Asignar empleados
+        const asignacionBody: any = {
+          jornadaId,
+          nivel: asignacion.nivel,
+        };
+
+        if (asignacion.nivel === 'individual') {
+          asignacionBody.empleadoIds = asignacion.empleadoIds;
+        } else if (asignacion.nivel === 'equipo') {
+          asignacionBody.equipoIds = asignacion.equipoIds;
         }
 
         const asignacionResponse = await fetch('/api/jornadas/asignar', {
@@ -374,248 +682,131 @@ export function JornadasModal({ open, onClose }: JornadasModalProps) {
         });
 
         if (!asignacionResponse.ok) {
-          const errorData = await asignacionResponse.json().catch(() => ({}));
-          const errorMsg = errorData.error || errorData.message || 'Error al asignar jornada';
-          toast.error(errorMsg);
-          return;
+          const errorData = await asignacionResponse.json().catch(() => ({ error: 'Error desconocido' })) as { error?: string; message?: string; details?: Array<{ path: string[]; message: string }> };
+
+          // Si hay detalles de validación (Zod), mostrar errores específicos
+          if (errorData.details && Array.isArray(errorData.details) && errorData.details.length > 0) {
+            const validationErrors = errorData.details
+              .map(issue => `${issue.path.join('.')}: ${issue.message}`)
+              .join(', ');
+            throw new Error(`Jornada ${i + 1} - Asignación: ${validationErrors}`);
+          }
+
+          const errorMsg = errorData.error || errorData.message || `Error ${asignacionResponse.status}`;
+          throw new Error(`Jornada ${i + 1} - Asignación: ${errorMsg}`);
         }
       }
 
-      toast.success(isCreating ? 'Jornada creada' : 'Jornada actualizada');
-
-      // Refrescar lista y cerrar edición
+      toast.success(`Jornadas guardadas correctamente`);
       await refetchJornadas('/api/jornadas');
-      setEditingId(null);
+      onClose();
     } catch (error) {
-      console.error('Error guardando jornada:', error);
-      toast.error('Error inesperado al guardar');
+      console.error('Error guardando jornadas:', error);
+      toast.error(error instanceof Error ? error.message : 'Error al guardar');
     } finally {
       setGuardando(false);
     }
   }
 
-  async function handleEliminar(jornadaId: string) {
-    if (!confirm('¿Estás seguro de eliminar esta jornada?')) return;
-
-    try {
-      await eliminarJornada(`/api/jornadas/${jornadaId}`, undefined);
-      toast.success('Jornada eliminada');
-      setEditingId(null);
-      refetchJornadas('/api/jornadas');
-    } catch (error) {
-      toast.error('Error al eliminar la jornada');
-    }
-  }
-
-  function getTipoBadge(jornada: Jornada) {
-    const config = jornada.config;
-    const esFija = DIA_KEYS.some((dia) => {
-      const diaConfig = getDiaConfig(config, dia);
-      return Boolean(diaConfig?.entrada && diaConfig?.salida);
-    });
-
-    return (
-      <Badge variant={esFija ? 'default' : 'secondary'} className="capitalize">
-        {esFija ? 'Fija' : 'Flexible'}
-      </Badge>
-    );
-  }
-
-  function renderAsignados(jornada: Jornada) {
-    const numEmpleados = jornada._count?.empleados || 0;
-
-    if (jornada.nivelAsignacion === 'empresa') {
-      return (
-        <span className="text-sm text-gray-900 font-medium">
-          Toda la empresa ({numEmpleados})
-        </span>
-      );
-    }
-
-    if (jornada.nivelAsignacion === 'equipo' && jornada.equiposAsignados && jornada.equiposAsignados.length > 0) {
-      return (
-        <span className="text-sm text-gray-900">
-          {jornada.equiposAsignados.join(', ')} ({numEmpleados})
-        </span>
-      );
-    }
-
-    if (jornada.empleadosPreview && jornada.empleadosPreview.length > 0) {
-      return (
-        <EmployeeListPreview
-          empleados={jornada.empleadosPreview.map((e) => ({
-            id: e.id,
-            nombre: e.nombre,
-            apellidos: e.apellidos ?? undefined,
-            fotoUrl: e.fotoUrl ?? undefined,
-            avatar: e.avatar ?? undefined,
-          }))}
-          maxVisible={5}
-          dense
-          avatarSize="xxs"
-        />
-      );
-    }
-
-    return (
-      <span className="text-sm text-gray-500">
-        Sin asignar
-      </span>
-    );
-  }
-
-  const isCreating = editingId === 'new';
-
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogScrollableContent className="max-w-3xl">
+      <DialogScrollableContent className="max-w-4xl max-h-[90vh]">
         <DialogHeader>
           <DialogTitle>Gestión de Jornadas</DialogTitle>
         </DialogHeader>
 
         <DialogBody>
-          {/* Tabla de jornadas */}
           {loading ? (
             <div className="text-center py-8 text-gray-500">Cargando...</div>
-          ) : jornadas.length === 0 && !isCreating ? (
-            <EmptyState
-              icon={CalendarX}
-              title="No hay jornadas configuradas"
-              description="Crea la primera jornada para tus empleados"
-            />
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Tipo</TableHead>
-                  <TableHead>Horas</TableHead>
-                  <TableHead>Asignados</TableHead>
-                  <TableHead className="w-12"></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {/* Fila de crear nueva jornada */}
-                {isCreating && (
-                  <TableRow>
-                    <TableCell colSpan={4} className="p-0">
-                      <div className="p-6">
-                        <h3 className="text-lg font-semibold mb-4">Crear Nueva Jornada</h3>
-                        <JornadaFormFields
-                          data={formData}
-                          onChange={setFormData}
-                          errors={errors}
-                          disabled={guardando}
-                          showAsignacion={true}
-                          nivelAsignacion={nivelAsignacion}
-                          onNivelAsignacionChange={setNivelAsignacion}
-                          empleados={empleados}
-                          empleadosSeleccionados={empleadosSeleccionados}
-                          onEmpleadosSeleccionChange={setEmpleadosSeleccionados}
-                          equipos={equipos}
-                          equipoSeleccionado={equipoSeleccionado}
-                          onEquipoSeleccionadoChange={setEquipoSeleccionado}
-                        />
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                )}
+            <div className="space-y-4">
+              <p className="text-sm text-gray-500">
+                Configura las jornadas laborales y asigna empleados. Los asignados identifican cada jornada.
+              </p>
 
-                {/* Filas de jornadas existentes */}
-                {jornadas.map((jornada) => (
-                  <Fragment key={jornada.id}>
-                    <TableRow
-                      className={`cursor-pointer hover:bg-gray-50 ${editingId === jornada.id ? 'bg-gray-50' : ''}`}
-                      onClick={() => {
-                        if (editingId === jornada.id) {
-                          setEditingId(null);
-                        } else {
-                          handleEditarJornada(jornada);
-                        }
-                      }}
+              <Accordion
+                type="single"
+                collapsible
+                value={expandedIndex}
+                onValueChange={setExpandedIndex}
+                className="space-y-3"
+              >
+                {jornadas.map((jornada, index) => {
+                  const asignacion = asignaciones[index] || { nivel: 'empresa' as NivelAsignacion };
+                  const label = getJornadaLabel(jornada, asignacion, empleados, equipos);
+
+                  return (
+                    <AccordionItem
+                      key={jornada.id || `new-${index}`}
+                      value={`item-${index}`}
+                      className="border rounded-lg px-4 py-2 bg-white shadow-sm"
                     >
-                      <TableCell>{getTipoBadge(jornada)}</TableCell>
-                      <TableCell className="font-medium">{jornada.horasSemanales}h</TableCell>
-                      <TableCell>{renderAsignados(jornada)}</TableCell>
-                      <TableCell>
-                        <Button variant="ghost" size="sm">
-                          {editingId === jornada.id ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-
-                    {/* Fila expandida con formulario de edición */}
-                    {editingId === jornada.id && (
-                      <TableRow>
-                        <TableCell colSpan={4} className="p-0">
-                          <div className="p-6 border-t">
-                            <div className="flex items-center justify-between mb-4">
-                              <h3 className="text-lg font-semibold">Editar Jornada</h3>
-                              {!jornada.esPredefinida && (
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleEliminar(jornada.id);
-                                  }}
-                                  className="border-red-200 text-red-600 hover:text-red-700 hover:border-red-300 hover:bg-red-50"
-                                >
-                                  <Trash2 className="w-4 h-4 mr-2" />
-                                  Eliminar Jornada
-                                </Button>
-                              )}
-                            </div>
-                            <JornadaFormFields
-                              data={formData}
-                              onChange={setFormData}
-                              errors={errors}
-                              disabled={guardando || jornada.esPredefinida}
-                              showAsignacion={true}
-                              nivelAsignacion={nivelAsignacion}
-                              onNivelAsignacionChange={setNivelAsignacion}
-                              empleados={empleados}
-                              empleadosSeleccionados={empleadosSeleccionados}
-                              onEmpleadosSeleccionChange={setEmpleadosSeleccionados}
-                              equipos={equipos}
-                              equipoSeleccionado={equipoSeleccionado}
-                              onEquipoSeleccionadoChange={setEquipoSeleccionado}
-                            />
+                      <div className="flex items-center justify-between">
+                        <AccordionTrigger className="flex-1 text-left font-medium hover:no-underline">
+                          <div className="flex items-center gap-2">
+                            <ChevronDown className="h-4 w-4 transition-transform duration-200" />
+                            {label}
                           </div>
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </Fragment>
-                ))}
-              </TableBody>
-            </Table>
+                        </AccordionTrigger>
+                        {jornadas.length > 1 && !jornada.esPredefinida && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              removeJornada(index);
+                            }}
+                            disabled={guardando}
+                            className="ml-2 text-red-600 hover:text-red-700 hover:bg-red-50"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                      <AccordionContent className="pt-4">
+                        <JornadaFormFields
+                          data={jornada}
+                          onChange={(data) => updateJornada(index, data)}
+                          errors={errors[index] || {}}
+                          disabled={guardando || jornada.esPredefinida}
+                          showAsignacion={true}
+                          nivelAsignacion={asignacion.nivel}
+                          onNivelAsignacionChange={(nivel) => handleNivelAsignacionChange(index, nivel)}
+                          empleados={empleados}
+                          empleadosSeleccionados={asignacion.empleadoIds || []}
+                          onEmpleadosSeleccionChange={(ids) => handleEmpleadosChange(index, ids)}
+                          equipos={equipos}
+                          equiposSeleccionados={asignacion.equipoIds || []}
+                          onEquiposSeleccionadosChange={(ids) => handleEquiposChange(index, ids)}
+                        />
+                      </AccordionContent>
+                    </AccordionItem>
+                  );
+                })}
+              </Accordion>
+
+              <Button
+                type="button"
+                variant="outline"
+                onClick={addJornada}
+                disabled={guardando}
+                className="w-full"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Agregar otra jornada
+              </Button>
+            </div>
           )}
         </DialogBody>
 
         <DialogFooter className="gap-2">
-          {editingId ? (
-            <>
-              <Button
-                variant="outline"
-                onClick={() => setEditingId(null)}
-                disabled={guardando}
-              >
-                Cancelar
-              </Button>
-              <LoadingButton onClick={handleGuardar} loading={guardando}>
-                {isCreating ? 'Crear Jornada' : 'Guardar Cambios'}
-              </LoadingButton>
-            </>
-          ) : (
-            <>
-              <Button onClick={onClose} variant="outline">
-                Cerrar
-              </Button>
-              <Button onClick={handleNuevaJornada} className="gap-2">
-                <Plus className="w-4 h-4" />
-                Nueva Jornada
-              </Button>
-            </>
-          )}
+          <Button onClick={onClose} variant="outline" disabled={guardando}>
+            Cancelar
+          </Button>
+          <LoadingButton onClick={handleGuardar} loading={guardando}>
+            Guardar Cambios
+          </LoadingButton>
         </DialogFooter>
       </DialogScrollableContent>
     </Dialog>

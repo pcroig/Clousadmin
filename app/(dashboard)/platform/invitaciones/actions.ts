@@ -13,13 +13,22 @@ import { convertirWaitlistEnInvitacion, crearInvitacionSignup } from '@/lib/invi
 import { hasSubscriptionTable } from '@/lib/platform/subscriptions';
 import { prisma } from '@/lib/prisma';
 import { cancelSubscriptionAtPeriodEnd } from '@/lib/stripe/subscriptions';
+import { idSchema } from '@/lib/validaciones/schemas';
 
 const emailSchema = z.object({
   email: z.string().email('Introduce un email válido'),
 });
 
 const deactivateCompanySchema = z.object({
-  empresaId: z.string().uuid('ID de empresa inválido'),
+  empresaId: idSchema,
+});
+
+const reactivateCompanySchema = z.object({
+  empresaId: idSchema,
+});
+
+const deleteCompanySchema = z.object({
+  empresaId: idSchema,
 });
 
 type ActionResult = {
@@ -115,26 +124,11 @@ export async function deactivateCompanyAction(rawEmpresaId: string): Promise<Act
     await assertPlatformAdmin();
     const { empresaId } = deactivateCompanySchema.parse({ empresaId: rawEmpresaId });
 
-    const includeSubscriptions = await hasSubscriptionTable();
-
     const company = await prisma.empresas.findUnique({
       where: { id: empresaId },
       select: {
         id: true,
         activo: true,
-        ...(includeSubscriptions
-          ? {
-              subscriptions: {
-                orderBy: { createdAt: 'desc' },
-                take: 1,
-                select: {
-                  id: true,
-                  status: true,
-                  cancelAtPeriodEnd: true,
-                },
-              },
-            }
-          : {}),
       },
     });
 
@@ -180,10 +174,22 @@ export async function deactivateCompanyAction(rawEmpresaId: string): Promise<Act
       });
     });
 
-    const activeSubscription = company.subscriptions?.[0];
-    if (activeSubscription && !activeSubscription.cancelAtPeriodEnd) {
+    // Si las suscripciones están activas, cancelar la suscripción en Stripe
+    const includeSubscriptions = await hasSubscriptionTable();
+    if (includeSubscriptions) {
       try {
-        await cancelSubscriptionAtPeriodEnd(activeSubscription.id);
+        const activeSubscription = await prisma.subscriptions.findFirst({
+          where: { empresaId },
+          orderBy: { createdAt: 'desc' },
+          select: {
+            id: true,
+            cancelAtPeriodEnd: true,
+          },
+        });
+
+        if (activeSubscription && !activeSubscription.cancelAtPeriodEnd) {
+          await cancelSubscriptionAtPeriodEnd(activeSubscription.id);
+        }
       } catch (error) {
         console.error('[deactivateCompanyAction] Error cancelando suscripción en Stripe:', error);
       }
@@ -204,6 +210,142 @@ export async function deactivateCompanyAction(rawEmpresaId: string): Promise<Act
     return {
       success: false,
       error: 'No se pudo desactivar la empresa',
+    };
+  }
+}
+
+export async function reactivateCompanyAction(rawEmpresaId: string): Promise<ActionResult> {
+  try {
+    await assertPlatformAdmin();
+    const { empresaId } = reactivateCompanySchema.parse({ empresaId: rawEmpresaId });
+
+    const company = await prisma.empresas.findUnique({
+      where: { id: empresaId },
+      select: {
+        id: true,
+        activo: true,
+        deletedAt: true,
+      },
+    });
+
+    if (!company) {
+      return {
+        success: false,
+        error: 'Empresa no encontrada',
+      };
+    }
+
+    if (company.deletedAt) {
+      return {
+        success: false,
+        error: 'No se puede reactivar una empresa eliminada',
+      };
+    }
+
+    if (company.activo) {
+      return {
+        success: false,
+        error: 'La empresa ya está activa',
+      };
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await tx.empresas.update({
+        where: { id: empresaId },
+        data: { activo: true },
+      });
+
+      await tx.usuarios.updateMany({
+        where: { empresaId },
+        data: { activo: true },
+      });
+
+      await tx.empleados.updateMany({
+        where: {
+          empresaId,
+          estadoEmpleado: 'suspendido',
+        },
+        data: {
+          estadoEmpleado: 'activo',
+          fechaBaja: null,
+        },
+      });
+    });
+
+    revalidatePath('/platform/invitaciones');
+
+    return { success: true };
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return {
+        success: false,
+        error: error.issues[0]?.message ?? 'Datos inválidos',
+      };
+    }
+
+    console.error('[reactivateCompanyAction] Error:', error);
+    return {
+      success: false,
+      error: 'No se pudo reactivar la empresa',
+    };
+  }
+}
+
+export async function deleteCompanyAction(rawEmpresaId: string): Promise<ActionResult> {
+  try {
+    await assertPlatformAdmin();
+    const { empresaId } = deleteCompanySchema.parse({ empresaId: rawEmpresaId });
+
+    const company = await prisma.empresas.findUnique({
+      where: { id: empresaId },
+      select: {
+        id: true,
+        activo: true,
+        deletedAt: true,
+      },
+    });
+
+    if (!company) {
+      return {
+        success: false,
+        error: 'Empresa no encontrada',
+      };
+    }
+
+    if (company.deletedAt) {
+      return {
+        success: false,
+        error: 'La empresa ya está eliminada',
+      };
+    }
+
+    if (company.activo) {
+      return {
+        success: false,
+        error: 'Debes suspender la empresa antes de eliminarla',
+      };
+    }
+
+    await prisma.empresas.update({
+      where: { id: empresaId },
+      data: { deletedAt: new Date() },
+    });
+
+    revalidatePath('/platform/invitaciones');
+
+    return { success: true };
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return {
+        success: false,
+        error: error.issues[0]?.message ?? 'Datos inválidos',
+      };
+    }
+
+    console.error('[deleteCompanyAction] Error:', error);
+    return {
+      success: false,
+      error: 'No se pudo eliminar la empresa',
     };
   }
 }

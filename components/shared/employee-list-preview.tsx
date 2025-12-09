@@ -47,23 +47,37 @@ export function EmployeeListPreview({
   const visibles = empleados.slice(0, maxVisible);
   const restantes = empleados.length - visibles.length;
   const resolvedAvatarSize = avatarSize ?? (dense ? 'xs' : 'sm');
-  const dimensionClasses =
-    resolvedAvatarSize === 'xxs'
-      ? 'h-6 w-6'
-      : resolvedAvatarSize === 'xs'
-        ? 'h-7 w-7'
-        : resolvedAvatarSize === 'md'
-          ? 'h-9 w-9'
-          : 'h-8 w-8';
-  const fallbackSize =
-    resolvedAvatarSize === 'xxs'
-      ? 'text-[8px]'
-      : resolvedAvatarSize === 'xs'
-        ? 'text-[9px]'
-        : 'text-[11px]';
+  const sizeConfig = {
+    xxs: {
+      dimension: 'h-6 w-6',
+      fallback: 'text-[8px]',
+      count: 'h-6 w-6 text-[9px]',
+      overlap: '-space-x-1.5',
+    },
+    xs: {
+      dimension: 'h-7 w-7',
+      fallback: 'text-[9px]',
+      count: 'h-7 w-7 text-[10px]',
+      overlap: '-space-x-1.5',
+    },
+    sm: {
+      dimension: 'h-8 w-8',
+      fallback: 'text-[11px]',
+      count: 'h-8 w-8 text-[11px]',
+      overlap: '-space-x-2',
+    },
+    md: {
+      dimension: 'h-9 w-9',
+      fallback: 'text-[11px]',
+      count: 'h-9 w-9 text-[12px]',
+      overlap: '-space-x-2',
+    },
+  } satisfies Record<AvatarSize, { dimension: string; fallback: string; count: string; overlap: string }>;
+
+  const { dimension, fallback, count, overlap } = sizeConfig[resolvedAvatarSize];
 
   return (
-    <div className={cn('flex -space-x-2 flex-shrink-0', className)}>
+    <div className={cn('flex flex-shrink-0', overlap, className)}>
       {visibles.map((empleado) => {
         const fotoUrl = empleado.fotoUrl ?? empleado.avatar ?? null;
 
@@ -91,8 +105,8 @@ export function EmployeeListPreview({
                     ? 'xs'
                     : 'sm'
             }
-              className={cn(dimensionClasses)}
-              fallbackClassName={fallbackSize}
+              className={cn(dimension, 'border-2 border-white bg-white')}
+              fallbackClassName={fallback}
             />
           </EmpleadoHoverCard>
         );
@@ -101,8 +115,8 @@ export function EmployeeListPreview({
       {restantes > 0 && (
         <div
           className={cn(
-            'flex items-center justify-center rounded-full bg-gray-100 text-[11px] font-semibold text-gray-600',
-            dense ? 'h-7 w-7 text-[9px]' : 'h-8 w-8'
+            'flex items-center justify-center rounded-full border-2 border-white bg-gray-100 font-semibold text-gray-600',
+            count
           )}
         >
           +{restantes}

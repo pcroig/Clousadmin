@@ -1,37 +1,67 @@
-# Onboarding de Empleados con Gestión de Documentos
+# Onboarding de Empleados - Sistema Unificado
 
 ## 📋 Visión General
 
-El sistema de onboarding permite a HR crear nuevos empleados y activar un proceso de onboarding automatizado. **Ahora incluye la funcionalidad de subir documentos iniciales** durante la creación del empleado, conectados directamente al proceso de onboarding.
+El sistema de onboarding permite a HR crear nuevos empleados con un proceso automatizado y configurable. El sistema unifica **pasos base obligatorios** (credenciales, integraciones, PWA) con **acciones dinámicas de workflow** configuradas por la empresa.
+
+**Tipos de Onboarding:**
+- **Completo (`completo`)**: Para nuevos empleados - Incluye pasos base + workflow configurable
+- **Simplificado (`simplificado`)**: Para empleados existentes - Solo pasos base
 
 ---
 
 ## 🎯 Flujo Completo
 
-### 1. **HR Crea Empleado y Activa Onboarding**
+### 1. **HR Configura Workflow de Onboarding** (Una sola vez)
 
-**Ubicación:** `/hr/organizacion/personas` → "Añadir Persona" → Tab "Activar Onboarding"
+**Ubicación:** `/hr/organizacion/personas` → "Gestionar Onboarding"
+
+**Acciones configurables:**
+- **Rellenar campos**: Solicitar datos personales, bancarios, fiscales, etc.
+- **Compartir documentos**: Mostrar manuales, políticas, documentos de empresa
+- **Solicitar documentos**: Pedir DNI, titulación, certificados, etc.
+- **Solicitar firma**: Contratos, acuerdos, documentos legales
+
+### 2. **HR Crea Empleado y Envía Invitación**
+
+**Ubicación:** `/hr/organizacion/personas` → "Añadir Persona" → Tipo "Nuevo"
 
 **Pasos:**
-1. HR completa los datos básicos del empleado (nombre, apellidos, email, fecha de alta, puesto)
-2. **Opcional:** HR puede subir documentos iniciales (contrato, DNI, nómina, etc.)
-3. HR hace clic en "Crear y Enviar Onboarding"
+1. HR completa datos básicos (nombre, apellidos, email, puesto, equipo)
+2. HR revisa las acciones del workflow y puede activar/desactivar acciones específicas para este empleado
+3. HR hace clic en "Enviar Invitación"
 4. El sistema:
-   - Crea el empleado (inactivo)
-   - Crea el registro de onboarding con token único
-   - Sube los documentos a las carpetas de onboarding
-   - Envía email al empleado con link de onboarding
+   - Crea el empleado (`activo: false`)
+   - Crea registro de `onboarding_empleados` con token único
+   - Inicializa progreso con pasos base + acciones seleccionadas
+   - Envía email con link de onboarding
 
-### 2. **Empleado Completa Onboarding**
+### 3. **Empleado Completa Onboarding**
 
 **Ubicación:** `/onboarding/[token]`
 
-**Pasos del empleado:**
-1. **Paso 0 - Credenciales:** Establece contraseña y sube avatar (opcional)
-2. **Paso 1 - Datos Personales:** Completa NIF, NSS, dirección, etc.
-3. **Paso 2 - Datos Bancarios:** Completa IBAN y código BIC
-4. **Paso 3 - Documentos:** Puede subir documentos adicionales o ver los ya subidos por HR
-5. **Finalizar:** Traspasa todos los datos a los registros permanentes y activa el empleado
+**Layout:**
+- **Izquierda**: Checklist con todos los pasos (base + workflow)
+- **Derecha**: Contenido del paso actual
+
+**Pasos Base (Obligatorios para todos):**
+1. **Credenciales**: Establece contraseña y sube avatar (opcional)
+2. **Integraciones**: Conecta herramientas (Slack, Google, etc.) - opcional
+3. **PWA**: Explicación de cómo instalar la app móvil
+
+**Pasos de Workflow (Configurables):**
+4. **Acciones dinámicas** según configuración de la empresa
+   - Ejemplo: Rellenar datos personales (NIF, NSS, dirección)
+   - Ejemplo: Subir documentos (DNI, titulación)
+   - Ejemplo: Firmar contrato
+
+**Finalización:**
+- Empleado completa todos los pasos
+- Sistema valida que todos los pasos base y acciones estén completados
+- Transfiere datos de `datosTemporales` a `empleados`
+- Activa el empleado (`activo: true`)
+- Marca onboarding como completado
+- Redirige a `/empleado/mi-espacio`
 
 ---
 
@@ -79,82 +109,142 @@ El sistema utiliza **4 tipos de documentos** unificados:
 
 ## 🔌 API Endpoints
 
-### 1. Subir Documento de Onboarding (HR)
+### Endpoints de Configuración
 
-**Endpoint:** `POST /api/empleados/[id]/onboarding/documentos`
+#### 1. Obtener Workflow de Onboarding
 
-**Autenticación:** Requiere rol `hr_admin`
+**Endpoint:** `GET /api/onboarding/config`
 
-**Request:**
-```typescript
-FormData {
-  file: File;
-  nombreDocumento: string; // Ej: "Contrato laboral"
-  tipoDocumento: string;  // Ej: "contrato", "nomina", "justificante", "otro" (se infiere automáticamente desde la carpeta si no se especifica)
-  carpetaDestino?: string; // Opcional: carpeta donde se guardará (por defecto "Otros")
-}
-```
+**Autenticación:** Requiere sesión de HR Admin
 
 **Response:**
 ```json
 {
   "success": true,
-  "message": "Documento subido correctamente",
-  "documento": {
-    "id": "uuid",
-    "nombre": "Contrato laboral",
-    "tipoDocumento": "contrato",
-    "s3Key": "onboarding/{empresaId}/{empleadoId}/contrato-{timestamp}-{random}.pdf",
-    "downloadUrl": "https://...",
-    ...
-  }
-}
-```
-
-### 2. Listar Documentos de Onboarding (HR)
-
-**Endpoint:** `GET /api/empleados/[id]/onboarding/documentos`
-
-**Autenticación:** Requiere rol `hr_admin`
-
-**Response:**
-```json
-{
-  "success": true,
-  "documentos": [
+  "workflowAcciones": [
     {
-      "id": "uuid",
-      "nombre": "Contrato laboral",
-      "tipoDocumento": "contrato",
-      "downloadUrl": "https://...",
-      ...
+      "id": "accion-1",
+      "orden": 0,
+      "tipo": "rellenar_campos",
+      "titulo": "Datos Personales",
+      "activo": true,
+      "config": {
+        "campos": ["nif", "nss", "telefono"]
+      }
     }
-  ],
-  "carpeta": {
-    "id": "uuid",
-    "nombre": "Onboarding",
-    ...
-  }
+  ]
 }
 ```
 
-### 3. Subir Documento de Onboarding (Empleado)
+### Endpoints de Progreso (Empleado)
 
-**Endpoint:** `POST /api/onboarding/[token]/documentos`
+#### 2. Obtener Datos de Onboarding
+
+**Endpoint:** `GET /api/onboarding/[token]`
 
 **Autenticación:** Token de onboarding (válido por 7 días)
 
-**Request:** Mismo formato que HR endpoint
+**Response:**
+```json
+{
+  "workflow": [...],
+  "progreso": {
+    "credenciales_completadas": true,
+    "integraciones": false,
+    "pwa_explicacion": false,
+    "acciones": {}
+  },
+  "datosTemporales": {}
+}
+```
 
-**Response:** Mismo formato que HR endpoint
+#### 3. Actualizar Progreso de Acción
 
-### 4. Listar Documentos de Onboarding (Empleado)
+**Endpoint:** `POST /api/onboarding/[token]/progreso`
 
-**Endpoint:** `GET /api/onboarding/[token]/documentos`
+**Request:**
+```json
+{
+  "accionId": "accion-rellenar-datos",
+  "completado": true,
+  "datos": {
+    "nif": "12345678A",
+    "nss": "123456789012"
+  }
+}
+```
 
-**Autenticación:** Token de onboarding
+**Response:**
+```json
+{
+  "success": true
+}
+```
 
-**Response:** Mismo formato que HR endpoint
+#### 4. Marcar Integraciones Completadas
+
+**Endpoint:** `POST /api/onboarding/[token]/integraciones-completado`
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Paso de integraciones marcado como completado"
+}
+```
+
+#### 5. Marcar PWA Completado
+
+**Endpoint:** `POST /api/onboarding/[token]/pwa-completado`
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Paso de PWA marcado como completado"
+}
+```
+
+#### 6. Finalizar Onboarding
+
+**Endpoint:** `POST /api/onboarding/[token]/finalizar`
+
+**Validaciones:**
+- Todos los pasos base completados
+- Todas las acciones activas completadas
+- Documentos requeridos subidos (si aplica)
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Onboarding completado correctamente",
+  "empleadoId": "uuid"
+}
+```
+
+### Endpoints de Credenciales
+
+#### 7. Establecer Credenciales
+
+**Endpoint:** `POST /api/onboarding/[token]/credenciales`
+
+**Request:** FormData
+```typescript
+{
+  password: string;
+  confirmPassword: string;
+  avatar?: File;
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "avatarUrl": "https://..."
+}
+```
 
 ---
 
@@ -162,106 +252,238 @@ FormData {
 
 ### Componentes Frontend
 
-#### `AddPersonaOnboardingForm`
+#### `OnboardingForm` (Empleado)
+- **Ubicación:** `app/(auth)/onboarding/[token]/onboarding-form.tsx`
+- **Funcionalidad:**
+  - Layout unificado con checklist (izquierda) + contenido (derecha)
+  - Renderiza pasos base: Credenciales, Integraciones, PWA
+  - Renderiza acciones dinámicas del workflow
+  - Gestiona estado de progreso local y sincroniza con servidor
+  - Navegación entre pasos
+  - Botón de finalizar cuando todos los pasos están completados
+
+#### `CredencialesForm`
+- **Ubicación:** `components/onboarding/credenciales-form.tsx`
+- **Funcionalidad:**
+  - Establecer contraseña (mínimo 8 caracteres)
+  - Subir avatar opcional
+  - Validación de contraseñas coincidentes
+  - Funciona para ambos tipos de onboarding (completo y simplificado)
+
+#### `IntegracionesForm`
+- **Ubicación:** `components/onboarding/integraciones-form.tsx`
+- **Funcionalidad:**
+  - Conectar con Slack, Google Calendar, etc.
+  - Botones "Completar" y "Saltar"
+  - Persiste progreso al servidor
+
+#### `PWAExplicacion`
+- **Ubicación:** `components/onboarding/pwa-explicacion.tsx`
+- **Funcionalidad:**
+  - Explicación de instalación de PWA
+  - Botón "Continuar" que persiste progreso
+  - Botón "Finalizar" si no hay más acciones
+
+#### Componentes de Acciones de Workflow
+
+- `RellenarCamposStep` - Formulario para rellenar campos configurados
+- `CompartirDocsStep` - Visualización de documentos compartidos
+- `SolicitarDocsStep` - Subida de documentos solicitados
+- `SolicitarFirmaStep` - Firma digital de documentos
+
+#### `AddPersonaOnboardingForm` (HR)
 - **Ubicación:** `components/organizacion/add-persona-onboarding-form.tsx`
 - **Funcionalidad:**
-  - Formulario para crear empleado
-  - Selector de tipo de documento
-  - Uploader de documentos (usando `DocumentUploader`)
-  - Lista de documentos pendientes
-  - Subida automática de documentos después de crear empleado
-
-#### `DocumentUploader`
-- **Ubicación:** `components/shared/document-uploader.tsx`
-- **Funcionalidad:** Componente reutilizable para subir archivos
-
-#### `DocumentList`
-- **Ubicación:** `components/shared/document-list.tsx`
-- **Funcionalidad:** Componente para mostrar lista de documentos
+  - Crear empleado tipo "nuevo" o "existente"
+  - Para tipo "nuevo": Muestra workflow con switches para activar/desactivar acciones
+  - Envía invitación de onboarding
+  - Para tipo "existente": Flujo separado (no modificado)
 
 ### Backend
 
-#### `lib/documentos/onboarding.ts`
-- **Funciones principales:**
-  - `crearCarpetasOnboardingDocumento()` - Crea carpetas automáticamente
-  - `subirDocumentoOnboarding()` - Sube documento y lo guarda en BD
-  - `listarDocumentosOnboarding()` - Lista documentos de onboarding
-  - `validarDocumentosRequeridosCompletos()` - Valida documentos requeridos
-
 #### `lib/onboarding.ts`
-- **Funciones relacionadas:**
-  - `guardarProgresoDocumentos()` - Actualiza progreso cuando se suben documentos
-  - `finalizarOnboarding()` - Valida documentos requeridos antes de finalizar
+- **Funciones principales:**
+  - `verificarTokenOnboarding()` - Valida token y retorna onboarding
+  - `crearOnboarding()` - Crea registro de onboarding con progreso inicial
+  - `obtenerWorkflowConfig()` - Obtiene workflow configurado de la empresa
+  - `actualizarProgresoAccion()` - Actualiza progreso de una acción específica
+  - `guardarProgresoIntegraciones()` - Marca integraciones como completadas
+  - `finalizarOnboarding()` - Valida todos los pasos y activa empleado
+  - `validarTodasAccionesCompletadas()` - Verifica que todas las acciones estén completadas
+
+#### `lib/onboarding-config-types.ts`
+- **Tipos principales:**
+  - `WorkflowAccion` - Define una acción del workflow
+  - `RellenarCamposConfig`, `CompartirDocsConfig`, `SolicitarDocsConfig`, `SolicitarFirmaConfig`
+  - `ProgresoOnboardingWorkflow` - Estructura de progreso unificada
 
 ---
 
 ## 🔄 Flujo de Datos
 
-### Cuando HR Sube Documento
+### Flujo Completo de Onboarding
 
 ```
-1. HR selecciona archivo y tipo de documento
-2. Frontend → POST /api/empleados/[id]/onboarding/documentos
-3. Backend valida:
-   - Empleado existe y pertenece a la empresa
-   - Onboarding activo existe
-   - Archivo válido (tipo, tamaño)
-4. Backend:
-   - Sube archivo a S3
-   - Crea/obtiene carpetas de onboarding
-   - Guarda documento en BD
-   - Valida documentos requeridos
-   - Actualiza progreso si todos los requeridos están completos
-5. Frontend muestra confirmación
+1. HR crea empleado:
+   → POST /api/invitaciones/onboarding
+   → Crea empleado (activo: false)
+   → Crea onboarding_empleados con token
+   → Inicializa progreso:
+     {
+       credenciales_completadas: false,
+       integraciones: false,
+       pwa_explicacion: false,
+       acciones: { accion1: false, accion2: false }
+     }
+   → Envía email con token
+
+2. Empleado accede con token:
+   → GET /api/onboarding/[token]
+   → Retorna workflow, progreso, datosTemporales
+   → Frontend renderiza checklist + paso actual
+
+3. Empleado completa pasos base:
+   → POST /api/onboarding/[token]/credenciales
+     (actualiza password en usuarios)
+   → POST /api/onboarding/[token]/integraciones-completado
+     (actualiza progreso.integraciones = true)
+   → POST /api/onboarding/[token]/pwa-completado
+     (actualiza progreso.pwa_explicacion = true)
+
+4. Empleado completa acciones de workflow:
+   → POST /api/onboarding/[token]/progreso
+     {
+       accionId: "accion-rellenar-datos",
+       completado: true,
+       datos: { nif: "12345678A", ... }
+     }
+   → Actualiza progreso.acciones[accionId] = true
+   → Guarda datos en datosTemporales
+
+5. Empleado finaliza:
+   → POST /api/onboarding/[token]/finalizar
+   → Valida todos los pasos completados
+   → Transfiere datosTemporales a empleados
+   → Marca onboarding.completado = true
+   → Activa empleado (activo: true)
+   → Redirige a /empleado/mi-espacio
 ```
 
-### Cuando Empleado Sube Documento
+### Flujo de Actualización de Progreso
 
 ```
-1. Empleado selecciona archivo y tipo de documento
-2. Frontend → POST /api/onboarding/[token]/documentos
-3. Backend valida:
-   - Token válido y no expirado
-   - Onboarding no completado
-   - Archivo válido
-4. Backend: (mismo proceso que HR)
-5. Frontend actualiza lista de documentos
+Frontend (OnboardingForm):
+1. Usuario completa paso
+2. Llama a endpoint correspondiente:
+   - Pasos base: /credenciales, /integraciones-completado, /pwa-completado
+   - Acciones: /progreso con accionId
+3. Actualiza estado local
+4. Avanza al siguiente paso no completado
+
+Backend (lib/onboarding.ts):
+1. Verifica token válido
+2. Lee progreso actual
+3. Actualiza campo correspondiente
+4. Preserva todos los demás campos (importante para evitar pérdida de datos)
+5. Guarda en BD
+6. Retorna success
 ```
 
 ---
 
 ## ✅ Validaciones
 
-### Documentos Requeridos
+### Validación de Pasos Base
 
-El sistema valida automáticamente si todos los documentos requeridos están completos:
+En el endpoint `POST /api/onboarding/[token]/finalizar`, se valida:
 
-1. HR configura documentos requeridos en `OnboardingConfig`
-2. Al subir un documento, se valida si todos los requeridos están completos
-3. Si están completos, se actualiza automáticamente el progreso: `datos_documentos: true`
-4. Al finalizar onboarding, se valida nuevamente que todos los requeridos estén subidos
+```typescript
+// 1. Credenciales completadas
+if (!progreso.credenciales_completadas) {
+  throw new Error('Debes completar el paso de credenciales');
+}
 
-### Validaciones de Archivo
+// 2. Integraciones completadas
+if (!progreso.integraciones) {
+  throw new Error('Debes completar el paso de integraciones');
+}
 
-- **Tipo:** Solo PDF, JPEG, PNG
-- **Tamaño:** Máximo 5MB
-- **Nombre:** Validado para evitar caracteres especiales
-- **Duplicados:** Permitidos (mismo tipo puede tener múltiples versiones)
+// 3. PWA explicación vista
+if (!progreso.pwa_explicacion) {
+  throw new Error('Debes completar el paso de instalación de la app móvil');
+}
+```
+
+### Validación de Acciones de Workflow
+
+```typescript
+// Obtener workflow configurado
+const workflow = await obtenerWorkflowConfig(empresaId);
+const accionesActivas = workflow.filter(a => a.activo);
+
+// Validar cada acción
+for (const accion of accionesActivas) {
+  if (!progreso.acciones[accion.id]) {
+    throw new Error(`Debes completar: ${accion.titulo}`);
+  }
+}
+```
+
+### Validación de Contraseña
+
+En `CredencialesForm`:
+- Mínimo 8 caracteres
+- Contraseña y confirmación deben coincidir
+- Validación en cliente y servidor
+
+### Validación de Documentos Requeridos
+
+Si una acción de tipo `solicitar_docs` está activa:
+1. HR configura documentos requeridos en la configuración de la acción
+2. Al subir documento, se marca en el progreso
+3. Al finalizar onboarding, se valida que todos los requeridos estén subidos
+4. Tipos de archivo aceptados: PDF, JPEG, PNG, DOC, DOCX
+5. Tamaño máximo: 5MB por archivo
 
 ---
 
 ## 📊 Progreso de Onboarding
 
-El progreso se almacena en `OnboardingEmpleado.progreso`:
+### Onboarding Completo (Nuevos Empleados)
+
+El progreso se almacena en `onboarding_empleados.progreso` con estructura unificada:
 
 ```json
 {
-  "credenciales_completadas": boolean,
-  "datos_personales": boolean,
-  "datos_bancarios": boolean,
-  "datos_documentos": boolean,  // Clave en onboarding completo
-  "integraciones": boolean,      // Clave en onboarding simplificado
-  "pwa_explicacion": boolean
+  "credenciales_completadas": true,
+  "integraciones": true,
+  "pwa_explicacion": false,
+  "acciones": {
+    "accion-rellenar-datos-personales": true,
+    "accion-solicitar-dni": false,
+    "accion-firmar-contrato": false
+  }
+}
+```
+
+**Pasos Base:**
+- `credenciales_completadas`: Contraseña establecida
+- `integraciones`: Integraciones configuradas (o saltadas)
+- `pwa_explicacion`: PWA explicación vista
+
+**Acciones Dinámicas:**
+- `acciones`: Objeto con ID de acción → booleano de completitud
+- Las acciones se definen en `onboarding_configs.workflowAcciones`
+
+### Onboarding Simplificado (Empleados Existentes)
+
+Mismo formato pero sin campo `acciones`:
+
+```json
+{
+  "credenciales_completadas": true,
+  "integraciones": true,
+  "pwa_explicacion": false
 }
 ```
 
@@ -316,39 +538,112 @@ El progreso se almacena en `OnboardingEmpleado.progreso`:
 
 ## 📝 Notas de Implementación
 
-### Características Clave
+### Características Clave del Sistema Unificado
 
-1. **Subida en dos fases:**
-   - Antes de crear empleado: Documentos se guardan temporalmente en el frontend
-   - Después de crear empleado: Documentos se suben automáticamente al servidor
+1. **Pasos Base + Workflow Dinámico:**
+   - Todos los empleados nuevos pasan por 3 pasos base obligatorios
+   - Luego completan acciones configurables del workflow de la empresa
+   - Sistema escalable y personalizable por empresa
 
-2. **Gestión de carpetas automática:**
-   - Carpetas se crean automáticamente cuando se necesita
-   - Estructura organizada por tipo de documento
+2. **Persistencia de Progreso:**
+   - Cada paso persiste su progreso al servidor inmediatamente
+   - No se pierde progreso al recargar página
+   - Estado sincronizado entre frontend y backend
 
-3. **Validación de documentos requeridos:**
-   - Se valida automáticamente al subir documentos
-   - El progreso se actualiza cuando todos los requeridos están completos
+3. **Navegación Flexible:**
+   - Empleado puede navegar entre pasos completados
+   - Checklist visual muestra progreso en tiempo real
+   - Botón "Finalizar" solo aparece cuando todo está completo
 
-4. **Manejo de errores robusto:**
-   - Errores específicos por tipo de problema
-   - Continuación del proceso aunque falle algún documento
-   - Mensajes claros al usuario
+4. **Validación Robusta:**
+   - Validación en cliente (UX inmediata)
+   - Validación en servidor (seguridad)
+   - Mensajes de error claros y específicos
 
----
-
-## 🔮 Mejoras Futuras
-
-1. **Vista previa de documentos:** Permitir ver documentos sin descargar
-2. **Edición de metadatos:** Permitir cambiar nombre y tipo después de subir
-3. **Eliminación de documentos:** Permitir eliminar documentos subidos (con permisos)
-4. **Extracción automática con IA:** Extraer datos de contratos y DNI automáticamente
-5. **Notificaciones:** Notificar a HR cuando empleado sube documentos
+5. **Endpoints Unificados:**
+   - Mismo código funciona para onboarding completo y simplificado
+   - Eliminación de duplicación de código
+   - Mantenimiento más sencillo
 
 ---
 
-**Última actualización:** 2025-11-05  
-**Versión:** 1.0.0
+## 🔧 Troubleshooting
+
+### Error: "Debes completar el paso de credenciales"
+
+**Causa:** El empleado intenta finalizar sin establecer contraseña
+
+**Solución:** Volver al paso de Credenciales y establecer contraseña válida (mínimo 8 caracteres)
+
+### Error: "Invalid UUID" para empleadoId
+
+**Causa:** Sistema antiguo usaba UUID, nuevo sistema usa CUID
+
+**Solución:** Ya resuelto - todos los endpoints ahora validan con `.cuid()` en lugar de `.uuid()`
+
+### Empleado no puede hacer login después de onboarding
+
+**Causa:** Password no se estableció correctamente o onboarding no se completó
+
+**Solución:**
+1. Verificar que `progreso.credenciales_completadas = true`
+2. Verificar que existe registro en `usuarios` con password hash
+3. Verificar que `empleados.activo = true`
+
+### Progreso se pierde al actualizar acción
+
+**Causa:** Función `actualizarProgresoAccion` no preservaba campos base
+
+**Solución:** Ya resuelto - función ahora preserva explícitamente `credenciales_completadas`, `integraciones`, `pwa_explicacion`
+
+---
+
+## 📜 Changelog
+
+### v2.0.0 (Diciembre 2025) - Sistema Unificado
+
+**Cambios Mayores:**
+- ✅ Unificación de onboarding completo y simplificado
+- ✅ Pasos base obligatorios: Credenciales, Integraciones, PWA
+- ✅ Workflow dinámico con acciones configurables
+- ✅ Nueva estructura de `ProgresoOnboardingWorkflow`
+- ✅ Layout con checklist (izquierda) + contenido (derecha)
+- ✅ Endpoints unificados para ambos tipos de onboarding
+- ✅ Validación robusta de todos los pasos antes de finalizar
+
+**Componentes Nuevos:**
+- `OnboardingForm` - Componente unificado con checklist
+- `RellenarCamposStep`, `CompartirDocsStep`, `SolicitarDocsStep`, `SolicitarFirmaStep`
+
+**Endpoints Nuevos:**
+- `POST /api/onboarding/[token]/integraciones-completado`
+- `POST /api/onboarding/[token]/pwa-completado`
+- `POST /api/onboarding/[token]/progreso`
+
+**Funciones Modificadas:**
+- `finalizarOnboarding()` - Validación unificada de pasos base + acciones
+- `actualizarProgresoAccion()` - Preservación de campos base
+- `guardarProgresoIntegraciones()` - Tipo genérico para ambos onboardings
+
+**Bugs Resueltos:**
+- 404 al asignar equipo durante onboarding (removida validación `activo: true`)
+- Login failure después de onboarding (credenciales ahora obligatorias)
+- UUID/CUID validation mismatches (todos los endpoints usan `.cuid()`)
+- Pérdida de progreso al actualizar acciones (campos base preservados)
+- Botones de integraciones no visibles en onboarding completo
+
+### v1.0.0 (Noviembre 2025) - Sistema con Documentos
+
+**Versión Inicial:**
+- Sistema de onboarding con gestión de documentos
+- Subida de documentos por HR y empleado
+- Carpetas automáticas
+- Validación de documentos requeridos
+
+---
+
+**Última actualización:** Diciembre 2025
+**Versión:** 2.0.0
 
 
 

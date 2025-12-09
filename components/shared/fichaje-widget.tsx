@@ -21,9 +21,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
 import { calcularHorasObjetivoDesdeJornada, calcularProgresoEventos } from '@/lib/calculos/fichajes-cliente';
-import { MOBILE_DESIGN } from '@/lib/constants/mobile-design';
 import { extractArrayFromResponse } from '@/lib/utils/api-response';
 import { toMadridDate } from '@/lib/utils/fechas';
 import { formatearHorasMinutos, formatTiempoTrabajado } from '@/lib/utils/formatters';
@@ -42,6 +40,7 @@ interface Fichaje {
   id: string;
   fecha: string;
   estado: string;
+  tipoFichaje?: 'ordinario' | 'extraordinario';
   horasTrabajadas: number | null;
   horasEsperadas?: number | string | null;
   eventos: Array<{
@@ -65,6 +64,9 @@ interface FichajeWidgetState {
   horasAcumuladas: number;
   horaEntradaDia: Date | null;
   horaSalidaDia: Date | null;
+  tipoFichaje: 'ordinario' | 'extraordinario';
+  fichajeId: string | null;
+  eventos: Array<{ tipo: string; hora: string | Date }>; // Eventos del fichaje actual
   modalManual: boolean;
   loading: boolean;
   inicializando: boolean;
@@ -82,6 +84,9 @@ type FichajeWidgetAction =
         horasAcumuladas: number;
         horaEntradaDia: Date | null;
         horaSalidaDia: Date | null;
+        tipoFichaje?: 'ordinario' | 'extraordinario';
+        fichajeId?: string | null;
+        eventos?: Array<{ tipo: string; hora: string | Date }>;
       };
     };
 
@@ -91,6 +96,9 @@ const initialState: FichajeWidgetState = {
   horasAcumuladas: 0,
   horaEntradaDia: null,
   horaSalidaDia: null,
+  tipoFichaje: 'ordinario',
+  fichajeId: null,
+  eventos: [],
   modalManual: false,
   loading: false,
   inicializando: true,
@@ -115,6 +123,9 @@ function fichajeWidgetReducer(
         horasAcumuladas: action.payload.horasAcumuladas,
         horaEntradaDia: action.payload.horaEntradaDia,
         horaSalidaDia: action.payload.horaSalidaDia,
+        tipoFichaje: action.payload.tipoFichaje ?? state.tipoFichaje,
+        fichajeId: action.payload.fichajeId ?? state.fichajeId,
+        eventos: action.payload.eventos ?? state.eventos,
         inicializando: false,
         loading: false,
       };
@@ -132,7 +143,13 @@ function deriveEstadoDesdeFichaje(fichaje: Fichaje): EstadoFichaje {
     return 'sin_fichar';
   }
 
-  const ultimoEvento = fichaje.eventos[fichaje.eventos.length - 1];
+  // CRÍTICO: Ordenar eventos por hora antes de derivar estado
+  // Los eventos pueden venir desordenados si se modificaron en el cliente
+  const eventosOrdenados = [...fichaje.eventos].sort(
+    (a, b) => new Date(a.hora).getTime() - new Date(b.hora).getTime()
+  );
+
+  const ultimoEvento = eventosOrdenados[eventosOrdenados.length - 1];
 
   switch (ultimoEvento.tipo) {
     case 'entrada':
@@ -191,9 +208,16 @@ export function FichajeWidget({
   const [state, dispatch] = useReducer(fichajeWidgetReducer, initialState);
   const [tick, setTick] = useState(0);
   const [horasObjetivoDia, setHorasObjetivoDia] = useState<number>(8);
-  const [empleadoData, setEmpleadoData] = useState<EmpleadoActualResponse | null>(null);
   const [showExtraordinarioDialog, setShowExtraordinarioDialog] = useState(false);
   const [pendingFichajeTipo, setPendingFichajeTipo] = useState<string | null>(null);
+  // NUEVO: Estados para caso 2 (completar descanso)
+  const [showDescansoDialog, setShowDescansoDialog] = useState(false);
+  const [infoDescanso, setInfoDescanso] = useState<{
+    tienePausaInicio: boolean;
+    tienePausaFin: boolean;
+    fichajeId: string;
+  } | null>(null);
+  const [eventosActuales, setEventosActuales] = useState<Array<{ tipo: string; hora: string | Date }>>([]);
 
   useEffect(() => {
     if (state.status !== 'trabajando' || !state.horaEntrada) {
@@ -217,9 +241,6 @@ export function FichajeWidget({
         }
 
         const payload = await parseJson<EmpleadoActualResponse>(response).catch(() => null);
-        if (!cancelled && payload) {
-          setEmpleadoData(payload);
-        }
 
         if (!payload?.jornada) {
           return;
@@ -301,6 +322,8 @@ export function FichajeWidget({
               horasAcumuladas: 0,
               horaEntradaDia: null,
               horaSalidaDia: null,
+              tipoFichaje: 'ordinario',
+              eventos: [],
             },
           });
           return;
@@ -326,6 +349,9 @@ export function FichajeWidget({
             horasAcumuladas,
             horaEntradaDia,
             horaSalidaDia,
+            tipoFichaje: fichajeHoy.tipoFichaje ?? 'ordinario',
+            fichajeId: fichajeHoy.id,
+            eventos: fichajeHoy.eventos, // Guardar eventos en el estado
           },
         });
       } catch (error) {
@@ -338,6 +364,8 @@ export function FichajeWidget({
             horasAcumuladas: 0,
             horaEntradaDia: null,
             horaSalidaDia: null,
+            tipoFichaje: 'ordinario',
+            eventos: [],
           },
         });
       }
@@ -360,39 +388,7 @@ export function FichajeWidget({
     obtenerEstadoActual({ initial: true });
   }, [obtenerEstadoActual]);
 
-  /**
-   * Verifica si el empleado está fichando fuera de su horario laboral
-   * @returns true si está fuera de horario (fichaje extraordinario)
-   */
-  function esFueraDeHorario(): boolean {
-    // Si no hay jornada asignada, siempre es extraordinario
-    if (!empleadoData?.jornada) {
-      return true;
-    }
-
-    const jornada = empleadoData.jornada;
-    const config = jornada.config as Record<string, unknown> | null;
-
-    if (!config) {
-      return false;
-    }
-
-    // Obtener día actual
-    const ahora = new Date();
-    const diasSemana = ['domingo', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado'];
-    const nombreDia = diasSemana[ahora.getDay()];
-
-    const configDia = config[nombreDia] as { activo?: boolean } | undefined;
-
-    // Si el día no está activo en la jornada, es extraordinario
-    if (!configDia || configDia.activo === false) {
-      return true;
-    }
-
-    return false;
-  }
-
-  async function handleFichar(tipoOverride?: string, confirmed: boolean = false) {
+  async function handleFichar(tipoOverride?: string, forceExtraordinario: boolean = false, confirmarSinDescanso: boolean = false) {
     if (state.loading) return;
 
     // Determinar tipo de fichaje según estado actual
@@ -413,22 +409,10 @@ export function FichajeWidget({
       }
     }
 
-    // Solo verificar si está fuera de horario para fichajes de entrada
-    // (no para pausas o salidas en medio de una jornada)
-    const esEntrada = tipo === 'entrada';
-    const fueraDeHorario = esEntrada && esFueraDeHorario();
-
-    // Si está fuera de horario y no ha confirmado, mostrar diálogo
-    if (fueraDeHorario && !confirmed) {
-      setPendingFichajeTipo(tipo);
-      setShowExtraordinarioDialog(true);
-      return;
-    }
-
     dispatch({ type: 'SET_LOADING', payload: true });
     try {
-      // Determinar tipo de fichaje: ordinario o extraordinario
-      const tipoFichaje = fueraDeHorario ? 'extraordinario' : 'ordinario';
+      // Determinar tipo de fichaje: ordinario (default) o extraordinario (si forzado)
+      const tipoFichaje = forceExtraordinario ? 'extraordinario' : 'ordinario';
 
       const response = await fetch('/api/fichajes', {
         method: 'POST',
@@ -436,12 +420,46 @@ export function FichajeWidget({
         body: JSON.stringify({
           tipo,
           tipoFichaje,
+          confirmarSinDescanso,
         }),
       });
 
       if (!response.ok) {
-        const error = await parseJson<{ error?: string }>(response).catch(() => null);
+        const error = await parseJson<{
+          error?: string;
+          code?: string;
+          tienePausaInicio?: boolean;
+          tienePausaFin?: boolean;
+          fichajeId?: string;
+        }>(response).catch(() => null);
+
+        // Si el backend rechaza por día no laborable, preguntar si quiere registrarlo como extraordinario
+        if (error?.code === 'DIA_NO_LABORABLE' && !forceExtraordinario) {
+          setPendingFichajeTipo(tipo);
+          setShowExtraordinarioDialog(true);
+          dispatch({ type: 'SET_LOADING', payload: false });
+          return;
+        }
+
+        // NUEVO: Dialog de descanso incompleto
+        if (error?.code === 'DESCANSO_INCOMPLETO') {
+          const fichajeId = error.fichajeId ?? state.fichajeId ?? '';
+
+          // Usar eventos del estado si están disponibles, evitando fetch adicional
+          setEventosActuales(state.eventos.length > 0 ? state.eventos : []);
+
+          setInfoDescanso({
+            tienePausaInicio: error.tienePausaInicio ?? false,
+            tienePausaFin: error.tienePausaFin ?? false,
+            fichajeId,
+          });
+          setShowDescansoDialog(true);
+          dispatch({ type: 'SET_LOADING', payload: false });
+          return;
+        }
+
         toast.error(error?.error || 'Error al fichar');
+        dispatch({ type: 'SET_LOADING', payload: false });
         return;
       }
 
@@ -466,7 +484,7 @@ export function FichajeWidget({
   function handleConfirmarExtraordinario() {
     setShowExtraordinarioDialog(false);
     if (pendingFichajeTipo) {
-      handleFichar(pendingFichajeTipo, true);
+      handleFichar(pendingFichajeTipo, true); // forceExtraordinario = true
       setPendingFichajeTipo(null);
     }
   }
@@ -474,6 +492,17 @@ export function FichajeWidget({
   function handleCancelarExtraordinario() {
     setShowExtraordinarioDialog(false);
     setPendingFichajeTipo(null);
+  }
+
+  function handleConfirmarSinDescanso() {
+    setShowDescansoDialog(false);
+    setInfoDescanso(null);
+    handleFichar('salida', false, true);
+  }
+
+  function handleEditarEventos() {
+    setShowDescansoDialog(false);
+    dispatch({ type: 'SET_MODAL', payload: true });
   }
 
   function getTextoBoton() {
@@ -545,7 +574,10 @@ export function FichajeWidget({
                 </div>
                 {state.status === 'trabajando' && (
                   <span className="text-[10px] text-gray-500">
-                    {formatearHorasMinutos(horasPorHacer)} restantes
+                    {state.tipoFichaje === 'extraordinario'
+                      ? '⚡ Jornada extraordinaria'
+                      : `${formatearHorasMinutos(horasPorHacer)} restantes`
+                    }
                   </span>
                 )}
               </div>
@@ -618,9 +650,15 @@ export function FichajeWidget({
             <div className="flex-1 flex flex-col justify-between min-w-0 py-8">
               {/* Estado con descripción */}
               <div className="space-y-1">
-                <h3 className="text-[24px] font-bold text-gray-900 leading-tight">{getTituloEstado()}</h3>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-[24px] font-bold text-gray-900 leading-tight">{getTituloEstado()}</h3>
+                </div>
                 <p className="text-[12px] text-gray-500">
-                  {state.status === 'trabajando' && `${formatearHorasMinutos(horasPorHacer)} restantes`}
+                  {state.status === 'trabajando' && (
+                    state.tipoFichaje === 'extraordinario'
+                      ? '⚡ Jornada extraordinaria'
+                      : `${formatearHorasMinutos(horasPorHacer)} restantes`
+                  )}
                   {state.status === 'en_pausa' && 'En descanso'}
                   {state.status === 'sin_fichar' && 'Listo para comenzar'}
                   {state.status === 'finalizado' && 'Día completado'}
@@ -682,7 +720,7 @@ export function FichajeWidget({
                       className="w-full font-semibold text-[12px] py-2"
                       onClick={() => dispatch({ type: 'SET_MODAL', payload: true })}
                     >
-                      + Añadir Manual
+                      Editar
                     </Button>
                   </>
                 )}
@@ -789,6 +827,69 @@ export function FichajeWidget({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Dialog de confirmación para descanso incompleto */}
+      <AlertDialog open={showDescansoDialog} onOpenChange={setShowDescansoDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-orange-600" />
+              Descanso incompleto
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-3">
+              <p>
+                Tu jornada requiere descanso pero{' '}
+                {!infoDescanso?.tienePausaInicio && !infoDescanso?.tienePausaFin
+                  ? 'no has registrado ninguna pausa'
+                  : infoDescanso?.tienePausaInicio && !infoDescanso?.tienePausaFin
+                    ? 'no has registrado el fin de la pausa'
+                    : 'la pausa está incompleta'}
+                .
+              </p>
+
+              {/* Mostrar eventos existentes */}
+              {eventosActuales.length > 0 && (
+                <div className="mt-4 p-3 bg-gray-50 rounded-md">
+                  <p className="text-sm font-medium text-gray-700 mb-2">Eventos registrados:</p>
+                  <div className="space-y-1">
+                    {eventosActuales.map((evento, idx) => {
+                      const tipoLabel = {
+                        entrada: 'Entrada',
+                        pausa_inicio: 'Inicio de pausa',
+                        pausa_fin: 'Fin de pausa',
+                        salida: 'Salida'
+                      }[evento.tipo] || evento.tipo;
+                      const horaFormateada = new Date(evento.hora).toLocaleTimeString('es-ES', {
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      });
+                      return (
+                        <div key={idx} className="flex items-center justify-between text-sm">
+                          <span className="text-gray-600">{tipoLabel}</span>
+                          <span className="font-mono text-gray-900">{horaFormateada}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              <p className="text-sm">
+                Puedes editar los eventos para corregir los horarios, o confirmar la jornada tal cual está.
+              </p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <Button variant="outline" onClick={handleConfirmarSinDescanso}>
+              Confirmar
+            </Button>
+            <AlertDialogAction onClick={handleEditarEventos}>
+              Editar eventos
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
     </div>
   );
 }

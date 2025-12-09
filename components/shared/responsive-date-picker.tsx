@@ -10,6 +10,7 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Calendar as CalendarIcon } from 'lucide-react';
 import * as React from 'react';
+import type { Matcher, Modifiers, ModifiersClassNames } from 'react-day-picker';
 
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
@@ -236,6 +237,14 @@ interface ResponsiveDateRangePickerProps {
    * Fecha máxima seleccionable
    */
   toDate?: Date;
+  /**
+   * Modifiers personalizados para el calendario (ej: festivos, no laborables)
+   */
+  modifiers?: Modifiers;
+  /**
+   * Clases CSS para los modifiers
+   */
+  modifiersClassNames?: ModifiersClassNames;
 }
 
 /**
@@ -251,6 +260,8 @@ export function ResponsiveDateRangePicker({
   className,
   fromDate,
   toDate,
+  modifiers,
+  modifiersClassNames,
 }: ResponsiveDateRangePickerProps) {
   const [open, setOpen] = React.useState(false);
   const isMobile = useIsMobile();
@@ -259,13 +270,13 @@ export function ResponsiveDateRangePicker({
 
   const handleSelect = (range: DateRange | undefined) => {
     if (range) {
-      // Si solo se selecciona 'from' (primer clic), forzar 'to' al mismo día
-      // Esto permite rangos de 1 día de forma natural
-      const normalizedRange: DateRange = {
+      // Simplemente pasar las fechas tal cual vienen del calendario
+      // El calendario ya devuelve objetos Date a medianoche en la zona horaria local
+      // No crear nuevos objetos Date ni normalizar aquí para evitar problemas de zona horaria
+      onSelect({
         from: range.from,
         to: range.to ?? range.from,
-      };
-      onSelect(normalizedRange);
+      });
     }
   };
 
@@ -314,6 +325,8 @@ export function ResponsiveDateRangePicker({
                 toDate={toDate}
                 numberOfMonths={1}
                 initialFocus
+                modifiers={modifiers}
+                modifiersClassNames={modifiersClassNames}
                 className="rounded-md border-0"
                 classNames={{
                   day_button: cn(
@@ -388,6 +401,8 @@ export function ResponsiveDateRangePicker({
           toDate={toDate}
           numberOfMonths={2}
           initialFocus
+          modifiers={modifiers}
+          modifiersClassNames={modifiersClassNames}
         />
       </PopoverContent>
     </Popover>

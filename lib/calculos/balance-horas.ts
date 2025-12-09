@@ -114,9 +114,11 @@ export async function calcularBalanceDiario(
   fechaInicio.setHours(0, 0, 0, 0);
 
   // Obtener fichajes del día
+  // FIX: Solo fichajes ordinarios para balance
   const fichajes = await prismaClient.fichajes.findMany({
     where: {
       empleadoId,
+      tipoFichaje: 'ordinario',
       fecha: fechaInicio,
     },
   });
@@ -203,6 +205,7 @@ export async function calcularBalanceMensualBatch(
     prismaClient.fichajes.findMany({
       where: {
         empleadoId: { in: uniqueEmpleadoIds },
+        tipoFichaje: 'ordinario', // FIX: Solo fichajes ordinarios para balance
         fecha: {
           gte: fechaInicio,
           lte: fechaFin,
@@ -337,9 +340,11 @@ export async function calcularBalancePeriodo(
   }
 
   // Obtener todos los fichajes del período efectivo
+  // FIX: Excluir fichajes extraordinarios del balance (se cuentan aparte)
   const fichajes = await prismaClient.fichajes.findMany({
     where: {
       empleadoId,
+      tipoFichaje: 'ordinario', // Solo fichajes ordinarios para el balance
       fecha: {
         gte: fechaInicioEfectiva,
         lte: fechaFinNormalizada,

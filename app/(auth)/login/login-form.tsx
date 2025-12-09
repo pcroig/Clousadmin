@@ -12,6 +12,7 @@ import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { PasswordInput } from '@/components/ui/password-input';
 import { UsuarioRol } from '@/lib/constants/enums';
 
 import { loginAction } from './actions';
@@ -26,6 +27,7 @@ export function LoginForm({ callbackUrl }: LoginFormProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [rateLimited, setRateLimited] = useState(false);
@@ -34,7 +36,15 @@ export function LoginForm({ callbackUrl }: LoginFormProps) {
   // Detectar errores en la URL (cuenta inactiva, OAuth, etc.)
   useEffect(() => {
     const errorParam = searchParams.get('error');
+    const resetParam = searchParams.get('reset');
     const emailParam = searchParams.get('email');
+
+    // Mostrar mensaje de éxito si viene de reset de contraseña
+    if (resetParam === 'success') {
+      setSuccessMessage('Tu contraseña se ha actualizado correctamente. Ya puedes iniciar sesión.');
+      router.replace('/login');
+      return;
+    }
 
     if (errorParam === 'cuenta_inactiva') {
       // Borrar cookie de sesión automáticamente
@@ -165,15 +175,20 @@ export function LoginForm({ callbackUrl }: LoginFormProps) {
 
         <div className="space-y-2">
           <Label htmlFor="password">Contraseña</Label>
-          <Input
+          <PasswordInput
             id="password"
-            type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
             autoComplete="current-password"
           />
         </div>
+
+        {successMessage && (
+          <div className="rounded-md bg-green-50 p-3">
+            <p className="text-sm text-green-600">{successMessage}</p>
+          </div>
+        )}
 
         {error && (
           <div className="rounded-md bg-red-50 p-3">

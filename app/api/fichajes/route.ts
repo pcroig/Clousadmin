@@ -21,11 +21,13 @@ import {
   calcularTiempoEnPausa,
   esDiaLaboral,
   obtenerHorasEsperadasBatch,
+  validarDescansoAntesDeSalida,
   validarEvento,
   validarEventoExtraordinario,
   validarFichajeCompleto,
   validarLimitesJornada,
 } from '@/lib/calculos/fichajes';
+import { calcularProgresoEventos } from '@/lib/calculos/fichajes-cliente';
 import { normalizarFechaSinHora } from '@/lib/utils/fechas';
 import { EstadoFichaje, UsuarioRol } from '@/lib/constants/enums';
 import { prisma, Prisma } from '@/lib/prisma';
@@ -33,14 +35,16 @@ import {
   buildPaginationMeta,
   parsePaginationParams,
 } from '@/lib/utils/pagination';
+import { optionalIdSchema } from '@/lib/validaciones/schemas';
 
 const fichajeEventoCreateSchema = z.object({
   tipo: z.enum(['entrada', 'pausa_inicio', 'pausa_fin', 'salida']),
   fecha: z.string().optional(), // Opcional, default hoy
   hora: z.string().optional(), // Opcional, default ahora
   ubicacion: z.string().optional(),
-  empleadoId: z.string().uuid().optional(),
+  empleadoId: optionalIdSchema,
   tipoFichaje: z.enum(['ordinario', 'extraordinario']).optional().default('ordinario'),
+  confirmarSinDescanso: z.boolean().optional(), // NUEVO: Para permitir finalizar sin completar descanso
 });
 
 // GET /api/fichajes - Listar fichajes
@@ -257,13 +261,30 @@ export async function GET(req: NextRequest) {
       const fechaBase = normalizarFechaSinHora(fichaje.fecha);
       const key = `${fichaje.empleadoId}_${fechaBase.toISOString().split('T')[0]}`;
 
-      const horasEsperadas = horasEsperadasMap[key] ?? 0;
+      // FIX: Fichajes extraordinarios NO tienen horas esperadas (todo es extra)
+      const horasEsperadas = fichaje.tipoFichaje === 'extraordinario'
+        ? 0
+        : horasEsperadasMap[key] ?? 0;
       const eventos = fichaje.eventos ?? [];
 
-      const horasTrabajadas =
-        fichaje.horasTrabajadas !== null && fichaje.horasTrabajadas !== undefined
-          ? Number(fichaje.horasTrabajadas)
-          : calcularHorasTrabajadas(eventos) ?? 0;
+      // FIX CRÍTICO: Para fichajes en_curso, calcular horas en tiempo real
+      // La BD guarda el valor en el último evento, pero necesitamos el valor actual
+      let horasTrabajadas: number;
+      if (fichaje.estado === 'en_curso') {
+        const { horasAcumuladas, horaEnCurso } = calcularProgresoEventos(eventos);
+        horasTrabajadas = horasAcumuladas;
+        if (horaEnCurso) {
+          const ahora = new Date();
+          const horasDesdeUltimoEvento = (ahora.getTime() - horaEnCurso.getTime()) / (1000 * 60 * 60);
+          horasTrabajadas += horasDesdeUltimoEvento;
+        }
+        horasTrabajadas = Math.round(horasTrabajadas * 100) / 100;
+      } else {
+        horasTrabajadas =
+          fichaje.horasTrabajadas !== null && fichaje.horasTrabajadas !== undefined
+            ? Number(fichaje.horasTrabajadas)
+            : calcularHorasTrabajadas(eventos) ?? 0;
+      }
 
       const horasEnPausa =
         fichaje.horasEnPausa !== null && fichaje.horasEnPausa !== undefined
@@ -445,7 +466,14 @@ export async function POST(req: NextRequest) {
         const esLaboral = await esDiaLaboral(targetEmpleadoId, fecha);
 
         if (!esLaboral) {
-          return badRequestResponse('No puedes fichar en este día. Puede ser un día no laborable según el calendario de la empresa, un festivo, o tienes una ausencia de día completo.');
+          return NextResponse.json(
+            {
+              error: 'No puedes fichar en este día. Puede ser un día no laborable según el calendario de la empresa, un festivo, o tienes una ausencia de día completo.',
+              code: 'DIA_NO_LABORABLE',
+              sugerencia: 'Si deseas registrar este fichaje como horas extraordinarias, puedes hacerlo manualmente.'
+            },
+            { status: 400 }
+          );
         }
       }
 
@@ -489,6 +517,29 @@ export async function POST(req: NextRequest) {
           eventos: true,
         },
       });
+    }
+
+    // NUEVO: Validar descanso antes de permitir salida (solo fichajes ordinarios)
+    if (validatedData.tipo === 'salida' && tipoFichaje === 'ordinario') {
+      const validacionDescanso = await validarDescansoAntesDeSalida(
+        targetEmpleadoId,
+        fecha
+      );
+
+      if (validacionDescanso.debeConfirmar && !validatedData.confirmarSinDescanso) {
+        return NextResponse.json(
+          {
+            error: 'Descanso incompleto o inexistente',
+            code: 'DESCANSO_INCOMPLETO',
+            requiereDescanso: validacionDescanso.requiereDescanso,
+            tienePausaInicio: validacionDescanso.tienePausaInicio,
+            tienePausaFin: validacionDescanso.tienePausaFin,
+            fichajeId: fichaje.id,
+            sugerencia: 'Puedes editar los eventos de pausa o confirmar la jornada tal cual está.'
+          },
+          { status: 400 }
+        );
+      }
     }
 
     // 7. Crear evento dentro del fichaje

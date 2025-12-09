@@ -26,11 +26,6 @@ export function AddPersonaDocumentForm({ onSuccess, onCancel }: AddPersonaDocume
   if (mode === 'select') {
     return (
       <div className="space-y-6">
-        <div className="text-sm text-gray-600 bg-gray-50 p-4 rounded-lg border border-gray-200">
-          <p className="font-medium text-gray-900 mb-2">📥 Importar empleados</p>
-          <p className="text-gray-600">Elige cómo deseas importar los datos de los empleados:</p>
-        </div>
-
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Opción Individual */}
           <button
