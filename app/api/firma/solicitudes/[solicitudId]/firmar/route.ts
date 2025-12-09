@@ -27,6 +27,7 @@ import { uploadToS3 } from '@/lib/s3';
  *   firmaImagen?: string;  // Data URL de la firma manuscrita
  *   firmaImagenWidth?: number;
  *   firmaImagenHeight?: number;
+ *   carpetaDestinoId?: string; // ID de carpeta centralizada (para documentos desde carpetas compartidas)
  * }
  */
 export async function POST(
@@ -46,6 +47,43 @@ export async function POST(
     const firmaImagen: string | undefined = typeof body.firmaImagen === 'string' ? body.firmaImagen : undefined;
     const firmaImagenWidth: number | undefined = typeof body.firmaImagenWidth === 'number' ? body.firmaImagenWidth : undefined;
     const firmaImagenHeight: number | undefined = typeof body.firmaImagenHeight === 'number' ? body.firmaImagenHeight : undefined;
+    const carpetaDestinoId: string | undefined = typeof body.carpetaDestinoId === 'string' ? body.carpetaDestinoId : undefined;
+
+    // Validar carpetaDestinoId si se proporcionó
+    if (carpetaDestinoId) {
+      const carpeta = await prisma.carpetas.findUnique({
+        where: { id: carpetaDestinoId },
+        select: {
+          id: true,
+          empresaId: true,
+          empleadoId: true,
+          asignadoA: true,
+          compartida: true,
+        },
+      });
+
+      if (!carpeta) {
+        return NextResponse.json(
+          { error: 'La carpeta destino no existe' },
+          { status: 400 }
+        );
+      }
+
+      if (carpeta.empresaId !== session.user.empresaId) {
+        return NextResponse.json(
+          { error: 'La carpeta destino no pertenece a tu empresa' },
+          { status: 403 }
+        );
+      }
+
+      // Validar que sea carpeta centralizada (empleadoId null, asignadoA 'hr')
+      if (carpeta.empleadoId !== null || carpeta.asignadoA !== 'hr') {
+        return NextResponse.json(
+          { error: 'La carpeta destino debe ser una carpeta centralizada' },
+          { status: 400 }
+        );
+      }
+    }
 
     // Obtener empleado asociado al usuario autenticado
     const empleado = await prisma.empleados.findUnique({
@@ -120,8 +158,8 @@ export async function POST(
       datosCapturados.firmaGuardadaS3Key = empleado.firmaS3Key;
     }
 
-    // Firmar documento
-    const resultado = await firmarDocumento(firmaId, empleado.id, datosCapturados);
+    // Firmar documento (pasar carpetaDestinoId si se proporcionó)
+    const resultado = await firmarDocumento(firmaId, empleado.id, datosCapturados, carpetaDestinoId);
 
     // TODO: Si la solicitud está completada, notificar al creador (Fase 2)
 

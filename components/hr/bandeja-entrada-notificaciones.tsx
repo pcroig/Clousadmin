@@ -4,8 +4,10 @@
 
 'use client';
 
-import { Bell } from 'lucide-react';
+import { Bell, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { useState } from 'react';
+import { toast } from 'sonner';
 
 import { EmptyState } from '@/components/shared/empty-state';
 import { Button } from '@/components/ui/button';
@@ -27,6 +29,40 @@ export function BandejaEntradaNotificaciones({
   onMarcarLeida,
 }: BandejaEntradaNotificacionesProps) {
   const router = useRouter();
+  const [rechazandoEdicion, setRechazandoEdicion] = useState<string | null>(null);
+
+  /**
+   * Rechazar edición de fichaje desde la notificación
+   */
+  const handleRechazarEdicion = async (notifId: string, event: MouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+
+    if (!confirm('¿Seguro que quieres rechazar esta edición? Se revertirán todos los cambios.')) {
+      return;
+    }
+
+    setRechazandoEdicion(notifId);
+    try {
+      const response = await fetch(`/api/notificaciones/${notifId}/rechazar-edicion`, {
+        method: 'POST',
+      });
+
+      if (response.ok) {
+        toast.success('Edición rechazada correctamente');
+        router.refresh();
+        // Disparar evento para sincronizar tablas de fichajes
+        window.dispatchEvent(new CustomEvent('fichaje-updated'));
+      } else {
+        const error = await response.json();
+        toast.error(error.message || 'Error al rechazar la edición');
+      }
+    } catch (error) {
+      console.error('[BandejaEntrada] Error al rechazar edición:', error);
+      toast.error('Error al rechazar la edición');
+    } finally {
+      setRechazandoEdicion(null);
+    }
+  };
 
   /**
    * Corrige URLs antiguas de notificaciones que apuntan a lugares incorrectos
@@ -86,13 +122,55 @@ export function BandejaEntradaNotificaciones({
   };
 
   const renderAccion = (notificacion: NotificacionUI) => {
-    const accionUrlOriginal = notificacion.metadata?.accionUrl;
+    // NUEVA LÓGICA: Detectar notificaciones con botón de rechazo
+    const metadata = notificacion.metadata as { accionBoton?: string; accionUrl?: string; accionTexto?: string; requiresModal?: boolean; requiresSignature?: boolean; requiresSelection?: boolean } | undefined;
+    const accionBoton = metadata?.accionBoton;
+
+    // Si es una notificación de edición con botón de rechazo
+    if (accionBoton === 'rechazar_edicion') {
+      const estaCargando = rechazandoEdicion === notificacion.id;
+
+      return (
+        <div className="flex gap-2 mt-2">
+          <Button
+            type="button"
+            size="sm"
+            variant="destructive"
+            onClick={(e) => handleRechazarEdicion(notificacion.id, e)}
+            disabled={estaCargando}
+            className="gap-1.5"
+          >
+            <X className="w-3.5 h-3.5" />
+            {estaCargando ? 'Rechazando...' : 'Rechazar edición'}
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={(e) => {
+              e.stopPropagation();
+              onMarcarLeida?.(notificacion.id);
+              const enlace = metadata?.accionUrl;
+              if (enlace) {
+                router.push(enlace);
+              }
+            }}
+            disabled={estaCargando}
+          >
+            Ver cambios
+          </Button>
+        </div>
+      );
+    }
+
+    // Lógica original para otros tipos de notificaciones
+    const accionUrlOriginal = metadata?.accionUrl;
     const accionUrl = corregirUrlNotificacion(notificacion);
-    const accionTexto = notificacion.metadata?.accionTexto;
+    const accionTexto = metadata?.accionTexto;
     const tieneAccionEspecial =
-      notificacion.metadata?.requiresModal ||
-      notificacion.metadata?.requiresSignature ||
-      notificacion.metadata?.requiresSelection;
+      metadata?.requiresModal ||
+      metadata?.requiresSignature ||
+      metadata?.requiresSelection;
 
     if (
       !accionUrlOriginal ||

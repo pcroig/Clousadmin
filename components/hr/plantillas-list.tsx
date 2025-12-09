@@ -4,7 +4,7 @@
 // Plantillas List Component - Lista de plantillas con filtros
 // ========================================
 
-import { FileText, FileType, Filter, Search } from 'lucide-react';
+import { FileText, FileType, Menu, Search } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
@@ -131,7 +131,7 @@ export function PlantillasList() {
 
         {/* Filtros */}
         <div className="flex gap-3 items-center flex-wrap">
-          <Filter className="h-4 w-4 text-gray-500" />
+          <Menu className="h-4 w-4 text-gray-500" />
           
           <Select value={filtroTipo} onValueChange={setFiltroTipo}>
             <SelectTrigger className="w-[180px]">

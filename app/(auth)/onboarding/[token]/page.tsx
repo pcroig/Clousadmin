@@ -6,7 +6,12 @@ import { GalleryVerticalEnd } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 
-import { verificarTokenOnboarding } from '@/lib/onboarding';
+import {
+  verificarTokenOnboarding,
+  obtenerWorkflowConfig,
+  type ProgresoOnboardingWorkflow,
+  type DatosTemporales,
+} from '@/lib/onboarding';
 
 import { OnboardingForm } from './onboarding-form';
 
@@ -14,6 +19,11 @@ export default async function OnboardingPage(context: { params: Promise<{ token:
   const params = await context.params;
   const { token } = params;
   const { valido, onboarding, error } = await verificarTokenOnboarding(token);
+
+  // Obtener workflow configurado para la empresa (solo para onboarding completo)
+  const workflow = valido && onboarding
+    ? await obtenerWorkflowConfig(onboarding.empresaId)
+    : [];
 
   return (
     <div className="grid min-h-svh lg:grid-cols-2">
@@ -44,8 +54,11 @@ export default async function OnboardingPage(context: { params: Promise<{ token:
             ) : (
               <OnboardingForm
                 token={token}
-                empleado={onboarding!.empleado}
-                nombreEmpresa={onboarding!.empresa.nombre}
+                empleado={onboarding!.empleado as never}
+                progreso={onboarding!.progreso as unknown as ProgresoOnboardingWorkflow}
+                datosTemporales={(onboarding!.datosTemporales as unknown as DatosTemporales) || null}
+                empresaNombre={onboarding!.empresa.nombre}
+                workflow={workflow}
               />
             )}
           </div>

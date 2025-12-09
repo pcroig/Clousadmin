@@ -1514,3 +1514,115 @@ export async function validarDescansoAntesDeSalida(
     debeConfirmar,
   };
 }
+
+/**
+ * Verifica si un fichaje debe cerrarse automáticamente según el límite superior de la jornada
+ * o porque pertenece a un día anterior.
+ *
+ * @param fichaje - Fichaje a evaluar con jornada incluida
+ * @param ahora - Fecha/hora actual (opcional, por defecto new Date())
+ * @returns true si el fichaje debe cerrarse automáticamente
+ */
+export function debeCerrarseAutomaticamente(
+  fichaje: {
+    fecha: Date;
+    estado: string;
+    empleado?: {
+      jornada?: {
+        config: unknown;
+      } | null;
+    };
+  },
+  ahora: Date = new Date()
+): boolean {
+  // Solo cerrar fichajes en estado 'en_curso'
+  if (fichaje.estado !== PrismaEstadoFichaje.en_curso) {
+    return false;
+  }
+
+  const fechaFichaje = normalizarFechaSinHora(fichaje.fecha);
+  const fechaHoy = normalizarFechaSinHora(ahora);
+
+  // Si el fichaje es de un día anterior a hoy, debe cerrarse
+  if (fechaFichaje < fechaHoy) {
+    return true;
+  }
+
+  // Si el fichaje es de hoy, verificar el límite superior
+  if (fechaFichaje.getTime() === fechaHoy.getTime()) {
+    const jornada = fichaje.empleado?.jornada;
+    if (!jornada) {
+      // Sin jornada, no podemos determinar límite superior
+      // Mantener abierto (conservador)
+      return false;
+    }
+
+    const config = jornada.config as JornadaConfig | null;
+    if (!config) {
+      return false;
+    }
+
+    const limiteSuperior = config.limiteSuperior;
+    if (!limiteSuperior || typeof limiteSuperior !== 'string') {
+      // Sin límite superior configurado, solo cerrar si es día anterior
+      return false;
+    }
+
+    // Parsear límite superior (formato "HH:mm")
+    const [horaLimite, minutoLimite] = limiteSuperior.split(':').map(Number);
+    if (horaLimite === undefined || minutoLimite === undefined) {
+      return false;
+    }
+
+    // Crear fecha límite (mismo día que el fichaje, con la hora límite superior)
+    const fechaLimite = new Date(fechaFichaje);
+    fechaLimite.setHours(horaLimite, minutoLimite, 0, 0);
+
+    // Si ya pasó el límite superior, debe cerrarse
+    return ahora > fechaLimite;
+  }
+
+  // Fichaje es del futuro (no debería ocurrir), no cerrar
+  return false;
+}
+
+/**
+ * Cierra automáticamente un fichaje que quedó abierto, clasificándolo como pendiente o finalizado
+ * según su completitud.
+ *
+ * @param fichajeId - ID del fichaje a cerrar
+ * @param prismaClient - Cliente de Prisma (opcional, para uso en transacciones)
+ * @returns Estado final del fichaje ('finalizado' o 'pendiente')
+ */
+export async function cerrarFichajeAutomaticamente(
+  fichajeId: string,
+  prismaClient?: PrismaClient | Prisma.TransactionClient
+): Promise<'finalizado' | 'pendiente'> {
+  const client = prismaClient ?? prisma;
+
+  // Obtener fichaje con validación completa
+  const validacion = await validarFichajeCompleto(fichajeId);
+
+  // Actualizar cálculos antes de cerrar
+  await actualizarCalculosFichaje(fichajeId, client);
+
+  const estadoFinal = validacion.completo
+    ? PrismaEstadoFichaje.finalizado
+    : PrismaEstadoFichaje.pendiente;
+
+  await client.fichajes.update({
+    where: { id: fichajeId },
+    data: {
+      estado: estadoFinal,
+      // Si está finalizado, marcar fecha de aprobación automática
+      ...(validacion.completo && { fechaAprobacion: new Date() }),
+    },
+  });
+
+  console.log(
+    `[cerrarFichajeAutomaticamente] Fichaje ${fichajeId} cerrado automáticamente: ${estadoFinal}`,
+    { completo: validacion.completo, razon: validacion.razon }
+  );
+
+  return estadoFinal === PrismaEstadoFichaje.finalizado ? 'finalizado' : 'pendiente';
+}

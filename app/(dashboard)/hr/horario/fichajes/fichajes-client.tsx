@@ -818,7 +818,6 @@ export function FichajesClient({ initialState }: { initialState?: string }) {
           fetchFichajes();
         }}
         contexto="hr_admin"
-        modo="editar"
       />
 
       {showCompensarHorasDialog && (

@@ -12,7 +12,7 @@
 //    - Si está completo: marcar como 'finalizado'
 //    - Si está incompleto: marcar como 'pendiente' (para cuadrar)
 //
-// Se ejecuta todas las noches a las 23:30
+// Se ejecuta todas las noches a las 00:01
 
 import { NextRequest } from 'next/server';
 
@@ -56,12 +56,11 @@ export async function POST(request: NextRequest) {
       try {
         console.log(`[CRON Cerrar Jornadas] Procesando empresa: ${empresa.nombre}`);
 
-        // Obtener empleados que deberían trabajar ese día
-        const empleadosDisponibles = await obtenerEmpleadosDisponibles(empresa.id, ayer);
+        // PASO 1: Procesar fichajes del día ANTERIOR (siempre cerrar)
+        const empleadosAyer = await obtenerEmpleadosDisponibles(empresa.id, ayer);
+        console.log(`[CRON Cerrar Jornadas] ${empleadosAyer.length} empleados disponibles ayer en ${empresa.nombre}`);
 
-        console.log(`[CRON Cerrar Jornadas] ${empleadosDisponibles.length} empleados disponibles en ${empresa.nombre}`);
-
-        for (const empleado of empleadosDisponibles) {
+        for (const empleado of empleadosAyer) {
           try {
             // Buscar fichaje del día anterior
             let fichaje = await prisma.fichajes.findUnique({
@@ -76,9 +75,28 @@ export async function POST(request: NextRequest) {
               },
             });
 
-            // Si no existe fichaje, crear uno en estado pendiente
-            // IMPORTANTE: Solo crear fichajes ordinarios automáticamente
+            // Si no existe fichaje, verificar si hay ausencia de día completo
             if (!fichaje) {
+              // Verificar ausencia de día completo
+              const ausenciaDiaCompleto = await prisma.ausencias.findFirst({
+                where: {
+                  empleadoId: empleado.id,
+                  fechaInicio: { lte: ayer },
+                  fechaFin: { gte: ayer },
+                  aprobado: true,
+                  OR: [
+                    { periodo: null },        // Ausencia sin período específico (día completo)
+                    { periodo: 'completo' }   // Ausencia día completo explícito
+                  ]
+                }
+              });
+
+              if (ausenciaDiaCompleto) {
+                console.log(`[CRON Cerrar Jornadas] Empleado ${empleado.nombre} ${empleado.apellidos} tiene ausencia día completo, NO crear fichaje`);
+                continue; // NO crear fichaje para ausencias de día completo
+              }
+
+              // Si no hay ausencia día completo, crear fichaje pendiente
               fichaje = await prisma.fichajes.create({
                 data: {
                   empresaId: empresa.id,
@@ -96,7 +114,7 @@ export async function POST(request: NextRequest) {
               console.log(`[CRON Cerrar Jornadas] Fichaje creado para ${empleado.nombre} ${empleado.apellidos}`);
               fichajesCreados++;
               fichajesPendientes++;
-              
+
               // Crear notificación de fichaje pendiente
               await crearNotificacionFichajeRequiereRevision(prisma, {
                 fichajeId: fichaje.id,
@@ -106,7 +124,7 @@ export async function POST(request: NextRequest) {
                 fecha: fichaje.fecha,
                 razon: 'No se registraron fichajes en el día',
               });
-              
+
               continue;
             }
 
@@ -153,7 +171,7 @@ export async function POST(request: NextRequest) {
               }
             }
           } catch (error) {
-            const mensaje = `Error procesando empleado ${empleado.nombre} ${empleado.apellidos}: ${
+            const mensaje = `Error procesando empleado de ayer ${empleado.nombre} ${empleado.apellidos}: ${
               error instanceof Error ? error.message : 'Error desconocido'
             }`;
             errores.push(mensaje);
@@ -172,7 +190,7 @@ export async function POST(request: NextRequest) {
     const huboErrores = errores.length > 0;
     const resultado = {
       success: !huboErrores,
-      fecha: ayer.toISOString().split('T')[0],
+      fechaAyer: ayer.toISOString().split('T')[0],
       empresas: empresas.length,
       fichajesCreados,
       fichajesPendientes,

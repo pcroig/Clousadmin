@@ -65,7 +65,7 @@ export const iconClasses = {
  */
 export const iconButtonClasses = {
   default:
-    'inline-flex h-9 w-9 items-center justify-center rounded-md border border-gray-200 bg-white text-gray-500 transition-colors hover:bg-gray-50 hover:text-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d97757]/40',
+    'inline-flex h-9 w-9 items-center justify-center rounded-md border border-gray-200 bg-transparent text-gray-600 transition-colors hover:bg-gray-50 hover:text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d97757]/30',
 } as const;
 
 // ========================================

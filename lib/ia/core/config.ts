@@ -187,7 +187,8 @@ export function getModelForUseCase(useCase: AIUseCase, provider: AIProvider): st
       [AIProvider.GOOGLE]: GOOGLE_MODELS.GEMINI_1_5_PRO,
     },
     [AIUseCase.CLASSIFICATION]: {
-      [AIProvider.OPENAI]: OPENAI_MODELS.GPT_5_1_MINI,
+      // Usamos el mismo modelo estable que en importación de Excel (comprobado)
+      [AIProvider.OPENAI]: OPENAI_MODELS.GPT_5_1,
       [AIProvider.ANTHROPIC]: ANTHROPIC_MODELS.CLAUDE_HAIKU_4_5, // Near-frontier intelligence
       [AIProvider.GOOGLE]: GOOGLE_MODELS.GEMINI_1_5_FLASH,
     },

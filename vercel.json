@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/aprobar-ediciones-expiradas",
+      "schedule": "0 * * * *"
+    }
+  ]
+}

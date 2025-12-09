@@ -564,7 +564,6 @@ export function CuadrarFichajesClient() {
           fetchFichajesRevision();
         }}
         contexto="hr_admin"
-        modo="editar"
         // PUNTO 6: Pasar eventos propuestos al modal
         eventosPropuestos={editarFichajeModal.fichaje?.eventosPropuestos}
         fechaFichaje={editarFichajeModal.fichaje?.fecha}

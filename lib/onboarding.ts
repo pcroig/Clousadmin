@@ -740,7 +740,12 @@ export async function finalizarOnboarding(token: string) {
 
         for (const campo of camposATransferir) {
           if (datosTemporales[campo] !== undefined && datosTemporales[campo] !== null) {
-            datosEmpleado[campo] = datosTemporales[campo];
+            // Convertir fechaNacimiento de string a Date
+            if (campo === 'fechaNacimiento' && typeof datosTemporales[campo] === 'string') {
+              datosEmpleado[campo] = new Date(datosTemporales[campo] as string);
+            } else {
+              datosEmpleado[campo] = datosTemporales[campo];
+            }
           }
         }
 

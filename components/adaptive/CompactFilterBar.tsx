@@ -1,6 +1,6 @@
 'use client';
 
-import { Filter, Search, X } from 'lucide-react';
+import { Menu, Search, X } from 'lucide-react';
 import React, { useState } from 'react';
 
 import { Badge } from '@/components/ui/badge';
@@ -145,7 +145,7 @@ export function CompactFilterBar({
               hasActiveFilters && 'border-blue-600'
             )}
           >
-            <Filter className="h-4 w-4" />
+            <Menu className="h-4 w-4" />
             <span>Filtros</span>
             {hasActiveFilters && (
               <Badge

@@ -1,9 +1,10 @@
 # ✍️ Sistema de Firma Digital - Especificación Funcional y Técnica
 
-**Proyecto**: Clousadmin  
-**Fecha**: 12 de Noviembre 2025  
-**Versión**: 1.0.0 (MVP)  
-**Estado**: 📋 Especificación en Definición
+**Proyecto**: Clousadmin
+**Fecha**: 12 de Noviembre 2025
+**Versión**: 1.1.0
+**Estado**: ✅ Implementado
+**Última actualización**: 9 de Diciembre 2025
 
 ---
 
@@ -17,6 +18,7 @@
 6. [Integraciones con Módulos Existentes](#6-integraciones-con-módulos-existentes)
 7. [Proveedores de Firma](#7-proveedores-de-firma)
 8. [Seguridad y Cumplimiento](#8-seguridad-y-cumplimiento)
+9. [Firma desde Carpetas Compartidas (v1.1)](#9-firma-desde-carpetas-compartidas-v11)
 
 ---
 
@@ -1596,11 +1598,65 @@ describe('generarCertificadoFirma', () => {
 
 ---
 
+## 9. Firma desde Carpetas Compartidas (v1.1)
+
+> **Implementado**: Diciembre 2025 | [Documentación completa](../funcionalidades/firma-carpetas-compartidas.md)
+
+### Problema Resuelto
+
+Documentos firmados desde **carpetas compartidas** quedaban accesibles para todos los usuarios, rompiendo la privacidad de documentos individuales.
+
+### Solución Implementada
+
+Sistema automático de detección que:
+1. **Detecta** si el documento viene de una carpeta compartida
+2. **Solicita** selección de carpeta centralizada destino (o creación de nueva)
+3. **Asigna** documentos firmados con `empleadoId` individual en carpeta centralizada
+4. **Garantiza** privacidad: cada empleado solo ve su documento, HR ve todos
+
+### Arquitectura de Carpetas
+
+| Tipo | `empleadoId` | `asignadoA` | `compartida` | Comportamiento al Firmar |
+|------|--------------|-------------|--------------|--------------------------|
+| **Personal** | `!== null` | - | `false` | Se queda en misma carpeta personal |
+| **Centralizada** | `null` | `'hr'` | `false` | Se queda en misma carpeta (filtro por `empleadoId` del documento) |
+| **Compartida** | - | `'todos'` o `'equipo:X'` | `true` | **Requiere selección** de carpeta centralizada destino |
+
+### Componentes Principales
+
+- **`FirmarConSeleccionCarpeta`**: Wrapper inteligente con detección automática (drop-in replacement)
+- **`SeleccionarCarpetaDestinoDialog`**: Dialog para elegir o crear carpeta centralizada
+- **API Endpoints**:
+  - `GET /api/firma/solicitudes/[id]/carpeta-origen` - Detección de tipo de carpeta
+  - `POST /api/carpetas/centralizada` - Creación de carpeta centralizada
+
+### Validaciones de Seguridad
+
+✅ Ownership (empresaId)
+✅ Permisos (firma pendiente)
+✅ Tipos de carpeta (centralizada vs compartida)
+✅ Sanitización de inputs
+✅ Manejo de race conditions
+
+### Performance
+
+- **97% reducción** en queries de base de datos (de ~101 a 3 queries para 50 empleados)
+- Pre-carga en batch con Maps para lookups O(1)
+- Operaciones idempotentes para concurrencia segura
+
+### Documentación Técnica
+
+Para detalles completos de implementación, arquitectura, flujo de usuario, y ejemplos de código, consultar:
+
+📖 **[Firma de Documentos desde Carpetas Compartidas](../funcionalidades/firma-carpetas-compartidas.md)**
+
+---
+
 **FIN DE LA ESPECIFICACIÓN**
 
-**Versión**: 1.0.0  
-**Última actualización**: 12 de Noviembre 2025  
-**Autor**: Sofia Roig (con asistencia de Claude AI)  
+**Versión**: 1.1.0
+**Última actualización**: 9 de Diciembre 2025
+**Autor**: Sofia Roig (con asistencia de Claude AI)
 **Proyecto**: Clousadmin - Sistema de Gestión de RRHH
 
 

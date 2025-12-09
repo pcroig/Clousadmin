@@ -31,6 +31,7 @@ export async function POST(
       success: true,
       message: 'Onboarding completado correctamente',
       empleadoId: resultado.empleadoId,
+      redirectUrl: '/empleado/mi-espacio',
     });
   } catch (error) {
     console.error('[POST /api/onboarding/[token]/finalizar] Error:', error);

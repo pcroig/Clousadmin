@@ -61,6 +61,7 @@ interface DashboardClientProps {
     };
   } | null;
   equipoResumen: PlantillaResumen | null;
+  empresaResumen: PlantillaResumen;
   campanasEnabled?: boolean;
 }
 
@@ -77,6 +78,7 @@ export function EmpleadoDashboardClient({
   campanaPendiente,
   campanaPropuesta,
   equipoResumen,
+  empresaResumen,
   campanasEnabled = true,
 }: DashboardClientProps) {
   const [modalAusencia, setModalAusencia] = useState(false);
@@ -121,6 +123,8 @@ export function EmpleadoDashboardClient({
       }
     }
   };
+
+  const plantillaResumen = equipoResumen ?? empresaResumen;
 
   return (
     <>
@@ -186,18 +190,16 @@ export function EmpleadoDashboardClient({
             </div>
 
             {/* Plantilla Widget */}
-            {equipoResumen && (
-              <div className="min-h-[240px] h-full">
-                <PlantillaWidget
-                  trabajando={equipoResumen.trabajando}
-                  enPausa={equipoResumen.enPausa}
-                  ausentes={equipoResumen.ausentes}
-                  sinFichar={equipoResumen.sinFichar}
-                  fueraDeHorario={equipoResumen.fueraDeHorario}
-                  rol="empleado"
-                />
-              </div>
-            )}
+            <div className="min-h-[240px] h-full">
+              <PlantillaWidget
+                trabajando={plantillaResumen.trabajando}
+                enPausa={plantillaResumen.enPausa}
+                ausentes={plantillaResumen.ausentes}
+                sinFichar={plantillaResumen.sinFichar}
+                fueraDeHorario={plantillaResumen.fueraDeHorario}
+                rol="empleado"
+              />
+            </div>
           </div>
         </div>
       </div>

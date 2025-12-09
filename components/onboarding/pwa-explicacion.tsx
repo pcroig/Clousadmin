@@ -13,9 +13,20 @@ interface PWAExplicacionProps {
   showCompleteButton?: boolean;
   loading?: boolean;
   token?: string; // Token para llamar al endpoint de progreso
+  buttonText?: string; // Texto personalizado del botón
+  onBack?: () => void; // Botón para volver al paso anterior
+  showBackButton?: boolean; // Mostrar botón de volver
 }
 
-export function PWAExplicacion({ onComplete, showCompleteButton = false, loading = false, token }: PWAExplicacionProps) {
+export function PWAExplicacion({
+  onComplete,
+  showCompleteButton = false,
+  loading = false,
+  token,
+  buttonText = 'Entendido, continuar',
+  onBack,
+  showBackButton = false,
+}: PWAExplicacionProps) {
   const [activeTab, setActiveTab] = useState('ios');
   const [installing, setInstalling] = useState(false);
   const { canInstall, promptInstall } = usePWAInstallPrompt();
@@ -126,13 +137,18 @@ export function PWAExplicacion({ onComplete, showCompleteButton = false, loading
       )}
 
       {showCompleteButton && (
-        <div className="flex justify-center pt-4 border-t">
+        <div className="flex justify-between pt-4 border-t">
+          {showBackButton && onBack && (
+            <Button variant="outline" onClick={onBack} disabled={loading}>
+              Anterior
+            </Button>
+          )}
           <LoadingButton
             onClick={handleComplete}
             loading={loading}
-            className="w-full sm:w-auto"
+            className={!showBackButton ? 'ml-auto' : ''}
           >
-            {loading ? 'Cargando...' : 'Entendido, continuar'}
+            {loading ? 'Cargando...' : buttonText}
           </LoadingButton>
         </div>
       )}

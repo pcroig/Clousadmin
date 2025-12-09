@@ -1,11 +1,7 @@
 'use client';
 
-import { Plus } from 'lucide-react';
-import { useState } from 'react';
-
 import { PageMobileHeader } from '@/components/layout/page-mobile-header';
 import { FichajesTab } from '@/components/shared/mi-espacio/fichajes-tab';
-import { Button } from '@/components/ui/button';
 
 import type { MiEspacioEmpleado } from '@/types/empleado';
 
@@ -15,21 +11,11 @@ interface MiEspacioFichajesClientProps {
 }
 
 export function MiEspacioFichajesClient({ empleadoId, empleado }: MiEspacioFichajesClientProps) {
-  const [manualModalOpen, setManualModalOpen] = useState(false);
-
   return (
     <div className="h-full w-full flex flex-col px-1 py-1 sm:max-w-[1800px] sm:mx-auto sm:px-8 sm:py-6">
-      {/* Mobile Header - sin fondo */}
+      {/* Mobile Header */}
       <PageMobileHeader
         title="Fichajes"
-        actions={[
-          {
-            icon: Plus,
-            label: 'Solicitar fichaje manual',
-            onClick: () => setManualModalOpen(true),
-            isPrimary: true,
-          },
-        ]}
       />
 
       {/* Desktop Header */}
@@ -37,12 +23,9 @@ export function MiEspacioFichajesClient({ empleadoId, empleado }: MiEspacioFicha
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Fichajes</h1>
           <p className="text-sm text-gray-500">
-            Revisa tus jornadas registradas y solicita correcciones si es necesario
+            Revisa tus jornadas registradas
           </p>
         </div>
-        <Button size="sm" onClick={() => setManualModalOpen(true)}>
-          Solicitar fichaje manual
-        </Button>
       </div>
 
       {/* Content */}
@@ -52,9 +35,6 @@ export function MiEspacioFichajesClient({ empleadoId, empleado }: MiEspacioFicha
             empleadoId={empleadoId}
             empleado={empleado}
             contexto="empleado"
-            manualModalOpen={manualModalOpen}
-            onManualModalOpenChange={setManualModalOpen}
-            showManualActionButton={false}
           />
         </div>
       </div>

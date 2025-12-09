@@ -588,6 +588,8 @@ model empleados {
   solicitudes_correccion_fichaje_solicitudes_correccion_fichaje_empleadoIdToempleados  solicitudes_correccion_fichaje[] @relation("solicitudes_correccion_fichaje_empleadoIdToempleados")
   solicitudes_correccion_fichaje_solicitudes_correccion_fichaje_revisadaPorToempleados solicitudes_correccion_fichaje[] @relation("solicitudes_correccion_fichaje_revisadaPorToempleados")
   solicitudes_eliminacion_datos                                                        solicitudes_eliminacion_datos[]
+  ediciones_fichaje_pendientes                                                         ediciones_fichaje_pendientes[]   @relation("ediciones_empleado")
+  ediciones_fichaje_editadas                                                           ediciones_fichaje_pendientes[]   @relation("ediciones_editor")
 
   @@index([email])
   @@index([empresaId])
@@ -671,6 +673,7 @@ model empresas {
   subscriptions                  subscriptions[]
   tipos_complemento              tipos_complemento[]
   usuarios                       usuarios[]
+  ediciones_fichaje_pendientes   ediciones_fichaje_pendientes[]
 
   @@index([cif])
 }
@@ -835,6 +838,7 @@ model fichajes {
   empresa                        empresas                         @relation(fields: [empresaId], references: [id], onDelete: Cascade)
   jornada                        jornadas?                        @relation(fields: [jornadaId], references: [id])
   solicitudes_correccion_fichaje solicitudes_correccion_fichaje[]
+  ediciones_pendientes           ediciones_fichaje_pendientes[]
 
   @@unique([empleadoId, fecha])
   @@index([empleadoId])
@@ -1066,18 +1070,23 @@ model nominas {
 }
 
 model notificaciones {
-  id             String          @id @default(cuid())
-  empresaId      String
-  usuarioId      String
-  tipo           String          @db.VarChar(50)
-  mensaje        String          @db.Text
-  metadata       Json?
-  leida          Boolean         @default(false)
-  createdAt      DateTime        @default(now())
-  eventoNominaId String?
-  empresa        empresas        @relation(fields: [empresaId], references: [id], onDelete: Cascade)
-  eventos_nomina eventos_nomina? @relation(fields: [eventoNominaId], references: [id])
-  usuario        usuarios        @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  id                          String                           @id @default(cuid())
+  empresaId                   String
+  usuarioId                   String
+  tipo                        String                           @db.VarChar(50)
+  mensaje                     String                           @db.Text
+  metadata                    Json?
+  leida                       Boolean                          @default(false)
+  createdAt                   DateTime                         @default(now())
+  eventoNominaId              String?
+  accionBoton                 String?                          @db.VarChar(50)
+  enlace                      String?
+  textoBoton                  String?                          @db.VarChar(100)
+  prioridad                   String                           @default("normal") @db.VarChar(20)
+  empresa                     empresas                         @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  eventos_nomina              eventos_nomina?                  @relation(fields: [eventoNominaId], references: [id])
+  usuario                     usuarios                         @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  ediciones_fichaje_pendiente ediciones_fichaje_pendientes?
 
   @@index([createdAt])
   @@index([empresaId])
@@ -1491,6 +1500,35 @@ model waitlist {
 
   @@index([email])
   @@index([invitado])
+}
+
+/// Ediciones de fichajes pendientes de aprobación/rechazo
+/// Sistema de aplicación optimista: cambios se aplican inmediatamente,
+/// el empleado puede rechazarlos en las siguientes 48h
+model ediciones_fichaje_pendientes {
+  id              String          @id @default(cuid())
+  fichajeId       String
+  empresaId       String
+  empleadoId      String
+  editadoPor      String
+  notificacionId  String          @unique
+  cambios         Json            // Array de cambios aplicados (crear/editar/eliminar)
+  estado          String          @default("pendiente") @db.VarChar(50) // pendiente | aprobado | rechazado
+  expiraEn        DateTime        // 48h después de creación
+  createdAt       DateTime        @default(now())
+  aprobadoEn      DateTime?
+  rechazadoEn     DateTime?
+
+  fichaje         fichajes        @relation(fields: [fichajeId], references: [id], onDelete: Cascade)
+  empleado        empleados       @relation("ediciones_empleado", fields: [empleadoId], references: [id])
+  empresa         empresas        @relation(fields: [empresaId], references: [id])
+  editor          empleados       @relation("ediciones_editor", fields: [editadoPor], references: [id])
+  notificacion    notificaciones  @relation(fields: [notificacionId], references: [id])
+
+  @@index([fichajeId, estado])
+  @@index([empleadoId, estado, expiraEn])
+  @@index([empresaId])
+  @@index([estado])
 }
 
 enum BillingInterval {

@@ -17,6 +17,7 @@ import {
   validarIntegridadDocumento,
 } from '@/lib/firma-digital';
 import { convertirWordAPDF, esDocumentoWord } from '@/lib/documentos/convertir-word';
+import { mapearTipoDocumentoACarpetaSistema } from '@/lib/documentos';
 import { crearNotificacionFirmaCompletada, crearNotificacionFirmaPendiente } from '@/lib/notificaciones';
 import { prisma } from '@/lib/prisma';
 import { asJsonValue, JSON_NULL } from '@/lib/prisma/json';
@@ -318,6 +319,7 @@ export async function crearSolicitudFirma(input: CrearSolicitudFirmaInput) {
  * @param firmaId - ID de la firma a procesar
  * @param empleadoId - ID del empleado que firma
  * @param datosCapturados - Datos de la firma (IP, user agent, etc.)
+ * @param carpetaDestinoId - (Opcional) ID de carpeta centralizada donde guardar documentos firmados (para carpetas compartidas)
  * @returns Firma actualizada con certificado
  *
  * @example
@@ -330,14 +332,16 @@ export async function crearSolicitudFirma(input: CrearSolicitudFirmaInput) {
  *     ip: '192.168.1.1',
  *     userAgent: 'Mozilla/5.0...',
  *     timestamp: new Date().toISOString()
- *   }
+ *   },
+ *   'carpeta-centralizada-id' // Opcional: para documentos desde carpetas compartidas
  * );
  * ```
  */
 export async function firmarDocumento(
   firmaId: string,
   empleadoId: string,
-  datosCapturados: DatosCapturadosFirma
+  datosCapturados: DatosCapturadosFirma,
+  carpetaDestinoId?: string
 ) {
   // 1. Obtener firma con solicitud y documento
   const firma = await prisma.firmas.findUnique({
@@ -659,32 +663,52 @@ export async function firmarDocumento(
             },
           });
 
-          // Crear copias individuales para cada empleado que firmó
-          for (const firmaConEmpleado of firmasConEmpleado) {
-          // Generar nombre personalizado: "Nombre original - Nombre Empleado (firma).pdf"
-          const nombreEmpleado = `${firmaConEmpleado.empleado.nombre} ${firmaConEmpleado.empleado.apellidos}`;
-          const nombreDocumentoFirmado = `${nombreBase} - ${nombreEmpleado} (firma).pdf`;
+          // OPTIMIZACIÓN: Pre-cargar carpetas para evitar N+1
+          const nombreCarpetaSistema = mapearTipoDocumentoACarpetaSistema(
+            documentoOriginal.tipoDocumento
+          );
 
-          // Buscar carpeta individual del empleado del mismo tipo
-          const carpetaIndividual = await prisma.carpetas.findFirst({
+          // Obtener todas las carpetas individuales de los empleados en una sola query
+          const empleadoIds = firmasConEmpleado.map((f) => f.empleadoId);
+          const carpetasIndividuales = await prisma.carpetas.findMany({
             where: {
               empresaId: documentoOriginal.empresaId,
-              empleadoId: firmaConEmpleado.empleadoId,
-              nombre: documentoOriginal.tipoDocumento,
+              empleadoId: { in: empleadoIds },
+              nombre: nombreCarpetaSistema,
               esSistema: true,
+            },
+            select: {
+              id: true,
+              empleadoId: true,
             },
           });
 
-          // Determinar carpeta destino: individual si existe, sino obtener del documento original
-          const carpetaIdDestino = carpetaIndividual?.id || (
-            await (async () => {
-              const docOriginalCarpeta = await prisma.documento_carpetas.findFirst({
-                where: { documentoId: documentoOriginal.id },
-                select: { carpetaId: true },
-              });
-              return docOriginalCarpeta?.carpetaId;
-            })()
+          // Crear mapa para lookup rápido
+          const carpetasPorEmpleado = new Map(
+            carpetasIndividuales.map((c) => [c.empleadoId, c.id])
           );
+
+          // Obtener carpeta del documento original (solo una vez)
+          let carpetaOriginalId: string | undefined;
+          if (!carpetaDestinoId) {
+            const docOriginalCarpeta = await prisma.documento_carpetas.findFirst({
+              where: { documentoId: documentoOriginal.id },
+              select: { carpetaId: true },
+            });
+            carpetaOriginalId = docOriginalCarpeta?.carpetaId ?? undefined;
+          }
+
+          // Crear copias individuales para cada empleado que firmó
+          for (const firmaConEmpleado of firmasConEmpleado) {
+            // Generar nombre personalizado: "Nombre original - Nombre Empleado (firma).pdf"
+            const nombreEmpleado = `${firmaConEmpleado.empleado.nombre} ${firmaConEmpleado.empleado.apellidos}`;
+            const nombreDocumentoFirmado = `${nombreBase} - ${nombreEmpleado} (firma).pdf`;
+
+            // Determinar carpeta destino usando el mapa pre-cargado
+            const carpetaIdDestino =
+              carpetaDestinoId || // 1. Carpeta seleccionada (compartida)
+              carpetasPorEmpleado.get(firmaConEmpleado.empleadoId) || // 2. Carpeta individual
+              carpetaOriginalId; // 3. Carpeta original
 
           // Crear documento individual asignado al empleado
           const documentoCreado = await prisma.documentos.create({

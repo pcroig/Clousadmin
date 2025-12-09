@@ -72,11 +72,17 @@ El onboarding de empresa es el proceso mediante el cual un nuevo HR Admin config
 **Funcionalidad:**
 - Subida de archivo Excel (.xlsx, .xls, .csv)
 - Procesamiento con IA para detectar estructura automáticamente
-- Preview completo antes de confirmar
+- **Importación directa sin paso de confirmación** (simplificado en v2.2)
 - Validación de datos
 - Creación automática de equipos y puestos detectados
 - Opción de enviar invitaciones por email
 - **Persistencia:** Al volver a este paso, se cargan automáticamente empleados sin onboarding completado
+
+**Mejoras en v2.2:**
+- ❌ Eliminado paso intermedio "Confirmar e importar X empleados"
+- ✅ Botón cambiado de "Guardar y volver" a "Guardar"
+- ✅ Banner solo muestra empleados del equipo (no cuenta al HR admin)
+- ✅ Banner solo aparece con 2+ empleados totales (admin + al menos 1 del equipo)
 
 **Persistencia de Datos:**
 ```typescript
@@ -457,6 +463,9 @@ El stepper muestra:
 **Autor:** Clousadmin Dev Team
 
 **Cambios en v2.2 (9 Dic 2025):**
+- ✅ **Paso 1 simplificado**: Eliminado paso de confirmación intermedio en importación de empleados
+- ✅ **Banner de empleados**: Solo muestra "empleados del equipo" (excluye HR admin)
+- ✅ **Validación mejorada**: Banner solo aparece con 2+ empleados totales
 - ✅ **Paso 4 actualizado**: Modal unificado de importación de festivos
 - ✅ **Gestión por año**: Selector de año en tabla de festivos
 - ✅ **Importación automática**: Festivos nacionales se importan al entrar al paso 4

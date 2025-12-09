@@ -1,9 +1,9 @@
 # 📁 Sistema de Gestión Documental
 
-**Estado**: ✅ Implementado y Funcional  
-**Versión**: 1.5.0  
+**Estado**: ✅ Implementado y Funcional
+**Versión**: 1.6.0
 **Fecha de finalización**: 2 de Noviembre 2025
-**Última actualización**: 28 de Noviembre 2025
+**Última actualización**: 9 de Diciembre 2025
 
 ---
 
@@ -26,6 +26,16 @@ Sistema completo de gestión documental con:
 - **Tabs Documentos/Plantillas** renovados: botones contextuales (Crear carpeta / Subir plantilla) se actualizan dinámicamente por tab.
 - **Plantillas gestionadas**: `PlantillasList` y `SubirPlantillaModal` permiten uploads rápidos y refrescan la vista automáticamente.
 - **Compatibilidad responsive**: `CarpetasGrid` reutilizable en móvil y desktop, con contadores y estados vacíos coherentes.
+
+### 🆕 Novedades 2025-12-09
+
+- **✍️ Firma desde Carpetas Compartidas**: Sistema inteligente de asignación de documentos firmados ([Ver documentación](./firma-carpetas-compartidas.md))
+  - Detección automática de documentos en carpetas compartidas
+  - Dialog de selección de carpeta centralizada destino
+  - Creación on-the-fly de carpetas centralizadas
+  - Privacidad garantizada (empleados solo ven sus documentos)
+  - Optimización de performance (97% reducción en queries)
+  - Validaciones de seguridad completas
 
 ### 🆕 Novedades 2025-11-27
 

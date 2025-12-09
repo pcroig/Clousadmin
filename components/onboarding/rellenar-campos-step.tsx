@@ -23,7 +23,11 @@ interface RellenarCamposStepProps {
   onGuardar: (datos: Record<string, unknown>) => Promise<void>;
 }
 
-export function RellenarCamposStep({ config, datosActuales, onGuardar }: RellenarCamposStepProps) {
+export function RellenarCamposStep({
+  config,
+  datosActuales,
+  onGuardar,
+}: RellenarCamposStepProps) {
   const [guardando, setGuardando] = useState(false);
 
   // Construir schema dinámico basado en campos configurados
@@ -98,9 +102,9 @@ export function RellenarCamposStep({ config, datosActuales, onGuardar }: Rellena
             );
           })}
 
-          <div className="flex justify-end pt-4">
+          <div className="flex justify-end pt-4 border-t">
             <Button type="submit" disabled={guardando}>
-              {guardando ? 'Guardando...' : 'Guardar y Continuar'}
+              {guardando ? 'Guardando...' : 'Guardar'}
             </Button>
           </div>
         </form>

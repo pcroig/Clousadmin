@@ -281,8 +281,6 @@ export function FichajesTab({ empleadoId }: { empleadoId: string }) {
             refetchFichajes(`/api/fichajes?empleadoId=${empleadoId}&propios=1`);
           }}
           contexto="empleado"
-          empleadoId={empleadoId}
-          modo="editar"
         />
       )}
     </div>

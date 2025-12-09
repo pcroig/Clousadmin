@@ -28,7 +28,12 @@ interface SolicitarFirmaStepProps {
   onTodasFirmadas: () => Promise<void>;
 }
 
-export function SolicitarFirmaStep({ config, empleadoId, token, onTodasFirmadas }: SolicitarFirmaStepProps) {
+export function SolicitarFirmaStep({
+  config,
+  empleadoId,
+  token,
+  onTodasFirmadas,
+}: SolicitarFirmaStepProps) {
   const [solicitudes, setSolicitudes] = useState<SolicitudFirma[]>([]);
   const [cargando, setCargando] = useState(true);
 
@@ -142,9 +147,9 @@ export function SolicitarFirmaStep({ config, empleadoId, token, onTodasFirmadas 
         </div>
       )}
 
-      <div className="flex justify-end pt-4">
+      <div className="flex justify-end pt-4 border-t">
         <Button onClick={handleContinuar} disabled={!todasFirmadas}>
-          Continuar
+          Confirmar firmas
         </Button>
       </div>
     </div>

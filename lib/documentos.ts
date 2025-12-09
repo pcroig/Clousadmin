@@ -43,6 +43,19 @@ export const TIPOS_DOCUMENTO = {
   OTRO: 'otro',
 } as const;
 
+/**
+ * Mapea tipo de documento a nombre de carpeta del sistema
+ */
+export function mapearTipoDocumentoACarpetaSistema(tipoDocumento: string): CarpetaSistema {
+  const normalizado = tipoDocumento.toLowerCase();
+
+  if (normalizado.includes('contrato')) return 'Contratos';
+  if (normalizado.includes('nomina') || normalizado.includes('nómina')) return 'Nóminas';
+  if (normalizado.includes('justificante')) return 'Justificantes';
+
+  return 'Otros';
+}
+
 const normalizarTexto = (texto: string) =>
   texto
     .normalize('NFD')

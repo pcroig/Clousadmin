@@ -18,6 +18,13 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { parseJson } from '@/lib/utils/json';
 
 interface FestivoEmpresa {
@@ -78,6 +85,7 @@ export function FestivosPersonalizadosModal({
   const [empleadosSeleccionados, setEmpleadosSeleccionados] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
 
   const isHR = contexto === 'hr_admin';
 
@@ -132,6 +140,32 @@ export function FestivosPersonalizadosModal({
       cargarDatos();
     }
   }, [open, cargarDatos]);
+
+  const yearsAvailable = useMemo(() => {
+    const years = new Set<number>();
+    festivosEmpresa.forEach((festivo) => {
+      const year = new Date(festivo.fecha).getFullYear();
+      if (!Number.isNaN(year)) {
+        years.add(year);
+      }
+    });
+    return Array.from(years).sort((a, b) => a - b);
+  }, [festivosEmpresa]);
+
+  useEffect(() => {
+    if (yearsAvailable.length === 0) return;
+    if (!yearsAvailable.includes(selectedYear)) {
+      setSelectedYear(yearsAvailable[yearsAvailable.length - 1]);
+    }
+  }, [yearsAvailable, selectedYear]);
+
+  const festivosFiltrados = useMemo(
+    () =>
+      festivosEmpresa.filter(
+        (festivo) => new Date(festivo.fecha).getFullYear() === selectedYear,
+      ),
+    [festivosEmpresa, selectedYear],
+  );
 
   const hasChanges = useMemo(() => {
     if (originalFestivos.size !== draftFestivos.size) return true;
@@ -384,8 +418,39 @@ const renderEditingView = () => (
                 <p className="text-sm text-gray-500">No hay festivos configurados</p>
               </div>
             ) : (
-              <div className="space-y-2">
-                {festivosEmpresa.map((festivoEmpresa) => {
+              <div className="space-y-3">
+                <div className="flex items-center gap-3 justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">Año</p>
+                    <p className="text-xs text-gray-500">Solo se muestran los festivos del año seleccionado.</p>
+                  </div>
+                  <div className="min-w-[160px]">
+                    <Label className="sr-only">Año</Label>
+                    <Select
+                      value={selectedYear.toString()}
+                      onValueChange={(value) => setSelectedYear(parseInt(value, 10))}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Selecciona año" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {yearsAvailable.map((year) => (
+                          <SelectItem key={year} value={year.toString()}>
+                            {year}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                {festivosFiltrados.length === 0 ? (
+                  <div className="rounded-lg border border-dashed border-gray-300 p-6 text-center text-sm text-gray-500">
+                    No hay festivos configurados para {selectedYear}.
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {festivosFiltrados.map((festivoEmpresa) => {
                   const draft = draftFestivos.get(festivoEmpresa.id);
                   const isEditing = editingFestivoId === festivoEmpresa.id;
 
@@ -443,7 +508,9 @@ const renderEditingView = () => (
                       </div>
                     </div>
                   );
-                })}
+                    })}
+                  </div>
+                )}
               </div>
             )}
           </div>

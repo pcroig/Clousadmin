@@ -5,18 +5,12 @@
 
 'use client';
 
-import { Bell, Filter } from 'lucide-react';
+import { Bell } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { memo, useCallback, useState, type MouseEvent } from 'react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { openPreferenciasModalFromUrl } from '@/lib/events/vacaciones';
 import { obtenerIconoPorTipo } from '@/lib/notificaciones/helpers';
 import { formatRelativeTimeShort } from '@/lib/utils/formatRelativeTime';
@@ -44,7 +38,7 @@ export const NotificacionesWidget = memo(function NotificacionesWidget({
 }: NotificacionesWidgetProps) {
   const router = useRouter();
   const [marcandoLeidas, setMarcandoLeidas] = useState(false);
-  const [filtro, setFiltro] = useState<FiltroNotificaciones>('no_leidas');
+  const filtro: FiltroNotificaciones = 'no_leidas';
 
   // Filtrar notificaciones según el filtro
   const notificacionesFiltradas = notificaciones.filter(n => {
@@ -232,28 +226,6 @@ export const NotificacionesWidget = memo(function NotificacionesWidget({
               Marcar leídas
             </button>
           )}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button
-                type="button"
-                className="h-8 w-8 rounded-md hover:bg-gray-100 flex items-center justify-center transition-colors"
-                aria-label="Filtrar notificaciones"
-              >
-                <Filter className="h-4 w-4 text-gray-600" />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => setFiltro('todas')}>
-                Todas
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setFiltro('no_leidas')}>
-                No leídas
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setFiltro('leidas')}>
-                Leídas
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
         </div>
       }
     >

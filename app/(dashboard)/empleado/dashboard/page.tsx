@@ -5,7 +5,7 @@
 import { AusenciaItem } from '@/components/shared/ausencias-widget';
 import { getCurrentUserAvatar, getSession } from '@/lib/auth';
 import { calcularSaldoDisponible } from '@/lib/calculos/ausencias';
-import { obtenerResumenPlantillaEquipo, type PlantillaResumen } from '@/lib/calculos/plantilla';
+import { obtenerResumenPlantilla, obtenerResumenPlantillaEquipo, type PlantillaResumen } from '@/lib/calculos/plantilla';
 import { EstadoAusencia, PeriodoMedioDiaValue, UsuarioRol } from '@/lib/constants/enums';
 import { prisma } from '@/lib/prisma';
 import { CAMPANAS_VACACIONES_ENABLED } from '@/lib/constants/feature-flags';
@@ -63,6 +63,7 @@ interface DashboardData {
     };
   } | null;
   equipoResumen: PlantillaResumen | null;
+  empresaResumen: PlantillaResumen;
 }
 
 async function obtenerDatosDashboard(session: { user: { id: string; empresaId: string } }): Promise<DashboardData> {
@@ -109,6 +110,9 @@ async function obtenerDatosDashboard(session: { user: { id: string; empresaId: s
       });
     }
   }
+
+  // Resumen general de la empresa (mismo widget que HR)
+  const empresaResumen = await obtenerResumenPlantilla(session.user.empresaId);
 
   // Notificaciones del empleado
   const notificacionesDb = await prisma.notificaciones.findMany({
@@ -251,6 +255,7 @@ async function obtenerDatosDashboard(session: { user: { id: string; empresaId: s
     campanaPendiente,
     campanaPropuesta,
     equipoResumen,
+    empresaResumen,
   };
 }
 
@@ -319,6 +324,7 @@ export default async function EmpleadoDashboardPage() {
       campanaPropuesta={dashboardData.campanaPropuesta}
       campanasEnabled={CAMPANAS_VACACIONES_ENABLED}
       equipoResumen={dashboardData.equipoResumen}
+      empresaResumen={dashboardData.empresaResumen}
     />
   );
 }

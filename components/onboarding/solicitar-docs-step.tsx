@@ -20,7 +20,11 @@ interface SolicitarDocsStepProps {
   onDocumentosSubidos: () => Promise<void>;
 }
 
-export function SolicitarDocsStep({ config, empleadoId, onDocumentosSubidos }: SolicitarDocsStepProps) {
+export function SolicitarDocsStep({
+  config,
+  empleadoId,
+  onDocumentosSubidos,
+}: SolicitarDocsStepProps) {
   const [archivosSubidos, setArchivosSubidos] = useState<Record<string, File>>({});
   const [subiendo, setSubiendo] = useState(false);
   const [progreso, setProgreso] = useState<Record<string, boolean>>({});
@@ -175,9 +179,9 @@ export function SolicitarDocsStep({ config, empleadoId, onDocumentosSubidos }: S
         </div>
       )}
 
-      <div className="flex justify-end pt-4">
+      <div className="flex justify-end pt-4 border-t">
         <Button onClick={handleContinuar} disabled={!todosRequeridosSubidos || subiendo}>
-          {subiendo ? 'Subiendo...' : 'Continuar'}
+          {subiendo ? 'Subiendo...' : 'Confirmar documentos'}
         </Button>
       </div>
     </div>

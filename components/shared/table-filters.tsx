@@ -4,7 +4,7 @@
 
 'use client';
 
-import { ChevronLeft, ChevronRight, Filter, MoreHorizontal } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Menu, MoreHorizontal } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 
@@ -32,7 +32,7 @@ export function TableFilters({
         onClick={onFilterClick}
         className="text-gray-600 hover:text-gray-900"
       >
-        <Filter className="w-4 h-4 mr-2" />
+        <Menu className="w-4 h-4 mr-2" />
         Filtro
       </Button>
 

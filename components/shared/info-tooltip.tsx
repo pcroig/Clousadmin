@@ -12,10 +12,16 @@ interface InfoTooltipProps {
 
 export function InfoTooltip({ content, side = 'top' }: InfoTooltipProps) {
   return (
-    <TooltipProvider>
+    <TooltipProvider delayDuration={150}>
       <Tooltip>
         <TooltipTrigger asChild>
-          <button className="text-gray-400 hover:text-gray-600 transition-colors">
+          <button
+            type="button"
+            className="text-gray-400 hover:text-gray-600 transition-colors"
+            tabIndex={-1}
+            aria-label="Información adicional"
+            onFocus={(event) => event.currentTarget.blur()}
+          >
             <Info className="h-4 w-4" />
           </button>
         </TooltipTrigger>

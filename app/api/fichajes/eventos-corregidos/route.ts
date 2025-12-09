@@ -143,6 +143,9 @@ export async function POST(req: NextRequest) {
           fichajeId: fichaje!.id,
           tipo: 'salida',
           hora: new Date(),
+          editado: true, // Marcar como editado porque es una corrección manual
+          motivoEdicion: 'Salida automática al completar descanso',
+          editadoPor: session.user.empleadoId,
         }
       });
     }

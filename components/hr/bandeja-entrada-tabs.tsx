@@ -4,7 +4,7 @@
 
 'use client';
 
-import { Filter, Settings } from 'lucide-react';
+import { Menu, Settings } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
@@ -319,7 +319,7 @@ export function BandejaEntradaTabs({
               className={iconButtonClasses.default}
               aria-label="Filtrar solicitudes"
             >
-              <Filter className="h-4 w-4" />
+              <Menu className="h-4 w-4" />
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
@@ -344,7 +344,7 @@ export function BandejaEntradaTabs({
               className={iconButtonClasses.default}
               aria-label="Filtrar notificaciones"
             >
-              <Filter className="h-4 w-4" />
+              <Menu className="h-4 w-4" />
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">

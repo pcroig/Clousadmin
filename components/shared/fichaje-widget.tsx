@@ -67,7 +67,6 @@ interface FichajeWidgetState {
   tipoFichaje: 'ordinario' | 'extraordinario';
   fichajeId: string | null;
   eventos: Array<{ tipo: string; hora: string | Date }>; // Eventos del fichaje actual
-  modalManual: boolean;
   loading: boolean;
   inicializando: boolean;
 }
@@ -75,7 +74,6 @@ interface FichajeWidgetState {
 type FichajeWidgetAction =
   | { type: 'SET_INITIALIZING'; payload: boolean }
   | { type: 'SET_LOADING'; payload: boolean }
-  | { type: 'SET_MODAL'; payload: boolean }
   | {
       type: 'SET_DATA';
       payload: {
@@ -99,7 +97,6 @@ const initialState: FichajeWidgetState = {
   tipoFichaje: 'ordinario',
   fichajeId: null,
   eventos: [],
-  modalManual: false,
   loading: false,
   inicializando: true,
 };
@@ -113,8 +110,6 @@ function fichajeWidgetReducer(
       return { ...state, inicializando: action.payload };
     case 'SET_LOADING':
       return { ...state, loading: action.payload };
-    case 'SET_MODAL':
-      return { ...state, modalManual: action.payload };
     case 'SET_DATA':
       return {
         ...state,
@@ -218,6 +213,8 @@ export function FichajeWidget({
     fichajeId: string;
   } | null>(null);
   const [eventosActuales, setEventosActuales] = useState<Array<{ tipo: string; hora: string | Date }>>([]);
+  // Modal de edición unificado
+  const [editarModalOpen, setEditarModalOpen] = useState(false);
 
   useEffect(() => {
     if (state.status !== 'trabajando' || !state.horaEntrada) {
@@ -502,7 +499,8 @@ export function FichajeWidget({
 
   function handleEditarEventos() {
     setShowDescansoDialog(false);
-    dispatch({ type: 'SET_MODAL', payload: true });
+    // Siempre abrir modal de edición con el fichajeId actual
+    setEditarModalOpen(true);
   }
 
   function getTextoBoton() {
@@ -718,9 +716,10 @@ export function FichajeWidget({
                     <Button
                       variant="outline"
                       className="w-full font-semibold text-[12px] py-2"
-                      onClick={() => dispatch({ type: 'SET_MODAL', payload: true })}
+                      onClick={() => setEditarModalOpen(true)}
+                      disabled={!state.fichajeId}
                     >
-                      Editar
+                      Editar fichaje
                     </Button>
                   </>
                 )}
@@ -785,17 +784,17 @@ export function FichajeWidget({
         </WidgetCard>
       </div>
 
-      {/* Modal de fichaje manual */}
+      {/* Modal de edición de fichaje */}
       <FichajeModal
-        open={state.modalManual}
-        onClose={() => dispatch({ type: 'SET_MODAL', payload: false })}
+        open={editarModalOpen}
+        fichajeDiaId={state.fichajeId ?? undefined}
+        onClose={() => setEditarModalOpen(false)}
         onSuccess={() => {
-          dispatch({ type: 'SET_MODAL', payload: false });
+          setEditarModalOpen(false);
           obtenerEstadoActual();
           window.dispatchEvent(new CustomEvent('fichaje-updated'));
         }}
         contexto="empleado"
-        modo="crear"
       />
 
       {/* Dialog de confirmación para fichajes extraordinarios */}
@@ -837,7 +836,7 @@ export function FichajeWidget({
               Descanso incompleto
             </AlertDialogTitle>
             <AlertDialogDescription className="space-y-3">
-              <p>
+              <div>
                 Tu jornada requiere descanso pero{' '}
                 {!infoDescanso?.tienePausaInicio && !infoDescanso?.tienePausaFin
                   ? 'no has registrado ninguna pausa'
@@ -845,12 +844,12 @@ export function FichajeWidget({
                     ? 'no has registrado el fin de la pausa'
                     : 'la pausa está incompleta'}
                 .
-              </p>
+              </div>
 
               {/* Mostrar eventos existentes */}
               {eventosActuales.length > 0 && (
                 <div className="mt-4 p-3 bg-gray-50 rounded-md">
-                  <p className="text-sm font-medium text-gray-700 mb-2">Eventos registrados:</p>
+                  <div className="text-sm font-medium text-gray-700 mb-2">Eventos registrados:</div>
                   <div className="space-y-1">
                     {eventosActuales.map((evento, idx) => {
                       const tipoLabel = {

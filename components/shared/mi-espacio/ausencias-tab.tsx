@@ -164,6 +164,7 @@ export function AusenciasTab({
   const puedeSolicitar = contexto === 'empleado' || contexto === 'manager';
   const puedeRegistrar = contexto === 'hr_admin';
   const puedeAccionar = puedeSolicitar || puedeRegistrar;
+  const puedePersonalizarFestivos = contexto === 'hr_admin';
 
   const cargarAusencias = useCallback(
     async (signal?: AbortSignal) => {
@@ -791,7 +792,7 @@ export function AusenciasTab({
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <h3 className="text-lg font-semibold text-gray-900">Calendario</h3>
-            {puedeAccionar && (
+            {puedePersonalizarFestivos && (
               <Button
                 variant="ghost"
                 size="icon"
@@ -953,13 +954,15 @@ export function AusenciasTab({
             contexto={contexto}
           />
 
-          <FestivosPersonalizadosModal
-            open={festivosModalOpen}
-            onClose={() => setFestivosModalOpen(false)}
-            empleadoId={empleadoId}
-            contexto={contexto}
-            onSuccess={() => notifyFestivosUpdated()}
-          />
+          {puedePersonalizarFestivos && (
+            <FestivosPersonalizadosModal
+              open={festivosModalOpen}
+              onClose={() => setFestivosModalOpen(false)}
+              empleadoId={empleadoId}
+              contexto={contexto}
+              onSuccess={() => notifyFestivosUpdated()}
+            />
+          )}
         </>
       )}
       </div>

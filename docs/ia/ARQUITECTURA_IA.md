@@ -330,9 +330,9 @@ callOpenAI(messages, config, options)  [core/providers/openai.ts]
 Todas las funcionalidades están configuradas con modelos que soportan Responses API:
 - `procesar-excel-empleados`: `gpt-5.1` ✅
 - `cuadrar-vacaciones`: `gpt-5.1` ✅
-- `clasificador-nominas`: `gpt-5.1-mini` ✅
+- `clasificador-nominas`: `gpt-5.1` ✅
 - `extraer-documentos`: `gpt-5.1` ✅
-- `analisis-sentimientos`: `gpt-5.1-mini` ✅
+- `analisis-sentimientos`: `gpt-5.1` ✅
 
 ### Anthropic (Claude)
 

@@ -26,7 +26,10 @@ interface CompartirDocsStepProps {
   onMarcarLeido: () => Promise<void>;
 }
 
-export function CompartirDocsStep({ config, onMarcarLeido }: CompartirDocsStepProps) {
+export function CompartirDocsStep({
+  config,
+  onMarcarLeido,
+}: CompartirDocsStepProps) {
   const [documentos, setDocumentos] = useState<Documento[]>([]);
   const [cargando, setCargando] = useState(true);
   const [leido, setLeido] = useState(false);
@@ -139,9 +142,9 @@ export function CompartirDocsStep({ config, onMarcarLeido }: CompartirDocsStepPr
             </label>
           </div>
 
-          <div className="flex justify-end mt-6">
+          <div className="flex justify-end mt-6 pt-4 border-t">
             <Button onClick={handleMarcarLeido} disabled={!leido || guardando}>
-              {guardando ? 'Guardando...' : 'Confirmar y Continuar'}
+              {guardando ? 'Guardando...' : 'Marcar como leído'}
             </Button>
           </div>
         </CardContent>

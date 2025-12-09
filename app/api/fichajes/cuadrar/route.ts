@@ -18,6 +18,8 @@ import {
 import {
   calcularHorasTrabajadas,
   calcularTiempoEnPausa,
+  cerrarFichajeAutomaticamente,
+  debeCerrarseAutomaticamente,
 } from '@/lib/calculos/fichajes';
 import { calcularHorasEsperadasDelDia } from '@/lib/calculos/fichajes-helpers';
 import {
@@ -209,19 +211,30 @@ export async function POST(request: NextRequest) {
 
     // OPTIMIZACIÓN CONCURRENCIA: Usar transacción interactiva para asegurar consistencia
     // Aunque sea secuencial, la transacción asegura que no se modifique el fichaje mientras procesamos.
-    // NOTA: Para batches muy grandes, Prisma recomienda transactions pequeñas. 
+    // NOTA: Para batches muy grandes, Prisma recomienda transactions pequeñas.
     // Aquí procesamos todo en una sola transacción para garantizar integridad total.
-    
+
     await prisma.$transaction(async (tx) => {
       for (const fichaje of fichajes) {
         const fichajeId = fichaje.id;
         try {
+          // PASO 0: Verificar si el fichaje debe cerrarse automáticamente ANTES de cuadrar
+          // (Ej: fichaje en_curso de ayer o que pasó el limiteSuperior)
+          if (fichaje.estado === 'en_curso') {
+            const debeCerrarse = debeCerrarseAutomaticamente(fichaje);
+            if (debeCerrarse) {
+              console.log(`[API Cuadrar] Fichaje ${fichajeId} debe cerrarse automáticamente antes de cuadrar`);
+              await cerrarFichajeAutomaticamente(fichajeId, tx);
+              // Continuar con el cuadrado normal (el fichaje ahora está en pendiente o finalizado)
+            }
+          }
+
           // Re-fetch dentro de la transacción para lock/concurrencia (optimista)
-          // O confiar en la carga previa si el riesgo es bajo. 
+          // O confiar en la carga previa si el riesgo es bajo.
           // Para seguridad máxima en "cuadrar", verificamos estado una vez más.
           const fichajeActual = await tx.fichajes.findUnique({
              where: { id: fichajeId },
-             select: { estado: true } 
+             select: { estado: true }
           });
 
           if (!fichajeActual || (fichajeActual.estado !== 'pendiente' && fichajeActual.estado !== 'en_curso')) {
@@ -351,6 +364,8 @@ export async function POST(request: NextRequest) {
                       fichajeId,
                       tipo: 'pausa_fin',
                       hora: horaFin,
+                      editado: true, // Evento propuesto por el sistema al cuadrar
+                      motivoEdicion: 'Pausa fin completada automáticamente al cuadrar',
                     },
                   });
                   tiposEventos.push('pausa_fin');
@@ -408,6 +423,8 @@ export async function POST(request: NextRequest) {
                   fichajeId,
                   tipo,
                   hora,
+                  editado: true, // Evento propuesto por el sistema al cuadrar
+                  motivoEdicion: 'Evento creado automáticamente al cuadrar fichaje',
                 },
               });
               tiposEventos.push(tipo);
@@ -443,7 +460,7 @@ export async function POST(request: NextRequest) {
               if (eventosFaltantes.includes('entrada') && !tiposEventos.includes('entrada')) {
                 const [horas, minutos] = (configDia.entrada || '09:00').split(':').map(Number);
                 const hora = crearFechaConHora(fechaBase, horas, minutos);
-                await tx.fichaje_eventos.create({ data: { fichajeId, tipo: 'entrada', hora } });
+                await tx.fichaje_eventos.create({ data: { fichajeId, tipo: 'entrada', hora, editado: true, motivoEdicion: 'Entrada propuesta al cuadrar' } });
               }
               
               // Pausas - solo si faltan y no hay ausencia de medio día
@@ -454,7 +471,7 @@ export async function POST(request: NextRequest) {
               ) {
                 const [h, m] = configDia.pausa_inicio.split(':').map(Number);
                 const hora = crearFechaConHora(fechaBase, h, m);
-                await tx.fichaje_eventos.create({ data: { fichajeId, tipo: 'pausa_inicio', hora } });
+                await tx.fichaje_eventos.create({ data: { fichajeId, tipo: 'pausa_inicio', hora, editado: true, motivoEdicion: 'Pausa inicio propuesta al cuadrar' } });
               }
               if (
                 eventosFaltantes.includes('pausa_fin') &&
@@ -463,14 +480,14 @@ export async function POST(request: NextRequest) {
               ) {
                 const [h, m] = configDia.pausa_fin.split(':').map(Number);
                 const hora = crearFechaConHora(fechaBase, h, m);
-                await tx.fichaje_eventos.create({ data: { fichajeId, tipo: 'pausa_fin', hora } });
+                await tx.fichaje_eventos.create({ data: { fichajeId, tipo: 'pausa_fin', hora, editado: true, motivoEdicion: 'Pausa fin propuesta al cuadrar' } });
               }
               
               // Salida - solo si falta y no hay ausencia de tarde
               if (eventosFaltantes.includes('salida') && !tiposEventos.includes('salida')) {
                 const [h, m] = (configDia.salida || '18:00').split(':').map(Number);
                 const hora = crearFechaConHora(fechaBase, h, m);
-                await tx.fichaje_eventos.create({ data: { fichajeId, tipo: 'salida', hora } });
+                await tx.fichaje_eventos.create({ data: { fichajeId, tipo: 'salida', hora, editado: true, motivoEdicion: 'Salida propuesta al cuadrar' } });
               }
             } 
             else if (config.tipo === 'flexible') {
@@ -494,7 +511,7 @@ export async function POST(request: NextRequest) {
               } else if (eventosFaltantes.includes('entrada') && !tiposEventos.includes('entrada')) {
                 // Solo crear si no existe
                 horaEntrada = crearFechaConHora(fechaBase, 9, 0); // Default 9:00
-                await tx.fichaje_eventos.create({ data: { fichajeId, tipo: 'entrada', hora: horaEntrada } });
+                await tx.fichaje_eventos.create({ data: { fichajeId, tipo: 'entrada', hora: horaEntrada, editado: true, motivoEdicion: 'Entrada propuesta al cuadrar (jornada flexible)' } });
               }
 
               // Pausas (si descansoMinimo) - solo si no existen
@@ -507,10 +524,10 @@ export async function POST(request: NextRequest) {
                  const horaPausaFin = new Date(horaPausaInicio.getTime() + descansoMs);
 
                  if (!tiposEventos.includes('pausa_inicio'))
-                   await tx.fichaje_eventos.create({ data: { fichajeId, tipo: 'pausa_inicio', hora: horaPausaInicio } });
-                 
+                   await tx.fichaje_eventos.create({ data: { fichajeId, tipo: 'pausa_inicio', hora: horaPausaInicio, editado: true, motivoEdicion: 'Pausa inicio propuesta al cuadrar (jornada flexible)' } });
+
                  if (!tiposEventos.includes('pausa_fin') && eventosFaltantes.includes('pausa_fin'))
-                   await tx.fichaje_eventos.create({ data: { fichajeId, tipo: 'pausa_fin', hora: horaPausaFin } });
+                   await tx.fichaje_eventos.create({ data: { fichajeId, tipo: 'pausa_fin', hora: horaPausaFin, editado: true, motivoEdicion: 'Pausa fin propuesta al cuadrar (jornada flexible)' } });
               }
 
               // Salida - solo si no existe
@@ -522,7 +539,7 @@ export async function POST(request: NextRequest) {
                     durationMs += (h * 60 + m) * 60 * 1000;
                  }
                  const horaSalida = new Date(horaEntrada.getTime() + durationMs);
-                 await tx.fichaje_eventos.create({ data: { fichajeId, tipo: 'salida', hora: horaSalida } });
+                 await tx.fichaje_eventos.create({ data: { fichajeId, tipo: 'salida', hora: horaSalida, editado: true, motivoEdicion: 'Salida propuesta al cuadrar (jornada flexible)' } });
               }
             }
           }

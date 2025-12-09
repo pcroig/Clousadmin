@@ -53,6 +53,7 @@ interface FirmarDocumentoDialogProps {
   onOpenChange: (open: boolean) => void;
   firma: FirmaPendiente | null;
   onSigned?: (data?: { solicitudCompletada?: boolean; solicitudId?: string; documentoFirmado?: { id: string; nombre: string } }) => void;
+  carpetaDestinoId?: string | null; // ID de carpeta centralizada (para documentos desde carpetas compartidas)
 }
 
 export function FirmarDocumentoDialog({
@@ -60,6 +61,7 @@ export function FirmarDocumentoDialog({
   onOpenChange,
   firma,
   onSigned,
+  carpetaDestinoId,
 }: FirmarDocumentoDialogProps) {
   const [loading, setLoading] = useState(false);
   const [firmaGuardadaDisponible, setFirmaGuardadaDisponible] = useState(false);
@@ -140,6 +142,7 @@ export function FirmarDocumentoDialog({
         firmaImagen: firmaImagenDataUrl,
         firmaImagenWidth: 500,
         firmaImagenHeight: 180,
+        ...(carpetaDestinoId && { carpetaDestinoId }), // Incluir si está presente
       };
 
       const res = await fetch(`/api/firma/solicitudes/${firma.solicitudId}/firmar`, {

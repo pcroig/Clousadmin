@@ -40,35 +40,17 @@ interface FichajesTabProps {
   empleadoId: string;
   empleado?: MiEspacioEmpleado;
   contexto?: 'empleado' | 'manager' | 'hr_admin';
-  manualModalOpen?: boolean;
-  onManualModalOpenChange?: (open: boolean) => void;
-  showManualActionButton?: boolean;
 }
 
 export function FichajesTab({
   empleadoId,
   empleado,
   contexto = 'empleado',
-  manualModalOpen: manualModalOpenProp,
-  onManualModalOpenChange,
-  showManualActionButton = true,
 }: FichajesTabProps) {
   const [jornadas, setJornadas] = useState<JornadaUI[]>([]);
   const [fichajeEditando, setFichajeEditando] = useState<FichajeNormalizado | null>(null);
-  const [internalManualModalOpen, setInternalManualModalOpen] = useState(false);
   const [fechaInicio, setFechaInicio] = useState<Date | null>(null);
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
-  const manualModalOpen = manualModalOpenProp ?? internalManualModalOpen;
-
-  const handleManualModalChange = useCallback(
-    (open: boolean) => {
-      onManualModalOpenChange?.(open);
-      if (manualModalOpenProp === undefined) {
-        setInternalManualModalOpen(open);
-      }
-    },
-    [manualModalOpenProp, onManualModalOpenChange],
-  );
 
   // Obtener horas objetivo desde jornada del empleado
   const horasObjetivo = useMemo(() => {
@@ -146,13 +128,12 @@ export function FichajesTab({
 
   const resumen = useMemo(() => {
     // Si hay fecha de renovación, filtrar jornadas anteriores
-    const jornadasFiltradas = fechaInicio 
-      ? jornadas.filter(j => j.fecha >= fechaInicio) 
+    const jornadasFiltradas = fechaInicio
+      ? jornadas.filter(j => j.fecha >= fechaInicio)
       : jornadas;
-      
+
     return calcularResumenJornadas(jornadasFiltradas);
   }, [jornadas, fechaInicio]);
-  const puedeCrearManual = contexto === 'empleado' || contexto === 'manager';
   const puedeEditar = contexto === 'hr_admin';
   const mostrarRenovar = contexto === 'hr_admin';
 
@@ -281,8 +262,6 @@ export function FichajesTab({
   ], []);
 
   const displayedJornadas = useMemo(() => jornadas.slice(0, MAX_FILAS), [jornadas]);
-  const manualActionLabel = contexto === 'hr_admin' ? 'Añadir fichaje' : 'Solicitar fichaje manual';
-  const manualActionVisible = (puedeCrearManual || puedeEditar) && showManualActionButton;
   const headerDescription = useMemo(() => {
     if (loading) {
       return 'Cargando tus fichajes...';
@@ -575,11 +554,6 @@ export function FichajesTab({
             <h3 className="text-base font-semibold text-gray-900">Historial por jornadas</h3>
             {headerDescription && <p className="text-sm text-gray-500">{headerDescription}</p>}
           </div>
-          {manualActionVisible && (
-            <Button size="sm" onClick={() => handleManualModalChange(true)}>
-              {manualActionLabel}
-            </Button>
-          )}
         </div>
 
         <DataTable
@@ -617,23 +591,6 @@ export function FichajesTab({
             refetchFichajes(`/api/fichajes?empleadoId=${empleadoId}&propios=1`);
           }}
           contexto={contexto}
-          empleadoId={empleadoId}
-          modo="editar"
-        />
-      )}
-
-      {/* Modal Crear Fichaje */}
-      {(puedeCrearManual || puedeEditar) && (
-        <FichajeModal
-          open={manualModalOpen}
-          onClose={() => handleManualModalChange(false)}
-          onSuccess={() => {
-            handleManualModalChange(false);
-            refetchFichajes(`/api/fichajes?empleadoId=${empleadoId}&propios=1`);
-          }}
-          contexto={contexto}
-          empleadoId={empleadoId}
-          modo="crear"
         />
       )}
     </div>

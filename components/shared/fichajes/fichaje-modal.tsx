@@ -1,19 +1,21 @@
 'use client';
 
 // ========================================
-// Modal Unificado de Fichajes - Crear y Editar
+// Modal de Edición de Fichajes
 // ========================================
-// Modal único para crear/editar fichajes con múltiples eventos
-// Permite añadir varios eventos en una sola operación
-// Según el contexto, permite cambiar fecha y empleado o no
+// Modal UNIFICADO para editar fichajes existentes con múltiples eventos
+// Permite modificar horas, añadir y eliminar eventos
+// La fecha y tipo de evento son SOLO LECTURA
+// SISTEMA: Edición por lotes con aprobación optimista (HR) o edición directa (empleados)
 
 import { format } from 'date-fns';
-import { Plus, Trash2 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { Plus, Trash2, AlertTriangle } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 
 import { LoadingButton } from '@/components/shared/loading-button';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -25,13 +27,6 @@ import {
 } from '@/components/ui/dialog';
 import { Field, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { extraerHoraDeISO } from '@/lib/utils/formatters';
 import { parseJson } from '@/lib/utils/json';
@@ -65,25 +60,19 @@ interface FichajeModalProps {
   open: boolean;
   onClose: () => void;
   onSuccess?: () => void;
-  
+
   // Contexto de uso
   contexto: 'empleado' | 'manager' | 'hr_admin';
-  
-  // Para edición: ID del fichaje del día
+
+  // ID del fichaje del día (REQUERIDO)
   fichajeDiaId?: string;
-  
-  // Para creación: empleadoId (solo para HR/Manager)
-  empleadoId?: string;
-  
-  // Modo: si no se pasa fichajeDiaId, es creación; si se pasa, es edición
-  modo?: 'crear' | 'editar';
-  
+
   // NUEVO: Eventos propuestos para pre-cargar (desde cuadrar fichajes)
   eventosPropuestos?: EventoPropuesto[];
-  
+
   // NUEVO: Fecha del fichaje (para cuadrar fichajes)
   fechaFichaje?: string;
-  
+
   // NUEVO: Nombre del empleado (para mostrar en cuadrar fichajes)
   empleadoNombreProp?: string;
 }
@@ -94,16 +83,11 @@ export function FichajeModal({
   onSuccess,
   contexto,
   fichajeDiaId,
-  empleadoId,
-  modo: modoExplicito,
   eventosPropuestos,
   fechaFichaje,
   empleadoNombreProp,
 }: FichajeModalProps) {
-  const modo = modoExplicito ?? (fichajeDiaId ? 'editar' : 'crear');
   const operaDirecto = contexto === 'hr_admin' || contexto === 'manager';
-  const puedeEditarFecha = operaDirecto && modo === 'crear';
-  const _puedeEditarEmpleado = contexto === 'hr_admin' && modo === 'crear';
 
   // Estado general
   const [cargando, setCargando] = useState(false);
@@ -119,18 +103,30 @@ export function FichajeModal({
   const [eventosOriginales, setEventosOriginales] = useState<EventoFichaje[]>([]);
   const [eventosEliminados, setEventosEliminados] = useState<string[]>([]);
 
-  // Cargar fichaje si es modo editar
+  // Validación de secuencia y completitud
+  const [errorSecuencia, setErrorSecuencia] = useState<string | null>(null);
+  const [advertenciaIncompletitud, setAdvertenciaIncompletitud] = useState<string | null>(null);
+
+  // Cargar fichaje al abrir
   useEffect(() => {
     async function cargarFichaje() {
-      if (modo !== 'editar' || !fichajeDiaId || !open) return;
-      
+      // CRÍTICO: Validar que fichajeDiaId existe
+      if (!open) return;
+
+      if (!fichajeDiaId) {
+        console.error('[FichajeModal] fichajeDiaId es requerido');
+        toast.error('Error: No se puede abrir el modal sin ID de fichaje');
+        onClose();
+        return;
+      }
+
       setCargando(true);
       try {
         const res = await fetch(`/api/fichajes/${fichajeDiaId}`);
         if (!res.ok) {
           throw new Error('Error al cargar el fichaje');
         }
-        
+
         const data = await parseJson<{
           id: string;
           fecha: string;
@@ -140,7 +136,7 @@ export function FichajeModal({
 
         // Usar fecha proporcionada si existe (para cuadrar fichajes), o la del fichaje
         setFecha(fechaFichaje || data.fecha.split('T')[0]);
-        
+
         // Usar nombre proporcionado si existe (para cuadrar fichajes)
         setEmpleadoNombre(
           empleadoNombreProp || (data.empleado
@@ -157,7 +153,7 @@ export function FichajeModal({
           editado: e.editado,
           origen: 'registrado' as const,
         }));
-        
+
         // PUNTO 6: Pre-cargar eventos propuestos si se proporcionan
         const eventosPropuestosFormateados: EventoFichaje[] = (eventosPropuestos || []).map((ep, idx) => ({
           id: `propuesto_${Date.now()}_${idx}`,
@@ -166,11 +162,18 @@ export function FichajeModal({
           isNew: true, // Marcar como nuevo para que se cree al guardar
           origen: 'propuesto' as const,
         }));
-        
+
         // Combinar: primero registrados, luego propuestos
         const todosEventos = [...eventosRegistrados, ...eventosPropuestosFormateados];
-        
-        setEventos(todosEventos);
+
+        // CRÍTICO: Ordenar eventos por hora antes de establecerlos
+        const eventosOrdenados = todosEventos.sort((a, b) => {
+          const horaA = new Date(`2000-01-01T${a.hora}:00`).getTime();
+          const horaB = new Date(`2000-01-01T${b.hora}:00`).getTime();
+          return horaA - horaB;
+        });
+
+        setEventos(eventosOrdenados);
         setEventosOriginales(eventosRegistrados); // Solo los registrados son "originales"
         setEventosEliminados([]);
       } catch (error) {
@@ -180,27 +183,49 @@ export function FichajeModal({
         setCargando(false);
       }
     }
-    
-    cargarFichaje();
-  }, [modo, fichajeDiaId, open, eventosPropuestos, fechaFichaje, empleadoNombreProp]);
 
-  // Resetear al abrir en modo crear
+    cargarFichaje();
+  }, [fichajeDiaId, open, eventosPropuestos, fechaFichaje, empleadoNombreProp, onClose]);
+
+  // Serializar eventos para dependencia del useEffect
+  const eventosKey = useMemo(
+    () => eventos.map(e => `${e.id}-${e.hora}-${e.tipo}`).join(','),
+    [eventos]
+  );
+
+  // Limpiar validaciones cuando cambian los eventos (se han reordenado/modificado)
   useEffect(() => {
-    if (open && modo === 'crear') {
-      setFecha(new Date().toISOString().split('T')[0]);
-      setMotivo('');
-      setEventos([
-        {
-          id: `temp_${Date.now()}`,
-          tipo: 'entrada',
-          hora: format(new Date(), 'HH:mm'),
-          isNew: true,
-        },
-      ]);
+    // Solo limpiar si hay mensajes de error/advertencia visibles
+    // Esto permite al usuario ver qué está mal mientras edita
+    if (errorSecuencia || advertenciaIncompletitud) {
+      setErrorSecuencia(null);
+      setAdvertenciaIncompletitud(null);
+    }
+  }, [eventosKey, errorSecuencia, advertenciaIncompletitud]);
+
+  // Limpiar validaciones y resetear estado al cerrar el modal
+  useEffect(() => {
+    if (!open) {
+      setErrorSecuencia(null);
+      setAdvertenciaIncompletitud(null);
+      // CRÍTICO: Resetear estado para evitar mostrar datos del fichaje anterior
+      setEventos([]);
       setEventosOriginales([]);
       setEventosEliminados([]);
+      setMotivo('');
+      setEmpleadoNombre('');
+      setEmpleadoPuesto('');
     }
-  }, [open, modo]);
+  }, [open]);
+
+  // Helper: Ordenar eventos por hora
+  const ordenarEventos = (eventosParaOrdenar: EventoFichaje[]): EventoFichaje[] => {
+    return [...eventosParaOrdenar].sort((a, b) => {
+      const horaA = new Date(`2000-01-01T${a.hora}:00`).getTime();
+      const horaB = new Date(`2000-01-01T${b.hora}:00`).getTime();
+      return horaA - horaB;
+    });
+  };
 
   function handleAñadirEvento() {
     const fechaSeleccionada = new Date(fecha);
@@ -214,15 +239,15 @@ export function FichajeModal({
     }
 
     const tempId = `temp_${Date.now()}`;
-    setEventos((prev) => [
-      ...prev,
-      {
-        id: tempId,
-        tipo: 'entrada',
-        hora: format(new Date(), 'HH:mm'),
-        isNew: true,
-      },
-    ]);
+    const nuevoEvento: EventoFichaje = {
+      id: tempId,
+      tipo: 'entrada',
+      hora: format(new Date(), 'HH:mm'),
+      isNew: true,
+    };
+
+    // CRÍTICO: Reordenar automáticamente después de añadir
+    setEventos((prev) => ordenarEventos([...prev, nuevoEvento]));
   }
 
   function handleEliminarEvento(id: string) {
@@ -237,16 +262,109 @@ export function FichajeModal({
     }
   }
 
-  function actualizarEvento(id: string, campo: 'tipo' | 'hora', valor: string) {
-    setEventos((prev) =>
-      prev.map((e) => (e.id === id ? { ...e, [campo]: valor } : e))
-    );
+  function actualizarEvento(id: string, campo: 'hora', valor: string) {
+    setEventos((prev) => {
+      const eventosActualizados = prev.map((e) => (e.id === id ? { ...e, [campo]: valor } : e));
+
+      // CRÍTICO: Reordenar siempre que se actualice la hora
+      return ordenarEventos(eventosActualizados);
+    });
+  }
+
+  // Función auxiliar para validar secuencia y completitud (NO se ejecuta automáticamente)
+  function validarEventos(): { errorSecuencia: string | null; advertenciaIncompletitud: string | null } {
+    if (eventos.length === 0) {
+      return { errorSecuencia: null, advertenciaIncompletitud: null };
+    }
+
+    // Ordenar eventos por hora
+    const eventosOrdenados = [...eventos].sort((a, b) => {
+      const horaA = new Date(`2000-01-01T${a.hora}:00`).getTime();
+      const horaB = new Date(`2000-01-01T${b.hora}:00`).getTime();
+      return horaA - horaB;
+    });
+
+    // Validar secuencia
+    let estadoEsperado = 'sin_fichar';
+    let errorEncontrado: string | null = null;
+
+    for (let i = 0; i < eventosOrdenados.length; i++) {
+      const evento = eventosOrdenados[i];
+      const anterior = eventosOrdenados[i - 1];
+
+      // Validar que la hora sea posterior al evento anterior
+      if (anterior && evento.hora < anterior.hora) {
+        errorEncontrado = `El evento ${evento.tipo} tiene una hora anterior al evento ${anterior.tipo}`;
+        break;
+      }
+
+      // Validar transiciones de estado
+      switch (evento.tipo) {
+        case 'entrada':
+          if (estadoEsperado !== 'sin_fichar' && estadoEsperado !== 'finalizado') {
+            errorEncontrado = 'Ya existe una entrada activa';
+          }
+          estadoEsperado = 'trabajando';
+          break;
+
+        case 'pausa_inicio':
+          if (estadoEsperado !== 'trabajando') {
+            errorEncontrado = 'Debe haber una entrada antes de iniciar pausa';
+          }
+          estadoEsperado = 'en_pausa';
+          break;
+
+        case 'pausa_fin':
+          if (estadoEsperado !== 'en_pausa') {
+            errorEncontrado = 'Debe haber inicio de pausa antes de reanudar';
+          }
+          estadoEsperado = 'trabajando';
+          break;
+
+        case 'salida':
+          if (estadoEsperado === 'sin_fichar' || estadoEsperado === 'finalizado') {
+            errorEncontrado = 'No hay jornada iniciada para finalizar';
+          }
+          // PERMITIR salida desde 'en_pausa' (se reanuda implícitamente, consistente con backend)
+          estadoEsperado = 'finalizado';
+          break;
+      }
+
+      if (errorEncontrado) break;
+    }
+
+    // Validar completitud (no bloquea, solo advierte)
+    let advertencia: string | null = null;
+    if (!errorEncontrado) {
+      const tipos = eventosOrdenados.map(e => e.tipo);
+      const faltantes: string[] = [];
+
+      if (!tipos.includes('entrada')) faltantes.push('entrada');
+      if (!tipos.includes('salida')) faltantes.push('salida');
+
+      if (faltantes.length > 0) {
+        advertencia = `El fichaje quedará incompleto. Faltan: ${faltantes.join(', ')}`;
+      }
+    }
+
+    return { errorSecuencia: errorEncontrado, advertenciaIncompletitud: advertencia };
   }
 
   async function handleGuardar() {
     // Validaciones
     if (eventos.length === 0) {
       toast.error('Debes añadir al menos un evento');
+      return;
+    }
+
+    // EJECUTAR validación SOLO al intentar guardar
+    const validacion = validarEventos();
+    setErrorSecuencia(validacion.errorSecuencia);
+    setAdvertenciaIncompletitud(validacion.advertenciaIncompletitud);
+
+    // CRÍTICO: Bloquear guardado si la secuencia es inválida
+    if (validacion.errorSecuencia) {
+      toast.error(validacion.errorSecuencia);
       return;
     }
 
@@ -277,20 +395,17 @@ export function FichajeModal({
     setCargando(true);
 
     try {
-      if (modo === 'editar') {
-        await guardarEdicion();
-      } else {
-        await guardarCreacion();
-      }
+      await guardarEdicion();
 
-      toast.success(
-        modo === 'editar'
-          ? 'Fichaje actualizado correctamente'
-          : operaDirecto
-            ? 'Fichaje creado correctamente'
-            : 'Solicitud de fichaje creada correctamente'
-      );
-      
+      toast.success('Fichaje actualizado correctamente');
+
+      // CRÍTICO: Pequeño delay antes de disparar evento global
+      // Esto asegura que el backend haya terminado de procesar antes del refetch
+      await new Promise(resolve => setTimeout(resolve, 150));
+
+      // Disparar evento global para sincronizar todas las tablas
+      window.dispatchEvent(new CustomEvent('fichaje-updated'));
+
       onClose();
       onSuccess?.();
     } catch (error) {
@@ -306,140 +421,116 @@ export function FichajeModal({
   async function guardarEdicion() {
     if (!fichajeDiaId) return;
 
-    // 1. Eliminar eventos marcados
-    for (const eventoId of eventosEliminados) {
-      await fetch(`/api/fichajes/eventos/${eventoId}`, { method: 'DELETE' });
-    }
+    // Determinar si el usuario es HR Admin (puede editar por lotes)
+    const esHRAdmin = operaDirecto;
 
-    // 2. Crear eventos nuevos
-    for (const ev of eventos.filter((e) => e.isNew)) {
-      await fetch('/api/fichajes/eventos', {
+    // Si es HR Admin, usar el sistema de edición por lotes
+    if (esHRAdmin) {
+      const cambios: any[] = [];
+
+      // 1. Eventos eliminados
+      for (const eventoId of eventosEliminados) {
+        cambios.push({
+          accion: 'eliminar',
+          eventoId,
+        });
+      }
+
+      // 2. Eventos nuevos (crear)
+      for (const ev of eventos.filter((e) => e.isNew)) {
+        cambios.push({
+          accion: 'crear',
+          tipo: ev.tipo,
+          hora: new Date(`${fecha}T${ev.hora}:00`).toISOString(),
+        });
+      }
+
+      // 3. Eventos modificados (editar)
+      for (const ev of eventos.filter((e) => !e.isNew)) {
+        const original = eventosOriginales.find((o) => o.id === ev.id);
+        if (!original) continue;
+
+        if (original.tipo !== ev.tipo || original.hora !== ev.hora) {
+          cambios.push({
+            accion: 'editar',
+            eventoId: ev.id,
+            tipo: ev.tipo !== original.tipo ? ev.tipo : undefined,
+            hora:
+              ev.hora !== original.hora
+                ? new Date(`${fecha}T${ev.hora}:00`).toISOString()
+                : undefined,
+          });
+        }
+      }
+
+      // Si no hay cambios, no hacer nada
+      if (cambios.length === 0) {
+        throw new Error('No hay cambios que guardar');
+      }
+
+      // Usar motivo o uno por defecto
+      const motivoFinal = motivo || 'Corrección de fichaje';
+
+      // Llamar al endpoint de edición por lotes
+      const res = await fetch('/api/fichajes/editar-batch', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           fichajeId: fichajeDiaId,
-          tipo: ev.tipo,
-          hora: new Date(`${fecha}T${ev.hora}:00`).toISOString(),
-          motivoEdicion: motivo || undefined,
-          esEdicionManual: true, // Marcar como edición manual (no fichaje en tiempo real)
+          cambios,
+          motivo: motivoFinal,
         }),
       });
-    }
 
-    // 3. Actualizar eventos modificados
-    for (const ev of eventos.filter((e) => !e.isNew)) {
-      const original = eventosOriginales.find((o) => o.id === ev.id);
-      if (!original) continue;
-
-      if (original.tipo !== ev.tipo || original.hora !== ev.hora) {
-        await fetch(`/api/fichajes/eventos/${ev.id}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            tipo: ev.tipo,
-            hora: new Date(`${fecha}T${ev.hora}:00`).toISOString(),
-            motivoEdicion: motivo || undefined,
-          }),
-        });
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({ message: 'Error desconocido' })) as { message?: string };
+        throw new Error(errorData.message || 'Error al guardar la edición');
       }
-    }
-  }
-
-  async function guardarCreacion() {
-    if (operaDirecto) {
-      // Crear fichaje directo
-      const targetEmpleadoId = empleadoId;
-      if (!targetEmpleadoId) {
-        throw new Error('No se ha especificado el empleado para el fichaje');
+    } else {
+      // Si NO es HR Admin, usar el método tradicional (individual)
+      // 1. Eliminar eventos marcados
+      for (const eventoId of eventosEliminados) {
+        await fetch(`/api/fichajes/eventos/${eventoId}`, { method: 'DELETE' });
       }
 
-      // Verificar si ya existe fichaje del día
-      const resFichajes = await fetch(
-        `/api/fichajes?fecha=${fecha}&empleadoId=${targetEmpleadoId}`
-      );
-      
-      if (!resFichajes.ok) {
-        throw new Error('Error al verificar fichajes existentes');
-      }
-
-      const dataFichajes = await parseJson<{ data?: Array<{ id: string }> }>(resFichajes);
-      const fichajes = dataFichajes?.data || [];
-
-      let fichajeId = fichajes[0]?.id;
-
-      // Si no existe, crear con el primer evento
-      if (!fichajeId && eventos.length > 0) {
-        const primerEvento = eventos[0];
-        const resCrear = await fetch('/api/fichajes', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            fecha,
-            tipo: primerEvento.tipo,
-            hora: new Date(`${fecha}T${primerEvento.hora}:00`).toISOString(),
-            empleadoId: targetEmpleadoId,
-          }),
-        });
-
-        if (!resCrear.ok) {
-          throw new Error('Error al crear el fichaje');
-        }
-
-        const dataCrear = await parseJson<{ fichajeId?: string }>(resCrear);
-        const nuevoFichajeId = typeof dataCrear.fichajeId === 'string' ? dataCrear.fichajeId : undefined;
-
-        if (!nuevoFichajeId) {
-          throw new Error('No se obtuvo el ID del fichaje creado');
-        }
-
-        fichajeId = nuevoFichajeId;
-      }
-
-      // Añadir el resto de eventos (o todos si ya existía el fichaje)
-      const eventosParaAñadir = fichajeId && fichajes.length > 0 ? eventos : eventos.slice(1);
-
-      for (const ev of eventosParaAñadir) {
+      // 2. Crear eventos nuevos
+      for (const ev of eventos.filter((e) => e.isNew)) {
         await fetch('/api/fichajes/eventos', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            fichajeId,
+            fichajeId: fichajeDiaId,
             tipo: ev.tipo,
             hora: new Date(`${fecha}T${ev.hora}:00`).toISOString(),
             motivoEdicion: motivo || undefined,
-            esEdicionManual: true, // Marcar como edición manual (no fichaje en tiempo real)
+            esEdicionManual: true,
           }),
         });
       }
-    } else {
-      // Crear solicitud (empleado)
-      // Por ahora solo soportamos un evento en solicitudes
-      const primerEvento = eventos[0];
-      
-      await fetch('/api/solicitudes', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          tipo: 'fichaje_manual',
-          camposCambiados: {
-            fecha,
-            tipo: primerEvento.tipo,
-            hora: new Date(`${fecha}T${primerEvento.hora}:00`).toISOString(),
-            motivo: motivo || 'Fichaje manual',
-          },
-          motivo: motivo || 'Fichaje manual',
-        }),
-      });
+
+      // 3. Actualizar eventos modificados
+      for (const ev of eventos.filter((e) => !e.isNew)) {
+        const original = eventosOriginales.find((o) => o.id === ev.id);
+        if (!original) continue;
+
+        if (original.tipo !== ev.tipo || original.hora !== ev.hora) {
+          await fetch(`/api/fichajes/eventos/${ev.id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              tipo: ev.tipo,
+              hora: new Date(`${fecha}T${ev.hora}:00`).toISOString(),
+              motivoEdicion: motivo || undefined,
+            }),
+          });
+        }
+      }
     }
   }
 
-  const titulo = modo === 'editar' ? 'Editar Fichaje' : 'Añadir Fichaje';
-  const descripcion =
-    modo === 'editar'
-      ? 'Modifica, añade o elimina eventos del fichaje'
-      : operaDirecto
-        ? 'Registra uno o varios eventos de fichaje'
-        : 'Solicita un fichaje indicando los eventos';
+
+  const titulo = 'Editar Fichaje';
+  const descripcion = 'Modifica, añade o elimina eventos del fichaje';
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
@@ -451,8 +542,8 @@ export function FichajeModal({
 
         <DialogBody>
           <div className="space-y-4 py-2">
-          {/* Info del empleado (solo en modo editar) */}
-          {modo === 'editar' && empleadoNombre && (
+          {/* Info del empleado */}
+          {empleadoNombre && (
             <div className="space-y-1 pb-3 border-b">
               <div className="text-base font-semibold text-gray-900">
                 {empleadoNombre}
@@ -463,16 +554,16 @@ export function FichajeModal({
             </div>
           )}
 
-          {/* Fecha */}
+          {/* Fecha - SOLO LECTURA */}
           <Field>
             <FieldLabel>Fecha</FieldLabel>
             <Input
               type="date"
               value={fecha}
               onChange={(e) => setFecha(e.target.value)}
-              disabled={!puedeEditarFecha}
+              disabled={true}
               max={new Date().toISOString().split('T')[0]}
-              className="bg-white"
+              className="bg-gray-50"
             />
           </Field>
 
@@ -515,41 +606,23 @@ export function FichajeModal({
                             : 'bg-gray-50 border-gray-200' // Gris para nuevos añadidos manualmente
                       }`}
                     >
-                      {/* Indicador de origen */}
+                      {/* Indicador de origen - SOLO mostrar propuesto */}
                       {esPropuesto && (
                         <span className="text-[10px] font-medium text-tertiary-600 bg-tertiary-100 px-1.5 py-0.5 rounded whitespace-nowrap">
                           Propuesto
                         </span>
                       )}
-                      {esRegistrado && (
-                        <span className="text-[10px] font-medium text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded whitespace-nowrap">
-                          Registrado
-                        </span>
-                      )}
                       
-                      {/* Tipo */}
+                      {/* Tipo - SOLO LECTURA */}
                       <div className="flex-1">
-                        <Select
-                          value={ev.tipo}
-                          onValueChange={(valor) =>
-                            actualizarEvento(ev.id, 'tipo', valor as TipoEventoFichaje)
-                          }
-                          disabled={cargando}
-                        >
-                          <SelectTrigger className={`h-9 ${esPropuesto ? 'bg-tertiary-50' : 'bg-white'}`}>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {EVENT_OPTIONS.map((opt) => (
-                              <SelectItem key={opt.value} value={opt.value}>
-                                {opt.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <div className={`h-9 px-3 py-2 border rounded-md bg-gray-50 text-sm flex items-center ${
+                          esPropuesto ? 'bg-tertiary-50' : 'bg-gray-50'
+                        }`}>
+                          {EVENT_OPTIONS.find(opt => opt.value === ev.tipo)?.label || ev.tipo}
+                        </div>
                       </div>
 
-                      {/* Hora */}
+                      {/* Hora - EDITABLE */}
                       <div className="flex-1">
                         <Input
                           type="time"
@@ -564,9 +637,9 @@ export function FichajeModal({
 
                       {/* Indicador editado */}
                       {ev.editado && (
-                        <span className="text-xs text-amber-600 whitespace-nowrap">
+                        <Badge className="bg-gray-100 text-gray-800 text-xs whitespace-nowrap">
                           Editado
-                        </span>
+                        </Badge>
                       )}
 
                       {/* Botón eliminar */}
@@ -586,6 +659,34 @@ export function FichajeModal({
               </div>
             )}
           </div>
+
+          {/* Error de secuencia (BLOQUEA guardado) */}
+          {errorSecuencia && (
+            <div className="flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+              <AlertTriangle className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" />
+              <div className="flex-1">
+                <p className="text-sm font-medium text-red-900">Secuencia de eventos inválida</p>
+                <p className="text-sm text-red-700">{errorSecuencia}</p>
+                <p className="text-xs text-red-600 mt-1">
+                  Corrige la secuencia antes de guardar.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Advertencia de incompletitud (NO bloquea, solo advierte) */}
+          {!errorSecuencia && advertenciaIncompletitud && (
+            <div className="flex items-start gap-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <AlertTriangle className="w-5 h-5 text-yellow-600 mt-0.5 flex-shrink-0" />
+              <div className="flex-1">
+                <p className="text-sm font-medium text-yellow-900">Fichaje incompleto</p>
+                <p className="text-sm text-yellow-700">{advertenciaIncompletitud}</p>
+                <p className="text-xs text-yellow-600 mt-1">
+                  Puedes guardarlo así, el fichaje quedará pendiente.
+                </p>
+              </div>
+            </div>
+          )}
 
           {/* Motivo */}
           <Field>
@@ -612,11 +713,7 @@ export function FichajeModal({
             Cancelar
           </Button>
           <LoadingButton onClick={handleGuardar} loading={cargando}>
-            {modo === 'editar'
-              ? 'Guardar cambios'
-              : operaDirecto
-                ? 'Guardar fichaje'
-                : 'Crear solicitud'}
+            Guardar cambios
           </LoadingButton>
         </DialogFooter>
       </DialogScrollableContent>
