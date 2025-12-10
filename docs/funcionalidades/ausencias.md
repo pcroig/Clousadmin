@@ -1,13 +1,53 @@
 # 🏖️ DOCUMENTACIÓN: GESTIÓN DE AUSENCIAS - ESTADO ACTUAL
 
-**Versión**: 3.3.0  
-**Fecha**: 27 Enero 2025  
-**Última actualización**: Diciembre 2025  
-**Estado**: Sistema refactorizado con validaciones robustas, transacciones atómicas y prevención REAL de race conditions. ⚠️ **Campañas de vacaciones deprecadas temporalmente** para el primer lanzamiento.
+**Versión**: 3.6.0
+**Fecha**: 10 Diciembre 2025
+**Última actualización**: 10 Diciembre 2025
+**Estado**: Sistema refactorizado con validaciones robustas, transacciones atómicas, prevención de race conditions **Y normalización UTC para fechas**. ⚠️ **Campañas de vacaciones deprecadas temporalmente** para el primer lanzamiento.
 
 ---
 
 ## 🔄 CAMBIOS RECIENTES
+
+### v3.6.0 - Fix Completo de Timezone (10 Dic 2025) 🔥
+
+**Problema resuelto**: Ausencias creadas desde "Mi Espacio" (empleado) con rango 17-22 se persistían como 16-21 debido a conversión incorrecta de timezone local a UTC.
+
+**Cambios principales**:
+- **Helper centralizado**: Nuevo módulo `lib/utils/dates.ts` con funciones timezone-safe:
+  - `normalizeToUTCDate()`: Normaliza cualquier fecha a medianoche UTC
+  - `getDaysBetween()`: Calcula días entre fechas normalizadas
+  - `isSameDayUTC()`: Compara fechas ignorando hora
+  - `toDateInputValue()`: Formato YYYY-MM-DD para inputs HTML
+- **Backend normalizado**: Todos los endpoints de ausencias (`POST`, `PATCH`, `GET`) normalizan fechas a UTC antes de persistir o comparar
+- **calcularDias() robusto**: Normaliza internamente + usa `getUTCDay()` y `setUTCDate()` para evitar problemas con DST
+- **Frontend normalizado**: Componentes `solicitar-ausencia-modal.tsx` y `editar-ausencia-modal.tsx` normalizan antes de enviar
+- **Tests de regresión**: 30 tests (18 unitarios + 12 integración) que validan el fix y previenen regresión
+- **Defensa en profundidad**: Frontend normaliza (1ª barrera) + Backend normaliza (2ª barrera) + calcularDias normaliza (3ª barrera)
+
+**Extensión a otros módulos**:
+- ✅ **Festivos**: `app/api/festivos/nacionales/route.ts` normaliza fechas de festivos nacionales
+- ✅ **Contratos**: `app/api/contratos/[id]/finalizar/route.ts` normaliza fechaFin antes de comparar
+- ✅ **Empleados**: `app/api/empleados/route.ts` normaliza fechaNacimiento y fechaAlta en `parseDateString()`
+
+**Archivos afectados**:
+- `lib/utils/dates.ts` (nuevo)
+- `tests/unit/utils/dates.test.ts` (nuevo)
+- `tests/integration/ausencias-timezone.test.ts` (nuevo)
+- `app/api/ausencias/route.ts`
+- `app/api/ausencias/[id]/route.ts`
+- `lib/calculos/ausencias.ts`
+- `components/empleado/solicitar-ausencia-modal.tsx`
+- `components/ausencias/editar-ausencia-modal.tsx`
+- `app/api/festivos/nacionales/route.ts`
+- `app/api/contratos/[id]/finalizar/route.ts`
+- `app/api/empleados/route.ts`
+
+**Commits**:
+- `cc3a2d5`: Fix ausencias + helper + tests + docs
+- `841a5d8`: Extensión a festivos, contratos y empleados
+
+---
 
 ### v3.5.0 - Unificación de Tablas y Mejoras de UI (Enero 2025)
 
