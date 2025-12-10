@@ -34,6 +34,7 @@ import {
 } from '@/lib/notificaciones';
 import { prisma } from '@/lib/prisma';
 import { getJsonBody } from '@/lib/utils/json';
+import { normalizeToUTCDate } from '@/lib/utils/dates';
 
 class SaldoInsuficienteError extends Error {
   saldoDisponible: number;
@@ -116,10 +117,8 @@ export async function PATCH(
     // Determinar estado resultante
     let nuevoEstado: EstadoAusencia = EstadoAusencia.rechazada;
       if (accion === 'aprobar') {
-      const hoy = new Date();
-      hoy.setHours(0, 0, 0, 0);
-      const fechaFin = new Date(ausencia.fechaFin);
-      fechaFin.setHours(0, 0, 0, 0);
+      const hoy = normalizeToUTCDate(new Date());
+      const fechaFin = normalizeToUTCDate(ausencia.fechaFin);
       
       nuevoEstado = fechaFin < hoy ? EstadoAusencia.completada : EstadoAusencia.confirmada;
 
@@ -318,8 +317,7 @@ export async function PATCH(
       if (resetWorkflow) {
         const hoy = new Date();
         hoy.setHours(0, 0, 0, 0);
-        const fechaInicio = new Date(ausencia.fechaInicio);
-        fechaInicio.setHours(0, 0, 0, 0);
+        const fechaInicio = normalizeToUTCDate(ausencia.fechaInicio);
         if (fechaInicio < hoy) {
           return forbiddenResponse('No puedes editar ausencias que ya han comenzado');
         }
@@ -361,11 +359,11 @@ export async function PATCH(
 
       // Determinar fechas a usar (nuevas o existentes)
       const nuevaFechaInicio = dataEdicion.fechaInicio 
-        ? new Date(dataEdicion.fechaInicio)
-        : new Date(ausencia.fechaInicio);
+        ? normalizeToUTCDate(dataEdicion.fechaInicio)
+        : normalizeToUTCDate(ausencia.fechaInicio);
       const nuevaFechaFin = dataEdicion.fechaFin 
-        ? new Date(dataEdicion.fechaFin)
-        : new Date(ausencia.fechaFin);
+        ? normalizeToUTCDate(dataEdicion.fechaFin)
+        : normalizeToUTCDate(ausencia.fechaFin);
 
       // Validar que no se solape con otras ausencias del mismo empleado
       const ausenciasSolapadas = await prisma.ausencias.findMany({

@@ -16,6 +16,7 @@ import {
   PeriodoMedioDiaValue,
   PERIODOS_MEDIO_DIA_OPTIONS,
 } from '@/lib/constants/enums';
+import { normalizeToUTCDate } from '@/lib/utils/dates';
 import { parseJson } from '@/lib/utils/json';
 
 interface ErrorDetail {
@@ -277,11 +278,15 @@ export function SolicitarAusenciaModal({
         documentoId?: string;
         empleadoId?: string;
       }
-      
+
+      // Normalizar las fechas a medianoche UTC para evitar desfases de zona horaria
+      const fechaInicioNormalizada = normalizeToUTCDate(fechaInicio);
+      const fechaFinNormalizada = normalizeToUTCDate(fechaFin);
+
       const payload: AusenciaPayload = {
         tipo,
-        fechaInicio: fechaInicio.toISOString(),
-        fechaFin: fechaFin.toISOString(),
+        fechaInicio: fechaInicioNormalizada.toISOString(),
+        fechaFin: fechaFinNormalizada.toISOString(),
         medioDia,
       };
 

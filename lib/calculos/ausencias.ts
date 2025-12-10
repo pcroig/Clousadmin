@@ -4,6 +4,7 @@
 
 import { EstadoAusencia } from '@/lib/constants/enums';
 import { prisma } from '@/lib/prisma';
+import { normalizeToUTCDate, getDaysBetween } from '@/lib/utils/dates';
 
 import {
   crearSetFestivos,
@@ -253,12 +254,28 @@ export async function calcularDiasSolicitados(
 }
 
 /**
- * Calcula los días naturales y laborables entre dos fechas
- * Usa la configuración de días laborables de la empresa y festivos
+ * Calcula los días naturales y laborables entre dos fechas.
+ *
+ * IMPORTANTE: Normaliza automáticamente las fechas a UTC para evitar problemas de timezone.
+ * Usa la configuración de días laborables de la empresa y festivos.
+ *
+ * @param fechaInicio - Fecha de inicio (se normalizará a medianoche UTC)
+ * @param fechaFin - Fecha de fin (se normalizará a medianoche UTC)
+ * @param empresaId - ID de la empresa para obtener configuración y festivos
+ * @param empleadoId - ID del empleado (opcional, para incluir festivos personalizados)
+ * @returns Objeto con diasNaturales, diasLaborables y diasSolicitados
+ *
+ * @example
+ * const resultado = await calcularDias(
+ *   new Date('2025-01-17T23:00:00+01:00'), // Se normalizará a 2025-01-17 00:00 UTC
+ *   new Date('2025-01-22T12:00:00-05:00'), // Se normalizará a 2025-01-22 00:00 UTC
+ *   'empresa-id'
+ * );
+ * // resultado: { diasNaturales: 6, diasLaborables: 4, diasSolicitados: 4 }
  */
 export async function calcularDias(
-  fechaInicio: Date,
-  fechaFin: Date,
+  fechaInicio: Date | string,
+  fechaFin: Date | string,
   empresaId: string,
   empleadoId?: string
 ): Promise<{
@@ -266,25 +283,28 @@ export async function calcularDias(
   diasLaborables: number;
   diasSolicitados: number;
 }> {
-  // Días naturales (todos los días incluyendo fines de semana)
-  const diffTime = Math.abs(fechaFin.getTime() - fechaInicio.getTime());
-  const diasNaturales = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1; // +1 para incluir el día de inicio
+  // Normalizar fechas a UTC para evitar problemas de timezone
+  const fechaInicioUTC = normalizeToUTCDate(fechaInicio);
+  const fechaFinUTC = normalizeToUTCDate(fechaFin);
+
+  // Días naturales usando helper centralizado
+  const diasNaturales = getDaysBetween(fechaInicioUTC, fechaFinUTC);
 
   const [diasLaborablesConfig, festivos] = await Promise.all([
     getDiasLaborablesEmpresa(empresaId),
-    getFestivosActivosParaEmpleado(empresaId, empleadoId, fechaInicio, fechaFin),
+    getFestivosActivosParaEmpleado(empresaId, empleadoId, fechaInicioUTC, fechaFinUTC),
   ]);
   const festivosSet = crearSetFestivos(festivos);
 
   // Contar días laborables y solicitados según configuración de empresa
   let diasLaborables = 0;
   let diasSolicitados = 0;
-  const fecha = new Date(fechaInicio);
-  const fechaFinDate = new Date(fechaFin);
+  const fecha = new Date(fechaInicioUTC);
+  const fechaFinDate = new Date(fechaFinUTC);
 
   while (fecha <= fechaFinDate) {
     // Verificar si el día de la semana es laborable según configuración
-    const diaSemana = fecha.getDay();
+    const diaSemana = fecha.getUTCDay(); // Usar getUTCDay() para consistencia
     const mapaDias: { [key: number]: keyof typeof diasLaborablesConfig } = {
       0: 'domingo',
       1: 'lunes',
@@ -296,7 +316,7 @@ export async function calcularDias(
     };
     const nombreDia = mapaDias[diaSemana];
     const esDiaSemanaLaborable = diasLaborablesConfig[nombreDia];
-    
+
     // Un día es "laborable" si el día de la semana está configurado como tal
     // (no consideramos festivos para días laborables, solo para días solicitados)
     if (esDiaSemanaLaborable) {
@@ -309,7 +329,8 @@ export async function calcularDias(
       diasSolicitados++;
     }
 
-    fecha.setDate(fecha.getDate() + 1);
+    // Incrementar usando setUTCDate para evitar problemas con DST
+    fecha.setUTCDate(fecha.getUTCDate() + 1);
   }
 
   return {

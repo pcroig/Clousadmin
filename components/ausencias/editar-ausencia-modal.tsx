@@ -29,6 +29,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
 import { EstadoAusencia, PeriodoMedioDiaValue } from '@/lib/constants/enums';
+import { normalizeToUTCDate } from '@/lib/utils/dates';
 import { extractArrayFromResponse } from '@/lib/utils/api-response';
 import { parseJson } from '@/lib/utils/json';
 
@@ -315,21 +316,9 @@ export function EditarAusenciaModal({
         setUploadingJustificante(false);
       }
 
-      // Normalizar fechas a medianoche UTC antes de enviar
-      // Usar Date.UTC() para evitar problemas de zona horaria
-      const fechaInicioNormalizada = new Date(Date.UTC(
-        fechaInicio.getFullYear(),
-        fechaInicio.getMonth(),
-        fechaInicio.getDate(),
-        0, 0, 0, 0
-      ));
-
-      const fechaFinNormalizada = new Date(Date.UTC(
-        fechaFin.getFullYear(),
-        fechaFin.getMonth(),
-        fechaFin.getDate(),
-        0, 0, 0, 0
-      ));
+      // Normalizar fechas a medianoche UTC antes de enviar para evitar problemas de zona horaria
+      const fechaInicioNormalizada = normalizeToUTCDate(fechaInicio);
+      const fechaFinNormalizada = normalizeToUTCDate(fechaFin);
 
       const payload: Record<string, unknown> = {
         tipo,

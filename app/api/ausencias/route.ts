@@ -36,7 +36,7 @@ import {
   parsePaginationParams,
 } from '@/lib/utils/pagination';
 import { ausenciaCreateSchema } from '@/lib/validaciones/schemas';
-
+import { normalizeToUTCDate } from '@/lib/utils/dates';
 
 const ausenciaConEmpleadoInclude = Prisma.validator<Prisma.ausenciasInclude>()({
   empleado: {
@@ -104,17 +104,17 @@ export async function GET(req: NextRequest) {
       });
     }
 
+    // Normalizar filtros de fecha a UTC para evitar problemas de timezone
     if (fechaInicioParam) {
-      const inicio = new Date(fechaInicioParam);
-      inicio.setHours(0, 0, 0, 0);
+      const inicio = normalizeToUTCDate(fechaInicioParam);
       if (!Number.isNaN(inicio.getTime())) {
         andFilters.push({ fechaInicio: { gte: inicio } });
       }
     }
 
     if (fechaFinParam) {
-      const fin = new Date(fechaFinParam);
-      fin.setHours(23, 59, 59, 999);
+      const fin = normalizeToUTCDate(fechaFinParam);
+      // Para fechaFin, queremos incluir todo el día, así que buscamos ausencias que empiecen en o antes de este día
       if (!Number.isNaN(fin.getTime())) {
         andFilters.push({ fechaInicio: { lte: fin } });
       }
@@ -337,12 +337,8 @@ export async function POST(req: NextRequest) {
     }
 
     // Validar que no hay solapamiento con ausencias existentes del mismo empleado
-    const fechaInicioCheck = validatedData.fechaInicio instanceof Date 
-      ? validatedData.fechaInicio 
-      : new Date(validatedData.fechaInicio);
-    const fechaFinCheck = validatedData.fechaFin instanceof Date 
-      ? validatedData.fechaFin 
-      : new Date(validatedData.fechaFin);
+    const fechaInicioCheck = normalizeToUTCDate(validatedData.fechaInicio);
+    const fechaFinCheck = normalizeToUTCDate(validatedData.fechaFin);
 
     if (validatedData.medioDia) {
       if (!validatedData.periodo) {
@@ -407,8 +403,8 @@ export async function POST(req: NextRequest) {
 
     // Calcular días (naturales, laborables, solicitados)
     const { diasNaturales, diasLaborables, diasSolicitados } = await calcularDias(
-      new Date(validatedData.fechaInicio),
-      new Date(validatedData.fechaFin),
+      fechaInicioCheck,
+      fechaFinCheck,
       session.user.empresaId,
       empleadoId
     );
@@ -432,12 +428,8 @@ export async function POST(req: NextRequest) {
     }
 
     // Convertir fechas a Date si son strings
-    const fechaInicio = validatedData.fechaInicio instanceof Date 
-      ? validatedData.fechaInicio 
-      : new Date(validatedData.fechaInicio);
-    const fechaFin = validatedData.fechaFin instanceof Date 
-      ? validatedData.fechaFin 
-      : new Date(validatedData.fechaFin);
+    const fechaInicio = fechaInicioCheck;
+    const fechaFin = fechaFinCheck;
 
     // Validar políticas del equipo
     // - Antelación: aplica a vacaciones y "otro" (tipos que requieren aprobación)
