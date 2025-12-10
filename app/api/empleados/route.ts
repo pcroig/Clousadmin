@@ -21,6 +21,7 @@ import { getOrCreateDefaultJornada } from '@/lib/jornadas/get-or-create-default'
 import { crearNotificacionEmpleadoCreado } from '@/lib/notificaciones';
 import { prisma } from '@/lib/prisma';
 import { empleadoSelectListado } from '@/lib/prisma/selects';
+import { normalizeToUTCDate } from '@/lib/utils/dates';
 import {
   buildPaginationMeta,
   parsePaginationParams,
@@ -112,12 +113,16 @@ export async function POST(request: NextRequest) {
       return sanitized ? sanitized.toUpperCase() : null;
     };
 
+    // Normalizar fechas a UTC para evitar problemas de timezone
     const parseDateString = (value: unknown): Date | null => {
       if (typeof value !== 'string') {
         return null;
       }
       const parsed = new Date(value);
-      return Number.isNaN(parsed.getTime()) ? null : parsed;
+      if (Number.isNaN(parsed.getTime())) {
+        return null;
+      }
+      return normalizeToUTCDate(parsed);
     };
 
     const email = sanitizeEmail(body.email);

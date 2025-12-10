@@ -18,6 +18,7 @@ import {
 } from '@/lib/api-handler';
 import { autoGenerarDocumentosOffboarding } from '@/lib/plantillas';
 import { prisma } from '@/lib/prisma';
+import { normalizeToUTCDate } from '@/lib/utils/dates';
 
 // Schema de validación - Fecha de finalización es obligatoria
 const finalizarContratoSchema = z.object({
@@ -86,10 +87,10 @@ export async function POST(
       );
     }
 
-    // Validar que la fecha de finalización no sea anterior a la fecha de inicio
-    const fechaFin = new Date(validatedData.fechaFin);
-    const fechaInicio = new Date(contrato.fechaInicio);
-    
+    // Normalizar fechas a UTC para evitar problemas de timezone
+    const fechaFin = normalizeToUTCDate(validatedData.fechaFin);
+    const fechaInicio = normalizeToUTCDate(contrato.fechaInicio);
+
     if (fechaFin < fechaInicio) {
       return successResponse(
         { error: 'La fecha de finalización no puede ser anterior a la fecha de inicio del contrato' },
@@ -114,6 +115,7 @@ export async function POST(
           activo: false,
           fechaBaja: fechaFin,
           estadoEmpleado: 'baja',
+          jornadaId: null, // Limpiar jornada al desactivar
         },
       });
 

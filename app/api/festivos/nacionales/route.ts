@@ -5,6 +5,7 @@
 import { NextRequest } from 'next/server';
 
 import { handleApiError, requireAuth, successResponse } from '@/lib/api-handler';
+import { normalizeToUTCDate, toDateInputValue } from '@/lib/utils/dates';
 
 // GET /api/festivos/nacionales - Obtener festivos nacionales de España
 export async function GET(req: NextRequest) {
@@ -37,13 +38,17 @@ export async function GET(req: NextRequest) {
     ];
 
     const festivos = [
-      ...festivosNacionales.map((f) => ({
-        fecha: new Date(año, f.mes, f.dia).toISOString().split('T')[0],
-        nombre: f.nombre,
-        tipo: 'nacional',
-      })),
+      ...festivosNacionales.map((f) => {
+        // Normalizar a UTC para evitar problemas de timezone
+        const fecha = new Date(año, f.mes, f.dia);
+        return {
+          fecha: toDateInputValue(normalizeToUTCDate(fecha)),
+          nombre: f.nombre,
+          tipo: 'nacional',
+        };
+      }),
       ...festivosMoviles.map((f) => ({
-        fecha: f.fecha.toISOString().split('T')[0],
+        fecha: toDateInputValue(normalizeToUTCDate(f.fecha)),
         nombre: f.nombre,
         tipo: 'nacional',
       })),
