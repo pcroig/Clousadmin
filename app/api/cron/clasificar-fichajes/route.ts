@@ -25,7 +25,6 @@ import { EstadoFichaje } from '@/lib/constants/enums';
 import { initCronLogger } from '@/lib/cron/logger';
 import { crearNotificacionFichajeRequiereRevision } from '@/lib/notificaciones';
 import { prisma } from '@/lib/prisma';
-import { enqueueJob, chunk } from '@/lib/queue';
 import { normalizarFechaSinHora } from '@/lib/utils/fechas';
 
 export async function POST(request: NextRequest) {
