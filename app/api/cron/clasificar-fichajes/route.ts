@@ -25,6 +25,8 @@ import { EstadoFichaje } from '@/lib/constants/enums';
 import { initCronLogger } from '@/lib/cron/logger';
 import { crearNotificacionFichajeRequiereRevision } from '@/lib/notificaciones';
 import { prisma } from '@/lib/prisma';
+import { enqueueJob, chunk } from '@/lib/queue';
+import { normalizarFechaSinHora } from '@/lib/utils/fechas';
 
 export async function POST(request: NextRequest) {
   let cronLogger: ReturnType<typeof initCronLogger> | null = null;
@@ -38,9 +40,9 @@ export async function POST(request: NextRequest) {
     cronLogger = initCronLogger('Cerrar Jornadas');
 
     // Fecha de ayer (el día que queremos cerrar)
-    const ayer = new Date();
-    ayer.setDate(ayer.getDate() - 1);
-    ayer.setHours(0, 0, 0, 0);
+    // CRÍTICO: Usar normalizarFechaSinHora para consistencia con la BD
+    const hoy = normalizarFechaSinHora(new Date());
+    const ayer = normalizarFechaSinHora(new Date(hoy.getTime() - 24 * 60 * 60 * 1000));
 
     console.log(`[CRON Cerrar Jornadas] Procesando día: ${ayer.toISOString().split('T')[0]}`);
 
@@ -78,16 +80,14 @@ export async function POST(request: NextRequest) {
             // Si no existe fichaje, verificar si hay ausencia de día completo
             if (!fichaje) {
               // Verificar ausencia de día completo
+              // (ausencia sin periodo específico = día completo)
               const ausenciaDiaCompleto = await prisma.ausencias.findFirst({
                 where: {
                   empleadoId: empleado.id,
                   fechaInicio: { lte: ayer },
                   fechaFin: { gte: ayer },
-                  aprobado: true,
-                  OR: [
-                    { periodo: null },        // Ausencia sin período específico (día completo)
-                    { periodo: 'completo' }   // Ausencia día completo explícito
-                  ]
+                  estado: { in: ['confirmada', 'completada'] }, // Ausencias aprobadas
+                  periodo: null, // null = día completo
                 }
               });
 
@@ -96,12 +96,20 @@ export async function POST(request: NextRequest) {
                 continue; // NO crear fichaje para ausencias de día completo
               }
 
+              // CRÍTICO: No crear fichajes para empleados sin jornada asignada
+              if (!empleado.jornada?.id) {
+                console.warn(
+                  `[CRON Cerrar Jornadas] Empleado ${empleado.nombre} ${empleado.apellidos} no tiene jornada asignada. Omitiendo.`
+                );
+                continue;
+              }
+
               // Si no hay ausencia día completo, crear fichaje pendiente
               fichaje = await prisma.fichajes.create({
                 data: {
                   empresaId: empresa.id,
                   empleadoId: empleado.id,
-                  jornadaId: empleado.jornada?.id ?? null,
+                  jornadaId: empleado.jornada.id,
                   tipoFichaje: 'ordinario', // CRON solo crea fichajes ordinarios
                   fecha: ayer,
                   estado: EstadoFichaje.pendiente,
@@ -125,6 +133,14 @@ export async function POST(request: NextRequest) {
                 razon: 'No se registraron fichajes en el día',
               });
 
+              continue;
+            }
+
+            // BLOQUEO: Ignorar fichajes rechazados (congelados)
+            if (fichaje.estado === 'rechazado') {
+              console.log(
+                `[CRON Cerrar Jornadas] Fichaje ${fichaje.id} está rechazado (congelado), omitiendo`
+              );
               continue;
             }
 
@@ -187,6 +203,97 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // ========================================
+    // PASO 2: Encolar jobs para calcular eventos propuestos
+    // ========================================
+    console.log('[CRON Cerrar Jornadas] Iniciando encolado de jobs para eventos propuestos');
+
+    let jobsEncolados = 0;
+    let batchesEncolados = 0;
+
+    try {
+      // Buscar fichajes pendientes que necesitan eventos propuestos
+      const fichajesPendientesParaCalcular = await prisma.fichajes.findMany({
+        where: {
+          fecha: ayer,
+          estado: EstadoFichaje.pendiente,
+          tipoFichaje: 'ordinario', // Solo ordinarios
+          eventosPropuestosCalculados: false,
+          jornadaId: { not: null }, // Solo fichajes con jornada asignada
+        },
+        select: {
+          id: true,
+          empleadoId: true,
+        },
+      });
+
+      console.log(
+        `[CRON Cerrar Jornadas] ${fichajesPendientesParaCalcular.length} fichajes pendientes requieren cálculo de eventos propuestos`
+      );
+
+      if (fichajesPendientesParaCalcular.length > 0) {
+        // Filtrar fichajes que NO tienen ausencia de medio día
+        // (ausencias medio día se cuadran manualmente)
+        const fichajesParaCalcular: string[] = [];
+
+        for (const fichaje of fichajesPendientesParaCalcular) {
+          // Verificar ausencia de medio día
+          const ausenciaMedioDia = await prisma.ausencias.findFirst({
+            where: {
+              empleadoId: fichaje.empleadoId,
+              fechaInicio: { lte: ayer },
+              fechaFin: { gte: ayer },
+              estado: { in: ['confirmada', 'completada'] }, // Ausencias aprobadas
+              periodo: { in: ['manana', 'tarde'] },
+            },
+          });
+
+          if (!ausenciaMedioDia) {
+            // No tiene ausencia medio día → Calcular eventos propuestos
+            fichajesParaCalcular.push(fichaje.id);
+          } else {
+            console.log(
+              `[CRON Cerrar Jornadas] Fichaje ${fichaje.id} tiene ausencia medio día, se omite del cálculo automático`
+            );
+          }
+        }
+
+        console.log(
+          `[CRON Cerrar Jornadas] ${fichajesParaCalcular.length} fichajes serán procesados (${fichajesPendientesParaCalcular.length - fichajesParaCalcular.length} omitidos por ausencia medio día)`
+        );
+
+        // Dividir en batches de 50
+        const batches = chunk(fichajesParaCalcular, 50);
+
+        // Encolar cada batch
+        for (const batch of batches) {
+          try {
+            await enqueueJob('calcular-eventos-propuestos', {
+              fichajeIds: batch,
+            });
+            batchesEncolados++;
+            jobsEncolados += batch.length;
+          } catch (error) {
+            const mensaje = `Error encolando batch de ${batch.length} fichajes: ${
+              error instanceof Error ? error.message : 'Error desconocido'
+            }`;
+            errores.push(mensaje);
+            console.error(`[CRON Cerrar Jornadas] ${mensaje}`);
+          }
+        }
+
+        console.log(
+          `[CRON Cerrar Jornadas] ${batchesEncolados} batches encolados (${jobsEncolados} fichajes en total)`
+        );
+      }
+    } catch (error) {
+      const mensaje = `Error en encolado de jobs: ${
+        error instanceof Error ? error.message : 'Error desconocido'
+      }`;
+      errores.push(mensaje);
+      console.error(`[CRON Cerrar Jornadas] ${mensaje}`);
+    }
+
     const huboErrores = errores.length > 0;
     const resultado = {
       success: !huboErrores,
@@ -195,6 +302,8 @@ export async function POST(request: NextRequest) {
       fichajesCreados,
       fichajesPendientes,
       fichajesFinalizados,
+      jobsEncolados,
+      batchesEncolados,
       errores,
     };
 
@@ -211,6 +320,8 @@ export async function POST(request: NextRequest) {
         fichajesCreados: resultado.fichajesCreados,
         fichajesPendientes: resultado.fichajesPendientes,
         fichajesFinalizados: resultado.fichajesFinalizados,
+        jobsEncolados: resultado.jobsEncolados,
+        batchesEncolados: resultado.batchesEncolados,
         errores: resultado.errores.length,
       },
       errors: huboErrores ? errores : undefined,
