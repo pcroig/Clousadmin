@@ -13,7 +13,9 @@ import { MetricsCard } from '@/components/shared/metrics-card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { MOBILE_DESIGN } from '@/lib/constants/mobile-design';
 import { useApi } from '@/lib/hooks';
+import { cn } from '@/lib/utils';
 import { extractArrayFromResponse } from '@/lib/utils/api-response';
 import {
   agruparFichajesEnJornadas,
@@ -442,8 +444,8 @@ export function FichajesTab({
         </Card>
       </div>
 
-      {/* Tabla de fichajes - MOBILE: Colapsable */}
-      <div className="sm:hidden space-y-3">
+      {/* Tabla de fichajes - MOBILE: Card contenedora única */}
+      <div className="sm:hidden">
         {loading ? (
           <div className="py-8 text-center text-sm text-gray-500">Cargando...</div>
         ) : displayedJornadas.length === 0 ? (
@@ -452,98 +454,109 @@ export function FichajesTab({
             <p className="text-sm text-gray-500">No hay fichajes registrados</p>
           </div>
         ) : (
-          <div className="space-y-2">
-            {displayedJornadas.map((jornada) => {
+          <Card className={cn("overflow-hidden rounded-md", MOBILE_DESIGN.card.default)}>
+            {displayedJornadas.map((jornada, index) => {
               const rowId = `${jornada.fichaje.id}-${jornada.fecha.toISOString()}`;
               const isExpanded = expandedRows.has(rowId);
+              const isLast = index === displayedJornadas.length - 1;
 
               return (
-                <Card key={rowId} className="overflow-hidden border-gray-200 shadow-sm">
-                  <CardContent className="p-0">
-                    {/* Info básica - siempre visible */}
-                    <button
-                      onClick={() => {
-                        const newExpanded = new Set(expandedRows);
-                        if (isExpanded) {
-                          newExpanded.delete(rowId);
-                        } else {
-                          newExpanded.add(rowId);
-                        }
-                        setExpandedRows(newExpanded);
-                      }}
-                      className="w-full min-h-[50px] px-2.5 py-2 flex items-center justify-between gap-2 text-left transition-colors active:bg-gray-50"
-                    >
-                      {/* Izquierda: Fecha más compacta */}
-                      <div className="flex-1 min-w-0">
-                        <div className="text-xs font-semibold text-gray-900 capitalize">
-                          {format(jornada.fecha, "d MMM", { locale: es })}
+                <div key={rowId} className={cn("border-gray-200", !isLast && "border-b")}>
+                  {/* Fila colapsable */}
+                  <button
+                    onClick={() => {
+                      const newExpanded = new Set(expandedRows);
+                      if (isExpanded) {
+                        newExpanded.delete(rowId);
+                      } else {
+                        newExpanded.add(rowId);
+                      }
+                      setExpandedRows(newExpanded);
+                    }}
+                    className={cn(
+                      "w-full px-3 py-3 flex items-center justify-between gap-2 text-left transition-colors active:bg-gray-50",
+                      MOBILE_DESIGN.table.rowHeight
+                    )}
+                  >
+                    {/* Izquierda: Fecha */}
+                    <div className="flex-1 min-w-0">
+                      <div className={cn(MOBILE_DESIGN.text.bodyMedium, "font-semibold text-gray-900 capitalize")}>
+                        {format(jornada.fecha, "d MMM", { locale: es })}
+                      </div>
+                      <div className={cn(MOBILE_DESIGN.text.caption, "capitalize")}>
+                        {format(jornada.fecha, 'EEE', { locale: es })}
+                      </div>
+                    </div>
+
+                    {/* Derecha: Horas + Balance + Chevron */}
+                    <div className="flex items-center gap-2">
+                      <div className="text-right">
+                        <div className={cn(MOBILE_DESIGN.text.bodyMedium, "font-medium text-gray-700")}>
+                          {formatearHorasMinutos(jornada.horasTrabajadas)}
                         </div>
-                        <div className="text-[10px] text-gray-500 capitalize">
-                          {format(jornada.fecha, 'EEE', { locale: es })}
+                        <div className={cn(
+                          MOBILE_DESIGN.text.caption,
+                          "font-semibold",
+                          jornada.balance >= 0 ? 'text-green-600' : 'text-red-600'
+                        )}>
+                          {jornada.balance >= 0 ? '+' : ''}{formatearHorasMinutos(jornada.balance)}
                         </div>
                       </div>
 
-                      {/* Derecha: Horas + Balance + Chevron */}
-                      <div className="flex items-center gap-2">
-                        <div className="text-right">
-                          <div className="text-xs font-medium text-gray-700">
-                            {formatearHorasMinutos(jornada.horasTrabajadas)}
+                      {isExpanded ? (
+                        <ChevronUp className={cn(MOBILE_DESIGN.components.icon.medium, "text-gray-400 flex-shrink-0")} />
+                      ) : (
+                        <ChevronDown className={cn(MOBILE_DESIGN.components.icon.medium, "text-gray-400 flex-shrink-0")} />
+                      )}
+                    </div>
+                  </button>
+
+                  {/* Detalles expandidos */}
+                  {isExpanded && (
+                    <div className={cn("px-3 pb-3 pt-0 border-t bg-gray-50/50")}>
+                      <div className="grid grid-cols-2 gap-x-3 gap-y-2 mt-2">
+                        <div>
+                          <div className={cn(MOBILE_DESIGN.text.caption, "mb-0.5")}>Horas objetivo</div>
+                          <div className={cn(MOBILE_DESIGN.text.bodyMedium, "text-gray-900")}>
+                            {formatearHorasMinutos(jornada.horasObjetivo)}
                           </div>
-                          <div className={`text-[10px] font-semibold ${
+                        </div>
+                        <div>
+                          <div className={cn(MOBILE_DESIGN.text.caption, "mb-0.5")}>Balance</div>
+                          <div className={cn(
+                            MOBILE_DESIGN.text.bodyMedium,
+                            "font-semibold",
                             jornada.balance >= 0 ? 'text-green-600' : 'text-red-600'
-                          }`}>
+                          )}>
                             {jornada.balance >= 0 ? '+' : ''}{formatearHorasMinutos(jornada.balance)}
                           </div>
                         </div>
-                        
-                        {isExpanded ? (
-                          <ChevronUp className="h-4 w-4 text-gray-400 flex-shrink-0" />
-                        ) : (
-                          <ChevronDown className="h-4 w-4 text-gray-400 flex-shrink-0" />
-                        )}
-                      </div>
-                    </button>
-
-                    {/* Detalles expandidos */}
-                    {isExpanded && (
-                      <div className="px-2.5 pb-2 pt-0 border-t bg-gray-50/50">
-                        <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 mt-2">
-                          <div>
-                            <div className="text-[10px] text-gray-500 mb-0.5">Horas objetivo</div>
-                            <div className="text-xs text-gray-900">
-                              {formatearHorasMinutos(jornada.horasObjetivo)}
-                            </div>
+                        <div className="col-span-2">
+                          <div className={cn(MOBILE_DESIGN.text.caption, "mb-0.5")}>Horario</div>
+                          <div className={cn(MOBILE_DESIGN.text.bodyMedium, "text-gray-900")}>
+                            {jornada.entrada && jornada.salida
+                              ? `${format(jornada.entrada, 'HH:mm')} - ${format(jornada.salida, 'HH:mm')}`
+                              : jornada.entrada
+                              ? `${format(jornada.entrada, 'HH:mm')} - ...`
+                              : 'Sin datos'}
                           </div>
-                          <div>
-                            <div className="text-[10px] text-gray-500 mb-0.5">Balance</div>
-                            <div className={`text-xs font-semibold ${
-                              jornada.balance >= 0 ? 'text-green-600' : 'text-red-600'
-                            }`}>
-                              {jornada.balance >= 0 ? '+' : ''}{formatearHorasMinutos(jornada.balance)}
-                            </div>
-                          </div>
-                          <div className="col-span-2">
-                            <div className="text-[10px] text-gray-500 mb-0.5">Horario</div>
-                            <div className="text-xs text-gray-900">
-                              {jornada.entrada && jornada.salida
-                                ? `${format(jornada.entrada, 'HH:mm')} - ${format(jornada.salida, 'HH:mm')}`
-                                : jornada.entrada
-                                ? `${format(jornada.entrada, 'HH:mm')} - ...`
-                                : 'Sin datos'}
-                            </div>
-                          </div>
-                          <div className="col-span-2">
-                            <div className="text-[10px] text-gray-500 mb-0.5">Estado</div>
-                            <div className="text-xs text-gray-900">{getEstadoBadge(jornada.estado)}</div>
+                        </div>
+                        <div className="col-span-2">
+                          <div className={cn(MOBILE_DESIGN.text.caption, "mb-0.5")}>Estado</div>
+                          <div className="flex items-center gap-1.5">
+                            {getEstadoBadge(jornada.estado)}
+                            {jornada.fichaje.tipoFichaje === 'extraordinario' && (
+                              <Zap className={cn(MOBILE_DESIGN.components.icon.small, "text-amber-600 fill-amber-100")} />
+                            )}
                           </div>
                         </div>
                       </div>
-                    )}
-                  </CardContent>
-                </Card>
+                    </div>
+                  )}
+                </div>
               );
             })}
-          </div>
+          </Card>
         )}
       </div>
 

@@ -22,10 +22,12 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { calcularHorasObjetivoDesdeJornada, calcularProgresoEventos } from '@/lib/calculos/fichajes-cliente';
+import { MOBILE_DESIGN } from '@/lib/constants/mobile-design';
 import { extractArrayFromResponse } from '@/lib/utils/api-response';
 import { toMadridDate } from '@/lib/utils/fechas';
 import { formatearHorasMinutos, formatTiempoTrabajado } from '@/lib/utils/formatters';
 import { parseJson } from '@/lib/utils/json';
+import { cn } from '@/lib/utils';
 
 import { FichajeModal } from './fichajes/fichaje-modal';
 import { WidgetCard } from './widget-card';
@@ -575,23 +577,26 @@ export function FichajeWidget({
 
   return (
     <div className="h-full">
-      {/* Mobile: Card de fichaje mejorada */}
+      {/* Mobile: Card de fichaje mejorada con MOBILE_DESIGN constants */}
       <div className="sm:hidden">
-        <div className="bg-white rounded-lg p-3 shadow-sm border border-gray-100">
+        <div className={cn(
+          "bg-white rounded-md shadow-sm border border-gray-100",
+          MOBILE_DESIGN.spacing.cardLarge
+        )}>
           {/* Estado + Cronómetro en misma altura */}
           <div className="flex items-center justify-between mb-3">
             {/* Izquierda: Icono + Estado + Tiempo restante (vertical) */}
             <div className="flex items-center gap-2">
-              <Clock className="h-4 w-4 text-[#d97757] flex-shrink-0" />
+              <Clock className={cn(MOBILE_DESIGN.components.icon.medium, "text-[#d97757] flex-shrink-0")} />
               <div className="flex flex-col">
                 <div className="flex items-center gap-1.5">
-                  <span className="text-xs font-semibold text-gray-900">{getTituloEstado()}</span>
+                  <span className={cn(MOBILE_DESIGN.text.widgetTitle, "text-gray-900")}>{getTituloEstado()}</span>
                   {state.status === 'trabajando' && (
                     <div className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />
                   )}
                 </div>
                 {state.status === 'trabajando' && (
-                  <span className="text-[10px] text-gray-500">
+                  <span className={MOBILE_DESIGN.text.caption}>
                     {state.tipoFichaje === 'extraordinario'
                       ? '⚡ Jornada extraordinaria'
                       : `${formatearHorasMinutos(horasPorHacer)} restantes`
@@ -601,25 +606,25 @@ export function FichajeWidget({
               </div>
             </div>
 
-            {/* Derecha: Cronómetro (menos grande, menos bold) */}
-            <div className="text-xl font-medium text-gray-900">{tiempoTrabajado}</div>
+            {/* Derecha: Cronómetro */}
+            <div className={cn(MOBILE_DESIGN.text.displayLarge, "text-gray-900")}>{tiempoTrabajado}</div>
           </div>
 
-          {/* Botones de acción más compactos */}
+          {/* Botones de acción con MOBILE_DESIGN constants */}
           <div className="grid grid-cols-2 gap-2">
             {state.status === 'trabajando' ? (
               <>
                 <Button
                   variant="outline"
-                  className="h-11 text-xs font-medium border-2"
+                  className={cn(MOBILE_DESIGN.button.primary, "border-2")}
                   onClick={() => handleFichar('pausa_inicio')}
                   disabled={state.loading}
                 >
-                  Tienda
+                  Pausar
                 </Button>
                 <Button
                   variant="default"
-                  className="h-11 text-xs font-medium bg-gray-900 hover:bg-gray-800"
+                  className={cn(MOBILE_DESIGN.button.primary, "bg-gray-900 hover:bg-gray-800")}
                   onClick={() => handleFichar('salida')}
                   disabled={state.loading}
                 >
@@ -630,7 +635,7 @@ export function FichajeWidget({
               <>
                 <Button
                   variant="default"
-                  className="h-11 text-xs font-medium"
+                  className={MOBILE_DESIGN.button.primary}
                   onClick={() => handleFichar('pausa_fin')}
                   disabled={state.loading}
                 >
@@ -638,7 +643,7 @@ export function FichajeWidget({
                 </Button>
                 <Button
                   variant="outline"
-                  className="h-11 text-xs font-medium border-2"
+                  className={cn(MOBILE_DESIGN.button.primary, "border-2")}
                   onClick={() => handleFichar('salida')}
                   disabled={state.loading}
                 >
@@ -648,7 +653,7 @@ export function FichajeWidget({
             ) : (
               <Button
                 variant="default"
-                className="col-span-2 h-11 text-xs font-medium"
+                className={cn(MOBILE_DESIGN.button.primary, "col-span-2")}
                 onClick={() => handleFichar()}
                 disabled={state.loading}
               >

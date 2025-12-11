@@ -375,7 +375,7 @@ export default async function ManagerBandejaEntradaPage(props: {
       : undefined;
 
   return (
-    <div className="p-8">
+    <div className="p-3 sm:p-8">
       <BandejaEntradaTabs
         header={{
           title: 'Bandeja de entrada',

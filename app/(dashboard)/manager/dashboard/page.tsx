@@ -6,7 +6,6 @@ import { redirect } from 'next/navigation';
 
 import { PlantillaWidget } from '@/components/dashboard/plantilla-widget';
 import { AutoCompletadoWidget } from '@/components/shared/auto-completado-widget';
-import { FichajeBarMobile } from '@/components/shared/fichaje-bar-mobile';
 import { FichajeWidget } from '@/components/shared/fichaje-widget';
 import { NotificacionesWidget } from '@/components/shared/notificaciones-widget';
 import { SolicitudesWidget } from '@/components/shared/solicitudes-widget';
@@ -240,12 +239,24 @@ export default async function ManagerDashboardPage() {
       {/* Mobile Layout */}
       <div className="sm:hidden h-full w-full flex flex-col overflow-hidden">
         {/* Sin header "Buenos días" en mobile */}
-        
-        {/* Barra de fichaje compacta - sticky top */}
+
+        {/* Widget de fichaje unificado */}
         <div className="flex-shrink-0 mb-3">
-          <FichajeBarMobile />
+          <FichajeWidget />
         </div>
 
+        {/* Widget de plantilla compacto */}
+        <div className="flex-1 min-h-0 pb-4 overflow-auto">
+          <PlantillaWidget
+            trabajando={plantillaResumenEquipo.trabajando}
+            enPausa={plantillaResumenEquipo.enPausa}
+            ausentes={plantillaResumenEquipo.ausentes}
+            sinFichar={plantillaResumenEquipo.sinFichar}
+            fueraDeHorario={plantillaResumenEquipo.fueraDeHorario}
+            rol="manager"
+            variant="compact"
+          />
+        </div>
       </div>
 
       {/* Desktop Layout */}
